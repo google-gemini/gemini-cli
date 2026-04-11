@@ -8,8 +8,8 @@ import type React from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { ApprovalMode } from '@google/gemini-cli-core';
-import { formatCommand } from '../utils/keybindingUtils.js';
-import { Command } from '../../config/keyBindings.js';
+import { formatCommand } from '../key/keybindingUtils.js';
+import { Command } from '../key/keyBindings.js';
 
 interface ApprovalModeIndicatorProps {
   approvalMode: ApprovalMode;

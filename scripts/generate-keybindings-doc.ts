@@ -8,12 +8,12 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { readFile, writeFile } from 'node:fs/promises';
 
-import type { KeyBinding } from '../packages/cli/src/config/keyBindings.js';
+import type { KeyBinding } from '../packages/cli/src/ui/key/keyBindings.js';
 import {
   commandCategories,
   commandDescriptions,
-  defaultKeyBindings,
-} from '../packages/cli/src/config/keyBindings.js';
+  defaultKeyBindingConfig,
+} from '../packages/cli/src/ui/key/keyBindings.js';
 import {
   formatWithPrettier,
   injectBetweenMarkers,
@@ -24,9 +24,10 @@ const START_MARKER = '<!-- KEYBINDINGS-AUTOGEN:START -->';
 const END_MARKER = '<!-- KEYBINDINGS-AUTOGEN:END -->';
 const OUTPUT_RELATIVE_PATH = ['docs', 'reference', 'keyboard-shortcuts.md'];
 
-import { formatKeyBinding } from '../packages/cli/src/ui/utils/keybindingUtils.js';
+import { formatKeyBinding } from '../packages/cli/src/ui/key/keybindingUtils.js';
 
 export interface KeybindingDocCommand {
+  command: string;
   description: string;
   bindings: readonly KeyBinding[];
 }
@@ -81,8 +82,9 @@ export function buildDefaultDocSections(): readonly KeybindingDocSection[] {
   return commandCategories.map((category) => ({
     title: category.title,
     commands: category.commands.map((command) => ({
+      command: command,
       description: commandDescriptions[command],
-      bindings: defaultKeyBindings[command],
+      bindings: defaultKeyBindingConfig.get(command) ?? [],
     })),
   }));
 }
@@ -94,14 +96,14 @@ export function renderDocumentation(
     const rows = section.commands.map((command) => {
       const formattedBindings = formatBindings(command.bindings);
       const keysCell = formattedBindings.join('<br />');
-      return `| ${command.description} | ${keysCell} |`;
+      return `| \`${command.command}\` | ${command.description} | ${keysCell} |`;
     });
 
     return [
       `#### ${section.title}`,
       '',
-      '| Action | Keys |',
-      '| --- | --- |',
+      '| Command | Action | Keys |',
+      '| --- | --- | --- |',
       ...rows,
     ].join('\n');
   });

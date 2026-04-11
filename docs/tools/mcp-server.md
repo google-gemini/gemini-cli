@@ -1,7 +1,7 @@
-# MCP servers with the Gemini CLI
+# MCP servers with Gemini CLI
 
 This document provides a guide to configuring and using Model Context Protocol
-(MCP) servers with the Gemini CLI.
+(MCP) servers with Gemini CLI.
 
 ## What is an MCP server?
 
@@ -10,7 +10,7 @@ CLI through the Model Context Protocol, allowing it to interact with external
 systems and data sources. MCP servers act as a bridge between the Gemini model
 and your local environment or other services like APIs.
 
-An MCP server enables the Gemini CLI to:
+An MCP server enables Gemini CLI to:
 
 - **Discover tools:** List available tools, their descriptions, and parameters
   through standardized schema definitions.
@@ -19,13 +19,13 @@ An MCP server enables the Gemini CLI to:
 - **Access resources:** Read data from specific resources that the server
   exposes (files, API payloads, reports, etc.).
 
-With an MCP server, you can extend the Gemini CLI's capabilities to perform
-actions beyond its built-in features, such as interacting with databases, APIs,
-custom scripts, or specialized workflows.
+With an MCP server, you can extend Gemini CLI's capabilities to perform actions
+beyond its built-in features, such as interacting with databases, APIs, custom
+scripts, or specialized workflows.
 
 ## Core integration architecture
 
-The Gemini CLI integrates with MCP servers through a sophisticated discovery and
+Gemini CLI integrates with MCP servers through a sophisticated discovery and
 execution system built into the core package (`packages/core/src/tools/`):
 
 ### Discovery Layer (`mcp-client.ts`)
@@ -54,7 +54,7 @@ Each discovered MCP tool is wrapped in a `DiscoveredMCPTool` instance that:
 
 ### Transport mechanisms
 
-The Gemini CLI supports three MCP transport types:
+Gemini CLI supports three MCP transport types:
 
 - **Stdio Transport:** Spawns a subprocess and communicates via stdin/stdout
 - **SSE Transport:** Connects to Server-Sent Events endpoints
@@ -88,9 +88,9 @@ in the conversation.
 
 ## How to set up your MCP server
 
-The Gemini CLI uses the `mcpServers` configuration in your `settings.json` file
-to locate and connect to MCP servers. This configuration supports multiple
-servers with different transport mechanisms.
+Gemini CLI uses the `mcpServers` configuration in your `settings.json` file to
+locate and connect to MCP servers. This configuration supports multiple servers
+with different transport mechanisms.
 
 ### Configure the MCP server in settings.json
 
@@ -155,7 +155,8 @@ Each server configuration supports the following properties:
 #### Required (one of the following)
 
 - **`command`** (string): Path to the executable for Stdio transport
-- **`url`** (string): SSE endpoint URL (e.g., `"http://localhost:8080/sse"`)
+- **`url`** (string): SSE endpoint URL (for example,
+  `"http://localhost:8080/sse"`)
 - **`httpUrl`** (string): HTTP streaming endpoint URL
 
 #### Optional
@@ -176,8 +177,8 @@ Each server configuration supports the following properties:
   enabled by default.
 - **`excludeTools`** (string[]): List of tool names to exclude from this MCP
   server. Tools listed here will not be available to the model, even if they are
-  exposed by the server. **Note:** `excludeTools` takes precedence over
-  `includeTools` - if a tool is in both lists, it will be excluded.
+  exposed by the server. `excludeTools` takes precedence over `includeTools`. If
+  a tool is in both lists, it will be excluded.
 - **`targetAudience`** (string): The OAuth Client ID allowlisted on the
   IAP-protected application you are trying to access. Used with
   `authProviderType: 'service_account_impersonation'`.
@@ -188,7 +189,7 @@ Each server configuration supports the following properties:
 ### Environment variable expansion
 
 Gemini CLI automatically expands environment variables in the `env` block of
-your MCP server configuration. This allows you to securely reference variables
+your MCP server configuration. This lets you securely reference variables
 defined in your shell or environment without hardcoding sensitive information
 directly in your `settings.json` file.
 
@@ -238,14 +239,17 @@ This follows the security principle that if a variable is explicitly configured
 by the user for a specific server, it constitutes informed consent to share that
 specific data with that server.
 
-> **Note:** Even when explicitly defined, you should avoid hardcoding secrets.
-> Instead, use environment variable expansion (e.g., `"MY_KEY": "$MY_KEY"`) to
-> securely pull the value from your host environment at runtime.
+<!-- prettier-ignore -->
+> [!NOTE]
+> Even when explicitly defined, you should avoid hardcoding secrets.
+> Instead, use environment variable expansion
+> (for example, `"MY_KEY": "$MY_KEY"`) to securely pull the value from your host
+> environment at runtime.
 
 ### OAuth support for remote MCP servers
 
-The Gemini CLI supports OAuth 2.0 authentication for remote MCP servers using
-SSE or HTTP transports. This enables secure access to MCP servers that require
+Gemini CLI supports OAuth 2.0 authentication for remote MCP servers using SSE or
+HTTP transports. This enables secure access to MCP servers that require
 authentication.
 
 #### Automatic OAuth discovery
@@ -283,10 +287,12 @@ When connecting to an OAuth-enabled server:
 
 #### Browser redirect requirements
 
-**Important:** OAuth authentication requires that your local machine can:
-
-- Open a web browser for authentication
-- Receive redirects on `http://localhost:7777/oauth/callback`
+<!-- prettier-ignore -->
+> [!IMPORTANT]
+> OAuth authentication requires that your local machine can:
+>
+> - Open a web browser for authentication
+> - Receive redirects on `http://localhost:<random-port>/oauth/callback` (or a specific port if configured via `redirectUri`)
 
 This feature will not work in:
 
@@ -319,8 +325,8 @@ Use the `/mcp auth` command to manage OAuth authentication:
   if omitted)
 - **`tokenUrl`** (string): OAuth token endpoint (auto-discovered if omitted)
 - **`scopes`** (string[]): Required OAuth scopes
-- **`redirectUri`** (string): Custom redirect URI (defaults to
-  `http://localhost:7777/oauth/callback`)
+- **`redirectUri`** (string): Custom redirect URI (defaults to an OS-assigned
+  random port, e.g., `http://localhost:<random-port>/oauth/callback`)
 - **`tokenParamName`** (string): Query parameter name for tokens in SSE URLs
 - **`audiences`** (string[]): Audiences the token is valid for
 
@@ -372,7 +378,7 @@ To authenticate with a server using Service Account Impersonation, you must set
 the `authProviderType` to `service_account_impersonation` and provide the
 following properties:
 
-- **`targetAudience`** (string): The OAuth Client ID allowslisted on the
+- **`targetAudience`** (string): The OAuth Client ID allowlisted on the
   IAP-protected application you are trying to access.
 - **`targetServiceAccount`** (string): The email address of the Google Cloud
   Service Account to impersonate.
@@ -399,7 +405,7 @@ then be used to authenticate with the MCP server.
 5. **Grant all users and groups** who will access the MCP Server the necessary
    permissions to
    [impersonate the service account](https://cloud.google.com/docs/authentication/use-service-account-impersonation)
-   (i.e., `roles/iam.serviceAccountTokenCreator`).
+   (for example, `roles/iam.serviceAccountTokenCreator`).
 6. **[Enable](https://console.cloud.google.com/apis/library/iamcredentials.googleapis.com)
    the IAM Credentials API** for your project.
 
@@ -528,8 +534,8 @@ then be used to authenticate with the MCP server.
 
 ## Discovery process deep dive
 
-When the Gemini CLI starts, it performs MCP server discovery through the
-following detailed process:
+When Gemini CLI starts, it performs MCP server discovery through the following
+detailed process:
 
 ### 1. Server iteration and connection
 
@@ -555,21 +561,36 @@ Upon successful connection:
    `excludeTools` configuration
 4. **Name sanitization:** Tool names are cleaned to meet Gemini API
    requirements:
-   - Invalid characters (non-alphanumeric, underscore, dot, hyphen) are replaced
-     with underscores
+   - Characters other than letters, numbers, underscore (`_`), hyphen (`-`), dot
+     (`.`), and colon (`:`) are replaced with underscores
    - Names longer than 63 characters are truncated with middle replacement
-     (`___`)
+     (`...`)
 
-### 3. Conflict resolution
+### 3. Tool naming and namespaces
 
-When multiple servers expose tools with the same name:
+To prevent collisions across multiple servers or conflicting built-in tools,
+every discovered MCP tool is assigned a strict namespace.
 
-1. **First registration wins:** The first server to register a tool name gets
-   the unprefixed name
-2. **Automatic prefixing:** Subsequent servers get prefixed names:
-   `serverName__toolName`
-3. **Registry tracking:** The tool registry maintains mappings between server
-   names and their tools
+1. **Automatic FQN:** All MCP tools are unconditionally assigned a fully
+   qualified name (FQN) using the format `mcp_{serverName}_{toolName}`.
+2. **Registry tracking:** The tool registry maintains metadata mappings between
+   these FQNs and their original server identities.
+3. **Overwrites:** If two servers share the exact same alias in your
+   configuration and provide tools with the exact same name, the last registered
+   tool overwrites the previous one.
+4. **Policies:** To configure permissions (like auto-approval or denial) for MCP
+   tools, see
+   [Special syntax for MCP tools](../reference/policy-engine.md#special-syntax-for-mcp-tools)
+   in the Policy Engine documentation.
+
+<!-- prettier-ignore -->
+> [!WARNING]
+> Do not use underscores (`_`) in your MCP server names (for example, use
+> `my-server` rather than `my_server`). The policy parser splits Fully Qualified
+> Names (`mcp_server_tool`) on the _first_ underscore following the `mcp_`
+> prefix. If your server name contains an underscore, the parser will
+> misinterpret the server identity, which can cause wildcard rules and security
+> policies to fail silently.
 
 ### 4. Schema processing
 
@@ -695,7 +716,7 @@ MCP Servers Status:
 
 🐳 dockerizedServer (CONNECTED)
   Command: docker run -i --rm -e API_KEY my-mcp-server:latest
-  Tools: docker__deploy, docker__status
+  Tools: mcp_dockerizedServer_docker_deploy, mcp_dockerizedServer_docker_status
 
 Discovery State: COMPLETED
 ```
@@ -715,6 +736,43 @@ tools. The model will automatically:
 ### Connection states
 
 The MCP integration tracks several states:
+
+#### Overriding extension configurations
+
+If an MCP server is provided by an extension (for example, the
+`google-workspace` extension), you can still override its settings in your local
+`settings.json`. Gemini CLI merges your local configuration with the extension's
+defaults:
+
+- **Tool lists:** Tool lists are merged securely to ensure the most restrictive
+  policy wins:
+  - **Exclusions (`excludeTools`):** Arrays are combined (unioned). If either
+    source blocks a tool, it remains disabled.
+  - **Inclusions (`includeTools`):** Arrays are intersected. If both sources
+    provide an allowlist, only tools present in **both** lists are enabled. If
+    only one source provides an allowlist, that list is respected.
+  - **Precedence:** `excludeTools` always takes precedence over `includeTools`.
+
+  This ensures you always have veto power over tools provided by an extension
+  and that an extension cannot re-enable tools you have omitted from your
+  personal allowlist.
+
+- **Environment variables:** The `env` objects are merged. If the same variable
+  is defined in both places, your local value takes precedence.
+- **Scalar properties:** Properties like `command`, `url`, and `timeout` are
+  replaced by your local values if provided.
+
+**Example override:**
+
+```json
+{
+  "mcpServers": {
+    "google-workspace": {
+      "excludeTools": ["gmail.send"]
+    }
+  }
+}
+```
 
 #### Server status (`MCPServerStatus`)
 
@@ -832,7 +890,7 @@ use.
 
 MCP tools are not limited to returning simple text. You can return rich,
 multi-part content, including text, images, audio, and other binary data in a
-single tool response. This allows you to build powerful tools that can provide
+single tool response. This lets you build powerful tools that can provide
 diverse information to the model in a single turn.
 
 All data returned from the tool is processed and sent to the model as context
@@ -845,8 +903,8 @@ To return rich content, your tool's response must adhere to the MCP
 specification for a
 [`CallToolResult`](https://modelcontextprotocol.io/specification/2025-06-18/server/tools#tool-result).
 The `content` field of the result should be an array of `ContentBlock` objects.
-The Gemini CLI will correctly process this array, separating text from binary
-data and packaging it for the model.
+Gemini CLI will correctly process this array, separating text from binary data
+and packaging it for the model.
 
 You can mix and match different content block types in the `content` array. The
 supported block types include:
@@ -882,7 +940,7 @@ text description and an image:
 }
 ```
 
-When the Gemini CLI receives this response, it will:
+When Gemini CLI receives this response, it will:
 
 1.  Extract all the text and combine it into a single `functionResponse` part
     for the model.
@@ -896,8 +954,8 @@ context to the Gemini model.
 ## MCP prompts as slash commands
 
 In addition to tools, MCP servers can expose predefined prompts that can be
-executed as slash commands within the Gemini CLI. This allows you to create
-shortcuts for common or complex queries that can be easily invoked by name.
+executed as slash commands within Gemini CLI. This lets you create shortcuts for
+common or complex queries that can be easily invoked by name.
 
 ### Defining prompts on the server
 
@@ -965,8 +1023,8 @@ or, using positional arguments:
 /poem-writer "Gemini CLI" reverent
 ```
 
-When you run this command, the Gemini CLI executes the `prompts/get` method on
-the MCP server with the provided arguments. The server is responsible for
+When you run this command, Gemini CLI executes the `prompts/get` method on the
+MCP server with the provided arguments. The server is responsible for
 substituting the arguments into the prompt template and returning the final
 prompt text. The CLI then sends this prompt to the model for execution. This
 provides a convenient way to automate and share common workflows.
@@ -974,10 +1032,10 @@ provides a convenient way to automate and share common workflows.
 ## Managing MCP servers with `gemini mcp`
 
 While you can always configure MCP servers by manually editing your
-`settings.json` file, the Gemini CLI provides a convenient set of commands to
-manage your server configurations programmatically. These commands streamline
-the process of adding, listing, and removing MCP servers without needing to
-directly edit JSON files.
+`settings.json` file, Gemini CLI provides a convenient set of commands to manage
+your server configurations programmatically. These commands streamline the
+process of adding, listing, and removing MCP servers without needing to directly
+edit JSON files.
 
 ### Adding a server (`gemini mcp add`)
 
@@ -1000,9 +1058,9 @@ gemini mcp add [options] <name> <commandOrUrl> [args...]
 
 - `-s, --scope`: Configuration scope (user or project). [default: "project"]
 - `-t, --transport`: Transport type (stdio, sse, http). [default: "stdio"]
-- `-e, --env`: Set environment variables (e.g. -e KEY=value).
-- `-H, --header`: Set HTTP headers for SSE and HTTP transports (e.g. -H
-  "X-Api-Key: abc123" -H "Authorization: Bearer abc123").
+- `-e, --env`: Set environment variables (for example, `-e KEY=value`).
+- `-H, --header`: Set HTTP headers for SSE and HTTP transports (for example,
+  `-H "X-Api-Key: abc123" -H "Authorization: Bearer abc123"`).
 - `--timeout`: Set connection timeout in milliseconds.
 - `--trust`: Trust the server (bypass all tool call confirmation prompts).
 - `--description`: Set the description for the server.
@@ -1066,7 +1124,9 @@ command has no flags.
 gemini mcp list
 ```
 
-> **Note on Trust:** For security, `stdio` MCP servers (those using the
+<!-- prettier-ignore -->
+> [!NOTE]
+> For security, `stdio` MCP servers (those using the
 > `command` property) are only tested and displayed as "Connected" if the
 > current folder is trusted. If the folder is untrusted, they will show as
 > "Disconnected". Use `gemini trust` to trust the current folder.

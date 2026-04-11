@@ -229,14 +229,14 @@ describe('billing', () => {
       expect(isOverageEligibleModel('gemini-3.1-pro-preview')).toBe(true);
     });
 
-    it('should return true for gemini-3.1-pro-preview-customtools', () => {
+    it('should return false for gemini-3.1-pro-preview-customtools', () => {
       expect(isOverageEligibleModel('gemini-3.1-pro-preview-customtools')).toBe(
         false,
       );
     });
 
-    it('should return false for gemini-3-flash-preview', () => {
-      expect(isOverageEligibleModel('gemini-3-flash-preview')).toBe(false);
+    it('should return true for gemini-3-flash-preview', () => {
+      expect(isOverageEligibleModel('gemini-3-flash-preview')).toBe(true);
     });
 
     it('should return false for gemini-2.5-pro', () => {

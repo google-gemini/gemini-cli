@@ -1,0 +1,1816 @@
+{
+  "name": "google-workspace",
+  "tools": [
+    {
+      "name": "auth.clear",
+      "description": "Clears the authentication credentials, forcing a re-login on the next request.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Stub response for auth.clear"
+          }
+        ]
+      }
+    },
+    {
+      "name": "auth.refreshToken",
+      "description": "Manually triggers the token refresh process.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Stub response for auth.refreshToken"
+          }
+        ]
+      }
+    },
+    {
+      "name": "docs.getSuggestions",
+      "description": "Retrieves suggested edits from a Google Doc.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "documentId": {
+            "type": "string",
+            "description": "The ID of the document to retrieve suggestions from."
+          }
+        },
+        "required": ["documentId"],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Stub response for docs.getSuggestions"
+          }
+        ]
+      }
+    },
+    {
+      "name": "drive.getComments",
+      "description": "Retrieves comments from a Google Drive file (Docs, Sheets, Slides, etc.).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "fileId": {
+            "type": "string",
+            "description": "The ID of the file to retrieve comments from."
+          }
+        },
+        "required": ["fileId"],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Stub response for drive.getComments"
+          }
+        ]
+      }
+    },
+    {
+      "name": "docs.create",
+      "description": "Creates a new Google Doc. Can be blank or with initial text content.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "The title for the new Google Doc."
+          },
+          "content": {
+            "description": "The text content to create the document with.",
+            "type": "string"
+          }
+        },
+        "required": ["title"],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Stub response for docs.create"
+          }
+        ]
+      }
+    },
+    {
+      "name": "docs.writeText",
+      "description": "Writes text to a Google Doc at a specified position.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "documentId": {
+            "type": "string",
+            "description": "The ID of the document to modify."
+          },
+          "text": {
+            "type": "string",
+            "description": "The text to write to the document."
+          },
+          "position": {
+            "description": "Where to insert the text. Use \"beginning\" for the start, \"end\" for the end (default), or a numeric index for a specific position.",
+            "type": "string"
+          },
+          "tabId": {
+            "description": "The ID of the tab to modify. If not provided, modifies the first tab.",
+            "type": "string"
+          }
+        },
+        "required": ["documentId", "text"],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Stub response for docs.writeText"
+          }
+        ]
+      }
+    },
+    {
+      "name": "drive.findFolder",
+      "description": "Finds a folder by name in Google Drive.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "folderName": {
+            "type": "string",
+            "description": "The name of the folder to find."
+          }
+        },
+        "required": ["folderName"],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Stub response for drive.findFolder"
+          }
+        ]
+      }
+    },
+    {
+      "name": "drive.createFolder",
+      "description": "Creates a new folder in Google Drive.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The name of the new folder."
+          },
+          "parentId": {
+            "description": "The ID of the parent folder. If not provided, creates in the root directory.",
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": ["name"],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Stub response for drive.createFolder"
+          }
+        ]
+      }
+    },
+    {
+      "name": "docs.getText",
+      "description": "Retrieves the text content of a Google Doc.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "documentId": {
+            "type": "string",
+            "description": "The ID of the document to read."
+          },
+          "tabId": {
+            "description": "The ID of the tab to read. If not provided, returns all tabs.",
+            "type": "string"
+          }
+        },
+        "required": ["documentId"],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Stub response for docs.getText"
+          }
+        ]
+      }
+    },
+    {
+      "name": "docs.replaceText",
+      "description": "Replaces all occurrences of a given text with new text in a Google Doc.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "documentId": {
+            "type": "string",
+            "description": "The ID of the document to modify."
+          },
+          "findText": {
+            "type": "string",
+            "description": "The text to find in the document."
+          },
+          "replaceText": {
+            "type": "string",
+            "description": "The text to replace the found text with."
+          },
+          "tabId": {
+            "description": "The ID of the tab to modify. If not provided, replaces in all tabs (legacy behavior).",
+            "type": "string"
+          }
+        },
+        "required": ["documentId", "findText", "replaceText"],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Stub response for docs.replaceText"
+          }
+        ]
+      }
+    },
+    {
+      "name": "docs.formatText",
+      "description": "Applies formatting (bold, italic, headings, etc.) to text ranges in a Google Doc. Use after inserting text to apply rich formatting.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "documentId": {
+            "type": "string",
+            "description": "The ID of the document to format."
+          },
+          "formats": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "startIndex": {
+                  "type": "number",
+                  "description": "The start index of the text range (1-based)."
+                },
+                "endIndex": {
+                  "type": "number",
+                  "description": "The end index of the text range (exclusive, 1-based)."
+                },
+                "style": {
+                  "type": "string",
+                  "description": "The formatting style to apply. Supported: bold, italic, underline, strikethrough, code, link, heading1, heading2, heading3, heading4, heading5, heading6, normalText."
+                },
+                "url": {
+                  "description": "The URL for link formatting. Required when style is \"link\".",
+                  "type": "string"
+                }
+              },
+              "required": ["startIndex", "endIndex", "style"]
+            },
+            "description": "The formatting instructions to apply."
+          },
+          "tabId": {
+            "description": "The ID of the tab to format. If not provided, formats the first tab.",
+            "type": "string"
+          }
+        },
+        "required": ["documentId", "formats"],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Stub response for docs.formatText"
+          }
+        ]
+      }
+    },
+    {
+      "name": "slides.getText",
+      "description": "Retrieves the text content of a Google Slides presentation.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "presentationId": {
+            "type": "string",
+            "description": "The ID or URL of the presentation to read."
+          }
+        },
+        "required": ["presentationId"],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Stub response for slides.getText"
+          }
+        ]
+      }
+    },
+    {
+      "name": "slides.getMetadata",
+      "description": "Gets metadata about a Google Slides presentation.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "presentationId": {
+            "type": "string",
+            "description": "The ID or URL of the presentation."
+          }
+        },
+        "required": ["presentationId"],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Stub response for slides.getMetadata"
+          }
+        ]
+      }
+    },
+    {
+      "name": "slides.getImages",
+      "description": "Downloads all images embedded in a Google Slides presentation to a local directory.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "presentationId": {
+            "type": "string",
+            "description": "The ID or URL of the presentation to extract images from."
+          },
+          "localPath": {
+            "type": "string",
+            "description": "The absolute local directory path to download the images to (e.g., \"/Users/name/downloads/images\")."
+          }
+        },
+        "required": ["presentationId", "localPath"],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Stub response for slides.getImages"
+          }
+        ]
+      }
+    },
+    {
+      "name": "slides.getSlideThumbnail",
+      "description": "Downloads a thumbnail image for a specific slide in a Google Slides presentation to a local path.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "presentationId": {
+            "type": "string",
+            "description": "The ID or URL of the presentation."
+          },
+          "slideObjectId": {
+            "type": "string",
+            "description": "The object ID of the slide (can be found via slides.getMetadata or slides.getText)."
+          },
+          "localPath": {
+            "type": "string",
+            "description": "The absolute local file path to download the thumbnail to (e.g., \"/Users/name/downloads/slide1.png\")."
+          }
+        },
+        "required": ["presentationId", "slideObjectId", "localPath"],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Stub response for slides.getSlideThumbnail"
+          }
+        ]
+      }
+    },
+    {
+      "name": "sheets.getText",
+      "description": "Retrieves the content of a Google Sheets spreadsheet.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "spreadsheetId": {
+            "type": "string",
+            "description": "The ID or URL of the spreadsheet to read."
+          },
+          "format": {
+            "description": "Output format (default: text).",
+            "type": "string",
+            "enum": ["text", "csv", "json"]
+          }
+        },
+        "required": ["spreadsheetId"],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Stub response for sheets.getText"
+          }
+        ]
+      }
+    },
+    {
+      "name": "sheets.getRange",
+      "description": "Gets values from a specific range in a Google Sheets spreadsheet.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "spreadsheetId": {
+            "type": "string",
+            "description": "The ID or URL of the spreadsheet."
+          },
+          "range": {
+            "type": "string",
+            "description": "The A1 notation range to get (e.g., \"Sheet1!A1:B10\")."
+          }
+        },
+        "required": ["spreadsheetId", "range"],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Stub response for sheets.getRange"
+          }
+        ]
+      }
+    },
+    {
+      "name": "sheets.getMetadata",
+      "description": "Gets metadata about a Google Sheets spreadsheet.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "spreadsheetId": {
+            "type": "string",
+            "description": "The ID or URL of the spreadsheet."
+          }
+        },
+        "required": ["spreadsheetId"],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Stub response for sheets.getMetadata"
+          }
+        ]
+      }
+    },
+    {
+      "name": "drive.search",
+      "description": "Searches for files and folders in Google Drive. The query can be a simple search term, a Google Drive URL, or a full query string. For more information on query strings see: https://developers.google.com/drive/api/guides/search-files",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "description": "A simple search term (e.g., \"Budget Q3\"), a Google Drive URL, or a full query string (e.g., \"name contains 'Budget' and owners in 'user@example.com'\").",
+            "type": "string"
+          },
+          "pageSize": {
+            "description": "The maximum number of results to return.",
+            "type": "number"
+          },
+          "pageToken": {
+            "description": "The token for the next page of results.",
+            "type": "string"
+          },
+          "corpus": {
+            "description": "The corpus of files to search (e.g., \"user\", \"domain\").",
+            "type": "string"
+          },
+          "unreadOnly": {
+            "description": "Whether to filter for unread files only.",
+            "type": "boolean"
+          },
+          "sharedWithMe": {
+            "description": "Whether to search for files shared with the user.",
+            "type": "boolean"
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Stub response for drive.search"
+          }
+        ]
+      }
+    },
+    {
+      "name": "drive.downloadFile",
+      "description": "Downloads the content of a file from Google Drive to a local path. Note: Google Docs, Sheets, and Slides require specialized handling.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "fileId": {
+            "type": "string",
+            "description": "The ID of the file to download."
+          },
+          "localPath": {
+            "type": "string",
+            "description": "The local file path where the content should be saved (e.g., \"downloads/report.pdf\")."
+          }
+        },
+        "required": ["fileId", "localPath"],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Stub response for drive.downloadFile"
+          }
+        ]
+      }
+    },
+    {
+      "name": "drive.moveFile",
+      "description": "Moves a file or folder to a different folder in Google Drive.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "fileId": {
+            "type": "string",
+            "description": "The ID or URL of the file to move."
+          },
+          "folderId": {
+            "description": "The ID of the destination folder. Either folderId or folderName must be provided.",
+            "type": "string"
+          },
+          "folderName": {
+            "description": "The name of the destination folder. Either folderId or folderName must be provided.",
+            "type": "string"
+          }
+        },
+        "required": ["fileId"],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Stub response for drive.moveFile"
+          }
+        ]
+      }
+    },
+    {
+      "name": "drive.trashFile",
+      "description": "Moves a file or folder to the trash in Google Drive. This is a safe, reversible operation.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "fileId": {
+            "type": "string",
+            "description": "The ID or URL of the file to trash."
+          }
+        },
+        "required": ["fileId"],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Stub response for drive.trashFile"
+          }
+        ]
+      }
+    },
+    {
+      "name": "drive.renameFile",
+      "description": "Renames a file or folder in Google Drive.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "fileId": {
+            "type": "string",
+            "description": "The ID or URL of the file to rename."
+          },
+          "newName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The new name for the file."
+          }
+        },
+        "required": ["fileId", "newName"],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Stub response for drive.renameFile"
+          }
+        ]
+      }
+    },
+    {
+      "name": "calendar.list",
+      "description": "Lists all of the user's calendars.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Stub response for calendar.list"
+          }
+        ]
+      }
+    },
+    {
+      "name": "calendar.createEvent",
+      "description": "Creates a new event in a calendar. Supports optional Google Meet link generation and Google Drive file attachments. When addGoogleMeet is true, the Meet URL will be in the response's hangoutLink field. Attachments fully replace any existing attachments.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "calendarId": {
+            "type": "string",
+            "description": "The ID of the calendar to create the event in."
+          },
+          "summary": {
+            "type": "string",
+            "description": "The summary or title of the event."
+          },
+          "description": {
+            "description": "The description of the event.",
+            "type": "string"
+          },
+          "start": {
+            "type": "object",
+            "properties": {
+              "dateTime": {
+                "type": "string",
+                "description": "The start time in strict ISO 8601 format with seconds and timezone (e.g., 2024-01-15T10:30:00Z or 2024-01-15T10:30:00-05:00)."
+              }
+            },
+            "required": ["dateTime"]
+          },
+          "end": {
+            "type": "object",
+            "properties": {
+              "dateTime": {
+                "type": "string",
+                "description": "The end time in strict ISO 8601 format with seconds and timezone (e.g., 2024-01-15T11:30:00Z or 2024-01-15T11:30:00-05:00)."
+              }
+            },
+            "required": ["dateTime"]
+          },
+          "attendees": {
+            "description": "The email addresses of the attendees.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "sendUpdates": {
+            "description": "Whether to send notifications to attendees. Defaults to \"all\" if attendees are provided, otherwise \"none\".",
+            "type": "string",
+            "enum": ["all", "externalOnly", "none"]
+          },
+          "addGoogleMeet": {
+            "description": "Whether to create a Google Meet link for the event. The Meet URL will be available in the response's hangoutLink field.",
+            "type": "boolean"
+          },
+          "attachments": {
+            "description": "Google Drive file attachments. IMPORTANT: Providing attachments fully REPLACES any existing attachments on the event (not appended).",
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "fileUrl": {
+                  "type": "string",
+                  "format": "uri",
+                  "description": "Google Drive file URL (e.g., https://drive.google.com/file/d/...)"
+                },
+                "title": {
+                  "description": "Display title for the attachment.",
+                  "type": "string"
+                },
+                "mimeType": {
+                  "description": "MIME type of the attachment.",
+                  "type": "string"
+                }
+              },
+              "required": ["fileUrl"]
+            }
+          }
+        },
+        "required": ["calendarId", "summary", "start", "end"],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Stub response for calendar.createEvent"
+          }
+        ]
+      }
+    },
+    {
+      "name": "calendar.listEvents",
+      "description": "Lists events from a calendar. Defaults to upcoming events.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "calendarId": {
+            "type": "string",
+            "description": "The ID of the calendar to list events from."
+          },
+          "timeMin": {
+            "description": "The start time for the event search. Defaults to the current time.",
+            "type": "string"
+          },
+          "timeMax": {
+            "description": "The end time for the event search.",
+            "type": "string"
+          },
+          "attendeeResponseStatus": {
+            "description": "The response status of the attendee.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": ["calendarId"],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Stub response for calendar.listEvents"
+          }
+        ]
+      }
+    },
+    {
+      "name": "calendar.getEvent",
+      "description": "Gets the details of a specific calendar event.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "eventId": {
+            "type": "string",
+            "description": "The ID of the event to retrieve."
+          },
+          "calendarId": {
+            "description": "The ID of the calendar the event belongs to. Defaults to the primary calendar.",
+            "type": "string"
+          }
+        },
+        "required": ["eventId"],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Stub response for calendar.getEvent"
+          }
+        ]
+      }
+    },
+    {
+      "name": "calendar.findFreeTime",
+      "description": "Finds a free time slot for multiple people to meet.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "attendees": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The email addresses of the attendees."
+          },
+          "timeMin": {
+            "type": "string",
+            "description": "The start time for the search in strict ISO 8601 format with seconds and timezone (e.g., 2024-01-15T09:00:00Z or 2024-01-15T09:00:00-05:00)."
+          },
+          "timeMax": {
+            "type": "string",
+            "description": "The end time for the search in strict ISO 8601 format with seconds and timezone (e.g., 2024-01-15T18:00:00Z or 2024-01-15T18:00:00-05:00)."
+          },
+          "duration": {
+            "type": "number",
+            "description": "The duration of the meeting in minutes."
+          }
+        },
+        "required": ["attendees", "timeMin", "timeMax", "duration"],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Stub response for calendar.findFreeTime"
+          }
+        ]
+      }
+    },
+    {
+      "name": "calendar.updateEvent",
+      "description": "Updates an existing event in a calendar. Supports adding Google Meet links and Google Drive file attachments. When addGoogleMeet is true, the Meet URL will be in the response's hangoutLink field. Attachments fully replace any existing attachments (not appended).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "eventId": {
+            "type": "string",
+            "description": "The ID of the event to update."
+          },
+          "calendarId": {
+            "description": "The ID of the calendar to update the event in.",
+            "type": "string"
+          },
+          "summary": {
+            "description": "The new summary or title of the event.",
+            "type": "string"
+          },
+          "description": {
+            "description": "The new description of the event.",
+            "type": "string"
+          },
+          "start": {
+            "type": "object",
+            "properties": {
+              "dateTime": {
+                "type": "string",
+                "description": "The new start time in strict ISO 8601 format with seconds and timezone (e.g., 2024-01-15T10:30:00Z or 2024-01-15T10:30:00-05:00)."
+              }
+            },
+            "required": ["dateTime"]
+          },
+          "end": {
+            "type": "object",
+            "properties": {
+              "dateTime": {
+                "type": "string",
+                "description": "The new end time in strict ISO 8601 format with seconds and timezone (e.g., 2024-01-15T11:30:00Z or 2024-01-15T11:30:00-05:00)."
+              }
+            },
+            "required": ["dateTime"]
+          },
+          "attendees": {
+            "description": "The new list of attendees for the event.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "addGoogleMeet": {
+            "description": "Whether to create a Google Meet link for the event. The Meet URL will be available in the response's hangoutLink field.",
+            "type": "boolean"
+          },
+          "attachments": {
+            "description": "Google Drive file attachments. IMPORTANT: Providing attachments fully REPLACES any existing attachments on the event (not appended).",
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "fileUrl": {
+                  "type": "string",
+                  "format": "uri",
+                  "description": "Google Drive file URL (e.g., https://drive.google.com/file/d/...)"
+                },
+                "title": {
+                  "description": "Display title for the attachment.",
+                  "type": "string"
+                },
+                "mimeType": {
+                  "description": "MIME type of the attachment.",
+                  "type": "string"
+                }
+              },
+              "required": ["fileUrl"]
+            }
+          }
+        },
+        "required": ["eventId"],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Stub response for calendar.updateEvent"
+          }
+        ]
+      }
+    },
+    {
+      "name": "calendar.respondToEvent",
+      "description": "Responds to a meeting invitation (accept, decline, or tentative).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "eventId": {
+            "type": "string",
+            "description": "The ID of the event to respond to."
+          },
+          "calendarId": {
+            "description": "The ID of the calendar containing the event.",
+            "type": "string"
+          },
+          "responseStatus": {
+            "type": "string",
+            "enum": ["accepted", "declined", "tentative"],
+            "description": "Your response to the invitation."
+          },
+          "sendNotification": {
+            "description": "Whether to send a notification to the organizer (default: true).",
+            "type": "boolean"
+          },
+          "responseMessage": {
+            "description": "Optional message to include with your response.",
+            "type": "string"
+          }
+        },
+        "required": ["eventId", "responseStatus"],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Stub response for calendar.respondToEvent"
+          }
+        ]
+      }
+    },
+    {
+      "name": "calendar.deleteEvent",
+      "description": "Deletes an event from a calendar.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "eventId": {
+            "type": "string",
+            "description": "The ID of the event to delete."
+          },
+          "calendarId": {
+            "description": "The ID of the calendar to delete the event from. Defaults to the primary calendar.",
+            "type": "string"
+          }
+        },
+        "required": ["eventId"],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Stub response for calendar.deleteEvent"
+          }
+        ]
+      }
+    },
+    {
+      "name": "chat.listSpaces",
+      "description": "Lists the spaces the user is a member of.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Stub response for chat.listSpaces"
+          }
+        ]
+      }
+    },
+    {
+      "name": "chat.findSpaceByName",
+      "description": "Finds a Google Chat space by its display name.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "displayName": {
+            "type": "string",
+            "description": "The display name of the space to find."
+          }
+        },
+        "required": ["displayName"],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Stub response for chat.findSpaceByName"
+          }
+        ]
+      }
+    },
+    {
+      "name": "chat.sendMessage",
+      "description": "Sends a message to a Google Chat space.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "spaceName": {
+            "type": "string",
+            "description": "The name of the space to send the message to (e.g., spaces/AAAAN2J52O8)."
+          },
+          "message": {
+            "type": "string",
+            "description": "The message to send."
+          },
+          "threadName": {
+            "description": "The resource name of the thread to reply to. Example: \"spaces/AAAAVJcnwPE/threads/IAf4cnLqYfg\"",
+            "type": "string"
+          }
+        },
+        "required": ["spaceName", "message"],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Stub response for chat.sendMessage"
+          }
+        ]
+      }
+    },
+    {
+      "name": "chat.getMessages",
+      "description": "Gets messages from a Google Chat space.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "spaceName": {
+            "type": "string",
+            "description": "The name of the space to get messages from (e.g., spaces/AAAAN2J52O8)."
+          },
+          "threadName": {
+            "description": "The resource name of the thread to filter messages by. Example: \"spaces/AAAAVJcnwPE/threads/IAf4cnLqYfg\"",
+            "type": "string"
+          },
+          "unreadOnly": {
+            "description": "Whether to return only unread messages.",
+            "type": "boolean"
+          },
+          "pageSize": {
+            "description": "The maximum number of messages to return.",
+            "type": "number"
+          },
+          "pageToken": {
+            "description": "The token for the next page of results.",
+            "type": "string"
+          },
+          "orderBy": {
+            "description": "The order to list messages in (e.g., \"createTime desc\").",
+            "type": "string"
+          }
+        },
+        "required": ["spaceName"],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Stub response for chat.getMessages"
+          }
+        ]
+      }
+    },
+    {
+      "name": "chat.sendDm",
+      "description": "Sends a direct message to a user.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$",
+            "description": "The email address of the user to send the message to."
+          },
+          "message": {
+            "type": "string",
+            "description": "The message to send."
+          },
+          "threadName": {
+            "description": "The resource name of the thread to reply to. Example: \"spaces/AAAAVJcnwPE/threads/IAf4cnLqYfg\"",
+            "type": "string"
+          }
+        },
+        "required": ["email", "message"],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Stub response for chat.sendDm"
+          }
+        ]
+      }
+    },
+    {
+      "name": "chat.findDmByEmail",
+      "description": "Finds a Google Chat DM space by a user's email address.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$",
+            "description": "The email address of the user to find the DM space with."
+          }
+        },
+        "required": ["email"],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Stub response for chat.findDmByEmail"
+          }
+        ]
+      }
+    },
+    {
+      "name": "chat.listThreads",
+      "description": "Lists threads from a Google Chat space in reverse chronological order.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "spaceName": {
+            "type": "string",
+            "description": "The name of the space to get threads from (e.g., spaces/AAAAN2J52O8)."
+          },
+          "pageSize": {
+            "description": "The maximum number of threads to return.",
+            "type": "number"
+          },
+          "pageToken": {
+            "description": "The token for the next page of results.",
+            "type": "string"
+          }
+        },
+        "required": ["spaceName"],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Stub response for chat.listThreads"
+          }
+        ]
+      }
+    },
+    {
+      "name": "chat.setUpSpace",
+      "description": "Sets up a new Google Chat space with a display name and a list of members.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "displayName": {
+            "type": "string",
+            "description": "The display name of the space."
+          },
+          "userNames": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The user names of the members to add to the space (e.g. users/12345678)"
+          }
+        },
+        "required": ["displayName", "userNames"],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Stub response for chat.setUpSpace"
+          }
+        ]
+      }
+    },
+    {
+      "name": "gmail.search",
+      "description": "Search for emails in Gmail using query parameters.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "description": "Search query (same syntax as Gmail search box, e.g., \"from:someone@example.com is:unread\").",
+            "type": "string"
+          },
+          "maxResults": {
+            "description": "Maximum number of results to return (default: 100).",
+            "type": "number"
+          },
+          "pageToken": {
+            "description": "Token for the next page of results.",
+            "type": "string"
+          },
+          "labelIds": {
+            "description": "Filter by label IDs (e.g., [\"INBOX\", \"UNREAD\"]).",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "includeSpamTrash": {
+            "description": "Include messages from SPAM and TRASH (default: false).",
+            "type": "boolean"
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Stub response for gmail.search"
+          }
+        ]
+      }
+    },
+    {
+      "name": "gmail.get",
+      "description": "Get the full content of a specific email message.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "messageId": {
+            "type": "string",
+            "description": "The ID of the message to retrieve."
+          },
+          "format": {
+            "description": "Format of the message (default: full).",
+            "type": "string",
+            "enum": ["minimal", "full", "raw", "metadata"]
+          }
+        },
+        "required": ["messageId"],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Stub response for gmail.get"
+          }
+        ]
+      }
+    },
+    {
+      "name": "gmail.downloadAttachment",
+      "description": "Downloads an attachment from a Gmail message to a local file.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "messageId": {
+            "type": "string",
+            "description": "The ID of the message containing the attachment."
+          },
+          "attachmentId": {
+            "type": "string",
+            "description": "The ID of the attachment to download."
+          },
+          "localPath": {
+            "type": "string",
+            "description": "The absolute local path where the attachment should be saved (e.g., \"/Users/name/downloads/report.pdf\")."
+          }
+        },
+        "required": ["messageId", "attachmentId", "localPath"],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Stub response for gmail.downloadAttachment"
+          }
+        ]
+      }
+    },
+    {
+      "name": "gmail.modify",
+      "description": "Modify a Gmail message. Supported modifications include:\n    - Add labels to a message.\n    - Remove labels from a message.\nThere are a list of system labels that can be modified on a message:\n    - INBOX: removing INBOX label removes the message from inbox and archives the message.\n    - SPAM: adding SPAM label marks a message as spam.\n    - TRASH: adding TRASH label moves a message to trash.\n    - UNREAD: removing UNREAD label marks a message as read.\n    - STARRED: adding STARRED label marks a message as starred.\n    - IMPORTANT: adding IMPORTANT label marks a message as important.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "messageId": {
+            "type": "string",
+            "description": "The ID of the message to add labels to and/or remove labels from."
+          },
+          "addLabelIds": {
+            "description": "A list of label IDs to add to the message. Limit to 100 labels.",
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "removeLabelIds": {
+            "description": "A list of label IDs to remove from the message. Limit to 100 labels.",
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": ["messageId"],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Stub response for gmail.modify"
+          }
+        ]
+      }
+    },
+    {
+      "name": "gmail.batchModify",
+      "description": "Bulk modify up to 1,000 Gmail messages at once. Applies the same label changes to all specified messages in a single API call. This is much more efficient than modifying messages individually.\n    - Add labels to messages.\n    - Remove labels from messages.\nSystem labels that can be modified:\n    - INBOX: removing INBOX label archives messages.\n    - SPAM: adding SPAM label marks messages as spam.\n    - TRASH: adding TRASH label moves messages to trash.\n    - UNREAD: removing UNREAD label marks messages as read.\n    - STARRED: adding STARRED label marks messages as starred.\n    - IMPORTANT: adding IMPORTANT label marks messages as important.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "messageIds": {
+            "minItems": 1,
+            "maxItems": 1000,
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The IDs of the messages to modify. Maximum 1,000 per call."
+          },
+          "addLabelIds": {
+            "description": "A list of label IDs to add to the messages. Limit to 100 labels.",
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "removeLabelIds": {
+            "description": "A list of label IDs to remove from the messages. Limit to 100 labels.",
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": ["messageIds"],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Stub response for gmail.batchModify"
+          }
+        ]
+      }
+    },
+    {
+      "name": "gmail.modifyThread",
+      "description": "Modify labels on all messages in a Gmail thread. This applies label changes to every message in the thread at once, which is useful for operations like marking an entire conversation as read.\nSystem labels that can be modified:\n    - INBOX: removing INBOX label archives the thread.\n    - SPAM: adding SPAM label marks the thread as spam.\n    - TRASH: adding TRASH label moves the thread to trash.\n    - UNREAD: removing UNREAD label marks all messages in the thread as read.\n    - STARRED: adding STARRED label marks the thread as starred.\n    - IMPORTANT: adding IMPORTANT label marks the thread as important.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "threadId": {
+            "type": "string",
+            "description": "The ID of the thread to modify."
+          },
+          "addLabelIds": {
+            "description": "A list of label IDs to add to the thread. Limit to 100 labels.",
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "removeLabelIds": {
+            "description": "A list of label IDs to remove from the thread. Limit to 100 labels.",
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": ["threadId"],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Stub response for gmail.modifyThread"
+          }
+        ]
+      }
+    },
+    {
+      "name": "gmail.send",
+      "description": "Send an email message.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "to": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            ],
+            "description": "Recipient email address(es)."
+          },
+          "subject": {
+            "type": "string",
+            "description": "Email subject."
+          },
+          "body": {
+            "type": "string",
+            "description": "Email body content."
+          },
+          "cc": {
+            "description": "CC recipient email address(es).",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            ]
+          },
+          "bcc": {
+            "description": "BCC recipient email address(es).",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            ]
+          },
+          "isHtml": {
+            "description": "Whether the body is HTML (default: false).",
+            "type": "boolean"
+          }
+        },
+        "required": ["to", "subject", "body"],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Stub response for gmail.send"
+          }
+        ]
+      }
+    },
+    {
+      "name": "gmail.createDraft",
+      "description": "Create a draft email message.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "to": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            ],
+            "description": "Recipient email address(es)."
+          },
+          "subject": {
+            "type": "string",
+            "description": "Email subject."
+          },
+          "body": {
+            "type": "string",
+            "description": "Email body content."
+          },
+          "cc": {
+            "description": "CC recipient email address(es).",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            ]
+          },
+          "bcc": {
+            "description": "BCC recipient email address(es).",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            ]
+          },
+          "isHtml": {
+            "description": "Whether the body is HTML (default: false).",
+            "type": "boolean"
+          },
+          "threadId": {
+            "description": "The thread ID to create the draft as a reply to. When provided, the draft will be linked to the existing thread with appropriate reply headers.",
+            "type": "string"
+          }
+        },
+        "required": ["to", "subject", "body"],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Stub response for gmail.createDraft"
+          }
+        ]
+      }
+    },
+    {
+      "name": "gmail.sendDraft",
+      "description": "Send a previously created draft email.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "draftId": {
+            "type": "string",
+            "description": "The ID of the draft to send."
+          }
+        },
+        "required": ["draftId"],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Stub response for gmail.sendDraft"
+          }
+        ]
+      }
+    },
+    {
+      "name": "gmail.listLabels",
+      "description": "List all Gmail labels in the user's mailbox.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Stub response for gmail.listLabels"
+          }
+        ]
+      }
+    },
+    {
+      "name": "gmail.createLabel",
+      "description": "Create a new Gmail label. Labels help organize emails into categories.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The display name of the label."
+          },
+          "labelListVisibility": {
+            "description": "Visibility of the label in the label list. Defaults to \"labelShow\".",
+            "type": "string",
+            "enum": ["labelShow", "labelHide", "labelShowIfUnread"]
+          },
+          "messageListVisibility": {
+            "description": "Visibility of messages with this label in the message list. Defaults to \"show\".",
+            "type": "string",
+            "enum": ["show", "hide"]
+          }
+        },
+        "required": ["name"],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Stub response for gmail.createLabel"
+          }
+        ]
+      }
+    },
+    {
+      "name": "time.getCurrentDate",
+      "description": "Gets the current date. Returns both UTC (for calendar/API use) and local time (for display to the user), along with the timezone.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Stub response for time.getCurrentDate"
+          }
+        ]
+      }
+    },
+    {
+      "name": "time.getCurrentTime",
+      "description": "Gets the current time. Returns both UTC (for calendar/API use) and local time (for display to the user), along with the timezone.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Stub response for time.getCurrentTime"
+          }
+        ]
+      }
+    },
+    {
+      "name": "time.getTimeZone",
+      "description": "Gets the local timezone. Note: timezone is also included in getCurrentDate and getCurrentTime responses.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Stub response for time.getTimeZone"
+          }
+        ]
+      }
+    },
+    {
+      "name": "people.getUserProfile",
+      "description": "Gets a user's profile information.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "description": "The ID of the user to get profile information for.",
+            "type": "string"
+          },
+          "email": {
+            "description": "The email address of the user to get profile information for.",
+            "type": "string"
+          },
+          "name": {
+            "description": "The name of the user to get profile information for.",
+            "type": "string"
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Stub response for people.getUserProfile"
+          }
+        ]
+      }
+    },
+    {
+      "name": "people.getMe",
+      "description": "Gets the profile information of the authenticated user.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Stub response for people.getMe"
+          }
+        ]
+      }
+    },
+    {
+      "name": "people.getUserRelations",
+      "description": "Gets a user's relations (e.g., manager, spouse, assistant, etc.). Common relation types include: manager, assistant, spouse, partner, relative, mother, father, parent, sibling, child, friend, domesticPartner, referredBy. Defaults to the authenticated user if no userId is provided.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "description": "The ID of the user to get relations for (e.g., \"110001608645105799644\" or \"people/110001608645105799644\"). Defaults to the authenticated user if not provided.",
+            "type": "string"
+          },
+          "relationType": {
+            "description": "The type of relation to filter by (e.g., \"manager\", \"spouse\", \"assistant\"). If not provided, returns all relations.",
+            "type": "string"
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Stub response for people.getUserRelations"
+          }
+        ]
+      }
+    }
+  ]
+}

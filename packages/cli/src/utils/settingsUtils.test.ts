@@ -734,6 +734,55 @@ describe('SettingsUtils', () => {
         );
         expect(result).toBe('false');
       });
+
+      it('should display objects as JSON strings, not "[object Object]"', () => {
+        vi.mocked(getSettingsSchema).mockReturnValue({
+          experimental: {
+            type: 'object',
+            label: 'Experimental',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: {},
+            description: 'Experimental settings',
+            showInDialog: false,
+            properties: {
+              gemmaModelRouter: {
+                type: 'object',
+                label: 'Gemma Model Router',
+                category: 'Experimental',
+                requiresRestart: true,
+                default: {},
+                description: 'Gemma model router settings',
+                showInDialog: true,
+              },
+            },
+          },
+        } as unknown as SettingsSchemaType);
+
+        // Test with empty object (default)
+        const emptySettings = makeMockSettings({});
+        const emptyResult = getDisplayValue(
+          'experimental.gemmaModelRouter',
+          emptySettings,
+          emptySettings,
+        );
+        expect(emptyResult).toBe('{}');
+        expect(emptyResult).not.toBe('[object Object]');
+
+        // Test with object containing values
+        const settings = makeMockSettings({
+          experimental: {
+            gemmaModelRouter: { enabled: true, host: 'localhost' },
+          },
+        });
+        const result = getDisplayValue(
+          'experimental.gemmaModelRouter',
+          settings,
+          settings,
+        );
+        expect(result).toBe('{"enabled":true,"host":"localhost"}*');
+        expect(result).not.toContain('[object Object]');
+      });
     });
 
     describe('getDisplayValue with units', () => {

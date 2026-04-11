@@ -15,6 +15,7 @@ import {
   Kind,
   type ToolInvocation,
   type ToolResult,
+  type ExecuteOptions,
 } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
@@ -192,7 +193,7 @@ class GrepToolInvocation extends BaseToolInvocation<
     super(params, messageBus, _toolName, _toolDisplayName);
   }
 
-  async execute(signal: AbortSignal): Promise<ToolResult> {
+  async execute({ abortSignal: signal }: ExecuteOptions): Promise<ToolResult> {
     try {
       // Default to '.' if path is explicitly undefined/null.
       // This forces CWD search instead of 'all workspaces' search by default.
@@ -250,9 +251,17 @@ class GrepToolInvocation extends BaseToolInvocation<
 
       // Create a timeout controller to prevent indefinitely hanging searches
       const timeoutController = new AbortController();
+      const configTimeout = this.config.getFileFilteringOptions().searchTimeout;
+      // If configTimeout is less than standard default, it might be too short for grep.
+      // We check if it's greater or if we should use DEFAULT_SEARCH_TIMEOUT_MS as a fallback.
+      // Let's assume the user can set it higher if they want. Using it directly if it exists, otherwise fallback.
+      const timeoutMs =
+        configTimeout && configTimeout > DEFAULT_SEARCH_TIMEOUT_MS
+          ? configTimeout
+          : DEFAULT_SEARCH_TIMEOUT_MS;
       const timeoutId = setTimeout(() => {
         timeoutController.abort();
-      }, DEFAULT_SEARCH_TIMEOUT_MS);
+      }, timeoutMs);
 
       // Link the passed signal to our timeout controller
       const onAbort = () => timeoutController.abort();
@@ -279,6 +288,13 @@ class GrepToolInvocation extends BaseToolInvocation<
           max_matches_per_file: this.params.max_matches_per_file,
           signal: timeoutController.signal,
         });
+      } catch (error) {
+        if (timeoutController.signal.aborted) {
+          throw new Error(
+            `Operation timed out after ${timeoutMs}ms. In large repositories, consider narrowing your search scope by specifying a 'dir_path' or an 'include_pattern'.`,
+          );
+        }
+        throw error;
       } finally {
         clearTimeout(timeoutId);
         signal.removeEventListener('abort', onAbort);
@@ -476,6 +492,7 @@ class GrepToolInvocation extends BaseToolInvocation<
       const generator = execStreaming(rgPath, rgArgs, {
         signal: options.signal,
         allowedExitCodes: [0, 1],
+        sandboxManager: this.config.sandboxManager,
       });
 
       let matchesFound = 0;
