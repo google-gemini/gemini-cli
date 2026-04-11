@@ -12,6 +12,7 @@ import type {
   OAuthTokens,
 } from '@modelcontextprotocol/sdk/shared/auth.js';
 import { GoogleAuth } from 'google-auth-library';
+import { getProxyAgent } from '../utils/proxy.js';
 import type { MCPServerConfig } from '../config/config.js';
 import { FIVE_MIN_BUFFER_MS } from './oauth-utils.js';
 import { coreEvents } from '../utils/events.js';
@@ -57,6 +58,9 @@ export class GoogleCredentialProvider implements McpAuthProvider {
     }
     this.auth = new GoogleAuth({
       scopes,
+      clientOptions: {
+        agent: getProxyAgent(),
+      },
     });
   }
 

@@ -33,6 +33,7 @@ import readline from 'node:readline';
 import { Storage } from '../config/storage.js';
 import { OAuthCredentialStorage } from './oauth-credential-storage.js';
 import { FORCE_ENCRYPTED_FILE_ENV_VAR } from '../mcp/token-storage/index.js';
+import { getProxyAgent, withProxy, shouldProxy } from '../utils/proxy.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import {
   writeToStdout,
@@ -124,6 +125,9 @@ async function initOauthClient(
   ) {
     const auth = new GoogleAuth({
       scopes: OAUTH_SCOPE,
+      clientOptions: {
+        agent: getProxyAgent(),
+      },
     });
     const byoidClient = auth.fromJSON({
       ...credentials,
@@ -141,6 +145,7 @@ async function initOauthClient(
     clientSecret: OAUTH_CLIENT_SECRET,
     transporterOptions: {
       proxy: config.getProxy(),
+      agent: getProxyAgent(),
     },
   });
   const useEncryptedStorage = getUseEncryptedStorageFlag();
@@ -501,7 +506,8 @@ async function authWithUserCode(client: OAuth2Client): Promise<boolean> {
 
 async function authWithWeb(client: OAuth2Client): Promise<OauthWebLogin> {
   const port = await getAvailablePort();
-  // The hostname used for the HTTP server binding (e.g., '0.0.0.0' in Docker).
+  // Ensure we bind to 127.0.0.1 by default to prevent hijacking from external interfaces.
+  // In Docker, OAUTH_CALLBACK_HOST might be 0.0.0.0, but for local auth loopback is preferred.
   const host = process.env['OAUTH_CALLBACK_HOST'] || '127.0.0.1';
   // The `redirectUri` sent to Google's authorization server MUST use a loopback IP literal
   // (i.e., 'localhost' or '127.0.0.1'). This is a strict security policy for credentials of
@@ -715,14 +721,15 @@ async function fetchAndCacheUserInfo(client: OAuth2Client): Promise<void> {
       return;
     }
 
-    const response = await fetch(
-      'https://www.googleapis.com/oauth2/v2/userinfo',
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+    const url = 'https://www.googleapis.com/oauth2/v2/userinfo';
+    const fetchOptions = withProxy({
+      url,
+      headers: {
+        Authorization: `Bearer ${token}`,
       },
-    );
+    });
+
+    const response = await fetch(url, fetchOptions);
 
     if (!response.ok) {
       debugLogger.log(

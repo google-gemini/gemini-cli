@@ -33,6 +33,35 @@ export function isAbortError(error: unknown): boolean {
   return error instanceof Error && error.name === 'AbortError';
 }
 
+/**
+ * Checks if an error is a network error (e.g. timeout, connection reset, etc.).
+ */
+export function isNetworkError(error: unknown): boolean {
+  if (isNodeError(error)) {
+    const code = error.code;
+    return (
+      code === 'ECONNRESET' ||
+      code === 'ETIMEDOUT' ||
+      code === 'ECONNREFUSED' ||
+      code === 'ENOTFOUND' ||
+      code === 'ENETUNREACH' ||
+      code === 'EAI_AGAIN' ||
+      code === 'EAI_FAIL' ||
+      code === 'UND_ERR_CONNECT_TIMEOUT' ||
+      code === 'UND_ERR_HEADERS_TIMEOUT' ||
+      code === 'UND_ERR_SOCKET'
+    );
+  }
+  const message = getErrorMessage(error).toLowerCase();
+  return (
+    message.includes('network error') ||
+    message.includes('disconnected') ||
+    message.includes('socket disconnected') ||
+    message.includes('econnreset') ||
+    message.includes('etimedout')
+  );
+}
+
 export function getErrorMessage(error: unknown): string {
   const friendlyError = toFriendlyError(error);
   if (friendlyError instanceof Error) {

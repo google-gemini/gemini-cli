@@ -15,7 +15,11 @@ import {
 } from './types.js';
 import { CodeAssistServer, type HttpOptions } from './server.js';
 import type { AuthClient } from 'google-auth-library';
-import { ChangeAuthRequestedError } from '../utils/errors.js';
+import {
+  ChangeAuthRequestedError,
+  isNetworkError,
+  getErrorMessage,
+} from '../utils/errors.js';
 import { ValidationRequiredError } from '../utils/googleQuotaErrors.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { createCache, type CacheService } from '../utils/cache.js';
@@ -161,13 +165,25 @@ async function _doSetupUser(
 
   let loadRes: LoadCodeAssistResponse;
   while (true) {
-    loadRes = await caServer.loadCodeAssist({
-      cloudaicompanionProject: projectId,
-      metadata: {
-        ...coreClientMetadata,
-        duetProject: projectId,
-      },
-    });
+    try {
+      loadRes = await caServer.loadCodeAssist({
+        cloudaicompanionProject: projectId,
+        metadata: {
+          ...coreClientMetadata,
+          duetProject: projectId,
+        },
+      });
+    } catch (e) {
+      if (isNetworkError(e)) {
+        debugLogger.warn(
+          'Network error while loading user info from Code Assist. Retrying in 5 seconds...',
+          getErrorMessage(e),
+        );
+        await new Promise((resolve) => setTimeout(resolve, 5000));
+        continue;
+      }
+      throw e;
+    }
 
     try {
       validateLoadCodeAssistResponse(loadRes);

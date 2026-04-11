@@ -50,8 +50,13 @@ export class KeychainService {
    * @throws Error if the keychain is unavailable.
    */
   async getPassword(account: string): Promise<string | null> {
-    const keychain = await this.getKeychainOrThrow();
-    return keychain.getPassword(this.serviceName, account);
+    try {
+      const keychain = await this.getKeychainOrThrow();
+      return await keychain.getPassword(this.serviceName, account);
+    } catch (e) {
+      debugLogger.warn('Native keychain getPassword failed, falling back to FileKeychain:', e);
+      return await (new FileKeychain()).getPassword(this.serviceName, account);
+    }
   }
 
   /**
@@ -59,8 +64,13 @@ export class KeychainService {
    * @throws Error if the keychain is unavailable.
    */
   async setPassword(account: string, value: string): Promise<void> {
-    const keychain = await this.getKeychainOrThrow();
-    await keychain.setPassword(this.serviceName, account, value);
+    try {
+      const keychain = await this.getKeychainOrThrow();
+      await keychain.setPassword(this.serviceName, account, value);
+    } catch (e) {
+      debugLogger.warn('Native keychain setPassword failed (possibly D-Bus issue or locked), falling back to FileKeychain:', e);
+      await (new FileKeychain()).setPassword(this.serviceName, account, value);
+    }
   }
 
   /**
@@ -69,19 +79,27 @@ export class KeychainService {
    * @throws Error if the keychain is unavailable.
    */
   async deletePassword(account: string): Promise<boolean> {
-    const keychain = await this.getKeychainOrThrow();
-    return keychain.deletePassword(this.serviceName, account);
+    try {
+      const keychain = await this.getKeychainOrThrow();
+      return await keychain.deletePassword(this.serviceName, account);
+    } catch (e) {
+      debugLogger.warn('Native keychain deletePassword failed, falling back to FileKeychain:', e);
+      return await (new FileKeychain()).deletePassword(this.serviceName, account);
+    }
   }
 
   /**
    * Lists all account/secret pairs stored under this service.
    * @throws Error if the keychain is unavailable.
    */
-  async findCredentials(): Promise<
-    Array<{ account: string; password: string }>
-  > {
-    const keychain = await this.getKeychainOrThrow();
-    return keychain.findCredentials(this.serviceName);
+  async findCredentials(): Promise<Array<{ account: string; password: string }>> {
+    try {
+      const keychain = await this.getKeychainOrThrow();
+      return await keychain.findCredentials(this.serviceName);
+    } catch (e) {
+      debugLogger.warn('Native keychain findCredentials failed, falling back to FileKeychain:', e);
+      return await (new FileKeychain()).findCredentials(this.serviceName);
+    }
   }
 
   private async getKeychainOrThrow(): Promise<Keychain> {
