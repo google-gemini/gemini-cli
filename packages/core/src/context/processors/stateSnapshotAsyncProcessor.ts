@@ -24,7 +24,7 @@ export function createStateSnapshotAsyncProcessor(
   return {
     id,
     name: 'StateSnapshotAsyncProcessor',
-    process: async ({ targets, inbox }: ProcessArgs): Promise<void> => {
+    process: async ({ targets, snapshotCache }: ProcessArgs): Promise<void> => {
       if (targets.length === 0) return;
 
       try {
@@ -33,14 +33,10 @@ export function createStateSnapshotAsyncProcessor(
         const processorType = options.type ?? 'point-in-time';
 
         if (processorType === 'accumulate') {
-          // Look for the most recent unconsumed accumulate snapshot in the inbox
-          const proposedSnapshots = inbox.getMessages<{
-            newText: string;
-            consumedIds: string[];
-            type: string;
-          }>('PROPOSED_SNAPSHOT');
+          // Look for the most recent unconsumed accumulate snapshot in the cache
+          const proposedSnapshots = snapshotCache.getProposals();
           const accumulateSnapshots = proposedSnapshots.filter(
-            (s) => s.payload.type === 'accumulate',
+            (s) => s.type === 'accumulate',
           );
 
           if (accumulateSnapshots.length > 0) {
@@ -49,13 +45,10 @@ export function createStateSnapshotAsyncProcessor(
               (a, b) => b.timestamp - a.timestamp,
             )[0];
 
-            // Consume the old draft so the inbox doesn't fill up with stale drafts
-            inbox.consume(latest.id);
-            // And we must persist its consumption back to the live inbox immediately,
-            // because we are effectively "taking" it from the shelf to modify.
-            env.inbox.drainConsumed(new Set([latest.id]));
+            // Consume the old draft so the cache doesn't fill up with stale drafts
+            snapshotCache.consume(latest.id);
 
-            previousConsumedIds = latest.payload.consumedIds;
+            previousConsumedIds = latest.consumedIds;
 
             // Prepend a synthetic node representing the previous rolling state
             const previousStateNode: ConcreteNode = {
@@ -63,7 +56,7 @@ export function createStateSnapshotAsyncProcessor(
               logicalParentId: '',
               type: 'SNAPSHOT',
               timestamp: latest.timestamp,
-              text: latest.payload.newText,
+              text: latest.newText,
             };
 
             nodesToSummarize = [previousStateNode, ...targets];
@@ -80,9 +73,7 @@ export function createStateSnapshotAsyncProcessor(
           ...targets.map((t) => t.id),
         ];
 
-        // In V2, async pipelines communicate their work to the inbox, and the processor picks it up.
-        env.inbox.publish(
-          'PROPOSED_SNAPSHOT',
+        snapshotCache.publish(
           {
             newText: snapshotText,
             consumedIds: newConsumedIds,

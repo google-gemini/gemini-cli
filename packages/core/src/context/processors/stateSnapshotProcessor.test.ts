@@ -3,129 +3,96 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { createStateSnapshotProcessor } from './stateSnapshotProcessor.js';
 import {
   createMockEnvironment,
   createDummyNode,
   createMockProcessArgs,
 } from '../testing/contextTestUtils.js';
-import type { InboxSnapshotImpl } from '../pipeline/inbox.js';
 
 describe('StateSnapshotProcessor', () => {
-  it('should ignore if budget is satisfied', async () => {
+  it('should return original targets if no nodes to process', async () => {
     const env = createMockEnvironment();
-    const processor = createStateSnapshotProcessor(
-      'StateSnapshotProcessor',
-      env,
-      {
-        target: 'incremental',
-      },
-    );
-    const targets = [createDummyNode('ep1', 'USER_PROMPT')];
-    const result = await processor.process(createMockProcessArgs(targets));
-    expect(result).toBe(targets); // Strict equality
+    const processor = createStateSnapshotProcessor('StateSnapshotProcessor', env, {
+      target: 'max',
+    });
+
+    const result = await processor.process(createMockProcessArgs([], []));
+    expect(result).toEqual([]);
   });
 
-  it('should apply a valid snapshot from the Inbox (Fast Path)', async () => {
+  it('should use pre-computed snapshot from cache if valid', async () => {
     const env = createMockEnvironment();
-    const processor = createStateSnapshotProcessor(
-      'StateSnapshotProcessor',
-      env,
-      {
-        target: 'incremental',
-      },
-    );
+    const processor = createStateSnapshotProcessor('StateSnapshotProcessor', env, {
+      target: 'max', // implies 'accumulate' type
+    });
 
     const nodeA = createDummyNode('ep1', 'USER_PROMPT', 50, {}, 'node-A');
-    const nodeB = createDummyNode('ep1', 'AGENT_THOUGHT', 60, {}, 'node-B');
-    const nodeC = createDummyNode('ep2', 'USER_PROMPT', 50, {}, 'node-C');
+    const nodeB = createDummyNode('ep1', 'AGENT_THOUGHT', 50, {}, 'node-B');
+    const nodeC = createDummyNode('ep1', 'TOOL_EXECUTION', 50, {}, 'node-C');
 
     const targets = [nodeA, nodeB, nodeC];
 
-    // The async background pipeline created a snapshot of A and B
-    const messages = [
+    const proposals = [
       {
         id: 'msg-1',
-        topic: 'PROPOSED_SNAPSHOT',
         timestamp: Date.now(),
-        payload: {
-          consumedIds: ['node-A', 'node-B'],
-          newText: '<compressed A and B>',
-          type: 'point-in-time',
-        },
+        newText: 'Pre-computed summary of A and B',
+        consumedIds: ['node-A', 'node-B'],
+        type: 'accumulate',
       },
     ];
 
-    const processArgs = createMockProcessArgs(targets, [], messages);
+    const processArgs = createMockProcessArgs(targets, targets, proposals);
+    const consumeSpy = vi.spyOn(processArgs.snapshotCache, 'consume');
+
     const result = await processor.process(processArgs);
 
-    // Should remove A and B, insert Snapshot, keep C
+    // It should have replaced A and B with a SNAPSHOT, and kept C
     expect(result.length).toBe(2);
     expect(result[0].type).toBe('SNAPSHOT');
-    expect(result[1].id).toBe('node-C');
+    expect((result[0] as any).text).toBe('Pre-computed summary of A and B');
+    expect(result[1]).toEqual(nodeC);
 
-    // Should consume the message
-    expect(
-      (processArgs.inbox as InboxSnapshotImpl).getConsumedIds().has('msg-1'),
-    ).toBe(true);
+    // The message should be consumed
+    expect(consumeSpy).toHaveBeenCalledWith('msg-1');
   });
 
-  it('should reject a snapshot if the nodes were modified/deleted (Cache Invalidated)', async () => {
+  it('should fall back to synchronous generation if no valid snapshot in cache', async () => {
     const env = createMockEnvironment();
-    const processor = createStateSnapshotProcessor(
-      'StateSnapshotProcessor',
-      env,
-      {
-        target: 'incremental',
-      },
-    );
-    // Make deficit 0 so we don't fall through to the sync backstop and fail the test that way
+    const processor = createStateSnapshotProcessor('StateSnapshotProcessor', env, {
+      target: 'max',
+    });
 
-    // node-A is MISSING (user deleted it)
-    const nodeB = createDummyNode('ep1', 'AGENT_THOUGHT', 60, {}, 'node-B');
-    const targets = [nodeB];
+    const nodeA = createDummyNode('ep1', 'USER_PROMPT', 50, {}, 'node-A');
+    const nodeB = createDummyNode('ep1', 'AGENT_THOUGHT', 50, {}, 'node-B');
 
-    const messages = [
+    const targets = [nodeA, nodeB];
+
+    // Invalid snapshot (consumes a node that isn't in targets)
+    const proposals = [
       {
         id: 'msg-1',
-        topic: 'PROPOSED_SNAPSHOT',
         timestamp: Date.now(),
-        payload: {
-          consumedIds: ['node-A', 'node-B'],
-          newText: '<compressed A and B>',
-        },
+        newText: 'Invalid summary',
+        consumedIds: ['node-X'],
+        type: 'accumulate',
       },
     ];
 
-    const processArgs = createMockProcessArgs(targets, [], messages);
+    const processArgs = createMockProcessArgs(targets, targets, proposals);
+    const consumeSpy = vi.spyOn(processArgs.snapshotCache, 'consume');
+
     const result = await processor.process(processArgs);
 
-    // Because deficit is 0, and Inbox was rejected, nothing should change
-    expect(result.length).toBe(1);
-    expect(result[0].id).toBe('node-B');
-    expect(
-      (processArgs.inbox as InboxSnapshotImpl).getConsumedIds().has('msg-1'),
-    ).toBe(false);
-  });
-
-  it('should fall back to sync backstop if inbox is empty', async () => {
-    const env = createMockEnvironment();
-    const processor = createStateSnapshotProcessor(
-      'StateSnapshotProcessor',
-      env,
-      { target: 'max' },
-    ); // Summarize all
-
-    const nodeA = createDummyNode('ep1', 'USER_PROMPT', 50, {}, 'node-A');
-    const nodeB = createDummyNode('ep1', 'AGENT_THOUGHT', 60, {}, 'node-B');
-    const nodeC = createDummyNode('ep2', 'USER_PROMPT', 50, {}, 'node-C');
-    const targets = [nodeA, nodeB, nodeC];
-    const result = await processor.process(createMockProcessArgs(targets));
-
-    // Should synthesize a new snapshot synchronously
+    // Should have generated synchronously
     expect(env.llmClient.generateContent).toHaveBeenCalled();
-    expect(result.length).toBe(2); // nodeA is skipped as "system prompt", snapshot + nodeA
-    expect(result[1].type).toBe('SNAPSHOT');
+    expect(result.length).toBe(1);
+    expect(result[0].type).toBe('SNAPSHOT');
+    expect((result[0] as any).text).toBe('Mock LLM summary response');
+
+    // Should not have consumed the invalid message
+    expect(consumeSpy).not.toHaveBeenCalledWith('msg-1');
   });
 });

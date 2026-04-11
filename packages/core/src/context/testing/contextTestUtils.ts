@@ -14,22 +14,17 @@ import { ContextTracer } from '../tracer.js';
 import { ContextEnvironmentImpl } from '../pipeline/environmentImpl.js';
 import { SidecarLoader } from '../config/configLoader.js';
 import { SidecarRegistry } from '../config/registry.js';
-import { ContextEventBus } from '../eventBus.js';
-import { PipelineOrchestrator } from '../pipeline/orchestrator.js';
 import type { ConcreteNode, ToolExecution } from '../ir/types.js';
 import type { ContextEnvironment } from '../pipeline/environment.js';
 import type { Config } from '../../config/config.js';
 import type { BaseLlmClient } from '../../core/baseLlmClient.js';
 import type { Content, GenerateContentResponse } from '@google/genai';
-import { InboxSnapshotImpl } from '../pipeline/inbox.js';
-import type { InboxMessage, ProcessArgs } from '../pipeline.js';
+import type { SnapshotProposal, ProcessArgs } from '../pipeline.js';
 import type { ContextProfile } from '../config/profiles.js';
 import type { Mock } from 'vitest';
+import { LiveSnapshotCache } from '../pipeline/snapshotCache.js';
+import { ContextWorkingBufferImpl } from '../pipeline/contextWorkingBuffer.js';
 
-/**
- * Creates a valid mock GenerateContentResponse with the provided text.
- * Used to avoid having to manually construct the deeply nested candidate/content/part structure.
- */
 export const createMockGenerateContentResponse = (
   text: string,
 ): GenerateContentResponse =>
@@ -114,7 +109,6 @@ export function createMockLlmClient(
         generateContentMock.mockResolvedValueOnce(response);
       }
     }
-    // Fallback to the last response for any subsequent calls
     const lastResponse = responses[responses.length - 1];
     if (typeof lastResponse === 'string') {
       generateContentMock.mockResolvedValue(
@@ -124,7 +118,6 @@ export function createMockLlmClient(
       generateContentMock.mockResolvedValue(lastResponse);
     }
   } else {
-    // Default fallback
     generateContentMock.mockResolvedValue(
       createMockGenerateContentResponse('Mock LLM response'),
     );
@@ -145,7 +138,6 @@ export function createMockEnvironment(
     targetDir: '/tmp',
     sessionId: 'mock-session',
   });
-  const eventBus = new ContextEventBus();
 
   const env = new ContextEnvironmentImpl(
     llmClient,
@@ -155,7 +147,6 @@ export function createMockEnvironment(
     '/tmp/.gemini/tool-outputs',
     tracer,
     1,
-    eventBus,
     new InMemoryFileSystem(),
     new DeterministicIdGenerator('mock-uuid-'),
   );
@@ -166,23 +157,23 @@ export function createMockEnvironment(
   return env;
 }
 
-/**
- * Creates a block of synthetic conversation history designed to consume a specific number of tokens.
- * Assumes roughly 4 characters per token for standard English text.
- */
-import { ContextWorkingBufferImpl } from '../pipeline/contextWorkingBuffer.js';
-
 export function createMockProcessArgs(
   targets: ConcreteNode[],
   bufferNodes: ConcreteNode[] = [],
-  inboxMessages: InboxMessage[] = [],
+  proposals: SnapshotProposal[] = [],
 ): ProcessArgs {
+  const cache = new LiveSnapshotCache();
+  // We can just manually add the proposals for the mock
+  for (const p of proposals) {
+    (cache as any).proposals.push(p);
+  }
+
   return {
     targets,
     buffer: ContextWorkingBufferImpl.initialize(
       bufferNodes.length ? bufferNodes : targets,
     ),
-    inbox: new InboxSnapshotImpl(inboxMessages),
+    snapshotCache: cache,
   };
 }
 
@@ -207,9 +198,6 @@ export function createSyntheticHistory(
   return history;
 }
 
-/**
- * Creates a fully mocked Config object tailored for Context Component testing.
- */
 export function createMockContextConfig(
   overrides?: Record<string, unknown>,
   llmClientOverride?: unknown,
@@ -236,22 +224,17 @@ export function createMockContextConfig(
   return { ...defaultConfig, ...overrides } as unknown as Config;
 }
 
-/**
- * Wires up a full ContextManager component with an AgentChatHistory and active background async pipelines.
- */
-
 export function setupContextComponentTest(
   config: Config,
   sidecarOverride?: ContextProfile,
 ): { chatHistory: AgentChatHistory; contextManager: ContextManager } {
   const chatHistory = new AgentChatHistory();
-  const registry = new SidecarRegistry(); // Provide an empty registry for tests, or one pre-filled by the caller if needed later
+  const registry = new SidecarRegistry();
   const sidecar = sidecarOverride || SidecarLoader.fromConfig(config, registry);
   const tracer = new ContextTracer({
     targetDir: '/tmp',
     sessionId: 'test-session',
   });
-  const eventBus = new ContextEventBus();
   const env = new ContextEnvironmentImpl(
     config.getBaseLlmClient(),
     'test prompt-id',
@@ -260,25 +243,14 @@ export function setupContextComponentTest(
     '/tmp/gemini-test',
     tracer,
     1,
-    eventBus,
-  );
-
-  const orchestrator = new PipelineOrchestrator(
-    sidecar.buildPipelines(env),
-    sidecar.buildAsyncPipelines(env),
-    env,
-    eventBus,
-    tracer,
   );
 
   const contextManager = new ContextManager(
     sidecar,
     env,
     tracer,
-    orchestrator,
     chatHistory,
   );
 
-  // The async async pipeline is now internally managed by ContextManager
   return { chatHistory, contextManager };
 }

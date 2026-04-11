@@ -10,8 +10,6 @@ import type { Content } from '@google/genai';
 import type { ContextProfile } from '../config/profiles.js';
 import { ContextEnvironmentImpl } from '../pipeline/environmentImpl.js';
 import { ContextTracer } from '../tracer.js';
-import { ContextEventBus } from '../eventBus.js';
-import { PipelineOrchestrator } from '../pipeline/orchestrator.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 import { DeterministicIdGenerator } from '../system/DeterministicIdGenerator.js';
 import { InMemoryFileSystem } from '../system/InMemoryFileSystem.js';
@@ -27,8 +25,6 @@ export class SimulationHarness {
   readonly chatHistory: AgentChatHistory;
   contextManager!: ContextManager;
   env!: ContextEnvironmentImpl;
-  orchestrator!: PipelineOrchestrator;
-  readonly eventBus: ContextEventBus;
   config!: ContextProfile;
   private tracer!: ContextTracer;
   private currentTurnIndex = 0;
@@ -46,7 +42,6 @@ export class SimulationHarness {
 
   private constructor() {
     this.chatHistory = new AgentChatHistory();
-    this.eventBus = new ContextEventBus();
   }
 
   private async init(
@@ -68,37 +63,22 @@ export class SimulationHarness {
       mockTempDir,
       this.tracer,
       1, // 1 char per token average
-      this.eventBus,
       new InMemoryFileSystem(),
       new DeterministicIdGenerator(),
     );
 
-    this.orchestrator = new PipelineOrchestrator(
-      config.buildPipelines(this.env),
-      config.buildAsyncPipelines(this.env),
-      this.env,
-      this.eventBus,
-      this.tracer,
-    );
     this.contextManager = new ContextManager(
       config,
       this.env,
       this.tracer,
-      this.orchestrator,
       this.chatHistory,
     );
   }
 
-  /**
-   * Simulates a single "Turn" (User input + Model/Tool outputs)
-   * A turn might consist of multiple Content messages (e.g. user prompt -> model call -> user response -> model answer)
-   */
   async simulateTurn(messages: Content[]) {
-    // 1. Append the new messages
     const currentHistory = this.chatHistory.get();
     this.chatHistory.set([...currentHistory, ...messages]);
 
-    // 2. Measure tokens immediately after append (Before background processing)
     const tokensBefore = this.env.tokenCalculator.calculateConcreteListTokens(
       this.contextManager.getNodes(),
     );
@@ -106,10 +86,9 @@ export class SimulationHarness {
       `[Turn ${this.currentTurnIndex}] Tokens BEFORE: ${tokensBefore}`,
     );
 
-    // 3. Yield to event loop to allow internal async subscribers and orchestrator to finish
+    // Yield to let internal event loops settle
     await new Promise((resolve) => setTimeout(resolve, 50));
 
-    // 3.1 Simulate what projectCompressedHistory does with the sync handlers
     let currentView = this.contextManager.getNodes();
     const currentTokens =
       this.env.tokenCalculator.calculateConcreteListTokens(currentView);
@@ -120,23 +99,17 @@ export class SimulationHarness {
       debugLogger.log(
         `[Turn ${this.currentTurnIndex}] Sync panic triggered! ${currentTokens} > ${this.config.config.budget.maxTokens}`,
       );
-      const orchestrator = this.orchestrator;
-      // In the V2 simulation, we trigger the 'gc_backstop' to simulate emergency pressure.
-      // Since contextManager owns its buffer natively, the simulation now properly matches reality
-      // where the manager runs the orchestrator and keeps the resulting modified view.
-      const modifiedView = await orchestrator.executeTriggerSync(
+      
+      const modifiedView = await this.contextManager.executeTriggerSync(
         'gc_backstop',
         currentView,
         new Set(currentView.map((e) => e.id)),
         new Set<string>(),
       );
 
-      // In the real system, ContextManager triggers this and retains it.
-      // We will emulate that behavior internally in the test loop for token counting.
       currentView = modifiedView;
     }
 
-    // 4. Measure tokens after background processors have processed inboxes
     const tokensAfter = this.env.tokenCalculator.calculateConcreteListTokens(
       this.contextManager.getNodes(),
     );

@@ -6,16 +6,18 @@
 
 import type { ConcreteNode } from './ir/types.js';
 
-export interface InboxMessage<T = unknown> {
+export interface SnapshotProposal {
   id: string;
-  topic: string;
-  payload: T;
+  newText: string;
+  consumedIds: string[];
+  type: string;
   timestamp: number;
 }
 
-export interface InboxSnapshot {
-  getMessages<T = unknown>(topic: string): ReadonlyArray<InboxMessage<T>>;
-  consume(messageId: string): void;
+export interface SnapshotCache {
+  getProposals(): ReadonlyArray<SnapshotProposal>;
+  consume(id: string): void;
+  publish(proposal: Omit<SnapshotProposal, 'id' | 'timestamp'>, idGenerator: { generateId(): string }): void;
 }
 
 export interface GraphMutation {
@@ -35,7 +37,7 @@ export interface ContextWorkingBuffer {
 export interface ProcessArgs {
   readonly buffer: ContextWorkingBuffer;
   readonly targets: readonly ConcreteNode[];
-  readonly inbox: InboxSnapshot;
+  readonly snapshotCache: SnapshotCache;
 }
 
 /**

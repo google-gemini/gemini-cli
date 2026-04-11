@@ -7,22 +7,22 @@
 import type { BaseLlmClient } from '../../core/baseLlmClient.js';
 import type { ContextTracer } from '../tracer.js';
 import type { ContextEnvironment } from './environment.js';
-import type { ContextEventBus } from '../eventBus.js';
 import { ContextTokenCalculator } from '../utils/contextTokenCalculator.js';
 import type { IFileSystem } from '../system/IFileSystem.js';
 import { NodeFileSystem } from '../system/NodeFileSystem.js';
 import type { IIdGenerator } from '../system/IIdGenerator.js';
 import { NodeIdGenerator } from '../system/NodeIdGenerator.js';
-import { LiveInbox } from './inbox.js';
+import { LiveSnapshotCache } from './snapshotCache.js';
 import { IrNodeBehaviorRegistry } from '../ir/behaviorRegistry.js';
 import { registerBuiltInBehaviors } from '../ir/builtinBehaviors.js';
 import { IrMapper } from '../ir/mapper.js';
+import type { SnapshotCache } from '../pipeline.js';
 
 export class ContextEnvironmentImpl implements ContextEnvironment {
   readonly tokenCalculator: ContextTokenCalculator;
   readonly fileSystem: IFileSystem;
   readonly idGenerator: IIdGenerator;
-  readonly inbox: LiveInbox;
+  readonly snapshotCache: SnapshotCache;
   readonly behaviorRegistry: IrNodeBehaviorRegistry;
   readonly irMapper: IrMapper;
 
@@ -34,7 +34,6 @@ export class ContextEnvironmentImpl implements ContextEnvironment {
     readonly projectTempDir: string,
     readonly tracer: ContextTracer,
     readonly charsPerToken: number,
-    readonly eventBus: ContextEventBus,
     fileSystem?: IFileSystem,
     idGenerator?: IIdGenerator,
   ) {
@@ -46,7 +45,7 @@ export class ContextEnvironmentImpl implements ContextEnvironment {
     );
     this.fileSystem = fileSystem || new NodeFileSystem();
     this.idGenerator = idGenerator || new NodeIdGenerator();
-    this.inbox = new LiveInbox();
+    this.snapshotCache = new LiveSnapshotCache();
     this.irMapper = new IrMapper(this.behaviorRegistry, this.idGenerator);
   }
 }

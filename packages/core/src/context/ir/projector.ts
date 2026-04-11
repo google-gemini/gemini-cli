@@ -11,7 +11,7 @@ import type {
   ContextEnvironment,
   ContextTracer,
 } from '../pipeline/environment.js';
-import type { PipelineOrchestrator } from '../pipeline/orchestrator.js';
+import type { ContextManager } from '../contextManager.js';
 import type { ContextProfile } from '../config/profiles.js';
 
 export class IrProjector {
@@ -21,7 +21,7 @@ export class IrProjector {
    */
   static async project(
     nodes: readonly ConcreteNode[],
-    orchestrator: PipelineOrchestrator,
+    contextManager: ContextManager,
     sidecar: ContextProfile,
     tracer: ContextTracer,
     env: ContextEnvironment,
@@ -84,7 +84,7 @@ export class IrProjector {
       }
     }
 
-    const processedNodes = await orchestrator.executeTriggerSync(
+    const processedNodes = await contextManager.executeTriggerSync(
       'gc_backstop',
       nodes,
       agedOutNodes,

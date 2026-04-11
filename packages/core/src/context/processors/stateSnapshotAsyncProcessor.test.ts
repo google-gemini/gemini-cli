@@ -10,15 +10,11 @@ import {
   createDummyNode,
   createMockProcessArgs,
 } from '../testing/contextTestUtils.js';
-import type { InboxMessage } from '../pipeline.js';
-import type { InboxSnapshotImpl } from '../pipeline/inbox.js';
 
 describe('StateSnapshotAsyncProcessor', () => {
-  it('should generate a snapshot and publish it to the inbox', async () => {
+  it('should generate a snapshot and publish it to the cache', async () => {
     const env = createMockEnvironment();
-    // Spy on the publish method
-    const publishSpy = vi.spyOn(env.inbox, 'publish');
-
+    
     const worker = createStateSnapshotAsyncProcessor(
       'StateSnapshotAsyncProcessor',
       env,
@@ -29,14 +25,16 @@ describe('StateSnapshotAsyncProcessor', () => {
     const nodeB = createDummyNode('ep1', 'AGENT_THOUGHT', 60, {}, 'node-B');
 
     const targets = [nodeA, nodeB];
-    await worker.process(createMockProcessArgs(targets, targets, []));
+    const args = createMockProcessArgs(targets, targets, []);
+    const publishSpy = vi.spyOn(args.snapshotCache, 'publish');
+
+    await worker.process(args);
 
     // Ensure generateContent was called
     expect(env.llmClient.generateContent).toHaveBeenCalled();
 
-    // Verify it published to the inbox
+    // Verify it published to the cache
     expect(publishSpy).toHaveBeenCalledWith(
-      'PROPOSED_SNAPSHOT',
       expect.objectContaining({
         newText: 'Mock LLM summary response',
         consumedIds: ['node-A', 'node-B'],
@@ -46,11 +44,8 @@ describe('StateSnapshotAsyncProcessor', () => {
     );
   });
 
-  it('should pull previous accumulate snapshot from inbox and append new targets', async () => {
+  it('should pull previous accumulate snapshot from cache and append new targets', async () => {
     const env = createMockEnvironment();
-    const publishSpy = vi.spyOn(env.inbox, 'publish');
-    const drainSpy = vi.spyOn(env.inbox, 'drainConsumed');
-
     const worker = createStateSnapshotAsyncProcessor(
       'StateSnapshotAsyncProcessor',
       env,
@@ -60,32 +55,27 @@ describe('StateSnapshotAsyncProcessor', () => {
     const nodeC = createDummyNode('ep2', 'USER_PROMPT', 50, {}, 'node-C');
     const targets = [nodeC];
 
-    const inboxMessages: InboxMessage[] = [
+    const proposals = [
       {
         id: 'draft-1',
-        topic: 'PROPOSED_SNAPSHOT',
         timestamp: Date.now() - 1000,
-        payload: {
-          consumedIds: ['node-A', 'node-B'],
-          newText: '<old snapshot>',
-          type: 'accumulate',
-        },
+        consumedIds: ['node-A', 'node-B'],
+        newText: '<old snapshot>',
+        type: 'accumulate',
       },
     ];
 
-    const args = createMockProcessArgs(targets, targets, inboxMessages);
+    const args = createMockProcessArgs(targets, targets, proposals);
+    const publishSpy = vi.spyOn(args.snapshotCache, 'publish');
+    const consumeSpy = vi.spyOn(args.snapshotCache, 'consume');
 
     await worker.process(args);
 
     // The old draft should be consumed
-    expect(
-      (args.inbox as InboxSnapshotImpl).getConsumedIds().has('draft-1'),
-    ).toBe(true);
-    expect(drainSpy).toHaveBeenCalledWith(expect.any(Set));
+    expect(consumeSpy).toHaveBeenCalledWith('draft-1');
 
     // The new publish should contain ALL consumed IDs (old + new)
     expect(publishSpy).toHaveBeenCalledWith(
-      'PROPOSED_SNAPSHOT',
       expect.objectContaining({
         newText: 'Mock LLM summary response',
         consumedIds: ['node-A', 'node-B', 'node-C'], // Aggregated!
@@ -112,14 +102,16 @@ describe('StateSnapshotAsyncProcessor', () => {
 
   it('should ignore empty targets', async () => {
     const env = createMockEnvironment();
-    const publishSpy = vi.spyOn(env.inbox, 'publish');
     const worker = createStateSnapshotAsyncProcessor(
       'StateSnapshotAsyncProcessor',
       env,
       { type: 'accumulate' },
     );
 
-    await worker.process(createMockProcessArgs([], [], []));
+    const args = createMockProcessArgs([], [], []);
+    const publishSpy = vi.spyOn(args.snapshotCache, 'publish');
+
+    await worker.process(args);
 
     expect(env.llmClient.generateContent).not.toHaveBeenCalled();
     expect(publishSpy).not.toHaveBeenCalled();

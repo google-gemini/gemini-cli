@@ -28,7 +28,7 @@ export function createStateSnapshotProcessor(
   return {
     id,
     name: 'StateSnapshotProcessor',
-    process: async ({ targets, inbox }: ProcessArgs) => {
+    process: async ({ targets, snapshotCache }: ProcessArgs) => {
       if (targets.length === 0) {
         return targets;
       }
@@ -38,17 +38,13 @@ export function createStateSnapshotProcessor(
       const expectedType =
         strategy === 'incremental' ? 'point-in-time' : 'accumulate';
 
-      // 1. Check Inbox for a completed Snapshot (The Fast Path)
-      const proposedSnapshots = inbox.getMessages<{
-        newText: string;
-        consumedIds: string[];
-        type: string;
-      }>('PROPOSED_SNAPSHOT');
+      // 1. Check cache for a completed Snapshot (The Fast Path)
+      const proposedSnapshots = snapshotCache.getProposals();
 
       if (proposedSnapshots.length > 0) {
         // Filter for the snapshot type that matches our processor mode
         const matchingSnapshots = proposedSnapshots.filter(
-          (s) => s.payload.type === expectedType,
+          (s) => s.type === expectedType,
         );
 
         // Sort by newest timestamp first (we want the most accumulated snapshot)
@@ -57,7 +53,7 @@ export function createStateSnapshotProcessor(
         );
 
         for (const proposed of sorted) {
-          const { consumedIds, newText } = proposed.payload;
+          const { consumedIds, newText } = proposed;
 
           // Verify all consumed IDs still exist sequentially in targets
           const targetIds = new Set(targets.map((t) => t.id));
@@ -91,7 +87,7 @@ export function createStateSnapshotProcessor(
               returnedNodes.unshift(snapshotNode);
             }
 
-            inbox.consume(proposed.id);
+            snapshotCache.consume(proposed.id);
             return returnedNodes;
           }
         }
