@@ -4,10 +4,19 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, type Mock, beforeEach } from 'vitest';
 import { MarkdownDisplay } from './MarkdownDisplay.js';
 import { LoadedSettings } from '../../config/settings.js';
 import { renderWithProviders } from '../../test-utils/render.js';
+import { useIsScreenReaderEnabled } from 'ink';
+
+vi.mock('ink', async (importOriginal) => {
+  const original = await importOriginal<typeof import('ink')>();
+  return {
+    ...original,
+    useIsScreenReaderEnabled: vi.fn(),
+  };
+});
 
 describe('<MarkdownDisplay />', () => {
   const baseProps = {
@@ -18,6 +27,7 @@ describe('<MarkdownDisplay />', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    (useIsScreenReaderEnabled as Mock).mockReturnValue(false);
   });
 
   it('renders nothing for empty text', async () => {
@@ -231,6 +241,28 @@ Another paragraph.
       );
       expect(lastFrame()).toMatchSnapshot();
       expect(lastFrame()).toContain('1 const x = 1;');
+      unmount();
+    });
+
+    it('renders tables as plain text in screenReader mode', async () => {
+      (useIsScreenReaderEnabled as Mock).mockReturnValue(true);
+      const text = `
+| Name | Value |
+|------|-------|
+| foo  | bar   |
+| baz  | qux   |
+`.replace(/\n/g, eol);
+      const { lastFrame, unmount } = await renderWithProviders(
+        <MarkdownDisplay {...baseProps} text={text} />,
+      );
+      const frame = lastFrame();
+      // Plain-text pipe-separated output — no box-drawing characters
+      expect(frame).toContain('Name | Value');
+      expect(frame).toContain('--- | ---');
+      expect(frame).toContain('foo | bar');
+      expect(frame).toContain('baz | qux');
+      expect(frame).not.toContain('┌');
+      expect(frame).not.toContain('┬');
       unmount();
     });
   });
