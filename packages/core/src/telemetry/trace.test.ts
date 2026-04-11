@@ -4,32 +4,37 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { trace, SpanStatusCode, diag, type Tracer } from '@opentelemetry/api';
-import { runInDevTraceSpan, truncateForTelemetry } from './trace.js';
+import { diag, SpanStatusCode, trace } from '@opentelemetry/api';
+import type { Tracer } from '@opentelemetry/api';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
 import {
-  GeminiCliOperation,
-  GEN_AI_CONVERSATION_ID,
   GEN_AI_AGENT_DESCRIPTION,
   GEN_AI_AGENT_NAME,
+  GEN_AI_CONVERSATION_ID,
   GEN_AI_INPUT_MESSAGES,
   GEN_AI_OPERATION_NAME,
   GEN_AI_OUTPUT_MESSAGES,
+  GeminiCliOperation,
   SERVICE_DESCRIPTION,
   SERVICE_NAME,
 } from './constants.js';
+import {
+  runInDevTraceSpan,
+  spanRegistry,
+  truncateForTelemetry,
+} from './trace.js';
 
 vi.mock('@opentelemetry/api', async (importOriginal) => {
-  const original = await importOriginal<typeof import('@opentelemetry/api')>();
-  return {
-    ...original,
+  const original = await importOriginal();
+  return Object.assign({}, original, {
     trace: {
       getTracer: vi.fn(),
     },
     diag: {
       error: vi.fn(),
     },
-  };
+  });
 });
 
 vi.mock('../utils/session.js', () => ({
@@ -205,6 +210,45 @@ describe('runInDevTraceSpan', () => {
 
     expect(results).toEqual([1, 2]);
     expect(mockSpan.end).toHaveBeenCalled();
+  });
+
+  it('should register async generators with spanRegistry', async () => {
+    const spy = vi.spyOn(spanRegistry, 'register');
+    async function* testStream() {
+      yield 1;
+    }
+
+    const resultStream = await runInDevTraceSpan(
+      { operation: GeminiCliOperation.LLMCall, sessionId: 'test-session-id' },
+      async () => testStream(),
+    );
+
+    expect(spy).toHaveBeenCalledWith(resultStream, expect.any(Function));
+  });
+
+  it('should be idempotent and call span.end only once', async () => {
+    vi.spyOn(spanRegistry, 'register');
+    async function* testStream() {
+      yield 1;
+    }
+
+    const resultStream = await runInDevTraceSpan(
+      { operation: GeminiCliOperation.LLMCall, sessionId: 'test-session-id' },
+      async () => testStream(),
+    );
+
+    // Simulate completion
+    for await (const _ of resultStream) {
+      // iterate
+    }
+    expect(mockSpan.end).toHaveBeenCalledTimes(1);
+
+    // Try to end again (simulating registry or double call)
+    const endSpanFn = vi.mocked(spanRegistry.register).mock
+      .calls[0][1] as () => void;
+    endSpanFn();
+
+    expect(mockSpan.end).toHaveBeenCalledTimes(1);
   });
 
   it('should end span automatically on error in async iterators', async () => {
