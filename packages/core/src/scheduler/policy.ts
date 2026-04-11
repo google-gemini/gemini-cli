@@ -122,7 +122,6 @@ export async function updatePolicy(
   // Mode Transitions (AUTO_EDIT)
   if (isAutoEditTransition(tool, outcome)) {
     context.config.setApprovalMode(ApprovalMode.AUTO_EDIT);
-    return;
   }
 
   // Determine persist scope if we are persisting.
