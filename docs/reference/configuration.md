@@ -399,6 +399,12 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
+- **`ui.hiddenSlashCommands`** (array):
+  - **Description:** List of slash command names to hide from the completion
+    menu. Commands remain functional when invoked directly. Use the command name
+    without the leading slash (e.g., "skills", "mcp").
+  - **Default:** `[]`
+
 #### `ide`
 
 - **`ide.enabled`** (boolean):

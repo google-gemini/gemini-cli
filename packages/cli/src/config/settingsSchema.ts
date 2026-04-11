@@ -873,6 +873,20 @@ const SETTINGS_SCHEMA = {
           },
         },
       },
+      hiddenSlashCommands: {
+        type: 'array',
+        label: 'Hidden Slash Commands',
+        category: 'UI',
+        requiresRestart: false,
+        default: [] as string[],
+        description: oneLine`
+          List of slash command names to hide from the completion menu.
+          Commands remain functional when invoked directly.
+          Use the command name without the leading slash (e.g., "skills", "mcp").
+        `,
+        showInDialog: false,
+        items: { type: 'string' },
+      },
     },
   },
 
