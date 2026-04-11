@@ -271,4 +271,92 @@ describe('GeminiClient Watcher Integration', () => {
     client.dispose();
     expect(fs.existsSync(statusFilePath)).toBe(false);
   });
+
+  it('should robustly handle messy subagent output with conversational filler and markdown', async () => {
+    vi.spyOn(config, 'isExperimentalWatcherEnabled').mockReturnValue(true);
+    vi.spyOn(config, 'getExperimentalWatcherInterval').mockReturnValue(1);
+    vi.spyOn(config, 'getApprovalMode').mockReturnValue(ApprovalMode.DEFAULT);
+
+    const reportData = {
+      userDirections: 'Messy test direction',
+      progressSummary: 'Messy progress',
+      evaluation: 'ON_TRACK',
+    };
+
+    const messyOutput = `
+Subagent "watcher" finished with result:
+\`\`\`json
+${JSON.stringify(reportData, null, 2)}
+\`\`\`
+I hope this status update is helpful!
+    `;
+
+    const mockWatcherTool = {
+      build: vi.fn().mockReturnValue({
+        execute: vi.fn().mockResolvedValue({
+          llmContent: [{ text: 'Subagent finished' }],
+          returnDisplay: {
+            isSubagentProgress: true,
+            agentName: 'watcher',
+            recentActivity: [],
+            state: 'completed',
+            result: messyOutput,
+          },
+        }),
+      }),
+      name: 'watcher',
+      displayName: 'Watcher',
+      description: 'Watcher tool',
+      inputConfig: { inputSchema: {} },
+      outputConfig: { outputName: 'report', schema: {} },
+    };
+
+    const mockToolRegistry = {
+      getFunctionDeclarations: vi.fn().mockReturnValue([]),
+      getTool: vi.fn().mockImplementation((name) => {
+        if (name === 'watcher') return mockWatcherTool;
+        return undefined;
+      }),
+      getAllToolNames: vi.fn().mockReturnValue(['watcher']),
+      sortTools: vi.fn(),
+      discoverAllTools: vi.fn(),
+    };
+
+    const clientAccess = client as unknown as {
+      context: AgentLoopContext;
+    };
+
+    Object.defineProperty(clientAccess.context, 'toolRegistry', {
+      get: () => mockToolRegistry,
+      configurable: true,
+    });
+
+    (
+      clientAccess.context as unknown as { agentRegistry: unknown }
+    ).agentRegistry = {
+      getAllDefinitions: vi.fn().mockReturnValue([]),
+      getDefinition: vi.fn().mockReturnValue(undefined),
+      initialize: vi.fn().mockResolvedValue(undefined),
+    };
+
+    await config.storage.initialize();
+    await client.initialize();
+
+    const signal = new AbortController().signal;
+    const generator = client.sendMessageStream(
+      [{ text: 'test turn' }],
+      signal,
+      'test-prompt',
+    );
+    for await (const _ of generator) {
+      /* consume */
+    }
+
+    const projectTempDir = config.storage.getProjectTempDir();
+    const statusFilePath = path.join(projectTempDir, 'watcher_status.md');
+    expect(fs.existsSync(statusFilePath)).toBe(true);
+    const content = fs.readFileSync(statusFilePath, 'utf-8');
+    expect(content).toContain('Messy test direction');
+    expect(content).toContain('Messy progress');
+  });
 });

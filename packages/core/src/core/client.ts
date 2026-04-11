@@ -48,6 +48,7 @@ import { LoopDetectionService } from '../services/loopDetectionService.js';
 import { ChatCompressionService } from '../context/chatCompressionService.js';
 import { AgentHistoryProvider } from '../context/agentHistoryProvider.js';
 import { isSubagentProgress, type WatcherProgress } from '../agents/types.js';
+import { extractAndParseJson } from '../utils/jsonUtils.js';
 import { WatcherReportSchema } from '../agents/watcher-agent.js';
 import { ideContextStore } from '../ide/ideContext.js';
 import {
@@ -1409,7 +1410,9 @@ export class GeminiClient {
         try {
           const rawOutput = result.returnDisplay.result;
           debugLogger.log(`[Watcher] Raw content response: ${rawOutput}`);
-          const parsed = WatcherReportSchema.parse(JSON.parse(rawOutput));
+          const parsed = WatcherReportSchema.parse(
+            extractAndParseJson(rawOutput),
+          );
 
           // Internally write the status report to avoid requiring user permission
           const projectTempDir = this.config.storage.getProjectTempDir();
