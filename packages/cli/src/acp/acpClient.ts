@@ -1277,7 +1277,9 @@ export class Session {
         });
       }
 
-      const toolResult: ToolResult = await invocation.execute(abortSignal);
+      const toolResult: ToolResult = await invocation.execute({
+        abortSignal,
+      });
       const content = toToolCallContent(toolResult);
 
       const updateContent: acp.ToolCallContent[] = content ? [content] : [];
@@ -1819,7 +1821,7 @@ export class Session {
           kind: toAcpToolKind(readManyFilesTool.kind),
         });
 
-        const result = await invocation.execute(abortSignal);
+        const result = await invocation.execute({ abortSignal });
         const content = toToolCallContent(result) || {
           type: 'content',
           content: {

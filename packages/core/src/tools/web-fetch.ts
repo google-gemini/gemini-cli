@@ -13,6 +13,7 @@ import {
   type ToolInvocation,
   type ToolResult,
   type PolicyUpdateOptions,
+  type ExecuteOptions,
 } from './tools.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { ToolErrorType } from './tool-error.js';
@@ -761,7 +762,7 @@ Response: ${rawResponseText}`;
     }
   }
 
-  async execute(signal: AbortSignal): Promise<ToolResult> {
+  async execute({ abortSignal: signal }: ExecuteOptions): Promise<ToolResult> {
     if (this.context.config.getDirectWebFetch()) {
       return this.executeExperimental(signal);
     }
