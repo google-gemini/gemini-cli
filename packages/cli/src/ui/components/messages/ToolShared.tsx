@@ -196,6 +196,7 @@ type ToolInfoProps = {
   display?: ToolDisplay;
   progressMessage?: string;
   originalRequestName?: string;
+  hideSummary?: boolean;
 };
 
 export const ToolInfo: React.FC<ToolInfoProps> = ({
@@ -206,6 +207,7 @@ export const ToolInfo: React.FC<ToolInfoProps> = ({
   display,
   progressMessage: _progressMessage,
   originalRequestName,
+  hideSummary,
 }) => {
   const status = mapCoreStatusToDisplayStatus(coreStatus);
   const nameColor = React.useMemo<string>(() => {
@@ -228,7 +230,7 @@ export const ToolInfo: React.FC<ToolInfoProps> = ({
 
   const displayName = display?.name || name;
   const displayDescription = display?.description || description;
-  const displaySummary = display?.resultSummary;
+  const displaySummary = hideSummary ? undefined : display?.resultSummary;
 
   return (
     <Box overflow="hidden" height={1} flexGrow={1} flexShrink={1}>

@@ -35,7 +35,7 @@ export function populateToolDisplay({
     description: invocation?.getDescription?.(),
   };
 
-  if (resultDisplay) {
+  if (resultDisplay !== undefined && display.result === undefined) {
     display.result = toolResultDisplayToDisplayContent(resultDisplay);
   }
 

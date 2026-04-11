@@ -116,6 +116,7 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
           emphasis={emphasis}
           progressMessage={progressMessage}
           originalRequestName={originalRequestName}
+          hideSummary={!display?.result && !!display?.resultSummary}
         />
         <FocusHint
           shouldShowFocusHint={shouldShowFocusHint}

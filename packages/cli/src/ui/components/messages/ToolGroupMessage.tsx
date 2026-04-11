@@ -61,7 +61,9 @@ export const isCompactTool = (
   tool: IndividualToolCallDisplay,
   isCompactModeEnabled: boolean,
 ): boolean => {
-  const hasCompactOutputSupport = COMPACT_OUTPUT_ALLOWLIST.has(tool.name);
+  const hasCompactOutputSupport = COMPACT_OUTPUT_ALLOWLIST.has(
+    tool.originalRequestName || tool.name,
+  );
   const displayStatus = mapCoreStatusToDisplayStatus(tool.status);
   return (
     isCompactModeEnabled &&
