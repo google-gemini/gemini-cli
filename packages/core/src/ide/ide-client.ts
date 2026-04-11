@@ -77,6 +77,7 @@ export class IdeClient {
   private diffResponses = new Map<string, (result: DiffUpdateResult) => void>();
   private statusListeners = new Set<(state: IDEConnectionState) => void>();
   private trustChangeListeners = new Set<(isTrusted: boolean) => void>();
+  private lastNotifiedTrustValue: boolean | undefined = undefined;
   private availableTools: string[] = [];
   /**
    * A mutex to ensure that only one diff view is open in the IDE at a time.
@@ -504,7 +505,11 @@ export class IdeClient {
       (notification) => {
         ideContextStore.set(notification.params);
         const isTrusted = notification.params.workspaceState?.isTrusted;
-        if (isTrusted !== undefined) {
+        if (
+          isTrusted !== undefined &&
+          isTrusted !== this.lastNotifiedTrustValue
+        ) {
+          this.lastNotifiedTrustValue = isTrusted;
           for (const listener of this.trustChangeListeners) {
             listener(isTrusted);
           }
