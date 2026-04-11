@@ -225,10 +225,34 @@ export function setTargetDir(agentSettings: AgentSettings | undefined): string {
 
 export function loadEnvironment(): void {
   const envFilePaths = findEnvFiles(process.cwd());
+
+  // Snapshot the keys that were already present in the environment before
+  // loading any .env files.  Shell-set variables must never be overridden,
+  // but variables from a lower-precedence .env file can be overridden by a
+  // higher-precedence one.
+  const originalEnvKeys = new Set(Object.keys(process.env));
+
   // Load from lowest to highest precedence so that the workspace-level file
   // (last in the array) overrides the user-level file (first in the array).
   for (const envFilePath of envFilePaths) {
-    dotenv.config({ path: envFilePath, override: true });
+    try {
+      const envFileContent = fs.readFileSync(envFilePath, 'utf-8');
+      const parsedEnv = dotenv.parse(envFileContent);
+
+      for (const key in parsedEnv) {
+        if (Object.hasOwn(parsedEnv, key)) {
+          // Set the variable only when it was not originally present in the
+          // shell environment.  Variables set by a lower-precedence .env file
+          // (not in originalEnvKeys) will be overwritten here, allowing the
+          // highest-precedence file to win.
+          if (!originalEnvKeys.has(key)) {
+            process.env[key] = parsedEnv[key];
+          }
+        }
+      }
+    } catch {
+      // Errors are ignored to match the behavior of `dotenv.config({ quiet: true })`.
+    }
   }
 }
 
