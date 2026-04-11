@@ -26,32 +26,121 @@ export function safeLiteralReplace(
 }
 
 /**
- * Checks if a Buffer is likely binary by testing for the presence of a NULL byte.
- * The presence of a NULL byte is a strong indicator that the data is not plain text.
+ * Checks if a Buffer is likely binary by testing for the presence of NULL bytes.
+ * The presence of NULL bytes is a strong indicator that the data is not plain text.
+ *
+ * When `isPtyOutput` is true, the check strips ANSI escape sequences first and
+ * uses a ratio-based threshold instead of failing on a single NULL byte. This
+ * prevents false positives caused by PTY control sequences on Windows, which
+ * can contain NULL bytes in ANSI/VT escape data.
+ *
  * @param data The Buffer to check.
  * @param sampleSize The number of bytes from the start of the buffer to test.
- * @returns True if a NULL byte is found, false otherwise.
+ * @param isPtyOutput If true, apply PTY-aware heuristics to avoid false positives
+ *                    from ANSI control sequences (fixes Windows node-pty issue #25164).
+ * @returns True if the data appears to be binary, false otherwise.
  */
 export function isBinary(
   data: Buffer | null | undefined,
   sampleSize = 512,
+  isPtyOutput = false,
 ): boolean {
   if (!data) {
     return false;
   }
 
-  const sample = data.length > sampleSize ? data.subarray(0, sampleSize) : data;
+  let sample: Buffer | Uint8Array =
+    data.length > sampleSize ? data.subarray(0, sampleSize) : data;
 
+  if (isPtyOutput) {
+    // Strip ANSI escape sequences before performing the binary check.
+    // PTY streams (especially on Windows) emit VT/ANSI control sequences
+    // that can contain null bytes, causing false positives.
+    sample = stripAnsiFromBuffer(sample);
+
+    if (sample.length === 0) {
+      // If the entire sample was ANSI escape sequences, it's not binary.
+      return false;
+    }
+
+    // Use a ratio-based threshold for PTY output: if more than 10% of the
+    // (non-ANSI) bytes are NULL, consider it binary. A stray null byte in
+    // a PTY stream should not trigger binary detection.
+    const NULL_BYTE_THRESHOLD = 0.1;
+    let nullCount = 0;
+    for (const byte of sample) {
+      if (byte === 0) {
+        nullCount++;
+      }
+    }
+    return nullCount / sample.length > NULL_BYTE_THRESHOLD;
+  }
+
+  // Non-PTY path: original strict check — any single NULL byte means binary.
   for (const byte of sample) {
-    // The presence of a NULL byte (0x00) is one of the most reliable
-    // indicators of a binary file. Text files should not contain them.
     if (byte === 0) {
       return true;
     }
   }
 
-  // If no NULL bytes were found in the sample, we assume it's text.
   return false;
+}
+
+/**
+ * Strips ANSI/VT escape sequences from a raw byte buffer.
+ * This handles CSI sequences (ESC [ ... final_byte), OSC sequences (ESC ] ... ST),
+ * and simple two-byte escape sequences (ESC + single char).
+ *
+ * @param buf The raw buffer to strip ANSI sequences from.
+ * @returns A new Buffer with ANSI escape sequences removed.
+ */
+function stripAnsiFromBuffer(buf: Buffer | Uint8Array): Buffer {
+  const ESC = 0x1b;
+  const result: number[] = [];
+  let i = 0;
+
+  while (i < buf.length) {
+    if (buf[i] === ESC) {
+      i++; // skip ESC
+      if (i >= buf.length) break;
+
+      if (buf[i] === 0x5b) {
+        // '[' — CSI sequence: ESC [ <params> <final_byte>
+        i++; // skip '['
+        // Skip parameter bytes (0x30–0x3F) and intermediate bytes (0x20–0x2F)
+        while (i < buf.length && buf[i]! >= 0x20 && buf[i]! <= 0x3f) {
+          i++;
+        }
+        // Skip the final byte (0x40–0x7E)
+        if (i < buf.length && buf[i]! >= 0x40 && buf[i]! <= 0x7e) {
+          i++;
+        }
+      } else if (buf[i] === 0x5d) {
+        // ']' — OSC sequence: ESC ] ... (ST or BEL)
+        i++; // skip ']'
+        while (i < buf.length) {
+          // ST = ESC '\' (0x1b 0x5c) or BEL (0x07)
+          if (buf[i] === 0x07) {
+            i++;
+            break;
+          }
+          if (buf[i] === ESC && i + 1 < buf.length && buf[i + 1] === 0x5c) {
+            i += 2;
+            break;
+          }
+          i++;
+        }
+      } else {
+        // Simple two-byte escape sequence (ESC + single char)
+        i++;
+      }
+    } else {
+      result.push(buf[i]!);
+      i++;
+    }
+  }
+
+  return Buffer.from(result);
 }
 
 /**

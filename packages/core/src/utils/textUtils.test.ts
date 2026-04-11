@@ -198,3 +198,89 @@ describe('safeTemplateReplace', () => {
     expect(safeTemplateReplace(tmpl, replacements)).toBe('Value: $&');
   });
 });
+
+describe('isBinary', () => {
+  describe('non-PTY mode (default)', () => {
+    it('should return false for null/undefined input', () => {
+      expect(isBinary(null)).toBe(false);
+      expect(isBinary(undefined)).toBe(false);
+    });
+
+    it('should return false for a plain text buffer', () => {
+      expect(isBinary(Buffer.from('Hello, world!'))).toBe(false);
+    });
+
+    it('should return true for a buffer containing a single null byte', () => {
+      expect(isBinary(Buffer.from([0x48, 0x65, 0x00, 0x6c, 0x6f]))).toBe(
+        true,
+      );
+    });
+
+    it('should return true for a purely binary buffer', () => {
+      expect(isBinary(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x00]))).toBe(
+        true,
+      );
+    });
+
+    it('should only check up to sampleSize bytes', () => {
+      // Null byte is at position 4, sampleSize is 4 — should not be detected
+      const buf = Buffer.from([0x41, 0x42, 0x43, 0x44, 0x00]);
+      expect(isBinary(buf, 4)).toBe(false);
+    });
+  });
+
+  describe('PTY mode (isPtyOutput=true)', () => {
+    it('should return false for a buffer with ANSI escape sequences containing null bytes', () => {
+      // Simulate a PTY stream: ESC[0m (ANSI reset) + stray null + text
+      const buf = Buffer.from([
+        0x1b, 0x5b, 0x30, 0x6d, // ESC[0m
+        0x00, // stray null byte
+        0x48, 0x65, 0x6c, 0x6c, 0x6f, // "Hello"
+      ]);
+      expect(isBinary(buf, 512, true)).toBe(false);
+    });
+
+    it('should return false when buffer is entirely ANSI escape sequences', () => {
+      // ESC[0m ESC[1m
+      const buf = Buffer.from([
+        0x1b, 0x5b, 0x30, 0x6d, 0x1b, 0x5b, 0x31, 0x6d,
+      ]);
+      expect(isBinary(buf, 512, true)).toBe(false);
+    });
+
+    it('should return true for a buffer with >10% null bytes after ANSI stripping', () => {
+      // 10 bytes: 2 null + 8 text => 20% null => binary
+      const buf = Buffer.from([
+        0x00, 0x00, 0x48, 0x65, 0x6c, 0x6c, 0x6f, 0x21, 0x41, 0x42,
+      ]);
+      expect(isBinary(buf, 512, true)).toBe(true);
+    });
+
+    it('should return false for normal text with no null bytes in PTY mode', () => {
+      expect(isBinary(Buffer.from('Normal PTY output text'), 512, true)).toBe(
+        false,
+      );
+    });
+
+    it('should return false for Windows PTY output with VT sequences and stray nulls', () => {
+      // Realistic Windows PTY: OSC title sequence + stray null + prompt text
+      const title = Buffer.from('cmd');
+      const buf = Buffer.concat([
+        Buffer.from([0x1b, 0x5d, 0x30, 0x3b]), // ESC ] 0 ;
+        title,
+        Buffer.from([0x07]), // BEL (end of OSC)
+        Buffer.from([0x00]), // stray null from PTY
+        Buffer.from('C:\\Users>'), // actual command output
+      ]);
+      expect(isBinary(buf, 512, true)).toBe(false);
+    });
+
+    it('should return false for an empty buffer in PTY mode', () => {
+      expect(isBinary(Buffer.from([]), 512, true)).toBe(false);
+    });
+
+    it('should return false for null input in PTY mode', () => {
+      expect(isBinary(null, 512, true)).toBe(false);
+    });
+  });
+});
