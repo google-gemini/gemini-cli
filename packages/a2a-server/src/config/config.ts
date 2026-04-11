@@ -224,39 +224,62 @@ export function setTargetDir(agentSettings: AgentSettings | undefined): string {
 }
 
 export function loadEnvironment(): void {
-  const envFilePath = findEnvFile(process.cwd());
-  if (envFilePath) {
+  const envFilePaths = findEnvFiles(process.cwd());
+  // Load from lowest to highest precedence so that the workspace-level file
+  // (last in the array) overrides the user-level file (first in the array).
+  for (const envFilePath of envFilePaths) {
     dotenv.config({ path: envFilePath, override: true });
   }
 }
 
-function findEnvFile(startDir: string): string | null {
+/**
+ * Finds all relevant .env files, ordered from lowest to highest precedence.
+ *
+ * Precedence order (lowest to highest):
+ *   1. ~/.env               (user-level generic)
+ *   2. ~/.gemini/.env       (user-level gemini-specific)
+ *   3. <nearest ancestor>/.env or <nearest ancestor>/.gemini/.env
+ *      (workspace-level, found by walking up from startDir)
+ */
+function findEnvFiles(startDir: string): string[] {
+  const files: string[] = [];
+  const homeDir = path.resolve(homedir());
+
+  // 1. User-level files (lowest precedence): always included when present.
+  const homeEnvPath = path.join(homeDir, '.env');
+  const homeGeminiEnvPath = path.join(homeDir, GEMINI_DIR, '.env');
+  if (fs.existsSync(homeEnvPath)) {
+    files.push(homeEnvPath);
+  }
+  if (fs.existsSync(homeGeminiEnvPath)) {
+    files.push(homeGeminiEnvPath);
+  }
+
+  // 2. Workspace-level file (higher precedence): walk up from startDir toward
+  //    root, skipping the home dir (already handled above), and stop at the
+  //    first .gemini/.env or .env found.
   let currentDir = path.resolve(startDir);
   while (true) {
-    // prefer gemini-specific .env under GEMINI_DIR
-    const geminiEnvPath = path.join(currentDir, GEMINI_DIR, '.env');
-    if (fs.existsSync(geminiEnvPath)) {
-      return geminiEnvPath;
-    }
-    const envPath = path.join(currentDir, '.env');
-    if (fs.existsSync(envPath)) {
-      return envPath;
+    if (currentDir !== homeDir) {
+      const geminiEnvPath = path.join(currentDir, GEMINI_DIR, '.env');
+      if (fs.existsSync(geminiEnvPath)) {
+        files.push(geminiEnvPath);
+        break;
+      }
+      const envPath = path.join(currentDir, '.env');
+      if (fs.existsSync(envPath)) {
+        files.push(envPath);
+        break;
+      }
     }
     const parentDir = path.dirname(currentDir);
-    if (parentDir === currentDir || !parentDir) {
-      // check .env under home as fallback, again preferring gemini-specific .env
-      const homeGeminiEnvPath = path.join(process.cwd(), GEMINI_DIR, '.env');
-      if (fs.existsSync(homeGeminiEnvPath)) {
-        return homeGeminiEnvPath;
-      }
-      const homeEnvPath = path.join(homedir(), '.env');
-      if (fs.existsSync(homeEnvPath)) {
-        return homeEnvPath;
-      }
-      return null;
+    if (parentDir === currentDir) {
+      break;
     }
     currentDir = parentDir;
   }
+
+  return files;
 }
 
 async function refreshAuthentication(

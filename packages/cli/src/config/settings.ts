@@ -494,37 +494,63 @@ export class LoadedSettings {
   }
 }
 
-function findEnvFile(startDir: string): string | null {
+/**
+ * Finds all relevant .env files, ordered from lowest to highest precedence.
+ *
+ * Precedence order (lowest to highest):
+ *   1. ~/.env               (user-level generic)
+ *   2. ~/.gemini/.env       (user-level gemini-specific)
+ *   3. <nearest ancestor>/.env or <nearest ancestor>/.gemini/.env
+ *      (workspace-level, found by walking up from startDir)
+ *
+ * This mirrors the settings.json hierarchy: user-level settings are
+ * inherited by all projects, and workspace-level settings override them.
+ */
+function findEnvFiles(startDir: string): string[] {
+  const files: string[] = [];
+  const homeDir = path.resolve(homedir());
+
+  // 1. User-level files (lowest precedence): always included when present.
+  const homeEnvPath = path.join(homeDir, '.env');
+  const homeGeminiEnvPath = path.join(homeDir, GEMINI_DIR, '.env');
+  if (fs.existsSync(homeEnvPath)) {
+    files.push(homeEnvPath);
+  }
+  if (fs.existsSync(homeGeminiEnvPath)) {
+    files.push(homeGeminiEnvPath);
+  }
+
+  // 2. Workspace-level file (higher precedence): walk up from startDir toward
+  //    root, skipping the home dir (already handled above), and stop at the
+  //    first .gemini/.env or .env found.  The gemini-specific file is preferred
+  //    at each directory level, matching the original single-file behaviour.
   let currentDir = path.resolve(startDir);
   while (true) {
-    // prefer gemini-specific .env under GEMINI_DIR
-    const geminiEnvPath = path.join(currentDir, GEMINI_DIR, '.env');
-    if (fs.existsSync(geminiEnvPath)) {
-      return geminiEnvPath;
-    }
-    const envPath = path.join(currentDir, '.env');
-    if (fs.existsSync(envPath)) {
-      return envPath;
+    if (currentDir !== homeDir) {
+      const geminiEnvPath = path.join(currentDir, GEMINI_DIR, '.env');
+      if (fs.existsSync(geminiEnvPath)) {
+        files.push(geminiEnvPath);
+        break;
+      }
+      const envPath = path.join(currentDir, '.env');
+      if (fs.existsSync(envPath)) {
+        files.push(envPath);
+        break;
+      }
     }
     const parentDir = path.dirname(currentDir);
-    if (parentDir === currentDir || !parentDir) {
-      // check .env under home as fallback, again preferring gemini-specific .env
-      const homeGeminiEnvPath = path.join(homedir(), GEMINI_DIR, '.env');
-      if (fs.existsSync(homeGeminiEnvPath)) {
-        return homeGeminiEnvPath;
-      }
-      const homeEnvPath = path.join(homedir(), '.env');
-      if (fs.existsSync(homeEnvPath)) {
-        return homeEnvPath;
-      }
-      return null;
+    if (parentDir === currentDir) {
+      // Reached the filesystem root without finding a workspace-level file.
+      break;
     }
     currentDir = parentDir;
   }
+
+  return files;
 }
 
 export function setUpCloudShellEnvironment(
-  envFilePath: string | null,
+  envFilePaths: string[],
   isTrusted: boolean,
   isSandboxed: boolean,
 ): void {
@@ -535,14 +561,23 @@ export function setUpCloudShellEnvironment(
   // one of the .env files, we set the Cloud Shell-specific default here.
   let value = 'cloudshell-gca';
 
-  if (envFilePath && fs.existsSync(envFilePath)) {
-    const envFileContent = fs.readFileSync(envFilePath);
-    const parsedEnv = dotenv.parse(envFileContent);
-    if (parsedEnv['GOOGLE_CLOUD_PROJECT']) {
-      // .env file takes precedence in Cloud Shell
-      value = parsedEnv['GOOGLE_CLOUD_PROJECT'];
-      if (!isTrusted && isSandboxed) {
-        value = sanitizeEnvVar(value);
+  // Check env files from highest to lowest precedence so that the most
+  // specific file wins (last entry in the array has highest precedence).
+  for (let i = envFilePaths.length - 1; i >= 0; i--) {
+    const envFilePath = envFilePaths[i];
+    if (fs.existsSync(envFilePath)) {
+      try {
+        const envFileContent = fs.readFileSync(envFilePath);
+        const parsedEnv = dotenv.parse(envFileContent);
+        if (parsedEnv['GOOGLE_CLOUD_PROJECT']) {
+          value = parsedEnv['GOOGLE_CLOUD_PROJECT'];
+          if (!isTrusted && isSandboxed) {
+            value = sanitizeEnvVar(value);
+          }
+          break;
+        }
+      } catch {
+        // Ignore read errors and continue to the next file.
       }
     }
   }
@@ -554,7 +589,7 @@ export function loadEnvironment(
   workspaceDir: string,
   isWorkspaceTrustedFn = isWorkspaceTrusted,
 ): void {
-  const envFilePath = findEnvFile(workspaceDir);
+  const envFilePaths = findEnvFiles(workspaceDir);
   const trustResult = isWorkspaceTrustedFn(settings, workspaceDir);
 
   const isTrusted = trustResult.isTrusted ?? false;
@@ -575,45 +610,64 @@ export function loadEnvironment(
 
   // Cloud Shell environment variable handling
   if (process.env['CLOUD_SHELL'] === 'true') {
-    setUpCloudShellEnvironment(envFilePath, isTrusted, isSandboxed);
+    setUpCloudShellEnvironment(envFilePaths, isTrusted, isSandboxed);
   }
 
-  if (envFilePath) {
-    // Manually parse and load environment variables to handle exclusions correctly.
-    // This avoids modifying environment variables that were already set from the shell.
-    try {
-      const envFileContent = fs.readFileSync(envFilePath, 'utf-8');
-      const parsedEnv = dotenv.parse(envFileContent);
+  if (envFilePaths.length > 0) {
+    // Snapshot the keys that were already present in the environment before
+    // loading any .env files.  Shell-set variables must never be overridden,
+    // but variables that come from a lower-precedence .env file can be
+    // overridden by a higher-precedence one.
+    const originalEnvKeys = new Set(Object.keys(process.env));
 
-      const excludedVars =
-        settings?.advanced?.excludedEnvVars || DEFAULT_EXCLUDED_ENV_VARS;
-      const isProjectEnvFile = !envFilePath.includes(GEMINI_DIR);
+    const excludedVars =
+      settings?.advanced?.excludedEnvVars || DEFAULT_EXCLUDED_ENV_VARS;
 
-      for (const key in parsedEnv) {
-        if (Object.hasOwn(parsedEnv, key)) {
-          let value = parsedEnv[key];
-          // If the workspace is untrusted but we are sandboxed, only allow whitelisted variables.
-          if (!isTrusted && isSandboxed) {
-            if (!AUTH_ENV_VAR_WHITELIST.includes(key)) {
+    // Load files from lowest to highest precedence (the array is already
+    // ordered that way: home-level first, workspace-level last).  Processing
+    // in this order means that later files naturally overwrite values set by
+    // earlier files, while shell-set variables are always preserved.
+    for (const envFilePath of envFilePaths) {
+      // Manually parse and load environment variables to handle exclusions
+      // correctly.  This avoids modifying variables already set from the shell.
+      try {
+        const envFileContent = fs.readFileSync(envFilePath, 'utf-8');
+        const parsedEnv = dotenv.parse(envFileContent);
+
+        // A gemini-specific env file (inside GEMINI_DIR) is not subject to the
+        // excludedEnvVars restriction; only generic .env files are.
+        const isGenericEnvFile = !envFilePath.includes(GEMINI_DIR);
+
+        for (const key in parsedEnv) {
+          if (Object.hasOwn(parsedEnv, key)) {
+            let value = parsedEnv[key];
+            // If the workspace is untrusted but we are sandboxed, only allow
+            // whitelisted variables.
+            if (!isTrusted && isSandboxed) {
+              if (!AUTH_ENV_VAR_WHITELIST.includes(key)) {
+                continue;
+              }
+              // Sanitize the value for untrusted sources.
+              value = sanitizeEnvVar(value);
+            }
+
+            // If it's a generic .env file, skip loading excluded variables.
+            if (isGenericEnvFile && excludedVars.includes(key)) {
               continue;
             }
-            // Sanitize the value for untrusted sources
-            value = sanitizeEnvVar(value);
-          }
 
-          // If it's a project .env file, skip loading excluded variables.
-          if (isProjectEnvFile && excludedVars.includes(key)) {
-            continue;
-          }
-
-          // Load variable only if it's not already set in the environment.
-          if (!Object.hasOwn(process.env, key)) {
-            process.env[key] = value;
+            // Set the variable only when it was not originally present in the
+            // shell environment.  Variables that were set by a lower-precedence
+            // .env file (i.e., not in originalEnvKeys) will be overridden here,
+            // allowing the highest-precedence file to win.
+            if (!originalEnvKeys.has(key)) {
+              process.env[key] = value;
+            }
           }
         }
+      } catch {
+        // Errors are ignored to match the behavior of `dotenv.config({ quiet: true })`.
       }
-    } catch {
-      // Errors are ignored to match the behavior of `dotenv.config({ quiet: true })`.
     }
   }
 }
