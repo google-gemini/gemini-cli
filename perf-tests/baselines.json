@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-04-09T02:30:22.000Z",
+  "updatedAt": "2026-04-11T01:52:23.183Z",
   "scenarios": {
     "cold-startup-time": {
       "wallClockMs": 927.553249999999,
@@ -21,6 +21,11 @@
       "wallClockMs": 1119.9,
       "cpuTotalUs": 2100,
       "timestamp": "2026-04-09T02:30:22.000Z"
+    },
+    "long-conversation": {
+      "wallClockMs": 4199.5024319999975,
+      "cpuTotalUs": 292959,
+      "timestamp": "2026-04-11T01:52:23.183Z"
     }
   }
 }
