@@ -162,59 +162,6 @@ describe('createContentGenerator', () => {
     );
   });
 
-  it('should wrap custom baseUrl generators to avoid SDK streaming hangs', async () => {
-    const mockGenerator = {
-      models: {
-        generateContent: vi.fn(),
-        generateContentStream: vi.fn(),
-        countTokens: vi.fn(),
-        embedContent: vi.fn(),
-      },
-    } as unknown as GoogleGenAI;
-    vi.mocked(GoogleGenAI).mockImplementation(() => mockGenerator as never);
-
-    const generator = await createContentGenerator(
-      {
-        apiKey: 'test-api-key',
-        authType: AuthType.GATEWAY,
-        baseUrl: 'https://example.com',
-      },
-      mockConfig,
-    );
-
-    expect(generator).toBeInstanceOf(LoggingContentGenerator);
-  });
-
-  it('should wrap generators when GOOGLE_GEMINI_BASE_URL is set', async () => {
-    const mockGenerator = {
-      models: {
-        generateContent: vi.fn(),
-        generateContentStream: vi.fn(),
-        countTokens: vi.fn(),
-        embedContent: vi.fn(),
-      },
-    } as unknown as GoogleGenAI;
-    vi.mocked(GoogleGenAI).mockImplementation(() => mockGenerator as never);
-    vi.stubEnv('GOOGLE_GEMINI_BASE_URL', 'https://litellm.example.com');
-
-    const generator = await createContentGenerator(
-      {
-        apiKey: 'test-api-key',
-        authType: AuthType.USE_GEMINI,
-      },
-      mockConfig,
-    );
-
-    expect(GoogleGenAI).toHaveBeenCalledWith(
-      expect.objectContaining({
-        httpOptions: expect.objectContaining({
-          baseUrl: 'https://litellm.example.com',
-        }),
-      }),
-    );
-    expect(generator).toBeInstanceOf(LoggingContentGenerator);
-  });
-
   it('should use standard User-Agent for a2a-server running outside VS Code', async () => {
     const mockConfig = {
       getModel: vi.fn().mockReturnValue('gemini-pro'),

@@ -11,6 +11,7 @@ import {
 } from '../utils/secure-browser-launcher.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { getErrorMessage } from '../utils/errors.js';
+import { getErrorStatus } from '../utils/httpErrors.js';
 import type { FallbackIntent, FallbackRecommendation } from './types.js';
 import { classifyFailureKind } from '../availability/errorClassification.js';
 import {
@@ -28,6 +29,15 @@ export async function handleFallback(
   authType?: string,
   error?: unknown,
 ): Promise<string | boolean | null> {
+  // Server errors (5xx) should not trigger the fallback dialog. These are real
+  // server errors (e.g. from a custom proxy or a transient backend issue) that
+  // should propagate after retries are exhausted rather than prompting the user
+  // to switch models — a model switch cannot fix a server-side problem.
+  const errorStatus = getErrorStatus(error);
+  if (errorStatus !== undefined && errorStatus >= 500 && errorStatus < 600) {
+    return null;
+  }
+
   const chain = resolvePolicyChain(config);
   const { failedPolicy, candidates } = buildFallbackPolicyContext(
     chain,

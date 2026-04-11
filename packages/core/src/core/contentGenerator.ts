@@ -26,7 +26,6 @@ import { FakeContentGenerator } from './fakeContentGenerator.js';
 import { parseCustomHeaders } from '../utils/customHeaderUtils.js';
 import { determineSurface } from '../utils/surface.js';
 import { RecordingContentGenerator } from './recordingContentGenerator.js';
-import { CustomBaseUrlContentGenerator } from './customBaseUrlContentGenerator.js';
 import { getVersion, resolveModel } from '../../index.js';
 import type { LlmRole } from '../telemetry/llmRole.js';
 
@@ -101,20 +100,6 @@ export type ContentGeneratorConfig = {
   baseUrl?: string;
   customHeaders?: Record<string, string>;
 };
-
-function getConfiguredBaseUrl(
-  config: ContentGeneratorConfig,
-): string | undefined {
-  if (config.baseUrl) {
-    return config.baseUrl;
-  }
-
-  if (config.vertexai) {
-    return process.env['GOOGLE_VERTEX_BASE_URL'] || undefined;
-  }
-
-  return process.env['GOOGLE_GEMINI_BASE_URL'] || undefined;
-}
 
 export async function createContentGeneratorConfig(
   config: Config,
@@ -293,9 +278,8 @@ export async function createContentGenerator(
         headers: Record<string, string>;
       } = { headers };
 
-      const configuredBaseUrl = getConfiguredBaseUrl(config);
-      if (configuredBaseUrl) {
-        httpOptions.baseUrl = configuredBaseUrl;
+      if (config.baseUrl) {
+        httpOptions.baseUrl = config.baseUrl;
       }
 
       const googleGenAI = new GoogleGenAI({
@@ -304,10 +288,7 @@ export async function createContentGenerator(
         httpOptions,
         ...(apiVersionEnv && { apiVersion: apiVersionEnv }),
       });
-      const contentGenerator = configuredBaseUrl
-        ? new CustomBaseUrlContentGenerator(googleGenAI.models)
-        : googleGenAI.models;
-      return new LoggingContentGenerator(contentGenerator, gcConfig);
+      return new LoggingContentGenerator(googleGenAI.models, gcConfig);
     }
     throw new Error(
       `Error creating contentGenerator: Unsupported authType: ${config.authType}`,
