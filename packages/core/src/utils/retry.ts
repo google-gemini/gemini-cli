@@ -53,13 +53,28 @@ const RETRYABLE_NETWORK_CODES = [
   'ENOTFOUND',
   'EAI_AGAIN',
   'ECONNREFUSED',
-  // SSL/TLS transient errors
-  'ERR_SSL_SSLV3_ALERT_BAD_RECORD_MAC',
+  // SSL/TLS transient errors. Node.js constructs these codes by prepending
+  // ERR_SSL_ to the uppercased OpenSSL reason string with spaces replaced by
+  // underscores (see TLSWrap::ClearOut in node/src/crypto/crypto_tls.cc).
+  // The reason string format varies by OpenSSL version, so the same alert
+  // produces different codes:
+  'ERR_SSL_SSLV3_ALERT_BAD_RECORD_MAC', // OpenSSL 1.x
+  'ERR_SSL_SSL/TLS_ALERT_BAD_RECORD_MAC', // OpenSSL 3.x
   'ERR_SSL_WRONG_VERSION_NUMBER',
   'ERR_SSL_DECRYPTION_FAILED_OR_BAD_RECORD_MAC',
   'ERR_SSL_BAD_RECORD_MAC',
   'EPROTO', // Generic protocol error (often SSL-related)
 ];
+
+/**
+ * Checks if an error code looks like a retryable SSL error, even if
+ * not in the exact RETRYABLE_NETWORK_CODES list. OpenSSL version
+ * differences cause the error code format to vary (e.g. SSLV3 vs SSL/TLS).
+ */
+function isRetryableSslErrorCode(code: string): boolean {
+  const upper = code.toUpperCase();
+  return upper.startsWith('ERR_SSL') && upper.includes('BAD_RECORD_MAC');
+}
 
 function getNetworkErrorCode(error: unknown): string | undefined {
   const getCode = (obj: unknown): string | undefined => {
@@ -153,7 +168,11 @@ export function isRetryableError(
 ): boolean {
   // Check for common network error codes
   const errorCode = getNetworkErrorCode(error);
-  if (errorCode && RETRYABLE_NETWORK_CODES.includes(errorCode)) {
+  if (
+    errorCode &&
+    (RETRYABLE_NETWORK_CODES.includes(errorCode) ||
+      isRetryableSslErrorCode(errorCode))
+  ) {
     return true;
   }
 

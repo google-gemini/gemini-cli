@@ -1508,6 +1508,14 @@ export const useGeminiStream = (
             loopDetectedRef.current = true;
             break;
           case ServerGeminiEventType.Retry:
+            addItem(
+              {
+                type: MessageType.INFO,
+                text: 'Network error during streaming. Retrying...',
+              },
+              userMessageTimestamp,
+            );
+            break;
           case ServerGeminiEventType.InvalidStream:
             // Will add the missing logic later
             break;
