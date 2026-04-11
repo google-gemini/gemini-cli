@@ -5,9 +5,11 @@ and managing Gemini CLI in an enterprise environment. By leveraging system-level
 settings, administrators can enforce security policies, manage tool access, and
 ensure a consistent experience for all users.
 
-> **A note on security:** The patterns described in this document are intended
-> to help administrators create a more controlled and secure environment for
-> using Gemini CLI. However, they should not be considered a foolproof security
+<!-- prettier-ignore -->
+> [!WARNING]
+> The patterns described in this document are intended to help
+> administrators create a more controlled and secure environment for using
+> Gemini CLI. However, they should not be considered a foolproof security
 > boundary. A determined user with sufficient privileges on their local machine
 > may still be able to circumvent these configurations. These measures are
 > designed to prevent accidental misuse and enforce corporate policy in a
@@ -20,7 +22,7 @@ The most powerful tools for enterprise administration are the system-wide
 settings files. These files allow you to define a baseline configuration
 (`system-defaults.json`) and a set of overrides (`settings.json`) that apply to
 all users on a machine. For a complete overview of configuration options, see
-the [Configuration documentation](../get-started/configuration.md).
+the [Configuration documentation](../reference/configuration.md).
 
 Settings are merged from four files. The precedence order for single-value
 settings (like `theme`) is:
@@ -173,8 +175,8 @@ the enterprise settings are always loaded with the highest precedence.
 **Example wrapper script:**
 
 Administrators can create a script named `gemini` and place it in a directory
-that appears earlier in the user's `PATH` than the actual Gemini CLI binary
-(e.g., `/usr/local/bin/gemini`).
+that appears earlier in the user's `PATH` than the actual Gemini CLI binary (for
+example, `/usr/local/bin/gemini`).
 
 ```bash
 #!/bin/bash
@@ -203,6 +205,15 @@ with the actual Gemini CLI process, which inherits the environment variable.
 This makes it significantly more difficult for a user to bypass the enforced
 settings.
 
+**PowerShell Profile (Windows alternative):**
+
+On Windows, administrators can achieve similar results by adding the environment
+variable to the system-wide or user-specific PowerShell profile:
+
+```powershell
+Add-Content -Path $PROFILE -Value '$env:GEMINI_CLI_SYSTEM_SETTINGS_PATH="C:\ProgramData\gemini-cli\settings.json"'
+```
+
 ## User isolation in shared environments
 
 In shared compute environments (like ML experiment runners or shared build
@@ -214,9 +225,19 @@ use the `GEMINI_CLI_HOME` environment variable to point to a unique directory
 for a specific user or job. The CLI will create a `.gemini` folder inside the
 specified path.
 
+**macOS/Linux**
+
 ```bash
 # Isolate state for a specific job
 export GEMINI_CLI_HOME="/tmp/gemini-job-123"
+gemini
+```
+
+**Windows (PowerShell)**
+
+```powershell
+# Isolate state for a specific job
+$env:GEMINI_CLI_HOME="C:\temp\gemini-job-123"
 gemini
 ```
 
@@ -224,8 +245,8 @@ gemini
 
 You can significantly enhance security by controlling which tools the Gemini
 model can use. This is achieved through the `tools.core` setting and the
-[Policy Engine](../core/policy-engine.md). For a list of available tools, see
-the [Tools documentation](../tools/index.md).
+[Policy Engine](../reference/policy-engine.md). For a list of available tools,
+see the [Tools reference](../reference/tools.md).
 
 ### Allowlisting with `coreTools`
 
@@ -245,8 +266,8 @@ on the approved list.
 
 ### Blocklisting with `excludeTools` (Deprecated)
 
-> **Deprecated:** Use the [Policy Engine](../core/policy-engine.md) for more
-> robust control.
+> **Deprecated:** Use the [Policy Engine](../reference/policy-engine.md) for
+> more robust control.
 
 Alternatively, you can add specific tools that are considered dangerous in your
 environment to a blocklist.
@@ -261,10 +282,12 @@ environment to a blocklist.
 }
 ```
 
-**Security note:** Blocklisting with `excludeTools` is less secure than
-allowlisting with `coreTools`, as it relies on blocking known-bad commands, and
-clever users may find ways to bypass simple string-based blocks. **Allowlisting
-is the recommended approach.**
+<!-- prettier-ignore -->
+> [!WARNING]
+> Blocklisting with `excludeTools` is less secure than
+> allowlisting with `coreTools`, as it relies on blocking known-bad commands,
+> and clever users may find ways to bypass simple string-based blocks.
+> **Allowlisting is the recommended approach.**
 
 ### Disabling YOLO mode
 
@@ -289,7 +312,7 @@ unintended tool execution.
 ## Managing custom tools (MCP servers)
 
 If your organization uses custom tools via
-[Model-Context Protocol (MCP) servers](../core/tools-api.md), it is crucial to
+[Model-Context Protocol (MCP) servers](../tools/mcp-server.md), it is crucial to
 understand how server configurations are managed to apply security policies
 effectively.
 
@@ -302,9 +325,9 @@ User. When it comes to the `mcpServers` object, these configurations are
 1.  **Merging:** The lists of servers from all three levels are combined into a
     single list.
 2.  **Precedence:** If a server with the **same name** is defined at multiple
-    levels (e.g., a server named `corp-api` exists in both system and user
-    settings), the definition from the highest-precedence level is used. The
-    order of precedence is: **System > Workspace > User**.
+    levels (for example, a server named `corp-api` exists in both system and
+    user settings), the definition from the highest-precedence level is used.
+    The order of precedence is: **System > Workspace > User**.
 
 This means a user **cannot** override the definition of a server that is already
 defined in the system-level settings. However, they **can** add new servers with
@@ -320,8 +343,8 @@ canonical servers and adding their names to an allowlist.
 For even greater security, especially when dealing with third-party MCP servers,
 you can restrict which specific tools from a server are exposed to the model.
 This is done using the `includeTools` and `excludeTools` properties within a
-server's definition. This allows you to use a subset of tools from a server
-without allowing potentially dangerous ones.
+server's definition. This lets you use a subset of tools from a server without
+allowing potentially dangerous ones.
 
 Following the principle of least privilege, it is highly recommended to use
 `includeTools` to create an allowlist of only the necessary tools.
@@ -458,9 +481,8 @@ an environment variable, but it can also be enforced for custom tools via the
 ## Telemetry and auditing
 
 For auditing and monitoring purposes, you can configure Gemini CLI to send
-telemetry data to a central location. This allows you to track tool usage and
-other events. For more information, see the
-[telemetry documentation](./telemetry.md).
+telemetry data to a central location. This lets you track tool usage and other
+events. For more information, see the [telemetry documentation](./telemetry.md).
 
 **Example:** Enable telemetry and send it to a local OTLP collector. If
 `otlpEndpoint` is not specified, it defaults to `http://localhost:4317`.
@@ -475,21 +497,27 @@ other events. For more information, see the
 }
 ```
 
-**Note:** Ensure that `logPrompts` is set to `false` in an enterprise setting to
-avoid collecting potentially sensitive information from user prompts.
+<!-- prettier-ignore -->
+> [!NOTE]
+> Ensure that `logPrompts` is set to `false` in an enterprise setting to
+> avoid collecting potentially sensitive information from user prompts.
 
 ## Authentication
 
 You can enforce a specific authentication method for all users by setting the
-`enforcedAuthType` in the system-level `settings.json` file. This prevents users
-from choosing a different authentication method. See the
-[Authentication docs](./authentication.md) for more details.
+`security.auth.enforcedType` in the system-level `settings.json` file. This
+prevents users from choosing a different authentication method. See the
+[Authentication docs](../get-started/authentication.md) for more details.
 
 **Example:** Enforce the use of Google login for all users.
 
 ```json
 {
-  "enforcedAuthType": "oauth-personal"
+  "security": {
+    "auth": {
+      "enforcedType": "oauth-personal"
+    }
+  }
 }
 ```
 

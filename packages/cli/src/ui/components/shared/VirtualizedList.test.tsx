@@ -5,6 +5,7 @@
  */
 
 import { render } from '../../../test-utils/render.js';
+import { waitFor } from '../../../test-utils/async.js';
 import { VirtualizedList, type VirtualizedListRef } from './VirtualizedList.js';
 import { Text, Box } from 'ink';
 import {
@@ -16,15 +17,6 @@ import {
   useState,
 } from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { UIState } from '../../contexts/UIStateContext.js';
-
-vi.mock('../../contexts/UIStateContext.js', () => ({
-  useUIState: vi.fn(() => ({
-    copyModeEnabled: false,
-  })),
-}));
-
-const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 describe('<VirtualizedList />', () => {
   const keyExtractor = (item: string) => item;
@@ -60,7 +52,7 @@ describe('<VirtualizedList />', () => {
     ])(
       'renders only visible items ($name)',
       async ({ initialScrollIndex, visible, notVisible }) => {
-        const { lastFrame } = render(
+        const { lastFrame, unmount } = await render(
           <Box height={10} width={100} borderStyle="round">
             <VirtualizedList
               data={longData}
@@ -71,23 +63,21 @@ describe('<VirtualizedList />', () => {
             />
           </Box>,
         );
-        await act(async () => {
-          await delay(0);
-        });
 
-        const frame = lastFrame();
+        const output = lastFrame();
         visible.forEach((item) => {
-          expect(frame).toContain(item);
+          expect(output).toContain(item);
         });
         notVisible.forEach((item) => {
-          expect(frame).not.toContain(item);
+          expect(output).not.toContain(item);
         });
-        expect(frame).toMatchSnapshot();
+        expect(output).toMatchSnapshot();
+        unmount();
       },
     );
 
     it('sticks to bottom when new items added', async () => {
-      const { lastFrame, rerender } = render(
+      const { lastFrame, rerender, waitUntilReady, unmount } = await render(
         <Box height={10} width={100} borderStyle="round">
           <VirtualizedList
             data={longData}
@@ -98,38 +88,36 @@ describe('<VirtualizedList />', () => {
           />
         </Box>,
       );
-      await act(async () => {
-        await delay(0);
-      });
 
       expect(lastFrame()).toContain('Item 99');
 
       // Add items
       const newData = [...longData, 'Item 100', 'Item 101'];
-      rerender(
-        <Box height={10} width={100} borderStyle="round">
-          <VirtualizedList
-            data={newData}
-            renderItem={renderItem1px}
-            keyExtractor={keyExtractor}
-            estimatedItemHeight={() => itemHeight}
-            // We don't need to pass initialScrollIndex again for it to stick,
-            // but passing it doesn't hurt. The component should auto-stick because it was at bottom.
-          />
-        </Box>,
-      );
       await act(async () => {
-        await delay(0);
+        rerender(
+          <Box height={10} width={100} borderStyle="round">
+            <VirtualizedList
+              data={newData}
+              renderItem={renderItem1px}
+              keyExtractor={keyExtractor}
+              estimatedItemHeight={() => itemHeight}
+              // We don't need to pass initialScrollIndex again for it to stick,
+              // but passing it doesn't hurt. The component should auto-stick because it was at bottom.
+            />
+          </Box>,
+        );
       });
+      await waitUntilReady();
 
       const frame = lastFrame();
       expect(frame).toContain('Item 101');
       expect(frame).not.toContain('Item 0');
+      unmount();
     });
 
     it('scrolls down to show new items when requested via ref', async () => {
       const ref = createRef<VirtualizedListRef<string>>();
-      const { lastFrame } = render(
+      const { lastFrame, waitUntilReady, unmount } = await render(
         <Box height={10} width={100} borderStyle="round">
           <VirtualizedList
             ref={ref}
@@ -140,20 +128,18 @@ describe('<VirtualizedList />', () => {
           />
         </Box>,
       );
-      await act(async () => {
-        await delay(0);
-      });
 
       expect(lastFrame()).toContain('Item 0');
 
       // Scroll to bottom via ref
       await act(async () => {
         ref.current?.scrollToEnd();
-        await delay(0);
       });
+      await waitUntilReady();
 
       const frame = lastFrame();
       expect(frame).toContain('Item 99');
+      unmount();
     });
 
     it.each([
@@ -184,7 +170,7 @@ describe('<VirtualizedList />', () => {
           (_, i) => `Item ${i}`,
         );
 
-        const { lastFrame } = render(
+        const { lastFrame, unmount } = await render(
           <Box height={20} width={100} borderStyle="round">
             <VirtualizedList
               data={veryLongData}
@@ -197,13 +183,11 @@ describe('<VirtualizedList />', () => {
             />
           </Box>,
         );
-        await act(async () => {
-          await delay(0);
-        });
 
         const frame = lastFrame();
         expect(mountedCount).toBe(expectedMountedCount);
         expect(frame).toMatchSnapshot();
+        unmount();
       },
     );
   });
@@ -267,10 +251,9 @@ describe('<VirtualizedList />', () => {
       return null;
     };
 
-    const { lastFrame } = render(<TestComponent />);
-    await act(async () => {
-      await delay(0);
-    });
+    const { lastFrame, unmount, waitUntilReady } = await render(
+      <TestComponent />,
+    );
 
     // Initially, only Item 0 (height 10) fills the 10px viewport
     expect(lastFrame()).toContain('Item 0');
@@ -279,13 +262,16 @@ describe('<VirtualizedList />', () => {
     // Shrink Item 0 to 1px via context
     await act(async () => {
       setHeightFn(1);
-      await delay(0);
     });
+    await waitUntilReady();
 
     // Now Item 0 is 1px, so Items 1-9 should also be visible to fill 10px
-    expect(lastFrame()).toContain('Item 0');
-    expect(lastFrame()).toContain('Item 1');
-    expect(lastFrame()).toContain('Item 9');
+    await waitFor(() => {
+      expect(lastFrame()).toContain('Item 0');
+      expect(lastFrame()).toContain('Item 1');
+      expect(lastFrame()).toContain('Item 9');
+    });
+    unmount();
   });
 
   it('updates scroll position correctly when scrollBy is called multiple times in the same tick', async () => {
@@ -299,7 +285,7 @@ describe('<VirtualizedList />', () => {
     );
     const keyExtractor = (item: string) => item;
 
-    render(
+    const { unmount, waitUntilReady } = await render(
       <Box height={10} width={100} borderStyle="round">
         <VirtualizedList
           ref={ref}
@@ -310,37 +296,30 @@ describe('<VirtualizedList />', () => {
         />
       </Box>,
     );
-    await act(async () => {
-      await delay(0);
-    });
 
     expect(ref.current?.getScrollState().scrollTop).toBe(0);
 
     await act(async () => {
       ref.current?.scrollBy(1);
       ref.current?.scrollBy(1);
-      await delay(0);
     });
+    await waitUntilReady();
 
     expect(ref.current?.getScrollState().scrollTop).toBe(2);
 
     await act(async () => {
       ref.current?.scrollBy(2);
-      await delay(0);
     });
+    await waitUntilReady();
 
     expect(ref.current?.getScrollState().scrollTop).toBe(4);
+    unmount();
   });
 
   it('renders correctly in copyModeEnabled when scrolled', async () => {
-    const { useUIState } = await import('../../contexts/UIStateContext.js');
-    vi.mocked(useUIState).mockReturnValue({
-      copyModeEnabled: true,
-    } as Partial<UIState> as UIState);
-
     const longData = Array.from({ length: 100 }, (_, i) => `Item ${i}`);
     // Use copy mode
-    const { lastFrame } = render(
+    const { lastFrame, unmount } = await render(
       <Box height={10} width={100}>
         <VirtualizedList
           data={longData}
@@ -352,12 +331,10 @@ describe('<VirtualizedList />', () => {
           keyExtractor={(item) => item}
           estimatedItemHeight={() => 1}
           initialScrollIndex={50}
+          copyModeEnabled={true}
         />
       </Box>,
     );
-    await act(async () => {
-      await delay(0);
-    });
 
     // Item 50 should be visible
     expect(lastFrame()).toContain('Item 50');
@@ -365,5 +342,6 @@ describe('<VirtualizedList />', () => {
     expect(lastFrame()).toContain('Item 59');
     // But far away items should not be (ensures we are actually scrolled)
     expect(lastFrame()).not.toContain('Item 0');
+    unmount();
   });
 });

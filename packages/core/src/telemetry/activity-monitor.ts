@@ -50,6 +50,7 @@ export const DEFAULT_ACTIVITY_CONFIG: ActivityMonitorConfig = {
     ActivityType.USER_INPUT_START,
     ActivityType.MESSAGE_ADDED,
     ActivityType.TOOL_CALL_SCHEDULED,
+    ActivityType.TOOL_CALL_COMPLETED,
     ActivityType.STREAM_START,
   ],
 };

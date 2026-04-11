@@ -15,18 +15,19 @@ describe('<ChecklistItem />', () => {
     { status: 'in_progress', label: 'Doing this' },
     { status: 'completed', label: 'Done this' },
     { status: 'cancelled', label: 'Skipped this' },
-  ] as ChecklistItemData[])('renders %s item correctly', (item) => {
-    const { lastFrame } = render(<ChecklistItem item={item} />);
+    { status: 'blocked', label: 'Blocked this' },
+  ] as ChecklistItemData[])('renders %s item correctly', async (item) => {
+    const { lastFrame } = await render(<ChecklistItem item={item} />);
     expect(lastFrame()).toMatchSnapshot();
   });
 
-  it('truncates long text when wrap="truncate"', () => {
+  it('truncates long text when wrap="truncate"', async () => {
     const item: ChecklistItemData = {
       status: 'in_progress',
       label:
         'This is a very long text that should be truncated because the wrap prop is set to truncate',
     };
-    const { lastFrame } = render(
+    const { lastFrame } = await render(
       <Box width={30}>
         <ChecklistItem item={item} wrap="truncate" />
       </Box>,
@@ -34,13 +35,13 @@ describe('<ChecklistItem />', () => {
     expect(lastFrame()).toMatchSnapshot();
   });
 
-  it('wraps long text by default', () => {
+  it('wraps long text by default', async () => {
     const item: ChecklistItemData = {
       status: 'in_progress',
       label:
         'This is a very long text that should wrap because the default behavior is wrapping',
     };
-    const { lastFrame } = render(
+    const { lastFrame } = await render(
       <Box width={30}>
         <ChecklistItem item={item} />
       </Box>,

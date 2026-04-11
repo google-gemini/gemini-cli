@@ -16,6 +16,9 @@ export interface SemanticColors {
   };
   background: {
     primary: string;
+    message: string;
+    input: string;
+    focus: string;
     diff: {
       added: string;
       removed: string;
@@ -23,12 +26,13 @@ export interface SemanticColors {
   };
   border: {
     default: string;
-    focused: string;
   };
   ui: {
     comment: string;
     symbol: string;
+    active: string;
     dark: string;
+    focus: string;
     gradient: string[] | undefined;
   };
   status: {
@@ -48,19 +52,23 @@ export const lightSemanticColors: SemanticColors = {
   },
   background: {
     primary: lightTheme.Background,
+    message: lightTheme.MessageBackground!,
+    input: lightTheme.InputBackground!,
+    focus: lightTheme.FocusBackground!,
     diff: {
       added: lightTheme.DiffAdded,
       removed: lightTheme.DiffRemoved,
     },
   },
   border: {
-    default: lightTheme.Gray,
-    focused: lightTheme.AccentBlue,
+    default: lightTheme.DarkGray,
   },
   ui: {
     comment: lightTheme.Comment,
     symbol: lightTheme.Gray,
+    active: lightTheme.AccentBlue,
     dark: lightTheme.DarkGray,
+    focus: lightTheme.AccentGreen,
     gradient: lightTheme.GradientColors,
   },
   status: {
@@ -80,19 +88,23 @@ export const darkSemanticColors: SemanticColors = {
   },
   background: {
     primary: darkTheme.Background,
+    message: darkTheme.MessageBackground!,
+    input: darkTheme.InputBackground!,
+    focus: darkTheme.FocusBackground!,
     diff: {
       added: darkTheme.DiffAdded,
       removed: darkTheme.DiffRemoved,
     },
   },
   border: {
-    default: darkTheme.Gray,
-    focused: darkTheme.AccentBlue,
+    default: darkTheme.DarkGray,
   },
   ui: {
     comment: darkTheme.Comment,
     symbol: darkTheme.Gray,
+    active: darkTheme.AccentBlue,
     dark: darkTheme.DarkGray,
+    focus: darkTheme.AccentGreen,
     gradient: darkTheme.GradientColors,
   },
   status: {

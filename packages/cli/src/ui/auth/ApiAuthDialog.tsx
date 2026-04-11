@@ -13,7 +13,8 @@ import { useTextBuffer } from '../components/shared/text-buffer.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { clearApiKey, debugLogger } from '@google/gemini-cli-core';
 import { useKeypress } from '../hooks/useKeypress.js';
-import { keyMatchers, Command } from '../keyMatchers.js';
+import { Command } from '../key/keyMatchers.js';
+import { useKeyMatchers } from '../hooks/useKeyMatchers.js';
 
 interface ApiAuthDialogProps {
   onSubmit: (apiKey: string) => void;
@@ -28,6 +29,7 @@ export function ApiAuthDialog({
   error,
   defaultValue = '',
 }: ApiAuthDialogProps): React.JSX.Element {
+  const keyMatchers = useKeyMatchers();
   const { terminalWidth } = useUIState();
   const viewportWidth = terminalWidth - 8;
 
@@ -98,7 +100,7 @@ export function ApiAuthDialog({
   return (
     <Box
       borderStyle="round"
-      borderColor={theme.border.focused}
+      borderColor={theme.ui.focus}
       flexDirection="column"
       padding={1}
       width="100%"

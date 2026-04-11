@@ -103,19 +103,6 @@ describe('AskUserTool', () => {
       expect(result).toContain("must have required property 'header'");
     });
 
-    it('should return error if header exceeds max length', () => {
-      const result = tool.validateToolParams({
-        questions: [
-          {
-            question: 'Test?',
-            header: 'This is way too long',
-            type: QuestionType.CHOICE,
-          },
-        ],
-      });
-      expect(result).toContain('must NOT have more than 16 characters');
-    });
-
     it('should return error if options has fewer than 2 items', () => {
       const result = tool.validateToolParams({
         questions: [
@@ -276,13 +263,7 @@ describe('AskUserTool', () => {
   describe('validateBuildAndExecute', () => {
     it('should hide validation errors from returnDisplay', async () => {
       const params = {
-        questions: [
-          {
-            question: 'Test?',
-            header: 'This is way too long',
-            type: QuestionType.TEXT,
-          },
-        ],
+        questions: [],
       };
 
       const result = await tool.validateBuildAndExecute(
@@ -429,7 +410,9 @@ describe('AskUserTool', () => {
         });
       }
 
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
       expect(result.returnDisplay).toContain('User answered:');
       expect(result.returnDisplay).toContain(
         '  Approach → Quick fix (Recommended)',
@@ -472,7 +455,9 @@ describe('AskUserTool', () => {
         });
       }
 
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
       expect(result.returnDisplay).toBe(
         'User submitted without answering questions.',
       );
@@ -518,7 +503,9 @@ describe('AskUserTool', () => {
         await details.onConfirm(ToolConfirmationOutcome.Cancel);
       }
 
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
       expect(result.returnDisplay).toBe('User dismissed dialog');
       expect(result.llmContent).toBe(
         'User dismissed ask_user dialog without answering.',

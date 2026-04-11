@@ -5,11 +5,11 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import type {
-  ModelConfigAlias,
-  ModelConfigServiceConfig,
+import {
+  ModelConfigService,
+  type ModelConfigAlias,
+  type ModelConfigServiceConfig,
 } from './modelConfigService.js';
-import { ModelConfigService } from './modelConfigService.js';
 
 describe('ModelConfigService', () => {
   it('should resolve a basic alias to its model and settings', () => {
@@ -1016,6 +1016,43 @@ describe('ModelConfigService', () => {
         isRetry: true,
       });
       expect(retry.generateContentConfig.temperature).toBe(1.0);
+    });
+  });
+
+  describe('getAvailableModelOptions', () => {
+    it('should filter out Pro models when hasAccessToProModel is false', () => {
+      const config: ModelConfigServiceConfig = {
+        modelDefinitions: {
+          'gemini-3-pro': { isVisible: true, tier: 'pro' },
+          'gemini-3-flash': { isVisible: true, tier: 'flash' },
+        },
+      };
+      const service = new ModelConfigService(config);
+      const options = service.getAvailableModelOptions({
+        hasAccessToProModel: false,
+      });
+
+      expect(options.map((o) => o.modelId)).not.toContain('gemini-3-pro');
+      expect(options.map((o) => o.modelId)).toContain('gemini-3-flash');
+    });
+
+    it('should include Pro models when hasAccessToProModel is true or undefined', () => {
+      const config: ModelConfigServiceConfig = {
+        modelDefinitions: {
+          'gemini-3-pro': { isVisible: true, tier: 'pro' },
+        },
+      };
+      const service = new ModelConfigService(config);
+
+      const optionsWithTrue = service.getAvailableModelOptions({
+        hasAccessToProModel: true,
+      });
+      expect(optionsWithTrue.map((o) => o.modelId)).toContain('gemini-3-pro');
+
+      const optionsWithUndefined = service.getAvailableModelOptions({});
+      expect(optionsWithUndefined.map((o) => o.modelId)).toContain(
+        'gemini-3-pro',
+      );
     });
   });
 });

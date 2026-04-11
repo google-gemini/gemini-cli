@@ -4,17 +4,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import express from 'express';
+import express, { type Request } from 'express';
 
 import type { AgentCard, Message } from '@a2a-js/sdk';
-import type { TaskStore } from '@a2a-js/sdk/server';
 import {
+  type TaskStore,
   DefaultRequestHandler,
   InMemoryTaskStore,
   DefaultExecutionEventBus,
   type AgentExecutionEvent,
+  UnauthenticatedUser,
 } from '@a2a-js/sdk/server';
-import { A2AExpressApp } from '@a2a-js/sdk/server/express'; // Import server components
+import { A2AExpressApp, type UserBuilder } from '@a2a-js/sdk/server/express'; // Import server components
 import { v4 as uuidv4 } from 'uuid';
 import { logger } from '../utils/logger.js';
 import type { AgentSettings } from '../types.js';
@@ -25,9 +26,12 @@ import { loadConfig, loadEnvironment, setTargetDir } from '../config/config.js';
 import { loadSettings } from '../config/settings.js';
 import { loadExtensions } from '../config/extension.js';
 import { commandRegistry } from '../commands/command-registry.js';
-import { debugLogger, SimpleExtensionLoader } from '@google/gemini-cli-core';
+import {
+  debugLogger,
+  SimpleExtensionLoader,
+  GitService,
+} from '@google/gemini-cli-core';
 import type { Command, CommandArgument } from '../commands/types.js';
-import { GitService } from '@google/gemini-cli-core';
 
 type CommandResponse = {
   name: string;
@@ -52,8 +56,17 @@ const coderAgentCard: AgentCard = {
     pushNotifications: false,
     stateTransitionHistory: true,
   },
-  securitySchemes: undefined,
-  security: undefined,
+  securitySchemes: {
+    bearerAuth: {
+      type: 'http',
+      scheme: 'bearer',
+    },
+    basicAuth: {
+      type: 'http',
+      scheme: 'basic',
+    },
+  },
+  security: [{ bearerAuth: [] }, { basicAuth: [] }],
   defaultInputModes: ['text'],
   defaultOutputModes: ['text'],
   skills: [
@@ -78,6 +91,35 @@ export function updateCoderAgentCardUrl(port: number) {
   coderAgentCard.url = `http://localhost:${port}/`;
 }
 
+const customUserBuilder: UserBuilder = async (req: Request) => {
+  const auth = req.headers['authorization'];
+  if (auth) {
+    const scheme = auth.split(' ')[0];
+    logger.info(
+      `[customUserBuilder] Received Authorization header with scheme: ${scheme}`,
+    );
+  }
+  if (!auth) return new UnauthenticatedUser();
+
+  // 1. Bearer Auth
+  if (auth.startsWith('Bearer ')) {
+    const token = auth.substring(7);
+    if (token === 'valid-token') {
+      return { userName: 'bearer-user', isAuthenticated: true };
+    }
+  }
+
+  // 2. Basic Auth
+  if (auth.startsWith('Basic ')) {
+    const credentials = Buffer.from(auth.substring(6), 'base64').toString();
+    if (credentials === 'admin:password') {
+      return { userName: 'basic-user', isAuthenticated: true };
+    }
+  }
+
+  return new UnauthenticatedUser();
+};
+
 async function handleExecuteCommand(
   req: express.Request,
   res: express.Response,
@@ -88,6 +130,7 @@ async function handleExecuteCommand(
   },
 ) {
   logger.info('[CoreAgent] Received /executeCommand request: ', req.body);
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   const { command, args } = req.body;
   try {
     if (typeof command !== 'string') {
@@ -200,7 +243,7 @@ export async function createApp() {
       requestStorage.run({ req }, next);
     });
 
-    const appBuilder = new A2AExpressApp(requestHandler);
+    const appBuilder = new A2AExpressApp(requestHandler, customUserBuilder);
     expressApp = appBuilder.setupRoutes(expressApp, '');
     expressApp.use(express.json());
 
@@ -211,6 +254,7 @@ export async function createApp() {
         const agentSettings = req.body.agentSettings as
           | AgentSettings
           | undefined;
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         const contextId = req.body.contextId || uuidv4();
         const wrapper = await agentExecutor.createTask(
           taskId,

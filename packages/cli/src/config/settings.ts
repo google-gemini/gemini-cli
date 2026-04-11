@@ -14,14 +14,16 @@ import {
   FatalConfigError,
   GEMINI_DIR,
   getErrorMessage,
+  getFsErrorMessage,
   Storage,
   coreEvents,
   homedir,
   type AdminControlsSettings,
+  createCache,
 } from '@google/gemini-cli-core';
 import stripJsonComments from 'strip-json-comments';
-import { DefaultLight } from '../ui/themes/default-light.js';
-import { DefaultDark } from '../ui/themes/default.js';
+import { DefaultLight } from '../ui/themes/builtin/light/default-light.js';
+import { DefaultDark } from '../ui/themes/builtin/dark/default-dark.js';
 import { isWorkspaceTrusted } from './trustedFolders.js';
 import {
   type Settings,
@@ -165,7 +167,10 @@ export interface SummarizeToolOutputSettings {
   tokenBudget?: number;
 }
 
+export type LoadingPhrasesMode = 'tips' | 'witty' | 'all' | 'off';
+
 export interface AccessibilitySettings {
+  /** @deprecated Use ui.loadingPhrases instead. */
   enableLoadingPhrases?: boolean;
   screenReader?: boolean;
 }
@@ -182,9 +187,6 @@ export interface SessionRetentionSettings {
 
   /** Minimum retention period (safety limit, defaults to "1d") */
   minRetention?: string;
-
-  /** INTERNAL: Whether the user has acknowledged the session retention warning */
-  warningAcknowledged?: boolean;
 }
 
 export interface SettingsError {
@@ -478,6 +480,7 @@ export class LoadedSettings {
     admin.mcp = {
       enabled: mcpSetting?.mcpEnabled,
       config: mcpSetting?.mcpConfig?.mcpServers,
+      requiredConfig: mcpSetting?.requiredMcpConfig,
     };
     admin.extensions = {
       enabled: cliFeatureSetting?.extensionsSetting?.extensionsEnabled,
@@ -570,10 +573,6 @@ export function loadEnvironment(
     relevantArgs.includes('-s') ||
     relevantArgs.includes('--sandbox');
 
-  if (trustResult.isTrusted !== true && !isSandboxed) {
-    return;
-  }
-
   // Cloud Shell environment variable handling
   if (process.env['CLOUD_SHELL'] === 'true') {
     setUpCloudShellEnvironment(envFilePath, isTrusted, isSandboxed);
@@ -613,10 +612,28 @@ export function loadEnvironment(
           }
         }
       }
-    } catch (_e) {
+    } catch {
       // Errors are ignored to match the behavior of `dotenv.config({ quiet: true })`.
     }
   }
+}
+
+// Cache to store the results of loadSettings to avoid redundant disk I/O.
+const settingsCache = createCache<string, LoadedSettings>({
+  storage: 'map',
+  defaultTtl: 10000, // 10 seconds
+});
+
+/**
+ * Resets the settings cache. Used exclusively for test isolation.
+ * @internal
+ */
+export function resetSettingsCacheForTesting() {
+  settingsCache.clear();
+}
+
+export function isWorktreeEnabled(settings: LoadedSettings): boolean {
+  return settings.merged.experimental.worktrees;
 }
 
 /**
@@ -626,6 +643,16 @@ export function loadEnvironment(
 export function loadSettings(
   workspaceDir: string = process.cwd(),
 ): LoadedSettings {
+  const normalizedWorkspaceDir = path.resolve(workspaceDir);
+  return settingsCache.getOrCreate(normalizedWorkspaceDir, () =>
+    _doLoadSettings(normalizedWorkspaceDir),
+  );
+}
+
+/**
+ * Internal implementation of the settings loading logic.
+ */
+function _doLoadSettings(workspaceDir: string): LoadedSettings {
   let systemSettings: Settings = {};
   let systemDefaultSettings: Settings = {};
   let userSettings: Settings = {};
@@ -634,24 +661,8 @@ export function loadSettings(
   const systemSettingsPath = getSystemSettingsPath();
   const systemDefaultsPath = getSystemDefaultsPath();
 
-  // Resolve paths to their canonical representation to handle symlinks
-  const resolvedWorkspaceDir = path.resolve(workspaceDir);
-  const resolvedHomeDir = path.resolve(homedir());
-
-  let realWorkspaceDir = resolvedWorkspaceDir;
-  try {
-    // fs.realpathSync gets the "true" path, resolving any symlinks
-    realWorkspaceDir = fs.realpathSync(resolvedWorkspaceDir);
-  } catch (_e) {
-    // This is okay. The path might not exist yet, and that's a valid state.
-  }
-
-  // We expect homedir to always exist and be resolvable.
-  const realHomeDir = fs.realpathSync(resolvedHomeDir);
-
-  const workspaceSettingsPath = new Storage(
-    workspaceDir,
-  ).getWorkspaceSettingsPath();
+  const storage = new Storage(workspaceDir);
+  const workspaceSettingsPath = storage.getWorkspaceSettingsPath();
 
   const load = (filePath: string): { settings: Settings; rawJson?: string } => {
     try {
@@ -709,7 +720,7 @@ export function loadSettings(
     settings: {} as Settings,
     rawJson: undefined,
   };
-  if (realWorkspaceDir !== realHomeDir) {
+  if (!storage.isWorkspaceHomeDir()) {
     workspaceResult = load(workspaceSettingsPath);
   }
 
@@ -797,11 +808,11 @@ export function loadSettings(
       readOnly: false,
     },
     {
-      path: workspaceSettingsPath,
+      path: storage.isWorkspaceHomeDir() ? '' : workspaceSettingsPath,
       settings: workspaceSettings,
       originalSettings: workspaceOriginalSettings,
       rawJson: workspaceResult.rawJson,
-      readOnly: false,
+      readOnly: storage.isWorkspaceHomeDir(),
     },
     isTrusted,
     settingsErrors,
@@ -816,14 +827,13 @@ export function loadSettings(
 /**
  * Migrates deprecated settings to their new counterparts.
  *
- * TODO: After a couple of weeks (around early Feb 2026), we should start removing
- * the deprecated settings from the settings files by default.
+ * Deprecated settings are removed from settings files by default.
  *
  * @returns true if any changes were made and need to be saved.
  */
 export function migrateDeprecatedSettings(
   loadedSettings: LoadedSettings,
-  removeDeprecated = false,
+  removeDeprecated = true,
 ): boolean {
   let anyModified = false;
   const systemWarnings: Map<LoadableSettingScope, string[]> = new Map();
@@ -927,6 +937,22 @@ export function migrateDeprecatedSettings(
           if (!settingsFile.readOnly) {
             anyModified = true;
           }
+        }
+
+        // Migrate enableLoadingPhrases: false → loadingPhrases: 'off'
+        const enableLP = newAccessibility['enableLoadingPhrases'];
+        if (
+          typeof enableLP === 'boolean' &&
+          newUi['loadingPhrases'] === undefined
+        ) {
+          if (!enableLP) {
+            newUi['loadingPhrases'] = 'off';
+            loadedSettings.setValue(scope, 'ui', newUi);
+            if (!settingsFile.readOnly) {
+              anyModified = true;
+            }
+          }
+          foundDeprecated.push('ui.accessibility.enableLoadingPhrases');
         }
       }
     }
@@ -1034,6 +1060,9 @@ export function migrateDeprecatedSettings(
 }
 
 export function saveSettings(settingsFile: SettingsFile): void {
+  // Clear the entire cache on any save.
+  settingsCache.clear();
+
   try {
     // Ensure the directory exists
     const dirPath = path.dirname(settingsFile.path);
@@ -1049,9 +1078,10 @@ export function saveSettings(settingsFile: SettingsFile): void {
       settingsToSave as Record<string, unknown>,
     );
   } catch (error) {
+    const detailedErrorMessage = getFsErrorMessage(error);
     coreEvents.emitFeedback(
       'error',
-      'There was an error saving your latest settings changes.',
+      `Failed to save settings: ${detailedErrorMessage}`,
       error,
     );
   }
@@ -1064,9 +1094,10 @@ export function saveModelChange(
   try {
     loadedSettings.setValue(SettingScope.User, 'model.name', model);
   } catch (error) {
+    const detailedErrorMessage = getFsErrorMessage(error);
     coreEvents.emitFeedback(
       'error',
-      'There was an error saving your preferred model.',
+      `Failed to save preferred model: ${detailedErrorMessage}`,
       error,
     );
   }
@@ -1093,15 +1124,15 @@ function migrateExperimentalSettings(
     };
     let modified = false;
 
-    const migrateExperimental = (
+    const migrateExperimental = <T = Record<string, unknown>>(
       oldKey: string,
-      migrateFn: (oldValue: Record<string, unknown>) => void,
+      migrateFn: (oldValue: T) => void,
     ) => {
       const old = experimentalSettings[oldKey];
-      if (old) {
+      if (old !== undefined) {
         foundDeprecated?.push(`experimental.${oldKey}`);
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        migrateFn(old as Record<string, unknown>);
+        migrateFn(old as T);
         modified = true;
       }
     };
@@ -1166,6 +1197,24 @@ function migrateExperimentalSettings(
       agentsOverrides['cli_help'] = override;
     });
 
+    // Migrate experimental.plan -> general.plan.enabled
+    migrateExperimental<boolean>('plan', (planValue) => {
+      const generalSettings =
+        (settings.general as Record<string, unknown> | undefined) || {};
+      const newGeneral = { ...generalSettings };
+      const planSettings =
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        (newGeneral['plan'] as Record<string, unknown> | undefined) || {};
+      const newPlan = { ...planSettings };
+
+      if (newPlan['enabled'] === undefined) {
+        newPlan['enabled'] = planValue;
+        newGeneral['plan'] = newPlan;
+        loadedSettings.setValue(scope, 'general', newGeneral);
+        modified = true;
+      }
+    });
+
     if (modified) {
       agentsSettings['overrides'] = agentsOverrides;
       loadedSettings.setValue(scope, 'agents', agentsSettings);
@@ -1174,6 +1223,7 @@ function migrateExperimentalSettings(
         const newExperimental = { ...experimentalSettings };
         delete newExperimental['codebaseInvestigatorSettings'];
         delete newExperimental['cliHelpAgentSettings'];
+        delete newExperimental['plan'];
         loadedSettings.setValue(scope, 'experimental', newExperimental);
       }
       return true;

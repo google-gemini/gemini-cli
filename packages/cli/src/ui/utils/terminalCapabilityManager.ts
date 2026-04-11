@@ -13,12 +13,14 @@ import {
   disableModifyOtherKeys,
   enableBracketedPasteMode,
   disableBracketedPasteMode,
+  disableMouseEvents,
 } from '@google/gemini-cli-core';
 import { parseColor } from '../themes/color-utils.js';
 
 export type TerminalBackgroundColor = string | undefined;
 
-const TERMINAL_CLEANUP_SEQUENCE = '\x1b[<u\x1b[>4;0m\x1b[?2004l';
+const TERMINAL_CLEANUP_SEQUENCE =
+  '\x1b[<u\x1b[>4;0m\x1b[?2004l\x1b[?1000l\x1b[?1002l\x1b[?1003l\x1b[?1006l';
 
 export function cleanupTerminalOnExit() {
   try {
@@ -33,6 +35,7 @@ export function cleanupTerminalOnExit() {
   disableKittyKeyboardProtocol();
   disableModifyOtherKeys();
   disableBracketedPasteMode();
+  disableMouseEvents();
 }
 
 export class TerminalCapabilityManager {
@@ -43,6 +46,9 @@ export class TerminalCapabilityManager {
   private static readonly TERMINAL_NAME_QUERY = '\x1b[>q';
   private static readonly DEVICE_ATTRIBUTES_QUERY = '\x1b[c';
   private static readonly MODIFY_OTHER_KEYS_QUERY = '\x1b[>4;?m';
+  private static readonly HIDDEN_MODE = '\x1b[8m';
+  private static readonly CLEAR_LINE_AND_RETURN = '\x1b[2K\r';
+  private static readonly RESET_ATTRIBUTES = '\x1b[0m';
 
   /**
    * Triggers a terminal background color query.
@@ -135,9 +141,6 @@ export class TerminalCapabilityManager {
           process.stdin.setRawMode(false);
         }
         this.detectionComplete = true;
-
-        this.enableSupportedModes();
-
         resolve();
       };
 
@@ -219,11 +222,19 @@ export class TerminalCapabilityManager {
       try {
         fs.writeSync(
           process.stdout.fd,
-          TerminalCapabilityManager.KITTY_QUERY +
+          // Use hidden mode to prevent potential "m" character from being printed
+          // to the terminal during startup when querying for modifyOtherKeys.
+          // This can happen on some terminals that might echo the query or
+          // malform the response. We hide the output, send queries, then
+          // immediately clear the line and reset attributes.
+          TerminalCapabilityManager.HIDDEN_MODE +
+            TerminalCapabilityManager.KITTY_QUERY +
             TerminalCapabilityManager.OSC_11_QUERY +
             TerminalCapabilityManager.TERMINAL_NAME_QUERY +
             TerminalCapabilityManager.MODIFY_OTHER_KEYS_QUERY +
-            TerminalCapabilityManager.DEVICE_ATTRIBUTES_QUERY,
+            TerminalCapabilityManager.DEVICE_ATTRIBUTES_QUERY +
+            TerminalCapabilityManager.CLEAR_LINE_AND_RETURN +
+            TerminalCapabilityManager.RESET_ATTRIBUTES,
         );
       } catch (e) {
         debugLogger.warn('Failed to write terminal capability queries:', e);
@@ -235,9 +246,11 @@ export class TerminalCapabilityManager {
   enableSupportedModes() {
     try {
       if (this.kittySupported) {
+        debugLogger.log('Enabling Kitty keyboard protocol');
         enableKittyKeyboardProtocol();
         this.kittyEnabled = true;
       } else if (this.modifyOtherKeysSupported) {
+        debugLogger.log('Enabling modifyOtherKeys');
         enableModifyOtherKeys();
       }
       // Always enable bracketed paste since it'll be ignored if unsupported.
@@ -257,6 +270,44 @@ export class TerminalCapabilityManager {
 
   isKittyProtocolEnabled(): boolean {
     return this.kittyEnabled;
+  }
+
+  isGhosttyTerminal(env: NodeJS.ProcessEnv = process.env): boolean {
+    const termProgram = env['TERM_PROGRAM']?.toLowerCase();
+    const term = env['TERM']?.toLowerCase();
+    const name = this.getTerminalName()?.toLowerCase();
+
+    return !!(
+      name?.includes('ghostty') ||
+      termProgram?.includes('ghostty') ||
+      term?.includes('ghostty')
+    );
+  }
+
+  supportsOsc9Notifications(env: NodeJS.ProcessEnv = process.env): boolean {
+    if (env['WT_SESSION']) {
+      return false;
+    }
+
+    return (
+      this.hasOsc9TerminalSignature(this.getTerminalName()) ||
+      this.hasOsc9TerminalSignature(env['TERM_PROGRAM']) ||
+      this.hasOsc9TerminalSignature(env['TERM'])
+    );
+  }
+
+  private hasOsc9TerminalSignature(value: string | undefined): boolean {
+    if (!value) {
+      return false;
+    }
+
+    const normalized = value.toLowerCase();
+    return (
+      normalized.includes('wezterm') ||
+      normalized.includes('ghostty') ||
+      normalized.includes('iterm') ||
+      normalized.includes('kitty')
+    );
   }
 }
 

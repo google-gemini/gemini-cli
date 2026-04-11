@@ -5,20 +5,22 @@
  */
 
 import { useInactivityTimer } from './useInactivityTimer.js';
-import { useTurnActivityMonitor } from './useTurnActivityMonitor.js';
+import {
+  useTurnActivityMonitor,
+  type MinimalTrackedToolCall,
+} from './useTurnActivityMonitor.js';
 import {
   SHELL_FOCUS_HINT_DELAY_MS,
   SHELL_ACTION_REQUIRED_TITLE_DELAY_MS,
   SHELL_SILENT_WORKING_TITLE_DELAY_MS,
 } from '../constants.js';
 import type { StreamingState } from '../types.js';
-import { type TrackedToolCall } from './useToolScheduler.js';
 
 interface ShellInactivityStatusProps {
   activePtyId: number | string | null | undefined;
   lastOutputTime: number;
   streamingState: StreamingState;
-  pendingToolCalls: TrackedToolCall[];
+  pendingToolCalls: MinimalTrackedToolCall[];
   embeddedShellFocused: boolean;
   isInteractiveShellEnabled: boolean;
 }

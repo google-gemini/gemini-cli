@@ -22,9 +22,10 @@ powerful tool for developers.
     rendering.
   - `packages/core`: Backend logic, Gemini API orchestration, prompt
     construction, and tool execution.
-  - `packages/core/src/tools/`: Built-in tools for file system, shell, and web
-    operations.
   - `packages/a2a-server`: Experimental Agent-to-Agent server.
+  - `packages/sdk`: Programmatic SDK for embedding Gemini CLI capabilities.
+  - `packages/devtools`: Integrated developer tools (Network/Console inspector).
+  - `packages/test-utils`: Shared test utilities and test rig.
   - `packages/vscode-ide-companion`: VS Code extension pairing with the CLI.
 
 ## Building and Running
@@ -43,19 +44,28 @@ powerful tool for developers.
 - **Test Commands:**
   - **Unit (All):** `npm run test`
   - **Integration (E2E):** `npm run test:e2e`
+  - > **NOTE**: Please run the memory and perf tests locally **only if** you are
+    > implementing changes related to those test areas. Otherwise skip these
+    > tests locally and rely on CI to run them on nightly builds.
+  - **Memory (Nightly):** `npm run test:memory` (Runs memory regression tests
+    against baselines. Excluded from `preflight`, run nightly.)
+  - **Performance (Nightly):** `npm run test:perf` (Runs CPU performance
+    regression tests against baselines. Excluded from `preflight`, run nightly.)
   - **Workspace-Specific:** `npm test -w <pkg> -- <path>` (Note: `<path>` must
     be relative to the workspace root, e.g.,
     `-w @google/gemini-cli-core -- src/routing/modelRouterService.test.ts`)
 - **Full Validation:** `npm run preflight` (Heaviest check; runs clean, install,
-  build, lint, type check, and tests. Recommended before submitting PRs.)
+  build, lint, type check, and tests. Recommended before submitting PRs. Due to
+  its long runtime, only run this at the very end of a code implementation task.
+  If it fails, use faster, targeted commands (e.g., `npm run test`,
+  `npm run lint`, or workspace-specific tests) to iterate on fixes before
+  re-running `preflight`. For simple, non-code changes like documentation or
+  prompting updates, skip `preflight` at the end of the task and wait for PR
+  validation.)
 - **Individual Checks:** `npm run lint` / `npm run format` / `npm run typecheck`
 
 ## Development Conventions
 
-- **Legacy Snippets:** `packages/core/src/prompts/snippets.legacy.ts` is a
-  snapshot of an older system prompt. Avoid changing the prompting verbiage to
-  preserve its historical behavior; however, structural changes to ensure
-  compilation or simplify the code are permitted.
 - **Contributions:** Follow the process outlined in `CONTRIBUTING.md`. Requires
   signing the Google CLA.
 - **Pull Requests:** Keep PRs small, focused, and linked to an existing issue.
@@ -63,8 +73,6 @@ powerful tool for developers.
   `gh` CLI.
 - **Commit Messages:** Follow the
   [Conventional Commits](https://www.conventionalcommits.org/) standard.
-- **Coding Style:** Adhere to existing patterns in `packages/cli` (React/Ink)
-  and `packages/core` (Backend logic).
 - **Imports:** Use specific imports and avoid restricted relative imports
   between packages (enforced by ESLint).
 - **License Headers:** For all new source code files (`.ts`, `.tsx`, `.js`),

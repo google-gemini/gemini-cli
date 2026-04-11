@@ -1,6 +1,6 @@
 {
   "name": "@google/gemini-cli",
-  "version": "0.30.0-nightly.20260210.a2174751d",
+  "version": "0.39.0-nightly.20260408.e77b22e63",
   "description": "Gemini CLI",
   "license": "Apache-2.0",
   "repository": {
@@ -20,16 +20,17 @@
     "format": "prettier --write .",
     "test": "vitest run",
     "test:ci": "vitest run",
+    "posttest": "npm run build",
     "typecheck": "tsc --noEmit"
   },
   "files": [
     "dist"
   ],
   "config": {
-    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.30.0-nightly.20260210.a2174751d"
+    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.39.0-nightly.20260408.e77b22e63"
   },
   "dependencies": {
-    "@agentclientprotocol/sdk": "^0.12.0",
+    "@agentclientprotocol/sdk": "^0.16.1",
     "@google/gemini-cli-core": "file:../core",
     "@google/genai": "1.30.0",
     "@iarna/toml": "^2.2.5",
@@ -38,7 +39,8 @@
     "ansi-regex": "^6.2.2",
     "chalk": "^4.1.2",
     "cli-spinners": "^2.9.2",
-    "clipboardy": "^5.0.0",
+    "clipboardy": "~5.2.0",
+    "color-convert": "^2.0.1",
     "command-exists": "^1.2.9",
     "comment-json": "^4.2.5",
     "diff": "^8.0.3",
@@ -47,7 +49,7 @@
     "fzf": "^0.5.2",
     "glob": "^12.0.0",
     "highlight.js": "^11.11.1",
-    "ink": "npm:@jrichman/ink@6.4.10",
+    "ink": "npm:@jrichman/ink@6.6.9",
     "ink-gradient": "^3.0.0",
     "ink-spinner": "^5.0.0",
     "latest-version": "^9.0.0",
@@ -62,7 +64,7 @@
     "string-width": "^8.1.0",
     "strip-ansi": "^7.1.0",
     "strip-json-comments": "^3.1.1",
-    "tar": "^7.5.2",
+    "tar": "^7.5.8",
     "tinygradient": "^1.1.5",
     "undici": "^7.10.0",
     "ws": "^8.16.0",
@@ -79,7 +81,7 @@
     "@types/shell-quote": "^1.7.5",
     "@types/ws": "^8.5.10",
     "@types/yargs": "^17.0.32",
-    "ink-testing-library": "^4.0.0",
+    "@xterm/headless": "^5.5.0",
     "typescript": "^5.3.3",
     "vitest": "^3.1.1"
   },

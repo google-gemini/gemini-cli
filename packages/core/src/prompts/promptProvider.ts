@@ -7,7 +7,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
-import type { Config } from '../config/config.js';
 import type { HierarchicalMemory } from '../config/memory.js';
 import { GEMINI_DIR } from '../utils/paths.js';
 import { ApprovalMode } from '../policy/types.js';
@@ -22,16 +21,17 @@ import {
 import { CodebaseInvestigatorAgent } from '../agents/codebase-investigator.js';
 import { isGitRepository } from '../utils/gitUtils.js';
 import {
-  PLAN_MODE_TOOLS,
   WRITE_TODOS_TOOL_NAME,
   READ_FILE_TOOL_NAME,
   ENTER_PLAN_MODE_TOOL_NAME,
   GLOB_TOOL_NAME,
   GREP_TOOL_NAME,
+  AGENT_TOOL_NAME,
 } from '../tools/tool-names.js';
-import { resolveModel, isPreviewModel } from '../config/models.js';
+import { resolveModel, supportsModernFeatures } from '../config/models.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import { getAllGeminiMdFilenames } from '../tools/memoryTool.js';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
 
 /**
  * Orchestrates prompt generation by gathering context and building options.
@@ -41,7 +41,7 @@ export class PromptProvider {
    * Generates the core system prompt.
    */
   getCoreSystemPrompt(
-    config: Config,
+    context: AgentLoopContext,
     userMemory?: string | HierarchicalMemory,
     interactiveOverride?: boolean,
   ): string {
@@ -49,40 +49,51 @@ export class PromptProvider {
       process.env['GEMINI_SYSTEM_MD'],
     );
 
-    const interactiveMode = interactiveOverride ?? config.isInteractive();
-    const approvalMode = config.getApprovalMode?.() ?? ApprovalMode.DEFAULT;
+    const interactiveMode =
+      interactiveOverride ?? context.config.isInteractive();
+    const approvalMode =
+      context.config.getApprovalMode?.() ?? ApprovalMode.DEFAULT;
     const isPlanMode = approvalMode === ApprovalMode.PLAN;
     const isYoloMode = approvalMode === ApprovalMode.YOLO;
-    const skills = config.getSkillManager().getSkills();
-    const toolNames = config.getToolRegistry().getAllToolNames();
+    const skills = context.config.getSkillManager().getSkills();
+    const toolNames = context.toolRegistry.getAllToolNames();
     const enabledToolNames = new Set(toolNames);
-    const approvedPlanPath = config.getApprovedPlanPath();
 
-    const desiredModel = resolveModel(config.getActiveModel());
-    const isGemini3 = isPreviewModel(desiredModel);
-    const activeSnippets = isGemini3 ? snippets : legacySnippets;
+    const approvedPlanPath = context.config.getApprovedPlanPath();
+
+    const desiredModel = resolveModel(
+      context.config.getActiveModel(),
+      context.config.getGemini31LaunchedSync?.() ?? false,
+      context.config.getGemini31FlashLiteLaunchedSync?.() ?? false,
+      false,
+      context.config.getHasAccessToPreviewModel?.() ?? true,
+      context.config,
+    );
+    const isModernModel = supportsModernFeatures(desiredModel);
+    const activeSnippets = isModernModel ? snippets : legacySnippets;
     const contextFilenames = getAllGeminiMdFilenames();
 
-    // --- Context Gathering ---
-    let planModeToolsList = PLAN_MODE_TOOLS.filter((t) =>
-      enabledToolNames.has(t),
-    )
-      .map((t) => `  <tool>\`${t}\`</tool>`)
-      .join('\n');
+    let trackerDir = context.config.isTrackerEnabled()
+      ? context.config.storage.getProjectTempTrackerDir()
+      : undefined;
 
-    // Add read-only MCP tools to the list
+    if (trackerDir) {
+      // Sanitize path to prevent prompt injection
+      trackerDir = trackerDir.replace(/\n/g, ' ').replace(/\]/g, '');
+    }
+
+    // --- Context Gathering ---
+    let planModeToolsList = '';
     if (isPlanMode) {
-      const allTools = config.getToolRegistry().getAllTools();
-      const readOnlyMcpTools = allTools.filter(
-        (t): t is DiscoveredMCPTool =>
-          t instanceof DiscoveredMCPTool && !!t.isReadOnly,
-      );
-      if (readOnlyMcpTools.length > 0) {
-        const mcpToolsList = readOnlyMcpTools
-          .map((t) => `  <tool>\`${t.name}\` (${t.serverName})</tool>`)
-          .join('\n');
-        planModeToolsList += `\n${mcpToolsList}`;
-      }
+      const allTools = context.toolRegistry.getAllTools();
+      planModeToolsList = allTools
+        .map((t) => {
+          if (t instanceof DiscoveredMCPTool) {
+            return `  <tool>\`${t.name}\` (${t.serverName})</tool>`;
+          }
+          return `  <tool>\`${t.name}\`</tool>`;
+        })
+        .join('\n');
     }
 
     let basePrompt: string;
@@ -106,9 +117,9 @@ export class PromptProvider {
       );
       basePrompt = applySubstitutions(
         basePrompt,
-        config,
+        context.config,
         skillsPrompt,
-        isGemini3,
+        isModernModel,
       );
     } else {
       // --- Standard Composition ---
@@ -125,19 +136,22 @@ export class PromptProvider {
         })),
         coreMandates: this.withSection('coreMandates', () => ({
           interactive: interactiveMode,
-          isGemini3,
           hasSkills: skills.length > 0,
           hasHierarchicalMemory,
           contextFilenames,
+          topicUpdateNarration: context.config.isTopicUpdateNarrationEnabled(),
         })),
-        subAgents: this.withSection('agentContexts', () =>
-          config
-            .getAgentRegistry()
-            .getAllDefinitions()
-            .map((d) => ({
-              name: d.name,
-              description: d.description,
-            })),
+        subAgents: this.withSection(
+          'agentContexts',
+          () =>
+            context.config
+              .getAgentRegistry()
+              .getAllDefinitions()
+              .map((d) => ({
+                name: d.name,
+                description: d.description,
+              })),
+          enabledToolNames.has(AGENT_TOOL_NAME),
         ),
         agentSkills: this.withSection(
           'agentSkills',
@@ -149,32 +163,40 @@ export class PromptProvider {
             })),
           skills.length > 0,
         ),
+        taskTracker: trackerDir,
         hookContext: isSectionEnabled('hookContext') || undefined,
         primaryWorkflows: this.withSection(
           'primaryWorkflows',
-          () => ({
-            interactive: interactiveMode,
-            enableCodebaseInvestigator: enabledToolNames.has(
-              CodebaseInvestigatorAgent.name,
-            ),
-            enableWriteTodosTool: enabledToolNames.has(WRITE_TODOS_TOOL_NAME),
-            enableEnterPlanModeTool: enabledToolNames.has(
-              ENTER_PLAN_MODE_TOOL_NAME,
-            ),
-            enableGrep: enabledToolNames.has(GREP_TOOL_NAME),
-            enableGlob: enabledToolNames.has(GLOB_TOOL_NAME),
-            approvedPlan: approvedPlanPath
-              ? { path: approvedPlanPath }
-              : undefined,
-          }),
+          () => {
+            const agentRegistry = context.config.getAgentRegistry();
+            return {
+              interactive: interactiveMode,
+              enableCodebaseInvestigator:
+                agentRegistry.getDefinition(CodebaseInvestigatorAgent.name) !==
+                undefined,
+              enableWriteTodosTool: enabledToolNames.has(WRITE_TODOS_TOOL_NAME),
+              enableEnterPlanModeTool: enabledToolNames.has(
+                ENTER_PLAN_MODE_TOOL_NAME,
+              ),
+              enableGrep: enabledToolNames.has(GREP_TOOL_NAME),
+              enableGlob: enabledToolNames.has(GLOB_TOOL_NAME),
+              approvedPlan: approvedPlanPath
+                ? { path: approvedPlanPath }
+                : undefined,
+              taskTracker: trackerDir,
+              topicUpdateNarration:
+                context.config.isTopicUpdateNarrationEnabled(),
+            };
+          },
           !isPlanMode,
         ),
         planningWorkflow: this.withSection(
           'planningWorkflow',
           () => ({
+            interactive: interactiveMode,
             planModeToolsList,
-            plansDir: config.storage.getProjectTempPlansDir(),
-            approvedPlanPath: config.getApprovedPlanPath(),
+            plansDir: context.config.storage.getPlansDir(),
+            approvedPlanPath: context.config.getApprovedPlanPath(),
           }),
           isPlanMode,
         ),
@@ -182,12 +204,18 @@ export class PromptProvider {
           'operationalGuidelines',
           () => ({
             interactive: interactiveMode,
-            isGemini3,
-            enableShellEfficiency: config.getEnableShellOutputEfficiency(),
-            interactiveShellEnabled: config.isInteractiveShellEnabled(),
+            enableShellEfficiency:
+              context.config.getEnableShellOutputEfficiency(),
+            interactiveShellEnabled: context.config.isInteractiveShellEnabled(),
+            topicUpdateNarration:
+              context.config.isTopicUpdateNarrationEnabled(),
+            memoryManagerEnabled: context.config.isMemoryManagerEnabled(),
           }),
         ),
-        sandbox: this.withSection('sandbox', () => getSandboxMode()),
+        sandbox: this.withSection('sandbox', () => ({
+          mode: getSandboxMode(),
+          toolSandboxingEnabled: context.config.getSandboxEnabled(),
+        })),
         interactiveYoloMode: this.withSection(
           'interactiveYoloMode',
           () => true,
@@ -198,7 +226,7 @@ export class PromptProvider {
           () => ({ interactive: interactiveMode }),
           isGitRepository(process.cwd()) ? true : false,
         ),
-        finalReminder: isGemini3
+        finalReminder: isModernModel
           ? undefined
           : this.withSection('finalReminder', () => ({
               readFileToolName: READ_FILE_TOOL_NAME,
@@ -220,7 +248,18 @@ export class PromptProvider {
     );
 
     // Sanitize erratic newlines from composition
-    const sanitizedPrompt = finalPrompt.replace(/\n{3,}/g, '\n\n');
+    let sanitizedPrompt = finalPrompt.replace(/\n{3,}/g, '\n\n');
+
+    // Context Reinjection (Active Topic)
+    if (context.config.isTopicUpdateNarrationEnabled()) {
+      const activeTopic = context.config.topicState.getTopic();
+      if (activeTopic) {
+        const sanitizedTopic = activeTopic
+          .replace(/\n/g, ' ')
+          .replace(/\]/g, '');
+        sanitizedPrompt += `\n\n[Active Topic: ${sanitizedTopic}]`;
+      }
+    }
 
     // Write back to file if requested
     this.maybeWriteSystemMd(
@@ -232,11 +271,20 @@ export class PromptProvider {
     return sanitizedPrompt;
   }
 
-  getCompressionPrompt(config: Config): string {
-    const desiredModel = resolveModel(config.getActiveModel());
-    const isGemini3 = isPreviewModel(desiredModel);
-    const activeSnippets = isGemini3 ? snippets : legacySnippets;
-    return activeSnippets.getCompressionPrompt();
+  getCompressionPrompt(context: AgentLoopContext): string {
+    const desiredModel = resolveModel(
+      context.config.getActiveModel(),
+      context.config.getGemini31LaunchedSync?.() ?? false,
+      context.config.getGemini31FlashLiteLaunchedSync?.() ?? false,
+      false,
+      context.config.getHasAccessToPreviewModel?.() ?? true,
+      context.config,
+    );
+    const isModernModel = supportsModernFeatures(desiredModel);
+    const activeSnippets = isModernModel ? snippets : legacySnippets;
+    return activeSnippets.getCompressionPrompt(
+      context.config.getApprovedPlanPath(),
+    );
   }
 
   private withSection<T>(

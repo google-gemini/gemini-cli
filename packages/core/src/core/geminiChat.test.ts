@@ -5,8 +5,12 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import type { Content, GenerateContentResponse } from '@google/genai';
-import { ApiError, ThinkingLevel } from '@google/genai';
+import {
+  ApiError,
+  ThinkingLevel,
+  type Content,
+  type GenerateContentResponse,
+} from '@google/genai';
 import type { ContentGenerator } from '../core/contentGenerator.js';
 import {
   GeminiChat,
@@ -15,6 +19,11 @@ import {
   SYNTHETIC_THOUGHT_SIGNATURE,
   type StreamEvent,
 } from './geminiChat.js';
+import {
+  type CompletedToolCall,
+  CoreToolCallStatus,
+} from '../scheduler/types.js';
+import { MockTool } from '../test-utils/mock-tool.js';
 import type { Config } from '../config/config.js';
 import { setSimulate429 } from '../utils/testUtils.js';
 import { DEFAULT_THINKING_MODE } from '../config/models.js';
@@ -28,6 +37,7 @@ import type { ModelAvailabilityService } from '../availability/modelAvailability
 import * as policyHelpers from '../availability/policyHelpers.js';
 import { makeResolvedModelConfig } from '../services/modelConfigServiceTestUtils.js';
 import type { HookSystem } from '../hooks/hookSystem.js';
+import { LlmRole } from '../telemetry/types.js';
 
 // Mock fs module to prevent actual file system operations during tests
 const mockFileSystem = new Map<string, string>();
@@ -37,6 +47,10 @@ vi.mock('node:fs', () => {
     mkdirSync: vi.fn(),
     writeFileSync: vi.fn((path: string, data: string) => {
       mockFileSystem.set(path, data);
+    }),
+    appendFileSync: vi.fn((path: string, data: string) => {
+      const current = mockFileSystem.get(path) || '';
+      mockFileSystem.set(path, current + data);
     }),
     readFileSync: vi.fn((path: string) => {
       if (mockFileSystem.has(path)) {
@@ -80,14 +94,20 @@ vi.mock('../fallback/handler.js', () => ({
   handleFallback: mockHandleFallback,
 }));
 
-const { mockLogContentRetry, mockLogContentRetryFailure } = vi.hoisted(() => ({
+const {
+  mockLogContentRetry,
+  mockLogContentRetryFailure,
+  mockLogNetworkRetryAttempt,
+} = vi.hoisted(() => ({
   mockLogContentRetry: vi.fn(),
   mockLogContentRetryFailure: vi.fn(),
+  mockLogNetworkRetryAttempt: vi.fn(),
 }));
 
 vi.mock('../telemetry/loggers.js', () => ({
   logContentRetry: mockLogContentRetry,
   logContentRetryFailure: mockLogContentRetryFailure,
+  logNetworkRetryAttempt: mockLogNetworkRetryAttempt,
 }));
 
 vi.mock('../telemetry/uiTelemetry.js', () => ({
@@ -126,6 +146,11 @@ describe('GeminiChat', () => {
     let currentActiveModel = 'gemini-pro';
 
     mockConfig = {
+      getRequestTimeoutMs: vi.fn().mockReturnValue(undefined),
+      get config() {
+        return this;
+      },
+      promptId: 'test-session-id',
       getSessionId: () => 'test-session-id',
       getTelemetryLogPromptsEnabled: () => true,
       getUsageStatisticsEnabled: () => true,
@@ -150,8 +175,12 @@ describe('GeminiChat', () => {
       getToolRegistry: vi.fn().mockReturnValue({
         getTool: vi.fn(),
       }),
+      toolRegistry: {
+        getTool: vi.fn(),
+      },
       getContentGenerator: vi.fn().mockReturnValue(mockContentGenerator),
       getRetryFetchErrors: vi.fn().mockReturnValue(false),
+      getMaxAttempts: vi.fn().mockReturnValue(10),
       getUserTier: vi.fn().mockReturnValue(undefined),
       modelConfigService: {
         getResolvedConfig: vi.fn().mockImplementation((modelConfigKey) => {
@@ -287,6 +316,7 @@ describe('GeminiChat', () => {
         'test message',
         'prompt-id-tool-call-empty-end',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
       await expect(
         (async () => {
@@ -340,6 +370,7 @@ describe('GeminiChat', () => {
         'test message',
         'prompt-id-no-finish-empty-end',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
       await expect(
         (async () => {
@@ -387,6 +418,7 @@ describe('GeminiChat', () => {
         'test message',
         'prompt-id-valid-then-invalid-end',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
       await expect(
         (async () => {
@@ -435,6 +467,7 @@ describe('GeminiChat', () => {
         'test message',
         'prompt-id-empty-chunk-consolidation',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
       for await (const _ of stream) {
         // Consume the stream
@@ -494,6 +527,7 @@ describe('GeminiChat', () => {
         'test message',
         'prompt-id-multi-chunk',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
       for await (const _ of stream) {
         // Consume the stream to trigger history recording.
@@ -543,6 +577,7 @@ describe('GeminiChat', () => {
         'test message',
         'prompt-id-mixed-chunk',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
       for await (const _ of stream) {
         // This loop consumes the stream.
@@ -612,6 +647,7 @@ describe('GeminiChat', () => {
         },
         'prompt-id-stream-1',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
 
       // 4. Assert: The stream processing should throw an InvalidStreamError.
@@ -656,6 +692,7 @@ describe('GeminiChat', () => {
         'test message',
         'prompt-id-1',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
 
       // Should not throw an error
@@ -693,6 +730,7 @@ describe('GeminiChat', () => {
         'test message',
         'prompt-id-1',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
 
       await expect(
@@ -729,6 +767,7 @@ describe('GeminiChat', () => {
         'test message',
         'prompt-id-1',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
 
       await expect(
@@ -765,6 +804,7 @@ describe('GeminiChat', () => {
         'test message',
         'prompt-id-1',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
 
       // Should not throw an error
@@ -802,6 +842,7 @@ describe('GeminiChat', () => {
         'test',
         'prompt-id-malformed',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
 
       // Should throw an error
@@ -849,6 +890,7 @@ describe('GeminiChat', () => {
         'test retry',
         'prompt-id-retry-malformed',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
       const events: StreamEvent[] = [];
       for await (const event of stream) {
@@ -906,6 +948,7 @@ describe('GeminiChat', () => {
         'hello',
         'prompt-id-1',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
       for await (const _ of stream) {
         // consume stream
@@ -931,6 +974,7 @@ describe('GeminiChat', () => {
           },
         },
         'prompt-id-1',
+        LlmRole.MAIN,
       );
     });
 
@@ -954,6 +998,7 @@ describe('GeminiChat', () => {
         'hello',
         'prompt-id-thinking-level',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
       for await (const _ of stream) {
         // consume stream
@@ -970,6 +1015,7 @@ describe('GeminiChat', () => {
           }),
         }),
         'prompt-id-thinking-level',
+        LlmRole.MAIN,
       );
     });
 
@@ -993,6 +1039,7 @@ describe('GeminiChat', () => {
         'hello',
         'prompt-id-thinking-budget',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
       for await (const _ of stream) {
         // consume stream
@@ -1003,13 +1050,71 @@ describe('GeminiChat', () => {
           model: 'gemini-2.0-flash',
           config: expect.objectContaining({
             thinkingConfig: {
-              thinkingBudget: DEFAULT_THINKING_MODE,
+              thinkingBudget: 8192,
               thinkingLevel: undefined,
             },
           }),
         }),
         'prompt-id-thinking-budget',
+        LlmRole.MAIN,
       );
+    });
+
+    it('should flush transcript before tool dispatch for pure tool call with no text or thoughts', async () => {
+      const pureToolCallStream = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [
+                  {
+                    functionCall: {
+                      name: 'read_file',
+                      args: { path: 'test.py' },
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+      })();
+
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        pureToolCallStream,
+      );
+
+      const { default: fs } = await import('node:fs');
+      const appendFileSync = vi.mocked(fs.appendFileSync);
+      const writeCountBefore = appendFileSync.mock.calls.length;
+
+      await chat.initialize();
+
+      const stream = await chat.sendMessageStream(
+        { model: 'test-model' },
+        'analyze test.py',
+        'prompt-id-pure-tool-flush',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+      for await (const _ of stream) {
+        // consume
+      }
+
+      const newWrites = appendFileSync.mock.calls.slice(writeCountBefore);
+      expect(newWrites.length).toBeGreaterThan(0);
+
+      const geminiWrite = newWrites.find((w) => {
+        try {
+          const data = JSON.parse(w[1] as string);
+          return data.type === 'gemini';
+        } catch {
+          return false;
+        }
+      });
+
+      expect(geminiWrite).toBeDefined();
     });
   });
 
@@ -1044,39 +1149,6 @@ describe('GeminiChat', () => {
   });
 
   describe('sendMessageStream with retries', () => {
-    it('should not retry on invalid content if model does not start with gemini-2', async () => {
-      // Mock the stream to fail.
-      vi.mocked(mockContentGenerator.generateContentStream).mockImplementation(
-        async () =>
-          (async function* () {
-            yield {
-              candidates: [{ content: { parts: [{ text: '' }] } }],
-            } as unknown as GenerateContentResponse;
-          })(),
-      );
-
-      const stream = await chat.sendMessageStream(
-        { model: 'gemini-1.5-pro' },
-        'test',
-        'prompt-id-no-retry',
-        new AbortController().signal,
-      );
-
-      await expect(
-        (async () => {
-          for await (const _ of stream) {
-            // Must loop to trigger the internal logic that throws.
-          }
-        })(),
-      ).rejects.toThrow(InvalidStreamError);
-
-      // Should be called only 1 time (no retry)
-      expect(mockContentGenerator.generateContentStream).toHaveBeenCalledTimes(
-        1,
-      );
-      expect(mockLogContentRetry).not.toHaveBeenCalled();
-    });
-
     it('should yield a RETRY event when an invalid stream is encountered', async () => {
       // ARRANGE: Mock the stream to fail once, then succeed.
       vi.mocked(mockContentGenerator.generateContentStream)
@@ -1108,6 +1180,7 @@ describe('GeminiChat', () => {
         'test message',
         'prompt-id-yield-retry',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
       const events: StreamEvent[] = [];
       for await (const event of stream) {
@@ -1150,6 +1223,7 @@ describe('GeminiChat', () => {
         'test',
         'prompt-id-retry-success',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
       const chunks: StreamEvent[] = [];
       for await (const chunk of stream) {
@@ -1222,6 +1296,7 @@ describe('GeminiChat', () => {
         'test message',
         'prompt-id-retry-temperature',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
 
       for await (const _ of stream) {
@@ -1243,6 +1318,7 @@ describe('GeminiChat', () => {
           }),
         }),
         'prompt-id-retry-temperature',
+        LlmRole.MAIN,
       );
 
       // Second call (retry) should have temperature 1
@@ -1256,6 +1332,7 @@ describe('GeminiChat', () => {
           }),
         }),
         'prompt-id-retry-temperature',
+        LlmRole.MAIN,
       );
     });
 
@@ -1281,6 +1358,7 @@ describe('GeminiChat', () => {
         'test',
         'prompt-id-retry-fail',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
       await expect(async () => {
         for await (const _ of stream) {
@@ -1288,11 +1366,11 @@ describe('GeminiChat', () => {
         }
       }).rejects.toThrow(InvalidStreamError);
 
-      // Should be called 2 times (initial + 1 retry)
+      // Should be called 4 times (initial + 3 retries)
       expect(mockContentGenerator.generateContentStream).toHaveBeenCalledTimes(
-        2,
+        4,
       );
-      expect(mockLogContentRetry).toHaveBeenCalledTimes(1);
+      expect(mockLogContentRetry).toHaveBeenCalledTimes(3);
       expect(mockLogContentRetryFailure).toHaveBeenCalledTimes(1);
 
       // History should still contain the user message.
@@ -1347,6 +1425,7 @@ describe('GeminiChat', () => {
           'test message',
           'prompt-id-400',
           new AbortController().signal,
+          LlmRole.MAIN,
         );
 
         await expect(
@@ -1386,9 +1465,11 @@ describe('GeminiChat', () => {
           'test message',
           'prompt-id-429-retry',
           new AbortController().signal,
+          LlmRole.MAIN,
         );
 
         const events: StreamEvent[] = [];
+
         for await (const event of stream) {
           events.push(event);
         }
@@ -1435,9 +1516,11 @@ describe('GeminiChat', () => {
           'test message',
           'prompt-id-500-retry',
           new AbortController().signal,
+          LlmRole.MAIN,
         );
 
         const events: StreamEvent[] = [];
+
         for await (const event of stream) {
           events.push(event);
         }
@@ -1492,9 +1575,11 @@ describe('GeminiChat', () => {
           'test message',
           'prompt-id-fetch-error-retry',
           new AbortController().signal,
+          LlmRole.MAIN,
         );
 
         const events: StreamEvent[] = [];
+
         for await (const event of stream) {
           events.push(event);
         }
@@ -1556,6 +1641,7 @@ describe('GeminiChat', () => {
       'Second question',
       'prompt-id-retry-existing',
       new AbortController().signal,
+      LlmRole.MAIN,
     );
     for await (const _ of stream) {
       // consume stream
@@ -1628,6 +1714,7 @@ describe('GeminiChat', () => {
       'test empty stream',
       'prompt-id-empty-stream',
       new AbortController().signal,
+      LlmRole.MAIN,
     );
     const chunks: StreamEvent[] = [];
     for await (const chunk of stream) {
@@ -1709,6 +1796,7 @@ describe('GeminiChat', () => {
       'first',
       'prompt-1',
       new AbortController().signal,
+      LlmRole.MAIN,
     );
     const firstStreamIterator = firstStream[Symbol.asyncIterator]();
     await firstStreamIterator.next();
@@ -1719,6 +1807,7 @@ describe('GeminiChat', () => {
       'second',
       'prompt-2',
       new AbortController().signal,
+      LlmRole.MAIN,
     );
 
     // 5. Assert that only one API call has been made so far.
@@ -1824,6 +1913,7 @@ describe('GeminiChat', () => {
         'trigger 429',
         'prompt-id-fb1',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
 
       // Consume stream to trigger logic
@@ -1890,6 +1980,7 @@ describe('GeminiChat', () => {
       'test message',
       'prompt-id-discard-test',
       new AbortController().signal,
+      LlmRole.MAIN,
     );
     const events: StreamEvent[] = [];
     for await (const event of stream) {
@@ -2106,6 +2197,7 @@ describe('GeminiChat', () => {
         'test',
         'prompt-healthy',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
       for await (const _ of stream) {
         // consume
@@ -2141,6 +2233,7 @@ describe('GeminiChat', () => {
         'test',
         'prompt-sticky-once',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
       for await (const _ of stream) {
         // consume
@@ -2191,6 +2284,7 @@ describe('GeminiChat', () => {
           'test',
           'prompt-fallback-arg',
           new AbortController().signal,
+          LlmRole.MAIN,
         );
         for await (const _ of stream) {
           // consume
@@ -2269,6 +2363,7 @@ describe('GeminiChat', () => {
         'test',
         'prompt-config-refresh',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
       // Consume to drive both attempts
       for await (const _ of stream) {
@@ -2281,9 +2376,12 @@ describe('GeminiChat', () => {
         1,
         expect.objectContaining({
           model: 'model-a',
-          config: expect.objectContaining({ temperature: 0.1 }),
+          config: expect.objectContaining({
+            temperature: 0.1,
+          }),
         }),
         expect.any(String),
+        LlmRole.MAIN,
       );
       expect(
         mockContentGenerator.generateContentStream,
@@ -2291,9 +2389,12 @@ describe('GeminiChat', () => {
         2,
         expect.objectContaining({
           model: 'model-b',
-          config: expect.objectContaining({ temperature: 0.9 }),
+          config: expect.objectContaining({
+            temperature: 0.9,
+          }),
         }),
         expect.any(String),
+        LlmRole.MAIN,
       );
     });
   });
@@ -2323,6 +2424,7 @@ describe('GeminiChat', () => {
         'test',
         'prompt-id',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
 
       const events: StreamEvent[] = [];
@@ -2353,6 +2455,7 @@ describe('GeminiChat', () => {
         'test',
         'prompt-id',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
 
       const events: StreamEvent[] = [];
@@ -2392,6 +2495,7 @@ describe('GeminiChat', () => {
         'test',
         'prompt-id',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
 
       const events: StreamEvent[] = [];
@@ -2428,6 +2532,7 @@ describe('GeminiChat', () => {
         'test',
         'prompt-id',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
 
       const events: StreamEvent[] = [];
@@ -2444,6 +2549,80 @@ describe('GeminiChat', () => {
         type: StreamEventType.CHUNK,
         value: response,
       });
+    });
+  });
+
+  describe('recordCompletedToolCalls', () => {
+    it('should use originalRequestName and originalRequestArgs if present', () => {
+      const completedCall: CompletedToolCall = {
+        status: CoreToolCallStatus.Success,
+        request: {
+          callId: 'call-1',
+          name: 'tail-tool',
+          args: { tail: 'args' },
+          originalRequestName: 'original-tool',
+          originalRequestArgs: { original: 'args' },
+          isClientInitiated: false,
+          prompt_id: 'p1',
+        },
+        response: {
+          callId: 'call-1',
+          responseParts: [{ text: 'response' }],
+          resultDisplay: undefined,
+          error: undefined,
+          errorType: undefined,
+        },
+        tool: new MockTool({ name: 'mock-tool' }),
+        invocation: new MockTool({ name: 'mock-tool' }).build({ key: 'value' }),
+      };
+
+      const spy = vi.spyOn(chat.getChatRecordingService(), 'recordToolCalls');
+
+      chat.recordCompletedToolCalls('test-model', [completedCall]);
+
+      expect(spy).toHaveBeenCalledWith('test-model', [
+        expect.objectContaining({
+          id: 'call-1',
+          name: 'original-tool',
+          args: { original: 'args' },
+          result: [{ text: 'response' }],
+        }),
+      ]);
+    });
+
+    it('should fall back to request name and args if original are not present', () => {
+      const completedCall: CompletedToolCall = {
+        status: CoreToolCallStatus.Success,
+        request: {
+          callId: 'call-1',
+          name: 'tool-name',
+          args: { key: 'value' },
+          isClientInitiated: false,
+          prompt_id: 'p1',
+        },
+        response: {
+          callId: 'call-1',
+          responseParts: [{ text: 'response' }],
+          resultDisplay: undefined,
+          error: undefined,
+          errorType: undefined,
+        },
+        tool: new MockTool({ name: 'mock-tool' }),
+        invocation: new MockTool({ name: 'mock-tool' }).build({ key: 'value' }),
+      };
+
+      const spy = vi.spyOn(chat.getChatRecordingService(), 'recordToolCalls');
+
+      chat.recordCompletedToolCalls('test-model', [completedCall]);
+
+      expect(spy).toHaveBeenCalledWith('test-model', [
+        expect.objectContaining({
+          id: 'call-1',
+          name: 'tool-name',
+          args: { key: 'value' },
+          result: [{ text: 'response' }],
+        }),
+      ]);
     });
   });
 });

@@ -98,30 +98,49 @@ export function cpSlice(str: string, start: number, end?: number): string {
 /**
  * Strip characters that can break terminal rendering.
  *
- * Uses Node.js built-in stripVTControlCharacters to handle VT sequences,
- * then filters remaining control characters that can disrupt display.
+ * This is a strict sanitization function intended for general display
+ * contexts. It strips all C1 control characters (0x80-0x9F) and VT
+ * control sequences. For list display contexts where a more lenient
+ * approach is needed (preserving C1 characters and only stripping ANSI
+ * codes and newlines/tabs), use a separate function instead.
+ *
+ * Processing order:
+ * 1. stripAnsi removes ANSI escape sequences (including 8-bit CSI 0x9B)
+ * 2. Regex strips C0, C1, BiDi, and zero-width control characters
+ * 3. stripVTControlCharacters removes any remaining VT sequences
  *
  * Characters stripped:
  * - ANSI escape sequences (via strip-ansi)
  * - VT control sequences (via Node.js util.stripVTControlCharacters)
  * - C0 control chars (0x00-0x1F) except TAB(0x09), LF(0x0A), CR(0x0D)
  * - C1 control chars (0x80-0x9F) that can cause display issues
+ * - BiDi control chars (U+200E, U+200F, U+202A-U+202E, U+2066-U+2069)
+ * - Zero-width chars (U+200B, U+FEFF)
  *
  * Characters preserved:
  * - All printable Unicode including emojis
+ * - ZWJ (U+200D) - needed for complex emoji sequences
+ * - ZWNJ (U+200C) - preserve zero-width non-joiner
  * - DEL (0x7F) - handled functionally by applyOperations, not a display issue
  * - CR/LF (0x0D/0x0A) - needed for line breaks
  * - TAB (0x09) - preserve tabs
  */
 export function stripUnsafeCharacters(str: string): string {
   const strippedAnsi = stripAnsi(str);
-  const strippedVT = stripVTControlCharacters(strippedAnsi);
 
-  // Use a regex to strip remaining unsafe control characters
-  // C0: 0x00-0x1F except 0x09 (TAB), 0x0A (LF), 0x0D (CR)
-  // C1: 0x80-0x9F
-  // eslint-disable-next-line no-control-regex
-  return strippedVT.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x80-\x9F]/g, '');
+  // Strip C0, C1, and other unsafe characters via regex first.
+  // This is more efficient than multiple replaces and crucially removes C1
+  // characters (e.g., 0x90 DCS) before they can be misinterpreted by
+  // stripVTControlCharacters, which could otherwise cause data loss.
+  const strippedWithRegex = strippedAnsi.replace(
+    // eslint-disable-next-line no-control-regex
+    /[\x00-\x08\x0B\x0C\x0E-\x1F\x80-\x9F\u200E\u200F\u202A-\u202E\u2066-\u2069\u200B\uFEFF]/g,
+    '',
+  );
+
+  // Finally, use stripVTControlCharacters for any remaining VT sequences
+  // that the regex might not cover.
+  return stripVTControlCharacters(strippedWithRegex);
 }
 
 /**
@@ -224,7 +243,9 @@ export function escapeAnsiCtrlCodes<T>(obj: T): T {
     let newArr: unknown[] | null = null;
 
     for (let i = 0; i < obj.length; i++) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const value = obj[i];
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const escapedValue = escapeAnsiCtrlCodes(value);
       if (escapedValue !== value) {
         if (newArr === null) {

@@ -11,7 +11,8 @@ exports[`DetailedMessagesDisplay > renders message counts 1`] = `
 │                                                                              │
 │                                                                              │
 │                                                                              │
-╰──────────────────────────────────────────────────────────────────────────────╯"
+╰──────────────────────────────────────────────────────────────────────────────╯
+"
 `;
 
 exports[`DetailedMessagesDisplay > renders messages correctly 1`] = `
@@ -22,7 +23,6 @@ exports[`DetailedMessagesDisplay > renders messages correctly 1`] = `
 │ ℹ  Log message                                                               │
 │ ⚠  Warning message                                                           │
 │ ✖  Error message                                                             │
-│ 🔍 Debug message                                                             │
 │                                                                              │
 │                                                                              │
 │                                                                              │
@@ -35,5 +35,7 @@ exports[`DetailedMessagesDisplay > renders messages correctly 1`] = `
 │                                                                              │
 │                                                                              │
 │                                                                              │
-╰──────────────────────────────────────────────────────────────────────────────╯"
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+"
 `;

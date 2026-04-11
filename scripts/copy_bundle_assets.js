@@ -73,4 +73,39 @@ if (existsSync(builtinSkillsSrc)) {
   console.log('Copied built-in skills to bundle/builtin/');
 }
 
+// 5. Copy DevTools package so the external dynamic import resolves at runtime
+const devtoolsSrc = join(root, 'packages/devtools');
+const devtoolsDest = join(
+  bundleDir,
+  'node_modules',
+  '@google',
+  'gemini-cli-devtools',
+);
+const devtoolsDistSrc = join(devtoolsSrc, 'dist');
+if (existsSync(devtoolsDistSrc)) {
+  mkdirSync(devtoolsDest, { recursive: true });
+  cpSync(devtoolsDistSrc, join(devtoolsDest, 'dist'), {
+    recursive: true,
+    dereference: true,
+  });
+  copyFileSync(
+    join(devtoolsSrc, 'package.json'),
+    join(devtoolsDest, 'package.json'),
+  );
+  console.log('Copied devtools package to bundle/node_modules/');
+}
+
+// 6. Copy bundled chrome-devtools-mcp
+const bundleMcpSrc = join(root, 'packages/core/dist/bundled');
+const bundleMcpDest = join(bundleDir, 'bundled');
+if (!existsSync(bundleMcpSrc)) {
+  console.error(
+    `Error: chrome-devtools-mcp bundle not found at ${bundleMcpSrc}.\n` +
+      `Run "npm run bundle:browser-mcp -w @google/gemini-cli-core" first.`,
+  );
+  process.exit(1);
+}
+cpSync(bundleMcpSrc, bundleMcpDest, { recursive: true, dereference: true });
+console.log('Copied bundled chrome-devtools-mcp to bundle/bundled/');
+
 console.log('Assets copied to bundle/');

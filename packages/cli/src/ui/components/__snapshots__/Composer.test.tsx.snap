@@ -2,43 +2,44 @@
 
 exports[`Composer > Snapshots > matches snapshot in idle state 1`] = `
 "
-                                                                                       ShortcutsHint
+                                                                                    ? for shortcuts
 ────────────────────────────────────────────────────────────────────────────────────────────────────
- ApprovalModeIndicator                                                                 StatusDisplay
+ ApprovalModeIndicator: default                                                        StatusDisplay
 InputPrompt:   Type your message or @path/to/file
-Footer"
+Footer
+"
 `;
 
 exports[`Composer > Snapshots > matches snapshot in minimal UI mode 1`] = `
+"                                                                           press tab twice for more
+InputPrompt:   Type your message or @path/to/file
 "
-                                                                                       ShortcutsHint
-InputPrompt:   Type your message or @path/to/file"
 `;
 
 exports[`Composer > Snapshots > matches snapshot in minimal UI mode while loading 1`] = `
+"LoadingIndicator                                                           press tab twice for more
+InputPrompt:   Type your message or @path/to/file
 "
- LoadingIndicator
-InputPrompt:   Type your message or @path/to/file"
 `;
 
 exports[`Composer > Snapshots > matches snapshot in narrow view 1`] = `
 "
-
-ShortcutsHint
+                        ? for shortcuts
 ────────────────────────────────────────
- ApprovalModeIndicator
-
-StatusDisplay
+ ApprovalModeIndicator:     StatusDispl
+ default                    ay
 InputPrompt:   Type your message or
 @path/to/file
-Footer"
+Footer
+"
 `;
 
 exports[`Composer > Snapshots > matches snapshot while streaming 1`] = `
 "
- LoadingIndicator: Thinking                                                            ShortcutsHint
+ LoadingIndicator: Thinking                                                         ? for shortcuts
 ────────────────────────────────────────────────────────────────────────────────────────────────────
- ApprovalModeIndicator
+ ApprovalModeIndicator: default                                                        StatusDisplay
 InputPrompt:   Type your message or @path/to/file
-Footer"
+Footer
+"
 `;

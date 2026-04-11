@@ -5,6 +5,13 @@
  */
 
 import type { GenerateContentConfig } from '@google/genai';
+import type { ModelPolicy } from '../availability/modelPolicy.js';
+import {
+  getDisplayString,
+  PREVIEW_GEMINI_3_1_MODEL,
+  PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL,
+  isProModel,
+} from '../config/models.js';
 
 // The primary key for the ModelConfig is the model string. However, we also
 // support a secondary key to limit the override scope, typically an agent name.
@@ -51,11 +58,70 @@ export interface ModelConfigAlias {
   modelConfig: ModelConfig;
 }
 
+// A model definition is a mapping from a model name to a list of features
+// that the model supports. Model names can be either direct model IDs
+// (gemini-2.5-pro) or aliases (auto).
+export interface ModelDefinition {
+  displayName?: string;
+  tier?: string; // 'pro' | 'flash' | 'flash-lite' | 'custom' | 'auto'
+  family?: string; // The gemini family, e.g. 'gemini-3' | 'gemini-2'
+  isPreview?: boolean;
+  // Specifies whether the model should be visible in the dialog.
+  isVisible?: boolean;
+  /** A short description of the model for the dialog. */
+  dialogDescription?: string;
+  features?: {
+    // Whether the model supports thinking.
+    thinking?: boolean;
+    // Whether the model supports mutlimodal function responses. This is
+    // supported in Gemini 3.
+    multimodalToolUse?: boolean;
+  };
+}
+
+// A model resolution is a mapping from a model name to a list of conditions
+// that can be used to resolve the model to a model ID.
+export interface ModelResolution {
+  // The default model ID to use when no conditions are met.
+  default: string;
+  // A list of conditions that can be used to resolve the model.
+  contexts?: Array<{
+    // The condition to check for.
+    condition: ResolutionCondition;
+    // The model ID to use when the condition is met.
+    target: string;
+  }>;
+}
+
+/** The actual state of the current session. */
+export interface ResolutionContext {
+  useGemini3_1?: boolean;
+  useGemini3_1FlashLite?: boolean;
+  useCustomTools?: boolean;
+  hasAccessToPreview?: boolean;
+  hasAccessToProModel?: boolean;
+  requestedModel?: string;
+}
+
+/** The requirements defined in the registry. */
+export interface ResolutionCondition {
+  useGemini3_1?: boolean;
+  useGemini3_1FlashLite?: boolean;
+  useCustomTools?: boolean;
+  hasAccessToPreview?: boolean;
+  /** Matches if the current model is in this list. */
+  requestedModels?: string[];
+}
+
 export interface ModelConfigServiceConfig {
   aliases?: Record<string, ModelConfigAlias>;
   customAliases?: Record<string, ModelConfigAlias>;
   overrides?: ModelConfigOverride[];
   customOverrides?: ModelConfigOverride[];
+  modelDefinitions?: Record<string, ModelDefinition>;
+  modelIdResolutions?: Record<string, ModelResolution>;
+  classifierIdResolutions?: Record<string, ModelResolution>;
+  modelChains?: Record<string, ModelPolicy[]>;
 }
 
 const MAX_ALIAS_CHAIN_DEPTH = 100;
@@ -75,6 +141,193 @@ export class ModelConfigService {
 
   // TODO(12597): Process config to build a typed alias hierarchy.
   constructor(private readonly config: ModelConfigServiceConfig) {}
+
+  /**
+   * Returns a standardized list of available model options based on the resolution context.
+   * This logic is shared across the TUI and ACP mode.
+   */
+  getAvailableModelOptions(context: ResolutionContext): Array<{
+    modelId: string;
+    name: string;
+    description: string;
+    tier: string;
+  }> {
+    const definitions = this.config.modelDefinitions ?? {};
+    const shouldShowPreviewModels = context.hasAccessToPreview ?? false;
+    const useGemini31 = context.useGemini3_1 ?? false;
+    const useGemini31FlashLite = context.useGemini3_1FlashLite ?? false;
+
+    const mainOptions = Object.entries(definitions)
+      .filter(([_, m]) => {
+        if (m.isVisible !== true) return false;
+        if (m.isPreview && !shouldShowPreviewModels) return false;
+        if (m.tier !== 'auto') return false;
+        return true;
+      })
+      .map(([id, m]) => ({
+        modelId: id,
+        name: m.displayName ?? getDisplayString(id),
+        description:
+          id === 'auto-gemini-3' && useGemini31
+            ? (m.dialogDescription ?? '').replace(
+                'gemini-3-pro',
+                'gemini-3.1-pro',
+              )
+            : (m.dialogDescription ?? ''),
+        tier: m.tier ?? 'auto',
+      }));
+
+    const manualOptions = Object.entries(definitions)
+      .filter(([id, m]) => {
+        if (m.isVisible !== true) return false;
+        if (m.isPreview && !shouldShowPreviewModels) return false;
+        if (m.tier === 'auto') return false;
+        if (context.hasAccessToProModel === false && isProModel(id))
+          return false;
+        if (id === PREVIEW_GEMINI_3_1_MODEL && !useGemini31) return false;
+        if (id === PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL && !useGemini31FlashLite)
+          return false;
+        return true;
+      })
+      .map(([id, m]) => {
+        const resolvedId = this.resolveModelId(id, context);
+        const titleId = this.resolveModelId(id, {
+          useGemini3_1: useGemini31,
+          useGemini3_1FlashLite: useGemini31FlashLite,
+        });
+        return {
+          modelId: resolvedId,
+          name: m.displayName ?? getDisplayString(titleId),
+          description: m.dialogDescription ?? '',
+          tier: m.tier ?? 'custom',
+        };
+      });
+
+    // Deduplicate manual options
+    const seen = new Set<string>();
+    const uniqueManualOptions = manualOptions.filter((option) => {
+      if (seen.has(option.modelId)) return false;
+      seen.add(option.modelId);
+      return true;
+    });
+
+    return [...mainOptions, ...uniqueManualOptions];
+  }
+
+  getModelDefinition(modelId: string): ModelDefinition | undefined {
+    const definition = this.config.modelDefinitions?.[modelId];
+    if (definition) {
+      return definition;
+    }
+
+    // For unknown models, return an implicit custom definition to match legacy behavior.
+    if (!modelId.startsWith('gemini-')) {
+      return {
+        tier: 'custom',
+        family: 'custom',
+        features: {},
+      };
+    }
+
+    return undefined;
+  }
+
+  getModelDefinitions(): Record<string, ModelDefinition> {
+    return this.config.modelDefinitions ?? {};
+  }
+
+  private matches(
+    condition: ResolutionCondition,
+    context: ResolutionContext,
+  ): boolean {
+    return Object.entries(condition).every(([key, value]) => {
+      if (value === undefined) return true;
+
+      switch (key) {
+        case 'useGemini3_1':
+          return value === context.useGemini3_1;
+        case 'useGemini3_1FlashLite':
+          return value === context.useGemini3_1FlashLite;
+        case 'useCustomTools':
+          return value === context.useCustomTools;
+        case 'hasAccessToPreview':
+          return value === context.hasAccessToPreview;
+        case 'requestedModels':
+          return (
+            Array.isArray(value) &&
+            !!context.requestedModel &&
+            value.includes(context.requestedModel)
+          );
+        default:
+          return false;
+      }
+    });
+  }
+
+  // Resolves a model ID to a concrete model ID based on the provided context.
+  resolveModelId(
+    requestedName: string,
+    context: ResolutionContext = {},
+  ): string {
+    const resolution = this.config.modelIdResolutions?.[requestedName];
+    if (!resolution) {
+      return requestedName;
+    }
+
+    for (const ctx of resolution.contexts ?? []) {
+      if (this.matches(ctx.condition, context)) {
+        return ctx.target;
+      }
+    }
+
+    return resolution.default;
+  }
+
+  // Resolves a classifier model ID to a concrete model ID based on the provided context.
+  resolveClassifierModelId(
+    tier: string,
+    requestedModel: string,
+    context: ResolutionContext = {},
+  ): string {
+    const resolution = this.config.classifierIdResolutions?.[tier];
+    const fullContext: ResolutionContext = { ...context, requestedModel };
+
+    if (!resolution) {
+      // Fallback to regular model resolution if no classifier-specific rule exists
+      return this.resolveModelId(tier, fullContext);
+    }
+
+    for (const ctx of resolution.contexts ?? []) {
+      if (this.matches(ctx.condition, fullContext)) {
+        return ctx.target;
+      }
+    }
+
+    return resolution.default;
+  }
+
+  getModelChain(chainName: string): ModelPolicy[] | undefined {
+    return this.config.modelChains?.[chainName];
+  }
+
+  /**
+   * Fetches a chain template and resolves all model IDs within it
+   * based on the provided context.
+   */
+  resolveChain(
+    chainName: string,
+    context: ResolutionContext = {},
+  ): ModelPolicy[] | undefined {
+    const template = this.config.modelChains?.[chainName];
+    if (!template) {
+      return undefined;
+    }
+    // Map through the template and resolve each model ID
+    return template.map((policy) => ({
+      ...policy,
+      model: this.resolveModelId(policy.model, context),
+    }));
+  }
 
   registerRuntimeModelConfig(aliasName: string, alias: ModelConfigAlias): void {
     this.runtimeAliases[aliasName] = alias;

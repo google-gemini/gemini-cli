@@ -2,7 +2,7 @@
   "name": "gemini-cli-vscode-ide-companion",
   "displayName": "Gemini CLI Companion",
   "description": "Enable Gemini CLI with direct access to your IDE workspace.",
-  "version": "0.30.0-nightly.20260210.a2174751d",
+  "version": "0.39.0-nightly.20260408.e77b22e63",
   "publisher": "google",
   "icon": "assets/icon.png",
   "repository": {
@@ -108,7 +108,7 @@
   "scripts": {
     "prepackage": "npm run generate:notices && npm run check-types && npm run lint && npm run build:prod",
     "build": "npm run build:dev",
-    "build:dev": "npm run check-types && npm run lint && node esbuild.js",
+    "build:dev": "node esbuild.js",
     "build:prod": "node esbuild.js --production",
     "generate:notices": "node ./scripts/generate-notices.js",
     "prepare": "npm run generate:notices",

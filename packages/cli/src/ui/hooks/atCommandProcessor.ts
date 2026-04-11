@@ -21,11 +21,34 @@ import {
   CoreToolCallStatus,
 } from '@google/gemini-cli-core';
 import { Buffer } from 'node:buffer';
-import type { HistoryItem, IndividualToolCallDisplay } from '../types.js';
+import type {
+  HistoryItemToolGroup,
+  IndividualToolCallDisplay,
+} from '../types.js';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 
 const REF_CONTENT_HEADER = `\n${REFERENCE_CONTENT_START}`;
 const REF_CONTENT_FOOTER = `\n${REFERENCE_CONTENT_END}`;
+
+/**
+ * Escapes unescaped @ symbols so they are not interpreted as @path commands.
+ */
+export function escapeAtSymbols(text: string): string {
+  return text.replace(/(?<!\\)@/g, '\\@');
+}
+
+/**
+ * Unescapes \@ back to @ correctly, preserving \\@ sequences.
+ */
+export function unescapeLiteralAt(text: string): string {
+  return text.replace(/\\@/g, (match, offset, full) => {
+    let backslashCount = 0;
+    for (let i = offset - 1; i >= 0 && full[i] === '\\'; i--) {
+      backslashCount++;
+    }
+    return backslashCount % 2 === 0 ? '@' : '\\@';
+  });
+}
 
 /**
  * Regex source for the path/command part of an @ reference.
@@ -46,6 +69,7 @@ interface HandleAtCommandParams {
   onDebugMessage: (message: string) => void;
   messageId: number;
   signal: AbortSignal;
+  escapePastedAtSymbols?: boolean;
 }
 
 interface HandleAtCommandResult {
@@ -62,7 +86,10 @@ interface AtCommandPart {
  * Parses a query string to find all '@<path>' commands and text segments.
  * Handles \ escaped spaces within paths.
  */
-function parseAllAtCommands(query: string): AtCommandPart[] {
+function parseAllAtCommands(
+  query: string,
+  escapePastedAtSymbols = false,
+): AtCommandPart[] {
   const parts: AtCommandPart[] = [];
   let lastIndex = 0;
 
@@ -82,7 +109,9 @@ function parseAllAtCommands(query: string): AtCommandPart[] {
     if (matchIndex > lastIndex) {
       parts.push({
         type: 'text',
-        content: query.substring(lastIndex, matchIndex),
+        content: escapePastedAtSymbols
+          ? unescapeLiteralAt(query.substring(lastIndex, matchIndex))
+          : query.substring(lastIndex, matchIndex),
       });
     }
 
@@ -95,7 +124,12 @@ function parseAllAtCommands(query: string): AtCommandPart[] {
 
   // Add remaining text
   if (lastIndex < query.length) {
-    parts.push({ type: 'text', content: query.substring(lastIndex) });
+    parts.push({
+      type: 'text',
+      content: escapePastedAtSymbols
+        ? unescapeLiteralAt(query.substring(lastIndex))
+        : query.substring(lastIndex),
+    });
   }
 
   // Filter out empty text parts that might result from consecutive @paths or leading/trailing spaces
@@ -410,6 +444,7 @@ async function readMcpResources(
           name: `resources/read (${resource.serverName})`,
           description: resource.uri,
           status: CoreToolCallStatus.Success,
+          isClientInitiated: true,
           resultDisplay: `Successfully read resource ${resource.uri}`,
           confirmationDetails: undefined,
         } as IndividualToolCallDisplay,
@@ -424,6 +459,7 @@ async function readMcpResources(
           name: `resources/read (${resource.serverName})`,
           description: resource.uri,
           status: CoreToolCallStatus.Error,
+          isClientInitiated: true,
           resultDisplay: `Error reading resource ${resource.uri}: ${getErrorMessage(error)}`,
           confirmationDetails: undefined,
         } as IndividualToolCallDisplay,
@@ -497,12 +533,13 @@ async function readLocalFiles(
   let invocation: AnyToolInvocation | undefined = undefined;
   try {
     invocation = readManyFilesTool.build(toolArgs);
-    const result = await invocation.execute(signal);
+    const result = await invocation.execute({ abortSignal: signal });
     const display: IndividualToolCallDisplay = {
       callId: `client-read-${userMessageTimestamp}`,
       name: readManyFilesTool.displayName,
       description: invocation.getDescription(),
       status: CoreToolCallStatus.Success,
+      isClientInitiated: true,
       resultDisplay:
         result.returnDisplay ||
         `Successfully read: ${fileLabelsForDisplay.join(', ')}`,
@@ -562,6 +599,7 @@ async function readLocalFiles(
         invocation?.getDescription() ??
         'Error attempting to execute tool to read files',
       status: CoreToolCallStatus.Error,
+      isClientInitiated: true,
       resultDisplay: `Error reading files (${fileLabelsForDisplay.join(', ')}): ${getErrorMessage(error)}`,
       confirmationDetails: undefined,
     };
@@ -628,8 +666,9 @@ export async function handleAtCommand({
   onDebugMessage,
   messageId: userMessageTimestamp,
   signal,
+  escapePastedAtSymbols = false,
 }: HandleAtCommandParams): Promise<HandleAtCommandResult> {
-  const commandParts = parseAllAtCommands(query);
+  const commandParts = parseAllAtCommands(query, escapePastedAtSymbols);
 
   const { agentParts, resourceParts, fileParts } = categorizeAtCommands(
     commandParts,
@@ -697,7 +736,7 @@ export async function handleAtCommand({
       {
         type: 'tool_group',
         tools: allDisplays,
-      } as Omit<HistoryItem, 'id'>,
+      } as HistoryItemToolGroup,
       userMessageTimestamp,
     );
   }

@@ -14,41 +14,7 @@ core architecture, component patterns, and testing standards.
 
 In addition to the code context, you MUST strictly adhere to the following frontend-specific development guidelines while adding code to packages/cli.
 
-## Testing Standards
-*   **Async Testing**: ALWAYS use `waitFor` from `packages/cli/src/test-utils/async.ts` instead of `vi.waitFor` to prevent flakiness and `act` warnings. NEVER use fixed waits (e.g., `await delay(100)`).
-*   **State Changes**: Wrap all blocks that change component state in `act`.
-*   **Snapshots**: Use `toMatchSnapshot` to verify rendering.
-*   **Rendering**: Use `render` or `renderWithProviders` from `packages/cli/src/test-utils/render.tsx` instead of `ink-testing-library` directly.
-*   **Mocking**:
-    *   Reuse existing mocks/fakes where possible.
-    *   **Parameterized Tests**: Use parameterized tests with explicit types to reduce duplication and ensure type safety.
-    *   Avoid mocking the file system, os, or child_process if at all possible; if you have to mock the Mock critical dependencies (`fs`, `os`, `child_process`) do so ONLY at the top of the file.
-
-## React & Ink Architecture
-*   **Keyboard Handling**: You MUST use `useKeyPress.ts` from Gemini CLI for keyboard handling, NOT the standard ink library. This is critical for supporting slow terminals and multiple events per frame.
-    *   Handle multiple events gracefully (often requires a reducer pattern, see `text-buffer.ts`).
-*   **State Management**:
-    *   NEVER trigger side effects from within the body of a `setState` callback. Use a reducer or `useRef` if necessary.
-    *   Initialize state explicitly (e.g., use `undefined` rather than `true` if unknown).
-*   **Performance**:
-    *   Avoid synchronous file I/O in components.
-    *   Do not introduce excessive property drilling; leverage or extend existing providers.
-
-## Configuration & Settings
-*   **Settings vs Args**: Use settings for user-configurable options; do not add new CLI arguments.
-*   **Schema**: Add new settings to `packages/cli/src/config/settingsSchema.ts`.
-*   **Documentation**:
-    *   If `showInDialog: true`, document in `docs/get-started/configuration.md`.
-    *   Ensure `requiresRestart` is correctly set.
-
-## Keyboard Shortcuts
-*   **Registration**: Define new shortcuts in `packages/cli/src/config/keyBindings.ts`.
-*   **Documentation**: Document all new shortcuts in `docs/cli/keyboard-shortcuts.md`.
-*   **Compatibility**: Avoid function keys and common VSCode shortcuts. Be cautious with `Meta` key (Mac-limited support).
-
-## General
-*   **Logging**: Use `debugLogger` for errors. NEVER leave `console.log/warn/error` in the code.
-*   **TypeScript**: Avoid the non-null assertion operator (`!`).
+!{cat .gemini/commands/strict-development-rules.md}
 
 {{args}}. 
  """

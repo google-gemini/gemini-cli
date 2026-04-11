@@ -5,7 +5,9 @@
  */
 
 import { render } from '../../../test-utils/render.js';
+import { waitFor } from '../../../test-utils/async.js';
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
+import { act } from 'react';
 import { TextInput } from './TextInput.js';
 import { useKeypress } from '../../hooks/useKeypress.js';
 import { useTextBuffer, type TextBuffer } from './text-buffer.js';
@@ -15,7 +17,8 @@ vi.mock('../../hooks/useKeypress.js', () => ({
   useKeypress: vi.fn(),
 }));
 
-vi.mock('./text-buffer.js', () => {
+vi.mock('./text-buffer.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./text-buffer.js')>();
   const mockTextBuffer = {
     text: '',
     lines: [''],
@@ -58,6 +61,7 @@ vi.mock('./text-buffer.js', () => {
   };
 
   return {
+    ...actual,
     useTextBuffer: vi.fn(() => mockTextBuffer as unknown as TextBuffer),
     TextBuffer: vi.fn(() => mockTextBuffer as unknown as TextBuffer),
   };
@@ -80,6 +84,7 @@ describe('TextInput', () => {
       cursor: [0, 0],
       visualCursor: [0, 0],
       viewportVisualLines: [''],
+      pastedContent: {} as Record<string, string>,
       handleInput: vi.fn((key) => {
         if (key.sequence) {
           buffer.text += key.sequence;
@@ -114,7 +119,7 @@ describe('TextInput', () => {
     mockedUseTextBuffer.mockReturnValue(mockBuffer);
   });
 
-  it('renders with an initial value', () => {
+  it('renders with an initial value', async () => {
     const buffer = {
       text: 'test',
       lines: ['test'],
@@ -124,7 +129,7 @@ describe('TextInput', () => {
       handleInput: vi.fn(),
       setText: vi.fn(),
     };
-    const { lastFrame } = render(
+    const { lastFrame, unmount } = await render(
       <TextInput
         buffer={buffer as unknown as TextBuffer}
         onSubmit={onSubmit}
@@ -132,9 +137,10 @@ describe('TextInput', () => {
       />,
     );
     expect(lastFrame()).toContain('test');
+    unmount();
   });
 
-  it('renders a placeholder', () => {
+  it('renders a placeholder', async () => {
     const buffer = {
       text: '',
       lines: [''],
@@ -144,7 +150,7 @@ describe('TextInput', () => {
       handleInput: vi.fn(),
       setText: vi.fn(),
     };
-    const { lastFrame } = render(
+    const { lastFrame, unmount } = await render(
       <TextInput
         buffer={buffer as unknown as TextBuffer}
         placeholder="testing"
@@ -153,22 +159,26 @@ describe('TextInput', () => {
       />,
     );
     expect(lastFrame()).toContain('testing');
+    unmount();
   });
 
-  it('handles character input', () => {
-    render(
+  it('handles character input', async () => {
+    const { waitUntilReady, unmount } = await render(
       <TextInput buffer={mockBuffer} onSubmit={onSubmit} onCancel={onCancel} />,
     );
     const keypressHandler = mockedUseKeypress.mock.calls[0][0];
 
-    keypressHandler({
-      name: 'a',
-      shift: false,
-      alt: false,
-      ctrl: false,
-      cmd: false,
-      sequence: 'a',
+    await act(async () => {
+      keypressHandler({
+        name: 'a',
+        shift: false,
+        alt: false,
+        ctrl: false,
+        cmd: false,
+        sequence: 'a',
+      });
     });
+    await waitUntilReady();
 
     expect(mockBuffer.handleInput).toHaveBeenCalledWith({
       name: 'a',
@@ -179,23 +189,27 @@ describe('TextInput', () => {
       sequence: 'a',
     });
     expect(mockBuffer.text).toBe('a');
+    unmount();
   });
 
-  it('handles backspace', () => {
+  it('handles backspace', async () => {
     mockBuffer.setText('test');
-    render(
+    const { waitUntilReady, unmount } = await render(
       <TextInput buffer={mockBuffer} onSubmit={onSubmit} onCancel={onCancel} />,
     );
     const keypressHandler = mockedUseKeypress.mock.calls[0][0];
 
-    keypressHandler({
-      name: 'backspace',
-      shift: false,
-      alt: false,
-      ctrl: false,
-      cmd: false,
-      sequence: '',
+    await act(async () => {
+      keypressHandler({
+        name: 'backspace',
+        shift: false,
+        alt: false,
+        ctrl: false,
+        cmd: false,
+        sequence: '',
+      });
     });
+    await waitUntilReady();
 
     expect(mockBuffer.handleInput).toHaveBeenCalledWith({
       name: 'backspace',
@@ -206,99 +220,171 @@ describe('TextInput', () => {
       sequence: '',
     });
     expect(mockBuffer.text).toBe('tes');
+    unmount();
   });
 
-  it('handles left arrow', () => {
+  it('handles left arrow', async () => {
     mockBuffer.setText('test');
-    render(
+    const { waitUntilReady, unmount } = await render(
       <TextInput buffer={mockBuffer} onSubmit={onSubmit} onCancel={onCancel} />,
     );
     const keypressHandler = mockedUseKeypress.mock.calls[0][0];
 
-    keypressHandler({
-      name: 'left',
-      shift: false,
-      alt: false,
-      ctrl: false,
-      cmd: false,
-      sequence: '',
+    await act(async () => {
+      keypressHandler({
+        name: 'left',
+        shift: false,
+        alt: false,
+        ctrl: false,
+        cmd: false,
+        sequence: '',
+      });
     });
+    await waitUntilReady();
 
     // Cursor moves from end to before 't'
     expect(mockBuffer.visualCursor[1]).toBe(3);
+    unmount();
   });
 
-  it('handles right arrow', () => {
+  it('handles right arrow', async () => {
     mockBuffer.setText('test');
     mockBuffer.visualCursor[1] = 2; // Set initial cursor for right arrow test
-    render(
+    const { waitUntilReady, unmount } = await render(
       <TextInput buffer={mockBuffer} onSubmit={onSubmit} onCancel={onCancel} />,
     );
     const keypressHandler = mockedUseKeypress.mock.calls[0][0];
 
-    keypressHandler({
-      name: 'right',
-      shift: false,
-      alt: false,
-      ctrl: false,
-      cmd: false,
-      sequence: '',
+    await act(async () => {
+      keypressHandler({
+        name: 'right',
+        shift: false,
+        alt: false,
+        ctrl: false,
+        cmd: false,
+        sequence: '',
+      });
     });
+    await waitUntilReady();
 
     expect(mockBuffer.visualCursor[1]).toBe(3);
+    unmount();
   });
 
-  it('calls onSubmit on return', () => {
+  it('calls onSubmit on return', async () => {
     mockBuffer.setText('test');
-    render(
+    const { waitUntilReady, unmount } = await render(
       <TextInput buffer={mockBuffer} onSubmit={onSubmit} onCancel={onCancel} />,
     );
     const keypressHandler = mockedUseKeypress.mock.calls[0][0];
 
-    keypressHandler({
-      name: 'return',
-      shift: false,
-      alt: false,
-      ctrl: false,
-      cmd: false,
-      sequence: '',
+    await act(async () => {
+      keypressHandler({
+        name: 'enter',
+        shift: false,
+        alt: false,
+        ctrl: false,
+        cmd: false,
+        sequence: '',
+      });
     });
+    await waitUntilReady();
 
     expect(onSubmit).toHaveBeenCalledWith('test');
+    unmount();
+  });
+
+  it('expands paste placeholder to real content on submit', async () => {
+    const placeholder = '[Pasted Text: 6 lines]';
+    const realContent = 'line1\nline2\nline3\nline4\nline5\nline6';
+    mockBuffer.setText(placeholder);
+    mockBuffer.pastedContent = { [placeholder]: realContent };
+    const { waitUntilReady, unmount } = await render(
+      <TextInput buffer={mockBuffer} onSubmit={onSubmit} onCancel={onCancel} />,
+    );
+    const keypressHandler = mockedUseKeypress.mock.calls[0][0];
+
+    await act(async () => {
+      keypressHandler({
+        name: 'enter',
+        shift: false,
+        alt: false,
+        ctrl: false,
+        cmd: false,
+        sequence: '',
+      });
+    });
+    await waitUntilReady();
+
+    expect(onSubmit).toHaveBeenCalledWith(realContent);
+    unmount();
+  });
+
+  it('submits text unchanged when pastedContent is empty', async () => {
+    mockBuffer.setText('normal text');
+    mockBuffer.pastedContent = {};
+    const { waitUntilReady, unmount } = await render(
+      <TextInput buffer={mockBuffer} onSubmit={onSubmit} onCancel={onCancel} />,
+    );
+    const keypressHandler = mockedUseKeypress.mock.calls[0][0];
+
+    await act(async () => {
+      keypressHandler({
+        name: 'enter',
+        shift: false,
+        alt: false,
+        ctrl: false,
+        cmd: false,
+        sequence: '',
+      });
+    });
+    await waitUntilReady();
+
+    expect(onSubmit).toHaveBeenCalledWith('normal text');
+    unmount();
   });
 
   it('calls onCancel on escape', async () => {
     vi.useFakeTimers();
-    render(
+    const { waitUntilReady, unmount } = await render(
       <TextInput buffer={mockBuffer} onCancel={onCancel} onSubmit={onSubmit} />,
     );
     const keypressHandler = mockedUseKeypress.mock.calls[0][0];
 
-    keypressHandler({
-      name: 'escape',
-      shift: false,
-      alt: false,
-      ctrl: false,
-      cmd: false,
-      sequence: '',
+    await act(async () => {
+      keypressHandler({
+        name: 'escape',
+        shift: false,
+        alt: false,
+        ctrl: false,
+        cmd: false,
+        sequence: '',
+      });
     });
-    await vi.runAllTimersAsync();
+    // Escape key has a 50ms timeout in KeypressContext, so we need to wrap waitUntilReady in act
+    await act(async () => {
+      await waitUntilReady();
+    });
 
-    expect(onCancel).toHaveBeenCalled();
+    await waitFor(() => {
+      expect(onCancel).toHaveBeenCalled();
+    });
     vi.useRealTimers();
+    unmount();
   });
 
-  it('renders the input value', () => {
+  it('renders the input value', async () => {
     mockBuffer.setText('secret');
-    const { lastFrame } = render(
+    const { lastFrame, unmount } = await render(
       <TextInput buffer={mockBuffer} onSubmit={onSubmit} onCancel={onCancel} />,
     );
     expect(lastFrame()).toContain('secret');
+    unmount();
   });
 
-  it('does not show cursor when not focused', () => {
+  it('does not show cursor when not focused', async () => {
     mockBuffer.setText('test');
-    const { lastFrame } = render(
+    const { lastFrame, unmount } = await render(
       <TextInput
         buffer={mockBuffer}
         focus={false}
@@ -307,17 +393,19 @@ describe('TextInput', () => {
       />,
     );
     expect(lastFrame()).not.toContain('\u001b[7m'); // Inverse video chalk
+    unmount();
   });
 
-  it('renders multiple lines when text wraps', () => {
+  it('renders multiple lines when text wraps', async () => {
     mockBuffer.text = 'line1\nline2';
     mockBuffer.viewportVisualLines = ['line1', 'line2'];
 
-    const { lastFrame } = render(
+    const { lastFrame, unmount } = await render(
       <TextInput buffer={mockBuffer} onSubmit={onSubmit} onCancel={onCancel} />,
     );
 
     expect(lastFrame()).toContain('line1');
     expect(lastFrame()).toContain('line2');
+    unmount();
   });
 });

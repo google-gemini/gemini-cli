@@ -8,25 +8,38 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
-import { GEMINI_DIR, homedir } from '../utils/paths.js';
+import {
+  GEMINI_DIR,
+  homedir,
+  GOOGLE_ACCOUNTS_FILENAME,
+  isSubpath,
+  resolveToRealPath,
+  normalizePath,
+} from '../utils/paths.js';
 import { ProjectRegistry } from './projectRegistry.js';
 import { StorageMigration } from './storageMigration.js';
 
-export const GOOGLE_ACCOUNTS_FILENAME = 'google_accounts.json';
 export const OAUTH_FILE = 'oauth_creds.json';
 const TMP_DIR_NAME = 'tmp';
 const BIN_DIR_NAME = 'bin';
 const AGENTS_DIR_NAME = '.agents';
+
+export const AUTO_SAVED_POLICY_FILENAME = 'auto-saved.toml';
 
 export class Storage {
   private readonly targetDir: string;
   private readonly sessionId: string | undefined;
   private projectIdentifier: string | undefined;
   private initPromise: Promise<void> | undefined;
+  private customPlansDir: string | undefined;
 
   constructor(targetDir: string, sessionId?: string) {
     this.targetDir = targetDir;
     this.sessionId = sessionId;
+  }
+
+  setCustomPlansDir(dir: string | undefined): void {
+    this.customPlansDir = dir;
   }
 
   static getGlobalGeminiDir(): string {
@@ -47,6 +60,10 @@ export class Storage {
 
   static getMcpOAuthTokensPath(): string {
     return path.join(Storage.getGlobalGeminiDir(), 'mcp-oauth-tokens.json');
+  }
+
+  static getA2AOAuthTokensPath(): string {
+    return path.join(Storage.getGlobalGeminiDir(), 'a2a-oauth-tokens.json');
   }
 
   static getGlobalSettingsPath(): string {
@@ -81,6 +98,10 @@ export class Storage {
     return path.join(Storage.getGlobalGeminiDir(), 'policies');
   }
 
+  static getUserKeybindingsPath(): string {
+    return path.join(Storage.getGlobalGeminiDir(), 'keybindings.json');
+  }
+
   static getUserAgentsDir(): string {
     return path.join(Storage.getGlobalGeminiDir(), 'agents');
   }
@@ -91,6 +112,10 @@ export class Storage {
       'acknowledgments',
       'agents.json',
     );
+  }
+
+  static getPolicyIntegrityStoragePath(): string {
+    return path.join(Storage.getGlobalGeminiDir(), 'policy_integrity.json');
   }
 
   private static getSystemConfigDir(): string {
@@ -126,6 +151,17 @@ export class Storage {
     return path.join(this.targetDir, GEMINI_DIR);
   }
 
+  /**
+   * Checks if the current workspace storage location is the same as the global/user storage location.
+   * This handles symlinks and platform-specific path normalization.
+   */
+  isWorkspaceHomeDir(): boolean {
+    return (
+      normalizePath(resolveToRealPath(this.targetDir)) ===
+      normalizePath(resolveToRealPath(homedir()))
+    );
+  }
+
   getAgentsDir(): string {
     return path.join(this.targetDir, AGENTS_DIR_NAME);
   }
@@ -134,6 +170,21 @@ export class Storage {
     const identifier = this.getProjectIdentifier();
     const tempDir = Storage.getGlobalTempDir();
     return path.join(tempDir, identifier);
+  }
+
+  getWorkspacePoliciesDir(): string {
+    return path.join(this.getGeminiDir(), 'policies');
+  }
+
+  getWorkspaceAutoSavedPolicyPath(): string {
+    return path.join(
+      this.getWorkspacePoliciesDir(),
+      AUTO_SAVED_POLICY_FILENAME,
+    );
+  }
+
+  getAutoSavedPolicyPath(): string {
+    return path.join(Storage.getUserPoliciesDir(), AUTO_SAVED_POLICY_FILENAME);
   }
 
   ensureProjectTempDirExists(): void {
@@ -215,6 +266,18 @@ export class Storage {
     return path.join(historyDir, identifier);
   }
 
+  getProjectMemoryDir(): string {
+    return this.getProjectMemoryTempDir();
+  }
+
+  getProjectMemoryTempDir(): string {
+    return path.join(this.getProjectTempDir(), 'memory');
+  }
+
+  getProjectSkillsMemoryDir(): string {
+    return path.join(this.getProjectMemoryTempDir(), 'skills');
+  }
+
   getWorkspaceSettingsPath(): string {
     return path.join(this.getGeminiDir(), 'settings.json');
   }
@@ -250,11 +313,97 @@ export class Storage {
     return path.join(this.getProjectTempDir(), 'plans');
   }
 
+  getProjectTempTrackerDir(): string {
+    if (this.sessionId) {
+      return path.join(this.getProjectTempDir(), this.sessionId, 'tracker');
+    }
+    return path.join(this.getProjectTempDir(), 'tracker');
+  }
+
+  getPlansDir(): string {
+    if (this.customPlansDir) {
+      const resolvedPath = path.resolve(
+        this.getProjectRoot(),
+        this.customPlansDir,
+      );
+      const realProjectRoot = resolveToRealPath(this.getProjectRoot());
+      const realResolvedPath = resolveToRealPath(resolvedPath);
+
+      if (!isSubpath(realProjectRoot, realResolvedPath)) {
+        throw new Error(
+          `Custom plans directory '${this.customPlansDir}' resolves to '${realResolvedPath}', which is outside the project root '${realProjectRoot}'.`,
+        );
+      }
+
+      return resolvedPath;
+    }
+    return this.getProjectTempPlansDir();
+  }
+
   getProjectTempTasksDir(): string {
     if (this.sessionId) {
       return path.join(this.getProjectTempDir(), this.sessionId, 'tasks');
     }
     return path.join(this.getProjectTempDir(), 'tasks');
+  }
+
+  async listProjectChatFiles(): Promise<
+    Array<{ filePath: string; lastUpdated: string }>
+  > {
+    const chatsDir = path.join(this.getProjectTempDir(), 'chats');
+    try {
+      const files = await fs.promises.readdir(chatsDir);
+      const jsonFiles = files.filter(
+        (f) => f.endsWith('.json') || f.endsWith('.jsonl'),
+      );
+
+      const sessions = await Promise.all(
+        jsonFiles.map(async (file) => {
+          const absolutePath = path.join(chatsDir, file);
+          const stats = await fs.promises.stat(absolutePath);
+          return {
+            filePath: path.join('chats', file),
+            lastUpdated: stats.mtime.toISOString(),
+            mtimeMs: stats.mtimeMs,
+          };
+        }),
+      );
+
+      return sessions
+        .sort((a, b) => b.mtimeMs - a.mtimeMs)
+        .map(({ filePath, lastUpdated }) => ({ filePath, lastUpdated }));
+    } catch (e) {
+      // If directory doesn't exist, return empty
+      if (
+        e instanceof Error &&
+        'code' in e &&
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        (e as NodeJS.ErrnoException).code === 'ENOENT'
+      ) {
+        return [];
+      }
+      throw e;
+    }
+  }
+
+  async loadProjectTempFile<T>(filePath: string): Promise<T | null> {
+    const absolutePath = path.join(this.getProjectTempDir(), filePath);
+    try {
+      const content = await fs.promises.readFile(absolutePath, 'utf8');
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      return JSON.parse(content) as T;
+    } catch (e) {
+      // If file doesn't exist, return null
+      if (
+        e instanceof Error &&
+        'code' in e &&
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        (e as NodeJS.ErrnoException).code === 'ENOENT'
+      ) {
+        return null;
+      }
+      throw e;
+    }
   }
 
   getExtensionsDir(): string {

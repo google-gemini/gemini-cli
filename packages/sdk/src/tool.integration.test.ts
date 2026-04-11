@@ -10,10 +10,9 @@ import * as path from 'node:path';
 import { z } from 'zod';
 import { tool, ModelVisibleError } from './tool.js';
 import { fileURLToPath } from 'node:url';
-import { dirname } from 'node:path';
 
 const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+const __dirname = path.dirname(__filename);
 
 // Set this to true locally when you need to update snapshots
 const RECORD_MODE = process.env['RECORD_NEW_RESPONSES'] === 'true';
@@ -45,7 +44,8 @@ describe('GeminiCliAgent Tool Integration', () => {
     });
 
     const events = [];
-    const stream = agent.sendStream('What is 5 + 3?');
+    const session = agent.session();
+    const stream = session.sendStream('What is 5 + 3?');
 
     for await (const event of stream) {
       events.push(event);
@@ -85,9 +85,10 @@ describe('GeminiCliAgent Tool Integration', () => {
     });
 
     const events = [];
+    const session = agent.session();
     // Force the model to trigger the error first, then hopefully recover or at least acknowledge it.
     // The prompt is crafted to make the model try 'fail' first.
-    const stream = agent.sendStream(
+    const stream = session.sendStream(
       'Call the tool with "fail". If it fails, tell me the error message.',
     );
 
@@ -128,7 +129,8 @@ describe('GeminiCliAgent Tool Integration', () => {
     });
 
     const events = [];
-    const stream = agent.sendStream(
+    const session = agent.session();
+    const stream = session.sendStream(
       'Check the system status and report any errors.',
     );
 
