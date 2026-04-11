@@ -24,6 +24,7 @@ import {
   type ToolResultDisplay,
   isTodoList,
 } from '../../types.js';
+import { isCompactTool } from './ToolGroupMessage.js';
 import { useAlternateBuffer } from '../../hooks/useAlternateBuffer.js';
 import { ToolStatusIndicator } from './ToolShared.js';
 import { theme } from '../../semantic-colors.js';
@@ -286,6 +287,7 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
 
   const [isFocused, setIsFocused] = useState(false);
   const toggleRef = useRef<DOMElement>(null);
+  const isActuallyCompact = useMemo(() => isCompactTool(props, true), [props]);
 
   // Unified File Data Extraction (Safely bridge resultDisplay and confirmationDetails)
   const diff = useMemo((): FileDiff | undefined => {
@@ -369,11 +371,36 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
         }
       }
 
-      // If we have a display.result or a simple success, use it
+      // If we have a display.result, use it as the payload
+      let payload: React.ReactNode;
+      if (display.result) {
+        if (display.result.type === 'text') {
+          const text = display.result.text;
+          if (text) {
+            payload = (
+              <Text color={theme.text.secondary} wrap="truncate-end">
+                {text}
+              </Text>
+            );
+          }
+        }
+        // Step 5 will expand this to handle 'diff' type
+      }
+
+      // Compact tools should elide text payloads by default unless expanded.
+      if (
+        isActuallyCompact &&
+        !isExpanded &&
+        display.result?.type === 'text' &&
+        !isAlternateBuffer
+      ) {
+        payload = undefined;
+      }
+
       return {
         description: descriptionText,
         summary: summaryText,
-        payload: undefined, // Payload rendering will be updated in Step 5
+        payload,
       };
     }
 
@@ -439,6 +466,8 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
     originalDescription,
     isAlternateBuffer,
     display,
+    isActuallyCompact,
+    isExpanded,
   ]);
 
   const { description, summary } = viewParts;
@@ -476,6 +505,10 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
   }, [diff, isExpanded, isAlternateBuffer, terminalWidth, settings, status]);
 
   const showPayload = useMemo(() => {
+    // If we are using the new display protocol and it's a compact tool,
+    // hide the payload by default unless expanded.
+    if (display && isActuallyCompact && !isExpanded) return false;
+
     const policy = !isAlternateBuffer || !diff || isExpanded;
     if (!policy) return false;
 
@@ -495,6 +528,8 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
     diffLines.length,
     viewParts.payload,
     outputFile,
+    isActuallyCompact,
+    display,
   ]);
 
   const keyExtractor = (_item: React.ReactNode, index: number) =>
@@ -505,7 +540,16 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
 
   return (
     <Box flexDirection="column">
-      <Box marginLeft={2} flexDirection="row" flexWrap="wrap">
+      <Box
+        marginLeft={2}
+        flexDirection="row"
+        flexWrap="wrap"
+        ref={
+          isActuallyCompact || (isAlternateBuffer && diff)
+            ? toggleRef
+            : undefined
+        }
+      >
         <Box flexDirection="row" flexShrink={1}>
           <ToolStatusIndicator status={status} name={name} />
           <Box maxWidth={25} flexShrink={0} flexGrow={0}>
@@ -519,12 +563,7 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
         </Box>
 
         {summary && (
-          <Box
-            key="tool-summary"
-            ref={isAlternateBuffer && diff ? toggleRef : undefined}
-            marginLeft={1}
-            flexGrow={0}
-          >
+          <Box key="tool-summary" marginLeft={1} flexGrow={0}>
             {summary}
           </Box>
         )}

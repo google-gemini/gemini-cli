@@ -284,6 +284,19 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
 
       return {
         llmContent: resultMessage,
+        display: {
+          name: LS_DISPLAY_NAME,
+          description: this.getDescription(),
+          resultSummary: displayMessage,
+          result: {
+            type: 'text',
+            text: entries
+              .map(
+                (entry) => `${entry.isDirectory ? '[DIR] ' : ''}${entry.name}`,
+              )
+              .join('\n'),
+          },
+        },
         returnDisplay: {
           summary: displayMessage,
           files: entries.map(

@@ -224,9 +224,9 @@ export const useAgentStream = ({
               else if (evtStatus === 'success')
                 status = CoreToolCallStatus.Success;
 
-              const display = event.display?.result;
               const liveOutput =
-                displayContentToString(display) ?? tc.resultDisplay;
+                displayContentToString(event.display?.result) ??
+                tc.resultDisplay;
               const progressMessage =
                 legacyState?.progressMessage ?? tc.progressMessage;
               const progress = legacyState?.progress ?? tc.progress;
@@ -237,6 +237,7 @@ export const useAgentStream = ({
 
               return {
                 ...tc,
+                name: event.display?.name ?? tc.name,
                 status,
                 display: event.display
                   ? { ...tc.display, ...event.display }
@@ -259,12 +260,13 @@ export const useAgentStream = ({
 
               const legacyState = event._meta?.legacyState;
               const outputFile = legacyState?.outputFile;
-              const display = event.display?.result;
+              const display = event.display;
               const resultDisplay =
-                displayContentToString(display) ?? tc.resultDisplay;
+                displayContentToString(display?.result) ?? tc.resultDisplay;
 
               return {
                 ...tc,
+                name: display?.name ?? tc.name,
                 status: event.isError
                   ? CoreToolCallStatus.Error
                   : CoreToolCallStatus.Success,

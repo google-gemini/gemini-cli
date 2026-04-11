@@ -925,8 +925,23 @@ export class ShellToolInvocation extends BaseToolInvocation<
         };
       }
 
+      const displayResultSummary = result.backgrounded
+        ? `PID: ${result.pid}`
+        : result.exitCode !== null && result.exitCode !== 0
+          ? `Exit Code: ${result.exitCode}`
+          : undefined;
+
       return {
         llmContent,
+        display: {
+          name: this.getDisplayTitle(),
+          description: this.getDescription(),
+          resultSummary: displayResultSummary,
+          result:
+            typeof returnDisplay === 'string'
+              ? { type: 'text', text: returnDisplay }
+              : undefined,
+        },
         returnDisplay,
         data,
         ...executionError,

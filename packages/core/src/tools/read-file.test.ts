@@ -237,10 +237,18 @@ describe('ReadFileTool', () => {
       const params: ReadFileToolParams = { file_path: 'textfile.txt' };
       const invocation = tool.build(params);
 
-      expect(await invocation.execute({ abortSignal })).toEqual({
-        llmContent: fileContent,
-        returnDisplay: '',
-      });
+      const result = await invocation.execute({ abortSignal });
+      expect(result).toEqual(
+        expect.objectContaining({
+          llmContent: fileContent,
+          returnDisplay: '',
+          display: expect.objectContaining({
+            name: 'ReadFile',
+            description: expect.stringContaining('textfile.txt'),
+            resultSummary: '1 lines',
+          }),
+        }),
+      );
     });
 
     it('should return error if file does not exist', async () => {
@@ -267,10 +275,18 @@ describe('ReadFileTool', () => {
       const params: ReadFileToolParams = { file_path: filePath };
       const invocation = tool.build(params);
 
-      expect(await invocation.execute({ abortSignal })).toEqual({
-        llmContent: fileContent,
-        returnDisplay: '',
-      });
+      const result = await invocation.execute({ abortSignal });
+      expect(result).toEqual(
+        expect.objectContaining({
+          llmContent: fileContent,
+          returnDisplay: '',
+          display: expect.objectContaining({
+            name: 'ReadFile',
+            description: expect.stringContaining('textfile.txt'),
+            resultSummary: '1 lines',
+          }),
+        }),
+      );
     });
 
     it('should return error if path is a directory', async () => {

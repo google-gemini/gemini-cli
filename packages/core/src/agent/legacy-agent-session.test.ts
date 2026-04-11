@@ -102,7 +102,10 @@ function makeCompletedToolCall(
     response: {
       callId,
       responseParts: [{ text: responseText }],
-      resultDisplay: undefined,
+      resultDisplay: responseText,
+      display: {
+        result: { type: 'text', text: responseText },
+      },
       error: undefined,
       errorType: undefined,
     },
@@ -427,6 +430,12 @@ describe('LegacyAgentSession', () => {
         (e): e is AgentEvent<'tool_response'> => e.type === 'tool_response',
       );
       expect(toolResp?.name).toBe('read_file');
+      expect(toolResp?.display).toEqual(
+        expect.objectContaining({
+          name: 'read_file',
+          result: { type: 'text', text: 'file contents' },
+        }),
+      );
       expect(toolResp?.content).toEqual([
         { type: 'text', text: 'file contents' },
       ]);

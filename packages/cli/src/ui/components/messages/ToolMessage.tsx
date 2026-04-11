@@ -87,6 +87,11 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
     resultDisplay,
   );
 
+  const effectiveResultDisplay =
+    display?.resultSummary && !display.result
+      ? display.resultSummary
+      : resultDisplay;
+
   return (
     // It is crucial we don't replace this <> with a Box because otherwise the
     // sticky header inside it would be sticky to that box rather than to the
@@ -139,7 +144,7 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
           />
         )}
         <ToolResultDisplay
-          resultDisplay={resultDisplay}
+          resultDisplay={effectiveResultDisplay}
           availableTerminalHeight={availableTerminalHeight}
           terminalWidth={terminalWidth}
           renderOutputAsMarkdown={renderOutputAsMarkdown}

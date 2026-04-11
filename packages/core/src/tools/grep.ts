@@ -284,12 +284,21 @@ class GrepToolInvocation extends BaseToolInvocation<
         searchLocationDescription = `in path "${searchDirDisplay}"`;
       }
 
-      return await formatGrepResults(
+      const result = await formatGrepResults(
         allMatches,
         this.params,
         searchLocationDescription,
         totalMaxMatches,
       );
+      return {
+        ...result,
+        display: {
+          name: this._toolDisplayName,
+          description: this.getDescription(),
+          resultSummary: result.returnDisplay.summary,
+          result: null,
+        },
+      };
     } catch (error) {
       debugLogger.warn(`Error during GrepLogic execution: ${error}`);
       const errorMessage = getErrorMessage(error);

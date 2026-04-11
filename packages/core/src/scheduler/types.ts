@@ -12,6 +12,7 @@ import type {
   ToolConfirmationOutcome,
   ToolResultDisplay,
   ToolLiveOutput,
+  ToolDisplay,
 } from '../tools/tools.js';
 import type { ToolErrorType } from '../tools/tool-error.js';
 import type { SerializableConfirmationDetails } from '../confirmation-bus/types.js';
@@ -56,6 +57,8 @@ export interface ToolCallRequestInfo {
 export interface ToolCallResponseInfo {
   callId: string;
   responseParts: Part[];
+  /** Tool-controlled display information. */
+  display?: ToolDisplay;
   resultDisplay: ToolResultDisplay | undefined;
   error: Error | undefined;
   errorType: ToolErrorType | undefined;

@@ -187,8 +187,8 @@ export type DisplayContent = DisplayText | DisplayDiff;
 export interface ToolDisplay {
   name?: string;
   description?: string;
-  resultSummary?: string;
-  result?: DisplayContent;
+  resultSummary?: string | null;
+  result?: DisplayContent | null;
 }
 
 export interface ToolRequest {
