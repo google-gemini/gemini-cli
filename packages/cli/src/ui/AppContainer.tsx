@@ -71,6 +71,7 @@ import {
   CoreEvent,
   refreshServerHierarchicalMemory,
   flattenMemory,
+  type ChatInjectPayload,
   type MemoryChangedPayload,
   writeToStdout,
   disableMouseEvents,
@@ -2356,6 +2357,18 @@ Logging in with Google... Restarting Gemini CLI to continue.
       coreEvents.off(CoreEvent.MemoryChanged, handleMemoryChanged);
     };
   }, []);
+
+  useEffect(() => {
+    const handleChatInject = (payload: ChatInjectPayload) => {
+      debugLogger.log(`AppContainer handleChatInject received payload: ${JSON.stringify(payload)}`);
+      // Use the message queue to handle queuing when not idle
+      addMessage(payload.message);
+    };
+    coreEvents.on(CoreEvent.ChatInject, handleChatInject);
+    return () => {
+      coreEvents.off(CoreEvent.ChatInject, handleChatInject);
+    };
+  }, [addMessage]);
 
   useEffect(() => {
     let isMounted = true;

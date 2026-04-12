@@ -178,6 +178,13 @@ export interface QuotaChangedPayload {
   resetTime?: string;
 }
 
+/**
+ * Payload for the 'chat-inject' event.
+ */
+export interface ChatInjectPayload {
+  message: string;
+}
+
 export enum CoreEvent {
   UserFeedback = 'user-feedback',
   ModelChanged = 'model-changed',
@@ -201,6 +208,7 @@ export enum CoreEvent {
   EditorSelected = 'editor-selected',
   SlashCommandConflicts = 'slash-command-conflicts',
   QuotaChanged = 'quota-changed',
+  ChatInject = 'chat-inject',
   TelemetryKeychainAvailability = 'telemetry-keychain-availability',
   TelemetryTokenStorageType = 'telemetry-token-storage-type',
 }
@@ -219,6 +227,7 @@ export interface CoreEvents extends ExtensionEvents {
   [CoreEvent.Output]: [OutputPayload];
   [CoreEvent.MemoryChanged]: [MemoryChangedPayload];
   [CoreEvent.QuotaChanged]: [QuotaChangedPayload];
+  [CoreEvent.ChatInject]: [ChatInjectPayload];
   [CoreEvent.ExternalEditorClosed]: never[];
   [CoreEvent.McpClientUpdate]: Array<Map<string, McpClient> | never>;
   [CoreEvent.OauthDisplayMessage]: string[];
@@ -417,6 +426,14 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
   ): void {
     const payload: QuotaChangedPayload = { remaining, limit, resetTime };
     this.emit(CoreEvent.QuotaChanged, payload);
+  }
+
+  /**
+   * Notifies subscribers to inject a chat message.
+   */
+  emitChatInject(message: string): void {
+    const payload: ChatInjectPayload = { message };
+    this._emitOrQueue(CoreEvent.ChatInject, payload);
   }
 
   /**

@@ -6,6 +6,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { StreamingState } from '../types.js';
+import { debugLogger } from '@google/gemini-cli-core';
 
 export interface UseMessageQueueOptions {
   isConfigInitialized: boolean;
@@ -39,7 +40,10 @@ export function useMessageQueue({
   const addMessage = useCallback((message: string) => {
     const trimmedMessage = message.trim();
     if (trimmedMessage.length > 0) {
+      debugLogger.log(`useMessageQueue: adding message to queue: ${trimmedMessage.substring(0, 50)}...`);
       setMessageQueue((prev) => [...prev, trimmedMessage]);
+    } else {
+      debugLogger.log('useMessageQueue: ignored empty message');
     }
   }, []);
 
@@ -66,12 +70,14 @@ export function useMessageQueue({
 
   // Process queued messages when streaming becomes idle
   useEffect(() => {
+    debugLogger.log(`useMessageQueue effect trigger: config=${isConfigInitialized}, state=${streamingState}, mcpReady=${isMcpReady}, queueLen=${messageQueue.length}`);
     if (
       isConfigInitialized &&
       streamingState === StreamingState.Idle &&
       isMcpReady &&
       messageQueue.length > 0
     ) {
+      debugLogger.log('useMessageQueue: submitting queued message!');
       // Combine all messages with double newlines for clarity
       const combinedMessage = messageQueue.join('\n\n');
       // Clear the queue and submit

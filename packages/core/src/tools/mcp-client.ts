@@ -35,6 +35,7 @@ import {
   type Resource,
   type Tool as McpTool,
 } from '@modelcontextprotocol/sdk/types.js';
+import { z } from 'zod';
 import { parse } from 'shell-quote';
 import {
   AuthProviderType,
@@ -135,6 +136,14 @@ export interface RegistrySet {
   promptRegistry: PromptRegistry;
   resourceRegistry: ResourceRegistry;
 }
+
+const ChatInjectNotificationSchema = z.object({
+  method: z.literal('notifications/chat/channel'),
+  params: z.object({
+    message: z.string().optional(),
+    content: z.string().optional(),
+  }).passthrough().optional()
+});
 
 /**
  * A client for a single MCP server.
@@ -386,6 +395,27 @@ export class McpClient implements McpProgressReporter {
     if (!this.client) {
       return;
     }
+
+    this.client.setNotificationHandler(
+      ChatInjectNotificationSchema,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (notification: any) => {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
+        let message = notification.params?.message || notification.params?.content;
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
+        const meta = notification.params?.meta;
+        
+        if (typeof message === 'string') {
+          const sanitizedMessage = message.replace(/\u003c/g, '\u0026lt;').replace(/\u003e/g, '\u0026gt;');
+          const attrs = (meta && typeof meta === 'object' && Object.keys(meta).length > 0)
+            ? ' ' + Object.entries(meta).map(([k, v]) => k + '="' + String(v) + '"').join(' ')
+            : '';
+          message = '\u003cchannel source="plugin:' + this.serverName + ':agentchat"' + attrs + '\u003e\n' + sanitizedMessage + '\n\u003c/channel\u003e';
+          debugLogger.log('🔔 Received chat channel notification from ' + this.serverName);
+          coreEvents.emitChatInject(message);
+        }
+      }
+    );
 
     const capabilities = this.client.getServerCapabilities();
 
