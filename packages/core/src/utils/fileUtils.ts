@@ -569,10 +569,9 @@ export async function processSingleFileContent(
           }
 
           // Check file size to prevent excessively large uploads
-          const imageStats = await fs.promises.stat(filePath);
           const maxSize = 20 * 1024 * 1024; // 20MB
-          if (imageStats.size > maxSize) {
-            const sizeMB = (imageStats.size / (1024 * 1024)).toFixed(1);
+          if (stats.size > maxSize) {
+            const sizeMB = (stats.size / (1024 * 1024)).toFixed(1);
             return {
               llmContent: `Image file too large (${sizeMB} MB).`,
               returnDisplay: `Image file too large (${sizeMB} MB).`,
