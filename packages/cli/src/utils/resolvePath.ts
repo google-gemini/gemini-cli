@@ -17,14 +17,13 @@ export function resolvePath(p: string): string {
   } else if (p === '~' || p.startsWith('~/')) {
     expandedPath = homedir() + p.substring(1);
   }
-    try {
-  return path.normalize(expandedPath);
-} catch (err: any) {
-  // Only fallback for path length related errors
-  if (err?.code === 'ENAMETOOLONG') {
-    return expandedPath;
-  }
-  throw err; // rethrow other unexpected errors
-    }
+      try {
+      return path.normalize(expandedPath);
+    } catch (err: any) {
+      if (err?.code === 'ENAMETOOLONG') {
+        return expandedPath;
+      }
+      throw err;
+      }
   
 }
