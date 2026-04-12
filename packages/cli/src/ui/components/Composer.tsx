@@ -9,6 +9,7 @@ import { useState, useEffect } from 'react';
 import { useConfig } from '../contexts/ConfigContext.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 import { useUIState } from '../contexts/UIStateContext.js';
+import { useInputState } from '../contexts/InputContext.js';
 import { useUIActions } from '../contexts/UIActionsContext.js';
 import { useVimMode } from '../contexts/VimModeContext.js';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
@@ -30,6 +31,7 @@ import { appEvents, AppEvent } from '../../utils/events.js';
 
 export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
   const uiState = useUIState();
+  const inputState = useInputState();
   const uiActions = useUIActions();
   const settings = useSettings();
   const config = useConfig();
@@ -81,12 +83,12 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
     return null;
   }
 
-  const hasToast = shouldShowToast(uiState);
+  const showToast = shouldShowToast(uiState, inputState);
   const hideUiDetailsForSuggestions =
     suggestionsVisible && suggestionsPosition === 'above';
 
   // Mini Mode VIP Flags (Pure Content Triggers)
-  const showMinimalToast = hasToast;
+  const showMinimalToast = showToast;
 
   return (
     <Box
@@ -142,17 +144,12 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
       {uiState.isInputActive && (
         <InputPrompt
           key="input-prompt"
-          buffer={uiState.buffer}
-          inputWidth={uiState.inputWidth}
-          suggestionsWidth={uiState.suggestionsWidth}
           onSubmit={uiActions.handleFinalSubmit}
-          userMessages={uiState.userMessages}
           setBannerVisible={uiActions.setBannerVisible}
           onClearScreen={uiActions.handleClearScreen}
           config={config}
           slashCommands={uiState.slashCommands || []}
           commandContext={uiState.commandContext}
-          shellModeActive={uiState.shellModeActive}
           setShellModeActive={uiActions.setShellModeActive}
           approvalMode={uiState.showApprovalModeIndicator}
           onEscapePromptChange={uiActions.onEscapePromptChange}
@@ -166,7 +163,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
               ? vimMode === 'INSERT'
                 ? "  Press 'Esc' for NORMAL mode."
                 : "  Press 'i' for INSERT mode."
-              : uiState.shellModeActive
+              : inputState.shellModeActive
                 ? '  Type your shell command'
                 : '  Type your message or @path/to/file'
           }
@@ -174,7 +171,6 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
           streamingState={uiState.streamingState}
           suggestionsPosition={suggestionsPosition}
           onSuggestionsVisibilityChange={setSuggestionsVisible}
-          copyModeEnabled={uiState.copyModeEnabled}
         />
       )}
 

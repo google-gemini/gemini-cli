@@ -37,6 +37,7 @@ import {
   LegacyAgentSession,
   ToolErrorType,
   geminiPartsToContentParts,
+  debugLogger,
 } from '@google/gemini-cli-core';
 
 import type { Part } from '@google/genai';
@@ -183,6 +184,7 @@ export async function runNonInteractive({
     };
 
     let errorToHandle: unknown | undefined;
+    let scheduler: Scheduler | undefined;
     let abortSession = () => {};
     try {
       consolePatcher.patch();
@@ -214,7 +216,7 @@ export async function runNonInteractive({
       });
 
       const geminiClient = config.getGeminiClient();
-      const scheduler = new Scheduler({
+      scheduler = new Scheduler({
         context: config,
         messageBus: config.getMessageBus(),
         getPreferredEditor: () => undefined,
@@ -250,9 +252,21 @@ export async function runNonInteractive({
           config,
           settings,
         );
-        if (slashCommandResult) {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          query = slashCommandResult as Part[];
+        if (slashCommandResult.kind === 'submit_prompt') {
+          query = Array.isArray(slashCommandResult.content)
+            ? // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+              (slashCommandResult.content as Part[])
+            : // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+              [{ text: slashCommandResult.content as string }];
+        } else if (slashCommandResult.kind === 'message') {
+          if (slashCommandResult.messageType === 'error') {
+            throw new FatalInputError(slashCommandResult.content);
+          }
+          // eslint-disable-next-line no-console
+          console.log(slashCommandResult.content);
+          return;
+        } else if (slashCommandResult.kind === 'handled') {
+          return;
         }
       }
 
@@ -599,6 +613,7 @@ export async function runNonInteractive({
             // Explicitly ignore these non-interactive events
             break;
           default:
+            debugLogger.error('Unknown agent event type:', event);
             event satisfies never;
             break;
         }
@@ -610,6 +625,7 @@ export async function runNonInteractive({
       cleanupStdinCancellation();
       abortController.signal.removeEventListener('abort', abortSession);
 
+      scheduler?.dispose();
       consolePatcher.cleanup();
       coreEvents.off(CoreEvent.UserFeedback, handleUserFeedback);
     }

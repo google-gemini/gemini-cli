@@ -42,7 +42,7 @@ const mockFileKeychain: MockKeychain = {
   findCredentials: vi.fn(),
 };
 
-vi.mock('keytar', () => ({ default: mockKeytar }));
+vi.mock('@github/keytar', () => ({ default: mockKeytar }));
 
 vi.mock('./fileKeychain.js', () => ({
   FileKeychain: vi.fn(() => mockFileKeychain),

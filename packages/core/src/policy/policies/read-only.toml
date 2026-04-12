@@ -28,43 +28,26 @@
 #   999: YOLO mode allow-all (becomes 1.999 in default tier)
 
 [[rule]]
-toolName = "glob"
-decision = "allow"
-priority = 50
-
-[[rule]]
-toolName = "grep_search"
-decision = "allow"
-priority = 50
-
-[[rule]]
-toolName = "list_directory"
-decision = "allow"
-priority = 50
-
-[[rule]]
-toolName = "read_file"
-decision = "allow"
-priority = 50
-
-[[rule]]
-toolName = "google_web_search"
-decision = "allow"
-priority = 50
-
-[[rule]]
-toolName = ["codebase_investigator", "cli_help", "get_internal_docs"]
-decision = "allow"
-priority = 50
-
-# Topic grouping tool is innocuous and used for UI organization.
-[[rule]]
-toolName = "update_topic"
-decision = "allow"
-priority = 50
-
-# Core agent lifecycle tool
-[[rule]]
-toolName = "complete_task"
+toolName = [
+  "glob",
+  "grep_search",
+  "list_directory",
+  "read_file",
+  "google_web_search",
+  "codebase_investigator",
+  "cli_help",
+  "get_internal_docs",
+  # Tracker tools for task management (safe as they only modify internal state)
+  "tracker_create_task",
+  "tracker_update_task",
+  "tracker_get_task",
+  "tracker_list_tasks",
+  "tracker_add_dependency",
+  "tracker_visualize",
+  # Topic grouping tool is innocuous and used for UI organization.
+  "update_topic",
+  # Core agent lifecycle tool
+  "complete_task"
+]
 decision = "allow"
 priority = 50

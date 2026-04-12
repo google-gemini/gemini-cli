@@ -71,6 +71,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     Scheduler: class {
       schedule = mockSchedulerSchedule;
       cancelAll = vi.fn();
+      dispose = vi.fn();
     },
     isTelemetrySdkInitialized: vi.fn().mockReturnValue(true),
     ChatRecordingService: MockChatRecordingService,
@@ -1130,7 +1131,10 @@ describe('runNonInteractive', () => {
       nonInteractiveCliCommands,
       'handleSlashCommand',
     );
-    handleSlashCommandSpy.mockResolvedValue([{ text: 'Slash command output' }]);
+    handleSlashCommandSpy.mockResolvedValue({
+      kind: 'submit_prompt',
+      content: [{ text: 'Slash command output' }],
+    });
 
     const events: ServerGeminiStreamEvent[] = [
       { type: GeminiEventType.Content, value: 'Response to slash command' },
