@@ -174,9 +174,13 @@ export const usePhraseCycler = (
 
   if (shouldShowFocusHint) {
     currentTip = INTERACTIVE_SHELL_WAITING_PHRASE;
-  } else if (isWaiting) {
+  }
+
+  if (!currentTip && isWaiting) {
     currentTip = 'Waiting for user confirmation...';
-  } else if (isActive) {
+  }
+
+  if (!currentTip && isActive) {
     currentTip = currentTipState;
     currentWittyPhrase = currentWittyPhraseState;
   }

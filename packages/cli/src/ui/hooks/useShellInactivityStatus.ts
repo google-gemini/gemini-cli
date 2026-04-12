@@ -51,7 +51,10 @@ export const useShellInactivityStatus = ({
   );
 
   const isAwaitingFocus =
-    !!activePtyId && !embeddedShellFocused && isInteractiveShellEnabled;
+    !!activePtyId &&
+    !embeddedShellFocused &&
+    isInteractiveShellEnabled &&
+    streamingState !== StreamingState.Idle;
 
   // Derive whether output was produced by comparing the last output time to when the operation started.
   const hasProducedOutput = lastOutputTime > operationStartTime;
