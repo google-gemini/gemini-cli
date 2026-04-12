@@ -237,6 +237,13 @@ export class CoderAgentExecutor implements AgentExecutor {
       );
       task.cancelPendingTools('Task canceled by user request.');
 
+      if (task.config.getEnableHooks()) {
+        await task.config
+          .getHookSystem()
+          ?.getEventHandler()
+          .fireUserCancelEvent('user_request', taskId);
+      }
+
       const stateChange: StateChange = {
         kind: CoderAgentEvent.StateChangeEvent,
       };

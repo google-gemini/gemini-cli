@@ -23,6 +23,7 @@ import {
   type BeforeModelInput,
   type AfterModelInput,
   type BeforeToolSelectionInput,
+  type UserCancelInput,
   type NotificationType,
   type SessionStartSource,
   type SessionEndReason,
@@ -197,6 +198,23 @@ export class HookEventHandler {
 
     const context: HookEventContext = { trigger: reason };
     return this.executeHooks(HookEventName.SessionEnd, input, context);
+  }
+
+  /**
+   * Fire a UserCancel event
+   */
+  async fireUserCancelEvent(
+    reason: string,
+    taskId?: string,
+  ): Promise<AggregatedHookResult> {
+    const input: UserCancelInput = {
+      ...this.createBaseInput(HookEventName.UserCancel),
+      reason,
+      ...(taskId && { task_id: taskId }),
+    };
+
+    const context: HookEventContext = { trigger: reason };
+    return this.executeHooks(HookEventName.UserCancel, input, context);
   }
 
   /**
