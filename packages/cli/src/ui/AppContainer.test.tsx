@@ -3571,4 +3571,150 @@ describe('AppContainer State Management', () => {
       unmount();
     });
   });
+
+  describe('Idle Shutdown', () => {
+    let mockHandleSlashCommand: ReturnType<typeof vi.fn>;
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+      mockHandleSlashCommand = vi.fn().mockResolvedValue(undefined);
+      mockedUseSlashCommandProcessor.mockReturnValue({
+        handleSlashCommand: mockHandleSlashCommand,
+        slashCommands: [],
+        pendingHistoryItems: [],
+        commandContext: {},
+        shellConfirmationRequest: null,
+        confirmationRequest: null,
+      });
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('triggers /quit after the configured idle timeout while in Idle state', async () => {
+      const idleSettings = createMockSettings({
+        merged: { general: { idleShutdownMinutes: 15 } },
+      });
+      mockedUseGeminiStream.mockReturnValue({
+        ...DEFAULT_GEMINI_STREAM_MOCK,
+        streamingState: StreamingState.Idle,
+      });
+
+      const { unmount } = await act(async () =>
+        renderAppContainer({ settings: idleSettings }),
+      );
+
+      expect(mockHandleSlashCommand).not.toHaveBeenCalledWith(
+        '/quit',
+        undefined,
+        undefined,
+        false,
+      );
+
+      await act(async () => {
+        vi.advanceTimersByTime(15 * 60 * 1000);
+      });
+
+      expect(mockHandleSlashCommand).toHaveBeenCalledWith(
+        '/quit',
+        undefined,
+        undefined,
+        false,
+      );
+
+      unmount();
+    });
+
+    it('does not trigger /quit when idleShutdownMinutes is not set', async () => {
+      const idleSettings = createMockSettings({
+        merged: { general: { idleShutdownMinutes: undefined } },
+      });
+      mockedUseGeminiStream.mockReturnValue({
+        ...DEFAULT_GEMINI_STREAM_MOCK,
+        streamingState: StreamingState.Idle,
+      });
+
+      const { unmount } = await act(async () =>
+        renderAppContainer({ settings: idleSettings }),
+      );
+
+      await act(async () => {
+        vi.advanceTimersByTime(60 * 60 * 1000); // 1 hour
+      });
+
+      expect(mockHandleSlashCommand).not.toHaveBeenCalledWith(
+        '/quit',
+        undefined,
+        undefined,
+        false,
+      );
+
+      unmount();
+    });
+
+    it('resets the idle timer when streaming state changes away from Idle', async () => {
+      const idleSettings = createMockSettings({
+        merged: { general: { idleShutdownMinutes: 15 } },
+      });
+      let currentStreamingState: StreamingState = StreamingState.Idle;
+      mockedUseGeminiStream.mockImplementation(() => ({
+        ...DEFAULT_GEMINI_STREAM_MOCK,
+        streamingState: currentStreamingState,
+      }));
+
+      const { unmount, rerender } = await act(async () =>
+        renderAppContainer({ settings: idleSettings }),
+      );
+
+      // Advance 10 minutes (not yet at the 15-minute threshold)
+      await act(async () => {
+        vi.advanceTimersByTime(10 * 60 * 1000);
+      });
+
+      // User submits a query – streaming state changes to Responding
+      currentStreamingState = StreamingState.Responding;
+      await act(async () => {
+        rerender(getAppContainer({ settings: idleSettings }));
+      });
+
+      // Advance another 10 minutes while responding (timer should be cleared)
+      await act(async () => {
+        vi.advanceTimersByTime(10 * 60 * 1000);
+      });
+
+      // Response completes – back to Idle, timer resets
+      currentStreamingState = StreamingState.Idle;
+      await act(async () => {
+        rerender(getAppContainer({ settings: idleSettings }));
+      });
+
+      // Only 5 more minutes elapse – total idle time since reset is 5 min
+      await act(async () => {
+        vi.advanceTimersByTime(5 * 60 * 1000);
+      });
+
+      // Should NOT have quit yet (only 5 min of idle since reset)
+      expect(mockHandleSlashCommand).not.toHaveBeenCalledWith(
+        '/quit',
+        undefined,
+        undefined,
+        false,
+      );
+
+      // Advance the remaining 10 minutes to hit the 15-minute threshold
+      await act(async () => {
+        vi.advanceTimersByTime(10 * 60 * 1000);
+      });
+
+      expect(mockHandleSlashCommand).toHaveBeenCalledWith(
+        '/quit',
+        undefined,
+        undefined,
+        false,
+      );
+
+      unmount();
+    });
+  });
 });

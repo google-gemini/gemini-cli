@@ -175,6 +175,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Enable debug logging of keystrokes to the console.
   - **Default:** `false`
 
+- **`general.idleShutdownMinutes`** (number):
+  - **Description:** Automatically close the CLI after this many minutes of
+    inactivity (waiting for user input). Leave unset or set to 0 to disable.
+  - **Default:** `undefined`
+
 - **`general.sessionRetention.enabled`** (boolean):
   - **Description:** Enable automatic session cleanup
   - **Default:** `true`
