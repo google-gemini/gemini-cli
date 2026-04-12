@@ -408,7 +408,7 @@ export const defaultKeyBindingConfig: KeyBindingConfig = new Map([
   [Command.RESTART_APP, [new KeyBinding('r'), new KeyBinding('shift+r')]],
   [Command.SUSPEND_APP, [new KeyBinding('ctrl+z')]],
   [Command.SHOW_SHELL_INPUT_UNFOCUS_WARNING, [new KeyBinding('tab')]],
-  [Command.EXPORT_LOGS, [new KeyBinding('ctrl+shift+l')]],
+  [Command.EXPORT_LOGS, [new KeyBinding('f10')]],
   [Command.DUMP_FRAME, [new KeyBinding('f8')]],
   [Command.START_RECORDING, [new KeyBinding('f6')]],
   [Command.STOP_RECORDING, [new KeyBinding('f7')]],

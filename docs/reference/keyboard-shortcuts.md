@@ -115,7 +115,7 @@ available combinations.
 | `app.restart`                 | Restart the application.                                                                                                                           | `R`<br />`Shift+R` |
 | `app.suspend`                 | Suspend the CLI and move it to the background.                                                                                                     | `Ctrl+Z`           |
 | `app.showShellUnfocusWarning` | Show warning when trying to move focus away from shell input.                                                                                      | `Tab`              |
-| `app.exportLogs`              | Export debug console logs to a file.                                                                                                               | `Ctrl+Shift+L`     |
+| `app.exportLogs`              | Export debug console logs to a file.                                                                                                               | `F10`              |
 
 #### Background Shell Controls
 
