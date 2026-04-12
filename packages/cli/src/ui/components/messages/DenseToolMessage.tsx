@@ -17,14 +17,12 @@ import {
   isGrepResult,
   isListResult,
   isReadManyFilesResult,
-  type ToolDisplay,
 } from '@google/gemini-cli-core';
 import {
   type IndividualToolCallDisplay,
   type ToolResultDisplay,
   isTodoList,
 } from '../../types.js';
-import { isCompactTool } from './ToolGroupMessage.js';
 import { useAlternateBuffer } from '../../hooks/useAlternateBuffer.js';
 import { ToolStatusIndicator } from './ToolShared.js';
 import { theme } from '../../semantic-colors.js';
@@ -48,7 +46,6 @@ const PAYLOAD_SCROLL_GUTTER = 4;
 const PAYLOAD_MAX_WIDTH = 120 + PAYLOAD_SCROLL_GUTTER;
 
 interface DenseToolMessageProps extends IndividualToolCallDisplay {
-  display?: ToolDisplay;
   terminalWidth: number;
   availableTerminalHeight?: number;
 }
@@ -272,7 +269,6 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
     terminalWidth,
     availableTerminalHeight,
     description: originalDescription,
-    display,
   } = props;
 
   const settings = useSettings();
@@ -287,7 +283,6 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
 
   const [isFocused, setIsFocused] = useState(false);
   const toggleRef = useRef<DOMElement>(null);
-  const isActuallyCompact = useMemo(() => isCompactTool(props, true), [props]);
 
   // Unified File Data Extraction (Safely bridge resultDisplay and confirmationDetails)
   const diff = useMemo((): FileDiff | undefined => {
@@ -327,83 +322,6 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
 
   // State-to-View Coordination
   const viewParts = useMemo((): ViewParts => {
-    if (display) {
-      const descriptionText = (
-        <Text color={theme.text.secondary} wrap="truncate-end">
-          {display.description || originalDescription}
-        </Text>
-      );
-
-      const summaryText = display.resultSummary ? (
-        <Text color={theme.text.accent} wrap="truncate-end">
-          → {display.resultSummary}
-        </Text>
-      ) : status === CoreToolCallStatus.Error ? (
-        <Text color={theme.status.error} wrap="truncate-end">
-          → {typeof resultDisplay === 'string' ? resultDisplay : 'Failed'}
-        </Text>
-      ) : undefined;
-
-      // For now, DenseToolMessage still handles complex resultDisplay types
-      // like FileDiff or ListResult manually if display.result is not provided
-      // or doesn't cover them.
-      if (!display.result) {
-        if (diff) {
-          return {
-            ...getFileOpData(
-              diff,
-              status,
-              resultDisplay,
-              terminalWidth,
-              availableTerminalHeight,
-              isAlternateBuffer,
-            ),
-            description: descriptionText,
-            summary: summaryText,
-          };
-        }
-        if (isListResult(resultDisplay)) {
-          return {
-            ...getListResultData(resultDisplay, originalDescription),
-            description: descriptionText,
-            summary: summaryText,
-          };
-        }
-      }
-
-      // If we have a display.result, use it as the payload
-      let payload: React.ReactNode;
-      if (display.result) {
-        if (display.result.type === 'text') {
-          const text = display.result.text;
-          if (text) {
-            payload = (
-              <Text color={theme.text.secondary} wrap="truncate-end">
-                {text}
-              </Text>
-            );
-          }
-        }
-        // Step 5 will expand this to handle 'diff' type
-      }
-
-      // Compact tools should elide text payloads by default unless expanded.
-      if (
-        isActuallyCompact &&
-        !isExpanded &&
-        display.result?.type === 'text' &&
-        !isAlternateBuffer
-      ) {
-        payload = undefined;
-      }
-
-      return {
-        description: descriptionText,
-        summary: summaryText,
-        payload,
-      };
-    }
-
     if (diff) {
       return getFileOpData(
         diff,
@@ -465,9 +383,6 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
     availableTerminalHeight,
     originalDescription,
     isAlternateBuffer,
-    display,
-    isActuallyCompact,
-    isExpanded,
   ]);
 
   const { description, summary } = viewParts;
@@ -505,10 +420,6 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
   }, [diff, isExpanded, isAlternateBuffer, terminalWidth, settings, status]);
 
   const showPayload = useMemo(() => {
-    // If we are using the new display protocol and it's a compact tool,
-    // hide the payload by default unless expanded.
-    if (display && isActuallyCompact && !isExpanded) return false;
-
     const policy = !isAlternateBuffer || !diff || isExpanded;
     if (!policy) return false;
 
@@ -528,8 +439,6 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
     diffLines.length,
     viewParts.payload,
     outputFile,
-    isActuallyCompact,
-    display,
   ]);
 
   const keyExtractor = (_item: React.ReactNode, index: number) =>
@@ -540,16 +449,7 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
 
   return (
     <Box flexDirection="column">
-      <Box
-        marginLeft={2}
-        flexDirection="row"
-        flexWrap="wrap"
-        ref={
-          isActuallyCompact || (isAlternateBuffer && diff)
-            ? toggleRef
-            : undefined
-        }
-      >
+      <Box marginLeft={2} flexDirection="row" flexWrap="wrap">
         <Box flexDirection="row" flexShrink={1}>
           <ToolStatusIndicator status={status} name={name} />
           <Box maxWidth={25} flexShrink={0} flexGrow={0}>
@@ -563,7 +463,12 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
         </Box>
 
         {summary && (
-          <Box key="tool-summary" marginLeft={1} flexGrow={0}>
+          <Box
+            key="tool-summary"
+            ref={isAlternateBuffer && diff ? toggleRef : undefined}
+            marginLeft={1}
+            flexGrow={0}
+          >
             {summary}
           </Box>
         )}

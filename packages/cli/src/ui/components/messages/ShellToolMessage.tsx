@@ -43,7 +43,6 @@ export interface ShellToolMessageProps extends ToolMessageProps {
 export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
   name,
   description,
-  display,
   resultDisplay,
   status,
   availableTerminalHeight,
@@ -168,7 +167,6 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
           name={name}
           status={status}
           description={description}
-          display={display}
           emphasis={emphasis}
           originalRequestName={originalRequestName}
         />

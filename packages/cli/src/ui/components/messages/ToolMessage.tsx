@@ -21,20 +21,13 @@ import {
   useFocusHint,
   FocusHint,
 } from './ToolShared.js';
-import {
-  type Config,
-  CoreToolCallStatus,
-  Kind,
-  type ToolDisplay,
-} from '@google/gemini-cli-core';
+import { type Config, CoreToolCallStatus, Kind } from '@google/gemini-cli-core';
 import { ShellInputPrompt } from '../ShellInputPrompt.js';
 import { SUBAGENT_MAX_LINES } from '../../constants.js';
 
 export type { TextEmphasis };
 
 export interface ToolMessageProps extends IndividualToolCallDisplay {
-  description: string;
-  display?: ToolDisplay;
   availableTerminalHeight?: number;
   terminalWidth: number;
   emphasis?: TextEmphasis;
@@ -51,7 +44,6 @@ export interface ToolMessageProps extends IndividualToolCallDisplay {
 export const ToolMessage: React.FC<ToolMessageProps> = ({
   name,
   description,
-  display,
   resultDisplay,
   status,
   kind,
@@ -87,11 +79,6 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
     resultDisplay,
   );
 
-  const effectiveResultDisplay =
-    display?.resultSummary && !display.result
-      ? display.resultSummary
-      : resultDisplay;
-
   return (
     // It is crucial we don't replace this <> with a Box because otherwise the
     // sticky header inside it would be sticky to that box rather than to the
@@ -112,11 +99,9 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
           name={name}
           status={status}
           description={description}
-          display={display}
           emphasis={emphasis}
           progressMessage={progressMessage}
           originalRequestName={originalRequestName}
-          hideSummary={!display?.result && !!display?.resultSummary}
         />
         <FocusHint
           shouldShowFocusHint={shouldShowFocusHint}
@@ -145,7 +130,7 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
           />
         )}
         <ToolResultDisplay
-          resultDisplay={effectiveResultDisplay}
+          resultDisplay={resultDisplay}
           availableTerminalHeight={availableTerminalHeight}
           terminalWidth={terminalWidth}
           renderOutputAsMarkdown={renderOutputAsMarkdown}

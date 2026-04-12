@@ -8,7 +8,6 @@ import {
   type ToolCall,
   type SerializableConfirmationDetails,
   type ToolResultDisplay,
-  type ToolDisplay,
   debugLogger,
   CoreToolCallStatus,
   type SubagentActivityItem,
@@ -36,17 +35,10 @@ export function mapToDisplay(
     borderBottom?: boolean;
     borderColor?: string;
     borderDimColor?: boolean;
-    isAgentSessionInteractive?: boolean;
   } = {},
 ): HistoryItemToolGroup {
   const toolCalls = Array.isArray(toolOrTools) ? toolOrTools : [toolOrTools];
-  const {
-    borderTop,
-    borderBottom,
-    borderColor,
-    borderDimColor,
-    isAgentSessionInteractive,
-  } = options;
+  const { borderTop, borderBottom, borderColor, borderDimColor } = options;
 
   const toolDisplays = toolCalls.map((call): IndividualToolCallDisplay => {
     let description: string;
@@ -71,7 +63,6 @@ export function mapToDisplay(
     };
 
     let resultDisplay: ToolResultDisplay | undefined = undefined;
-    let display: ToolDisplay | undefined = undefined;
     let confirmationDetails: SerializableConfirmationDetails | undefined =
       undefined;
     let outputFile: string | undefined = undefined;
@@ -84,17 +75,11 @@ export function mapToDisplay(
     switch (call.status) {
       case CoreToolCallStatus.Success:
         resultDisplay = call.response.resultDisplay;
-        if (isAgentSessionInteractive) {
-          display = call.response.display;
-        }
         outputFile = call.response.outputFile;
         break;
       case CoreToolCallStatus.Error:
       case CoreToolCallStatus.Cancelled:
         resultDisplay = call.response.resultDisplay;
-        if (isAgentSessionInteractive) {
-          display = call.response.display;
-        }
         break;
       case CoreToolCallStatus.AwaitingApproval:
         correlationId = call.correlationId;
@@ -127,7 +112,6 @@ export function mapToDisplay(
       status: call.status,
       isClientInitiated: !!call.request.isClientInitiated,
       kind: call.tool?.kind,
-      display,
       resultDisplay,
       confirmationDetails,
       outputFile,
