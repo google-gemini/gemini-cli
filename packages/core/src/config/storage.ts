@@ -266,6 +266,18 @@ export class Storage {
     return path.join(historyDir, identifier);
   }
 
+  getProjectMemoryDir(): string {
+    return this.getProjectMemoryTempDir();
+  }
+
+  getProjectMemoryTempDir(): string {
+    return path.join(this.getProjectTempDir(), 'memory');
+  }
+
+  getProjectSkillsMemoryDir(): string {
+    return path.join(this.getProjectMemoryTempDir(), 'skills');
+  }
+
   getWorkspaceSettingsPath(): string {
     return path.join(this.getGeminiDir(), 'settings.json');
   }
@@ -341,7 +353,9 @@ export class Storage {
     const chatsDir = path.join(this.getProjectTempDir(), 'chats');
     try {
       const files = await fs.promises.readdir(chatsDir);
-      const jsonFiles = files.filter((f) => f.endsWith('.json'));
+      const jsonFiles = files.filter(
+        (f) => f.endsWith('.json') || f.endsWith('.jsonl'),
+      );
 
       const sessions = await Promise.all(
         jsonFiles.map(async (file) => {

@@ -62,14 +62,16 @@ locations for these files:
 
 **Note on environment variables in settings:** String values within your
 `settings.json` and `gemini-extension.json` files can reference environment
-variables using either `$VAR_NAME` or `${VAR_NAME}` syntax. These variables will
-be automatically resolved when the settings are loaded. For example, if you have
-an environment variable `MY_API_TOKEN`, you could use it in `settings.json` like
-this: `"apiKey": "$MY_API_TOKEN"`. Additionally, each extension can have its own
-`.env` file in its directory, which will be loaded automatically.
+variables using `$VAR_NAME`, `${VAR_NAME}`, or `${VAR_NAME:-DEFAULT_VALUE}`
+syntax. These variables will be automatically resolved when the settings are
+loaded. For example, if you have an environment variable `MY_API_TOKEN`, you
+could use it in `settings.json` like this: `"apiKey": "$MY_API_TOKEN"`. If you
+want to provide a fallback value, use `${MY_API_TOKEN:-default-token}`.
+Additionally, each extension can have its own `.env` file in its directory,
+which will be loaded automatically.
 
 **Note for Enterprise Users:** For guidance on deploying and managing Gemini CLI
-in a corporate environment, please see the
+in a corporate environment, see the
 [Enterprise Configuration](../cli/enterprise.md) documentation.
 
 ### The `.gemini` directory in your project
@@ -77,7 +79,7 @@ in a corporate environment, please see the
 In addition to a project settings file, a project's `.gemini` directory can
 contain other project-specific files related to Gemini CLI's operation, such as:
 
-- [Custom sandbox profiles](#sandboxing) (e.g.,
+- [Custom sandbox profiles](#sandboxing) (for example,
   `.gemini/sandbox-macos-custom.sb`, `.gemini/sandbox.Dockerfile`).
 
 ### Available settings in `settings.json`
@@ -141,6 +143,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
+- **`general.plan.enabled`** (boolean):
+  - **Description:** Enable Plan Mode for read-only safety during planning.
+  - **Default:** `true`
+  - **Requires restart:** Yes
+
 - **`general.plan.directory`** (string):
   - **Description:** The directory where planning artifacts are stored. If not
     specified, defaults to the system temporary directory. A custom directory
@@ -194,6 +201,12 @@ their corresponding top-level category object in your `settings.json` file.
   - **Values:** `"text"`, `"json"`
 
 #### `ui`
+
+- **`ui.debugRainbow`** (boolean):
+  - **Description:** Enable debug rainbow rendering. Only useful for debugging
+    rendering bugs and performance issues.
+  - **Default:** `false`
+  - **Requires restart:** Yes
 
 - **`ui.theme`** (string):
   - **Description:** The color theme for the UI. See the CLI themes guide for
@@ -255,6 +268,11 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`ui.showShortcutsHint`** (boolean):
   - **Description:** Show the "? for shortcuts" hint above the input.
+  - **Default:** `true`
+
+- **`ui.compactToolOutput`** (boolean):
+  - **Description:** Display tool outputs (like directory listings and file
+    reads) in a compact, structured format.
   - **Default:** `true`
 
 - **`ui.hideBanner`** (boolean):
@@ -327,6 +345,16 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
+- **`ui.renderProcess`** (boolean):
+  - **Description:** Enable Ink render process for the UI.
+  - **Default:** `true`
+  - **Requires restart:** Yes
+
+- **`ui.terminalBuffer`** (boolean):
+  - **Description:** Use the new terminal buffer architecture for rendering.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
 - **`ui.useBackgroundColor`** (boolean):
   - **Description:** Whether to use background colors in the UI.
   - **Default:** `true`
@@ -344,8 +372,8 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`ui.loadingPhrases`** (enum):
   - **Description:** What to show while the model is working: tips, witty
-    comments, both, or nothing.
-  - **Default:** `"tips"`
+    comments, all, or off.
+  - **Default:** `"off"`
   - **Values:** `"tips"`, `"witty"`, `"all"`, `"off"`
 
 - **`ui.errorVerbosity`** (enum):
@@ -1232,7 +1260,8 @@ their corresponding top-level category object in your `settings.json` file.
   - **Requires restart:** Yes
 
 - **`agents.browser.visualModel`** (string):
-  - **Description:** Model override for the visual agent.
+  - **Description:** Model for the visual agent's analyze_screenshot tool. When
+    set, enables the tool.
   - **Default:** `undefined`
   - **Requires restart:** Yes
 
@@ -1381,7 +1410,7 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`tools.shell.showColor`** (boolean):
   - **Description:** Show color in shell output.
-  - **Default:** `false`
+  - **Default:** `true`
 
 - **`tools.shell.inactivityTimeout`** (number):
   - **Description:** The maximum time in seconds allowed without output from the
@@ -1469,9 +1498,10 @@ their corresponding top-level category object in your `settings.json` file.
 #### `security`
 
 - **`security.toolSandboxing`** (boolean):
-  - **Description:** Experimental tool-level sandboxing (implementation in
-    progress).
+  - **Description:** Tool-level sandboxing. Isolates individual tools instead of
+    the entire CLI process.
   - **Default:** `false`
+  - **Requires restart:** Yes
 
 - **`security.disableYoloMode`** (boolean):
   - **Description:** Disable YOLO mode, even if enabled by a flag.
@@ -1554,8 +1584,11 @@ their corresponding top-level category object in your `settings.json` file.
 #### `advanced`
 
 - **`advanced.autoConfigureMemory`** (boolean):
-  - **Description:** Automatically configure Node.js memory limits
-  - **Default:** `false`
+  - **Description:** Automatically configure Node.js memory limits. Note:
+    Because memory is allocated during the initial process boot, this setting is
+    only read from the global user settings file and ignores workspace-level
+    overrides.
+  - **Default:** `true`
   - **Requires restart:** Yes
 
 - **`advanced.dnsResolutionOrder`** (string):
@@ -1577,26 +1610,15 @@ their corresponding top-level category object in your `settings.json` file.
 
 #### `experimental`
 
-- **`experimental.toolOutputMasking.enabled`** (boolean):
-  - **Description:** Enables tool output masking to save tokens.
-  - **Default:** `true`
+- **`experimental.adk.agentSessionNoninteractiveEnabled`** (boolean):
+  - **Description:** Enable non-interactive agent sessions.
+  - **Default:** `false`
   - **Requires restart:** Yes
 
-- **`experimental.toolOutputMasking.toolProtectionThreshold`** (number):
-  - **Description:** Minimum number of tokens to protect from masking (most
-    recent tool outputs).
-  - **Default:** `50000`
-  - **Requires restart:** Yes
-
-- **`experimental.toolOutputMasking.minPrunableTokensThreshold`** (number):
-  - **Description:** Minimum prunable tokens required to trigger a masking pass.
-  - **Default:** `30000`
-  - **Requires restart:** Yes
-
-- **`experimental.toolOutputMasking.protectLatestTurn`** (boolean):
-  - **Description:** Ensures the absolute latest turn is never masked,
-    regardless of token count.
-  - **Default:** `true`
+- **`experimental.adk.agentSessionInteractiveEnabled`** (boolean):
+  - **Description:** Enable the agent session implementation for the interactive
+    CLI.
+  - **Default:** `false`
   - **Requires restart:** Yes
 
 - **`experimental.enableAgents`** (boolean):
@@ -1637,7 +1659,7 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`experimental.jitContext`** (boolean):
   - **Description:** Enable Just-In-Time (JIT) context loading.
-  - **Default:** `true`
+  - **Default:** `false`
   - **Requires restart:** Yes
 
 - **`experimental.useOSC52Paste`** (boolean):
@@ -1651,11 +1673,6 @@ their corresponding top-level category object in your `settings.json` file.
     default system when using remote terminal sessions (if your terminal is
     configured to allow it).
   - **Default:** `false`
-
-- **`experimental.plan`** (boolean):
-  - **Description:** Enable Plan Mode.
-  - **Default:** `true`
-  - **Requires restart:** Yes
 
 - **`experimental.taskTracker`** (boolean):
   - **Description:** Enable task tracker tools.
@@ -1702,25 +1719,13 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
-- **`experimental.agentHistoryTruncation`** (boolean):
-  - **Description:** Enable truncation window logic for the Agent History
-    Provider.
+- **`experimental.generalistProfile`** (boolean):
+  - **Description:** Suitable for general coding and software development tasks.
   - **Default:** `false`
   - **Requires restart:** Yes
 
-- **`experimental.agentHistoryTruncationThreshold`** (number):
-  - **Description:** The maximum number of messages before history is truncated.
-  - **Default:** `30`
-  - **Requires restart:** Yes
-
-- **`experimental.agentHistoryRetainedMessages`** (number):
-  - **Description:** The number of recent messages to retain after truncation.
-  - **Default:** `15`
-  - **Requires restart:** Yes
-
-- **`experimental.agentHistorySummarization`** (boolean):
-  - **Description:** Enable summarization of truncated content via a small model
-    for the Agent History Provider.
+- **`experimental.contextManagement`** (boolean):
+  - **Description:** Enable logic for context management.
   - **Default:** `false`
   - **Requires restart:** Yes
 
@@ -1815,6 +1820,69 @@ their corresponding top-level category object in your `settings.json` file.
     prioritize available tools dynamically.
   - **Default:** `[]`
 
+#### `contextManagement`
+
+- **`contextManagement.historyWindow.maxTokens`** (number):
+  - **Description:** The number of tokens to allow before triggering
+    compression.
+  - **Default:** `150000`
+  - **Requires restart:** Yes
+
+- **`contextManagement.historyWindow.retainedTokens`** (number):
+  - **Description:** The number of tokens to always retain.
+  - **Default:** `40000`
+  - **Requires restart:** Yes
+
+- **`contextManagement.messageLimits.normalMaxTokens`** (number):
+  - **Description:** The target number of tokens to budget for a normal
+    conversation turn.
+  - **Default:** `2500`
+  - **Requires restart:** Yes
+
+- **`contextManagement.messageLimits.retainedMaxTokens`** (number):
+  - **Description:** The maximum number of tokens a single conversation turn can
+    consume before truncation.
+  - **Default:** `12000`
+  - **Requires restart:** Yes
+
+- **`contextManagement.messageLimits.normalizationHeadRatio`** (number):
+  - **Description:** The ratio of tokens to retain from the beginning of a
+    truncated message (0.0 to 1.0).
+  - **Default:** `0.25`
+  - **Requires restart:** Yes
+
+- **`contextManagement.tools.distillation.maxOutputTokens`** (number):
+  - **Description:** Maximum tokens to show to the model when truncating large
+    tool outputs.
+  - **Default:** `10000`
+  - **Requires restart:** Yes
+
+- **`contextManagement.tools.distillation.summarizationThresholdTokens`**
+  (number):
+  - **Description:** Threshold above which truncated tool outputs will be
+    summarized by an LLM.
+  - **Default:** `20000`
+  - **Requires restart:** Yes
+
+- **`contextManagement.tools.outputMasking.protectionThresholdTokens`**
+  (number):
+  - **Description:** Minimum number of tokens to protect from masking (most
+    recent tool outputs).
+  - **Default:** `50000`
+  - **Requires restart:** Yes
+
+- **`contextManagement.tools.outputMasking.minPrunableThresholdTokens`**
+  (number):
+  - **Description:** Minimum prunable tokens required to trigger a masking pass.
+  - **Default:** `30000`
+  - **Requires restart:** Yes
+
+- **`contextManagement.tools.outputMasking.protectLatestTurn`** (boolean):
+  - **Description:** Ensures the absolute latest turn is never masked,
+    regardless of token count.
+  - **Default:** `true`
+  - **Requires restart:** Yes
+
 #### `admin`
 
 - **`admin.secureModeEnabled`** (boolean):
@@ -1850,15 +1918,15 @@ Configures connections to one or more Model-Context Protocol (MCP) servers for
 discovering and using custom tools. Gemini CLI attempts to connect to each
 configured MCP server to discover available tools. Every discovered tool is
 prepended with the `mcp_` prefix and its server alias to form a fully qualified
-name (FQN) (e.g., `mcp_serverAlias_actualToolName`) to avoid conflicts. Note
-that the system might strip certain schema properties from MCP tool definitions
-for compatibility. At least one of `command`, `url`, or `httpUrl` must be
-provided. If multiple are specified, the order of precedence is `httpUrl`, then
-`url`, then `command`.
+name (FQN) (for example, `mcp_serverAlias_actualToolName`) to avoid conflicts.
+Note that the system might strip certain schema properties from MCP tool
+definitions for compatibility. At least one of `command`, `url`, or `httpUrl`
+must be provided. If multiple are specified, the order of precedence is
+`httpUrl`, then `url`, then `command`.
 
 <!-- prettier-ignore -->
 > [!WARNING]
-> Avoid using underscores (`_`) in your server aliases (e.g., use
+> Avoid using underscores (`_`) in your server aliases (for example, use
 > `my-server` instead of `my_server`). The underlying policy engine parses Fully
 > Qualified Names (`mcp_server_tool`) using the first underscore after the
 > `mcp_` prefix. An underscore in your server alias will cause the parser to
@@ -2024,8 +2092,8 @@ the `advanced.excludedEnvVars` setting in your `settings.json` file.
   - Your API key for the Gemini API.
   - One of several available
     [authentication methods](../get-started/authentication.md).
-  - Set this in your shell profile (e.g., `~/.bashrc`, `~/.zshrc`) or an `.env`
-    file.
+  - Set this in your shell profile (for example, `~/.bashrc`, `~/.zshrc`) or an
+    `.env` file.
 - **`GEMINI_MODEL`**:
   - Specifies the default Gemini model to use.
   - Overrides the hardcoded default
@@ -2109,7 +2177,7 @@ the `advanced.excludedEnvVars` setting in your `settings.json` file.
     Any other value is treated as disabling it.
   - Overrides the `telemetry.useCollector` setting.
 - **`GOOGLE_CLOUD_LOCATION`**:
-  - Your Google Cloud Project Location (e.g., us-central1).
+  - Your Google Cloud Project Location (for example, us-central1).
   - Required for using Vertex AI in non-express mode.
   - Example: `export GOOGLE_CLOUD_LOCATION="YOUR_PROJECT_LOCATION"` (Windows
     PowerShell: `$env:GOOGLE_CLOUD_LOCATION="YOUR_PROJECT_LOCATION"`).
@@ -2140,7 +2208,7 @@ the `advanced.excludedEnvVars` setting in your `settings.json` file.
   - `strict-proxied`: Same as `strict-open` but routes network through proxy.
   - `<profile_name>`: Uses a custom profile. To define a custom profile, create
     a file named `sandbox-macos-<profile_name>.sb` in your project's `.gemini/`
-    directory (e.g., `my-project/.gemini/sandbox-macos-custom.sb`).
+    directory (for example, `my-project/.gemini/sandbox-macos-custom.sb`).
 - **`DEBUG` or `DEBUG_MODE`** (often used by underlying libraries or the CLI
   itself):
   - Set to `true` or `1` to enable verbose debug logging, which can be helpful
@@ -2179,7 +2247,7 @@ from the system or loaded from `.env` files.
 
 **Allowlist (Never Redacted):**
 
-- Common system variables (e.g., `PATH`, `HOME`, `USER`, `SHELL`, `TERM`,
+- Common system variables (for example, `PATH`, `HOME`, `USER`, `SHELL`, `TERM`,
   `LANG`).
 - Variables starting with `GEMINI_CLI_`.
 - GitHub Action specific variables.
@@ -2305,7 +2373,7 @@ for that specific session.
 While not strictly configuration for the CLI's _behavior_, context files
 (defaulting to `GEMINI.md` but configurable via the `context.fileName` setting)
 are crucial for configuring the _instructional context_ (also referred to as
-"memory") provided to the Gemini model. This powerful feature allows you to give
+"memory") provided to the Gemini model. This powerful feature lets you give
 project-specific instructions, coding style guides, or any relevant background
 information to the AI, making its responses more tailored and accurate to your
 needs. The CLI includes UI elements, such as an indicator in the footer showing
@@ -2316,7 +2384,7 @@ context.
   that you want the Gemini model to be aware of during your interactions. The
   system is designed to manage this instructional context hierarchically.
 
-### Example context file content (e.g., `GEMINI.md`)
+### Example context file content (for example, `GEMINI.md`)
 
 Here's a conceptual example of what a context file at the root of a TypeScript
 project might contain:
@@ -2326,7 +2394,7 @@ project might contain:
 
 ## General Instructions:
 
-- When generating new TypeScript code, please follow the existing coding style.
+- When generating new TypeScript code, follow the existing coding style.
 - Ensure all new functions and classes have JSDoc comments.
 - Prefer functional programming paradigms where appropriate.
 - All code should be compatible with TypeScript 5.0 and Node.js 20+.
@@ -2334,7 +2402,7 @@ project might contain:
 ## Coding Style:
 
 - Use 2 spaces for indentation.
-- Interface names should be prefixed with `I` (e.g., `IUserService`).
+- Interface names should be prefixed with `I` (for example, `IUserService`).
 - Private class members should be prefixed with an underscore (`_`).
 - Always use strict equality (`===` and `!==`).
 
@@ -2348,7 +2416,7 @@ project might contain:
 ## Regarding Dependencies:
 
 - Avoid introducing new external dependencies unless absolutely necessary.
-- If a new dependency is required, please state the reason.
+- If a new dependency is required, state the reason.
 ```
 
 This example demonstrates how you can provide general project context, specific
@@ -2358,13 +2426,13 @@ you. Project-specific context files are highly encouraged to establish
 conventions and context.
 
 - **Hierarchical loading and precedence:** The CLI implements a sophisticated
-  hierarchical memory system by loading context files (e.g., `GEMINI.md`) from
-  several locations. Content from files lower in this list (more specific)
+  hierarchical memory system by loading context files (for example, `GEMINI.md`)
+  from several locations. Content from files lower in this list (more specific)
   typically overrides or supplements content from files higher up (more
   general). The exact concatenation order and final context can be inspected
   using the `/memory show` command. The typical loading order is:
   1.  **Global context file:**
-      - Location: `~/.gemini/<configured-context-filename>` (e.g.,
+      - Location: `~/.gemini/<configured-context-filename>` (for example,
         `~/.gemini/GEMINI.md` in your user home directory).
       - Scope: Provides default instructions for all your projects.
   2.  **Project root and ancestors context files:**
@@ -2401,12 +2469,12 @@ conventions and context.
 
 By understanding and utilizing these configuration layers and the hierarchical
 nature of context files, you can effectively manage the AI's memory and tailor
-the Gemini CLI's responses to your specific needs and projects.
+Gemini CLI's responses to your specific needs and projects.
 
 ## Sandboxing
 
-The Gemini CLI can execute potentially unsafe operations (like shell commands
-and file modifications) within a sandboxed environment to protect your system.
+Gemini CLI can execute potentially unsafe operations (like shell commands and
+file modifications) within a sandboxed environment to protect your system.
 
 Sandboxing is disabled by default, but you can enable it in a few ways:
 
@@ -2441,11 +2509,15 @@ sandbox image:
 BUILD_SANDBOX=1 gemini -s
 ```
 
+Building a custom sandbox with `BUILD_SANDBOX` is only supported when running
+Gemini CLI from source. If you installed the CLI with npm, build the Docker
+image separately and reference that image in your sandbox configuration.
+
 ## Usage statistics
 
-To help us improve the Gemini CLI, we collect anonymized usage statistics. This
-data helps us understand how the CLI is used, identify common issues, and
-prioritize new features.
+To help us improve Gemini CLI, we collect anonymized usage statistics. This data
+helps us understand how the CLI is used, identify common issues, and prioritize
+new features.
 
 **What we collect:**
 

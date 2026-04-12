@@ -29,16 +29,16 @@ and parameters.
 
 These commands are available within the interactive REPL.
 
-| Command              | Description                              |
-| -------------------- | ---------------------------------------- |
-| `/skills reload`     | Reload discovered skills from disk       |
-| `/agents reload`     | Reload the agent registry                |
-| `/commands reload`   | Reload custom slash commands             |
-| `/memory reload`     | Reload context files (e.g., `GEMINI.md`) |
-| `/mcp reload`        | Restart and reload MCP servers           |
-| `/extensions reload` | Reload all active extensions             |
-| `/help`              | Show help for all commands               |
-| `/quit`              | Exit the interactive session             |
+| Command              | Description                                     |
+| -------------------- | ----------------------------------------------- |
+| `/skills reload`     | Reload discovered skills from disk              |
+| `/agents reload`     | Reload the agent registry                       |
+| `/commands reload`   | Reload custom slash commands                    |
+| `/memory reload`     | Reload context files (for example, `GEMINI.md`) |
+| `/mcp reload`        | Restart and reload MCP servers                  |
+| `/extensions reload` | Reload all active extensions                    |
+| `/help`              | Show help for all commands                      |
+| `/quit`              | Exit the interactive session                    |
 
 ## CLI Options
 
@@ -52,7 +52,7 @@ These commands are available within the interactive REPL.
 | `--prompt-interactive`           | `-i`  | string  | -         | Execute prompt and continue in interactive mode                                                                                                                        |
 | `--worktree`                     | `-w`  | string  | -         | Start Gemini in a new git worktree. If no name is provided, one is generated automatically. Requires `experimental.worktrees: true` in settings.                       |
 | `--sandbox`                      | `-s`  | boolean | `false`   | Run in a sandboxed environment for safer execution                                                                                                                     |
-| `--approval-mode`                | -     | string  | `default` | Approval mode for tool execution. Choices: `default`, `auto_edit`, `yolo`                                                                                              |
+| `--approval-mode`                | -     | string  | `default` | Approval mode for tool execution. Choices: `default`, `auto_edit`, `yolo`, `plan`                                                                                      |
 | `--yolo`                         | `-y`  | boolean | `false`   | **Deprecated.** Auto-approve all actions. Use `--approval-mode=yolo` instead.                                                                                          |
 | `--experimental-acp`             | -     | boolean | -         | Start in ACP (Agent Code Pilot) mode. **Experimental feature.**                                                                                                        |
 | `--experimental-zed-integration` | -     | boolean | -         | Run in Zed editor integration mode. **Experimental feature.**                                                                                                          |
@@ -60,7 +60,7 @@ These commands are available within the interactive REPL.
 | `--allowed-tools`                | -     | array   | -         | **Deprecated.** Use the [Policy Engine](../reference/policy-engine.md) instead. Tools that are allowed to run without confirmation (comma-separated or multiple flags) |
 | `--extensions`                   | `-e`  | array   | -         | List of extensions to use. If not provided, all extensions are enabled (comma-separated or multiple flags)                                                             |
 | `--list-extensions`              | `-l`  | boolean | -         | List all available extensions and exit                                                                                                                                 |
-| `--resume`                       | `-r`  | string  | -         | Resume a previous session. Use `"latest"` for most recent or index number (e.g. `--resume 5`)                                                                          |
+| `--resume`                       | `-r`  | string  | -         | Resume a previous session. Use `"latest"` for most recent or index number (for example `--resume 5`)                                                                   |
 | `--list-sessions`                | -     | boolean | -         | List available sessions for the current project and exit                                                                                                               |
 | `--delete-session`               | -     | string  | -         | Delete a session by index number (use `--list-sessions` to see available sessions)                                                                                     |
 | `--include-directories`          | -     | array   | -         | Additional directories to include in the workspace (comma-separated or multiple flags)                                                                                 |

@@ -43,8 +43,8 @@ import type {
 } from '../services/chatRecordingService.js';
 import type { ContentGenerator } from './contentGenerator.js';
 import { LoopDetectionService } from '../services/loopDetectionService.js';
-import { ChatCompressionService } from '../services/chatCompressionService.js';
-import { AgentHistoryProvider } from '../services/agentHistoryProvider.js';
+import { ChatCompressionService } from '../context/chatCompressionService.js';
+import { AgentHistoryProvider } from '../context/agentHistoryProvider.js';
 import { ideContextStore } from '../ide/ideContext.js';
 import {
   logContentRetryFailure,
@@ -65,17 +65,13 @@ import { handleFallback } from '../fallback/handler.js';
 import type { RoutingContext } from '../routing/routingStrategy.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
-import { ToolOutputMaskingService } from '../services/toolOutputMaskingService.js';
+import { ToolOutputMaskingService } from '../context/toolOutputMaskingService.js';
 import { calculateRequestTokenCount } from '../utils/tokenCalculation.js';
 import {
   applyModelSelection,
   createAvailabilityContextProvider,
 } from '../availability/policyHelpers.js';
-import {
-  getDisplayString,
-  resolveModel,
-  isGemini2Model,
-} from '../config/models.js';
+import { getDisplayString, resolveModel } from '../config/models.js';
 import { partToString } from '../utils/partUtils.js';
 import { coreEvents, CoreEvent } from '../utils/events.js';
 
@@ -115,12 +111,10 @@ export class GeminiClient {
   constructor(private readonly context: AgentLoopContext) {
     this.loopDetector = new LoopDetectionService(this.config);
     this.compressionService = new ChatCompressionService();
-    this.agentHistoryProvider = new AgentHistoryProvider(this.config, {
-      truncationThreshold:
-        this.config.getExperimentalAgentHistoryTruncationThreshold(),
-      retainedMessages:
-        this.config.getExperimentalAgentHistoryRetainedMessages(),
-    });
+    this.agentHistoryProvider = new AgentHistoryProvider(
+      this.config.agentHistoryProviderConfig,
+      this.config,
+    );
     this.toolOutputMaskingService = new ToolOutputMaskingService();
     this.lastPromptId = this.config.getSessionId();
 
@@ -318,7 +312,7 @@ export class GeminiClient {
     this.updateTelemetryTokenCount();
     // Reset JIT context loaded paths so subdirectory context can be
     // re-discovered in the new session.
-    await this.config.getContextManager()?.refresh();
+    await this.config.getMemoryContextManager()?.refresh();
   }
 
   dispose() {
@@ -384,7 +378,7 @@ export class GeminiClient {
     try {
       const systemMemory = this.config.getSystemInstructionMemory();
       const systemInstruction = getCoreSystemPrompt(this.config, systemMemory);
-      return new GeminiChat(
+      const chat = new GeminiChat(
         this.config,
         systemInstruction,
         tools,
@@ -398,6 +392,8 @@ export class GeminiClient {
           return [{ functionDeclarations: toolDeclarations }];
         },
       );
+      await chat.initialize(resumedSessionData, 'main');
+      return chat;
     } catch (error) {
       await reportError(
         error,
@@ -621,7 +617,7 @@ export class GeminiClient {
     // Check for context window overflow
     const modelForLimitCheck = this._getActiveModelForCurrentTurn();
 
-    if (this.config.isExperimentalAgentHistoryTruncationEnabled()) {
+    if (this.config.getContextManagementConfig().enabled) {
       const newHistory = await this.agentHistoryProvider.manageHistory(
         this.getHistory(),
         signal,
@@ -822,10 +818,7 @@ export class GeminiClient {
     }
 
     if (isInvalidStream) {
-      if (
-        this.config.getContinueOnFailedApiCall() &&
-        isGemini2Model(modelToUse)
-      ) {
+      if (this.config.getContinueOnFailedApiCall()) {
         if (isInvalidStreamRetry) {
           logContentRetryFailure(
             this.config,
@@ -1240,9 +1233,6 @@ export class GeminiClient {
    * Masks bulky tool outputs to save context window space.
    */
   private async tryMaskToolOutputs(history: readonly Content[]): Promise<void> {
-    if (!this.config.getToolOutputMaskingEnabled()) {
-      return;
-    }
     const result = await this.toolOutputMaskingService.mask(
       history,
       this.config,

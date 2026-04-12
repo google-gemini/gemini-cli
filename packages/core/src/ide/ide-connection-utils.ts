@@ -134,7 +134,7 @@ export async function getConnectionConfigFromFile(
       return parsed;
     }
     throw new Error('Invalid connection config format');
-  } catch (_) {
+  } catch {
     // For newer extension versions, the file name matches the pattern
     // /^gemini-ide-server-${pid}-\d+\.json$/. If multiple IDE
     // windows are open, multiple files matching the pattern are expected to
