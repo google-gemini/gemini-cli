@@ -1,0 +1,83 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`<ToolGroupDisplay /> > Border & Margin Logic > applies bottom margin in compact mode when group is at boundary 1`] = `
+"  ✓   Compact Tool Test description
+"
+`;
+
+exports[`<ToolGroupDisplay /> > Border & Margin Logic > forces top border on box when it follows a notice 1`] = `
+"  Notice:
+  Test description
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│   ✓   Tool in Box Test description                                                               │
+│                                                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
+`;
+
+exports[`<ToolGroupDisplay /> > Golden Snapshots > renders error message when display info is missing 1`] = `
+"  ⊷   Error: Tool display missing
+"
+`;
+
+exports[`<ToolGroupDisplay /> > Golden Snapshots > renders in boxed mode (full verbosity) 1`] = `
+"
+╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│   ✓   Tool A Test description                                                                    │
+│                                                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
+`;
+
+exports[`<ToolGroupDisplay /> > Golden Snapshots > renders in compact mode (no box borders) 1`] = `
+"  ✓   Tool A Test description
+  ✓   Tool B Test description
+"
+`;
+
+exports[`<ToolGroupDisplay /> > Golden Snapshots > renders notices at the top (hoisting) 1`] = `
+"
+  Update Topic Context:
+  New Topic
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│   ✓   Tool A Test description                                                                    │
+│                                                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
+`;
+
+exports[`<ToolGroupDisplay /> > Golden Snapshots > renders standalone notices without a box 1`] = `
+"
+  Notice Only:
+  Test description
+"
+`;
+
+exports[`<ToolGroupDisplay /> > Result Formatting > renders compact tools with summary on same line 1`] = `
+"  ✓   test-tool Test description → Success summary
+"
+`;
+
+exports[`<ToolGroupDisplay /> > Result Formatting > renders placeholder for diff results 1`] = `
+"
+╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│   ✓   test-tool Test description                                                                 │
+│     [Diff Display: 3 -> 3 chars]                                                                 │
+│                                                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
+`;
+
+exports[`<ToolGroupDisplay /> > Result Formatting > renders text results with summary below 1`] = `
+"
+╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│   ✓   test-tool Test description                                                                 │
+│     Detailed output                                                                              │
+│                                                                                                  │
+│     Short summary                                                                                │
+│                                                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
+`;

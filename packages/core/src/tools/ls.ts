@@ -288,6 +288,14 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
           name: LS_DISPLAY_NAME,
           description: this.getDescription(),
           resultSummary: displayMessage,
+          result: {
+            type: 'text',
+            text: entries
+              .map(
+                (entry) => `${entry.isDirectory ? '[DIR] ' : ''}${entry.name}`,
+              )
+              .join('\n'),
+          },
         },
         returnDisplay: {
           summary: displayMessage,
