@@ -5,7 +5,7 @@ exports[`Full Terminal Tool Confirmation Snapshot > renders tool confirmation bo
 ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
 
 ╭─────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ ? Edit                                                                                          │
+│ ? Edit packages/.../InputPrompt.tsx:   return kittyProtocolSupporte... =>   return kittyProto…  │
 │ ╭─────────────────────────────────────────────────────────────────────────────────────────────╮ │
 │ │ ... first 42 lines hidden (Ctrl+O to show) ...                                              │ │
 │ │ 43   const line43 = true;                                                                   │ │

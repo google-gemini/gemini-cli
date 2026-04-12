@@ -439,6 +439,16 @@ const SETTINGS_SCHEMA = {
     description: 'User interface settings.',
     showInDialog: false,
     properties: {
+      debugRainbow: {
+        type: 'boolean',
+        label: 'Debug Rainbow',
+        category: 'UI',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Enable debug rainbow rendering. Only useful for debugging rendering bugs and performance issues.',
+        showInDialog: false,
+      },
       theme: {
         type: 'string',
         label: 'Theme',
@@ -757,7 +767,7 @@ const SETTINGS_SCHEMA = {
         label: 'Terminal Buffer',
         category: 'UI',
         requiresRestart: true,
-        default: true,
+        default: false,
         description: 'Use the new terminal buffer architecture for rendering.',
         showInDialog: true,
       },
@@ -1907,7 +1917,8 @@ const SETTINGS_SCHEMA = {
         category: 'Advanced',
         requiresRestart: true,
         default: true,
-        description: 'Automatically configure Node.js memory limits',
+        description:
+          'Automatically configure Node.js memory limits. Note: Because memory is allocated during the initial process boot, this setting is only read from the global user settings file and ignores workspace-level overrides.',
         showInDialog: true,
       },
       dnsResolutionOrder: {

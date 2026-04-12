@@ -22,8 +22,7 @@ import { theme } from '../../semantic-colors.js';
 import { useConfig } from '../../contexts/ConfigContext.js';
 import { isShellTool } from './ToolShared.js';
 import {
-  shouldHideToolCall,
-  CoreToolCallStatus,
+  isVisibleInToolGroup,
   Kind,
   EDIT_DISPLAY_NAME,
   GLOB_DISPLAY_NAME,
@@ -35,9 +34,8 @@ import {
   WRITE_FILE_DISPLAY_NAME,
   READ_MANY_FILES_DISPLAY_NAME,
   isFileDiff,
-  isGrepResult,
-  isListResult,
 } from '@google/gemini-cli-core';
+import { buildToolVisibilityContextFromDisplay } from '../../utils/historyUtils.js';
 import { useUIState } from '../../contexts/UIStateContext.js';
 import { getToolGroupBorderAppearance } from '../../utils/borderStyles.js';
 import { useSettings } from '../../contexts/SettingsContext.js';
@@ -81,15 +79,6 @@ export const hasDensePayload = (tool: IndividualToolCallDisplay): boolean => {
   // TODO(24053): Usage of type guards makes this class too aware of internals
   if (isFileDiff(res)) return true;
   if (tool.confirmationDetails?.type === 'edit') return true;
-  if (isGrepResult(res) && res.matches.length > 0) return true;
-
-  // ReadManyFilesResult check (has 'include' and 'files')
-  if (isListResult(res) && 'include' in res) {
-    const includeProp = (res as { include?: unknown }).include;
-    if (Array.isArray(includeProp) && res.files.length > 0) {
-      return true;
-    }
-  }
 
   // Generic summary/payload pattern
   if (
@@ -136,40 +125,13 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   // Filter out tool calls that should be hidden (e.g. in-progress Ask User, or Plan Mode operations).
   const visibleToolCalls = useMemo(
     () =>
-      allToolCalls.filter((t) => {
-        // Hide internal errors unless full verbosity
-        if (
-          isLowErrorVerbosity &&
-          t.status === CoreToolCallStatus.Error &&
-          !t.isClientInitiated
-        ) {
-          return false;
-        }
-        // Standard hiding logic (e.g. Plan Mode internal edits)
-        if (
-          shouldHideToolCall({
-            displayName: t.name,
-            status: t.status,
-            approvalMode: t.approvalMode,
-            hasResultDisplay: !!t.resultDisplay,
-            parentCallId: t.parentCallId,
-          })
-        ) {
-          return false;
-        }
-
-        // We HIDE tools that are still in pre-execution states (Confirming, Pending)
-        // from the History log. They live in the Global Queue or wait for their turn.
-        // Only show tools that are actually running or finished.
-        const displayStatus = mapCoreStatusToDisplayStatus(t.status);
-
-        // We hide Confirming tools from the history log because they are
-        // currently being rendered in the interactive ToolConfirmationQueue.
-        // We show everything else, including Pending (waiting to run) and
-        // Canceled (rejected by user), to ensure the history is complete
-        // and to avoid tools "vanishing" after approval.
-        return displayStatus !== ToolCallStatus.Confirming;
-      }),
+      allToolCalls.filter((t) =>
+        // Use the unified visibility utility
+        isVisibleInToolGroup(
+          buildToolVisibilityContextFromDisplay(t),
+          isLowErrorVerbosity ? 'low' : 'full',
+        ),
+      ),
     [allToolCalls, isLowErrorVerbosity],
   );
 

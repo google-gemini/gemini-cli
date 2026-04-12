@@ -69,6 +69,7 @@ import {
   AppEvent,
   TransientMessageType,
 } from '../../utils/events.js';
+import '../../test-utils/customMatchers.js';
 
 vi.mock('../hooks/useShellHistory.js');
 vi.mock('../hooks/useCommandCompletion.js');
@@ -254,7 +255,7 @@ describe('InputPrompt', () => {
       setText: vi.fn(
         (newText: string, cursorPosition?: 'start' | 'end' | number) => {
           mockBuffer.text = newText;
-          mockBuffer.lines = [newText];
+          mockBuffer.lines = newText.split('\n');
           let col = 0;
           if (typeof cursorPosition === 'number') {
             col = cursorPosition;
@@ -264,11 +265,18 @@ describe('InputPrompt', () => {
             col = newText.length;
           }
           mockBuffer.cursor = [0, col];
-          mockBuffer.allVisualLines = [newText];
-          mockBuffer.viewportVisualLines = [newText];
-          mockBuffer.allVisualLines = [newText];
-          mockBuffer.visualToLogicalMap = [[0, 0]];
+          mockBuffer.allVisualLines = newText.split('\n');
+          mockBuffer.viewportVisualLines = newText.split('\n');
+          mockBuffer.visualToLogicalMap = newText
+            .split('\n')
+            .map((_, i) => [i, 0] as [number, number]);
           mockBuffer.visualCursor = [0, col];
+          mockBuffer.visualScrollRow = 0;
+          mockBuffer.viewportHeight = 10;
+          mockBuffer.visualToTransformedMap = newText
+            .split('\n')
+            .map((_, i) => i);
+          mockBuffer.transformationsByLine = newText.split('\n').map(() => []);
         },
       ),
       replaceRangeByOffset: vi.fn(),
@@ -276,6 +284,7 @@ describe('InputPrompt', () => {
       allVisualLines: [''],
       visualCursor: [0, 0],
       visualScrollRow: 0,
+      viewportHeight: 10,
       handleInput: vi.fn((key: Key) => {
         if (defaultKeyMatchers[Command.CLEAR_INPUT](key)) {
           if (mockBuffer.text.length > 0) {
@@ -409,6 +418,7 @@ describe('InputPrompt', () => {
         getTargetDir: () => path.join('test', 'project', 'src'),
         getVimMode: () => false,
         getUseBackgroundColor: () => true,
+        getUseTerminalBuffer: () => false,
         getTerminalBackground: () => undefined,
         getWorkspaceContext: () => ({
           getDirectories: () => ['/test/project/src'],
@@ -3779,11 +3789,7 @@ describe('InputPrompt', () => {
     );
 
     it('should unfocus embedded shell on click', async () => {
-      props.buffer.text = 'hello';
-      props.buffer.lines = ['hello'];
-      props.buffer.allVisualLines = ['hello'];
-      props.buffer.viewportVisualLines = ['hello'];
-      props.buffer.visualToLogicalMap = [[0, 0]];
+      props.buffer.setText('hello');
       props.isEmbeddedShellFocused = true;
 
       const { stdin, stdout, unmount } = await renderWithProviders(
@@ -4291,11 +4297,7 @@ describe('InputPrompt', () => {
   describe('IME Cursor Support', () => {
     it('should report correct cursor position for simple ASCII text', async () => {
       const text = 'hello';
-      mockBuffer.text = text;
-      mockBuffer.lines = [text];
-      mockBuffer.allVisualLines = [text];
-      mockBuffer.viewportVisualLines = [text];
-      mockBuffer.visualToLogicalMap = [[0, 0]];
+      mockBuffer.setText(text);
       mockBuffer.visualCursor = [0, 3]; // Cursor after 'hel'
       mockBuffer.visualScrollRow = 0;
 
@@ -4322,11 +4324,7 @@ describe('InputPrompt', () => {
 
     it('should report correct cursor position for text with double-width characters', async () => {
       const text = '👍hello';
-      mockBuffer.text = text;
-      mockBuffer.lines = [text];
-      mockBuffer.allVisualLines = [text];
-      mockBuffer.viewportVisualLines = [text];
-      mockBuffer.visualToLogicalMap = [[0, 0]];
+      mockBuffer.setText(text);
       mockBuffer.visualCursor = [0, 2]; // Cursor after '👍h' (Note: '👍' is one code point but width 2)
       mockBuffer.visualScrollRow = 0;
 
@@ -4352,11 +4350,7 @@ describe('InputPrompt', () => {
 
     it('should report correct cursor position for a line full of "😀" emojis', async () => {
       const text = '😀😀😀';
-      mockBuffer.text = text;
-      mockBuffer.lines = [text];
-      mockBuffer.allVisualLines = [text];
-      mockBuffer.viewportVisualLines = [text];
-      mockBuffer.visualToLogicalMap = [[0, 0]];
+      mockBuffer.setText(text);
       mockBuffer.visualCursor = [0, 2]; // Cursor after 2 emojis (each 1 code point, width 2)
       mockBuffer.visualScrollRow = 0;
 
@@ -4501,12 +4495,12 @@ describe('InputPrompt', () => {
       mockBuffer.lines = [logicalLine];
       mockBuffer.allVisualLines = [visualLine];
       mockBuffer.viewportVisualLines = [visualLine];
-      mockBuffer.allVisualLines = [visualLine];
       mockBuffer.visualToLogicalMap = [[0, 0]];
       mockBuffer.visualToTransformedMap = [0];
       mockBuffer.transformationsByLine = [transformations];
       mockBuffer.cursor = [0, cursorCol];
-      mockBuffer.visualCursor = [0, 0];
+      mockBuffer.visualCursor = [0, cursorCol];
+      mockBuffer.visualScrollRow = 0;
     };
 
     it('should snapshot collapsed image path', async () => {
@@ -5071,8 +5065,8 @@ describe('InputPrompt', () => {
         input: '\x12',
       },
       {
-        name: 'Ctrl+X hotkey is pressed',
-        input: '\x18',
+        name: 'Ctrl+G hotkey is pressed',
+        input: '\x07',
       },
       {
         name: 'F12 hotkey is pressed',
