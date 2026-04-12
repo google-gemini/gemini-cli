@@ -56,6 +56,24 @@ describe('fetchJson', () => {
     });
   });
 
+  it('should reject when there are too many redirects', async () => {
+    // Mock 11 consecutive 302 redirects
+    for (let i = 0; i < 11; i++) {
+      getMock.mockImplementationOnce((_url, _options, callback) => {
+        const res = new EventEmitter() as IncomingMessage;
+        res.statusCode = 302;
+        res.headers = { location: `https://example.com/redirect-${i + 1}` };
+        (callback as (res: IncomingMessage) => void)(res);
+        res.emit('end');
+        return new EventEmitter() as ClientRequest;
+      });
+    }
+
+    await expect(
+      fetchJson('https://example.com/start-redirect'),
+    ).rejects.toThrow('Too many redirects');
+  });
+
   it('should handle redirects (301 and 302)', async () => {
     // Test 302
     getMock.mockImplementationOnce((_url, _options, callback) => {
