@@ -25,6 +25,9 @@ export const ToolGroupDisplay: React.FC<ToolGroupDisplayProps> = ({
   item,
   isToolGroupBoundary,
 }) => {
+  const settings = useSettings();
+  const isCompactModeEnabled = settings.merged.ui?.compactToolOutput === true;
+
   if (item.type !== 'tool_display_group') {
     return null;
   }
@@ -32,23 +35,68 @@ export const ToolGroupDisplay: React.FC<ToolGroupDisplayProps> = ({
   const { tools, borderColor, borderDimColor, borderTop, borderBottom } =
     item as HistoryItemToolDisplayGroup;
 
+  const noticeTools = tools.filter((t) => t.format === 'notice');
+  const otherTools = tools.filter(
+    (t) => t.format !== 'notice' && t.format !== 'hidden',
+  );
+
+  const hasOtherTools = otherTools.length > 0;
+  const isClosingSlice = tools.length === 0 && borderBottom;
+
+  // Standard view behavior: If compact mode is enabled, non-notice tools
+  // are typically rendered without an outer box.
+  const shouldShowBox =
+    (hasOtherTools || isClosingSlice) && !isCompactModeEnabled;
+
+  const boxBorderTop = borderTop || noticeTools.length > 0;
+
   return (
-    <Box
-      flexDirection="column"
-      borderStyle="round"
-      borderColor={borderColor}
-      borderDimColor={borderDimColor}
-      borderTop={borderTop}
-      borderBottom={borderBottom}
-      borderLeft={!isToolGroupBoundary}
-      borderRight={!isToolGroupBoundary}
-      marginTop={borderTop ? 1 : 0}
-      marginBottom={borderBottom ? 1 : 0}
-      paddingX={1}
-    >
-      {tools.map((tool, index) => (
-        <ToolDisplayMessage key={index} tool={tool} />
-      ))}
+    <Box flexDirection="column">
+      {noticeTools.map((tool, index) => {
+        const isFirstInGroup = index === 0 && borderTop;
+        const isLastElementInGroup =
+          index === noticeTools.length - 1 && !shouldShowBox && borderBottom;
+
+        return (
+          <Box
+            key={`notice-${index}`}
+            marginTop={isFirstInGroup ? 1 : index > 0 ? 1 : 0}
+            marginBottom={isLastElementInGroup ? 1 : 0}
+          >
+            <ToolDisplayMessage tool={tool} />
+          </Box>
+        );
+      })}
+      {shouldShowBox ? (
+        <Box
+          flexDirection="column"
+          borderStyle="round"
+          borderColor={borderColor}
+          borderDimColor={borderDimColor}
+          borderTop={boxBorderTop}
+          borderBottom={borderBottom}
+          borderLeft={!isToolGroupBoundary}
+          borderRight={!isToolGroupBoundary}
+          marginTop={boxBorderTop ? 1 : 0}
+          marginBottom={borderBottom ? 1 : 0}
+          paddingX={1}
+        >
+          {otherTools.map((tool, index) => (
+            <ToolDisplayMessage key={`tool-${index}`} tool={tool} />
+          ))}
+        </Box>
+      ) : otherTools.length > 0 ? (
+        // Compact mode or no tools to box
+        <Box
+          flexDirection="column"
+          marginTop={noticeTools.length > 0 ? 1 : 0}
+          marginBottom={borderBottom ? 1 : 0}
+        >
+          {otherTools.map((tool, index) => (
+            <ToolDisplayMessage key={`tool-${index}`} tool={tool} />
+          ))}
+        </Box>
+      ) : null}
     </Box>
   );
 };
@@ -88,6 +136,21 @@ const ToolDisplayMessage: React.FC<ToolDisplayMessageProps> = ({ tool }) => {
 
   if (format === 'hidden') {
     return null;
+  }
+
+  if (format === 'notice') {
+    return (
+      <Box paddingLeft={2} flexDirection="column">
+        <Text color={theme.text.primary} bold wrap="truncate-end">
+          {name || 'Topic'}:
+        </Text>
+        {description && (
+          <Text color={theme.text.secondary} wrap="wrap">
+            {description}
+          </Text>
+        )}
+      </Box>
+    );
   }
 
   const isCompact =
@@ -153,7 +216,16 @@ const ToolResultDisplayContent: React.FC<ToolResultDisplayContentProps> = ({
 
   switch (content.type) {
     case 'text':
-      return <Text color={theme.text.secondary}>{content.text}</Text>;
+      return (
+        <Box flexDirection="column">
+          <Text color={theme.text.secondary}>{content.text}</Text>
+          {summary && (
+            <Box marginTop={1}>
+              <Text color={theme.text.secondary}>{summary}</Text>
+            </Box>
+          )}
+        </Box>
+      );
     case 'diff':
       // Simplified diff display for now
       return (

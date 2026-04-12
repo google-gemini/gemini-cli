@@ -77,6 +77,8 @@ export const useAgentStream = ({
     useStateAndRef<Set<string>>(new Set());
   const [_isFirstToolInGroup, isFirstToolInGroupRef, setIsFirstToolInGroup] =
     useStateAndRef<boolean>(true);
+  const [_hasEmittedBoxInTurn, hasEmittedBoxInTurnRef, setHasEmittedBoxInTurn] =
+    useStateAndRef<boolean>(false);
 
   const { startNewPrompt } = useSessionStats();
 
@@ -381,31 +383,26 @@ export const useAgentStream = ({
 
   // Push completed tools to history
   useEffect(() => {
-    const toolsToPush: IndividualToolCallDisplay[] = [];
-    for (let i = 0; i < trackedTools.length; i++) {
-      const tc = trackedTools[i];
-      if (pushedToolCallIdsRef.current.has(tc.callId)) continue;
+    if (trackedTools.length === 0) return;
 
-      if (
+    // We only push to history once all currently known tools in the turn are terminal.
+    // This allows ToolGroupDisplay to correctly hoist ALL notices (topics) for the turn.
+    const allTerminal = trackedTools.every(
+      (tc) =>
         tc.status === 'success' ||
         tc.status === 'error' ||
-        tc.status === 'cancelled'
-      ) {
-        toolsToPush.push(tc);
-      } else {
-        break;
-      }
-    }
+        tc.status === 'cancelled',
+    );
 
-    if (toolsToPush.length > 0) {
+    const toolsToPush = trackedTools.filter(
+      (tc) => !pushedToolCallIdsRef.current.has(tc.callId),
+    );
+
+    if (allTerminal && toolsToPush.length > 0) {
       const newPushed = new Set(pushedToolCallIdsRef.current);
       for (const tc of toolsToPush) {
         newPushed.add(tc.callId);
       }
-
-      const isLastInBatch =
-        toolsToPush[toolsToPush.length - 1] ===
-        trackedTools[trackedTools.length - 1];
 
       const appearance = getToolGroupBorderAppearance(
         { type: 'tool_group', tools: trackedTools },
@@ -414,6 +411,13 @@ export const useAgentStream = ({
         [],
         backgroundTasks,
       );
+
+      const hasBoxInBatch = toolsToPush.some(
+        (tc) => tc.display?.format !== 'notice',
+      );
+      const shouldStartNewBlock =
+        isFirstToolInGroupRef.current ||
+        (!hasEmittedBoxInTurnRef.current && hasBoxInBatch);
 
       const historyItem: HistoryItemToolDisplayGroup = {
         type: 'tool_display_group',
@@ -424,21 +428,27 @@ export const useAgentStream = ({
           status: tc.status,
           originalRequestName: tc.originalRequestName,
         })),
-        borderTop: isFirstToolInGroupRef.current,
-        borderBottom: isLastInBatch,
+        borderTop: shouldStartNewBlock,
+        borderBottom: true,
         ...appearance,
       };
 
       addItem(historyItem);
       setPushedToolCallIds(newPushed);
+
+      if (hasBoxInBatch) {
+        setHasEmittedBoxInTurn(true);
+      }
       setIsFirstToolInGroup(false);
     }
   }, [
     trackedTools,
     pushedToolCallIdsRef,
     isFirstToolInGroupRef,
+    hasEmittedBoxInTurnRef,
     setPushedToolCallIds,
     setIsFirstToolInGroup,
+    setHasEmittedBoxInTurn,
     addItem,
     activePtyId,
     isShellFocused,
@@ -447,7 +457,7 @@ export const useAgentStream = ({
 
   const pendingToolGroupItems = useMemo((): HistoryItemWithoutId[] => {
     const remainingTools = trackedTools.filter(
-      (tc) => !pushedToolCallIds.has(tc.callId),
+      (tc) => !pushedToolCallIdsRef.current.has(tc.callId),
     );
 
     const items: HistoryItemWithoutId[] = [];
@@ -461,6 +471,13 @@ export const useAgentStream = ({
     );
 
     if (remainingTools.length > 0) {
+      const hasBoxInPending = remainingTools.some(
+        (tc) => tc.display?.format !== 'notice',
+      );
+      const shouldStartNewBlock =
+        pushedToolCallIds.size === 0 ||
+        (!hasEmittedBoxInTurnRef.current && hasBoxInPending);
+
       items.push({
         type: 'tool_display_group',
         tools: remainingTools.map((tc) => ({
@@ -470,7 +487,7 @@ export const useAgentStream = ({
           status: tc.status,
           originalRequestName: tc.originalRequestName,
         })),
-        borderTop: pushedToolCallIds.size === 0,
+        borderTop: shouldStartNewBlock,
         borderBottom: false,
         ...appearance,
       });
@@ -510,6 +527,8 @@ export const useAgentStream = ({
   }, [
     trackedTools,
     pushedToolCallIds,
+    pushedToolCallIdsRef,
+    hasEmittedBoxInTurnRef,
     activePtyId,
     isShellFocused,
     backgroundTasks,
