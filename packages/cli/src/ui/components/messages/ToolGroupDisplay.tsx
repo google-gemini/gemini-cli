@@ -6,6 +6,7 @@
 
 import type React from 'react';
 import { Box, Text } from 'ink';
+import { CoreToolCallStatus } from '@google/gemini-cli-core';
 import type {
   HistoryItem,
   HistoryItemWithoutId,
@@ -35,13 +36,22 @@ export const ToolGroupDisplay: React.FC<ToolGroupDisplayProps> = ({
   const { tools, borderColor, borderDimColor, borderTop, borderBottom } =
     item as HistoryItemToolDisplayGroup;
 
-  const noticeTools = tools.filter((t) => t.format === 'notice');
-  const otherTools = tools.filter(
+  const visibleTools = tools.filter(
+    (t) => t.status !== CoreToolCallStatus.AwaitingApproval,
+  );
+
+  const noticeTools = visibleTools.filter((t) => t.format === 'notice');
+  const otherTools = visibleTools.filter(
     (t) => t.format !== 'notice' && t.format !== 'hidden',
   );
 
   const hasOtherTools = otherTools.length > 0;
   const isClosingSlice = tools.length === 0 && borderBottom;
+
+  // If no tools are visible and it's not an explicit closing slice, hide the group
+  if (visibleTools.length === 0 && !isClosingSlice) {
+    return null;
+  }
 
   // Standard view behavior: If compact mode is enabled, non-notice tools
   // are typically rendered without an outer box.
