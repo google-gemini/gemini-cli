@@ -92,7 +92,10 @@ export function getInstallationInfo(
     }
 
     // Check for Homebrew (macOS) or Linuxbrew (Linux/WSL)
-    if (process.platform === 'darwin' || process.platform === 'linux') {
+    if (
+      (process.platform === 'darwin' || process.platform === 'linux') &&
+      realPath.includes('Cellar')
+    ) {
       try {
         const brewPrefix = childProcess
           .execSync('brew --prefix gemini-cli', {
