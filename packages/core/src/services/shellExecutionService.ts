@@ -984,7 +984,13 @@ export class ShellExecutionService {
       }).result;
 
       let processingChain = Promise.resolve();
-      let decoder: TextDecoder | null = null;
+      // node-pty delivers data as JavaScript strings via onData().
+      // Buffer.from(data, 'utf-8') in the onData handler always produces
+      // UTF-8 bytes, regardless of the system code page. Pre-initializing
+      // the decoder to UTF-8 prevents getCachedEncodingForBuffer() from
+      // using the system code page (e.g. Shift-JIS on Japanese Windows)
+      // to decode what is already UTF-8 data. Fixes #12468.
+      const decoder = new TextDecoder('utf-8');
       let output: string | AnsiOutput | null = null;
       const sniffChunks: Buffer[] = [];
       let binaryBytesReceived = 0;
