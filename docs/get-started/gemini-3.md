@@ -60,7 +60,7 @@ or fallback to Gemini 2.5 Pro.
 > [!NOTE]
 > The **Keep trying** option uses exponential backoff, in which Gemini
 > CLI waits longer between each retry, when the system is busy. If the retry
-> doesn't happen immediately, please wait a few minutes for the request to
+> doesn't happen immediately, wait a few minutes for the request to
 > process.
 
 ### Model selection and routing types
