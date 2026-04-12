@@ -312,7 +312,7 @@ export class GeminiClient {
     this.updateTelemetryTokenCount();
     // Reset JIT context loaded paths so subdirectory context can be
     // re-discovered in the new session.
-    await this.config.getContextManager()?.refresh();
+    await this.config.getMemoryContextManager()?.refresh();
   }
 
   dispose() {
@@ -378,7 +378,7 @@ export class GeminiClient {
     try {
       const systemMemory = this.config.getSystemInstructionMemory();
       const systemInstruction = getCoreSystemPrompt(this.config, systemMemory);
-      return new GeminiChat(
+      const chat = new GeminiChat(
         this.config,
         systemInstruction,
         tools,
@@ -392,6 +392,8 @@ export class GeminiClient {
           return [{ functionDeclarations: toolDeclarations }];
         },
       );
+      await chat.initialize(resumedSessionData, 'main');
+      return chat;
     } catch (error) {
       await reportError(
         error,
@@ -1231,9 +1233,6 @@ export class GeminiClient {
    * Masks bulky tool outputs to save context window space.
    */
   private async tryMaskToolOutputs(history: readonly Content[]): Promise<void> {
-    if (!this.config.getToolOutputMaskingEnabled()) {
-      return;
-    }
     const result = await this.toolOutputMaskingService.mask(
       history,
       this.config,

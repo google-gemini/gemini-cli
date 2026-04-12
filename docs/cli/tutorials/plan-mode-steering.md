@@ -79,8 +79,8 @@ each step with higher confidence and fewer errors.
 - **Steer early:** Providing feedback during the research phase is more
   efficient than waiting for the final plan to be drafted.
 - **Use for context:** Steering is a great way to provide knowledge that might
-  not be obvious from reading the code (e.g., "We are planning to deprecate this
-  module next month").
+  not be obvious from reading the code (for example, "We are planning to
+  deprecate this module next month").
 
 ## Next steps
 

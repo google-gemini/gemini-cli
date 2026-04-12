@@ -108,7 +108,7 @@ Download complete.
 $ ./lit.lit.macos_arm64 pull gemma3-1b-gpu-custom
 
 [Legal] The model you are about to download is governed by
-the Gemma Terms of Use and Prohibited Use Policy. Please review these terms and ensure you agree before continuing.
+the Gemma Terms of Use and Prohibited Use Policy. Review these terms and ensure you agree before continuing.
 
 Full Terms: https://ai.google.dev/gemma/terms
 Prohibited Use Policy: https://ai.google.dev/gemma/prohibited_use_policy

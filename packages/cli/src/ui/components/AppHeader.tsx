@@ -59,13 +59,20 @@ const NARROW_TERMINAL_BREAKPOINT = 60;
 export const AppHeader = ({ version, showDetails = true }: AppHeaderProps) => {
   const settings = useSettings();
   const config = useConfig();
-  const { terminalWidth, bannerData, bannerVisible, updateInfo } = useUIState();
+  const {
+    terminalWidth,
+    bannerData,
+    bannerVisible,
+    updateInfo,
+    isConfigInitialized,
+    isAuthenticating,
+  } = useUIState();
 
   const { bannerText } = useBanner(bannerData);
   const { showTips } = useTips();
 
   const authType = config.getContentGeneratorConfig()?.authType;
-  const loggedOut = !authType;
+  const loggedOut = isConfigInitialized && !isAuthenticating && !authType;
 
   const showHeader = !(
     settings.merged.ui.hideBanner || config.getScreenReader()

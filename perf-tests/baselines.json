@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "updatedAt": "2026-04-09T02:30:22.000Z",
+  "scenarios": {
+    "cold-startup-time": {
+      "wallClockMs": 927.553249999999,
+      "cpuTotalUs": 1470,
+      "timestamp": "2026-04-08T22:27:54.871Z"
+    },
+    "idle-cpu-usage": {
+      "wallClockMs": 5000.460750000002,
+      "cpuTotalUs": 12157,
+      "timestamp": "2026-04-08T22:28:19.098Z"
+    },
+    "skill-loading-time": {
+      "wallClockMs": 930.0920409999962,
+      "cpuTotalUs": 1323,
+      "timestamp": "2026-04-08T22:28:23.290Z"
+    },
+    "high-volume-shell-output": {
+      "wallClockMs": 1119.9,
+      "cpuTotalUs": 2100,
+      "timestamp": "2026-04-09T02:30:22.000Z"
+    }
+  }
+}

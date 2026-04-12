@@ -23,6 +23,15 @@ export const BASE_SEATBELT_PROFILE = `(version 1)
 (allow signal (target same-sandbox))
 (allow process-info*)
 
+; Map system frameworks + dylibs for loader.
+(allow file-map-executable
+  (subpath "/System/Library/Frameworks")
+  (subpath "/System/Library/PrivateFrameworks")
+  (subpath "/usr/lib")
+  (subpath "/bin")
+  (subpath "/usr/bin")
+)
+
 (allow file-write-data
   (require-all
     (path "/dev/null")
@@ -86,14 +95,20 @@ export const BASE_SEATBELT_PROFILE = `(version 1)
 
 (allow mach-lookup
   (global-name "com.apple.sysmond")
+  (global-name "com.apple.system.opendirectoryd.libinfo")
+  (global-name "com.apple.system.opendirectoryd.membership")
+  (global-name "com.apple.system.logger")
+  (global-name "com.apple.system.notification_center")
+  (global-name "com.apple.logd")
+  (global-name "com.apple.secinitd")
+  (global-name "com.apple.trustd.agent")
+  (global-name "com.apple.trustd")
+  (global-name "com.apple.analyticsd")
+  (global-name "com.apple.analyticsd.messagetracer")
 )
 \n; IOKit
 (allow iokit-open
   (iokit-registry-entry-class "RootDomainUserClient")
-)
-
-(allow mach-lookup
-  (global-name "com.apple.system.opendirectoryd.libinfo")
 )
 
 ; Needed for python multiprocessing on MacOS for the SemLock
@@ -132,8 +147,17 @@ export const BASE_SEATBELT_PROFILE = `(version 1)
 (allow file-read* file-write*
   (literal "/dev/null")
   (literal "/dev/zero")
+  (literal "/dev/tty")
+  (subpath "/dev/fd")
   (subpath "/tmp")
   (subpath "/private/tmp")
+)
+
+(allow file-read-metadata
+  (literal "/")
+  (subpath "/var")
+  (subpath "/private/var")
+  (subpath "/dev")
 )
 
 `;

@@ -84,6 +84,7 @@ export class ToolExecutor {
       {
         operation: GeminiCliOperation.ToolCall,
         logPrompts: this.config.getTelemetryLogPromptsEnabled(),
+        sessionId: this.config.getSessionId(),
         attributes: {
           [GEN_AI_TOOL_NAME]: toolName,
           [GEN_AI_TOOL_CALL_ID]: callId,
@@ -197,7 +198,7 @@ export class ToolExecutor {
     call: ToolCall,
     content: PartListUnion,
   ): Promise<{ truncatedContent: PartListUnion; outputFile?: string }> {
-    if (this.config.isAutoDistillationEnabled()) {
+    if (this.config.isContextManagementEnabled()) {
       const distiller = new ToolOutputDistillationService(
         this.config,
         this.context.geminiClient,

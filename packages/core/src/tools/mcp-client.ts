@@ -812,7 +812,7 @@ type StatusChangeListener = (
   serverName: string,
   status: MCPServerStatus,
 ) => void;
-const statusChangeListeners: StatusChangeListener[] = [];
+const statusChangeListeners: Set<StatusChangeListener> = new Set();
 
 /**
  * Add a listener for MCP server status changes
@@ -820,7 +820,7 @@ const statusChangeListeners: StatusChangeListener[] = [];
 export function addMCPStatusChangeListener(
   listener: StatusChangeListener,
 ): void {
-  statusChangeListeners.push(listener);
+  statusChangeListeners.add(listener);
 }
 
 /**
@@ -829,10 +829,7 @@ export function addMCPStatusChangeListener(
 export function removeMCPStatusChangeListener(
   listener: StatusChangeListener,
 ): void {
-  const index = statusChangeListeners.indexOf(listener);
-  if (index !== -1) {
-    statusChangeListeners.splice(index, 1);
-  }
+  statusChangeListeners.delete(listener);
 }
 
 /**
@@ -1817,7 +1814,7 @@ export async function connectToMcpServer(
         await mcpClient.notification({
           method: 'notifications/roots/list_changed',
         });
-      } catch (_) {
+      } catch {
         // If this fails, its almost certainly because the connection was closed
         // and we should just stop listening for future directory changes.
         unlistenDirectories?.();
