@@ -6,7 +6,7 @@
 
 import { vi, describe, it, expect, beforeEach, type Mock } from 'vitest';
 import { EventEmitter } from 'node:events';
-import clipboardy from 'clipboardy';
+import * as clipboard from 'tinyclip';
 import {
   isAtCommand,
   isSlashCommand,
@@ -20,11 +20,9 @@ const ESC = '\u001B';
 const BEL = '\u0007';
 const ST = '\u001B\\';
 
-// Mock clipboardy
-vi.mock('clipboardy', () => ({
-  default: {
-    write: vi.fn(),
-  },
+// Mock tinyclip
+vi.mock('tinyclip', () => ({
+  writeText: vi.fn(),
 }));
 
 // Mock child_process
@@ -107,7 +105,7 @@ interface MockChildProcess extends EventEmitter {
 describe('commandUtils', () => {
   let mockSpawn: Mock;
   let mockChild: MockChildProcess;
-  let mockClipboardyWrite: Mock;
+  let mockClipboardWrite: Mock;
 
   beforeEach(async () => {
     vi.clearAllMocks();
@@ -135,8 +133,8 @@ describe('commandUtils', () => {
 
     mockSpawn.mockReturnValue(mockChild as unknown as ReturnType<typeof spawn>);
 
-    // Setup clipboardy mock
-    mockClipboardyWrite = clipboardy.write as Mock;
+    // Setup clipboard mock
+    mockClipboardWrite = clipboard.writeText as Mock;
 
     // default: /dev/tty creation succeeds and emits 'open'
     mockFs.createWriteStream.mockImplementation(() => {
@@ -235,9 +233,9 @@ describe('commandUtils', () => {
   });
 
   describe('copyToClipboard', () => {
-    it('uses clipboardy when not in SSH/tmux/screen/WSL (even if TTYs exist)', async () => {
+    it('uses tinyclip when not in SSH/tmux/screen/WSL (even if TTYs exist)', async () => {
       const testText = 'Hello, world!';
-      mockClipboardyWrite.mockResolvedValue(undefined);
+      mockClipboardWrite.mockResolvedValue(undefined);
 
       // even if stderr/stdout are TTY, without the env signals we fallback
       Object.defineProperty(process, 'stderr', {
@@ -251,7 +249,7 @@ describe('commandUtils', () => {
 
       await copyToClipboard(testText);
 
-      expect(mockClipboardyWrite).toHaveBeenCalledWith(testText);
+      expect(mockClipboardWrite).toHaveBeenCalledWith(testText);
     });
 
     it('writes OSC-52 to /dev/tty when in SSH', async () => {
@@ -272,7 +270,7 @@ describe('commandUtils', () => {
       expect(tty.write).toHaveBeenCalledTimes(1);
       expect(tty.write.mock.calls[0][0]).toBe(expected);
       expect(tty.end).toHaveBeenCalledTimes(1); // /dev/tty closed after write
-      expect(mockClipboardyWrite).not.toHaveBeenCalled();
+      expect(mockClipboardWrite).not.toHaveBeenCalled();
     });
 
     it('uses OSC-52 when useOSC52Copy setting is enabled', async () => {
@@ -295,7 +293,7 @@ describe('commandUtils', () => {
 
       expect(tty.write).toHaveBeenCalledTimes(1);
       expect(tty.write.mock.calls[0][0]).toBe(expected);
-      expect(mockClipboardyWrite).not.toHaveBeenCalled();
+      expect(mockClipboardWrite).not.toHaveBeenCalled();
     });
 
     it('wraps OSC-52 for tmux when in SSH', async () => {
@@ -317,7 +315,7 @@ describe('commandUtils', () => {
       expect(written.endsWith(ST)).toBe(true);
       // ESC bytes in payload are doubled
       expect(written).toContain(`${ESC}${ESC}]52;c;`);
-      expect(mockClipboardyWrite).not.toHaveBeenCalled();
+      expect(mockClipboardWrite).not.toHaveBeenCalled();
     });
 
     it('wraps OSC-52 for GNU screen with chunked DCS when in SSH', async () => {
@@ -342,7 +340,7 @@ describe('commandUtils', () => {
       expect(chunkStarts).toBeGreaterThan(1);
       expect(chunkStarts).toBe(chunkEnds);
       expect(written).toContain(']52;c;'); // contains base OSC-52 marker
-      expect(mockClipboardyWrite).not.toHaveBeenCalled();
+      expect(mockClipboardWrite).not.toHaveBeenCalled();
     });
 
     it('falls back to stderr when /dev/tty unavailable and stderr is a TTY', async () => {
@@ -368,12 +366,12 @@ describe('commandUtils', () => {
       const expected = `${ESC}]52;c;${b64}${BEL}`;
 
       expect(stderrStream.write).toHaveBeenCalledWith(expected);
-      expect(mockClipboardyWrite).not.toHaveBeenCalled();
+      expect(mockClipboardWrite).not.toHaveBeenCalled();
     });
 
-    it('falls back to clipboardy when no TTY is available', async () => {
+    it('falls back to tinyclip when no TTY is available', async () => {
       const testText = 'no-tty';
-      mockClipboardyWrite.mockResolvedValue(undefined);
+      mockClipboardWrite.mockResolvedValue(undefined);
 
       // /dev/tty throws or errors
       mockFs.createWriteStream.mockImplementation(() => {
@@ -384,7 +382,7 @@ describe('commandUtils', () => {
 
       await copyToClipboard(testText);
 
-      expect(mockClipboardyWrite).toHaveBeenCalledWith(testText);
+      expect(mockClipboardWrite).toHaveBeenCalledWith(testText);
     });
 
     it('resolves on drain when backpressure occurs', async () => {
@@ -416,12 +414,12 @@ describe('commandUtils', () => {
       }, 0);
 
       await expect(p).rejects.toThrow('tty error');
-      expect(mockClipboardyWrite).not.toHaveBeenCalled();
+      expect(mockClipboardWrite).not.toHaveBeenCalled();
     });
 
     it('does nothing for empty string', async () => {
       await copyToClipboard('');
-      expect(mockClipboardyWrite).not.toHaveBeenCalled();
+      expect(mockClipboardWrite).not.toHaveBeenCalled();
       // ensure no accidental writes to stdio either
       const stderrStream = process.stderr as unknown as { write: Mock };
       const stdoutStream = process.stdout as unknown as { write: Mock };
@@ -429,18 +427,18 @@ describe('commandUtils', () => {
       expect(stdoutStream.write).not.toHaveBeenCalled();
     });
 
-    it('uses clipboardy when not in eligible env even if /dev/tty exists', async () => {
+    it('uses tinyclip when not in eligible env even if /dev/tty exists', async () => {
       const tty = makeWritable({ isTTY: true });
       mockFs.createWriteStream.mockImplementation(() => {
         setTimeout(() => tty.emit('open'), 0);
         return tty;
       });
       const text = 'local-terminal';
-      mockClipboardyWrite.mockResolvedValue(undefined);
+      mockClipboardWrite.mockResolvedValue(undefined);
 
       await copyToClipboard(text);
 
-      expect(mockClipboardyWrite).toHaveBeenCalledWith(text);
+      expect(mockClipboardWrite).toHaveBeenCalledWith(text);
       expect(tty.write).not.toHaveBeenCalled();
       expect(tty.end).not.toHaveBeenCalled();
     });
@@ -456,28 +454,28 @@ describe('commandUtils', () => {
         return stream;
       });
 
-      // Fallback to clipboardy since stdio isn't configured as TTY in this test (default from beforeEach)
-      mockClipboardyWrite.mockResolvedValue(undefined);
+      // Fallback to tinyclip since stdio isn't configured as TTY in this test (default from beforeEach)
+      mockClipboardWrite.mockResolvedValue(undefined);
 
       await copyToClipboard(testText);
 
       expect(mockFs.createWriteStream).toHaveBeenCalled();
-      expect(mockClipboardyWrite).toHaveBeenCalledWith(testText);
+      expect(mockClipboardWrite).toHaveBeenCalledWith(testText);
     });
-    it('uses clipboardy in tmux when not in SSH/WSL', async () => {
+    it('uses tinyclip in tmux when not in SSH/WSL', async () => {
       const tty = makeWritable({ isTTY: true });
       mockFs.createWriteStream.mockImplementation(() => {
         setTimeout(() => tty.emit('open'), 0);
         return tty;
       });
       const text = 'tmux-local';
-      mockClipboardyWrite.mockResolvedValue(undefined);
+      mockClipboardWrite.mockResolvedValue(undefined);
 
       process.env['TMUX'] = '1';
 
       await copyToClipboard(text);
 
-      expect(mockClipboardyWrite).toHaveBeenCalledWith(text);
+      expect(mockClipboardWrite).toHaveBeenCalledWith(text);
       expect(tty.write).not.toHaveBeenCalled();
       expect(tty.end).not.toHaveBeenCalled();
     });
@@ -491,13 +489,13 @@ describe('commandUtils', () => {
         makeWritable({ isTTY: true }),
       );
 
-      mockClipboardyWrite.mockResolvedValue(undefined);
+      mockClipboardWrite.mockResolvedValue(undefined);
 
       // Should complete even though stream hangs
       await copyToClipboard(testText);
 
       expect(mockFs.createWriteStream).toHaveBeenCalled();
-      expect(mockClipboardyWrite).toHaveBeenCalledWith(testText);
+      expect(mockClipboardWrite).toHaveBeenCalledWith(testText);
     });
 
     it('skips /dev/tty on Windows and uses stderr fallback for OSC-52', async () => {
@@ -515,17 +513,17 @@ describe('commandUtils', () => {
 
       expect(mockFs.createWriteStream).not.toHaveBeenCalled();
       expect(stderrStream.write).toHaveBeenCalled();
-      expect(mockClipboardyWrite).not.toHaveBeenCalled();
+      expect(mockClipboardWrite).not.toHaveBeenCalled();
     });
 
-    it('uses clipboardy on native Windows without SSH/WSL', async () => {
+    it('uses tinyclip on native Windows without SSH/WSL', async () => {
       mockProcess.platform = 'win32';
-      mockClipboardyWrite.mockResolvedValue(undefined);
+      mockClipboardWrite.mockResolvedValue(undefined);
 
       await copyToClipboard('windows-native-test');
 
-      // Fallback to clipboardy and not /dev/tty
-      expect(mockClipboardyWrite).toHaveBeenCalledWith('windows-native-test');
+      // Fallback to tinyclip and not /dev/tty
+      expect(mockClipboardWrite).toHaveBeenCalledWith('windows-native-test');
       expect(mockFs.createWriteStream).not.toHaveBeenCalled();
     });
 
@@ -552,7 +550,7 @@ describe('commandUtils', () => {
 
       expect(stdoutStream.write).toHaveBeenCalledWith(expected);
       expect(stderrStream.write).not.toHaveBeenCalled();
-      expect(mockClipboardyWrite).not.toHaveBeenCalled();
+      expect(mockClipboardWrite).not.toHaveBeenCalled();
     });
 
     it('uses fs.writeSync on Windows when stdout has an fd (bypassing Ink)', async () => {
@@ -576,7 +574,7 @@ describe('commandUtils', () => {
 
       expect(mockFs.writeSync).toHaveBeenCalledWith(1, expected);
       expect(stdoutStream.write).not.toHaveBeenCalled();
-      expect(mockClipboardyWrite).not.toHaveBeenCalled();
+      expect(mockClipboardWrite).not.toHaveBeenCalled();
     });
 
     it('uses fs.writeSync on Windows when stderr has an fd and stdout is not a TTY', async () => {
@@ -605,7 +603,7 @@ describe('commandUtils', () => {
 
       expect(mockFs.writeSync).toHaveBeenCalledWith(2, expected);
       expect(stderrStream.write).not.toHaveBeenCalled();
-      expect(mockClipboardyWrite).not.toHaveBeenCalled();
+      expect(mockClipboardWrite).not.toHaveBeenCalled();
     });
   });
 

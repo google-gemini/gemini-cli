@@ -5,7 +5,7 @@
  */
 
 import { debugLogger } from '@google/gemini-cli-core';
-import clipboardy from 'clipboardy';
+import * as clipboard from 'tinyclip';
 import type { SlashCommand } from '../commands/types.js';
 import fs from 'node:fs';
 import type { Writable } from 'node:stream';
@@ -280,7 +280,7 @@ export const copyToClipboard = async (
   }
 
   // Local / non-TTY fallback
-  await clipboardy.write(text);
+  await clipboard.writeText(text);
 };
 
 export const getUrlOpenCommand = (): string => {

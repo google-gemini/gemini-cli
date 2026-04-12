@@ -51,7 +51,7 @@ import {
   useReverseSearchCompletion,
   type UseReverseSearchCompletionReturn,
 } from '../hooks/useReverseSearchCompletion.js';
-import clipboardy from 'clipboardy';
+import * as clipboard from 'tinyclip';
 import * as clipboardUtils from '../utils/clipboardUtils.js';
 import { useKittyKeyboardProtocol } from '../hooks/useKittyKeyboardProtocol.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
@@ -75,7 +75,7 @@ vi.mock('../hooks/useShellHistory.js');
 vi.mock('../hooks/useCommandCompletion.js');
 vi.mock('../hooks/useInputHistory.js');
 vi.mock('../hooks/useReverseSearchCompletion.js');
-vi.mock('clipboardy');
+vi.mock('tinyclip');
 vi.mock('../utils/clipboardUtils.js');
 vi.mock('../hooks/useKittyKeyboardProtocol.js');
 vi.mock('../utils/terminalUtils.js', () => ({
@@ -404,7 +404,7 @@ describe('InputPrompt', () => {
       checking: false,
     });
 
-    vi.mocked(clipboardy.read).mockResolvedValue('');
+    vi.mocked(clipboard.readText).mockResolvedValue('');
 
     props = {
       onQueueMessage: vi.fn(),
@@ -993,7 +993,7 @@ describe('InputPrompt', () => {
   describe('clipboard text paste', () => {
     it('should insert text from clipboard on Ctrl+V', async () => {
       vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(false);
-      vi.mocked(clipboardy.read).mockResolvedValue('pasted text');
+      vi.mocked(clipboard.readText).mockResolvedValue('pasted text');
       vi.mocked(mockBuffer.replaceRangeByOffset).mockClear();
 
       const { stdin, unmount } = await renderWithProviders(
@@ -1005,7 +1005,7 @@ describe('InputPrompt', () => {
       });
 
       await waitFor(() => {
-        expect(clipboardy.read).toHaveBeenCalled();
+        expect(clipboard.readText).toHaveBeenCalled();
         expect(mockBuffer.insert).toHaveBeenCalledWith(
           'pasted text',
           expect.objectContaining({ paste: true }),
@@ -1034,8 +1034,8 @@ describe('InputPrompt', () => {
       await waitFor(() => {
         expect(writeSpy).toHaveBeenCalledWith('\x1b]52;c;?\x07');
       });
-      // Should NOT call clipboardy.read()
-      expect(clipboardy.read).not.toHaveBeenCalled();
+      // Should NOT call clipboard.readText()
+      expect(clipboard.readText).not.toHaveBeenCalled();
       unmount();
     });
   });
@@ -2589,7 +2589,7 @@ describe('InputPrompt', () => {
     it('should handle large clipboard paste (lines > 5) by calling buffer.insert', async () => {
       vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(false);
       const largeText = '1\n2\n3\n4\n5\n6';
-      vi.mocked(clipboardy.read).mockResolvedValue(largeText);
+      vi.mocked(clipboard.readText).mockResolvedValue(largeText);
 
       const { stdin, unmount } = await renderWithProviders(
         <TestInputPrompt {...props} />,
@@ -2612,7 +2612,7 @@ describe('InputPrompt', () => {
     it('should handle large clipboard paste (chars > 500) by calling buffer.insert', async () => {
       vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(false);
       const largeText = 'a'.repeat(501);
-      vi.mocked(clipboardy.read).mockResolvedValue(largeText);
+      vi.mocked(clipboard.readText).mockResolvedValue(largeText);
 
       const { stdin, unmount } = await renderWithProviders(
         <TestInputPrompt {...props} />,
@@ -2635,7 +2635,7 @@ describe('InputPrompt', () => {
     it('should handle normal clipboard paste by calling buffer.insert', async () => {
       vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(false);
       const smallText = 'hello world';
-      vi.mocked(clipboardy.read).mockResolvedValue(smallText);
+      vi.mocked(clipboard.readText).mockResolvedValue(smallText);
 
       const { stdin, unmount } = await renderWithProviders(
         <TestInputPrompt {...props} />,
@@ -4607,7 +4607,7 @@ describe('InputPrompt', () => {
         expectHint: true,
       },
     ])('$name', async ({ text, method, expectHint }) => {
-      vi.mocked(clipboardy.read).mockResolvedValue(text);
+      vi.mocked(clipboard.readText).mockResolvedValue(text);
       vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(false);
 
       const emitSpy = vi.spyOn(appEvents, 'emit');
@@ -5048,7 +5048,7 @@ describe('InputPrompt', () => {
         input: '\x16',
         setupMocks: () => {
           vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(false);
-          vi.mocked(clipboardy.read).mockResolvedValue('clipboard text');
+          vi.mocked(clipboard.readText).mockResolvedValue('clipboard text');
         },
       },
       {
@@ -5057,7 +5057,7 @@ describe('InputPrompt', () => {
         mouseEventsEnabled: true,
         setupMocks: () => {
           vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(false);
-          vi.mocked(clipboardy.read).mockResolvedValue('clipboard text');
+          vi.mocked(clipboard.readText).mockResolvedValue('clipboard text');
         },
       },
       {
