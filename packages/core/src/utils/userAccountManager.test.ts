@@ -140,6 +140,60 @@ describe('UserAccountManager', () => {
         old: [],
       });
     });
+
+    it('should handle JSON array by starting fresh via zod validation', async () => {
+      fs.mkdirSync(path.dirname(accountsFile()), { recursive: true });
+      fs.writeFileSync(accountsFile(), JSON.stringify([1, 2, 3]));
+      const consoleLogSpy = vi
+        .spyOn(debugLogger, 'log')
+        .mockImplementation(() => {});
+
+      await userAccountManager.cacheGoogleAccount('test1@google.com');
+
+      expect(consoleLogSpy).toHaveBeenCalled();
+      expect(JSON.parse(fs.readFileSync(accountsFile(), 'utf-8'))).toEqual({
+        active: 'test1@google.com',
+        old: [],
+      });
+    });
+
+    it('should handle non-string active field via zod validation', async () => {
+      fs.mkdirSync(path.dirname(accountsFile()), { recursive: true });
+      fs.writeFileSync(
+        accountsFile(),
+        JSON.stringify({ active: 123, old: [] }),
+      );
+      const consoleLogSpy = vi
+        .spyOn(debugLogger, 'log')
+        .mockImplementation(() => {});
+
+      await userAccountManager.cacheGoogleAccount('test1@google.com');
+
+      expect(consoleLogSpy).toHaveBeenCalled();
+      expect(JSON.parse(fs.readFileSync(accountsFile(), 'utf-8'))).toEqual({
+        active: 'test1@google.com',
+        old: [],
+      });
+    });
+
+    it('should handle old array with non-string items via zod validation', async () => {
+      fs.mkdirSync(path.dirname(accountsFile()), { recursive: true });
+      fs.writeFileSync(
+        accountsFile(),
+        JSON.stringify({ active: null, old: [1, 2, 3] }),
+      );
+      const consoleLogSpy = vi
+        .spyOn(debugLogger, 'log')
+        .mockImplementation(() => {});
+
+      await userAccountManager.cacheGoogleAccount('test1@google.com');
+
+      expect(consoleLogSpy).toHaveBeenCalled();
+      expect(JSON.parse(fs.readFileSync(accountsFile(), 'utf-8'))).toEqual({
+        active: 'test1@google.com',
+        old: [],
+      });
+    });
   });
 
   describe('getCachedGoogleAccount', () => {
