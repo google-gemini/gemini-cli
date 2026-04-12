@@ -5,7 +5,7 @@
  */
 
 import { type ColorsTheme, Theme } from '../../theme.js';
-import { lightSemanticColors } from '../../semantic-tokens.js';
+import type { SemanticColors } from '../../semantic-tokens.js';
 
 const ansiLightColors: ColorsTheme = {
   type: 'light',
@@ -24,6 +24,43 @@ const ansiLightColors: ColorsTheme = {
   Gray: 'gray',
   DarkGray: 'gray',
   GradientColors: ['blue', 'green'],
+};
+
+// semantic colors derived from ansi color names instead of hex values
+const ansiLightSemanticColors: SemanticColors = {
+  text: {
+    primary: ansiLightColors.Foreground,
+    secondary: ansiLightColors.Gray,
+    link: ansiLightColors.AccentBlue,
+    accent: ansiLightColors.AccentPurple,
+    response: ansiLightColors.Foreground,
+  },
+  background: {
+    primary: ansiLightColors.Background,
+    message: ansiLightColors.Background,
+    input: ansiLightColors.Background,
+    focus: ansiLightColors.FocusBackground ?? ansiLightColors.Background,
+    diff: {
+      added: ansiLightColors.DiffAdded,
+      removed: ansiLightColors.DiffRemoved,
+    },
+  },
+  border: {
+    default: ansiLightColors.DarkGray,
+  },
+  ui: {
+    comment: ansiLightColors.Comment,
+    symbol: ansiLightColors.Gray,
+    active: ansiLightColors.AccentBlue,
+    dark: ansiLightColors.DarkGray,
+    focus: ansiLightColors.AccentGreen,
+    gradient: ansiLightColors.GradientColors,
+  },
+  status: {
+    error: ansiLightColors.AccentRed,
+    success: ansiLightColors.AccentGreen,
+    warning: ansiLightColors.AccentYellow,
+  },
 };
 
 export const ANSILight: Theme = new Theme(
@@ -147,5 +184,5 @@ export const ANSILight: Theme = new Theme(
     },
   },
   ansiLightColors,
-  lightSemanticColors,
+  ansiLightSemanticColors,
 );
