@@ -2030,6 +2030,7 @@ export const useGeminiStream = (
             signal,
           })
             .then((ackText) => {
+              if (signal?.aborted) return;
               addItem(
                 {
                   type: MessageType.INFO,
