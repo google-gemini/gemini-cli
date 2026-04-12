@@ -20,7 +20,7 @@ export function resolvePath(p: string): string {
       try {
       return path.normalize(expandedPath);
     } catch (err: any) {
-      if (err?.code === 'ENAMETOOLONG') {
+      if (err.code === 'ENAMETOOLONG') {
         return expandedPath;
       }
       throw err;
