@@ -260,6 +260,11 @@ export type HistoryItemToolGroup = HistoryItemBase & {
   borderDimColor?: boolean;
 };
 
+export type HistoryItemToolDisplayGroup = HistoryItemBase & {
+  type: 'tool_display_group';
+  tools: ToolDisplay[];
+};
+
 export type HistoryItemUserShell = HistoryItemBase & {
   type: 'user_shell';
   text: string;
@@ -393,6 +398,7 @@ export type HistoryItemWithoutId =
   | HistoryItemAbout
   | HistoryItemHelp
   | HistoryItemToolGroup
+  | HistoryItemToolDisplayGroup
   | HistoryItemStats
   | HistoryItemModelStats
   | HistoryItemToolStats

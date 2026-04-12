@@ -121,6 +121,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   isToolGroupBoundary,
 }) => {
   const settings = useSettings();
+
   const isLowErrorVerbosity = settings.merged.ui?.errorVerbosity !== 'full';
   const isCompactModeEnabled = settings.merged.ui?.compactToolOutput === true;
 

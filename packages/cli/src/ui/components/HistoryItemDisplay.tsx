@@ -208,6 +208,7 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
           isToolGroupBoundary={isToolGroupBoundary}
         />
       )}
+      {/* TODO: tool_group_display goes here  */}
       {itemForDisplay.type === 'subagent' && (
         <SubagentHistoryMessage
           item={itemForDisplay}
