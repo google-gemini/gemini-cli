@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import { Text, Box } from 'ink';
 import { useKeypress, type Key } from '../../hooks/useKeypress.js';
 import chalk from 'chalk';
@@ -22,6 +22,15 @@ export interface TextInputProps {
   onCancel?: () => void;
   focus?: boolean;
 }
+
+/**
+ * Guard window (ms) after a paste event during which Enter is treated as a
+ * newline rather than a submit.  This mirrors the protection in InputPrompt
+ * and prevents accidental auto-submission on terminals that deliver a trailing
+ * Return in the same data chunk as the bracketed-paste end sequence.  40 ms is
+ * well below human reaction time yet long enough to cover same-tick delivery.
+ */
+const PASTE_SUBMIT_GUARD_MS = 40;
 
 export function TextInput({
   buffer,
@@ -40,6 +49,12 @@ export function TextInput({
   } = buffer;
   const [cursorVisualRowAbsolute, cursorVisualColAbsolute] = visualCursor;
 
+  // Track recent paste events to prevent accidental auto-submission.
+  // Uses refs (not state) so the value is always current inside the
+  // keypress callback regardless of React's render cycle.
+  const recentPasteTimeRef = useRef<number | null>(null);
+  const pasteGuardTimerRef = useRef<NodeJS.Timeout | null>(null);
+
   const handleKeyPress = useCallback(
     (key: Key) => {
       if (key.name === 'escape' && onCancel) {
@@ -48,8 +63,31 @@ export function TextInput({
       }
 
       if (keyMatchers[Command.SUBMIT](key) && onSubmit) {
+        if (recentPasteTimeRef.current !== null) {
+          // A paste just occurred — treat this Enter as a newline to avoid
+          // submitting stale content from the pre-paste render closure.
+          handleInput({
+            ...key,
+            name: 'enter',
+            shift: true,
+            sequence: '\r',
+          });
+          return true;
+        }
         onSubmit(expandPastePlaceholders(text, buffer.pastedContent));
         return true;
+      }
+
+      // Record paste events so the SUBMIT guard above can detect them.
+      if (key.name === 'paste') {
+        recentPasteTimeRef.current = Date.now();
+        if (pasteGuardTimerRef.current) {
+          clearTimeout(pasteGuardTimerRef.current);
+        }
+        pasteGuardTimerRef.current = setTimeout(() => {
+          recentPasteTimeRef.current = null;
+          pasteGuardTimerRef.current = null;
+        }, PASTE_SUBMIT_GUARD_MS);
       }
 
       const handled = handleInput(key);
