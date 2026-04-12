@@ -1057,6 +1057,19 @@ describe('applyHiddenSlashCommands', () => {
     expect(result[0]?.hidden).toBe(true);
   });
 
+  it('should return the same object reference for already-hidden commands', () => {
+    const commands = [makeCommand('debug', { hidden: true })];
+    const result = applyHiddenSlashCommands(commands, ['debug']);
+    expect(result[0]).toBe(commands[0]);
+  });
+
+  it('should hide a command when an altName matches', () => {
+    const commands = [makeCommand('quit', { altNames: ['exit', 'q'] })];
+    const result = applyHiddenSlashCommands(commands, ['exit']);
+    expect(result[0]?.hidden).toBe(true);
+    expect(result[0]?.name).toBe('quit');
+  });
+
   it('should preserve original command properties', () => {
     const action = vi.fn();
     const commands = [

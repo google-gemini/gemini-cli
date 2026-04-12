@@ -85,9 +85,12 @@ export function applyHiddenSlashCommands(
     hiddenNames.map((name) => name.replace(/^\//, '').toLowerCase()),
   );
 
-  return commands.map((cmd) =>
-    hiddenSet.has(cmd.name.toLowerCase()) ? { ...cmd, hidden: true } : cmd,
-  );
+  return commands.map((cmd) => {
+    const isMatch = [cmd.name, ...(cmd.altNames ?? [])].some((name) =>
+      hiddenSet.has(name.toLowerCase()),
+    );
+    return isMatch && !cmd.hidden ? { ...cmd, hidden: true } : cmd;
+  });
 }
 
 interface SlashCommandProcessorActions {
