@@ -14,6 +14,7 @@ import { GeminiMessage } from './messages/GeminiMessage.js';
 import { InfoMessage } from './messages/InfoMessage.js';
 import { ErrorMessage } from './messages/ErrorMessage.js';
 import { ToolGroupMessage } from './messages/ToolGroupMessage.js';
+import { ToolGroupDisplay } from './messages/ToolGroupDisplay.js';
 import { GeminiMessageContent } from './messages/GeminiMessageContent.js';
 import { CompressionMessage } from './messages/CompressionMessage.js';
 import { WarningMessage } from './messages/WarningMessage.js';
@@ -208,7 +209,12 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
           isToolGroupBoundary={isToolGroupBoundary}
         />
       )}
-      {/* TODO: tool_group_display goes here  */}
+      {itemForDisplay.type === 'tool_display_group' && (
+        <ToolGroupDisplay
+          item={itemForDisplay}
+          isToolGroupBoundary={isToolGroupBoundary}
+        />
+      )}
       {itemForDisplay.type === 'subagent' && (
         <SubagentHistoryMessage
           item={itemForDisplay}

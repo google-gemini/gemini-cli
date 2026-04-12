@@ -26,7 +26,7 @@ import type {
   HistoryItemWithoutId,
   LoopDetectionConfirmationRequest,
   IndividualToolCallDisplay,
-  HistoryItemToolGroup,
+  HistoryItemToolDisplayGroup,
 } from '../types.js';
 import { StreamingState, MessageType } from '../types.js';
 import { findLastSafeSplitPoint } from '../utils/markdownUtilities.js';
@@ -415,9 +415,15 @@ export const useAgentStream = ({
         backgroundTasks,
       );
 
-      const historyItem: HistoryItemToolGroup = {
-        type: 'tool_group',
-        tools: toolsToPush,
+      const historyItem: HistoryItemToolDisplayGroup = {
+        type: 'tool_display_group',
+        tools: toolsToPush.map((tc) => ({
+          name: tc.name,
+          description: tc.description,
+          ...tc.display,
+          status: tc.status,
+          originalRequestName: tc.originalRequestName,
+        })),
         borderTop: isFirstToolInGroupRef.current,
         borderBottom: isLastInBatch,
         ...appearance,
@@ -456,8 +462,14 @@ export const useAgentStream = ({
 
     if (remainingTools.length > 0) {
       items.push({
-        type: 'tool_group',
-        tools: remainingTools,
+        type: 'tool_display_group',
+        tools: remainingTools.map((tc) => ({
+          name: tc.name,
+          description: tc.description,
+          ...tc.display,
+          status: tc.status,
+          originalRequestName: tc.originalRequestName,
+        })),
         borderTop: pushedToolCallIds.size === 0,
         borderBottom: false,
         ...appearance,
@@ -486,7 +498,7 @@ export const useAgentStream = ({
       (anyVisibleInHistory || anyVisibleInPending)
     ) {
       items.push({
-        type: 'tool_group' as const,
+        type: 'tool_display_group',
         tools: [],
         borderTop: false,
         borderBottom: true,

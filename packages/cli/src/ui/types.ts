@@ -260,9 +260,18 @@ export type HistoryItemToolGroup = HistoryItemBase & {
   borderDimColor?: boolean;
 };
 
+export type ToolDisplayItem = ToolDisplay & {
+  status: CoreToolCallStatus;
+  originalRequestName?: string;
+};
+
 export type HistoryItemToolDisplayGroup = HistoryItemBase & {
   type: 'tool_display_group';
-  tools: ToolDisplay[];
+  tools: ToolDisplayItem[];
+  borderTop?: boolean;
+  borderBottom?: boolean;
+  borderColor?: string;
+  borderDimColor?: boolean;
 };
 
 export type HistoryItemUserShell = HistoryItemBase & {

@@ -236,6 +236,7 @@ export function translateEvent(
           requestId: event.value.callId,
           name: event.value.name,
           args: event.value.args,
+          display: event.value.display,
         }),
       );
       break;
@@ -281,7 +282,6 @@ export function translateEvent(
       ((x: never) => {
         throw new Error(`Unhandled event type: ${JSON.stringify(x)}`);
       })(event);
-      break;
   }
 
   return out;

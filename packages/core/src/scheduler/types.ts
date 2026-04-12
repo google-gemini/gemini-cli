@@ -37,6 +37,8 @@ export interface ToolCallRequestInfo {
   callId: string;
   name: string;
   args: Record<string, unknown>;
+  /** Tool-controlled display information. */
+  display?: ToolDisplay;
   /**
    * The original name and arguments of the tool requested by the model.
    * This is used for tail calls to ensure the final response and log retains
