@@ -1892,6 +1892,12 @@ Logging in with Google... Restarting Gemini CLI to continue.
         }
       }
 
+      if (keyMatchers[Command.EXPORT_LOGS](key)) {
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
+        handleSlashCommand('/export-logs');
+        return true;
+      }
+
       if (keyMatchers[Command.SHOW_ERROR_DETAILS](key)) {
         if (settings.merged.general.devtools) {
           void (async () => {
