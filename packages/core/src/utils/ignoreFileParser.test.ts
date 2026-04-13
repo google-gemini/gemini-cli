@@ -75,6 +75,21 @@ describe('IgnoreFileParser', () => {
       expect(paths[0]).toBe(path.join(projectRoot, secondary));
       expect(paths[1]).toBe(path.join(projectRoot, primary));
     });
+
+    it('should not return directory paths from getIgnoreFilePaths()', async () => {
+      // When customIgnoreFilePaths contains entries like "node_modules/" the
+      // resolved path is a directory. Including it caused EISDIR when
+      // loadIgnoreRules() tried to readFileSync the directory, which silently
+      // broke @ file completion in the UI.
+      await fs.mkdir(path.join(projectRoot, 'node_modules'), {
+        recursive: true,
+      });
+
+      const parser = new IgnoreFileParser(projectRoot, ['node_modules/']);
+      const paths = parser.getIgnoreFilePaths();
+
+      expect(paths).toHaveLength(0);
+    });
   });
 
   describe('Direct Pattern Input (isPatterns = true)', () => {

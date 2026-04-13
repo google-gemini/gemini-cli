@@ -105,7 +105,16 @@ export class IgnoreFileParser implements IgnoreFileFilter {
       .slice()
       .reverse()
       .map((fileName) => path.join(this.projectRoot, fileName))
-      .filter((filePath) => fs.existsSync(filePath));
+      .filter((filePath) => {
+        try {
+          // Only return paths that are actual files, not directories.
+          // customIgnoreFilePaths entries like "node_modules/" resolve to a
+          // directory, causing EISDIR when later read as an ignore file.
+          return fs.existsSync(filePath) && fs.statSync(filePath).isFile();
+        } catch {
+          return false;
+        }
+      });
   }
 
   /**
