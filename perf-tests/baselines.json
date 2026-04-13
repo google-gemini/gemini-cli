@@ -18,7 +18,7 @@
       "timestamp": "2026-04-08T22:28:23.290Z"
     },
     "high-volume-shell-output": {
-       "wallClockMs": 1119.9,
+      "wallClockMs": 1119.9,
       "cpuTotalUs": 2100,
       "timestamp": "2026-04-09T02:30:22.000Z"
     },
