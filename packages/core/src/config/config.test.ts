@@ -304,6 +304,53 @@ describe('Server Config (config.ts)', () => {
     });
   });
 
+  describe('setShellExecutionConfig', () => {
+    it('should preserve existing shell execution fields that are not being updated', () => {
+      const config = new Config({
+        ...baseParams,
+        sandbox: {
+          enabled: true,
+          command: 'windows-native',
+          networkAccess: false,
+        },
+        shellBackgroundCompletionBehavior: 'notify',
+      });
+
+      expect(config.getShellExecutionConfig()).toEqual(
+        expect.objectContaining({
+          sandboxConfig: expect.objectContaining({
+            enabled: true,
+            command: 'windows-native',
+            networkAccess: false,
+          }),
+          backgroundCompletionBehavior: 'notify',
+        }),
+      );
+
+      config.setShellExecutionConfig({
+        terminalWidth: 123,
+        terminalHeight: 45,
+        showColor: true,
+        pager: 'cat',
+        sanitizationConfig: config.sanitizationConfig,
+        sandboxManager: config.sandboxManager,
+      });
+
+      expect(config.getShellExecutionConfig()).toEqual(
+        expect.objectContaining({
+          terminalWidth: 123,
+          terminalHeight: 45,
+          sandboxConfig: expect.objectContaining({
+            enabled: true,
+            command: 'windows-native',
+            networkAccess: false,
+          }),
+          backgroundCompletionBehavior: 'notify',
+        }),
+      );
+    });
+  });
+
   beforeEach(() => {
     // Reset mocks if necessary
     vi.clearAllMocks();

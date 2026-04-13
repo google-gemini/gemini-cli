@@ -248,6 +248,83 @@ a `key` combination.
 - `Double-click` on a paste placeholder (alternate buffer mode only): Expand to
   view full content inline. Double-click again to collapse.
 
+## Vi mode shortcuts
+
+When vim mode is enabled with `/vim` or `general.vimMode: true`, Gemini CLI
+supports NORMAL and INSERT modes.
+
+### Mode switching
+
+| Action                                       | Keys      |
+| -------------------------------------------- | --------- |
+| Enter NORMAL mode from INSERT mode           | `Esc`     |
+| Enter INSERT mode at the cursor              | `i`       |
+| Enter INSERT mode after the cursor           | `a`       |
+| Enter INSERT mode at the start of the line   | `I`       |
+| Enter INSERT mode at the end of the line     | `A`       |
+| Insert a new line below and switch to INSERT | `o`       |
+| Insert a new line above and switch to INSERT | `O`       |
+| Clear input in NORMAL mode                   | `Esc Esc` |
+
+### Navigation in NORMAL mode
+
+| Action                            | Keys            |
+| --------------------------------- | --------------- |
+| Move left                         | `h`             |
+| Move down                         | `j`             |
+| Move up                           | `k`             |
+| Move right                        | `l`             |
+| Move to start of line             | `0`             |
+| Move to first non-whitespace char | `^`             |
+| Move to end of line               | `$`             |
+| Move forward by word              | `w`             |
+| Move backward by word             | `b`             |
+| Move to end of word               | `e`             |
+| Move forward by WORD              | `W`             |
+| Move backward by WORD             | `B`             |
+| Move to end of WORD               | `E`             |
+| Go to first line                  | `gg`            |
+| Go to last line                   | `G`             |
+| Go to line N                      | `N G` or `N gg` |
+
+Counts are supported for navigation commands. For example, `5j` moves down five
+lines and `3w` moves forward three words.
+
+### Editing in NORMAL mode
+
+| Action                         | Keys  |
+| ------------------------------ | ----- |
+| Delete character under cursor  | `x`   |
+| Delete to end of line          | `D`   |
+| Delete line                    | `dd`  |
+| Change to end of line          | `C`   |
+| Change line                    | `cc`  |
+| Delete forward word            | `dw`  |
+| Delete backward word           | `db`  |
+| Delete to end of word          | `de`  |
+| Delete forward WORD            | `dW`  |
+| Delete backward WORD           | `dB`  |
+| Delete to end of WORD          | `dE`  |
+| Change forward word            | `cw`  |
+| Change backward word           | `cb`  |
+| Change to end of word          | `ce`  |
+| Change forward WORD            | `cW`  |
+| Change backward WORD           | `cB`  |
+| Change to end of WORD          | `cE`  |
+| Delete to start of line        | `d0`  |
+| Delete to first non-whitespace | `d^`  |
+| Change to start of line        | `c0`  |
+| Change to first non-whitespace | `c^`  |
+| Delete from first line to here | `dgg` |
+| Delete from here to last line  | `dG`  |
+| Change from first line to here | `cgg` |
+| Change from here to last line  | `cG`  |
+| Undo last change               | `u`   |
+| Repeat last command            | `.`   |
+
+Counts are also supported for editing commands. For example, `3dd` deletes three
+lines and `2cw` changes two words.
+
 ## Limitations
 
 - On [Windows Terminal](https://en.wikipedia.org/wiki/Windows_Terminal):
