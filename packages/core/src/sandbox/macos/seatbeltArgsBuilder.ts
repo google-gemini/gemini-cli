@@ -188,19 +188,17 @@ export function buildSeatbeltProfile(options: SeatbeltArgsOptions): string {
   if (resolvedPaths.gitWorktree) {
     const { worktreeGitDir, mainGitDir } = resolvedPaths.gitWorktree;
     if (worktreeGitDir) {
-      const isExplicitlyAllowed = resolvedPaths.policyWrite.some(
-        (p) => p === worktreeGitDir || worktreeGitDir.startsWith(p + path.sep),
-      );
-      if (!isExplicitlyAllowed) {
-        profile += `(deny file-write* (subpath "${escapeSchemeString(worktreeGitDir)}"))\n`;
+      const realWorktreeGitDir = resolveToRealPath(worktreeGitDir);
+      profile += `(deny file-write* (subpath "${escapeSchemeString(worktreeGitDir)}"))\n`;
+      if (realWorktreeGitDir !== worktreeGitDir) {
+        profile += `(deny file-write* (subpath "${escapeSchemeString(realWorktreeGitDir)}"))\n`;
       }
     }
     if (mainGitDir) {
-      const isExplicitlyAllowed = resolvedPaths.policyWrite.some(
-        (p) => p === mainGitDir || mainGitDir.startsWith(p + path.sep),
-      );
-      if (!isExplicitlyAllowed) {
-        profile += `(deny file-write* (subpath "${escapeSchemeString(mainGitDir)}"))\n`;
+      const realMainGitDir = resolveToRealPath(mainGitDir);
+      profile += `(deny file-write* (subpath "${escapeSchemeString(mainGitDir)}"))\n`;
+      if (realMainGitDir !== mainGitDir) {
+        profile += `(deny file-write* (subpath "${escapeSchemeString(realMainGitDir)}"))\n`;
       }
     }
   }
