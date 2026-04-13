@@ -18,8 +18,10 @@ export interface ContextProcessorDef<T = unknown> {
 export class ContextProcessorRegistry {
   private readonly processors = new Map<string, ContextProcessorDef>();
 
-  registerProcessor(def: ContextProcessorDef) {
-    this.processors.set(def.id, def);
+  registerProcessor<T>(def: ContextProcessorDef<T>) {
+    // Erasing the type.
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    this.processors.set(def.id, def as unknown as ContextProcessorDef<unknown>);
   }
 
   getSchema(id: string): object | undefined {

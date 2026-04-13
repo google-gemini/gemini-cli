@@ -5,6 +5,12 @@
  */
 import { randomUUID } from 'node:crypto';
 import type { JSONSchemaType } from 'ajv';
+import type { ProcessArgs, ContextProcessor } from '../pipeline.js';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
+import type { ConcreteNode, UserPrompt } from '../graph/types.js';
+import type { ContextEnvironment } from '../pipeline/environment.js';
+import { sanitizeFilenamePart } from '../../utils/fileUtils.js';
 
 export type BlobDegradationProcessorOptions = Record<string, never>;
 
@@ -14,12 +20,6 @@ export const BlobDegradationProcessorOptionsSchema: JSONSchemaType<BlobDegradati
     properties: {},
     required: [],
   };
-import type { ProcessArgs, ContextProcessor } from '../pipeline.js';
-import * as fs from 'node:fs/promises';
-import * as path from 'node:path';
-import type { ConcreteNode, UserPrompt } from '../graph/types.js';
-import type { ContextEnvironment } from '../pipeline/environment.js';
-import { sanitizeFilenamePart } from '../../utils/fileUtils.js';
 
 export function createBlobDegradationProcessor(
   id: string,

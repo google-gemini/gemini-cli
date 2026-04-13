@@ -9,7 +9,7 @@ import type { ContextProcessorRegistry } from './registry.js';
 export function getContextManagementConfigSchema(
   registry: ContextProcessorRegistry,
 ) {
-  // If a registry is provided, we can deeply validate processor overrides.
+  // We use a registry to deeply validate processor overrides.
   // We do this by generating a `oneOf` list that matches the `type` discriminator
   // to the specific processor `options` schema.
   const processorOptionSchemas = registry.getSchemaDefs().map((def) => ({
@@ -20,25 +20,6 @@ export function getContextManagementConfigSchema(
       options: def.schema,
     },
   }));
-
-  const processorOptionsMapping =
-    processorOptionSchemas.length > 0
-      ? { oneOf: processorOptionSchemas }
-      : {
-          type: 'object',
-          required: ['type', 'options'],
-          properties: {
-            type: {
-              type: 'string',
-              description:
-                'The registry type of the processor (e.g. NodeTruncation)',
-            },
-            options: {
-              type: 'object',
-              description: 'The hyperparameter overrides',
-            },
-          },
-        };
 
   return {
     $schema: 'http://json-schema.org/draft-07/schema#',
@@ -67,7 +48,7 @@ export function getContextManagementConfigSchema(
         type: 'object',
         description:
           'Named hyperparameter configurations for ContextProcessors and AsyncProcessors.',
-        additionalProperties: processorOptionsMapping,
+        additionalProperties: { oneOf: processorOptionSchemas },
       },
     },
   };

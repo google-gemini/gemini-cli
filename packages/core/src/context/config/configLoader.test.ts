@@ -12,6 +12,7 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import type { Config } from '../../config/config.js';
+import type { JSONSchemaType } from 'ajv';
 
 describe('SidecarLoader (Real FS)', () => {
   let tmpDir: string;
