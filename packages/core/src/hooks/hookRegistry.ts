@@ -73,7 +73,10 @@ export class HookRegistry {
       (entry) => entry.source === ConfigSource.Runtime,
     );
     this.entries = [...runtimeHooks];
-    this.processHooksFromConfig();
+
+    if (this.config.getEnableHooks()) {
+      this.processHooksFromConfig();
+    }
 
     debugLogger.debug(
       `Hook registry initialized with ${this.entries.length} hook entries`,

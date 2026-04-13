@@ -14,6 +14,7 @@ import { loadAgentsFromDirectory } from './agentLoader.js';
 import { CodebaseInvestigatorAgent } from './codebase-investigator.js';
 import { CliHelpAgent } from './cli-help-agent.js';
 import { GeneralistAgent } from './generalist-agent.js';
+import { DeepValidationAgent } from './deep-validation-agent.js';
 import { BrowserAgentDefinition } from './browser/browserAgentDefinition.js';
 import { MemoryManagerAgent } from './memory-manager-agent.js';
 import { A2AAuthProviderFactory } from './auth-provider/factory.js';
@@ -243,7 +244,7 @@ export class AgentRegistry {
 
     if (this.config.getDebugMode()) {
       debugLogger.log(
-        `[AgentRegistry] Loaded with ${this.agents.size} agents.`,
+        `[AgentRegistry] Loaded with ${this.getAllDefinitions().length} agents.`,
       );
     }
   }
@@ -252,6 +253,7 @@ export class AgentRegistry {
     this.registerLocalAgent(CodebaseInvestigatorAgent(this.config));
     this.registerLocalAgent(CliHelpAgent(this.config));
     this.registerLocalAgent(GeneralistAgent(this.config));
+    this.registerLocalAgent(DeepValidationAgent(this.config, '${originalPrompt}'));
 
     // Register the browser agent if enabled in settings.
     // Tools are configured dynamically at invocation time via browserAgentFactory.
@@ -669,7 +671,7 @@ export class AgentRegistry {
    * Returns all active agent definitions.
    */
   getAllDefinitions(): AgentDefinition[] {
-    return Array.from(this.agents.values());
+    return Array.from(this.agents.values()).filter((d) => !d.internal);
   }
 
   /**

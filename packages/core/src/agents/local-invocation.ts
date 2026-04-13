@@ -56,7 +56,7 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
    * @param messageBus Message bus for policy enforcement.
    */
   constructor(
-    private readonly definition: LocalAgentDefinition,
+    private readonly definition: LocalAgentDefinition<any>,
     private readonly context: AgentLoopContext,
     params: AgentInputs,
     messageBus: MessageBus,

@@ -70,7 +70,7 @@ describe('HookRegistry', () => {
     mockConfig = {
       storage: mockStorage,
       getExtensions: vi.fn().mockReturnValue([]),
-      getHooks: vi.fn().mockReturnValue({}),
+      getHooks: vi.fn(), getEnableHooks: vi.fn().mockReturnValue(true).mockReturnValue({}),
       getProjectHooks: vi.fn().mockReturnValue({}),
       getDisabledHooks: vi.fn().mockReturnValue([]),
       isTrustedFolder: vi.fn().mockReturnValue(true),

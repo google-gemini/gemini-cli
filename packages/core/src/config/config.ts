@@ -43,7 +43,15 @@ import { EnterPlanModeTool } from '../tools/enter-plan-mode.js';
 import { GeminiClient } from '../core/client.js';
 import { BaseLlmClient } from '../core/baseLlmClient.js';
 import { LocalLiteRtLmClient } from '../core/localLiteRtLmClient.js';
-import type { HookDefinition, HookEventName } from '../hooks/types.js';
+import {
+  type HookDefinition,
+  HookEventName,
+  HookType,
+  type AfterAgentInput,
+  type HookInput,
+} from '../hooks/types.js';
+import { DeepValidationAgent } from '../agents/deep-validation-agent.js';
+import { LocalSubagentInvocation } from '../agents/local-invocation.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { GitService } from '../services/gitService.js';
 import {
@@ -575,6 +583,7 @@ export interface ConfigParameters {
   toolSandboxing?: boolean;
   targetDir: string;
   debugMode: boolean;
+  deepValidation?: boolean;
   question?: string;
 
   coreTools?: string[];
@@ -740,6 +749,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly targetDir: string;
   private workspaceContext: WorkspaceContext;
   private readonly debugMode: boolean;
+  private readonly deepValidation: boolean;
   private readonly question: string | undefined;
   private readonly worktreeSettings: WorktreeSettings | undefined;
   readonly enableConseca: boolean;
@@ -1009,6 +1019,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.workspaceContext = new WorkspaceContext(this.targetDir, []);
     this.pendingIncludeDirectories = params.includeDirectories ?? [];
     this.debugMode = params.debugMode;
+    this.deepValidation = params.deepValidation ?? false;
     this.question = params.question;
     this.worktreeSettings = params.worktreeSettings;
 
@@ -1443,10 +1454,53 @@ export class Config implements McpContext, AgentLoopContext {
       }
     }
 
-    // Initialize hook system if enabled
-    if (this.getEnableHooks()) {
+    // Initialize hook system if enabled or if deepValidation is enabled
+    if (this.getEnableHooks() || this.deepValidation) {
       this.hookSystem = new HookSystem(this);
       await this.hookSystem.initialize();
+
+      // Register Deep Validation hook if enabled
+      if (this.deepValidation) {
+        this.hookSystem.registerHook(
+          {
+            type: HookType.Runtime,
+            name: 'deep-validation-hook',
+            action: async (input: HookInput) => {
+              const afterAgentInput = input as AfterAgentInput;
+              const invocation = new LocalSubagentInvocation(
+                DeepValidationAgent(this, afterAgentInput.prompt),
+                this,
+                { originalPrompt: afterAgentInput.prompt },
+                this.messageBus,
+              );
+
+              const result = await invocation.execute(new AbortController().signal);
+              const progress = result.returnDisplay as any;
+              const subagentResult = progress?.result;
+
+              let validationResult: { report: string; isSatisfied: boolean };
+              try {
+                validationResult = JSON.parse(subagentResult);
+              } catch {
+                validationResult = {
+                  report: subagentResult || 'Failed to parse validation report.',
+                  isSatisfied: false,
+                };
+              }
+
+              const satisfactionMessage = validationResult.isSatisfied
+                ? '✅ Deep validation satisfied.'
+                : '⚠️ Deep validation NOT satisfied.';
+
+              return {
+                continue: true,
+                systemMessage: `${satisfactionMessage}\n\n${validationResult.report}`,
+              };
+            },
+          },
+          HookEventName.AfterAgent,
+        );
+      }
     }
 
     if (this.experimentalJitContext) {
@@ -3508,7 +3562,7 @@ export class Config implements McpContext, AgentLoopContext {
     const discoveredNames = this.agentRegistry.getAllDiscoveredAgentNames();
     for (const agentName of discoveredNames) {
       const definition = this.agentRegistry.getDiscoveredDefinition(agentName);
-      if (!definition) {
+      if (!definition || definition.internal) {
         continue;
       }
       try {

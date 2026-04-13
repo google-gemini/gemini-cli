@@ -236,6 +236,16 @@ const SETTINGS_SCHEMA = {
         description: 'Enable DevTools inspector on launch.',
         showInDialog: false,
       },
+      deepValidation: {
+        type: 'boolean',
+        label: 'Deep Validation',
+        category: 'General',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Run a subagent after the main agent finishes to perform final validation.',
+        showInDialog: true,
+      },
       enableAutoUpdate: {
         type: 'boolean',
         label: 'Enable Auto Update',

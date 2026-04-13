@@ -193,6 +193,7 @@ export interface BaseAgentDefinition<
   displayName?: string;
   description: string;
   experimental?: boolean;
+  internal?: boolean;
   inputConfig: InputConfig;
   outputConfig?: OutputConfig<TOutput>;
   metadata?: {

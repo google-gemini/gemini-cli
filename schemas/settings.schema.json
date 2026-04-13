@@ -77,6 +77,13 @@
           "default": false,
           "type": "boolean"
         },
+        "deepValidation": {
+          "title": "Deep Validation",
+          "description": "Run a subagent after the main agent finishes to perform final validation.",
+          "markdownDescription": "Run a subagent after the main agent finishes to perform final validation. This subagent will reflect on the original prompt, review changes, and run tests to ensure satisfaction.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "enableAutoUpdate": {
           "title": "Enable Auto Update",
           "description": "Enable automatic updates.",

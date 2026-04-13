@@ -809,7 +809,7 @@ export class GeminiClient {
 
     // Update cumulative response in hook state
     // We do this immediately after the stream finishes for THIS turn.
-    const hooksEnabled = this.config.getEnableHooks();
+    const hooksEnabled = this.config.getHookSystem() !== undefined;
     if (hooksEnabled) {
       const responseText = turn.getResponseText() || '';
       const hookState = this.hookStateMap.get(prompt_id);
@@ -900,7 +900,7 @@ export class GeminiClient {
       this.config.resetTurn();
     }
 
-    const hooksEnabled = this.config.getEnableHooks();
+    const hooksEnabled = this.config.getHookSystem() !== undefined;
     const messageBus = this.context.messageBus;
 
     if (this.lastPromptId !== prompt_id) {
