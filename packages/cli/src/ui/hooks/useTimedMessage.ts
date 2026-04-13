@@ -12,19 +12,29 @@ import { useState, useCallback, useRef, useEffect } from 'react';
  */
 export function useTimedMessage<T>(durationMs: number) {
   const [message, setMessage] = useState<T | null>(null);
+  const messageRef = useRef<T | null>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const showMessage = useCallback(
     (msg: T | null) => {
-      setMessage(msg);
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
       }
       if (msg !== null) {
         timeoutRef.current = setTimeout(() => {
-          setMessage(null);
+          timeoutRef.current = null;
+          messageRef.current = null;
+          setMessage((prev) => (prev === null ? prev : null));
         }, durationMs);
       }
+
+      if (Object.is(messageRef.current, msg)) {
+        return;
+      }
+
+      messageRef.current = msg;
+      setMessage(msg);
     },
     [durationMs],
   );
@@ -33,6 +43,7 @@ export function useTimedMessage<T>(durationMs: number) {
     () => () => {
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
       }
     },
     [],
