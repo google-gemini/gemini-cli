@@ -156,10 +156,18 @@ export async function notifyViaTerminal(
       emitBellNotification();
     } else {
       // auto
-      if (TerminalCapabilityManager.getInstance().supportsOsc9Notifications()) {
+      const capabilityManager = TerminalCapabilityManager.getInstance();
+      if (capabilityManager.isITerm2()) {
         emitOsc9Notification(content);
-      } else {
+      } else if (
+        capabilityManager.isAlacritty() ||
+        capabilityManager.isAppleTerminal() ||
+        capabilityManager.isVSCodeTerminal() ||
+        capabilityManager.isWindowsTerminal()
+      ) {
         emitBellNotification();
+      } else {
+        emitOsc777Notification(content);
       }
     }
 

@@ -30,6 +30,10 @@ describe('terminal notifications', () => {
     vi.unstubAllEnvs();
     vi.stubEnv('TMUX', '');
     vi.stubEnv('STY', '');
+    vi.stubEnv('WT_SESSION', '');
+    vi.stubEnv('TERM_PROGRAM', '');
+    vi.stubEnv('TERM', '');
+    vi.stubEnv('ALACRITTY_WINDOW_ID', '');
   });
 
   afterEach(() => {
@@ -46,8 +50,7 @@ describe('terminal notifications', () => {
     expect(writeToStdout).not.toHaveBeenCalled();
   });
 
-  it('emits OSC 9 notification when supported terminal is detected', async () => {
-    vi.stubEnv('WT_SESSION', '');
+  it('emits OSC 9 notification when iTerm2 is detected', async () => {
     vi.stubEnv('TERM_PROGRAM', 'iTerm.app');
 
     const shown = await notifyViaTerminal(true, {
@@ -63,10 +66,7 @@ describe('terminal notifications', () => {
     expect(emitted.endsWith('\x07')).toBe(true);
   });
 
-  it('emits BEL fallback when OSC 9 is not supported', async () => {
-    vi.stubEnv('TERM_PROGRAM', '');
-    vi.stubEnv('TERM', '');
-
+  it('emits OSC 777 for unknown terminals', async () => {
     const shown = await notifyViaTerminal(true, {
       title: 'Title',
       subtitle: 'Subtitle',
@@ -74,12 +74,49 @@ describe('terminal notifications', () => {
     });
 
     expect(shown).toBe(true);
+    expect(writeToStdout).toHaveBeenCalledTimes(1);
+    const emitted = String(writeToStdout.mock.calls[0][0]);
+    expect(emitted.startsWith('\x1b]777;notify;')).toBe(true);
+  });
+
+  it('uses BEL when Windows Terminal is detected', async () => {
+    vi.stubEnv('WT_SESSION', '1');
+
+    const shown = await notifyViaTerminal(true, {
+      title: 'Title',
+      body: 'Body',
+    });
+
+    expect(shown).toBe(true);
     expect(writeToStdout).toHaveBeenCalledWith('\x07');
   });
 
-  it('uses BEL fallback when WT_SESSION is set', async () => {
-    vi.stubEnv('WT_SESSION', '1');
-    vi.stubEnv('TERM_PROGRAM', 'WezTerm');
+  it('uses BEL when Alacritty is detected', async () => {
+    vi.stubEnv('ALACRITTY_WINDOW_ID', '1');
+
+    const shown = await notifyViaTerminal(true, {
+      title: 'Title',
+      body: 'Body',
+    });
+
+    expect(shown).toBe(true);
+    expect(writeToStdout).toHaveBeenCalledWith('\x07');
+  });
+
+  it('uses BEL when Apple Terminal is detected', async () => {
+    vi.stubEnv('TERM_PROGRAM', 'Apple_Terminal');
+
+    const shown = await notifyViaTerminal(true, {
+      title: 'Title',
+      body: 'Body',
+    });
+
+    expect(shown).toBe(true);
+    expect(writeToStdout).toHaveBeenCalledWith('\x07');
+  });
+
+  it('uses BEL when VSCode Terminal is detected', async () => {
+    vi.stubEnv('TERM_PROGRAM', 'vscode');
 
     const shown = await notifyViaTerminal(true, {
       title: 'Title',
@@ -105,7 +142,6 @@ describe('terminal notifications', () => {
   });
 
   it('strips terminal control sequences and newlines from payload text', async () => {
-    vi.stubEnv('WT_SESSION', '');
     vi.stubEnv('TERM_PROGRAM', 'iTerm.app');
 
     const shown = await notifyViaTerminal(true, {
@@ -142,9 +178,8 @@ describe('terminal notifications', () => {
   });
 
   it('emits OSC 9 notification when method is explicitly set to osc9', async () => {
-    // Explicitly set terminal to something that would normally fallback to BEL
-    vi.stubEnv('TERM_PROGRAM', '');
-    vi.stubEnv('TERM', '');
+    // Explicitly set terminal to something that would normally use BEL
+    vi.stubEnv('WT_SESSION', '1');
 
     const shown = await notifyViaTerminal(
       true,
@@ -164,6 +199,8 @@ describe('terminal notifications', () => {
   });
 
   it('emits OSC 777 notification when method is explicitly set to osc777', async () => {
+    // Explicitly set terminal to something that would normally use BEL
+    vi.stubEnv('WT_SESSION', '1');
     const shown = await notifyViaTerminal(
       true,
       {
@@ -183,7 +220,6 @@ describe('terminal notifications', () => {
 
   it('emits BEL notification when method is explicitly set to bell', async () => {
     // Explicitly set terminal to something that supports OSC 9
-    vi.stubEnv('WT_SESSION', '');
     vi.stubEnv('TERM_PROGRAM', 'iTerm.app');
 
     const shown = await notifyViaTerminal(
@@ -231,7 +267,6 @@ describe('terminal notifications', () => {
 
   it('wraps OSC sequence in tmux passthrough when TMUX env var is set', async () => {
     vi.stubEnv('TMUX', '1');
-    vi.stubEnv('WT_SESSION', '');
     vi.stubEnv('TERM_PROGRAM', 'iTerm.app');
 
     const shown = await notifyViaTerminal(true, {
@@ -248,7 +283,6 @@ describe('terminal notifications', () => {
 
   it('wraps OSC sequence in GNU screen passthrough when STY env var is set', async () => {
     vi.stubEnv('STY', '1');
-    vi.stubEnv('WT_SESSION', '');
     vi.stubEnv('TERM_PROGRAM', 'iTerm.app');
 
     const shown = await notifyViaTerminal(true, {
