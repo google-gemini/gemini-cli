@@ -89,7 +89,7 @@ describe('run_shell_command streaming to file regression', () => {
             return { p, size: 'error' };
           }
         });
-        console.error('Available files:', JSON.stringify(fileStats, null, 2));
+        rig.log('Available files:', JSON.stringify(fileStats, null, 2));
       }
     }
 
@@ -178,7 +178,7 @@ describe('run_shell_command streaming to file regression', () => {
             return { p, size: 'error' };
           }
         });
-        console.error('Available files:', JSON.stringify(fileStats, null, 2));
+        rig.log('Available files:', JSON.stringify(fileStats, null, 2));
       }
     }
 
