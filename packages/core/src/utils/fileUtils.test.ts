@@ -286,6 +286,35 @@ describe('fileUtils', () => {
       }
       expect(await isBinaryFile(filePathForBinaryTest)).toBe(false);
     });
+
+    it('should return false for a source file containing literal U+FFFD (replacement character)', async () => {
+      // U+FFFD is a valid Unicode codepoint that legitimately appears in source
+      // files (for example Rust code declaring a UNICODE_REPLACEMENT_CHAR
+      // constant). Its UTF-8 encoding is EF BF BD; the binary detector must
+      // not treat these bytes as evidence of a binary file. Regression guard
+      // for issue #24547.
+      const content =
+        '// Rust-style source\npub const UNICODE_REPLACEMENT_CHAR: char = \'\uFFFD\';\nlet s = "\uFFFD\uFFFD\uFFFD";\n';
+      actualNodeFs.writeFileSync(filePathForBinaryTest, content, 'utf8');
+      expect(await isBinaryFile(filePathForBinaryTest)).toBe(false);
+    });
+
+    it('should return false for a file with mixed CJK, emoji, and U+FFFD content', async () => {
+      // Valid UTF-8 multibyte sequences (2/3/4-byte) must not trip the binary
+      // heuristic. This exercises 3-byte (CJK, U+FFFD) and 4-byte (emoji via
+      // surrogate pair) sequences together.
+      const content = '\uFFFD\uFFFD hello \u4e16\u754c \uD83D\uDE00\n';
+      actualNodeFs.writeFileSync(filePathForBinaryTest, content, 'utf8');
+      expect(await isBinaryFile(filePathForBinaryTest)).toBe(false);
+    });
+
+    it('should return true for a file with dense invalid UTF-8 byte sequences', async () => {
+      // Raw high bytes that do not form valid UTF-8 continuation sequences
+      // should still be detected as binary.
+      const binaryContent = Buffer.alloc(128, 0x80);
+      actualNodeFs.writeFileSync(filePathForBinaryTest, binaryContent);
+      expect(await isBinaryFile(filePathForBinaryTest)).toBe(true);
+    });
   });
 
   describe('BOM detection and encoding', () => {
