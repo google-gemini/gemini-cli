@@ -9,26 +9,17 @@ import { toIr } from './toIr.js';
 import { fromIr } from './fromIr.js';
 import type { ContextTokenCalculator } from '../utils/contextTokenCalculator.js';
 import type { IrNodeBehaviorRegistry } from './behaviorRegistry.js';
-import type { IIdGenerator } from '../system/IIdGenerator.js';
 
 export class IrMapper {
   private readonly nodeIdentityMap = new WeakMap<object, string>();
 
-  constructor(
-    private readonly registry: IrNodeBehaviorRegistry,
-    private readonly idGenerator: IIdGenerator,
-  ) {}
+  constructor(private readonly registry: IrNodeBehaviorRegistry) {}
 
   toIr(
     history: readonly Content[],
     tokenCalculator: ContextTokenCalculator,
   ): Episode[] {
-    return toIr(
-      history,
-      tokenCalculator,
-      this.nodeIdentityMap,
-      this.idGenerator,
-    );
+    return toIr(history, tokenCalculator, this.nodeIdentityMap);
   }
 
   fromIr(nodes: readonly ConcreteNode[]): Content[] {

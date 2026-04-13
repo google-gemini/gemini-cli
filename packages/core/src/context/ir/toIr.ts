@@ -14,17 +14,16 @@ import type {
   UserPrompt,
 } from './types.js';
 import type { ContextTokenCalculator } from '../utils/contextTokenCalculator.js';
-import type { IIdGenerator } from '../system/IIdGenerator.js';
+import { randomUUID } from 'node:crypto';
 
 // We remove the global nodeIdentityMap and instead rely on one passed from IrMapper
 export function getStableId(
   obj: object,
   nodeIdentityMap: WeakMap<object, string>,
-  idGenerator: IIdGenerator,
 ): string {
   let id = nodeIdentityMap.get(obj);
   if (!id) {
-    id = idGenerator.generateId();
+    id = randomUUID();
     nodeIdentityMap.set(obj, id);
   }
   return id;
@@ -47,7 +46,6 @@ export function toIr(
   history: readonly Content[],
   tokenCalculator: ContextTokenCalculator,
   nodeIdentityMap: WeakMap<object, string>,
-  idGenerator: IIdGenerator,
 ): Episode[] {
   const episodes: Episode[] = [];
   let currentEpisode: Partial<Episode> | null = null;
@@ -76,13 +74,12 @@ export function toIr(
           pendingCallParts,
           tokenCalculator,
           nodeIdentityMap,
-          idGenerator,
         );
       }
 
       if (hasUserParts) {
         finalizeEpisode();
-        currentEpisode = parseUserParts(msg, nodeIdentityMap, idGenerator);
+        currentEpisode = parseUserParts(msg, nodeIdentityMap);
       }
     } else if (msg.role === 'model') {
       currentEpisode = parseModelParts(
@@ -90,13 +87,12 @@ export function toIr(
         currentEpisode,
         pendingCallParts,
         nodeIdentityMap,
-        idGenerator,
       );
     }
   }
 
   if (currentEpisode) {
-    finalizeYield(currentEpisode, idGenerator);
+    finalizeYield(currentEpisode);
     finalizeEpisode();
   }
 
@@ -109,11 +105,10 @@ function parseToolResponses(
   pendingCallParts: Map<string, Part>,
   tokenCalculator: ContextTokenCalculator,
   nodeIdentityMap: WeakMap<object, string>,
-  idGenerator: IIdGenerator,
 ): Partial<Episode> {
   if (!currentEpisode) {
     currentEpisode = {
-      id: getStableId(msg, nodeIdentityMap, idGenerator),
+      id: getStableId(msg, nodeIdentityMap),
       timestamp: Date.now(),
       concreteNodes: [],
     };
@@ -131,7 +126,7 @@ function parseToolResponses(
       const obsTokens = tokenCalculator.estimateTokensForParts([part]);
 
       const step: ToolExecution = {
-        id: getStableId(part, nodeIdentityMap, idGenerator),
+        id: getStableId(part, nodeIdentityMap),
         type: 'TOOL_EXECUTION',
         toolName: part.functionResponse.name || 'unknown',
         intent: isRecord(matchingCall?.functionCall?.args)
@@ -158,7 +153,6 @@ function parseToolResponses(
 function parseUserParts(
   msg: Content,
   nodeIdentityMap: WeakMap<object, string>,
-  idGenerator: IIdGenerator,
 ): Partial<Episode> {
   const semanticParts: SemanticPart[] = [];
   const parts = msg.parts || [];
@@ -183,12 +177,12 @@ function parseUserParts(
 
   const baseObj = parts.length > 0 ? parts[0] : msg;
   const trigger: UserPrompt = {
-    id: getStableId(baseObj, nodeIdentityMap, idGenerator),
+    id: getStableId(baseObj, nodeIdentityMap),
     type: 'USER_PROMPT',
     semanticParts,
   };
   return {
-    id: getStableId(msg, nodeIdentityMap, idGenerator),
+    id: getStableId(msg, nodeIdentityMap),
     timestamp: Date.now(),
     concreteNodes: [trigger],
   };
@@ -199,11 +193,10 @@ function parseModelParts(
   currentEpisode: Partial<Episode> | null,
   pendingCallParts: Map<string, Part>,
   nodeIdentityMap: WeakMap<object, string>,
-  idGenerator: IIdGenerator,
 ): Partial<Episode> {
   if (!currentEpisode) {
     currentEpisode = {
-      id: getStableId(msg, nodeIdentityMap, idGenerator),
+      id: getStableId(msg, nodeIdentityMap),
       timestamp: Date.now(),
       concreteNodes: [],
     };
@@ -216,7 +209,7 @@ function parseModelParts(
       if (callId) pendingCallParts.set(callId, part);
     } else if (part.text) {
       const thought: AgentThought = {
-        id: getStableId(part, nodeIdentityMap, idGenerator),
+        id: getStableId(part, nodeIdentityMap),
         type: 'AGENT_THOUGHT',
         text: part.text,
       };
@@ -230,13 +223,10 @@ function parseModelParts(
   return currentEpisode;
 }
 
-function finalizeYield(
-  currentEpisode: Partial<Episode>,
-  idGenerator: IIdGenerator,
-) {
+function finalizeYield(currentEpisode: Partial<Episode>) {
   if (currentEpisode.concreteNodes && currentEpisode.concreteNodes.length > 0) {
     const yieldNode: AgentYield = {
-      id: idGenerator.generateId(),
+      id: randomUUID(),
       type: 'AGENT_YIELD',
       text: 'Yield', // Synthesized yield since we don't have the original concrete node
     };

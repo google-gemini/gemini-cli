@@ -3,6 +3,12 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+import { randomUUID } from 'node:crypto';
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import type {
   ContextProcessor,
   ProcessArgs,
@@ -103,7 +109,7 @@ export function createRollingSummaryProcessor(
       try {
         // Synthesize the rolling summary synchronously
         const snapshotText = await generateRollingSummary(nodesToSummarize);
-        const newId = env.idGenerator.generateId();
+        const newId = randomUUID();
 
         const summaryNode: RollingSummary = {
           id: newId,

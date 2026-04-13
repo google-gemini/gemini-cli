@@ -3,6 +3,12 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+import { randomUUID } from 'node:crypto';
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import type { AsyncContextProcessor, ProcessArgs } from '../pipeline.js';
 import type { ContextEnvironment } from '../pipeline/environment.js';
 import type { ConcreteNode } from '../ir/types.js';
@@ -59,7 +65,7 @@ export function createStateSnapshotAsyncProcessor(
 
             // Prepend a synthetic node representing the previous rolling state
             const previousStateNode: ConcreteNode = {
-              id: env.idGenerator.generateId(),
+              id: randomUUID(),
               logicalParentId: '',
               type: 'SNAPSHOT',
               timestamp: latest.timestamp,
@@ -81,15 +87,11 @@ export function createStateSnapshotAsyncProcessor(
         ];
 
         // In V2, async pipelines communicate their work to the inbox, and the processor picks it up.
-        env.inbox.publish(
-          'PROPOSED_SNAPSHOT',
-          {
-            newText: snapshotText,
-            consumedIds: newConsumedIds,
-            type: processorType,
-          },
-          env.idGenerator,
-        );
+        env.inbox.publish('PROPOSED_SNAPSHOT', {
+          newText: snapshotText,
+          consumedIds: newConsumedIds,
+          type: processorType,
+        });
       } catch (e) {
         debugLogger.error(
           'StateSnapshotAsyncProcessor failed to generate snapshot',

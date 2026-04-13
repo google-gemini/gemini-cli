@@ -5,15 +5,13 @@
  */
 import { describe, it, expect } from 'vitest';
 import { LiveInbox, InboxSnapshotImpl } from './inbox.js';
-import { DeterministicIdGenerator } from '../system/DeterministicIdGenerator.js';
 
 describe('Inbox', () => {
   it('should publish messages and provide snapshots', () => {
     const inbox = new LiveInbox();
-    const idGenerator = new DeterministicIdGenerator('mock-uuid-');
 
-    inbox.publish('test-topic', { data: 'hello' }, idGenerator);
-    inbox.publish('other-topic', { data: 'world' }, idGenerator);
+    inbox.publish('test-topic', { data: 'hello' });
+    inbox.publish('other-topic', { data: 'world' });
 
     const messages = inbox.getMessages();
     expect(messages.length).toBe(2);
@@ -23,10 +21,9 @@ describe('Inbox', () => {
 
   it('should drain consumed messages from the snapshot', () => {
     const inbox = new LiveInbox();
-    const idGenerator = new DeterministicIdGenerator('mock-uuid-');
 
-    inbox.publish('test-topic', { data: 'hello' }, idGenerator);
-    inbox.publish('other-topic', { data: 'world' }, idGenerator);
+    inbox.publish('test-topic', { data: 'hello' });
+    inbox.publish('other-topic', { data: 'world' });
 
     const messages = inbox.getMessages();
     const snapshot = new InboxSnapshotImpl(messages);

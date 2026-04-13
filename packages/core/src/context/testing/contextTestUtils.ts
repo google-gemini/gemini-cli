@@ -7,8 +7,6 @@
 import { vi } from 'vitest';
 import { AgentChatHistory } from '../../core/agentChatHistory.js';
 import { ContextManager } from '../contextManager.js';
-import { InMemoryFileSystem } from '../system/InMemoryFileSystem.js';
-import { DeterministicIdGenerator } from '../system/DeterministicIdGenerator.js';
 import { randomUUID } from 'node:crypto';
 import { ContextTracer } from '../tracer.js';
 import { ContextEnvironmentImpl } from '../pipeline/environmentImpl.js';
@@ -156,8 +154,6 @@ export function createMockEnvironment(
     tracer,
     1,
     eventBus,
-    new InMemoryFileSystem(),
-    new DeterministicIdGenerator('mock-uuid-'),
   );
 
   if (overrides) {

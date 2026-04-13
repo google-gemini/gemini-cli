@@ -5,13 +5,13 @@
  */
 
 import type { Config } from '../../config/config.js';
+import * as fsSync from 'node:fs';
+import * as fs from 'node:fs/promises';
 import type { ContextManagementConfig } from './types.js';
 import { defaultContextProfile, type ContextProfile } from './profiles.js';
 import { SchemaValidator } from '../../utils/schemaValidator.js';
 import { getContextManagementConfigSchema } from './schema.js';
 import type { ContextProcessorRegistry } from './registry.js';
-import type { IFileSystem } from '../system/IFileSystem.js';
-import { NodeFileSystem } from '../system/NodeFileSystem.js';
 import { getErrorMessage } from '../../utils/errors.js';
 
 /**
@@ -21,17 +21,16 @@ import { getErrorMessage } from '../../utils/errors.js';
 async function loadConfigFromFile(
   sidecarPath: string,
   registry: ContextProcessorRegistry,
-  fileSystem: IFileSystem = new NodeFileSystem(),
 ): Promise<ContextProfile> {
-  const fileContent = await fileSystem.readFile(sidecarPath);
+  const fileContent = await fs.readFile(sidecarPath, 'utf8');
   let parsed: unknown;
   try {
     parsed = JSON.parse(fileContent);
   } catch (error) {
     throw new Error(
-      `Failed to parse Sidecar configuration file at ${sidecarPath}: ${
-        getErrorMessage(error)
-      }`,
+      `Failed to parse Sidecar configuration file at ${sidecarPath}: ${getErrorMessage(
+        error,
+      )}`,
     );
   }
 
@@ -73,19 +72,18 @@ async function loadConfigFromFile(
 export async function loadContextManagementConfig(
   config: Config,
   registry: ContextProcessorRegistry,
-  fileSystem: IFileSystem = new NodeFileSystem(),
 ): Promise<ContextProfile> {
   const sidecarPath = config.getExperimentalContextManagementConfig();
 
-  if (sidecarPath && fileSystem.existsSync(sidecarPath)) {
-    const size = fileSystem.statSyncSize(sidecarPath);
+  if (sidecarPath && fsSync.existsSync(sidecarPath)) {
+    const size = fsSync.statSync(sidecarPath).size;
     // If the file exists but is completely empty (0 bytes), it's safe to fallback.
     if (size === 0) {
       return defaultContextProfile;
     }
 
     // If the file has content, enforce strict validation and throw on failure.
-    return loadConfigFromFile(sidecarPath, registry, fileSystem);
+    return loadConfigFromFile(sidecarPath, registry);
   }
 
   return defaultContextProfile;

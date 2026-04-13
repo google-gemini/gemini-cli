@@ -7,8 +7,6 @@ import type { BaseLlmClient } from '../../core/baseLlmClient.js';
 import type { ContextEventBus } from '../eventBus.js';
 import type { ContextTokenCalculator } from '../utils/contextTokenCalculator.js';
 import type { ContextTracer } from '../tracer.js';
-import type { IFileSystem } from '../system/IFileSystem.js';
-import type { IIdGenerator } from '../system/IIdGenerator.js';
 import type { LiveInbox } from './inbox.js';
 import type { IrNodeBehaviorRegistry } from '../ir/behaviorRegistry.js';
 import type { IrMapper } from '../ir/mapper.js';
@@ -24,8 +22,6 @@ export interface ContextEnvironment {
   readonly tracer: ContextTracer;
   readonly charsPerToken: number;
   readonly tokenCalculator: ContextTokenCalculator;
-  readonly fileSystem: IFileSystem;
-  readonly idGenerator: IIdGenerator;
   readonly eventBus: ContextEventBus;
   readonly inbox: LiveInbox;
   readonly behaviorRegistry: IrNodeBehaviorRegistry;

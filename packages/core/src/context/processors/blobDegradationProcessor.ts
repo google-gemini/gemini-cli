@@ -3,7 +3,15 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+import { randomUUID } from 'node:crypto';
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import type { ProcessArgs, ContextProcessor } from '../pipeline.js';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
 import type { ConcreteNode, UserPrompt } from '../ir/types.js';
 import type { ContextEnvironment } from '../pipeline/environment.js';
 import { sanitizeFilenamePart } from '../../utils/fileUtils.js';
@@ -22,13 +30,10 @@ export function createBlobDegradationProcessor(
 
       let directoryCreated = false;
 
-      let blobOutputsDir = env.fileSystem.join(
-        env.projectTempDir,
-        'degraded-blobs',
-      );
+      let blobOutputsDir = path.join(env.projectTempDir, 'degraded-blobs');
       const sessionId = env.sessionId;
       if (sessionId) {
-        blobOutputsDir = env.fileSystem.join(
+        blobOutputsDir = path.join(
           blobOutputsDir,
           `session-${sanitizeFilenamePart(sessionId)}`,
         );
@@ -36,7 +41,7 @@ export function createBlobDegradationProcessor(
 
       const ensureDir = async () => {
         if (!directoryCreated) {
-          await env.fileSystem.mkdir(blobOutputsDir, { recursive: true });
+          await fs.mkdir(blobOutputsDir, { recursive: true });
           directoryCreated = true;
         }
       };
@@ -61,14 +66,11 @@ export function createBlobDegradationProcessor(
                 case 'inline_data': {
                   await ensureDir();
                   const ext = part.mimeType.split('/')[1] || 'bin';
-                  const fileName = `blob_${Date.now()}_${env.idGenerator.generateId()}.${ext}`;
-                  const filePath = env.fileSystem.join(
-                    blobOutputsDir,
-                    fileName,
-                  );
+                  const fileName = `blob_${Date.now()}_${randomUUID()}.${ext}`;
+                  const filePath = path.join(blobOutputsDir, fileName);
 
                   const buffer = Buffer.from(part.data, 'base64');
-                  await env.fileSystem.writeFile(filePath, buffer);
+                  await fs.writeFile(filePath, buffer);
 
                   const mb = (buffer.byteLength / 1024 / 1024).toFixed(2);
                   newText = `[Multi-Modal Blob (${part.mimeType}, ${mb}MB) degraded to text to preserve context window. Saved to: ${filePath}]`;
@@ -124,7 +126,7 @@ export function createBlobDegradationProcessor(
             if (modified) {
               const degradedNode: UserPrompt = {
                 ...node,
-                id: env.idGenerator.generateId(),
+                id: randomUUID(),
                 semanticParts: newParts,
                 replacesId: node.id,
               };

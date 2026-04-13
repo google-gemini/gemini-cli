@@ -3,6 +3,12 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+import { randomUUID } from 'node:crypto';
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import type {
   ContextProcessor,
   ProcessArgs,
@@ -65,7 +71,7 @@ export function createStateSnapshotProcessor(
 
           if (isValid) {
             // If valid, apply it!
-            const newId = env.idGenerator.generateId();
+            const newId = randomUUID();
 
             const snapshotNode: Snapshot = {
               id: newId,
@@ -132,7 +138,7 @@ export function createStateSnapshotProcessor(
           nodesToSummarize,
           options.systemInstruction,
         );
-        const newId = env.idGenerator.generateId();
+        const newId = randomUUID();
         const snapshotNode: Snapshot = {
           id: newId,
           logicalParentId: newId,

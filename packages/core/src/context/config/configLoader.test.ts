@@ -4,38 +4,47 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { loadContextManagementConfig } from './configLoader.js';
 import { defaultContextProfile } from './profiles.js';
 import { ContextProcessorRegistry } from './registry.js';
-import { InMemoryFileSystem } from '../system/InMemoryFileSystem.js';
-import type { Config } from 'src/config/config.js';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
+import * as os from 'node:os';
+import type { Config } from '../../config/config.js';
 
-describe('SidecarLoader (Fake FS)', () => {
-  let fileSystem: InMemoryFileSystem;
+describe('SidecarLoader (Real FS)', () => {
+  let tmpDir: string;
   let registry: ContextProcessorRegistry;
+  let sidecarPath: string;
+  let mockConfig: Config;
 
-  beforeEach(() => {
-    fileSystem = new InMemoryFileSystem();
+  beforeEach(async () => {
+    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'gemini-sidecar-test-'));
+    sidecarPath = path.join(tmpDir, 'sidecar.json');
     registry = new ContextProcessorRegistry();
     registry.registerProcessor({
       id: 'NodeTruncation',
       schema: { type: 'object', properties: { maxTokens: { type: 'number' } } },
     });
+
+    mockConfig = {
+      getExperimentalContextManagementConfig: () => sidecarPath,
+    } as unknown as Config;
   });
 
-  const mockConfig = {
-    getExperimentalContextManagementConfig: () => '/path/to/sidecar.json',
-  } as unknown as Config;
+  afterEach(async () => {
+    await fs.rm(tmpDir, { recursive: true, force: true });
+  });
 
   it('returns default profile if file does not exist', async () => {
-    const result = await loadContextManagementConfig(mockConfig, registry, fileSystem);
+    const result = await loadContextManagementConfig(mockConfig, registry);
     expect(result).toBe(defaultContextProfile);
   });
 
   it('returns default profile if file exists but is 0 bytes', async () => {
-    fileSystem.setFile('/path/to/sidecar.json', '');
-    const result = await loadContextManagementConfig(mockConfig, registry, fileSystem);
+    await fs.writeFile(sidecarPath, '');
+    const result = await loadContextManagementConfig(mockConfig, registry);
     expect(result).toBe(defaultContextProfile);
   });
 
@@ -49,8 +58,8 @@ describe('SidecarLoader (Fake FS)', () => {
         },
       },
     };
-    fileSystem.setFile('/path/to/sidecar.json', JSON.stringify(validConfig));
-    const result = await loadContextManagementConfig(mockConfig, registry, fileSystem);
+    await fs.writeFile(sidecarPath, JSON.stringify(validConfig));
+    const result = await loadContextManagementConfig(mockConfig, registry);
     expect(result.config.budget?.maxTokens).toBe(2000);
     expect(result.config.processorOptions?.['myTruncation']).toBeDefined();
   });
@@ -65,12 +74,16 @@ describe('SidecarLoader (Fake FS)', () => {
         },
       },
     };
-    fileSystem.setFile('/path/to/sidecar.json', JSON.stringify(invalidConfig));
-    await expect(loadContextManagementConfig(mockConfig, registry, fileSystem)).rejects.toThrow('Validation error');
+    await fs.writeFile(sidecarPath, JSON.stringify(invalidConfig));
+    await expect(
+      loadContextManagementConfig(mockConfig, registry),
+    ).rejects.toThrow('Validation error');
   });
 
   it('throws validation error if file is empty whitespace', async () => {
-    fileSystem.setFile('/path/to/sidecar.json', '   \n  ');
-    await expect(loadContextManagementConfig(mockConfig, registry, fileSystem)).rejects.toThrow('Unexpected end of JSON input');
+    await fs.writeFile(sidecarPath, '   \n  ');
+    await expect(
+      loadContextManagementConfig(mockConfig, registry),
+    ).rejects.toThrow('Unexpected end of JSON input');
   });
 });

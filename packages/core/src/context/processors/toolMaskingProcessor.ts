@@ -3,7 +3,15 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+import { randomUUID } from 'node:crypto';
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import type { ContextProcessor, ProcessArgs } from '../pipeline.js';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
 import type { ConcreteNode, ToolExecution } from '../ir/types.js';
 import type { ContextEnvironment } from '../pipeline/environment.js';
 import { sanitizeFilenamePart } from '../../utils/fileUtils.js';
@@ -83,13 +91,10 @@ export function createToolMaskingProcessor(
         maskingConfig.stringLengthThresholdTokens,
       );
 
-      let toolOutputsDir = env.fileSystem.join(
-        env.projectTempDir,
-        'tool-outputs',
-      );
+      let toolOutputsDir = path.join(env.projectTempDir, 'tool-outputs');
       const sessionId = env.sessionId;
       if (sessionId) {
-        toolOutputsDir = env.fileSystem.join(
+        toolOutputsDir = path.join(
           toolOutputsDir,
           `session-${sanitizeFilenamePart(sessionId)}`,
         );
@@ -104,14 +109,14 @@ export function createToolMaskingProcessor(
         nodeType: string,
       ): Promise<string> => {
         if (!directoryCreated) {
-          await env.fileSystem.mkdir(toolOutputsDir, { recursive: true });
+          await fs.mkdir(toolOutputsDir, { recursive: true });
           directoryCreated = true;
         }
 
-        const fileName = `${sanitizeFilenamePart(toolName).toLowerCase()}_${sanitizeFilenamePart(callId).toLowerCase()}_${nodeType}_${env.idGenerator.generateId()}.txt`;
-        const filePath = env.fileSystem.join(toolOutputsDir, fileName);
+        const fileName = `${sanitizeFilenamePart(toolName).toLowerCase()}_${sanitizeFilenamePart(callId).toLowerCase()}_${nodeType}_${randomUUID()}.txt`;
+        const filePath = path.join(toolOutputsDir, fileName);
 
-        await env.fileSystem.writeFile(filePath, content);
+        await fs.writeFile(filePath, content);
 
         const fileSizeMB = (
           Buffer.byteLength(content, 'utf8') /
@@ -230,7 +235,7 @@ export function createToolMaskingProcessor(
               if (tokensSaved > 0) {
                 const maskedNode: ToolExecution = {
                   ...node,
-                  id: env.idGenerator.generateId(), // Modified, so generate new ID
+                  id: randomUUID(), // Modified, so generate new ID
                   intent: maskedIntent ?? node.intent,
                   observation: maskedObs ?? node.observation,
                   tokens: {

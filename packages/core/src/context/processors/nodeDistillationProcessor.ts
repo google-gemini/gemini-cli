@@ -3,6 +3,12 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+import { randomUUID } from 'node:crypto';
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import type { ContextProcessor, ProcessArgs } from '../pipeline.js';
 import type { ConcreteNode } from '../ir/types.js';
 import type { ContextEnvironment } from '../pipeline/environment.js';
@@ -95,7 +101,7 @@ export function createNodeDistillationProcessor(
             if (modified) {
               returnedNodes.push({
                 ...node,
-                id: env.idGenerator.generateId(),
+                id: randomUUID(),
                 semanticParts: newParts,
                 replacesId: node.id,
               });
@@ -116,7 +122,7 @@ export function createNodeDistillationProcessor(
               if (newTokens < oldTokens) {
                 returnedNodes.push({
                   ...node,
-                  id: env.idGenerator.generateId(),
+                  id: randomUUID(),
                   text: summary,
                   replacesId: node.id,
                 });
@@ -166,8 +172,8 @@ export function createNodeDistillationProcessor(
               if (newObsTokens < oldObsTokens) {
                 returnedNodes.push({
                   ...node,
-                  id: env.idGenerator.generateId(),
-                  observation: newObsObject as Record<string, unknown>,
+                  id: randomUUID(),
+                  observation: newObsObject,
                   tokens: {
                     intent: intentTokens,
                     observation: newObsTokens,

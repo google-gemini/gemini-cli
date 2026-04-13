@@ -13,8 +13,6 @@ import { ContextTracer } from '../tracer.js';
 import { ContextEventBus } from '../eventBus.js';
 import { PipelineOrchestrator } from '../pipeline/orchestrator.js';
 import { debugLogger } from '../../utils/debugLogger.js';
-import { DeterministicIdGenerator } from '../system/DeterministicIdGenerator.js';
-import { InMemoryFileSystem } from '../system/InMemoryFileSystem.js';
 import type { BaseLlmClient } from '../../core/baseLlmClient.js';
 
 export interface TurnSummary {
@@ -69,8 +67,6 @@ export class SimulationHarness {
       this.tracer,
       1, // 1 char per token average
       this.eventBus,
-      new InMemoryFileSystem(),
-      new DeterministicIdGenerator(),
     );
 
     this.orchestrator = new PipelineOrchestrator(

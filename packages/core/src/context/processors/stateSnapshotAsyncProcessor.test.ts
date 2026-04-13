@@ -42,7 +42,6 @@ describe('StateSnapshotAsyncProcessor', () => {
         consumedIds: ['node-A', 'node-B'],
         type: 'point-in-time',
       }),
-      env.idGenerator,
     );
   });
 
@@ -91,7 +90,6 @@ describe('StateSnapshotAsyncProcessor', () => {
         consumedIds: ['node-A', 'node-B', 'node-C'], // Aggregated!
         type: 'accumulate',
       }),
-      env.idGenerator,
     );
 
     // Verify the LLM was called with the old snapshot prepended

@@ -3,6 +3,12 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+import { randomUUID } from 'node:crypto';
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import type { ContextProcessor, ProcessArgs } from '../pipeline.js';
 import type { ContextEnvironment } from '../pipeline/environment.js';
 import { truncateProportionally } from '../truncation.js';
@@ -81,7 +87,7 @@ export function createNodeTruncationProcessor(
             if (modified) {
               returnedNodes.push({
                 ...node,
-                id: env.idGenerator.generateId(),
+                id: randomUUID(),
                 semanticParts: newParts,
                 replacesId: node.id,
               });
@@ -96,7 +102,7 @@ export function createNodeTruncationProcessor(
             if (squashResult) {
               returnedNodes.push({
                 ...node,
-                id: env.idGenerator.generateId(),
+                id: randomUUID(),
                 text: squashResult.text,
                 replacesId: node.id,
               });
@@ -111,7 +117,7 @@ export function createNodeTruncationProcessor(
             if (squashResult) {
               returnedNodes.push({
                 ...node,
-                id: env.idGenerator.generateId(),
+                id: randomUUID(),
                 text: squashResult.text,
                 replacesId: node.id,
               });

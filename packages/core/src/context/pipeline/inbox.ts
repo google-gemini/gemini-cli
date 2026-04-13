@@ -3,18 +3,20 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+import { randomUUID } from 'node:crypto';
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import type { InboxMessage, InboxSnapshot } from '../pipeline.js';
 
 export class LiveInbox {
   private messages: InboxMessage[] = [];
 
-  publish<T>(
-    topic: string,
-    payload: T,
-    idGenerator: { generateId(): string },
-  ): void {
+  publish<T>(topic: string, payload: T): void {
     this.messages.push({
-      id: idGenerator.generateId(),
+      id: randomUUID(),
       topic,
       payload,
       timestamp: Date.now(),

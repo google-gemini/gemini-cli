@@ -4,82 +4,91 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { ContextTracer } from './tracer.js';
-import { InMemoryFileSystem } from './system/InMemoryFileSystem.js';
-import { DeterministicIdGenerator } from './system/DeterministicIdGenerator.js';
+import * as fs from 'node:fs/promises';
+import { existsSync, readFileSync } from 'node:fs';
+import * as path from 'node:path';
+import * as os from 'node:os';
 
-describe('ContextTracer (Fake FS & ID Gen)', () => {
-  let fileSystem: InMemoryFileSystem;
-  let idGenerator: DeterministicIdGenerator;
+vi.mock('node:crypto', () => {
+  let count = 0;
+  return {
+    randomUUID: vi.fn(() => `mock-uuid-${++count}`),
+  };
+});
 
-  beforeEach(() => {
-    fileSystem = new InMemoryFileSystem();
-    idGenerator = new DeterministicIdGenerator('mock-uuid-');
+describe('ContextTracer (Real FS & Mock ID Gen)', () => {
+  let tmpDir: string;
 
-    // We must mock Date.now() to ensure asset file names are perfectly deterministic
+  beforeEach(async () => {
+    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'gemini-tracer-test-'));
+
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-01-01T12:00:00Z'));
   });
 
-  it('initializes, logs events, and auto-saves large assets deterministically', () => {
-    const tracer = new ContextTracer(
-      { enabled: true, targetDir: '/fake/target', sessionId: 'test-session' },
-      fileSystem,
-      idGenerator,
-    );
+  afterEach(async () => {
+    vi.useRealTimers();
+    await fs.rm(tmpDir, { recursive: true, force: true });
+  });
+
+  it('initializes, logs events, and auto-saves large assets deterministically', async () => {
+    const tracer = new ContextTracer({
+      enabled: true,
+      targetDir: tmpDir,
+      sessionId: 'test-session',
+    });
+    vi.advanceTimersByTime(10);
+    await Promise.resolve(); // allow async mkdir to happen in constructor
 
     // Verify Initialization
-    const initTraceLog = fileSystem.readFileSync(
-      '/fake/target/.gemini/context_trace/test-session/trace.log',
-      'utf-8',
+    const traceLogPath = path.join(
+      tmpDir,
+      '.gemini/context_trace/test-session/trace.log',
     );
+    const initTraceLog = readFileSync(traceLogPath, 'utf-8');
     expect(initTraceLog).toContain('[SYSTEM] Context Tracer Initialized');
 
-    // Small logging: shouldn't trigger saveAsset
     tracer.logEvent('TestComponent', 'TestAction', { key: 'value' });
+    vi.advanceTimersByTime(10);
+    await Promise.resolve();
 
-    const smallTraceLog = fileSystem.readFileSync(
-      '/fake/target/.gemini/context_trace/test-session/trace.log',
-      'utf-8',
-    );
+    const smallTraceLog = readFileSync(traceLogPath, 'utf-8');
     expect(smallTraceLog).toContain('[TestComponent] TestAction');
     expect(smallTraceLog).toContain('{"key":"value"}');
 
-    // Large logging: should trigger auto-asset save
     const hugeString = 'a'.repeat(2000);
     tracer.logEvent('TestComponent', 'LargeAction', { largeKey: hugeString });
+    vi.advanceTimersByTime(10);
+    await Promise.resolve();
 
-    // 1767268800000 is 2026-01-01T12:00:00Z
-    const expectedAssetPath =
-      '/fake/target/.gemini/context_trace/test-session/assets/1767268800000-mock-uuid-1-largeKey.json';
-
-    // Assert asset was written to FS
-    expect(fileSystem.existsSync(expectedAssetPath)).toBe(true);
-
-    const largeTraceLog = fileSystem.readFileSync(
-      '/fake/target/.gemini/context_trace/test-session/trace.log',
-      'utf-8',
+    const expectedAssetPath = path.join(
+      tmpDir,
+      '.gemini/context_trace/test-session/assets/1767268800020-mock-uuid-1-largeKey.json',
     );
+    expect(existsSync(expectedAssetPath)).toBe(true);
+
+    const largeTraceLog = readFileSync(traceLogPath, 'utf-8');
     expect(largeTraceLog).toContain('[TestComponent] LargeAction');
     expect(largeTraceLog).toContain(
-      `{"largeKey":{"$asset":"1767268800000-mock-uuid-1-largeKey.json"}}`,
+      `{"largeKey":{"$asset":"1767268800020-mock-uuid-1-largeKey.json"}}`,
     );
   });
 
-  it('silently ignores logging when disabled', () => {
-    const tracer = new ContextTracer(
-      { enabled: false, targetDir: '/fake/target', sessionId: 'test-session' },
-      fileSystem,
-      idGenerator,
-    );
+  it('silently ignores logging when disabled', async () => {
+    const tracer = new ContextTracer({
+      enabled: false,
+      targetDir: tmpDir,
+      sessionId: 'test-session',
+    });
 
     tracer.logEvent('TestComponent', 'TestAction');
-
     const hugeString = 'a'.repeat(2000);
     tracer.logEvent('TestComponent', 'LargeAction', { largeKey: hugeString });
 
-    // FS should be completely empty
-    expect(fileSystem.getFiles().size).toBe(0);
+    // Nothing should be written
+    const traceDir = path.join(tmpDir, '.gemini');
+    expect(existsSync(traceDir)).toBe(false);
   });
 });
