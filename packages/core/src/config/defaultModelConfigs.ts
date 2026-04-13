@@ -484,7 +484,7 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
         },
         {
           condition: {
-            requestedModels: ['auto-gemini-3', 'gemini-3-pro-preview'],
+            requestedModels: ['gemini-3-pro-preview'],
           },
           target: 'gemini-3-flash-preview',
         },
