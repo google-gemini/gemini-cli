@@ -13,13 +13,13 @@ export function getContextManagementConfigSchema(
   // We do this by generating a `oneOf` list that matches the `type` discriminator
   // to the specific processor `options` schema.
   const processorOptionSchemas = registry.getSchemaDefs().map((def) => ({
-        type: 'object',
-        required: ['type', 'options'],
-        properties: {
-          type: { const: def.id },
-          options: def.schema,
-        },
-      }));
+    type: 'object',
+    required: ['type', 'options'],
+    properties: {
+      type: { const: def.id },
+      options: def.schema,
+    },
+  }));
 
   const processorOptionsMapping =
     processorOptionSchemas.length > 0

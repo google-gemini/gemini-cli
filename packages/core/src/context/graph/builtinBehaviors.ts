@@ -4,10 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import type { Part } from '@google/genai';
-import type {
-  NodeBehavior,
-  NodeBehaviorRegistry,
-} from './behaviorRegistry.js';
+import type { NodeBehavior, NodeBehaviorRegistry } from './behaviorRegistry.js';
 import type {
   UserPrompt,
   AgentThought,
