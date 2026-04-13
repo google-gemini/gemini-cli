@@ -346,20 +346,7 @@ export async function isEmpty(filePath: string): Promise<boolean> {
 
 /**
  * Heuristic: determine if a file is likely binary.
- *
- * Delegates to the well-established `isbinaryfile` package, which correctly
- * handles:
- *   - Unicode BOMs (UTF-8, UTF-16 LE/BE, UTF-32 LE/BE, GB-18030) → text
- *   - PDF / common binary magic bytes → binary
- *   - NULL bytes → binary
- *   - Valid UTF-8 multibyte sequences (including U+FFFD encoded as EF BF BD,
- *     CJK characters, emojis, etc.) → skipped from the non-printable tally
- *   - Invalid high-byte sequences → counted toward a suspicious-byte ratio
- *
- * Fixes the false-positive binary detection for source files that legitimately
- * contain the Unicode replacement character U+FFFD (see issue #24547).
- * Returns `false` on I/O errors (e.g. ENOENT, path is a directory) to preserve
- * the prior lenient behavior — callers handle non-readable files elsewhere.
+ * Delegates to the `isbinaryfile` package for UTF-8-aware detection.
  */
 export async function isBinaryFile(filePath: string): Promise<boolean> {
   try {
