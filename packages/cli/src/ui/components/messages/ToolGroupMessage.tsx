@@ -273,11 +273,11 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
           (showClosingBorder ? 1 : 0);
       } else if (isTopicToolCall) {
         // Topic Message Spacing Breakdown:
-        // 1. Top Boundary (0 or 1): Only present via borderTop if isFirstProp is true.
+        // 1. Top Margin (1): Always present for spacing.
         // 2. Topic Content (1).
         // 3. Bottom Margin (1): Always present around TopicMessage for breathing room.
         // 4. Closing Border (1): Added if transition logic (showClosingBorder) requires it.
-        height += (isFirstProp ? 1 : 0) + 1 + 1 + (showClosingBorder ? 1 : 0);
+        height += 1 + 1 + 1 + (showClosingBorder ? 1 : 0);
       } else if (isCompact) {
         // Compact Tool: Always renders as a single dense line.
         height += 1;
