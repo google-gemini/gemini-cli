@@ -227,8 +227,9 @@ export class BuiltinCommandLoader implements ICommandLoader {
       vimCommand,
       setupGithubCommand,
       terminalSetupCommand,
-      voiceCommand,
-      voiceModelCommand,
+      ...(this.config?.isVoiceModeEnabled()
+        ? [voiceCommand, voiceModelCommand]
+        : []),
       ...(this.config?.getContentGeneratorConfig()?.authType ===
       AuthType.LOGIN_WITH_GOOGLE
         ? [upgradeCommand]
