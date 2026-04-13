@@ -1074,7 +1074,7 @@ export class Config implements McpContext, AgentLoopContext {
       enableFileWatcher:
         params.fileFiltering?.enableFileWatcher ??
         DEFAULT_FILE_FILTERING_OPTIONS.enableFileWatcher ??
-        false,
+        true,
       enableRecursiveFileSearch:
         params.fileFiltering?.enableRecursiveFileSearch ?? true,
       enableFuzzySearch: params.fileFiltering?.enableFuzzySearch ?? true,

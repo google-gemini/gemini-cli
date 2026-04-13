@@ -225,6 +225,9 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
   }, [state.isLoading, setIsLoadingSuggestions]);
 
   const resetFileSearchState = () => {
+    for (const searcher of fileSearchMap.current.values()) {
+      searcher.close?.();
+    }
     fileSearchMap.current.clear();
     initEpoch.current += 1;
     dispatch({ type: 'RESET' });
@@ -295,6 +298,8 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
             ),
             cache: true,
             cacheTtl: 30,
+            enableFileWatcher:
+              config?.getFileFilteringOptions()?.enableFileWatcher ?? true,
             enableRecursiveFileSearch:
               config?.getEnableRecursiveFileSearch() ?? true,
             enableFuzzySearch:
