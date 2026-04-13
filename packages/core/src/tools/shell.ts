@@ -10,10 +10,7 @@ import path from 'node:path';
 import os from 'node:os';
 import crypto from 'node:crypto';
 import { debugLogger } from '../utils/debugLogger.js';
-import {
-  type SandboxPermissions,
-  getPathIdentity,
-} from '../services/sandboxManager.js';
+import { type SandboxPermissions } from '../services/sandboxManager.js';
 import { ToolErrorType } from './tool-error.js';
 import {
   BaseDeclarativeTool,
