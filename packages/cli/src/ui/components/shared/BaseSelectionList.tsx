@@ -76,8 +76,13 @@ function SelectionListItemRow<
     containerRef,
     () => {
       if (!item.disabled) {
-        setActiveIndex(itemIndex);
-        onSelect(item.value);
+        if (isSelected) {
+          // Second click on the same item triggers submission
+          onSelect(item.value);
+        } else {
+          // First click highlights the item
+          setActiveIndex(itemIndex);
+        }
       }
     },
     { isActive: isFocused },
@@ -217,10 +222,12 @@ export function BaseSelectionList<
   );
   const numberColumnWidth = String(items.length).length;
 
+  const showArrows = showScrollArrows && items.length > maxItemsToShow;
+
   return (
     <Box flexDirection="column">
       {/* Use conditional coloring instead of conditional rendering */}
-      {showScrollArrows && items.length > maxItemsToShow && (
+      {showArrows && (
         <Text
           color={
             effectiveScrollOffset > 0
@@ -253,7 +260,7 @@ export function BaseSelectionList<
         );
       })}
 
-      {showScrollArrows && items.length > maxItemsToShow && (
+      {showArrows && (
         <Text
           color={
             effectiveScrollOffset + maxItemsToShow < items.length

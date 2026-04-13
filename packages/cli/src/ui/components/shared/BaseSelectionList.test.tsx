@@ -5,6 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
+import { act } from 'react';
 import { renderWithProviders } from '../../../test-utils/render.js';
 import {
   BaseSelectionList,
@@ -496,7 +497,7 @@ describe('BaseSelectionList', () => {
       unmount();
     });
 
-    it('should call onSelect and setActiveIndex when an enabled item is clicked', async () => {
+    it('should update activeIndex on first click and call onSelect on second click', async () => {
       const { unmount, waitUntilReady } = await renderComponent();
       await waitUntilReady();
 
@@ -507,9 +508,27 @@ describe('BaseSelectionList', () => {
       // Get the mouse click handler for the third item (index 2)
       const mouseClickHandler = (useMouseClick as Mock).mock.calls[2][1];
 
-      mouseClickHandler();
+      // First click on item C
+      act(() => {
+        mouseClickHandler();
+      });
 
       expect(mockSetActiveIndex).toHaveBeenCalledWith(2);
+      expect(mockOnSelect).not.toHaveBeenCalled();
+
+      // Now simulate being on item C (isSelected = true)
+      // Rerender or update mocks for the next check
+      await renderComponent({}, 2);
+
+      // Get the updated mouse click handler for item C
+      // useMouseClick is called 3 more times on rerender
+      const updatedMouseClickHandler = (useMouseClick as Mock).mock.calls[5][1];
+
+      // Second click on item C
+      act(() => {
+        updatedMouseClickHandler();
+      });
+
       expect(mockOnSelect).toHaveBeenCalledWith('C');
       unmount();
     });
@@ -521,7 +540,9 @@ describe('BaseSelectionList', () => {
       // items[1] is 'B' (disabled)
       const mouseClickHandler = (useMouseClick as Mock).mock.calls[1][1];
 
-      mouseClickHandler();
+      act(() => {
+        mouseClickHandler();
+      });
 
       expect(mockSetActiveIndex).not.toHaveBeenCalled();
       expect(mockOnSelect).not.toHaveBeenCalled();
