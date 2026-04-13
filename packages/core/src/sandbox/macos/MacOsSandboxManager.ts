@@ -15,7 +15,6 @@ import {
   type GlobalSandboxOptions,
   type ParsedSandboxDenial,
   resolveSandboxPaths,
-  GOVERNANCE_FILES,
 } from '../../services/sandboxManager.js';
 import type { ShellExecutionResult } from '../../services/shellExecutionService.js';
 import {
@@ -39,27 +38,6 @@ import {
   type SandboxDenialCache,
 } from '../utils/sandboxDenialUtils.js';
 import { handleReadWriteCommands } from '../utils/sandboxReadWriteUtils.js';
-import { assertValidPathString } from '../../utils/paths.js';
-
-/**
- * Ensures a file or directory exists.
- */
-function touch(filePath: string, isDirectory: boolean) {
-  assertValidPathString(filePath);
-  try {
-    // If it exists (even as a broken symlink), do nothing
-    if (fs.lstatSync(filePath)) return;
-  } catch {
-    // Ignore ENOENT
-  }
-
-  if (isDirectory) {
-    fs.mkdirSync(filePath, { recursive: true });
-  } else {
-    fs.mkdirSync(path.dirname(filePath), { recursive: true });
-    fs.closeSync(fs.openSync(filePath, 'a'));
-  }
-}
 
 export class MacOsSandboxManager implements SandboxManager {
   private readonly denialCache: SandboxDenialCache = createSandboxDenialCache();
@@ -170,14 +148,6 @@ export class MacOsSandboxManager implements SandboxManager {
       req,
       mergedAdditional,
     );
-
-    // Initialize governance files (.git, .gitignore, etc.) on the host.
-    // These must exist before the sandbox is established to ensure the
-    // seatbelt profile can correctly target and protect them.
-    for (const file of GOVERNANCE_FILES) {
-      const filePath = path.join(this.options.workspace, file.path);
-      touch(filePath, file.isDirectory);
-    }
 
     const sandboxArgs = buildSeatbeltProfile({
       resolvedPaths,

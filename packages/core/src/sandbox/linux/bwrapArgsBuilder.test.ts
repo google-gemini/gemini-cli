@@ -92,6 +92,7 @@ describe.skipIf(os.platform() === 'win32')('buildBwrapArgs', () => {
     workspaceWrite: false,
     networkAccess: false,
     maskFilePath: '/tmp/mask',
+    isReadOnlyCommand: false,
   };
 
   it('should correctly format the base arguments', async () => {
@@ -187,7 +188,7 @@ describe.skipIf(os.platform() === 'win32')('buildBwrapArgs', () => {
     expect(args[args.indexOf('/opt/tools') - 1]).toBe('--bind-try');
   });
 
-  it('should bind the parent directory of a non-existent path with --bind-try', async () => {
+  it('should bind the parent directory of a non-existent path with --bind-try when isReadOnlyCommand is false', async () => {
     vi.mocked(fs.existsSync).mockImplementation((p) => {
       if (p === '/home/user/workspace/new-file.txt') return false;
       return true;
@@ -195,6 +196,7 @@ describe.skipIf(os.platform() === 'win32')('buildBwrapArgs', () => {
 
     const args = await buildBwrapArgs({
       ...defaultOptions,
+      isReadOnlyCommand: false,
       resolvedPaths: createResolvedPaths({
         policyAllowed: ['/home/user/workspace/new-file.txt'],
       }),
@@ -204,6 +206,26 @@ describe.skipIf(os.platform() === 'win32')('buildBwrapArgs', () => {
     const bindIndex = args.lastIndexOf(parentDir);
     expect(bindIndex).not.toBe(-1);
     expect(args[bindIndex - 2]).toBe('--bind-try');
+  });
+
+  it('should bind the parent directory of a non-existent path with --ro-bind-try when isReadOnlyCommand is true', async () => {
+    vi.mocked(fs.existsSync).mockImplementation((p) => {
+      if (p === '/home/user/workspace/new-file.txt') return false;
+      return true;
+    });
+
+    const args = await buildBwrapArgs({
+      ...defaultOptions,
+      isReadOnlyCommand: true,
+      resolvedPaths: createResolvedPaths({
+        policyAllowed: ['/home/user/workspace/new-file.txt'],
+      }),
+    });
+
+    const parentDir = '/home/user/workspace';
+    const bindIndex = args.lastIndexOf(parentDir);
+    expect(bindIndex).not.toBe(-1);
+    expect(args[bindIndex - 2]).toBe('--ro-bind-try');
   });
 
   it('should parameterize forbidden paths and explicitly deny them', async () => {

@@ -5,10 +5,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { MacOsSandboxManager } from './MacOsSandboxManager.js';
-import {
-  type ExecutionPolicy,
-  GOVERNANCE_FILES,
-} from '../../services/sandboxManager.js';
+import { type ExecutionPolicy } from '../../services/sandboxManager.js';
 import * as seatbeltArgsBuilder from './seatbeltArgsBuilder.js';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -191,37 +188,6 @@ describe('MacOsSandboxManager', () => {
         );
         expect(result.args[result.args.length - 2]).toBe('_');
         expect(result.args[result.args.length - 1]).toBe(testFile);
-      });
-    });
-
-    describe('governance files', () => {
-      it('should ensure governance files exist', async () => {
-        await manager.prepareCommand({
-          command: 'echo',
-          args: [],
-          cwd: mockWorkspace,
-          env: {},
-          policy: mockPolicy,
-        });
-
-        // Verify that governance files were actually created on disk
-        for (const file of GOVERNANCE_FILES) {
-          const expectedPath = path.join(mockWorkspace, file.path);
-          expect(fs.existsSync(expectedPath)).toBe(true);
-          if (file.isDirectory) {
-            expect(fs.statSync(expectedPath).isDirectory()).toBe(true);
-          } else {
-            expect(fs.statSync(expectedPath).isFile()).toBe(true);
-          }
-        }
-
-        expect(seatbeltArgsBuilder.buildSeatbeltProfile).toHaveBeenCalledWith(
-          expect.objectContaining({
-            resolvedPaths: expect.objectContaining({
-              workspace: { resolved: mockWorkspace, original: mockWorkspace },
-            }),
-          }),
-        );
       });
     });
 

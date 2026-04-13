@@ -3,7 +3,15 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  beforeAll,
+  beforeEach,
+  afterEach,
+  afterAll,
+} from 'vitest';
 import { createSandboxManager } from './sandboxManagerFactory.js';
 import { ShellExecutionService } from './shellExecutionService.js';
 import { getSecureSanitizationConfig } from './environmentSanitization.js';
@@ -140,10 +148,10 @@ Status: ${result.status} (expected ${expected})${
 }
 
 describe('SandboxManager Integration', () => {
-  const tempDirectories: string[] = [];
+  let tempDirectories: string[] = [];
 
   /**
-   * Creates a temporary directory.
+   * Creates a temporary directory and tracks it for automatic cleanup after each test.
    * - macOS: Created in process.cwd() to avoid the seatbelt profile's global os.tmpdir() whitelist.
    * - Win/Linux: Created in os.tmpdir() because enforcing sandbox restrictions inside a large directory can be very slow.
    */
@@ -161,14 +169,14 @@ describe('SandboxManager Integration', () => {
   let manager: SandboxManager;
 
   beforeEach(() => {
-    // Create a fresh, isolated workspace for every test.
-    // This is critical to prevent state leakage (e.g., leftover files or persistent Windows ACLs)
-    // from causing intermittent or order-dependent test failures.
+    tempDirectories = [];
+    // Create a fresh, isolated workspace for every test to prevent state
+    // leakage from causing intermittent or order-dependent test failures.
     workspace = createTempDir('workspace-');
     manager = createSandboxManager({ enabled: true }, { workspace });
   });
 
-  afterAll(() => {
+  afterEach(() => {
     for (const dir of tempDirectories) {
       try {
         fs.rmSync(dir, { recursive: true, force: true });
@@ -176,6 +184,7 @@ describe('SandboxManager Integration', () => {
         // Best-effort cleanup
       }
     }
+    tempDirectories = [];
   });
 
   describe('Execution & Environment', () => {
@@ -727,22 +736,34 @@ describe('SandboxManager Integration', () => {
     });
 
     describe('Governance Files', () => {
-      it('initializes repository governance files', async () => {
-        const { command, args } = Platform.echo('test');
+      it('prevents modification of governance files', async () => {
+        // Ensure workspace is initialized and governance files are created
+        const { command: echoCmd, args: echoArgs } = Platform.echo('test');
         await manager.prepareCommand({
-          command,
-          args,
+          command: echoCmd,
+          args: echoArgs,
           cwd: workspace,
           env: process.env,
+          // Even if the entire workspace is explicitly allowed, governance files must be protected
+          policy: { allowedPaths: [workspace] },
         });
 
-        // Verify all expected governance files were initialized correctly
         for (const file of GOVERNANCE_FILES) {
-          const expectedPath = path.join(workspace, file.path);
-          expect(fs.existsSync(expectedPath)).toBe(true);
-          expect(fs.statSync(expectedPath).isDirectory()).toBe(
-            file.isDirectory,
-          );
+          const filePath = path.join(workspace, file.path);
+          // Try to append to/overwrite the file or create a file inside the directory
+          const { command, args } = file.isDirectory
+            ? Platform.touch(path.join(filePath, 'evil.txt'))
+            : Platform.touch(filePath);
+
+          const sandboxed = await manager.prepareCommand({
+            command,
+            args,
+            cwd: workspace,
+            env: process.env,
+          });
+
+          const result = await runCommand(sandboxed);
+          assertResult(result, sandboxed, 'failure');
         }
       });
     });

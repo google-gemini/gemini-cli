@@ -23,6 +23,7 @@ export interface BwrapArgsOptions {
   workspaceWrite: boolean;
   networkAccess: boolean;
   maskFilePath: string;
+  isReadOnlyCommand: boolean;
 }
 
 /**
@@ -31,8 +32,13 @@ export interface BwrapArgsOptions {
 export async function buildBwrapArgs(
   options: BwrapArgsOptions,
 ): Promise<string[]> {
-  const { resolvedPaths, workspaceWrite, networkAccess, maskFilePath } =
-    options;
+  const {
+    resolvedPaths,
+    workspaceWrite,
+    networkAccess,
+    maskFilePath,
+    isReadOnlyCommand,
+  } = options;
   const { workspace } = resolvedPaths;
 
   const bwrapArgs: string[] = [
@@ -72,9 +78,14 @@ export async function buildBwrapArgs(
     if (fs.existsSync(allowedPath)) {
       bwrapArgs.push('--bind-try', allowedPath, allowedPath);
     } else {
-      // Bind the parent directory as read-write to allow creating the non-existent path.
+      // If the path doesn't exist, we still want to allow access to its parent
+      // to enable creating it.
       const parent = dirname(allowedPath);
-      bwrapArgs.push('--bind-try', parent, parent);
+      bwrapArgs.push(
+        isReadOnlyCommand ? '--ro-bind-try' : '--bind-try',
+        parent,
+        parent,
+      );
     }
   }
 
