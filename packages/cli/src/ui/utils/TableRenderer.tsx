@@ -264,7 +264,7 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
   ): React.ReactNode => {
     const renderedCells = cells.map((cell, index) => {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      const width: number = adjustedWidths[index] ?? 0;
+      const width = adjustedWidths[index] || 0;
       return renderCell(cell, width, isHeader);
     });
 
