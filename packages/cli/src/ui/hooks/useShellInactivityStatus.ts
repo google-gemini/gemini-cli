@@ -70,7 +70,10 @@ export const useShellInactivityStatus = ({
   // Logic: Only if output has been produced (likely a prompt).
   // Triggered after 30s of silence, but SUPPRESSED if redirection is active.
   const shouldShowActionRequiredTitle = useInactivityTimer(
-    isAwaitingFocus && !isRedirectionActive && hasProducedOutput,
+    isAwaitingFocus &&
+    !isRedirectionActive &&
+    hasProducedOutput &&
+    (Date.now() - lastOutputTime) < SHELL_ACTION_REQUIRED_TITLE_DELAY_MS,
     lastOutputTime,
     SHELL_ACTION_REQUIRED_TITLE_DELAY_MS,
   );
