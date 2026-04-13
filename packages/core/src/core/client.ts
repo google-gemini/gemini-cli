@@ -27,6 +27,7 @@ import {
 import type { Config } from '../config/config.js';
 import { type AgentLoopContext } from '../config/agent-loop-context.js';
 import { getCoreSystemPrompt } from './prompts.js';
+import { EXECUTE_FUNCTION_DECLARATION } from '../utils/dynamicToolsUtils.js';
 import { checkNextSpeaker } from '../utils/nextSpeakerChecker.js';
 import { reportError } from '../utils/errorReporting.js';
 import { GeminiChat } from './geminiChat.js';
@@ -301,10 +302,18 @@ export class GeminiClient {
     }
     this.lastUsedModelId = modelId;
 
-    const toolRegistry = this.context.toolRegistry;
-    const toolDeclarations = toolRegistry.getFunctionDeclarations(modelId);
-    const tools: Tool[] = [{ functionDeclarations: toolDeclarations }];
+    const tools = this.getChatTools(modelId);
     this.getChat().setTools(tools);
+  }
+
+  private getChatTools(modelId?: string): Tool[] {
+    const toolRegistry = this.context.toolRegistry;
+    if (this.config.getExperimentalDynamicTools()) {
+      debugLogger.log('[GeminiClient] Experimental Dynamic Tools enabled.');
+      return [{ functionDeclarations: [EXECUTE_FUNCTION_DECLARATION] }];
+    }
+    const toolDeclarations = toolRegistry.getFunctionDeclarations(modelId);
+    return [{ functionDeclarations: toolDeclarations }];
   }
 
   async resetChat(): Promise<void> {
@@ -369,9 +378,7 @@ export class GeminiClient {
     this.hasFailedCompressionAttempt = false;
     this.lastUsedModelId = undefined;
 
-    const toolRegistry = this.context.toolRegistry;
-    const toolDeclarations = toolRegistry.getFunctionDeclarations();
-    const tools: Tool[] = [{ functionDeclarations: toolDeclarations }];
+    const tools = this.getChatTools();
 
     const history = await getInitialChatHistory(this.config, extraHistory);
 
@@ -386,10 +393,7 @@ export class GeminiClient {
         resumedSessionData,
         async (modelId: string) => {
           this.lastUsedModelId = modelId;
-          const toolRegistry = this.context.toolRegistry;
-          const toolDeclarations =
-            toolRegistry.getFunctionDeclarations(modelId);
-          return [{ functionDeclarations: toolDeclarations }];
+          return this.getChatTools(modelId);
         },
       );
       await chat.initialize(resumedSessionData, 'main');

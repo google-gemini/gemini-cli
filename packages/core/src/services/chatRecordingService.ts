@@ -229,6 +229,7 @@ export async function loadConversationRecord(
       summary: metadata.summary,
       directories: metadata.directories,
       kind: metadata.kind,
+      experimentalDynamicTools: metadata.experimentalDynamicTools,
       messages: Array.from(messagesMap.values()),
       messageCount: options?.metadataOnly
         ? messageIds.length
@@ -292,6 +293,7 @@ export class ChatRecordingService {
               kind: this.cachedConversation.kind,
               directories: this.cachedConversation.directories,
               summary: this.cachedConversation.summary,
+              experimentalDynamicTools: this.cachedConversation.experimentalDynamicTools,
             };
             this.appendRecord(initialMetadata);
             for (const msg of this.cachedConversation.messages) {
@@ -358,18 +360,21 @@ export class ChatRecordingService {
               ]
             : undefined;
 
-        const initialMetadata = {
+        const initialMetadata: PartialMetadataRecord = {
           sessionId: this.sessionId,
           projectHash: this.projectHash,
           startTime: new Date().toISOString(),
           lastUpdated: new Date().toISOString(),
           kind: this.kind,
           directories,
+          experimentalDynamicTools: this.context.config.getExperimentalDynamicTools(),
         };
 
         this.appendRecord(initialMetadata);
         this.cachedConversation = {
           ...initialMetadata,
+          startTime: initialMetadata.startTime!,
+          lastUpdated: initialMetadata.lastUpdated!,
           messages: [],
         };
       }

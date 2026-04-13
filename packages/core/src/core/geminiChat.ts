@@ -49,12 +49,14 @@ import { isFunctionResponse } from '../utils/messageInspectors.js';
 import { partListUnionToString } from './geminiRequest.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
 import { estimateTokenCountSync } from '../utils/tokenCalculation.js';
+import { wrapAsExecute } from '../utils/dynamicToolsUtils.js';
 import {
   applyModelSelection,
   createAvailabilityContextProvider,
 } from '../availability/policyHelpers.js';
 import { coreEvents } from '../utils/events.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 export enum StreamEventType {
   /** A regular content chunk from the API. */
@@ -897,11 +899,30 @@ export class GeminiChat {
       if (isValidResponse(chunk)) {
         const content = chunk.candidates?.[0]?.content;
         if (content?.parts) {
-          if (content.parts.some((part) => part.thought)) {
-            // Record thoughts
-            hasThoughts = true;
-            this.recordThoughtFromContent(content);
+          for (const part of content.parts) {
+            if (part.thought) {
+              // Record thoughts
+              hasThoughts = true;
+              this.recordThoughtFromContent(content);
+            }
+            if (
+              part.functionCall &&
+              part.functionCall.name &&
+              part.functionCall.name !== 'execute' &&
+              this.context.config.getExperimentalDynamicTools()
+            ) {
+              debugLogger.log(
+                `[GeminiChat] Rewriting hallucinated tool call '${part.functionCall.name}' to 'execute' wrapper.`,
+              );
+              const wrapped = wrapAsExecute(
+                part.functionCall.name,
+                part.functionCall.args,
+              );
+              part.functionCall.name = wrapped.name;
+              part.functionCall.args = wrapped.args;
+            }
           }
+
           if (content.parts.some((part) => part.functionCall)) {
             hasToolCall = true;
           }
@@ -1057,6 +1078,8 @@ export class GeminiChat {
         resultDisplay,
         description:
           'invocation' in call ? call.invocation?.getDescription() : undefined,
+        originalRequestName: call.request.originalRequestName,
+        originalRequestArgs: call.request.originalRequestArgs,
       };
     });
 

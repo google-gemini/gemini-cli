@@ -51,6 +51,10 @@ export interface ToolCallRecord {
   description?: string;
   resultDisplay?: ToolResultDisplay;
   renderOutputAsMarkdown?: boolean;
+  /** Experimental: original name of the tool requested by the model before unwrapping */
+  originalRequestName?: string;
+  /** Experimental: original arguments of the tool requested by the model before unwrapping */
+  originalRequestArgs?: Record<string, unknown>;
 }
 
 /**
@@ -87,6 +91,8 @@ export interface ConversationRecord {
   directories?: string[];
   /** The kind of conversation (main agent or subagent) */
   kind?: 'main' | 'subagent';
+  /** Experimental: Whether dynamic tools documentation-injection was enabled */
+  experimentalDynamicTools?: boolean;
 }
 
 /**
@@ -122,4 +128,6 @@ export interface PartialMetadataRecord {
   summary?: string;
   directories?: string[];
   kind?: 'main' | 'subagent';
+  /** Experimental: Whether dynamic tools documentation-injection was enabled */
+  experimentalDynamicTools?: boolean;
 }

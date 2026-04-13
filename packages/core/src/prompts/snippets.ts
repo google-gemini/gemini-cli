@@ -43,6 +43,7 @@ import { DEFAULT_CONTEXT_FILENAME } from '../tools/memoryTool.js';
 export interface SystemPromptOptions {
   preamble?: PreambleOptions;
   coreMandates?: CoreMandatesOptions;
+  dynamicToolsDocumentation?: string;
   subAgents?: SubAgentOptions[];
   agentSkills?: AgentSkillOptions[];
   hookContext?: boolean;
@@ -126,6 +127,8 @@ export function getCoreSystemPrompt(options: SystemPromptOptions): string {
 ${renderPreamble(options.preamble)}
 
 ${renderCoreMandates(options.coreMandates)}
+
+${options.dynamicToolsDocumentation ? `\n<tools>\n${options.dynamicToolsDocumentation}\n</tools>\n` : ''}
 
 ${renderSubAgents(options.subAgents)}
 

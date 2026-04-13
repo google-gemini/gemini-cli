@@ -29,6 +29,11 @@ import { parseThought, type ThoughtSummary } from '../utils/thoughtUtils.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
 import { getCitations } from '../utils/generateContentResponseUtilities.js';
 import { LlmRole } from '../telemetry/types.js';
+import { debugLogger } from '../utils/debugLogger.js';
+import {
+  unwrapExecuteArgs,
+  wrapAsExecute,
+} from '../utils/dynamicToolsUtils.js';
 
 import {
   type ToolCallRequestInfo,
@@ -237,6 +242,7 @@ export type ServerGeminiStreamEvent =
 // A turn manages the agentic loop turn within the server context.
 export class Turn {
   private callCounter = 0;
+  private handledCallIds = new Set<string>();
 
   readonly pendingToolCalls: ToolCallRequestInfo[] = [];
   private debugResponses: GenerateContentResponse[] = [];
@@ -409,7 +415,74 @@ export class Turn {
   ): ServerGeminiStreamEvent | null {
     const name = fnCall.name || 'undefined_tool_name';
     const args = fnCall.args || {};
-    const callId = fnCall.id ?? `${name}_${Date.now()}_${this.callCounter++}`;
+    const callId = fnCall.id || `${name}_${Date.now()}_${this.callCounter++}`;
+
+    if (this.handledCallIds.has(callId)) {
+      return null;
+    }
+    this.handledCallIds.add(callId);
+
+    // Handle experimental dynamic tools
+    if (
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
+      (this.chat as any).context.config.getExperimentalDynamicTools()
+    ) {
+      if (name === 'execute') {
+        const unwrapped = unwrapExecuteArgs(fnCall.args);
+        if (unwrapped) {
+          debugLogger.log(
+            `[Turn] Unwrapping execute call for tool: ${unwrapped.name}`,
+          );
+
+          const toolCallRequest: ToolCallRequestInfo = {
+            callId,
+            name: unwrapped.name,
+            args: unwrapped.args,
+            originalRequestName: 'execute',
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-type-assertion
+            originalRequestArgs: fnCall.args as any,
+            isClientInitiated: false,
+            prompt_id: this.prompt_id,
+            traceId,
+          };
+
+          this.pendingToolCalls.push(toolCallRequest);
+          return {
+            type: GeminiEventType.ToolCallRequest,
+            value: toolCallRequest,
+          };
+        }
+      } else if (name !== 'undefined_tool_name') {
+        // Model called a tool directly despite documentation.
+        // It should have been wrapped by GeminiChat.makeApiCallAndProcessStream,
+        // but as a failsafe we wrap it here too.
+        debugLogger.log(
+          `[Turn] Model called tool '${name}' directly. Recovery wrapping as 'execute'.`,
+        );
+
+        const unwrapped = unwrapExecuteArgs(wrapAsExecute(name, args).args);
+
+        if (unwrapped) {
+          const toolCallRequest: ToolCallRequestInfo = {
+            callId,
+            name: unwrapped.name,
+            args: unwrapped.args,
+            originalRequestName: 'execute',
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-type-assertion
+            originalRequestArgs: wrapAsExecute(name, args).args as any,
+            isClientInitiated: false,
+            prompt_id: this.prompt_id,
+            traceId,
+          };
+
+          this.pendingToolCalls.push(toolCallRequest);
+          return {
+            type: GeminiEventType.ToolCallRequest,
+            value: toolCallRequest,
+          };
+        }
+      }
+    }
 
     const toolCallRequest: ToolCallRequestInfo = {
       callId,
@@ -426,15 +499,6 @@ export class Turn {
     return { type: GeminiEventType.ToolCallRequest, value: toolCallRequest };
   }
 
-  getDebugResponses(): GenerateContentResponse[] {
-    return this.debugResponses;
-  }
-
-  /**
-   * Get the concatenated response text from all responses in this turn.
-   * This extracts and joins all text content from the model's responses.
-   * The result is cached since this is called multiple times per turn.
-   */
   getResponseText(): string {
     if (this.cachedResponseText === undefined) {
       this.cachedResponseText = this.debugResponses
@@ -443,5 +507,9 @@ export class Turn {
         .join(' ');
     }
     return this.cachedResponseText;
+  }
+
+  getDebugResponses(): GenerateContentResponse[] {
+    return this.debugResponses;
   }
 }
