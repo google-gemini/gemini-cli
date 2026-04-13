@@ -454,3 +454,45 @@ function robustRealpath(p: string, visited = new Set<string>()): string {
     throw e;
   }
 }
+
+/**
+ * Deduplicates an array of paths and ensures all paths are absolute.
+ */
+export function deduplicateAbsolutePaths(paths?: string[] | null): string[] {
+  if (!paths || paths.length === 0) return [];
+
+  const uniquePathsMap = new Map<string, string>();
+  for (const p of paths) {
+    if (!path.isAbsolute(p)) {
+      throw new Error(`Path must be absolute: ${p}`);
+    }
+
+    const key = toPathKey(p);
+    if (!uniquePathsMap.has(key)) {
+      uniquePathsMap.set(key, p);
+    }
+  }
+
+  return Array.from(uniquePathsMap.values());
+}
+
+/**
+ * Returns a stable string key for a path to be used in comparisons or Map lookups.
+ */
+export function toPathKey(p: string): string {
+  // Normalize path segments
+  let norm = path.normalize(p);
+
+  // Strip trailing slashes (except for root paths)
+  if (norm.length > 1 && (norm.endsWith('/') || norm.endsWith('\\'))) {
+    // On Windows, don't strip the slash from a drive root (e.g., "C:\\")
+    if (!/^[a-zA-Z]:[\\/]$/.test(norm)) {
+      norm = norm.slice(0, -1);
+    }
+  }
+
+  // Convert to lowercase on case-insensitive platforms
+  const platform = process.platform;
+  const isCaseInsensitive = platform === 'win32' || platform === 'darwin';
+  return isCaseInsensitive ? norm.toLowerCase() : norm;
+}
