@@ -553,19 +553,21 @@ export async function loadCliConfig(
 ): Promise<Config> {
   const { cwd: cwdOption = process.cwd(), projectHooks } = options;
 
-  // --workspace takes priority over the default cwd. Validate it exists and
-  // is a directory before using it for anything else.
+  // --workspace takes priority over the default cwd. Resolve symlinks and
+  // validate it is an existing directory before using it for anything else.
   if (argv.workspace) {
-    if (!existsSync(argv.workspace)) {
+    const resolvedWorkspace = resolveToRealPath(argv.workspace);
+    if (!existsSync(resolvedWorkspace)) {
       throw new FatalConfigError(
         `--workspace directory does not exist: ${argv.workspace}`,
       );
     }
-    if (!statSync(argv.workspace).isDirectory()) {
+    if (!statSync(resolvedWorkspace).isDirectory()) {
       throw new FatalConfigError(
         `--workspace path is not a directory: ${argv.workspace}`,
       );
     }
+    argv.workspace = resolvedWorkspace;
   }
 
   const cwd = argv.workspace ?? cwdOption;
