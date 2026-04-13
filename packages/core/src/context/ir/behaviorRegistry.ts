@@ -30,7 +30,7 @@ export class IrNodeBehaviorRegistry {
   private readonly behaviors = new Map<string, IrNodeBehavior<ConcreteNode>>();
 
   register<T extends ConcreteNode>(behavior: IrNodeBehavior<T>) {
-    this.behaviors.set(behavior.type, behavior as IrNodeBehavior<ConcreteNode>);
+    this.behaviors.set(behavior.type, behavior);
   }
 
   get(type: string): IrNodeBehavior<ConcreteNode> {

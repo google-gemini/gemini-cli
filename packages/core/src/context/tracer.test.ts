@@ -32,7 +32,7 @@ describe('ContextTracer (Fake FS & ID Gen)', () => {
     // Verify Initialization
     const initTraceLog = fileSystem.readFileSync(
       '/fake/target/.gemini/context_trace/test-session/trace.log',
-      'utf8',
+      'utf-8',
     );
     expect(initTraceLog).toContain('[SYSTEM] Context Tracer Initialized');
 
@@ -41,7 +41,7 @@ describe('ContextTracer (Fake FS & ID Gen)', () => {
 
     const smallTraceLog = fileSystem.readFileSync(
       '/fake/target/.gemini/context_trace/test-session/trace.log',
-      'utf8',
+      'utf-8',
     );
     expect(smallTraceLog).toContain('[TestComponent] TestAction');
     expect(smallTraceLog).toContain('{"key":"value"}');
@@ -59,7 +59,7 @@ describe('ContextTracer (Fake FS & ID Gen)', () => {
 
     const largeTraceLog = fileSystem.readFileSync(
       '/fake/target/.gemini/context_trace/test-session/trace.log',
-      'utf8',
+      'utf-8',
     );
     expect(largeTraceLog).toContain('[TestComponent] LargeAction');
     expect(largeTraceLog).toContain(

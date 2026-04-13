@@ -18,7 +18,7 @@ export class NodeFileSystem implements IFileSystem {
     return fs.statSync(p).size;
   }
 
-  readFileSync(p: string, encoding: 'utf8'): string {
+  readFileSync(p: string, encoding: 'utf-8'): string {
     return fs.readFileSync(p, encoding);
   }
 
@@ -36,6 +36,10 @@ export class NodeFileSystem implements IFileSystem {
 
   mkdirSync(p: string, options?: { recursive?: boolean }): void {
     fs.mkdirSync(p, options);
+  }
+
+  async readFile(p: string, encoding: 'utf-8'): Promise<string> {
+    return fsPromises.readFile(p, {encoding});
   }
 
   async writeFile(p: string, data: string | Buffer): Promise<void> {

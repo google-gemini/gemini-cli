@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { AsyncPipelineDef, SidecarConfig, PipelineDef } from './types.js';
+import type { AsyncPipelineDef, ContextManagementConfig, PipelineDef } from './types.js';
 import type { ContextEnvironment } from '../pipeline/environment.js';
 
 // Import factories
@@ -28,7 +28,7 @@ import { createStateSnapshotAsyncProcessor } from '../processors/stateSnapshotAs
  * making the generic cast to \`<T>\` structurally safe.
  */
 function resolveProcessorOptions<T>(
-  config: SidecarConfig | undefined,
+  config: ContextManagementConfig | undefined,
   id: string,
   defaultOptions: T,
 ): T {
@@ -43,14 +43,14 @@ function resolveProcessorOptions<T>(
 }
 
 export interface ContextProfile {
-  config: SidecarConfig;
+  config: ContextManagementConfig;
   buildPipelines: (
     env: ContextEnvironment,
-    config?: SidecarConfig,
+    config?: ContextManagementConfig,
   ) => PipelineDef[];
   buildAsyncPipelines: (
     env: ContextEnvironment,
-    config?: SidecarConfig,
+    config?: ContextManagementConfig,
   ) => AsyncPipelineDef[];
 }
 
@@ -58,7 +58,7 @@ export interface ContextProfile {
  * The standard default context management profile.
  * Optimized for safety, precision, and reliable summarization.
  */
-export const defaultSidecarProfile: ContextProfile = {
+export const defaultContextProfile: ContextProfile = {
   config: {
     budget: {
       retainedTokens: 65000,
@@ -68,7 +68,7 @@ export const defaultSidecarProfile: ContextProfile = {
 
   buildPipelines: (
     env: ContextEnvironment,
-    config?: SidecarConfig,
+    config?: ContextManagementConfig,
   ): PipelineDef[] =>
     // Helper to merge default options with dynamically loaded processorOptions by ID
     [
@@ -122,7 +122,7 @@ export const defaultSidecarProfile: ContextProfile = {
     ],
   buildAsyncPipelines: (
     env: ContextEnvironment,
-    config?: SidecarConfig,
+    config?: ContextManagementConfig,
   ): AsyncPipelineDef[] => [
     {
       name: 'Async Background GC',

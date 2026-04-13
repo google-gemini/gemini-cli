@@ -12,8 +12,6 @@ import { DeterministicIdGenerator } from '../system/DeterministicIdGenerator.js'
 import { randomUUID } from 'node:crypto';
 import { ContextTracer } from '../tracer.js';
 import { ContextEnvironmentImpl } from '../pipeline/environmentImpl.js';
-import { SidecarLoader } from '../config/configLoader.js';
-import { SidecarRegistry } from '../config/registry.js';
 import { ContextEventBus } from '../eventBus.js';
 import { PipelineOrchestrator } from '../pipeline/orchestrator.js';
 import type { ConcreteNode, ToolExecution } from '../ir/types.js';
@@ -25,6 +23,8 @@ import { InboxSnapshotImpl } from '../pipeline/inbox.js';
 import type { InboxMessage, ProcessArgs } from '../pipeline.js';
 import type { ContextProfile } from '../config/profiles.js';
 import type { Mock } from 'vitest';
+import { ContextWorkingBufferImpl } from '../pipeline/contextWorkingBuffer.js';
+import { testTruncateProfile } from './testProfile.js';
 
 /**
  * Creates a valid mock GenerateContentResponse with the provided text.
@@ -170,7 +170,6 @@ export function createMockEnvironment(
  * Creates a block of synthetic conversation history designed to consume a specific number of tokens.
  * Assumes roughly 4 characters per token for standard English text.
  */
-import { ContextWorkingBufferImpl } from '../pipeline/contextWorkingBuffer.js';
 
 export function createMockProcessArgs(
   targets: ConcreteNode[],
@@ -245,8 +244,7 @@ export function setupContextComponentTest(
   sidecarOverride?: ContextProfile,
 ): { chatHistory: AgentChatHistory; contextManager: ContextManager } {
   const chatHistory = new AgentChatHistory();
-  const registry = new SidecarRegistry(); // Provide an empty registry for tests, or one pre-filled by the caller if needed later
-  const sidecar = sidecarOverride || SidecarLoader.fromConfig(config, registry);
+  const sidecar = sidecarOverride || testTruncateProfile;
   const tracer = new ContextTracer({
     targetDir: '/tmp',
     sessionId: 'test-session',

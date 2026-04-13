@@ -26,15 +26,18 @@ export interface AsyncPipelineDef {
   processors: AsyncContextProcessor[];
 }
 
+export interface ContextBudget {
+  retainedTokens: number;
+  maxTokens: number;
+}
+
 /**
  * The Data-Driven Schema for the Context Manager.
  */
-export interface SidecarConfig {
+export interface ContextManagementConfig {
   /** Defines the token ceilings and limits for the pipeline. */
-  budget: {
-    retainedTokens: number;
-    maxTokens: number;
-  };
+  budget: ContextBudget;
+
   /**
    * Dynamic hyperparameter overrides for individual ContextProcessors and AsyncProcessors.
    * Keys are named identifiers (e.g. "gentleTruncation").

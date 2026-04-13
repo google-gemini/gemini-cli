@@ -13,7 +13,7 @@ export interface ContextProcessorDef {
  * Registry for validating declarative sidecar configuration schemas.
  * (Dynamic instantiation has been replaced by static ContextProfiles)
  */
-export class SidecarRegistry {
+export class ContextProcessorRegistry {
   private readonly processors = new Map<string, ContextProcessorDef>();
 
   registerProcessor(def: ContextProcessorDef) {

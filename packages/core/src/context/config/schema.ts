@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { SidecarRegistry } from './registry.js';
+import type { ContextProcessorRegistry } from './registry.js';
 
-export function getSidecarConfigSchema(registry?: SidecarRegistry) {
+export function getContextManagementConfigSchema(registry?: ContextProcessorRegistry) {
   // If a registry is provided, we can deeply validate processor overrides.
   // We do this by generating a `oneOf` list that matches the `type` discriminator
   // to the specific processor `options` schema.
@@ -42,7 +42,7 @@ export function getSidecarConfigSchema(registry?: SidecarRegistry) {
 
   return {
     $schema: 'http://json-schema.org/draft-07/schema#',
-    title: 'SidecarConfig',
+    title: 'ContextManagementConfig',
     description: 'The Hyperparameter schema for a Context Profile.',
     type: 'object',
     properties: {

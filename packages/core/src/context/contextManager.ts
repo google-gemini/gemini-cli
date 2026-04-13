@@ -13,7 +13,7 @@ import type { ContextEnvironment } from './pipeline/environment.js';
 import type { ContextProfile } from './config/profiles.js';
 import type { PipelineOrchestrator } from './pipeline/orchestrator.js';
 import { HistoryObserver } from './historyObserver.js';
-import { IrProjector } from './ir/projector.js';
+import { render } from './ir/render.js';
 import { ContextWorkingBufferImpl } from './pipeline/contextWorkingBuffer.js';
 
 export class ContextManager {
@@ -140,10 +140,10 @@ export class ContextManager {
   ): Promise<Content[]> {
     this.tracer.logEvent(
       'ContextManager',
-      'Starting projection to LLM context',
+      'Starting rendering of LLM context',
     );
     // Apply final GC Backstop pressure barrier synchronously before mapping
-    const finalHistory = await IrProjector.project(
+    const finalHistory = await render(
       this.buffer.nodes,
       this.orchestrator,
       this.sidecar,
@@ -152,7 +152,7 @@ export class ContextManager {
       activeTaskIds,
     );
 
-    this.tracer.logEvent('ContextManager', 'Finished projection');
+    this.tracer.logEvent('ContextManager', 'Finished rendering');
 
     return finalHistory;
   }

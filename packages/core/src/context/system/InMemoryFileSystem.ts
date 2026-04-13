@@ -35,7 +35,7 @@ export class InMemoryFileSystem implements IFileSystem {
       : Buffer.byteLength(content, 'utf8');
   }
 
-  readFileSync(p: string, encoding: 'utf8'): string {
+  readFileSync(p: string, encoding: 'utf-8'): string {
     const content = this.files.get(this.normalize(p));
     if (content === undefined) {
       throw new Error(`ENOENT: no such file or directory, open '${p}'`);
@@ -60,6 +60,10 @@ export class InMemoryFileSystem implements IFileSystem {
   }
 
   mkdirSync(_p: string, _options?: { recursive?: boolean }): void {}
+
+  async readFile(p: string, encoding?: 'utf-8'): Promise<string> {
+    return this.readFileSync(p, encoding ?? 'utf-8');
+  }
 
   async writeFile(p: string, data: string | Buffer): Promise<void> {
     this.writeFileSync(p, data);
