@@ -30,18 +30,18 @@ describe('scrubCiEnv', () => {
     expect(Object.keys(env)).toEqual([]);
   });
 
-  it('preserves CI when set to "false"', () => {
+  it('deletes CI="false" but does not report it as scrubbed', () => {
     const env = { CI: 'false' };
     const removed = scrubCiEnv(env);
     expect(removed).toEqual([]);
-    expect(env).toHaveProperty('CI', 'false');
+    expect(env).not.toHaveProperty('CI');
   });
 
-  it('preserves CI when set to "0"', () => {
+  it('deletes CI="0" but does not report it as scrubbed', () => {
     const env = { CI: '0' };
     const removed = scrubCiEnv(env);
     expect(removed).toEqual([]);
-    expect(env).toHaveProperty('CI', '0');
+    expect(env).not.toHaveProperty('CI');
   });
 
   it('returns empty array when no CI vars are present', () => {

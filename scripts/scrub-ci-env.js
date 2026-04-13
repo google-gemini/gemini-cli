@@ -21,18 +21,25 @@ const CI_ENV_KEYS = ['CI', 'CONTINUOUS_INTEGRATION'];
  * Removes CI-related env vars from `env` **in place** so that `is-in-ci`
  * returns `false` and `ink` stays in interactive mode.
  *
- * Values of `'0'` and `'false'` are left untouched because `is-in-ci` already
- * treats them as non-CI.
+ * `is-in-ci` checks key existence (`'CI' in env`), so even `'0'` and `'false'`
+ * values trigger CI detection in Node.js (where all env values are strings and
+ * therefore truthy).  We always delete the key, but only report it in the
+ * returned array when the original value was meaningful — callers use the list
+ * to decide whether to show a warning, and `'0'`/`'false'` clearly signal
+ * intent to disable CI.
  *
  * @param {Record<string, string | undefined>} env  The environment object
  *   (typically a spread of `process.env`).
- * @returns {string[]}  The keys that were removed.
+ * @returns {string[]}  The keys that were removed with meaningful values.
  */
 export function scrubCiEnv(env) {
   const scrubbed = [];
   for (const key of CI_ENV_KEYS) {
-    if (key in env && env[key] !== '0' && env[key] !== 'false') {
-      scrubbed.push(key);
+    if (key in env) {
+      const value = env[key];
+      if (value !== '0' && value !== 'false') {
+        scrubbed.push(key);
+      }
       delete env[key];
     }
   }
