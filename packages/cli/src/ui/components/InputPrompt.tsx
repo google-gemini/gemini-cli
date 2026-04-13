@@ -32,14 +32,11 @@ import {
   LARGE_PASTE_LINE_THRESHOLD,
   LARGE_PASTE_CHAR_THRESHOLD,
 } from './shared/text-buffer.js';
-import {
-  cpSlice,
-  cpLen,
-  toCodePoints,
-  cpIndexToOffset,
-} from '../utils/textUtils.js';
+import { toCodePoints, cpLen, cpSlice } from '../utils/textUtils.js';
 import chalk from 'chalk';
 import stringWidth from 'string-width';
+import { reorderBidi, type ClusteredChar } from '../rtl/bidi.js';
+import { stringWidth as rtlStringWidth } from '../rtl/utils.js';
 import { useShellHistory } from '../hooks/useShellHistory.js';
 import { useReverseSearchCompletion } from '../hooks/useReverseSearchCompletion.js';
 import {
@@ -1530,13 +1527,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
 
       const { lineText, absoluteVisualIdx } = item;
-      // console.log('renderItem called with:', lineText);
       const mapEntry = buffer.visualToLogicalMap[absoluteVisualIdx];
       if (!mapEntry) return <Text> </Text>;
 
       const isOnCursorLine =
         focus && absoluteVisualIdx === cursorVisualRowAbsolute;
-      const renderedLine: React.ReactNode[] = [];
       const [logicalLineIdx] = mapEntry;
       const logicalLine = buffer.lines[logicalLineIdx] || '';
       const transformations =
@@ -1557,70 +1552,147 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         visualStartCol,
         visualEndCol,
       );
-      let charCount = 0;
-      segments.forEach((seg, segIdx) => {
-        const segLen = cpLen(seg.text);
-        let display = seg.text;
-        if (isOnCursorLine) {
-          const relCol = cursorVisualColAbsolute;
-          const segStart = charCount;
-          const segEnd = segStart + segLen;
-          if (relCol >= segStart && relCol < segEnd) {
-            const charToHighlight = cpSlice(
-              display,
-              relCol - segStart,
-              relCol - segStart + 1,
-            );
-            const highlighted = showCursor
-              ? chalk.inverse(charToHighlight)
-              : charToHighlight;
-            display =
-              cpSlice(display, 0, relCol - segStart) +
-              highlighted +
-              cpSlice(display, relCol - segStart + 1);
-          }
-          charCount = segEnd;
-        } else {
-          charCount += segLen;
-        }
+
+      // Collect all characters into a list with their visual properties for reordering
+      type RenderChar = ClusteredChar & { color: string; isCursor: boolean };
+      const logicalChars: RenderChar[] = [];
+
+      segments.forEach((seg) => {
         const color =
           seg.type === 'command' || seg.type === 'file' || seg.type === 'paste'
             ? theme.text.accent
             : theme.text.primary;
-        renderedLine.push(
-          <Text key={`token-${segIdx}`} color={color}>
-            {display}
-          </Text>,
-        );
+
+        for (const segment of Array.from(seg.text)) {
+          logicalChars.push({
+            value: segment,
+            width: rtlStringWidth(segment),
+            color,
+            isCursor: false,
+          });
+        }
       });
 
+      // Handle the virtual ' ' for cursor at end of line (when there's no ghost text)
       const currentLineGhost = isOnCursorLine ? inlineGhost : '';
       if (
         isOnCursorLine &&
         cursorVisualColAbsolute === cpLen(lineText) &&
         !currentLineGhost
       ) {
-        renderedLine.push(
-          <Text key={`cursor-end-${cursorVisualColAbsolute}`}>
-            {showCursor ? chalk.inverse(' ') : ' '}
+        logicalChars.push({
+          value: ' ',
+          width: 1,
+          color: theme.text.primary,
+          isCursor: true,
+        });
+      } else if (isOnCursorLine) {
+        // Mark the logical cursor character
+        const relCol = cursorVisualColAbsolute;
+        if (relCol >= 0 && relCol < logicalChars.length) {
+          logicalChars[relCol].isCursor = true;
+        }
+      }
+
+      // Reorder characters using the Bidi algorithm (Bypass if GEMINI_NATIVE_RTL is enabled)
+      const isNativeRTL =
+        process.env['GEMINI_NATIVE_RTL'] === 'true' ||
+        process.env['GEMINI_NATIVE_RTL'] === '1';
+      const visualChars = isNativeRTL
+        ? logicalChars
+        : reorderBidi(logicalChars);
+
+      // Grouping/Flushing Algorithm: Iterate through reordered visual characters and group adjacent
+      // characters that share the exact same style (color) AND cursor state into a single string.
+      // This allows the terminal to correctly apply contextual shaping (e.g. Arabic ligatures).
+      const renderedGroups: React.ReactNode[] = [];
+      let visualCursorPosition = 0;
+      let currentVisualOffset = 0;
+
+      if (visualChars.length > 0) {
+        let currentGroupValue = visualChars[0].value;
+        let currentGroupColor = visualChars[0].color;
+        let currentGroupIsCursor = visualChars[0].isCursor;
+
+        if (visualChars[0].isCursor) {
+          visualCursorPosition = 0;
+        }
+
+        for (let i = 1; i < visualChars.length; i++) {
+          const char = visualChars[i];
+          const charVisualOffset =
+            currentVisualOffset + visualChars[i - 1].width;
+          currentVisualOffset = charVisualOffset;
+
+          if (char.isCursor) {
+            visualCursorPosition = charVisualOffset;
+          }
+
+          if (
+            char.color === currentGroupColor &&
+            char.isCursor === currentGroupIsCursor
+          ) {
+            currentGroupValue += char.value;
+          } else {
+            // Flush current group
+            const display =
+              currentGroupIsCursor && showCursor
+                ? chalk.inverse(currentGroupValue)
+                : currentGroupValue;
+
+            renderedGroups.push(
+              <Text
+                key={`group-${renderedGroups.length}`}
+                color={currentGroupColor}
+              >
+                {display}
+              </Text>,
+            );
+
+            // Start new group
+            currentGroupValue = char.value;
+            currentGroupColor = char.color;
+            currentGroupIsCursor = char.isCursor;
+          }
+        }
+
+        // Final flush
+        const display =
+          currentGroupIsCursor && showCursor
+            ? chalk.inverse(currentGroupValue)
+            : currentGroupValue;
+        renderedGroups.push(
+          <Text
+            key={`group-${renderedGroups.length}`}
+            color={currentGroupColor}
+          >
+            {display}
           </Text>,
         );
       }
+
       const showCursorBeforeGhost =
         focus &&
         isOnCursorLine &&
         cursorVisualColAbsolute === cpLen(lineText) &&
         currentLineGhost;
+
+      // If cursor is at the very end before ghost text, calculate its position
+      if (showCursorBeforeGhost && showCursor) {
+        visualCursorPosition =
+          currentVisualOffset +
+          (visualChars.length > 0
+            ? visualChars[visualChars.length - 1].width
+            : 0);
+      }
+
       return (
         <Box height={1}>
           <Text
             terminalCursorFocus={showCursor && isOnCursorLine}
-            terminalCursorPosition={cpIndexToOffset(
-              lineText,
-              cursorVisualColAbsolute,
-            )}
+            terminalCursorPosition={visualCursorPosition}
           >
-            {renderedLine}
+            {renderedGroups}
             {showCursorBeforeGhost && (showCursor ? chalk.inverse(' ') : ' ')}
             {currentLineGhost && (
               <Text color={theme.text.secondary}>{currentLineGhost}</Text>
