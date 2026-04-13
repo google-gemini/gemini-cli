@@ -808,7 +808,7 @@ describe('oauth2', () => {
     });
 
     describe('error handling', () => {
-      it('should handle browser launch failure with FatalAuthenticationError', async () => {
+      it('should emit error feedback on browser launch failure without blocking auth', async () => {
         const mockError = new Error('Browser launch failed');
         vi.mocked(openBrowserSecurely).mockRejectedValue(mockError);
 
@@ -818,9 +818,44 @@ describe('oauth2', () => {
         } as unknown as OAuth2Client;
         vi.mocked(OAuth2Client).mockImplementation(() => mockOAuth2Client);
 
-        await expect(
-          getOauthClient(AuthType.LOGIN_WITH_GOOGLE, mockConfig),
-        ).rejects.toThrow('Failed to open browser: Browser launch failed');
+        const mockHttpServer = {
+          listen: vi.fn(),
+          close: vi.fn(),
+          on: vi.fn(),
+          address: () => ({ port: 3000 }),
+        };
+        (http.createServer as Mock).mockImplementation(
+          () => mockHttpServer as unknown as http.Server,
+        );
+
+        const feedbackSpy = vi.spyOn(coreEvents, 'emit');
+
+        // The browser launch error no longer throws; it emits feedback
+        // and the auth flow continues waiting. Abort via SIGINT to end.
+        const clientPromise = getOauthClient(
+          AuthType.LOGIN_WITH_GOOGLE,
+          mockConfig,
+        );
+
+        // Allow the fire-and-forget rejection to propagate
+        await vi.waitFor(() => {
+          expect(feedbackSpy).toHaveBeenCalledWith(
+            expect.anything(),
+            expect.objectContaining({
+              severity: 'error',
+              message: expect.stringContaining('Browser launch failed'),
+            }),
+          );
+        });
+
+        // Cancel to unblock the Promise.race
+        process.emit('SIGINT' as never);
+
+        await expect(clientPromise).rejects.toThrow(
+          'Authentication cancelled by user.',
+        );
+
+        feedbackSpy.mockRestore();
       });
 
       it('should handle authentication timeout with proper error message', async () => {
