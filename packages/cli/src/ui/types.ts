@@ -486,6 +486,7 @@ export type Message =
     };
 
 export interface ConsoleMessageItem {
+  id: string;
   type: 'log' | 'warn' | 'error' | 'debug' | 'info';
   content: string;
   count: number;

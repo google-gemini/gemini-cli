@@ -21,6 +21,7 @@ export interface TextInputProps {
   onSubmit?: (value: string) => void;
   onCancel?: () => void;
   focus?: boolean;
+  priority?: boolean | number;
 }
 
 export function TextInput({
@@ -29,6 +30,7 @@ export function TextInput({
   onSubmit,
   onCancel,
   focus = true,
+  priority,
 }: TextInputProps): React.JSX.Element {
   const keyMatchers = useKeyMatchers();
   const {
@@ -58,7 +60,10 @@ export function TextInput({
     [handleInput, onCancel, onSubmit, text, buffer.pastedContent, keyMatchers],
   );
 
-  useKeypress(handleKeyPress, { isActive: focus, priority: true });
+  useKeypress(handleKeyPress, {
+    isActive: focus,
+    priority: priority ?? true,
+  });
 
   const showPlaceholder = text.length === 0 && placeholder;
 

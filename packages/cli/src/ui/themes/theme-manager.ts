@@ -427,6 +427,13 @@ class ThemeManager {
           dark: colors.DarkGray,
           focus: colors.FocusColor ?? colors.AccentGreen,
         },
+        logLevels: {
+          log: colors.Foreground,
+          info: colors.AccentBlue,
+          warn: colors.AccentYellow,
+          error: colors.AccentRed,
+          debug: semanticColors.logLevels.debug,
+        },
       };
     } else {
       this.cachedSemanticColors = semanticColors;

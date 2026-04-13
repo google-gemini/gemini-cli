@@ -40,6 +40,13 @@ export interface SemanticColors {
     success: string;
     warning: string;
   };
+  logLevels: {
+    log: string;
+    info: string;
+    warn: string;
+    error: string;
+    debug: string;
+  };
 }
 
 export const lightSemanticColors: SemanticColors = {
@@ -76,6 +83,13 @@ export const lightSemanticColors: SemanticColors = {
     success: lightTheme.AccentGreen,
     warning: lightTheme.AccentYellow,
   },
+  logLevels: {
+    log: lightTheme.Foreground,
+    info: lightTheme.AccentBlue,
+    warn: lightTheme.AccentYellow,
+    error: lightTheme.AccentRed,
+    debug: '#008B8B',
+  },
 };
 
 export const darkSemanticColors: SemanticColors = {
@@ -111,5 +125,12 @@ export const darkSemanticColors: SemanticColors = {
     error: darkTheme.AccentRed,
     success: darkTheme.AccentGreen,
     warning: darkTheme.AccentYellow,
+  },
+  logLevels: {
+    log: darkTheme.Foreground,
+    info: darkTheme.AccentBlue,
+    warn: darkTheme.AccentYellow,
+    error: darkTheme.AccentRed,
+    debug: '#20B2AA',
   },
 };

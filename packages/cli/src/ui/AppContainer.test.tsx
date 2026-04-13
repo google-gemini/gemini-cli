@@ -2129,6 +2129,22 @@ describe('AppContainer State Management', () => {
 
         pressKey('\x03'); // Ctrl+C
         expect(mockHandleSlashCommand).not.toHaveBeenCalled();
+      });
+
+      it('does not trigger IDE context detail while debug console is open', async () => {
+        mockConfig.getIdeMode = vi.fn().mockReturnValue(true);
+        await setupKeypressTest();
+
+        act(() => {
+          capturedUIActions.setQueueErrorMessage('debug');
+        });
+        rerender();
+
+        pressKey('\x1b[24~'); // F12 opens debug console
+        expect(capturedUIState.showErrorDetails).toBe(true);
+
+        pressKey('\x1bOS'); // F4
+        expect(mockHandleSlashCommand).not.toHaveBeenCalledWith('/ide status');
         unmount();
       });
     });

@@ -62,6 +62,13 @@ const noColorSemanticColors: SemanticColors = {
     success: '',
     warning: '',
   },
+  logLevels: {
+    log: '',
+    info: '',
+    warn: '',
+    error: '',
+    debug: '',
+  },
 };
 
 export const NoColorTheme: Theme = new Theme(

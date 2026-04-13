@@ -93,8 +93,15 @@ vi.mock('./ShortcutsHelp.js', () => ({
   ShortcutsHelp: () => <Text>ShortcutsHelp</Text>,
 }));
 
+const detailedMessagesDisplayMock = vi.hoisted(() => ({
+  props: [] as Array<Record<string, unknown>>,
+}));
+
 vi.mock('./DetailedMessagesDisplay.js', () => ({
-  DetailedMessagesDisplay: () => <Text>DetailedMessagesDisplay</Text>,
+  DetailedMessagesDisplay: (props: Record<string, unknown>) => {
+    detailedMessagesDisplayMock.props.push(props);
+    return <Text>DetailedMessagesDisplay</Text>;
+  },
 }));
 
 vi.mock('./InputPrompt.js', () => ({
@@ -295,6 +302,7 @@ describe('Composer', () => {
     vi.useFakeTimers();
     composerTestControls.suggestionsVisible = false;
     composerTestControls.isAlternateBuffer = false;
+    detailedMessagesDisplayMock.props = [];
   });
 
   afterEach(() => {
@@ -800,6 +808,23 @@ describe('Composer', () => {
 
       expect(lastFrame()).toContain('DetailedMessagesDisplay');
       expect(lastFrame()).toContain('ShowMoreLines');
+    });
+
+    it('passes an isolated search buffer to DetailedMessagesDisplay', async () => {
+      const promptBuffer = { text: 'real prompt' } as unknown as TextBuffer;
+      const uiState = createMockUIState({
+        showErrorDetails: true,
+      });
+
+      await renderComposer(uiState, undefined, undefined, undefined, {
+        buffer: promptBuffer,
+      });
+
+      const props = detailedMessagesDisplayMock.props.at(-1);
+      expect(props).toBeTruthy();
+      expect(props?.['searchBuffer']).toBeDefined();
+      expect(props?.['searchBuffer']).not.toBe(promptBuffer);
+      expect((props?.['searchBuffer'] as TextBuffer).text).toBe('');
     });
 
     it('does not show error details when showErrorDetails is false', async () => {

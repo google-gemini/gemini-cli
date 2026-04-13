@@ -5,13 +5,17 @@
  */
 
 import { renderWithProviders } from '../../test-utils/render.js';
+import { useKeypress, type Key } from '../hooks/useKeypress.js';
+import { waitFor } from '../../test-utils/async.js';
 import { DetailedMessagesDisplay } from './DetailedMessagesDisplay.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { ConsoleMessageItem } from '../types.js';
-import { Box } from 'ink';
-import type React from 'react';
+import { Box, Text } from 'ink';
+import React from 'react';
 import { createMockSettings } from '../../test-utils/settings.js';
 import { useConsoleMessages } from '../hooks/useConsoleMessages.js';
+import type { TextBuffer } from './shared/text-buffer.js';
+import { useTextBuffer } from './shared/text-buffer.js';
 
 vi.mock('../hooks/useConsoleMessages.js', () => ({
   useConsoleMessages: vi.fn(),
@@ -34,9 +38,25 @@ vi.mock('./shared/ScrollableList.js', () => ({
 }));
 
 describe('DetailedMessagesDisplay', () => {
+  const renderDisplay = async (
+    props: Partial<React.ComponentProps<typeof DetailedMessagesDisplay>> = {},
+  ) =>
+    renderWithProviders(
+      <DetailedMessagesDisplay
+        maxHeight={20}
+        width={80}
+        hasFocus={true}
+        {...props}
+      />,
+      {
+        settings: createMockSettings({ ui: { errorVerbosity: 'full' } }),
+      },
+    );
+
   beforeEach(() => {
     vi.mocked(useConsoleMessages).mockReturnValue([]);
   });
+
   it('renders nothing when messages are empty', async () => {
     const { lastFrame, unmount } = await renderWithProviders(
       <DetailedMessagesDisplay maxHeight={10} width={80} hasFocus={false} />,
@@ -50,28 +70,33 @@ describe('DetailedMessagesDisplay', () => {
 
   it('renders messages correctly', async () => {
     const messages: ConsoleMessageItem[] = [
-      { type: 'log', content: 'Log message', count: 1 },
-      { type: 'warn', content: 'Warning message', count: 1 },
-      { type: 'error', content: 'Error message', count: 1 },
-      { type: 'debug', content: 'Debug message', count: 1 },
+      { id: '1', type: 'log', content: 'Log message', count: 1 },
+      { id: '2', type: 'info', content: 'Info message', count: 1 },
+      { id: '3', type: 'warn', content: 'Warning message', count: 1 },
+      { id: '4', type: 'error', content: 'Error message', count: 1 },
+      { id: '5', type: 'debug', content: 'Debug message', count: 1 },
     ];
     vi.mocked(useConsoleMessages).mockReturnValue(messages);
 
-    const { lastFrame, unmount } = await renderWithProviders(
-      <DetailedMessagesDisplay maxHeight={20} width={80} hasFocus={true} />,
-      {
-        settings: createMockSettings({ ui: { errorVerbosity: 'full' } }),
-      },
-    );
+    const { lastFrame, unmount } = await renderDisplay();
     const output = lastFrame();
 
+    expect(output).toContain('Debug Console');
+    expect(output).toContain('F4 to search');
+    expect(output).toContain('All(4)*');
+    expect(output).toContain('Log(1)');
+    expect(output).toContain('Info(1)');
+    expect(output).toContain('Warn(1)');
+    expect(output).toContain('Error(1)');
+    expect(output).toContain('Info message');
+    expect(output).not.toContain('Debug message');
     expect(output).toMatchSnapshot();
     unmount();
   });
 
   it('shows the F12 hint even in low error verbosity mode', async () => {
     const messages: ConsoleMessageItem[] = [
-      { type: 'error', content: 'Error message', count: 1 },
+      { id: '5', type: 'error', content: 'Error message', count: 1 },
     ];
     vi.mocked(useConsoleMessages).mockReturnValue(messages);
 
@@ -81,13 +106,15 @@ describe('DetailedMessagesDisplay', () => {
         settings: createMockSettings({ ui: { errorVerbosity: 'low' } }),
       },
     );
-    expect(lastFrame()).toContain('(F12 to close)');
+    expect(lastFrame()).toContain(
+      'Debug Console (F12 to close | F4 to search)',
+    );
     unmount();
   });
 
   it('shows the F12 hint in full error verbosity mode', async () => {
     const messages: ConsoleMessageItem[] = [
-      { type: 'error', content: 'Error message', count: 1 },
+      { id: '6', type: 'error', content: 'Error message', count: 1 },
     ];
     vi.mocked(useConsoleMessages).mockReturnValue(messages);
 
@@ -97,25 +124,197 @@ describe('DetailedMessagesDisplay', () => {
         settings: createMockSettings({ ui: { errorVerbosity: 'full' } }),
       },
     );
-    expect(lastFrame()).toContain('(F12 to close)');
+    expect(lastFrame()).toContain(
+      'Debug Console (F12 to close | F4 to search)',
+    );
     unmount();
   });
 
   it('renders message counts', async () => {
     const messages: ConsoleMessageItem[] = [
-      { type: 'log', content: 'Repeated message', count: 5 },
+      { id: '7', type: 'log', content: 'Repeated message', count: 5 },
     ];
     vi.mocked(useConsoleMessages).mockReturnValue(messages);
 
-    const { lastFrame, unmount } = await renderWithProviders(
-      <DetailedMessagesDisplay maxHeight={10} width={80} hasFocus={false} />,
+    const { lastFrame, unmount } = await renderDisplay({
+      maxHeight: 10,
+      hasFocus: false,
+    });
+    const output = lastFrame();
+
+    expect(output).toContain('Repeated message');
+    expect(output).toContain('(x5)');
+    expect(output).toMatchSnapshot();
+    unmount();
+  });
+
+  it('does not filter messages from search text until search mode is active', async () => {
+    const messages: ConsoleMessageItem[] = [
+      { id: '1', type: 'info', content: 'alpha match', count: 1 },
+      { id: '2', type: 'warn', content: 'beta only', count: 1 },
+    ];
+    vi.mocked(useConsoleMessages).mockReturnValue(messages);
+    const searchBuffer = { text: 'alpha' } as TextBuffer;
+
+    const { lastFrame, unmount } = await renderDisplay({ searchBuffer });
+
+    const output = lastFrame();
+    expect(output).toContain('alpha match');
+    expect(output).toContain('beta only');
+    expect(output).not.toContain('Search: alpha');
+    unmount();
+  });
+
+  it('renders info messages with info-level color', async () => {
+    const messages: ConsoleMessageItem[] = [
+      { id: '1', type: 'info', content: 'Info message', count: 1 },
+    ];
+    vi.mocked(useConsoleMessages).mockReturnValue(messages);
+    const searchBuffer = { text: '' } as TextBuffer;
+
+    const { lastFrame, unmount } = await renderDisplay({ searchBuffer });
+
+    expect(lastFrame()).toContain('Info message');
+    expect(lastFrame()).toMatchSnapshot();
+    unmount();
+  });
+
+  it('filters messages after entering search mode with F4 and typing a keyword', async () => {
+    const messages: ConsoleMessageItem[] = [
+      { id: '1', type: 'info', content: 'alpha match', count: 1 },
+      { id: '2', type: 'warn', content: 'beta only', count: 1 },
+    ];
+    vi.mocked(useConsoleMessages).mockReturnValue(messages);
+
+    const SearchHarness = () => {
+      const searchBuffer = useTextBuffer({
+        initialText: '',
+        viewport: { width: 30, height: 1 },
+        singleLine: true,
+      });
+
+      return (
+        <DetailedMessagesDisplay
+          maxHeight={20}
+          width={80}
+          hasFocus={true}
+          searchBuffer={searchBuffer}
+        />
+      );
+    };
+
+    const { lastFrame, stdin, unmount } = await renderWithProviders(
+      <SearchHarness />,
       {
         settings: createMockSettings({ ui: { errorVerbosity: 'full' } }),
       },
     );
-    const output = lastFrame();
 
-    expect(output).toMatchSnapshot();
+    await React.act(async () => {
+      stdin.write('\u001bOS');
+    });
+
+    await waitFor(() => {
+      const output = lastFrame();
+      expect(output).toContain('F4 esc search');
+      expect(output).toContain('Search:');
+      expect(output).toContain('Filter logs');
+      expect(output).toContain('╭');
+      expect(output).toContain('╮');
+    });
+
+    await React.act(async () => {
+      stdin.write('alpha');
+    });
+
+    await waitFor(() => {
+      const output = lastFrame();
+      expect(output).toContain('alpha match');
+      expect(output).not.toContain('beta only');
+      expect(output).toContain('alpha');
+      expect(output).toContain('[results: 1]');
+      expect(output).not.toContain('F\ni\nl\nt\ne\nr\n \nl\no\ng\ns');
+    });
+
+    unmount();
+  });
+
+  it('keeps search input active for consecutive typing instead of bubbling to lower inputs', async () => {
+    const messages: ConsoleMessageItem[] = [
+      { id: '1', type: 'info', content: 'alpha match', count: 1 },
+      { id: '2', type: 'warn', content: 'beta only', count: 1 },
+    ];
+    vi.mocked(useConsoleMessages).mockReturnValue(messages);
+
+    const LowerPriorityInput = () => {
+      const [value, setValue] = React.useState('');
+
+      useKeypress(
+        (key: Key) => {
+          if (key.sequence.length === 1 && !key.ctrl && !key.alt && !key.cmd) {
+            setValue((current) => current + key.sequence);
+            return true;
+          }
+          return false;
+        },
+        { isActive: true, priority: true },
+      );
+
+      return <Text>Composer mirror: {value || '(empty)'}</Text>;
+    };
+
+    const SearchHarness = () => {
+      const searchBuffer = useTextBuffer({
+        initialText: '',
+        viewport: { width: 30, height: 1 },
+        singleLine: true,
+      });
+
+      return (
+        <Box flexDirection="column">
+          <DetailedMessagesDisplay
+            maxHeight={20}
+            width={80}
+            hasFocus={true}
+            searchBuffer={searchBuffer}
+          />
+          <LowerPriorityInput />
+        </Box>
+      );
+    };
+
+    const { lastFrame, stdin, unmount } = await renderWithProviders(
+      <SearchHarness />,
+      {
+        settings: createMockSettings({ ui: { errorVerbosity: 'full' } }),
+      },
+    );
+
+    await React.act(async () => {
+      stdin.write('\u001bOS');
+    });
+
+    await waitFor(() => {
+      expect(lastFrame()).toContain('F4 esc search');
+      expect(lastFrame()).toContain('Search:');
+      expect(lastFrame()).toContain('Composer mirror: (empty)');
+    });
+
+    await React.act(async () => {
+      stdin.write('alpha');
+    });
+
+    await waitFor(() => {
+      const output = lastFrame();
+      expect(output).toContain('Composer mirror: (empty)');
+      expect(output).toContain('alpha match');
+      expect(output).not.toContain('beta only');
+      expect(output).toContain('a');
+      expect(output).toContain('l');
+      expect(output).toContain('p');
+      expect(output).toContain('h');
+    });
+
     unmount();
   });
 });
