@@ -378,9 +378,9 @@ export class ShellToolInvocation extends BaseToolInvocation<
         rootCommandDisplay += ', redirection';
       }
     } else {
-      rootCommandDisplay = parsed.details
-        .map((detail) => detail.name)
-        .join(', ');
+      rootCommandDisplay = [
+        ...new Set(parsed.details.map((detail) => detail.name)),
+      ].join(', ');
     }
 
     const rootCommands = [...new Set(getCommandRoots(command))];

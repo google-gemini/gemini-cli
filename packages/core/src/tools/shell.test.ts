@@ -1030,6 +1030,22 @@ describe('ShellTool', () => {
         expect(details.rootCommand).toBe('ls, grep');
       }
     });
+
+    it('should deduplicate repeated command names in rootCommand display', async () => {
+      const shellTool = new ShellTool(mockConfig, createMockMessageBus());
+      const command = 'git status && git diff && git log';
+      const invocation = shellTool.build({ command });
+
+      // @ts-expect-error - getConfirmationDetails is protected
+      const details = await invocation.getConfirmationDetails(
+        new AbortController().signal,
+      );
+
+      expect(details).not.toBe(false);
+      if (details && details.type === 'exec') {
+        expect(details.rootCommand).toBe('git');
+      }
+    });
   });
 
   describe('sandbox heuristics', () => {
