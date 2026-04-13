@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-04-11T01:52:23.183Z",
+  "updatedAt": "2026-04-13T19:21:34.123Z",
   "scenarios": {
     "cold-startup-time": {
       "wallClockMs": 927.553249999999,
@@ -26,6 +26,36 @@
       "wallClockMs": 4199.5024319999975,
       "cpuTotalUs": 292959,
       "timestamp": "2026-04-11T01:52:23.183Z"
+    },
+    "long-conversation-resume": {
+      "wallClockMs": 3006.8672899999947,
+      "cpuTotalUs": 220905,
+      "timestamp": "2026-04-13T19:20:42.672Z"
+    },
+    "long-conversation-typing": {
+      "wallClockMs": 361.24042400000326,
+      "cpuTotalUs": 12844,
+      "timestamp": "2026-04-13T19:20:56.118Z"
+    },
+    "long-conversation-execution": {
+      "wallClockMs": 248.57246799999848,
+      "cpuTotalUs": 5118,
+      "timestamp": "2026-04-13T19:21:08.755Z"
+    },
+    "long-conversation-scrolling": {
+      "wallClockMs": 210.18672699999297,
+      "cpuTotalUs": 7911,
+      "timestamp": "2026-04-13T18:32:14.226Z"
+    },
+    "long-conversation-terminal-scrolling": {
+      "wallClockMs": 210.52472200000193,
+      "cpuTotalUs": 8412,
+      "timestamp": "2026-04-13T19:21:21.244Z"
+    },
+    "long-conversation-alternate-scrolling": {
+      "wallClockMs": 208.16203599999426,
+      "cpuTotalUs": 9763,
+      "timestamp": "2026-04-13T19:21:34.123Z"
     }
   }
 }

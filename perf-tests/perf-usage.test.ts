@@ -171,7 +171,7 @@ describe('CPU Performance Tests', () => {
           const snapshot = await harness.measureWithEventLoop(
             'high-volume-output',
             async () => {
-              const runResult = await rig.run({
+              await rig.run({
                 args: ['Generate 1M lines of output'],
                 timeout: 120000,
                 env: {
@@ -182,7 +182,6 @@ describe('CPU Performance Tests', () => {
                   DEBUG: 'true',
                 },
               });
-              console.log(`  Child Process Output:`, runResult);
             },
           );
 
@@ -273,7 +272,11 @@ describe('CPU Performance Tests', () => {
     }
   });
 
-  it('long-conversation: input, command, and scroll latency', async () => {
+  describe('long-conversation', () => {
+    let rig: TestRig;
+    const identifier = 'perf-long-conversation';
+    const SESSION_ID =
+      'anonymous_unique_id_577296e0eee5afecdcec05d11838e0cd1a851cd97a28119a4a876b11';
     const LARGE_CHAT_SOURCE = join(
       __dirname,
       '..',
@@ -281,119 +284,208 @@ describe('CPU Performance Tests', () => {
       'large-chat-session.json',
     );
 
-    const result = await harness.runScenario('long-conversation', async () => {
-      const rig = new TestRig();
-      try {
-        rig.setup('perf-long-conversation', {
-          fakeResponsesPath: join(__dirname, 'perf.long-chat.responses'),
-        });
-
-        const SESSION_ID =
-          'anonymous_unique_id_577296e0eee5afecdcec05d11838e0cd1a851cd97a28119a4a876b11';
-        const identifier = 'perf-long-conversation';
-
-        // Manually setup the project registry so the CLI knows this project's ID
-        const geminiDir = join(rig.homeDir!, '.gemini');
-        mkdirSync(geminiDir, { recursive: true });
-        const registryPath = join(geminiDir, 'projects.json');
-        const projects = { [rig.testDir!]: identifier };
-        if (process.platform === 'win32') {
-          projects[rig.testDir!.toLowerCase()] = identifier;
-        }
-        writeFileSync(registryPath, JSON.stringify({ projects }));
-
-        // Create the temp dir and ownership marker
-        const projectTempDir = join(geminiDir, 'tmp', identifier);
-        mkdirSync(projectTempDir, { recursive: true });
-        writeFileSync(join(projectTempDir, '.project_root'), rig.testDir!);
-
-        // Setup the large chat history file
-        const targetChatsDir = join(projectTempDir, 'chats');
-        mkdirSync(targetChatsDir, { recursive: true });
-        const sessionFilePath = join(
-          targetChatsDir,
-          `session-${SESSION_ID}.json`,
+    beforeAll(async () => {
+      if (!existsSync(LARGE_CHAT_SOURCE)) {
+        throw new Error(
+          `Performance test fixture missing: ${LARGE_CHAT_SOURCE}.`,
         );
-        copyFileSync(LARGE_CHAT_SOURCE, sessionFilePath);
+      }
 
-        if (process.env['DEBUG']) {
-          console.log(`[PERF DEBUG] rig.testDir: ${rig.testDir}`);
-          console.log(`[PERF DEBUG] rig.homeDir: ${rig.homeDir}`);
-          console.log(`[PERF DEBUG] Registry path: ${registryPath}`);
-          console.log(
-            `[PERF DEBUG] Registry content: ${readFileSync(registryPath, 'utf8')}`,
+      rig = new TestRig();
+      rig.setup(identifier, {
+        fakeResponsesPath: join(__dirname, 'perf.long-chat.responses'),
+      });
+
+      const geminiDir = join(rig.homeDir!, '.gemini');
+      const projectTempDir = join(geminiDir, 'tmp', identifier);
+      const targetChatsDir = join(projectTempDir, 'chats');
+
+      mkdirSync(targetChatsDir, { recursive: true });
+      writeFileSync(
+        join(geminiDir, 'projects.json'),
+        JSON.stringify({
+          projects: { [rig.testDir!]: identifier },
+        }),
+      );
+      writeFileSync(join(projectTempDir, '.project_root'), rig.testDir!);
+      copyFileSync(
+        LARGE_CHAT_SOURCE,
+        join(targetChatsDir, `session-${SESSION_ID}.json`),
+      );
+    });
+
+    afterAll(async () => {
+      await rig.cleanup();
+    });
+
+    it('session-load: resume a 60MB chat history', async () => {
+      const result = await harness.runScenario(
+        'long-conversation-resume',
+        async () => {
+          const snapshot = await harness.measureWithEventLoop(
+            'resume',
+            async () => {
+              const run = await rig.runInteractive({
+                args: ['--resume', 'latest'],
+                env: { GEMINI_API_KEY: 'fake-perf-test-key' },
+              });
+              await run.kill();
+            },
           );
-          console.log(`[PERF DEBUG] Session file path: ${sessionFilePath}`);
-          console.log(
-            `[PERF DEBUG] Session file exists: ${existsSync(sessionFilePath)}`,
-          );
-        }
+          return snapshot;
+        },
+      );
 
-        let sessionLoadTimeMs = 0;
-        let avgTypingLatencyMs = 0;
-        let commandExecutionTimeMs = 0;
-        let scrollingLatencyMs = 0;
-
-        const snapshot = await harness.measureWithEventLoop(
-          'long-conversation-full',
-          async () => {
-            // 1. Measure Session Load Time
-            harness.startTimer('session-load-time');
-            const run = await rig.runInteractive({
-              args: ['--resume', 'latest', '--debug'],
-              env: { GEMINI_API_KEY: 'fake-perf-test-key' },
-            });
-            const loadSnapshot = harness.stopTimer('session-load-time');
-            sessionLoadTimeMs = loadSnapshot.wallClockMs;
-
-            // 2. Measure Typing Latency (average over 10 chars)
-            const testString = 'Hello Gemini';
-            harness.startTimer('typing-latency');
-            await run.type(testString);
-            const typeSnapshot = harness.stopTimer('typing-latency');
-            avgTypingLatencyMs = typeSnapshot.wallClockMs / testString.length;
-
-            // 3. Measure Simple Command Execution
-            harness.startTimer('command-execution-time');
-            await run.sendText('\r'); // Submit the "Hello Gemini" prompt
-            await run.expectText(
-              'I am a large conversation model response.',
-              30000,
-            );
-            const cmdSnapshot = harness.stopTimer('command-execution-time');
-            commandExecutionTimeMs = cmdSnapshot.wallClockMs;
-
-            // 4. Measure Scrolling Performance (Up/Down)
-            harness.startTimer('scrolling-latency');
-            // Simulate PageUp/PageDown multiple times
-            for (let i = 0; i < 5; i++) {
-              await run.sendKeys('\u001b[5~'); // PageUp
-              await run.sendKeys('\u001b[6~'); // PageDown
-            }
-            const scrollSnapshot = harness.stopTimer('scrolling-latency');
-            scrollingLatencyMs = scrollSnapshot.wallClockMs;
-
-            await run.kill();
-          },
-        );
-
-        // Add the sub-metrics to the main snapshot
-        return {
-          ...snapshot,
-          sessionLoadTimeMs,
-          avgTypingLatencyMs,
-          commandExecutionTimeMs,
-          scrollingLatencyMs,
-        };
-      } finally {
-        await rig.cleanup();
+      if (UPDATE_BASELINES) {
+        harness.updateScenarioBaseline(result);
+      } else {
+        harness.assertWithinBaseline(result);
       }
     });
 
-    if (UPDATE_BASELINES) {
-      harness.updateScenarioBaseline(result);
-    } else {
-      harness.assertWithinBaseline(result);
-    }
+    it('typing: latency when typing into a large session', async () => {
+      const result = await harness.runScenario(
+        'long-conversation-typing',
+        async () => {
+          const run = await rig.runInteractive({
+            args: ['--resume', 'latest'],
+            env: { GEMINI_API_KEY: 'fake-perf-test-key' },
+          });
+
+          const snapshot = await harness.measureWithEventLoop(
+            'typing',
+            async () => {
+              await run.type('Hello');
+            },
+          );
+
+          await run.kill();
+          return snapshot;
+        },
+      );
+
+      if (UPDATE_BASELINES) {
+        harness.updateScenarioBaseline(result);
+      } else {
+        harness.assertWithinBaseline(result);
+      }
+    });
+
+    it('execution: response latency for a simple shell command', async () => {
+      const result = await harness.runScenario(
+        'long-conversation-execution',
+        async () => {
+          const run = await rig.runInteractive({
+            args: ['--resume', 'latest'],
+            env: { GEMINI_API_KEY: 'fake-perf-test-key' },
+          });
+
+          await run.expectText('type your message');
+
+          const snapshot = await harness.measureWithEventLoop(
+            'execution',
+            async () => {
+              await run.sendKeys('!echo hi\r');
+              await run.expectText('hi');
+            },
+          );
+
+          await run.kill();
+          return snapshot;
+        },
+      );
+
+      if (UPDATE_BASELINES) {
+        harness.updateScenarioBaseline(result);
+      } else {
+        harness.assertWithinBaseline(result);
+      }
+    });
+
+    it('terminal-scrolling: latency when scrolling a large terminal buffer', async () => {
+      const result = await harness.runScenario(
+        'long-conversation-terminal-scrolling',
+        async () => {
+          // Enable terminalBuffer to intentionally test CLI scrolling logic
+          const settingsPath = join(rig.homeDir!, '.gemini', 'settings.json');
+          writeFileSync(
+            settingsPath,
+            JSON.stringify({
+              security: { folderTrust: { enabled: false } },
+              ui: { terminalBuffer: true },
+            }),
+          );
+
+          const run = await rig.runInteractive({
+            args: ['--resume', 'latest'],
+            env: { GEMINI_API_KEY: 'fake-perf-test-key' },
+          });
+
+          await run.expectText('type your message');
+
+          const snapshot = await harness.measureWithEventLoop(
+            'terminal-scrolling',
+            async () => {
+              for (let i = 0; i < 5; i++) {
+                await run.sendKeys('\u001b[5~'); // PageUp
+                await run.sendKeys('\u001b[6~'); // PageDown
+              }
+            },
+          );
+
+          await run.kill();
+          return snapshot;
+        },
+      );
+
+      if (UPDATE_BASELINES) {
+        harness.updateScenarioBaseline(result);
+      } else {
+        harness.assertWithinBaseline(result);
+      }
+    });
+
+    it('alternate-scrolling: latency when scrolling a large alternate buffer', async () => {
+      const result = await harness.runScenario(
+        'long-conversation-alternate-scrolling',
+        async () => {
+          // Enable useAlternateBuffer to intentionally test CLI scrolling logic
+          const settingsPath = join(rig.homeDir!, '.gemini', 'settings.json');
+          writeFileSync(
+            settingsPath,
+            JSON.stringify({
+              security: { folderTrust: { enabled: false } },
+              ui: { useAlternateBuffer: true },
+            }),
+          );
+
+          const run = await rig.runInteractive({
+            args: ['--resume', 'latest'],
+            env: { GEMINI_API_KEY: 'fake-perf-test-key' },
+          });
+
+          await run.expectText('type your message');
+
+          const snapshot = await harness.measureWithEventLoop(
+            'alternate-scrolling',
+            async () => {
+              for (let i = 0; i < 5; i++) {
+                await run.sendKeys('\u001b[5~'); // PageUp
+                await run.sendKeys('\u001b[6~'); // PageDown
+              }
+            },
+          );
+
+          await run.kill();
+          return snapshot;
+        },
+      );
+
+      if (UPDATE_BASELINES) {
+        harness.updateScenarioBaseline(result);
+      } else {
+        harness.assertWithinBaseline(result);
+      }
+    });
   });
 });
