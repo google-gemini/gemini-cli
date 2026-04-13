@@ -238,9 +238,11 @@ export class MessageBus extends EventEmitter {
       // Subscribe to responses
       this.subscribe<TResponse>(responseType, responseHandler);
 
-      // Publish the request with correlation ID
-      // eslint-disable-next-line @typescript-eslint/no-floating-promises, @typescript-eslint/no-unsafe-type-assertion
-      this.publish({ ...request, correlationId } as TRequest);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      this.publish({ ...request, correlationId } as TRequest).catch((err) => {
+        cleanup();
+        reject(err instanceof Error ? err : new Error(String(err)));
+      });
     });
   }
 }

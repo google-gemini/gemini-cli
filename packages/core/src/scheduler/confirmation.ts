@@ -335,8 +335,7 @@ async function waitForConfirmation(
       )
       .catch((error) => {
         debugLogger.warn('Error waiting for confirmation via IDE', error);
-        // Return a never-resolving promise so the race continues with the bus
-        return new Promise<ConfirmationResult>(() => {});
+        throw error;
       });
 
     return await Promise.race([busPromise, idePromise]);

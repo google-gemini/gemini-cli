@@ -163,15 +163,19 @@ export class Scheduler {
     });
   };
 
-  private readonly handleToolConfirmationRequest = async (
+  private readonly handleToolConfirmationRequest = (
     request: ToolConfirmationRequest,
   ) => {
-    await this.messageBus.publish({
-      type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
-      correlationId: request.correlationId,
-      confirmed: false,
-      requiresUserConfirmation: true,
-    });
+    this.messageBus
+      .publish({
+        type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+        correlationId: request.correlationId,
+        confirmed: false,
+        requiresUserConfirmation: true,
+      })
+      .catch(() => {
+        // Error updating confirmation response, swallowed intentionally
+      });
   };
 
   private setupMessageBusListener(messageBus: MessageBus): void {
