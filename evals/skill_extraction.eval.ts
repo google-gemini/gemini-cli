@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { describe, expect } from 'vitest';
+import { describe, expect, vi } from 'vitest';
 import {
   Storage,
   SESSION_FILE_PREFIX,
@@ -85,20 +85,11 @@ This workspace exists to exercise background skill extraction from prior chats.
 `,
 };
 
-function restoreGeminiHome(previousValue: string | undefined): void {
-  if (previousValue === undefined) {
-    delete process.env['GEMINI_CLI_HOME'];
-  } else {
-    process.env['GEMINI_CLI_HOME'] = previousValue;
-  }
-}
-
 async function withRigStorage<T>(
   rig: TestRig,
   fn: (storage: Storage, projectRoot: string) => Promise<T>,
 ): Promise<T> {
-  const previousGeminiHome = process.env['GEMINI_CLI_HOME'];
-  process.env['GEMINI_CLI_HOME'] = rig.homeDir!;
+  vi.stubEnv('GEMINI_CLI_HOME', rig.homeDir!);
 
   try {
     const projectRoot = fs.realpathSync(rig.testDir!);
@@ -106,7 +97,7 @@ async function withRigStorage<T>(
     await storage.initialize();
     return await fn(storage, projectRoot);
   } finally {
-    restoreGeminiHome(previousGeminiHome);
+    vi.unstubAllEnvs();
   }
 }
 
