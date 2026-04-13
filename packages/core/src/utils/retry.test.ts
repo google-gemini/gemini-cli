@@ -742,6 +742,8 @@ describe('retryWithBackoff', () => {
       AuthType.LOGIN_WITH_GOOGLE,
       expect.any(RetryableQuotaError),
     );
+    // 3 attempts (initial + 2 retries) fail, then fallback triggers, then 1 success
+    expect(mockFn).toHaveBeenCalledTimes(4);
   });
 
   it('should trigger fallback for OAuth personal users on ModelNotFoundError', async () => {
