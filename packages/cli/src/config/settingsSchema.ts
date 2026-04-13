@@ -1059,6 +1059,19 @@ const SETTINGS_SCHEMA = {
     description: 'Settings for voice mode and transcription.',
     showInDialog: true,
     properties: {
+      activationMode: {
+        type: 'enum',
+        label: 'Activation Mode',
+        category: 'Voice',
+        requiresRestart: false,
+        default: 'push-to-talk',
+        description: 'How to trigger voice recording with the Space key.',
+        showInDialog: true,
+        options: [
+          { value: 'push-to-talk', label: 'Push-To-Talk (Hold Space)' },
+          { value: 'toggle', label: 'Toggle (Press Space to start/stop)' },
+        ],
+      },
       backend: {
         type: 'enum',
         label: 'Transcription Backend',
