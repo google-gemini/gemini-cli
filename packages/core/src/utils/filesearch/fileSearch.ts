@@ -215,7 +215,10 @@ class RecursiveFileSearch implements FileSearch {
 
     let changed = false;
     if (event.eventType === 'add') {
-      if (fileFilter?.(normalizedPath)) {
+      if (
+        fileFilter?.(normalizedPath) ||
+        this.allFiles.size >= (this.options.maxFiles ?? 20000)
+      ) {
         return;
       }
       const sizeBefore = this.allFiles.size;
@@ -227,7 +230,10 @@ class RecursiveFileSearch implements FileSearch {
       const directoryPath = normalizedPath.endsWith('/')
         ? normalizedPath
         : `${normalizedPath}/`;
-      if (directoryFilter?.(directoryPath)) {
+      if (
+        directoryFilter?.(directoryPath) ||
+        this.allFiles.size >= (this.options.maxFiles ?? 20000)
+      ) {
         return;
       }
       const sizeBefore = this.allFiles.size;
