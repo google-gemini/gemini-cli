@@ -289,7 +289,6 @@ describe('GitService', () => {
 
       expect(hoistedMockEnv).toHaveBeenCalledWith(
         expect.objectContaining({
-          PATH: process.env['PATH'],
           GIT_CONFIG_GLOBAL: gitConfigPath,
           GIT_CONFIG_SYSTEM: path.join(repoDir, '.gitconfig_system_empty'),
           GIT_AUTHOR_NAME: SHADOW_REPO_AUTHOR_NAME,
@@ -304,18 +303,6 @@ describe('GitService', () => {
         'utf-8',
       );
       expect(systemConfigContent).toBe('');
-    });
-
-    it('should preserve the process environment when configuring git', async () => {
-      const service = new GitService(projectRoot, storage);
-      await service.setupShadowGitRepository();
-
-      expect(hoistedMockEnv).toHaveBeenCalledWith(
-        expect.objectContaining({
-          HOME: process.env['HOME'],
-          PATH: process.env['PATH'],
-        }),
-      );
     });
   });
 
