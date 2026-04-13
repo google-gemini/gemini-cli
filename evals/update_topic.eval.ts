@@ -215,4 +215,47 @@ export default app;
       expect(fs.existsSync(path.join(rig.testDir, 'src/routes.ts'))).toBe(true);
     },
   });
+
+  /**
+   * Regression test for a bug where update_topic was called multiple times in a
+   * row. We have seen cases of this occurring in earlier versions of the update_topic
+   * system instruction, prior to https://github.com/google-gemini/gemini-cli/pull/24640.
+   * This test demonstrated that there are cases where it can still occur and validates
+   * the prompt change that improves the behavior.
+   */
+  evalTest('USUALLY_PASSES', {
+    name: 'update_topic should not be called twice in a row',
+    prompt: `
+      We need to build a C compiler.
+
+      Before you write any code, you must formally declare your strategy.
+      First, declare that you will build a Lexer.
+      Then, immediately realize that is wrong and declare that you will actually build a Parser instead.
+
+      Finally, create 'parser.c'.
+    `,
+    files: {
+      'package.json': JSON.stringify({ name: 'test-project' }),
+      '.gemini/settings.json': JSON.stringify({
+        experimental: {
+          topicUpdateNarration: true,
+        },
+      }),
+    },
+    assert: async (rig) => {
+      const toolLogs = rig.readToolLogs();
+
+      // Check for back-to-back update_topic calls
+      for (let i = 1; i < toolLogs.length; i++) {
+        if (
+          toolLogs[i - 1].toolRequest.name === UPDATE_TOPIC_TOOL_NAME &&
+          toolLogs[i].toolRequest.name === UPDATE_TOPIC_TOOL_NAME
+        ) {
+          throw new Error(
+            `Detected back-to-back ${UPDATE_TOPIC_TOOL_NAME} calls at index ${i - 1} and ${i}`,
+          );
+        }
+      }
+    },
+  });
 });

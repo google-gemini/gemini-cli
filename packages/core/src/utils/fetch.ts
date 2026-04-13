@@ -10,9 +10,6 @@ import { Agent, ProxyAgent, setGlobalDispatcher } from 'undici';
 import ipaddr from 'ipaddr.js';
 import { lookup } from 'node:dns/promises';
 
-const DEFAULT_HEADERS_TIMEOUT = 300000; // 5 minutes
-const DEFAULT_BODY_TIMEOUT = 300000; // 5 minutes
-
 export class FetchError extends Error {
   constructor(
     message: string,
@@ -31,13 +28,35 @@ export class PrivateIpError extends Error {
   }
 }
 
+let defaultTimeout = 300000; // 5 minutes
+let currentProxy: string | undefined = undefined;
+
 // Configure default global dispatcher with higher timeouts
 setGlobalDispatcher(
   new Agent({
-    headersTimeout: DEFAULT_HEADERS_TIMEOUT,
-    bodyTimeout: DEFAULT_BODY_TIMEOUT,
+    headersTimeout: defaultTimeout,
+    bodyTimeout: defaultTimeout,
   }),
 );
+
+export function updateGlobalFetchTimeouts(timeoutMs: number) {
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+    throw new RangeError(
+      `Invalid timeout value: ${timeoutMs}. Must be a positive finite number.`,
+    );
+  }
+  defaultTimeout = timeoutMs;
+  if (currentProxy) {
+    setGlobalProxy(currentProxy);
+  } else {
+    setGlobalDispatcher(
+      new Agent({
+        headersTimeout: defaultTimeout,
+        bodyTimeout: defaultTimeout,
+      }),
+    );
+  }
+}
 
 /**
  * Sanitizes a hostname by stripping IPv6 brackets if present.
@@ -191,11 +210,12 @@ export async function fetchWithTimeout(
 }
 
 export function setGlobalProxy(proxy: string) {
+  currentProxy = proxy;
   setGlobalDispatcher(
     new ProxyAgent({
       uri: proxy,
-      headersTimeout: DEFAULT_HEADERS_TIMEOUT,
-      bodyTimeout: DEFAULT_BODY_TIMEOUT,
+      headersTimeout: defaultTimeout,
+      bodyTimeout: defaultTimeout,
     }),
   );
 }

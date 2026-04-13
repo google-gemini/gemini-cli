@@ -1687,6 +1687,29 @@ describe('Telemetry Metrics', () => {
         expect(mockCounterAddFn).not.toHaveBeenCalled();
       });
 
+      it('records tool_count on success when provided', () => {
+        initializeMetricsModule(mockConfig);
+        mockCounterAddFn.mockClear();
+        mockHistogramRecordFn.mockClear();
+
+        recordBrowserAgentConnectionModule(mockConfig, 1200, {
+          session_mode: 'isolated',
+          headless: false,
+          success: true,
+          tool_count: 5,
+        });
+
+        expect(mockHistogramRecordFn).toHaveBeenCalledWith(1200, {
+          'session.id': 'test-session-id',
+          'installation.id': 'test-installation-id',
+          'user.email': 'test@example.com',
+          session_mode: 'isolated',
+          headless: false,
+          success: true,
+          tool_count: 5,
+        });
+      });
+
       it('records connection duration and failure counter on error', () => {
         initializeMetricsModule(mockConfig);
         mockCounterAddFn.mockClear();
