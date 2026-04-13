@@ -351,13 +351,11 @@ export const Footer: React.FC = () => {
               <QuotaDisplay
                 remaining={quotaStats.remaining}
                 limit={quotaStats.limit}
-                resetTime={quotaStats.resetTime}
-                terse={true}
                 forceShow={true}
                 lowercase={true}
               />
             ),
-            10, // "daily 100%" is 10 chars, but terse is "100%" (4 chars)
+            9, // "100% used" is 9 chars
           );
         }
         break;
