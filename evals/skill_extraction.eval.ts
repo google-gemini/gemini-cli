@@ -14,6 +14,7 @@ import {
   SESSION_FILE_PREFIX,
   getProjectHash,
   startMemoryService,
+  Config,
 } from '@google/gemini-cli-core';
 import {
   loadCliConfig,
@@ -31,6 +32,13 @@ interface SeedSession {
   summary: string;
   userTurns: string[];
   timestampOffsetMinutes: number;
+}
+
+interface MessageRecord {
+  id: string;
+  timestamp: string;
+  type: string;
+  content: Array<{ text: string }>;
 }
 
 const MEMORY_EXTRACTION_ARGV: CliArgs = {
@@ -101,7 +109,7 @@ async function withRigStorage<T>(
   }
 }
 
-function buildMessages(userTurns: string[]) {
+function buildMessages(userTurns: string[]): MessageRecord[] {
   const baseTime = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
   return userTurns.flatMap((text, index) => [
     {
@@ -160,7 +168,7 @@ async function waitForExtractionState(rig: TestRig): Promise<{
     // The headless CLI eval finishes and exits before its fire-and-forget
     // memory task can complete, so invoke the real memory service directly.
     const previousCwd = process.cwd();
-    let config: Awaited<ReturnType<typeof loadCliConfig>> | undefined;
+    let config: Config | undefined;
 
     process.chdir(projectRoot);
 
