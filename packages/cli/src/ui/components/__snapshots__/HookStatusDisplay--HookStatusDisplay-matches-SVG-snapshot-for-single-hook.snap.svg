@@ -1,66 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="920" height="768" viewBox="0 0 920 768">
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="37" viewBox="0 0 920 37">
   <style>
     text { font-family: Consolas, "Courier New", monospace; font-size: 14px; dominant-baseline: text-before-edge; white-space: pre; }
   </style>
-  <rect width="920" height="768" fill="#000000" />
+  <rect width="920" height="37" fill="#000000" />
   <g transform="translate(10, 10)">
-    <rect x="9" y="17" width="63" height="17" fill="#cd0000" />
-    <text x="9" y="19" fill="#e5e5e5" textLength="63" lengthAdjust="spacingAndGlyphs"> ERROR </text>
-    <text x="72" y="19" fill="#ffffff" textLength="828" lengthAdjust="spacingAndGlyphs"> (0 , __vite_ssr_import_3__.isUserVisibleHook) is not a function                            </text>
-    <text x="0" y="53" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs"> src/ui/components/HookStatusDisplay.tsx:25:47                                                      </text>
-    <text x="0" y="87" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs"> 22:     return null;                                                                               </text>
-    <text x="0" y="104" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs"> 23:   }                                                                                            </text>
-    <text x="0" y="121" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs"> 24:                                                                                                </text>
-    <rect x="9" y="136" width="711" height="17" fill="#cd0000" />
-    <text x="9" y="138" fill="#e5e5e5" textLength="711" lengthAdjust="spacingAndGlyphs">25:   const userHooks = activeHooks.filter((h) =&gt; isUserVisibleHook(h.source));</text>
-    <text x="0" y="155" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs"> 26:                                                                                                </text>
-    <text x="0" y="172" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs"> 27:   if (userHooks.length &gt; 0) {                                                                  </text>
-    <text x="0" y="189" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs"> 28:     const label = userHooks.length &gt; 1 ? &apos;Executing Hooks&apos; : &apos;Executing Hook&apos;;                 </text>
-    <text x="0" y="223" fill="#ffffff" textLength="27" lengthAdjust="spacingAndGlyphs"> - </text>
-    <text x="27" y="223" fill="#7f7f7f" textLength="432" lengthAdjust="spacingAndGlyphs"> (src/ui/components/HookStatusDisplay.tsx:25:47)</text>
-    <text x="0" y="240" fill="#ffffff" textLength="27" lengthAdjust="spacingAndGlyphs"> - </text>
-    <text x="27" y="240" fill="#ffffff" textLength="324" lengthAdjust="spacingAndGlyphs" font-weight="bold">    at Array.filter (&lt;anonymous&gt;)\t </text>
-    <text x="0" y="257" fill="#ffffff" textLength="27" lengthAdjust="spacingAndGlyphs"> - </text>
-    <text x="27" y="257" fill="#ffffff" textLength="153" lengthAdjust="spacingAndGlyphs" font-weight="bold">HookStatusDisplay</text>
-    <text x="180" y="257" fill="#7f7f7f" textLength="432" lengthAdjust="spacingAndGlyphs" font-weight="bold"> (src/ui/components/HookStatusDisplay.tsx:25:33)</text>
-    <text x="0" y="274" fill="#ffffff" textLength="18" lengthAdjust="spacingAndGlyphs"> -</text>
-    <text x="18" y="274" fill="#ffffff" textLength="207" lengthAdjust="spacingAndGlyphs" font-weight="bold">Object.react-stack-bott</text>
-    <text x="18" y="291" fill="#ffffff" textLength="63" lengthAdjust="spacingAndGlyphs" font-weight="bold">m-frame</text>
-    <text x="225" y="291" fill="#7f7f7f" textLength="666" lengthAdjust="spacingAndGlyphs">(/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kil</text>
-    <text x="225" y="308" fill="#7f7f7f" textLength="666" lengthAdjust="spacingAndGlyphs">o-code-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-recon</text>
-    <text x="225" y="325" fill="#7f7f7f" textLength="270" lengthAdjust="spacingAndGlyphs">ciler.development.js:15859:20)</text>
-    <text x="0" y="342" fill="#ffffff" textLength="18" lengthAdjust="spacingAndGlyphs"> -</text>
-    <text x="18" y="342" fill="#ffffff" textLength="117" lengthAdjust="spacingAndGlyphs" font-weight="bold">renderWithHoo</text>
-    <text x="18" y="359" fill="#ffffff" textLength="9" lengthAdjust="spacingAndGlyphs" font-weight="bold">s</text>
-    <text x="135" y="359" fill="#7f7f7f" textLength="756" lengthAdjust="spacingAndGlyphs">(/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gre</text>
-    <text x="135" y="376" fill="#7f7f7f" textLength="756" lengthAdjust="spacingAndGlyphs">p-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js</text>
-    <text x="135" y="393" fill="#7f7f7f" textLength="81" lengthAdjust="spacingAndGlyphs">:3221:22)</text>
-    <text x="0" y="410" fill="#ffffff" textLength="18" lengthAdjust="spacingAndGlyphs"> -</text>
-    <text x="18" y="410" fill="#ffffff" textLength="162" lengthAdjust="spacingAndGlyphs" font-weight="bold">updateFunctionComp</text>
-    <text x="18" y="427" fill="#ffffff" textLength="36" lengthAdjust="spacingAndGlyphs" font-weight="bold">nent</text>
-    <text x="180" y="427" fill="#7f7f7f" textLength="711" lengthAdjust="spacingAndGlyphs">(/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-cod</text>
-    <text x="180" y="444" fill="#7f7f7f" textLength="711" lengthAdjust="spacingAndGlyphs">e-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.deve</text>
-    <text x="180" y="461" fill="#7f7f7f" textLength="171" lengthAdjust="spacingAndGlyphs">lopment.js:6475:19)</text>
-    <text x="0" y="478" fill="#ffffff" textLength="18" lengthAdjust="spacingAndGlyphs"> -</text>
-    <text x="18" y="478" fill="#ffffff" textLength="72" lengthAdjust="spacingAndGlyphs" font-weight="bold">beginWor</text>
-    <text x="90" y="495" fill="#7f7f7f" textLength="801" lengthAdjust="spacingAndGlyphs">(/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-onl</text>
-    <text x="90" y="512" fill="#7f7f7f" textLength="792" lengthAdjust="spacingAndGlyphs">y2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:8009:18)</text>
-    <text x="0" y="546" fill="#ffffff" textLength="18" lengthAdjust="spacingAndGlyphs"> -</text>
-    <text x="18" y="546" fill="#ffffff" textLength="126" lengthAdjust="spacingAndGlyphs" font-weight="bold">runWithFiberIn</text>
-    <text x="18" y="563" fill="#ffffff" textLength="18" lengthAdjust="spacingAndGlyphs" font-weight="bold">EV</text>
-    <text x="144" y="563" fill="#7f7f7f" textLength="747" lengthAdjust="spacingAndGlyphs">(/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr</text>
-    <text x="144" y="580" fill="#7f7f7f" textLength="747" lengthAdjust="spacingAndGlyphs">ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.</text>
-    <text x="144" y="597" fill="#7f7f7f" textLength="99" lengthAdjust="spacingAndGlyphs">js:1738:13)</text>
-    <text x="0" y="614" fill="#ffffff" textLength="18" lengthAdjust="spacingAndGlyphs"> -</text>
-    <text x="18" y="614" fill="#ffffff" textLength="126" lengthAdjust="spacingAndGlyphs" font-weight="bold">performUnitOfW</text>
-    <text x="18" y="631" fill="#ffffff" textLength="18" lengthAdjust="spacingAndGlyphs" font-weight="bold">rk</text>
-    <text x="144" y="631" fill="#7f7f7f" textLength="747" lengthAdjust="spacingAndGlyphs">(/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr</text>
-    <text x="144" y="648" fill="#7f7f7f" textLength="747" lengthAdjust="spacingAndGlyphs">ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.</text>
-    <text x="144" y="665" fill="#7f7f7f" textLength="108" lengthAdjust="spacingAndGlyphs">js:12834:22)</text>
-    <text x="0" y="682" fill="#ffffff" textLength="18" lengthAdjust="spacingAndGlyphs"> -</text>
-    <text x="18" y="682" fill="#ffffff" textLength="99" lengthAdjust="spacingAndGlyphs" font-weight="bold">workLoopSyn</text>
-    <text x="117" y="699" fill="#7f7f7f" textLength="774" lengthAdjust="spacingAndGlyphs">(/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-</text>
-    <text x="117" y="716" fill="#7f7f7f" textLength="774" lengthAdjust="spacingAndGlyphs">only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:126</text>
-    <text x="117" y="733" fill="#7f7f7f" textLength="54" lengthAdjust="spacingAndGlyphs">44:41)</text>
+    <text x="0" y="2" fill="#afafaf" textLength="225" lengthAdjust="spacingAndGlyphs" font-style="italic">Executing Hook: test-hook</text>
   </g>
 </svg>

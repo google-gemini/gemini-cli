@@ -1,319 +1,78 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`<ToolGroupMessage /> > Ask User Filtering > filtering logic for status='error' and hasResult='error message' 1`] = `
-"
-  ERROR  (0 , __vite_ssr_import_12__.isVisibleInToolGroup) is not a function
-
- src/ui/components/messages/ToolGroupMessage.tsx:130:9
-
- 127:     () =>
- 128:       allToolCalls.filter((t) =>
- 129:         // Use the unified visibility utility
- 130:         isVisibleInToolGroup(
- 131:           buildToolVisibilityContextFromDisplay(t),
- 132:           isLowErrorVerbosity ? 'low' : 'full',
- 133:         ),
-
- -  (src/ui/components/messages/ToolGroupMessage.tsx:130:9)
- -     at Array.filter (<anonymous>)\\t 
- -  (src/ui/components/messages/ToolGroupMessage.tsx:128:20)
- -mountMem 
-          (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-onl
-          y2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:4272:23)
-
- -Object.useMe 
-  o           (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep
-              -only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:1
-              4920:18)
- -process.env.NODE_ENV.expor 
-  s.useMemo                 (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-
-                            kilo-code-grep-only2/gemini-cli/node_modules/react/cjs/react.developmen
-                            t.js:1251:34)
- - ToolGroupMessage (src/ui/components/messages/ToolGroupMessage.tsx:126:28)
- -Object.react-stack-bott 
-  m-frame                (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kil
-                         o-code-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-recon
-                         ciler.development.js:15859:20)
- -renderWithHoo 
-  s            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gre
-               p-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js
-               :3221:22)
- -updateFunctionComp 
-  nent              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-cod
-                    e-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.deve
-                    lopment.js:6475:19)
+"╭──────────────────────────────────────────────────────────────────────────╮
+│ x  Ask User                                                              │
+│                                                                          │
+│ error message                                                            │
+╰──────────────────────────────────────────────────────────────────────────╯
 "
 `;
 
 exports[`<ToolGroupMessage /> > Ask User Filtering > filtering logic for status='success' and hasResult='test result' 1`] = `
-"
-  ERROR  (0 , __vite_ssr_import_12__.isVisibleInToolGroup) is not a function
-
- src/ui/components/messages/ToolGroupMessage.tsx:130:9
-
- 127:     () =>
- 128:       allToolCalls.filter((t) =>
- 129:         // Use the unified visibility utility
- 130:         isVisibleInToolGroup(
- 131:           buildToolVisibilityContextFromDisplay(t),
- 132:           isLowErrorVerbosity ? 'low' : 'full',
- 133:         ),
-
- -  (src/ui/components/messages/ToolGroupMessage.tsx:130:9)
- -     at Array.filter (<anonymous>)\\t 
- -  (src/ui/components/messages/ToolGroupMessage.tsx:128:20)
- -mountMem 
-          (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-onl
-          y2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:4272:23)
-
- -Object.useMe 
-  o           (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep
-              -only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:1
-              4920:18)
- -process.env.NODE_ENV.expor 
-  s.useMemo                 (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-
-                            kilo-code-grep-only2/gemini-cli/node_modules/react/cjs/react.developmen
-                            t.js:1251:34)
- - ToolGroupMessage (src/ui/components/messages/ToolGroupMessage.tsx:126:28)
- -Object.react-stack-bott 
-  m-frame                (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kil
-                         o-code-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-recon
-                         ciler.development.js:15859:20)
- -renderWithHoo 
-  s            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gre
-               p-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js
-               :3221:22)
- -updateFunctionComp 
-  nent              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-cod
-                    e-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.deve
-                    lopment.js:6475:19)
+"╭──────────────────────────────────────────────────────────────────────────╮
+│ ✓  Ask User                                                              │
+│                                                                          │
+│ test result                                                              │
+╰──────────────────────────────────────────────────────────────────────────╯
 "
 `;
 
 exports[`<ToolGroupMessage /> > Ask User Filtering > shows other tools when ask_user is filtered out 1`] = `
-"
-  ERROR  (0 , __vite_ssr_import_12__.isVisibleInToolGroup) is not a function
-
- src/ui/components/messages/ToolGroupMessage.tsx:130:9
-
- 127:     () =>
- 128:       allToolCalls.filter((t) =>
- 129:         // Use the unified visibility utility
- 130:         isVisibleInToolGroup(
- 131:           buildToolVisibilityContextFromDisplay(t),
- 132:           isLowErrorVerbosity ? 'low' : 'full',
- 133:         ),
-
- -  (src/ui/components/messages/ToolGroupMessage.tsx:130:9)
- -     at Array.filter (<anonymous>)\\t 
- -  (src/ui/components/messages/ToolGroupMessage.tsx:128:20)
- -mountMem 
-          (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-onl
-          y2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:4272:23)
-
- -Object.useMe 
-  o           (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep
-              -only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:1
-              4920:18)
- -process.env.NODE_ENV.expor 
-  s.useMemo                 (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-
-                            kilo-code-grep-only2/gemini-cli/node_modules/react/cjs/react.developmen
-                            t.js:1251:34)
- - ToolGroupMessage (src/ui/components/messages/ToolGroupMessage.tsx:126:28)
- -Object.react-stack-bott 
-  m-frame                (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kil
-                         o-code-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-recon
-                         ciler.development.js:15859:20)
- -renderWithHoo 
-  s            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gre
-               p-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js
-               :3221:22)
- -updateFunctionComp 
-  nent              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-cod
-                    e-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.deve
-                    lopment.js:6475:19)
+"╭──────────────────────────────────────────────────────────────────────────╮
+│ ✓  other-tool A tool for testing                                         │
+│                                                                          │
+│ Test result                                                              │
+╰──────────────────────────────────────────────────────────────────────────╯
 "
 `;
 
 exports[`<ToolGroupMessage /> > Border Color Logic > uses gray border when all tools are successful and no shell commands 1`] = `
-"
-  ERROR  (0 , __vite_ssr_import_12__.isVisibleInToolGroup) is not a function
-
- src/ui/components/messages/ToolGroupMessage.tsx:130:9
-
- 127:     () =>
- 128:       allToolCalls.filter((t) =>
- 129:         // Use the unified visibility utility
- 130:         isVisibleInToolGroup(
- 131:           buildToolVisibilityContextFromDisplay(t),
- 132:           isLowErrorVerbosity ? 'low' : 'full',
- 133:         ),
-
- -  (src/ui/components/messages/ToolGroupMessage.tsx:130:9)
- -     at Array.filter (<anonymous>)\\t 
- -  (src/ui/components/messages/ToolGroupMessage.tsx:128:20)
- -mountMem 
-          (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-onl
-          y2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:4272:23)
-
- -Object.useMe 
-  o           (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep
-              -only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:1
-              4920:18)
- -process.env.NODE_ENV.expor 
-  s.useMemo                 (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-
-                            kilo-code-grep-only2/gemini-cli/node_modules/react/cjs/react.developmen
-                            t.js:1251:34)
- - ToolGroupMessage (src/ui/components/messages/ToolGroupMessage.tsx:126:28)
- -Object.react-stack-bott 
-  m-frame                (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kil
-                         o-code-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-recon
-                         ciler.development.js:15859:20)
- -renderWithHoo 
-  s            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gre
-               p-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js
-               :3221:22)
- -updateFunctionComp 
-  nent              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-cod
-                    e-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.deve
-                    lopment.js:6475:19)
+"╭──────────────────────────────────────────────────────────────────────────╮
+│ ✓  test-tool A tool for testing                                          │
+│                                                                          │
+│ Test result                                                              │
+│                                                                          │
+│ ✓  another-tool A tool for testing                                       │
+│                                                                          │
+│ Test result                                                              │
+╰──────────────────────────────────────────────────────────────────────────╯
 "
 `;
 
 exports[`<ToolGroupMessage /> > Border Color Logic > uses yellow border for shell commands even when successful 1`] = `
-"
-  ERROR  (0 , __vite_ssr_import_12__.isVisibleInToolGroup) is not a function
-
- src/ui/components/messages/ToolGroupMessage.tsx:130:9
-
- 127:     () =>
- 128:       allToolCalls.filter((t) =>
- 129:         // Use the unified visibility utility
- 130:         isVisibleInToolGroup(
- 131:           buildToolVisibilityContextFromDisplay(t),
- 132:           isLowErrorVerbosity ? 'low' : 'full',
- 133:         ),
-
- -  (src/ui/components/messages/ToolGroupMessage.tsx:130:9)
- -     at Array.filter (<anonymous>)\\t 
- -  (src/ui/components/messages/ToolGroupMessage.tsx:128:20)
- -mountMem 
-          (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-onl
-          y2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:4272:23)
-
- -Object.useMe 
-  o           (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep
-              -only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:1
-              4920:18)
- -process.env.NODE_ENV.expor 
-  s.useMemo                 (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-
-                            kilo-code-grep-only2/gemini-cli/node_modules/react/cjs/react.developmen
-                            t.js:1251:34)
- - ToolGroupMessage (src/ui/components/messages/ToolGroupMessage.tsx:126:28)
- -Object.react-stack-bott 
-  m-frame                (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kil
-                         o-code-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-recon
-                         ciler.development.js:15859:20)
- -renderWithHoo 
-  s            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gre
-               p-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js
-               :3221:22)
- -updateFunctionComp 
-  nent              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-cod
-                    e-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.deve
-                    lopment.js:6475:19)
+"╭──────────────────────────────────────────────────────────────────────────╮
+│ ✓  run_shell_command A tool for testing                                  │
+│                                                                          │
+│ Test result                                                              │
+╰──────────────────────────────────────────────────────────────────────────╯
 "
 `;
 
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders canceled tool calls > canceled_tool 1`] = `
-"
-  ERROR  (0 , __vite_ssr_import_12__.isVisibleInToolGroup) is not a function
-
- src/ui/components/messages/ToolGroupMessage.tsx:130:9
-
- 127:     () =>
- 128:       allToolCalls.filter((t) =>
- 129:         // Use the unified visibility utility
- 130:         isVisibleInToolGroup(
- 131:           buildToolVisibilityContextFromDisplay(t),
- 132:           isLowErrorVerbosity ? 'low' : 'full',
- 133:         ),
-
- -  (src/ui/components/messages/ToolGroupMessage.tsx:130:9)
- -     at Array.filter (<anonymous>)\\t 
- -  (src/ui/components/messages/ToolGroupMessage.tsx:128:20)
- -mountMem 
-          (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-onl
-          y2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:4272:23)
-
- -Object.useMe 
-  o           (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep
-              -only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:1
-              4920:18)
- -process.env.NODE_ENV.expor 
-  s.useMemo                 (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-
-                            kilo-code-grep-only2/gemini-cli/node_modules/react/cjs/react.developmen
-                            t.js:1251:34)
- - ToolGroupMessage (src/ui/components/messages/ToolGroupMessage.tsx:126:28)
- -Object.react-stack-bott 
-  m-frame                (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kil
-                         o-code-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-recon
-                         ciler.development.js:15859:20)
- -renderWithHoo 
-  s            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gre
-               p-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js
-               :3221:22)
- -updateFunctionComp 
-  nent              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-cod
-                    e-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.deve
-                    lopment.js:6475:19)
+"╭──────────────────────────────────────────────────────────────────────────╮
+│ -  canceled-tool A tool for testing                                      │
+│                                                                          │
+│ Test result                                                              │
+╰──────────────────────────────────────────────────────────────────────────╯
 "
 `;
 
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders empty tool calls array 1`] = `""`;
 
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders header when scrolled 1`] = `
-"
-  ERROR  (0 , __vite_ssr_import_12__.isVisibleInToolGroup) is not a function
-
- src/ui/components/messages/ToolGroupMessage.tsx:130:9
-
- 127:     () =>
- 128:       allToolCalls.filter((t) =>
- 129:         // Use the unified visibility utility
- 130:         isVisibleInToolGroup(
- 131:           buildToolVisibilityContextFromDisplay(t),
- 132:           isLowErrorVerbosity ? 'low' : 'full',
- 133:         ),
-
- -  (src/ui/components/messages/ToolGroupMessage.tsx:130:9)
- -     at Array.filter (<anonymous>)\\t 
- -  (src/ui/components/messages/ToolGroupMessage.tsx:128:20)
- -mountMem 
-          (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-onl
-          y2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:4272:23)
-
- -Object.useMe 
-  o           (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep
-              -only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:1
-              4920:18)
- -process.env.NODE_ENV.expor 
-  s.useMemo                 (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-
-                            kilo-code-grep-only2/gemini-cli/node_modules/react/cjs/react.developmen
-                            t.js:1251:34)
- - ToolGroupMessage (src/ui/components/messages/ToolGroupMessage.tsx:126:28)
- -Object.react-stack-bott 
-  m-frame                (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kil
-                         o-code-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-recon
-                         ciler.development.js:15859:20)
- -renderWithHoo 
-  s            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gre
-               p-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js
-               :3221:22)
- -updateFunctionComp 
-  nent              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-cod
-                    e-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.deve
-                    lopment.js:6475:19)
+"╭──────────────────────────────────────────────────────────────────────────╮
+│ ✓  tool-1 Description 1. This is a long description that will need to b… │                       ▄
+│──────────────────────────────────────────────────────────────────────────│                       █
+│ line3                                                                    │                       █
+│ line4                                                                    │                       █
+│ line5                                                                    │                       █
+│                                                                          │                       █
+│ ✓  tool-2 Description 2                                                  │                       █
+│                                                                          │                       █
+│ line1                                                                    │                       █
+│ line2                                                                    │                       █
+╰──────────────────────────────────────────────────────────────────────────╯                       █
 "
 `;
 
@@ -355,137 +114,31 @@ exports[`<ToolGroupMessage /> > Golden Snapshots > renders multiple tool calls w
 `;
 
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders single successful tool call 1`] = `
-"
-  ERROR  (0 , __vite_ssr_import_12__.isVisibleInToolGroup) is not a function
-
- src/ui/components/messages/ToolGroupMessage.tsx:130:9
-
- 127:     () =>
- 128:       allToolCalls.filter((t) =>
- 129:         // Use the unified visibility utility
- 130:         isVisibleInToolGroup(
- 131:           buildToolVisibilityContextFromDisplay(t),
- 132:           isLowErrorVerbosity ? 'low' : 'full',
- 133:         ),
-
- -  (src/ui/components/messages/ToolGroupMessage.tsx:130:9)
- -     at Array.filter (<anonymous>)\\t 
- -  (src/ui/components/messages/ToolGroupMessage.tsx:128:20)
- -mountMem 
-          (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-onl
-          y2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:4272:23)
-
- -Object.useMe 
-  o           (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep
-              -only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:1
-              4920:18)
- -process.env.NODE_ENV.expor 
-  s.useMemo                 (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-
-                            kilo-code-grep-only2/gemini-cli/node_modules/react/cjs/react.developmen
-                            t.js:1251:34)
- - ToolGroupMessage (src/ui/components/messages/ToolGroupMessage.tsx:126:28)
- -Object.react-stack-bott 
-  m-frame                (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kil
-                         o-code-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-recon
-                         ciler.development.js:15859:20)
- -renderWithHoo 
-  s            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gre
-               p-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js
-               :3221:22)
- -updateFunctionComp 
-  nent              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-cod
-                    e-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.deve
-                    lopment.js:6475:19)
+"╭──────────────────────────────────────────────────────────────────────────╮
+│ ✓  test-tool A tool for testing                                          │
+│                                                                          │
+│ Test result                                                              │
+╰──────────────────────────────────────────────────────────────────────────╯
 "
 `;
 
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders tool call with outputFile 1`] = `
-"
-  ERROR  (0 , __vite_ssr_import_12__.isVisibleInToolGroup) is not a function
-
- src/ui/components/messages/ToolGroupMessage.tsx:130:9
-
- 127:     () =>
- 128:       allToolCalls.filter((t) =>
- 129:         // Use the unified visibility utility
- 130:         isVisibleInToolGroup(
- 131:           buildToolVisibilityContextFromDisplay(t),
- 132:           isLowErrorVerbosity ? 'low' : 'full',
- 133:         ),
-
- -  (src/ui/components/messages/ToolGroupMessage.tsx:130:9)
- -     at Array.filter (<anonymous>)\\t 
- -  (src/ui/components/messages/ToolGroupMessage.tsx:128:20)
- -mountMem 
-          (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-onl
-          y2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:4272:23)
-
- -Object.useMe 
-  o           (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep
-              -only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:1
-              4920:18)
- -process.env.NODE_ENV.expor 
-  s.useMemo                 (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-
-                            kilo-code-grep-only2/gemini-cli/node_modules/react/cjs/react.developmen
-                            t.js:1251:34)
- - ToolGroupMessage (src/ui/components/messages/ToolGroupMessage.tsx:126:28)
- -Object.react-stack-bott 
-  m-frame                (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kil
-                         o-code-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-recon
-                         ciler.development.js:15859:20)
- -renderWithHoo 
-  s            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gre
-               p-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js
-               :3221:22)
- -updateFunctionComp 
-  nent              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-cod
-                    e-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.deve
-                    lopment.js:6475:19)
+"╭──────────────────────────────────────────────────────────────────────────╮
+│ ✓  tool-with-file Tool that saved output to file                         │
+│                                                                          │
+│ Test result                                                              │
+│ Output too long and was saved to: /path/to/output.txt                    │
+╰──────────────────────────────────────────────────────────────────────────╯
 "
 `;
 
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders two tool groups where only the last line of the previous group is visible 1`] = `
-"
-  ERROR  (0 , __vite_ssr_import_12__.isVisibleInToolGroup) is not a function
-
- src/ui/components/messages/ToolGroupMessage.tsx:130:9
-
- 127:     () =>
- 128:       allToolCalls.filter((t) =>
- 129:         // Use the unified visibility utility
- 130:         isVisibleInToolGroup(
- 131:           buildToolVisibilityContextFromDisplay(t),
- 132:           isLowErrorVerbosity ? 'low' : 'full',
- 133:         ),
-
- -  (src/ui/components/messages/ToolGroupMessage.tsx:130:9)
- -     at Array.filter (<anonymous>)\\t 
- -  (src/ui/components/messages/ToolGroupMessage.tsx:128:20)
- -mountMem 
-          (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-onl
-          y2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:4272:23)
-
- -Object.useMe 
-  o           (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep
-              -only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:1
-              4920:18)
- -process.env.NODE_ENV.expor 
-  s.useMemo                 (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-
-                            kilo-code-grep-only2/gemini-cli/node_modules/react/cjs/react.developmen
-                            t.js:1251:34)
- - ToolGroupMessage (src/ui/components/messages/ToolGroupMessage.tsx:126:28)
- -Object.react-stack-bott 
-  m-frame                (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kil
-                         o-code-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-recon
-                         ciler.development.js:15859:20)
- -renderWithHoo 
-  s            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gre
-               p-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js
-               :3221:22)
- -updateFunctionComp 
-  nent              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-cod
-                    e-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.deve
-                    lopment.js:6475:19)
+"╰──────────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────────────────────────────────────────────────────╮
+│ ✓  tool-2 Description 2                                                  │
+│                                                                          │                       ▄
+│ line1                                                                    │                       █
+╰──────────────────────────────────────────────────────────────────────────╯                       █
 "
 `;
 
@@ -496,136 +149,39 @@ exports[`<ToolGroupMessage /> > Golden Snapshots > renders update_topic tool cal
 `;
 
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders with limited terminal height 1`] = `
-"
-  ERROR  (0 , __vite_ssr_import_12__.isVisibleInToolGroup) is not a function
-
- src/ui/components/messages/ToolGroupMessage.tsx:130:9
-
- 127:     () =>
- 128:       allToolCalls.filter((t) =>
- 129:         // Use the unified visibility utility
- 130:         isVisibleInToolGroup(
- 131:           buildToolVisibilityContextFromDisplay(t),
- 132:           isLowErrorVerbosity ? 'low' : 'full',
- 133:         ),
-
- -  (src/ui/components/messages/ToolGroupMessage.tsx:130:9)
- -     at Array.filter (<anonymous>)\\t 
- -  (src/ui/components/messages/ToolGroupMessage.tsx:128:20)
- -mountMem 
-          (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-onl
-          y2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:4272:23)
-
- -Object.useMe 
-  o           (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep
-              -only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:1
-              4920:18)
- -process.env.NODE_ENV.expor 
-  s.useMemo                 (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-
-                            kilo-code-grep-only2/gemini-cli/node_modules/react/cjs/react.developmen
-                            t.js:1251:34)
- - ToolGroupMessage (src/ui/components/messages/ToolGroupMessage.tsx:126:28)
- -Object.react-stack-bott 
-  m-frame                (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kil
-                         o-code-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-recon
-                         ciler.development.js:15859:20)
- -renderWithHoo 
-  s            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gre
-               p-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js
-               :3221:22)
- -updateFunctionComp 
-  nent              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-cod
-                    e-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.deve
-                    lopment.js:6475:19)
+"╭──────────────────────────────────────────────────────────────────────────╮
+│ ✓  tool-with-result Tool with output                                     │
+│                                                                          │
+│ This is a long result that might need height constraints                 │
+│                                                                          │
+│ ✓  another-tool Another tool                                             │
+│                                                                          │
+│ More output here                                                         │
+╰──────────────────────────────────────────────────────────────────────────╯
 "
 `;
 
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders with narrow terminal width 1`] = `
-"
-  ERROR  (0 , __vite_ssr_import_12__.isVisibleInToolGroup) is not a function
-
- src/ui/components/messages/ToolGroupMessage.tsx:130:9
-
- 127:     () =>
- 128:       allToolCalls.filter((t) =>
- 129:         // Use the unified visibility utility
- 130:         isVisibleInToolGroup(
- 131:           buildToolVisibilityContextFromDisplay(t),
- 132:           isLowErrorVerbosity ? 'low' : 'full',
- 133:         ),
-
- -  (src/ui/components/messages/ToolGroupMessage.tsx:130:9)
- -     at Array.filter (<anonymous>)\\t 
- -  (src/ui/components/messages/ToolGroupMessage.tsx:128:20)
- -mountMem 
-          (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-onl
-          y2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:4272:23)
-
- -Object.useMe 
-  o           (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep
-              -only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:1
-              4920:18)
- -process.env.NODE_ENV.expor 
-  s.useMemo                 (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-
-                            kilo-code-grep-only2/gemini-cli/node_modules/react/cjs/react.developmen
-                            t.js:1251:34)
- - ToolGroupMessage (src/ui/components/messages/ToolGroupMessage.tsx:126:28)
- -Object.react-stack-bott 
-  m-frame                (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kil
-                         o-code-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-recon
-                         ciler.development.js:15859:20)
- -renderWithHoo 
-  s            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gre
-               p-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js
-               :3221:22)
- -updateFunctionComp 
-  nent              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-cod
-                    e-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.deve
-                    lopment.js:6475:19)
+"╭──────────────────────────────────╮
+│ ✓  very-long-tool-name-that-mig… │
+│                                  │
+│ Test result                      │
+╰──────────────────────────────────╯
 "
 `;
 
 exports[`<ToolGroupMessage /> > Height Calculation > calculates available height correctly with multiple tools with results 1`] = `
-"
-  ERROR  (0 , __vite_ssr_import_12__.isVisibleInToolGroup) is not a function
-
- src/ui/components/messages/ToolGroupMessage.tsx:130:9
-
- 127:     () =>
- 128:       allToolCalls.filter((t) =>
- 129:         // Use the unified visibility utility
- 130:         isVisibleInToolGroup(
- 131:           buildToolVisibilityContextFromDisplay(t),
- 132:           isLowErrorVerbosity ? 'low' : 'full',
- 133:         ),
-
- -  (src/ui/components/messages/ToolGroupMessage.tsx:130:9)
- -     at Array.filter (<anonymous>)\\t 
- -  (src/ui/components/messages/ToolGroupMessage.tsx:128:20)
- -mountMem 
-          (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-onl
-          y2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:4272:23)
-
- -Object.useMe 
-  o           (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep
-              -only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:1
-              4920:18)
- -process.env.NODE_ENV.expor 
-  s.useMemo                 (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-
-                            kilo-code-grep-only2/gemini-cli/node_modules/react/cjs/react.developmen
-                            t.js:1251:34)
- - ToolGroupMessage (src/ui/components/messages/ToolGroupMessage.tsx:126:28)
- -Object.react-stack-bott 
-  m-frame                (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kil
-                         o-code-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-recon
-                         ciler.development.js:15859:20)
- -renderWithHoo 
-  s            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gre
-               p-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js
-               :3221:22)
- -updateFunctionComp 
-  nent              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-cod
-                    e-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.deve
-                    lopment.js:6475:19)
+"╭──────────────────────────────────────────────────────────────────────────╮
+│ ✓  test-tool A tool for testing                                          │
+│                                                                          │
+│ Result 1                                                                 │
+│                                                                          │
+│ ✓  test-tool A tool for testing                                          │
+│                                                                          │
+│ Result 2                                                                 │
+│                                                                          │
+│ ✓  test-tool A tool for testing                                          │
+│                                                                          │
+╰──────────────────────────────────────────────────────────────────────────╯
 "
 `;

@@ -1,57 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`AskUserDialog > Choice question placeholder > uses default placeholder when not provided 1`] = `
-"
-  ERROR  config.getUseTerminalBuffer is not a function
-
- src/ui/hooks/useAlternateBuffer.ts:16:44
-
- 13: // Right now this is convenient as it allows us to special case
-    terminalBuffer
- 14: // rendering like we special case alternateBuffer rendering.
- 15: export const isAlternateBufferEnabled = (config: Config): boolean =>
- 16:   config.getUseAlternateBuffer() || config.getUseTerminalBuffer();
- 17:
- 18: // This is read from Config so that the UI reads the same value per
-    application session
- 19: export const useAlternateBuffer = (): boolean => {
-
- - isAlternateBufferEnabled (src/ui/hooks/useAlternateBuffer.ts:16:44)
- - useAlternateBuffer (src/ui/hooks/useAlternateBuffer.ts:21:10)
- - ChoiceQuestionView (src/ui/components/AskUserDialog.tsx:513:29)
- -Object.react-stack-bot 
-  om-frame              (/usr/local/google/home/akkr/Documents/kilo_code_gemini
-                        _cli/gemini-cli-kilo-code-grep-only2/gemini-cli/node_mo
-                        dules/react-reconciler/cjs/react-reconciler.development
-                        .js:15859:20)
- -renderWithHo 
-  ks          (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemin
-              i-cli-kilo-code-grep-only2/gemini-cli/node_modules/react-reconcil
-              er/cjs/react-reconciler.development.js:3221:22)
- -updateFunctionCom 
-  onent            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/
-                   gemini-cli-kilo-code-grep-only2/gemini-cli/node_modules/reac
-                   t-reconciler/cjs/react-reconciler.development.js:6475:19)
- -beginWor 
-          (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cl
-          i-kilo-code-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/r
-          eact-reconciler.development.js:8009:18)
- -runWithFiberIn 
-  EV            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gem
-                ini-cli-kilo-code-grep-only2/gemini-cli/node_modules/react-reco
-                nciler/cjs/react-reconciler.development.js:1738:13)
- -performUnitOfW 
-  rk            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gem
-                ini-cli-kilo-code-grep-only2/gemini-cli/node_modules/react-reco
-                nciler/cjs/react-reconciler.development.js:12834:22)
- -workLoopSy 
-  c         (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-
-            cli-kilo-code-grep-only2/gemini-cli/node_modules/react-reconciler/c
-            js/react-reconciler.development.js:12644:41)
-"
-`;
-
-exports[`AskUserDialog > Choice question placeholder > uses default placeholder when not provided 2`] = `
 "Select your preferred language:
 
   1.  TypeScript
@@ -63,57 +12,6 @@ Enter to submit · Esc to cancel
 `;
 
 exports[`AskUserDialog > Choice question placeholder > uses placeholder for "Other" option when provided 1`] = `
-"
-  ERROR  config.getUseTerminalBuffer is not a function
-
- src/ui/hooks/useAlternateBuffer.ts:16:44
-
- 13: // Right now this is convenient as it allows us to special case
-    terminalBuffer
- 14: // rendering like we special case alternateBuffer rendering.
- 15: export const isAlternateBufferEnabled = (config: Config): boolean =>
- 16:   config.getUseAlternateBuffer() || config.getUseTerminalBuffer();
- 17:
- 18: // This is read from Config so that the UI reads the same value per
-    application session
- 19: export const useAlternateBuffer = (): boolean => {
-
- - isAlternateBufferEnabled (src/ui/hooks/useAlternateBuffer.ts:16:44)
- - useAlternateBuffer (src/ui/hooks/useAlternateBuffer.ts:21:10)
- - ChoiceQuestionView (src/ui/components/AskUserDialog.tsx:513:29)
- -Object.react-stack-bot 
-  om-frame              (/usr/local/google/home/akkr/Documents/kilo_code_gemini
-                        _cli/gemini-cli-kilo-code-grep-only2/gemini-cli/node_mo
-                        dules/react-reconciler/cjs/react-reconciler.development
-                        .js:15859:20)
- -renderWithHo 
-  ks          (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemin
-              i-cli-kilo-code-grep-only2/gemini-cli/node_modules/react-reconcil
-              er/cjs/react-reconciler.development.js:3221:22)
- -updateFunctionCom 
-  onent            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/
-                   gemini-cli-kilo-code-grep-only2/gemini-cli/node_modules/reac
-                   t-reconciler/cjs/react-reconciler.development.js:6475:19)
- -beginWor 
-          (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cl
-          i-kilo-code-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/r
-          eact-reconciler.development.js:8009:18)
- -runWithFiberIn 
-  EV            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gem
-                ini-cli-kilo-code-grep-only2/gemini-cli/node_modules/react-reco
-                nciler/cjs/react-reconciler.development.js:1738:13)
- -performUnitOfW 
-  rk            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gem
-                ini-cli-kilo-code-grep-only2/gemini-cli/node_modules/react-reco
-                nciler/cjs/react-reconciler.development.js:12834:22)
- -workLoopSy 
-  c         (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-
-            cli-kilo-code-grep-only2/gemini-cli/node_modules/react-reconciler/c
-            js/react-reconciler.development.js:12644:41)
-"
-`;
-
-exports[`AskUserDialog > Choice question placeholder > uses placeholder for "Other" option when provided 2`] = `
 "Select your preferred language:
 
   1.  TypeScript
@@ -157,125 +55,32 @@ Enter to select · ↑/↓ to navigate · Esc to cancel
 `;
 
 exports[`AskUserDialog > Text type questions > renders text input for type: "text" 1`] = `
-"
-  ERROR  config.getUseTerminalBuffer is not a function
+"What should we name this component?
 
- src/ui/hooks/useAlternateBuffer.ts:16:44
+> e.g., UserProfileCard
 
- 13: // Right now this is convenient as it allows us to special case terminalBuffer
- 14: // rendering like we special case alternateBuffer rendering.
- 15: export const isAlternateBufferEnabled = (config: Config): boolean =>
- 16:   config.getUseAlternateBuffer() || config.getUseTerminalBuffer();
- 17:
- 18: // This is read from Config so that the UI reads the same value per application session
- 19: export const useAlternateBuffer = (): boolean => {
 
- - isAlternateBufferEnabled (src/ui/hooks/useAlternateBuffer.ts:16:44)
- - useAlternateBuffer (src/ui/hooks/useAlternateBuffer.ts:21:10)
- - TextQuestionView (src/ui/components/AskUserDialog.tsx:293:29)
- -Object.react-stack-botto 
-  -frame                  (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-only2/g
-                          emini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:15859:20)
- -renderWithHoo 
-  s            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-only2/gemini-cli/n
-               ode_modules/react-reconciler/cjs/react-reconciler.development.js:3221:22)
- -updateFunctionCompo 
-  ent                (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-only2/gemini
-                     -cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:6475:19)
- -beginWork 
-           (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-only2/gemini-cli/node_
-           modules/react-reconciler/cjs/react-reconciler.development.js:8009:18)
- -runWithFiberInD 
-  V              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-only2/gemini-cli
-                 /node_modules/react-reconciler/cjs/react-reconciler.development.js:1738:13)
- -performUnitOfWo 
-  k              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-only2/gemini-cli
-                 /node_modules/react-reconciler/cjs/react-reconciler.development.js:12834:22)
- -workLoopSyn 
-             (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-only2/gemini-cli/nod
-             e_modules/react-reconciler/cjs/react-reconciler.development.js:12644:41)
+Enter to submit · Esc to cancel
 "
 `;
 
 exports[`AskUserDialog > Text type questions > shows correct keyboard hints for text type 1`] = `
-"
-  ERROR  config.getUseTerminalBuffer is not a function
+"Enter the variable name:
 
- src/ui/hooks/useAlternateBuffer.ts:16:44
+> Enter your response
 
- 13: // Right now this is convenient as it allows us to special case terminalBuffer
- 14: // rendering like we special case alternateBuffer rendering.
- 15: export const isAlternateBufferEnabled = (config: Config): boolean =>
- 16:   config.getUseAlternateBuffer() || config.getUseTerminalBuffer();
- 17:
- 18: // This is read from Config so that the UI reads the same value per application session
- 19: export const useAlternateBuffer = (): boolean => {
 
- - isAlternateBufferEnabled (src/ui/hooks/useAlternateBuffer.ts:16:44)
- - useAlternateBuffer (src/ui/hooks/useAlternateBuffer.ts:21:10)
- - TextQuestionView (src/ui/components/AskUserDialog.tsx:293:29)
- -Object.react-stack-botto 
-  -frame                  (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-only2/g
-                          emini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:15859:20)
- -renderWithHoo 
-  s            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-only2/gemini-cli/n
-               ode_modules/react-reconciler/cjs/react-reconciler.development.js:3221:22)
- -updateFunctionCompo 
-  ent                (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-only2/gemini
-                     -cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:6475:19)
- -beginWork 
-           (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-only2/gemini-cli/node_
-           modules/react-reconciler/cjs/react-reconciler.development.js:8009:18)
- -runWithFiberInD 
-  V              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-only2/gemini-cli
-                 /node_modules/react-reconciler/cjs/react-reconciler.development.js:1738:13)
- -performUnitOfWo 
-  k              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-only2/gemini-cli
-                 /node_modules/react-reconciler/cjs/react-reconciler.development.js:12834:22)
- -workLoopSyn 
-             (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-only2/gemini-cli/nod
-             e_modules/react-reconciler/cjs/react-reconciler.development.js:12644:41)
+Enter to submit · Esc to cancel
 "
 `;
 
 exports[`AskUserDialog > Text type questions > shows default placeholder when none provided 1`] = `
-"
-  ERROR  config.getUseTerminalBuffer is not a function
+"Enter the database connection string:
 
- src/ui/hooks/useAlternateBuffer.ts:16:44
+> Enter your response
 
- 13: // Right now this is convenient as it allows us to special case terminalBuffer
- 14: // rendering like we special case alternateBuffer rendering.
- 15: export const isAlternateBufferEnabled = (config: Config): boolean =>
- 16:   config.getUseAlternateBuffer() || config.getUseTerminalBuffer();
- 17:
- 18: // This is read from Config so that the UI reads the same value per application session
- 19: export const useAlternateBuffer = (): boolean => {
 
- - isAlternateBufferEnabled (src/ui/hooks/useAlternateBuffer.ts:16:44)
- - useAlternateBuffer (src/ui/hooks/useAlternateBuffer.ts:21:10)
- - TextQuestionView (src/ui/components/AskUserDialog.tsx:293:29)
- -Object.react-stack-botto 
-  -frame                  (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-only2/g
-                          emini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:15859:20)
- -renderWithHoo 
-  s            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-only2/gemini-cli/n
-               ode_modules/react-reconciler/cjs/react-reconciler.development.js:3221:22)
- -updateFunctionCompo 
-  ent                (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-only2/gemini
-                     -cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:6475:19)
- -beginWork 
-           (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-only2/gemini-cli/node_
-           modules/react-reconciler/cjs/react-reconciler.development.js:8009:18)
- -runWithFiberInD 
-  V              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-only2/gemini-cli
-                 /node_modules/react-reconciler/cjs/react-reconciler.development.js:1738:13)
- -performUnitOfWo 
-  k              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-only2/gemini-cli
-                 /node_modules/react-reconciler/cjs/react-reconciler.development.js:12834:22)
- -workLoopSyn 
-             (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-only2/gemini-cli/nod
-             e_modules/react-reconciler/cjs/react-reconciler.development.js:12644:41)
+Enter to submit · Esc to cancel
 "
 `;
 
@@ -294,252 +99,75 @@ Enter to submit · Tab/Shift+Tab to edit answers · Esc to cancel
 `;
 
 exports[`AskUserDialog > hides progress header for single question 1`] = `
-"
-  ERROR  config.getUseTerminalBuffer is not a function
+"Which authentication method should we use?
 
- src/ui/hooks/useAlternateBuffer.ts:16:44
+● 1.  OAuth 2.0                                                                                                         
+      Industry standard, supports SSO                                                                                   
+  2.  JWT tokens
+      Stateless, good for APIs
+  3.  Enter a custom value
 
- 13: // Right now this is convenient as it allows us to special case terminalBuffer
- 14: // rendering like we special case alternateBuffer rendering.
- 15: export const isAlternateBufferEnabled = (config: Config): boolean =>
- 16:   config.getUseAlternateBuffer() || config.getUseTerminalBuffer();
- 17:
- 18: // This is read from Config so that the UI reads the same value per application session
- 19: export const useAlternateBuffer = (): boolean => {
-
- - isAlternateBufferEnabled (src/ui/hooks/useAlternateBuffer.ts:16:44)
- - useAlternateBuffer (src/ui/hooks/useAlternateBuffer.ts:21:10)
- - ChoiceQuestionView (src/ui/components/AskUserDialog.tsx:513:29)
- -Object.react-stack-botto 
-  -frame                  (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-only2/g
-                          emini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:15859:20)
- -renderWithHoo 
-  s            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-only2/gemini-cli/n
-               ode_modules/react-reconciler/cjs/react-reconciler.development.js:3221:22)
- -updateFunctionCompo 
-  ent                (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-only2/gemini
-                     -cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:6475:19)
- -beginWork 
-           (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-only2/gemini-cli/node_
-           modules/react-reconciler/cjs/react-reconciler.development.js:8009:18)
- -runWithFiberInD 
-  V              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-only2/gemini-cli
-                 /node_modules/react-reconciler/cjs/react-reconciler.development.js:1738:13)
- -performUnitOfWo 
-  k              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-only2/gemini-cli
-                 /node_modules/react-reconciler/cjs/react-reconciler.development.js:12834:22)
- -workLoopSyn 
-             (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-only2/gemini-cli/nod
-             e_modules/react-reconciler/cjs/react-reconciler.development.js:12644:41)
+Enter to select · ↑/↓ to navigate · Esc to cancel
 "
 `;
 
 exports[`AskUserDialog > renders question and options 1`] = `
-"
-  ERROR  config.getUseTerminalBuffer is not a function
+"Which authentication method should we use?
 
- src/ui/hooks/useAlternateBuffer.ts:16:44
+● 1.  OAuth 2.0                                                                                                         
+      Industry standard, supports SSO                                                                                   
+  2.  JWT tokens
+      Stateless, good for APIs
+  3.  Enter a custom value
 
- 13: // Right now this is convenient as it allows us to special case terminalBuffer
- 14: // rendering like we special case alternateBuffer rendering.
- 15: export const isAlternateBufferEnabled = (config: Config): boolean =>
- 16:   config.getUseAlternateBuffer() || config.getUseTerminalBuffer();
- 17:
- 18: // This is read from Config so that the UI reads the same value per application session
- 19: export const useAlternateBuffer = (): boolean => {
-
- - isAlternateBufferEnabled (src/ui/hooks/useAlternateBuffer.ts:16:44)
- - useAlternateBuffer (src/ui/hooks/useAlternateBuffer.ts:21:10)
- - ChoiceQuestionView (src/ui/components/AskUserDialog.tsx:513:29)
- -Object.react-stack-botto 
-  -frame                  (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-only2/g
-                          emini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:15859:20)
- -renderWithHoo 
-  s            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-only2/gemini-cli/n
-               ode_modules/react-reconciler/cjs/react-reconciler.development.js:3221:22)
- -updateFunctionCompo 
-  ent                (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-only2/gemini
-                     -cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:6475:19)
- -beginWork 
-           (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-only2/gemini-cli/node_
-           modules/react-reconciler/cjs/react-reconciler.development.js:8009:18)
- -runWithFiberInD 
-  V              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-only2/gemini-cli
-                 /node_modules/react-reconciler/cjs/react-reconciler.development.js:1738:13)
- -performUnitOfWo 
-  k              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-only2/gemini-cli
-                 /node_modules/react-reconciler/cjs/react-reconciler.development.js:12834:22)
- -workLoopSyn 
-             (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-only2/gemini-cli/nod
-             e_modules/react-reconciler/cjs/react-reconciler.development.js:12644:41)
+Enter to select · ↑/↓ to navigate · Esc to cancel
 "
 `;
 
 exports[`AskUserDialog > shows Review tab in progress header for multiple questions 1`] = `
-"
-  ERROR  config.getUseTerminalBuffer is not a function
+"← □ Framework │ □ Styling │ ≡ Review →
 
- src/ui/hooks/useAlternateBuffer.ts:16:44
+Which framework?
 
- 13: // Right now this is convenient as it allows us to special case terminalBuffer
- 14: // rendering like we special case alternateBuffer rendering.
- 15: export const isAlternateBufferEnabled = (config: Config): boolean =>
- 16:   config.getUseAlternateBuffer() || config.getUseTerminalBuffer();
- 17:
- 18: // This is read from Config so that the UI reads the same value per application session
- 19: export const useAlternateBuffer = (): boolean => {
+● 1.  React                                                                                                             
+      Component library                                                                                                 
+  2.  Vue
+      Progressive framework
+  3.  Enter a custom value
 
- - isAlternateBufferEnabled (src/ui/hooks/useAlternateBuffer.ts:16:44)
- - useAlternateBuffer (src/ui/hooks/useAlternateBuffer.ts:21:10)
- - ChoiceQuestionView (src/ui/components/AskUserDialog.tsx:513:29)
- -Object.react-stack-botto 
-  -frame                  (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-only2/g
-                          emini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:15859:20)
- -renderWithHoo 
-  s            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-only2/gemini-cli/n
-               ode_modules/react-reconciler/cjs/react-reconciler.development.js:3221:22)
- -updateFunctionCompo 
-  ent                (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-only2/gemini
-                     -cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:6475:19)
- -beginWork 
-           (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-only2/gemini-cli/node_
-           modules/react-reconciler/cjs/react-reconciler.development.js:8009:18)
- -runWithFiberInD 
-  V              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-only2/gemini-cli
-                 /node_modules/react-reconciler/cjs/react-reconciler.development.js:1738:13)
- -performUnitOfWo 
-  k              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-only2/gemini-cli
-                 /node_modules/react-reconciler/cjs/react-reconciler.development.js:12834:22)
- -workLoopSyn 
-             (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-only2/gemini-cli/nod
-             e_modules/react-reconciler/cjs/react-reconciler.development.js:12644:41)
+Enter to select · ←/→ to switch questions · Esc to cancel
 "
 `;
 
 exports[`AskUserDialog > shows keyboard hints 1`] = `
-"
-  ERROR  config.getUseTerminalBuffer is not a function
+"Which authentication method should we use?
 
- src/ui/hooks/useAlternateBuffer.ts:16:44
+● 1.  OAuth 2.0                                                                                                         
+      Industry standard, supports SSO                                                                                   
+  2.  JWT tokens
+      Stateless, good for APIs
+  3.  Enter a custom value
 
- 13: // Right now this is convenient as it allows us to special case terminalBuffer
- 14: // rendering like we special case alternateBuffer rendering.
- 15: export const isAlternateBufferEnabled = (config: Config): boolean =>
- 16:   config.getUseAlternateBuffer() || config.getUseTerminalBuffer();
- 17:
- 18: // This is read from Config so that the UI reads the same value per application session
- 19: export const useAlternateBuffer = (): boolean => {
-
- - isAlternateBufferEnabled (src/ui/hooks/useAlternateBuffer.ts:16:44)
- - useAlternateBuffer (src/ui/hooks/useAlternateBuffer.ts:21:10)
- - ChoiceQuestionView (src/ui/components/AskUserDialog.tsx:513:29)
- -Object.react-stack-botto 
-  -frame                  (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-only2/g
-                          emini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:15859:20)
- -renderWithHoo 
-  s            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-only2/gemini-cli/n
-               ode_modules/react-reconciler/cjs/react-reconciler.development.js:3221:22)
- -updateFunctionCompo 
-  ent                (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-only2/gemini
-                     -cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:6475:19)
- -beginWork 
-           (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-only2/gemini-cli/node_
-           modules/react-reconciler/cjs/react-reconciler.development.js:8009:18)
- -runWithFiberInD 
-  V              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-only2/gemini-cli
-                 /node_modules/react-reconciler/cjs/react-reconciler.development.js:1738:13)
- -performUnitOfWo 
-  k              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-only2/gemini-cli
-                 /node_modules/react-reconciler/cjs/react-reconciler.development.js:12834:22)
- -workLoopSyn 
-             (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-only2/gemini-cli/nod
-             e_modules/react-reconciler/cjs/react-reconciler.development.js:12644:41)
+Enter to select · ↑/↓ to navigate · Esc to cancel
 "
 `;
 
 exports[`AskUserDialog > shows progress header for multiple questions 1`] = `
-"
-  ERROR  config.getUseTerminalBuffer is not a function
+"← □ Database │ □ ORM │ ≡ Review →
 
- src/ui/hooks/useAlternateBuffer.ts:16:44
+Which database should we use?
 
- 13: // Right now this is convenient as it allows us to special case terminalBuffer
- 14: // rendering like we special case alternateBuffer rendering.
- 15: export const isAlternateBufferEnabled = (config: Config): boolean =>
- 16:   config.getUseAlternateBuffer() || config.getUseTerminalBuffer();
- 17:
- 18: // This is read from Config so that the UI reads the same value per application session
- 19: export const useAlternateBuffer = (): boolean => {
+● 1.  PostgreSQL                                                                                                        
+      Relational database                                                                                               
+  2.  MongoDB
+      Document database
+  3.  Enter a custom value
 
- - isAlternateBufferEnabled (src/ui/hooks/useAlternateBuffer.ts:16:44)
- - useAlternateBuffer (src/ui/hooks/useAlternateBuffer.ts:21:10)
- - ChoiceQuestionView (src/ui/components/AskUserDialog.tsx:513:29)
- -Object.react-stack-botto 
-  -frame                  (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-only2/g
-                          emini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:15859:20)
- -renderWithHoo 
-  s            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-only2/gemini-cli/n
-               ode_modules/react-reconciler/cjs/react-reconciler.development.js:3221:22)
- -updateFunctionCompo 
-  ent                (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-only2/gemini
-                     -cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:6475:19)
- -beginWork 
-           (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-only2/gemini-cli/node_
-           modules/react-reconciler/cjs/react-reconciler.development.js:8009:18)
- -runWithFiberInD 
-  V              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-only2/gemini-cli
-                 /node_modules/react-reconciler/cjs/react-reconciler.development.js:1738:13)
- -performUnitOfWo 
-  k              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-only2/gemini-cli
-                 /node_modules/react-reconciler/cjs/react-reconciler.development.js:12834:22)
- -workLoopSyn 
-             (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-only2/gemini-cli/nod
-             e_modules/react-reconciler/cjs/react-reconciler.development.js:12644:41)
+Enter to select · ←/→ to switch questions · Esc to cancel
 "
 `;
 
 exports[`AskUserDialog > shows warning for unanswered questions on Review tab 1`] = `
-"
-  ERROR  config.getUseTerminalBuffer is not a function
-
- src/ui/hooks/useAlternateBuffer.ts:16:44
-
- 13: // Right now this is convenient as it allows us to special case terminalBuffer
- 14: // rendering like we special case alternateBuffer rendering.
- 15: export const isAlternateBufferEnabled = (config: Config): boolean =>
- 16:   config.getUseAlternateBuffer() || config.getUseTerminalBuffer();
- 17:
- 18: // This is read from Config so that the UI reads the same value per application session
- 19: export const useAlternateBuffer = (): boolean => {
-
- - isAlternateBufferEnabled (src/ui/hooks/useAlternateBuffer.ts:16:44)
- - useAlternateBuffer (src/ui/hooks/useAlternateBuffer.ts:21:10)
- - ChoiceQuestionView (src/ui/components/AskUserDialog.tsx:513:29)
- -Object.react-stack-botto 
-  -frame                  (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-only2/g
-                          emini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:15859:20)
- -renderWithHoo 
-  s            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-only2/gemini-cli/n
-               ode_modules/react-reconciler/cjs/react-reconciler.development.js:3221:22)
- -updateFunctionCompo 
-  ent                (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-only2/gemini
-                     -cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:6475:19)
- -beginWork 
-           (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-only2/gemini-cli/node_
-           modules/react-reconciler/cjs/react-reconciler.development.js:8009:18)
- -runWithFiberInD 
-  V              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-only2/gemini-cli
-                 /node_modules/react-reconciler/cjs/react-reconciler.development.js:1738:13)
- -performUnitOfWo 
-  k              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-only2/gemini-cli
-                 /node_modules/react-reconciler/cjs/react-reconciler.development.js:12834:22)
- -workLoopSyn 
-             (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-only2/gemini-cli/nod
-             e_modules/react-reconciler/cjs/react-reconciler.development.js:12644:41)
-"
-`;
-
-exports[`AskUserDialog > shows warning for unanswered questions on Review tab 2`] = `
 "← □ License │ □ README │ ≡ Review →
 
 Review your answers:
@@ -554,47 +182,6 @@ Enter to submit · Tab/Shift+Tab to edit answers · Esc to cancel
 `;
 
 exports[`AskUserDialog > verifies "All of the above" visual state with snapshot 1`] = `
-"
-  ERROR  config.getUseTerminalBuffer is not a function
-
- src/ui/hooks/useAlternateBuffer.ts:16:44
-
- 13: // Right now this is convenient as it allows us to special case terminalBuffer
- 14: // rendering like we special case alternateBuffer rendering.
- 15: export const isAlternateBufferEnabled = (config: Config): boolean =>
- 16:   config.getUseAlternateBuffer() || config.getUseTerminalBuffer();
- 17:
- 18: // This is read from Config so that the UI reads the same value per application session
- 19: export const useAlternateBuffer = (): boolean => {
-
- - isAlternateBufferEnabled (src/ui/hooks/useAlternateBuffer.ts:16:44)
- - useAlternateBuffer (src/ui/hooks/useAlternateBuffer.ts:21:10)
- - ChoiceQuestionView (src/ui/components/AskUserDialog.tsx:513:29)
- -Object.react-stack-botto 
-  -frame                  (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-only2/g
-                          emini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:15859:20)
- -renderWithHoo 
-  s            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-only2/gemini-cli/n
-               ode_modules/react-reconciler/cjs/react-reconciler.development.js:3221:22)
- -updateFunctionCompo 
-  ent                (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-only2/gemini
-                     -cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:6475:19)
- -beginWork 
-           (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-only2/gemini-cli/node_
-           modules/react-reconciler/cjs/react-reconciler.development.js:8009:18)
- -runWithFiberInD 
-  V              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-only2/gemini-cli
-                 /node_modules/react-reconciler/cjs/react-reconciler.development.js:1738:13)
- -performUnitOfWo 
-  k              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-only2/gemini-cli
-                 /node_modules/react-reconciler/cjs/react-reconciler.development.js:12834:22)
- -workLoopSyn 
-             (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-only2/gemini-cli/nod
-             e_modules/react-reconciler/cjs/react-reconciler.development.js:12644:41)
-"
-`;
-
-exports[`AskUserDialog > verifies "All of the above" visual state with snapshot 2`] = `
 "Which features?
 (Select all that apply)
 

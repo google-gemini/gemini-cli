@@ -2,162 +2,69 @@
 
 exports[`MainContent tool group border SVG snapshots > should render SVG snapshot for a pending search dialog (google_web_search) 1`] = `
 "
-  ERROR  config.getUseTerminalBuffer is not a function
+ ▝▜▄      ▗█▀▀▜▙▝█▛▀▀▌▜██▖▟██▘▜█▘▜██▖▝█▛▝█▛
+   ▝▜▄    █▌     █▙▟  ▐█▝█▛▐█ ▐█ ▐█▝█▖█▌ █▌
+  ▗▟▀     ▜▙ ▝█▛ █▌▝ ▖▐█   ▐█ ▐█ ▐█ ▝██▌ █▌
+ ▝▀        ▀▀▀▀▘▝▀▀▀▀▘▀▀▘  ▀▀▘▀▀▘▀▀▘ ▝▀▀▝▀▀
 
- src/ui/components/MainContent.tsx:40:36
+ Gemini CLI v1.2.3
 
- 37:   const uiState = useUIState();
- 38:   const isAlternateBufferOrTerminalBuffer = useAlternateBuffer();
- 39:   const config = useConfig();
- 40:   const useTerminalBuffer = config.getUseTerminalBuffer();
- 41:   const isAlternateBuffer = config.getUseAlternateBuffer();
- 42:
- 43:   const confirmingTool = useConfirmingTool();
 
- - MainContent (src/ui/components/MainContent.tsx:40:36)
- -Object.react-stack-bott 
-  m-frame                (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kil
-                         o-code-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-recon
-                         ciler.development.js:15859:20)
- -renderWithHoo 
-  s            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gre
-               p-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js
-               :3221:22)
- -updateFunctionComp 
-  nent              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-cod
-                    e-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.deve
-                    lopment.js:6475:19)
- -beginWor 
-          (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-onl
-          y2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:8009:18)
+Tips for getting started:
+1. Create GEMINI.md files to customize your interactions
+2. /help for more information
+3. Ask coding questions, edit code or run commands
+4. Be specific for the best results
 
- -runWithFiberIn 
-  EV            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
-                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
-                js:1738:13)
- -performUnitOfW 
-  rk            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
-                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
-                js:12834:22)
- -workLoopSyn 
-             (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-
-             only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:126
-             44:41)
- -renderRootSy 
-  c           (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep
-              -only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:1
-              2624:11)
- -performWorkOnR 
-  ot            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
-                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
-                js:12135:44)
-"
+╭──────────────────────────────────────────────────────────────────────────────────────────────╮
+│ ⊶  google_web_search                                                                         │
+│                                                                                              │
+│ Searching...                                                                                 │
+╰──────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
 
 exports[`MainContent tool group border SVG snapshots > should render SVG snapshot for a shell tool 1`] = `
 "
-  ERROR  config.getUseTerminalBuffer is not a function
+ ▝▜▄      ▗█▀▀▜▙▝█▛▀▀▌▜██▖▟██▘▜█▘▜██▖▝█▛▝█▛
+   ▝▜▄    █▌     █▙▟  ▐█▝█▛▐█ ▐█ ▐█▝█▖█▌ █▌
+  ▗▟▀     ▜▙ ▝█▛ █▌▝ ▖▐█   ▐█ ▐█ ▐█ ▝██▌ █▌
+ ▝▀        ▀▀▀▀▘▝▀▀▀▀▘▀▀▘  ▀▀▘▀▀▘▀▀▘ ▝▀▀▝▀▀
 
- src/ui/components/MainContent.tsx:40:36
+ Gemini CLI v1.2.3
 
- 37:   const uiState = useUIState();
- 38:   const isAlternateBufferOrTerminalBuffer = useAlternateBuffer();
- 39:   const config = useConfig();
- 40:   const useTerminalBuffer = config.getUseTerminalBuffer();
- 41:   const isAlternateBuffer = config.getUseAlternateBuffer();
- 42:
- 43:   const confirmingTool = useConfirmingTool();
 
- - MainContent (src/ui/components/MainContent.tsx:40:36)
- -Object.react-stack-bott 
-  m-frame                (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kil
-                         o-code-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-recon
-                         ciler.development.js:15859:20)
- -renderWithHoo 
-  s            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gre
-               p-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js
-               :3221:22)
- -updateFunctionComp 
-  nent              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-cod
-                    e-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.deve
-                    lopment.js:6475:19)
- -beginWor 
-          (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-onl
-          y2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:8009:18)
+Tips for getting started:
+1. Create GEMINI.md files to customize your interactions
+2. /help for more information
+3. Ask coding questions, edit code or run commands
+4. Be specific for the best results
 
- -runWithFiberIn 
-  EV            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
-                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
-                js:1738:13)
- -performUnitOfW 
-  rk            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
-                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
-                js:12834:22)
- -workLoopSyn 
-             (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-
-             only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:126
-             44:41)
- -renderRootSy 
-  c           (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep
-              -only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:1
-              2624:11)
- -performWorkOnR 
-  ot            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
-                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
-                js:12135:44)
-"
+╭──────────────────────────────────────────────────────────────────────────────────────────────╮
+│ ⊶  run_shell_command                                                                         │
+│                                                                                              │
+│ Running command...                                                                           │
+╰──────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
 
 exports[`MainContent tool group border SVG snapshots > should render SVG snapshot for an empty slice following a search tool 1`] = `
 "
-  ERROR  config.getUseTerminalBuffer is not a function
+ ▝▜▄      ▗█▀▀▜▙▝█▛▀▀▌▜██▖▟██▘▜█▘▜██▖▝█▛▝█▛
+   ▝▜▄    █▌     █▙▟  ▐█▝█▛▐█ ▐█ ▐█▝█▖█▌ █▌
+  ▗▟▀     ▜▙ ▝█▛ █▌▝ ▖▐█   ▐█ ▐█ ▐█ ▝██▌ █▌
+ ▝▀        ▀▀▀▀▘▝▀▀▀▀▘▀▀▘  ▀▀▘▀▀▘▀▀▘ ▝▀▀▝▀▀
 
- src/ui/components/MainContent.tsx:40:36
+ Gemini CLI v1.2.3
 
- 37:   const uiState = useUIState();
- 38:   const isAlternateBufferOrTerminalBuffer = useAlternateBuffer();
- 39:   const config = useConfig();
- 40:   const useTerminalBuffer = config.getUseTerminalBuffer();
- 41:   const isAlternateBuffer = config.getUseAlternateBuffer();
- 42:
- 43:   const confirmingTool = useConfirmingTool();
 
- - MainContent (src/ui/components/MainContent.tsx:40:36)
- -Object.react-stack-bott 
-  m-frame                (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kil
-                         o-code-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-recon
-                         ciler.development.js:15859:20)
- -renderWithHoo 
-  s            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gre
-               p-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js
-               :3221:22)
- -updateFunctionComp 
-  nent              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-cod
-                    e-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.deve
-                    lopment.js:6475:19)
- -beginWor 
-          (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-onl
-          y2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:8009:18)
+Tips for getting started:
+1. Create GEMINI.md files to customize your interactions
+2. /help for more information
+3. Ask coding questions, edit code or run commands
+4. Be specific for the best results
 
- -runWithFiberIn 
-  EV            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
-                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
-                js:1738:13)
- -performUnitOfW 
-  rk            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
-                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
-                js:12834:22)
- -workLoopSyn 
-             (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-
-             only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:126
-             44:41)
- -renderRootSy 
-  c           (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep
-              -only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:1
-              2624:11)
- -performWorkOnR 
-  ot            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
-                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
-                js:12135:44)
-"
+╭──────────────────────────────────────────────────────────────────────────────────────────────╮
+│ ⊶  google_web_search                                                                         │
+│                                                                                              │
+│ Searching...                                                                                 │
+╰──────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;

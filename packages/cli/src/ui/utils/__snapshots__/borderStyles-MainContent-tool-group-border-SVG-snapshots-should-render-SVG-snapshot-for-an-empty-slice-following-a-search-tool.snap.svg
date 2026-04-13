@@ -1,74 +1,45 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="920" height="870" viewBox="0 0 920 870">
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="360" viewBox="0 0 920 360">
   <style>
     text { font-family: Consolas, "Courier New", monospace; font-size: 14px; dominant-baseline: text-before-edge; white-space: pre; }
   </style>
-  <rect width="920" height="870" fill="#000000" />
+  <rect width="920" height="360" fill="#000000" />
   <g transform="translate(10, 10)">
-    <rect x="9" y="17" width="63" height="17" fill="#cd0000" />
-    <text x="9" y="19" fill="#e5e5e5" textLength="63" lengthAdjust="spacingAndGlyphs"> ERROR </text>
-    <text x="72" y="19" fill="#ffffff" textLength="828" lengthAdjust="spacingAndGlyphs"> config.getUseTerminalBuffer is not a function                                              </text>
-    <text x="0" y="53" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs"> src/ui/components/MainContent.tsx:40:36                                                            </text>
-    <text x="0" y="87" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs"> 37:   const uiState = useUIState();                                                                </text>
-    <text x="0" y="104" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs"> 38:   const isAlternateBufferOrTerminalBuffer = useAlternateBuffer();                              </text>
-    <text x="0" y="121" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs"> 39:   const config = useConfig();                                                                  </text>
-    <rect x="9" y="136" width="558" height="17" fill="#cd0000" />
-    <text x="9" y="138" fill="#e5e5e5" textLength="558" lengthAdjust="spacingAndGlyphs">40:   const useTerminalBuffer = config.getUseTerminalBuffer();</text>
-    <text x="0" y="155" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs"> 41:   const isAlternateBuffer = config.getUseAlternateBuffer();                                    </text>
-    <text x="0" y="172" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs"> 42:                                                                                                </text>
-    <text x="0" y="189" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs"> 43:   const confirmingTool = useConfirmingTool();                                                  </text>
-    <text x="0" y="223" fill="#ffffff" textLength="27" lengthAdjust="spacingAndGlyphs"> - </text>
-    <text x="27" y="223" fill="#ffffff" textLength="99" lengthAdjust="spacingAndGlyphs" font-weight="bold">MainContent</text>
-    <text x="126" y="223" fill="#7f7f7f" textLength="378" lengthAdjust="spacingAndGlyphs" font-weight="bold"> (src/ui/components/MainContent.tsx:40:36)</text>
-    <text x="0" y="240" fill="#ffffff" textLength="18" lengthAdjust="spacingAndGlyphs"> -</text>
-    <text x="18" y="240" fill="#ffffff" textLength="207" lengthAdjust="spacingAndGlyphs" font-weight="bold">Object.react-stack-bott</text>
-    <text x="18" y="257" fill="#ffffff" textLength="63" lengthAdjust="spacingAndGlyphs" font-weight="bold">m-frame</text>
-    <text x="225" y="257" fill="#7f7f7f" textLength="666" lengthAdjust="spacingAndGlyphs">(/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kil</text>
-    <text x="225" y="274" fill="#7f7f7f" textLength="666" lengthAdjust="spacingAndGlyphs">o-code-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-recon</text>
-    <text x="225" y="291" fill="#7f7f7f" textLength="270" lengthAdjust="spacingAndGlyphs">ciler.development.js:15859:20)</text>
-    <text x="0" y="308" fill="#ffffff" textLength="18" lengthAdjust="spacingAndGlyphs"> -</text>
-    <text x="18" y="308" fill="#ffffff" textLength="117" lengthAdjust="spacingAndGlyphs" font-weight="bold">renderWithHoo</text>
-    <text x="18" y="325" fill="#ffffff" textLength="9" lengthAdjust="spacingAndGlyphs" font-weight="bold">s</text>
-    <text x="135" y="325" fill="#7f7f7f" textLength="756" lengthAdjust="spacingAndGlyphs">(/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gre</text>
-    <text x="135" y="342" fill="#7f7f7f" textLength="756" lengthAdjust="spacingAndGlyphs">p-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js</text>
-    <text x="135" y="359" fill="#7f7f7f" textLength="81" lengthAdjust="spacingAndGlyphs">:3221:22)</text>
-    <text x="0" y="376" fill="#ffffff" textLength="18" lengthAdjust="spacingAndGlyphs"> -</text>
-    <text x="18" y="376" fill="#ffffff" textLength="162" lengthAdjust="spacingAndGlyphs" font-weight="bold">updateFunctionComp</text>
-    <text x="18" y="393" fill="#ffffff" textLength="36" lengthAdjust="spacingAndGlyphs" font-weight="bold">nent</text>
-    <text x="180" y="393" fill="#7f7f7f" textLength="711" lengthAdjust="spacingAndGlyphs">(/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-cod</text>
-    <text x="180" y="410" fill="#7f7f7f" textLength="711" lengthAdjust="spacingAndGlyphs">e-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.deve</text>
-    <text x="180" y="427" fill="#7f7f7f" textLength="171" lengthAdjust="spacingAndGlyphs">lopment.js:6475:19)</text>
-    <text x="0" y="444" fill="#ffffff" textLength="18" lengthAdjust="spacingAndGlyphs"> -</text>
-    <text x="18" y="444" fill="#ffffff" textLength="72" lengthAdjust="spacingAndGlyphs" font-weight="bold">beginWor</text>
-    <text x="90" y="461" fill="#7f7f7f" textLength="801" lengthAdjust="spacingAndGlyphs">(/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-onl</text>
-    <text x="90" y="478" fill="#7f7f7f" textLength="792" lengthAdjust="spacingAndGlyphs">y2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:8009:18)</text>
-    <text x="0" y="512" fill="#ffffff" textLength="18" lengthAdjust="spacingAndGlyphs"> -</text>
-    <text x="18" y="512" fill="#ffffff" textLength="126" lengthAdjust="spacingAndGlyphs" font-weight="bold">runWithFiberIn</text>
-    <text x="18" y="529" fill="#ffffff" textLength="18" lengthAdjust="spacingAndGlyphs" font-weight="bold">EV</text>
-    <text x="144" y="529" fill="#7f7f7f" textLength="747" lengthAdjust="spacingAndGlyphs">(/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr</text>
-    <text x="144" y="546" fill="#7f7f7f" textLength="747" lengthAdjust="spacingAndGlyphs">ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.</text>
-    <text x="144" y="563" fill="#7f7f7f" textLength="99" lengthAdjust="spacingAndGlyphs">js:1738:13)</text>
-    <text x="0" y="580" fill="#ffffff" textLength="18" lengthAdjust="spacingAndGlyphs"> -</text>
-    <text x="18" y="580" fill="#ffffff" textLength="126" lengthAdjust="spacingAndGlyphs" font-weight="bold">performUnitOfW</text>
-    <text x="18" y="597" fill="#ffffff" textLength="18" lengthAdjust="spacingAndGlyphs" font-weight="bold">rk</text>
-    <text x="144" y="597" fill="#7f7f7f" textLength="747" lengthAdjust="spacingAndGlyphs">(/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr</text>
-    <text x="144" y="614" fill="#7f7f7f" textLength="747" lengthAdjust="spacingAndGlyphs">ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.</text>
-    <text x="144" y="631" fill="#7f7f7f" textLength="108" lengthAdjust="spacingAndGlyphs">js:12834:22)</text>
-    <text x="0" y="648" fill="#ffffff" textLength="18" lengthAdjust="spacingAndGlyphs"> -</text>
-    <text x="18" y="648" fill="#ffffff" textLength="99" lengthAdjust="spacingAndGlyphs" font-weight="bold">workLoopSyn</text>
-    <text x="117" y="665" fill="#7f7f7f" textLength="774" lengthAdjust="spacingAndGlyphs">(/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-</text>
-    <text x="117" y="682" fill="#7f7f7f" textLength="774" lengthAdjust="spacingAndGlyphs">only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:126</text>
-    <text x="117" y="699" fill="#7f7f7f" textLength="54" lengthAdjust="spacingAndGlyphs">44:41)</text>
-    <text x="0" y="716" fill="#ffffff" textLength="18" lengthAdjust="spacingAndGlyphs"> -</text>
-    <text x="18" y="716" fill="#ffffff" textLength="108" lengthAdjust="spacingAndGlyphs" font-weight="bold">renderRootSy</text>
-    <text x="18" y="733" fill="#ffffff" textLength="9" lengthAdjust="spacingAndGlyphs" font-weight="bold">c</text>
-    <text x="126" y="733" fill="#7f7f7f" textLength="765" lengthAdjust="spacingAndGlyphs">(/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep</text>
-    <text x="126" y="750" fill="#7f7f7f" textLength="765" lengthAdjust="spacingAndGlyphs">-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:1</text>
-    <text x="126" y="767" fill="#7f7f7f" textLength="72" lengthAdjust="spacingAndGlyphs">2624:11)</text>
-    <text x="0" y="784" fill="#ffffff" textLength="18" lengthAdjust="spacingAndGlyphs"> -</text>
-    <text x="18" y="784" fill="#ffffff" textLength="126" lengthAdjust="spacingAndGlyphs" font-weight="bold">performWorkOnR</text>
-    <text x="18" y="801" fill="#ffffff" textLength="18" lengthAdjust="spacingAndGlyphs" font-weight="bold">ot</text>
-    <text x="144" y="801" fill="#7f7f7f" textLength="747" lengthAdjust="spacingAndGlyphs">(/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr</text>
-    <text x="144" y="818" fill="#7f7f7f" textLength="747" lengthAdjust="spacingAndGlyphs">ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.</text>
-    <text x="144" y="835" fill="#7f7f7f" textLength="108" lengthAdjust="spacingAndGlyphs">js:12135:44)</text>
+    <text x="9" y="19" fill="#4796e4" textLength="9" lengthAdjust="spacingAndGlyphs">▝</text>
+    <text x="18" y="19" fill="#6688d9" textLength="9" lengthAdjust="spacingAndGlyphs">▜</text>
+    <text x="27" y="19" fill="#847ace" textLength="9" lengthAdjust="spacingAndGlyphs">▄</text>
+    <text x="90" y="19" fill="#ffffff" textLength="297" lengthAdjust="spacingAndGlyphs">▗█▀▀▜▙▝█▛▀▀▌▜██▖▟██▘▜█▘▜██▖▝█▛▝█▛</text>
+    <text x="27" y="36" fill="#847ace" textLength="9" lengthAdjust="spacingAndGlyphs">▝</text>
+    <text x="36" y="36" fill="#a471a7" textLength="9" lengthAdjust="spacingAndGlyphs">▜</text>
+    <text x="45" y="36" fill="#c3677f" textLength="9" lengthAdjust="spacingAndGlyphs">▄</text>
+    <text x="90" y="36" fill="#ffffff" textLength="297" lengthAdjust="spacingAndGlyphs">█▌     █▙▟  ▐█▝█▛▐█ ▐█ ▐█▝█▖█▌ █▌</text>
+    <text x="18" y="53" fill="#6688d9" textLength="9" lengthAdjust="spacingAndGlyphs">▗</text>
+    <text x="27" y="53" fill="#847ace" textLength="9" lengthAdjust="spacingAndGlyphs">▟</text>
+    <text x="36" y="53" fill="#a471a7" textLength="9" lengthAdjust="spacingAndGlyphs">▀</text>
+    <text x="90" y="53" fill="#ffffff" textLength="297" lengthAdjust="spacingAndGlyphs">▜▙ ▝█▛ █▌▝ ▖▐█   ▐█ ▐█ ▐█ ▝██▌ █▌</text>
+    <text x="9" y="70" fill="#4796e4" textLength="9" lengthAdjust="spacingAndGlyphs">▝</text>
+    <text x="18" y="70" fill="#6688d9" textLength="9" lengthAdjust="spacingAndGlyphs">▀</text>
+    <text x="90" y="70" fill="#ffffff" textLength="297" lengthAdjust="spacingAndGlyphs"> ▀▀▀▀▘▝▀▀▀▀▘▀▀▘  ▀▀▘▀▀▘▀▀▘ ▝▀▀▝▀▀</text>
+    <text x="9" y="104" fill="#ffffff" textLength="90" lengthAdjust="spacingAndGlyphs" font-weight="bold">Gemini CLI</text>
+    <text x="99" y="104" fill="#afafaf" textLength="63" lengthAdjust="spacingAndGlyphs"> v1.2.3</text>
+    <text x="0" y="155" fill="#ffffff" textLength="225" lengthAdjust="spacingAndGlyphs">Tips for getting started:</text>
+    <text x="0" y="172" fill="#ffffff" textLength="90" lengthAdjust="spacingAndGlyphs">1. Create </text>
+    <text x="90" y="172" fill="#ffffff" textLength="81" lengthAdjust="spacingAndGlyphs" font-weight="bold">GEMINI.md</text>
+    <text x="171" y="172" fill="#ffffff" textLength="333" lengthAdjust="spacingAndGlyphs"> files to customize your interactions</text>
+    <text x="0" y="189" fill="#ffffff" textLength="27" lengthAdjust="spacingAndGlyphs">2. </text>
+    <text x="27" y="189" fill="#afafaf" textLength="45" lengthAdjust="spacingAndGlyphs">/help</text>
+    <text x="72" y="189" fill="#ffffff" textLength="189" lengthAdjust="spacingAndGlyphs"> for more information</text>
+    <text x="0" y="206" fill="#ffffff" textLength="450" lengthAdjust="spacingAndGlyphs">3. Ask coding questions, edit code or run commands</text>
+    <text x="0" y="223" fill="#ffffff" textLength="315" lengthAdjust="spacingAndGlyphs">4. Be specific for the best results</text>
+    <text x="0" y="257" fill="#ffffaf" textLength="864" lengthAdjust="spacingAndGlyphs">╭──────────────────────────────────────────────────────────────────────────────────────────────╮</text>
+    <text x="0" y="274" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="18" y="274" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">⊶</text>
+    <text x="45" y="274" fill="#ffffff" textLength="153" lengthAdjust="spacingAndGlyphs" font-weight="bold">google_web_search</text>
+    <text x="855" y="274" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="291" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="855" y="291" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="308" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="18" y="308" fill="#ffffff" textLength="108" lengthAdjust="spacingAndGlyphs">Searching...</text>
+    <text x="855" y="308" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="325" fill="#ffffaf" textLength="864" lengthAdjust="spacingAndGlyphs">╰──────────────────────────────────────────────────────────────────────────────────────────────╯</text>
   </g>
 </svg>

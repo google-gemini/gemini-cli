@@ -1,675 +1,93 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`InputPrompt > Highlighting and Cursor Display > multi-line scenarios > should display cursor correctly 'at the beginning of a line' in a multiline block 1`] = `
-"
-  ERROR  config.getUseTerminalBuffer is not a function
-
- src/ui/hooks/useAlternateBuffer.ts:16:44
-
- 13: // Right now this is convenient as it allows us to special case terminalBuffer
- 14: // rendering like we special case alternateBuffer rendering.
- 15: export const isAlternateBufferEnabled = (config: Config): boolean =>
- 16:   config.getUseAlternateBuffer() || config.getUseTerminalBuffer();
- 17:
- 18: // This is read from Config so that the UI reads the same value per application session
- 19: export const useAlternateBuffer = (): boolean => {
-
- - isAlternateBufferEnabled (src/ui/hooks/useAlternateBuffer.ts:16:44)
- - useAlternateBuffer (src/ui/hooks/useAlternateBuffer.ts:21:10)
- - InputPrompt (src/ui/components/InputPrompt.tsx:583:29)
- -Object.react-stack-bott 
-  m-frame                (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kil
-                         o-code-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-recon
-                         ciler.development.js:15859:20)
- -renderWithHoo 
-  s            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gre
-               p-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js
-               :3221:22)
- -updateFunctionComp 
-  nent              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-cod
-                    e-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.deve
-                    lopment.js:6475:19)
- -beginWor 
-          (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-onl
-          y2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:8009:18)
-
- -runWithFiberIn 
-  EV            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
-                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
-                js:1738:13)
- -performUnitOfW 
-  rk            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
-                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
-                js:12834:22)
- -workLoopSyn 
-             (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-
-             only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:126
-             44:41)
-"
+"────────────────────────────────────────────────────────────────────────────────────────────────────
+│ > first line                                                                                     │
+│   second line                                                                                    │
+────────────────────────────────────────────────────────────────────────────────────────────────────"
 `;
 
 exports[`InputPrompt > Highlighting and Cursor Display > multi-line scenarios > should display cursor correctly 'at the end of a line' in a multiline block 1`] = `
-"
-  ERROR  config.getUseTerminalBuffer is not a function
-
- src/ui/hooks/useAlternateBuffer.ts:16:44
-
- 13: // Right now this is convenient as it allows us to special case terminalBuffer
- 14: // rendering like we special case alternateBuffer rendering.
- 15: export const isAlternateBufferEnabled = (config: Config): boolean =>
- 16:   config.getUseAlternateBuffer() || config.getUseTerminalBuffer();
- 17:
- 18: // This is read from Config so that the UI reads the same value per application session
- 19: export const useAlternateBuffer = (): boolean => {
-
- - isAlternateBufferEnabled (src/ui/hooks/useAlternateBuffer.ts:16:44)
- - useAlternateBuffer (src/ui/hooks/useAlternateBuffer.ts:21:10)
- - InputPrompt (src/ui/components/InputPrompt.tsx:583:29)
- -Object.react-stack-bott 
-  m-frame                (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kil
-                         o-code-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-recon
-                         ciler.development.js:15859:20)
- -renderWithHoo 
-  s            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gre
-               p-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js
-               :3221:22)
- -updateFunctionComp 
-  nent              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-cod
-                    e-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.deve
-                    lopment.js:6475:19)
- -beginWor 
-          (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-onl
-          y2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:8009:18)
-
- -runWithFiberIn 
-  EV            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
-                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
-                js:1738:13)
- -performUnitOfW 
-  rk            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
-                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
-                js:12834:22)
- -workLoopSyn 
-             (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-
-             only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:126
-             44:41)
-"
+"────────────────────────────────────────────────────────────────────────────────────────────────────
+│ > first line                                                                                     │
+│   second line                                                                                    │
+────────────────────────────────────────────────────────────────────────────────────────────────────"
 `;
 
 exports[`InputPrompt > Highlighting and Cursor Display > multi-line scenarios > should display cursor correctly 'in the middle of a line' in a multiline block 1`] = `
-"
-  ERROR  config.getUseTerminalBuffer is not a function
-
- src/ui/hooks/useAlternateBuffer.ts:16:44
-
- 13: // Right now this is convenient as it allows us to special case terminalBuffer
- 14: // rendering like we special case alternateBuffer rendering.
- 15: export const isAlternateBufferEnabled = (config: Config): boolean =>
- 16:   config.getUseAlternateBuffer() || config.getUseTerminalBuffer();
- 17:
- 18: // This is read from Config so that the UI reads the same value per application session
- 19: export const useAlternateBuffer = (): boolean => {
-
- - isAlternateBufferEnabled (src/ui/hooks/useAlternateBuffer.ts:16:44)
- - useAlternateBuffer (src/ui/hooks/useAlternateBuffer.ts:21:10)
- - InputPrompt (src/ui/components/InputPrompt.tsx:583:29)
- -Object.react-stack-bott 
-  m-frame                (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kil
-                         o-code-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-recon
-                         ciler.development.js:15859:20)
- -renderWithHoo 
-  s            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gre
-               p-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js
-               :3221:22)
- -updateFunctionComp 
-  nent              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-cod
-                    e-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.deve
-                    lopment.js:6475:19)
- -beginWor 
-          (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-onl
-          y2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:8009:18)
-
- -runWithFiberIn 
-  EV            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
-                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
-                js:1738:13)
- -performUnitOfW 
-  rk            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
-                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
-                js:12834:22)
- -workLoopSyn 
-             (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-
-             only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:126
-             44:41)
-"
+"────────────────────────────────────────────────────────────────────────────────────────────────────
+│ > first line                                                                                     │
+│   second line                                                                                    │
+│   third line                                                                                     │
+────────────────────────────────────────────────────────────────────────────────────────────────────"
 `;
 
 exports[`InputPrompt > Highlighting and Cursor Display > multi-line scenarios > should display cursor on a blank line in a multiline block 1`] = `
-"
-  ERROR  config.getUseTerminalBuffer is not a function
-
- src/ui/hooks/useAlternateBuffer.ts:16:44
-
- 13: // Right now this is convenient as it allows us to special case terminalBuffer
- 14: // rendering like we special case alternateBuffer rendering.
- 15: export const isAlternateBufferEnabled = (config: Config): boolean =>
- 16:   config.getUseAlternateBuffer() || config.getUseTerminalBuffer();
- 17:
- 18: // This is read from Config so that the UI reads the same value per application session
- 19: export const useAlternateBuffer = (): boolean => {
-
- - isAlternateBufferEnabled (src/ui/hooks/useAlternateBuffer.ts:16:44)
- - useAlternateBuffer (src/ui/hooks/useAlternateBuffer.ts:21:10)
- - InputPrompt (src/ui/components/InputPrompt.tsx:583:29)
- -Object.react-stack-bott 
-  m-frame                (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kil
-                         o-code-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-recon
-                         ciler.development.js:15859:20)
- -renderWithHoo 
-  s            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gre
-               p-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js
-               :3221:22)
- -updateFunctionComp 
-  nent              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-cod
-                    e-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.deve
-                    lopment.js:6475:19)
- -beginWor 
-          (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-onl
-          y2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:8009:18)
-
- -runWithFiberIn 
-  EV            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
-                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
-                js:1738:13)
- -performUnitOfW 
-  rk            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
-                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
-                js:12834:22)
- -workLoopSyn 
-             (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-
-             only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:126
-             44:41)
-"
+"────────────────────────────────────────────────────────────────────────────────────────────────────
+│ > first line                                                                                     │
+│                                                                                                  │
+│   third line                                                                                     │
+────────────────────────────────────────────────────────────────────────────────────────────────────"
 `;
 
 exports[`InputPrompt > Highlighting and Cursor Display > single-line scenarios > should display cursor correctly 'after multi-byte unicode characters' 1`] = `
-"
-  ERROR  config.getUseTerminalBuffer is not a function
-
- src/ui/hooks/useAlternateBuffer.ts:16:44
-
- 13: // Right now this is convenient as it allows us to special case terminalBuffer
- 14: // rendering like we special case alternateBuffer rendering.
- 15: export const isAlternateBufferEnabled = (config: Config): boolean =>
- 16:   config.getUseAlternateBuffer() || config.getUseTerminalBuffer();
- 17:
- 18: // This is read from Config so that the UI reads the same value per application session
- 19: export const useAlternateBuffer = (): boolean => {
-
- - isAlternateBufferEnabled (src/ui/hooks/useAlternateBuffer.ts:16:44)
- - useAlternateBuffer (src/ui/hooks/useAlternateBuffer.ts:21:10)
- - InputPrompt (src/ui/components/InputPrompt.tsx:583:29)
- -Object.react-stack-bott 
-  m-frame                (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kil
-                         o-code-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-recon
-                         ciler.development.js:15859:20)
- -renderWithHoo 
-  s            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gre
-               p-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js
-               :3221:22)
- -updateFunctionComp 
-  nent              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-cod
-                    e-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.deve
-                    lopment.js:6475:19)
- -beginWor 
-          (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-onl
-          y2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:8009:18)
-
- -runWithFiberIn 
-  EV            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
-                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
-                js:1738:13)
- -performUnitOfW 
-  rk            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
-                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
-                js:12834:22)
- -workLoopSyn 
-             (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-
-             only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:126
-             44:41)
-"
+"────────────────────────────────────────────────────────────────────────────────────────────────────
+│ > 👍A                                                                                            │
+────────────────────────────────────────────────────────────────────────────────────────────────────"
 `;
 
 exports[`InputPrompt > Highlighting and Cursor Display > single-line scenarios > should display cursor correctly 'at the beginning of the line' 1`] = `
-"
-  ERROR  config.getUseTerminalBuffer is not a function
-
- src/ui/hooks/useAlternateBuffer.ts:16:44
-
- 13: // Right now this is convenient as it allows us to special case terminalBuffer
- 14: // rendering like we special case alternateBuffer rendering.
- 15: export const isAlternateBufferEnabled = (config: Config): boolean =>
- 16:   config.getUseAlternateBuffer() || config.getUseTerminalBuffer();
- 17:
- 18: // This is read from Config so that the UI reads the same value per application session
- 19: export const useAlternateBuffer = (): boolean => {
-
- - isAlternateBufferEnabled (src/ui/hooks/useAlternateBuffer.ts:16:44)
- - useAlternateBuffer (src/ui/hooks/useAlternateBuffer.ts:21:10)
- - InputPrompt (src/ui/components/InputPrompt.tsx:583:29)
- -Object.react-stack-bott 
-  m-frame                (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kil
-                         o-code-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-recon
-                         ciler.development.js:15859:20)
- -renderWithHoo 
-  s            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gre
-               p-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js
-               :3221:22)
- -updateFunctionComp 
-  nent              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-cod
-                    e-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.deve
-                    lopment.js:6475:19)
- -beginWor 
-          (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-onl
-          y2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:8009:18)
-
- -runWithFiberIn 
-  EV            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
-                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
-                js:1738:13)
- -performUnitOfW 
-  rk            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
-                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
-                js:12834:22)
- -workLoopSyn 
-             (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-
-             only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:126
-             44:41)
-"
+"────────────────────────────────────────────────────────────────────────────────────────────────────
+│ > hello                                                                                          │
+────────────────────────────────────────────────────────────────────────────────────────────────────"
 `;
 
 exports[`InputPrompt > Highlighting and Cursor Display > single-line scenarios > should display cursor correctly 'at the end of a line with unicode cha…' 1`] = `
-"
-  ERROR  config.getUseTerminalBuffer is not a function
-
- src/ui/hooks/useAlternateBuffer.ts:16:44
-
- 13: // Right now this is convenient as it allows us to special case terminalBuffer
- 14: // rendering like we special case alternateBuffer rendering.
- 15: export const isAlternateBufferEnabled = (config: Config): boolean =>
- 16:   config.getUseAlternateBuffer() || config.getUseTerminalBuffer();
- 17:
- 18: // This is read from Config so that the UI reads the same value per application session
- 19: export const useAlternateBuffer = (): boolean => {
-
- - isAlternateBufferEnabled (src/ui/hooks/useAlternateBuffer.ts:16:44)
- - useAlternateBuffer (src/ui/hooks/useAlternateBuffer.ts:21:10)
- - InputPrompt (src/ui/components/InputPrompt.tsx:583:29)
- -Object.react-stack-bott 
-  m-frame                (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kil
-                         o-code-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-recon
-                         ciler.development.js:15859:20)
- -renderWithHoo 
-  s            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gre
-               p-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js
-               :3221:22)
- -updateFunctionComp 
-  nent              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-cod
-                    e-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.deve
-                    lopment.js:6475:19)
- -beginWor 
-          (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-onl
-          y2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:8009:18)
-
- -runWithFiberIn 
-  EV            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
-                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
-                js:1738:13)
- -performUnitOfW 
-  rk            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
-                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
-                js:12834:22)
- -workLoopSyn 
-             (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-
-             only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:126
-             44:41)
-"
+"────────────────────────────────────────────────────────────────────────────────────────────────────
+│ > hello 👍                                                                                       │
+────────────────────────────────────────────────────────────────────────────────────────────────────"
 `;
 
 exports[`InputPrompt > Highlighting and Cursor Display > single-line scenarios > should display cursor correctly 'at the end of a short line with unico…' 1`] = `
-"
-  ERROR  config.getUseTerminalBuffer is not a function
-
- src/ui/hooks/useAlternateBuffer.ts:16:44
-
- 13: // Right now this is convenient as it allows us to special case terminalBuffer
- 14: // rendering like we special case alternateBuffer rendering.
- 15: export const isAlternateBufferEnabled = (config: Config): boolean =>
- 16:   config.getUseAlternateBuffer() || config.getUseTerminalBuffer();
- 17:
- 18: // This is read from Config so that the UI reads the same value per application session
- 19: export const useAlternateBuffer = (): boolean => {
-
- - isAlternateBufferEnabled (src/ui/hooks/useAlternateBuffer.ts:16:44)
- - useAlternateBuffer (src/ui/hooks/useAlternateBuffer.ts:21:10)
- - InputPrompt (src/ui/components/InputPrompt.tsx:583:29)
- -Object.react-stack-bott 
-  m-frame                (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kil
-                         o-code-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-recon
-                         ciler.development.js:15859:20)
- -renderWithHoo 
-  s            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gre
-               p-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js
-               :3221:22)
- -updateFunctionComp 
-  nent              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-cod
-                    e-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.deve
-                    lopment.js:6475:19)
- -beginWor 
-          (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-onl
-          y2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:8009:18)
-
- -runWithFiberIn 
-  EV            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
-                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
-                js:1738:13)
- -performUnitOfW 
-  rk            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
-                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
-                js:12834:22)
- -workLoopSyn 
-             (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-
-             only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:126
-             44:41)
-"
+"────────────────────────────────────────────────────────────────────────────────────────────────────
+│ > 👍                                                                                             │
+────────────────────────────────────────────────────────────────────────────────────────────────────"
 `;
 
 exports[`InputPrompt > Highlighting and Cursor Display > single-line scenarios > should display cursor correctly 'at the end of the line' 1`] = `
-"
-  ERROR  config.getUseTerminalBuffer is not a function
-
- src/ui/hooks/useAlternateBuffer.ts:16:44
-
- 13: // Right now this is convenient as it allows us to special case terminalBuffer
- 14: // rendering like we special case alternateBuffer rendering.
- 15: export const isAlternateBufferEnabled = (config: Config): boolean =>
- 16:   config.getUseAlternateBuffer() || config.getUseTerminalBuffer();
- 17:
- 18: // This is read from Config so that the UI reads the same value per application session
- 19: export const useAlternateBuffer = (): boolean => {
-
- - isAlternateBufferEnabled (src/ui/hooks/useAlternateBuffer.ts:16:44)
- - useAlternateBuffer (src/ui/hooks/useAlternateBuffer.ts:21:10)
- - InputPrompt (src/ui/components/InputPrompt.tsx:583:29)
- -Object.react-stack-bott 
-  m-frame                (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kil
-                         o-code-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-recon
-                         ciler.development.js:15859:20)
- -renderWithHoo 
-  s            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gre
-               p-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js
-               :3221:22)
- -updateFunctionComp 
-  nent              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-cod
-                    e-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.deve
-                    lopment.js:6475:19)
- -beginWor 
-          (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-onl
-          y2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:8009:18)
-
- -runWithFiberIn 
-  EV            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
-                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
-                js:1738:13)
- -performUnitOfW 
-  rk            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
-                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
-                js:12834:22)
- -workLoopSyn 
-             (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-
-             only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:126
-             44:41)
-"
+"────────────────────────────────────────────────────────────────────────────────────────────────────
+│ > hello                                                                                          │
+────────────────────────────────────────────────────────────────────────────────────────────────────"
 `;
 
 exports[`InputPrompt > Highlighting and Cursor Display > single-line scenarios > should display cursor correctly 'for multi-byte unicode characters' 1`] = `
-"
-  ERROR  config.getUseTerminalBuffer is not a function
-
- src/ui/hooks/useAlternateBuffer.ts:16:44
-
- 13: // Right now this is convenient as it allows us to special case terminalBuffer
- 14: // rendering like we special case alternateBuffer rendering.
- 15: export const isAlternateBufferEnabled = (config: Config): boolean =>
- 16:   config.getUseAlternateBuffer() || config.getUseTerminalBuffer();
- 17:
- 18: // This is read from Config so that the UI reads the same value per application session
- 19: export const useAlternateBuffer = (): boolean => {
-
- - isAlternateBufferEnabled (src/ui/hooks/useAlternateBuffer.ts:16:44)
- - useAlternateBuffer (src/ui/hooks/useAlternateBuffer.ts:21:10)
- - InputPrompt (src/ui/components/InputPrompt.tsx:583:29)
- -Object.react-stack-bott 
-  m-frame                (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kil
-                         o-code-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-recon
-                         ciler.development.js:15859:20)
- -renderWithHoo 
-  s            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gre
-               p-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js
-               :3221:22)
- -updateFunctionComp 
-  nent              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-cod
-                    e-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.deve
-                    lopment.js:6475:19)
- -beginWor 
-          (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-onl
-          y2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:8009:18)
-
- -runWithFiberIn 
-  EV            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
-                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
-                js:1738:13)
- -performUnitOfW 
-  rk            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
-                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
-                js:12834:22)
- -workLoopSyn 
-             (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-
-             only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:126
-             44:41)
-"
+"────────────────────────────────────────────────────────────────────────────────────────────────────
+│ > hello 👍 world                                                                                 │
+────────────────────────────────────────────────────────────────────────────────────────────────────"
 `;
 
 exports[`InputPrompt > Highlighting and Cursor Display > single-line scenarios > should display cursor correctly 'mid-word' 1`] = `
-"
-  ERROR  config.getUseTerminalBuffer is not a function
-
- src/ui/hooks/useAlternateBuffer.ts:16:44
-
- 13: // Right now this is convenient as it allows us to special case terminalBuffer
- 14: // rendering like we special case alternateBuffer rendering.
- 15: export const isAlternateBufferEnabled = (config: Config): boolean =>
- 16:   config.getUseAlternateBuffer() || config.getUseTerminalBuffer();
- 17:
- 18: // This is read from Config so that the UI reads the same value per application session
- 19: export const useAlternateBuffer = (): boolean => {
-
- - isAlternateBufferEnabled (src/ui/hooks/useAlternateBuffer.ts:16:44)
- - useAlternateBuffer (src/ui/hooks/useAlternateBuffer.ts:21:10)
- - InputPrompt (src/ui/components/InputPrompt.tsx:583:29)
- -Object.react-stack-bott 
-  m-frame                (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kil
-                         o-code-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-recon
-                         ciler.development.js:15859:20)
- -renderWithHoo 
-  s            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gre
-               p-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js
-               :3221:22)
- -updateFunctionComp 
-  nent              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-cod
-                    e-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.deve
-                    lopment.js:6475:19)
- -beginWor 
-          (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-onl
-          y2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:8009:18)
-
- -runWithFiberIn 
-  EV            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
-                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
-                js:1738:13)
- -performUnitOfW 
-  rk            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
-                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
-                js:12834:22)
- -workLoopSyn 
-             (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-
-             only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:126
-             44:41)
-"
+"────────────────────────────────────────────────────────────────────────────────────────────────────
+│ > hello world                                                                                    │
+────────────────────────────────────────────────────────────────────────────────────────────────────"
 `;
 
 exports[`InputPrompt > Highlighting and Cursor Display > single-line scenarios > should display cursor correctly 'on a highlighted token' 1`] = `
-"
-  ERROR  config.getUseTerminalBuffer is not a function
-
- src/ui/hooks/useAlternateBuffer.ts:16:44
-
- 13: // Right now this is convenient as it allows us to special case terminalBuffer
- 14: // rendering like we special case alternateBuffer rendering.
- 15: export const isAlternateBufferEnabled = (config: Config): boolean =>
- 16:   config.getUseAlternateBuffer() || config.getUseTerminalBuffer();
- 17:
- 18: // This is read from Config so that the UI reads the same value per application session
- 19: export const useAlternateBuffer = (): boolean => {
-
- - isAlternateBufferEnabled (src/ui/hooks/useAlternateBuffer.ts:16:44)
- - useAlternateBuffer (src/ui/hooks/useAlternateBuffer.ts:21:10)
- - InputPrompt (src/ui/components/InputPrompt.tsx:583:29)
- -Object.react-stack-bott 
-  m-frame                (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kil
-                         o-code-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-recon
-                         ciler.development.js:15859:20)
- -renderWithHoo 
-  s            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gre
-               p-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js
-               :3221:22)
- -updateFunctionComp 
-  nent              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-cod
-                    e-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.deve
-                    lopment.js:6475:19)
- -beginWor 
-          (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-onl
-          y2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:8009:18)
-
- -runWithFiberIn 
-  EV            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
-                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
-                js:1738:13)
- -performUnitOfW 
-  rk            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
-                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
-                js:12834:22)
- -workLoopSyn 
-             (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-
-             only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:126
-             44:41)
-"
+"────────────────────────────────────────────────────────────────────────────────────────────────────
+│ > run @path/to/file                                                                              │
+────────────────────────────────────────────────────────────────────────────────────────────────────"
 `;
 
 exports[`InputPrompt > Highlighting and Cursor Display > single-line scenarios > should display cursor correctly 'on a space between words' 1`] = `
-"
-  ERROR  config.getUseTerminalBuffer is not a function
-
- src/ui/hooks/useAlternateBuffer.ts:16:44
-
- 13: // Right now this is convenient as it allows us to special case terminalBuffer
- 14: // rendering like we special case alternateBuffer rendering.
- 15: export const isAlternateBufferEnabled = (config: Config): boolean =>
- 16:   config.getUseAlternateBuffer() || config.getUseTerminalBuffer();
- 17:
- 18: // This is read from Config so that the UI reads the same value per application session
- 19: export const useAlternateBuffer = (): boolean => {
-
- - isAlternateBufferEnabled (src/ui/hooks/useAlternateBuffer.ts:16:44)
- - useAlternateBuffer (src/ui/hooks/useAlternateBuffer.ts:21:10)
- - InputPrompt (src/ui/components/InputPrompt.tsx:583:29)
- -Object.react-stack-bott 
-  m-frame                (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kil
-                         o-code-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-recon
-                         ciler.development.js:15859:20)
- -renderWithHoo 
-  s            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gre
-               p-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js
-               :3221:22)
- -updateFunctionComp 
-  nent              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-cod
-                    e-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.deve
-                    lopment.js:6475:19)
- -beginWor 
-          (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-onl
-          y2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:8009:18)
-
- -runWithFiberIn 
-  EV            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
-                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
-                js:1738:13)
- -performUnitOfW 
-  rk            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
-                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
-                js:12834:22)
- -workLoopSyn 
-             (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-
-             only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:126
-             44:41)
-"
+"────────────────────────────────────────────────────────────────────────────────────────────────────
+│ > hello world                                                                                    │
+────────────────────────────────────────────────────────────────────────────────────────────────────"
 `;
 
 exports[`InputPrompt > Highlighting and Cursor Display > single-line scenarios > should display cursor correctly 'on an empty line' 1`] = `
-"
-  ERROR  config.getUseTerminalBuffer is not a function
-
- src/ui/hooks/useAlternateBuffer.ts:16:44
-
- 13: // Right now this is convenient as it allows us to special case terminalBuffer
- 14: // rendering like we special case alternateBuffer rendering.
- 15: export const isAlternateBufferEnabled = (config: Config): boolean =>
- 16:   config.getUseAlternateBuffer() || config.getUseTerminalBuffer();
- 17:
- 18: // This is read from Config so that the UI reads the same value per application session
- 19: export const useAlternateBuffer = (): boolean => {
-
- - isAlternateBufferEnabled (src/ui/hooks/useAlternateBuffer.ts:16:44)
- - useAlternateBuffer (src/ui/hooks/useAlternateBuffer.ts:21:10)
- - InputPrompt (src/ui/components/InputPrompt.tsx:583:29)
- -Object.react-stack-bott 
-  m-frame                (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kil
-                         o-code-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-recon
-                         ciler.development.js:15859:20)
- -renderWithHoo 
-  s            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gre
-               p-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js
-               :3221:22)
- -updateFunctionComp 
-  nent              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-cod
-                    e-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.deve
-                    lopment.js:6475:19)
- -beginWor 
-          (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-onl
-          y2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:8009:18)
-
- -runWithFiberIn 
-  EV            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
-                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
-                js:1738:13)
- -performUnitOfW 
-  rk            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
-                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
-                js:12834:22)
- -workLoopSyn 
-             (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-
-             only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:126
-             44:41)
-"
+"────────────────────────────────────────────────────────────────────────────────────────────────────
+│ >   Type your message or @path/to/file                                                           │
+────────────────────────────────────────────────────────────────────────────────────────────────────"
 `;
 
 exports[`InputPrompt > History Navigation and Completion Suppression > should not render suggestions during history navigation 1`] = `
@@ -751,99 +169,17 @@ exports[`InputPrompt > mouse interaction > should toggle paste expansion on doub
 `;
 
 exports[`InputPrompt > multiline rendering > should correctly render multiline input including blank lines 1`] = `
-"
-  ERROR  config.getUseTerminalBuffer is not a function
-
- src/ui/hooks/useAlternateBuffer.ts:16:44
-
- 13: // Right now this is convenient as it allows us to special case terminalBuffer
- 14: // rendering like we special case alternateBuffer rendering.
- 15: export const isAlternateBufferEnabled = (config: Config): boolean =>
- 16:   config.getUseAlternateBuffer() || config.getUseTerminalBuffer();
- 17:
- 18: // This is read from Config so that the UI reads the same value per application session
- 19: export const useAlternateBuffer = (): boolean => {
-
- - isAlternateBufferEnabled (src/ui/hooks/useAlternateBuffer.ts:16:44)
- - useAlternateBuffer (src/ui/hooks/useAlternateBuffer.ts:21:10)
- - InputPrompt (src/ui/components/InputPrompt.tsx:583:29)
- -Object.react-stack-bott 
-  m-frame                (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kil
-                         o-code-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-recon
-                         ciler.development.js:15859:20)
- -renderWithHoo 
-  s            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gre
-               p-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js
-               :3221:22)
- -updateFunctionComp 
-  nent              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-cod
-                    e-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.deve
-                    lopment.js:6475:19)
- -beginWor 
-          (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-onl
-          y2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:8009:18)
-
- -runWithFiberIn 
-  EV            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
-                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
-                js:1738:13)
- -performUnitOfW 
-  rk            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
-                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
-                js:12834:22)
- -workLoopSyn 
-             (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-
-             only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:126
-             44:41)
-"
+"────────────────────────────────────────────────────────────────────────────────────────────────────
+│ > hello                                                                                          │
+│                                                                                                  │
+│   world                                                                                          │
+────────────────────────────────────────────────────────────────────────────────────────────────────"
 `;
 
 exports[`InputPrompt > snapshots > should not show inverted cursor when shell is focused 1`] = `
-"
-  ERROR  config.getUseTerminalBuffer is not a function
-
- src/ui/hooks/useAlternateBuffer.ts:16:44
-
- 13: // Right now this is convenient as it allows us to special case terminalBuffer
- 14: // rendering like we special case alternateBuffer rendering.
- 15: export const isAlternateBufferEnabled = (config: Config): boolean =>
- 16:   config.getUseAlternateBuffer() || config.getUseTerminalBuffer();
- 17:
- 18: // This is read from Config so that the UI reads the same value per application session
- 19: export const useAlternateBuffer = (): boolean => {
-
- - isAlternateBufferEnabled (src/ui/hooks/useAlternateBuffer.ts:16:44)
- - useAlternateBuffer (src/ui/hooks/useAlternateBuffer.ts:21:10)
- - InputPrompt (src/ui/components/InputPrompt.tsx:583:29)
- -Object.react-stack-bott 
-  m-frame                (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kil
-                         o-code-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-recon
-                         ciler.development.js:15859:20)
- -renderWithHoo 
-  s            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gre
-               p-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js
-               :3221:22)
- -updateFunctionComp 
-  nent              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-cod
-                    e-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.deve
-                    lopment.js:6475:19)
- -beginWor 
-          (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-onl
-          y2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:8009:18)
-
- -runWithFiberIn 
-  EV            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
-                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
-                js:1738:13)
- -performUnitOfW 
-  rk            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
-                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
-                js:12834:22)
- -workLoopSyn 
-             (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-
-             only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:126
-             44:41)
-"
+"▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+ >   Type your message or @path/to/file                                                             
+▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄"
 `;
 
 exports[`InputPrompt > snapshots > should render correctly in shell mode 1`] = `
@@ -861,49 +197,8 @@ exports[`InputPrompt > snapshots > should render correctly in yolo mode 1`] = `
 `;
 
 exports[`InputPrompt > snapshots > should render correctly when accepting edits 1`] = `
-"
-  ERROR  config.getUseTerminalBuffer is not a function
-
- src/ui/hooks/useAlternateBuffer.ts:16:44
-
- 13: // Right now this is convenient as it allows us to special case terminalBuffer
- 14: // rendering like we special case alternateBuffer rendering.
- 15: export const isAlternateBufferEnabled = (config: Config): boolean =>
- 16:   config.getUseAlternateBuffer() || config.getUseTerminalBuffer();
- 17:
- 18: // This is read from Config so that the UI reads the same value per application session
- 19: export const useAlternateBuffer = (): boolean => {
-
- - isAlternateBufferEnabled (src/ui/hooks/useAlternateBuffer.ts:16:44)
- - useAlternateBuffer (src/ui/hooks/useAlternateBuffer.ts:21:10)
- - InputPrompt (src/ui/components/InputPrompt.tsx:583:29)
- -Object.react-stack-bott 
-  m-frame                (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kil
-                         o-code-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-recon
-                         ciler.development.js:15859:20)
- -renderWithHoo 
-  s            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gre
-               p-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js
-               :3221:22)
- -updateFunctionComp 
-  nent              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-cod
-                    e-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.deve
-                    lopment.js:6475:19)
- -beginWor 
-          (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-onl
-          y2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:8009:18)
-
- -runWithFiberIn 
-  EV            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
-                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
-                js:1738:13)
- -performUnitOfW 
-  rk            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
-                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
-                js:12834:22)
- -workLoopSyn 
-             (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-
-             only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:126
-             44:41)
+"▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+ >   Type your message or @path/to/file                                                             
+▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
 "
 `;

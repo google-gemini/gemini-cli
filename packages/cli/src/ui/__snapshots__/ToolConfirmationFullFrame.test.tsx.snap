@@ -1,55 +1,43 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`Full Terminal Tool Confirmation Snapshot > renders tool confirmation box in the frame of the entire terminal 1`] = `
-"
-  ERROR  config.getUseTerminalBuffer is not a function
+" > Can you edit InputPrompt.tsx for me?                                                             
+▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
 
- src/ui/components/MainContent.tsx:40:36
-
- 37:   const uiState = useUIState();
- 38:   const isAlternateBufferOrTerminalBuffer = useAlternateBuffer();
- 39:   const config = useConfig();
- 40:   const useTerminalBuffer = config.getUseTerminalBuffer();
- 41:   const isAlternateBuffer = config.getUseAlternateBuffer();
- 42:
- 43:   const confirmingTool = useConfirmingTool();
-
- - MainContent (src/ui/components/MainContent.tsx:40:36)
- -Object.react-stack-bott 
-  m-frame                (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kil
-                         o-code-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-recon
-                         ciler.development.js:15859:20)
- -renderWithHoo 
-  s            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gre
-               p-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js
-               :3221:22)
- -updateFunctionComp 
-  nent              (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-cod
-                    e-grep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.deve
-                    lopment.js:6475:19)
- -beginWor 
-          (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-onl
-          y2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:8009:18)
-
- -runWithFiberIn 
-  EV            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
-                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
-                js:1738:13)
- -performUnitOfW 
-  rk            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
-                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
-                js:12834:22)
- -workLoopSyn 
-             (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep-
-             only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:126
-             44:41)
- -renderRootSy 
-  c           (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-grep
-              -only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.js:1
-              2624:11)
- -performWorkOnR 
-  ot            (/usr/local/google/home/akkr/Documents/kilo_code_gemini_cli/gemini-cli-kilo-code-gr
-                ep-only2/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development.
-                js:12135:44)
+╭─────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ ? Edit packages/.../InputPrompt.tsx:   return kittyProtocolSupporte... =>   return kittyProto…  │
+│ ╭─────────────────────────────────────────────────────────────────────────────────────────────╮ │
+│ │ ... first 42 lines hidden (Ctrl+O to show) ...                                              │ │
+│ │ 43   const line43 = true;                                                                   │ │
+│ │ 44   const line44 = true;                                                                   │ │
+│ │ 45   const line45 = true;                                                                   │ │
+│ │ 46   const line46 = true;                                                                   │ │
+│ │ 47   const line47 = true;                                                                   │ │▄
+│ │ 48   const line48 = true;                                                                   │ │█
+│ │ 49   const line49 = true;                                                                   │ │█
+│ │ 50   const line50 = true;                                                                   │ │█
+│ │ 51   const line51 = true;                                                                   │ │█
+│ │ 52   const line52 = true;                                                                   │ │█
+│ │ 53   const line53 = true;                                                                   │ │█
+│ │ 54   const line54 = true;                                                                   │ │█
+│ │ 55   const line55 = true;                                                                   │ │█
+│ │ 56   const line56 = true;                                                                   │ │█
+│ │ 57   const line57 = true;                                                                   │ │█
+│ │ 58   const line58 = true;                                                                   │ │█
+│ │ 59   const line59 = true;                                                                   │ │█
+│ │ 60   const line60 = true;                                                                   │ │█
+│ │ 61 -  return kittyProtocolSupporte...;                                                      │ │█
+│ │ 61 +  return kittyProtocolSupporte...;                                                      │ │█
+│ │ 62    buffer: TextBuffer;                                                                   │ │█
+│ │ 63    onSubmit: (value: string) => void;                                                    │ │█
+│ ╰─────────────────────────────────────────────────────────────────────────────────────────────╯ │█
+│ Apply this change?                                                                              │█
+│                                                                                                 │█
+│ ● 1. Allow once                                                                                 │█
+│   2. Allow for this session                                                                     │█
+│   3. Allow for this file in all future sessions ~/.gemini/policies/auto-saved.toml              │█
+│   4. Modify with external editor                                                                │█
+│   5. No, suggest changes (esc)                                                                  │█
+╰─────────────────────────────────────────────────────────────────────────────────────────────────╯█
 "
 `;
