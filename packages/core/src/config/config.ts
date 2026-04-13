@@ -43,6 +43,7 @@ import { WebSearchTool } from '../tools/web-search.js';
 import { AskUserTool } from '../tools/ask-user.js';
 import { UpdateTopicTool } from '../tools/topicTool.js';
 import { TopicState } from './topicState.js';
+import { AgentTool } from '../agents/agent-tool.js';
 import { ExitPlanModeTool } from '../tools/exit-plan-mode.js';
 import { EnterPlanModeTool } from '../tools/enter-plan-mode.js';
 import {
@@ -161,7 +162,6 @@ import {
 import { AgentRegistry } from '../agents/registry.js';
 import { AcknowledgedAgentsService } from '../agents/acknowledgedAgents.js';
 import { setGlobalProxy, updateGlobalFetchTimeouts } from '../utils/fetch.js';
-import { SubagentTool } from '../agents/subagent-tool.js';
 import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { SkillManager, type SkillDefinition } from '../skills/skillManager.js';
@@ -451,7 +451,6 @@ import { McpClientManager } from '../tools/mcp-client-manager.js';
 import { A2AClientManager } from '../agents/a2a-client-manager.js';
 import { type McpContext } from '../tools/mcp-client.js';
 import type { EnvironmentSanitizationConfig } from '../services/environmentSanitization.js';
-import { getErrorMessage } from '../utils/errors.js';
 
 export type { FileFilteringOptions };
 export {
@@ -833,18 +832,16 @@ export class Config implements McpContext, AgentLoopContext {
   private lastEmittedQuotaLimit: number | undefined;
 
   private emitQuotaChangedEvent(): void {
-    const pooled = this.getPooledQuota();
+    const remaining = this.getQuotaRemaining();
+    const limit = this.getQuotaLimit();
+    const resetTime = this.getQuotaResetTime();
     if (
-      this.lastEmittedQuotaRemaining !== pooled.remaining ||
-      this.lastEmittedQuotaLimit !== pooled.limit
+      this.lastEmittedQuotaRemaining !== remaining ||
+      this.lastEmittedQuotaLimit !== limit
     ) {
-      this.lastEmittedQuotaRemaining = pooled.remaining;
-      this.lastEmittedQuotaLimit = pooled.limit;
-      coreEvents.emitQuotaChanged(
-        pooled.remaining,
-        pooled.limit,
-        pooled.resetTime,
-      );
+      this.lastEmittedQuotaRemaining = remaining;
+      this.lastEmittedQuotaLimit = limit;
+      coreEvents.emitQuotaChanged(remaining, limit, resetTime);
     }
   }
 
@@ -1224,7 +1221,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.useRipgrep = params.useRipgrep ?? true;
     this.useBackgroundColor = params.useBackgroundColor ?? true;
     this.useAlternateBuffer = params.useAlternateBuffer ?? false;
-    this.useTerminalBuffer = params.useTerminalBuffer ?? true;
+    this.useTerminalBuffer = params.useTerminalBuffer ?? false;
     this.useRenderProcess = params.useRenderProcess ?? true;
     this.enableInteractiveShell = params.enableInteractiveShell ?? false;
 
@@ -1820,6 +1817,9 @@ export class Config implements McpContext, AgentLoopContext {
       // When the user explicitly sets a model, that becomes the active model.
       this._activeModel = newModel;
       coreEvents.emitModelChanged(newModel);
+      this.lastEmittedQuotaRemaining = undefined;
+      this.lastEmittedQuotaLimit = undefined;
+      this.emitQuotaChangedEvent();
     }
     if (this.onModelChange && !isTemporary) {
       this.onModelChange(newModel);
@@ -2113,24 +2113,31 @@ export class Config implements McpContext, AgentLoopContext {
         this.lastQuotaFetchTime = Date.now();
 
         for (const bucket of quota.buckets) {
-          if (
-            bucket.modelId &&
-            bucket.remainingAmount &&
-            bucket.remainingFraction != null
-          ) {
-            const remaining = parseInt(bucket.remainingAmount, 10);
-            const limit =
+          if (!bucket.modelId || bucket.remainingFraction == null) {
+            continue;
+          }
+
+          let remaining: number;
+          let limit: number;
+
+          if (bucket.remainingAmount) {
+            remaining = parseInt(bucket.remainingAmount, 10);
+            limit =
               bucket.remainingFraction > 0
                 ? Math.round(remaining / bucket.remainingFraction)
                 : (this.modelQuotas.get(bucket.modelId)?.limit ?? 0);
+          } else {
+            // Server only sent remainingFraction — use a normalized scale.
+            limit = 100;
+            remaining = Math.round(bucket.remainingFraction * limit);
+          }
 
-            if (!isNaN(remaining) && Number.isFinite(limit) && limit > 0) {
-              this.modelQuotas.set(bucket.modelId, {
-                remaining,
-                limit,
-                resetTime: bucket.resetTime,
-              });
-            }
+          if (!isNaN(remaining) && Number.isFinite(limit) && limit > 0) {
+            this.modelQuotas.set(bucket.modelId, {
+              remaining,
+              limit,
+              resetTime: bucket.resetTime,
+            });
           }
         }
         this.emitQuotaChangedEvent();
@@ -3335,6 +3342,7 @@ export class Config implements McpContext, AgentLoopContext {
 
   setShellExecutionConfig(config: ShellExecutionConfig): void {
     this.shellExecutionConfig = {
+      ...this.shellExecutionConfig,
       terminalWidth:
         config.terminalWidth ?? this.shellExecutionConfig.terminalWidth,
       terminalHeight:
@@ -3623,57 +3631,14 @@ export class Config implements McpContext, AgentLoopContext {
       );
     }
 
-    // Register Subagents as Tools
-    this.registerSubAgentTools(registry);
+    // Register Subagent Tool
+    maybeRegister(AgentTool, () =>
+      registry.registerTool(new AgentTool(this, this.messageBus)),
+    );
 
     await registry.discoverAllTools();
     registry.sortTools();
     return registry;
-  }
-
-  /**
-   * Registers SubAgentTools for all available agents.
-   */
-  private registerSubAgentTools(registry: ToolRegistry): void {
-    const agentsOverrides = this.getAgentsSettings().overrides ?? {};
-    const discoveredDefinitions =
-      this.agentRegistry.getAllDiscoveredAgentNames();
-
-    // First, unregister any agents that are now disabled
-    for (const agentName of discoveredDefinitions) {
-      if (
-        !this.isAgentsEnabled() ||
-        agentsOverrides[agentName]?.enabled === false
-      ) {
-        const tool = registry.getTool(agentName);
-        if (tool instanceof SubagentTool) {
-          registry.unregisterTool(agentName);
-        }
-      }
-    }
-
-    const discoveredNames = this.agentRegistry.getAllDiscoveredAgentNames();
-    for (const agentName of discoveredNames) {
-      const definition = this.agentRegistry.getDiscoveredDefinition(agentName);
-      if (!definition) {
-        continue;
-      }
-      try {
-        if (
-          !this.isAgentsEnabled() ||
-          agentsOverrides[definition.name]?.enabled === false
-        ) {
-          continue;
-        }
-
-        const tool = new SubagentTool(definition, this, this.messageBus);
-        registry.registerTool(tool);
-      } catch (e: unknown) {
-        debugLogger.warn(
-          `Failed to register tool for agent ${definition.name}: ${getErrorMessage(e)}`,
-        );
-      }
-    }
   }
 
   /**
@@ -3766,9 +3731,8 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   private onAgentsRefreshed = async () => {
-    if (this._toolRegistry) {
-      this.registerSubAgentTools(this._toolRegistry);
-    }
+    await this.agentRegistry.initialize();
+
     // Propagate updates to the active chat session
     const client = this.geminiClient;
     if (client?.isInitialized()) {

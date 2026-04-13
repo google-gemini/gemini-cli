@@ -256,14 +256,19 @@ export class GeminiChat {
     private history: Content[] = [],
     resumedSessionData?: ResumedSessionData,
     private readonly onModelChanged?: (modelId: string) => Promise<Tool[]>,
-    kind: 'main' | 'subagent' = 'main',
   ) {
     validateHistory(history);
     this.chatRecordingService = new ChatRecordingService(context);
-    this.chatRecordingService.initialize(resumedSessionData, kind);
     this.lastPromptTokenCount = estimateTokenCountSync(
       this.history.flatMap((c) => c.parts || []),
     );
+  }
+
+  async initialize(
+    resumedSessionData?: ResumedSessionData,
+    kind: 'main' | 'subagent' = 'main',
+  ) {
+    await this.chatRecordingService.initialize(resumedSessionData, kind);
   }
 
   setSystemInstruction(sysInstr: string) {
@@ -1045,6 +1050,10 @@ export class GeminiChat {
         result: call.response?.responseParts || null,
         status: call.status,
         timestamp: new Date().toISOString(),
+        agentId:
+          typeof call.response?.data?.['agentId'] === 'string'
+            ? call.response.data['agentId']
+            : undefined,
         resultDisplay,
         description:
           'invocation' in call ? call.invocation?.getDescription() : undefined,

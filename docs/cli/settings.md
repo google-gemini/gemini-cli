@@ -75,7 +75,7 @@ they appear in the UI.
 | Show User Identity                   | `ui.showUserIdentity`                  | Show the signed-in user's identity (e.g. email) in the UI.                                                                                                        | `true`  |
 | Use Alternate Screen Buffer          | `ui.useAlternateBuffer`                | Use an alternate screen buffer for the UI, preserving shell history.                                                                                              | `false` |
 | Render Process                       | `ui.renderProcess`                     | Enable Ink render process for the UI.                                                                                                                             | `true`  |
-| Terminal Buffer                      | `ui.terminalBuffer`                    | Use the new terminal buffer architecture for rendering.                                                                                                           | `true`  |
+| Terminal Buffer                      | `ui.terminalBuffer`                    | Use the new terminal buffer architecture for rendering.                                                                                                           | `false` |
 | Use Background Color                 | `ui.useBackgroundColor`                | Whether to use background colors in the UI.                                                                                                                       | `true`  |
 | Incremental Rendering                | `ui.incrementalRendering`              | Enable incremental rendering for the UI. This option will reduce flickering but may cause rendering artifacts. Only supported when useAlternateBuffer is enabled. | `true`  |
 | Show Spinner                         | `ui.showSpinner`                       | Show the spinner during operations.                                                                                                                               | `true`  |
@@ -153,9 +153,9 @@ they appear in the UI.
 
 ### Advanced
 
-| UI Label                          | Setting                        | Description                                   | Default |
-| --------------------------------- | ------------------------------ | --------------------------------------------- | ------- |
-| Auto Configure Max Old Space Size | `advanced.autoConfigureMemory` | Automatically configure Node.js memory limits | `true`  |
+| UI Label                          | Setting                        | Description                                                                                                                                                                                                           | Default |
+| --------------------------------- | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| Auto Configure Max Old Space Size | `advanced.autoConfigureMemory` | Automatically configure Node.js memory limits. Note: Because memory is allocated during the initial process boot, this setting is only read from the global user settings file and ignores workspace-level overrides. | `true`  |
 
 ### Experimental
 

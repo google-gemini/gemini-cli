@@ -88,12 +88,12 @@ gemini extensions new <path> [template]
 ```
 
 - `<path>`: The directory to create.
-- `[template]`: The template to use (e.g., `mcp-server`, `context`,
+- `[template]`: The template to use (for example, `mcp-server`, `context`,
   `custom-commands`).
 
 ### Link a local extension
 
-Create a symbolic link between your development directory and the Gemini CLI
+Create a symbolic link between your development directory and Gemini CLI
 extensions directory. This lets you test changes immediately without
 reinstalling.
 
@@ -244,7 +244,7 @@ agent definition files (`.md`) to an `agents/` directory in your extension root.
 
 ### <a id="policy-engine"></a>Policy Engine
 
-Extensions can contribute policy rules and safety checkers to the Gemini CLI
+Extensions can contribute policy rules and safety checkers to Gemini CLI
 [Policy Engine](../reference/policy-engine.md). These rules are defined in
 `.toml` files and take effect when the extension is activated.
 
@@ -324,13 +324,14 @@ defined in the `themes` array in `gemini-extension.json`.
 Custom themes provided by extensions can be selected using the `/theme` command
 or by setting the `ui.theme` property in your `settings.json` file. Note that
 when referring to a theme from an extension, the extension name is appended to
-the theme name in parentheses, e.g., `shades-of-green (my-green-extension)`.
+the theme name in parentheses, for example,
+`shades-of-green (my-green-extension)`.
 
 ### Conflict resolution
 
 Extension commands have the lowest precedence. If an extension command name
 conflicts with a user or project command, the extension command is prefixed with
-the extension name (e.g., `/gcp.deploy`) using a dot separator.
+the extension name (for example, `/gcp.deploy`) using a dot separator.
 
 ## Variables
 
