@@ -38,7 +38,24 @@ export interface GemmaStatusResult {
 export async function checkGemmaStatus(
   port?: number,
 ): Promise<GemmaStatusResult> {
-  const effectivePort = port ?? DEFAULT_PORT;
+  let settingsEnabled = false;
+  let configuredPort = DEFAULT_PORT;
+  try {
+    const settings = loadSettings(process.cwd());
+    const gemmaSettings = settings.merged.experimental?.gemmaModelRouter;
+    settingsEnabled = gemmaSettings?.enabled === true;
+    const hostStr = gemmaSettings?.classifier?.host;
+    if (hostStr) {
+      const match = hostStr.match(/:(\d+)/);
+      if (match) {
+        configuredPort = parseInt(match[1], 10);
+      }
+    }
+  } catch {
+    // Settings may fail to load in some contexts; treat as not enabled.
+  }
+
+  const effectivePort = port ?? configuredPort;
   const binaryPath = getBinaryPath();
   const binaryInstalled = isBinaryInstalled();
   const modelDownloaded =
@@ -46,15 +63,6 @@ export async function checkGemmaStatus(
   const serverRunning = await isServerRunning(effectivePort);
   const pid = readServerPid();
   const serverPid = pid && isProcessRunning(pid) ? pid : null;
-
-  let settingsEnabled = false;
-  try {
-    const settings = loadSettings(process.cwd());
-    const gemmaSettings = settings.merged.experimental?.gemmaModelRouter;
-    settingsEnabled = gemmaSettings?.enabled === true;
-  } catch {
-    // Settings may fail to load in some contexts; treat as not enabled.
-  }
 
   const allPassing =
     binaryInstalled && modelDownloaded && serverRunning && settingsEnabled;
