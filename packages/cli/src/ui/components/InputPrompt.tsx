@@ -164,6 +164,8 @@ export function isLargePaste(text: string): boolean {
 }
 
 const DOUBLE_TAB_CLEAN_UI_TOGGLE_WINDOW_MS = 350;
+const HOLD_DELAY_MS = 600;
+const RELEASE_DELAY_MS = 300;
 
 /**
  * Attempt to toggle expansion of a paste placeholder in the buffer.
@@ -301,8 +303,191 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const transcriptionServiceRef = useRef<TranscriptionProvider | null>(null);
   const turnBaselineRef = useRef<string | null>(null);
 
+  const pttStateRef = useRef<'idle' | 'possible-hold' | 'recording'>('idle');
+  const pttTimerRef = useRef<NodeJS.Timeout | null>(null);
+
   const bufferRef = useRef(buffer);
   bufferRef.current = buffer;
+
+  const stopVoiceRecording = useCallback(() => {
+    debugLogger.debug('[Voice] Stop requested');
+    recordingInProgressRef.current = false;
+    stopRequestedRef.current = true;
+    setIsRecording(false);
+    isRecordingRef.current = false;
+    isConnectingRef.current = false;
+
+    if (recorderRef.current) {
+      recorderRef.current.stop();
+      recorderRef.current = null;
+    }
+    if (transcriptionServiceRef.current) {
+      transcriptionServiceRef.current.disconnect();
+      transcriptionServiceRef.current = null;
+    }
+
+    liveTranscriptionRef.current = '';
+    pttStateRef.current = 'idle';
+  }, []);
+
+  const startVoiceRecording = useCallback(() => {
+    // Check for cooldown after failure
+    if (Date.now() - lastFailureTimeRef.current < 2000) {
+      return;
+    }
+
+    recordingInProgressRef.current = true;
+    turnBaselineRef.current = bufferRef.current.text;
+
+    isConnectingRef.current = true;
+    setIsRecording(true);
+    isRecordingRef.current = true;
+
+    liveTranscriptionRef.current = '';
+    stopRequestedRef.current = false;
+
+    const apiKey =
+      config.getContentGeneratorConfig()?.apiKey ||
+      process.env['GEMINI_API_KEY'] ||
+      '';
+
+    const startAsync = async () => {
+      const cleanupIfStopped = () => {
+        if (stopRequestedRef.current) {
+          if (recorderRef.current) {
+            recorderRef.current.stop();
+            recorderRef.current = null;
+          }
+          if (transcriptionServiceRef.current) {
+            transcriptionServiceRef.current.disconnect();
+            transcriptionServiceRef.current = null;
+          }
+          setIsRecording(false);
+          isRecordingRef.current = false;
+          isConnectingRef.current = false;
+          recordingInProgressRef.current = false;
+
+          return true;
+        }
+        return false;
+      };
+
+      if (cleanupIfStopped()) return;
+
+      if (!apiKey) {
+        setQueueErrorMessage(
+          'Voice mode requires a GEMINI_API_KEY. Please set it in your environment or ~/.gemini/.env.',
+        );
+        setIsRecording(false);
+        isRecordingRef.current = false;
+        isConnectingRef.current = false;
+        recordingInProgressRef.current = false;
+        lastFailureTimeRef.current = Date.now();
+        return;
+      }
+
+      recorderRef.current = new AudioRecorder();
+      transcriptionServiceRef.current = TranscriptionFactory.createProvider(
+        settings.voice,
+        apiKey,
+      );
+
+      // TranscriptionProviders may be session-cumulative (full text so far) or
+      // turn-based (resetting text after turnComplete). We maintain a baseline
+      // that updates on every turnComplete to handle both cases transparently.
+      transcriptionServiceRef.current.on('transcription', (text) => {
+        // If user toggled off while transcription was in flight
+        if (!recordingInProgressRef.current) return;
+
+        if (text) {
+          const baseline = turnBaselineRef.current ?? '';
+          const separator =
+            baseline && !baseline.endsWith(' ') && !baseline.endsWith('\n')
+              ? ' '
+              : '';
+          const newTotalText = baseline + separator + text;
+
+          bufferRef.current.setText(newTotalText, 'end');
+        }
+
+        liveTranscriptionRef.current = text;
+      });
+
+      transcriptionServiceRef.current.on('turnComplete', () => {
+        // When a turn is complete, some providers (like Gemini Live) will start a new
+        // transcription from empty. We capture the current buffer as the NEW baseline
+        // so that the next turn appends to what we have so far.
+        turnBaselineRef.current = bufferRef.current.text;
+        liveTranscriptionRef.current = '';
+      });
+
+      transcriptionServiceRef.current.on('error', (err) => {
+        debugLogger.error('[Voice] Transcription error:', err);
+
+        lastFailureTimeRef.current = Date.now();
+        recordingInProgressRef.current = false;
+      });
+
+      transcriptionServiceRef.current.on('close', () => {
+        if (!stopRequestedRef.current) {
+          setIsRecording(false);
+          isRecordingRef.current = false;
+          isConnectingRef.current = false;
+          recordingInProgressRef.current = false;
+
+          lastFailureTimeRef.current = Date.now();
+        }
+      });
+
+      try {
+        await transcriptionServiceRef.current.connect();
+        if (cleanupIfStopped()) return;
+
+        await recorderRef.current?.start();
+        if (cleanupIfStopped()) return;
+
+        isConnectingRef.current = false; // Successfully connected
+
+        const voiceBackend = settings.voice?.backend ?? 'gemini-live';
+
+        recorderRef.current?.on('data', (chunk) => {
+          if (voiceBackend === 'gemini-live') {
+            transcriptionServiceRef.current?.sendAudioChunk(chunk);
+          }
+        });
+        recorderRef.current?.on('error', (err) => {
+          debugLogger.error('[Voice] Recorder error:', err);
+          setIsRecording(false);
+          isRecordingRef.current = false;
+          isConnectingRef.current = false;
+          recordingInProgressRef.current = false;
+
+          lastFailureTimeRef.current = Date.now();
+        });
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        setQueueErrorMessage(`Voice mode failure: ${message}`);
+        setIsRecording(false);
+        isRecordingRef.current = false;
+        isConnectingRef.current = false;
+        recordingInProgressRef.current = false;
+
+        lastFailureTimeRef.current = Date.now();
+
+        // Cleanup refs on failure
+        if (recorderRef.current) {
+          recorderRef.current.stop();
+          recorderRef.current = null;
+        }
+        if (transcriptionServiceRef.current) {
+          transcriptionServiceRef.current.disconnect();
+          transcriptionServiceRef.current = null;
+        }
+      }
+    };
+
+    void startAsync();
+  }, [config, settings.voice, setQueueErrorMessage]);
 
   const [reverseSearchActive, setReverseSearchActive] = useState(false);
   const [commandSearchActive, setCommandSearchActive] = useState(false);
@@ -685,35 +870,37 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       // While recording, suppress all keys except the space release (which is handled by useKeypress's nature)
       // or Escape to cancel.
       if (isRecording) {
-        // Handle Toggle OFF via Space or Escape
-        if (
-          keyMatchers[Command.ESCAPE](key) ||
-          keyMatchers[Command.VOICE_MODE_PTT](key)
-        ) {
-          debugLogger.debug(`[Voice] Stop requested via ${key.name}`);
-          recordingInProgressRef.current = false;
-          stopRequestedRef.current = true;
-          setIsRecording(false);
-          isRecordingRef.current = false;
-          isConnectingRef.current = false;
+        const activationMode = settings.voice?.activationMode ?? 'push-to-talk';
 
-          if (recorderRef.current) {
-            recorderRef.current.stop();
-            recorderRef.current = null;
-          }
-          if (transcriptionServiceRef.current) {
-            transcriptionServiceRef.current.disconnect();
-            transcriptionServiceRef.current = null;
-          }
-
-          liveTranscriptionRef.current = '';
+        if (keyMatchers[Command.ESCAPE](key)) {
+          stopVoiceRecording();
           return true;
+        }
+
+        if (keyMatchers[Command.VOICE_MODE_PTT](key)) {
+          if (activationMode === 'push-to-talk') {
+            // In PTT mode, Space acts as a heartbeat. Reset the release timer.
+            if (pttTimerRef.current) {
+              clearTimeout(pttTimerRef.current);
+            }
+            pttTimerRef.current = setTimeout(() => {
+              stopVoiceRecording();
+              pttTimerRef.current = null;
+            }, RELEASE_DELAY_MS);
+            return true;
+          } else {
+            // In Toggle mode, Space stops the recording.
+            stopVoiceRecording();
+            return true;
+          }
         }
         // Swallow other keys during active recording to prevent keyboard interference
         return true;
       }
 
       if (isVoiceModeEnabled) {
+        const activationMode = settings.voice?.activationMode ?? 'push-to-talk';
+
         if (keyMatchers[Command.ESCAPE](key) && buffer.text === '') {
           setVoiceModeEnabled(false);
           return true;
@@ -727,165 +914,51 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             !key.shift &&
             !key.cmd
           ) {
-            // Start recording (Toggle ON)
-            // Check for cooldown after failure
-            if (Date.now() - lastFailureTimeRef.current < 2000) {
+            if (activationMode === 'toggle') {
+              startVoiceRecording();
               return true;
+            } else {
+              // Push-To-Talk "Optimistic Space" Strategy
+              if (pttStateRef.current === 'idle') {
+                // First press: Insert space optimistically
+                buffer.insert(' ');
+                pttStateRef.current = 'possible-hold';
+
+                if (pttTimerRef.current) clearTimeout(pttTimerRef.current);
+                pttTimerRef.current = setTimeout(() => {
+                  // If no second space arrives within this window, it was a tap.
+                  pttStateRef.current = 'idle';
+                  pttTimerRef.current = null;
+                }, HOLD_DELAY_MS);
+                return true;
+              } else if (pttStateRef.current === 'possible-hold') {
+                // Second space arrives quickly (Key Repeat): It's a hold!
+                if (pttTimerRef.current) clearTimeout(pttTimerRef.current);
+
+                // Remove the optimistic space
+                buffer.backspace();
+
+                // Start recording
+                pttStateRef.current = 'recording';
+                startVoiceRecording();
+
+                // Start the release detection timer
+                pttTimerRef.current = setTimeout(() => {
+                  stopVoiceRecording();
+                  pttTimerRef.current = null;
+                }, RELEASE_DELAY_MS);
+                return true;
+              }
             }
+          }
+        }
 
-            recordingInProgressRef.current = true;
-            turnBaselineRef.current = buffer.text;
-
-            isConnectingRef.current = true;
-            setIsRecording(true);
-            isRecordingRef.current = true;
-
-            liveTranscriptionRef.current = '';
-            stopRequestedRef.current = false;
-
-            const apiKey =
-              config.getContentGeneratorConfig()?.apiKey ||
-              process.env['GEMINI_API_KEY'] ||
-              '';
-
-            const startRecording = async () => {
-              const cleanupIfStopped = () => {
-                if (stopRequestedRef.current) {
-                  if (recorderRef.current) {
-                    recorderRef.current.stop();
-                    recorderRef.current = null;
-                  }
-                  if (transcriptionServiceRef.current) {
-                    transcriptionServiceRef.current.disconnect();
-                    transcriptionServiceRef.current = null;
-                  }
-                  setIsRecording(false);
-                  isRecordingRef.current = false;
-                  isConnectingRef.current = false;
-                  recordingInProgressRef.current = false;
-
-                  return true;
-                }
-                return false;
-              };
-
-              if (cleanupIfStopped()) return;
-
-              if (!apiKey) {
-                setQueueErrorMessage(
-                  'Voice mode requires a GEMINI_API_KEY. Please set it in your environment or ~/.gemini/.env.',
-                );
-                setIsRecording(false);
-                isRecordingRef.current = false;
-                isConnectingRef.current = false;
-                recordingInProgressRef.current = false;
-                lastFailureTimeRef.current = Date.now();
-                return;
-              }
-
-              recorderRef.current = new AudioRecorder();
-              transcriptionServiceRef.current =
-                TranscriptionFactory.createProvider(settings.voice, apiKey);
-
-              // TranscriptionProviders may be session-cumulative (full text so far) or
-              // turn-based (resetting text after turnComplete). We maintain a baseline
-              // that updates on every turnComplete to handle both cases transparently.
-              transcriptionServiceRef.current.on('transcription', (text) => {
-                // If user toggled off while transcription was in flight
-                if (!recordingInProgressRef.current) return;
-
-                if (text) {
-                  const baseline = turnBaselineRef.current ?? '';
-                  const separator =
-                    baseline &&
-                    !baseline.endsWith(' ') &&
-                    !baseline.endsWith('\n')
-                      ? ' '
-                      : '';
-                  const newTotalText = baseline + separator + text;
-
-                  bufferRef.current.setText(newTotalText, 'end');
-                }
-
-                liveTranscriptionRef.current = text;
-              });
-
-              transcriptionServiceRef.current.on('turnComplete', () => {
-                // When a turn is complete, some providers (like Gemini Live) will start a new
-                // transcription from empty. We capture the current buffer as the NEW baseline
-                // so that the next turn appends to what we have so far.
-                turnBaselineRef.current = bufferRef.current.text;
-                liveTranscriptionRef.current = '';
-              });
-
-              transcriptionServiceRef.current.on('error', (err) => {
-                debugLogger.error('[Voice] Transcription error:', err);
-
-                lastFailureTimeRef.current = Date.now();
-                recordingInProgressRef.current = false;
-              });
-
-              transcriptionServiceRef.current.on('close', () => {
-                if (!stopRequestedRef.current) {
-                  setIsRecording(false);
-                  isRecordingRef.current = false;
-                  isConnectingRef.current = false;
-                  recordingInProgressRef.current = false;
-
-                  lastFailureTimeRef.current = Date.now();
-                }
-              });
-
-              try {
-                await transcriptionServiceRef.current.connect();
-                if (cleanupIfStopped()) return;
-
-                await recorderRef.current?.start();
-                if (cleanupIfStopped()) return;
-
-                isConnectingRef.current = false; // Successfully connected
-
-                const voiceBackend = settings.voice?.backend ?? 'gemini-live';
-
-                recorderRef.current?.on('data', (chunk) => {
-                  if (voiceBackend === 'gemini-live') {
-                    transcriptionServiceRef.current?.sendAudioChunk(chunk);
-                  }
-                });
-                recorderRef.current?.on('error', (err) => {
-                  debugLogger.error('[Voice] Recorder error:', err);
-                  setIsRecording(false);
-                  isRecordingRef.current = false;
-                  isConnectingRef.current = false;
-                  recordingInProgressRef.current = false;
-
-                  lastFailureTimeRef.current = Date.now();
-                });
-              } catch (err: unknown) {
-                const message =
-                  err instanceof Error ? err.message : String(err);
-                setQueueErrorMessage(`Voice mode failure: ${message}`);
-                setIsRecording(false);
-                isRecordingRef.current = false;
-                isConnectingRef.current = false;
-                recordingInProgressRef.current = false;
-
-                lastFailureTimeRef.current = Date.now();
-
-                // Cleanup refs on failure
-                if (recorderRef.current) {
-                  recorderRef.current.stop();
-                  recorderRef.current = null;
-                }
-                if (transcriptionServiceRef.current) {
-                  transcriptionServiceRef.current.disconnect();
-                  transcriptionServiceRef.current = null;
-                }
-              }
-            };
-
-            void startRecording();
-            return true;
+        // If any other key is pressed during possible-hold, it was a fast type.
+        if (pttStateRef.current === 'possible-hold') {
+          pttStateRef.current = 'idle';
+          if (pttTimerRef.current) {
+            clearTimeout(pttTimerRef.current);
+            pttTimerRef.current = null;
           }
         }
       }
@@ -1616,7 +1689,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       isVoiceModeEnabled,
       isRecording,
       setVoiceModeEnabled,
-      config,
+      startVoiceRecording,
+      stopVoiceRecording,
     ],
   );
 
@@ -2070,7 +2144,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             {isVoiceModeEnabled && !isRecording && (
               <Box flexDirection="row" marginBottom={0}>
                 <Text color={theme.text.secondary}>
-                  &gt; Voice mode: Space to start/stop recording (Esc to exit)
+                  &gt; Voice mode:{' '}
+                  {(settings.voice?.activationMode ?? 'push-to-talk') ===
+                  'push-to-talk'
+                    ? 'Hold Space to record'
+                    : 'Space to start/stop recording'}{' '}
+                  (Esc to exit)
                 </Text>
               </Box>
             )}
