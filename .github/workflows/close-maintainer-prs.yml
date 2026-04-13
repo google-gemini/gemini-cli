@@ -1,0 +1,58 @@
+name: Auto-close Maintainer Only PRs
+on:
+  pull_request_target:
+    types: [opened, reopened, edited]
+
+jobs:
+  close-maintainer-pr:
+    runs-on: ubuntu-latest
+    if: github.repository == 'google-gemini/gemini-cli' && github.event.pull_request.head.repo.full_name != github.repository
+    steps:
+      - name: Check linked issues
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const prNumber = context.payload.pull_request.number;
+            const repo = context.repo;
+            const query = `
+              query($owner: String!, $name: String!, $pr: Int!) {
+                repository(owner: $owner, name: $name) {
+                  pullRequest(number: $pr) {
+                    closingIssuesReferences(first: 50) {
+                      nodes {
+                        labels(first: 50) {
+                          nodes {
+                            name
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            `;
+            
+            const variables = { owner: repo.owner, name: repo.repo, pr: prNumber };
+            const result = await github.graphql(query, variables);
+            const linkedIssues = result.repository.pullRequest.closingIssuesReferences.nodes;
+            
+            const hasMaintainerLabel = linkedIssues.some(issue => 
+              issue.labels.nodes.some(label => label.name === '🔒 maintainer only')
+            );
+            
+            if (hasMaintainerLabel) {
+              await github.rest.issues.createComment({
+                owner: repo.owner,
+                repo: repo.repo,
+                issue_number: prNumber,
+                body: "Hi there! 👋 Thanks for your interest in contributing to Gemini CLI! Unfortunately, the issue you've linked is marked with `🔒 maintainer only`, meaning it is reserved for core maintainers. Therefore, we are automatically closing this PR. Please take a look at issues labeled `help wanted` or `good first issue` if you'd like to contribute. We appreciate your understanding!"
+              });
+              
+              await github.rest.pulls.update({
+                owner: repo.owner,
+                repo: repo.repo,
+                pull_number: prNumber,
+                state: 'closed'
+              });
+            }
