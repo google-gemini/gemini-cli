@@ -4,11 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import { randomUUID } from 'node:crypto';
-/**
- * @license
- * Copyright 2026 Google LLC
- * SPDX-License-Identifier: Apache-2.0
- */
+import type { JSONSchemaType } from 'ajv';
+
+export type BlobDegradationProcessorOptions = Record<string, never>;
+
+export const BlobDegradationProcessorOptionsSchema: JSONSchemaType<BlobDegradationProcessorOptions> =
+  {
+    type: 'object',
+    properties: {},
+    required: [],
+  };
 import type { ProcessArgs, ContextProcessor } from '../pipeline.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';

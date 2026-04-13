@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import { randomUUID } from 'node:crypto';
+import type { JSONSchemaType } from 'ajv';
 import type {
   ContextProcessor,
   ProcessArgs,
@@ -18,6 +19,22 @@ export interface StateSnapshotProcessorOptions extends BackstopTargetOptions {
   model?: string;
   systemInstruction?: string;
 }
+
+export const StateSnapshotProcessorOptionsSchema: JSONSchemaType<StateSnapshotProcessorOptions> =
+  {
+    type: 'object',
+    properties: {
+      target: {
+        type: 'string',
+        enum: ['incremental', 'freeNTokens', 'max'],
+        nullable: true,
+      },
+      freeTokensTarget: { type: 'number', nullable: true },
+      model: { type: 'string', nullable: true },
+      systemInstruction: { type: 'string', nullable: true },
+    },
+    required: [],
+  };
 
 export function createStateSnapshotProcessor(
   id: string,

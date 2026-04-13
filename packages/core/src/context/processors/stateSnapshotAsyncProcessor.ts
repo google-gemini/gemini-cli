@@ -4,11 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import { randomUUID } from 'node:crypto';
-/**
- * @license
- * Copyright 2026 Google LLC
- * SPDX-License-Identifier: Apache-2.0
- */
+import type { JSONSchemaType } from 'ajv';
 import type { AsyncContextProcessor, ProcessArgs } from '../pipeline.js';
 import type { ContextEnvironment } from '../pipeline/environment.js';
 import type { ConcreteNode } from '../graph/types.js';
@@ -19,6 +15,20 @@ export interface StateSnapshotAsyncProcessorOptions {
   type?: 'accumulate' | 'point-in-time';
   systemInstruction?: string;
 }
+
+export const StateSnapshotAsyncProcessorOptionsSchema: JSONSchemaType<StateSnapshotAsyncProcessorOptions> =
+  {
+    type: 'object',
+    properties: {
+      type: {
+        type: 'string',
+        enum: ['accumulate', 'point-in-time'],
+        nullable: true,
+      },
+      systemInstruction: { type: 'string', nullable: true },
+    },
+    required: [],
+  };
 
 export function createStateSnapshotAsyncProcessor(
   id: string,

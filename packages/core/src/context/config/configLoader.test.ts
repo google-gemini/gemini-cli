@@ -25,7 +25,11 @@ describe('SidecarLoader (Real FS)', () => {
     registry = new ContextProcessorRegistry();
     registry.registerProcessor({
       id: 'NodeTruncation',
-      schema: { type: 'object', properties: { maxTokens: { type: 'number' } } },
+      schema: {
+        type: 'object',
+        properties: { maxTokens: { type: 'number' } },
+        required: ['maxTokens'],
+      } as unknown as JSONSchemaType<{ maxTokens: number }>,
     });
 
     mockConfig = {

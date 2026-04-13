@@ -4,9 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-export interface ContextProcessorDef {
+import type { JSONSchemaType } from 'ajv';
+
+export interface ContextProcessorDef<T = unknown> {
   readonly id: string;
-  readonly schema: object;
+  readonly schema: JSONSchemaType<T>;
 }
 
 /**

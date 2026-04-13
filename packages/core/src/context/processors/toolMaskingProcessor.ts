@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import { randomUUID } from 'node:crypto';
+import type { JSONSchemaType } from 'ajv';
 import type { ContextProcessor, ProcessArgs } from '../pipeline.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
@@ -30,6 +31,15 @@ const UNMASKABLE_TOOLS = new Set([
 export interface ToolMaskingProcessorOptions {
   stringLengthThresholdTokens: number;
 }
+
+export const ToolMaskingProcessorOptionsSchema: JSONSchemaType<ToolMaskingProcessorOptions> =
+  {
+    type: 'object',
+    properties: {
+      stringLengthThresholdTokens: { type: 'number' },
+    },
+    required: ['stringLengthThresholdTokens'],
+  };
 
 type MaskableValue =
   | string

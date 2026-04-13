@@ -4,22 +4,26 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import { randomUUID } from 'node:crypto';
-/**
- * @license
- * Copyright 2026 Google LLC
- * SPDX-License-Identifier: Apache-2.0
- */
+import type { JSONSchemaType } from 'ajv';
 import type { ContextProcessor, ProcessArgs } from '../pipeline.js';
 import type { ConcreteNode } from '../graph/types.js';
 import type { ContextEnvironment } from '../pipeline/environment.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 import { getResponseText } from '../../utils/partUtils.js';
-
 import { LlmRole } from '../../telemetry/llmRole.js';
 
 export interface NodeDistillationProcessorOptions {
   nodeThresholdTokens: number;
 }
+
+export const NodeDistillationProcessorOptionsSchema: JSONSchemaType<NodeDistillationProcessorOptions> =
+  {
+    type: 'object',
+    properties: {
+      nodeThresholdTokens: { type: 'number' },
+    },
+    required: ['nodeThresholdTokens'],
+  };
 
 export function createNodeDistillationProcessor(
   id: string,

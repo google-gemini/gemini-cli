@@ -10,9 +10,24 @@ import type {
   ProcessArgs,
 } from '../pipeline.js';
 import type { ConcreteNode } from '../graph/types.js';
+import type { JSONSchemaType } from 'ajv';
 import type { ContextEnvironment } from '../pipeline/environment.js';
 
 export type HistoryTruncationProcessorOptions = BackstopTargetOptions;
+
+export const HistoryTruncationProcessorOptionsSchema: JSONSchemaType<HistoryTruncationProcessorOptions> =
+  {
+    type: 'object',
+    properties: {
+      target: {
+        type: 'string',
+        enum: ['incremental', 'freeNTokens', 'max'],
+        nullable: true,
+      },
+      freeTokensTarget: { type: 'number', nullable: true },
+    },
+    required: [],
+  };
 
 export function createHistoryTruncationProcessor(
   id: string,

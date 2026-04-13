@@ -4,11 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import { randomUUID } from 'node:crypto';
-/**
- * @license
- * Copyright 2026 Google LLC
- * SPDX-License-Identifier: Apache-2.0
- */
+import type { JSONSchemaType } from 'ajv';
 import type { ContextProcessor, ProcessArgs } from '../pipeline.js';
 import type { ContextEnvironment } from '../pipeline/environment.js';
 import { truncateProportionally } from '../truncation.js';
@@ -17,6 +13,15 @@ import type { ConcreteNode } from '../graph/types.js';
 export interface NodeTruncationProcessorOptions {
   maxTokensPerNode: number;
 }
+
+export const NodeTruncationProcessorOptionsSchema: JSONSchemaType<NodeTruncationProcessorOptions> =
+  {
+    type: 'object',
+    properties: {
+      maxTokensPerNode: { type: 'number' },
+    },
+    required: ['maxTokensPerNode'],
+  };
 
 export function createNodeTruncationProcessor(
   id: string,

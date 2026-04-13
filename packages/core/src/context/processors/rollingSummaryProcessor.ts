@@ -4,11 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import { randomUUID } from 'node:crypto';
-/**
- * @license
- * Copyright 2026 Google LLC
- * SPDX-License-Identifier: Apache-2.0
- */
+import type { JSONSchemaType } from 'ajv';
 import type {
   ContextProcessor,
   ProcessArgs,
@@ -22,6 +18,22 @@ import { LlmRole } from '../../telemetry/llmRole.js';
 export interface RollingSummaryProcessorOptions extends BackstopTargetOptions {
   systemInstruction?: string;
 }
+
+export const RollingSummaryProcessorOptionsSchema: JSONSchemaType<RollingSummaryProcessorOptions> =
+  {
+    type: 'object',
+    properties: {
+      target: {
+        type: 'string',
+        enum: ['incremental', 'freeNTokens', 'max'],
+        nullable: true,
+      },
+      freeTokensTarget: { type: 'number', nullable: true },
+      maxRollingSummaries: { type: 'number', nullable: true },
+      systemInstruction: { type: 'string', nullable: true },
+    },
+    required: [],
+  };
 
 export function createRollingSummaryProcessor(
   id: string,
