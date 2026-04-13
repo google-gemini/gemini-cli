@@ -72,27 +72,6 @@ const hasPayload = (res: unknown): res is PayloadResult => {
   return typeof value === 'string';
 };
 
-const RenderItemsList: React.FC<{
-  items?: string[];
-  maxVisible?: number;
-}> = ({ items, maxVisible = 20 }) => {
-  if (!items || items.length === 0) return null;
-  return (
-    <Box flexDirection="column">
-      {items.slice(0, maxVisible).map((item, i) => (
-        <Text key={i} color={theme.text.secondary}>
-          {item}
-        </Text>
-      ))}
-      {items.length > maxVisible && (
-        <Text color={theme.text.secondary}>
-          ... and {items.length - maxVisible} more
-        </Text>
-      )}
-    </Box>
-  );
-};
-
 function getFileOpData(
   diff: FileDiff,
   status: CoreToolCallStatus,
@@ -188,8 +167,6 @@ function getFileOpData(
 }
 
 function getReadManyFilesData(result: ReadManyFilesResult): ViewParts {
-  const items = result.files ?? [];
-  const maxVisible = 10;
   const includePatterns = result.include?.join(', ') ?? '';
   const description = (
     <Text color={theme.text.secondary} wrap="truncate-end">
@@ -198,18 +175,12 @@ function getReadManyFilesData(result: ReadManyFilesResult): ViewParts {
   );
 
   const skippedCount = result.skipped?.length ?? 0;
-  const summaryStr = `Read ${items.length} file(s)${
+  const summaryStr = `Read ${result.files.length} file(s)${
     skippedCount > 0 ? ` (${skippedCount} ignored)` : ''
   }`;
   const summary = <Text color={theme.text.accent}>→ {summaryStr}</Text>;
-  const hasItems = items.length > 0;
-  const payload = hasItems ? (
-    <Box flexDirection="column" marginLeft={2}>
-      {hasItems && <RenderItemsList items={items} maxVisible={maxVisible} />}
-    </Box>
-  ) : undefined;
 
-  return { description, summary, payload };
+  return { description, summary, payload: undefined };
 }
 
 function getListDirectoryData(
@@ -258,20 +229,11 @@ function getGenericSuccessData(
       </Text>
     );
   } else if (isGrepResult(resultDisplay)) {
-    summary = <Text color={theme.text.accent}>→ {resultDisplay.summary}</Text>;
-    const matches = resultDisplay.matches;
-    if (matches.length > 0) {
-      payload = (
-        <Box flexDirection="column" marginLeft={2}>
-          <RenderItemsList
-            items={matches.map(
-              (m) => `${m.filePath}:${m.lineNumber}: ${m.line.trim()}`,
-            )}
-            maxVisible={10}
-          />
-        </Box>
-      );
-    }
+    summary = (
+      <Text color={theme.text.accent} wrap="truncate-end">
+        → {resultDisplay.summary}
+      </Text>
+    );
   } else if (isTodoList(resultDisplay)) {
     summary = (
       <Text color={theme.text.accent} wrap="wrap">
@@ -488,15 +450,18 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
   return (
     <Box flexDirection="column">
       <Box marginLeft={2} flexDirection="row" flexWrap="wrap">
-        <ToolStatusIndicator status={status} name={name} />
-        <Box maxWidth={25} flexShrink={1} flexGrow={0}>
-          <Text color={theme.text.primary} bold wrap="truncate-end">
-            {name}{' '}
-          </Text>
+        <Box flexDirection="row" flexShrink={1}>
+          <ToolStatusIndicator status={status} name={name} />
+          <Box maxWidth={25} flexShrink={0} flexGrow={0}>
+            <Text color={theme.text.primary} bold wrap="truncate-end">
+              {name}{' '}
+            </Text>
+          </Box>
+          <Box marginLeft={1} flexShrink={1} flexGrow={0}>
+            {description}
+          </Box>
         </Box>
-        <Box marginLeft={1} flexShrink={1} flexGrow={0}>
-          {description}
-        </Box>
+
         {summary && (
           <Box
             key="tool-summary"

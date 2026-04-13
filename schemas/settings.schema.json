@@ -230,6 +230,13 @@
       "default": {},
       "type": "object",
       "properties": {
+        "debugRainbow": {
+          "title": "Debug Rainbow",
+          "description": "Enable debug rainbow rendering. Only useful for debugging rendering bugs and performance issues.",
+          "markdownDescription": "Enable debug rainbow rendering. Only useful for debugging rendering bugs and performance issues.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "theme": {
           "title": "Theme",
           "description": "The color theme for the UI. See the CLI themes guide for available options.",
@@ -2725,8 +2732,8 @@
       "properties": {
         "autoConfigureMemory": {
           "title": "Auto Configure Max Old Space Size",
-          "description": "Automatically configure Node.js memory limits",
-          "markdownDescription": "Automatically configure Node.js memory limits\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `true`",
+          "description": "Automatically configure Node.js memory limits. Note: Because memory is allocated during the initial process boot, this setting is only read from the global user settings file and ignores workspace-level overrides.",
+          "markdownDescription": "Automatically configure Node.js memory limits. Note: Because memory is allocated during the initial process boot, this setting is only read from the global user settings file and ignores workspace-level overrides.\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `true`",
           "default": true,
           "type": "boolean"
         },
