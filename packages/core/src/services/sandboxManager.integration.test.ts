@@ -3,7 +3,7 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest';
 import { createSandboxManager } from './sandboxManagerFactory.js';
 import { ShellExecutionService } from './shellExecutionService.js';
 import { getSecureSanitizationConfig } from './environmentSanitization.js';
@@ -160,7 +160,10 @@ describe('SandboxManager Integration', () => {
   let workspace: string;
   let manager: SandboxManager;
 
-  beforeAll(() => {
+  beforeEach(() => {
+    // Create a fresh, isolated workspace for every test.
+    // This is critical to prevent state leakage (e.g., leftover files or persistent Windows ACLs)
+    // from causing intermittent or order-dependent test failures.
     workspace = createTempDir('workspace-');
     manager = createSandboxManager({ enabled: true }, { workspace });
   });
@@ -306,7 +309,7 @@ describe('SandboxManager Integration', () => {
           args,
           cwd: workspace,
           env: process.env,
-          policy: { allowedPaths: [planFile] },
+          policy: { allowedPaths: [plansDir] },
         });
 
         const result = await runCommand(sandboxed);
@@ -323,7 +326,8 @@ describe('SandboxManager Integration', () => {
         );
 
         const taskFile = path.join(workspace, 'src/tasks/task.ts');
-        fs.mkdirSync(path.dirname(taskFile), { recursive: true });
+        const taskDir = path.dirname(taskFile);
+        fs.mkdirSync(taskDir, { recursive: true });
 
         // Simulate a generic edit anywhere in the workspace
         const { command, args } = Platform.touch(taskFile);
@@ -333,7 +337,7 @@ describe('SandboxManager Integration', () => {
           args,
           cwd: workspace,
           env: process.env,
-          policy: { allowedPaths: [taskFile] },
+          policy: { allowedPaths: [taskDir] },
         });
 
         const result = await runCommand(sandboxed);
@@ -349,7 +353,10 @@ describe('SandboxManager Integration', () => {
 
         const readonlyManager = createSandboxManager(
           { enabled: true },
-          { workspace, modeConfig: { readonly: true, allowOverrides: true } },
+          {
+            workspace,
+            modeConfig: { readonly: true, allowOverrides: true },
+          },
         );
 
         const sandboxed = await readonlyManager.prepareCommand({
@@ -367,7 +374,7 @@ describe('SandboxManager Integration', () => {
         const testFile = path.join(workspace, 'approved-test.txt');
         const command = Platform.isWindows ? 'cmd.exe' : 'sh';
         const args = Platform.isWindows
-          ? ['/c', `echo test > "${testFile}"`]
+          ? ['/c', `echo test > ${testFile}`]
           : ['-c', `echo test > "${testFile}"`];
 
         // The shell wrapper is stripped by getCommandRoots, so the root command evaluated is 'echo'
