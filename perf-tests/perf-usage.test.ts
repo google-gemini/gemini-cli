@@ -5,7 +5,11 @@
  */
 
 import { describe, it, beforeAll, afterAll } from 'vitest';
-import { TestRig, PerfTestHarness, type PerfSnapshot } from '@google/gemini-cli-test-utils';
+import {
+  TestRig,
+  PerfTestHarness,
+  type PerfSnapshot,
+} from '@google/gemini-cli-test-utils';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -221,8 +225,7 @@ describe('CPU Performance Tests', () => {
               JSON.stringify(toolLatencyMetric),
             );
           }
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const logs = (rig as any)._readAndParseTelemetryLog();
+          const logs = rig.readTelemetryLogs();
           console.log(`  Total telemetry log entries: ${logs.length}`);
           for (const logData of logs) {
             if (logData.scopeMetrics) {
@@ -247,10 +250,9 @@ describe('CPU Performance Tests', () => {
 
             const findValue = (percentile: string) => {
               const dp = eventLoopMetric.dataPoints.find(
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                (p: any) => p.attributes.percentile === percentile,
+                (p) => p.attributes?.['percentile'] === percentile,
               );
-              return dp ? dp.value.min : undefined;
+              return dp?.value?.min;
             };
 
             snapshot.childEventLoopDelayP50Ms = findValue('p50');
@@ -327,7 +329,13 @@ describe('CPU Performance Tests', () => {
             async () => {
               const run = await rig.runInteractive({
                 args: ['--resume', 'latest'],
-                env: { GEMINI_API_KEY: 'fake-perf-test-key' },
+                env: {
+                  GEMINI_API_KEY: 'fake-perf-test-key',
+                  GEMINI_TELEMETRY_ENABLED: 'true',
+                  GEMINI_MEMORY_MONITOR_INTERVAL: '500',
+                  GEMINI_EVENT_LOOP_MONITOR_ENABLED: 'true',
+                  DEBUG: 'true',
+                },
               });
               await run.kill();
             },
@@ -349,7 +357,13 @@ describe('CPU Performance Tests', () => {
         async () => {
           const run = await rig.runInteractive({
             args: ['--resume', 'latest'],
-            env: { GEMINI_API_KEY: 'fake-perf-test-key' },
+            env: {
+              GEMINI_API_KEY: 'fake-perf-test-key',
+              GEMINI_TELEMETRY_ENABLED: 'true',
+              GEMINI_MEMORY_MONITOR_INTERVAL: '500',
+              GEMINI_EVENT_LOOP_MONITOR_ENABLED: 'true',
+              DEBUG: 'true',
+            },
           });
 
           const snapshot = await harness.measureWithEventLoop(
@@ -377,7 +391,13 @@ describe('CPU Performance Tests', () => {
         async () => {
           const run = await rig.runInteractive({
             args: ['--resume', 'latest'],
-            env: { GEMINI_API_KEY: 'fake-perf-test-key' },
+            env: {
+              GEMINI_API_KEY: 'fake-perf-test-key',
+              GEMINI_TELEMETRY_ENABLED: 'true',
+              GEMINI_MEMORY_MONITOR_INTERVAL: '500',
+              GEMINI_EVENT_LOOP_MONITOR_ENABLED: 'true',
+              DEBUG: 'true',
+            },
           });
 
           await run.expectText('type your message');
@@ -418,7 +438,7 @@ describe('CPU Performance Tests', () => {
 
           const run = await rig.runInteractive({
             args: ['--resume', 'latest'],
-            env: { 
+            env: {
               GEMINI_API_KEY: 'fake-perf-test-key',
               GEMINI_TELEMETRY_ENABLED: 'true',
               GEMINI_MEMORY_MONITOR_INTERVAL: '500',
@@ -445,21 +465,27 @@ describe('CPU Performance Tests', () => {
           let p95Ms = 0;
           let maxMs = 0;
           if (eventLoopMetric) {
-             const dataPoints = (eventLoopMetric as any).dataPoints || [];
-             const p50Data = dataPoints.find((dp: any) => dp.attributes?.percentile === 'p50');
-             const p95Data = dataPoints.find((dp: any) => dp.attributes?.percentile === 'p95');
-             const maxData = dataPoints.find((dp: any) => dp.attributes?.percentile === 'max');
+            const dataPoints = eventLoopMetric.dataPoints;
+            const p50Data = dataPoints.find(
+              (dp) => dp.attributes?.['percentile'] === 'p50',
+            );
+            const p95Data = dataPoints.find(
+              (dp) => dp.attributes?.['percentile'] === 'p95',
+            );
+            const maxData = dataPoints.find(
+              (dp) => dp.attributes?.['percentile'] === 'max',
+            );
 
-             if (p50Data) p50Ms = p50Data.value.sum;
-             if (p95Data) p95Ms = p95Data.value.sum;
-             if (maxData) maxMs = maxData.value.sum;
+            if (p50Data?.value?.sum) p50Ms = p50Data.value.sum;
+            if (p95Data?.value?.sum) p95Ms = p95Data.value.sum;
+            if (maxData?.value?.sum) maxMs = maxData.value.sum;
           }
 
           let cpuTotalUs = 0;
           if (cpuMetric) {
-            const dataPoints = (cpuMetric as any).dataPoints || [];
-            for(const dp of dataPoints) {
-              if (dp.value?.sum > 0) {
+            const dataPoints = cpuMetric.dataPoints;
+            for (const dp of dataPoints) {
+              if (dp.value?.sum && dp.value.sum > 0) {
                 cpuTotalUs += dp.value.sum;
               }
             }
@@ -506,7 +532,7 @@ describe('CPU Performance Tests', () => {
 
           const run = await rig.runInteractive({
             args: ['--resume', 'latest'],
-            env: { 
+            env: {
               GEMINI_API_KEY: 'fake-perf-test-key',
               GEMINI_TELEMETRY_ENABLED: 'true',
               GEMINI_MEMORY_MONITOR_INTERVAL: '500',
@@ -533,21 +559,27 @@ describe('CPU Performance Tests', () => {
           let p95Ms = 0;
           let maxMs = 0;
           if (eventLoopMetric) {
-             const dataPoints = (eventLoopMetric as any).dataPoints || [];
-             const p50Data = dataPoints.find((dp: any) => dp.attributes?.percentile === 'p50');
-             const p95Data = dataPoints.find((dp: any) => dp.attributes?.percentile === 'p95');
-             const maxData = dataPoints.find((dp: any) => dp.attributes?.percentile === 'max');
+            const dataPoints = eventLoopMetric.dataPoints;
+            const p50Data = dataPoints.find(
+              (dp) => dp.attributes?.['percentile'] === 'p50',
+            );
+            const p95Data = dataPoints.find(
+              (dp) => dp.attributes?.['percentile'] === 'p95',
+            );
+            const maxData = dataPoints.find(
+              (dp) => dp.attributes?.['percentile'] === 'max',
+            );
 
-             if (p50Data) p50Ms = p50Data.value.sum;
-             if (p95Data) p95Ms = p95Data.value.sum;
-             if (maxData) maxMs = maxData.value.sum;
+            if (p50Data?.value?.sum) p50Ms = p50Data.value.sum;
+            if (p95Data?.value?.sum) p95Ms = p95Data.value.sum;
+            if (maxData?.value?.sum) maxMs = maxData.value.sum;
           }
 
           let cpuTotalUs = 0;
           if (cpuMetric) {
-            const dataPoints = (cpuMetric as any).dataPoints || [];
-            for(const dp of dataPoints) {
-              if (dp.value?.sum > 0) {
+            const dataPoints = cpuMetric.dataPoints;
+            for (const dp of dataPoints) {
+              if (dp.value?.sum && dp.value.sum > 0) {
                 cpuTotalUs += dp.value.sum;
               }
             }
