@@ -50,10 +50,9 @@ export function TextInput({
   const [cursorVisualRowAbsolute, cursorVisualColAbsolute] = visualCursor;
 
   // Track recent paste events to prevent accidental auto-submission.
-  // Uses refs (not state) so the value is always current inside the
+  // Uses a ref (not state) so the value is always current inside the
   // keypress callback regardless of React's render cycle.
   const recentPasteTimeRef = useRef<number | null>(null);
-  const pasteGuardTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleKeyPress = useCallback(
     (key: Key) => {
@@ -63,7 +62,10 @@ export function TextInput({
       }
 
       if (keyMatchers[Command.SUBMIT](key) && onSubmit) {
-        if (recentPasteTimeRef.current !== null) {
+        if (
+          recentPasteTimeRef.current !== null &&
+          Date.now() - recentPasteTimeRef.current < PASTE_SUBMIT_GUARD_MS
+        ) {
           // A paste just occurred — treat this Enter as a newline to avoid
           // submitting stale content from the pre-paste render closure.
           handleInput({
@@ -74,6 +76,7 @@ export function TextInput({
           });
           return true;
         }
+        recentPasteTimeRef.current = null;
         onSubmit(expandPastePlaceholders(text, buffer.pastedContent));
         return true;
       }
@@ -81,13 +84,6 @@ export function TextInput({
       // Record paste events so the SUBMIT guard above can detect them.
       if (key.name === 'paste') {
         recentPasteTimeRef.current = Date.now();
-        if (pasteGuardTimerRef.current) {
-          clearTimeout(pasteGuardTimerRef.current);
-        }
-        pasteGuardTimerRef.current = setTimeout(() => {
-          recentPasteTimeRef.current = null;
-          pasteGuardTimerRef.current = null;
-        }, PASTE_SUBMIT_GUARD_MS);
       }
 
       const handled = handleInput(key);

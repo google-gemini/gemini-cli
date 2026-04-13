@@ -428,7 +428,7 @@ describe('TextInput', () => {
         sequence: 'line1\nline2\nline3\nline4\nline5\nline6',
       });
     });
-    // Enter arrives in the same tick (before the 40ms guard clears)
+    // Enter arrives in the same tick (within the 40ms guard window)
     await act(async () => {
       keypressHandler({
         name: 'enter',
