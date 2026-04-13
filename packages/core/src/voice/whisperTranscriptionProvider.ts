@@ -6,6 +6,7 @@
 
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { EventEmitter } from 'node:events';
+import commandExists from 'command-exists';
 import { debugLogger } from '../utils/debugLogger.js';
 import type {
   TranscriptionProvider,
@@ -36,10 +37,31 @@ export class WhisperTranscriptionProvider
     super();
   }
 
+  /**
+   * Checks if `whisper-stream` is available on the system.
+   */
+  static async isAvailable(): Promise<boolean> {
+    try {
+      await commandExists('whisper-stream');
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   async connect(): Promise<void> {
     const { modelPath, threads = 4, step = 0, length = 5000 } = this.options;
 
     this.currentTranscription = '';
+
+    const available = await WhisperTranscriptionProvider.isAvailable();
+    if (!available) {
+      return Promise.reject(
+        new Error(
+          'The `whisper-stream` command is required for local voice mode. Please install it (e.g., `brew install whisper-cpp` on macOS).',
+        ),
+      );
+    }
 
     debugLogger.debug(
       `[WhisperTranscription] Starting whisper-stream with model: ${modelPath} (VAD mode: step=${step}, length=${length})`,
