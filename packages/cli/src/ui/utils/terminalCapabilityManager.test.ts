@@ -330,31 +330,31 @@ describe('TerminalCapabilityManager', () => {
         name: 'Ghostty (terminal name)',
         terminalName: 'Ghostty',
         env: {},
-        expected: true,
+        expected: 'osc9',
       },
       {
         name: 'ghostty (TERM_PROGRAM)',
         terminalName: undefined,
         env: { TERM_PROGRAM: 'ghostty' },
-        expected: true,
+        expected: 'osc9',
       },
       {
         name: 'xterm-ghostty (TERM)',
         terminalName: undefined,
         env: { TERM: 'xterm-ghostty' },
-        expected: true,
+        expected: 'osc9',
       },
       {
         name: 'iTerm.app (TERM_PROGRAM)',
         terminalName: undefined,
         env: { TERM_PROGRAM: 'iTerm.app' },
-        expected: false,
+        expected: 'osc777',
       },
       {
         name: 'undefined env',
         terminalName: undefined,
         env: {},
-        expected: false,
+        expected: 'osc777',
       },
     ])(
       'should return $expected for $name',
@@ -365,7 +365,7 @@ describe('TerminalCapabilityManager', () => {
     );
   });
 
-  describe('supportsOsc9Notifications', () => {
+  describe('getNotificationBackend', () => {
     const manager = TerminalCapabilityManager.getInstance();
 
     it.each([
@@ -373,67 +373,67 @@ describe('TerminalCapabilityManager', () => {
         name: 'WezTerm (terminal name)',
         terminalName: 'WezTerm',
         env: {},
-        expected: true,
+        expected: 'osc9',
       },
       {
         name: 'iTerm.app (terminal name)',
         terminalName: 'iTerm.app',
         env: {},
-        expected: true,
+        expected: 'osc9',
       },
       {
         name: 'ghostty (terminal name)',
         terminalName: 'ghostty',
         env: {},
-        expected: true,
+        expected: 'osc9',
       },
       {
         name: 'kitty (terminal name)',
         terminalName: 'kitty',
         env: {},
-        expected: true,
+        expected: 'osc9',
       },
       {
         name: 'some-other-term (terminal name)',
         terminalName: 'some-other-term',
         env: {},
-        expected: false,
+        expected: 'osc777',
       },
       {
         name: 'iTerm.app (TERM_PROGRAM)',
         terminalName: undefined,
         env: { TERM_PROGRAM: 'iTerm.app' },
-        expected: true,
+        expected: 'osc9',
       },
       {
         name: 'vscode (TERM_PROGRAM)',
         terminalName: undefined,
         env: { TERM_PROGRAM: 'vscode' },
-        expected: false,
+        expected: 'osc777',
       },
       {
         name: 'xterm-kitty (TERM)',
         terminalName: undefined,
         env: { TERM: 'xterm-kitty' },
-        expected: true,
+        expected: 'osc9',
       },
       {
         name: 'xterm-256color (TERM)',
         terminalName: undefined,
         env: { TERM: 'xterm-256color' },
-        expected: false,
+        expected: 'osc777',
       },
       {
         name: 'Windows Terminal (WT_SESSION)',
         terminalName: 'iTerm.app',
         env: { WT_SESSION: 'some-guid' },
-        expected: false,
+        expected: 'bel',
       },
     ])(
       'should return $expected for $name',
       ({ terminalName, env, expected }) => {
         vi.spyOn(manager, 'getTerminalName').mockReturnValue(terminalName);
-        expect(manager.supportsOsc9Notifications(env)).toBe(expected);
+        expect(manager.getNotificationBackend(env)).toBe(expected);
       },
     );
   });

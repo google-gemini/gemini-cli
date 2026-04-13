@@ -284,16 +284,20 @@ export class TerminalCapabilityManager {
     );
   }
 
-  supportsOsc9Notifications(env: NodeJS.ProcessEnv = process.env): boolean {
+  getNotificationBackend(env: NodeJS.ProcessEnv = process.env): 'osc9' | 'osc777' | 'bel' {
     if (env['WT_SESSION']) {
-      return false;
+      return 'bel';
     }
 
-    return (
+    if (
       this.hasOsc9TerminalSignature(this.getTerminalName()) ||
       this.hasOsc9TerminalSignature(env['TERM_PROGRAM']) ||
       this.hasOsc9TerminalSignature(env['TERM'])
-    );
+    ) {
+      return 'osc9';
+    }
+
+    return 'osc777';
   }
 
   private hasOsc9TerminalSignature(value: string | undefined): boolean {

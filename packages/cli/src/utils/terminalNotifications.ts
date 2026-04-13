@@ -91,14 +91,27 @@ function buildTerminalNotificationMessage(
   return sanitizeForDisplay(combined, MAX_OSC9_MESSAGE_CHARS);
 }
 
-function emitOsc9Notification(content: RunEventNotificationContent): void {
-  const message = buildTerminalNotificationMessage(content);
-  if (!TerminalCapabilityManager.getInstance().supportsOsc9Notifications()) {
+function emitTerminalNotification(content: RunEventNotificationContent): void {
+  const backend = TerminalCapabilityManager.getInstance().getNotificationBackend();
+
+  if (backend === 'bel') {
     writeToStdout(BEL);
     return;
   }
 
-  writeToStdout(`${OSC9_PREFIX}${message}${BEL}`);
+  if (backend === 'osc9') {
+    const message = buildTerminalNotificationMessage(content);
+    writeToStdout(`${OSC9_PREFIX}${message}${BEL}`);
+    return;
+  }
+
+  if (backend === 'osc777') {
+    const titlePiece = [content.title, content.subtitle].filter(Boolean).join(' - ');
+    const safeTitle = sanitizeForDisplay(titlePiece, MAX_NOTIFICATION_TITLE_CHARS + MAX_NOTIFICATION_SUBTITLE_CHARS);
+    const safeBody = sanitizeForDisplay(content.body, MAX_NOTIFICATION_BODY_CHARS);
+    writeToStdout(`\x1b]777;notify;${safeTitle};${safeBody}${BEL}`);
+    return;
+  }
 }
 
 export async function notifyViaTerminal(
@@ -110,7 +123,7 @@ export async function notifyViaTerminal(
   }
 
   try {
-    emitOsc9Notification(sanitizeNotificationContent(content));
+    emitTerminalNotification(sanitizeNotificationContent(content));
     return true;
   } catch (error) {
     debugLogger.debug('Failed to emit terminal notification:', error);

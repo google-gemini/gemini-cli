@@ -85,9 +85,25 @@ describe('terminal notifications', () => {
     expect(emitted.endsWith('\x07')).toBe(true);
   });
 
-  it('emits BEL fallback when OSC 9 is not supported', async () => {
+  it('emits OSC 777 fallback when OSC 9 is not supported', async () => {
     vi.stubEnv('TERM_PROGRAM', '');
     vi.stubEnv('TERM', '');
+
+    const shown = await notifyViaTerminal(true, {
+      title: 'Title',
+      subtitle: 'Subtitle',
+      body: 'Body',
+    });
+
+    expect(shown).toBe(true);
+    const emitted = String(writeToStdout.mock.calls[0][0]);
+    expect(emitted.startsWith('\x1b]777;')).toBe(true);
+  });
+
+  it('emits BEL fallback on Windows Terminal', async () => {
+    vi.stubEnv('TERM_PROGRAM', '');
+    vi.stubEnv('TERM', '');
+    vi.stubEnv('WT_SESSION', 'some-id');
 
     const shown = await notifyViaTerminal(true, {
       title: 'Title',
