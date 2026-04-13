@@ -12,7 +12,7 @@
     }
   },
   "scripts": {
-    "build": "npm run build:client && tsc -p tsconfig.build.json",
+    "build": "npm run build:client && tsgo -p tsconfig.build.json",
     "build:client": "node esbuild.client.js"
   },
   "files": [
@@ -23,6 +23,7 @@
     "node": ">=20"
   },
   "devDependencies": {
+    "@typescript/native-preview": "^7.0.0-dev.20260412.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },

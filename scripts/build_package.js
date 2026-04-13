@@ -29,7 +29,7 @@ if (!process.cwd().includes('packages')) {
 const packageName = basename(process.cwd());
 
 // build typescript files
-execSync('tsc --build', { stdio: 'inherit' });
+execSync('tsgo --build', { stdio: 'inherit' });
 
 // Run package-specific bundling if the script exists
 const bundleScript = join(process.cwd(), 'scripts', 'bundle-browser-mcp.mjs');

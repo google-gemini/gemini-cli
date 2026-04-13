@@ -12,6 +12,7 @@ import {
   type ToolCallRequestInfo,
   type GitService,
   type CompletedToolCall,
+  type ServerGeminiStreamEvent,
 } from '@google/gemini-cli-core';
 import { createMockConfig } from '../utils/testing_utils.js';
 import type { ExecutionEventBus, RequestContext } from '@a2a-js/sdk/server';
@@ -231,10 +232,10 @@ describe('Task', () => {
       );
 
       const event = {
-        type: 'content',
+        type: GeminiEventType.Content,
         value: 'test',
         traceId: 'test-trace-id',
-      };
+      } as const;
 
       await task.acceptAgentMessage(event);
 
@@ -270,7 +271,7 @@ describe('Task', () => {
       const citationEvent = {
         type: GeminiEventType.Citation,
         value: citationText,
-      };
+      } as const;
 
       await task.acceptAgentMessage(citationEvent);
 
@@ -313,7 +314,7 @@ describe('Task', () => {
       const modelInfoEvent = {
         type: GeminiEventType.ModelInfo,
         value: 'new-model-name',
-      };
+      } as const;
 
       await task.acceptAgentMessage(modelInfoEvent);
 
@@ -368,7 +369,7 @@ describe('Task', () => {
 
         const event = {
           type: eventType,
-        };
+        } as unknown as ServerGeminiStreamEvent;
 
         await task.acceptAgentMessage(event);
 
