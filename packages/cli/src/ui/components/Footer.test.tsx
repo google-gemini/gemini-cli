@@ -281,7 +281,7 @@ describe('<Footer />', () => {
         },
       },
     });
-    expect(lastFrame()).toContain('85%');
+    expect(lastFrame()).toContain('85% used');
     expect(normalizeFrame(lastFrame())).toMatchSnapshot();
     unmount();
   });
@@ -306,7 +306,7 @@ describe('<Footer />', () => {
         },
       },
     });
-    expect(normalizeFrame(lastFrame())).not.toContain('used');
+    expect(normalizeFrame(lastFrame())).toContain('15% used');
     expect(normalizeFrame(lastFrame())).toMatchSnapshot();
     unmount();
   });
