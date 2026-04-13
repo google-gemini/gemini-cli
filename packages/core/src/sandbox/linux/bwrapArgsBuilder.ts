@@ -23,7 +23,6 @@ export interface BwrapArgsOptions {
   workspaceWrite: boolean;
   networkAccess: boolean;
   maskFilePath: string;
-  isWriteCommand: boolean;
 }
 
 /**
@@ -32,13 +31,8 @@ export interface BwrapArgsOptions {
 export async function buildBwrapArgs(
   options: BwrapArgsOptions,
 ): Promise<string[]> {
-  const {
-    resolvedPaths,
-    workspaceWrite,
-    networkAccess,
-    maskFilePath,
-    isWriteCommand,
-  } = options;
+  const { resolvedPaths, workspaceWrite, networkAccess, maskFilePath } =
+    options;
   const { workspace } = resolvedPaths;
 
   const bwrapArgs: string[] = [
@@ -78,11 +72,9 @@ export async function buildBwrapArgs(
     if (fs.existsSync(allowedPath)) {
       bwrapArgs.push('--bind-try', allowedPath, allowedPath);
     } else {
-      // If the path doesn't exist, we still want to allow access to its parent
-      // to enable creating it. Since allowedPath is already resolved by resolveSandboxPaths,
-      // its parent is also correctly resolved.
+      // Bind the parent directory as read-write to allow creating the non-existent path.
       const parent = dirname(allowedPath);
-      bwrapArgs.push(isWriteCommand ? '--bind-try' : bindFlag, parent, parent);
+      bwrapArgs.push('--bind-try', parent, parent);
     }
   }
 

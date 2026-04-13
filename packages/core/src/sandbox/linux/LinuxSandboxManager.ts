@@ -268,7 +268,6 @@ export class LinuxSandboxManager implements SandboxManager {
       workspaceWrite,
       networkAccess: mergedAdditional.network ?? false,
       maskFilePath: this.getMaskFilePath(),
-      isWriteCommand: req.command === '__write',
     });
 
     const bpfPath = getSeccompBpfPath();

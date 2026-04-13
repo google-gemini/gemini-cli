@@ -92,7 +92,6 @@ describe.skipIf(os.platform() === 'win32')('buildBwrapArgs', () => {
     workspaceWrite: false,
     networkAccess: false,
     maskFilePath: '/tmp/mask',
-    isWriteCommand: false,
   };
 
   it('should correctly format the base arguments', async () => {
@@ -188,7 +187,7 @@ describe.skipIf(os.platform() === 'win32')('buildBwrapArgs', () => {
     expect(args[args.indexOf('/opt/tools') - 1]).toBe('--bind-try');
   });
 
-  it('should bind the parent directory of a non-existent path', async () => {
+  it('should bind the parent directory of a non-existent path with --bind-try', async () => {
     vi.mocked(fs.existsSync).mockImplementation((p) => {
       if (p === '/home/user/workspace/new-file.txt') return false;
       return true;
@@ -199,7 +198,6 @@ describe.skipIf(os.platform() === 'win32')('buildBwrapArgs', () => {
       resolvedPaths: createResolvedPaths({
         policyAllowed: ['/home/user/workspace/new-file.txt'],
       }),
-      isWriteCommand: true,
     });
 
     const parentDir = '/home/user/workspace';
