@@ -179,7 +179,10 @@ const ToolDisplayMessage: React.FC<ToolDisplayMessageProps> = ({ tool }) => {
         </Text>
         {description && <Text color={theme.text.secondary}>{description}</Text>}
         {resultSummary && (
-          <Text color={theme.text.accent}> → {resultSummary}</Text>
+          <Text color={theme.text.accent}>
+            {' '}
+            → {resultSummary.replace(/\n/g, ' ')}
+          </Text>
         )}
       </Box>
     );

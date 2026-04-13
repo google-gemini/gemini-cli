@@ -17,7 +17,7 @@ exports[`<ToolGroupDisplay /> > Border & Margin Logic > forces top border on box
 `;
 
 exports[`<ToolGroupDisplay /> > Golden Snapshots > renders error message when display info is missing 1`] = `
-"  ⊷   Error: Tool display missing
+"  ⊶   Error: Tool display missing
 "
 `;
 

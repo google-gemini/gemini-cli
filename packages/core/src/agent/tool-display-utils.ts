@@ -30,9 +30,9 @@ export function populateToolDisplay({
   display?: ToolDisplay;
 }): ToolDisplay {
   const display: ToolDisplay = {
-    ...prevDisplay,
     name: displayName || name,
     description: invocation?.getDescription?.(),
+    ...prevDisplay,
   };
 
   if (resultDisplay !== undefined && display.result === undefined) {
