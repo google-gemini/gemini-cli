@@ -1867,6 +1867,32 @@ describe('loadCliConfig with admin.mcp.config', () => {
   });
 });
 
+describe('loadCliConfig deepValidation', () => {
+  beforeEach(() => {
+    vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([]);
+  });
+
+  it('should enable deepValidation by default', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const settings = createTestMergedSettings();
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.isDeepValidationEnabled()).toBe(true);
+  });
+
+  it('should allow disabling deepValidation via settings', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const settings = createTestMergedSettings({
+      general: {
+        deepValidation: false,
+      },
+    });
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.isDeepValidationEnabled()).toBe(false);
+  });
+});
+
 describe('loadCliConfig model selection', () => {
   beforeEach(() => {
     vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([]);

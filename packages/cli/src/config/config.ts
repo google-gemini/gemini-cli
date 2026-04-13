@@ -900,7 +900,7 @@ export async function loadCliConfig(
     memoryBoundaryMarkers: settings.context?.memoryBoundaryMarkers,
     importFormat: settings.context?.importFormat,
     debugMode,
-    deepValidation: settings.general?.deepValidation,
+    deepValidation: settings.general?.deepValidation ?? true,
     question,
     worktreeSettings,
 

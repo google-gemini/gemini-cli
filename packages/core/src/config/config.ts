@@ -2051,6 +2051,11 @@ export class Config implements McpContext, AgentLoopContext {
   getDebugMode(): boolean {
     return this.debugMode;
   }
+
+  isDeepValidationEnabled(): boolean {
+    return this.deepValidation;
+  }
+
   getQuestion(): string | undefined {
     return this.question;
   }

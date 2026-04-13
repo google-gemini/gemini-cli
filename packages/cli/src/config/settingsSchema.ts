@@ -241,7 +241,7 @@ const SETTINGS_SCHEMA = {
         label: 'Deep Validation',
         category: 'General',
         requiresRestart: false,
-        default: false,
+        default: true,
         description:
           'Run a subagent after the main agent finishes to perform final validation.',
         showInDialog: true,
