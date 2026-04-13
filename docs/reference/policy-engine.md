@@ -1,8 +1,8 @@
 # Policy engine
 
-The Gemini CLI includes a powerful policy engine that provides fine-grained
-control over tool execution. It allows users and administrators to define rules
-that determine whether a tool call should be allowed, denied, or require user
+Gemini CLI includes a powerful policy engine that provides fine-grained control
+over tool execution. It allows users and administrators to define rules that
+determine whether a tool call should be allowed, denied, or require user
 confirmation.
 
 ## Quick start
@@ -23,9 +23,9 @@ To create your first policy:
     New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.gemini\policies"
     ```
 
-2.  **Create a new policy file** (e.g., `~/.gemini/policies/my-rules.toml`). You
-    can use any filename ending in `.toml`; all such files in this directory
-    will be loaded and combined:
+2.  **Create a new policy file** (for example,
+    `~/.gemini/policies/my-rules.toml`). You can use any filename ending in
+    `.toml`; all such files in this directory will be loaded and combined:
     ```toml
     [[rule]]
     toolName = "run_shell_command"
@@ -33,7 +33,7 @@ To create your first policy:
     decision = "deny"
     priority = 100
     ```
-3.  **Run a command** that triggers the policy (e.g., ask Gemini CLI to
+3.  **Run a command** that triggers the policy (for example, ask Gemini CLI to
     `rm -rf /`). The tool will now be blocked automatically.
 
 ## Core concepts
@@ -127,13 +127,13 @@ rule with the highest priority wins**.
 To provide a clear hierarchy, policies are organized into three tiers. Each tier
 has a designated number that forms the base of the final priority calculation.
 
-| Tier      | Base | Description                                                                |
-| :-------- | :--- | :------------------------------------------------------------------------- |
-| Default   | 1    | Built-in policies that ship with the Gemini CLI.                           |
-| Extension | 2    | Policies defined in extensions.                                            |
-| Workspace | 3    | Policies defined in the current workspace's configuration directory.       |
-| User      | 4    | Custom policies defined by the user.                                       |
-| Admin     | 5    | Policies managed by an administrator (e.g., in an enterprise environment). |
+| Tier      | Base | Description                                                                       |
+| :-------- | :--- | :-------------------------------------------------------------------------------- |
+| Default   | 1    | Built-in policies that ship with Gemini CLI.                                      |
+| Extension | 2    | Policies defined in extensions.                                                   |
+| Workspace | 3    | Policies defined in the current workspace's configuration directory.              |
+| User      | 4    | Custom policies defined by the user.                                              |
+| Admin     | 5    | Policies managed by an administrator (for example, in an enterprise environment). |
 
 Within a TOML policy file, you assign a priority value from **0 to 999**. The
 engine transforms this into a final priority using the following formula:
@@ -159,8 +159,8 @@ For example:
 
 Approval modes allow the policy engine to apply different sets of rules based on
 the CLI's operational mode. A rule in a TOML policy file can be associated with
-one or more modes (e.g., `yolo`, `autoEdit`, `plan`). The rule will only be
-active if the CLI is running in one of its specified modes. If a rule has no
+one or more modes (for example, `yolo`, `autoEdit`, `plan`). The rule will only
+be active if the CLI is running in one of its specified modes. If a rule has no
 modes specified, it is always active.
 
 - `default`: The standard interactive mode where most write tools require
@@ -257,7 +257,7 @@ To prevent privilege escalation, the CLI enforces strict security checks on the
 directory are **ignored**.
 
 - **Linux / macOS:** Must be owned by `root` (UID 0) and NOT writable by group
-  or others (e.g., `chmod 755`).
+  or others (for example, `chmod 755`).
 - **Windows:** Must be in `C:\ProgramData`. Standard users (`Users`, `Everyone`)
   must NOT have `Write`, `Modify`, or `Full Control` permissions. If you see a
   security warning, use the folder properties to remove write permissions for
@@ -386,7 +386,7 @@ policies, as it is much more robust than manually writing Fully Qualified Names
 
 <!-- prettier-ignore -->
 > [!WARNING]
-> Do not use underscores (`_`) in your MCP server names (e.g., use
+> Do not use underscores (`_`) in your MCP server names (for example, use
 > `my-server` rather than `my_server`). The policy parser splits Fully Qualified
 > Names (`mcp_server_tool`) on the _first_ underscore following the `mcp_`
 > prefix. If your server name contains an underscore, the parser will
@@ -397,7 +397,8 @@ policies, as it is much more robust than manually writing Fully Qualified Names
 
 Combine `mcpName` and `toolName` to target a single operation. When using
 `mcpName`, the `toolName` field should strictly be the simple name of the tool
-(e.g., `search`), **not** the Fully Qualified Name (e.g., `mcp_server_search`).
+(for example, `search`), **not** the Fully Qualified Name (for example,
+`mcp_server_search`).
 
 ```toml
 # Allows the `search` tool on the `my-jira-server` MCP
@@ -438,10 +439,37 @@ decision = "ask_user"
 priority = 10
 ```
 
+### Special syntax for subagents
+
+You can secure and govern subagents using standard policy rules by treating the
+subagent's name as the `toolName`.
+
+When the main agent invokes a subagent (e.g., using the unified `invoke_agent`
+tool), the Policy Engine automatically treats the target `agent_name` as a
+virtual tool alias for rule matching.
+
+**Example:**
+
+This rule denies access to the `codebase_investigator` subagent.
+
+```toml
+[[rule]]
+toolName = "codebase_investigator"
+decision = "deny"
+priority = 500
+deny_message = "Deep codebase analysis is restricted for this session."
+```
+
+- **Backward Compatibility**: Any rules written targeting historical 1:1
+  subagent tool names will continue to match transparently.
+- **Context differentiation**: To create rules based on **who** is calling a
+  tool, use the `subagent` field instead. See
+  [TOML rule schema](#toml-rule-schema).
+
 ## Default policies
 
-The Gemini CLI ships with a set of default policies to provide a safe
-out-of-the-box experience.
+Gemini CLI ships with a set of default policies to provide a safe out-of-the-box
+experience.
 
 - **Read-only tools** (like `read_file`, `glob`) are generally **allowed**.
 - **Agent delegation** defaults to **`ask_user`** to ensure remote agents can

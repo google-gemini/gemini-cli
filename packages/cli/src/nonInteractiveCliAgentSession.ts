@@ -37,6 +37,7 @@ import {
   LegacyAgentSession,
   ToolErrorType,
   geminiPartsToContentParts,
+  debugLogger,
 } from '@google/gemini-cli-core';
 
 import type { Part } from '@google/genai';
@@ -183,6 +184,7 @@ export async function runNonInteractive({
     };
 
     let errorToHandle: unknown | undefined;
+    let scheduler: Scheduler | undefined;
     let abortSession = () => {};
     try {
       consolePatcher.patch();
@@ -214,7 +216,7 @@ export async function runNonInteractive({
       });
 
       const geminiClient = config.getGeminiClient();
-      const scheduler = new Scheduler({
+      scheduler = new Scheduler({
         context: config,
         messageBus: config.getMessageBus(),
         getPreferredEditor: () => undefined,
@@ -599,6 +601,7 @@ export async function runNonInteractive({
             // Explicitly ignore these non-interactive events
             break;
           default:
+            debugLogger.error('Unknown agent event type:', event);
             event satisfies never;
             break;
         }
@@ -610,6 +613,7 @@ export async function runNonInteractive({
       cleanupStdinCancellation();
       abortController.signal.removeEventListener('abort', abortSession);
 
+      scheduler?.dispose();
       consolePatcher.cleanup();
       coreEvents.off(CoreEvent.UserFeedback, handleUserFeedback);
     }

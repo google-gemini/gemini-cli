@@ -504,6 +504,8 @@ const baseMockUiState = {
   history: [],
   renderMarkdown: true,
   streamingState: StreamingState.Idle,
+  isConfigInitialized: true,
+  isAuthenticating: false,
   terminalWidth: 100,
   terminalHeight: 40,
   currentModel: 'gemini-pro',
@@ -729,7 +731,7 @@ export const renderWithProviders = async (
             <UIStateContext.Provider value={finalUiState}>
               <VimModeProvider>
                 <ShellFocusContext.Provider value={shellFocus}>
-                  <SessionStatsProvider>
+                  <SessionStatsProvider sessionId={config.getSessionId()}>
                     <StreamingContext.Provider
                       value={finalUiState.streamingState}
                     >

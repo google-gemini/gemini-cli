@@ -10,6 +10,7 @@ import {
   createSessionId,
   type ResumedSessionData,
   type ConversationRecord,
+  loadConversationRecord,
 } from '@google/gemini-cli-core';
 
 import { GeminiCliSession } from './session.js';
@@ -55,9 +56,11 @@ export class GeminiCliAgent {
     const filesToCheck = candidates.length > 0 ? candidates : sessions;
 
     for (const sessionFile of filesToCheck) {
-      const loaded = await storage.loadProjectTempFile<ConversationRecord>(
+      const absolutePath = path.join(
+        storage.getProjectTempDir(),
         sessionFile.filePath,
       );
+      const loaded = await loadConversationRecord(absolutePath);
       if (loaded && loaded.sessionId === sessionId) {
         conversation = loaded;
         filePath = path.join(storage.getProjectTempDir(), sessionFile.filePath);

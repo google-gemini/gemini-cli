@@ -100,6 +100,7 @@ export {
   PRIORITY_YOLO_ALLOW_ALL,
 } from './policy/types.js';
 export * from './utils/tool-utils.js';
+export * from './utils/tool-visibility.js';
 export * from './utils/terminalSerializer.js';
 export * from './utils/systemEncoding.js';
 export * from './utils/textUtils.js';
@@ -252,7 +253,7 @@ export * from './telemetry/index.js';
 export * from './telemetry/billingEvents.js';
 export { logBillingEvent } from './telemetry/loggers.js';
 export * from './telemetry/constants.js';
-export { sessionId, createSessionId } from './utils/session.js';
+export { createSessionId } from './utils/session.js';
 export * from './utils/compatibility.js';
 export * from './utils/browser.js';
 export { Storage } from './config/storage.js';
