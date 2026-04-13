@@ -58,7 +58,6 @@ export class GitService {
     const gitConfigPath = path.join(repoDir, '.gitconfig');
     const systemConfigPath = path.join(repoDir, '.gitconfig_system_empty');
     return {
-      ...process.env,
       // Prevent git from using the user's global git config.
       GIT_CONFIG_GLOBAL: gitConfigPath,
       GIT_CONFIG_SYSTEM: systemConfigPath,
