@@ -445,6 +445,10 @@ on the current phase of your task:
     switches to a high-speed **Flash** model. This provides a faster, more
     responsive experience during the implementation of the plan.
 
+If the high-reasoning model is unavailable or you don't have access to it,
+Gemini CLI automatically and silently falls back to a faster model to ensure
+your workflow isn't interrupted.
+
 This behavior is enabled by default to provide the best balance of quality and
 performance. You can disable this automatic switching in your settings:
 
