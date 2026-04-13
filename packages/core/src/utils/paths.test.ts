@@ -16,7 +16,10 @@ import {
   normalizePath,
   resolveToRealPath,
   makeRelative,
+  deduplicateAbsolutePaths,
+  toPathKey,
 } from './paths.js';
+import os from 'node:os';
 
 vi.mock('node:fs', async (importOriginal) => {
   const actual = await importOriginal<typeof fs>();
@@ -700,6 +703,62 @@ describe('normalizePath', () => {
     it('should use forward slashes', () => {
       const result = normalizePath('/usr/local/bin');
       expect(result).toBe('/usr/local/bin');
+    });
+  });
+
+  describe('deduplicateAbsolutePaths', () => {
+    it('should return an empty array if no paths are provided', () => {
+      expect(deduplicateAbsolutePaths(undefined)).toEqual([]);
+      expect(deduplicateAbsolutePaths(null)).toEqual([]);
+      expect(deduplicateAbsolutePaths([])).toEqual([]);
+    });
+
+    it('should deduplicate paths using their normalized identity', () => {
+      const paths = ['/workspace/foo', '/workspace/foo/'];
+      expect(deduplicateAbsolutePaths(paths)).toEqual(['/workspace/foo']);
+    });
+
+    it('should handle case-insensitivity on Windows and macOS', () => {
+      vi.spyOn(os, 'platform').mockReturnValue('win32');
+      const paths = ['/workspace/foo', '/Workspace/Foo'];
+      expect(deduplicateAbsolutePaths(paths)).toEqual(['/workspace/foo']);
+
+      vi.spyOn(os, 'platform').mockReturnValue('darwin');
+      const macPaths = ['/tmp/foo', '/Tmp/Foo'];
+      expect(deduplicateAbsolutePaths(macPaths)).toEqual(['/tmp/foo']);
+
+      vi.spyOn(os, 'platform').mockReturnValue('linux');
+      const linuxPaths = ['/tmp/foo', '/tmp/FOO'];
+      expect(deduplicateAbsolutePaths(linuxPaths)).toEqual([
+        '/tmp/foo',
+        '/tmp/FOO',
+      ]);
+    });
+
+    it('should throw an error if a path is not absolute', () => {
+      const paths = ['relative/path'];
+      expect(() => deduplicateAbsolutePaths(paths)).toThrow(
+        'Path must be absolute: relative/path',
+      );
+    });
+  });
+
+  describe('toPathKey', () => {
+    it('should normalize paths and strip trailing slashes', () => {
+      expect(toPathKey('/foo/bar//baz/')).toBe(path.normalize('/foo/bar/baz'));
+    });
+
+    it('should convert paths to lowercase on Windows and macOS', () => {
+      vi.spyOn(os, 'platform').mockReturnValue('win32');
+      expect(toPathKey('/Workspace/Foo')).toBe(
+        path.normalize('/workspace/foo'),
+      );
+
+      vi.spyOn(os, 'platform').mockReturnValue('darwin');
+      expect(toPathKey('/Tmp/Foo')).toBe(path.normalize('/tmp/foo'));
+
+      vi.spyOn(os, 'platform').mockReturnValue('linux');
+      expect(toPathKey('/Tmp/Foo')).toBe(path.normalize('/Tmp/Foo'));
     });
   });
 });
