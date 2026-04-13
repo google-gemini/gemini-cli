@@ -74,6 +74,11 @@ export function isAppleTerminal(): boolean {
  * Detects if the current terminal supports 256 colors (8-bit).
  */
 export function supports256Colors(): boolean {
+  // Check COLORTERM for known terminals that support 256+ colors
+  if (process.env['COLORTERM'] === 'kmscon') {
+    return true;
+  }
+
   // Check if stdout supports at least 8-bit color depth
   if (process.stdout.getColorDepth && process.stdout.getColorDepth() >= 8) {
     return true;
@@ -95,7 +100,8 @@ export function supportsTrueColor(): boolean {
   // Check COLORTERM environment variable
   if (
     process.env['COLORTERM'] === 'truecolor' ||
-    process.env['COLORTERM'] === '24bit'
+    process.env['COLORTERM'] === '24bit' ||
+    process.env['COLORTERM'] === 'kmscon'
   ) {
     return true;
   }
