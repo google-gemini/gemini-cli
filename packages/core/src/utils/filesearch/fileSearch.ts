@@ -13,6 +13,7 @@ import { AsyncFzf, type FzfResultItem } from 'fzf';
 import { unescapePath } from '../paths.js';
 import type { FileDiscoveryService } from '../../services/fileDiscoveryService.js';
 import { FileWatcher, type FileWatcherEvent } from './fileWatcher.js';
+import { debugLogger } from '../debugLogger.js';
 
 // Tiebreaker: Prefers shorter paths.
 const byLengthAsc = (a: { item: string }, b: { item: string }) =>
@@ -169,6 +170,9 @@ class RecursiveFileSearch implements FileSearch {
         (event) => this.handleFileWatcherEvent(event),
         {
           shouldIgnore: (relativePath) => directoryFilter(`${relativePath}/`),
+          onError(error) {
+            debugLogger.error('File search watcher error: ', error);
+          },
         },
       );
       this.fileWatcher.start();
