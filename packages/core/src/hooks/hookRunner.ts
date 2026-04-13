@@ -348,6 +348,7 @@ export class HookRunner {
       const env = {
         ...sanitizeEnvironment(process.env, this.config.sanitizationConfig),
         GEMINI_PROJECT_DIR: input.cwd,
+        GEMINI_PLANS_DIR: this.config.storage.getPlansDir(),
         CLAUDE_PROJECT_DIR: input.cwd, // For compatibility
         ...hookConfig.env,
       };

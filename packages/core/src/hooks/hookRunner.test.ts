@@ -76,6 +76,9 @@ describe('HookRunner', () => {
       sanitizationConfig: {
         enableEnvironmentVariableRedaction: true,
       },
+      storage: {
+        getPlansDir: vi.fn().mockReturnValue('/test/project/plans'),
+      },
     } as unknown as Config;
 
     hookRunner = new HookRunner(mockConfig);
@@ -370,6 +373,7 @@ describe('HookRunner', () => {
             shell: false,
             env: expect.objectContaining({
               GEMINI_PROJECT_DIR: '/test/project',
+              GEMINI_PLANS_DIR: '/test/project/plans',
               CLAUDE_PROJECT_DIR: '/test/project',
             }),
           }),

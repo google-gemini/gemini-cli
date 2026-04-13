@@ -57,13 +57,13 @@ Understanding these core principles is essential for building robust hooks.
 
 Hooks communicate via `stdin` (Input) and `stdout` (Output).
 
-1. **Silence is Mandatory**: Your script **must not** print any plain text to
+1. **Silence is mandatory**: Your script **must not** print any plain text to
    `stdout` other than the final JSON object. **Even a single `echo` or `print`
    call before the JSON will break parsing.**
-2. **Pollution = Failure**: If `stdout` contains non-JSON text, parsing will
+2. **Pollution = failure**: If `stdout` contains non-JSON text, parsing will
    fail. The CLI will default to "Allow" and treat the entire output as a
    `systemMessage`.
-3. **Debug via Stderr**: Use `stderr` for **all** logging and debugging (for
+3. **Debug via stderr**: Use `stderr` for **all** logging and debugging (for
    example, `echo "debug" >&2`). Gemini CLI captures `stderr` but never attempts
    to parse it as JSON.
 
@@ -75,7 +75,7 @@ execution:
 | Exit Code | Label            | Behavioral Impact                                                                                                                                                            |
 | --------- | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **0**     | **Success**      | The `stdout` is parsed as JSON. **Preferred code** for all logic, including intentional blocks (for example, `{"decision": "deny"}`).                                        |
-| **2**     | **System Block** | **Critical Block**. The target action (tool, turn, or stop) is aborted. `stderr` is used as the rejection reason. High severity; used for security stops or script failures. |
+| **2**     | **System block** | **Critical block**. The target action (tool, turn, or stop) is aborted. `stderr` is used as the rejection reason. High severity; used for security stops or script failures. |
 | **Other** | **Warning**      | Non-fatal failure. A warning is shown, but the interaction proceeds using original parameters.                                                                               |
 
 #### Matchers
@@ -84,8 +84,8 @@ You can filter which specific tools or triggers fire your hook using the
 `matcher` field.
 
 - **Tool events** (`BeforeTool`, `AfterTool`): Matchers are **Regular
-  Expressions**. (for example, `"write_.*"`).
-- **Lifecycle events**: Matchers are **Exact Strings**. (for example,
+  expressions**. (for example, `"write_.*"`).
+- **Lifecycle events**: Matchers are **Exact strings**. (for example,
   `"startup"`).
 - **Wildcards**: `"*"` or `""` (empty string) matches all occurrences.
 
@@ -138,6 +138,7 @@ multiple layers in the following order of precedence (highest to lowest):
 Hooks are executed with a sanitized environment.
 
 - `GEMINI_PROJECT_DIR`: The absolute path to the project root.
+- `GEMINI_PLANS_DIR`: The absolute path to the plans directory.
 - `GEMINI_SESSION_ID`: The unique ID for the current session.
 - `GEMINI_CWD`: The current working directory.
 - `CLAUDE_PROJECT_DIR`: (Alias) Provided for compatibility.
