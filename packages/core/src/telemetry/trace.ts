@@ -14,7 +14,6 @@ import {
 
 import { debugLogger } from '../utils/debugLogger.js';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
-import { truncateString } from '../utils/textUtils.js';
 import {
   GEN_AI_AGENT_DESCRIPTION,
   GEN_AI_AGENT_NAME,
@@ -54,27 +53,78 @@ export const spanRegistry = new FinalizationRegistry((endSpan: () => void) => {
  */
 export function truncateForTelemetry(
   value: unknown,
-  maxLength = 10000,
+  maxStringLength = 10000,
+  maxArrayLength = 100,
+  maxDepth = 4,
 ): AttributeValue | undefined {
-  if (typeof value === 'string') {
-    return truncateString(
-      value,
-      maxLength,
-      `...[TRUNCATED: original length ${value.length}]`,
-    ) as AttributeValue;
+  const truncateObj = (v: unknown, depth: number): unknown => {
+    if (typeof v === 'string') {
+      const graphemes = Array.from(v);
+      if (graphemes.length > maxStringLength) {
+        return (
+          graphemes.slice(0, maxStringLength).join('') +
+          `...[TRUNCATED: original length ${graphemes.length}]`
+        );
+      }
+      return v;
+    }
+    if (
+      typeof v === 'number' ||
+      typeof v === 'boolean' ||
+      v === null ||
+      v === undefined
+    ) {
+      return v;
+    }
+    if (typeof v === 'object') {
+      if (depth >= maxDepth) {
+        return `[TRUNCATED: Max Depth Reached]`;
+      }
+      if (Array.isArray(v)) {
+        if (v.length > maxArrayLength) {
+          const truncatedArray = v
+            .slice(0, maxArrayLength)
+            .map((item) => truncateObj(item, depth + 1));
+          truncatedArray.push(`[TRUNCATED: Array of length ${v.length}]`);
+          return truncatedArray;
+        }
+        return v.map((item) => truncateObj(item, depth + 1));
+      }
+
+      const newObj: Record<string, unknown> = {};
+      let numKeys = 0;
+      const MAX_KEYS = 100;
+      for (const key in v) {
+        if (!Object.prototype.hasOwnProperty.call(v, key)) continue;
+        if (numKeys >= MAX_KEYS) {
+          newObj['__truncated'] = `[TRUNCATED: Object with >${MAX_KEYS} keys]`;
+          break;
+        }
+        const descriptor = Object.getOwnPropertyDescriptor(v, key);
+        if (descriptor) {
+          newObj[key] = truncateObj(descriptor.value, depth + 1);
+        }
+        numKeys++;
+      }
+      return newObj;
+    }
+    return undefined;
+  };
+
+  const truncated = truncateObj(value, 0);
+
+  if (
+    typeof truncated === 'string' ||
+    typeof truncated === 'number' ||
+    typeof truncated === 'boolean'
+  ) {
+    return truncated as AttributeValue;
   }
-  if (typeof value === 'object' && value !== null) {
-    const stringified = safeJsonStringify(value);
-    return truncateString(
-      stringified,
-      maxLength,
-      `...[TRUNCATED: original length ${stringified.length}]`,
-    ) as AttributeValue;
+  if (truncated === null || truncated === undefined) {
+    return undefined;
   }
-  if (typeof value === 'number' || typeof value === 'boolean') {
-    return value as AttributeValue;
-  }
-  return undefined;
+
+  return safeJsonStringify(truncated) as AttributeValue;
 }
 
 function isAsyncIterable<T>(value: T): value is T & AsyncIterable<unknown> {

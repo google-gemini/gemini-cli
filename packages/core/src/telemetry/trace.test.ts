@@ -52,23 +52,37 @@ describe('truncateForTelemetry', () => {
   });
 
   it('should correctly truncate strings with multi-byte unicode characters (emojis)', () => {
-    // 5 emojis, each is multiple bytes in UTF-16
+    // 5 emojis, each is a single grapheme cluster
     const emojis = '👋🌍🚀🔥🎉';
 
-    // Truncating to length 5 (which is 2.5 emojis in UTF-16 length terms)
-    // truncateString will stop after the full grapheme clusters that fit within 5
-    const result = truncateForTelemetry(emojis, 5);
+    // Truncating to 2 graphemes
+    const result = truncateForTelemetry(emojis, 2);
 
-    expect(result).toBe('👋🌍...[TRUNCATED: original length 10]');
+    expect(result).toBe('👋🌍...[TRUNCATED: original length 5]');
   });
 
-  it('should stringify and truncate objects if exceeding maxLength', () => {
+  it('should stringify and structurally truncate objects if exceeding limits', () => {
     const obj = { message: 'hello world', nested: { a: 1 } };
-    const stringified = JSON.stringify(obj);
     const result = truncateForTelemetry(obj, 10);
     expect(result).toBe(
-      stringified.substring(0, 10) +
-        `...[TRUNCATED: original length ${stringified.length}]`,
+      JSON.stringify({
+        message: 'hello worl...[TRUNCATED: original length 11]',
+        nested: { a: 1 },
+      }),
+    );
+  });
+
+  it('should structurally truncate arrays and depth', () => {
+    const obj = {
+      arr: [1, 2, 3],
+      deep: { level1: { level2: { level3: { a: 1 } } } },
+    };
+    const result = truncateForTelemetry(obj, 100, 2, 3);
+    expect(result).toBe(
+      JSON.stringify({
+        arr: [1, 2, '[TRUNCATED: Array of length 3]'],
+        deep: { level1: { level2: '[TRUNCATED: Max Depth Reached]' } },
+      }),
     );
   });
 
