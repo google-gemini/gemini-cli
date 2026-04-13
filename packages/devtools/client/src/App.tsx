@@ -60,14 +60,28 @@ export function filterConsoleLogs(
 export function getConsoleLevelCounts(
   logs: ConsoleLog[],
 ): Record<ConsoleLevelFilter, number> {
-  return {
+  const counts: Record<ConsoleLevelFilter, number> = {
     all: logs.length,
-    log: logs.filter((l) => l.type === 'log').length,
-    info: logs.filter((l) => l.type === 'info').length,
-    warn: logs.filter((l) => l.type === 'warn').length,
-    error: logs.filter((l) => l.type === 'error').length,
-    debug: logs.filter((l) => l.type === 'debug').length,
+    log: 0,
+    info: 0,
+    warn: 0,
+    error: 0,
+    debug: 0,
   };
+
+  for (const log of logs) {
+    switch (log.type) {
+      case 'log':
+      case 'info':
+      case 'warn':
+      case 'error':
+      case 'debug':
+        counts[log.type] += 1;
+        break;
+    }
+  }
+
+  return counts;
 }
 
 interface ThemeColors {

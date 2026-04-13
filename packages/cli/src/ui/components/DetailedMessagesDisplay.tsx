@@ -45,14 +45,9 @@ type FilterButtonConfig = {
   key: LogLevelLabels;
   label: string;
   color: string;
-  shortcut: string;
 };
 
 const iconBoxWidth = 3;
-const DEFAULT_MESSAGE_PRESENTATION: MessagePresentation = {
-  color: theme.logLevels.info,
-  icon: 'ℹ',
-};
 const LEVEL_COUNTS_INITIAL_STATE: Record<LogLevelLabels, number> = {
   [LogLevelLabels.all]: 0,
   [LogLevelLabels.log]: 0,
@@ -61,72 +56,94 @@ const LEVEL_COUNTS_INITIAL_STATE: Record<LogLevelLabels, number> = {
   [LogLevelLabels.error]: 0,
   [LogLevelLabels.debug]: 0,
 };
-const FILTER_BUTTONS: readonly FilterButtonConfig[] = [
-  {
-    key: LogLevelLabels.all,
-    label: 'All',
-    color: theme.text.primary,
-    shortcut: '1',
-  },
-  {
-    key: LogLevelLabels.log,
-    label: 'Log',
-    color: theme.logLevels.log,
-    shortcut: '2',
-  },
-  {
-    key: LogLevelLabels.info,
-    label: 'Info',
-    color: theme.logLevels.info,
-    shortcut: '3',
-  },
-  {
-    key: LogLevelLabels.warn,
-    label: 'Warn',
-    color: theme.logLevels.warn,
-    shortcut: '4',
-  },
-  {
-    key: LogLevelLabels.error,
-    label: 'Error',
-    color: theme.logLevels.error,
-    shortcut: '5',
-  },
-  {
-    key: LogLevelLabels.debug,
-    label: 'Debug',
-    color: theme.logLevels.debug,
-    shortcut: '6',
-  },
-] as const;
-const FILTER_SHORTCUTS: Record<string, LogLevelLabels> = Object.fromEntries(
-  FILTER_BUTTONS.map(({ shortcut, key }) => [shortcut, key]),
-) as Record<string, LogLevelLabels>;
-const MESSAGE_PRESENTATIONS: Record<DisplayedLogLevel, MessagePresentation> = {
-  log: {
-    color: theme.logLevels.log,
-    icon: 'ℹ',
-  },
-  info: {
-    color: theme.logLevels.info,
-    icon: 'ℹ',
-  },
-  warn: {
-    color: theme.logLevels.warn,
-    icon: '⚠',
-  },
-  error: {
-    color: theme.logLevels.error,
-    icon: '✖',
-  },
-  debug: {
-    color: theme.logLevels.debug,
-    icon: '🔍',
-  },
-};
+
+function getFilterButtons(): readonly FilterButtonConfig[] {
+  return [
+    {
+      key: LogLevelLabels.all,
+      label: 'All',
+      color: theme.text.primary,
+    },
+    {
+      key: LogLevelLabels.log,
+      label: 'Log',
+      color: theme.logLevels.log,
+    },
+    {
+      key: LogLevelLabels.info,
+      label: 'Info',
+      color: theme.logLevels.info,
+    },
+    {
+      key: LogLevelLabels.warn,
+      label: 'Warn',
+      color: theme.logLevels.warn,
+    },
+    {
+      key: LogLevelLabels.error,
+      label: 'Error',
+      color: theme.logLevels.error,
+    },
+    {
+      key: LogLevelLabels.debug,
+      label: 'Debug',
+      color: theme.logLevels.debug,
+    },
+  ] as const;
+}
+
+function getFilterShortcuts(): Record<string, LogLevelLabels> {
+  return {
+    '1': LogLevelLabels.all,
+    '2': LogLevelLabels.log,
+    '3': LogLevelLabels.info,
+    '4': LogLevelLabels.warn,
+    '5': LogLevelLabels.error,
+    '6': LogLevelLabels.debug,
+  };
+}
 
 function getMessagePresentation(type: DisplayedLogLevel): MessagePresentation {
-  return MESSAGE_PRESENTATIONS[type] ?? DEFAULT_MESSAGE_PRESENTATION;
+  const messagePresentations: Record<DisplayedLogLevel, MessagePresentation> = {
+    log: {
+      color: theme.logLevels.log,
+      icon: 'ℹ',
+    },
+    info: {
+      color: theme.logLevels.info,
+      icon: 'ℹ',
+    },
+    warn: {
+      color: theme.logLevels.warn,
+      icon: '⚠',
+    },
+    error: {
+      color: theme.logLevels.error,
+      icon: '✖',
+    },
+    debug: {
+      color: theme.logLevels.debug,
+      icon: '🔍',
+    },
+  };
+
+  return (
+    messagePresentations[type] ?? {
+      color: theme.logLevels.info,
+      icon: 'ℹ',
+    }
+  );
+}
+
+export function getLevelFilterShortcut<T extends string>(
+  key: Key,
+  filterShortcuts: Record<string, T>,
+): T | undefined {
+  if (!key.alt || key.ctrl || key.cmd) {
+    return undefined;
+  }
+
+  return filterShortcuts[key.name];
 }
 
 export const DetailedMessagesDisplay: React.FC<
@@ -143,6 +160,9 @@ export const DetailedMessagesDisplay: React.FC<
     activeSectionRef.current = activeSection;
   }, [activeSection]);
 
+  const filterButtons = useMemo(() => getFilterButtons(), []);
+  const filterShortcuts = useMemo(() => getFilterShortcuts(), []);
+
   const consoleMessages = useConsoleMessages();
   const config = useConfig();
 
@@ -154,6 +174,7 @@ export const DetailedMessagesDisplay: React.FC<
   }, [consoleMessages, config]);
 
   const borderAndPadding = 3;
+  const normalizedSearchText = searchBuffer?.text.trim().toLowerCase() ?? '';
   const filteredMessages = useMemo(
     () =>
       messages.filter((msg) => {
@@ -161,15 +182,13 @@ export const DetailedMessagesDisplay: React.FC<
           return false;
         }
 
-        if (activeSection === 'search' && searchBuffer?.text) {
-          return msg.content
-            .toLowerCase()
-            .includes(searchBuffer.text.toLowerCase());
+        if (normalizedSearchText) {
+          return msg.content.toLowerCase().includes(normalizedSearchText);
         }
 
         return true;
       }),
-    [messages, activeSection, levelFilter, searchBuffer?.text],
+    [messages, levelFilter, normalizedSearchText],
   );
 
   const levelCounts = useMemo(() => {
@@ -184,31 +203,28 @@ export const DetailedMessagesDisplay: React.FC<
     return counts;
   }, [messages]);
 
-  const handleKeypress = useCallback((key: Key): boolean | void => {
-    const input = key.sequence;
-    const section = activeSectionRef.current;
+  const handleKeypress = useCallback(
+    (key: Key): boolean | void => {
+      const section = activeSectionRef.current;
 
-    if (key.name === 'f4' && !key.ctrl && !key.alt) {
-      setActiveSection(section === 'list' ? 'search' : 'list');
-      return true;
-    }
+      if (key.name === 'f4' && !key.ctrl && !key.alt) {
+        setActiveSection(section === 'list' ? 'search' : 'list');
+        return true;
+      }
 
-    if (key.name === 'escape' && section === 'search') {
-      setActiveSection('list');
-      return true;
-    }
+      if (key.name === 'escape' && section === 'search') {
+        setActiveSection('list');
+        return true;
+      }
 
-    if (
-      !key.ctrl &&
-      !key.alt &&
-      input &&
-      FILTER_SHORTCUTS[input] &&
-      section === 'list'
-    ) {
-      setLevelFilter(FILTER_SHORTCUTS[input]);
-      return true;
-    }
-  }, []);
+      const shortcutTarget = getLevelFilterShortcut(key, filterShortcuts);
+      if (shortcutTarget) {
+        setLevelFilter(shortcutTarget);
+        return true;
+      }
+    },
+    [filterShortcuts],
+  );
 
   useKeypress(handleKeypress, {
     isActive: hasFocus,
@@ -234,7 +250,6 @@ export const DetailedMessagesDisplay: React.FC<
   if (messages.length === 0) {
     return null;
   }
-  const listHeight = maxHeight ?? 3;
 
   return (
     <Box
@@ -268,18 +283,20 @@ export const DetailedMessagesDisplay: React.FC<
         </Text>
       </Box>
       <Box flexDirection="row" marginBottom={1}>
-        {FILTER_BUTTONS.map(({ key, label, color, shortcut }) => (
+        {filterButtons.map(({ key, label, color }) => (
           <Box key={key} marginRight={1}>
             <Text
               color={color}
               bold={levelFilter === key}
               underline={levelFilter === key}
             >
-              {shortcut}:{label}({levelCounts[key]})
-              {levelFilter === key ? '* ' : ' '}
+              {label}({levelCounts[key]}){levelFilter === key ? '* ' : ' '}
             </Text>
           </Box>
         ))}
+      </Box>
+      <Box marginBottom={1}>
+        <Text color={theme.text.secondary}>Alt+1-6 to filter by level</Text>
       </Box>
       {searchBuffer && activeSection === 'search' && (
         <Box flexDirection="row" alignItems="center" marginBottom={1}>
@@ -300,7 +317,7 @@ export const DetailedMessagesDisplay: React.FC<
           </Box>
         </Box>
       )}
-      <Box height={listHeight} width={width - borderAndPadding}>
+      <Box height={maxHeight} width={width - borderAndPadding}>
         {filteredMessages.length > 0 ? (
           <ScrollableList
             ref={scrollableListRef}
@@ -332,7 +349,7 @@ export const DetailedMessagesDisplay: React.FC<
         ) : (
           <Box>
             <Text color={theme.text.secondary}>
-              {searchBuffer?.text || levelFilter !== LogLevelLabels.all
+              {normalizedSearchText || levelFilter !== LogLevelLabels.all
                 ? 'No messages match the filter'
                 : 'No messages'}
             </Text>

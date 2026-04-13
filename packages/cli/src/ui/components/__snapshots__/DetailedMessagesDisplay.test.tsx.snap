@@ -5,10 +5,10 @@ exports[`DetailedMessagesDisplay > renders info messages with info-level color 1
 ╭──────────────────────────────────────────────────────────────────────────────╮
 │ Debug Console (F12 to close | F4 to search)                                  │
 │                                                                              │
-│ 1:All(1)*  2:Log(0)  3:Info(1)  4:Warn(0)  5:Error(0)  6:Debug(0)            │
+│ All(1)*  Log(0)  Info(1)  Warn(0)  Error(0)  Debug(0)                        │
+│ Alt+1-6 to filter by level                                                   │
+│                                                                              │
 │ ℹ  Info message                                                              │
-│                                                                              │
-│                                                                              │
 │                                                                              │
 │                                                                              │
 │                                                                              │
@@ -28,11 +28,11 @@ exports[`DetailedMessagesDisplay > renders info messages with info-level color 1
 exports[`DetailedMessagesDisplay > renders message counts 1`] = `
 "
 ╭──────────────────────────────────────────────────────────────────────────────╮
-│ Debug Console (F12 to close | F4 to search)                                  │
 │                                                                              │
-│ 1:All(1)*  2:Log(1)  3:Info(0)  4:Warn(0)  5:Error(0)  6:Debug(0)            │
+│ All(1)*  Log(1)  Info(0)  Warn(0)  Error(0)  Debug(0)                        │
+│                                                                              │
+│ Alt+1-6 to filter by level                                                   │
 │ ℹ  Repeated message (x5)                                                     │
-│                                                                              │
 │                                                                              │
 │                                                                              │
 │                                                                              │
@@ -45,13 +45,13 @@ exports[`DetailedMessagesDisplay > renders messages correctly 1`] = `
 ╭──────────────────────────────────────────────────────────────────────────────╮
 │ Debug Console (F12 to close | F4 to search)                                  │
 │                                                                              │
-│ 1:All(4)*  2:Log(1)  3:Info(1)  4:Warn(1)  5:Error(1)  6:Debug(0)            │
+│ All(4)*  Log(1)  Info(1)  Warn(1)  Error(1)  Debug(0)                        │
+│ Alt+1-6 to filter by level                                                   │
+│                                                                              │
 │ ℹ  Log message                                                               │
 │ ℹ  Info message                                                              │
 │ ⚠  Warning message                                                           │
 │ ✖  Error message                                                             │
-│                                                                              │
-│                                                                              │
 │                                                                              │
 │                                                                              │
 │                                                                              │

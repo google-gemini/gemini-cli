@@ -7,7 +7,10 @@
 import { renderWithProviders } from '../../test-utils/render.js';
 import { useKeypress, type Key } from '../hooks/useKeypress.js';
 import { waitFor } from '../../test-utils/async.js';
-import { DetailedMessagesDisplay } from './DetailedMessagesDisplay.js';
+import {
+  DetailedMessagesDisplay,
+  getLevelFilterShortcut,
+} from './DetailedMessagesDisplay.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { ConsoleMessageItem } from '../types.js';
 import { Box, Text } from 'ink';
@@ -57,6 +60,93 @@ describe('DetailedMessagesDisplay', () => {
     vi.mocked(useConsoleMessages).mockReturnValue([]);
   });
 
+  describe('getLevelFilterShortcut', () => {
+    const shortcuts: Parameters<typeof getLevelFilterShortcut>[1] = {
+      '1': 'all',
+      '2': 'log',
+      '3': 'info',
+      '4': 'warn',
+      '5': 'error',
+      '6': 'debug',
+    };
+
+    it('maps Alt+number shortcuts using key.name', () => {
+      expect(
+        getLevelFilterShortcut(
+          {
+            name: '1',
+            sequence: '\u001b1',
+            alt: true,
+            ctrl: false,
+            cmd: false,
+            shift: false,
+            insertable: true,
+          },
+          shortcuts,
+        ),
+      ).toBe('all');
+      expect(
+        getLevelFilterShortcut(
+          {
+            name: '4',
+            sequence: '\u001b4',
+            alt: true,
+            ctrl: false,
+            cmd: false,
+            shift: false,
+            insertable: true,
+          },
+          shortcuts,
+        ),
+      ).toBe('warn');
+    });
+
+    it('ignores non-Alt or modified shortcuts', () => {
+      expect(
+        getLevelFilterShortcut(
+          {
+            name: '4',
+            sequence: '4',
+            alt: false,
+            ctrl: false,
+            cmd: false,
+            shift: false,
+            insertable: true,
+          },
+          shortcuts,
+        ),
+      ).toBeUndefined();
+      expect(
+        getLevelFilterShortcut(
+          {
+            name: '4',
+            sequence: '\u001b4',
+            alt: true,
+            ctrl: true,
+            cmd: false,
+            shift: false,
+            insertable: false,
+          },
+          shortcuts,
+        ),
+      ).toBeUndefined();
+      expect(
+        getLevelFilterShortcut(
+          {
+            name: '4',
+            sequence: '\u001b4',
+            alt: true,
+            ctrl: false,
+            cmd: true,
+            shift: false,
+            insertable: false,
+          },
+          shortcuts,
+        ),
+      ).toBeUndefined();
+    });
+  });
+
   it('renders nothing when messages are empty', async () => {
     const { lastFrame, unmount } = await renderWithProviders(
       <DetailedMessagesDisplay maxHeight={10} width={80} hasFocus={false} />,
@@ -83,11 +173,14 @@ describe('DetailedMessagesDisplay', () => {
 
     expect(output).toContain('Debug Console');
     expect(output).toContain('F4 to search');
-    expect(output).toContain('All(4)*');
+    expect(output).toContain('Alt+1-6 to filter by level');
+    expect(output).toContain('All(4)');
     expect(output).toContain('Log(1)');
     expect(output).toContain('Info(1)');
     expect(output).toContain('Warn(1)');
     expect(output).toContain('Error(1)');
+    expect(output).not.toContain('Alt+1:All');
+    expect(output).not.toContain('Alt+4:Warn');
     expect(output).toContain('Info message');
     expect(output).not.toContain('Debug message');
     expect(output).toMatchSnapshot();
@@ -148,7 +241,7 @@ describe('DetailedMessagesDisplay', () => {
     unmount();
   });
 
-  it('does not filter messages from search text until search mode is active', async () => {
+  it('filters messages whenever search text is present', async () => {
     const messages: ConsoleMessageItem[] = [
       { id: '1', type: 'info', content: 'alpha match', count: 1 },
       { id: '2', type: 'warn', content: 'beta only', count: 1 },
@@ -160,7 +253,7 @@ describe('DetailedMessagesDisplay', () => {
 
     const output = lastFrame();
     expect(output).toContain('alpha match');
-    expect(output).toContain('beta only');
+    expect(output).not.toContain('beta only');
     expect(output).not.toContain('Search: alpha');
     unmount();
   });
@@ -217,7 +310,6 @@ describe('DetailedMessagesDisplay', () => {
     await waitFor(() => {
       const output = lastFrame();
       expect(output).toContain('F4 esc search');
-      expect(output).toContain('Search:');
       expect(output).toContain('Filter logs');
       expect(output).toContain('╭');
       expect(output).toContain('╮');
@@ -232,8 +324,18 @@ describe('DetailedMessagesDisplay', () => {
       expect(output).toContain('alpha match');
       expect(output).not.toContain('beta only');
       expect(output).toContain('alpha');
-      expect(output).toContain('[results: 1]');
       expect(output).not.toContain('F\ni\nl\nt\ne\nr\n \nl\no\ng\ns');
+    });
+
+    await React.act(async () => {
+      stdin.write('\u001b');
+    });
+
+    await waitFor(() => {
+      const output = lastFrame();
+      expect(output).toContain('alpha match');
+      expect(output).not.toContain('beta only');
+      expect(output).not.toContain('Filter logs');
     });
 
     unmount();
@@ -296,7 +398,7 @@ describe('DetailedMessagesDisplay', () => {
 
     await waitFor(() => {
       expect(lastFrame()).toContain('F4 esc search');
-      expect(lastFrame()).toContain('Search:');
+      expect(lastFrame()).toContain('Filter logs');
       expect(lastFrame()).toContain('Composer mirror: (empty)');
     });
 
@@ -313,6 +415,83 @@ describe('DetailedMessagesDisplay', () => {
       expect(output).toContain('l');
       expect(output).toContain('p');
       expect(output).toContain('h');
+    });
+
+    unmount();
+  });
+
+  it('renders compact level filter labels and shortcut hint', async () => {
+    const messages: ConsoleMessageItem[] = [
+      { id: '1', type: 'log', content: 'log message', count: 1 },
+      { id: '2', type: 'warn', content: 'warn message', count: 1 },
+    ];
+    vi.mocked(useConsoleMessages).mockReturnValue(messages);
+
+    const { lastFrame, unmount } = await renderDisplay();
+
+    const output = lastFrame();
+    expect(output).toContain('Alt+1-6 to filter by level');
+    expect(output).toContain('All(2)');
+    expect(output).toContain('Log(1)');
+    expect(output).toContain('Warn(1)');
+    expect(output).not.toContain('Alt+1:All');
+    expect(output).not.toContain('Alt+4:Warn');
+    expect(output).toContain('log message');
+    expect(output).toContain('warn message');
+
+    unmount();
+  });
+
+  it('does not intercept plain number input while the debug console is visible', async () => {
+    const messages: ConsoleMessageItem[] = [
+      { id: '1', type: 'log', content: 'alpha match', count: 1 },
+    ];
+    vi.mocked(useConsoleMessages).mockReturnValue(messages);
+
+    const LowerPriorityInput = () => {
+      const [value, setValue] = React.useState('');
+
+      useKeypress(
+        (key: Key) => {
+          if (key.sequence.length === 1 && !key.ctrl && !key.alt && !key.cmd) {
+            setValue((current) => current + key.sequence);
+            return true;
+          }
+          return false;
+        },
+        { isActive: true, priority: true },
+      );
+
+      return <Text>Composer mirror: {value || '(empty)'}</Text>;
+    };
+
+    const InputHarness = () => (
+      <Box flexDirection="column">
+        <DetailedMessagesDisplay maxHeight={20} width={80} hasFocus={true} />
+        <LowerPriorityInput />
+      </Box>
+    );
+
+    const { lastFrame, stdin, unmount } = await renderWithProviders(
+      <InputHarness />,
+      {
+        settings: createMockSettings({ ui: { errorVerbosity: 'full' } }),
+      },
+    );
+
+    await waitFor(() => {
+      expect(lastFrame()).toContain('Composer mirror: (empty)');
+    });
+
+    await React.act(async () => {
+      stdin.write('4');
+    });
+
+    await waitFor(() => {
+      const output = lastFrame();
+      expect(output).toContain('Composer mirror: 4');
+      expect(output).toContain('Alt+1-6 to filter by level');
+      expect(output).toContain('alpha match');
     });
 
     unmount();
