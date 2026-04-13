@@ -61,7 +61,7 @@ gemini --list-sessions
 gemini --delete-session 1
 ```
 
-### Scenario: Exiting without leaving traces
+### Scenario: Delete session on exit
 
 If you're doing a one-off task and don't want to leave any session history
 behind, use the `--delete` flag when exiting:
