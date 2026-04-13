@@ -100,6 +100,7 @@ export {
   PRIORITY_YOLO_ALLOW_ALL,
 } from './policy/types.js';
 export * from './utils/tool-utils.js';
+export * from './utils/tool-visibility.js';
 export * from './utils/terminalSerializer.js';
 export * from './utils/systemEncoding.js';
 export * from './utils/textUtils.js';
@@ -139,7 +140,11 @@ export * from './services/sandboxedFileSystemService.js';
 export * from './services/modelConfigService.js';
 export * from './sandbox/windows/WindowsSandboxManager.js';
 export * from './services/sessionSummaryUtils.js';
-export { startMemoryService } from './services/memoryService.js';
+export {
+  startMemoryService,
+  validatePatches,
+} from './services/memoryService.js';
+export { isProjectSkillPatchTarget } from './services/memoryPatchUtils.js';
 export * from './context/memoryContextManager.js';
 export * from './services/trackerService.js';
 export * from './services/trackerTypes.js';
