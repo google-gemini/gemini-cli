@@ -11,6 +11,7 @@ import {
   type ThoughtSummary,
   type SerializableConfirmationDetails,
   type ToolResultDisplay,
+  type ToolDisplay,
   type RetrieveUserQuotaResponse,
   type SkillDefinition,
   type AgentDefinition,
@@ -121,6 +122,7 @@ export interface IndividualToolCallDisplay {
   name: string;
   args?: Record<string, unknown>;
   description: string;
+  display?: ToolDisplay;
   resultDisplay: ToolResultDisplay | undefined;
   status: CoreToolCallStatus;
   // True when the tool was initiated directly by the user (slash/@/shell flows).
