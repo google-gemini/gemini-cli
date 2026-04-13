@@ -14,6 +14,7 @@ import {
   readServerPid,
   isProcessRunning,
   isServerRunning,
+  resolveGemmaConfig,
 } from './platform.js';
 
 /**
@@ -66,18 +67,25 @@ export async function stopServer(): Promise<boolean> {
 
   return true;
 }
-
 export const stopCommand: CommandModule = {
   command: 'stop',
   describe: 'Stop the LiteRT-LM server',
   builder: (yargs) =>
     yargs.option('port', {
       type: 'number',
-      default: DEFAULT_PORT,
-      description: 'Port the server is running on',
+      description: 'Port where the LiteRT server is running',
     }),
   handler: async (argv) => {
-    const port = Number(argv['port']);
+    let port: number | undefined;
+    if (argv['port'] !== undefined) {
+      port = Number(argv['port']);
+    }
+
+    if (!port) {
+      const { configuredPort } = resolveGemmaConfig(DEFAULT_PORT);
+      port = configuredPort;
+    }
+
     const pid = readServerPid();
 
     if (pid !== null && isProcessRunning(pid)) {

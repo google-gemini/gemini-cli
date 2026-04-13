@@ -21,6 +21,7 @@ import {
   getBinaryPath,
   isBinaryInstalled,
   isServerRunning,
+  resolveGemmaConfig,
 } from './platform.js';
 
 /**
@@ -78,11 +79,18 @@ export const startCommand: CommandModule = {
   builder: (yargs) =>
     yargs.option('port', {
       type: 'number',
-      default: DEFAULT_PORT,
       description: 'Port for the LiteRT server',
     }),
   handler: async (argv) => {
-    const port = Number(argv['port']);
+    let port: number | undefined;
+    if (argv['port'] !== undefined) {
+      port = Number(argv['port']);
+    }
+
+    if (!port) {
+      const { configuredPort } = resolveGemmaConfig(DEFAULT_PORT);
+      port = configuredPort;
+    }
 
     if (!isBinaryInstalled()) {
       debugLogger.error(
