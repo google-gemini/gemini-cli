@@ -18,7 +18,7 @@ export interface ContextConsolidationEvent {
   targetNodeIds: Set<string>;
 }
 
-export interface IrChunkReceivedEvent {
+export interface ChunkReceivedEvent {
   nodes: readonly ConcreteNode[];
   targetNodeIds: Set<string>;
 }
@@ -34,11 +34,11 @@ export class ContextEventBus extends EventEmitter {
     this.on('PRISTINE_HISTORY_UPDATED', listener);
   }
 
-  emitChunkReceived(event: IrChunkReceivedEvent) {
+  emitChunkReceived(event: ChunkReceivedEvent) {
     this.emit('IR_CHUNK_RECEIVED', event);
   }
 
-  onChunkReceived(listener: (event: IrChunkReceivedEvent) => void) {
+  onChunkReceived(listener: (event: ChunkReceivedEvent) => void) {
     this.on('IR_CHUNK_RECEIVED', listener);
   }
 

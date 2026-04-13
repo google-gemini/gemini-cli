@@ -13,7 +13,7 @@ export interface NodeSerializationWriter {
   flushModelParts(): void;
 }
 
-export interface IrNodeBehavior<T extends ConcreteNode = ConcreteNode> {
+export interface NodeBehavior<T extends ConcreteNode = ConcreteNode> {
   readonly type: T['type'];
 
   /** Serializes the node into the Gemini Content structure. */
@@ -27,16 +27,16 @@ export interface IrNodeBehavior<T extends ConcreteNode = ConcreteNode> {
 }
 
 export class NodeBehaviorRegistry {
-  private readonly behaviors = new Map<string, IrNodeBehavior<ConcreteNode>>();
+  private readonly behaviors = new Map<string, NodeBehavior<ConcreteNode>>();
 
-  register<T extends ConcreteNode>(behavior: IrNodeBehavior<T>) {
+  register<T extends ConcreteNode>(behavior: NodeBehavior<T>) {
     this.behaviors.set(behavior.type, behavior);
   }
 
-  get(type: string): IrNodeBehavior<ConcreteNode> {
+  get(type: string): NodeBehavior<ConcreteNode> {
     const behavior = this.behaviors.get(type);
     if (!behavior) {
-      throw new Error(`Unregistered IrNode type: ${type}`);
+      throw new Error(`Unregistered Node type: ${type}`);
     }
     return behavior;
   }

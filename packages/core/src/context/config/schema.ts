@@ -7,21 +7,19 @@
 import type { ContextProcessorRegistry } from './registry.js';
 
 export function getContextManagementConfigSchema(
-  registry?: ContextProcessorRegistry,
+  registry: ContextProcessorRegistry,
 ) {
   // If a registry is provided, we can deeply validate processor overrides.
   // We do this by generating a `oneOf` list that matches the `type` discriminator
   // to the specific processor `options` schema.
-  const processorOptionSchemas = registry
-    ? registry.getSchemaDefs().map((def) => ({
+  const processorOptionSchemas = registry.getSchemaDefs().map((def) => ({
         type: 'object',
         required: ['type', 'options'],
         properties: {
           type: { const: def.id },
           options: def.schema,
         },
-      }))
-    : [];
+      }));
 
   const processorOptionsMapping =
     processorOptionSchemas.length > 0

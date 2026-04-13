@@ -5,7 +5,7 @@
  */
 import type { Part } from '@google/genai';
 import type {
-  IrNodeBehavior,
+  NodeBehavior,
   NodeBehaviorRegistry,
 } from './behaviorRegistry.js';
 import type {
@@ -19,7 +19,7 @@ import type {
   SystemEvent,
 } from './types.js';
 
-export const UserPromptBehavior: IrNodeBehavior<UserPrompt> = {
+export const UserPromptBehavior: NodeBehavior<UserPrompt> = {
   type: 'USER_PROMPT',
   getEstimatableParts(prompt) {
     const parts: Part[] = [];
@@ -54,7 +54,7 @@ export const UserPromptBehavior: IrNodeBehavior<UserPrompt> = {
   },
 };
 
-export const AgentThoughtBehavior: IrNodeBehavior<AgentThought> = {
+export const AgentThoughtBehavior: NodeBehavior<AgentThought> = {
   type: 'AGENT_THOUGHT',
   getEstimatableParts(thought) {
     return [{ text: thought.text }];
@@ -64,7 +64,7 @@ export const AgentThoughtBehavior: IrNodeBehavior<AgentThought> = {
   },
 };
 
-export const ToolExecutionBehavior: IrNodeBehavior<ToolExecution> = {
+export const ToolExecutionBehavior: NodeBehavior<ToolExecution> = {
   type: 'TOOL_EXECUTION',
   getEstimatableParts(tool) {
     return [
@@ -89,7 +89,7 @@ export const ToolExecutionBehavior: IrNodeBehavior<ToolExecution> = {
   },
 };
 
-export const MaskedToolBehavior: IrNodeBehavior<MaskedTool> = {
+export const MaskedToolBehavior: NodeBehavior<MaskedTool> = {
   type: 'MASKED_TOOL',
   getEstimatableParts(tool) {
     return [
@@ -120,7 +120,7 @@ export const MaskedToolBehavior: IrNodeBehavior<MaskedTool> = {
   },
 };
 
-export const AgentYieldBehavior: IrNodeBehavior<AgentYield> = {
+export const AgentYieldBehavior: NodeBehavior<AgentYield> = {
   type: 'AGENT_YIELD',
   getEstimatableParts(yieldNode) {
     return [{ text: yieldNode.text }];
@@ -131,7 +131,7 @@ export const AgentYieldBehavior: IrNodeBehavior<AgentYield> = {
   },
 };
 
-export const SystemEventBehavior: IrNodeBehavior<SystemEvent> = {
+export const SystemEventBehavior: NodeBehavior<SystemEvent> = {
   type: 'SYSTEM_EVENT',
   getEstimatableParts() {
     return [];
@@ -141,7 +141,7 @@ export const SystemEventBehavior: IrNodeBehavior<SystemEvent> = {
   },
 };
 
-export const SnapshotBehavior: IrNodeBehavior<Snapshot> = {
+export const SnapshotBehavior: NodeBehavior<Snapshot> = {
   type: 'SNAPSHOT',
   getEstimatableParts(node) {
     return [{ text: node.text }];
@@ -152,7 +152,7 @@ export const SnapshotBehavior: IrNodeBehavior<Snapshot> = {
   },
 };
 
-export const RollingSummaryBehavior: IrNodeBehavior<RollingSummary> = {
+export const RollingSummaryBehavior: NodeBehavior<RollingSummary> = {
   type: 'ROLLING_SUMMARY',
   getEstimatableParts(node) {
     return [{ text: node.text }];

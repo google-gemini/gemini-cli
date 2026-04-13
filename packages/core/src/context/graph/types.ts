@@ -6,7 +6,7 @@
 
 import type { Part } from '@google/genai';
 
-export type IrNodeType =
+export type NodeType =
   // Organic Concrete Nodes
   | 'USER_PROMPT'
   | 'SYSTEM_EVENT'
@@ -24,16 +24,16 @@ export type IrNodeType =
   | 'EPISODE';
 
 /** Base interface for all nodes in the Episodic Context Graph */
-export interface IrNode {
+export interface Node {
   readonly id: string;
-  readonly type: IrNodeType;
+  readonly type: NodeType;
 }
 
 /**
  * Concrete Nodes: The atomic, renderable pieces of data.
  * These are the actual "planks" of the Nodes of Theseus.
  */
-export interface BaseConcreteNode extends IrNode {
+export interface BaseConcreteNode extends Node {
   readonly timestamp: number;
   /** The ID of the Logical Node (e.g., Episode) that structurally owns this node */
   readonly logicalParentId?: string;
@@ -165,13 +165,13 @@ export type ConcreteNode =
  * Logical Nodes
  * These define hierarchy and grouping. They do not directly render to Gemini.
  */
-export interface Episode extends IrNode {
+export interface Episode extends Node {
   readonly type: 'EPISODE';
   /** References to the Concrete Node IDs that conceptually belong to this Episode. */
   concreteNodes: readonly ConcreteNode[];
 }
 
-export interface Task extends IrNode {
+export interface Task extends Node {
   readonly type: 'TASK';
   readonly goal: string;
   readonly status: 'active' | 'completed' | 'failed';
@@ -181,42 +181,42 @@ export interface Task extends IrNode {
 
 export type LogicalNode = Task | Episode;
 
-export function isEpisode(node: IrNode): node is Episode {
+export function isEpisode(node: Node): node is Episode {
   return node.type === 'EPISODE';
 }
 
-export function isTask(node: IrNode): node is Task {
+export function isTask(node: Node): node is Task {
   return node.type === 'TASK';
 }
 
-export function isAgentThought(node: IrNode): node is AgentThought {
+export function isAgentThought(node: Node): node is AgentThought {
   return node.type === 'AGENT_THOUGHT';
 }
 
-export function isAgentYield(node: IrNode): node is AgentYield {
+export function isAgentYield(node: Node): node is AgentYield {
   return node.type === 'AGENT_YIELD';
 }
 
-export function isToolExecution(node: IrNode): node is ToolExecution {
+export function isToolExecution(node: Node): node is ToolExecution {
   return node.type === 'TOOL_EXECUTION';
 }
 
-export function isMaskedTool(node: IrNode): node is MaskedTool {
+export function isMaskedTool(node: Node): node is MaskedTool {
   return node.type === 'MASKED_TOOL';
 }
 
-export function isUserPrompt(node: IrNode): node is UserPrompt {
+export function isUserPrompt(node: Node): node is UserPrompt {
   return node.type === 'USER_PROMPT';
 }
 
-export function isSystemEvent(node: IrNode): node is SystemEvent {
+export function isSystemEvent(node: Node): node is SystemEvent {
   return node.type === 'SYSTEM_EVENT';
 }
 
-export function isSnapshot(node: IrNode): node is Snapshot {
+export function isSnapshot(node: Node): node is Snapshot {
   return node.type === 'SNAPSHOT';
 }
 
-export function isRollingSummary(node: IrNode): node is RollingSummary {
+export function isRollingSummary(node: Node): node is RollingSummary {
   return node.type === 'ROLLING_SUMMARY';
 }
