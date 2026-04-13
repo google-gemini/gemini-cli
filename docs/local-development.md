@@ -148,7 +148,7 @@ await runInDevTraceSpan(
     },
   },
   async ({ metadata }) => {
-    // metadata allows you to record the input and output of the
+    // metadata lets you record the input and output of the
     // operation as well as other attributes.
     metadata.input = { key: 'value' };
     // Set custom attributes.

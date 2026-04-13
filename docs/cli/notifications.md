@@ -1,59 +1,45 @@
-# Notifications (experimental)
+# Notifications
 
-Gemini CLI can send system notifications to alert you when a session completes
-or when it needs your attention, such as when it's waiting for you to approve a
-tool call.
+Gemini CLI can provide run-event notifications to alert you when an action is
+required or when a long-running session completes.
 
-<!-- prettier-ignore -->
-> [!NOTE]
-> This is an experimental feature currently under active development and
-> may need to be enabled under `/settings`.
+## Overview
 
-Notifications are particularly useful when running long-running tasks or using
-[Plan Mode](./plan-mode.md), letting you switch to other windows while Gemini
-CLI works in the background.
+Notifications help you stay informed about the agent's progress without
+constantly monitoring the terminal. When enabled, Gemini CLI uses system-level
+notifications to alert you in the following scenarios:
 
-## Requirements
-
-### Terminal support
-
-The CLI uses the OSC 9 terminal escape sequence to trigger system notifications.
-This is supported by several modern terminal emulators including iTerm2,
-WezTerm, Ghostty, and Kitty. If your terminal does not support OSC 9
-notifications, Gemini CLI falls back to a terminal bell (BEL) to get your
-attention. Most terminals respond to BEL with a taskbar flash or system alert
-sound.
+- **Action required:** When the agent is waiting for your approval to execute a
+  tool.
+- **Session completed:** When a sequence of tasks has finished.
+- **Critical errors:** When a session terminates due to an error.
 
 ## Enable notifications
 
-Notifications are disabled by default. You can enable them using the `/settings`
-command or by updating your `settings.json` file.
+To enable notifications, set the `general.enableNotifications` setting to
+`true`.
 
-1.  Open the settings dialog by typing `/settings` in an interactive session.
-2.  Navigate to the **General** category.
-3.  Toggle the **Enable Notifications** setting to **On**.
-
-Alternatively, add the following to your `settings.json`:
-
-```json
-{
-  "general": {
-    "enableNotifications": true
-  }
-}
+```bash
+gemini config set general.enableNotifications true
 ```
 
-## Types of notifications
+Alternatively, you can enable them via the `/settings` dialog:
 
-Gemini CLI sends notifications for the following events:
+1.  Open the settings dialog by typing `/settings`.
+2.  Navigate to the **General** category.
+3.  Check the **Enable Notifications** box.
 
-- **Action required:** Triggered when the model is waiting for user input or
-  tool approval. This helps you know when the CLI has paused and needs you to
-  intervene.
-- **Session complete:** Triggered when a session finishes successfully. This is
-  useful for tracking the completion of automated tasks.
+## Requirements
 
-## Next steps
+Notifications depend on your operating system's capabilities:
 
-- Start planning with [Plan Mode](./plan-mode.md).
-- Configure your experience with other [settings](./settings.md).
+- **macOS:** Uses the built-in Notification Center.
+- **Linux:** Requires a notification daemon (like `dunst` or `notify-osd`) and
+  the `notify-send` utility.
+- **Windows:** Uses the Windows Action Center.
+
+<!-- prettier-ignore -->
+> [!NOTE]
+> In some terminal environments or remote sessions (like SSH), system
+> notifications may not be available or may require additional configuration on
+> the host machine.

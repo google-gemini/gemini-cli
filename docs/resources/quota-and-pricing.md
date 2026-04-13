@@ -35,16 +35,15 @@ Generally, there are three categories to choose from:
 - Pay-As-You-Go: The most flexible option for professional use, long-running
   tasks, or when you need full control over your usage.
 
-Requests are limited per user per minute and are subject to the availability of
-the service in times of high demand.
+Gemini CLI limits requests per user per minute and depends on the availability
+of the service during times of high demand.
 
 ## Free usage
 
 Access to Gemini CLI begins with a generous free tier, perfect for
 experimentation and light use.
 
-Your free usage is governed by the following limits, which depend on your
-authorization type.
+The following limits govern your free usage, based on your authorization type.
 
 ### Log in with Google (Gemini Code Assist for individuals)
 
@@ -52,8 +51,7 @@ For users who authenticate by using their Google account to access Gemini Code
 Assist for individuals. This includes:
 
 - 1000 maximum model requests / user / day
-- Model requests will be made across the Gemini model family as determined by
-  Gemini CLI.
+- Gemini CLI makes model requests across the Gemini model family.
 
 Learn more at
 [Gemini Code Assist for Individuals Limits](https://developers.google.com/gemini-code-assist/resources/quotas#quotas-for-agent-mode-gemini-cli).
@@ -131,8 +129,7 @@ Standard/Plus and AI Expanded, are not supported._
     - 1500 maximum model requests / user / day
   - Gemini Code Assist Enterprise edition:
     - 2000 maximum model requests / user / day
-  - Model requests will be made across the Gemini model family as determined by
-    Gemini CLI.
+  - Gemini CLI makes model requests across the Gemini model family.
 
   [Learn more about Gemini Code Assist license limits](https://developers.google.com/gemini-code-assist/resources/quotas#quotas-for-agent-mode-gemini-cli).
 
@@ -171,10 +168,9 @@ Learn more at
 [Gemini API Rate Limits](https://ai.google.dev/gemini-api/docs/rate-limits),
 [Gemini API Pricing](https://ai.google.dev/gemini-api/docs/pricing)
 
-It’s important to highlight that when using an API key, you pay per token/call.
+It's important to highlight that when using an API key, you pay per token/call.
 This can be more expensive for many small calls with few tokens, but it's the
-only way to ensure your workflow isn't interrupted by reaching a limit on your
-quota.
+only way to ensure your workflow isn't interrupted by reaching a limit.
 
 ## Gemini for workspace plans
 
@@ -194,7 +190,8 @@ your current quota.
 For more information on the `/stats` command and its subcommands, see the
 [Command Reference](../reference/commands.md#stats).
 
-A summary of model usage is also presented on exit at the end of a session.
+Gemini CLI also presents a summary of model usage on exit at the end of a
+session.
 
 ## Tips to avoid high costs
 

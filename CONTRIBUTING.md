@@ -1,7 +1,8 @@
 # How to contribute
 
-We would love to accept your patches and contributions to this project. This
-document includes:
+Gemini CLI welcomes patches and contributions from the community. This document
+outlines the process for becoming a contributor and setting up your development
+environment.
 
 - **[Before you begin](#before-you-begin):** Essential steps to take before
   becoming a Gemini CLI contributor.
@@ -11,8 +12,6 @@ document includes:
   set up your development environment and workflow.
 - **[Documentation contribution process](#documentation-contribution-process):**
   How to contribute documentation to Gemini CLI.
-
-We're looking forward to seeing your contributions!
 
 ## Before you begin
 

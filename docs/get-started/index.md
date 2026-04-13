@@ -18,7 +18,7 @@ The standard method to install and run Gemini CLI uses `npm`:
 npm install -g @google/gemini-cli
 ```
 
-Once Gemini CLI is installed, run Gemini CLI from your command line:
+Once installed, run Gemini CLI from your command line:
 
 ```bash
 gemini
@@ -87,7 +87,7 @@ Give Gemini the following prompt:
 Rename the photos in my "photos" directory based on their contents.
 ```
 
-Result: Gemini asks for permission to rename your files.
+Result: Gemini CLI asks for permission to rename your files.
 
 Select **Allow once** and your files are renamed:
 
@@ -111,7 +111,7 @@ Give Gemini CLI the following prompt:
 Clone the 'chalk' repository from https://github.com/chalk/chalk, read its key source files, and explain how it works.
 ```
 
-Result: Gemini performs a sequence of actions to answer your request.
+Result: Gemini CLI performs a sequence of actions to answer your request.
 
 1.  First, it asks for permission to run `git clone` to download the repository.
 2.  Next, it finds the important source files and asks for permission to read
@@ -178,7 +178,7 @@ Gemini CLI can generate boilerplate code and tests based on your existing
 implementation. This example demonstrates how to request code coverage for a
 JavaScript component.
 
-Scenario: You've written a simple login page. You wish to write unit tests to
+Scenario: You've written a simple login page. You want to write unit tests to
 ensure that your login page has code coverage.
 
 Give Gemini CLI the following prompt:

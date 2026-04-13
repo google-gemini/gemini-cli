@@ -8,7 +8,7 @@
 
 Our release flows support both `dev` and `prod` environments.
 
-The `dev` environment pushes to a private Github-hosted NPM repository, with the
+The `dev` environment pushes to a private GitHub-hosted NPM repository, with the
 package names beginning with `@google-gemini/**` instead of `@google/**`.
 
 The `prod` environment pushes to the public global NPM registry via Wombat
@@ -16,11 +16,11 @@ Dressing Room, which is Google's system for managing NPM packages in the
 `@google/**` namespace. The packages are all named `@google/**`.
 
 More information can be found about these systems in the
-[NPM Package Overview](npm.md)
+[NPM package structure](./npm.md)
 
 ### Package scopes
 
-| Package    | `prod` (Wombat Dressing Room) | `dev` (Github Private NPM Repo)           |
+| Package    | `prod` (Wombat Dressing Room) | `dev` (GitHub Private NPM Repo)           |
 | ---------- | ----------------------------- | ----------------------------------------- |
 | CLI        | @google/gemini-cli            | @google-gemini/gemini-cli                 |
 | Core       | @google/gemini-cli-core       | @google-gemini/gemini-cli-core A2A Server |
@@ -28,10 +28,10 @@ More information can be found about these systems in the
 
 ## Release cadence and tags
 
-We will follow https://semver.org/ as closely as possible but will call out when
-or if we have to deviate from it. Our weekly releases will be minor version
-increments and any bug or hotfixes between releases will go out as patch
-versions on the most recent release.
+We follow [Semantic Versioning](https://semver.org/) as closely as possible but
+will call out when or if we have to deviate from it. Our weekly releases will be
+minor version increments and any bug or hotfixes between releases will go out as
+patch versions on the most recent release.
 
 Each Tuesday ~20:00 UTC new Stable and Preview releases will be cut. The
 promotion flow is:
@@ -375,10 +375,9 @@ the main release file once service account permissions are sorted out.
 
 ## Release validation
 
-After pushing a new release smoke testing should be performed to ensure that the
-packages are working as expected. This can be done by installing the packages
-locally and running a set of tests to ensure that they are functioning
-correctly.
+After pushing a new release, perform smoke testing to ensure that the packages
+are working as expected. Install the packages locally and run a set of tests to
+ensure that they are functioning correctly.
 
 - `npx -y @google/gemini-cli@latest --version` to validate the push worked as
   expected if you were not doing a rc or dev tag
@@ -386,8 +385,8 @@ correctly.
   appropriately
 - _This is destructive locally_
   `npm uninstall @google/gemini-cli && npm uninstall -g @google/gemini-cli && npm cache clean --force &&  npm install @google/gemini-cli@<version>`
-- Smoke testing a basic run through of exercising a few llm commands and tools
-  is recommended to ensure that the packages are working as expected. We'll
+- Perform smoke testing of a basic run through of exercising a few llm commands
+  and tools to ensure that the packages are working as expected. Gemini CLI will
   codify this more in the future.
 
 ## Local testing and validation: Changes to the packaging and publishing process

@@ -20,7 +20,7 @@ installation methods, and release types.
 
 ## Install Gemini CLI
 
-We recommend most users install Gemini CLI using one of the following
+Gemini CLI recommends that most users install it using one of the following
 installation methods:
 
 - npm
@@ -63,7 +63,7 @@ npm install -g @google/gemini-cli
 
 ## Run Gemini CLI
 
-For most users, we recommend running Gemini CLI with the `gemini` command:
+Start Gemini CLI with the `gemini` command:
 
 ```bash
 gemini
@@ -143,8 +143,8 @@ code.
 
 ## Releases
 
-Gemini CLI has three release channels: nightly, preview, and stable. For most
-users, we recommend the stable release, which is the default installation.
+Gemini CLI has three release channels: nightly, preview, and stable. The stable
+release is the default installation and is recommended for most users.
 
 ### Stable
 
