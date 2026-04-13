@@ -5,24 +5,24 @@
  */
 import type { Content } from '@google/genai';
 import type { Episode, ConcreteNode } from './types.js';
-import { toIr } from './toIr.js';
-import { fromIr } from './fromIr.js';
+import { toGraph } from './toGraph.js';
+import { fromGraph } from './fromGraph.js';
 import type { ContextTokenCalculator } from '../utils/contextTokenCalculator.js';
-import type { IrNodeBehaviorRegistry } from './behaviorRegistry.js';
+import type { NodeBehaviorRegistry } from './behaviorRegistry.js';
 
-export class IrMapper {
+export class ContextGraphMapper {
   private readonly nodeIdentityMap = new WeakMap<object, string>();
 
-  constructor(private readonly registry: IrNodeBehaviorRegistry) {}
+  constructor(private readonly registry: NodeBehaviorRegistry) {}
 
-  toIr(
+  toGraph(
     history: readonly Content[],
     tokenCalculator: ContextTokenCalculator,
   ): Episode[] {
-    return toIr(history, tokenCalculator, this.nodeIdentityMap);
+    return toGraph(history, tokenCalculator, this.nodeIdentityMap);
   }
 
-  fromIr(nodes: readonly ConcreteNode[]): Content[] {
-    return fromIr(nodes, this.registry);
+  fromGraph(nodes: readonly ConcreteNode[]): Content[] {
+    return fromGraph(nodes, this.registry);
   }
 }

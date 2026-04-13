@@ -27,7 +27,7 @@ export async function render(
   protectedIds: Set<string>,
 ): Promise<Content[]> {
   if (!sidecar.config.budget) {
-    const contents = env.irMapper.fromIr(nodes);
+    const contents = env.graphMapper.fromGraph(nodes);
     tracer.logEvent('Render', 'Render Context to LLM (No Budget)', {
       renderedContext: contents,
     });
@@ -35,8 +35,7 @@ export async function render(
   }
 
   const maxTokens = sidecar.config.budget.maxTokens;
-  const currentTokens =
-    env.tokenCalculator.calculateConcreteListTokens(nodes);
+  const currentTokens = env.tokenCalculator.calculateConcreteListTokens(nodes);
 
   // V0: Always protect the first node (System Prompt) and the last turn
   if (nodes.length > 0) {
@@ -53,7 +52,7 @@ export async function render(
       'Render',
       `View is within maxTokens (${currentTokens} <= ${maxTokens}). Returning view.`,
     );
-    const contents = env.irMapper.fromIr(nodes);
+    const contents = env.graphMapper.fromGraph(nodes);
     tracer.logEvent('Render', 'Render Context for LLM', {
       renderedContext: contents,
     });
@@ -74,9 +73,7 @@ export async function render(
   // Start from newest and count backwards
   for (let i = nodes.length - 1; i >= 0; i--) {
     const node = nodes[i];
-    const nodeTokens = env.tokenCalculator.calculateConcreteListTokens([
-      node,
-    ]);
+    const nodeTokens = env.tokenCalculator.calculateConcreteListTokens([node]);
     rollingTokens += nodeTokens;
     if (rollingTokens > sidecar.config.budget.retainedTokens) {
       agedOutNodes.add(node.id);
@@ -110,7 +107,7 @@ export async function render(
 
   const visibleNodes = processedNodes.filter((n) => !skipList.has(n.id));
 
-  const contents = env.irMapper.fromIr(visibleNodes);
+  const contents = env.graphMapper.fromGraph(visibleNodes);
   tracer.logEvent('Render', 'Render Sanitized Context for LLM', {
     renderedContextSanitized: contents,
   });

@@ -19,7 +19,7 @@ import type {
 } from '../pipeline.js';
 import type { PipelineDef, AsyncPipelineDef } from '../config/types.js';
 import type { ContextEventBus } from '../eventBus.js';
-import type { ConcreteNode, UserPrompt } from '../ir/types.js';
+import type { ConcreteNode, UserPrompt } from '../graph/types.js';
 
 // A realistic mock processor that modifies the text of the first target node
 function createModifyingProcessor(id: string): ContextProcessor {

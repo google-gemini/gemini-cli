@@ -12,7 +12,7 @@ import { randomUUID } from 'node:crypto';
 import type { ContextProcessor, ProcessArgs } from '../pipeline.js';
 import type { ContextEnvironment } from '../pipeline/environment.js';
 import { truncateProportionally } from '../truncation.js';
-import type { ConcreteNode } from '../ir/types.js';
+import type { ConcreteNode } from '../graph/types.js';
 
 export interface NodeTruncationProcessorOptions {
   maxTokensPerNode: number;

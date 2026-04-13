@@ -12,7 +12,7 @@ import { randomUUID } from 'node:crypto';
 import type { ProcessArgs, ContextProcessor } from '../pipeline.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import type { ConcreteNode, UserPrompt } from '../ir/types.js';
+import type { ConcreteNode, UserPrompt } from '../graph/types.js';
 import type { ContextEnvironment } from '../pipeline/environment.js';
 import { sanitizeFilenamePart } from '../../utils/fileUtils.js';
 

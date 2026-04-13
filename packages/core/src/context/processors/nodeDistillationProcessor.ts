@@ -10,7 +10,7 @@ import { randomUUID } from 'node:crypto';
  * SPDX-License-Identifier: Apache-2.0
  */
 import type { ContextProcessor, ProcessArgs } from '../pipeline.js';
-import type { ConcreteNode } from '../ir/types.js';
+import type { ConcreteNode } from '../graph/types.js';
 import type { ContextEnvironment } from '../pipeline/environment.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 import { getResponseText } from '../../utils/partUtils.js';

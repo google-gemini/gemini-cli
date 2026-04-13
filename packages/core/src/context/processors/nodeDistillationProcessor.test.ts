@@ -14,7 +14,11 @@ import {
   createDummyToolNode,
   createMockLlmClient,
 } from '../testing/contextTestUtils.js';
-import type { UserPrompt, AgentThought, ToolExecution } from '../ir/types.js';
+import type {
+  UserPrompt,
+  AgentThought,
+  ToolExecution,
+} from '../graph/types.js';
 
 describe('NodeDistillationProcessor', () => {
   it('should trigger summarization via LLM for long text parts', async () => {

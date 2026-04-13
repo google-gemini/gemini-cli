@@ -8,16 +8,16 @@ import type {
   AgentChatHistory,
   HistoryEvent,
 } from '../core/agentChatHistory.js';
-import type { IrMapper } from './ir/mapper.js';
+import type { ContextGraphMapper } from './graph/mapper.js';
 import type { ContextTokenCalculator } from './utils/contextTokenCalculator.js';
 import type { ContextEventBus } from './eventBus.js';
 import type { ContextTracer } from './tracer.js';
 
-import type { ConcreteNode } from './ir/types.js';
+import type { ConcreteNode } from './graph/types.js';
 
 /**
  * Connects the raw AgentChatHistory to the ContextManager.
- * It maps raw messages into Episodic Intermediate Representation (IR)
+ * It maps raw messages into Episodic Intermediate Representation (Context Graph)
  * and evaluates background triggers whenever history changes.
  */
 export class HistoryObserver {
@@ -30,7 +30,7 @@ export class HistoryObserver {
     private readonly eventBus: ContextEventBus,
     private readonly tracer: ContextTracer,
     private readonly tokenCalculator: ContextTokenCalculator,
-    private readonly irMapper: IrMapper,
+    private readonly graphMapper: ContextGraphMapper,
   ) {}
 
   start() {
@@ -40,10 +40,10 @@ export class HistoryObserver {
 
     this.unsubscribeHistory = this.chatHistory.subscribe(
       (_event: HistoryEvent) => {
-        // Rebuild the pristine IR graph from the full source history on every change.
-        // Wait, toIr still returns an Episode[].
+        // Rebuild the pristine Context Graph graph from the full source history on every change.
+        // Wait, toGraph still returns an Episode[].
         // We actually need to map the Episode[] to a flat ConcreteNode[] here to form the 'nodes'.
-        const pristineEpisodes = this.irMapper.toIr(
+        const pristineEpisodes = this.graphMapper.toGraph(
           this.chatHistory.get(),
           this.tokenCalculator,
         );

@@ -16,7 +16,7 @@ import type {
 import type { ContextTokenCalculator } from '../utils/contextTokenCalculator.js';
 import { randomUUID } from 'node:crypto';
 
-// We remove the global nodeIdentityMap and instead rely on one passed from IrMapper
+// We remove the global nodeIdentityMap and instead rely on one passed from ContextGraphMapper
 export function getStableId(
   obj: object,
   nodeIdentityMap: WeakMap<object, string>,
@@ -42,7 +42,7 @@ function isCompleteEpisode(ep: Partial<Episode>): ep is Episode {
   );
 }
 
-export function toIr(
+export function toGraph(
   history: readonly Content[],
   tokenCalculator: ContextTokenCalculator,
   nodeIdentityMap: WeakMap<object, string>,

@@ -10,15 +10,15 @@ import type { ContextEnvironment } from './environment.js';
 import type { ContextEventBus } from '../eventBus.js';
 import { ContextTokenCalculator } from '../utils/contextTokenCalculator.js';
 import { LiveInbox } from './inbox.js';
-import { IrNodeBehaviorRegistry } from '../ir/behaviorRegistry.js';
-import { registerBuiltInBehaviors } from '../ir/builtinBehaviors.js';
-import { IrMapper } from '../ir/mapper.js';
+import { NodeBehaviorRegistry } from '../graph/behaviorRegistry.js';
+import { registerBuiltInBehaviors } from '../graph/builtinBehaviors.js';
+import { ContextGraphMapper } from '../graph/mapper.js';
 
 export class ContextEnvironmentImpl implements ContextEnvironment {
   readonly tokenCalculator: ContextTokenCalculator;
   readonly inbox: LiveInbox;
-  readonly behaviorRegistry: IrNodeBehaviorRegistry;
-  readonly irMapper: IrMapper;
+  readonly behaviorRegistry: NodeBehaviorRegistry;
+  readonly graphMapper: ContextGraphMapper;
 
   constructor(
     readonly llmClient: BaseLlmClient,
@@ -30,13 +30,13 @@ export class ContextEnvironmentImpl implements ContextEnvironment {
     readonly charsPerToken: number,
     readonly eventBus: ContextEventBus,
   ) {
-    this.behaviorRegistry = new IrNodeBehaviorRegistry();
+    this.behaviorRegistry = new NodeBehaviorRegistry();
     registerBuiltInBehaviors(this.behaviorRegistry);
     this.tokenCalculator = new ContextTokenCalculator(
       this.charsPerToken,
       this.behaviorRegistry,
     );
     this.inbox = new LiveInbox();
-    this.irMapper = new IrMapper(this.behaviorRegistry);
+    this.graphMapper = new ContextGraphMapper(this.behaviorRegistry);
   }
 }

@@ -15,7 +15,7 @@ import type {
   BackstopTargetOptions,
 } from '../pipeline.js';
 import type { ContextEnvironment } from '../pipeline/environment.js';
-import type { ConcreteNode, RollingSummary } from '../ir/types.js';
+import type { ConcreteNode, RollingSummary } from '../graph/types.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 import { LlmRole } from '../../telemetry/llmRole.js';
 

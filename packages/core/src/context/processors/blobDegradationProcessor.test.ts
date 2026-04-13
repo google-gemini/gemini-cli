@@ -12,7 +12,7 @@ import {
   createMockEnvironment,
   createDummyNode,
 } from '../testing/contextTestUtils.js';
-import type { UserPrompt, SemanticPart, ConcreteNode } from '../ir/types.js';
+import type { UserPrompt, SemanticPart, ConcreteNode } from '../graph/types.js';
 
 describe('BlobDegradationProcessor', () => {
   it('should ignore text parts and only target inline_data and file_data', async () => {

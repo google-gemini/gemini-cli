@@ -6,14 +6,14 @@
 
 import type { Content } from '@google/genai';
 import type { AgentChatHistory } from '../core/agentChatHistory.js';
-import type { ConcreteNode } from './ir/types.js';
+import type { ConcreteNode } from './graph/types.js';
 import type { ContextEventBus } from './eventBus.js';
 import type { ContextTracer } from './tracer.js';
 import type { ContextEnvironment } from './pipeline/environment.js';
 import type { ContextProfile } from './config/profiles.js';
 import type { PipelineOrchestrator } from './pipeline/orchestrator.js';
 import { HistoryObserver } from './historyObserver.js';
-import { render } from './ir/render.js';
+import { render } from './graph/render.js';
 import { ContextWorkingBufferImpl } from './pipeline/contextWorkingBuffer.js';
 
 export class ContextManager {
@@ -43,7 +43,7 @@ export class ContextManager {
       this.env.eventBus,
       this.tracer,
       this.env.tokenCalculator,
-      this.env.irMapper,
+      this.env.graphMapper,
     );
     this.historyObserver.start();
 
@@ -113,7 +113,7 @@ export class ContextManager {
   }
 
   /**
-   * Retrieves the raw, uncompressed Episodic IR graph.
+   * Retrieves the raw, uncompressed Episodic Context Graph graph.
    * Useful for internal tool rendering (like the trace viewer).
    * Note: This is an expensive, deep clone operation.
    */
@@ -132,16 +132,13 @@ export class ContextManager {
 
   /**
    * Executes the final 'gc_backstop' pipeline if necessary, enforcing the token budget,
-   * and maps the Episodic IR back into a raw Gemini Content[] array for transmission.
+   * and maps the Episodic Context Graph back into a raw Gemini Content[] array for transmission.
    * This is the primary method called by the agent framework before sending a request.
    */
   async projectCompressedHistory(
     activeTaskIds: Set<string> = new Set(),
   ): Promise<Content[]> {
-    this.tracer.logEvent(
-      'ContextManager',
-      'Starting rendering of LLM context',
-    );
+    this.tracer.logEvent('ContextManager', 'Starting rendering of LLM context');
     // Apply final GC Backstop pressure barrier synchronously before mapping
     const finalHistory = await render(
       this.buffer.nodes,

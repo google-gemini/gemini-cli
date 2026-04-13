@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { ConcreteNode } from '../ir/types.js';
+import type { ConcreteNode } from '../graph/types.js';
 import type {
   AsyncPipelineDef,
   PipelineDef,

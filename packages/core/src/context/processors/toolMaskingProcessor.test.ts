@@ -10,7 +10,7 @@ import {
   createMockEnvironment,
   createDummyToolNode,
 } from '../testing/contextTestUtils.js';
-import type { ToolExecution } from '../ir/types.js';
+import type { ToolExecution } from '../graph/types.js';
 
 describe('ToolMaskingProcessor', () => {
   it('should write large strings to disk and replace them with a masked pointer', async () => {

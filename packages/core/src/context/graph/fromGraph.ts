@@ -6,11 +6,11 @@
 import type { Content, Part } from '@google/genai';
 import type { ConcreteNode } from './types.js';
 import type {
-  IrSerializationWriter,
-  IrNodeBehaviorRegistry,
+  NodeSerializationWriter,
+  NodeBehaviorRegistry,
 } from './behaviorRegistry.js';
 
-class IrSerializer implements IrSerializationWriter {
+class NodeSerializer implements NodeSerializationWriter {
   private history: Content[] = [];
   private currentModelParts: Part[] = [];
 
@@ -41,11 +41,11 @@ class IrSerializer implements IrSerializationWriter {
   }
 }
 
-export function fromIr(
+export function fromGraph(
   nodes: readonly ConcreteNode[],
-  registry: IrNodeBehaviorRegistry,
+  registry: NodeBehaviorRegistry,
 ): Content[] {
-  const writer = new IrSerializer();
+  const writer = new NodeSerializer();
   for (const node of nodes) {
     const behavior = registry.get(node.type);
     behavior.serialize(node, writer);

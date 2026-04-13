@@ -23,7 +23,7 @@ export type IrNodeType =
   | 'TASK'
   | 'EPISODE';
 
-/** Base interface for all nodes in the Episodic IR */
+/** Base interface for all nodes in the Episodic Context Graph */
 export interface IrNode {
   readonly id: string;
   readonly type: IrNodeType;

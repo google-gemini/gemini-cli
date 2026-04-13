@@ -8,8 +8,8 @@ import type { ContextEventBus } from '../eventBus.js';
 import type { ContextTokenCalculator } from '../utils/contextTokenCalculator.js';
 import type { ContextTracer } from '../tracer.js';
 import type { LiveInbox } from './inbox.js';
-import type { IrNodeBehaviorRegistry } from '../ir/behaviorRegistry.js';
-import type { IrMapper } from '../ir/mapper.js';
+import type { NodeBehaviorRegistry } from '../graph/behaviorRegistry.js';
+import type { ContextGraphMapper } from '../graph/mapper.js';
 
 export type { ContextTracer, ContextEventBus };
 
@@ -24,6 +24,6 @@ export interface ContextEnvironment {
   readonly tokenCalculator: ContextTokenCalculator;
   readonly eventBus: ContextEventBus;
   readonly inbox: LiveInbox;
-  readonly behaviorRegistry: IrNodeBehaviorRegistry;
-  readonly irMapper: IrMapper;
+  readonly behaviorRegistry: NodeBehaviorRegistry;
+  readonly graphMapper: ContextGraphMapper;
 }

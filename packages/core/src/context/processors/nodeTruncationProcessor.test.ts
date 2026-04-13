@@ -12,7 +12,7 @@ import {
   createMockEnvironment,
   createDummyNode,
 } from '../testing/contextTestUtils.js';
-import type { UserPrompt, AgentThought, AgentYield } from '../ir/types.js';
+import type { UserPrompt, AgentThought, AgentYield } from '../graph/types.js';
 
 describe('NodeTruncationProcessor', () => {
   it('should truncate nodes that exceed maxTokensPerNode', async () => {

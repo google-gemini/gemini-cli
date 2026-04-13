@@ -9,7 +9,7 @@ import type {
   BackstopTargetOptions,
   ProcessArgs,
 } from '../pipeline.js';
-import type { ConcreteNode } from '../ir/types.js';
+import type { ConcreteNode } from '../graph/types.js';
 import type { ContextEnvironment } from '../pipeline/environment.js';
 
 export type HistoryTruncationProcessorOptions = BackstopTargetOptions;

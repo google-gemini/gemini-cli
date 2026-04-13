@@ -5,7 +5,7 @@
  */
 
 import { EventEmitter } from 'node:events';
-import type { ConcreteNode } from './ir/types.js';
+import type { ConcreteNode } from './graph/types.js';
 
 export interface PristineHistoryUpdatedEvent {
   nodes: readonly ConcreteNode[];

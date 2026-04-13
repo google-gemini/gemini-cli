@@ -6,7 +6,7 @@
 import type { Content, Part } from '@google/genai';
 import type { ConcreteNode } from './types.js';
 
-export interface IrSerializationWriter {
+export interface NodeSerializationWriter {
   appendContent(content: Content): void;
   appendModelPart(part: Part): void;
   appendUserPart(part: Part): void;
@@ -17,7 +17,7 @@ export interface IrNodeBehavior<T extends ConcreteNode = ConcreteNode> {
   readonly type: T['type'];
 
   /** Serializes the node into the Gemini Content structure. */
-  serialize(node: T, writer: IrSerializationWriter): void;
+  serialize(node: T, writer: NodeSerializationWriter): void;
 
   /**
    * Generates a structural representation of the node for the purpose
@@ -26,7 +26,7 @@ export interface IrNodeBehavior<T extends ConcreteNode = ConcreteNode> {
   getEstimatableParts(node: T): Part[];
 }
 
-export class IrNodeBehaviorRegistry {
+export class NodeBehaviorRegistry {
   private readonly behaviors = new Map<string, IrNodeBehavior<ConcreteNode>>();
 
   register<T extends ConcreteNode>(behavior: IrNodeBehavior<T>) {

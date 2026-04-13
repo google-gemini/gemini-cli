@@ -6,8 +6,8 @@
 
 import type { Part } from '@google/genai';
 import { estimateTokenCountSync as baseEstimate } from '../../utils/tokenCalculation.js';
-import type { ConcreteNode } from '../ir/types.js';
-import type { IrNodeBehaviorRegistry } from '../ir/behaviorRegistry.js';
+import type { ConcreteNode } from '../graph/types.js';
+import type { NodeBehaviorRegistry } from '../graph/behaviorRegistry.js';
 
 /**
  * The flat token cost assigned to a single multi-modal asset (like an image tile)
@@ -19,7 +19,7 @@ export class ContextTokenCalculator {
 
   constructor(
     private readonly charsPerToken: number,
-    private readonly registry: IrNodeBehaviorRegistry,
+    private readonly registry: NodeBehaviorRegistry,
   ) {}
 
   /**

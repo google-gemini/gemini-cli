@@ -39,6 +39,6 @@ describe('ContextEnvironmentImpl', () => {
     expect(env.behaviorRegistry).toBeDefined();
     expect(env.tokenCalculator).toBeDefined();
     expect(env.inbox).toBeDefined();
-    expect(env.irMapper).toBeDefined();
+    expect(env.graphMapper).toBeDefined();
   });
 });

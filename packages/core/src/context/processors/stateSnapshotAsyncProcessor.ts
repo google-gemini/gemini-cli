@@ -11,7 +11,7 @@ import { randomUUID } from 'node:crypto';
  */
 import type { AsyncContextProcessor, ProcessArgs } from '../pipeline.js';
 import type { ContextEnvironment } from '../pipeline/environment.js';
-import type { ConcreteNode } from '../ir/types.js';
+import type { ConcreteNode } from '../graph/types.js';
 import { SnapshotGenerator } from '../utils/snapshotGenerator.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 
