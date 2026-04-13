@@ -208,7 +208,7 @@ describe('SandboxManager', () => {
     });
 
     it('should handle case-insensitive conflicts on supported platforms', async () => {
-      vi.spyOn(os, 'platform').mockReturnValue('darwin');
+      vi.spyOn(process, 'platform', 'get').mockReturnValue('darwin');
       const workspace = path.resolve('/workspace');
       const secretUpper = path.join(workspace, 'SECRET');
       const secretLower = path.join(workspace, 'secret');
