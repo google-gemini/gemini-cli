@@ -137,7 +137,11 @@ describe('runInDevTraceSpan', () => {
     expect(trace.getTracer).toHaveBeenCalled();
     expect(mockTracer.startActiveSpan).toHaveBeenCalledWith(
       GeminiCliOperation.LLMCall,
-      {},
+      {
+        attributes: {
+          [GEN_AI_CONVERSATION_ID]: 'test-session-id',
+        },
+      },
       expect.any(Function),
     );
   });
