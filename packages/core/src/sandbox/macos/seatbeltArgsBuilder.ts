@@ -150,6 +150,19 @@ export function buildSeatbeltProfile(options: SeatbeltArgsOptions): string {
     );
     const realGovernanceFile = resolveToRealPath(governanceFile);
 
+    // Skip deny if explicitly allowed by additional write permissions
+    const isExplicitlyAllowed = resolvedPaths.policyWrite.some(
+      (p) =>
+        p === governanceFile ||
+        p === realGovernanceFile ||
+        governanceFile.startsWith(p + path.sep) ||
+        realGovernanceFile.startsWith(p + path.sep),
+    );
+
+    if (isExplicitlyAllowed) {
+      continue;
+    }
+
     // Determine if it should be treated as a directory (subpath) or a file (literal).
     // .git is generally a directory, while ignore files are literals.
     let isDirectory = GOVERNANCE_FILES[i].isDirectory;
@@ -175,10 +188,20 @@ export function buildSeatbeltProfile(options: SeatbeltArgsOptions): string {
   if (resolvedPaths.gitWorktree) {
     const { worktreeGitDir, mainGitDir } = resolvedPaths.gitWorktree;
     if (worktreeGitDir) {
-      profile += `(deny file-write* (subpath "${escapeSchemeString(worktreeGitDir)}"))\n`;
+      const isExplicitlyAllowed = resolvedPaths.policyWrite.some(
+        (p) => p === worktreeGitDir || worktreeGitDir.startsWith(p + path.sep),
+      );
+      if (!isExplicitlyAllowed) {
+        profile += `(deny file-write* (subpath "${escapeSchemeString(worktreeGitDir)}"))\n`;
+      }
     }
     if (mainGitDir) {
-      profile += `(deny file-write* (subpath "${escapeSchemeString(mainGitDir)}"))\n`;
+      const isExplicitlyAllowed = resolvedPaths.policyWrite.some(
+        (p) => p === mainGitDir || mainGitDir.startsWith(p + path.sep),
+      );
+      if (!isExplicitlyAllowed) {
+        profile += `(deny file-write* (subpath "${escapeSchemeString(mainGitDir)}"))\n`;
+      }
     }
   }
 

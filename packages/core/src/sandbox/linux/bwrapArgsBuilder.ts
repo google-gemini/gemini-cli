@@ -90,10 +90,6 @@ export async function buildBwrapArgs(
     bwrapArgs.push('--ro-bind-try', p, p);
   }
 
-  for (const p of resolvedPaths.policyWrite) {
-    bwrapArgs.push('--bind-try', p, p);
-  }
-
   for (const file of GOVERNANCE_FILES) {
     const filePath = join(workspace.original, file.path);
     const realPath = join(workspace.resolved, file.path);
@@ -113,6 +109,13 @@ export async function buildBwrapArgs(
     if (mainGitDir) {
       bwrapArgs.push('--ro-bind-try', mainGitDir, mainGitDir);
     }
+  }
+
+  // Apply explicit additional write permissions.
+  // We apply these after GOVERNANCE_FILES and gitWorktree rules so that if a user explicitly requests
+  // write access to a protected directory (like .git), the explicit allow takes precedence in bwrap.
+  for (const p of resolvedPaths.policyWrite) {
+    bwrapArgs.push('--bind-try', p, p);
   }
 
   for (const p of resolvedPaths.forbidden) {
