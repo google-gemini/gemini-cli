@@ -119,6 +119,7 @@ describe('ShellTool', () => {
       getDebugMode: vi.fn().mockReturnValue(false),
       getTargetDir: vi.fn().mockReturnValue(tempRootDir),
       getSummarizeToolOutputConfig: vi.fn().mockReturnValue(undefined),
+      getSqueezConfig: vi.fn().mockReturnValue(undefined),
       getWorkspaceContext: vi
         .fn()
         .mockReturnValue(new WorkspaceContext(tempRootDir)),
@@ -508,7 +509,7 @@ describe('ShellTool', () => {
       (mockConfig.getSummarizeToolOutputConfig as Mock).mockReturnValue({
         [SHELL_TOOL_NAME]: { tokenBudget: 1000 },
       });
-      vi.mocked(summarizer.summarizeToolOutput).mockResolvedValue(
+      vi.mocked(summarizer.llmSummarizer).mockResolvedValue(
         'summarized output',
       );
 
@@ -527,13 +528,7 @@ describe('ShellTool', () => {
 
       const result = await promise;
 
-      expect(summarizer.summarizeToolOutput).toHaveBeenCalledWith(
-        mockConfig,
-        { model: 'summarizer-shell' },
-        expect.any(String),
-        mockConfig.geminiClient,
-        mockAbortSignal,
-      );
+      expect(summarizer.llmSummarizer).toHaveBeenCalled();
       expect(result.llmContent).toBe('summarized output');
       expect(result.returnDisplay).toBe('long output');
     });

@@ -10,7 +10,7 @@ import type { GeminiClient } from '../core/client.js';
 import { getResponseText, partToString } from './partUtils.js';
 import { debugLogger } from './debugLogger.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
-import type { Config } from '../config/config.js';
+import type { Config, SqueezSettings } from '../config/config.js';
 import { LlmRole } from '../telemetry/llmRole.js';
 
 /**
@@ -68,6 +68,29 @@ export const llmSummarizer: Summarizer = async (
     geminiClient,
     abortSignal,
   );
+
+/**
+ * Create a summarizer that uses Squeeze for pruning.
+ * Falls back to LLM summarization if Squeeze is not configured or fails.
+ */
+export function createSqueezAwareSummarizer(
+  squeezSettings: SqueezSettings | undefined,
+): Summarizer {
+  if (!squeezSettings?.serverUrl) {
+    return llmSummarizer;
+  }
+
+  // Lazy import to avoid adding weight when squeez is not used
+  let squeezFn: ((config: Config, result: ToolResult, geminiClient: GeminiClient, abortSignal: AbortSignal) => Promise<string>) | null = null;
+
+  return async (config, result, geminiClient, abortSignal) => {
+    if (!squeezFn) {
+      const { createSqueezSummarizer } = await import('./squeezSummarizer.js');
+      squeezFn = createSqueezSummarizer(squeezSettings);
+    }
+    return squeezFn(config, result, geminiClient, abortSignal);
+  };
+}
 
 export async function summarizeToolOutput(
   config: Config,
