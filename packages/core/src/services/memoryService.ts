@@ -581,14 +581,16 @@ export async function validatePatches(
 }
 
 /**
- * Main entry point for the skill extraction background task.
- * Designed to be called fire-and-forget on session startup.
+ * Runs the skill extraction background task.
  *
  * Coordinates across multiple CLI instances via a lock file,
  * scans past sessions for reusable patterns, and runs a sub-agent
  * to extract and write SKILL.md files.
+ *
+ * Called by DefaultMemoryProvider.onSessionStart(). Not intended to
+ * be called directly — use MemoryService.emitSessionStart() instead.
  */
-export async function startMemoryService(config: Config): Promise<void> {
+export async function startSkillExtraction(config: Config): Promise<void> {
   const memoryDir = config.storage.getProjectMemoryTempDir();
   const skillsDir = config.storage.getProjectSkillsMemoryDir();
   const lockPath = path.join(memoryDir, LOCK_FILENAME);
@@ -815,4 +817,265 @@ export async function startMemoryService(config: Config): Promise<void> {
       );
     }
   }
+}
+
+// ---------------------------------------------------------------------------
+// MemoryService — pluggable event bus for memory providers
+// ---------------------------------------------------------------------------
+
+import type {
+  MemoryProvider,
+  MemoryProviderContext,
+  MemoryEventResult,
+  SessionStartPayload,
+  UserInputPayload,
+  ContextEvictedPayload,
+  PreCompressPayload,
+  TurnCompletePayload,
+  IdlePayload,
+  SessionEndPayload,
+} from './memoryProvider.js';
+import { DefaultMemoryProvider } from './defaultMemoryProvider.js';
+
+/**
+ * MemoryService is the central event bus for memory providers.
+ *
+ * It dispatches CLI lifecycle events to registered providers. Each provider
+ * implements the event methods it cares about — implementing a method
+ * implicitly subscribes to that event.
+ *
+ * The DefaultMemoryProvider is always registered and handles built-in
+ * functionality (skill extraction). External providers can be registered
+ * for custom behavior (RAG indexer, vector recall, etc.).
+ */
+export class MemoryService {
+  private providers: MemoryProvider[] = [];
+  private ctx: MemoryProviderContext | undefined;
+
+  /**
+   * Registers a provider and calls its initialize() if available.
+   */
+  async registerProvider(
+    provider: MemoryProvider,
+    config: Config,
+  ): Promise<void> {
+    this.providers.push(provider);
+    debugLogger.log(`[MemoryService] Provider '${provider.name}' registered`);
+    if (provider.initialize && this.ctx) {
+      try {
+        await provider.initialize(config, this.ctx);
+      } catch (e) {
+        debugLogger.error(
+          `[MemoryService] Provider '${provider.name}' initialize failed:`,
+          e,
+        );
+      }
+    }
+  }
+
+  /**
+   * Emits SessionStart to all providers that implement onSessionStart.
+   * Fire-and-forget — errors are isolated per provider.
+   */
+  async emitSessionStart(
+    payload: SessionStartPayload,
+    config: Config,
+  ): Promise<void> {
+    debugLogger.log(
+      `[MemoryService] SessionStart (session=${payload.sessionId}, resumed=${payload.resumed})`,
+    );
+    this.ctx = {
+      config,
+      signal: new AbortController().signal,
+      sessionId: payload.sessionId,
+      workspaceDir: payload.workspaceDir,
+    };
+    for (const p of this.providers) {
+      if (!p.onSessionStart) continue;
+      p.onSessionStart(payload, this.ctx).catch((e) => {
+        debugLogger.error(
+          `[MemoryService] Provider '${p.name}' onSessionStart failed:`,
+          e,
+        );
+      });
+    }
+  }
+
+  /**
+   * Emits UserInput to all providers that implement onUserInput.
+   * Collects inject results — this is the only synchronous event.
+   */
+  async emitUserInput(
+    payload: UserInputPayload,
+  ): Promise<MemoryEventResult | void> {
+    if (!this.ctx) return;
+    debugLogger.log(
+      `[MemoryService] UserInput (length=${payload.userMessage.length})`,
+    );
+    const injections: string[] = [];
+    for (const p of this.providers) {
+      if (!p.onUserInput) continue;
+      try {
+        const result = await p.onUserInput(payload, this.ctx);
+        if (result?.inject) injections.push(result.inject);
+      } catch (e) {
+        debugLogger.error(
+          `[MemoryService] Provider '${p.name}' onUserInput failed:`,
+          e,
+        );
+      }
+    }
+    return injections.length ? { inject: injections.join('\n\n') } : undefined;
+  }
+
+  /**
+   * Emits ContextEvicted to all providers that implement onContextEvicted.
+   * Fire-and-forget.
+   */
+  async emitContextEvicted(payload: ContextEvictedPayload): Promise<void> {
+    if (!this.ctx) return;
+    for (const p of this.providers) {
+      if (!p.onContextEvicted) continue;
+      p.onContextEvicted(payload, this.ctx).catch((e) => {
+        debugLogger.error(
+          `[MemoryService] Provider '${p.name}' onContextEvicted failed:`,
+          e,
+        );
+      });
+    }
+  }
+
+  /**
+   * Emits PreCompress to all providers that implement onPreCompress.
+   * Collects preservation hints — text that the compressor should
+   * retain in its summary. Returns combined text or empty string.
+   */
+  async emitPreCompress(payload: PreCompressPayload): Promise<string> {
+    if (!this.ctx) return '';
+    debugLogger.log(
+      `[MemoryService] PreCompress (messages=${payload.messages.length})`,
+    );
+    const hints: string[] = [];
+    for (const p of this.providers) {
+      if (!p.onPreCompress) continue;
+      try {
+        const result = await p.onPreCompress(payload, this.ctx);
+        if (result && result.trim()) hints.push(result.trim());
+      } catch (e) {
+        debugLogger.error(
+          `[MemoryService] Provider '${p.name}' onPreCompress failed:`,
+          e,
+        );
+      }
+    }
+    return hints.join('\n\n');
+  }
+
+  /**
+   * Emits TurnComplete to all providers that implement onTurnComplete.
+   * Fire-and-forget.
+   */
+  async emitTurnComplete(payload: TurnCompletePayload): Promise<void> {
+    if (!this.ctx) return;
+    debugLogger.log(`[MemoryService] TurnComplete (turn=${payload.turnIndex})`);
+    for (const p of this.providers) {
+      if (!p.onTurnComplete) continue;
+      p.onTurnComplete(payload, this.ctx).catch((e) => {
+        debugLogger.error(
+          `[MemoryService] Provider '${p.name}' onTurnComplete failed:`,
+          e,
+        );
+      });
+    }
+  }
+
+  /**
+   * Emits Idle to providers that implement onIdle AND whose
+   * idleThresholdMs has been exceeded.
+   */
+  async emitIdle(payload: IdlePayload): Promise<void> {
+    if (!this.ctx) return;
+    for (const p of this.providers) {
+      if (!p.onIdle) continue;
+      const threshold = p.idleThresholdMs ?? 0;
+      if (payload.idleDurationMs < threshold) continue;
+      p.onIdle(payload, this.ctx).catch((e) => {
+        debugLogger.error(
+          `[MemoryService] Provider '${p.name}' onIdle failed:`,
+          e,
+        );
+      });
+    }
+  }
+
+  /**
+   * Emits SessionEnd to all providers that implement onSessionEnd.
+   * Fire-and-forget.
+   */
+  async emitSessionEnd(payload: SessionEndPayload): Promise<void> {
+    if (!this.ctx) return;
+    debugLogger.log(
+      `[MemoryService] SessionEnd (reason=${payload.reason}, messages=${payload.messages.length})`,
+    );
+    for (const p of this.providers) {
+      if (!p.onSessionEnd) continue;
+      p.onSessionEnd(payload, this.ctx).catch((e) => {
+        debugLogger.error(
+          `[MemoryService] Provider '${p.name}' onSessionEnd failed:`,
+          e,
+        );
+      });
+    }
+  }
+
+  /**
+   * Shuts down all providers.
+   */
+  async shutdown(): Promise<void> {
+    debugLogger.log(
+      `[MemoryService] Shutdown (${this.providers.length} provider(s))`,
+    );
+    for (const p of this.providers) {
+      if (!p.shutdown) continue;
+      try {
+        await p.shutdown();
+      } catch (e) {
+        debugLogger.error(
+          `[MemoryService] Provider '${p.name}' shutdown failed:`,
+          e,
+        );
+      }
+    }
+  }
+
+  /**
+   * Returns all registered providers (for testing/introspection).
+   */
+  getProviders(): readonly MemoryProvider[] {
+    return this.providers;
+  }
+}
+
+/**
+ * Creates a MemoryService with the DefaultMemoryProvider pre-registered.
+ * This is the standard factory for production use.
+ */
+export async function createMemoryService(
+  config: Config,
+): Promise<MemoryService> {
+  const service = new MemoryService();
+  await service.registerProvider(new DefaultMemoryProvider(), config);
+  return service;
+}
+
+/**
+ * Backward-compatible entry point.
+ *
+ * Directly runs the skill extraction logic. This preserves the
+ * existing awaiting behavior used by AppContainer.tsx.
+ *
+ * @deprecated Use createMemoryService() + emitSessionStart() instead.
+ */
+export async function startMemoryService(config: Config): Promise<void> {
+  await startSkillExtraction(config);
 }

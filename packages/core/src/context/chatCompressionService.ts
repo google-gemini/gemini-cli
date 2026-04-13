@@ -243,6 +243,7 @@ export class ChatCompressionService {
     config: Config,
     hasFailedCompressionAttempt: boolean,
     abortSignal?: AbortSignal,
+    memoryPreserveHints?: string,
   ): Promise<{ newHistory: Content[] | null; info: ChatCompressionInfo }> {
     const curatedHistory = chat.getHistory(true);
 
@@ -356,6 +357,10 @@ export class ChatCompressionService {
       ? 'A previous <state_snapshot> exists in the history. You MUST integrate all still-relevant information from that snapshot into the new one, updating it with the more recent events. Do not lose established constraints or critical knowledge.'
       : 'Generate a new <state_snapshot> based on the provided history.';
 
+    const preserveBlock = memoryPreserveHints?.trim()
+      ? `\n\nIMPORTANT — The following facts were identified by memory providers as critical to preserve in the snapshot:\n${memoryPreserveHints}`
+      : '';
+
     const summaryResponse = await config.getBaseLlmClient().generateContent({
       modelConfigKey: { model: modelStringToModelConfigAlias(model) },
       contents: [
@@ -364,7 +369,7 @@ export class ChatCompressionService {
           role: 'user',
           parts: [
             {
-              text: `${anchorInstruction}\n\nFirst, reason in your scratchpad. Then, generate the updated <state_snapshot>.`,
+              text: `${anchorInstruction}${preserveBlock}\n\nFirst, reason in your scratchpad. Then, generate the updated <state_snapshot>.`,
             },
           ],
         },

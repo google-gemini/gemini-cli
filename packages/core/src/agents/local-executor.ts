@@ -652,6 +652,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
             break;
           }
 
+          const turnIndex = turnCounter;
           const turnResult = await this.executeTurn(
             chat,
             currentMessage,
@@ -660,6 +661,30 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
             deadlineTimer.signal,
             onWaitingForConfirmation,
           );
+
+          // Notify memory providers that a turn completed.
+          const memoryService = this.context.config.getMemoryService();
+          if (memoryService) {
+            const userText = (currentMessage.parts ?? [])
+              .filter((p): p is { text: string } => 'text' in p)
+              .map((p) => p.text)
+              .join('\n');
+            const history = chat.getHistory();
+            const lastModel = [...history]
+              .reverse()
+              .find((c) => c.role === 'model');
+            const assistantText = (lastModel?.parts ?? [])
+              .filter((p): p is { text: string } => 'text' in p)
+              .map((p) => p.text)
+              .join('\n');
+            memoryService
+              .emitTurnComplete({
+                turnIndex,
+                userContent: userText,
+                assistantContent: assistantText,
+              })
+              .catch(() => {});
+          }
 
           if (turnResult.status === 'stop') {
             terminateReason = turnResult.terminateReason;
@@ -865,6 +890,19 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
   ): Promise<void> {
     const model = this.definition.modelConfig.model ?? DEFAULT_GEMINI_MODEL;
 
+    // Collect preservation hints from memory providers before compression.
+    let memoryPreserveHints = '';
+    const memoryService = this.context.config.getMemoryService();
+    if (memoryService) {
+      try {
+        memoryPreserveHints = await memoryService.emitPreCompress({
+          messages: [...chat.getHistory()],
+        });
+      } catch {
+        // Best-effort — don't block compression.
+      }
+    }
+
     const { newHistory, info } = await this.compressionService.compress(
       chat,
       prompt_id,
@@ -873,6 +911,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       this.context.config,
       this.hasFailedCompressionAttempt,
       abortSignal,
+      memoryPreserveHints,
     );
 
     if (

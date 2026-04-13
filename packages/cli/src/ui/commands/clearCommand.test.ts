@@ -45,6 +45,7 @@ describe('clearCommand', () => {
               fireSessionEndEvent: vi.fn().mockResolvedValue(undefined),
               fireSessionStartEvent: vi.fn().mockResolvedValue(undefined),
             }),
+            getMemoryService: vi.fn().mockReturnValue(undefined),
             injectionService: {
               clear: mockHintClear,
             },

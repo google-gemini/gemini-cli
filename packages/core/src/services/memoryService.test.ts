@@ -87,6 +87,7 @@ vi.mock('../utils/debugLogger.js', () => ({
     debug: vi.fn(),
     log: vi.fn(),
     warn: vi.fn(),
+    error: vi.fn(),
   },
 }));
 
@@ -1321,6 +1322,780 @@ describe('memoryService', () => {
       await startMemoryService(mockConfig);
 
       expect(coreEvents.emitFeedback).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('MemoryService', () => {
+    // Helper to create a minimal mock MemoryProvider
+    function createMockProvider(
+      overrides: Partial<import('./memoryProvider.js').MemoryProvider> & {
+        name: string;
+      },
+    ): import('./memoryProvider.js').MemoryProvider {
+      return { ...overrides };
+    }
+
+    // Minimal Config mock reusable across tests
+    function createMockConfig() {
+      return {
+        storage: {
+          getProjectMemoryDir: vi.fn().mockReturnValue('/tmp/fake-memory'),
+          getProjectMemoryTempDir: vi.fn().mockReturnValue('/tmp/fake-memory'),
+          getProjectSkillsMemoryDir: vi
+            .fn()
+            .mockReturnValue('/tmp/fake-skills'),
+          getProjectTempDir: vi.fn().mockReturnValue('/tmp/fake-temp'),
+        },
+        getToolRegistry: vi.fn(),
+        getMessageBus: vi.fn(),
+        getGeminiClient: vi.fn(),
+        sandboxManager: undefined,
+      } as unknown as import('../config/config.js').Config;
+    }
+
+    describe('registerProvider', () => {
+      it('adds provider to the providers list', async () => {
+        const { MemoryService } = await import('./memoryService.js');
+        const service = new MemoryService();
+        const provider = createMockProvider({ name: 'test-provider' });
+
+        await service.registerProvider(provider, createMockConfig());
+
+        expect(service.getProviders()).toContain(provider);
+      });
+
+      it('calls initialize if ctx has been set', async () => {
+        const { MemoryService } = await import('./memoryService.js');
+        const service = new MemoryService();
+        const config = createMockConfig();
+
+        // Set ctx by emitting sessionStart first
+        await service.emitSessionStart(
+          { sessionId: 's1', resumed: false, workspaceDir: '/tmp' },
+          config,
+        );
+
+        const initializeFn = vi.fn().mockResolvedValue(undefined);
+        const provider = createMockProvider({
+          name: 'late-provider',
+          initialize: initializeFn,
+        });
+
+        await service.registerProvider(provider, config);
+
+        expect(initializeFn).toHaveBeenCalledWith(
+          config,
+          expect.objectContaining({ sessionId: 's1' }),
+        );
+      });
+
+      it('does not call initialize if ctx is not set', async () => {
+        const { MemoryService } = await import('./memoryService.js');
+        const service = new MemoryService();
+
+        const initializeFn = vi.fn().mockResolvedValue(undefined);
+        const provider = createMockProvider({
+          name: 'early-provider',
+          initialize: initializeFn,
+        });
+
+        await service.registerProvider(provider, createMockConfig());
+
+        expect(initializeFn).not.toHaveBeenCalled();
+      });
+
+      it('handles initialize errors without throwing', async () => {
+        const { MemoryService } = await import('./memoryService.js');
+        const service = new MemoryService();
+        const config = createMockConfig();
+
+        await service.emitSessionStart(
+          { sessionId: 's1', resumed: false, workspaceDir: '/tmp' },
+          config,
+        );
+
+        const provider = createMockProvider({
+          name: 'bad-init-provider',
+          initialize: vi.fn().mockRejectedValue(new Error('init boom')),
+        });
+
+        await expect(
+          service.registerProvider(provider, config),
+        ).resolves.not.toThrow();
+        expect(service.getProviders()).toContain(provider);
+      });
+    });
+
+    describe('emitSessionStart', () => {
+      it('dispatches to providers that implement onSessionStart', async () => {
+        const { MemoryService } = await import('./memoryService.js');
+        const service = new MemoryService();
+        const config = createMockConfig();
+
+        const onSessionStart = vi.fn().mockResolvedValue(undefined);
+        const provider = createMockProvider({
+          name: 'start-provider',
+          onSessionStart,
+        });
+        await service.registerProvider(provider, config);
+
+        const payload = {
+          sessionId: 'sess-1',
+          resumed: false,
+          workspaceDir: '/workspace',
+        };
+        await service.emitSessionStart(payload, config);
+
+        // Fire-and-forget — allow microtask to settle
+        await new Promise((r) => setTimeout(r, 10));
+
+        expect(onSessionStart).toHaveBeenCalledWith(
+          payload,
+          expect.objectContaining({
+            sessionId: 'sess-1',
+            workspaceDir: '/workspace',
+            config,
+          }),
+        );
+      });
+
+      it('sets context for subsequent events', async () => {
+        const { MemoryService } = await import('./memoryService.js');
+        const service = new MemoryService();
+        const config = createMockConfig();
+
+        // Before emitSessionStart, emitUserInput should no-op
+        const result = await service.emitUserInput({
+          userMessage: 'hello',
+        });
+        expect(result).toBeUndefined();
+
+        // After emitSessionStart, events should dispatch
+        await service.emitSessionStart(
+          { sessionId: 's2', resumed: false, workspaceDir: '/tmp' },
+          config,
+        );
+
+        const onUserInput = vi.fn().mockResolvedValue({ inject: 'injected' });
+        const provider = createMockProvider({
+          name: 'input-provider',
+          onUserInput,
+        });
+        await service.registerProvider(provider, config);
+
+        const inputResult = await service.emitUserInput({
+          userMessage: 'test',
+        });
+        expect(inputResult).toEqual({ inject: 'injected' });
+      });
+
+      it('handles errors per-provider without throwing', async () => {
+        const { MemoryService } = await import('./memoryService.js');
+        const service = new MemoryService();
+        const config = createMockConfig();
+
+        const badProvider = createMockProvider({
+          name: 'bad-start',
+          onSessionStart: vi.fn().mockRejectedValue(new Error('start boom')),
+        });
+        const goodProvider = createMockProvider({
+          name: 'good-start',
+          onSessionStart: vi.fn().mockResolvedValue(undefined),
+        });
+
+        await service.registerProvider(badProvider, config);
+        await service.registerProvider(goodProvider, config);
+
+        const payload = {
+          sessionId: 'sess-err',
+          resumed: false,
+          workspaceDir: '/tmp',
+        };
+        await expect(
+          service.emitSessionStart(payload, config),
+        ).resolves.not.toThrow();
+
+        await new Promise((r) => setTimeout(r, 10));
+        expect(goodProvider.onSessionStart).toHaveBeenCalled();
+      });
+
+      it('skips providers that do not implement onSessionStart', async () => {
+        const { MemoryService } = await import('./memoryService.js');
+        const service = new MemoryService();
+        const config = createMockConfig();
+
+        const provider = createMockProvider({ name: 'no-start' });
+        await service.registerProvider(provider, config);
+
+        await expect(
+          service.emitSessionStart(
+            { sessionId: 's3', resumed: false, workspaceDir: '/tmp' },
+            config,
+          ),
+        ).resolves.not.toThrow();
+      });
+    });
+
+    describe('emitUserInput', () => {
+      it('collects inject strings from multiple providers', async () => {
+        const { MemoryService } = await import('./memoryService.js');
+        const service = new MemoryService();
+        const config = createMockConfig();
+
+        const provider1 = createMockProvider({
+          name: 'inject-1',
+          onUserInput: vi.fn().mockResolvedValue({ inject: 'context-A' }),
+        });
+        const provider2 = createMockProvider({
+          name: 'inject-2',
+          onUserInput: vi.fn().mockResolvedValue({ inject: 'context-B' }),
+        });
+        await service.registerProvider(provider1, config);
+        await service.registerProvider(provider2, config);
+
+        await service.emitSessionStart(
+          { sessionId: 's1', resumed: false, workspaceDir: '/tmp' },
+          config,
+        );
+
+        const result = await service.emitUserInput({
+          userMessage: 'hello',
+        });
+
+        expect(result).toEqual({
+          inject: 'context-A\n\ncontext-B',
+        });
+      });
+
+      it('returns undefined when no providers return inject', async () => {
+        const { MemoryService } = await import('./memoryService.js');
+        const service = new MemoryService();
+        const config = createMockConfig();
+
+        const provider = createMockProvider({
+          name: 'no-inject',
+          onUserInput: vi.fn().mockResolvedValue(undefined),
+        });
+        await service.registerProvider(provider, config);
+
+        await service.emitSessionStart(
+          { sessionId: 's1', resumed: false, workspaceDir: '/tmp' },
+          config,
+        );
+
+        const result = await service.emitUserInput({
+          userMessage: 'hello',
+        });
+
+        expect(result).toBeUndefined();
+      });
+
+      it('returns undefined when ctx is not set', async () => {
+        const { MemoryService } = await import('./memoryService.js');
+        const service = new MemoryService();
+
+        const result = await service.emitUserInput({
+          userMessage: 'no ctx',
+        });
+
+        expect(result).toBeUndefined();
+      });
+
+      it('handles errors from one provider and still collects from others', async () => {
+        const { MemoryService } = await import('./memoryService.js');
+        const service = new MemoryService();
+        const config = createMockConfig();
+
+        const badProvider = createMockProvider({
+          name: 'bad-input',
+          onUserInput: vi.fn().mockRejectedValue(new Error('input boom')),
+        });
+        const goodProvider = createMockProvider({
+          name: 'good-input',
+          onUserInput: vi.fn().mockResolvedValue({ inject: 'good-context' }),
+        });
+        await service.registerProvider(badProvider, config);
+        await service.registerProvider(goodProvider, config);
+
+        await service.emitSessionStart(
+          { sessionId: 's1', resumed: false, workspaceDir: '/tmp' },
+          config,
+        );
+
+        const result = await service.emitUserInput({
+          userMessage: 'test',
+        });
+
+        expect(result).toEqual({ inject: 'good-context' });
+      });
+    });
+
+    describe('emitContextEvicted', () => {
+      it('dispatches to providers that implement onContextEvicted', async () => {
+        const { MemoryService } = await import('./memoryService.js');
+        const service = new MemoryService();
+        const config = createMockConfig();
+
+        const onContextEvicted = vi.fn().mockResolvedValue(undefined);
+        const provider = createMockProvider({
+          name: 'evict-provider',
+          onContextEvicted,
+        });
+        await service.registerProvider(provider, config);
+
+        await service.emitSessionStart(
+          { sessionId: 's1', resumed: false, workspaceDir: '/tmp' },
+          config,
+        );
+
+        const payload = {
+          reason: 'compress' as const,
+          evictedTurns: [],
+          summary: 'compressed',
+        };
+        await service.emitContextEvicted(payload);
+
+        await new Promise((r) => setTimeout(r, 10));
+        expect(onContextEvicted).toHaveBeenCalledWith(
+          payload,
+          expect.objectContaining({ sessionId: 's1' }),
+        );
+      });
+
+      it('no-ops when ctx is not set', async () => {
+        const { MemoryService } = await import('./memoryService.js');
+        const service = new MemoryService();
+
+        const onContextEvicted = vi.fn().mockResolvedValue(undefined);
+        const provider = createMockProvider({
+          name: 'evict-noop',
+          onContextEvicted,
+        });
+        await service.registerProvider(provider, createMockConfig());
+
+        await service.emitContextEvicted({
+          reason: 'truncate',
+          evictedTurns: [],
+        });
+
+        expect(onContextEvicted).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('emitPreCompress', () => {
+      it('collects preservation hints from multiple providers', async () => {
+        const { MemoryService } = await import('./memoryService.js');
+        const service = new MemoryService();
+        const config = createMockConfig();
+
+        const provider1 = createMockProvider({
+          name: 'hint-1',
+          onPreCompress: vi.fn().mockResolvedValue('User prefers TypeScript'),
+        });
+        const provider2 = createMockProvider({
+          name: 'hint-2',
+          onPreCompress: vi.fn().mockResolvedValue('Project uses Vitest'),
+        });
+        await service.registerProvider(provider1, config);
+        await service.registerProvider(provider2, config);
+
+        await service.emitSessionStart(
+          { sessionId: 'test', resumed: false, workspaceDir: '/tmp' },
+          config,
+        );
+
+        const result = await service.emitPreCompress({
+          messages: [{ role: 'user', parts: [{ text: 'hello' }] }],
+        });
+
+        expect(result).toBe('User prefers TypeScript\n\nProject uses Vitest');
+      });
+
+      it('returns empty string when no providers have hints', async () => {
+        const { MemoryService } = await import('./memoryService.js');
+        const service = new MemoryService();
+        const config = createMockConfig();
+
+        const provider = createMockProvider({
+          name: 'no-hint',
+          onPreCompress: vi.fn().mockResolvedValue(undefined),
+        });
+        await service.registerProvider(provider, config);
+
+        await service.emitSessionStart(
+          { sessionId: 'test', resumed: false, workspaceDir: '/tmp' },
+          config,
+        );
+
+        const result = await service.emitPreCompress({ messages: [] });
+        expect(result).toBe('');
+      });
+
+      it('returns empty string when ctx is not set', async () => {
+        const { MemoryService } = await import('./memoryService.js');
+        const service = new MemoryService();
+
+        const result = await service.emitPreCompress({ messages: [] });
+        expect(result).toBe('');
+      });
+
+      it('handles errors from one provider and still collects from others', async () => {
+        const { MemoryService } = await import('./memoryService.js');
+        const service = new MemoryService();
+        const config = createMockConfig();
+
+        const provider1 = createMockProvider({
+          name: 'error-provider',
+          onPreCompress: vi.fn().mockRejectedValue(new Error('boom')),
+        });
+        const provider2 = createMockProvider({
+          name: 'good-provider',
+          onPreCompress: vi.fn().mockResolvedValue('Keep this fact'),
+        });
+        await service.registerProvider(provider1, config);
+        await service.registerProvider(provider2, config);
+
+        await service.emitSessionStart(
+          { sessionId: 'test', resumed: false, workspaceDir: '/tmp' },
+          config,
+        );
+
+        const result = await service.emitPreCompress({ messages: [] });
+        expect(result).toBe('Keep this fact');
+      });
+    });
+
+    describe('emitTurnComplete', () => {
+      it('dispatches fire-and-forget to providers', async () => {
+        const { MemoryService } = await import('./memoryService.js');
+        const service = new MemoryService();
+        const config = createMockConfig();
+
+        const onTurnComplete = vi.fn().mockResolvedValue(undefined);
+        const provider = createMockProvider({
+          name: 'turn-provider',
+          onTurnComplete,
+        });
+        await service.registerProvider(provider, config);
+
+        await service.emitSessionStart(
+          { sessionId: 's1', resumed: false, workspaceDir: '/tmp' },
+          config,
+        );
+
+        const payload = {
+          turnIndex: 1,
+          userContent: 'user said',
+          assistantContent: 'assistant said',
+        };
+        await service.emitTurnComplete(payload);
+
+        await new Promise((r) => setTimeout(r, 10));
+        expect(onTurnComplete).toHaveBeenCalledWith(
+          payload,
+          expect.objectContaining({ sessionId: 's1' }),
+        );
+      });
+
+      it('no-ops when ctx is not set', async () => {
+        const { MemoryService } = await import('./memoryService.js');
+        const service = new MemoryService();
+
+        const onTurnComplete = vi.fn().mockResolvedValue(undefined);
+        const provider = createMockProvider({
+          name: 'turn-noop',
+          onTurnComplete,
+        });
+        await service.registerProvider(provider, createMockConfig());
+
+        await service.emitTurnComplete({
+          turnIndex: 0,
+          userContent: 'x',
+          assistantContent: 'y',
+        });
+
+        expect(onTurnComplete).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('emitIdle', () => {
+      it('dispatches to provider when idleDurationMs >= threshold', async () => {
+        const { MemoryService } = await import('./memoryService.js');
+        const service = new MemoryService();
+        const config = createMockConfig();
+
+        const onIdle = vi.fn().mockResolvedValue(undefined);
+        const provider = createMockProvider({
+          name: 'idle-provider',
+          onIdle,
+          idleThresholdMs: 5000,
+        });
+        await service.registerProvider(provider, config);
+
+        await service.emitSessionStart(
+          { sessionId: 's1', resumed: false, workspaceDir: '/tmp' },
+          config,
+        );
+
+        await service.emitIdle({ idleDurationMs: 5000 });
+
+        await new Promise((r) => setTimeout(r, 10));
+        expect(onIdle).toHaveBeenCalledWith(
+          { idleDurationMs: 5000 },
+          expect.objectContaining({ sessionId: 's1' }),
+        );
+      });
+
+      it('skips provider when idleDurationMs < threshold', async () => {
+        const { MemoryService } = await import('./memoryService.js');
+        const service = new MemoryService();
+        const config = createMockConfig();
+
+        const onIdle = vi.fn().mockResolvedValue(undefined);
+        const provider = createMockProvider({
+          name: 'idle-skip',
+          onIdle,
+          idleThresholdMs: 10000,
+        });
+        await service.registerProvider(provider, config);
+
+        await service.emitSessionStart(
+          { sessionId: 's1', resumed: false, workspaceDir: '/tmp' },
+          config,
+        );
+
+        await service.emitIdle({ idleDurationMs: 5000 });
+
+        await new Promise((r) => setTimeout(r, 10));
+        expect(onIdle).not.toHaveBeenCalled();
+      });
+
+      it('treats missing idleThresholdMs as 0 (always fire)', async () => {
+        const { MemoryService } = await import('./memoryService.js');
+        const service = new MemoryService();
+        const config = createMockConfig();
+
+        const onIdle = vi.fn().mockResolvedValue(undefined);
+        const provider = createMockProvider({
+          name: 'idle-default',
+          onIdle,
+          // no idleThresholdMs — defaults to 0
+        });
+        await service.registerProvider(provider, config);
+
+        await service.emitSessionStart(
+          { sessionId: 's1', resumed: false, workspaceDir: '/tmp' },
+          config,
+        );
+
+        await service.emitIdle({ idleDurationMs: 1 });
+
+        await new Promise((r) => setTimeout(r, 10));
+        expect(onIdle).toHaveBeenCalled();
+      });
+
+      it('no-ops when ctx is not set', async () => {
+        const { MemoryService } = await import('./memoryService.js');
+        const service = new MemoryService();
+
+        const onIdle = vi.fn().mockResolvedValue(undefined);
+        const provider = createMockProvider({
+          name: 'idle-noop',
+          onIdle,
+        });
+        await service.registerProvider(provider, createMockConfig());
+
+        await service.emitIdle({ idleDurationMs: 99999 });
+
+        expect(onIdle).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('emitSessionEnd', () => {
+      it('dispatches fire-and-forget to providers', async () => {
+        const { MemoryService } = await import('./memoryService.js');
+        const service = new MemoryService();
+        const config = createMockConfig();
+
+        const onSessionEnd = vi.fn().mockResolvedValue(undefined);
+        const provider = createMockProvider({
+          name: 'end-provider',
+          onSessionEnd,
+        });
+        await service.registerProvider(provider, config);
+
+        await service.emitSessionStart(
+          { sessionId: 's1', resumed: false, workspaceDir: '/tmp' },
+          config,
+        );
+
+        const payload = { messages: [], reason: 'exit' as const };
+        await service.emitSessionEnd(payload);
+
+        await new Promise((r) => setTimeout(r, 10));
+        expect(onSessionEnd).toHaveBeenCalledWith(
+          payload,
+          expect.objectContaining({ sessionId: 's1' }),
+        );
+      });
+
+      it('no-ops when ctx is not set', async () => {
+        const { MemoryService } = await import('./memoryService.js');
+        const service = new MemoryService();
+
+        const onSessionEnd = vi.fn().mockResolvedValue(undefined);
+        const provider = createMockProvider({
+          name: 'end-noop',
+          onSessionEnd,
+        });
+        await service.registerProvider(provider, createMockConfig());
+
+        await service.emitSessionEnd({ messages: [], reason: 'clear' });
+
+        expect(onSessionEnd).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('shutdown', () => {
+      it('calls shutdown on all providers that implement it', async () => {
+        const { MemoryService } = await import('./memoryService.js');
+        const service = new MemoryService();
+        const config = createMockConfig();
+
+        const shutdown1 = vi.fn().mockResolvedValue(undefined);
+        const shutdown2 = vi.fn().mockResolvedValue(undefined);
+        const provider1 = createMockProvider({
+          name: 'shut-1',
+          shutdown: shutdown1,
+        });
+        const provider2 = createMockProvider({
+          name: 'shut-2',
+          shutdown: shutdown2,
+        });
+        await service.registerProvider(provider1, config);
+        await service.registerProvider(provider2, config);
+
+        await service.shutdown();
+
+        expect(shutdown1).toHaveBeenCalled();
+        expect(shutdown2).toHaveBeenCalled();
+      });
+
+      it('handles shutdown errors without throwing', async () => {
+        const { MemoryService } = await import('./memoryService.js');
+        const service = new MemoryService();
+        const config = createMockConfig();
+
+        const provider = createMockProvider({
+          name: 'bad-shutdown',
+          shutdown: vi.fn().mockRejectedValue(new Error('shutdown boom')),
+        });
+        await service.registerProvider(provider, config);
+
+        await expect(service.shutdown()).resolves.not.toThrow();
+      });
+
+      it('skips providers without a shutdown method', async () => {
+        const { MemoryService } = await import('./memoryService.js');
+        const service = new MemoryService();
+        const config = createMockConfig();
+
+        const provider = createMockProvider({ name: 'no-shutdown' });
+        await service.registerProvider(provider, config);
+
+        await expect(service.shutdown()).resolves.not.toThrow();
+      });
+    });
+
+    describe('getProviders', () => {
+      it('returns empty array initially', async () => {
+        const { MemoryService } = await import('./memoryService.js');
+        const service = new MemoryService();
+
+        expect(service.getProviders()).toEqual([]);
+      });
+
+      it('returns all registered providers in order', async () => {
+        const { MemoryService } = await import('./memoryService.js');
+        const service = new MemoryService();
+        const config = createMockConfig();
+
+        const p1 = createMockProvider({ name: 'p1' });
+        const p2 = createMockProvider({ name: 'p2' });
+        await service.registerProvider(p1, config);
+        await service.registerProvider(p2, config);
+
+        const providers = service.getProviders();
+        expect(providers).toHaveLength(2);
+        expect(providers[0].name).toBe('p1');
+        expect(providers[1].name).toBe('p2');
+      });
+    });
+  });
+
+  describe('createMemoryService', () => {
+    it('creates a service with DefaultMemoryProvider pre-registered', async () => {
+      const { createMemoryService } = await import('./memoryService.js');
+      const config = {
+        storage: {
+          getProjectMemoryDir: vi.fn().mockReturnValue('/tmp/fake-memory'),
+          getProjectMemoryTempDir: vi.fn().mockReturnValue('/tmp/fake-memory'),
+          getProjectSkillsMemoryDir: vi
+            .fn()
+            .mockReturnValue('/tmp/fake-skills'),
+          getProjectTempDir: vi.fn().mockReturnValue('/tmp/fake-temp'),
+        },
+        getToolRegistry: vi.fn(),
+        getMessageBus: vi.fn(),
+        getGeminiClient: vi.fn(),
+        sandboxManager: undefined,
+      } as unknown as Parameters<typeof createMemoryService>[0];
+
+      const service = await createMemoryService(config);
+
+      const providers = service.getProviders();
+      expect(providers).toHaveLength(1);
+      expect(providers[0].name).toBe('default');
+    });
+  });
+
+  describe('startMemoryService backward compat', () => {
+    it('calls startSkillExtraction via the legacy entry point', async () => {
+      const { startMemoryService } = await import('./memoryService.js');
+
+      // startMemoryService delegates to startSkillExtraction which
+      // tries to acquire a lock. We just verify it does not throw when
+      // the lock is already held (it gracefully skips).
+      const memoryDir = path.join(tmpDir, 'compat-memory');
+      const skillsDir = path.join(tmpDir, 'compat-skills');
+      const projectTempDir = path.join(tmpDir, 'compat-temp');
+      await fs.mkdir(memoryDir, { recursive: true });
+
+      // Pre-acquire lock so it skips extraction
+      const lockPath = path.join(memoryDir, '.extraction.lock');
+      await fs.writeFile(
+        lockPath,
+        JSON.stringify({
+          pid: process.pid,
+          startedAt: new Date().toISOString(),
+        }),
+      );
+
+      const mockConfig = {
+        storage: {
+          getProjectMemoryDir: vi.fn().mockReturnValue(memoryDir),
+          getProjectMemoryTempDir: vi.fn().mockReturnValue(memoryDir),
+          getProjectSkillsMemoryDir: vi.fn().mockReturnValue(skillsDir),
+          getProjectTempDir: vi.fn().mockReturnValue(projectTempDir),
+        },
+        getToolRegistry: vi.fn(),
+        getMessageBus: vi.fn(),
+        getGeminiClient: vi.fn(),
+        sandboxManager: undefined,
+      } as unknown as Parameters<typeof startMemoryService>[0];
+
+      // Should not throw — gracefully skips since lock is held
+      await expect(startMemoryService(mockConfig)).resolves.not.toThrow();
     });
   });
 });

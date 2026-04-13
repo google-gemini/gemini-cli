@@ -364,6 +364,7 @@ describe('useGeminiStream', () => {
     })),
     getIdeMode: vi.fn(() => false),
     getEnableHooks: vi.fn(() => false),
+    getMemoryService: vi.fn(() => undefined),
   } as unknown as Config;
 
   beforeEach(() => {

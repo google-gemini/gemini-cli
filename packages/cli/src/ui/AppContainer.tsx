@@ -92,7 +92,7 @@ import {
   ApiKeyUpdatedEvent,
   LegacyAgentProtocol,
   type InjectionSource,
-  startMemoryService,
+  createMemoryService,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import process from 'node:process';
@@ -482,11 +482,37 @@ export const AppContainer = (props: AppContainerProps) => {
       setConfigInitialized(true);
       startupProfiler.flush(config);
 
-      // Fire-and-forget memory service (skill extraction from past sessions)
+      // Initialize the pluggable memory service and emit SessionStart.
       if (config.isMemoryManagerEnabled()) {
-        startMemoryService(config).catch((e) => {
-          debugLogger.error('Failed to start memory service:', e);
-        });
+        createMemoryService(config)
+          .then((ms) => {
+            config.setMemoryService(ms);
+            registerCleanup(async () => {
+              try {
+                const client = config.getGeminiClient();
+                if (client?.isInitialized()) {
+                  await ms.emitSessionEnd({
+                    messages: [...client.getHistory()],
+                    reason: 'exit',
+                  });
+                }
+              } catch {
+                // Best-effort during shutdown.
+              }
+              await ms.shutdown();
+            });
+            return ms.emitSessionStart(
+              {
+                sessionId: config.getSessionId(),
+                resumed: !!resumedSessionData,
+                workspaceDir: config.getProjectRoot(),
+              },
+              config,
+            );
+          })
+          .catch((e) => {
+            debugLogger.error('Failed to start memory service:', e);
+          });
       }
 
       const sessionStartSource = resumedSessionData

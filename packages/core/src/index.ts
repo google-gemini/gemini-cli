@@ -142,9 +142,25 @@ export * from './sandbox/windows/WindowsSandboxManager.js';
 export * from './services/sessionSummaryUtils.js';
 export {
   startMemoryService,
+  createMemoryService,
+  MemoryService,
+  startSkillExtraction,
   validatePatches,
 } from './services/memoryService.js';
 export { isProjectSkillPatchTarget } from './services/memoryPatchUtils.js';
+export type {
+  MemoryProvider,
+  MemoryProviderContext,
+  MemoryEventResult,
+  SessionStartPayload,
+  UserInputPayload,
+  ContextEvictedPayload,
+  PreCompressPayload,
+  TurnCompletePayload,
+  IdlePayload,
+  SessionEndPayload,
+} from './services/memoryProvider.js';
+export { DefaultMemoryProvider } from './services/defaultMemoryProvider.js';
 export * from './context/memoryContextManager.js';
 export * from './services/trackerService.js';
 export * from './services/trackerTypes.js';

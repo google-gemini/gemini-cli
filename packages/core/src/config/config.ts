@@ -147,6 +147,7 @@ import {
   type SafetyCheckerRule,
 } from '../policy/types.js';
 import { HookSystem } from '../hooks/index.js';
+import type { MemoryService } from '../services/memoryService.js';
 import type {
   UserTierId,
   GeminiUserTier,
@@ -918,6 +919,7 @@ export class Config implements McpContext, AgentLoopContext {
   private experiments: Experiments | undefined;
   private experimentsPromise: Promise<Experiments | undefined> | undefined;
   private hookSystem?: HookSystem;
+  private memoryService?: MemoryService;
   private readonly onModelChange: ((model: string) => void) | undefined;
   private readonly onReload:
     | (() => Promise<{
@@ -3646,6 +3648,20 @@ export class Config implements McpContext, AgentLoopContext {
    */
   getHookSystem(): HookSystem | undefined {
     return this.hookSystem;
+  }
+
+  /**
+   * Get the memory service instance
+   */
+  getMemoryService(): MemoryService | undefined {
+    return this.memoryService;
+  }
+
+  /**
+   * Set the memory service instance
+   */
+  setMemoryService(service: MemoryService): void {
+    this.memoryService = service;
   }
 
   /**

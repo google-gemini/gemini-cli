@@ -244,6 +244,7 @@ export const useGeminiStream = (
   const lowVerbosityFailureNoteShownRef = useRef(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const turnCancelledRef = useRef(false);
+  const turnCountRef = useRef(0);
   const activeQueryIdRef = useRef<string | null>(null);
   const previousApprovalModeRef = useRef<ApprovalMode>(
     config.getApprovalMode(),
@@ -1632,6 +1633,32 @@ export const useGeminiStream = (
             lastQueryRef.current = queryToSend;
             lastPromptIdRef.current = prompt_id!;
 
+            // Notify memory providers and collect injections.
+            if (!options?.isContinuation) {
+              const memoryService = config.getMemoryService();
+              if (memoryService) {
+                try {
+                  const parts = Array.isArray(queryToSend)
+                    ? queryToSend
+                    : [queryToSend];
+                  const userText = parts
+                    .map((p) =>
+                      typeof p === 'string'
+                        ? p
+                        : 'text' in p
+                          ? (p.text ?? '')
+                          : '',
+                    )
+                    .join('\n');
+                  await memoryService.emitUserInput({
+                    userMessage: userText,
+                  });
+                } catch {
+                  // Best-effort — don't block the query.
+                }
+              }
+            }
+
             try {
               const stream = geminiClient.sendMessageStream(
                 queryToSend,
@@ -1649,6 +1676,28 @@ export const useGeminiStream = (
 
               if (processingStatus === StreamProcessingStatus.UserCancelled) {
                 return;
+              }
+
+              // Notify memory providers that a turn completed.
+              if (!options?.isContinuation) {
+                const memSvc = config.getMemoryService();
+                if (memSvc) {
+                  const assistantText =
+                    (
+                      pendingHistoryItemRef.current as
+                        | { text?: string }
+                        | null
+                        | undefined
+                    )?.text ?? '';
+                  memSvc
+                    .emitTurnComplete({
+                      turnIndex: turnCountRef.current++,
+                      userContent:
+                        typeof queryToSend === 'string' ? queryToSend : '',
+                      assistantContent: assistantText,
+                    })
+                    .catch(() => {});
+                }
               }
 
               if (pendingHistoryItemRef.current) {

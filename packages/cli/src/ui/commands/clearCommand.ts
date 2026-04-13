@@ -30,6 +30,15 @@ export const clearCommand: SlashCommand = {
       await hookSystem.fireSessionEndEvent(SessionEndReason.Clear);
     }
 
+    // Notify memory providers that the session is ending.
+    const memoryService = config?.getMemoryService();
+    if (memoryService && geminiClient?.isInitialized()) {
+      await memoryService.emitSessionEnd({
+        messages: [...geminiClient.getHistory()],
+        reason: 'clear',
+      });
+    }
+
     // Reset user steering hints
     config?.injectionService.clear();
 
