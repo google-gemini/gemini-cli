@@ -4,10 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import * as path from 'node:path';
-import {
-  type SandboxPermissions,
-  type SandboxRequest,
-} from '../../services/sandboxManager.js';
+import { type SandboxRequest } from '../../services/sandboxManager.js';
 import { isValidPathString } from '../../utils/paths.js';
 
 /**
@@ -47,38 +44,34 @@ function validatePaths(
   return true;
 }
 
-export function handleReadWriteCommands(
+export function validateVirtualCommandPaths(
   req: SandboxRequest,
-  mergedAdditional: SandboxPermissions,
   workspace: string,
   allowedPaths: string[] = [],
-): { command: string; args: string[] } {
+): void {
+  if (req.command === '__read' || req.command === '__write') {
+    if (req.args.length > 0) {
+      if (!validatePaths(req.args, workspace, allowedPaths)) {
+        throw new Error(
+          `Sandbox Error: Path traversal or unauthorized access attempt detected in ${req.command}: ${req.args.join(', ')}`,
+        );
+      }
+    }
+  }
+}
+
+export function handleReadWriteCommands(req: SandboxRequest): {
+  command: string;
+  args: string[];
+} {
   let finalCommand = req.command;
   let finalArgs = req.args;
 
   if (req.command === '__read') {
     finalCommand = '/bin/cat';
-    if (req.args.length > 0) {
-      if (validatePaths(req.args, workspace, allowedPaths)) {
-        mergedAdditional.fileSystem!.read!.push(...req.args);
-      } else {
-        throw new Error(
-          `Sandbox Error: Path traversal or unauthorized access attempt detected in __read: ${req.args.join(', ')}`,
-        );
-      }
-    }
   } else if (req.command === '__write') {
     finalCommand = '/bin/sh';
     finalArgs = ['-c', 'tee -- "$@" > /dev/null', '_', ...req.args];
-    if (req.args.length > 0) {
-      if (validatePaths(req.args, workspace, allowedPaths)) {
-        mergedAdditional.fileSystem!.write!.push(...req.args);
-      } else {
-        throw new Error(
-          `Sandbox Error: Path traversal or unauthorized access attempt detected in __write: ${req.args.join(', ')}`,
-        );
-      }
-    }
   }
 
   return { command: finalCommand, args: finalArgs };

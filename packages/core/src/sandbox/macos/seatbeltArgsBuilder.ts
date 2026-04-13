@@ -15,7 +15,7 @@ import {
   GOVERNANCE_FILES,
   SECRET_FILES,
   type ResolvedSandboxPaths,
-} from '../../services/sandboxManager.js';
+} from '../abstractOsSandboxManager.js';
 import { resolveToRealPath } from '../../utils/paths.js';
 
 /**

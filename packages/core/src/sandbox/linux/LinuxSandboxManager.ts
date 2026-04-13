@@ -5,40 +5,27 @@
  */
 
 import fs from 'node:fs';
-import { join, dirname } from 'node:path';
+import { join } from 'node:path';
 import os from 'node:os';
-import {
-  type SandboxManager,
-  type GlobalSandboxOptions,
-  type SandboxRequest,
-  type SandboxedCommand,
-  type SandboxPermissions,
-  GOVERNANCE_FILES,
-  type ParsedSandboxDenial,
-  resolveSandboxPaths,
+import type {
+  GlobalSandboxOptions,
+  SandboxRequest,
+  SandboxedCommand,
+  SandboxPermissions,
+  ParsedSandboxDenial,
 } from '../../services/sandboxManager.js';
+import {
+  type ResolvedSandboxPaths,
+  AbstractOsSandboxManager,
+} from '../abstractOsSandboxManager.js';
 import type { ShellExecutionResult } from '../../services/shellExecutionService.js';
-import {
-  sanitizeEnvironment,
-  getSecureSanitizationConfig,
-} from '../../services/environmentSanitization.js';
-import {
-  isStrictlyApproved,
-  verifySandboxOverrides,
-  getCommandName,
-} from '../utils/commandUtils.js';
-import { assertValidPathString } from '../../utils/paths.js';
-import {
-  isKnownSafeCommand,
-  isDangerousCommand,
-} from '../utils/commandSafety.js';
-import {
-  parsePosixSandboxDenials,
-  createSandboxDenialCache,
-  type SandboxDenialCache,
-} from '../utils/sandboxDenialUtils.js';
-import { handleReadWriteCommands } from '../utils/sandboxReadWriteUtils.js';
 import { buildBwrapArgs } from './bwrapArgsBuilder.js';
+import {
+  isKnownSafeCommand as isPosixSafeCommand,
+  isDangerousCommand as isPosixDangerousCommand,
+} from '../utils/commandSafety.js';
+import { parsePosixSandboxDenials } from '../utils/sandboxDenialUtils.js';
+import { handleReadWriteCommands } from '../utils/sandboxReadWriteUtils.js';
 
 let cachedBpfPath: string | undefined;
 
@@ -110,53 +97,41 @@ function getSeccompBpfPath(): string {
 }
 
 /**
- * Ensures a file or directory exists.
- */
-function touch(filePath: string, isDirectory: boolean) {
-  assertValidPathString(filePath);
-  try {
-    // If it exists (even as a broken symlink), do nothing
-    if (fs.lstatSync(filePath)) return;
-  } catch {
-    // Ignore ENOENT
-  }
-
-  if (isDirectory) {
-    fs.mkdirSync(filePath, { recursive: true });
-  } else {
-    fs.mkdirSync(dirname(filePath), { recursive: true });
-    fs.closeSync(fs.openSync(filePath, 'a'));
-  }
-}
-
-/**
  * A SandboxManager implementation for Linux that uses Bubblewrap (bwrap).
  */
-
-export class LinuxSandboxManager implements SandboxManager {
+export class LinuxSandboxManager extends AbstractOsSandboxManager {
   private static maskFilePath: string | undefined;
-  private readonly denialCache: SandboxDenialCache = createSandboxDenialCache();
 
-  constructor(private readonly options: GlobalSandboxOptions) {}
+  constructor(options: GlobalSandboxOptions) {
+    super(options);
+  }
 
   isKnownSafeCommand(args: string[]): boolean {
-    return isKnownSafeCommand(args);
+    const toolName = args[0];
+    if (toolName && this.isToolApproved(toolName)) {
+      return true;
+    }
+    return isPosixSafeCommand(args);
   }
 
   isDangerousCommand(args: string[]): boolean {
-    return isDangerousCommand(args);
+    return isPosixDangerousCommand(args);
   }
 
   parseDenials(result: ShellExecutionResult): ParsedSandboxDenial | undefined {
     return parsePosixSandboxDenials(result, this.denialCache);
   }
 
-  getWorkspace(): string {
-    return this.options.workspace;
+  protected get isCaseInsensitive(): boolean {
+    return false;
   }
 
-  getOptions(): GlobalSandboxOptions {
-    return this.options;
+  protected override resolveFinalCommand(
+    req: SandboxRequest,
+    _permissions: SandboxPermissions,
+    _resolvedPaths: ResolvedSandboxPaths,
+  ): { command: string; args: string[] } {
+    return handleReadWriteCommands(req);
   }
 
   private getMaskFilePath(): string {
@@ -184,85 +159,14 @@ export class LinuxSandboxManager implements SandboxManager {
     return maskPath;
   }
 
-  async prepareCommand(req: SandboxRequest): Promise<SandboxedCommand> {
-    const isReadonlyMode = this.options.modeConfig?.readonly ?? true;
-    const allowOverrides = this.options.modeConfig?.allowOverrides ?? true;
-
-    verifySandboxOverrides(allowOverrides, req.policy);
-
-    let command = req.command;
-    let args = req.args;
-
-    // Translate virtual commands for sandboxed file system access
-    if (command === '__read') {
-      command = 'cat';
-    } else if (command === '__write') {
-      command = 'sh';
-      args = ['-c', 'cat > "$1"', '_', ...args];
-    }
-
-    const commandName = await getCommandName({ ...req, command, args });
-    const isApproved = allowOverrides
-      ? await isStrictlyApproved(
-          { ...req, command, args },
-          this.options.modeConfig?.approvedTools,
-        )
-      : false;
-    const isYolo = this.options.modeConfig?.yolo ?? false;
-    const workspaceWrite = !isReadonlyMode || isApproved || isYolo;
-
-    const networkAccess =
-      this.options.modeConfig?.network || req.policy?.networkAccess || isYolo;
-
-    const persistentPermissions = allowOverrides
-      ? this.options.policyManager?.getCommandPermissions(commandName)
-      : undefined;
-
-    const mergedAdditional: SandboxPermissions = {
-      fileSystem: {
-        read: [
-          ...(persistentPermissions?.fileSystem?.read ?? []),
-          ...(req.policy?.additionalPermissions?.fileSystem?.read ?? []),
-        ],
-        write: [
-          ...(persistentPermissions?.fileSystem?.write ?? []),
-          ...(req.policy?.additionalPermissions?.fileSystem?.write ?? []),
-        ],
-      },
-      network:
-        networkAccess ||
-        persistentPermissions?.network ||
-        req.policy?.additionalPermissions?.network ||
-        false,
-    };
-
-    const { command: finalCommand, args: finalArgs } = handleReadWriteCommands(
-      req,
-      mergedAdditional,
-      this.options.workspace,
-      [
-        ...(req.policy?.allowedPaths || []),
-        ...(this.options.includeDirectories || []),
-      ],
-    );
-
-    const sanitizationConfig = getSecureSanitizationConfig(
-      req.policy?.sanitizationConfig,
-    );
-
-    const sanitizedEnv = sanitizeEnvironment(req.env, sanitizationConfig);
-
-    const resolvedPaths = await resolveSandboxPaths(
-      this.options,
-      req,
-      mergedAdditional,
-    );
-
-    for (const file of GOVERNANCE_FILES) {
-      const filePath = join(this.options.workspace, file.path);
-      touch(filePath, file.isDirectory);
-    }
-
+  protected async buildSandboxedExecution(
+    req: SandboxRequest,
+    finalCmd: { command: string; args: string[] },
+    sanitizedEnv: NodeJS.ProcessEnv,
+    mergedAdditional: SandboxPermissions,
+    resolvedPaths: ResolvedSandboxPaths,
+    workspaceWrite: boolean,
+  ): Promise<SandboxedCommand> {
     const bwrapArgs = await buildBwrapArgs({
       resolvedPaths,
       workspaceWrite,
@@ -283,8 +187,8 @@ export class LinuxSandboxManager implements SandboxManager {
       bpfPath,
       argsPath,
       '--',
-      finalCommand,
-      ...finalArgs,
+      finalCmd.command,
+      ...finalCmd.args,
     ];
 
     return {

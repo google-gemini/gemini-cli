@@ -8,7 +8,7 @@ import {
   buildSeatbeltProfile,
   escapeSchemeString,
 } from './seatbeltArgsBuilder.js';
-import type { ResolvedSandboxPaths } from '../../services/sandboxManager.js';
+import type { ResolvedSandboxPaths } from '../abstractOsSandboxManager.js';
 import fs from 'node:fs';
 import os from 'node:os';
 

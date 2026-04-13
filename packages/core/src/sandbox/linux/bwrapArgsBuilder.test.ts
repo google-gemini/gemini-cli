@@ -5,11 +5,15 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { buildBwrapArgs, type BwrapArgsOptions } from './bwrapArgsBuilder.js';
+import {
+  buildBwrapArgs,
+  type BwrapArgsOptions,
+  getSecretFileFindArgs,
+} from './bwrapArgsBuilder.js';
 import fs from 'node:fs';
 import * as shellUtils from '../../utils/shell-utils.js';
 import os from 'node:os';
-import { type ResolvedSandboxPaths } from '../../services/sandboxManager.js';
+import type { ResolvedSandboxPaths } from '../abstractOsSandboxManager.js';
 
 vi.mock('node:fs', async () => {
   const actual = await vi.importActual<typeof import('node:fs')>('node:fs');
@@ -395,5 +399,27 @@ describe.skipIf(os.platform() === 'win32')('buildBwrapArgs', () => {
     expect(writeBindIndex).toBeGreaterThan(-1);
     expect(worktreeBindIndex).toBeGreaterThan(-1);
     expect(worktreeBindIndex).toBeGreaterThan(writeBindIndex);
+  });
+});
+
+describe('getSecretFileFindArgs', () => {
+  it('should return the correct find arguments array combining all SECRET_FILES patterns', () => {
+    const args = getSecretFileFindArgs();
+
+    expect(args[0]).toBe('(');
+    expect(args[args.length - 1]).toBe(')');
+
+    // Ensure it correctly handles the structure of `[ '(', '-name', '.env', '-o', '-name', '.env.*', ')' ]`
+    const isName = args.includes('-name');
+    expect(isName).toBe(true);
+
+    const envIndex = args.indexOf('.env');
+    expect(envIndex).toBeGreaterThan(0);
+    expect(args[envIndex - 1]).toBe('-name');
+
+    if (args.includes('-o')) {
+      const oIndex = args.indexOf('-o');
+      expect(args[oIndex + 1]).toBe('-name');
+    }
   });
 });

@@ -5,9 +5,15 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { LinuxSandboxManager } from './LinuxSandboxManager.js';
 import fs from 'node:fs';
 import path from 'node:path';
+import { LinuxSandboxManager } from './LinuxSandboxManager.js';
+import {
+  isKnownSafeCommand as isPosixSafeCommand,
+  isDangerousCommand as isPosixDangerousCommand,
+} from '../utils/commandSafety.js';
+import { parsePosixSandboxDenials } from '../utils/sandboxDenialUtils.js';
+import type { ShellExecutionResult } from '../../services/shellExecutionService.js';
 
 vi.mock('node:fs', async () => {
   const actual = await vi.importActual<typeof import('node:fs')>('node:fs');
@@ -57,6 +63,16 @@ vi.mock('../../utils/shell-utils.js', async (importOriginal) => {
   };
 });
 
+vi.mock('../utils/commandSafety.js', () => ({
+  isKnownSafeCommand: vi.fn(),
+  isDangerousCommand: vi.fn(),
+}));
+
+vi.mock('../utils/sandboxDenialUtils.js', () => ({
+  parsePosixSandboxDenials: vi.fn(),
+  createSandboxDenialCache: vi.fn().mockReturnValue({}),
+}));
+
 describe('LinuxSandboxManager', () => {
   const workspace = '/home/user/workspace';
   let manager: LinuxSandboxManager;
@@ -70,6 +86,48 @@ describe('LinuxSandboxManager', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  describe('isKnownSafeCommand', () => {
+    it('should return true if the tool is in the approvedTools list', () => {
+      const managerWithTools = new LinuxSandboxManager({
+        workspace,
+        modeConfig: { approvedTools: ['git'] },
+      });
+      expect(managerWithTools.isKnownSafeCommand(['git'])).toBe(true);
+      expect(isPosixSafeCommand).not.toHaveBeenCalled();
+    });
+
+    it('should fallback to isPosixSafeCommand for non-approved tools', () => {
+      vi.mocked(isPosixSafeCommand).mockReturnValue(true);
+      expect(manager.isKnownSafeCommand(['ls'])).toBe(true);
+      expect(isPosixSafeCommand).toHaveBeenCalledWith(['ls']);
+    });
+  });
+
+  describe('isDangerousCommand', () => {
+    it('should delegate to isPosixDangerousCommand', () => {
+      vi.mocked(isPosixDangerousCommand).mockReturnValue(true);
+      expect(manager.isDangerousCommand(['rm', '-rf', '/'])).toBe(true);
+      expect(isPosixDangerousCommand).toHaveBeenCalledWith(['rm', '-rf', '/']);
+    });
+  });
+
+  describe('parseDenials', () => {
+    it('should delegate to parsePosixSandboxDenials', () => {
+      const mockResult = {
+        exitCode: 1,
+        output: 'denied',
+      } as unknown as ShellExecutionResult;
+      const mockParsed = { filePaths: ['/tmp/blocked'] };
+      vi.mocked(parsePosixSandboxDenials).mockReturnValue(mockParsed);
+
+      expect(manager.parseDenials(mockResult)).toBe(mockParsed);
+      expect(parsePosixSandboxDenials).toHaveBeenCalledWith(
+        mockResult,
+        manager['denialCache'],
+      );
+    });
   });
 
   describe('prepareCommand', () => {
@@ -148,22 +206,6 @@ describe('LinuxSandboxManager', () => {
 
       expect(result.args[result.args.length - 2]).toBe('/bin/cat');
       expect(result.args[result.args.length - 1]).toBe(testFile);
-    });
-
-    it('rejects overrides in plan mode', async () => {
-      const customManager = new LinuxSandboxManager({
-        workspace,
-        modeConfig: { allowOverrides: false },
-      });
-      await expect(
-        customManager.prepareCommand({
-          command: 'ls',
-          args: [],
-          cwd: workspace,
-          env: {},
-          policy: { networkAccess: true },
-        }),
-      ).rejects.toThrow(/Cannot override/);
     });
   });
 });

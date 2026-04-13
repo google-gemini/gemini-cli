@@ -8,9 +8,9 @@ import fs from 'node:fs';
 import { join, dirname } from 'node:path';
 import {
   GOVERNANCE_FILES,
-  getSecretFileFindArgs,
+  SECRET_FILES,
   type ResolvedSandboxPaths,
-} from '../../services/sandboxManager.js';
+} from '../abstractOsSandboxManager.js';
 import { isErrnoException } from '../utils/fsUtils.js';
 import { spawnAsync } from '../../utils/shell-utils.js';
 import { debugLogger } from '../../utils/debugLogger.js';
@@ -210,5 +210,15 @@ async function getSecretFilesArgs(
       );
     }
   }
+  return args;
+}
+
+export function getSecretFileFindArgs(): string[] {
+  const args: string[] = ['('];
+  SECRET_FILES.forEach((s: { pattern: string }, i: number) => {
+    if (i > 0) args.push('-o');
+    args.push('-name', s.pattern);
+  });
+  args.push(')');
   return args;
 }
