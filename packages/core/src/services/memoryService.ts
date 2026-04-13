@@ -8,6 +8,7 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { constants as fsConstants } from 'node:fs';
 import { randomUUID } from 'node:crypto';
+import * as Diff from 'diff';
 import type { Config } from '../config/config.js';
 import {
   SESSION_FILE_PREFIX,
@@ -28,6 +29,10 @@ import { PolicyDecision } from '../policy/types.js';
 import { MessageBus } from '../confirmation-bus/message-bus.js';
 import { Storage } from '../config/storage.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
+import {
+  applyParsedSkillPatches,
+  hasParsedPatchHunks,
+} from './memoryPatchUtils.js';
 
 const LOCK_FILENAME = '.extraction.lock';
 const STATE_FILENAME = '.extraction-state.json';
@@ -420,19 +425,18 @@ async function buildExistingSkillsSummary(
       const builtinSkills: string[] = [];
 
       for (const s of discoveredSkills) {
-        const entry = `- **${s.name}**: ${s.description}`;
         const loc = s.location;
         if (loc.includes('/bundle/') || loc.includes('\\bundle\\')) {
-          builtinSkills.push(entry);
+          builtinSkills.push(`- **${s.name}**: ${s.description}`);
         } else if (loc.startsWith(userSkillsDir)) {
-          globalSkills.push(entry);
+          globalSkills.push(`- **${s.name}**: ${s.description} (${loc})`);
         } else if (
           loc.includes('/extensions/') ||
           loc.includes('\\extensions\\')
         ) {
-          extensionSkills.push(entry);
+          extensionSkills.push(`- **${s.name}**: ${s.description}`);
         } else {
-          workspaceSkills.push(entry);
+          workspaceSkills.push(`- **${s.name}**: ${s.description} (${loc})`);
         }
       }
 
@@ -491,6 +495,89 @@ function buildAgentLoopContext(config: Config): AgentLoopContext {
     geminiClient: config.getGeminiClient(),
     sandboxManager: config.sandboxManager,
   };
+}
+
+/**
+ * Validates all .patch files in the skills directory using the `diff` library.
+ * Parses each patch, reads the target file(s), and attempts a dry-run apply.
+ * Removes patches that fail validation. Returns the filenames of valid patches.
+ */
+export async function validatePatches(
+  skillsDir: string,
+  config: Config,
+): Promise<string[]> {
+  let entries: string[];
+  try {
+    entries = await fs.readdir(skillsDir);
+  } catch {
+    return [];
+  }
+
+  const patchFiles = entries.filter((e) => e.endsWith('.patch'));
+  const validPatches: string[] = [];
+
+  for (const patchFile of patchFiles) {
+    const patchPath = path.join(skillsDir, patchFile);
+    let valid = true;
+    let reason = '';
+
+    try {
+      const patchContent = await fs.readFile(patchPath, 'utf-8');
+      const parsedPatches = Diff.parsePatch(patchContent);
+
+      if (!hasParsedPatchHunks(parsedPatches)) {
+        valid = false;
+        reason = 'no hunks found in patch';
+      } else {
+        const applied = await applyParsedSkillPatches(parsedPatches, config);
+        if (!applied.success) {
+          valid = false;
+          switch (applied.reason) {
+            case 'missingTargetPath':
+              reason = 'missing target file path in patch header';
+              break;
+            case 'invalidPatchHeaders':
+              reason = 'invalid diff headers';
+              break;
+            case 'outsideAllowedRoots':
+              reason = `target file is outside skill roots: ${applied.targetPath}`;
+              break;
+            case 'newFileAlreadyExists':
+              reason = `new file target already exists: ${applied.targetPath}`;
+              break;
+            case 'targetNotFound':
+              reason = `target file not found: ${applied.targetPath}`;
+              break;
+            case 'doesNotApply':
+              reason = `patch does not apply cleanly to ${applied.targetPath}`;
+              break;
+            default:
+              reason = 'unknown patch validation failure';
+              break;
+          }
+        }
+      }
+    } catch (err) {
+      valid = false;
+      reason = `failed to read or parse patch: ${err}`;
+    }
+
+    if (valid) {
+      validPatches.push(patchFile);
+      debugLogger.log(`[MemoryService] Patch validated: ${patchFile}`);
+    } else {
+      debugLogger.warn(
+        `[MemoryService] Removing invalid patch ${patchFile}: ${reason}`,
+      );
+      try {
+        await fs.unlink(patchPath);
+      } catch {
+        // Best-effort cleanup
+      }
+    }
+  }
+
+  return validPatches;
 }
 
 /**
@@ -562,9 +649,21 @@ export async function startMemoryService(config: Config): Promise<void> {
 
     // Snapshot existing skill directories before extraction
     const skillsBefore = new Set<string>();
+    const patchContentsBefore = new Map<string, string>();
     try {
       const entries = await fs.readdir(skillsDir);
       for (const e of entries) {
+        if (e.endsWith('.patch')) {
+          try {
+            patchContentsBefore.set(
+              e,
+              await fs.readFile(path.join(skillsDir, e), 'utf-8'),
+            );
+          } catch {
+            // Ignore unreadable existing patches.
+          }
+          continue;
+        }
         skillsBefore.add(e);
       }
     } catch {
@@ -618,12 +717,33 @@ export async function startMemoryService(config: Config): Promise<void> {
     try {
       const entriesAfter = await fs.readdir(skillsDir);
       for (const e of entriesAfter) {
-        if (!skillsBefore.has(e)) {
+        if (!skillsBefore.has(e) && !e.endsWith('.patch')) {
           skillsCreated.push(e);
         }
       }
     } catch {
       // Skills dir read failed
+    }
+
+    // Validate any .patch files the agent generated
+    const validPatches = await validatePatches(skillsDir, config);
+    const patchesCreatedThisRun: string[] = [];
+    for (const patchFile of validPatches) {
+      const patchPath = path.join(skillsDir, patchFile);
+      let currentContent: string;
+      try {
+        currentContent = await fs.readFile(patchPath, 'utf-8');
+      } catch {
+        continue;
+      }
+      if (patchContentsBefore.get(patchFile) !== currentContent) {
+        patchesCreatedThisRun.push(patchFile);
+      }
+    }
+    if (validPatches.length > 0) {
+      debugLogger.log(
+        `[MemoryService] ${validPatches.length} valid patch(es) currently in inbox; ${patchesCreatedThisRun.length} created or updated this run`,
+      );
     }
 
     // Record the run with full metadata
@@ -637,18 +757,39 @@ export async function startMemoryService(config: Config): Promise<void> {
     };
     await writeExtractionState(statePath, updatedState);
 
-    if (skillsCreated.length > 0) {
+    if (skillsCreated.length > 0 || patchesCreatedThisRun.length > 0) {
+      const completionParts: string[] = [];
+      if (skillsCreated.length > 0) {
+        completionParts.push(
+          `created ${skillsCreated.length} skill(s): ${skillsCreated.join(', ')}`,
+        );
+      }
+      if (patchesCreatedThisRun.length > 0) {
+        completionParts.push(
+          `prepared ${patchesCreatedThisRun.length} patch(es): ${patchesCreatedThisRun.join(', ')}`,
+        );
+      }
       debugLogger.log(
-        `[MemoryService] Completed in ${elapsed}s. Created ${skillsCreated.length} skill(s): ${skillsCreated.join(', ')}`,
+        `[MemoryService] Completed in ${elapsed}s. ${completionParts.join('; ')} (processed ${newSessionIds.length} session(s))`,
       );
-      const skillList = skillsCreated.join(', ');
+      const feedbackParts: string[] = [];
+      if (skillsCreated.length > 0) {
+        feedbackParts.push(
+          `${skillsCreated.length} new skill${skillsCreated.length > 1 ? 's' : ''} extracted from past sessions: ${skillsCreated.join(', ')}`,
+        );
+      }
+      if (patchesCreatedThisRun.length > 0) {
+        feedbackParts.push(
+          `${patchesCreatedThisRun.length} skill update${patchesCreatedThisRun.length > 1 ? 's' : ''} extracted from past sessions`,
+        );
+      }
       coreEvents.emitFeedback(
         'info',
-        `${skillsCreated.length} new skill${skillsCreated.length > 1 ? 's' : ''} extracted from past sessions: ${skillList}. Use /memory inbox to review.`,
+        `${feedbackParts.join('. ')}. Use /memory inbox to review.`,
       );
     } else {
       debugLogger.log(
-        `[MemoryService] Completed in ${elapsed}s. No new skills created (processed ${newSessionIds.length} session(s))`,
+        `[MemoryService] Completed in ${elapsed}s. No new skills or patches created (processed ${newSessionIds.length} session(s))`,
       );
     }
   } catch (error) {
