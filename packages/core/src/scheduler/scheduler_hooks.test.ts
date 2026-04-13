@@ -71,6 +71,7 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
     getEnableHooks: () => true,
     getExperiments: () => {},
     getTelemetryLogPromptsEnabled: () => false,
+    getTelemetryTracesEnabled: () => false,
     getPolicyEngine: () =>
       ({
         check: async () => ({ decision: 'allow' }),
