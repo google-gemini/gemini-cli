@@ -77,14 +77,25 @@ async function run() {
     const nodeArgs: string[] = [...process.execArgv];
     const scriptArgs = process.argv.slice(2);
 
-    const memoryArgs = await getMemoryNodeArgs();
-    nodeArgs.push(...memoryArgs);
-
     const script = process.argv[1];
-    nodeArgs.push(script);
+    if (script !== undefined) {
+      nodeArgs.push(script);
+    }
     nodeArgs.push(...scriptArgs);
 
-    const newEnv = { ...process.env, GEMINI_CLI_NO_RELAUNCH: 'true' };
+    const newEnv: NodeJS.ProcessEnv = {
+      ...process.env,
+      GEMINI_CLI_NO_RELAUNCH: 'true',
+    };
+    const memoryArgs = await getMemoryNodeArgs();
+    if (memoryArgs.length > 0) {
+      newEnv['NODE_OPTIONS'] = [
+        process.env['NODE_OPTIONS'] || '',
+        ...memoryArgs,
+      ]
+        .join(' ')
+        .trim();
+    }
     const RELAUNCH_EXIT_CODE = 199;
     let latestAdminSettings: unknown = undefined;
 
