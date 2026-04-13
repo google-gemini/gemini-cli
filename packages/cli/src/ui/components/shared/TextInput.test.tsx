@@ -408,4 +408,96 @@ describe('TextInput', () => {
     expect(lastFrame()).toContain('line2');
     unmount();
   });
+
+  it('treats Enter as newline when it immediately follows a paste event', async () => {
+    vi.useFakeTimers();
+    const { waitUntilReady, unmount } = await render(
+      <TextInput buffer={mockBuffer} onSubmit={onSubmit} onCancel={onCancel} />,
+    );
+    const keypressHandler = mockedUseKeypress.mock.calls[0][0];
+
+    // Simulate a paste event followed immediately by Enter (same tick)
+    await act(async () => {
+      keypressHandler({
+        name: 'paste',
+        shift: false,
+        alt: false,
+        ctrl: false,
+        cmd: false,
+        insertable: true,
+        sequence: 'line1\nline2\nline3\nline4\nline5\nline6',
+      });
+    });
+    // Enter arrives in the same tick (within the 40ms guard window)
+    await act(async () => {
+      keypressHandler({
+        name: 'enter',
+        shift: false,
+        alt: false,
+        ctrl: false,
+        cmd: false,
+        sequence: '',
+      });
+    });
+    await waitUntilReady();
+
+    // onSubmit should NOT have been called — Enter was converted to newline
+    expect(onSubmit).not.toHaveBeenCalled();
+    // handleInput should have been called with a shift+enter (newline)
+    expect(mockBuffer.handleInput).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'enter', shift: true }),
+    );
+
+    vi.useRealTimers();
+    unmount();
+  });
+
+  it('allows normal submit after paste guard timeout expires', async () => {
+    vi.useFakeTimers();
+    const placeholder = '[Pasted Text: 6 lines]';
+    const realContent = 'line1\nline2\nline3\nline4\nline5\nline6';
+    mockBuffer.setText(placeholder);
+    mockBuffer.pastedContent = { [placeholder]: realContent };
+
+    const { waitUntilReady, unmount } = await render(
+      <TextInput buffer={mockBuffer} onSubmit={onSubmit} onCancel={onCancel} />,
+    );
+    const keypressHandler = mockedUseKeypress.mock.calls[0][0];
+
+    // Simulate paste event
+    await act(async () => {
+      keypressHandler({
+        name: 'paste',
+        shift: false,
+        alt: false,
+        ctrl: false,
+        cmd: false,
+        insertable: true,
+        sequence: realContent,
+      });
+    });
+
+    // Advance past the 40ms guard window
+    await act(async () => {
+      vi.advanceTimersByTime(50);
+    });
+
+    // Now Enter should trigger a normal submit with expanded content
+    await act(async () => {
+      keypressHandler({
+        name: 'enter',
+        shift: false,
+        alt: false,
+        ctrl: false,
+        cmd: false,
+        sequence: '',
+      });
+    });
+    await waitUntilReady();
+
+    expect(onSubmit).toHaveBeenCalledWith(realContent);
+
+    vi.useRealTimers();
+    unmount();
+  });
 });
