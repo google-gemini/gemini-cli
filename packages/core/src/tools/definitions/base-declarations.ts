@@ -137,3 +137,8 @@ export const TOPIC_PARAM_STRATEGIC_INTENT = 'strategic_intent';
 // -- complete_task --
 export const COMPLETE_TASK_TOOL_NAME = 'complete_task';
 export const COMPLETE_TASK_DISPLAY_NAME = 'Complete Task';
+
+// -- watcher --
+export const WATCHER_TOOL_NAME = 'watcher';
+export const WATCHER_DISPLAY_NAME = 'Watcher';
+export const WATCHER_PARAM_RECENT_HISTORY = 'recentHistory';

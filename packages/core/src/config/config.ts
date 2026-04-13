@@ -44,6 +44,7 @@ import { AskUserTool } from '../tools/ask-user.js';
 import { UpdateTopicTool } from '../tools/topicTool.js';
 import { TopicState } from './topicState.js';
 import { AgentTool } from '../agents/agent-tool.js';
+import { WatcherTool } from '../tools/watcherTool.js';
 import { ExitPlanModeTool } from '../tools/exit-plan-mode.js';
 import { EnterPlanModeTool } from '../tools/enter-plan-mode.js';
 import {
@@ -3649,6 +3650,12 @@ export class Config implements McpContext, AgentLoopContext {
     maybeRegister(AgentTool, () =>
       registry.registerTool(new AgentTool(this, this.messageBus)),
     );
+
+    if (this.isExperimentalWatcherEnabled()) {
+      maybeRegister(WatcherTool, () =>
+        registry.registerTool(new WatcherTool(this, this.messageBus)),
+      );
+    }
 
     await registry.discoverAllTools();
     registry.sortTools();
