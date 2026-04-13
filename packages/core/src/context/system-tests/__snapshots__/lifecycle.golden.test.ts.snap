@@ -16,9 +16,6 @@ exports[`System Lifecycle Golden Tests > Scenario 1: Organic Growth with Huge To
         {
           "text": "Ack.",
         },
-        {
-          "text": "Yield",
-        },
       ],
       "role": "model",
     },
@@ -34,9 +31,6 @@ exports[`System Lifecycle Golden Tests > Scenario 1: Organic Growth with Huge To
       "parts": [
         {
           "text": "Hi, how can I help?",
-        },
-        {
-          "text": "Yield",
         },
       ],
       "role": "model",
@@ -80,9 +74,6 @@ exports[`System Lifecycle Golden Tests > Scenario 1: Organic Growth with Huge To
         {
           "text": "The logs are very long.",
         },
-        {
-          "text": "Yield",
-        },
       ],
       "role": "model",
     },
@@ -104,9 +95,6 @@ exports[`System Lifecycle Golden Tests > Scenario 1: Organic Growth with Huge To
       "parts": [
         {
           "text": "Nice diagram.",
-        },
-        {
-          "text": "Yield",
         },
       ],
       "role": "model",
@@ -138,23 +126,23 @@ exports[`System Lifecycle Golden Tests > Scenario 1: Organic Growth with Huge To
       "turnIndex": 0,
     },
     {
-      "tokensAfterBackground": 70,
-      "tokensBeforeBackground": 70,
+      "tokensAfterBackground": 64,
+      "tokensBeforeBackground": 64,
       "turnIndex": 1,
     },
     {
-      "tokensAfterBackground": 25370,
-      "tokensBeforeBackground": 25370,
+      "tokensAfterBackground": 25358,
+      "tokensBeforeBackground": 25358,
       "turnIndex": 2,
     },
     {
-      "tokensAfterBackground": 28692,
-      "tokensBeforeBackground": 28692,
+      "tokensAfterBackground": 28674,
+      "tokensBeforeBackground": 28674,
       "turnIndex": 3,
     },
     {
-      "tokensAfterBackground": 28731,
-      "tokensBeforeBackground": 28731,
+      "tokensAfterBackground": 28707,
+      "tokensBeforeBackground": 28707,
       "turnIndex": 4,
     },
   ],
@@ -176,9 +164,6 @@ exports[`System Lifecycle Golden Tests > Scenario 2: Under Budget (No Modificati
       "parts": [
         {
           "text": "Ack.",
-        },
-        {
-          "text": "Yield",
         },
       ],
       "role": "model",
@@ -210,8 +195,8 @@ exports[`System Lifecycle Golden Tests > Scenario 2: Under Budget (No Modificati
       "turnIndex": 0,
     },
     {
-      "tokensAfterBackground": 70,
-      "tokensBeforeBackground": 70,
+      "tokensAfterBackground": 64,
+      "tokensBeforeBackground": 64,
       "turnIndex": 1,
     },
   ],
@@ -234,9 +219,6 @@ exports[`System Lifecycle Golden Tests > Scenario 3: Async-Driven Background GC 
         {
           "text": "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
         },
-        {
-          "text": "Yield",
-        },
       ],
       "role": "model",
     },
@@ -252,9 +234,6 @@ exports[`System Lifecycle Golden Tests > Scenario 3: Async-Driven Background GC 
       "parts": [
         {
           "text": "DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD",
-        },
-        {
-          "text": "Yield",
         },
       ],
       "role": "model",
@@ -286,13 +265,13 @@ exports[`System Lifecycle Golden Tests > Scenario 3: Async-Driven Background GC 
       "turnIndex": 0,
     },
     {
-      "tokensAfterBackground": 260,
-      "tokensBeforeBackground": 260,
+      "tokensAfterBackground": 254,
+      "tokensBeforeBackground": 254,
       "turnIndex": 1,
     },
     {
-      "tokensAfterBackground": 390,
-      "tokensBeforeBackground": 390,
+      "tokensAfterBackground": 378,
+      "tokensBeforeBackground": 378,
       "turnIndex": 2,
     },
   ],

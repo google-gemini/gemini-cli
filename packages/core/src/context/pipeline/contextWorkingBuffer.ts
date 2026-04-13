@@ -157,11 +157,84 @@ export class ContextWorkingBufferImpl implements ContextWorkingBuffer {
       newProvenanceMap.set(added.id, roots);
     }
 
+    
+    // GC the Caches
+    // We only want to keep provenance and pristine entries that are reachable
+    // from the nodes in 'newGraph'.
+    const reachablePristineIds = new Set<string>();
+    const reachableCurrentIds = new Set<string>();
+
+    for (const node of newGraph) {
+      reachableCurrentIds.add(node.id);
+      const roots = newProvenanceMap.get(node.id);
+      if (roots) {
+        for (const root of roots) {
+           reachablePristineIds.add(root);
+        }
+      }
+    }
+
+    // Prune Provenance Map
+    for (const [id] of newProvenanceMap) {
+      if (!reachableCurrentIds.has(id)) {
+         newProvenanceMap.delete(id);
+      }
+    }
+
+    // Prune Pristine Map
+    const prunedPristineMap = new Map<string, ConcreteNode>();
+    for (const id of reachablePristineIds) {
+       const node = finalPristineMap.get(id);
+       if (node) prunedPristineMap.set(id, node);
+    }
+    finalPristineMap = prunedPristineMap;
+
     return new ContextWorkingBufferImpl(
       newGraph,
       finalPristineMap,
       newProvenanceMap,
       [...this.history, mutation],
+    );
+  }
+
+  
+  /** Removes nodes from the working buffer that were completely dropped from the upstream pristine history */
+  prunePristineNodes(retainedIds: ReadonlySet<string>): ContextWorkingBufferImpl {
+    const newGraph = this.nodes.filter(n => retainedIds.has(n.id) || !this.pristineNodesMap.has(n.id));
+    
+    const newProvenanceMap = new Map(this.provenanceMap);
+    const reachablePristineIds = new Set<string>();
+    const reachableCurrentIds = new Set<string>();
+
+    for (const node of newGraph) {
+      reachableCurrentIds.add(node.id);
+      const roots = newProvenanceMap.get(node.id);
+      if (roots) {
+        for (const root of roots) {
+           if (retainedIds.has(root) || !this.pristineNodesMap.has(root)) {
+               reachablePristineIds.add(root);
+           }
+        }
+      }
+    }
+
+    for (const [id] of newProvenanceMap) {
+      if (!reachableCurrentIds.has(id)) {
+         newProvenanceMap.delete(id);
+      }
+    }
+
+    const prunedPristineMap = new Map<string, ConcreteNode>();
+    for (const id of reachablePristineIds) {
+       const node = this.pristineNodesMap.get(id);
+       if (node) prunedPristineMap.set(id, node);
+    }
+
+    return new ContextWorkingBufferImpl(
+      newGraph,
+      prunedPristineMap,
+      newProvenanceMap,
+      [...this.history]
     );
   }
 
