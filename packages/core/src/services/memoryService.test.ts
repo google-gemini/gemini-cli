@@ -8,12 +8,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import * as os from 'node:os';
+import type { Config } from '../config/config.js';
 import {
   SESSION_FILE_PREFIX,
   type ConversationRecord,
 } from './chatRecordingService.js';
 import type { ExtractionState, ExtractionRun } from './memoryService.js';
 import { coreEvents } from '../utils/events.js';
+import { Storage } from '../config/storage.js';
 
 // Mock external modules used by startMemoryService
 vi.mock('../agents/local-executor.js', () => ({
@@ -881,6 +883,444 @@ describe('memoryService', () => {
       const result = await readExtractionState(statePath);
 
       expect(result).toEqual({ runs: [] });
+    });
+  });
+
+  describe('validatePatches', () => {
+    let skillsDir: string;
+    let globalSkillsDir: string;
+    let projectSkillsDir: string;
+    let validateConfig: Config;
+
+    beforeEach(() => {
+      skillsDir = path.join(tmpDir, 'skills');
+      globalSkillsDir = path.join(tmpDir, 'global-skills');
+      projectSkillsDir = path.join(tmpDir, 'project-skills');
+
+      vi.mocked(Storage.getUserSkillsDir).mockReturnValue(globalSkillsDir);
+      validateConfig = {
+        storage: {
+          getProjectSkillsDir: () => projectSkillsDir,
+        },
+      } as unknown as Config;
+    });
+
+    it('returns empty array when no patch files exist', async () => {
+      const { validatePatches } = await import('./memoryService.js');
+
+      await fs.mkdir(skillsDir, { recursive: true });
+      // Add a non-patch file to ensure it's ignored
+      await fs.writeFile(path.join(skillsDir, 'some-file.txt'), 'hello');
+
+      const result = await validatePatches(skillsDir, validateConfig);
+
+      expect(result).toEqual([]);
+    });
+
+    it('returns empty array when directory does not exist', async () => {
+      const { validatePatches } = await import('./memoryService.js');
+
+      const result = await validatePatches(
+        path.join(tmpDir, 'nonexistent-dir'),
+        validateConfig,
+      );
+
+      expect(result).toEqual([]);
+    });
+
+    it('removes invalid patch files', async () => {
+      const { validatePatches } = await import('./memoryService.js');
+
+      await fs.mkdir(skillsDir, { recursive: true });
+
+      // Write a malformed patch
+      const patchPath = path.join(skillsDir, 'bad-skill.patch');
+      await fs.writeFile(patchPath, 'this is not a valid patch');
+
+      const result = await validatePatches(skillsDir, validateConfig);
+
+      expect(result).toEqual([]);
+      // Verify the invalid patch was deleted
+      await expect(fs.access(patchPath)).rejects.toThrow();
+    });
+
+    it('keeps valid patch files', async () => {
+      const { validatePatches } = await import('./memoryService.js');
+
+      await fs.mkdir(skillsDir, { recursive: true });
+      await fs.mkdir(projectSkillsDir, { recursive: true });
+
+      // Create a real target file to patch
+      const targetFile = path.join(projectSkillsDir, 'target.md');
+      await fs.writeFile(targetFile, 'line1\nline2\nline3\n');
+
+      // Write a valid unified diff patch with absolute paths
+      const patchContent = [
+        `--- ${targetFile}`,
+        `+++ ${targetFile}`,
+        '@@ -1,3 +1,4 @@',
+        ' line1',
+        ' line2',
+        '+line2.5',
+        ' line3',
+        '',
+      ].join('\n');
+      const patchPath = path.join(skillsDir, 'good-skill.patch');
+      await fs.writeFile(patchPath, patchContent);
+
+      const result = await validatePatches(skillsDir, validateConfig);
+
+      expect(result).toEqual(['good-skill.patch']);
+      // Verify the valid patch still exists
+      await expect(fs.access(patchPath)).resolves.toBeUndefined();
+    });
+
+    it('keeps patches with repeated sections for the same file when hunks apply cumulatively', async () => {
+      const { validatePatches } = await import('./memoryService.js');
+
+      await fs.mkdir(skillsDir, { recursive: true });
+      await fs.mkdir(projectSkillsDir, { recursive: true });
+
+      const targetFile = path.join(projectSkillsDir, 'target.md');
+      await fs.writeFile(targetFile, 'alpha\nbeta\ngamma\ndelta\n');
+
+      const patchPath = path.join(skillsDir, 'multi-section.patch');
+      await fs.writeFile(
+        patchPath,
+        [
+          `--- ${targetFile}`,
+          `+++ ${targetFile}`,
+          '@@ -1,4 +1,5 @@',
+          ' alpha',
+          ' beta',
+          '+beta2',
+          ' gamma',
+          ' delta',
+          `--- ${targetFile}`,
+          `+++ ${targetFile}`,
+          '@@ -2,4 +2,5 @@',
+          ' beta',
+          ' beta2',
+          ' gamma',
+          '+gamma2',
+          ' delta',
+          '',
+        ].join('\n'),
+      );
+
+      const result = await validatePatches(skillsDir, validateConfig);
+
+      expect(result).toEqual(['multi-section.patch']);
+      await expect(fs.access(patchPath)).resolves.toBeUndefined();
+    });
+
+    it('removes /dev/null patches that target an existing skill file', async () => {
+      const { validatePatches } = await import('./memoryService.js');
+
+      await fs.mkdir(skillsDir, { recursive: true });
+      await fs.mkdir(projectSkillsDir, { recursive: true });
+
+      const targetFile = path.join(projectSkillsDir, 'existing-skill.md');
+      await fs.writeFile(targetFile, 'original content\n');
+
+      const patchPath = path.join(skillsDir, 'bad-new-file.patch');
+      await fs.writeFile(
+        patchPath,
+        [
+          '--- /dev/null',
+          `+++ ${targetFile}`,
+          '@@ -0,0 +1 @@',
+          '+replacement content',
+          '',
+        ].join('\n'),
+      );
+
+      const result = await validatePatches(skillsDir, validateConfig);
+
+      expect(result).toEqual([]);
+      await expect(fs.access(patchPath)).rejects.toThrow();
+      expect(await fs.readFile(targetFile, 'utf-8')).toBe('original content\n');
+    });
+
+    it('removes patches with malformed diff headers', async () => {
+      const { validatePatches } = await import('./memoryService.js');
+
+      await fs.mkdir(skillsDir, { recursive: true });
+      await fs.mkdir(projectSkillsDir, { recursive: true });
+
+      const targetFile = path.join(projectSkillsDir, 'target.md');
+      await fs.writeFile(targetFile, 'line1\nline2\nline3\n');
+
+      const patchPath = path.join(skillsDir, 'bad-headers.patch');
+      await fs.writeFile(
+        patchPath,
+        [
+          `--- ${targetFile}`,
+          '+++ .gemini/skills/foo/SKILL.md',
+          '@@ -1,3 +1,4 @@',
+          ' line1',
+          ' line2',
+          '+line2.5',
+          ' line3',
+          '',
+        ].join('\n'),
+      );
+
+      const result = await validatePatches(skillsDir, validateConfig);
+
+      expect(result).toEqual([]);
+      await expect(fs.access(patchPath)).rejects.toThrow();
+      expect(await fs.readFile(targetFile, 'utf-8')).toBe(
+        'line1\nline2\nline3\n',
+      );
+    });
+
+    it('removes patches that contain no hunks', async () => {
+      const { validatePatches } = await import('./memoryService.js');
+
+      await fs.mkdir(skillsDir, { recursive: true });
+      const patchPath = path.join(skillsDir, 'empty.patch');
+      await fs.writeFile(
+        patchPath,
+        [
+          `--- ${path.join(projectSkillsDir, 'target.md')}`,
+          `+++ ${path.join(projectSkillsDir, 'target.md')}`,
+          '',
+        ].join('\n'),
+      );
+
+      const result = await validatePatches(skillsDir, validateConfig);
+
+      expect(result).toEqual([]);
+      await expect(fs.access(patchPath)).rejects.toThrow();
+    });
+
+    it('removes patches that target files outside the allowed skill roots', async () => {
+      const { validatePatches } = await import('./memoryService.js');
+
+      await fs.mkdir(skillsDir, { recursive: true });
+      const outsideFile = path.join(tmpDir, 'outside.md');
+      await fs.writeFile(outsideFile, 'line1\nline2\nline3\n');
+
+      const patchPath = path.join(skillsDir, 'outside.patch');
+      await fs.writeFile(
+        patchPath,
+        [
+          `--- ${outsideFile}`,
+          `+++ ${outsideFile}`,
+          '@@ -1,3 +1,4 @@',
+          ' line1',
+          ' line2',
+          '+line2.5',
+          ' line3',
+          '',
+        ].join('\n'),
+      );
+
+      const result = await validatePatches(skillsDir, validateConfig);
+
+      expect(result).toEqual([]);
+      await expect(fs.access(patchPath)).rejects.toThrow();
+    });
+
+    it('removes patches that escape the allowed roots through a symlinked parent', async () => {
+      const { validatePatches } = await import('./memoryService.js');
+
+      await fs.mkdir(skillsDir, { recursive: true });
+      await fs.mkdir(projectSkillsDir, { recursive: true });
+
+      const outsideDir = path.join(tmpDir, 'outside-dir');
+      const linkedDir = path.join(projectSkillsDir, 'linked');
+      await fs.mkdir(outsideDir, { recursive: true });
+      await fs.symlink(
+        outsideDir,
+        linkedDir,
+        process.platform === 'win32' ? 'junction' : 'dir',
+      );
+
+      const outsideFile = path.join(outsideDir, 'escaped.md');
+      await fs.writeFile(outsideFile, 'line1\nline2\nline3\n');
+
+      const patchPath = path.join(skillsDir, 'symlink.patch');
+      await fs.writeFile(
+        patchPath,
+        [
+          `--- ${path.join(linkedDir, 'escaped.md')}`,
+          `+++ ${path.join(linkedDir, 'escaped.md')}`,
+          '@@ -1,3 +1,4 @@',
+          ' line1',
+          ' line2',
+          '+line2.5',
+          ' line3',
+          '',
+        ].join('\n'),
+      );
+
+      const result = await validatePatches(skillsDir, validateConfig);
+
+      expect(result).toEqual([]);
+      await expect(fs.access(patchPath)).rejects.toThrow();
+      expect(await fs.readFile(outsideFile, 'utf-8')).not.toContain('line2.5');
+    });
+  });
+
+  describe('startMemoryService feedback for patch-only runs', () => {
+    it('emits feedback when extraction produces only patch suggestions', async () => {
+      const { startMemoryService } = await import('./memoryService.js');
+      const { LocalAgentExecutor } = await import(
+        '../agents/local-executor.js'
+      );
+
+      vi.mocked(coreEvents.emitFeedback).mockClear();
+      vi.mocked(LocalAgentExecutor.create).mockReset();
+
+      const memoryDir = path.join(tmpDir, 'memory-patch-only');
+      const skillsDir = path.join(tmpDir, 'skills-patch-only');
+      const projectTempDir = path.join(tmpDir, 'temp-patch-only');
+      const chatsDir = path.join(projectTempDir, 'chats');
+      const projectSkillsDir = path.join(tmpDir, 'workspace-skills');
+      await fs.mkdir(memoryDir, { recursive: true });
+      await fs.mkdir(skillsDir, { recursive: true });
+      await fs.mkdir(chatsDir, { recursive: true });
+      await fs.mkdir(projectSkillsDir, { recursive: true });
+
+      const existingSkill = path.join(projectSkillsDir, 'existing-skill.md');
+      await fs.writeFile(existingSkill, 'line1\nline2\nline3\n');
+
+      const conversation = createConversation({
+        sessionId: 'patch-only-session',
+        messageCount: 20,
+      });
+      await fs.writeFile(
+        path.join(chatsDir, 'session-2025-01-01T00-00-patchonly.json'),
+        JSON.stringify(conversation),
+      );
+
+      vi.mocked(Storage.getUserSkillsDir).mockReturnValue(
+        path.join(tmpDir, 'global-skills'),
+      );
+      vi.mocked(LocalAgentExecutor.create).mockResolvedValueOnce({
+        run: vi.fn().mockImplementation(async () => {
+          const patchPath = path.join(skillsDir, 'existing-skill.patch');
+          await fs.writeFile(
+            patchPath,
+            [
+              `--- ${existingSkill}`,
+              `+++ ${existingSkill}`,
+              '@@ -1,3 +1,4 @@',
+              ' line1',
+              ' line2',
+              '+line2.5',
+              ' line3',
+              '',
+            ].join('\n'),
+          );
+          return undefined;
+        }),
+      } as never);
+
+      const mockConfig = {
+        storage: {
+          getProjectMemoryDir: vi.fn().mockReturnValue(memoryDir),
+          getProjectMemoryTempDir: vi.fn().mockReturnValue(memoryDir),
+          getProjectSkillsMemoryDir: vi.fn().mockReturnValue(skillsDir),
+          getProjectSkillsDir: vi.fn().mockReturnValue(projectSkillsDir),
+          getProjectTempDir: vi.fn().mockReturnValue(projectTempDir),
+        },
+        getToolRegistry: vi.fn(),
+        getMessageBus: vi.fn(),
+        getGeminiClient: vi.fn(),
+        getSkillManager: vi.fn().mockReturnValue({ getSkills: () => [] }),
+        modelConfigService: {
+          registerRuntimeModelConfig: vi.fn(),
+        },
+        sandboxManager: undefined,
+      } as unknown as Parameters<typeof startMemoryService>[0];
+
+      await startMemoryService(mockConfig);
+
+      expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
+        'info',
+        expect.stringContaining('skill update'),
+      );
+      expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
+        'info',
+        expect.stringContaining('/memory inbox'),
+      );
+    });
+
+    it('does not emit feedback for old inbox patches when this run creates none', async () => {
+      const { startMemoryService } = await import('./memoryService.js');
+      const { LocalAgentExecutor } = await import(
+        '../agents/local-executor.js'
+      );
+
+      vi.mocked(coreEvents.emitFeedback).mockClear();
+      vi.mocked(LocalAgentExecutor.create).mockReset();
+
+      const memoryDir = path.join(tmpDir, 'memory-old-patch');
+      const skillsDir = path.join(tmpDir, 'skills-old-patch');
+      const projectTempDir = path.join(tmpDir, 'temp-old-patch');
+      const chatsDir = path.join(projectTempDir, 'chats');
+      const projectSkillsDir = path.join(tmpDir, 'workspace-old-patch');
+      await fs.mkdir(memoryDir, { recursive: true });
+      await fs.mkdir(skillsDir, { recursive: true });
+      await fs.mkdir(chatsDir, { recursive: true });
+      await fs.mkdir(projectSkillsDir, { recursive: true });
+
+      const existingSkill = path.join(projectSkillsDir, 'existing-skill.md');
+      await fs.writeFile(existingSkill, 'line1\nline2\nline3\n');
+      await fs.writeFile(
+        path.join(skillsDir, 'existing-skill.patch'),
+        [
+          `--- ${existingSkill}`,
+          `+++ ${existingSkill}`,
+          '@@ -1,3 +1,4 @@',
+          ' line1',
+          ' line2',
+          '+line2.5',
+          ' line3',
+          '',
+        ].join('\n'),
+      );
+
+      const conversation = createConversation({
+        sessionId: 'old-patch-session',
+        messageCount: 20,
+      });
+      await fs.writeFile(
+        path.join(chatsDir, 'session-2025-01-01T00-00-oldpatch.json'),
+        JSON.stringify(conversation),
+      );
+
+      vi.mocked(Storage.getUserSkillsDir).mockReturnValue(
+        path.join(tmpDir, 'global-skills'),
+      );
+      vi.mocked(LocalAgentExecutor.create).mockResolvedValueOnce({
+        run: vi.fn().mockResolvedValue(undefined),
+      } as never);
+
+      const mockConfig = {
+        storage: {
+          getProjectMemoryDir: vi.fn().mockReturnValue(memoryDir),
+          getProjectMemoryTempDir: vi.fn().mockReturnValue(memoryDir),
+          getProjectSkillsMemoryDir: vi.fn().mockReturnValue(skillsDir),
+          getProjectSkillsDir: vi.fn().mockReturnValue(projectSkillsDir),
+          getProjectTempDir: vi.fn().mockReturnValue(projectTempDir),
+        },
+        getToolRegistry: vi.fn(),
+        getMessageBus: vi.fn(),
+        getGeminiClient: vi.fn(),
+        getSkillManager: vi.fn().mockReturnValue({ getSkills: () => [] }),
+        modelConfigService: {
+          registerRuntimeModelConfig: vi.fn(),
+        },
+        sandboxManager: undefined,
+      } as unknown as Parameters<typeof startMemoryService>[0];
+
+      await startMemoryService(mockConfig);
+
+      expect(coreEvents.emitFeedback).not.toHaveBeenCalled();
     });
   });
 });
