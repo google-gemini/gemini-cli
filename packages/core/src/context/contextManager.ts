@@ -48,7 +48,7 @@ export class ContextManager {
 
     this.eventBus.onPristineHistoryUpdated((event) => {
       const existingIds = new Set(this.buffer.nodes.map((n) => n.id));
-      const newIds = new Set(event.nodes.map(n => n.id));
+      const newIds = new Set(event.nodes.map((n) => n.id));
       const addedNodes = event.nodes.filter((n) => !existingIds.has(n.id));
 
       // Prune any pristine nodes that were dropped from the upstream history
@@ -103,7 +103,9 @@ export class ContextManager {
       }
 
       if (agedOutNodes.size > 0) {
-        this.env.tokenCalculator.garbageCollectCache(new Set(this.buffer.nodes.map((n) => n.id)));
+        this.env.tokenCalculator.garbageCollectCache(
+          new Set(this.buffer.nodes.map((n) => n.id)),
+        );
         this.eventBus.emitConsolidationNeeded({
           nodes: this.buffer.nodes,
           targetDeficit:

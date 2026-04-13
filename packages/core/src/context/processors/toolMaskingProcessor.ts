@@ -20,14 +20,6 @@ import {
 } from '../../tools/tool-names.js';
 import type { Part } from '@google/genai';
 
-const UNMASKABLE_TOOLS = new Set([
-  ACTIVATE_SKILL_TOOL_NAME,
-  MEMORY_TOOL_NAME,
-  ASK_USER_TOOL_NAME,
-  ENTER_PLAN_MODE_TOOL_NAME,
-  EXIT_PLAN_MODE_TOOL_NAME,
-]);
-
 export interface ToolMaskingProcessorOptions {
   stringLengthThresholdTokens: number;
 }
@@ -40,6 +32,14 @@ export const ToolMaskingProcessorOptionsSchema: JSONSchemaType<ToolMaskingProces
     },
     required: ['stringLengthThresholdTokens'],
   };
+
+const UNMASKABLE_TOOLS = new Set([
+  ACTIVATE_SKILL_TOOL_NAME,
+  MEMORY_TOOL_NAME,
+  ASK_USER_TOOL_NAME,
+  ENTER_PLAN_MODE_TOOL_NAME,
+  EXIT_PLAN_MODE_TOOL_NAME,
+]);
 
 type MaskableValue =
   | string
