@@ -18,7 +18,7 @@ import url from 'node:url';
 import crypto from 'node:crypto';
 import * as net from 'node:net';
 import { EventEmitter } from 'node:events';
-import open from 'open';
+import { openBrowserSecurely } from '../utils/secure-browser-launcher.js';
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
 import type { Config } from '../config/config.js';
@@ -299,22 +299,9 @@ async function initOauthClient(
     });
     try {
       // Attempt to open the authentication URL in the default browser.
-      // We do not use the `wait` option here because the main script's execution
-      // is already paused by `loginCompletePromise`, which awaits the server callback.
-      const childProcess = await open(webLogin.authUrl);
-
-      // IMPORTANT: Attach an error handler to the returned child process.
-      // Without this, if `open` fails to spawn a process (e.g., `xdg-open` is not found
-      // in a minimal Docker container), it will emit an unhandled 'error' event,
-      // causing the entire Node.js process to crash.
-      childProcess.on('error', (error) => {
-        coreEvents.emit(CoreEvent.UserFeedback, {
-          severity: 'error',
-          message:
-            `Failed to open browser with error: ${getErrorMessage(error)}\n` +
-            `Please try running again with NO_BROWSER=true set.`,
-        });
-      });
+      // Uses the system's xdg-open on Linux to respect the user's default
+      // browser configuration.
+      await openBrowserSecurely(webLogin.authUrl);
     } catch (err) {
       coreEvents.emit(CoreEvent.UserFeedback, {
         severity: 'error',
