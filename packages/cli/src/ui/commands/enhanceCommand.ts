@@ -78,7 +78,11 @@ export const enhanceCommand: SlashCommand = {
         LlmRole.UTILITY_TOOL,
       );
 
-      const enhancedText = response.candidates?.[0]?.content?.parts?.[0]?.text;
+      const parts = response.candidates?.[0]?.content?.parts;
+      const enhancedText = parts
+        ?.find((part) => 'text' in part && !('thought' in part))
+        ?.text?.replace(/\n/g, '')
+        ?.replace(/]/g, '');
 
       if (enhancedText) {
         const cleanedText = clean(enhancedText);

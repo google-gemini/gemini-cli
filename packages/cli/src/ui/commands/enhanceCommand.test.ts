@@ -172,4 +172,30 @@ describe('enhanceCommand', () => {
       }),
     );
   });
+  it('should ignore thought parts and sanitize the output', async () => {
+    if (!enhanceCommand.action) throw new Error('Action must be defined');
+
+    mockGenerateContent.mockResolvedValue({
+      candidates: [
+        {
+          content: {
+            parts: [
+              { thought: true, text: 'This is a thought.' },
+              { text: 'Sanitized\nPrompt]' },
+            ],
+          },
+        },
+      ],
+    });
+
+    await enhanceCommand.action(mockContext, 'dirty prompt');
+
+    expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: MessageType.INFO,
+        text: expect.stringContaining('Enhanced prompt:\n\nSanitizedPrompt'),
+      }),
+    );
+    expect(mockContext.ui.setInput).toHaveBeenCalledWith('SanitizedPrompt');
+  });
 });
