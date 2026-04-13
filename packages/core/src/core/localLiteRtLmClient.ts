@@ -27,9 +27,6 @@ export class LocalLiteRtLmClient {
       apiKey: 'no-api-key-needed',
       httpOptions: {
         baseUrl: this.host,
-        // The LiteRT-LM server does not use a versioned API path prefix.
-        // The SDK defaults to 'v1beta' which produces 404s against LiteRT-LM.
-        apiVersion: '',
         // If the LiteRT-LM server is started but the wrong port is set, there will be a lengthy TCP timeout (here fixed to be 10 seconds).
         // If the LiteRT-LM server is not started, there will be an immediate connection refusal.
         // If the LiteRT-LM server is started and the model is unsupported or not downloaded, the server will return an error immediately.
