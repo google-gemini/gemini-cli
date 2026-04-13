@@ -1,9 +1,9 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`<HalfLinePaddedBox /> > renders Apple Terminal-specific blocks when detected 1`] = `
-"▀▀▀▀▀▀▀▀▀▀
+"▄▄▄▄▄▄▄▄▄▄
 Content   
-▄▄▄▄▄▄▄▄▄▄
+▀▀▀▀▀▀▀▀▀▀
 "
 `;
 

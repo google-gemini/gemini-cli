@@ -15,7 +15,7 @@ import {
   getSafeLowColorBackground,
 } from '../../themes/color-utils.js';
 import { isLowColorDepth } from '../../utils/terminalUtils.js';
-import { isAppleTerminal } from '@google/gemini-cli-core';
+import { supportsTrueColor } from '@google/gemini-cli-core';
 
 export interface HalfLinePaddedBoxProps {
   /**
@@ -80,9 +80,9 @@ const HalfLinePaddedBoxInternal: React.FC<HalfLinePaddedBoxProps> = ({
     return <>{children}</>;
   }
 
-  const isApple = isAppleTerminal();
+  const noTrueColor = !supportsTrueColor();
 
-  if (isApple) {
+  if (noTrueColor) {
     return (
       <Box
         width={terminalWidth}
