@@ -11,6 +11,7 @@ import {
   MAX_NOTIFICATION_SUBTITLE_CHARS,
   MAX_NOTIFICATION_TITLE_CHARS,
   notifyViaTerminal,
+  TerminalNotificationMethod,
 } from './terminalNotifications.js';
 
 const writeToStdout = vi.hoisted(() => vi.fn());
@@ -24,38 +25,13 @@ vi.mock('@google/gemini-cli-core', () => ({
 }));
 
 describe('terminal notifications', () => {
-  const originalPlatform = process.platform;
-
   beforeEach(() => {
     vi.resetAllMocks();
     vi.unstubAllEnvs();
-    Object.defineProperty(process, 'platform', {
-      value: 'darwin',
-      configurable: true,
-    });
   });
 
   afterEach(() => {
     vi.unstubAllEnvs();
-    Object.defineProperty(process, 'platform', {
-      value: originalPlatform,
-      configurable: true,
-    });
-  });
-
-  it('emits notification on non-macOS platforms', async () => {
-    Object.defineProperty(process, 'platform', {
-      value: 'linux',
-      configurable: true,
-    });
-
-    const shown = await notifyViaTerminal(true, {
-      title: 't',
-      body: 'b',
-    });
-
-    expect(shown).toBe(true);
-    expect(writeToStdout).toHaveBeenCalled();
   });
 
   it('returns false without writing when disabled', async () => {
@@ -161,5 +137,93 @@ describe('terminal notifications', () => {
     expect(content.body.length).toBeLessThanOrEqual(
       MAX_NOTIFICATION_BODY_CHARS,
     );
+  });
+
+  it('emits OSC 9 notification when method is explicitly set to osc9', async () => {
+    // Explicitly set terminal to something that would normally fallback to BEL
+    vi.stubEnv('TERM_PROGRAM', '');
+    vi.stubEnv('TERM', '');
+
+    const shown = await notifyViaTerminal(
+      true,
+      {
+        title: 'Explicit OSC 9',
+        body: 'Body',
+      },
+      TerminalNotificationMethod.Osc9,
+    );
+
+    expect(shown).toBe(true);
+    expect(writeToStdout).toHaveBeenCalledTimes(1);
+    const emitted = String(writeToStdout.mock.calls[0][0]);
+    expect(emitted.startsWith('\x1b]9;')).toBe(true);
+    expect(emitted.endsWith('\x07')).toBe(true);
+    expect(emitted).toContain('Explicit OSC 9');
+  });
+
+  it('emits OSC 777 notification when method is explicitly set to osc777', async () => {
+    const shown = await notifyViaTerminal(
+      true,
+      {
+        title: 'Explicit OSC 777',
+        body: 'Body',
+      },
+      TerminalNotificationMethod.Osc777,
+    );
+
+    expect(shown).toBe(true);
+    expect(writeToStdout).toHaveBeenCalledTimes(1);
+    const emitted = String(writeToStdout.mock.calls[0][0]);
+    expect(emitted.startsWith('\x1b]777;notify;')).toBe(true);
+    expect(emitted.endsWith('\x07')).toBe(true);
+    expect(emitted).toContain('Explicit OSC 777');
+  });
+
+  it('emits BEL notification when method is explicitly set to bell', async () => {
+    // Explicitly set terminal to something that supports OSC 9
+    vi.stubEnv('WT_SESSION', '');
+    vi.stubEnv('TERM_PROGRAM', 'iTerm.app');
+
+    const shown = await notifyViaTerminal(
+      true,
+      {
+        title: 'Explicit BEL',
+        body: 'Body',
+      },
+      TerminalNotificationMethod.Bell,
+    );
+
+    expect(shown).toBe(true);
+    expect(writeToStdout).toHaveBeenCalledTimes(1);
+    expect(writeToStdout).toHaveBeenCalledWith('\x07');
+  });
+
+  it('replaces semicolons with colons in OSC 777 to avoid breaking the sequence', async () => {
+    const shown = await notifyViaTerminal(
+      true,
+      {
+        title: 'Title; with; semicolons',
+        subtitle: 'Sub;title',
+        body: 'Body; with; semicolons',
+      },
+      TerminalNotificationMethod.Osc777,
+    );
+
+    expect(shown).toBe(true);
+    const emitted = String(writeToStdout.mock.calls[0][0]);
+
+    // Format: \x1b]777;notify;title;body\x07
+    expect(emitted).toContain('Title: with: semicolons');
+    expect(emitted).toContain('Sub:title');
+    expect(emitted).toContain('Body: with: semicolons');
+    expect(emitted).not.toContain('Title; with; semicolons');
+    expect(emitted).not.toContain('Body; with; semicolons');
+
+    // Extract everything after '\x1b]777;notify;' and before '\x07'
+    const payload = emitted.slice('\x1b]777;notify;'.length, -1);
+
+    // There should be exactly one semicolon separating title and body
+    const semicolonsCount = (payload.match(/;/g) || []).length;
+    expect(semicolonsCount).toBe(1);
   });
 });
