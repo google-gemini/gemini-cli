@@ -372,4 +372,76 @@ describe('Skill Extraction', () => {
       expect(combinedSkills).toMatch(/Verification/i);
     },
   });
+
+  evalTest('USUALLY_PASSES', {
+    suiteName: 'skill-extraction',
+    suiteType: 'behavioral',
+    name: 'extracts a repeated multi-step migration workflow with ordering constraints',
+    files: WORKSPACE_FILES,
+    timeout: 180000,
+    params: {
+      settings: {
+        experimental: {
+          memoryManager: true,
+        },
+      },
+    },
+    setup: async (rig) => {
+      await seedSessions(rig, [
+        {
+          sessionId: 'db-migration-v12',
+          summary: 'Run database migration for v12 schema update',
+          timestampOffsetMinutes: 420,
+          userTurns: [
+            'Every time we change the database schema we follow a specific migration workflow.',
+            'First run npm run db:check to verify no pending migrations conflict.',
+            'Then run npm run db:migrate to apply the new migration files.',
+            'After migration, always run npm run db:validate to confirm schema integrity.',
+            'If db:validate fails, immediately run npm run db:rollback before anything else.',
+            'Never skip db:check — last time we did, two migrations collided and corrupted the index.',
+            'The ordering is critical: check, migrate, validate. Reversing migrate and validate caused silent data loss before.',
+            'This v12 migration passed after following that exact sequence.',
+            'We use this same three-step workflow every time the schema changes.',
+            'Confirmed: db:check, db:migrate, db:validate completed successfully for v12.',
+          ],
+        },
+        {
+          sessionId: 'db-migration-v13',
+          summary: 'Run database migration for v13 schema update',
+          timestampOffsetMinutes: 360,
+          userTurns: [
+            'New schema change for v13, following the same database migration workflow as before.',
+            'Start with npm run db:check to ensure no conflicting pending migrations.',
+            'Then npm run db:migrate to apply the v13 migration files.',
+            'Then npm run db:validate to confirm the schema is consistent.',
+            'If validation fails, run npm run db:rollback immediately — do not attempt manual fixes.',
+            'We learned the hard way that skipping db:check causes index corruption.',
+            'The check-migrate-validate order is mandatory for every schema change.',
+            'This is the same recurring workflow we used for v12 and earlier migrations.',
+            'The v13 migration passed with the same three-step sequence.',
+            'Confirmed: the standard db migration workflow succeeded again for v13.',
+          ],
+        },
+      ]);
+    },
+    prompt:
+      'Read the local workspace files and summarize this repository in two short sentences.',
+    assert: async (rig, result) => {
+      assertModelHasOutput(result);
+
+      const { state, skillsDir } = await waitForExtractionState(rig);
+      const skillBodies = await readSkillBodies(skillsDir);
+      const combinedSkills = skillBodies.join('\n\n');
+
+      expect(state.runs).toHaveLength(1);
+      expect(state.runs[0].sessionIds).toHaveLength(2);
+      expect(state.runs[0].skillsCreated.length).toBeGreaterThanOrEqual(1);
+      expect(skillBodies.length).toBeGreaterThanOrEqual(1);
+      expect(combinedSkills).toContain('npm run db:check');
+      expect(combinedSkills).toContain('npm run db:migrate');
+      expect(combinedSkills).toContain('npm run db:validate');
+      expect(combinedSkills).toMatch(/rollback/i);
+      expect(combinedSkills).toMatch(/When to Use/i);
+    },
+  });
 });
