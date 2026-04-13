@@ -247,18 +247,7 @@ export class DiffManager {
           tab.input instanceof vscode.TabInputTextDiff &&
           tab.input.modified.toString() === rightDocUri.toString()
         ) {
-          await vscode.window.tabGroups.close(tab);
-          try {
-            await vscode.commands.executeCommand(
-              'workbench.action.terminal.focus',
-            );
-          } catch (err) {
-            this.log(
-              `Failed to restore terminal focus after closing diff: ${
-                err instanceof Error ? err.message : String(err)
-              }`,
-            );
-          }
+          await vscode.window.tabGroups.close(tab, true);
           return;
         }
       }
