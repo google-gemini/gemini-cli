@@ -9,7 +9,11 @@ import { render } from 'ink';
 import { basename } from 'node:path';
 import { AppContainer } from './ui/AppContainer.js';
 import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
-import { registerCleanup, setupTtyCheck } from './utils/cleanup.js';
+import {
+  registerCleanup,
+  removeCleanup,
+  setupTtyCheck,
+} from './utils/cleanup.js';
 import {
   type StartupWarning,
   type Config,
@@ -43,9 +47,9 @@ import { KeypressProvider } from './ui/contexts/KeypressContext.js';
 import { useKittyKeyboardProtocol } from './ui/hooks/useKittyKeyboardProtocol.js';
 import { ScrollProvider } from './ui/contexts/ScrollProvider.js';
 import { TerminalProvider } from './ui/contexts/TerminalContext.js';
-import { isAlternateBufferEnabled } from './ui/hooks/useAlternateBuffer.js';
 import { OverflowProvider } from './ui/contexts/OverflowContext.js';
 import { profiler } from './ui/components/DebugProfiler.js';
+import { initializeConsoleStore } from './ui/hooks/useConsoleMessages.js';
 
 const SLOW_RENDER_MS = 200;
 
@@ -57,12 +61,13 @@ export async function startInteractiveUI(
   resumedSessionData: ResumedSessionData | undefined,
   initializationResult: InitializationResult,
 ) {
+  initializeConsoleStore();
   // Never enter Ink alternate buffer mode when screen reader mode is enabled
   // as there is no benefit of alternate buffer mode when using a screen reader
   // and the Ink alternate buffer mode requires line wrapping harmful to
   // screen readers.
   const useAlternateBuffer = shouldEnterAlternateScreen(
-    isAlternateBufferEnabled(config),
+    config.getUseAlternateBuffer(),
     config.getScreenReader(),
   );
   const mouseEventsEnabled = useAlternateBuffer;
@@ -88,7 +93,6 @@ export async function startInteractiveUI(
     debugMode: config.getDebugMode(),
   });
   consolePatcher.patch();
-  registerCleanup(consolePatcher.cleanup);
 
   const { stdout: inkStdout, stderr: inkStderr } = createWorkingStdio();
 
@@ -106,7 +110,7 @@ export async function startInteractiveUI(
               <TerminalProvider>
                 <ScrollProvider>
                   <OverflowProvider>
-                    <SessionStatsProvider>
+                    <SessionStatsProvider sessionId={config.getSessionId()}>
                       <VimModeProvider>
                         <AppContainer
                           config={config}
@@ -131,7 +135,6 @@ export async function startInteractiveUI(
     // Wait a moment for shpool to stabilize terminal size and state.
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
-
   const instance = render(
     process.env['DEBUG'] ? (
       <React.StrictMode>
@@ -152,20 +155,26 @@ export async function startInteractiveUI(
         }
         profiler.reportFrameRendered();
       },
+      standardReactLayoutTiming:
+        useAlternateBuffer || config.getUseTerminalBuffer(),
       patchConsole: false,
       alternateBuffer: useAlternateBuffer,
+      terminalBuffer: config.getUseTerminalBuffer(),
+      renderProcess:
+        config.getUseRenderProcess() && config.getUseTerminalBuffer(),
       incrementalRendering:
         settings.merged.ui.incrementalRendering !== false &&
         useAlternateBuffer &&
         !isShpool,
+      debugRainbow: settings.merged.ui.debugRainbow === true,
     },
   );
 
+  let cleanupLineWrapping: (() => void) | undefined;
   if (useAlternateBuffer) {
     disableLineWrapping();
-    registerCleanup(() => {
-      enableLineWrapping();
-    });
+    cleanupLineWrapping = () => enableLineWrapping();
+    registerCleanup(cleanupLineWrapping);
   }
 
   checkForUpdates(settings)
@@ -179,9 +188,48 @@ export async function startInteractiveUI(
       }
     });
 
-  registerCleanup(() => instance.unmount());
+  const cleanupUnmount = () => instance.unmount();
+  registerCleanup(cleanupUnmount);
 
-  registerCleanup(setupTtyCheck());
+  const cleanupTtyCheck = setupTtyCheck();
+  registerCleanup(cleanupTtyCheck);
+
+  const cleanupConsolePatcher = () => consolePatcher.cleanup();
+  registerCleanup(cleanupConsolePatcher);
+
+  try {
+    await instance.waitUntilExit();
+  } finally {
+    try {
+      removeCleanup(cleanupConsolePatcher);
+      cleanupConsolePatcher();
+    } catch (e: unknown) {
+      debugLogger.error('Error cleaning up console patcher:', e);
+    }
+
+    try {
+      removeCleanup(cleanupUnmount);
+      instance.unmount();
+    } catch (e: unknown) {
+      debugLogger.error('Error unmounting Ink instance:', e);
+    }
+
+    try {
+      removeCleanup(cleanupTtyCheck);
+      cleanupTtyCheck();
+    } catch (e: unknown) {
+      debugLogger.error('Error in TTY cleanup:', e);
+    }
+
+    if (cleanupLineWrapping) {
+      try {
+        removeCleanup(cleanupLineWrapping);
+        cleanupLineWrapping();
+      } catch (e: unknown) {
+        debugLogger.error('Error restoring line wrapping:', e);
+      }
+    }
+  }
 }
 
 function setWindowTitle(title: string, settings: LoadedSettings) {

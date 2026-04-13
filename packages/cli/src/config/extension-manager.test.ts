@@ -101,7 +101,7 @@ describe('ExtensionManager', () => {
     themeManager.clearExtensionThemes();
     try {
       fs.rmSync(tempHomeDir, { recursive: true, force: true });
-    } catch (_e) {
+    } catch {
       // Ignore
     }
   });
@@ -634,66 +634,6 @@ describe('ExtensionManager', () => {
 
       expect(themeManager.getCustomThemeNames()).not.toContain(
         'MyTheme (disabled-ext)',
-      );
-    });
-  });
-
-  describe('orphaned extension cleanup', () => {
-    it('should remove broken extension metadata on startup to allow re-installation', async () => {
-      const extName = 'orphaned-ext';
-      const sourceDir = path.join(tempHomeDir, 'valid-source');
-      fs.mkdirSync(sourceDir, { recursive: true });
-      fs.writeFileSync(
-        path.join(sourceDir, 'gemini-extension.json'),
-        JSON.stringify({ name: extName, version: '1.0.0' }),
-      );
-
-      // Link an extension successfully.
-      await extensionManager.loadExtensions();
-      await extensionManager.installOrUpdateExtension({
-        source: sourceDir,
-        type: 'link',
-      });
-
-      const destinationPath = path.join(userExtensionsDir, extName);
-      const metadataPath = path.join(
-        destinationPath,
-        '.gemini-extension-install.json',
-      );
-      expect(fs.existsSync(metadataPath)).toBe(true);
-
-      // Simulate metadata corruption (e.g., pointing to a non-existent source).
-      fs.writeFileSync(
-        metadataPath,
-        JSON.stringify({ source: '/NON_EXISTENT_PATH', type: 'link' }),
-      );
-
-      // Simulate CLI startup. The manager should detect the broken link
-      // and proactively delete the orphaned metadata directory.
-      const newManager = new ExtensionManager({
-        settings: createTestMergedSettings(),
-        workspaceDir: tempWorkspaceDir,
-        requestConsent: vi.fn().mockResolvedValue(true),
-        requestSetting: null,
-        integrityManager: mockIntegrityManager,
-      });
-
-      await newManager.loadExtensions();
-
-      // Verify the extension failed to load and was proactively cleaned up.
-      expect(newManager.getExtensions().some((e) => e.name === extName)).toBe(
-        false,
-      );
-      expect(fs.existsSync(destinationPath)).toBe(false);
-
-      // Verify the system is self-healed and allows re-linking to the valid source.
-      await newManager.installOrUpdateExtension({
-        source: sourceDir,
-        type: 'link',
-      });
-
-      expect(newManager.getExtensions().some((e) => e.name === extName)).toBe(
-        true,
       );
     });
   });

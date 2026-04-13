@@ -9,15 +9,23 @@ import { renderWithProviders } from '../../test-utils/render.js';
 import { ToastDisplay, shouldShowToast } from './ToastDisplay.js';
 import { TransientMessageType } from '../../utils/events.js';
 import { type UIState } from '../contexts/UIStateContext.js';
+import { type InputState } from '../contexts/InputContext.js';
 import { type TextBuffer } from './shared/text-buffer.js';
 import { type HistoryItem } from '../types.js';
 
-const renderToastDisplay = async (uiState: Partial<UIState> = {}) =>
+const renderToastDisplay = async (
+  uiState: Partial<UIState> = {},
+  inputState: Partial<InputState> = {},
+) =>
   renderWithProviders(<ToastDisplay />, {
     uiState: {
-      buffer: { text: '' } as TextBuffer,
       history: [] as HistoryItem[],
       ...uiState,
+    },
+    inputState: {
+      buffer: { text: '' } as TextBuffer,
+      showEscapePrompt: false,
+      ...inputState,
     },
   });
 
@@ -27,177 +35,209 @@ describe('ToastDisplay', () => {
   });
 
   describe('shouldShowToast', () => {
-    const baseState: Partial<UIState> = {
+    const baseUIState: Partial<UIState> = {
       ctrlCPressedOnce: false,
       transientMessage: null,
       ctrlDPressedOnce: false,
-      showEscapePrompt: false,
-      buffer: { text: '' } as TextBuffer,
       history: [] as HistoryItem[],
       queueErrorMessage: null,
       showIsExpandableHint: false,
     };
 
+    const baseInputState: Partial<InputState> = {
+      showEscapePrompt: false,
+      buffer: { text: '' } as TextBuffer,
+    };
+
     it('returns false for default state', () => {
-      expect(shouldShowToast(baseState as UIState)).toBe(false);
+      expect(
+        shouldShowToast(baseUIState as UIState, baseInputState as InputState),
+      ).toBe(false);
     });
 
     it('returns true when showIsExpandableHint is true', () => {
       expect(
-        shouldShowToast({
-          ...baseState,
-          showIsExpandableHint: true,
-        } as UIState),
+        shouldShowToast(
+          {
+            ...baseUIState,
+            showIsExpandableHint: true,
+          } as UIState,
+          baseInputState as InputState,
+        ),
       ).toBe(true);
     });
 
     it('returns true when ctrlCPressedOnce is true', () => {
       expect(
-        shouldShowToast({ ...baseState, ctrlCPressedOnce: true } as UIState),
+        shouldShowToast(
+          { ...baseUIState, ctrlCPressedOnce: true } as UIState,
+          baseInputState as InputState,
+        ),
       ).toBe(true);
     });
 
     it('returns true when transientMessage is present', () => {
       expect(
-        shouldShowToast({
-          ...baseState,
-          transientMessage: { text: 'test', type: TransientMessageType.Hint },
-        } as UIState),
+        shouldShowToast(
+          {
+            ...baseUIState,
+            transientMessage: { text: 'test', type: TransientMessageType.Hint },
+          } as UIState,
+          baseInputState as InputState,
+        ),
       ).toBe(true);
     });
 
     it('returns true when ctrlDPressedOnce is true', () => {
       expect(
-        shouldShowToast({ ...baseState, ctrlDPressedOnce: true } as UIState),
+        shouldShowToast(
+          { ...baseUIState, ctrlDPressedOnce: true } as UIState,
+          baseInputState as InputState,
+        ),
       ).toBe(true);
     });
 
     it('returns true when showEscapePrompt is true and buffer is NOT empty', () => {
       expect(
-        shouldShowToast({
-          ...baseState,
-          showEscapePrompt: true,
-          buffer: { text: 'some text' } as TextBuffer,
-        } as UIState),
+        shouldShowToast(
+          {
+            ...baseUIState,
+          } as UIState,
+          {
+            ...baseInputState,
+            showEscapePrompt: true,
+            buffer: { text: 'some text' } as TextBuffer,
+          } as InputState,
+        ),
       ).toBe(true);
     });
 
     it('returns true when showEscapePrompt is true and history is NOT empty', () => {
       expect(
-        shouldShowToast({
-          ...baseState,
-          showEscapePrompt: true,
-          history: [{ id: '1' } as unknown as HistoryItem],
-        } as UIState),
+        shouldShowToast(
+          {
+            ...baseUIState,
+            history: [{ id: '1' } as unknown as HistoryItem],
+          } as UIState,
+          {
+            ...baseInputState,
+            showEscapePrompt: true,
+          } as InputState,
+        ),
       ).toBe(true);
     });
 
     it('returns false when showEscapePrompt is true but buffer and history are empty', () => {
       expect(
-        shouldShowToast({
-          ...baseState,
-          showEscapePrompt: true,
-        } as UIState),
+        shouldShowToast(
+          {
+            ...baseUIState,
+          } as UIState,
+          {
+            ...baseInputState,
+            showEscapePrompt: true,
+          } as InputState,
+        ),
       ).toBe(false);
     });
 
     it('returns true when queueErrorMessage is present', () => {
       expect(
-        shouldShowToast({
-          ...baseState,
-          queueErrorMessage: 'error',
-        } as UIState),
+        shouldShowToast(
+          {
+            ...baseUIState,
+            queueErrorMessage: 'error',
+          } as UIState,
+          baseInputState as InputState,
+        ),
       ).toBe(true);
     });
   });
 
   it('renders nothing by default', async () => {
-    const { lastFrame, waitUntilReady } = await renderToastDisplay();
-    await waitUntilReady();
+    const { lastFrame } = await renderToastDisplay();
     expect(lastFrame({ allowEmpty: true })).toBe('');
   });
 
   it('renders Ctrl+C prompt', async () => {
-    const { lastFrame, waitUntilReady } = await renderToastDisplay({
+    const { lastFrame } = await renderToastDisplay({
       ctrlCPressedOnce: true,
     });
-    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
   });
 
   it('renders warning message', async () => {
-    const { lastFrame, waitUntilReady } = await renderToastDisplay({
+    const { lastFrame } = await renderToastDisplay({
       transientMessage: {
         text: 'This is a warning',
         type: TransientMessageType.Warning,
       },
     });
-    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
   });
 
   it('renders hint message', async () => {
-    const { lastFrame, waitUntilReady } = await renderToastDisplay({
+    const { lastFrame } = await renderToastDisplay({
       transientMessage: {
         text: 'This is a hint',
         type: TransientMessageType.Hint,
       },
     });
-    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
   });
 
   it('renders Ctrl+D prompt', async () => {
-    const { lastFrame, waitUntilReady } = await renderToastDisplay({
+    const { lastFrame } = await renderToastDisplay({
       ctrlDPressedOnce: true,
     });
-    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
   });
 
   it('renders Escape prompt when buffer is empty', async () => {
-    const { lastFrame, waitUntilReady } = await renderToastDisplay({
-      showEscapePrompt: true,
-      history: [{ id: 1, type: 'user', text: 'test' }] as HistoryItem[],
-    });
-    await waitUntilReady();
+    const { lastFrame } = await renderToastDisplay(
+      {
+        history: [{ id: 1, type: 'user', text: 'test' }] as HistoryItem[],
+      },
+      {
+        showEscapePrompt: true,
+      },
+    );
     expect(lastFrame()).toMatchSnapshot();
   });
 
   it('renders Escape prompt when buffer is NOT empty', async () => {
-    const { lastFrame, waitUntilReady } = await renderToastDisplay({
-      showEscapePrompt: true,
-      buffer: { text: 'some text' } as TextBuffer,
-    });
-    await waitUntilReady();
+    const { lastFrame } = await renderToastDisplay(
+      {},
+      {
+        showEscapePrompt: true,
+        buffer: { text: 'some text' } as TextBuffer,
+      },
+    );
     expect(lastFrame()).toMatchSnapshot();
   });
 
   it('renders Queue Error Message', async () => {
-    const { lastFrame, waitUntilReady } = await renderToastDisplay({
+    const { lastFrame } = await renderToastDisplay({
       queueErrorMessage: 'Queue Error',
     });
-    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
   });
 
   it('renders expansion hint when showIsExpandableHint is true', async () => {
-    const { lastFrame, waitUntilReady } = await renderToastDisplay({
+    const { lastFrame } = await renderToastDisplay({
       showIsExpandableHint: true,
       constrainHeight: true,
     });
-    await waitUntilReady();
     expect(lastFrame()).toContain(
       'Press Ctrl+O to show more lines of the last response',
     );
   });
 
   it('renders collapse hint when showIsExpandableHint is true and constrainHeight is false', async () => {
-    const { lastFrame, waitUntilReady } = await renderToastDisplay({
+    const { lastFrame } = await renderToastDisplay({
       showIsExpandableHint: true,
       constrainHeight: false,
     });
-    await waitUntilReady();
     expect(lastFrame()).toContain(
       'Ctrl+O to collapse lines of the last response',
     );

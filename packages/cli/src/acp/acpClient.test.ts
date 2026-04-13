@@ -21,13 +21,15 @@ import {
   AuthType,
   ToolConfirmationOutcome,
   StreamEventType,
-  isWithinRoot,
   ReadManyFilesTool,
   type GeminiChat,
   type Config,
   type MessageBus,
   LlmRole,
   type GitService,
+  type ModelRouterService,
+  processSingleFileContent,
+  InvalidStreamError,
 } from '@google/gemini-cli-core';
 import {
   SettingScope,
@@ -99,19 +101,10 @@ vi.mock(
     const actual = await importOriginal();
     return {
       ...actual,
-      ReadManyFilesTool: vi.fn().mockImplementation(() => ({
-        name: 'read_many_files',
-        kind: 'read',
-        build: vi.fn().mockReturnValue({
-          getDescription: () => 'Read files',
-          toolLocations: () => [],
-          execute: vi.fn().mockResolvedValue({
-            llmContent: ['--- file.txt ---\n\nFile content\n\n'],
-          }),
-        }),
-      })),
+      updatePolicy: vi.fn(),
+      createPolicyUpdater: vi.fn(),
+      ReadManyFilesTool: vi.fn(),
       logToolCall: vi.fn(),
-      isWithinRoot: vi.fn().mockReturnValue(true),
       LlmRole: {
         MAIN: 'main',
         SUBAGENT: 'subagent',
@@ -134,6 +127,7 @@ vi.mock(
         Cancelled: 'cancelled',
         AwaitingApproval: 'awaiting_approval',
       },
+      processSingleFileContent: vi.fn(),
     };
   },
 );
@@ -177,6 +171,24 @@ describe('GeminiAgent', () => {
       getHasAccessToPreviewModel: vi.fn().mockReturnValue(false),
       getCheckpointingEnabled: vi.fn().mockReturnValue(false),
       getDisableAlwaysAllow: vi.fn().mockReturnValue(false),
+      validatePathAccess: vi.fn().mockReturnValue(null),
+      getWorkspaceContext: vi.fn().mockReturnValue({
+        addReadOnlyPath: vi.fn(),
+      }),
+      getPolicyEngine: vi.fn().mockReturnValue({
+        addRule: vi.fn(),
+      }),
+      messageBus: {
+        publish: vi.fn(),
+        subscribe: vi.fn(),
+        unsubscribe: vi.fn(),
+      },
+      storage: {
+        getWorkspaceAutoSavedPolicyPath: vi.fn(),
+        getAutoSavedPolicyPath: vi.fn(),
+        setClientName: vi.fn(),
+      },
+      setClientName: vi.fn(),
       get config() {
         return this;
       },
@@ -191,12 +203,16 @@ describe('GeminiAgent', () => {
     mockArgv = {} as unknown as CliArgs;
     mockConnection = {
       sessionUpdate: vi.fn(),
+      requestPermission: vi.fn(),
     } as unknown as Mocked<acp.AgentSideConnection>;
 
     (loadCliConfig as unknown as Mock).mockResolvedValue(mockConfig);
     (loadSettings as unknown as Mock).mockImplementation(() => ({
       merged: {
-        security: { auth: { selectedType: AuthType.LOGIN_WITH_GOOGLE } },
+        security: {
+          auth: { selectedType: AuthType.LOGIN_WITH_GOOGLE },
+          enablePermanentToolApproval: true,
+        },
         mcpServers: {},
       },
       setValue: vi.fn(),
@@ -391,6 +407,26 @@ describe('GeminiAgent', () => {
         expect.objectContaining({
           modelId: 'gemini-3.1-pro-preview',
           name: 'gemini-3.1-pro-preview',
+        }),
+      ]),
+    );
+  });
+
+  it('should include gemini-3.1-flash-lite when useGemini31FlashLite is true', async () => {
+    mockConfig.getHasAccessToPreviewModel = vi.fn().mockReturnValue(true);
+    mockConfig.getGemini31LaunchedSync = vi.fn().mockReturnValue(true);
+    mockConfig.getGemini31FlashLiteLaunchedSync = vi.fn().mockReturnValue(true);
+
+    const response = await agent.newSession({
+      cwd: '/tmp',
+      mcpServers: [],
+    });
+
+    expect(response.models?.availableModels).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          modelId: 'gemini-3.1-flash-lite-preview',
+          name: 'gemini-3.1-flash-lite-preview',
         }),
       ]),
     );
@@ -621,6 +657,7 @@ describe('Session', () => {
       sendMessageStream: vi.fn(),
       addHistory: vi.fn(),
       recordCompletedToolCalls: vi.fn(),
+      getHistory: vi.fn().mockReturnValue([]),
     } as unknown as Mocked<GeminiChat>;
     mockTool = {
       kind: 'read',
@@ -642,12 +679,16 @@ describe('Session', () => {
     mockConfig = {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getActiveModel: vi.fn().mockReturnValue('gemini-pro'),
+      getModelRouterService: vi.fn().mockReturnValue({
+        route: vi.fn().mockResolvedValue({ model: 'resolved-model' }),
+      }),
       getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
       getMcpServers: vi.fn(),
       getFileService: vi.fn().mockReturnValue({
         shouldIgnoreFile: vi.fn().mockReturnValue(false),
       }),
       getFileFilteringOptions: vi.fn().mockReturnValue({}),
+      getFileSystemService: vi.fn().mockReturnValue({}),
       getTargetDir: vi.fn().mockReturnValue('/tmp'),
       getEnableRecursiveFileSearch: vi.fn().mockReturnValue(false),
       getDebugMode: vi.fn().mockReturnValue(false),
@@ -657,6 +698,10 @@ describe('Session', () => {
       isPlanEnabled: vi.fn().mockReturnValue(true),
       getCheckpointingEnabled: vi.fn().mockReturnValue(false),
       getGitService: vi.fn().mockResolvedValue({} as GitService),
+      validatePathAccess: vi.fn().mockReturnValue(null),
+      getWorkspaceContext: vi.fn().mockReturnValue({
+        addReadOnlyPath: vi.fn(),
+      }),
       waitForMcpInit: vi.fn(),
       getDisableAlwaysAllow: vi.fn().mockReturnValue(false),
       get config() {
@@ -677,13 +722,28 @@ describe('Session', () => {
       systemDefaults: { settings: {} },
       user: { settings: {} },
       workspace: { settings: {} },
-      merged: { settings: {} },
+      merged: {
+        security: { enablePermanentToolApproval: true },
+        mcpServers: {},
+      },
       errors: [],
     } as unknown as LoadedSettings);
+
+    (ReadManyFilesTool as unknown as Mock).mockImplementation(() => ({
+      name: 'read_many_files',
+      kind: 'read',
+      build: vi.fn().mockReturnValue({
+        getDescription: () => 'Read files',
+        toolLocations: () => [],
+        execute: vi.fn().mockResolvedValue({
+          llmContent: ['--- file.txt ---\n\nFile content\n\n'],
+        }),
+      }),
+    }));
   });
 
   afterEach(() => {
-    vi.clearAllMocks();
+    vi.restoreAllMocks();
   });
 
   it('should send available commands', async () => {
@@ -750,6 +810,94 @@ describe('Session', () => {
         content: { type: 'text', text: 'Hello' },
       },
     });
+    expect(result).toMatchObject({ stopReason: 'end_turn' });
+  });
+
+  it('should use model router to determine model', async () => {
+    const mockRouter = {
+      route: vi.fn().mockResolvedValue({ model: 'routed-model' }),
+    } as unknown as ModelRouterService;
+    mockConfig.getModelRouterService.mockReturnValue(mockRouter);
+
+    const stream = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: {
+          candidates: [{ content: { parts: [{ text: 'Hello' }] } }],
+        },
+      },
+    ]);
+    mockChat.sendMessageStream.mockResolvedValue(stream);
+
+    await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Hi' }],
+    });
+
+    expect(mockRouter.route).toHaveBeenCalledWith(
+      expect.objectContaining({
+        requestedModel: 'gemini-pro',
+        request: [{ text: 'Hi' }],
+      }),
+    );
+    expect(mockChat.sendMessageStream).toHaveBeenCalledWith(
+      expect.objectContaining({ model: 'routed-model' }),
+      expect.any(Array),
+      expect.any(String),
+      expect.any(Object),
+      expect.any(String),
+    );
+  });
+
+  it('should handle prompt with empty response (InvalidStreamError)', async () => {
+    mockChat.sendMessageStream.mockRejectedValue(
+      new InvalidStreamError('Empty response', 'NO_RESPONSE_TEXT'),
+    );
+
+    const result = await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Hi' }],
+    });
+
+    expect(mockChat.sendMessageStream).toHaveBeenCalled();
+    expect(result).toMatchObject({ stopReason: 'end_turn' });
+  });
+
+  it('should handle prompt with empty response (NO_RESPONSE_TEXT anomaly)', async () => {
+    mockChat.sendMessageStream.mockRejectedValue({ type: 'NO_RESPONSE_TEXT' });
+
+    const result = await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Hi' }],
+    });
+
+    expect(mockChat.sendMessageStream).toHaveBeenCalled();
+    expect(result).toMatchObject({ stopReason: 'end_turn' });
+  });
+
+  it('should handle prompt with no finish reason (InvalidStreamError)', async () => {
+    mockChat.sendMessageStream.mockRejectedValue(
+      new InvalidStreamError('No finish reason', 'NO_FINISH_REASON'),
+    );
+
+    const result = await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Hi' }],
+    });
+
+    expect(mockChat.sendMessageStream).toHaveBeenCalled();
+    expect(result).toMatchObject({ stopReason: 'end_turn' });
+  });
+
+  it('should handle prompt with no finish reason (NO_FINISH_REASON anomaly)', async () => {
+    mockChat.sendMessageStream.mockRejectedValue({ type: 'NO_FINISH_REASON' });
+
+    const result = await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Hi' }],
+    });
+
+    expect(mockChat.sendMessageStream).toHaveBeenCalled();
     expect(result).toMatchObject({ stopReason: 'end_turn' });
   });
 
@@ -1016,6 +1164,166 @@ describe('Session', () => {
     );
   });
 
+  it('should exclude always allow and save permanent option when enablePermanentToolApproval is false', async () => {
+    mockConfig.getDisableAlwaysAllow = vi.fn().mockReturnValue(false);
+    const confirmationDetails = {
+      type: 'edit',
+      onConfirm: vi.fn(),
+    };
+    mockTool.build.mockReturnValue({
+      getDescription: () => 'Test Tool',
+      toolLocations: () => [],
+      shouldConfirmExecute: vi.fn().mockResolvedValue(confirmationDetails),
+      execute: vi.fn().mockResolvedValue({ llmContent: 'Tool Result' }),
+    });
+
+    const customSettings = {
+      system: { settings: {} },
+      systemDefaults: { settings: {} },
+      user: { settings: {} },
+      workspace: { settings: {} },
+      merged: {
+        security: { enablePermanentToolApproval: false },
+        mcpServers: {},
+      },
+      errors: [],
+    } as unknown as LoadedSettings;
+
+    const localSession = new Session(
+      'session-2',
+      mockChat,
+      mockConfig,
+      mockConnection,
+      customSettings,
+    );
+
+    mockConnection.requestPermission.mockResolvedValueOnce({
+      outcome: {
+        outcome: 'selected',
+        optionId: ToolConfirmationOutcome.ProceedOnce,
+      },
+    });
+
+    const stream1 = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: {
+          functionCalls: [{ name: 'test_tool', args: {} }],
+        },
+      },
+    ]);
+    const stream2 = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: { candidates: [] },
+      },
+    ]);
+
+    mockChat.sendMessageStream
+      .mockResolvedValueOnce(stream1)
+      .mockResolvedValueOnce(stream2);
+
+    await localSession.prompt({
+      sessionId: 'session-2',
+      prompt: [{ type: 'text', text: 'Call tool' }],
+    });
+
+    expect(mockConnection.requestPermission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        options: expect.not.arrayContaining([
+          expect.objectContaining({
+            optionId: ToolConfirmationOutcome.ProceedAlwaysAndSave,
+          }),
+        ]),
+      }),
+    );
+    expect(mockConnection.requestPermission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        options: expect.arrayContaining([
+          expect.objectContaining({
+            optionId: ToolConfirmationOutcome.ProceedAlways,
+          }),
+        ]),
+      }),
+    );
+  });
+
+  it('should include always allow and save permanent option when enablePermanentToolApproval is true', async () => {
+    mockConfig.getDisableAlwaysAllow = vi.fn().mockReturnValue(false);
+    const confirmationDetails = {
+      type: 'edit',
+      onConfirm: vi.fn(),
+    };
+    mockTool.build.mockReturnValue({
+      getDescription: () => 'Test Tool',
+      toolLocations: () => [],
+      shouldConfirmExecute: vi.fn().mockResolvedValue(confirmationDetails),
+      execute: vi.fn().mockResolvedValue({ llmContent: 'Tool Result' }),
+    });
+
+    const customSettings = {
+      system: { settings: {} },
+      systemDefaults: { settings: {} },
+      user: { settings: {} },
+      workspace: { settings: {} },
+      merged: {
+        security: { enablePermanentToolApproval: true },
+        mcpServers: {},
+      },
+      errors: [],
+    } as unknown as LoadedSettings;
+
+    const localSession = new Session(
+      'session-2',
+      mockChat,
+      mockConfig,
+      mockConnection,
+      customSettings,
+    );
+
+    mockConnection.requestPermission.mockResolvedValueOnce({
+      outcome: {
+        outcome: 'selected',
+        optionId: ToolConfirmationOutcome.ProceedOnce,
+      },
+    });
+
+    const stream1 = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: {
+          functionCalls: [{ name: 'test_tool', args: {} }],
+        },
+      },
+    ]);
+    const stream2 = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: { candidates: [] },
+      },
+    ]);
+
+    mockChat.sendMessageStream
+      .mockResolvedValueOnce(stream1)
+      .mockResolvedValueOnce(stream2);
+
+    await localSession.prompt({
+      sessionId: 'session-2',
+      prompt: [{ type: 'text', text: 'Call tool' }],
+    });
+
+    expect(mockConnection.requestPermission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        options: expect.arrayContaining([
+          expect.objectContaining({
+            optionId: ToolConfirmationOutcome.ProceedAlwaysAndSave,
+            name: 'Allow for this file in all future sessions',
+          }),
+        ]),
+      }),
+    );
+  });
+
   it('should use filePath for ACP diff content in permission request', async () => {
     const confirmationDetails = {
       type: 'edit',
@@ -1078,6 +1386,120 @@ describe('Session', () => {
         }),
       }),
     );
+  });
+
+  it('should split getDisplayTitle and getExplanation for title and content in permission request', async () => {
+    const confirmationDetails = {
+      type: 'info',
+      onConfirm: vi.fn(),
+    };
+    mockTool.build.mockReturnValue({
+      getDescription: () => 'Original Description',
+      getDisplayTitle: () => 'Display Title Only',
+      getExplanation: () => 'A detailed explanation text',
+      toolLocations: () => [],
+      shouldConfirmExecute: vi.fn().mockResolvedValue(confirmationDetails),
+      execute: vi.fn().mockResolvedValue({ llmContent: 'Tool Result' }),
+    });
+
+    mockConnection.requestPermission.mockResolvedValue({
+      outcome: {
+        outcome: 'selected',
+        optionId: ToolConfirmationOutcome.ProceedOnce,
+      },
+    });
+
+    const stream1 = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: {
+          functionCalls: [{ name: 'test_tool', args: {} }],
+        },
+      },
+    ]);
+    const stream2 = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: { candidates: [] },
+      },
+    ]);
+
+    mockChat.sendMessageStream
+      .mockResolvedValueOnce(stream1)
+      .mockResolvedValueOnce(stream2);
+
+    await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Call tool' }],
+    });
+
+    expect(mockConnection.requestPermission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        toolCall: expect.objectContaining({
+          title: 'Display Title Only',
+          content: [],
+        }),
+      }),
+    );
+
+    expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({
+          sessionUpdate: 'agent_thought_chunk',
+          content: { type: 'text', text: 'A detailed explanation text' },
+        }),
+      }),
+    );
+  });
+
+  it('should call updatePolicy when tool permission triggers always allow', async () => {
+    const confirmationDetails = {
+      type: 'info',
+      onConfirm: vi.fn(),
+    };
+    mockTool.build.mockReturnValue({
+      getDescription: () => 'Test Tool',
+      toolLocations: () => [],
+      shouldConfirmExecute: vi.fn().mockResolvedValue(confirmationDetails),
+      execute: vi.fn().mockResolvedValue({ llmContent: 'Tool Result' }),
+    });
+
+    mockConnection.requestPermission.mockResolvedValue({
+      outcome: {
+        outcome: 'selected',
+        optionId: ToolConfirmationOutcome.ProceedAlways,
+      },
+    });
+
+    const stream1 = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: {
+          functionCalls: [{ name: 'test_tool', args: {} }],
+        },
+      },
+    ]);
+    const stream2 = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: { candidates: [] },
+      },
+    ]);
+
+    mockChat.sendMessageStream
+      .mockResolvedValueOnce(stream1)
+      .mockResolvedValueOnce(stream2);
+
+    const { updatePolicy } = await import('@google/gemini-cli-core');
+
+    await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Call tool' }],
+    });
+
+    expect(confirmationDetails.onConfirm).toHaveBeenCalled();
+
+    expect(updatePolicy).toHaveBeenCalled();
   });
 
   it('should use filePath for ACP diff content in tool result', async () => {
@@ -1292,7 +1714,6 @@ describe('Session', () => {
     (fs.stat as unknown as Mock).mockResolvedValue({
       isDirectory: () => false,
     });
-    (isWithinRoot as unknown as Mock).mockReturnValue(true);
 
     const stream = createMockStream([
       {
@@ -1350,7 +1771,6 @@ describe('Session', () => {
     (fs.stat as unknown as Mock).mockResolvedValue({
       isDirectory: () => false,
     });
-    (isWithinRoot as unknown as Mock).mockReturnValue(true);
 
     const MockReadManyFilesTool = ReadManyFilesTool as unknown as Mock;
     MockReadManyFilesTool.mockImplementationOnce(() => ({
@@ -1401,6 +1821,172 @@ describe('Session', () => {
           kind: 'read',
         }),
       }),
+    );
+  });
+
+  it('should handle @path validation error and bubble it to user', async () => {
+    mockConfig.getTargetDir.mockReturnValue('/workspace');
+    (path.resolve as unknown as Mock).mockReturnValue('/tmp/disallowed.txt');
+    mockConfig.validatePathAccess.mockReturnValue('Path is outside workspace');
+
+    // Force fs.stat to fail to skip direct reading and triggers the warning
+    (fs.stat as unknown as Mock).mockRejectedValue(new Error('File not found'));
+
+    const stream = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: { candidates: [] },
+      },
+    ]);
+    mockChat.sendMessageStream.mockResolvedValue(stream);
+
+    await session.prompt({
+      sessionId: 'session-1',
+      prompt: [
+        {
+          type: 'resource_link',
+          uri: 'file://disallowed.txt',
+          mimeType: 'text/plain',
+          name: 'disallowed.txt',
+        },
+      ],
+    });
+
+    // Verify warning sent via sendUpdate
+    expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({
+          sessionUpdate: 'agent_thought_chunk',
+          content: expect.objectContaining({
+            text: expect.stringContaining(
+              'Warning: skipping access to `disallowed.txt`. Reason: Path is outside workspace',
+            ),
+          }),
+        }),
+      }),
+    );
+  });
+
+  it('should read absolute file directly if outside workspace', async () => {
+    mockConfig.getTargetDir.mockReturnValue('/workspace');
+    const testFilePath = '/tmp/custom.txt';
+    (path.resolve as unknown as Mock).mockReturnValue(testFilePath);
+    mockConfig.validatePathAccess.mockReturnValue('Path is outside workspace');
+
+    mockConnection.requestPermission.mockResolvedValue({
+      outcome: {
+        outcome: 'selected',
+        optionId: ToolConfirmationOutcome.ProceedOnce,
+      },
+    } as unknown as acp.RequestPermissionResponse);
+
+    const mockStats = {
+      isFile: () => true,
+      isDirectory: () => false,
+    };
+    (fs.stat as unknown as Mock).mockResolvedValue(mockStats);
+    (processSingleFileContent as unknown as Mock).mockResolvedValue({
+      llmContent: 'Absolute File Content',
+    });
+
+    const stream = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: { candidates: [] },
+      },
+    ]);
+    mockChat.sendMessageStream.mockResolvedValue(stream);
+
+    await session.prompt({
+      sessionId: 'session-1',
+      prompt: [
+        {
+          type: 'resource_link',
+          uri: `file://${testFilePath}`,
+          mimeType: 'text/plain',
+          name: 'custom.txt',
+        },
+      ],
+    });
+
+    expect(processSingleFileContent).toHaveBeenCalledWith(
+      testFilePath,
+      expect.anything(),
+      expect.anything(),
+    );
+
+    // Verify content appended to sendMessageStream parts
+    expect(mockChat.sendMessageStream).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.arrayContaining([
+        expect.objectContaining({
+          text: 'Absolute File Content',
+        }),
+      ]),
+      expect.anything(),
+      expect.any(AbortSignal),
+      expect.anything(),
+    );
+  });
+
+  it('should read escaping relative file directly if outside workspace', async () => {
+    mockConfig.getTargetDir.mockReturnValue('/workspace');
+    const testFilePath = '../../custom.txt';
+    (path.resolve as unknown as Mock).mockReturnValue('/custom.txt');
+    mockConfig.validatePathAccess.mockReturnValue('Path is outside workspace');
+
+    mockConnection.requestPermission.mockResolvedValue({
+      outcome: {
+        outcome: 'selected',
+        optionId: ToolConfirmationOutcome.ProceedOnce,
+      },
+    } as unknown as acp.RequestPermissionResponse);
+
+    const mockStats = {
+      isFile: () => true,
+      isDirectory: () => false,
+    };
+    (fs.stat as unknown as Mock).mockResolvedValue(mockStats);
+    (processSingleFileContent as unknown as Mock).mockResolvedValue({
+      llmContent: 'Escaping Relative File Content',
+    });
+
+    const stream = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: { candidates: [] },
+      },
+    ]);
+    mockChat.sendMessageStream.mockResolvedValue(stream);
+
+    await session.prompt({
+      sessionId: 'session-1',
+      prompt: [
+        {
+          type: 'resource_link',
+          uri: `file://${testFilePath}`,
+          mimeType: 'text/plain',
+          name: 'custom.txt',
+        },
+      ],
+    });
+
+    expect(processSingleFileContent).toHaveBeenCalledWith(
+      '/custom.txt',
+      expect.any(String),
+      expect.anything(),
+    );
+
+    expect(mockChat.sendMessageStream).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.arrayContaining([
+        expect.objectContaining({
+          text: 'Escaping Relative File Content',
+        }),
+      ]),
+      expect.anything(),
+      expect.any(AbortSignal),
+      expect.anything(),
     );
   });
 
@@ -1602,7 +2188,6 @@ describe('Session', () => {
     (fs.stat as unknown as Mock).mockResolvedValue({
       isDirectory: () => true,
     });
-    (isWithinRoot as unknown as Mock).mockReturnValue(true);
 
     const stream = createMockStream([
       {

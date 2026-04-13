@@ -43,11 +43,15 @@ export * from './core/prompts.js';
 export * from './core/tokenLimits.js';
 export * from './core/turn.js';
 export * from './core/geminiRequest.js';
-export * from './core/coreToolScheduler.js';
 export * from './scheduler/scheduler.js';
 export * from './scheduler/types.js';
 export * from './scheduler/tool-executor.js';
+export * from './scheduler/policy.js';
 export * from './core/recordingContentGenerator.js';
+
+// Export Routing
+export * from './routing/routingStrategy.js';
+export * from './routing/modelRouterService.js';
 
 export * from './fallback/types.js';
 export * from './fallback/handler.js';
@@ -84,13 +88,19 @@ export * from './utils/authConsent.js';
 export * from './utils/googleQuotaErrors.js';
 export * from './utils/googleErrors.js';
 export * from './utils/fileUtils.js';
+export * from './utils/sessionOperations.js';
 export * from './utils/planUtils.js';
 export * from './utils/approvalModeUtils.js';
 export * from './utils/fileDiffUtils.js';
 export * from './utils/retry.js';
 export * from './utils/shell-utils.js';
-export { PolicyDecision, ApprovalMode } from './policy/types.js';
+export {
+  PolicyDecision,
+  ApprovalMode,
+  PRIORITY_YOLO_ALLOW_ALL,
+} from './policy/types.js';
 export * from './utils/tool-utils.js';
+export * from './utils/tool-visibility.js';
 export * from './utils/terminalSerializer.js';
 export * from './utils/systemEncoding.js';
 export * from './utils/textUtils.js';
@@ -127,9 +137,11 @@ export * from './services/FolderTrustDiscoveryService.js';
 export * from './services/chatRecordingService.js';
 export * from './services/fileSystemService.js';
 export * from './services/sandboxedFileSystemService.js';
-export * from './services/windowsSandboxManager.js';
+export * from './services/modelConfigService.js';
+export * from './sandbox/windows/WindowsSandboxManager.js';
 export * from './services/sessionSummaryUtils.js';
-export * from './services/contextManager.js';
+export { startMemoryService } from './services/memoryService.js';
+export * from './context/memoryContextManager.js';
 export * from './services/trackerService.js';
 export * from './services/trackerTypes.js';
 export * from './services/keychainService.js';
@@ -159,12 +171,6 @@ export * from './services/executionLifecycleService.js';
 // Export Injection Service
 export * from './config/injectionService.js';
 
-// Export Execution Lifecycle Service
-export * from './services/executionLifecycleService.js';
-
-// Export Injection Service
-export * from './config/injectionService.js';
-
 // Export base tool definitions
 export * from './tools/tools.js';
 export * from './tools/tool-error.js';
@@ -180,6 +186,33 @@ export * from './agents/types.js';
 export * from './agents/agentLoader.js';
 export * from './agents/local-executor.js';
 export * from './agents/agent-scheduler.js';
+
+// Export browser session management
+export { resetBrowserSession } from './agents/browser/browserAgentFactory.js';
+// Export agent session interface
+export * from './agent/agent-session.js';
+export * from './agent/legacy-agent-session.js';
+export * from './agent/event-translator.js';
+export * from './agent/content-utils.js';
+// Agent event types — namespaced to avoid collisions with existing exports
+export type {
+  AgentEvent,
+  AgentEventCommon,
+  AgentEventData,
+  AgentEnd,
+  AgentEvents as AgentEventMap,
+  AgentEventType,
+  AgentProtocol,
+  AgentSend,
+  AgentStart,
+  ContentPart,
+  ErrorData,
+  StreamEndReason,
+  Trajectory,
+  Unsubscribe,
+  Usage as AgentUsage,
+  WithMeta,
+} from './agent/types.js';
 
 // Export specific tool logic
 export * from './tools/read-file.js';
@@ -220,7 +253,7 @@ export * from './telemetry/index.js';
 export * from './telemetry/billingEvents.js';
 export { logBillingEvent } from './telemetry/loggers.js';
 export * from './telemetry/constants.js';
-export { sessionId, createSessionId } from './utils/session.js';
+export { createSessionId } from './utils/session.js';
 export * from './utils/compatibility.js';
 export * from './utils/browser.js';
 export { Storage } from './config/storage.js';
@@ -237,9 +270,14 @@ export * from './agents/types.js';
 // Export stdio utils
 export * from './utils/stdio.js';
 export * from './utils/terminal.js';
+export * from './services/worktreeService.js';
 
 // Export voice utilities
 export * from './voice/responseFormatter.js';
 
 // Export types from @google/genai
 export type { Content, Part, FunctionCall } from '@google/genai';
+
+// Export context types and profiles
+export * from './context/types.js';
+export * from './context/profiles.js';

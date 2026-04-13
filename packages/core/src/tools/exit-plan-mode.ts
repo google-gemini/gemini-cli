@@ -13,6 +13,7 @@ import {
   type ToolExitPlanModeConfirmationDetails,
   type ToolExitPlanModeConfirmationPayload,
   type ToolResult,
+  type ExecuteOptions,
 } from './tools.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import path from 'node:path';
@@ -28,7 +29,7 @@ import { resolveToolDeclaration } from './definitions/resolver.js';
 import { getPlanModeExitMessage } from '../utils/approvalModeUtils.js';
 
 export interface ExitPlanModeParams {
-  plan_path: string;
+  plan_filename: string;
 }
 
 export class ExitPlanModeTool extends BaseDeclarativeTool<
@@ -41,8 +42,7 @@ export class ExitPlanModeTool extends BaseDeclarativeTool<
     private config: Config,
     messageBus: MessageBus,
   ) {
-    const plansDir = config.storage.getPlansDir();
-    const definition = getExitPlanModeDefinition(plansDir);
+    const definition = getExitPlanModeDefinition();
     super(
       ExitPlanModeTool.Name,
       'Exit Plan Mode',
@@ -56,22 +56,21 @@ export class ExitPlanModeTool extends BaseDeclarativeTool<
   protected override validateToolParamValues(
     params: ExitPlanModeParams,
   ): string | null {
-    if (!params.plan_path || params.plan_path.trim() === '') {
-      return 'plan_path is required.';
+    if (!params.plan_filename || params.plan_filename.trim() === '') {
+      return 'plan_filename is required.';
     }
 
-    // Since validateToolParamValues is synchronous, we use a basic synchronous check
-    // for path traversal safety. High-level async validation is deferred to shouldConfirmExecute.
+    const safeFilename = path.basename(params.plan_filename);
     const plansDir = resolveToRealPath(this.config.storage.getPlansDir());
-    const resolvedPath = path.resolve(
-      this.config.getTargetDir(),
-      params.plan_path,
+    const resolvedPath = path.join(
+      this.config.storage.getPlansDir(),
+      safeFilename,
     );
 
     const realPath = resolveToRealPath(resolvedPath);
 
     if (!isSubpath(plansDir, realPath)) {
-      return `Access denied: plan path must be within the designated plans directory.`;
+      return `Access denied: plan path (${resolvedPath}) must be within the designated plans directory (${plansDir}).`;
     }
 
     return null;
@@ -93,8 +92,7 @@ export class ExitPlanModeTool extends BaseDeclarativeTool<
   }
 
   override getSchema(modelId?: string) {
-    const plansDir = this.config.storage.getPlansDir();
-    return resolveToolDeclaration(getExitPlanModeDefinition(plansDir), modelId);
+    return resolveToolDeclaration(getExitPlanModeDefinition(), modelId);
   }
 }
 
@@ -122,9 +120,8 @@ export class ExitPlanModeInvocation extends BaseToolInvocation<
     const resolvedPlanPath = this.getResolvedPlanPath();
 
     const pathError = await validatePlanPath(
-      this.params.plan_path,
+      this.params.plan_filename,
       this.config.storage.getPlansDir(),
-      this.config.getTargetDir(),
     );
     if (pathError) {
       this.planValidationError = pathError;
@@ -138,7 +135,7 @@ export class ExitPlanModeInvocation extends BaseToolInvocation<
     }
 
     const decision = await this.getMessageBusDecision(abortSignal);
-    if (decision === 'DENY') {
+    if (decision === 'deny') {
       throw new Error(
         `Tool execution for "${
           this._toolDisplayName || this._toolName
@@ -146,7 +143,7 @@ export class ExitPlanModeInvocation extends BaseToolInvocation<
       );
     }
 
-    if (decision === 'ALLOW') {
+    if (decision === 'allow') {
       // If policy is allow, auto-approve with default settings and execute.
       this.confirmationOutcome = ToolConfirmationOutcome.ProceedOnce;
       this.approvalPayload = {
@@ -156,7 +153,7 @@ export class ExitPlanModeInvocation extends BaseToolInvocation<
       return false;
     }
 
-    // decision is 'ASK_USER'
+    // decision is 'ask_user'
     return {
       type: 'exit_plan_mode',
       title: 'Plan Approval',
@@ -174,7 +171,7 @@ export class ExitPlanModeInvocation extends BaseToolInvocation<
   }
 
   getDescription(): string {
-    return `Requesting plan approval for: ${this.params.plan_path}`;
+    return `Requesting plan approval for: ${path.join(this.config.storage.getPlansDir(), this.params.plan_filename)}`;
   }
 
   /**
@@ -182,10 +179,11 @@ export class ExitPlanModeInvocation extends BaseToolInvocation<
    * Note: Validation is done in validateToolParamValues, so this assumes the path is valid.
    */
   private getResolvedPlanPath(): string {
-    return path.resolve(this.config.getTargetDir(), this.params.plan_path);
+    const safeFilename = path.basename(this.params.plan_filename);
+    return path.join(this.config.storage.getPlansDir(), safeFilename);
   }
 
-  async execute(_signal: AbortSignal): Promise<ToolResult> {
+  async execute({ abortSignal: _signal }: ExecuteOptions): Promise<ToolResult> {
     const resolvedPlanPath = this.getResolvedPlanPath();
 
     if (this.planValidationError) {

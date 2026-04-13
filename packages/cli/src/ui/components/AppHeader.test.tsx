@@ -8,15 +8,22 @@ import {
   renderWithProviders,
   persistentStateMock,
 } from '../../test-utils/render.js';
+import type { LoadedSettings } from '../../config/settings.js';
 import { AppHeader } from './AppHeader.js';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { makeFakeConfig } from '@google/gemini-cli-core';
 import crypto from 'node:crypto';
+import { _clearSessionBannersForTest } from '../hooks/useBanner.js';
 
 vi.mock('../utils/terminalSetup.js', () => ({
   getTerminalProgram: () => null,
 }));
 
 describe('<AppHeader />', () => {
+  beforeEach(() => {
+    _clearSessionBannersForTest();
+  });
+
   it('should render the banner with default text', async () => {
     const uiState = {
       history: [],
@@ -27,13 +34,12 @@ describe('<AppHeader />', () => {
       bannerVisible: true,
     };
 
-    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <AppHeader version="1.0.0" />,
       {
         uiState,
       },
     );
-    await waitUntilReady();
 
     expect(lastFrame()).toContain('This is the default banner');
     expect(lastFrame()).toMatchSnapshot();
@@ -50,13 +56,12 @@ describe('<AppHeader />', () => {
       bannerVisible: true,
     };
 
-    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <AppHeader version="1.0.0" />,
       {
         uiState,
       },
     );
-    await waitUntilReady();
 
     expect(lastFrame()).toContain('There are capacity issues');
     expect(lastFrame()).toMatchSnapshot();
@@ -72,13 +77,12 @@ describe('<AppHeader />', () => {
       },
     };
 
-    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <AppHeader version="1.0.0" />,
       {
         uiState,
       },
     );
-    await waitUntilReady();
 
     expect(lastFrame()).not.toContain('Banner');
     expect(lastFrame()).toMatchSnapshot();
@@ -103,13 +107,12 @@ describe('<AppHeader />', () => {
       },
     });
 
-    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <AppHeader version="1.0.0" />,
       {
         uiState,
       },
     );
-    await waitUntilReady();
 
     expect(lastFrame()).not.toContain('This is the default banner');
     expect(lastFrame()).toMatchSnapshot();
@@ -129,13 +132,12 @@ describe('<AppHeader />', () => {
     // and interfering with the expected persistentState.set call.
     persistentStateMock.setData({ tipsShown: 10 });
 
-    const { waitUntilReady, unmount } = await renderWithProviders(
+    const { unmount } = await renderWithProviders(
       <AppHeader version="1.0.0" />,
       {
         uiState,
       },
     );
-    await waitUntilReady();
 
     expect(persistentStateMock.set).toHaveBeenCalledWith(
       'defaultBannerShownCount',
@@ -159,13 +161,12 @@ describe('<AppHeader />', () => {
       bannerVisible: true,
     };
 
-    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <AppHeader version="1.0.0" />,
       {
         uiState,
       },
     );
-    await waitUntilReady();
 
     expect(lastFrame()).not.toContain('First line\\nSecond line');
     unmount();
@@ -183,13 +184,12 @@ describe('<AppHeader />', () => {
 
     persistentStateMock.setData({ tipsShown: 5 });
 
-    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <AppHeader version="1.0.0" />,
       {
         uiState,
       },
     );
-    await waitUntilReady();
 
     expect(lastFrame()).toContain('Tips');
     expect(persistentStateMock.set).toHaveBeenCalledWith('tipsShown', 6);
@@ -206,13 +206,12 @@ describe('<AppHeader />', () => {
 
     persistentStateMock.setData({ tipsShown: 10 });
 
-    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <AppHeader version="1.0.0" />,
       {
         uiState,
       },
     );
-    await waitUntilReady();
 
     expect(lastFrame()).not.toContain('Tips');
     unmount();
@@ -234,7 +233,6 @@ describe('<AppHeader />', () => {
     const session1 = await renderWithProviders(<AppHeader version="1.0.0" />, {
       uiState,
     });
-    await session1.waitUntilReady();
 
     expect(session1.lastFrame()).toContain('Tips');
     expect(persistentStateMock.get('tipsShown')).toBe(10);
@@ -245,9 +243,50 @@ describe('<AppHeader />', () => {
       <AppHeader version="1.0.0" />,
       {},
     );
-    await session2.waitUntilReady();
 
     expect(session2.lastFrame()).not.toContain('Tips');
     session2.unmount();
+  });
+
+  it('should render the full logo when logged out', async () => {
+    const mockConfig = makeFakeConfig();
+    vi.spyOn(mockConfig, 'getContentGeneratorConfig').mockReturnValue({
+      authType: undefined,
+    } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
+      <AppHeader version="1.0.0" />,
+      {
+        config: mockConfig,
+        uiState: {
+          terminalWidth: 120,
+        },
+      },
+    );
+    await waitUntilReady();
+
+    // Check for block characters from the logo
+    expect(lastFrame()).toContain('▗█▀▀▜▙');
+    expect(lastFrame()).toMatchSnapshot();
+    unmount();
+  });
+
+  it('should NOT render Tips when ui.hideTips is true', async () => {
+    const mockConfig = makeFakeConfig();
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
+      <AppHeader version="1.0.0" />,
+      {
+        config: mockConfig,
+        settings: {
+          merged: {
+            ui: { hideTips: true },
+          },
+        } as unknown as LoadedSettings,
+      },
+    );
+    await waitUntilReady();
+
+    expect(lastFrame()).not.toContain('Tips');
+    unmount();
   });
 });
