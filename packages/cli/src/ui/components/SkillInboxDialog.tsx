@@ -28,8 +28,8 @@ import {
   dismissInboxSkill,
   applyInboxPatch,
   dismissInboxPatch,
+  isProjectSkillPatchTarget,
 } from '@google/gemini-cli-core';
-import { isProjectSkillPatchTarget } from '@google/gemini-cli-core/src/services/memoryPatchUtils.js';
 
 type Phase = 'list' | 'skill-preview' | 'skill-action' | 'patch-preview';
 

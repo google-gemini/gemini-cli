@@ -14,8 +14,8 @@ import {
   moveInboxSkill,
   applyInboxPatch,
   dismissInboxPatch,
+  isProjectSkillPatchTarget,
 } from '@google/gemini-cli-core';
-import { isProjectSkillPatchTarget } from '@google/gemini-cli-core/src/services/memoryPatchUtils.js';
 import { waitFor } from '../../test-utils/async.js';
 import { renderWithProviders } from '../../test-utils/render.js';
 import { SkillInboxDialog } from './SkillInboxDialog.js';
@@ -32,15 +32,12 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     moveInboxSkill: vi.fn(),
     applyInboxPatch: vi.fn(),
     dismissInboxPatch: vi.fn(),
+    isProjectSkillPatchTarget: vi.fn(),
     getErrorMessage: vi.fn((error: unknown) =>
       error instanceof Error ? error.message : String(error),
     ),
   };
 });
-
-vi.mock('@google/gemini-cli-core/src/services/memoryPatchUtils.js', () => ({
-  isProjectSkillPatchTarget: vi.fn(),
-}));
 
 const mockListInboxSkills = vi.mocked(listInboxSkills);
 const mockListInboxPatches = vi.mocked(listInboxPatches);
