@@ -17,7 +17,7 @@ export interface FileFilteringOptions {
 export const DEFAULT_MEMORY_FILE_FILTERING_OPTIONS: FileFilteringOptions = {
   respectGitIgnore: false,
   respectGeminiIgnore: true,
-  enableFileWatcher: true,
+  enableFileWatcher: false,
   maxFileCount: 20000,
   searchTimeout: 5000,
   customIgnoreFilePaths: [],
@@ -27,7 +27,7 @@ export const DEFAULT_MEMORY_FILE_FILTERING_OPTIONS: FileFilteringOptions = {
 export const DEFAULT_FILE_FILTERING_OPTIONS: FileFilteringOptions = {
   respectGitIgnore: true,
   respectGeminiIgnore: true,
-  enableFileWatcher: true,
+  enableFileWatcher: false,
   maxFileCount: 20000,
   searchTimeout: 5000,
   customIgnoreFilePaths: [],

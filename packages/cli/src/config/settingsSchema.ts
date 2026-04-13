@@ -1411,11 +1411,11 @@ const SETTINGS_SCHEMA = {
             label: 'Enable File Watcher',
             category: 'Context',
             requiresRestart: true,
-            default: true,
+            default: false,
             description: oneLine`
               Enable file watcher updates for @ file suggestions (experimental).
             `,
-            showInDialog: true,
+            showInDialog: false,
           },
           enableRecursiveFileSearch: {
             type: 'boolean',

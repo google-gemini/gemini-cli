@@ -96,8 +96,8 @@ export class FileWatcher {
       });
   }
 
-  stop(): void {
-    void this.watcher?.close();
+  async close(): Promise<void> {
+    await this.watcher?.close();
     this.watcher = null;
   }
 }

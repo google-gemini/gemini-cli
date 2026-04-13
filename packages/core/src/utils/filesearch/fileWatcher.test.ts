@@ -56,7 +56,7 @@ describe('FileWatcher', () => {
     await fs.rm(filePath, { force: true });
     await sleep(1200);
 
-    watcher.stop();
+    await watcher.close();
 
     expect(events).toContainEqual({ eventType: 'add', relativePath: fileName });
     expect(events).toContainEqual({
@@ -87,7 +87,7 @@ describe('FileWatcher', () => {
     await fs.writeFile(path.join(tmpDir, 'kept.txt'), 'x');
     await sleep(1200);
 
-    watcher.stop();
+    await watcher.close();
 
     expect(events.some((event) => event.relativePath === 'ignored.txt')).toBe(
       false,
@@ -126,7 +126,7 @@ describe('FileWatcher', () => {
         event.eventType === 'unlinkDir' && event.relativePath === dirName,
     );
 
-    watcher.stop();
+    await watcher.close();
   });
 
   it('should normalize nested paths without leading dot prefix', async () => {
@@ -159,7 +159,7 @@ describe('FileWatcher', () => {
     expect(nestedFileEvent!.relativePath.startsWith('./')).toBe(false);
     expect(nestedFileEvent!.relativePath.includes('\\')).toBe(false);
 
-    watcher.stop();
+    await watcher.close();
   });
 
   it('should not emit new events after stop is called', async () => {
@@ -182,7 +182,7 @@ describe('FileWatcher', () => {
         event.eventType === 'add' && event.relativePath === 'before-stop.txt',
     );
 
-    watcher.stop();
+    await watcher.close();
 
     const afterStopCount = events.length;
     await fs.writeFile(path.join(tmpDir, 'after-stop.txt'), 'x');
@@ -211,8 +211,8 @@ describe('FileWatcher', () => {
         event.eventType === 'add' && event.relativePath === 'idempotent.txt',
     );
 
-    watcher.stop();
-    watcher.stop();
+    await watcher.close();
+    await watcher.close();
 
     expect(events.length).toBeGreaterThan(0);
   });

@@ -129,7 +129,7 @@ export interface SearchOptions {
 export interface FileSearch {
   initialize(): Promise<void>;
   search(pattern: string, options?: SearchOptions): Promise<string[]>;
-  close?(): void;
+  close?(): Promise<void>;
 }
 
 class RecursiveFileSearch implements FileSearch {
@@ -139,7 +139,6 @@ class RecursiveFileSearch implements FileSearch {
   private fzf: AsyncFzf<string[]> | undefined;
   private fileWatcher: FileWatcher | undefined;
   private rebuildTimer: NodeJS.Timeout | undefined;
-  private rebuildScheduled = false;
 
   constructor(private readonly options: FileSearchOptions) {}
 
@@ -180,32 +179,14 @@ class RecursiveFileSearch implements FileSearch {
   }
 
   private scheduleRebuild(): void {
-    this.rebuildScheduled = true;
     if (this.rebuildTimer) {
-      return;
+      clearTimeout(this.rebuildTimer);
     }
 
     this.rebuildTimer = setTimeout(() => {
       this.rebuildTimer = undefined;
-      if (this.rebuildScheduled) {
-        this.rebuildScheduled = false;
-        this.buildResultCache();
-      }
+      this.buildResultCache();
     }, 150);
-  }
-
-  private flushPendingRebuild(): void {
-    if (!this.rebuildScheduled) {
-      return;
-    }
-
-    if (this.rebuildTimer) {
-      clearTimeout(this.rebuildTimer);
-      this.rebuildTimer = undefined;
-    }
-
-    this.rebuildScheduled = false;
-    this.buildResultCache();
   }
 
   private handleFileWatcherEvent(event: FileWatcherEvent): void {
@@ -276,8 +257,6 @@ class RecursiveFileSearch implements FileSearch {
       throw new Error('Engine not initialized. Call initialize() first.');
     }
 
-    this.flushPendingRebuild();
-
     pattern = unescapePath(pattern) || '*';
 
     let filteredCandidates;
@@ -333,14 +312,13 @@ class RecursiveFileSearch implements FileSearch {
     return results;
   }
 
-  close(): void {
-    this.fileWatcher?.stop();
+  async close(): Promise<void> {
+    await this.fileWatcher?.close();
     this.fileWatcher = undefined;
     if (this.rebuildTimer) {
       clearTimeout(this.rebuildTimer);
       this.rebuildTimer = undefined;
     }
-    this.rebuildScheduled = false;
   }
 
   private buildResultCache(): void {
