@@ -33,6 +33,7 @@ import {
   type AnyDeclarativeTool,
 } from '../tools/tools.js';
 import { getToolSuggestion } from '../utils/tool-utils.js';
+import { debugLogger } from '../utils/debugLogger.js';
 import { runInDevTraceSpan } from '../telemetry/trace.js';
 import { logToolCall } from '../telemetry/loggers.js';
 import { ToolCallEvent } from '../telemetry/types.js';
@@ -173,8 +174,10 @@ export class Scheduler {
         confirmed: false,
         requiresUserConfirmation: true,
       })
-      .catch(() => {
-        // Error updating confirmation response, swallowed intentionally
+      .catch((error) => {
+        debugLogger.error(
+          `Failed to publish tool confirmation response: ${error}`,
+        );
       });
   };
 

@@ -143,7 +143,9 @@ export class MessageBus extends EventEmitter {
         this.emitMessage(message);
       }
     } catch (error) {
+      debugLogger.error(`[MESSAGE_BUS] publish failed: ${error}`);
       this.emit('error', error);
+      throw error;
     }
   }
 
@@ -209,18 +211,35 @@ export class MessageBus extends EventEmitter {
   async request<TRequest extends Message, TResponse extends Message>(
     request: Omit<TRequest, 'correlationId'>,
     responseType: TResponse['type'],
-    timeoutMs: number = 60000,
+    options: { timeoutMs?: number; signal?: AbortSignal } = {},
   ): Promise<TResponse> {
+    const { timeoutMs = 60000, signal } = options;
     const correlationId = randomUUID();
 
     return new Promise<TResponse>((resolve, reject) => {
-      const timeoutId = setTimeout(() => {
+      const timeoutId =
+        timeoutMs > 0
+          ? setTimeout(() => {
+              cleanup();
+              reject(
+                new Error(`Request timed out waiting for ${responseType}`),
+              );
+            }, timeoutMs)
+          : undefined;
+
+      const onAbort = () => {
         cleanup();
-        reject(new Error(`Request timed out waiting for ${responseType}`));
-      }, timeoutMs);
+        reject(new Error('Operation cancelled'));
+      };
+
+      if (signal?.aborted) {
+        return onAbort();
+      }
+      signal?.addEventListener('abort', onAbort, { once: true });
 
       const cleanup = () => {
-        clearTimeout(timeoutId);
+        if (timeoutId) clearTimeout(timeoutId);
+        signal?.removeEventListener('abort', onAbort);
         this.unsubscribe(responseType, responseHandler);
       };
 
