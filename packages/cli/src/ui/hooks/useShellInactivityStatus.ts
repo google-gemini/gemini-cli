@@ -54,8 +54,14 @@ export const useShellInactivityStatus = ({
     !!activePtyId && !embeddedShellFocused && isInteractiveShellEnabled;
 
   // Derive whether output was produced by comparing the last output time to when the operation started.
-  
-  const hasProducedOutput = operationStartTime > 0 && lastOutputTime > operationStartTime;
+
+  const hasProducedOutput =
+    operationStartTime > 0 && lastOutputTime > operationStartTime;
+
+  // const now = Date.now();
+  // const isOutputRecent =
+  // hasProducedOutput &&
+  // now - lastOutputTime < SHELL_ACTION_REQUIRED_TITLE_DELAY_MS;
 
   // 1. Focus Hint (The "press tab to focus" message in the loading indicator)
   // Logic: 5s if output has been produced, 20s if silent. Suppressed if redirected.
@@ -70,8 +76,11 @@ export const useShellInactivityStatus = ({
   // 2. Action Required Status (The ✋ icon in the terminal window title)
   // Logic: Only if output has been produced (likely a prompt).
   // Triggered after 30s of silence, but SUPPRESSED if redirection is active.
+  const wasOutputRecent =
+    hasProducedOutput &&
+    lastOutputTime - operationStartTime < SHELL_ACTION_REQUIRED_TITLE_DELAY_MS;
   const shouldShowActionRequiredTitle = useInactivityTimer(
-    isAwaitingFocus && !isRedirectionActive && hasProducedOutput,
+    isAwaitingFocus && !isRedirectionActive && wasOutputRecent,
     lastOutputTime,
     SHELL_ACTION_REQUIRED_TITLE_DELAY_MS,
   );
