@@ -178,7 +178,7 @@ jobs:
             npm run test:ci --workspace "@google/gemini-cli"
           else
             # Explicitly list non-cli packages to ensure they are sharded correctly
-            npm run test:ci --workspace "@google/gemini-cli-core" --workspace "@google/gemini-cli-a2a-server" --workspace "gemini-cli-vscode-ide-companion" --workspace "@google/gemini-cli-test-utils" --if-present -- --coverage.enabled=false
+            npm run test:ci --workspace "@google/gemini-cli-core" --workspace "@google/gemini-cli-a2a-server" --workspace "gemini-cli-vscode-ide-companion" --workspace "@google/gemini-cli-test-utils" --workspace "@google/gemini-cli-sdk" --if-present -- --coverage.enabled=false
             npm run test:scripts
           fi
 
@@ -266,7 +266,7 @@ jobs:
             npm run test:ci --workspace "@google/gemini-cli" -- --coverage.enabled=false
           else
             # Explicitly list non-cli packages to ensure they are sharded correctly
-            npm run test:ci --workspace "@google/gemini-cli-core" --workspace "@google/gemini-cli-a2a-server" --workspace "gemini-cli-vscode-ide-companion" --workspace "@google/gemini-cli-test-utils" --if-present -- --coverage.enabled=false
+            npm run test:ci --workspace "@google/gemini-cli-core" --workspace "@google/gemini-cli-a2a-server" --workspace "gemini-cli-vscode-ide-companion" --workspace "@google/gemini-cli-test-utils" --workspace "@google/gemini-cli-sdk" --if-present -- --coverage.enabled=false
             npm run test:scripts
           fi
 
@@ -433,7 +433,7 @@ jobs:
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           } else {
             # Explicitly list non-cli packages to ensure they are sharded correctly
-            npm run test:ci --workspace "@google/gemini-cli-core" --workspace "@google/gemini-cli-a2a-server" --workspace "gemini-cli-vscode-ide-companion" --workspace "@google/gemini-cli-test-utils" --if-present -- --coverage.enabled=false
+            npm run test:ci --workspace "@google/gemini-cli-core" --workspace "@google/gemini-cli-a2a-server" --workspace "gemini-cli-vscode-ide-companion" --workspace "@google/gemini-cli-test-utils" --workspace "@google/gemini-cli-sdk" --if-present -- --coverage.enabled=false
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
             npm run test:scripts
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
