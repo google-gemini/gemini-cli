@@ -12,6 +12,7 @@ import {
   type ToolCallRequestInfo,
   type ToolCallResponseInfo,
   type ToolResult,
+  type ToolDisplay,
   type Config,
   type AgentLoopContext,
   type ToolLiveOutput,
@@ -159,6 +160,7 @@ export class ToolExecutor {
               toolResult.error.type,
               displayText,
               toolResult.tailToolCallRequest,
+              toolResult.display,
             );
           }
         } catch (executionError: unknown) {
@@ -349,6 +351,7 @@ export class ToolExecutor {
       response: {
         callId: call.request.callId,
         responseParts,
+        display: toolResult?.display,
         resultDisplay: toolResult?.returnDisplay,
         error: undefined,
         errorType: undefined,
@@ -385,6 +388,7 @@ export class ToolExecutor {
     const successResponse: ToolCallResponseInfo = {
       callId,
       responseParts: response,
+      display: toolResult.display,
       resultDisplay: toolResult.returnDisplay,
       error: undefined,
       errorType: undefined,
@@ -419,12 +423,14 @@ export class ToolExecutor {
     errorType?: ToolErrorType,
     returnDisplay?: string,
     tailToolCallRequest?: { name: string; args: Record<string, unknown> },
+    display?: ToolDisplay,
   ): ErroredToolCall {
     const response = this.createErrorResponse(
       call.request,
       error,
       errorType,
       returnDisplay,
+      display,
     );
     const startTime = 'startTime' in call ? call.startTime : undefined;
 
@@ -446,11 +452,13 @@ export class ToolExecutor {
     error: Error,
     errorType: ToolErrorType | undefined,
     returnDisplay?: string,
+    display?: ToolDisplay,
   ): ToolCallResponseInfo {
     const displayText = returnDisplay ?? error.message;
     return {
       callId: request.callId,
       error,
+      display,
       responseParts: [
         {
           functionResponse: {

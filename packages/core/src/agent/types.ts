@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { AnsiOutput } from 'src/utils/terminalSerializer.js';
 import type { Kind } from '../tools/tools.js';
 
 export type WithMeta = { _meta?: Record<string, unknown> };
@@ -182,13 +183,48 @@ export type DisplayDiff = {
   beforeText: string;
   afterText: string;
 };
-export type DisplayContent = DisplayText | DisplayDiff;
+export type DisplayTerminal = {
+  type: 'terminal';
+  pid?: string;
+  exitCode?: number;
+  ansi?: AnsiOutput;
+};
+export type DisplayAgent = {
+  type: 'agent';
+  threadId: string;
+};
+
+export type DisplayContent =
+  | DisplayText
+  | DisplayDiff
+  | DisplayTerminal
+  | DisplayAgent;
+
+export type ToolDisplayFormat =
+  /**
+   * Displays as compact when user has enabled compact tools, box otherwise.
+   * This is the default format if none is selected.
+   **/
+  | 'auto'
+  /** Always display this tool in compact format. */
+  | 'compact'
+  /** Always display this tool in full box format. */
+  | 'box'
+  /** Hide this tool from the event history. */
+  | 'hidden'
+  /** Display this tool as a message-like notice. */
+  | 'notice';
 
 export interface ToolDisplay {
+  /** A display name for the tool. */
   name?: string;
+  /** A short description of what the tool is doing. */
   description?: string;
-  resultSummary?: string;
-  result?: DisplayContent;
+  /** A short, one-line summary of the tool's results. */
+  resultSummary?: string | null;
+  result?: DisplayContent | null;
+  /** A tool may specify its preferred display format. */
+  format?: ToolDisplayFormat;
 }
 
 export interface ToolRequest {

@@ -3430,11 +3430,17 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   getAgentSessionNoninteractiveEnabled(): boolean {
-    return this.agentSessionNoninteractiveEnabled;
+    return (
+      process.env['GEMINI_CLI_EXP_AGENT'] === 'true' ||
+      this.agentSessionNoninteractiveEnabled
+    );
   }
 
   getAgentSessionInteractiveEnabled(): boolean {
-    return this.agentSessionInteractiveEnabled;
+    return (
+      process.env['GEMINI_CLI_EXP_AGENT'] === 'true' ||
+      this.agentSessionInteractiveEnabled
+    );
   }
 
   /**

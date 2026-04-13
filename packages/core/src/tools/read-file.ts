@@ -186,8 +186,20 @@ ${result.llmContent}`;
       }
     }
 
+    const displayResultSummary = result.isTruncated
+      ? `${result.linesShown![0]}-${result.linesShown![1]} of ${result.originalLineCount}`
+      : lines !== undefined
+        ? `${lines} lines`
+        : undefined;
+
     return {
       llmContent,
+      display: {
+        name: READ_FILE_DISPLAY_NAME,
+        description: this.getDescription(),
+        resultSummary: displayResultSummary,
+        result: { type: 'text', text: result.returnDisplay || '' },
+      },
       returnDisplay: result.returnDisplay || '',
     };
   }
