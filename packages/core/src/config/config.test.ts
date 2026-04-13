@@ -48,6 +48,7 @@ import {
 import { GeminiClient } from '../core/client.js';
 import { GitService } from '../services/gitService.js';
 import { ShellTool } from '../tools/shell.js';
+import { AgentTool } from '../agents/agent-tool.js';
 import { ReadFileTool } from '../tools/read-file.js';
 import { GrepTool } from '../tools/grep.js';
 import { RipGrepTool, canUseRipgrep } from '../tools/ripGrep.js';
@@ -191,10 +192,6 @@ vi.mock('../agents/registry.js', () => {
   return { AgentRegistry: AgentRegistryMock };
 });
 
-vi.mock('../agents/subagent-tool.js', () => ({
-  SubagentTool: vi.fn(),
-}));
-
 vi.mock('../resources/resource-registry.js', () => ({
   ResourceRegistry: vi.fn(),
 }));
@@ -304,6 +301,53 @@ describe('Server Config (config.ts)', () => {
         maxAttempts: 20,
       });
       expect(config.getMaxAttempts()).toBe(DEFAULT_MAX_ATTEMPTS);
+    });
+  });
+
+  describe('setShellExecutionConfig', () => {
+    it('should preserve existing shell execution fields that are not being updated', () => {
+      const config = new Config({
+        ...baseParams,
+        sandbox: {
+          enabled: true,
+          command: 'windows-native',
+          networkAccess: false,
+        },
+        shellBackgroundCompletionBehavior: 'notify',
+      });
+
+      expect(config.getShellExecutionConfig()).toEqual(
+        expect.objectContaining({
+          sandboxConfig: expect.objectContaining({
+            enabled: true,
+            command: 'windows-native',
+            networkAccess: false,
+          }),
+          backgroundCompletionBehavior: 'notify',
+        }),
+      );
+
+      config.setShellExecutionConfig({
+        terminalWidth: 123,
+        terminalHeight: 45,
+        showColor: true,
+        pager: 'cat',
+        sanitizationConfig: config.sanitizationConfig,
+        sandboxManager: config.sandboxManager,
+      });
+
+      expect(config.getShellExecutionConfig()).toEqual(
+        expect.objectContaining({
+          terminalWidth: 123,
+          terminalHeight: 45,
+          sandboxConfig: expect.objectContaining({
+            enabled: true,
+            command: 'windows-native',
+            networkAccess: false,
+          }),
+          backgroundCompletionBehavior: 'notify',
+        }),
+      );
     });
   });
 
@@ -1345,6 +1389,21 @@ describe('Server Config (config.ts)', () => {
       expect(wasReadFileToolRegistered).toBe(false);
     });
 
+    it('should register AgentTool', async () => {
+      const config = new Config(baseParams);
+      await config.initialize();
+
+      const registerToolMock = (
+        (await vi.importMock('../tools/tool-registry')) as {
+          ToolRegistry: { prototype: { registerTool: Mock } };
+        }
+      ).ToolRegistry.prototype.registerTool;
+
+      const wasRegistered = registerToolMock.mock.calls.some(
+        (call) => call[0] instanceof vi.mocked(AgentTool),
+      );
+      expect(wasRegistered).toBe(true);
+    });
     it('should register EnterPlanModeTool and ExitPlanModeTool when plan is enabled', async () => {
       const params: ConfigParameters = {
         ...baseParams,
@@ -2946,6 +3005,78 @@ describe('Config Quota & Preview Model Access', () => {
       expect(result).toBeUndefined();
       // Never set => stays null (unknown); getter returns true so UI shows preview
       expect(config.getHasAccessToPreviewModel()).toBe(true);
+    });
+    it('should derive quota from remainingFraction when remainingAmount is missing', async () => {
+      mockCodeAssistServer.retrieveUserQuota.mockResolvedValue({
+        buckets: [
+          {
+            modelId: 'gemini-3-flash-preview',
+            remainingFraction: 0.96,
+          },
+        ],
+      });
+
+      config.setModel('gemini-3-flash-preview');
+      mockCoreEvents.emitQuotaChanged.mockClear();
+      await config.refreshUserQuota();
+
+      // Normalized: limit=100, remaining=96
+      expect(mockCoreEvents.emitQuotaChanged).toHaveBeenCalledWith(
+        96,
+        100,
+        undefined,
+      );
+      expect(config.getQuotaRemaining()).toBe(96);
+      expect(config.getQuotaLimit()).toBe(100);
+    });
+
+    it('should store quota from remainingFraction when remainingFraction is 0', async () => {
+      mockCodeAssistServer.retrieveUserQuota.mockResolvedValue({
+        buckets: [
+          {
+            modelId: 'gemini-3-pro-preview',
+            remainingFraction: 0,
+          },
+        ],
+      });
+
+      config.setModel('gemini-3-pro-preview');
+      mockCoreEvents.emitQuotaChanged.mockClear();
+      await config.refreshUserQuota();
+
+      // remaining=0, limit=100 but limit>0 check still passes
+      // however remaining=0 means 0% remaining = 100% used
+      expect(config.getQuotaRemaining()).toBe(0);
+      expect(config.getQuotaLimit()).toBe(100);
+    });
+
+    it('should emit QuotaChanged when model is switched via setModel', async () => {
+      mockCodeAssistServer.retrieveUserQuota.mockResolvedValue({
+        buckets: [
+          {
+            modelId: 'gemini-2.5-pro',
+            remainingAmount: '10',
+            remainingFraction: 0.2,
+          },
+          {
+            modelId: 'gemini-2.5-flash',
+            remainingAmount: '80',
+            remainingFraction: 0.8,
+          },
+        ],
+      });
+
+      config.setModel('auto-gemini-2.5');
+      await config.refreshUserQuota();
+      mockCoreEvents.emitQuotaChanged.mockClear();
+
+      // Switch to a specific model — should re-emit quota for that model
+      config.setModel('gemini-2.5-pro');
+      expect(mockCoreEvents.emitQuotaChanged).toHaveBeenCalledWith(
+        10,
+        50,
+        undefined,
+      );
     });
   });
 
