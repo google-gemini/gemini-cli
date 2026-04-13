@@ -202,6 +202,7 @@ vi.mock('./config/config.js', () => ({
   isDebugMode: vi.fn(() => false),
   getRequestedWorktreeName: vi.fn(() => undefined),
   getWorktreeArg: vi.fn(() => undefined),
+  getWorkspaceArg: vi.fn(() => undefined),
 }));
 
 vi.mock('read-package-up', () => ({

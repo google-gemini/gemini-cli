@@ -992,6 +992,7 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
       }),
       200, // maxDirs
       ['.git'], // boundaryMarkers
+      undefined, // workspaceRootOverride
     );
   });
 
@@ -1022,6 +1023,7 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
       }),
       200,
       ['.git'], // boundaryMarkers
+      undefined, // workspaceRootOverride
     );
   });
 
@@ -1051,6 +1053,7 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
       }),
       200,
       ['.git'], // boundaryMarkers
+      undefined, // workspaceRootOverride
     );
   });
 });

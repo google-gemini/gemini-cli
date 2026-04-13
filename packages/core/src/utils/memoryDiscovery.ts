@@ -214,6 +214,7 @@ async function getGeminiMdFilePathsInternal(
   fileFilteringOptions: FileFilteringOptions,
   maxDirs: number,
   boundaryMarkers: readonly string[] = ['.git'],
+  workspaceRootOverride?: string,
 ): Promise<{ global: string[]; project: string[] }> {
   const dirs = new Set<string>([
     ...includeDirectoriesToReadGemini,
@@ -237,6 +238,7 @@ async function getGeminiMdFilePathsInternal(
         fileFilteringOptions,
         maxDirs,
         boundaryMarkers,
+        workspaceRootOverride,
       ),
     );
 
@@ -269,6 +271,7 @@ async function getGeminiMdFilePathsInternalForEachDir(
   fileFilteringOptions: FileFilteringOptions,
   maxDirs: number,
   boundaryMarkers: readonly string[] = ['.git'],
+  workspaceRootOverride?: string,
 ): Promise<{ global: string[]; project: string[] }> {
   const globalPaths = new Set<string>();
   const projectPaths = new Set<string>();
@@ -305,17 +308,29 @@ async function getGeminiMdFilePathsInternalForEachDir(
         resolvedCwd,
       );
 
-      const projectRoot = await findProjectRoot(resolvedCwd, boundaryMarkers);
+      // When an explicit workspace root is provided via --workspace, use it
+      // directly as the project root. This prevents any upward traversal
+      // above the user-specified directory boundary.
+      const projectRoot = workspaceRootOverride
+        ? normalizePath(workspaceRootOverride)
+        : await findProjectRoot(resolvedCwd, boundaryMarkers);
       debugLogger.debug(
         '[DEBUG] [MemoryDiscovery] Determined project root:',
         projectRoot ?? 'None',
+        workspaceRootOverride ? '(from --workspace override)' : '',
       );
 
       const upwardPaths: string[] = [];
       let currentDir = resolvedCwd;
-      const ultimateStopDir = projectRoot
-        ? normalizePath(path.dirname(projectRoot))
-        : normalizePath(path.dirname(resolvedHome));
+      // When a workspace root override is provided, the upward walk stops AT
+      // the workspace dir (it is included, but nothing above it is scanned).
+      // Without an override, the walk stops at the parent of the project root
+      // (the original behaviour).
+      const ultimateStopDir = workspaceRootOverride
+        ? normalizePath(workspaceRootOverride)
+        : projectRoot
+          ? normalizePath(path.dirname(projectRoot))
+          : normalizePath(path.dirname(resolvedHome));
 
       while (
         currentDir &&
@@ -647,6 +662,7 @@ export async function loadServerHierarchicalMemory(
   fileFilteringOptions?: FileFilteringOptions,
   maxDirs: number = 200,
   boundaryMarkers: readonly string[] = ['.git'],
+  workspaceRootOverride?: string,
 ): Promise<LoadServerHierarchicalMemoryResponse> {
   // FIX: Use real, canonical paths for a reliable comparison to handle symlinks.
   const realCwd = normalizePath(
@@ -680,6 +696,7 @@ export async function loadServerHierarchicalMemory(
       fileFilteringOptions || DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
       maxDirs,
       boundaryMarkers,
+      workspaceRootOverride,
     ),
     Promise.resolve(getExtensionMemoryPaths(extensionLoader)),
   ]);
