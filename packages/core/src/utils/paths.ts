@@ -485,11 +485,14 @@ export function toPathKey(p: string): string {
 
   // Strip trailing slashes (except for root paths)
   if (norm.length > 1 && (norm.endsWith('/') || norm.endsWith('\\'))) {
-    norm = norm.slice(0, -1);
+    // On Windows, don't strip the slash from a drive root (e.g., "C:\\")
+    if (!/^[a-zA-Z]:[\\/]$/.test(norm)) {
+      norm = norm.slice(0, -1);
+    }
   }
 
   // Convert to lowercase on case-insensitive platforms
-  const platform = os.platform();
+  const platform = process.platform;
   const isCaseInsensitive = platform === 'win32' || platform === 'darwin';
   return isCaseInsensitive ? norm.toLowerCase() : norm;
 }

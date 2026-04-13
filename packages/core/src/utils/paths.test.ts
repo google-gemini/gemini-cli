@@ -19,7 +19,6 @@ import {
   deduplicateAbsolutePaths,
   toPathKey,
 } from './paths.js';
-import os from 'node:os';
 
 vi.mock('node:fs', async (importOriginal) => {
   const actual = await importOriginal<typeof fs>();
@@ -719,15 +718,15 @@ describe('normalizePath', () => {
     });
 
     it('should handle case-insensitivity on Windows and macOS', () => {
-      vi.spyOn(os, 'platform').mockReturnValue('win32');
+      mockPlatform('win32');
       const paths = ['/workspace/foo', '/Workspace/Foo'];
       expect(deduplicateAbsolutePaths(paths)).toEqual(['/workspace/foo']);
 
-      vi.spyOn(os, 'platform').mockReturnValue('darwin');
+      mockPlatform('darwin');
       const macPaths = ['/tmp/foo', '/Tmp/Foo'];
       expect(deduplicateAbsolutePaths(macPaths)).toEqual(['/tmp/foo']);
 
-      vi.spyOn(os, 'platform').mockReturnValue('linux');
+      mockPlatform('linux');
       const linuxPaths = ['/tmp/foo', '/tmp/FOO'];
       expect(deduplicateAbsolutePaths(linuxPaths)).toEqual([
         '/tmp/foo',
@@ -749,15 +748,17 @@ describe('normalizePath', () => {
     });
 
     it('should convert paths to lowercase on Windows and macOS', () => {
-      vi.spyOn(os, 'platform').mockReturnValue('win32');
+      mockPlatform('win32');
       expect(toPathKey('/Workspace/Foo')).toBe(
         path.normalize('/workspace/foo'),
       );
+      // Ensure drive roots are preserved
+      expect(toPathKey('C:\\')).toBe('c:\\');
 
-      vi.spyOn(os, 'platform').mockReturnValue('darwin');
+      mockPlatform('darwin');
       expect(toPathKey('/Tmp/Foo')).toBe(path.normalize('/tmp/foo'));
 
-      vi.spyOn(os, 'platform').mockReturnValue('linux');
+      mockPlatform('linux');
       expect(toPathKey('/Tmp/Foo')).toBe(path.normalize('/Tmp/Foo'));
     });
   });
