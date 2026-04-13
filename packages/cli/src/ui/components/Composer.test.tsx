@@ -248,6 +248,7 @@ const renderComposer = async (
   config = createMockConfig(),
   uiActions = createMockUIActions(),
   inputStateOverrides: Partial<InputState> = {},
+  quotaStateOverrides: Partial<QuotaState> = {},
 ) => {
   const inputState = {
     buffer: { text: '' } as unknown as TextBuffer,
@@ -262,10 +263,13 @@ const renderComposer = async (
   };
 
   const quotaState: QuotaState = {
-    userTier: (uiState as unknown as QuotaState).userTier,
-    stats: (uiState as unknown as QuotaState).stats,
-    proQuotaRequest: (uiState as unknown as QuotaState).proQuotaRequest,
-    validationRequest: (uiState as unknown as QuotaState).validationRequest,
+    userTier: undefined,
+    stats: undefined,
+    proQuotaRequest: null,
+    validationRequest: null,
+    overageMenuRequest: null,
+    emptyWalletRequest: null,
+    ...quotaStateOverrides,
   };
 
   const result = await render(
