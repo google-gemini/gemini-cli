@@ -686,15 +686,41 @@ describe('retryWithBackoff', () => {
     expect(mockFn).toHaveBeenCalledTimes(1);
   });
 
-  it('should trigger fallback for OAuth personal users on persistent 500 errors', async () => {
+  it('should throw after max attempts on persistent 500 without calling onPersistent429', async () => {
+    const fallbackCallback = vi.fn().mockResolvedValue('gemini-2.5-flash');
+
+    const mockFn = vi.fn().mockImplementation(async () => {
+      const error: HttpError = new Error('Internal Server Error');
+      error.status = 500;
+      throw error;
+    });
+
+    const promise = retryWithBackoff(mockFn, {
+      maxAttempts: 3,
+      initialDelayMs: 100,
+      onPersistent429: fallbackCallback,
+      authType: AuthType.LOGIN_WITH_GOOGLE,
+    });
+
+    await vi.runAllTimersAsync();
+
+    await expect(promise).rejects.toThrow('Internal Server Error');
+    // Fallback should NOT be called for generic 500 errors
+    expect(fallbackCallback).not.toHaveBeenCalled();
+    expect(mockFn).toHaveBeenCalledTimes(3);
+  });
+
+  it('should still call onPersistent429 for RetryableQuotaError after max attempts', async () => {
     const fallbackCallback = vi.fn().mockResolvedValue('gemini-2.5-flash');
 
     let fallbackOccurred = false;
     const mockFn = vi.fn().mockImplementation(async () => {
       if (!fallbackOccurred) {
-        const error: HttpError = new Error('Internal Server Error');
-        error.status = 500;
-        throw error;
+        throw new RetryableQuotaError('Resource exhausted', {
+          code: 503,
+          message: 'Resource exhausted',
+          details: [],
+        });
       }
       return 'success';
     });
@@ -714,10 +740,8 @@ describe('retryWithBackoff', () => {
     await expect(promise).resolves.toBe('success');
     expect(fallbackCallback).toHaveBeenCalledWith(
       AuthType.LOGIN_WITH_GOOGLE,
-      expect.objectContaining({ status: 500 }),
+      expect.any(RetryableQuotaError),
     );
-    // 3 attempts (initial + 2 retries) fail with 500, then fallback triggers, then 1 success
-    expect(mockFn).toHaveBeenCalledTimes(4);
   });
 
   it('should trigger fallback for OAuth personal users on ModelNotFoundError', async () => {
