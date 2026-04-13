@@ -139,32 +139,32 @@ When writing [`argsPattern`](./policy-engine.md#arguments-pattern) rules for the
 each tool. The following table lists the keys that appear in the JSON
 representation of each tool's arguments.
 
-| Tool                     | JSON argument keys                                                       |
-| :----------------------- | :----------------------------------------------------------------------- |
-| `run_shell_command`      | `command`, `description`, `dir_path`, `is_background`                    |
-| `glob`                   | `pattern`, `path`, `case_sensitive`, `respect_git_ignore`                |
-| `grep_search`            | `pattern`, `path`, `include`                                             |
-| `list_directory`         | `dir_path`, `ignore`, `file_filtering_options`                           |
-| `read_file`              | `file_path`, `offset`, `limit`                                           |
-| `read_many_files`        | `include`, `exclude`, `recursive`, `useDefaultExcludes`                  |
-| `write_file`             | `file_path`, `content`                                                   |
-| `replace`                | `file_path`, `old_string`, `new_string`, `instruction`, `allow_multiple` |
-| `ask_user`               | `questions` (array of `question`, `header`, `type`, `options`)           |
-| `write_todos`            | `todos` (array of `description`, `status`)                               |
-| `save_memory`            | `fact`                                                                   |
-| `activate_skill`         | `name`                                                                   |
-| `get_internal_docs`      | `path`                                                                   |
-| `enter_plan_mode`        | `reason`                                                                 |
-| `exit_plan_mode`         | `plan_path`                                                              |
-| `tracker_create_task`    | `title`, `description`, `type`                                           |
-| `tracker_update_task`    | `id`, `title`, `description`, `status`, `dependencies`                   |
-| `tracker_get_task`       | `id`                                                                     |
-| `tracker_list_tasks`     | `status`, `type`, `parentId`                                             |
-| `tracker_add_dependency` | `taskId`, `dependencyId`                                                 |
-| `tracker_visualize`      | _(none)_                                                                 |
-| `update_topic`           | `title`, `summary`, `strategic_intent`                                   |
-| `google_web_search`      | `query`                                                                  |
-| `web_fetch`              | `prompt`                                                                 |
+| Tool                     | JSON argument keys                                                                                                                                                                                   |
+| :----------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `run_shell_command`      | `command`, `description`, `dir_path`, `is_background`                                                                                                                                                |
+| `glob`                   | `pattern`, `dir_path`, `case_sensitive`, `respect_git_ignore`, `respect_gemini_ignore`                                                                                                               |
+| `grep_search`            | `pattern`, `dir_path`, `include_pattern`, `exclude_pattern`, `names_only`, `case_sensitive`, `fixed_strings`, `context`, `after`, `before`, `no_ignore`, `max_matches_per_file`, `total_max_matches` |
+| `list_directory`         | `dir_path`, `ignore`, `file_filtering_options`                                                                                                                                                       |
+| `read_file`              | `file_path`, `start_line`, `end_line`                                                                                                                                                                |
+| `read_many_files`        | `include`, `exclude`, `recursive`, `useDefaultExcludes`                                                                                                                                              |
+| `write_file`             | `file_path`, `content`                                                                                                                                                                               |
+| `replace`                | `file_path`, `old_string`, `new_string`, `instruction`, `allow_multiple`                                                                                                                             |
+| `ask_user`               | `questions` (array of `question`, `header`, `type`, `options`)                                                                                                                                       |
+| `write_todos`            | `todos` (array of `description`, `status`)                                                                                                                                                           |
+| `save_memory`            | `fact`                                                                                                                                                                                               |
+| `activate_skill`         | `name`                                                                                                                                                                                               |
+| `get_internal_docs`      | `path`                                                                                                                                                                                               |
+| `enter_plan_mode`        | `reason`                                                                                                                                                                                             |
+| `exit_plan_mode`         | `plan_path`                                                                                                                                                                                          |
+| `tracker_create_task`    | `title`, `description`, `type`                                                                                                                                                                       |
+| `tracker_update_task`    | `id`, `title`, `description`, `status`, `dependencies`                                                                                                                                               |
+| `tracker_get_task`       | `id`                                                                                                                                                                                                 |
+| `tracker_list_tasks`     | `status`, `type`, `parentId`                                                                                                                                                                         |
+| `tracker_add_dependency` | `taskId`, `dependencyId`                                                                                                                                                                             |
+| `tracker_visualize`      | _(none)_                                                                                                                                                                                             |
+| `update_topic`           | `title`, `summary`, `strategic_intent`                                                                                                                                                               |
+| `google_web_search`      | `query`                                                                                                                                                                                              |
+| `web_fetch`              | `prompt`                                                                                                                                                                                             |
 
 For example, to write a policy rule that blocks any `write_file` call targeting
 a `.env` file, you would match against the `file_path` key:
