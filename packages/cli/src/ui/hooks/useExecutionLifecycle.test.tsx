@@ -101,6 +101,7 @@ import {
   type GeminiClient,
   type ShellExecutionResult,
   type ShellOutputEvent,
+  type AnsiOutput,
   CoreToolCallStatus,
 } from '@google/gemini-cli-core';
 import * as fs from 'node:fs';
@@ -132,6 +133,7 @@ describe('useExecutionLifecycle', () => {
     mockConfig = {
       getTargetDir: () => '/test/dir',
       getEnableInteractiveShell: () => false,
+      getSessionId: () => 'test-session-id',
       getShellExecutionConfig: () => ({
         terminalHeight: 20,
         terminalWidth: 80,
@@ -245,9 +247,30 @@ describe('useExecutionLifecycle', () => {
       expect.any(Function),
       expect.any(Object),
       false,
-      expect.any(Object),
+      expect.objectContaining({
+        sessionId: 'test-session-id',
+      }),
     );
     expect(onExecMock).toHaveBeenCalledWith(expect.any(Promise));
+  });
+
+  it('should pass the config sessionId into shell execution config', async () => {
+    const { result } = await renderProcessorHook();
+
+    await act(async () => {
+      result.current.handleShellCommand('top', new AbortController().signal);
+    });
+
+    expect(mockShellExecutionService).toHaveBeenCalledWith(
+      expect.any(String),
+      '/test/dir',
+      expect.any(Function),
+      expect.any(Object),
+      false,
+      expect.objectContaining({
+        sessionId: 'test-session-id',
+      }),
+    );
   });
 
   it('should handle successful execution and update history correctly', async () => {
@@ -519,6 +542,53 @@ describe('useExecutionLifecycle', () => {
     expect(finalHistoryItem.tools[0].resultDisplay).toBe(
       '[Command produced binary output, which is not shown.]',
     );
+  });
+
+  it('should prepend warnings to AnsiOutput array', async () => {
+    const { result } = await renderProcessorHook();
+
+    act(() => {
+      result.current.handleShellCommand('ls', new AbortController().signal);
+    });
+    const execPromise = onExecMock.mock.calls[0][0];
+
+    const ansiOutput: AnsiOutput = [
+      [
+        {
+          text: 'ansi line 1',
+          fg: '',
+          bg: '',
+          bold: false,
+          dim: false,
+          italic: false,
+          underline: false,
+          inverse: false,
+          isUninitialized: false,
+        },
+      ],
+    ];
+
+    act(() => {
+      resolveExecutionPromise(
+        createMockServiceResult({
+          exitCode: 1,
+          output: 'ansi line 1',
+          ansiOutput,
+        }),
+      );
+    });
+    await act(async () => await execPromise);
+
+    expect(setPendingHistoryItemMock).toHaveBeenCalledWith(null);
+    expect(addItemToHistoryMock).toHaveBeenCalledTimes(2);
+
+    const historyCall = addItemToHistoryMock.mock.calls[1][0];
+    const display = historyCall.tools[0].resultDisplay;
+
+    expect(Array.isArray(display)).toBe(true);
+    expect(display.length).toBe(3); // Error line, empty line, original output
+    expect(display[0][0].text).toBe('Command exited with code 1.');
+    expect(display[2][0].text).toBe('ansi line 1');
   });
 
   it('should handle promise rejection and show an error', async () => {

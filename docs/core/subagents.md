@@ -5,15 +5,6 @@ session. They are designed to handle specific, complex tasks—like deep codebas
 analysis, documentation lookup, or domain-specific reasoning—without cluttering
 the main agent's context or toolset.
 
-Subagents are enabled by default. To disable them, set `enableAgents` to `false`
-in your `settings.json`:
-
-```json
-{
-  "experimental": { "enableAgents": false }
-}
-```
-
 ## What are subagents?
 
 Subagents are "specialists" that the main Gemini agent can hire for a specific
@@ -120,10 +111,12 @@ Gemini CLI comes with the following built-in subagents:
 
 The browser agent requires:
 
-- **Chrome** version 144 or later (any recent stable release will work).
-- **Node.js** with `npx` available (used to launch the
-  [`chrome-devtools-mcp`](https://www.npmjs.com/package/chrome-devtools-mcp)
-  server).
+- **Chrome** version 144 or later (any recent stable release works).
+
+The underlying
+[`chrome-devtools-mcp`](https://www.npmjs.com/package/chrome-devtools-mcp)
+server is bundled with Gemini CLI and launched automatically — no separate
+installation is needed.
 
 #### Enabling the browser agent
 
@@ -169,26 +162,58 @@ The available modes are:
 | `isolated`   | Launches Chrome with a temporary profile that is deleted after each session. Use this for clean-state automation.                                                                           |
 | `existing`   | Attaches to an already-running Chrome instance. You must enable remote debugging first by navigating to `chrome://inspect/#remote-debugging` in Chrome. No new browser process is launched. |
 
+#### First-run consent
+
+The first time the browser agent is invoked, Gemini CLI displays a consent
+dialog. You must accept before the browser session starts. This dialog only
+appears once.
+
 #### Configuration reference
 
 All browser-specific settings go under `agents.browser` in your `settings.json`.
+For full details, see the
+[`agents.browser` configuration reference](../reference/configuration.md#agents).
 
-| Setting       | Type      | Default        | Description                                                                                     |
-| :------------ | :-------- | :------------- | :---------------------------------------------------------------------------------------------- |
-| `sessionMode` | `string`  | `"persistent"` | How Chrome is managed: `"persistent"`, `"isolated"`, or `"existing"`.                           |
-| `headless`    | `boolean` | `false`        | Run Chrome in headless mode (no visible window).                                                |
-| `profilePath` | `string`  | —              | Custom path to a browser profile directory.                                                     |
-| `visualModel` | `string`  | —              | Model override for the visual agent (for example, `"gemini-2.5-computer-use-preview-10-2025"`). |
+| Setting                   | Type       | Default        | Description                                                                     |
+| :------------------------ | :--------- | :------------- | :------------------------------------------------------------------------------ |
+| `sessionMode`             | `string`   | `"persistent"` | How Chrome is managed: `"persistent"`, `"isolated"`, or `"existing"`.           |
+| `headless`                | `boolean`  | `false`        | Run Chrome in headless mode (no visible window).                                |
+| `profilePath`             | `string`   | —              | Custom path to a browser profile directory.                                     |
+| `visualModel`             | `string`   | —              | Model override for the visual agent.                                            |
+| `allowedDomains`          | `string[]` | —              | Restrict navigation to specific domains (for example, `["github.com"]`).        |
+| `disableUserInput`        | `boolean`  | `true`         | Disable user input on the browser window during automation (non-headless only). |
+| `maxActionsPerTask`       | `number`   | `100`          | Maximum tool calls per task. The agent is terminated when the limit is reached. |
+| `confirmSensitiveActions` | `boolean`  | `false`        | Require manual confirmation for `upload_file` and `evaluate_script`.            |
+| `blockFileUploads`        | `boolean`  | `false`        | Hard-block all file upload requests from the agent.                             |
+
+#### Automation overlay and input blocking
+
+In non-headless mode, the browser agent injects a visual overlay into the
+browser window to indicate that automation is in progress. By default, user
+input (keyboard and mouse) is also blocked to prevent accidental interference.
+You can disable this by setting `disableUserInput` to `false`.
 
 #### Security
 
-The browser agent enforces the following security restrictions:
+The browser agent enforces several layers of security:
 
-- **Blocked URL patterns:** `file://`, `javascript:`, `data:text/html`,
-  `chrome://extensions`, and `chrome://settings/passwords` are always blocked.
-- **Sensitive action confirmation:** Actions like form filling, file uploads,
-  and form submissions require user confirmation through the standard policy
-  engine.
+- **Domain restrictions:** When `allowedDomains` is set, the agent can only
+  navigate to the listed domains (and their subdomains when using `*.` prefix).
+  Attempting to visit a disallowed domain throws a fatal error that immediately
+  terminates the agent. The agent also attempts to detect and block the use of
+  allowed domains as proxies (e.g., via query parameters or fragments) to access
+  restricted content.
+- **Blocked URL patterns:** The underlying MCP server blocks dangerous URL
+  schemes including `file://`, `javascript:`, `data:text/html`,
+  `chrome://extensions`, and `chrome://settings/passwords`.
+- **Sensitive action confirmation:** Form filling (`fill`, `fill_form`) always
+  requires user confirmation through the policy engine, regardless of approval
+  mode. When `confirmSensitiveActions` is `true`, `upload_file` and
+  `evaluate_script` also require confirmation.
+- **File upload blocking:** Set `blockFileUploads` to `true` to hard-block all
+  file upload requests, preventing the agent from uploading any files.
+- **Action rate limiting:** The `maxActionsPerTask` setting (default: 100)
+  limits the total number of tool calls per task to prevent runaway execution.
 
 #### Visual agent
 
@@ -333,7 +358,7 @@ it yourself; just report it.
 | `kind`         | string | No       | `local` (default) or `remote`.                                                                                                                                                                                |
 | `tools`        | array  | No       | List of tool names this agent can use. Supports wildcards: `*` (all tools), `mcp_*` (all MCP tools), `mcp_server_*` (all tools from a server). **If omitted, it inherits all tools from the parent session.** |
 | `mcpServers`   | object | No       | Configuration for inline Model Context Protocol (MCP) servers isolated to this specific agent.                                                                                                                |
-| `model`        | string | No       | Specific model to use (e.g., `gemini-3-preview`). Defaults to `inherit` (uses the main session model).                                                                                                        |
+| `model`        | string | No       | Specific model to use (for example, `gemini-3-preview`). Defaults to `inherit` (uses the main session model).                                                                                                 |
 | `temperature`  | number | No       | Model temperature (0.0 - 2.0). Defaults to `1`.                                                                                                                                                               |
 | `max_turns`    | number | No       | Maximum number of conversation turns allowed for this agent before it must return. Defaults to `30`.                                                                                                          |
 | `timeout_mins` | number | No       | Maximum execution time in minutes. Defaults to `10`.                                                                                                                                                          |
@@ -385,8 +410,8 @@ With this feature, you can:
 ### Configuring isolated tools and servers
 
 You can configure tool isolation for a subagent by updating its markdown
-frontmatter. This allows you to explicitly state which tools the subagent can
-use, rather than relying on the global registry.
+frontmatter. This lets you explicitly state which tools the subagent can use,
+rather than relying on the global registry.
 
 Add an `mcpServers` object to define inline MCP servers that are unique to the
 agent.
@@ -496,6 +521,24 @@ field.
 }
 ```
 
+#### Safety policies (TOML)
+
+You can restrict access to specific subagents using the CLI's **Policy Engine**.
+Subagents are treated as virtual tool names for policy matching purposes.
+
+To govern access to a subagent, create a `.toml` file in your policy directory
+(e.g., `~/.gemini/policies/`):
+
+```toml
+[[rule]]
+toolName = "codebase_investigator"
+decision = "deny"
+deny_message = "Deep codebase analysis is restricted for this session."
+```
+
+For more information on setting up fine-grained safety guardrails, see the
+[Policy Engine reference](../reference/policy-engine.md#special-syntax-for-subagents).
+
 ### Optimizing your subagent
 
 The main agent's system prompt encourages it to use an expert subagent when one
@@ -534,3 +577,14 @@ configuration, authentication, and usage instructions.
 Extensions can bundle and distribute subagents. See the
 [Extensions documentation](../extensions/index.md#subagents) for details on how
 to package agents within an extension.
+
+## Disabling subagents
+
+Subagents are enabled by default. To disable them, set `enableAgents` to `false`
+in your `settings.json`:
+
+```json
+{
+  "experimental": { "enableAgents": false }
+}
+```

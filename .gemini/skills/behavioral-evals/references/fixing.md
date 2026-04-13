@@ -33,6 +33,35 @@ evaluation.
     - **Warning**: Do not lose test fidelity by making prompts too direct/easy.
     - **Primary Fix Trigger**: Adjust tool descriptions, system prompts
       (`snippets.ts`), or **modules that contribute to the prompt template**.
+    - Fixes should generally try to improve the prompt
+      `@packages/core/src/prompts/snippets.ts` first.
+    - **Instructional Generality**: Changes to the system prompt should aim to
+      be as general as possible while still accomplishing the goal. Specificity
+      should be added only as needed.
+      - **Principle**: Instead of creating "forbidden lists" for specific syntax
+        (e.g., "Don't use `Object.create()`"), formulate a broader engineering
+        principle that covers the underlying issue (e.g., "Prioritize explicit
+        composition over hidden prototype manipulation"). This improves
+        steerability across a wider range of similar scenarios.
+      - _Low Specificity_: "Follow ecosystem best practices"
+      - _Medium Specificity_: "Utilize OOP and functional best practices, as
+        applicable"
+      - _High Specificity_: Provide ecosystem-specific hints as examples of a
+        broader principle rather than direct instructions. e.g., "NEVER use
+        hacks like bypassing the type system or employing 'hidden' logic (e.g.:
+        reflection, prototype manipulation). Instead, use explicit and idiomatic
+        language features (e.g.: type guards, explicit class instantiation, or
+        object spread) that maintain structural integrity."
+    - **Prompt Simplification**: Once the test is passing, use `ask_user` to
+      determine if prompt simplification is desired.
+      - **Criteria**: Simplification should be attempted only if there are
+        related clauses that can be de-duplicated or reparented under a single
+        heading.
+      - **Verification**: As part of simplification, you MUST identify and run
+        any behavioral eval tests that might be affected by the changes to
+        ensure no regressions are introduced.
+    - Test fixes should not "cheat" by changing a test's `GEMINI.md` file or by
+      updating the test's prompt to instruct it to not repro the bug.
     - **Warning**: Prompts have multiple configurations; ensure your fix targets
       the correct config for the model in question.
 4.  **Architecture Options**: If prompt or instruction tuning triggers no
