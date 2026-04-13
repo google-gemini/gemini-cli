@@ -406,6 +406,7 @@ export class ShellExecutionService {
     args: string[];
     env: NodeJS.ProcessEnv;
     cwd: string;
+    shell: ShellType;
     cleanup?: () => void;
   }> {
     const sandboxManager =
@@ -512,6 +513,7 @@ export class ShellExecutionService {
       args: sandboxedCommand.args,
       env: sandboxedCommand.env,
       cwd: sandboxedCommand.cwd ?? cwd,
+      shell,
       cleanup: sandboxedCommand.cleanup,
     };
   }
@@ -541,6 +543,7 @@ export class ShellExecutionService {
         args: finalArgs,
         env: finalEnv,
         cwd: finalCwd,
+        shell,
       } = prepared;
 
       const child = cpSpawn(finalExecutable, finalArgs, {
