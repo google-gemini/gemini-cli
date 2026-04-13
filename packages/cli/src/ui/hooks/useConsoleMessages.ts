@@ -83,7 +83,7 @@ function processQueue() {
         count: prev.count + 1,
       };
     } else {
-      newMessages.push({ ...queuedMessage, id: nextMessageId(), count: 1 });
+      newMessages.push(structuredClone(queuedMessage));
     }
   }
 
