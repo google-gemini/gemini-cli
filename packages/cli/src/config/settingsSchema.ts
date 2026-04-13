@@ -1121,6 +1121,16 @@ const SETTINGS_SCHEMA = {
           },
         ],
       },
+      stopGracePeriodMs: {
+        type: 'number',
+        label: 'Stop Grace Period (ms)',
+        category: 'Voice',
+        requiresRestart: false,
+        default: 1000,
+        description:
+          'How long to wait for final transcription after stopping recording.',
+        showInDialog: true,
+      },
     },
   },
 
