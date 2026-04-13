@@ -329,6 +329,7 @@ Storage whenever Gemini CLI exits Plan Mode to start the implementation.
 #!/usr/bin/env bash
 # Extract the plan filename from the tool input JSON
 plan_filename=$(jq -r '.tool_input.plan_filename // empty')
+plan_filename=$(basename -- "$plan_filename")
 
 # Construct the absolute path using the GEMINI_PLANS_DIR environment variable
 plan_path="$GEMINI_PLANS_DIR/$plan_filename"
