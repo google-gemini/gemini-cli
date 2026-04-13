@@ -305,13 +305,13 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   const pttStateRef = useRef<'idle' | 'possible-hold' | 'recording'>('idle');
   const pttTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const disconnectTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const bufferRef = useRef(buffer);
   bufferRef.current = buffer;
 
   const stopVoiceRecording = useCallback(() => {
     debugLogger.debug('[Voice] Stop requested');
-    recordingInProgressRef.current = false;
     stopRequestedRef.current = true;
     setIsRecording(false);
     isRecordingRef.current = false;
@@ -321,19 +321,38 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       recorderRef.current.stop();
       recorderRef.current = null;
     }
-    if (transcriptionServiceRef.current) {
-      transcriptionServiceRef.current.disconnect();
-      transcriptionServiceRef.current = null;
+
+    const serviceToDisconnect = transcriptionServiceRef.current;
+    transcriptionServiceRef.current = null; // Detach immediately so new session can start if needed
+
+    if (serviceToDisconnect) {
+      const gracePeriodMs = settings.voice?.stopGracePeriodMs ?? 1000;
+      debugLogger.debug(
+        `[Voice] Draining transcription for ${gracePeriodMs}ms`,
+      );
+
+      if (disconnectTimerRef.current) clearTimeout(disconnectTimerRef.current);
+      disconnectTimerRef.current = setTimeout(() => {
+        debugLogger.debug('[Voice] Grace period ended, disconnecting service');
+        serviceToDisconnect.disconnect();
+        disconnectTimerRef.current = null;
+      }, gracePeriodMs);
     }
 
     liveTranscriptionRef.current = '';
     pttStateRef.current = 'idle';
-  }, []);
+  }, [settings.voice]);
 
   const startVoiceRecording = useCallback(() => {
     // Check for cooldown after failure
     if (Date.now() - lastFailureTimeRef.current < 2000) {
       return;
+    }
+
+    // Cancel any pending disconnect if we start a new session quickly
+    if (disconnectTimerRef.current) {
+      clearTimeout(disconnectTimerRef.current);
+      disconnectTimerRef.current = null;
     }
 
     recordingInProgressRef.current = true;
@@ -396,9 +415,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       // turn-based (resetting text after turnComplete). We maintain a baseline
       // that updates on every turnComplete to handle both cases transparently.
       transcriptionServiceRef.current.on('transcription', (text) => {
-        // If user toggled off while transcription was in flight
-        if (!recordingInProgressRef.current) return;
-
         if (text) {
           const baseline = turnBaselineRef.current ?? '';
           const separator =
