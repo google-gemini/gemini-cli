@@ -68,7 +68,21 @@ export const SCROLLBACK_LIMIT = 300000;
 const BASH_SHOPT_OPTIONS = 'promptvars nullglob extglob nocaseglob dotglob';
 const BASH_SHOPT_GUARD = `shopt -u ${BASH_SHOPT_OPTIONS};`;
 
+// PowerShell preamble that forces UTF-8 output encoding so that non-ASCII
+// characters (e.g. Chinese, Japanese, Cyrillic) are not garbled when captured
+// through Node.js pipes on Windows systems whose default code page is not 65001.
+const POWERSHELL_UTF8_GUARD =
+  '[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; $OutputEncoding = [System.Text.Encoding]::UTF8;';
+
 function ensurePromptvarsDisabled(command: string, shell: ShellType): string {
+  if (shell === 'powershell') {
+    const trimmed = command.trimStart();
+    if (trimmed.startsWith(POWERSHELL_UTF8_GUARD)) {
+      return command;
+    }
+    return `${POWERSHELL_UTF8_GUARD} ${command}`;
+  }
+
   if (shell !== 'bash') {
     return command;
   }
