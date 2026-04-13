@@ -16,6 +16,7 @@ import {
 } from '../shared/text-buffer.js';
 import { HalfLinePaddedBox } from '../shared/HalfLinePaddedBox.js';
 import { useConfig } from '../../contexts/ConfigContext.js';
+import { processRtlText, wrapLogicalText } from '../../rtl/rtlUtils.js';
 
 interface UserMessageProps {
   text: string;
@@ -33,7 +34,7 @@ export const UserMessage: React.FC<UserMessageProps> = ({ text, width }) => {
 
   const displayText = useMemo(() => {
     if (!text) return text;
-    return text
+    const transformed = text
       .split('\n')
       .map((line) => {
         const transformations = calculateTransformationsForLine(line);
@@ -47,7 +48,15 @@ export const UserMessage: React.FC<UserMessageProps> = ({ text, width }) => {
         return transformedLine;
       })
       .join('\n');
-  }, [text]);
+
+    // Account for padding (2 units for paddingX=1)
+    const effectiveWidth = width - (useBackgroundColor ? 2 : 0);
+    const wrappedLines = wrapLogicalText(
+      transformed,
+      Math.max(10, effectiveWidth - prefixWidth),
+    );
+    return wrappedLines.map((line) => processRtlText(line)).join('\n');
+  }, [text, width, prefixWidth, useBackgroundColor]);
 
   return (
     <HalfLinePaddedBox
