@@ -85,6 +85,11 @@ export function supports256Colors(): boolean {
     return true;
   }
 
+  // kmscon (Fedora's virtual console) supports true color but sets TERM=linux
+  if (process.env['COLORTERM'] === 'kmscon') {
+    return true;
+  }
+
   return false;
 }
 
@@ -95,7 +100,8 @@ export function supportsTrueColor(): boolean {
   // Check COLORTERM environment variable
   if (
     process.env['COLORTERM'] === 'truecolor' ||
-    process.env['COLORTERM'] === '24bit'
+    process.env['COLORTERM'] === '24bit' ||
+    process.env['COLORTERM'] === 'kmscon'
   ) {
     return true;
   }
