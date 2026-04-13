@@ -23,7 +23,7 @@ import type { ConcreteNode } from './graph/types.js';
 export class HistoryObserver {
   private unsubscribeHistory?: () => void;
 
-  private seenNodeIds = new Set<string>();
+  private readonly seenNodeIds = new Set<string>();
 
   constructor(
     private readonly chatHistory: AgentChatHistory,

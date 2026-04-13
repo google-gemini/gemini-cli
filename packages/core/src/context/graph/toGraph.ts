@@ -15,6 +15,7 @@ import type {
 } from './types.js';
 import type { ContextTokenCalculator } from '../utils/contextTokenCalculator.js';
 import { randomUUID } from 'node:crypto';
+import { isRecord } from '../../utils/markdownUtils.js';
 
 // We remove the global nodeIdentityMap and instead rely on one passed from ContextGraphMapper
 export function getStableId(
@@ -27,10 +28,6 @@ export function getStableId(
     nodeIdentityMap.set(obj, id);
   }
   return id;
-}
-
-function isRecord(v: unknown): v is Record<string, unknown> {
-  return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
 
 function isCompleteEpisode(ep: Partial<Episode>): ep is Episode {

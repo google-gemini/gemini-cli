@@ -47,25 +47,33 @@ export interface BaseConcreteNode extends IrNode {
 /**
  * Semantic Parts for User Prompts
  */
+export interface SemanticTextPart {
+  readonly type: 'text';
+  readonly text: string;
+}
+
+export interface SemanticInlineDataPart {
+  readonly type: 'inline_data';
+  readonly mimeType: string;
+  readonly data: string;
+}
+
+export interface SemanticFileDataPart {
+  readonly type: 'file_data';
+  readonly mimeType: string;
+  readonly fileUri: string;
+}
+
+export interface SemanticRawPart {
+  readonly type: 'raw_part';
+  readonly part: Part;
+}
+
 export type SemanticPart =
-  | {
-      readonly type: 'text';
-      readonly text: string;
-    }
-  | {
-      readonly type: 'inline_data';
-      readonly mimeType: string;
-      readonly data: string;
-    }
-  | {
-      readonly type: 'file_data';
-      readonly mimeType: string;
-      readonly fileUri: string;
-    }
-  | {
-      readonly type: 'raw_part';
-      readonly part: Part;
-    };
+  | SemanticTextPart
+  | SemanticInlineDataPart
+  | SemanticFileDataPart
+  | SemanticRawPart;
 
 /**
  * Trigger Nodes
