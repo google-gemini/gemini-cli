@@ -289,16 +289,10 @@ async function initOauthClient(
       }
     }
 
-    const webLogin = await authWithWeb(client);
-
-    coreEvents.emit(CoreEvent.UserFeedback, {
-      severity: 'info',
-      message:
-        `\n\nAttempting to open authentication page in your browser.\n` +
-        `Otherwise navigate to:\n\n${webLogin.authUrl}\n\n\n`,
-    });
     // Set up an AbortController for timeout and cancellation before opening the
     // browser so the CLI remains responsive to Ctrl+C throughout.
+    // The signal is propagated into authWithWeb so it closes the callback
+    // server on abort, preventing resource leaks.
     const abortController = new AbortController();
     const { signal } = abortController;
 
@@ -329,6 +323,15 @@ async function initOauthClient(
     };
     process.stdin.on('data', stdinHandler);
 
+    const webLogin = await authWithWeb(client, signal);
+
+    coreEvents.emit(CoreEvent.UserFeedback, {
+      severity: 'info',
+      message:
+        `\n\nAttempting to open authentication page in your browser.\n` +
+        `Otherwise navigate to:\n\n${webLogin.authUrl}\n\n\n`,
+    });
+
     // Fire-and-forget: don't await so that the Ctrl+C handler above is already
     // active while the browser is launching.
     openBrowserSecurely(webLogin.authUrl).catch((err) => {
@@ -346,18 +349,7 @@ async function initOauthClient(
     });
 
     try {
-      await Promise.race([
-        webLogin.loginCompletePromise,
-        new Promise<never>((_, reject) => {
-          if (signal.aborted) {
-            reject(signal.reason);
-            return;
-          }
-          signal.addEventListener('abort', () => reject(signal.reason), {
-            once: true,
-          });
-        }),
-      ]);
+      await webLogin.loginCompletePromise;
     } finally {
       clearTimeout(timeoutId);
       process.removeListener('SIGINT', sigIntHandler);
@@ -479,7 +471,10 @@ async function authWithUserCode(client: OAuth2Client): Promise<boolean> {
   }
 }
 
-async function authWithWeb(client: OAuth2Client): Promise<OauthWebLogin> {
+async function authWithWeb(
+  client: OAuth2Client,
+  signal: AbortSignal,
+): Promise<OauthWebLogin> {
   const port = await getAvailablePort();
   // The hostname used for the HTTP server binding (e.g., '0.0.0.0' in Docker).
   const host = process.env['OAUTH_CALLBACK_HOST'] || '127.0.0.1';
@@ -584,6 +579,19 @@ async function authWithWeb(client: OAuth2Client): Promise<OauthWebLogin> {
         server.close();
       }
     });
+
+    // Close the server and reject if the signal is aborted (timeout or
+    // user cancellation).  This prevents the server from leaking when
+    // loginCompletePromise is abandoned.
+    const onAbort = () => {
+      server.close();
+      reject(signal.reason);
+    };
+    if (signal.aborted) {
+      onAbort();
+      return;
+    }
+    signal.addEventListener('abort', onAbort, { once: true });
 
     server.listen(port, host, () => {
       // Server started successfully
