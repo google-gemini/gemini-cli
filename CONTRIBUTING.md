@@ -110,7 +110,9 @@ assign or unassign the issue as requested, provided the conditions are met
 (e.g., an issue must be unassigned to be assigned).
 
 Please note that you can have a maximum of 3 issues assigned to you at any given
-time.
+time and that only
+[issues labeled "help wanted"](https://github.com/google-gemini/gemini-cli/issues?q=is%3Aissue%20state%3Aopen%20label%3A%22help%20wanted%22)
+may be self-assigned.
 
 ### Pull request guidelines
 
