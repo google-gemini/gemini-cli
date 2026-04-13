@@ -1,5 +1,6 @@
 {
   "experimental": {
+    "plan": true,
     "extensionReloading": true,
     "modelSteering": true,
     "autoMemory": true,
@@ -9,12 +10,6 @@
     "voiceMode": true
   },
   "general": {
-    "devtools": true,
-    "plan": {
-      "enabled": true
-    }
-  },
-  "agents": {
-    "overrides": {}
+    "devtools": true
   }
 }
