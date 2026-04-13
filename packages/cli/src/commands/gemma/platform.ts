@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { loadSettings } from '../../config/settings.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -20,6 +21,34 @@ import {
 export interface PlatformInfo {
   key: string;
   binaryName: string;
+}
+
+export interface GemmaConfigStatus {
+  settingsEnabled: boolean;
+  configuredPort: number;
+}
+
+/**
+ * Resolves the Gemma configuration from the workspace settings.
+ */
+export function resolveGemmaConfig(fallbackPort: number): GemmaConfigStatus {
+  let settingsEnabled = false;
+  let configuredPort = fallbackPort;
+  try {
+    const settings = loadSettings(process.cwd());
+    const gemmaSettings = settings.merged.experimental?.gemmaModelRouter;
+    settingsEnabled = gemmaSettings?.enabled === true;
+    const hostStr = gemmaSettings?.classifier?.host;
+    if (hostStr) {
+      const match = hostStr.match(/:(\d+)/);
+      if (match) {
+        configuredPort = parseInt(match[1], 10);
+      }
+    }
+  } catch {
+    // Settings may fail to load in some contexts; treat as not enabled.
+  }
+  return { settingsEnabled, configuredPort };
 }
 
 /**

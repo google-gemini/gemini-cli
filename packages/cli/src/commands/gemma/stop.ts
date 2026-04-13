@@ -14,6 +14,7 @@ import {
   readServerPid,
   isProcessRunning,
   isServerRunning,
+  resolveGemmaConfig,
 } from './platform.js';
 
 /**
@@ -81,21 +82,8 @@ export const stopCommand: CommandModule = {
     }
 
     if (!port) {
-      try {
-        const { loadSettings } = await import('../../config/settings.js');
-        const settings = loadSettings(process.cwd());
-        const hostStr =
-          settings.merged.experimental?.gemmaModelRouter?.classifier?.host;
-        if (hostStr) {
-          const match = hostStr.match(/:(\d+)/);
-          if (match) {
-            port = parseInt(match[1], 10);
-          }
-        }
-      } catch {
-        // Ignore
-      }
-      port = port ?? DEFAULT_PORT;
+      const { configuredPort } = resolveGemmaConfig(DEFAULT_PORT);
+      port = configuredPort;
     }
 
     const pid = readServerPid();

@@ -6,7 +6,6 @@
 
 import type { CommandModule } from 'yargs';
 import chalk from 'chalk';
-import { loadSettings } from '../../config/settings.js';
 import { DEFAULT_PORT, GEMMA_MODEL_NAME } from './constants.js';
 import {
   detectPlatform,
@@ -16,6 +15,7 @@ import {
   isServerRunning,
   readServerPid,
   isProcessRunning,
+  resolveGemmaConfig,
 } from './platform.js';
 import { exitCli } from '../utils.js';
 
@@ -38,22 +38,7 @@ export interface GemmaStatusResult {
 export async function checkGemmaStatus(
   port?: number,
 ): Promise<GemmaStatusResult> {
-  let settingsEnabled = false;
-  let configuredPort = DEFAULT_PORT;
-  try {
-    const settings = loadSettings(process.cwd());
-    const gemmaSettings = settings.merged.experimental?.gemmaModelRouter;
-    settingsEnabled = gemmaSettings?.enabled === true;
-    const hostStr = gemmaSettings?.classifier?.host;
-    if (hostStr) {
-      const match = hostStr.match(/:(\d+)/);
-      if (match) {
-        configuredPort = parseInt(match[1], 10);
-      }
-    }
-  } catch {
-    // Settings may fail to load in some contexts; treat as not enabled.
-  }
+  const { settingsEnabled, configuredPort } = resolveGemmaConfig(DEFAULT_PORT);
 
   const effectivePort = port ?? configuredPort;
   const binaryPath = getBinaryPath();
@@ -175,11 +160,13 @@ export const statusCommand: CommandModule = {
   builder: (yargs) =>
     yargs.option('port', {
       type: 'number',
-      default: DEFAULT_PORT,
       description: 'Port to check for the LiteRT server',
     }),
   handler: async (argv) => {
-    const port = Number(argv['port']);
+    let port: number | undefined;
+    if (argv['port'] !== undefined) {
+      port = Number(argv['port']);
+    }
     const status = await checkGemmaStatus(port);
     const output = formatGemmaStatus(status);
     // Use process.stdout directly for consistent output in non-interactive mode.
