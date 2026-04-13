@@ -33,7 +33,6 @@ export function getStableId(
 function isCompleteEpisode(ep: Partial<Episode>): ep is Episode {
   return (
     typeof ep.id === 'string' &&
-    typeof ep.timestamp === 'number' &&
     Array.isArray(ep.concreteNodes) &&
     ep.concreteNodes.length > 0
   );
@@ -106,7 +105,7 @@ function parseToolResponses(
   if (!currentEpisode) {
     currentEpisode = {
       id: getStableId(msg, nodeIdentityMap),
-      timestamp: Date.now(),
+
       concreteNodes: [],
     };
   }
@@ -124,6 +123,7 @@ function parseToolResponses(
 
       const step: ToolExecution = {
         id: getStableId(part, nodeIdentityMap),
+        timestamp: Date.now(),
         type: 'TOOL_EXECUTION',
         toolName: part.functionResponse.name || 'unknown',
         intent: isRecord(matchingCall?.functionCall?.args)
@@ -175,12 +175,13 @@ function parseUserParts(
   const baseObj = parts.length > 0 ? parts[0] : msg;
   const trigger: UserPrompt = {
     id: getStableId(baseObj, nodeIdentityMap),
+    timestamp: Date.now(),
     type: 'USER_PROMPT',
     semanticParts,
   };
   return {
     id: getStableId(msg, nodeIdentityMap),
-    timestamp: Date.now(),
+
     concreteNodes: [trigger],
   };
 }
@@ -194,7 +195,7 @@ function parseModelParts(
   if (!currentEpisode) {
     currentEpisode = {
       id: getStableId(msg, nodeIdentityMap),
-      timestamp: Date.now(),
+
       concreteNodes: [],
     };
   }
@@ -207,6 +208,7 @@ function parseModelParts(
     } else if (part.text) {
       const thought: AgentThought = {
         id: getStableId(part, nodeIdentityMap),
+        timestamp: Date.now(),
         type: 'AGENT_THOUGHT',
         text: part.text,
       };
@@ -224,6 +226,7 @@ function finalizeYield(currentEpisode: Partial<Episode>) {
   if (currentEpisode.concreteNodes && currentEpisode.concreteNodes.length > 0) {
     const yieldNode: AgentYield = {
       id: randomUUID(),
+      timestamp: Date.now(),
       type: 'AGENT_YIELD',
       text: 'Yield', // Synthesized yield since we don't have the original concrete node
     };

@@ -6,7 +6,9 @@
 
 import type { ContextProcessorRegistry } from './registry.js';
 
-export function getContextManagementConfigSchema(registry?: ContextProcessorRegistry) {
+export function getContextManagementConfigSchema(
+  registry?: ContextProcessorRegistry,
+) {
   // If a registry is provided, we can deeply validate processor overrides.
   // We do this by generating a `oneOf` list that matches the `type` discriminator
   // to the specific processor `options` schema.

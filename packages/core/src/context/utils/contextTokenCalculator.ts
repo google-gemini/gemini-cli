@@ -42,6 +42,19 @@ export class ContextTokenCalculator {
    * Pre-calculates and caches the token cost of a newly minted node.
    * Because nodes are immutable, this cost never changes for this node ID.
    */
+
+  /**
+   * Removes cached token counts for any nodes that are no longer in the given live set.
+   * This prevents unbounded memory growth during long sessions.
+   */
+  garbageCollectCache(liveNodeIds: ReadonlySet<string>): void {
+    for (const [id] of this.tokenCache) {
+      if (!liveNodeIds.has(id)) {
+        this.tokenCache.delete(id);
+      }
+    }
+  }
+
   cacheNodeTokens(node: ConcreteNode): number {
     const behavior = this.registry.get(node.type);
     const parts = behavior.getEstimatableParts(node);

@@ -4,7 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { AsyncPipelineDef, ContextManagementConfig, PipelineDef } from './types.js';
+import type {
+  AsyncPipelineDef,
+  ContextManagementConfig,
+  PipelineDef,
+} from './types.js';
 import type { ContextEnvironment } from '../pipeline/environment.js';
 
 // Import factories

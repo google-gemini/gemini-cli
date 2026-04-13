@@ -34,6 +34,7 @@ export interface IrNode {
  * These are the actual "planks" of the Nodes of Theseus.
  */
 export interface BaseConcreteNode extends IrNode {
+  readonly timestamp: number;
   /** The ID of the Logical Node (e.g., Episode) that structurally owns this node */
   readonly logicalParentId?: string;
 
@@ -140,13 +141,11 @@ export interface AgentYield extends BaseConcreteNode {
  */
 export interface Snapshot extends BaseConcreteNode {
   readonly type: 'SNAPSHOT';
-  readonly timestamp: number;
   readonly text: string;
 }
 
 export interface RollingSummary extends BaseConcreteNode {
   readonly type: 'ROLLING_SUMMARY';
-  readonly timestamp: number;
   readonly text: string;
 }
 
@@ -168,14 +167,12 @@ export type ConcreteNode =
  */
 export interface Episode extends IrNode {
   readonly type: 'EPISODE';
-  readonly timestamp: number;
   /** References to the Concrete Node IDs that conceptually belong to this Episode. */
   concreteNodes: readonly ConcreteNode[];
 }
 
 export interface Task extends IrNode {
   readonly type: 'TASK';
-  readonly timestamp: number;
   readonly goal: string;
   readonly status: 'active' | 'completed' | 'failed';
   /** References to the Episode IDs that belong to this task */

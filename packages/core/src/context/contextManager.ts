@@ -20,7 +20,6 @@ export class ContextManager {
   // The master state containing the pristine graph and current active graph.
   private buffer: ContextWorkingBufferImpl =
     ContextWorkingBufferImpl.initialize([]);
-  private pristineNodes: readonly ConcreteNode[] = [];
 
   private readonly eventBus: ContextEventBus;
 
@@ -48,8 +47,6 @@ export class ContextManager {
     this.historyObserver.start();
 
     this.eventBus.onPristineHistoryUpdated((event) => {
-      this.pristineNodes = event.nodes;
-
       const existingIds = new Set(this.buffer.nodes.map((n) => n.id));
       const addedNodes = event.nodes.filter((n) => !existingIds.has(n.id));
 
@@ -118,7 +115,17 @@ export class ContextManager {
    * Note: This is an expensive, deep clone operation.
    */
   getPristineGraph(): readonly ConcreteNode[] {
-    return [...this.pristineNodes];
+    const pristineSet = new Map<string, ConcreteNode>();
+    for (const node of this.buffer.nodes) {
+      const roots = this.buffer.getPristineNodes(node.id);
+      for (const root of roots) {
+        pristineSet.set(root.id, root);
+      }
+    }
+    // We sort them by timestamp to ensure they are returned in chronological order
+    return Array.from(pristineSet.values()).sort(
+      (a, b) => a.timestamp - b.timestamp,
+    );
   }
 
   /**
