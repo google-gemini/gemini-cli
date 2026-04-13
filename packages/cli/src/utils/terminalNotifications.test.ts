@@ -28,6 +28,8 @@ describe('terminal notifications', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     vi.unstubAllEnvs();
+    vi.stubEnv('TMUX', '');
+    vi.stubEnv('STY', '');
   });
 
   afterEach(() => {
@@ -225,5 +227,39 @@ describe('terminal notifications', () => {
     // There should be exactly one semicolon separating title and body
     const semicolonsCount = (payload.match(/;/g) || []).length;
     expect(semicolonsCount).toBe(1);
+  });
+
+  it('wraps OSC sequence in tmux passthrough when TMUX env var is set', async () => {
+    vi.stubEnv('TMUX', '1');
+    vi.stubEnv('WT_SESSION', '');
+    vi.stubEnv('TERM_PROGRAM', 'iTerm.app');
+
+    const shown = await notifyViaTerminal(true, {
+      title: 'Title',
+      body: 'Body',
+    });
+
+    expect(shown).toBe(true);
+    expect(writeToStdout).toHaveBeenCalledTimes(1);
+    const emitted = String(writeToStdout.mock.calls[0][0]);
+    expect(emitted.startsWith('\x1bPtmux;\x1b\x1b]9;')).toBe(true);
+    expect(emitted.endsWith('\x1b\\')).toBe(true);
+  });
+
+  it('wraps OSC sequence in GNU screen passthrough when STY env var is set', async () => {
+    vi.stubEnv('STY', '1');
+    vi.stubEnv('WT_SESSION', '');
+    vi.stubEnv('TERM_PROGRAM', 'iTerm.app');
+
+    const shown = await notifyViaTerminal(true, {
+      title: 'Title',
+      body: 'Body',
+    });
+
+    expect(shown).toBe(true);
+    expect(writeToStdout).toHaveBeenCalledTimes(1);
+    const emitted = String(writeToStdout.mock.calls[0][0]);
+    expect(emitted.startsWith('\x1bP\x1b]9;')).toBe(true);
+    expect(emitted.endsWith('\x1b\\')).toBe(true);
   });
 });

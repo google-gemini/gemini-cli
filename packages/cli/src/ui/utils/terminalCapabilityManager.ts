@@ -284,6 +284,14 @@ export class TerminalCapabilityManager {
     );
   }
 
+  isTmux(env: NodeJS.ProcessEnv = process.env): boolean {
+    return !!env['TMUX'];
+  }
+
+  isScreen(env: NodeJS.ProcessEnv = process.env): boolean {
+    return !!env['STY'];
+  }
+
   supportsOsc9Notifications(env: NodeJS.ProcessEnv = process.env): boolean {
     if (env['WT_SESSION']) {
       return false;

@@ -365,6 +365,34 @@ describe('TerminalCapabilityManager', () => {
     );
   });
 
+  describe('isTmux', () => {
+    const manager = TerminalCapabilityManager.getInstance();
+
+    it('returns true when TMUX is set', () => {
+      expect(manager.isTmux({ TMUX: '1' })).toBe(true);
+      expect(manager.isTmux({ TMUX: 'tmux-1234' })).toBe(true);
+    });
+
+    it('returns false when TMUX is not set', () => {
+      expect(manager.isTmux({})).toBe(false);
+      expect(manager.isTmux({ STY: '1' })).toBe(false);
+    });
+  });
+
+  describe('isScreen', () => {
+    const manager = TerminalCapabilityManager.getInstance();
+
+    it('returns true when STY is set', () => {
+      expect(manager.isScreen({ STY: '1' })).toBe(true);
+      expect(manager.isScreen({ STY: 'screen.1234' })).toBe(true);
+    });
+
+    it('returns false when STY is not set', () => {
+      expect(manager.isScreen({})).toBe(false);
+      expect(manager.isScreen({ TMUX: '1' })).toBe(false);
+    });
+  });
+
   describe('supportsOsc9Notifications', () => {
     const manager = TerminalCapabilityManager.getInstance();
 
