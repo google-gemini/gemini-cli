@@ -123,16 +123,19 @@ vi.mock('ink', async (importOriginal) => {
 });
 
 import { InputContext, type InputState } from './contexts/InputContext.js';
+import { QuotaContext, type QuotaState } from './contexts/QuotaContext.js';
 
 // Helper component will read the context values provided by AppContainer
 // so we can assert against them in our tests.
 let capturedUIState: UIState;
 let capturedInputState: InputState;
+let capturedQuotaState: QuotaState;
 let capturedUIActions: UIActions;
 let capturedOverflowActions: OverflowActions;
 function TestContextConsumer() {
   capturedUIState = useContext(UIStateContext)!;
   capturedInputState = useContext(InputContext)!;
+  capturedQuotaState = useContext(QuotaContext)!;
   capturedUIActions = useContext(UIActionsContext)!;
   capturedOverflowActions = useOverflowActions()!;
   return null;
@@ -1309,15 +1312,15 @@ describe('AppContainer State Management', () => {
   });
 
   describe('Quota and Fallback Integration', () => {
-    it('passes a null proQuotaRequest to UIStateContext by default', async () => {
+    it('passes a null proQuotaRequest to QuotaContext by default', async () => {
       // The default mock from beforeEach already sets proQuotaRequest to null
       const { unmount } = await act(async () => renderAppContainer());
       // Assert that the context value is as expected
-      expect(capturedUIState.quota.proQuotaRequest).toBeNull();
+      expect(capturedQuotaState.proQuotaRequest).toBeNull();
       unmount();
     });
 
-    it('passes a valid proQuotaRequest to UIStateContext when provided by the hook', async () => {
+    it('passes a valid proQuotaRequest to QuotaContext when provided by the hook', async () => {
       // Arrange: Create a mock request object that a UI dialog would receive
       const mockRequest = {
         failedModel: 'gemini-pro',
@@ -1332,7 +1335,7 @@ describe('AppContainer State Management', () => {
       // Act: Render the container
       const { unmount } = await act(async () => renderAppContainer());
       // Assert: The mock request is correctly passed through the context
-      expect(capturedUIState.quota.proQuotaRequest).toEqual(mockRequest);
+      expect(capturedQuotaState.proQuotaRequest).toEqual(mockRequest);
       unmount();
     });
 
