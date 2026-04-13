@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-04-13T19:49:01.577Z",
+  "updatedAt": "2026-04-13T21:48:46.316Z",
   "scenarios": {
     "cold-startup-time": {
       "wallClockMs": 927.553249999999,
@@ -18,7 +18,7 @@
       "timestamp": "2026-04-08T22:28:23.290Z"
     },
     "high-volume-shell-output": {
-      "wallClockMs": 1119.9,
+       "wallClockMs": 1119.9,
       "cpuTotalUs": 2100,
       "timestamp": "2026-04-09T02:30:22.000Z"
     },
@@ -28,34 +28,29 @@
       "timestamp": "2026-04-11T01:52:23.183Z"
     },
     "long-conversation-resume": {
-      "wallClockMs": 2807.285507000008,
-      "cpuTotalUs": 21912,
-      "timestamp": "2026-04-13T19:48:10.905Z"
+      "wallClockMs": 3609.1588829999964,
+      "cpuTotalUs": 256378,
+      "timestamp": "2026-04-13T21:47:38.112Z"
     },
     "long-conversation-typing": {
-      "wallClockMs": 339.29195900000923,
-      "cpuTotalUs": 10295,
-      "timestamp": "2026-04-13T19:48:24.011Z"
+      "wallClockMs": 567.3885389999923,
+      "cpuTotalUs": 16572,
+      "timestamp": "2026-04-13T21:47:54.721Z"
     },
     "long-conversation-execution": {
-      "wallClockMs": 247.3171299999958,
-      "cpuTotalUs": 3583,
-      "timestamp": "2026-04-13T19:48:36.640Z"
-    },
-    "long-conversation-scrolling": {
-      "wallClockMs": 210.18672699999297,
-      "cpuTotalUs": 7911,
-      "timestamp": "2026-04-13T18:32:14.226Z"
+      "wallClockMs": 447.42054899998766,
+      "cpuTotalUs": 6902,
+      "timestamp": "2026-04-13T21:48:10.571Z"
     },
     "long-conversation-terminal-scrolling": {
-      "wallClockMs": 207.54268199999933,
-      "cpuTotalUs": 6390,
-      "timestamp": "2026-04-13T19:48:49.110Z"
+      "wallClockMs": 367.099886,
+      "cpuTotalUs": 12504142,
+      "timestamp": "2026-04-13T21:48:28.810Z"
     },
     "long-conversation-alternate-scrolling": {
-      "wallClockMs": 207.34147999998822,
-      "cpuTotalUs": 6135,
-      "timestamp": "2026-04-13T19:49:01.577Z"
+      "wallClockMs": 367.099886,
+      "cpuTotalUs": 12504142,
+      "timestamp": "2026-04-13T21:48:46.316Z"
     }
   }
 }
