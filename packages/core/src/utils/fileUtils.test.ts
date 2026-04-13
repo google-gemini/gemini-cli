@@ -286,6 +286,25 @@ describe('fileUtils', () => {
       }
       expect(await isBinaryFile(filePathForBinaryTest)).toBe(false);
     });
+
+    it('should return false for a source file containing literal U+FFFD (replacement character)', async () => {
+      const content =
+        '// Rust-style source\npub const UNICODE_REPLACEMENT_CHAR: char = \'\uFFFD\';\nlet s = "\uFFFD\uFFFD\uFFFD";\n';
+      actualNodeFs.writeFileSync(filePathForBinaryTest, content, 'utf8');
+      expect(await isBinaryFile(filePathForBinaryTest)).toBe(false);
+    });
+
+    it('should return false for a file with mixed CJK, emoji, and U+FFFD content', async () => {
+      const content = '\uFFFD\uFFFD hello \u4e16\u754c \uD83D\uDE00\n';
+      actualNodeFs.writeFileSync(filePathForBinaryTest, content, 'utf8');
+      expect(await isBinaryFile(filePathForBinaryTest)).toBe(false);
+    });
+
+    it('should return true for a file with dense invalid UTF-8 byte sequences', async () => {
+      const binaryContent = Buffer.alloc(128, 0x80);
+      actualNodeFs.writeFileSync(filePathForBinaryTest, binaryContent);
+      expect(await isBinaryFile(filePathForBinaryTest)).toBe(true);
+    });
   });
 
   describe('BOM detection and encoding', () => {
