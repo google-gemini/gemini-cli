@@ -292,7 +292,7 @@ describe('ShellTool', () => {
 
     it('should wrap command on linux and parse pgrep output', async () => {
       const invocation = shellTool.build({ command: 'my-command &' });
-      const promise = invocation.execute(mockAbortSignal);
+      const promise = invocation.execute({ abortSignal: mockAbortSignal });
       resolveShellExecution({ pid: 54321 });
 
       // Simulate pgrep output file creation by the shell command
@@ -321,7 +321,7 @@ describe('ShellTool', () => {
 
     it('should add a space when command ends with a backslash to prevent escaping newline', async () => {
       const invocation = shellTool.build({ command: 'ls\\' });
-      const promise = invocation.execute(mockAbortSignal);
+      const promise = invocation.execute({ abortSignal: mockAbortSignal });
       resolveShellExecution();
       await promise;
 
@@ -339,7 +339,7 @@ describe('ShellTool', () => {
 
     it('should handle trailing comments correctly by placing them on their own line', async () => {
       const invocation = shellTool.build({ command: 'ls # comment' });
-      const promise = invocation.execute(mockAbortSignal);
+      const promise = invocation.execute({ abortSignal: mockAbortSignal });
       resolveShellExecution();
       await promise;
 
@@ -361,7 +361,7 @@ describe('ShellTool', () => {
         command: 'ls',
         dir_path: subdir,
       });
-      const promise = invocation.execute(mockAbortSignal);
+      const promise = invocation.execute({ abortSignal: mockAbortSignal });
       resolveShellExecution();
       await promise;
 
@@ -386,7 +386,7 @@ describe('ShellTool', () => {
         command: 'ls',
         dir_path: 'subdir',
       });
-      const promise = invocation.execute(mockAbortSignal);
+      const promise = invocation.execute({ abortSignal: mockAbortSignal });
       resolveShellExecution();
       await promise;
 
@@ -412,7 +412,7 @@ describe('ShellTool', () => {
         command: 'sleep 10',
         is_background: true,
       });
-      const promise = invocation.execute(mockAbortSignal);
+      const promise = invocation.execute({ abortSignal: mockAbortSignal });
 
       // We need to provide a PID for the background logic to trigger
       resolveShellExecution({ pid: 12345 });
@@ -434,7 +434,7 @@ describe('ShellTool', () => {
       async () => {
         mockPlatform.mockReturnValue('win32');
         const invocation = shellTool.build({ command: 'dir' });
-        const promise = invocation.execute(mockAbortSignal);
+        const promise = invocation.execute({ abortSignal: mockAbortSignal });
         resolveShellExecution({
           rawOutput: Buffer.from(''),
           output: '',
@@ -465,7 +465,7 @@ describe('ShellTool', () => {
     it('should format error messages correctly', async () => {
       const error = new Error('wrapped command failed');
       const invocation = shellTool.build({ command: 'user-command' });
-      const promise = invocation.execute(mockAbortSignal);
+      const promise = invocation.execute({ abortSignal: mockAbortSignal });
       resolveShellExecution({
         error,
         exitCode: 1,
@@ -485,7 +485,7 @@ describe('ShellTool', () => {
     it('should return a SHELL_EXECUTE_ERROR for a command failure', async () => {
       const error = new Error('command failed');
       const invocation = shellTool.build({ command: 'user-command' });
-      const promise = invocation.execute(mockAbortSignal);
+      const promise = invocation.execute({ abortSignal: mockAbortSignal });
       resolveShellExecution({
         error,
         exitCode: 1,
@@ -513,7 +513,7 @@ describe('ShellTool', () => {
       );
 
       const invocation = shellTool.build({ command: 'ls' });
-      const promise = invocation.execute(mockAbortSignal);
+      const promise = invocation.execute({ abortSignal: mockAbortSignal });
       resolveExecutionPromise({
         output: 'long output',
         rawOutput: Buffer.from('long output'),
@@ -545,7 +545,7 @@ describe('ShellTool', () => {
       vi.useFakeTimers();
 
       const invocation = shellTool.build({ command: 'sleep 10' });
-      const promise = invocation.execute(mockAbortSignal);
+      const promise = invocation.execute({ abortSignal: mockAbortSignal });
 
       // Verify no timeout logic is triggered even after a long time
       resolveShellExecution({
@@ -570,7 +570,9 @@ describe('ShellTool', () => {
       });
 
       const invocation = shellTool.build({ command: 'a-command' });
-      await expect(invocation.execute(mockAbortSignal)).rejects.toThrow(error);
+      await expect(
+        invocation.execute({ abortSignal: mockAbortSignal }),
+      ).rejects.toThrow(error);
 
       const tmpFile = path.join(os.tmpdir(), 'shell_pgrep_abcdef.tmp');
       expect(fs.existsSync(tmpFile)).toBe(false);
@@ -584,7 +586,7 @@ describe('ShellTool', () => {
         command: 'sleep 10',
         is_background: true,
       });
-      const promise = invocation.execute(mockAbortSignal);
+      const promise = invocation.execute({ abortSignal: mockAbortSignal });
 
       // Advance time to trigger backgrounding
       await vi.advanceTimersByTimeAsync(200);
@@ -606,7 +608,10 @@ describe('ShellTool', () => {
 
       it('should immediately show binary detection message and throttle progress', async () => {
         const invocation = shellTool.build({ command: 'cat img' });
-        const promise = invocation.execute(mockAbortSignal, updateOutputMock);
+        const promise = invocation.execute({
+          abortSignal: mockAbortSignal,
+          updateOutput: updateOutputMock,
+        });
 
         mockShellOutputCallback({ type: 'binary_detected' });
         expect(updateOutputMock).toHaveBeenCalledOnce();
@@ -653,7 +658,10 @@ describe('ShellTool', () => {
           command: 'sleep 10',
           is_background: true,
         });
-        const promise = invocation.execute(mockAbortSignal, updateOutputMock);
+        const promise = invocation.execute({
+          abortSignal: mockAbortSignal,
+          updateOutput: updateOutputMock,
+        });
 
         mockShellOutputCallback({ type: 'data', chunk: 'some output' });
         expect(updateOutputMock).not.toHaveBeenCalled();
@@ -768,6 +776,46 @@ describe('ShellTool', () => {
       const shellTool = new ShellTool(mockConfig, createMockMessageBus());
       expect(shellTool.description).not.toContain('Efficiency Guidelines:');
     });
+
+    it('should return the command if description is not provided', () => {
+      const invocation = shellTool.build({
+        command: 'echo "hello"',
+      });
+      expect(invocation.getDescription()).toBe('echo "hello"');
+    });
+
+    it('should return the command if it is short (<= 150 chars), even if description is provided', () => {
+      const invocation = shellTool.build({
+        command: 'echo "hello"',
+        description: 'Prints a friendly greeting.',
+      });
+      expect(invocation.getDescription()).toBe('echo "hello"');
+    });
+
+    it('should return the description if the command is long (> 150 chars)', () => {
+      const longCommand = 'echo "hello" && '.repeat(15) + 'echo "world"'; // Length > 150
+      const invocation = shellTool.build({
+        command: longCommand,
+        description: 'Prints multiple greetings.',
+      });
+      expect(invocation.getDescription()).toBe('Prints multiple greetings.');
+    });
+
+    it('should return the raw command if description is an empty string', () => {
+      const invocation = shellTool.build({
+        command: 'echo hello',
+        description: '',
+      });
+      expect(invocation.getDescription()).toBe('echo hello');
+    });
+
+    it('should return the raw command if description is just whitespace', () => {
+      const invocation = shellTool.build({
+        command: 'echo hello',
+        description: '   ',
+      });
+      expect(invocation.getDescription()).toBe('echo hello');
+    });
   });
 
   describe('getDisplayTitle and getExplanation', () => {
@@ -825,7 +873,7 @@ describe('ShellTool', () => {
 
     it('should not include Command in output', async () => {
       const invocation = shellTool.build({ command: 'echo hello' });
-      const promise = invocation.execute(mockAbortSignal);
+      const promise = invocation.execute({ abortSignal: mockAbortSignal });
       resolveShellExecution({ output: 'hello', exitCode: 0 });
 
       const result = await promise;
@@ -834,7 +882,7 @@ describe('ShellTool', () => {
 
     it('should not include Directory in output', async () => {
       const invocation = shellTool.build({ command: 'ls', dir_path: 'subdir' });
-      const promise = invocation.execute(mockAbortSignal);
+      const promise = invocation.execute({ abortSignal: mockAbortSignal });
       resolveShellExecution({ output: 'file.txt', exitCode: 0 });
 
       const result = await promise;
@@ -843,7 +891,7 @@ describe('ShellTool', () => {
 
     it('should not include Exit Code when command succeeds (exit code 0)', async () => {
       const invocation = shellTool.build({ command: 'echo hello' });
-      const promise = invocation.execute(mockAbortSignal);
+      const promise = invocation.execute({ abortSignal: mockAbortSignal });
       resolveShellExecution({ output: 'hello', exitCode: 0 });
 
       const result = await promise;
@@ -852,7 +900,7 @@ describe('ShellTool', () => {
 
     it('should include Exit Code when command fails (non-zero exit code)', async () => {
       const invocation = shellTool.build({ command: 'false' });
-      const promise = invocation.execute(mockAbortSignal);
+      const promise = invocation.execute({ abortSignal: mockAbortSignal });
       resolveShellExecution({ output: '', exitCode: 1 });
 
       const result = await promise;
@@ -861,7 +909,7 @@ describe('ShellTool', () => {
 
     it('should not include Error when there is no process error', async () => {
       const invocation = shellTool.build({ command: 'echo hello' });
-      const promise = invocation.execute(mockAbortSignal);
+      const promise = invocation.execute({ abortSignal: mockAbortSignal });
       resolveShellExecution({ output: 'hello', exitCode: 0, error: null });
 
       const result = await promise;
@@ -870,7 +918,7 @@ describe('ShellTool', () => {
 
     it('should include Error when there is a process error', async () => {
       const invocation = shellTool.build({ command: 'bad-command' });
-      const promise = invocation.execute(mockAbortSignal);
+      const promise = invocation.execute({ abortSignal: mockAbortSignal });
       resolveShellExecution({
         output: '',
         exitCode: 1,
@@ -883,7 +931,7 @@ describe('ShellTool', () => {
 
     it('should not include Signal when there is no signal', async () => {
       const invocation = shellTool.build({ command: 'echo hello' });
-      const promise = invocation.execute(mockAbortSignal);
+      const promise = invocation.execute({ abortSignal: mockAbortSignal });
       resolveShellExecution({ output: 'hello', exitCode: 0, signal: null });
 
       const result = await promise;
@@ -892,7 +940,7 @@ describe('ShellTool', () => {
 
     it('should include Signal when process was killed by signal', async () => {
       const invocation = shellTool.build({ command: 'sleep 100' });
-      const promise = invocation.execute(mockAbortSignal);
+      const promise = invocation.execute({ abortSignal: mockAbortSignal });
       resolveShellExecution({
         output: '',
         exitCode: null,
@@ -905,7 +953,7 @@ describe('ShellTool', () => {
 
     it('should not include Background PIDs when there are none', async () => {
       const invocation = shellTool.build({ command: 'echo hello' });
-      const promise = invocation.execute(mockAbortSignal);
+      const promise = invocation.execute({ abortSignal: mockAbortSignal });
       resolveShellExecution({ output: 'hello', exitCode: 0 });
 
       const result = await promise;
@@ -914,7 +962,7 @@ describe('ShellTool', () => {
 
     it('should not include Process Group PGID when pid is not set', async () => {
       const invocation = shellTool.build({ command: 'echo hello' });
-      const promise = invocation.execute(mockAbortSignal);
+      const promise = invocation.execute({ abortSignal: mockAbortSignal });
       resolveShellExecution({ output: 'hello', exitCode: 0, pid: undefined });
 
       const result = await promise;
@@ -923,7 +971,7 @@ describe('ShellTool', () => {
 
     it('should have minimal output for successful command', async () => {
       const invocation = shellTool.build({ command: 'echo hello' });
-      const promise = invocation.execute(mockAbortSignal);
+      const promise = invocation.execute({ abortSignal: mockAbortSignal });
       resolveShellExecution({ output: 'hello', exitCode: 0, pid: undefined });
 
       const result = await promise;
@@ -1011,7 +1059,7 @@ describe('ShellTool', () => {
       mockSandboxManager = sandboxManager;
 
       const invocation = shellTool.build({ command: 'npm install' });
-      const promise = invocation.execute(mockAbortSignal);
+      const promise = invocation.execute({ abortSignal: mockAbortSignal });
 
       resolveExecutionPromise({
         exitCode: 1,
@@ -1074,7 +1122,7 @@ describe('ShellTool', () => {
       mockSandboxManager = sandboxManager;
 
       const invocation = shellTool.build({ command: `ls ${homeDir}` });
-      const promise = invocation.execute(mockAbortSignal);
+      const promise = invocation.execute({ abortSignal: mockAbortSignal });
 
       resolveExecutionPromise({
         exitCode: 1,

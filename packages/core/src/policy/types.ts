@@ -354,9 +354,11 @@ export interface CheckResult {
 
 /**
  * Priority for subagent tools (registered dynamically).
- * Effective priority matching Tier 1 (Default) read-only tools.
+ * Effective priority matching Tier 1 (Default) at priority 30.
+ * This ensures they are blocked by Plan Mode (priority 40) while
+ * remaining above directive write tools (priority 10).
  */
-export const PRIORITY_SUBAGENT_TOOL = 1.05;
+export const PRIORITY_SUBAGENT_TOOL = 1.03;
 
 /**
  * The fractional priority of "Always allow" rules (e.g., 950/1000).

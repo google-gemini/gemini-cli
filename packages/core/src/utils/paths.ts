@@ -370,6 +370,22 @@ export function isSubpath(parentPath: string, childPath: string): boolean {
 }
 
 /**
+ * Type guard to verify a value is a string and does not contain null bytes.
+ */
+export function isValidPathString(p: unknown): p is string {
+  return typeof p === 'string' && !p.includes('\0');
+}
+
+/**
+ * Asserts that a value is a valid path string, throwing an Error otherwise.
+ */
+export function assertValidPathString(p: unknown): asserts p is string {
+  if (!isValidPathString(p)) {
+    throw new Error(`Invalid path: ${String(p)}`);
+  }
+}
+
+/**
  * Resolves a path to its real path, sanitizing it first.
  * - Removes 'file://' protocol if present.
  * - Decodes URI components (e.g. %20 -> space).
@@ -379,6 +395,7 @@ export function isSubpath(parentPath: string, childPath: string): boolean {
  * @returns The resolved real path.
  */
 export function resolveToRealPath(pathStr: string): string {
+  assertValidPathString(pathStr);
   let resolvedPath = pathStr;
 
   try {
@@ -436,4 +453,46 @@ function robustRealpath(p: string, visited = new Set<string>()): string {
     }
     throw e;
   }
+}
+
+/**
+ * Deduplicates an array of paths and ensures all paths are absolute.
+ */
+export function deduplicateAbsolutePaths(paths?: string[] | null): string[] {
+  if (!paths || paths.length === 0) return [];
+
+  const uniquePathsMap = new Map<string, string>();
+  for (const p of paths) {
+    if (!path.isAbsolute(p)) {
+      throw new Error(`Path must be absolute: ${p}`);
+    }
+
+    const key = toPathKey(p);
+    if (!uniquePathsMap.has(key)) {
+      uniquePathsMap.set(key, p);
+    }
+  }
+
+  return Array.from(uniquePathsMap.values());
+}
+
+/**
+ * Returns a stable string key for a path to be used in comparisons or Map lookups.
+ */
+export function toPathKey(p: string): string {
+  // Normalize path segments
+  let norm = path.normalize(p);
+
+  // Strip trailing slashes (except for root paths)
+  if (norm.length > 1 && (norm.endsWith('/') || norm.endsWith('\\'))) {
+    // On Windows, don't strip the slash from a drive root (e.g., "C:\\")
+    if (!/^[a-zA-Z]:[\\/]$/.test(norm)) {
+      norm = norm.slice(0, -1);
+    }
+  }
+
+  // Convert to lowercase on case-insensitive platforms
+  const platform = process.platform;
+  const isCaseInsensitive = platform === 'win32' || platform === 'darwin';
+  return isCaseInsensitive ? norm.toLowerCase() : norm;
 }
