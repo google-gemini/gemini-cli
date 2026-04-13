@@ -2144,7 +2144,7 @@ const SETTINGS_SCHEMA = {
             default: false,
             description:
               'Enable the Gemma Model Router (experimental). Requires a local endpoint serving Gemma via the Gemini API using LiteRT-LM shim.',
-            showInDialog: false,
+            showInDialog: true,
           },
           autoStartServer: {
             type: 'boolean',
@@ -2154,7 +2154,7 @@ const SETTINGS_SCHEMA = {
             default: true,
             description:
               'Automatically start the LiteRT-LM server when Gemini CLI starts and the Gemma router is enabled.',
-            showInDialog: false,
+            showInDialog: true,
           },
           binaryPath: {
             type: 'string',
