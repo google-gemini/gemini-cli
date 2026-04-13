@@ -285,7 +285,7 @@ function promoteNightlyVersion({ args } = {}) {
   const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
   const gitShortHash = execSync('git rev-parse --short HEAD').toString().trim();
   return {
-    releaseVersion: `${major}.${nextMinor}.0-nightly.${date}.${gitShortHash}`,
+    releaseVersion: `${major}.${nextMinor}.0-nightly.${date}.g${gitShortHash}`,
     npmTag: TAG_NIGHTLY,
     previousReleaseTag: previousNightlyTag,
   };
@@ -296,7 +296,7 @@ function getNightlyVersion() {
   const baseVersion = packageJson.version.split('-')[0];
   const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
   const gitShortHash = execSync('git rev-parse --short HEAD').toString().trim();
-  const releaseVersion = `${baseVersion}-nightly.${date}.${gitShortHash}`;
+  const releaseVersion = `${baseVersion}-nightly.${date}.g${gitShortHash}`;
   const previousReleaseTag = getLatestTag('v*-nightly*');
 
   return {
