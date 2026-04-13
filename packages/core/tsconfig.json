@@ -6,7 +6,7 @@
     "composite": true,
     "types": ["node", "vitest/globals"],
     "paths": {
-      "*": ["./*"],
+      "src/*": ["./src/*"],
       "@google/gemini-cli-core": ["./index.ts"]
     }
   },
