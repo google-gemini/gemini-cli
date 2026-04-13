@@ -147,7 +147,10 @@ export function resolvePolicyChain(
 
   // Apply Unified Silent Injection for Plan Mode with defensive checks
   if (config?.getApprovalMode?.() === ApprovalMode.PLAN) {
-    return chain.map((policy) => ({ ...policy, actions: SILENT_ACTIONS }));
+    return chain.map((policy) => ({
+      ...policy,
+      actions: { ...SILENT_ACTIONS },
+    }));
   }
 
   return chain;
