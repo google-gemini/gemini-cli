@@ -30,7 +30,7 @@ import {
   COMMON_DIRECTORY_EXCLUDES,
 } from '../utils/ignorePatterns.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
-import { execStreaming } from '../utils/shell-utils.js';
+import { execStreaming, resolveExecutable } from '../utils/shell-utils.js';
 import {
   DEFAULT_TOTAL_MAX_MATCHES,
   DEFAULT_SEARCH_TIMEOUT_MS,
@@ -51,6 +51,11 @@ async function resolveExistingRgPath(): Promise<string | null> {
       return candidatePath;
     }
   }
+
+  // Fallback: managed binary unavailable or incompatible (e.g. Termux/non-FHS)
+  const systemRg = await resolveExecutable('rg');
+  if (systemRg) return systemRg;
+
   return null;
 }
 
