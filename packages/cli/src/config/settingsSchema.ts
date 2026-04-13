@@ -2130,6 +2130,16 @@ const SETTINGS_SCHEMA = {
         description: 'Enable access to Gemma 4 models (experimental).',
         showInDialog: true,
       },
+      voiceMode: {
+        type: 'boolean',
+        label: 'Voice Mode',
+        category: 'Experimental',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Enable experimental voice dictation and commands (/voice, /voice model).',
+        showInDialog: true,
+      },
       adk: {
         type: 'object',
         label: 'ADK',
