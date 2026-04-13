@@ -8,7 +8,6 @@ import { describe, expect, it } from 'vitest';
 import {
   geminiPartsToContentParts,
   contentPartsToGeminiParts,
-  toolResultDisplayToContentParts,
   buildToolResponseData,
 } from './content-utils.js';
 import type { Part } from '@google/genai';
@@ -197,27 +196,6 @@ describe('contentPartsToGeminiParts', () => {
     expect(result[0]).toEqual({
       text: JSON.stringify({ type: 'custom_widget', payload: 123 }),
     });
-  });
-});
-
-describe('toolResultDisplayToContentParts', () => {
-  it('returns undefined for undefined', () => {
-    expect(toolResultDisplayToContentParts(undefined)).toBeUndefined();
-  });
-
-  it('returns undefined for null', () => {
-    expect(toolResultDisplayToContentParts(null)).toBeUndefined();
-  });
-
-  it('handles string resultDisplay as-is', () => {
-    const result = toolResultDisplayToContentParts('File written');
-    expect(result).toEqual([{ type: 'text', text: 'File written' }]);
-  });
-
-  it('stringifies object resultDisplay', () => {
-    const display = { type: 'FileDiff', oldPath: 'a.ts', newPath: 'b.ts' };
-    const result = toolResultDisplayToContentParts(display);
-    expect(result).toEqual([{ type: 'text', text: JSON.stringify(display) }]);
   });
 });
 
