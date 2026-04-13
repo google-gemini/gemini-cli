@@ -23,8 +23,8 @@ import {
   buildToolResponseData,
   contentPartsToGeminiParts,
   geminiPartsToContentParts,
-  toolResultDisplayToContentParts,
 } from './content-utils.js';
+import { populateToolDisplay } from './tool-display-utils.js';
 import { AgentSession } from './agent-session.js';
 import {
   createTranslationState,
@@ -262,9 +262,12 @@ export class LegacyAgentProtocol implements AgentProtocol {
         const content: ContentPart[] = response.error
           ? [{ type: 'text', text: response.error.message }]
           : geminiPartsToContentParts(response.responseParts);
-        const displayContent = toolResultDisplayToContentParts(
-          response.resultDisplay,
-        );
+        const display = populateToolDisplay({
+          name: request.name,
+          invocation: 'invocation' in tc ? tc.invocation : undefined,
+          resultDisplay: response.resultDisplay,
+          displayName: 'tool' in tc ? tc.tool?.displayName : undefined,
+        });
         const data = buildToolResponseData(response);
 
         this._emit([
@@ -273,7 +276,7 @@ export class LegacyAgentProtocol implements AgentProtocol {
             name: request.name,
             content,
             isError: response.error !== undefined,
-            ...(displayContent ? { displayContent } : {}),
+            ...(display ? { display } : {}),
             ...(data ? { data } : {}),
           }),
         ]);

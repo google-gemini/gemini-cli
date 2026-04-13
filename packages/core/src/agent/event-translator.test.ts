@@ -155,9 +155,10 @@ describe('translateEvent', () => {
       expect(resp.content).toEqual([
         { type: 'text', text: 'Permission denied to write' },
       ]);
-      expect(resp.displayContent).toEqual([
-        { type: 'text', text: 'Permission denied' },
-      ]);
+      expect(resp.display?.result).toEqual({
+        type: 'text',
+        text: 'Permission denied',
+      });
       expect(resp.data).toEqual({ errorType: 'permission_denied' });
     });
 
@@ -200,9 +201,12 @@ describe('translateEvent', () => {
       };
       const result = translateEvent(event, state);
       const resp = result[0] as AgentEvent<'tool_response'>;
-      expect(resp.displayContent).toEqual([
-        { type: 'text', text: JSON.stringify(objectDisplay) },
-      ]);
+      expect(resp.display?.result).toEqual({
+        type: 'diff',
+        path: '/tmp/test.txt',
+        beforeText: 'a',
+        afterText: 'b',
+      });
     });
 
     it('passes through string resultDisplay as-is', () => {
@@ -220,9 +224,10 @@ describe('translateEvent', () => {
       };
       const result = translateEvent(event, state);
       const resp = result[0] as AgentEvent<'tool_response'>;
-      expect(resp.displayContent).toEqual([
-        { type: 'text', text: 'Command output text' },
-      ]);
+      expect(resp.display?.result).toEqual({
+        type: 'text',
+        text: 'Command output text',
+      });
     });
 
     it('preserves outputFile and contentLength in data', () => {
