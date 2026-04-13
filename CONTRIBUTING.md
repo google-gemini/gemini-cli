@@ -35,6 +35,18 @@ sign a new one.
 This project follows
 [Google's Open Source Community Guidelines](https://opensource.google/conduct/).
 
+### New to open source?
+
+If you're contributing to this project for the first time, a great way to start is with small improvements such as:
+
+- Fixing typos or improving documentation clarity
+- Enhancing existing documentation
+- Addressing issues related to documentation or developer experience
+
+Starting with smaller documentation contributions can help you become familiar with the repository structure and contribution workflow before working on larger code changes.
+
+If you're unsure where to start, consider reviewing open issues or documentation pages that could benefit from clarification or examples.
+
 ## Code contribution process
 
 ### Get started
