@@ -101,7 +101,7 @@ export function createMockConfig(
     getGitService: vi.fn(),
     validatePathAccess: vi.fn().mockReturnValue(undefined),
     getShellExecutionConfig: vi.fn().mockReturnValue({
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-unsafe-assignment
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       sandboxManager: new NoopSandboxManager() as unknown as SandboxManager,
       sanitizationConfig: {
         allowedEnvironmentVariables: [],

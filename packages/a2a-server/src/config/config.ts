@@ -87,7 +87,6 @@ export async function loadConfig(
               {
                 toolName: '*',
                 decision: PolicyDecision.ALLOW,
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
                 priority: PRIORITY_YOLO_ALLOW_ALL,
                 modes: [ApprovalMode.YOLO],
                 allowRedirection: true,

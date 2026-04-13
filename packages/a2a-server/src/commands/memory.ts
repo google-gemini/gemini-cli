@@ -105,7 +105,6 @@ export class AddMemoryCommand implements Command {
       await tool.buildAndExecute(result.toolArgs, abortSignal, undefined, {
         shellExecutionConfig: {
           sanitizationConfig: DEFAULT_SANITIZATION_CONFIG,
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           sandboxManager: loopContext.sandboxManager,
         },
       });

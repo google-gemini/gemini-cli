@@ -6,7 +6,6 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { setupWorktree } from './worktreeSetup.js';
-/* eslint-disable import/namespace */
 import * as coreFunctions from '@google/gemini-cli-core';
 
 // Mock dependencies
