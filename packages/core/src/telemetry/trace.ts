@@ -125,13 +125,14 @@ export async function runInDevTraceSpan<R>(
     operation: GeminiCliOperation;
     logPrompts?: boolean;
     sessionId: string;
+    tracesEnabled?: boolean;
   },
   fn: ({ metadata }: { metadata: SpanMetadata }) => Promise<R>,
 ): Promise<R> {
-  const { operation, logPrompts, sessionId, ...restOfSpanOpts } = opts;
+  const { operation, logPrompts, sessionId, tracesEnabled, ...restOfSpanOpts } =
+    opts;
 
-  const tracer = trace.getTracer(TRACER_NAME, TRACER_VERSION);
-  return tracer.startActiveSpan(operation, restOfSpanOpts, async (span) => {
+  if (tracesEnabled === false) {
     const meta: SpanMetadata = {
       name: operation,
       attributes: {
@@ -141,87 +142,113 @@ export async function runInDevTraceSpan<R>(
         [GEN_AI_CONVERSATION_ID]: sessionId,
       },
     };
-    let spanEnded = false;
-    const endSpan = () => {
-      if (spanEnded) {
-        return;
-      }
-      spanEnded = true;
-      try {
-        if (logPrompts !== false) {
-          if (meta.input !== undefined) {
-            const truncated = truncateForTelemetry(meta.input);
-            if (truncated !== undefined) {
-              span.setAttribute(GEN_AI_INPUT_MESSAGES, truncated);
+    return fn({ metadata: meta });
+  }
+
+  const spanOptsWithSession: SpanOptions = {
+    ...restOfSpanOpts,
+    attributes: {
+      ...restOfSpanOpts.attributes,
+      [GEN_AI_CONVERSATION_ID]: sessionId,
+    },
+  };
+
+  const tracer = trace.getTracer(TRACER_NAME, TRACER_VERSION);
+  return tracer.startActiveSpan(
+    operation,
+    spanOptsWithSession,
+    async (span) => {
+      const meta: SpanMetadata = {
+        name: operation,
+        attributes: {
+          [GEN_AI_OPERATION_NAME]: operation,
+          [GEN_AI_AGENT_NAME]: SERVICE_NAME,
+          [GEN_AI_AGENT_DESCRIPTION]: SERVICE_DESCRIPTION,
+          [GEN_AI_CONVERSATION_ID]: sessionId,
+        },
+      };
+      let spanEnded = false;
+      const endSpan = () => {
+        if (spanEnded) {
+          return;
+        }
+        spanEnded = true;
+        try {
+          if (logPrompts !== false) {
+            if (meta.input !== undefined) {
+              const truncated = truncateForTelemetry(meta.input);
+              if (truncated !== undefined) {
+                span.setAttribute(GEN_AI_INPUT_MESSAGES, truncated);
+              }
+            }
+            if (meta.output !== undefined) {
+              const truncated = truncateForTelemetry(meta.output);
+              if (truncated !== undefined) {
+                span.setAttribute(GEN_AI_OUTPUT_MESSAGES, truncated);
+              }
             }
           }
-          if (meta.output !== undefined) {
-            const truncated = truncateForTelemetry(meta.output);
+          for (const [key, value] of Object.entries(meta.attributes)) {
+            const truncated = truncateForTelemetry(value);
             if (truncated !== undefined) {
-              span.setAttribute(GEN_AI_OUTPUT_MESSAGES, truncated);
+              span.setAttribute(key, truncated);
             }
           }
-        }
-        for (const [key, value] of Object.entries(meta.attributes)) {
-          const truncated = truncateForTelemetry(value);
-          if (truncated !== undefined) {
-            span.setAttribute(key, truncated);
+          if (meta.error) {
+            span.setStatus({
+              code: SpanStatusCode.ERROR,
+              message: getErrorMessage(meta.error),
+            });
+            if (meta.error instanceof Error) {
+              span.recordException(meta.error);
+            }
+          } else {
+            span.setStatus({ code: SpanStatusCode.OK });
           }
-        }
-        if (meta.error) {
+        } catch (e) {
+          // Log the error but don't rethrow, to ensure span.end() is called.
+          diag.error('Error setting span attributes in endSpan', e);
           span.setStatus({
             code: SpanStatusCode.ERROR,
-            message: getErrorMessage(meta.error),
+            message: `Error in endSpan: ${getErrorMessage(e)}`,
           });
-          if (meta.error instanceof Error) {
-            span.recordException(meta.error);
-          }
-        } else {
-          span.setStatus({ code: SpanStatusCode.OK });
+        } finally {
+          span.end();
         }
-      } catch (e) {
-        // Log the error but don't rethrow, to ensure span.end() is called.
-        diag.error('Error setting span attributes in endSpan', e);
-        span.setStatus({
-          code: SpanStatusCode.ERROR,
-          message: `Error in endSpan: ${getErrorMessage(e)}`,
-        });
+      };
+
+      let isStream = false;
+      try {
+        const result = await fn({ metadata: meta });
+
+        if (isAsyncIterable(result)) {
+          isStream = true;
+          const streamWrapper = (async function* () {
+            try {
+              yield* result;
+            } catch (e: unknown) {
+              meta.error = e;
+              throw e;
+            } finally {
+              endSpan();
+            }
+          })();
+
+          const finalResult = Object.assign(streamWrapper, result);
+          spanRegistry.register(finalResult, endSpan);
+          return finalResult;
+        }
+        return result;
+      } catch (e: unknown) {
+        meta.error = e;
+        throw e;
       } finally {
-        span.end();
+        if (!isStream) {
+          endSpan();
+        }
       }
-    };
-
-    let isStream = false;
-    try {
-      const result = await fn({ metadata: meta });
-
-      if (isAsyncIterable(result)) {
-        isStream = true;
-        const streamWrapper = (async function* () {
-          try {
-            yield* result;
-          } catch (e: unknown) {
-            meta.error = e;
-            throw e;
-          } finally {
-            endSpan();
-          }
-        })();
-
-        const finalResult = Object.assign(streamWrapper, result);
-        spanRegistry.register(finalResult, endSpan);
-        return finalResult;
-      }
-      return result;
-    } catch (e: unknown) {
-      meta.error = e;
-      throw e;
-    } finally {
-      if (!isStream) {
-        endSpan();
-      }
-    }
-  });
+    },
+  );
 }
 
 /**

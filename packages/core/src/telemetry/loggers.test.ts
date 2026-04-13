@@ -352,6 +352,7 @@ describe('loggers', () => {
         getSessionId: () => 'test-session-id',
         getTelemetryEnabled: () => true,
         getTelemetryLogPromptsEnabled: () => false,
+        getTelemetryTracesEnabled: () => false,
         getTargetDir: () => 'target-dir',
         getUsageStatisticsEnabled: () => true,
         isInteractive: () => false,
@@ -922,7 +923,8 @@ describe('loggers', () => {
         getTargetDir: () => 'target-dir',
         getUsageStatisticsEnabled: () => true,
         getTelemetryEnabled: () => true,
-        getTelemetryLogPromptsEnabled: () => false, // Disabled
+        getTelemetryLogPromptsEnabled: () => false,
+        getTelemetryTracesEnabled: () => false, // Disabled
         isInteractive: () => false,
         getExperiments: () => undefined,
         getExperimentsAsync: async () => undefined,
@@ -2423,6 +2425,7 @@ describe('loggers', () => {
       getExperiments: () => undefined,
       getExperimentsAsync: async () => undefined,
       getTelemetryLogPromptsEnabled: () => false,
+      getTelemetryTracesEnabled: () => false,
       getContentGeneratorConfig: () => undefined,
     } as unknown as Config;
 
