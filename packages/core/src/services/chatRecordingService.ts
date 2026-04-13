@@ -741,35 +741,16 @@ export class ChatRecordingService {
       return;
     }
 
-    const sessionId = path.basename(this.conversationFile, '.json');
-
     try {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      const tempDir = this.config.storage.getProjectTempDir();
-      const chatsDir = path.join(tempDir, 'chats');
-      const sessionPath = path.join(chatsDir, `${sessionId}.json`);
+      const tempDir = this.context.config.storage.getProjectTempDir();
 
-      await fs.promises.unlink(sessionPath).catch(() => {
+      // Delete the conversation file directly using the tracked path.
+      await fs.promises.unlink(this.conversationFile).catch(() => {
         // File may not exist; ignore.
       });
 
-      // Cleanup tool outputs for this session
-      const safeSessionId = sanitizeFilenamePart(sessionId);
-      const toolOutputDir = path.join(
-        tempDir,
-        'tool-outputs',
-        `session-${safeSessionId}`,
-      );
-
-      // Robustness: Ensure the path is strictly within the tool-outputs base
-      const toolOutputsBase = path.join(tempDir, 'tool-outputs');
-      if (toolOutputDir.startsWith(toolOutputsBase)) {
-        await fs.promises
-          .rm(toolOutputDir, { recursive: true, force: true })
-          .catch(() => {
-            // Directory may not exist; ignore.
-          });
-      }
+      // Delegate tool-output and log cleanup to the shared utility.
+      await deleteSessionArtifactsAsync(this.sessionId, tempDir);
     } catch (error) {
       debugLogger.error('Error deleting current session.', error);
       throw error;

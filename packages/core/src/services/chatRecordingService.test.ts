@@ -737,7 +737,7 @@ describe('ChatRecordingService', () => {
 
   describe('deleteCurrentSessionAsync', () => {
     it('should asynchronously delete the current session file and tool outputs', async () => {
-      chatRecordingService.initialize();
+      await chatRecordingService.initialize();
       // Record a message to trigger the file write (writeConversation skips
       // writing when there are no messages).
       chatRecordingService.recordMessage({
@@ -748,12 +748,12 @@ describe('ChatRecordingService', () => {
       const conversationFile = chatRecordingService.getConversationFilePath();
       expect(conversationFile).not.toBeNull();
 
-      // Create a tool output directory matching the session filename
-      const sessionBaseName = path.basename(conversationFile!, '.json');
+      // Create a tool output directory matching the session ID used by
+      // deleteSessionArtifactsAsync (this.sessionId = mockConfig.promptId).
       const toolOutputDir = path.join(
         testTempDir,
         'tool-outputs',
-        `session-${sessionBaseName}`,
+        'session-test-session-id',
       );
       fs.mkdirSync(toolOutputDir, { recursive: true });
       fs.writeFileSync(path.join(toolOutputDir, 'output.txt'), 'data');
@@ -775,11 +775,14 @@ describe('ChatRecordingService', () => {
     });
 
     it('should not throw if session file does not exist on disk', async () => {
-      // initialize() sets conversationFile but writeConversation skips writing
-      // when there are no messages, so the file doesn't exist on disk.
-      chatRecordingService.initialize();
+      // initialize() writes an initial metadata record synchronously, so
+      // delete the file manually to simulate the "missing on disk" scenario.
+      await chatRecordingService.initialize();
       const conversationFile = chatRecordingService.getConversationFilePath();
       expect(conversationFile).not.toBeNull();
+      if (conversationFile && fs.existsSync(conversationFile)) {
+        fs.unlinkSync(conversationFile);
+      }
       expect(fs.existsSync(conversationFile!)).toBe(false);
 
       await expect(
