@@ -149,7 +149,7 @@ export class ContextManager {
    * and maps the Episodic Context Graph back into a raw Gemini Content[] array for transmission.
    * This is the primary method called by the agent framework before sending a request.
    */
-  async projectCompressedHistory(
+  async renderHistory(
     activeTaskIds: Set<string> = new Set(),
   ): Promise<Content[]> {
     this.tracer.logEvent('ContextManager', 'Starting rendering of LLM context');

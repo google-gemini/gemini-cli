@@ -51,7 +51,7 @@ describe('ContextManager Sync Pressure Barrier Tests', () => {
     const rawHistoryLength = chatHistory.get().length;
 
     // 5. Project History (Triggers Sync Barrier)
-    const projection = await contextManager.projectCompressedHistory();
+    const projection = await contextManager.renderHistory();
 
     // 6. Assertions
     // The barrier should have dropped several older episodes to get under 150k.
