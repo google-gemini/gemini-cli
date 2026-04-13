@@ -267,17 +267,12 @@ describe('<Footer />', () => {
       width: 120,
       uiState: {
         sessionStats: mockSessionStats,
-        quota: {
-          userTier: undefined,
-          stats: {
-            remaining: 15,
-            limit: 100,
-            resetTime: undefined,
-          },
-          proQuotaRequest: null,
-          validationRequest: null,
-          overageMenuRequest: null,
-          emptyWalletRequest: null,
+      },
+      quotaState: {
+        stats: {
+          remaining: 15,
+          limit: 100,
+          resetTime: undefined,
         },
       },
     });
@@ -292,17 +287,12 @@ describe('<Footer />', () => {
       width: 120,
       uiState: {
         sessionStats: mockSessionStats,
-        quota: {
-          userTier: undefined,
-          stats: {
-            remaining: 85,
-            limit: 100,
-            resetTime: undefined,
-          },
-          proQuotaRequest: null,
-          validationRequest: null,
-          overageMenuRequest: null,
-          emptyWalletRequest: null,
+      },
+      quotaState: {
+        stats: {
+          remaining: 85,
+          limit: 100,
+          resetTime: undefined,
         },
       },
     });
@@ -317,17 +307,12 @@ describe('<Footer />', () => {
       width: 120,
       uiState: {
         sessionStats: mockSessionStats,
-        quota: {
-          userTier: undefined,
-          stats: {
-            remaining: 0,
-            limit: 100,
-            resetTime: undefined,
-          },
-          proQuotaRequest: null,
-          validationRequest: null,
-          overageMenuRequest: null,
-          emptyWalletRequest: null,
+      },
+      quotaState: {
+        stats: {
+          remaining: 0,
+          limit: 100,
+          resetTime: undefined,
         },
       },
     });
