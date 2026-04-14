@@ -1511,6 +1511,56 @@ describe('Server Config (config.ts)', () => {
     });
   });
 
+  describe('getExtensionSetting', () => {
+    it('returns undefined if the extension does not exist', () => {
+      const config = new Config(baseParams);
+      vi.spyOn(config, 'getExtensions').mockReturnValue([]);
+      expect(config.getExtensionSetting('foo', 'bar')).toBeUndefined();
+    });
+
+    it('returns undefined if the extension has no resolvedSettings', () => {
+      const config = new Config(baseParams);
+      vi.spyOn(config, 'getExtensions').mockReturnValue([
+        {
+          name: 'my-ext',
+          version: '1.0',
+          isActive: true,
+          path: '/ext',
+          contextFiles: [],
+          id: 'my-ext',
+        },
+      ]);
+      expect(
+        config.getExtensionSetting('my-ext', 'some.setting'),
+      ).toBeUndefined();
+    });
+
+    it('returns the setting value if it exists', () => {
+      const config = new Config(baseParams);
+      vi.spyOn(config, 'getExtensions').mockReturnValue([
+        {
+          name: 'my-ext',
+          version: '1.0',
+          isActive: true,
+          path: '/ext',
+          contextFiles: [],
+          id: 'my-ext',
+          resolvedSettings: [
+            {
+              name: 'some.setting',
+              value: 'custom-val',
+              envVar: 'MY_EXT_SOME_SETTING',
+              sensitive: false,
+            },
+          ],
+        },
+      ]);
+      expect(config.getExtensionSetting('my-ext', 'some.setting')).toBe(
+        'custom-val',
+      );
+    });
+  });
+
   describe('getTruncateToolOutputThreshold', () => {
     beforeEach(() => {
       vi.clearAllMocks();
