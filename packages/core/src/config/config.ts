@@ -737,6 +737,17 @@ export class Config implements McpContext, AgentLoopContext {
   private blockedEnvironmentVariables: string[];
   private readonly enableEnvironmentVariableRedaction: boolean;
   private _promptRegistry!: PromptRegistry;
+  private _activeExtensionName?: string;
+
+  get activeExtensionName(): string | undefined {
+    return (
+      this._activeExtensionName || process.env['GEMINI_CLI_ACTIVE_EXTENSION']
+    );
+  }
+
+  setActiveExtensionName(name: string | undefined): void {
+    this._activeExtensionName = name;
+  }
   private _resourceRegistry!: ResourceRegistry;
   private agentRegistry!: AgentRegistry;
   private readonly acknowledgedAgentsService: AcknowledgedAgentsService;

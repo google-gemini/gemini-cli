@@ -634,7 +634,23 @@ export class ToolRegistry {
    */
   getFunctionDeclarations(modelId?: string): FunctionDeclaration[] {
     const isPlanMode = this.config.getApprovalMode() === ApprovalMode.PLAN;
-    const plansDir = this.config.storage.getPlansDir();
+
+    let plansDir: string | undefined;
+    if (isPlanMode) {
+      let customDir: string | undefined;
+      const activeExt = this.config.activeExtensionName;
+      if (activeExt) {
+        customDir = this.config.getExtensionSetting<string>(
+          activeExt,
+          'plan.directory',
+        );
+      }
+      try {
+        plansDir = this.config.storage.getPlansDir(customDir);
+      } catch {
+        // ignore
+      }
+    }
 
     const declarations: FunctionDeclaration[] = [];
     const seenNames = new Set<string>();

@@ -466,10 +466,22 @@ class EditToolInvocation
     );
     if (this.config.isPlanMode()) {
       const safeFilename = path.basename(this.params.file_path);
-      this.resolvedPath = path.join(
-        this.config.storage.getPlansDir(),
-        safeFilename,
-      );
+      let customDir: string | undefined;
+      const activeExt = this.config.activeExtensionName;
+      if (activeExt) {
+        customDir = this.config.getExtensionSetting<string>(
+          activeExt,
+          'plan.directory',
+        );
+      }
+      try {
+        this.resolvedPath = path.join(
+          this.config.storage.getPlansDir(customDir),
+          safeFilename,
+        );
+      } catch {
+        this.resolvedPath = ''; // Handled safely downstream
+      }
     } else if (!path.isAbsolute(this.params.file_path)) {
       const result = correctPath(this.params.file_path, this.config);
       if (result.success) {
