@@ -50,7 +50,7 @@ describe('GeminiClient Watcher Integration', () => {
   afterEach(() => {
     vi.unstubAllEnvs();
     const projectTempDir = config.storage.getProjectTempDir();
-    const statusFilePath = path.join(projectTempDir, 'watcher_status.md');
+    const statusFilePath = path.join(projectTempDir, '.sys_state_cache.log');
     if (fs.existsSync(statusFilePath)) {
       fs.unlinkSync(statusFilePath);
     }
@@ -261,7 +261,7 @@ describe('GeminiClient Watcher Integration', () => {
 
     // Verify the status file exists (written by GeminiClient internally)
     const projectTempDir = config.storage.getProjectTempDir();
-    const statusFilePath = path.join(projectTempDir, 'watcher_status.md');
+    const statusFilePath = path.join(projectTempDir, '.sys_state_cache.log');
     expect(fs.existsSync(statusFilePath)).toBe(true);
     const content = fs.readFileSync(statusFilePath, 'utf-8');
     expect(content).toContain('# Watcher Memory State');
@@ -353,7 +353,7 @@ I hope this status update is helpful!
     }
 
     const projectTempDir = config.storage.getProjectTempDir();
-    const statusFilePath = path.join(projectTempDir, 'watcher_status.md');
+    const statusFilePath = path.join(projectTempDir, '.sys_state_cache.log');
     expect(fs.existsSync(statusFilePath)).toBe(true);
     const content = fs.readFileSync(statusFilePath, 'utf-8');
     expect(content).toContain('Messy test direction');

@@ -38,7 +38,7 @@ export const WatcherAgent = (
   context: AgentLoopContext,
 ): LocalAgentDefinition<typeof WatcherReportSchema> => {
   const projectTempDir = context.config.storage.getProjectTempDir();
-  const statusFilePath = path.join(projectTempDir, 'watcher_status.md');
+  const statusFilePath = path.join(projectTempDir, '.sys_state_cache.log');
 
   return {
     name: 'watcher',

@@ -327,7 +327,7 @@ export class GeminiClient {
     // Clean up Watcher status file
     try {
       const projectTempDir = this.config.storage.getProjectTempDir();
-      const statusFilePath = path.join(projectTempDir, 'watcher_status.md');
+      const statusFilePath = path.join(projectTempDir, '.sys_state_cache.log');
       if (fs.existsSync(statusFilePath)) {
         fs.unlinkSync(statusFilePath);
       }
@@ -1346,7 +1346,7 @@ export class GeminiClient {
     const interval = this.config.getExperimentalWatcherInterval();
 
     const projectTempDir = this.config.storage.getProjectTempDir();
-    const statusFilePath = path.join(projectTempDir, 'watcher_status.md');
+    const statusFilePath = path.join(projectTempDir, '.sys_state_cache.log');
 
     // Ensure the file exists before the subagent tries to read it
     if (!fs.existsSync(statusFilePath)) {
@@ -1416,7 +1416,10 @@ export class GeminiClient {
 
           // Internally write the status report to avoid requiring user permission
           const projectTempDir = this.config.storage.getProjectTempDir();
-          const statusFilePath = path.join(projectTempDir, 'watcher_status.md');
+          const statusFilePath = path.join(
+            projectTempDir,
+            '.sys_state_cache.log',
+          );
           debugLogger.log(
             `[Watcher] Writing status report to ${statusFilePath}`,
           );
