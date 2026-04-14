@@ -47,9 +47,8 @@ export class ContextManager {
     this.historyObserver.start();
 
     this.eventBus.onPristineHistoryUpdated((event) => {
-      const existingIds = new Set(this.buffer.nodes.map((n) => n.id));
       const newIds = new Set(event.nodes.map((n) => n.id));
-      const addedNodes = event.nodes.filter((n) => !existingIds.has(n.id));
+      const addedNodes = event.nodes.filter((n) => event.newNodes.has(n.id));
 
       // Prune any pristine nodes that were dropped from the upstream history
       this.buffer = this.buffer.prunePristineNodes(newIds);
@@ -59,6 +58,13 @@ export class ContextManager {
       }
 
       this.evaluateTriggers(event.newNodes);
+    });
+    this.eventBus.onProcessorResult((event) => {
+      this.buffer = this.buffer.applyProcessorResult(
+        event.processorId,
+        event.targets,
+        event.returnedNodes,
+      );
     });
   }
 

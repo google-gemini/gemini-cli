@@ -25,12 +25,9 @@ export class ContextTracer {
   constructor(options: ContextTracerOptions) {
     this.enabled = options.enabled ?? false;
 
-    this.traceDir = path.join(
-      options.targetDir,
-      '.gemini',
-      'context_trace',
-      options.sessionId,
-    );
+    this.traceDir =
+      process.env['GEMINI_CONTEXT_TRACE_DIR'] ||
+      path.join(options.targetDir, 'context_trace', options.sessionId);
     this.assetsDir = path.join(this.traceDir, 'assets');
 
     if (this.enabled) {

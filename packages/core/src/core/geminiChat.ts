@@ -18,6 +18,7 @@ import {
   type GenerateContentConfig,
   type GenerateContentParameters,
 } from '@google/genai';
+import { AgentChatHistory } from './agentChatHistory.js';
 import { toParts } from '../code_assist/converter.js';
 import {
   retryWithBackoff,
@@ -248,19 +249,21 @@ export class GeminiChat {
   private sendPromise: Promise<void> = Promise.resolve();
   private readonly chatRecordingService: ChatRecordingService;
   private lastPromptTokenCount: number;
+  agentHistory: AgentChatHistory;
 
   constructor(
     private readonly context: AgentLoopContext,
     private systemInstruction: string = '',
     private tools: Tool[] = [],
-    private history: Content[] = [],
+    history: Content[] = [],
     resumedSessionData?: ResumedSessionData,
     private readonly onModelChanged?: (modelId: string) => Promise<Tool[]>,
   ) {
     validateHistory(history);
+    this.agentHistory = new AgentChatHistory(history);
     this.chatRecordingService = new ChatRecordingService(context);
     this.lastPromptTokenCount = estimateTokenCountSync(
-      this.history.flatMap((c) => c.parts || []),
+      this.agentHistory.flatMap((c) => c.parts || []),
     );
   }
 
@@ -347,7 +350,7 @@ export class GeminiChat {
     }
 
     // Add user content to history ONCE before any attempts.
-    this.history.push(userContent);
+    this.agentHistory.push(userContent);
     const requestContents = this.getHistory(true);
 
     const streamWithRetries = async function* (
@@ -747,8 +750,8 @@ export class GeminiChat {
    */
   getHistory(curated: boolean = false): readonly Content[] {
     const history = curated
-      ? extractCuratedHistory(this.history)
-      : this.history;
+      ? extractCuratedHistory([...this.agentHistory.get()])
+      : this.agentHistory.get();
     return [...history];
   }
 
@@ -756,26 +759,26 @@ export class GeminiChat {
    * Clears the chat history.
    */
   clearHistory(): void {
-    this.history = [];
+    this.agentHistory.clear();
   }
 
   /**
    * Adds a new entry to the chat history.
    */
   addHistory(content: Content): void {
-    this.history.push(content);
+    this.agentHistory.push(content);
   }
 
   setHistory(history: readonly Content[]): void {
-    this.history = [...history];
+    this.agentHistory.set(history);
     this.lastPromptTokenCount = estimateTokenCountSync(
-      this.history.flatMap((c) => c.parts || []),
+      this.agentHistory.flatMap((c) => c.parts || []),
     );
     this.chatRecordingService.updateMessagesFromHistory(history);
   }
 
   stripThoughtsFromHistory(): void {
-    this.history = this.history.map((content) => {
+    this.agentHistory.map((content) => {
       const newContent = { ...content };
       if (newContent.parts) {
         newContent.parts = newContent.parts.map((part) => {
@@ -1013,7 +1016,7 @@ export class GeminiChat {
       }
     }
 
-    this.history.push({ role: 'model', parts: consolidatedParts });
+    this.agentHistory.push({ role: 'model', parts: consolidatedParts });
   }
 
   getLastPromptTokenCount(): number {
