@@ -1457,19 +1457,18 @@ export async function discoverPrompts(
         ),
     }));
   } catch (error) {
-    if (
-      !(error instanceof McpError && error.code === ErrorCode.MethodNotFound)
-    ) {
-      cliConfig.emitMcpDiagnostic(
-        'error',
-        `Error discovering prompts from ${mcpServerName}: ${getErrorMessage(
-          error,
-        )}`,
-        error,
-        mcpServerName,
-      );
+    if (error instanceof McpError && error.code === ErrorCode.MethodNotFound) {
+      return [];
     }
-    return [];
+    cliConfig.emitMcpDiagnostic(
+      'error',
+      `Error discovering prompts from ${mcpServerName}: ${getErrorMessage(
+        error,
+      )}`,
+      error,
+      mcpServerName,
+    );
+    throw error;
   }
 }
 
@@ -1506,19 +1505,18 @@ async function listResources(
       cursor = response.nextCursor ?? undefined;
     } while (cursor);
   } catch (error) {
-    if (
-      !(error instanceof McpError && error.code === ErrorCode.MethodNotFound)
-    ) {
-      cliConfig.emitMcpDiagnostic(
-        'error',
-        `Error discovering resources from ${mcpServerName}: ${getErrorMessage(
-          error,
-        )}`,
-        error,
-        mcpServerName,
-      );
+    if (error instanceof McpError && error.code === ErrorCode.MethodNotFound) {
+      return [];
     }
-    return [];
+    cliConfig.emitMcpDiagnostic(
+      'error',
+      `Error discovering resources from ${mcpServerName}: ${getErrorMessage(
+        error,
+      )}`,
+      error,
+      mcpServerName,
+    );
+    throw error;
   }
   return resources;
 }

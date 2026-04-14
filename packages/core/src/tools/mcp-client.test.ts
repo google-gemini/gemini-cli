@@ -266,7 +266,7 @@ describe('mcp-client', () => {
       consoleWarnSpy.mockRestore();
     });
 
-    it('should not throw when discovering prompts fails and should still discover tools', async () => {
+    it('should propagate errors when discovering prompts', async () => {
       const mockedClient = {
         connect: vi.fn(),
         discover: vi.fn(),
@@ -275,20 +275,10 @@ describe('mcp-client', () => {
         registerCapabilities: vi.fn(),
         setRequestHandler: vi.fn(),
         setNotificationHandler: vi.fn(),
-        getServerCapabilities: vi
-          .fn()
-          .mockReturnValue({ prompts: {}, tools: {} }),
-        listTools: vi.fn().mockResolvedValue({
-          tools: [
-            {
-              name: 'tool1',
-              description: 'Test tool',
-              inputSchema: { type: 'object' },
-            },
-          ],
-        }),
+        getServerCapabilities: vi.fn().mockReturnValue({ prompts: {} }),
+        listTools: vi.fn().mockResolvedValue({ tools: [] }),
         listPrompts: vi.fn().mockRejectedValue(new Error('Test error')),
-        request: vi.fn().mockResolvedValue({ resources: [] }),
+        request: vi.fn().mockResolvedValue({}),
       };
       vi.mocked(ClientLib.Client).mockReturnValue(
         mockedClient as unknown as ClientLib.Client,
@@ -298,8 +288,6 @@ describe('mcp-client', () => {
       );
       const mockedToolRegistry = {
         registerTool: vi.fn(),
-        sortTools: vi.fn(),
-        getToolsByServer: vi.fn().mockReturnValue([]),
         getMessageBus: vi.fn().mockReturnValue(undefined),
       } as unknown as ToolRegistry;
       const promptRegistry = {
@@ -321,21 +309,19 @@ describe('mcp-client', () => {
         '0.0.1',
       );
       await client.connect();
-      // Should NOT throw despite prompt discovery failure
-      await client.discoverInto(MOCK_CONTEXT, {
-        toolRegistry: mockedToolRegistry,
-        promptRegistry,
-        resourceRegistry,
-      });
-      // Diagnostic should still be emitted
+      await expect(
+        client.discoverInto(MOCK_CONTEXT, {
+          toolRegistry: mockedToolRegistry,
+          promptRegistry,
+          resourceRegistry,
+        }),
+      ).rejects.toThrow('Test error');
       expect(MOCK_CONTEXT.emitMcpDiagnostic).toHaveBeenCalledWith(
         'error',
         `Error discovering prompts from test-server: Test error`,
         expect.any(Error),
         'test-server',
       );
-      // Tools should still be discovered
-      expect(mockedToolRegistry.registerTool).toHaveBeenCalledTimes(1);
     });
 
     it('should return empty array for discoverPrompts on MethodNotFound error without diagnostic', async () => {
@@ -357,17 +343,18 @@ describe('mcp-client', () => {
       expect(MOCK_CONTEXT.emitMcpDiagnostic).not.toHaveBeenCalled();
     });
 
-    it('should return empty array for discoverPrompts on non-MethodNotFound error with diagnostic', async () => {
+    it('should throw for discoverPrompts on non-MethodNotFound error with diagnostic', async () => {
       const mockedClient = {
         getServerCapabilities: vi.fn().mockReturnValue({ prompts: {} }),
         listPrompts: vi.fn().mockRejectedValue(new Error('Connection reset')),
       };
-      const result = await discoverPrompts(
-        'test-server',
-        mockedClient as unknown as ClientLib.Client,
-        MOCK_CONTEXT,
-      );
-      expect(result).toEqual([]);
+      await expect(
+        discoverPrompts(
+          'test-server',
+          mockedClient as unknown as ClientLib.Client,
+          MOCK_CONTEXT,
+        ),
+      ).rejects.toThrow('Connection reset');
       expect(MOCK_CONTEXT.emitMcpDiagnostic).toHaveBeenCalledWith(
         'error',
         expect.stringContaining('Connection reset'),
@@ -376,19 +363,20 @@ describe('mcp-client', () => {
       );
     });
 
-    it('should return empty array for discoverResources on error without throwing', async () => {
+    it('should throw for discoverResources on non-MethodNotFound error with diagnostic', async () => {
       const mockedClient = {
         getServerCapabilities: vi.fn().mockReturnValue({ resources: {} }),
         request: vi
           .fn()
           .mockRejectedValue(new Error('Resource listing failed')),
       };
-      const result = await discoverResources(
-        'test-server',
-        mockedClient as unknown as ClientLib.Client,
-        MOCK_CONTEXT,
-      );
-      expect(result).toEqual([]);
+      await expect(
+        discoverResources(
+          'test-server',
+          mockedClient as unknown as ClientLib.Client,
+          MOCK_CONTEXT,
+        ),
+      ).rejects.toThrow('Resource listing failed');
       expect(MOCK_CONTEXT.emitMcpDiagnostic).toHaveBeenCalledWith(
         'error',
         expect.stringContaining('Resource listing failed'),
