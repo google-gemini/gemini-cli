@@ -21,10 +21,10 @@ interface DesiredCursorShapeOptions extends UseVimCursorShapeOptions {
   lastApplied: string | null;
 }
 
-function isInteractiveTerminal(
+export function isInteractiveTerminal(
   stdout: ReturnType<typeof useStdout>['stdout'],
 ): boolean {
-  return Boolean(stdout && ('isTTY' in stdout ? stdout.isTTY !== false : true));
+  return stdout?.isTTY === true;
 }
 
 export function getDesiredVimCursorShape({

@@ -5,8 +5,10 @@
  */
 
 import { describe, it, expect } from 'vitest';
+
 import {
   getDesiredVimCursorShape,
+  isInteractiveTerminal,
   VIM_CURSOR_SHAPE_DEFAULT,
   VIM_CURSOR_SHAPE_INSERT,
   VIM_CURSOR_SHAPE_NORMAL,
@@ -66,5 +68,24 @@ describe('getDesiredVimCursorShape', () => {
         lastApplied: null,
       }),
     ).toBeNull();
+  });
+});
+
+describe('isInteractiveTerminal', () => {
+  it('returns true when stdout is explicitly marked as a TTY', () => {
+    expect(
+      isInteractiveTerminal({
+        isTTY: true,
+        write: () => true,
+      } as ReturnType<typeof import('ink').useStdout>['stdout']),
+    ).toBe(true);
+  });
+
+  it('returns false when stdout does not expose TTY support', () => {
+    expect(
+      isInteractiveTerminal({
+        write: () => true,
+      } as ReturnType<typeof import('ink').useStdout>['stdout']),
+    ).toBe(false);
   });
 });
