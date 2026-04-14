@@ -68,3 +68,6 @@ temp_agents/
 
 # conductor extension and planning directories
 conductor/
+
+# Windows sandbox binaries
+packages/core/src/sandbox/windows/*.exe
