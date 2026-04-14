@@ -77,7 +77,7 @@ jobs:
 
   deflake_e2e_mac:
     name: 'E2E Test (macOS)'
-    runs-on: 'macos-latest'
+    runs-on: 'macos-latest-large'
     if: "github.repository == 'google-gemini/gemini-cli'"
     steps:
       - name: 'Checkout'

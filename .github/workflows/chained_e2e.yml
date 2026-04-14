@@ -183,7 +183,7 @@ jobs:
     needs:
       - 'merge_queue_skipper'
       - 'parse_run_context'
-    runs-on: 'macos-latest'
+    runs-on: 'macos-latest-large'
     if: |
       github.repository == 'google-gemini/gemini-cli' && always() && (needs.merge_queue_skipper.result !='success' || needs.merge_queue_skipper.outputs.skip != 'true')
     steps:
