@@ -85,11 +85,12 @@ accessible.
 
 - **Callouts**: Use GitHub-flavored markdown alerts to highlight important
   information. To ensure the formatting is preserved by `npm run format`, place
-  an empty line, then a prettier ignore comment directly before
-  the callout block. Use `<!-- prettier-ignore -->` for standard Markdown files (`.md`) and `{/* prettier-ignore */}` for MDX files (`.mdx`). The callout type (`[!TYPE]`) should be on the first line,
-  followed by a newline, and then the content, with each subsequent line of
-  content starting with `>`. Available types are `NOTE`, `TIP`, `IMPORTANT`,
-  `WARNING`, and `CAUTION`.
+  an empty line, then a prettier ignore comment directly before the callout
+  block. Use `<!-- prettier-ignore -->` for standard Markdown files (`.md`) and
+  `{/* prettier-ignore */}` for MDX files (`.mdx`). The callout type (`[!TYPE]`)
+  should be on the first line, followed by a newline, and then the content, with
+  each subsequent line of content starting with `>`. Available types are `NOTE`,
+  `TIP`, `IMPORTANT`, `WARNING`, and `CAUTION`.
 
   Example (.md):
 
