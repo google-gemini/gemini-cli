@@ -5,7 +5,6 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import '../../../test-utils/customMatchers.js';
 import { handleVimAction } from './vim-buffer-actions.js';
 import type { TextBufferState, VisualLayout } from './text-buffer.js';
 

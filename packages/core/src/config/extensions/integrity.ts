@@ -147,8 +147,7 @@ class ExtensionIntegrityStore {
     const { store, signature: actualSignature } = rawStore;
 
     // Re-generate the expected signature for the store content.
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const storeContent: string = stableStringify(store) ?? '';
+    const storeContent = stableStringify(store) ?? '';
     const expectedSignature = await this.generateSignature(storeContent);
 
     // Verify the store hasn't been tampered with.
@@ -166,8 +165,7 @@ class ExtensionIntegrityStore {
    */
   async save(store: ExtensionIntegrityMap): Promise<void> {
     // Generate a signature for the entire map to prevent manual tampering.
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const storeContent: string = stableStringify(store) ?? '';
+    const storeContent = stableStringify(store) ?? '';
     const storeSignature = await this.generateSignature(storeContent);
 
     const finalData: IntegrityStore = {
@@ -192,8 +190,7 @@ class ExtensionIntegrityStore {
    * Generates a deterministic SHA-256 hash of the metadata.
    */
   generateHash(metadata: ExtensionInstallMetadata): string {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const content: string = stableStringify(metadata) ?? '';
+    const content = stableStringify(metadata) ?? '';
     return createHash('sha256').update(content).digest('hex');
   }
 
