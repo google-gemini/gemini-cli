@@ -1,0 +1,183 @@
+name: 🧹 Janitorial Pass
+
+on:
+  schedule:
+    - cron: '0 2 * * *' # Run daily at 2:00 AM UTC
+  workflow_dispatch: # Allow manual triggering
+
+jobs:
+  janitorial-pass:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: read
+    steps:
+      - name: Run Janitorial Pass
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const now = new Date();
+            const days60 = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+            const days14 = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+
+            let hasNextPage = true;
+            let endCursor = null;
+
+            while (hasNextPage) {
+              const query = `
+                query($searchQuery: String!, $cursor: String) {
+                  search(query: $searchQuery, type: ISSUE, first: 50, after: $cursor) {
+                    pageInfo {
+                      hasNextPage
+                      endCursor
+                    }
+                    nodes {
+                      ... on Issue {
+                        id
+                        number
+                        updatedAt
+                        labels(first: 10) {
+                          nodes {
+                            name
+                          }
+                        }
+                        comments(last: 1) {
+                          nodes {
+                            author {
+                              login
+                              __typename
+                            }
+                            createdAt
+                          }
+                        }
+                        timelineItems(itemTypes: [CROSS_REFERENCED_EVENT, LABELED_EVENT], first: 50) {
+                          nodes {
+                            __typename
+                            ... on CrossReferencedEvent {
+                              willCloseTarget
+                              source {
+                                ... on PullRequest {
+                                  state
+                                  merged
+                                }
+                              }
+                            }
+                            ... on LabeledEvent {
+                              createdAt
+                              label {
+                                name
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              `;
+              
+              const searchQuery = `repo:${owner}/${repo} is:issue is:open label:area/core,area/extensions,area/site label:status/need-triage,status/needs-info sort:created-asc`;
+              const variables = { searchQuery, cursor: endCursor };
+              const result = await github.graphql(query, variables);
+              
+              const issues = result.search.nodes;
+              hasNextPage = result.search.pageInfo.hasNextPage;
+              endCursor = result.search.pageInfo.endCursor;
+
+              for (const issue of issues) {
+                if (!issue || !issue.number) continue; // Skip if node is not an issue (though type: ISSUE ensures it should be)
+                const labels = issue.labels.nodes.map(l => l.name);
+                const isNeedsInfo = labels.includes('status/needs-info');
+                const updatedAt = new Date(issue.updatedAt);
+                
+                // 1. Merged PR linked?
+                let hasMergedPR = false;
+                for (const item of issue.timelineItems.nodes) {
+                  if (item.__typename === 'CrossReferencedEvent' && item.willCloseTarget && item.source && item.source.merged) {
+                    hasMergedPR = true;
+                    break;
+                  }
+                }
+
+                if (hasMergedPR) {
+                  console.log(`Issue #${issue.number} has a linked merged PR. Closing as Completed.`);
+                  await github.rest.issues.createComment({
+                    owner, repo, issue_number: issue.number,
+                    body: "This issue has a linked merged PR. Closing as completed."
+                  });
+                  await github.rest.issues.update({
+                    owner, repo, issue_number: issue.number,
+                    state: 'closed',
+                    state_reason: 'completed'
+                  });
+                  continue; // Move to next issue
+                }
+
+                // 2. Inactive over 60 days?
+                if (updatedAt < days60) {
+                  console.log(`Issue #${issue.number} inactive over 60 days. Closing as Not Planned.`);
+                  await github.rest.issues.createComment({
+                    owner, repo, issue_number: issue.number,
+                    body: "This issue has been inactive for over 60 days. Closing as not planned. Please reopen if this is still relevant."
+                  });
+                  await github.rest.issues.update({
+                    owner, repo, issue_number: issue.number,
+                    state: 'closed',
+                    state_reason: 'not_planned'
+                  });
+                  continue;
+                }
+
+                if (isNeedsInfo) {
+                  // 3. Labeled 'status/needs-info' and inactive over 14 days?
+                  if (updatedAt < days14) {
+                    console.log(`Issue #${issue.number} has needs-info and inactive over 14 days. Closing as Not Planned.`);
+                    await github.rest.issues.createComment({
+                      owner, repo, issue_number: issue.number,
+                      body: "This issue has been waiting for information for over 14 days. Closing as not planned."
+                    });
+                    await github.rest.issues.update({
+                      owner, repo, issue_number: issue.number,
+                      state: 'closed',
+                      state_reason: 'not_planned'
+                    });
+                    continue;
+                  }
+
+                  // 4. Labeled 'status/needs-info' but has new human comments?
+                  // Find when the label was added
+                  let labelAddedAt = new Date(0);
+                  for (const item of issue.timelineItems.nodes) {
+                    if (item.__typename === 'LabeledEvent' && item.label.name === 'status/needs-info') {
+                      const addedAt = new Date(item.createdAt);
+                      if (addedAt > labelAddedAt) labelAddedAt = addedAt;
+                    }
+                  }
+
+                  const lastComment = issue.comments.nodes[0];
+                  if (lastComment) {
+                    const commentCreatedAt = new Date(lastComment.createdAt);
+                    const isBot = lastComment.author.__typename === 'Bot' || lastComment.author.login.toLowerCase().includes('bot');
+                    
+                    if (!isBot && commentCreatedAt > labelAddedAt) {
+                      console.log(`Issue #${issue.number} has a new human comment after needs-info. Removing label and adding need-triage.`);
+                      try {
+                        await github.rest.issues.removeLabel({
+                          owner, repo, issue_number: issue.number,
+                          name: 'status/needs-info'
+                        });
+                      } catch (error) {
+                        console.log(`Failed to remove label status/needs-info from issue #${issue.number}: ${error.message}`);
+                      }
+                      
+                      await github.rest.issues.addLabels({
+                        owner, repo, issue_number: issue.number,
+                        labels: ['status/need-triage']
+                      });
+                    }
+                  }
+                }
+              }
+            }
