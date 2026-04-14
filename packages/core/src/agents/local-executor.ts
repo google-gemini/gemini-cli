@@ -1026,10 +1026,9 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
           const invocation = tool.build(args);
           // Prefer getDisplayTitle if it differs, otherwise fallback to getDescription.
           // This ensures the timeline ("Shell (Replace)") matches the confirmation dialog.
-          description =
-            typeof invocation.getDisplayTitle === 'function'
-              ? invocation.getDisplayTitle()
-              : invocation.getDescription();
+          description = invocation.getDisplayTitle
+            ? invocation.getDisplayTitle()
+            : invocation.getDescription();
         }
       } catch {
         // Ignore errors during formatting for activity emission

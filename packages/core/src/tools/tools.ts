@@ -393,6 +393,32 @@ export abstract class BaseToolInvocation<
 export type AnyToolInvocation = ToolInvocation<object, ToolResult>;
 
 /**
+ * Type guard to check if an object is an AnyToolInvocation.
+ */
+export function isAnyToolInvocation(
+  invocation: unknown,
+): invocation is AnyToolInvocation {
+  if (typeof invocation !== 'object' || invocation === null) {
+    return false;
+  }
+
+  return (
+    'execute' in invocation &&
+    typeof invocation.execute === 'function' &&
+    'getDescription' in invocation &&
+    typeof invocation.getDescription === 'function' &&
+    'params' in invocation &&
+    isRecord(invocation.params)
+  );
+}
+
+export function hasDisplayTitle(
+  invocation: AnyToolInvocation,
+): invocation is AnyToolInvocation & { getDisplayTitle(): string } {
+  return typeof invocation.getDisplayTitle === 'function';
+}
+
+/**
  * Interface for a tool builder that validates parameters and creates invocations.
  */
 export interface ToolBuilder<

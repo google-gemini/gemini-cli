@@ -44,7 +44,6 @@ import {
   parseCommandDetails,
   hasRedirection,
   inferFileOperation,
-  FileOperationType,
 } from '../utils/shell-utils.js';
 import { logFileOperation } from '../telemetry/loggers.js';
 import { FileOperationEvent } from '../telemetry/types.js';
@@ -143,13 +142,13 @@ export class ShellToolInvocation extends BaseToolInvocation<
     const inferred = inferFileOperation(this.params.command);
     if (inferred) {
       switch (inferred.type) {
-        case FileOperationType.SEARCH:
+        case 'search':
           return `Shell (Search)`;
-        case FileOperationType.EDIT:
+        case 'edit':
           return `Shell (Replace)`;
-        case FileOperationType.WRITE:
+        case 'write':
           return `Shell (Write File)`;
-        case FileOperationType.READ:
+        case 'read':
           return `Shell (Read File)`;
         default:
           break;
@@ -225,11 +224,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
     const command = stripShellWrapper(this.params.command);
     const inferred = inferFileOperation(this.params.command);
 
-    if (
-      inferred &&
-      (inferred.type === FileOperationType.EDIT ||
-        inferred.type === FileOperationType.WRITE)
-    ) {
+    if (inferred && (inferred.type === 'edit' || inferred.type === 'write')) {
       const filePath = path.resolve(
         this.context.config.getTargetDir(),
         inferred.filePath,
@@ -242,23 +237,24 @@ export class ShellToolInvocation extends BaseToolInvocation<
       }
 
       let newContent: string | undefined;
-      if (
-        inferred.type === FileOperationType.EDIT &&
-        originalContent !== null
-      ) {
-        if (typeof inferred.metadata?.['sedExpression'] === 'string') {
+      if (inferred.type === 'edit' && originalContent !== null) {
+        if (
+          inferred.metadata?.type === 'edit' &&
+          inferred.metadata.sedExpression
+        ) {
           newContent = this.simulateSed(
             originalContent,
-            inferred.metadata['sedExpression'],
+            inferred.metadata.sedExpression,
           );
         } else if (
-          typeof inferred.metadata?.['oldString'] === 'string' &&
-          typeof inferred.metadata?.['newString'] === 'string'
+          inferred.metadata?.type === 'edit' &&
+          inferred.metadata.oldString &&
+          inferred.metadata.newString
         ) {
           newContent = this.simulatePsReplace(
             originalContent,
-            inferred.metadata['oldString'],
-            inferred.metadata['newString'],
+            inferred.metadata.oldString,
+            inferred.metadata.newString,
           );
         }
       }
@@ -501,19 +497,19 @@ export class ShellToolInvocation extends BaseToolInvocation<
         let operation: FileOperation | undefined;
         let canonicalToolName = SHELL_TOOL_NAME;
         switch (inferred.type) {
-          case FileOperationType.SEARCH:
+          case 'search':
             operation = FileOperation.READ;
             canonicalToolName = GREP_TOOL_NAME;
             break;
-          case FileOperationType.READ:
+          case 'read':
             operation = FileOperation.READ;
             canonicalToolName = READ_FILE_TOOL_NAME;
             break;
-          case FileOperationType.EDIT:
+          case 'edit':
             operation = FileOperation.UPDATE;
             canonicalToolName = EDIT_TOOL_NAME;
             break;
-          case FileOperationType.WRITE:
+          case 'write':
             operation = FileOperation.UPDATE;
             canonicalToolName = WRITE_FILE_TOOL_NAME;
             break;

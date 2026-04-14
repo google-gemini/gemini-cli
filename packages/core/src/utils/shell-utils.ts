@@ -623,18 +623,39 @@ export function getShellConfiguration(): ShellConfiguration {
  */
 export const isWindows = () => os.platform() === 'win32';
 
-export enum FileOperationType {
-  SEARCH = 'SEARCH',
-  EDIT = 'EDIT',
-  WRITE = 'WRITE',
-  READ = 'READ',
-}
+export type FileOperationType = 'search' | 'edit' | 'write' | 'read';
+
+export type SearchFileMetadata = {
+  type: 'search';
+  pattern: string;
+};
+
+export type EditFileMetadata = {
+  type: 'edit';
+  sedExpression?: string;
+  oldString?: string;
+  newString?: string;
+};
+
+export type WriteFileMetadata = {
+  type: 'write';
+};
+
+export type ReadFileMetadata = {
+  type: 'read';
+};
+
+export type InferredFileMetadata =
+  | SearchFileMetadata
+  | EditFileMetadata
+  | WriteFileMetadata
+  | ReadFileMetadata;
 
 export interface InferredFileOperation {
   type: FileOperationType;
   filePath: string;
   /** Inferred details (e.g., the sed expression or replacement string) */
-  metadata?: Record<string, unknown>;
+  metadata?: InferredFileMetadata;
 }
 
 /**
@@ -783,9 +804,9 @@ export function inferFileOperation(
     );
     if (sedMatch) {
       return {
-        type: FileOperationType.EDIT,
+        type: 'edit',
         filePath: sedMatch[2].trim(),
-        metadata: { sedExpression: sedMatch[1] },
+        metadata: { type: 'edit', sedExpression: sedMatch[1] },
       };
     }
 
@@ -796,7 +817,7 @@ export function inferFileOperation(
     );
     if (redirectionMatch) {
       return {
-        type: FileOperationType.WRITE,
+        type: 'write',
         filePath: redirectionMatch[1].trim(),
       };
     }
@@ -807,7 +828,7 @@ export function inferFileOperation(
     );
     if (heredocMatch) {
       return {
-        type: FileOperationType.WRITE,
+        type: 'write',
         filePath: heredocMatch[1].trim(),
       };
     }
@@ -818,7 +839,7 @@ export function inferFileOperation(
     );
     if (cpMatch) {
       return {
-        type: FileOperationType.WRITE,
+        type: 'write',
         filePath: cpMatch[2].trim(),
       };
     }
@@ -829,7 +850,7 @@ export function inferFileOperation(
     );
     if (mvMatch) {
       return {
-        type: FileOperationType.WRITE,
+        type: 'write',
         filePath: mvMatch[2].trim(),
       };
     }
@@ -840,7 +861,7 @@ export function inferFileOperation(
     );
     if (teeMatch) {
       return {
-        type: FileOperationType.WRITE,
+        type: 'write',
         filePath: teeMatch[1].trim(),
       };
     }
@@ -851,9 +872,9 @@ export function inferFileOperation(
     );
     if (grepMatch) {
       return {
-        type: FileOperationType.SEARCH,
+        type: 'search',
         filePath: grepMatch[2].trim(),
-        metadata: { pattern: grepMatch[1] },
+        metadata: { type: 'search', pattern: grepMatch[1] },
       };
     }
 
@@ -863,7 +884,7 @@ export function inferFileOperation(
     );
     if (readMatch) {
       return {
-        type: FileOperationType.READ,
+        type: 'read',
         filePath: readMatch[1].trim(),
       };
     }
@@ -874,9 +895,10 @@ export function inferFileOperation(
     );
     if (psReplaceMatch) {
       return {
-        type: FileOperationType.EDIT,
+        type: 'edit',
         filePath: psReplaceMatch[1].trim(),
         metadata: {
+          type: 'edit',
           oldString: psReplaceMatch[2],
           newString: psReplaceMatch[3],
         },
@@ -889,7 +911,7 @@ export function inferFileOperation(
     );
     if (psSetContentMatch) {
       return {
-        type: FileOperationType.WRITE,
+        type: 'write',
         filePath: psSetContentMatch[1].trim(),
       };
     }
@@ -900,9 +922,9 @@ export function inferFileOperation(
     );
     if (psSearchMatch) {
       return {
-        type: FileOperationType.SEARCH,
+        type: 'search',
         filePath: psSearchMatch[1].trim(),
-        metadata: { pattern: psSearchMatch[2] },
+        metadata: { type: 'search', pattern: psSearchMatch[2] },
       };
     }
 
@@ -912,7 +934,7 @@ export function inferFileOperation(
     );
     if (psReadMatch) {
       return {
-        type: FileOperationType.READ,
+        type: 'read',
         filePath: psReadMatch[1].trim(),
       };
     }

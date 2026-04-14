@@ -42,10 +42,9 @@ export function mapToDisplay(
     if (call.status === CoreToolCallStatus.Error) {
       description = JSON.stringify(call.request.args);
     } else {
-      description =
-        typeof call.invocation.getDisplayTitle === 'function'
-          ? call.invocation.getDisplayTitle()
-          : call.invocation.getDescription();
+      description = call.invocation.getDisplayTitle
+        ? call.invocation.getDisplayTitle()
+        : call.invocation.getDescription();
       renderOutputAsMarkdown = call.tool.isOutputMarkdown;
     }
 

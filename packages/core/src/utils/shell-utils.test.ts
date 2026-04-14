@@ -24,7 +24,6 @@ import {
   hasRedirection,
   resolveExecutable,
   inferFileOperation,
-  FileOperationType,
 } from './shell-utils.js';
 import path from 'node:path';
 
@@ -611,16 +610,19 @@ describe('inferFileOperation', () => {
     mockPlatform.mockReturnValue('linux');
     const result = inferFileOperation("sed -i 's/foo/bar/g' test.ts");
     expect(result).toBeDefined();
-    expect(result?.type).toBe(FileOperationType.EDIT);
+    expect(result?.type).toBe('edit');
     expect(result?.filePath).toBe('test.ts');
-    expect(result?.metadata?.['sedExpression']).toBe('s/foo/bar/g');
+    expect(result?.metadata?.type).toBe('edit');
+    if (result?.metadata?.type === 'edit') {
+      expect(result.metadata.sedExpression).toBe('s/foo/bar/g');
+    }
   });
 
   it('should infer echo redirection as a WRITE operation', () => {
     mockPlatform.mockReturnValue('linux');
     const result = inferFileOperation("echo 'hello' > hello.txt");
     expect(result).toBeDefined();
-    expect(result?.type).toBe(FileOperationType.WRITE);
+    expect(result?.type).toBe('write');
     expect(result?.filePath).toBe('hello.txt');
   });
 
@@ -628,9 +630,12 @@ describe('inferFileOperation', () => {
     mockPlatform.mockReturnValue('linux');
     const result = inferFileOperation("grep 'pattern' file.txt");
     expect(result).toBeDefined();
-    expect(result?.type).toBe(FileOperationType.SEARCH);
+    expect(result?.type).toBe('search');
     expect(result?.filePath).toBe('file.txt');
-    expect(result?.metadata?.['pattern']).toBe('pattern');
+    expect(result?.metadata?.type).toBe('search');
+    if (result?.metadata?.type === 'search') {
+      expect(result.metadata.pattern).toBe('pattern');
+    }
   });
 
   it('should infer PowerShell -replace as an EDIT operation', () => {
@@ -639,9 +644,12 @@ describe('inferFileOperation', () => {
       "(Get-Content file.txt) -replace 'a', 'b' | Set-Content file.txt",
     );
     expect(result).toBeDefined();
-    expect(result?.type).toBe(FileOperationType.EDIT);
+    expect(result?.type).toBe('edit');
     expect(result?.filePath).toBe('file.txt');
-    expect(result?.metadata?.['oldString']).toBe('a');
-    expect(result?.metadata?.['newString']).toBe('b');
+    expect(result?.metadata?.type).toBe('edit');
+    if (result?.metadata?.type === 'edit') {
+      expect(result.metadata.oldString).toBe('a');
+      expect(result.metadata.newString).toBe('b');
+    }
   });
 });

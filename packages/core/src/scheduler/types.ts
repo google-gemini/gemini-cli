@@ -5,13 +5,14 @@
  */
 
 import type { Part } from '@google/genai';
-import type {
-  AnyDeclarativeTool,
-  AnyToolInvocation,
-  ToolCallConfirmationDetails,
-  ToolConfirmationOutcome,
-  ToolResultDisplay,
-  ToolLiveOutput,
+import {
+  isAnyToolInvocation,
+  type AnyDeclarativeTool,
+  type AnyToolInvocation,
+  type ToolCallConfirmationDetails,
+  type ToolConfirmationOutcome,
+  type ToolResultDisplay,
+  type ToolLiveOutput,
 } from '../tools/tools.js';
 import type { ToolErrorType } from '../tools/tool-error.js';
 import type { SerializableConfirmationDetails } from '../confirmation-bus/types.js';
@@ -194,6 +195,12 @@ export type CompletedToolCall =
   | SuccessfulToolCall
   | CancelledToolCall
   | ErroredToolCall;
+
+export function isInvocationCall(
+  call: CompletedToolCall,
+): call is CompletedToolCall & { invocation: AnyToolInvocation } {
+  return 'invocation' in call && isAnyToolInvocation(call.invocation);
+}
 
 export type ConfirmHandler = (
   toolCall: WaitingToolCall,

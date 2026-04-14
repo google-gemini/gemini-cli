@@ -139,6 +139,7 @@ describe('ShellTool', () => {
       getShellBackgroundCompletionBehavior: vi.fn().mockReturnValue('silent'),
       getEnableShellOutputEfficiency: vi.fn().mockReturnValue(true),
       getSandboxEnabled: vi.fn().mockReturnValue(false),
+      getUsageStatisticsEnabled: vi.fn().mockReturnValue(false),
       sanitizationConfig: {},
       sandboxManager: new NoopSandboxManager(),
     } as unknown as Config;

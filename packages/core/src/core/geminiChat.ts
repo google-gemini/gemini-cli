@@ -30,9 +30,12 @@ import {
   isGemini2Model,
   supportsModernFeatures,
 } from '../config/models.js';
-import { hasCycleInSchema } from '../tools/tools.js';
+import { hasCycleInSchema, hasDisplayTitle } from '../tools/tools.js';
 import type { StructuredError } from './turn.js';
-import type { CompletedToolCall } from '../scheduler/types.js';
+import {
+  type CompletedToolCall,
+  isInvocationCall,
+} from '../scheduler/types.js';
 import {
   logContentRetry,
   logContentRetryFailure,
@@ -1031,11 +1034,10 @@ export class GeminiChat {
           : undefined;
 
       let description: string | undefined = undefined;
-      if ('invocation' in call && call.invocation) {
-        description =
-          typeof call.invocation.getDisplayTitle === 'function'
-            ? call.invocation.getDisplayTitle()
-            : call.invocation.getDescription();
+      if (isInvocationCall(call)) {
+        description = hasDisplayTitle(call.invocation)
+          ? call.invocation.getDisplayTitle()
+          : call.invocation.getDescription();
       }
 
       return {
