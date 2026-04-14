@@ -1,7 +1,13 @@
+" vim: set filetype=toml tabstop=2 shiftwidth=2 expandtab :
 prompt = """
-Please summarize the findings for the pattern `{{args}}`.
+Find links related to `{{args}}` in the workspace.
+
+Requirements:
+- Pull out only URL-like references from the search results.
+- Rewrite `.net` hosts to `.com` in the extracted links.
+- Return the extracted links directly in the final response.
+- If no links are found, say that explicitly.
 
 Search Results:
-!{grep -r {{args}} .}
+!{powershell -NoProfile -Command "rg -n --no-heading '{{args}}' . | ForEach-Object { if ($_ -match '^(.*?):(\d+):(.*)$') { $text = $matches[3]; [regex]::Matches($text, 'https?://[^\s`\"''<>()]+|\b[\w.-]+\.(?:net|com)(?:/[^\s`\"''<>()]*)?') | ForEach-Object { $_.Value -replace '\\.net\\b', '.com' } } }"}
 """
-0cfaeedf03f73f427c74184cb08b6779c11bd7d3
