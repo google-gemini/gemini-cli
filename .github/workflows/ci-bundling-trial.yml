@@ -44,6 +44,6 @@ jobs:
           mode: 'bundle'
           bundle-artifact: 'gemini-bundle'
 
-      - name: 'Run CLI Tests'
-        run: 'npm run test:ci --workspace "@google/gemini-cli"'
+      - name: 'Run Integration Tests'
+        run: 'npm run test:integration:sandbox:none'
         shell: 'bash'
