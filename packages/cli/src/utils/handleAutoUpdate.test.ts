@@ -329,7 +329,7 @@ describe('handleAutoUpdate', () => {
     });
   });
 
-  it('should use the "@nightly" tag for nightly updates', async () => {
+  it('should use the "@nightly" tag for nightly updates in both command and message', async () => {
     mockUpdateInfo = {
       ...mockUpdateInfo,
       update: {
@@ -339,15 +339,52 @@ describe('handleAutoUpdate', () => {
     };
     mockGetInstallationInfo.mockReturnValue({
       updateCommand: 'npm i -g @google/gemini-cli@latest',
-      updateMessage: 'This is an additional message.',
+      updateMessage: 'To update, run: npm i -g @google/gemini-cli@latest',
       isGlobal: false,
       packageManager: PackageManager.NPM,
     });
 
     handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', mockSpawn);
 
+    expect(updateEventEmitter.emit).toHaveBeenCalledWith('update-received', {
+      message:
+        'An update is available!\nTo update, run: npm i -g @google/gemini-cli@nightly',
+    });
+
     expect(mockSpawn).toHaveBeenCalledWith(
       'npm i -g @google/gemini-cli@nightly',
+      {
+        shell: true,
+        stdio: 'ignore',
+        detached: true,
+      },
+    );
+  });
+
+  it('should use the version tag for stable updates in both command and message', async () => {
+    mockUpdateInfo = {
+      ...mockUpdateInfo,
+      update: {
+        ...mockUpdateInfo.update,
+        latest: '2.0.0',
+      },
+    };
+    mockGetInstallationInfo.mockReturnValue({
+      updateCommand: 'npm i -g @google/gemini-cli@latest',
+      updateMessage: 'To update, run: npm i -g @google/gemini-cli@latest',
+      isGlobal: false,
+      packageManager: PackageManager.NPM,
+    });
+
+    handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', mockSpawn);
+
+    expect(updateEventEmitter.emit).toHaveBeenCalledWith('update-received', {
+      message:
+        'An update is available!\nTo update, run: npm i -g @google/gemini-cli@2.0.0',
+    });
+
+    expect(mockSpawn).toHaveBeenCalledWith(
+      'npm i -g @google/gemini-cli@2.0.0',
       {
         shell: true,
         stdio: 'ignore',
