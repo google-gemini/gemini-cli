@@ -1,5 +1,12 @@
 name: 🧹 Janitorial Pass
 
+# 🤖 Automated: The Janitorial Pass (Scheduled daily)
+# This workflow programmatically handles the following cases before human review:
+# - Merged PR linked: Closes the issue as Completed.
+# - Inactive over 60 days: Closes the issue as Not Planned.
+# - Labeled 'status/needs-info' and inactive over 14 days: Closes the issue as Not Planned.
+# - Labeled 'status/needs-info' but has new human comments: Removes 'status/needs-info' and adds 'status/need-triage'.
+
 on:
   schedule:
     - cron: '0 2 * * *' # Run daily at 2:00 AM UTC
