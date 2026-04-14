@@ -475,6 +475,128 @@ describe('createContentGenerator', () => {
       apiVersion: 'v1alpha',
     });
   });
+
+  it('should pass baseUrl to GoogleGenAI when GOOGLE_GEMINI_BASE_URL is set', async () => {
+    const mockConfig = {
+      getModel: vi.fn().mockReturnValue('gemini-pro'),
+      getProxy: vi.fn().mockReturnValue(undefined),
+      getUsageStatisticsEnabled: () => false,
+    } as unknown as Config;
+
+    const mockGenerator = {
+      models: {},
+    } as unknown as GoogleGenAI;
+    vi.mocked(GoogleGenAI).mockImplementation(() => mockGenerator as never);
+    vi.stubEnv('GOOGLE_GEMINI_BASE_URL', 'https://gemini.test.local');
+    vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
+
+    const config = await createContentGeneratorConfig(
+      mockConfig,
+      AuthType.USE_GEMINI,
+    );
+    await createContentGenerator(config, mockConfig);
+
+    expect(GoogleGenAI).toHaveBeenCalledWith(
+      expect.objectContaining({
+        apiKey: 'test-api-key',
+        vertexai: false,
+        httpOptions: expect.objectContaining({
+          baseUrl: 'https://gemini.test.local',
+        }),
+      }),
+    );
+  });
+
+  it('should pass baseUrl to GoogleGenAI when GOOGLE_VERTEX_BASE_URL is set', async () => {
+    const mockConfig = {
+      getModel: vi.fn().mockReturnValue('gemini-pro'),
+      getProxy: vi.fn().mockReturnValue(undefined),
+      getUsageStatisticsEnabled: () => false,
+    } as unknown as Config;
+
+    const mockGenerator = {
+      models: {},
+    } as unknown as GoogleGenAI;
+    vi.mocked(GoogleGenAI).mockImplementation(() => mockGenerator as never);
+    vi.stubEnv('GOOGLE_VERTEX_BASE_URL', 'https://vertex.test.local');
+    vi.stubEnv('GOOGLE_CLOUD_PROJECT', 'my-project');
+    vi.stubEnv('GOOGLE_CLOUD_LOCATION', 'us-central1');
+
+    const config = await createContentGeneratorConfig(
+      mockConfig,
+      AuthType.USE_VERTEX_AI,
+    );
+    await createContentGenerator(config, mockConfig);
+
+    expect(GoogleGenAI).toHaveBeenCalledWith(
+      expect.objectContaining({
+        apiKey: undefined,
+        vertexai: true,
+        httpOptions: expect.objectContaining({
+          baseUrl: 'https://vertex.test.local',
+        }),
+      }),
+    );
+  });
+
+  it('should allow localhost baseUrl overrides over http', async () => {
+    const mockConfig = {
+      getModel: vi.fn().mockReturnValue('gemini-pro'),
+      getProxy: vi.fn().mockReturnValue(undefined),
+      getUsageStatisticsEnabled: () => false,
+    } as unknown as Config;
+
+    const mockGenerator = {
+      models: {},
+    } as unknown as GoogleGenAI;
+    vi.mocked(GoogleGenAI).mockImplementation(() => mockGenerator as never);
+
+    await createContentGenerator(
+      {
+        apiKey: 'test-api-key',
+        authType: AuthType.USE_GEMINI,
+        baseUrl: 'http://127.0.0.1:8080',
+      },
+      mockConfig,
+    );
+
+    expect(GoogleGenAI).toHaveBeenCalledWith(
+      expect.objectContaining({
+        httpOptions: expect.objectContaining({
+          baseUrl: 'http://127.0.0.1:8080',
+        }),
+      }),
+    );
+  });
+
+  it('should reject invalid custom baseUrl values', async () => {
+    await expect(
+      createContentGenerator(
+        {
+          apiKey: 'test-api-key',
+          authType: AuthType.USE_GEMINI,
+          baseUrl: 'not-a-url',
+        },
+        mockConfig,
+      ),
+    ).rejects.toThrow('Invalid custom base URL: not-a-url');
+  });
+
+  it('should reject non-https remote custom baseUrl values', async () => {
+    await expect(
+      createContentGenerator(
+        {
+          apiKey: 'test-api-key',
+          authType: AuthType.USE_GEMINI,
+          baseUrl: 'http://example.com',
+        },
+        mockConfig,
+      ),
+    ).rejects.toThrow(
+      'Custom base URL must use HTTPS unless it is localhost.',
+    );
+  });
+
 });
 
 describe('createContentGeneratorConfig', () => {
