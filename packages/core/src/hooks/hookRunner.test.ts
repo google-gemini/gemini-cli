@@ -76,6 +76,9 @@ describe('HookRunner', () => {
       sanitizationConfig: {
         enableEnvironmentVariableRedaction: true,
       },
+      storage: {
+        getPlansDir: vi.fn().mockReturnValue('/test/project/plans'),
+      },
     } as unknown as Config;
 
     hookRunner = new HookRunner(mockConfig);
@@ -370,9 +373,48 @@ describe('HookRunner', () => {
             shell: false,
             env: expect.objectContaining({
               GEMINI_PROJECT_DIR: '/test/project',
+              GEMINI_PLANS_DIR: '/test/project/plans',
+              GEMINI_CWD: '/test/project',
+              GEMINI_SESSION_ID: 'test-session',
               CLAUDE_PROJECT_DIR: '/test/project',
             }),
           }),
+        );
+      });
+
+      it('should expand and escape GEMINI_PLANS_DIR in commands', async () => {
+        const configWithEnvVar: HookConfig = {
+          type: HookType.Command,
+          command: 'ls $GEMINI_PLANS_DIR',
+        };
+
+        // Change plans dir to one with spaces
+        vi.mocked(mockConfig.storage.getPlansDir).mockReturnValue(
+          '/test/project/plans with spaces',
+        );
+
+        mockSpawn.mockProcessOn.mockImplementation(
+          (event: string, callback: (code: number) => void) => {
+            if (event === 'close') {
+              setImmediate(() => callback(0));
+            }
+          },
+        );
+
+        await hookRunner.executeHook(
+          configWithEnvVar,
+          HookEventName.BeforeTool,
+          mockInput,
+        );
+
+        expect(spawn).toHaveBeenCalledWith(
+          expect.stringMatching(/bash|powershell/),
+          expect.arrayContaining([
+            expect.stringMatching(
+              /ls ['"]\/test\/project\/plans with spaces['"]/,
+            ),
+          ]),
+          expect.any(Object),
         );
       });
 

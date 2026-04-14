@@ -114,7 +114,7 @@ export function createUnauthorizedToolError(toolName: string): string {
 export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
   readonly definition: LocalAgentDefinition<TOutput>;
 
-  private readonly agentId: string;
+  readonly agentId: string;
   private readonly toolRegistry: ToolRegistry;
   private readonly promptRegistry: PromptRegistry;
   private readonly resourceRegistry: ResourceRegistry;
