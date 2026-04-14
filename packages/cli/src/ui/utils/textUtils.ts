@@ -216,12 +216,15 @@ export const getCachedStringWidth = (str: string): number => {
   }
 
   let width: number;
+  // TODO(#25369): Remove saraAmCompensation once string-width > 8.1.0
+  // fixes Intl.Segmenter-based width for Thai/Lao SARA AM clusters.
+  const compensation = saraAmCompensation(str);
   try {
-    width = stringWidth(str) + saraAmCompensation(str);
+    width = stringWidth(str) + compensation;
   } catch {
     // Fallback for characters that cause string-width to crash (e.g. U+0602)
     // See: https://github.com/google-gemini/gemini-cli/issues/16418
-    width = toCodePoints(stripAnsi(str)).length;
+    width = toCodePoints(stripAnsi(str)).length + compensation;
   }
 
   stringWidthCache.set(str, width);
