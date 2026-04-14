@@ -191,6 +191,16 @@ const SETTINGS_SCHEMA = {
         description: 'Enable Vim keybindings',
         showInDialog: true,
       },
+      vimModeCursorShape: {
+        type: 'boolean',
+        label: 'Vim Cursor Shape',
+        category: 'General',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Change the cursor shape to reflect Vim mode when supported by the terminal',
+        showInDialog: true,
+      },
       defaultApprovalMode: {
         type: 'enum',
         label: 'Default Approval Mode',

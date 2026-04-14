@@ -10,9 +10,11 @@ import {
   useContext,
   useEffect,
   useState,
+  useSyncExternalStore,
 } from 'react';
 import type { LoadedSettings } from '../../config/settings.js';
 import { SettingScope } from '../../config/settings.js';
+import { useVimCursorShape } from '../hooks/useVimCursorShape.js';
 
 export type VimMode = 'NORMAL' | 'INSERT';
 
@@ -32,19 +34,30 @@ export const VimModeProvider = ({
   children: React.ReactNode;
   settings: LoadedSettings;
 }) => {
-  const initialVimEnabled = settings.merged.general.vimMode;
+  const settingsSnapshot = useSyncExternalStore(
+    (listener) => settings.subscribe(listener),
+    () => settings.getSnapshot(),
+  );
+  const generalSettings = settingsSnapshot.merged.general;
+  const initialVimEnabled = generalSettings.vimMode;
   const [vimEnabled, setVimEnabled] = useState(initialVimEnabled);
   const [vimMode, setVimMode] = useState<VimMode>('INSERT');
 
+  useVimCursorShape({
+    enabled: generalSettings.vimModeCursorShape,
+    vimEnabled,
+    vimMode,
+  });
+
   useEffect(() => {
     // Initialize vimEnabled from settings on mount
-    const enabled = settings.merged.general.vimMode;
+    const enabled = generalSettings.vimMode;
     setVimEnabled(enabled);
     // When vim mode is enabled, start in INSERT mode
     if (enabled) {
       setVimMode('INSERT');
     }
-  }, [settings.merged.general.vimMode]);
+  }, [generalSettings.vimMode]);
 
   const toggleVimEnabled = useCallback(async () => {
     const newValue = !vimEnabled;
