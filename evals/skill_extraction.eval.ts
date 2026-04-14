@@ -4,28 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
-import { randomUUID } from 'node:crypto';
-import { describe, expect, vi } from 'vitest';
+import { describe, expect } from 'vitest';
 import {
-  Storage,
+  type Config,
+  ApprovalMode,
   SESSION_FILE_PREFIX,
   getProjectHash,
   startMemoryService,
-  Config,
 } from '@google/gemini-cli-core';
-import {
-  loadCliConfig,
-  type CliArgs,
-} from '../packages/cli/src/config/config.js';
-import {
-  loadSettings,
-  resetSettingsCacheForTesting,
-} from '../packages/cli/src/config/settings.js';
-import { validateNonInteractiveAuth } from '../packages/cli/src/validateNonInterActiveAuth.js';
-import { evalTest, assertModelHasOutput, type TestRig } from './test-helper.js';
+import { componentEvalTest } from './component-test-helper.js';
 
 interface SeedSession {
   sessionId: string;
@@ -40,38 +29,6 @@ interface MessageRecord {
   type: string;
   content: Array<{ text: string }>;
 }
-
-const MEMORY_EXTRACTION_ARGV: CliArgs = {
-  query: undefined,
-  model: undefined,
-  sandbox: undefined,
-  debug: false,
-  prompt: undefined,
-  promptInteractive: undefined,
-  yolo: true,
-  approvalMode: 'yolo',
-  policy: undefined,
-  adminPolicy: undefined,
-  allowedMcpServerNames: undefined,
-  allowedTools: undefined,
-  acp: false,
-  experimentalAcp: false,
-  extensions: undefined,
-  listExtensions: false,
-  resume: undefined,
-  listSessions: false,
-  deleteSession: undefined,
-  includeDirectories: undefined,
-  screenReader: false,
-  useWriteTodos: undefined,
-  outputFormat: undefined,
-  fakeResponses: undefined,
-  recordResponses: undefined,
-  startupMessages: [],
-  rawOutput: false,
-  acceptRawOutputRisk: false,
-  isCommand: false,
-};
 
 const WORKSPACE_FILES = {
   'package.json': JSON.stringify(
@@ -93,22 +50,6 @@ This workspace exists to exercise background skill extraction from prior chats.
 `,
 };
 
-async function withRigStorage<T>(
-  rig: TestRig,
-  fn: (storage: Storage, projectRoot: string) => Promise<T>,
-): Promise<T> {
-  vi.stubEnv('GEMINI_CLI_HOME', rig.homeDir!);
-
-  try {
-    const projectRoot = fs.realpathSync(rig.testDir!);
-    const storage = new Storage(projectRoot);
-    await storage.initialize();
-    return await fn(storage, projectRoot);
-  } finally {
-    vi.unstubAllEnvs();
-  }
-}
-
 function buildMessages(userTurns: string[]): MessageRecord[] {
   const baseTime = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
   return userTurns.flatMap((text, index) => [
@@ -128,103 +69,67 @@ function buildMessages(userTurns: string[]): MessageRecord[] {
 }
 
 async function seedSessions(
-  rig: TestRig,
+  config: Config,
   sessions: SeedSession[],
 ): Promise<void> {
-  await withRigStorage(rig, async (storage, projectRoot) => {
-    const chatsDir = path.join(storage.getProjectTempDir(), 'chats');
-    await fsp.mkdir(chatsDir, { recursive: true });
+  const chatsDir = path.join(config.storage.getProjectTempDir(), 'chats');
+  await fsp.mkdir(chatsDir, { recursive: true });
 
-    for (const session of sessions) {
-      const timestamp = new Date(
-        Date.now() - session.timestampOffsetMinutes * 60 * 1000,
-      )
-        .toISOString()
-        .slice(0, 16)
-        .replace(/:/g, '-');
-      const filename = `${SESSION_FILE_PREFIX}${timestamp}-${session.sessionId.slice(0, 8)}.json`;
-      const conversation = {
-        sessionId: session.sessionId,
-        projectHash: getProjectHash(projectRoot),
-        summary: session.summary,
-        startTime: new Date(Date.now() - 7 * 60 * 60 * 1000).toISOString(),
-        lastUpdated: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
-        messages: buildMessages(session.userTurns),
-      };
+  const projectRoot = config.storage.getProjectRoot();
 
-      await fsp.writeFile(
-        path.join(chatsDir, filename),
-        JSON.stringify(conversation, null, 2),
-      );
-    }
-  });
+  for (const session of sessions) {
+    const timestamp = new Date(
+      Date.now() - session.timestampOffsetMinutes * 60 * 1000,
+    )
+      .toISOString()
+      .slice(0, 16)
+      .replace(/:/g, '-');
+    const filename = `${SESSION_FILE_PREFIX}${timestamp}-${session.sessionId.slice(0, 8)}.json`;
+    const conversation = {
+      sessionId: session.sessionId,
+      projectHash: getProjectHash(projectRoot),
+      summary: session.summary,
+      startTime: new Date(Date.now() - 7 * 60 * 60 * 1000).toISOString(),
+      lastUpdated: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
+      messages: buildMessages(session.userTurns),
+    };
+
+    await fsp.writeFile(
+      path.join(chatsDir, filename),
+      JSON.stringify(conversation, null, 2),
+    );
+  }
 }
 
-async function waitForExtractionState(rig: TestRig): Promise<{
+async function runExtractionAndReadState(config: Config): Promise<{
   state: { runs: Array<{ sessionIds: string[]; skillsCreated: string[] }> };
   skillsDir: string;
 }> {
-  return withRigStorage(rig, async (storage, projectRoot) => {
-    // The headless CLI eval finishes and exits before its fire-and-forget
-    // memory task can complete, so invoke the real memory service directly.
-    const previousCwd = process.cwd();
-    let config: Config | undefined;
+  await startMemoryService(config);
 
-    process.chdir(projectRoot);
+  const memoryDir = config.storage.getProjectMemoryTempDir();
+  const skillsDir = config.storage.getProjectSkillsMemoryDir();
+  const statePath = path.join(memoryDir, '.extraction-state.json');
 
-    try {
-      resetSettingsCacheForTesting();
-      const settings = loadSettings(projectRoot);
-      config = await loadCliConfig(
-        settings.merged,
-        `skill-extraction-eval-${randomUUID().slice(0, 8)}`,
-        MEMORY_EXTRACTION_ARGV,
-        { cwd: projectRoot },
-      );
-      await config.initialize();
+  const raw = await fsp.readFile(statePath, 'utf-8');
+  const state = JSON.parse(raw) as {
+    runs?: Array<{ sessionIds?: string[]; skillsCreated?: string[] }>;
+  };
+  if (!Array.isArray(state.runs) || state.runs.length === 0) {
+    throw new Error('Skill extraction finished without writing any run state');
+  }
 
-      const authType = await validateNonInteractiveAuth(
-        settings.merged.security.auth.selectedType,
-        settings.merged.security.auth.useExternal,
-        config,
-        settings,
-      );
-      await config.refreshAuth(authType);
-      await startMemoryService(config);
-    } finally {
-      process.chdir(previousCwd);
-      resetSettingsCacheForTesting();
-      await config?.dispose();
-    }
-
-    const statePath = path.join(
-      storage.getProjectMemoryTempDir(),
-      '.extraction-state.json',
-    );
-    const skillsDir = storage.getProjectSkillsMemoryDir();
-
-    const raw = await fsp.readFile(statePath, 'utf-8');
-    const state = JSON.parse(raw) as {
-      runs?: Array<{ sessionIds?: string[]; skillsCreated?: string[] }>;
-    };
-    if (!Array.isArray(state.runs) || state.runs.length === 0) {
-      throw new Error(
-        'Skill extraction finished without writing any run state',
-      );
-    }
-
-    return {
-      state: {
-        runs: state.runs.map((run) => ({
-          sessionIds: Array.isArray(run.sessionIds) ? run.sessionIds : [],
-          skillsCreated: Array.isArray(run.skillsCreated)
-            ? run.skillsCreated
-            : [],
-        })),
-      },
-      skillsDir,
-    };
-  });
+  return {
+    state: {
+      runs: state.runs.map((run) => ({
+        sessionIds: Array.isArray(run.sessionIds) ? run.sessionIds : [],
+        skillsCreated: Array.isArray(run.skillsCreated)
+          ? run.skillsCreated
+          : [],
+      })),
+    },
+    skillsDir,
+  };
 }
 
 async function readSkillBodies(skillsDir: string): Promise<string[]> {
@@ -242,22 +147,27 @@ async function readSkillBodies(skillsDir: string): Promise<string[]> {
   }
 }
 
+/**
+ * Shared configOverrides for all skill extraction component evals.
+ * - experimentalMemoryManager: enables the memory extraction pipeline.
+ * - approvalMode: YOLO auto-approves tool calls (write_file, read_file) so the
+ *   background agent can execute without interactive confirmation.
+ */
+const EXTRACTION_CONFIG_OVERRIDES = {
+  experimentalMemoryManager: true,
+  approvalMode: ApprovalMode.YOLO,
+};
+
 describe('Skill Extraction', () => {
-  evalTest('USUALLY_PASSES', {
+  componentEvalTest('USUALLY_PASSES', {
     suiteName: 'skill-extraction',
-    suiteType: 'behavioral',
+    suiteType: 'component',
     name: 'ignores one-off incidents even when session summaries look similar',
     files: WORKSPACE_FILES,
     timeout: 180000,
-    params: {
-      settings: {
-        experimental: {
-          memoryManager: true,
-        },
-      },
-    },
-    setup: async (rig) => {
-      await seedSessions(rig, [
+    configOverrides: EXTRACTION_CONFIG_OVERRIDES,
+    setup: async (config) => {
+      await seedSessions(config, [
         {
           sessionId: 'incident-login-redirect',
           summary: 'Debug login redirect loop in staging',
@@ -294,12 +204,8 @@ describe('Skill Extraction', () => {
         },
       ]);
     },
-    prompt:
-      'Read the local workspace files and summarize this repository in two short sentences.',
-    assert: async (rig, result) => {
-      assertModelHasOutput(result);
-
-      const { state, skillsDir } = await waitForExtractionState(rig);
+    assert: async (config) => {
+      const { state, skillsDir } = await runExtractionAndReadState(config);
       const skillBodies = await readSkillBodies(skillsDir);
 
       expect(state.runs).toHaveLength(1);
@@ -309,21 +215,15 @@ describe('Skill Extraction', () => {
     },
   });
 
-  evalTest('USUALLY_PASSES', {
+  componentEvalTest('USUALLY_PASSES', {
     suiteName: 'skill-extraction',
-    suiteType: 'behavioral',
+    suiteType: 'component',
     name: 'extracts a repeated project-specific workflow into a skill',
     files: WORKSPACE_FILES,
     timeout: 180000,
-    params: {
-      settings: {
-        experimental: {
-          memoryManager: true,
-        },
-      },
-    },
-    setup: async (rig) => {
-      await seedSessions(rig, [
+    configOverrides: EXTRACTION_CONFIG_OVERRIDES,
+    setup: async (config) => {
+      await seedSessions(config, [
         {
           sessionId: 'settings-docs-regen-1',
           summary: 'Update settings docs after adding a config option',
@@ -360,12 +260,8 @@ describe('Skill Extraction', () => {
         },
       ]);
     },
-    prompt:
-      'Read the local workspace files and summarize this repository in two short sentences.',
-    assert: async (rig, result) => {
-      assertModelHasOutput(result);
-
-      const { state, skillsDir } = await waitForExtractionState(rig);
+    assert: async (config) => {
+      const { state, skillsDir } = await runExtractionAndReadState(config);
       const skillBodies = await readSkillBodies(skillsDir);
       const combinedSkills = skillBodies.join('\n\n');
 
@@ -381,21 +277,15 @@ describe('Skill Extraction', () => {
     },
   });
 
-  evalTest('USUALLY_PASSES', {
+  componentEvalTest('USUALLY_PASSES', {
     suiteName: 'skill-extraction',
-    suiteType: 'behavioral',
+    suiteType: 'component',
     name: 'extracts a repeated multi-step migration workflow with ordering constraints',
     files: WORKSPACE_FILES,
     timeout: 180000,
-    params: {
-      settings: {
-        experimental: {
-          memoryManager: true,
-        },
-      },
-    },
-    setup: async (rig) => {
-      await seedSessions(rig, [
+    configOverrides: EXTRACTION_CONFIG_OVERRIDES,
+    setup: async (config) => {
+      await seedSessions(config, [
         {
           sessionId: 'db-migration-v12',
           summary: 'Run database migration for v12 schema update',
@@ -432,12 +322,8 @@ describe('Skill Extraction', () => {
         },
       ]);
     },
-    prompt:
-      'Read the local workspace files and summarize this repository in two short sentences.',
-    assert: async (rig, result) => {
-      assertModelHasOutput(result);
-
-      const { state, skillsDir } = await waitForExtractionState(rig);
+    assert: async (config) => {
+      const { state, skillsDir } = await runExtractionAndReadState(config);
       const skillBodies = await readSkillBodies(skillsDir);
       const combinedSkills = skillBodies.join('\n\n');
 
