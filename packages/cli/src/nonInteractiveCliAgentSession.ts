@@ -626,5 +626,3 @@ export async function runNonInteractive({
     }
   });
 }
-
-// drift-check test: remove before merge
