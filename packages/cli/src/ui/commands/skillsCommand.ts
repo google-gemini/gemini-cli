@@ -13,6 +13,8 @@ import {
 import {
   type HistoryItemInfo,
   type HistoryItemSkillsList,
+  type SkillListItem,
+  type SkillDiscoveryReportView,
   MessageType,
 } from '../types.js';
 import { disableSkill, enableSkill } from '../../utils/skillSettings.js';
@@ -27,9 +29,11 @@ import {
   requestConsentInteractive,
   skillsConsentString,
 } from '../../config/extensions/consent.js';
+import { getDiscoveryReportForSkill } from '../../utils/skillDiscovery.js';
 
 interface SkillManagerWithLoadTiming {
   getSlowestSkillLoadTime?: (thresholdMs?: number) => number | null;
+  getLatestDiscoveryReport?: () => SkillDiscoveryReportView[];
 }
 
 async function listAction(
@@ -65,10 +69,17 @@ async function listAction(
   const skills = showAll
     ? skillManager.getAllSkills()
     : skillManager.getAllSkills().filter((s) => !s.isBuiltin);
+  const reports = (
+    skillManager as SkillManagerWithLoadTiming
+  ).getLatestDiscoveryReport?.();
+  const skillsWithReports: SkillListItem[] = skills.map((skill) => ({
+    ...skill,
+    loadDiscoveryReport: getDiscoveryReportForSkill(skill.location, reports),
+  }));
 
   const skillsListItem: HistoryItemSkillsList = {
     type: MessageType.SKILLS_LIST,
-    skills: skills.map((skill) => ({ ...skill })),
+    skills: skillsWithReports,
     showDescriptions: useShowDescriptions,
     showVerbose,
   };
@@ -317,7 +328,8 @@ async function reloadAction(
       skillManager as typeof skillManager & SkillManagerWithLoadTiming
     ).getSlowestSkillLoadTime?.();
     if (slowestSkillLoadTime !== null && slowestSkillLoadTime !== undefined) {
-      successText += ' Run "/skills list verbose" to inspect skill load timings.';
+      successText +=
+        ' Run "/skills list verbose" to inspect skill load timings.';
     }
 
     context.ui.addItem({
@@ -377,7 +389,7 @@ export const skillsCommand: SlashCommand = {
   subCommands: [
     {
       name: 'list',
-       description:
+      description:
         'List available agent skills. Usage: /skills list [nodesc] [all] [verbose]',
       kind: CommandKind.BUILT_IN,
       action: listAction,

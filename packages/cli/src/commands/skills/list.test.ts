@@ -77,7 +77,7 @@ describe('skills list command', () => {
           name: 'skill1',
           description: 'desc1',
           disabled: false,
-          location: '/path/to/skill1',
+          location: '/skills/skill1/SKILL.md',
           loadMetadata: {
             duration_ms: 12,
           },
@@ -96,6 +96,15 @@ describe('skills list command', () => {
         initialize: vi.fn().mockResolvedValue(undefined),
         getSkillManager: vi.fn().mockReturnValue({
           getAllSkills: vi.fn().mockReturnValue(skills),
+          getLatestDiscoveryReport: vi.fn().mockReturnValue([
+            {
+              source_dir: '/skills',
+              total_duration_ms: 45,
+              glob_duration_ms: 30,
+              skill_count: 1,
+              invalid_count: 0,
+            },
+          ]),
         }),
       };
       mockLoadCliConfig.mockResolvedValue(mockConfig as unknown as Config);
@@ -125,7 +134,7 @@ describe('skills list command', () => {
           name: 'skill1',
           description: 'desc1',
           disabled: false,
-          location: '/path/to/skill1',
+          location: '/skills/skill1/SKILL.md',
           loadMetadata: {
             duration_ms: 12,
           },
@@ -135,6 +144,15 @@ describe('skills list command', () => {
         initialize: vi.fn().mockResolvedValue(undefined),
         getSkillManager: vi.fn().mockReturnValue({
           getAllSkills: vi.fn().mockReturnValue(skills),
+          getLatestDiscoveryReport: vi.fn().mockReturnValue([
+            {
+              source_dir: '/skills',
+              total_duration_ms: 45,
+              glob_duration_ms: 30,
+              skill_count: 1,
+              invalid_count: 0,
+            },
+          ]),
         }),
       };
       mockLoadCliConfig.mockResolvedValue(mockConfig as unknown as Config);
@@ -142,7 +160,12 @@ describe('skills list command', () => {
       await handleList({ verbose: true });
 
       expect(stdoutWriteSpy).toHaveBeenCalledWith('  Load Time:   12ms\n');
-      expect(stdoutWriteSpy).toHaveBeenCalledWith('\n');
+      expect(stdoutWriteSpy).toHaveBeenCalledWith(
+        '  Location:    /skills/skill1/SKILL.md\n',
+      );
+      expect(stdoutWriteSpy).toHaveBeenCalledWith(
+        '  Discovery:   total 45ms, glob 30ms\n',
+      );
     });
 
     it('should filter built-in skills by default and show them with { all: true }', async () => {

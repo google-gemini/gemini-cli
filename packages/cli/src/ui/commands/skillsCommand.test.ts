@@ -56,13 +56,13 @@ describe('skillsCommand', () => {
       {
         name: 'skill1',
         description: 'desc1',
-        location: '/loc1',
+        location: '/skills/skill1/SKILL.md',
         body: 'body1',
       },
       {
         name: 'skill2',
         description: 'desc2',
-        location: '/loc2',
+        location: '/skills/skill2/SKILL.md',
         body: 'body2',
       },
     ];
@@ -74,6 +74,7 @@ describe('skillsCommand', () => {
             getSkills: vi.fn().mockReturnValue(skills),
             isAdminEnabled: vi.fn().mockReturnValue(true),
             getSlowestSkillLoadTime: vi.fn().mockReturnValue(null),
+            getLatestDiscoveryReport: vi.fn().mockReturnValue([]),
             getSkill: vi
               .fn()
               .mockImplementation(
@@ -110,7 +111,7 @@ describe('skillsCommand', () => {
             name: 'skill1',
             description: 'desc1',
             disabled: undefined,
-            location: '/loc1',
+            location: '/skills/skill1/SKILL.md',
             body: 'body1',
             loadMetadata: undefined,
           },
@@ -118,7 +119,7 @@ describe('skillsCommand', () => {
             name: 'skill2',
             description: 'desc2',
             disabled: undefined,
-            location: '/loc2',
+            location: '/skills/skill2/SKILL.md',
             body: 'body2',
             loadMetadata: undefined,
           },
@@ -140,7 +141,7 @@ describe('skillsCommand', () => {
             name: 'skill1',
             description: 'desc1',
             disabled: undefined,
-            location: '/loc1',
+            location: '/skills/skill1/SKILL.md',
             body: 'body1',
             loadMetadata: undefined,
           },
@@ -148,7 +149,7 @@ describe('skillsCommand', () => {
             name: 'skill2',
             description: 'desc2',
             disabled: undefined,
-            location: '/loc2',
+            location: '/skills/skill2/SKILL.md',
             body: 'body2',
             loadMetadata: undefined,
           },
@@ -171,11 +172,31 @@ describe('skillsCommand', () => {
 
   it('should enable verbose skill listing when requested', async () => {
     const listCmd = skillsCommand.subCommands!.find((s) => s.name === 'list')!;
+    const skillManager =
+      context.services.agentContext!.config.getSkillManager() as unknown as {
+        getLatestDiscoveryReport: ReturnType<typeof vi.fn>;
+      };
+    skillManager.getLatestDiscoveryReport.mockReturnValue([
+      {
+        source_dir: '/skills',
+        total_duration_ms: 45,
+        glob_duration_ms: 30,
+      },
+    ]);
     await listCmd.action!(context, 'verbose');
 
     expect(context.ui.addItem).toHaveBeenCalledWith(
       expect.objectContaining({
         showVerbose: true,
+        skills: expect.arrayContaining([
+          expect.objectContaining({
+            loadDiscoveryReport: {
+              source_dir: '/skills',
+              total_duration_ms: 45,
+              glob_duration_ms: 30,
+            },
+          }),
+        ]),
       }),
     );
   });

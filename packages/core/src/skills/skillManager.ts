@@ -63,12 +63,17 @@ export class SkillManager {
     // 2. Extension skills
     for (const extension of extensions) {
       if (extension.isActive && extension.skills) {
+        if (extension.skillsDiscoveryReport) {
+          this.latestDiscoveryReport.push(extension.skillsDiscoveryReport);
+        }
         this.addSkillsWithPrecedence(extension.skills);
       }
     }
 
     // 3. User skills
-    const userSkills = await this.loadAndTrackSkills(Storage.getUserSkillsDir());
+    const userSkills = await this.loadAndTrackSkills(
+      Storage.getUserSkillsDir(),
+    );
     this.addSkillsWithPrecedence(userSkills);
 
     // 3.1 User agent skills alias (.agents/skills)

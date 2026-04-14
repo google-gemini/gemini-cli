@@ -24,7 +24,9 @@ describe('skillLoader', () => {
     testRootDir = await fs.mkdtemp(
       path.join(os.tmpdir(), 'skill-loader-test-'),
     );
-    tempHomeDir = await fs.mkdtemp(path.join(os.tmpdir(), 'skill-loader-home-'));
+    tempHomeDir = await fs.mkdtemp(
+      path.join(os.tmpdir(), 'skill-loader-home-'),
+    );
     vi.stubEnv('GEMINI_CLI_HOME', tempHomeDir);
     vi.spyOn(coreEvents, 'emitFeedback');
     vi.spyOn(debugLogger, 'debug').mockImplementation(() => {});

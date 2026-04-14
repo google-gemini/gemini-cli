@@ -181,11 +181,8 @@ export async function loadSkillsFromDirWithReport(
     });
     report.glob_duration_ms = Math.round(performance.now() - globStart);
 
-    const loadResults = await Promise.all(
-      skillFiles.map((skillFile) => loadSkillFromFile(skillFile)),
-    );
-
-    for (const { skill, metric } of loadResults) {
+    for (const skillFile of skillFiles) {
+      const { skill, metric } = await loadSkillFromFile(skillFile);
       report.skill_metrics.push(metric);
       if (skill) {
         discoveredSkills.push(skill);

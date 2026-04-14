@@ -8,6 +8,7 @@ import {
   type CompressionStatus,
   type GeminiCLIExtension,
   type MCPServerConfig,
+  type SkillLoadMetric,
   type ThoughtSummary,
   type SerializableConfirmationDetails,
   type ToolResultDisplay,
@@ -305,6 +306,17 @@ export interface ToolDefinition {
   description?: string;
 }
 
+export interface SkillDiscoveryReportView {
+  source_dir: string;
+  total_duration_ms: number;
+  glob_duration_ms: number;
+}
+
+export interface SkillListItem extends SkillDefinition {
+  loadMetadata?: SkillLoadMetric;
+  loadDiscoveryReport?: SkillDiscoveryReportView;
+}
+
 export type HistoryItemToolsList = HistoryItemBase & {
   type: 'tools_list';
   tools: ToolDefinition[];
@@ -313,7 +325,7 @@ export type HistoryItemToolsList = HistoryItemBase & {
 
 export type HistoryItemSkillsList = HistoryItemBase & {
   type: 'skills_list';
-  skills: SkillDefinition[];
+  skills: SkillListItem[];
   showDescriptions: boolean;
   showVerbose?: boolean;
 };
