@@ -98,6 +98,36 @@ describe('CPU Performance Tests', () => {
     }
   });
 
+  it('asian-language-conv: verify perf is acceptable ', async () => {
+    const result = await harness.runScenario(
+      'asian-language-conv',
+      async () => {
+        const rig = new TestRig();
+        try {
+          rig.setup('perf-asian-language', {
+            fakeResponsesPath: join(__dirname, 'perf.asian-language.responses'),
+          });
+
+          return await harness.measure('asian-language', async () => {
+            await rig.run({
+              args: ['嗨'],
+              timeout: 120000,
+              env: { GEMINI_API_KEY: 'fake-perf-test-key' },
+            });
+          });
+        } finally {
+          await rig.cleanup();
+        }
+      },
+    );
+
+    if (UPDATE_BASELINES) {
+      harness.updateScenarioBaseline(result);
+    } else {
+      harness.assertWithinBaseline(result);
+    }
+  });
+
   it('skill-loading-time: startup with many skills within baseline', async () => {
     const SKILL_COUNT = 20;
 
