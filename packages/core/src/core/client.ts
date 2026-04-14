@@ -1077,7 +1077,7 @@ export class GeminiClient {
             const feedback = watcherResult.feedback;
             const feedbackRequest = [
               {
-                text: `System: Feedback from Watcher Sub Agent based on recent progress (Review of last ${watcherInterval} turns):\n\n${feedback}`,
+                text: `System: EXTREMELY IMPORTANT Feedback from Watcher Sub Agent based on recent progress (Review of last ${watcherInterval} turns):\n\n${feedback}`,
               },
             ];
             // Inject feedback into the conversation for the NEXT turn
