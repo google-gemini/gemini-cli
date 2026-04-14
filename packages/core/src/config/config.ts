@@ -706,6 +706,7 @@ export interface ConfigParameters {
   experimentalJitContext?: boolean;
   autoDistillation?: boolean;
   experimentalMemoryManager?: boolean;
+  experimentalContextManagementConfig?: string;
   experimentalAgentHistoryTruncation?: boolean;
   experimentalAgentHistoryTruncationThreshold?: number;
   experimentalAgentHistoryRetainedMessages?: number;
@@ -839,18 +840,16 @@ export class Config implements McpContext, AgentLoopContext {
   private lastEmittedQuotaLimit: number | undefined;
 
   private emitQuotaChangedEvent(): void {
-    const pooled = this.getPooledQuota();
+    const remaining = this.getQuotaRemaining();
+    const limit = this.getQuotaLimit();
+    const resetTime = this.getQuotaResetTime();
     if (
-      this.lastEmittedQuotaRemaining !== pooled.remaining ||
-      this.lastEmittedQuotaLimit !== pooled.limit
+      this.lastEmittedQuotaRemaining !== remaining ||
+      this.lastEmittedQuotaLimit !== limit
     ) {
-      this.lastEmittedQuotaRemaining = pooled.remaining;
-      this.lastEmittedQuotaLimit = pooled.limit;
-      coreEvents.emitQuotaChanged(
-        pooled.remaining,
-        pooled.limit,
-        pooled.resetTime,
-      );
+      this.lastEmittedQuotaRemaining = remaining;
+      this.lastEmittedQuotaLimit = limit;
+      coreEvents.emitQuotaChanged(remaining, limit, resetTime);
     }
   }
 
@@ -948,6 +947,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly adminSkillsEnabled: boolean;
   private readonly experimentalJitContext: boolean;
   private readonly experimentalMemoryManager: boolean;
+  private readonly experimentalContextManagementConfig?: string;
   private readonly memoryBoundaryMarkers: readonly string[];
   private readonly topicUpdateNarration: boolean;
   private readonly disableLLMCorrection: boolean;
@@ -1159,6 +1159,8 @@ export class Config implements McpContext, AgentLoopContext {
 
     this.experimentalJitContext = params.experimentalJitContext ?? false;
     this.experimentalMemoryManager = params.experimentalMemoryManager ?? false;
+    this.experimentalContextManagementConfig =
+      params.experimentalContextManagementConfig;
     this.memoryBoundaryMarkers = params.memoryBoundaryMarkers ?? ['.git'];
     this.contextManagement = {
       enabled: params.contextManagement?.enabled ?? false,
@@ -1826,6 +1828,9 @@ export class Config implements McpContext, AgentLoopContext {
       // When the user explicitly sets a model, that becomes the active model.
       this._activeModel = newModel;
       coreEvents.emitModelChanged(newModel);
+      this.lastEmittedQuotaRemaining = undefined;
+      this.lastEmittedQuotaLimit = undefined;
+      this.emitQuotaChangedEvent();
     }
     if (this.onModelChange && !isTemporary) {
       this.onModelChange(newModel);
@@ -2119,24 +2124,31 @@ export class Config implements McpContext, AgentLoopContext {
         this.lastQuotaFetchTime = Date.now();
 
         for (const bucket of quota.buckets) {
-          if (
-            bucket.modelId &&
-            bucket.remainingAmount &&
-            bucket.remainingFraction != null
-          ) {
-            const remaining = parseInt(bucket.remainingAmount, 10);
-            const limit =
+          if (!bucket.modelId || bucket.remainingFraction == null) {
+            continue;
+          }
+
+          let remaining: number;
+          let limit: number;
+
+          if (bucket.remainingAmount) {
+            remaining = parseInt(bucket.remainingAmount, 10);
+            limit =
               bucket.remainingFraction > 0
                 ? Math.round(remaining / bucket.remainingFraction)
                 : (this.modelQuotas.get(bucket.modelId)?.limit ?? 0);
+          } else {
+            // Server only sent remainingFraction — use a normalized scale.
+            limit = 100;
+            remaining = Math.round(bucket.remainingFraction * limit);
+          }
 
-            if (!isNaN(remaining) && Number.isFinite(limit) && limit > 0) {
-              this.modelQuotas.set(bucket.modelId, {
-                remaining,
-                limit,
-                resetTime: bucket.resetTime,
-              });
-            }
+          if (!isNaN(remaining) && Number.isFinite(limit) && limit > 0) {
+            this.modelQuotas.set(bucket.modelId, {
+              remaining,
+              limit,
+              resetTime: bucket.resetTime,
+            });
           }
         }
         this.emitQuotaChangedEvent();
@@ -2431,6 +2443,10 @@ export class Config implements McpContext, AgentLoopContext {
 
   isMemoryManagerEnabled(): boolean {
     return this.experimentalMemoryManager;
+  }
+
+  getExperimentalContextManagementConfig(): string | undefined {
+    return this.experimentalContextManagementConfig;
   }
 
   getContextManagementConfig(): ContextManagementConfig {
