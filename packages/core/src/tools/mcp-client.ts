@@ -1252,6 +1252,10 @@ export async function connectAndDiscover(
   }
 }
 
+function isMcpMethodNotFoundError(error: unknown): boolean {
+  return error instanceof McpError && error.code === ErrorCode.MethodNotFound;
+}
+
 /**
  * Discovers and sanitizes tools from a connected MCP client.
  * It retrieves function declarations from the client, filters out disabled tools,
@@ -1331,9 +1335,7 @@ export async function discoverTools(
     }
     return discoveredTools;
   } catch (error) {
-    if (
-      !(error instanceof McpError && error.code === ErrorCode.MethodNotFound)
-    ) {
+    if (!isMcpMethodNotFoundError(error)) {
       cliConfig.emitMcpDiagnostic(
         'error',
         `Error discovering tools from ${mcpServerName}: ${getErrorMessage(
@@ -1457,7 +1459,7 @@ export async function discoverPrompts(
         ),
     }));
   } catch (error) {
-    if (error instanceof McpError && error.code === ErrorCode.MethodNotFound) {
+    if (isMcpMethodNotFoundError(error)) {
       return [];
     }
     cliConfig.emitMcpDiagnostic(
@@ -1505,7 +1507,7 @@ async function listResources(
       cursor = response.nextCursor ?? undefined;
     } while (cursor);
   } catch (error) {
-    if (error instanceof McpError && error.code === ErrorCode.MethodNotFound) {
+    if (isMcpMethodNotFoundError(error)) {
       return [];
     }
     cliConfig.emitMcpDiagnostic(
