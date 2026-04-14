@@ -39,6 +39,8 @@ describe('EnterPlanModeTool', () => {
 
     mockConfig = {
       setApprovalMode: vi.fn(),
+      getExtensions: vi.fn().mockReturnValue([]),
+      getExtensionSetting: vi.fn(),
       storage: {
         getPlansDir: vi.fn().mockReturnValue('/mock/plans/dir'),
       } as unknown as Config['storage'],
@@ -132,15 +134,71 @@ describe('EnterPlanModeTool', () => {
       expect(result.returnDisplay).toBe('Switching to Plan mode');
     });
 
-    it('should create plans directory if it does not exist', async () => {
-      const invocation = tool.build({});
+    it('should create custom plan directories for active extensions', async () => {
+      vi.mocked(mockConfig.getExtensions!).mockReturnValue([
+        {
+          name: 'ext-a',
+          isActive: true,
+        } as import('../config/config.js').GeminiCLIExtension,
+        {
+          name: 'ext-b',
+          isActive: false,
+        } as import('../config/config.js').GeminiCLIExtension,
+      ]);
+      vi.mocked(mockConfig.getExtensionSetting!).mockImplementation(
+        (name, setting) => {
+          if (name === 'ext-a' && setting === 'plan.directory')
+            return '.ext-a-plans';
+          return undefined;
+        },
+      );
+      vi.mocked(mockConfig.storage!.getPlansDir).mockImplementation(
+        (customDir?: string) => {
+          if (customDir === '.ext-a-plans') return '/mock/plans/ext-a-plans';
+          return '/mock/plans/dir';
+        },
+      );
       vi.mocked(fs.existsSync).mockReturnValue(false);
 
+      const invocation = tool.build({});
       await invocation.execute({ abortSignal: new AbortController().signal });
 
       expect(fs.mkdirSync).toHaveBeenCalledWith('/mock/plans/dir', {
         recursive: true,
       });
+      expect(fs.mkdirSync).toHaveBeenCalledWith('/mock/plans/ext-a-plans', {
+        recursive: true,
+      });
+      expect(fs.mkdirSync).toHaveBeenCalledTimes(2);
+    });
+
+    it('should ignore validation failures for extension-specific plan directories', async () => {
+      vi.mocked(mockConfig.getExtensions!).mockReturnValue([
+        {
+          name: 'ext-a',
+          isActive: true,
+        } as import('../config/config.js').GeminiCLIExtension,
+      ]);
+      vi.mocked(mockConfig.getExtensionSetting!).mockReturnValue(
+        '../outside-workspace',
+      );
+      vi.mocked(mockConfig.storage!.getPlansDir).mockImplementation(
+        (customDir?: string) => {
+          if (customDir === '../outside-workspace')
+            throw new Error('Path traversal detected');
+          return '/mock/plans/dir';
+        },
+      );
+      vi.mocked(fs.existsSync).mockReturnValue(false);
+
+      const invocation = tool.build({});
+      await invocation.execute({ abortSignal: new AbortController().signal });
+
+      // Should only create the default one
+      expect(fs.mkdirSync).toHaveBeenCalledWith('/mock/plans/dir', {
+        recursive: true,
+      });
+      expect(fs.mkdirSync).toHaveBeenCalledTimes(1);
     });
 
     it('should include optional reason in output display but not in llmContent', async () => {
