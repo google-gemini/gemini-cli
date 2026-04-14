@@ -192,12 +192,28 @@ export class PromptProvider {
         ),
         planningWorkflow: this.withSection(
           'planningWorkflow',
-          () => ({
-            interactive: interactiveMode,
-            planModeToolsList,
-            plansDir: context.config.storage.getPlansDir(),
-            approvedPlanPath: context.config.getApprovedPlanPath(),
-          }),
+          () => {
+            let plansDir = '';
+            const activeExt = context.config.activeExtensionName;
+            let customDir: string | undefined;
+            if (activeExt) {
+              customDir = context.config.getExtensionSetting<string>(
+                activeExt,
+                'plan.directory',
+              );
+            }
+            try {
+              plansDir = context.config.storage.getPlansDir(customDir);
+            } catch {
+              // ignore
+            }
+            return {
+              interactive: interactiveMode,
+              planModeToolsList,
+              plansDir,
+              approvedPlanPath: context.config.getApprovedPlanPath(),
+            };
+          },
           isPlanMode,
         ),
         operationalGuidelines: this.withSection(

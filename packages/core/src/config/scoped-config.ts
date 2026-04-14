@@ -19,6 +19,9 @@ import { WorkspaceContext } from '../utils/workspaceContext.js';
  * This follows the same pattern as `toolCallContext` and `promptIdContext`.
  */
 const workspaceContextOverride = new AsyncLocalStorage<WorkspaceContext>();
+const activeExtensionOverride = new AsyncLocalStorage<{
+  name: string | null;
+}>();
 
 /**
  * Returns the current workspace context override, if any.
@@ -26,6 +29,16 @@ const workspaceContextOverride = new AsyncLocalStorage<WorkspaceContext>();
  */
 export function getWorkspaceContextOverride(): WorkspaceContext | undefined {
   return workspaceContextOverride.getStore();
+}
+
+/**
+ * Returns the current active extension name override, if any.
+ * Called by `Config.activeExtensionName` getter/setter to check for isolated scoped execution.
+ */
+export function getActiveExtensionOverride():
+  | { name: string | null }
+  | undefined {
+  return activeExtensionOverride.getStore();
 }
 
 /**
@@ -42,6 +55,22 @@ export function runWithScopedWorkspaceContext<T>(
   fn: () => T,
 ): T {
   return workspaceContextOverride.run(scopedContext, fn);
+}
+
+/**
+ * Runs a function with a scoped active extension context override.
+ * Any calls to `Config.activeExtensionName` within `fn` will return
+ * the scoped context instead of the inherited default.
+ *
+ * @param scopedExtension The active extension name to use within the scope.
+ * @param fn The function to run.
+ * @returns The result of the function.
+ */
+export function runWithScopedActiveExtension<T>(
+  scopedExtension: string | null,
+  fn: () => T,
+): T {
+  return activeExtensionOverride.run({ name: scopedExtension }, fn);
 }
 
 /**

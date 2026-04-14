@@ -12,6 +12,8 @@ import {
   createScopedWorkspaceContext,
   runWithScopedWorkspaceContext,
   getWorkspaceContextOverride,
+  runWithScopedActiveExtension,
+  getActiveExtensionOverride,
 } from './scoped-config.js';
 import { Config } from './config.js';
 
@@ -201,6 +203,68 @@ describe('runWithScopedWorkspaceContext', () => {
 
     runWithScopedWorkspaceContext(scoped, () => {
       expect(getWorkspaceContextOverride()).toBe(scoped);
+    });
+  });
+});
+
+describe('runWithScopedActiveExtension', () => {
+  let config: Config;
+  let tempDir: string;
+
+  beforeEach(() => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'scoped-run-'));
+    config = new Config({
+      targetDir: tempDir,
+      sessionId: 'test-session',
+      debugMode: false,
+      cwd: tempDir,
+      model: 'test-model',
+    });
+  });
+
+  afterEach(() => {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  it('should override Config.activeExtensionName within scope', () => {
+    config.setActiveExtensionName('global-ext');
+
+    runWithScopedActiveExtension('scoped-ext', () => {
+      expect(config.activeExtensionName).toBe('scoped-ext');
+    });
+
+    expect(config.activeExtensionName).toBe('global-ext');
+  });
+
+  it('should handle null to mask the global extension', () => {
+    config.setActiveExtensionName('global-ext');
+
+    runWithScopedActiveExtension(null, () => {
+      expect(config.activeExtensionName).toBeUndefined();
+    });
+
+    expect(config.activeExtensionName).toBe('global-ext');
+  });
+
+  it('should allow mutating the scoped extension using Config.setActiveExtensionName', () => {
+    config.setActiveExtensionName('global-ext');
+
+    runWithScopedActiveExtension('scoped-ext', () => {
+      config.setActiveExtensionName('mutated-scoped-ext');
+      expect(config.activeExtensionName).toBe('mutated-scoped-ext');
+    });
+
+    // The global state should remain untouched
+    expect(config.activeExtensionName).toBe('global-ext');
+  });
+
+  it('should return undefined from getActiveExtensionOverride outside scope', () => {
+    expect(getActiveExtensionOverride()).toBeUndefined();
+  });
+
+  it('should return the object from getActiveExtensionOverride inside scope', () => {
+    runWithScopedActiveExtension('scoped-ext', () => {
+      expect(getActiveExtensionOverride()).toEqual({ name: 'scoped-ext' });
     });
   });
 });

@@ -38,6 +38,7 @@ export interface ExecuteOptions {
   updateOutput?: (output: ToolLiveOutput) => void;
   shellExecutionConfig?: ShellExecutionConfig;
   setExecutionIdCallback?: (executionId: number) => void;
+  activeExtensionName?: string;
 }
 
 /**
