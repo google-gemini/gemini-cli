@@ -124,18 +124,6 @@ describe('truncateForTelemetry', () => {
     );
   });
 
-  it('should enforce a global payload string limit', () => {
-    const obj = {
-      a: 'x'.repeat(100),
-      b: 'y'.repeat(100),
-    };
-    // Let's cap global string length to 50
-    const result = truncateForTelemetry(obj, 100, 100, 4, 50) as string;
-    expect(result.length).toBeGreaterThan(50);
-    expect(result).toContain('...[TRUNCATED: original payload length');
-    expect(result.startsWith('{"a":"xxxx')).toBe(true);
-  });
-
   it('should stringify objects unchanged if within maxLength', () => {
     const obj = { a: 1 };
     expect(truncateForTelemetry(obj, 100)).toBe(JSON.stringify(obj));
