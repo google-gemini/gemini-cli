@@ -211,12 +211,12 @@ describe('RemoteSessionInvocation', () => {
     it('should pass initial state from static map to session', async () => {
       const priorState = { contextId: 'ctx-42', taskId: 'task-42' };
 
-      // Seed the static map before constructing the invocation
+      // Seed the static map before constructing the invocation (composite key)
       (
         RemoteSessionInvocation as unknown as {
           sessionState: Map<string, unknown>;
         }
-      ).sessionState.set('test-agent', priorState);
+      ).sessionState.set('test-agent::http://test-agent/card', priorState);
 
       setupMockSession();
 
@@ -253,12 +253,12 @@ describe('RemoteSessionInvocation', () => {
         abortSignal: new AbortController().signal,
       });
 
-      // Verify the state was persisted in the static map
+      // Verify the state was persisted in the static map (composite key)
       const storedState = (
         RemoteSessionInvocation as unknown as {
           sessionState: Map<string, { contextId?: string; taskId?: string }>;
         }
-      ).sessionState.get('test-agent');
+      ).sessionState.get('test-agent::http://test-agent/card');
       expect(storedState).toEqual(newState);
     });
 
@@ -496,11 +496,12 @@ describe('RemoteSessionInvocation', () => {
   // ---------------------------------------------------------------------------
 
   describe('SessionState Management', () => {
-    it('should use definition.name as session state key', async () => {
+    it('should use composite name::url as session state key', async () => {
       const secondDefinition: RemoteAgentDefinition = {
         ...mockDefinition,
         name: 'other-agent',
         displayName: 'Other Agent',
+        agentCardUrl: 'http://other-agent/card',
       };
 
       // First agent
@@ -533,9 +534,81 @@ describe('RemoteSessionInvocation', () => {
         }
       ).sessionState;
 
-      // Each agent should have its own entry
-      expect(stateMap.get('test-agent')).toEqual({ contextId: 'ctx-a' });
-      expect(stateMap.get('other-agent')).toEqual({ contextId: 'ctx-b' });
+      // Each agent should have its own entry keyed by name::url
+      expect(stateMap.get('test-agent::http://test-agent/card')).toEqual({
+        contextId: 'ctx-a',
+      });
+      expect(stateMap.get('other-agent::http://other-agent/card')).toEqual({
+        contextId: 'ctx-b',
+      });
+    });
+
+    it('should isolate same-name agents with different URLs', async () => {
+      const defA: RemoteAgentDefinition = {
+        ...mockDefinition,
+        agentCardUrl: 'http://host-a/card',
+      };
+      const defB: RemoteAgentDefinition = {
+        ...mockDefinition,
+        agentCardUrl: 'http://host-b/card',
+      };
+
+      // Agent A
+      setupMockSession({ sessionState: { contextId: 'ctx-a' } });
+      const invA = new RemoteSessionInvocation(
+        defA,
+        mockContext,
+        { query: 'hi' },
+        mockMessageBus,
+      );
+      await invA.execute({ abortSignal: new AbortController().signal });
+
+      // Agent B (same name, different URL)
+      setupMockSession({ sessionState: { contextId: 'ctx-b' } });
+      const invB = new RemoteSessionInvocation(
+        defB,
+        mockContext,
+        { query: 'hi' },
+        mockMessageBus,
+      );
+      await invB.execute({ abortSignal: new AbortController().signal });
+
+      const stateMap = (
+        RemoteSessionInvocation as unknown as {
+          sessionState: Map<string, { contextId?: string; taskId?: string }>;
+        }
+      ).sessionState;
+
+      expect(stateMap.get('test-agent::http://host-a/card')).toEqual({
+        contextId: 'ctx-a',
+      });
+      expect(stateMap.get('test-agent::http://host-b/card')).toEqual({
+        contextId: 'ctx-b',
+      });
+    });
+
+    it('should fall back to name-only key when URL is unavailable', async () => {
+      const noUrlDef: RemoteAgentDefinition = {
+        ...mockDefinition,
+        agentCardUrl: undefined,
+      };
+
+      setupMockSession({ sessionState: { contextId: 'ctx-no-url' } });
+      const inv = new RemoteSessionInvocation(
+        noUrlDef,
+        mockContext,
+        { query: 'hi' },
+        mockMessageBus,
+      );
+      await inv.execute({ abortSignal: new AbortController().signal });
+
+      const stateMap = (
+        RemoteSessionInvocation as unknown as {
+          sessionState: Map<string, { contextId?: string; taskId?: string }>;
+        }
+      ).sessionState;
+
+      expect(stateMap.get('test-agent')).toEqual({ contextId: 'ctx-no-url' });
     });
 
     it('should persist state even on error', async () => {
@@ -562,7 +635,9 @@ describe('RemoteSessionInvocation', () => {
         }
       ).sessionState;
 
-      expect(stateMap.get('test-agent')).toEqual(stateOnError);
+      expect(stateMap.get('test-agent::http://test-agent/card')).toEqual(
+        stateOnError,
+      );
     });
   });
 });

@@ -1012,44 +1012,57 @@ describe('AgentRegistry', () => {
       );
     });
 
-    it('should overwrite an existing agent definition', async () => {
+    it('should override an existing agent but warn on duplicate name', async () => {
       await registry.testRegisterAgent(MOCK_AGENT_V1);
       expect(registry.getDefinition('MockAgent')?.description).toBe(
         'Mock Description V1',
       );
 
+      const feedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
       await registry.testRegisterAgent(MOCK_AGENT_V2);
+
+      // Should override to V2 (preserves existing precedence)
       expect(registry.getDefinition('MockAgent')?.description).toBe(
         'Mock Description V2 (Updated)',
       );
       expect(registry.getAllDefinitions()).toHaveLength(1);
+      // But should emit a warning about the duplicate
+      expect(feedbackSpy).toHaveBeenCalledWith(
+        'warning',
+        expect.stringContaining("Duplicate agent name 'MockAgent'"),
+      );
     });
 
-    it('should log overwrites when in debug mode', async () => {
+    it('should not warn when re-registering the same definition (refresh)', async () => {
+      await registry.testRegisterAgent(MOCK_AGENT_V1);
+      expect(registry.getDefinition('MockAgent')?.description).toBe(
+        'Mock Description V1',
+      );
+
+      // Re-registering the exact same object should succeed without warning
+      const feedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
+      await registry.testRegisterAgent(MOCK_AGENT_V1);
+      expect(registry.getDefinition('MockAgent')?.description).toBe(
+        'Mock Description V1',
+      );
+      expect(feedbackSpy).not.toHaveBeenCalledWith(
+        'warning',
+        expect.stringContaining('Duplicate'),
+      );
+    });
+
+    it('should warn on duplicate in debug logs', async () => {
       const debugConfig = makeMockedConfig({ debugMode: true });
       const debugRegistry = new TestableAgentRegistry(debugConfig);
-      const debugLogSpy = vi
-        .spyOn(debugLogger, 'log')
+      const warnSpy = vi
+        .spyOn(debugLogger, 'warn')
         .mockImplementation(() => {});
 
       await debugRegistry.testRegisterAgent(MOCK_AGENT_V1);
       await debugRegistry.testRegisterAgent(MOCK_AGENT_V2);
 
-      expect(debugLogSpy).toHaveBeenCalledWith(
-        `[AgentRegistry] Overriding agent 'MockAgent'`,
-      );
-    });
-
-    it('should not log overwrites when not in debug mode', async () => {
-      const debugLogSpy = vi
-        .spyOn(debugLogger, 'log')
-        .mockImplementation(() => {});
-
-      await registry.testRegisterAgent(MOCK_AGENT_V1);
-      await registry.testRegisterAgent(MOCK_AGENT_V2);
-
-      expect(debugLogSpy).not.toHaveBeenCalledWith(
-        `[AgentRegistry] Overriding agent 'MockAgent'`,
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Overriding agent'),
       );
     });
 

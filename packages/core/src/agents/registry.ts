@@ -317,13 +317,27 @@ export class AgentRegistry {
   }
 
   /**
-   * Registers an agent definition. If an agent with the same name exists,
-   * it will be overwritten, respecting the precedence established by the
-   * initialization order.
+   * Registers an agent definition. If an agent with the same name already
+   * exists from a different definition, a warning is emitted to surface
+   * potential state collision. The new definition still overwrites the old
+   * one to preserve existing precedence order (user → project → extension).
    */
   protected async registerAgent<TOutput extends z.ZodTypeAny>(
     definition: AgentDefinition<TOutput>,
   ): Promise<void> {
+    const existing = this.agents.get(definition.name);
+    if (existing && existing !== definition) {
+      coreEvents.emitFeedback(
+        'warning',
+        `Duplicate agent name '${definition.name}' detected. ` +
+          `The later definition will override the earlier one. ` +
+          `Rename one of the agents to avoid this conflict.`,
+      );
+      debugLogger.warn(
+        `[AgentRegistry] Overriding agent '${definition.name}' — duplicate name from a different definition.`,
+      );
+    }
+
     if (definition.kind === 'local') {
       this.registerLocalAgent(definition);
     } else if (definition.kind === 'remote') {

@@ -17,6 +17,7 @@ import {
   type RemoteAgentDefinition,
   type AgentInputs,
   type SubagentProgress,
+  getRemoteAgentTargetUrl,
 } from './types.js';
 import { type AgentLoopContext } from '../config/agent-loop-context.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
@@ -38,19 +39,29 @@ export interface SubagentInvocationOptions {
  * which wraps the A2A client streaming behind the AgentProtocol interface.
  *
  * Cross-invocation A2A session state (contextId/taskId) is persisted via a
- * static map keyed by agent name, matching the original RemoteAgentInvocation
- * behavior.
+ * static map keyed by a composite of agent name and target URL. This ensures
+ * agents with the same name but different endpoints maintain independent state.
  */
 export class RemoteSessionInvocation extends BaseToolInvocation<
   RemoteAgentInputs,
   ToolResult
 > {
   // Persist A2A conversation state across ephemeral invocation instances.
-  // Keyed by agent name — each remote agent maintains independent state.
+  // Keyed by composite of name + target URL so agents with the same name
+  // but different endpoints don't share state.
   private static readonly sessionState = new Map<
     string,
     { contextId?: string; taskId?: string }
   >();
+
+  /**
+   * Builds a composite key for the sessionState map.
+   * Format: `name::targetUrl` (or just `name` if no URL can be derived).
+   */
+  private static sessionKey(definition: RemoteAgentDefinition): string {
+    const url = getRemoteAgentTargetUrl(definition);
+    return url ? `${definition.name}::${url}` : definition.name;
+  }
 
   private readonly _onAgentEvent?: (event: AgentEvent) => void;
 
@@ -106,9 +117,8 @@ export class RemoteSessionInvocation extends BaseToolInvocation<
     const agentName = this.definition.displayName ?? this.definition.name;
 
     // Seed session with prior A2A conversation state
-    const priorState = RemoteSessionInvocation.sessionState.get(
-      this.definition.name,
-    );
+    const stateKey = RemoteSessionInvocation.sessionKey(this.definition);
+    const priorState = RemoteSessionInvocation.sessionState.get(stateKey);
     const session = new RemoteSubagentSession(
       this.definition,
       this.context,
@@ -215,7 +225,7 @@ export class RemoteSessionInvocation extends BaseToolInvocation<
     } finally {
       // Persist A2A state for next invocation — even on abort/error
       RemoteSessionInvocation.sessionState.set(
-        this.definition.name,
+        stateKey,
         session.getSessionState(),
       );
       _signal.removeEventListener('abort', abortListener);
