@@ -303,9 +303,8 @@ describe('memoryService', () => {
     });
 
     it('writes state atomically via temp file + rename', async () => {
-      const { writeExtractionState, readExtractionState } = await import(
-        './memoryService.js'
-      );
+      const { writeExtractionState, readExtractionState } =
+        await import('./memoryService.js');
 
       const statePath = path.join(tmpDir, '.extraction-state.json');
       const state: ExtractionState = {
@@ -333,9 +332,8 @@ describe('memoryService', () => {
   describe('startMemoryService', () => {
     it('skips when lock is held by another instance', async () => {
       const { startMemoryService } = await import('./memoryService.js');
-      const { LocalAgentExecutor } = await import(
-        '../agents/local-executor.js'
-      );
+      const { LocalAgentExecutor } =
+        await import('../agents/local-executor.js');
 
       const memoryDir = path.join(tmpDir, 'memory');
       const skillsDir = path.join(tmpDir, 'skills');
@@ -373,9 +371,8 @@ describe('memoryService', () => {
 
     it('skips when no unprocessed sessions exist', async () => {
       const { startMemoryService } = await import('./memoryService.js');
-      const { LocalAgentExecutor } = await import(
-        '../agents/local-executor.js'
-      );
+      const { LocalAgentExecutor } =
+        await import('../agents/local-executor.js');
 
       const memoryDir = path.join(tmpDir, 'memory2');
       const skillsDir = path.join(tmpDir, 'skills2');
@@ -408,12 +405,10 @@ describe('memoryService', () => {
 
     it('releases lock on error', async () => {
       const { startMemoryService } = await import('./memoryService.js');
-      const { LocalAgentExecutor } = await import(
-        '../agents/local-executor.js'
-      );
-      const { ExecutionLifecycleService } = await import(
-        './executionLifecycleService.js'
-      );
+      const { LocalAgentExecutor } =
+        await import('../agents/local-executor.js');
+      const { ExecutionLifecycleService } =
+        await import('./executionLifecycleService.js');
 
       const memoryDir = path.join(tmpDir, 'memory3');
       const skillsDir = path.join(tmpDir, 'skills3');
@@ -467,9 +462,8 @@ describe('memoryService', () => {
 
     it('emits feedback when new skills are created during extraction', async () => {
       const { startMemoryService } = await import('./memoryService.js');
-      const { LocalAgentExecutor } = await import(
-        '../agents/local-executor.js'
-      );
+      const { LocalAgentExecutor } =
+        await import('../agents/local-executor.js');
 
       // Reset mocks that may carry state from prior tests
       vi.mocked(coreEvents.emitFeedback).mockClear();
@@ -845,9 +839,8 @@ describe('memoryService', () => {
     });
 
     it('writeExtractionState + readExtractionState roundtrips runs correctly', async () => {
-      const { writeExtractionState, readExtractionState } = await import(
-        './memoryService.js'
-      );
+      const { writeExtractionState, readExtractionState } =
+        await import('./memoryService.js');
 
       const statePath = path.join(tmpDir, 'roundtrip-state.json');
       const runs: ExtractionRun[] = [
@@ -1167,9 +1160,8 @@ describe('memoryService', () => {
   describe('startMemoryService feedback for patch-only runs', () => {
     it('emits feedback when extraction produces only patch suggestions', async () => {
       const { startMemoryService } = await import('./memoryService.js');
-      const { LocalAgentExecutor } = await import(
-        '../agents/local-executor.js'
-      );
+      const { LocalAgentExecutor } =
+        await import('../agents/local-executor.js');
 
       vi.mocked(coreEvents.emitFeedback).mockClear();
       vi.mocked(LocalAgentExecutor.create).mockReset();
@@ -1251,9 +1243,8 @@ describe('memoryService', () => {
 
     it('does not emit feedback for old inbox patches when this run creates none', async () => {
       const { startMemoryService } = await import('./memoryService.js');
-      const { LocalAgentExecutor } = await import(
-        '../agents/local-executor.js'
-      );
+      const { LocalAgentExecutor } =
+        await import('../agents/local-executor.js');
 
       vi.mocked(coreEvents.emitFeedback).mockClear();
       vi.mocked(LocalAgentExecutor.create).mockReset();

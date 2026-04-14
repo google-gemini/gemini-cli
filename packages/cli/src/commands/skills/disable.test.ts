@@ -14,9 +14,8 @@ import {
 } from '../../config/settings.js';
 
 const { emitConsoleLog, debugLogger } = await vi.hoisted(async () => {
-  const { createMockDebugLogger } = await import(
-    '../../test-utils/mockDebugLogger.js'
-  );
+  const { createMockDebugLogger } =
+    await import('../../test-utils/mockDebugLogger.js');
   return createMockDebugLogger({ stripAnsi: true });
 });
 

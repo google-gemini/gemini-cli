@@ -1312,9 +1312,8 @@ ${JSON.stringify(
         true,
       );
       // Get the mocked checkNextSpeaker function and configure it to trigger infinite loop
-      const { checkNextSpeaker } = await import(
-        '../utils/nextSpeakerChecker.js'
-      );
+      const { checkNextSpeaker } =
+        await import('../utils/nextSpeakerChecker.js');
       const mockCheckNextSpeaker = vi.mocked(checkNextSpeaker);
       mockCheckNextSpeaker.mockResolvedValue({
         next_speaker: 'model',
@@ -1436,9 +1435,8 @@ ${JSON.stringify(
       // someone tries to bypass it by calling with a very large turns value
 
       // Get the mocked checkNextSpeaker function and configure it to trigger infinite loop
-      const { checkNextSpeaker } = await import(
-        '../utils/nextSpeakerChecker.js'
-      );
+      const { checkNextSpeaker } =
+        await import('../utils/nextSpeakerChecker.js');
       const mockCheckNextSpeaker = vi.mocked(checkNextSpeaker);
       mockCheckNextSpeaker.mockResolvedValue({
         next_speaker: 'model',
@@ -2971,9 +2969,8 @@ ${JSON.stringify(
 
     it('should not call checkNextSpeaker when turn.run() yields an error', async () => {
       // Arrange
-      const { checkNextSpeaker } = await import(
-        '../utils/nextSpeakerChecker.js'
-      );
+      const { checkNextSpeaker } =
+        await import('../utils/nextSpeakerChecker.js');
       const mockCheckNextSpeaker = vi.mocked(checkNextSpeaker);
 
       const mockStream = (async function* () {
@@ -3008,9 +3005,8 @@ ${JSON.stringify(
 
     it('should not call checkNextSpeaker when turn.run() yields a value then an error', async () => {
       // Arrange
-      const { checkNextSpeaker } = await import(
-        '../utils/nextSpeakerChecker.js'
-      );
+      const { checkNextSpeaker } =
+        await import('../utils/nextSpeakerChecker.js');
       const mockCheckNextSpeaker = vi.mocked(checkNextSpeaker);
 
       const mockStream = (async function* () {
@@ -3388,9 +3384,8 @@ ${JSON.stringify(
       });
 
       it('should fire BeforeAgent once and AfterAgent once even with recursion', async () => {
-        const { checkNextSpeaker } = await import(
-          '../utils/nextSpeakerChecker.js'
-        );
+        const { checkNextSpeaker } =
+          await import('../utils/nextSpeakerChecker.js');
         vi.mocked(checkNextSpeaker)
           .mockResolvedValueOnce({ next_speaker: 'model', reasoning: 'more' })
           .mockResolvedValueOnce(null);
@@ -3429,9 +3424,8 @@ ${JSON.stringify(
       });
 
       it('should use original request in AfterAgent hook even when continuation happened', async () => {
-        const { checkNextSpeaker } = await import(
-          '../utils/nextSpeakerChecker.js'
-        );
+        const { checkNextSpeaker } =
+          await import('../utils/nextSpeakerChecker.js');
         vi.mocked(checkNextSpeaker)
           .mockResolvedValueOnce({ next_speaker: 'model', reasoning: 'more' })
           .mockResolvedValueOnce(null);

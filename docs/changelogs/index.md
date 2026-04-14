@@ -18,6 +18,30 @@ on GitHub.
 | [Preview](preview.md) | Experimental features ready for early feedback. |
 | [Stable](latest.md)   | Stable, recommended for general use.            |
 
+## Announcements: v0.38.0 - 2026-04-14
+
+- **Context Compression Service:** Introduced a new service to intelligently
+  manage and compress session context, optimizing performance for long
+  conversations
+  ([#24483](https://github.com/google-gemini/gemini-cli/pull/24483) by
+  @joshualitt).
+- **Terminal Performance and UI Polish:** Implemented TerminalBuffer mode to
+  eliminate flicker, added scrollbars for input prompts, and refined tool output
+  layouts ([#24512](https://github.com/google-gemini/gemini-cli/pull/24512),
+  [#21992](https://github.com/google-gemini/gemini-cli/pull/21992) by @jacob314,
+  [#24449](https://github.com/google-gemini/gemini-cli/pull/24449) by
+  @jwhelangoog).
+- **Enhanced Sandbox Reliability:** Significant improvements to Linux and
+  Windows sandboxing, including better error matching, caching, and fix for
+  ARG_MAX crashes
+  ([#24286](https://github.com/google-gemini/gemini-cli/pull/24286) by
+  @ehedlund, [#24550](https://github.com/google-gemini/gemini-cli/pull/24550) by
+  @DavidAPierce).
+- **Background Process Monitoring:** New tools for monitoring and inspecting
+  background processes directly from the CLI
+  ([#23799](https://github.com/google-gemini/gemini-cli/pull/23799) by
+  @cocosheng-g).
+
 ## Announcements: v0.37.0 - 2026-04-08
 
 - **Dynamic Sandbox Expansion:** Implemented dynamic sandbox expansion and
