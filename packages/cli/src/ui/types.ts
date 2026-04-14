@@ -315,6 +315,7 @@ export type HistoryItemSkillsList = HistoryItemBase & {
   type: 'skills_list';
   skills: SkillDefinition[];
   showDescriptions: boolean;
+  showVerbose?: boolean;
 };
 
 export type AgentDefinitionJson = Pick<

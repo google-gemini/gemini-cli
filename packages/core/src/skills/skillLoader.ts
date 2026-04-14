@@ -29,6 +29,33 @@ export interface SkillDefinition {
   isBuiltin?: boolean;
   /** The name of the extension that provided this skill, if any. */
   extensionName?: string;
+  /** Optional load metadata from the most recent discovery pass. */
+  loadMetadata?: SkillLoadMetric;
+}
+
+export type SkillLoadCacheStatus = 'hit' | 'miss' | 'bypass';
+export type SkillParseResult = 'loaded' | 'invalid_frontmatter' | 'error';
+
+export interface SkillLoadMetric {
+  name?: string;
+  location: string;
+  duration_ms: number;
+  cache_status: SkillLoadCacheStatus;
+  parse_result: SkillParseResult;
+}
+
+export interface SkillDiscoveryReport {
+  source_dir: string;
+  total_duration_ms: number;
+  glob_duration_ms: number;
+  skill_count: number;
+  invalid_count: number;
+  skill_metrics: SkillLoadMetric[];
+}
+
+export interface SkillLoadResult {
+  skills: SkillDefinition[];
+  report: SkillDiscoveryReport;
 }
 
 export const FRONTMATTER_REGEX =
@@ -115,29 +142,56 @@ function parseSimpleFrontmatter(
 export async function loadSkillsFromDir(
   dir: string,
 ): Promise<SkillDefinition[]> {
+  return (await loadSkillsFromDirWithReport(dir)).skills;
+}
+
+/**
+ * Discovers and loads all skills in the provided directory, returning timing metadata.
+ */
+export async function loadSkillsFromDirWithReport(
+  dir: string,
+): Promise<SkillLoadResult> {
   const discoveredSkills: SkillDefinition[] = [];
+  const absoluteSearchPath = path.resolve(dir);
+  const startTime = performance.now();
+  const report: SkillDiscoveryReport = {
+    source_dir: absoluteSearchPath,
+    total_duration_ms: 0,
+    glob_duration_ms: 0,
+    skill_count: 0,
+    invalid_count: 0,
+    skill_metrics: [],
+  };
 
   try {
-    const absoluteSearchPath = path.resolve(dir);
     const stats = await fs.stat(absoluteSearchPath).catch(() => null);
     if (!stats || !stats.isDirectory()) {
-      return [];
+      report.total_duration_ms = Math.round(performance.now() - startTime);
+      return { skills: [], report };
     }
 
     const pattern = ['SKILL.md', '*/SKILL.md'];
+    const globStart = performance.now();
     const skillFiles = await glob(pattern, {
       cwd: absoluteSearchPath,
       absolute: true,
       nodir: true,
+      follow: true,
       ignore: ['**/node_modules/**', '**/.git/**'],
     });
+    report.glob_duration_ms = Math.round(performance.now() - globStart);
 
     for (const skillFile of skillFiles) {
-      const metadata = await loadSkillFromFile(skillFile);
-      if (metadata) {
-        discoveredSkills.push(metadata);
+      const { skill, metric } = await loadSkillFromFile(skillFile);
+      report.skill_metrics.push(metric);
+      if (skill) {
+        discoveredSkills.push(skill);
+      } else {
+        report.invalid_count++;
       }
     }
+
+    report.skill_count = discoveredSkills.length;
 
     if (discoveredSkills.length === 0) {
       const files = await fs.readdir(absoluteSearchPath);
@@ -155,7 +209,8 @@ export async function loadSkillsFromDir(
     );
   }
 
-  return discoveredSkills;
+  report.total_duration_ms = Math.round(performance.now() - startTime);
+  return { skills: discoveredSkills, report };
 }
 
 /**
@@ -163,30 +218,66 @@ export async function loadSkillsFromDir(
  */
 export async function loadSkillFromFile(
   filePath: string,
-): Promise<SkillDefinition | null> {
+): Promise<{ skill: SkillDefinition | null; metric: SkillLoadMetric }> {
+  const startTime = performance.now();
+  const cacheStatus: SkillLoadCacheStatus = 'bypass';
+
   try {
     const content = await fs.readFile(filePath, 'utf-8');
     const match = content.match(FRONTMATTER_REGEX);
     if (!match) {
-      return null;
+      return {
+        skill: null,
+        metric: {
+          location: filePath,
+          duration_ms: Math.round(performance.now() - startTime),
+          cache_status: cacheStatus,
+          parse_result: 'invalid_frontmatter',
+        },
+      };
     }
 
     const frontmatter = parseFrontmatter(match[1]);
     if (!frontmatter) {
-      return null;
+      return {
+        skill: null,
+        metric: {
+          location: filePath,
+          duration_ms: Math.round(performance.now() - startTime),
+          cache_status: cacheStatus,
+          parse_result: 'invalid_frontmatter',
+        },
+      };
     }
 
     // Sanitize name for use as a filename/directory name (e.g. replace ':' with '-')
     const sanitizedName = frontmatter.name.replace(/[:\\/<>*?"|]/g, '-');
-
-    return {
+    const metric: SkillLoadMetric = {
+      name: sanitizedName,
+      location: filePath,
+      duration_ms: Math.round(performance.now() - startTime),
+      cache_status: cacheStatus,
+      parse_result: 'loaded',
+    };
+    const skill: SkillDefinition = {
       name: sanitizedName,
       description: frontmatter.description,
       location: filePath,
       body: match[2]?.trim() ?? '',
+      loadMetadata: metric,
     };
+
+    return { skill, metric };
   } catch (error) {
     debugLogger.log(`Error parsing skill file ${filePath}:`, error);
-    return null;
+    return {
+      skill: null,
+      metric: {
+        location: filePath,
+        duration_ms: Math.round(performance.now() - startTime),
+        cache_status: cacheStatus,
+        parse_result: 'error',
+      },
+    };
   }
 }

@@ -78,12 +78,18 @@ describe('skills list command', () => {
           description: 'desc1',
           disabled: false,
           location: '/path/to/skill1',
+          loadMetadata: {
+            duration_ms: 12,
+          },
         },
         {
           name: 'skill2',
           description: 'desc2',
           disabled: true,
           location: '/path/to/skill2',
+          loadMetadata: {
+            duration_ms: 2,
+          },
         },
       ];
       const mockConfig = {
@@ -111,6 +117,32 @@ describe('skills list command', () => {
       expect(stdoutWriteSpy).toHaveBeenCalledWith(
         expect.stringContaining(chalk.red('[Disabled]')),
       );
+    });
+
+    it('should include timing details in verbose mode', async () => {
+      const skills = [
+        {
+          name: 'skill1',
+          description: 'desc1',
+          disabled: false,
+          location: '/path/to/skill1',
+          loadMetadata: {
+            duration_ms: 12,
+          },
+        },
+      ];
+      const mockConfig = {
+        initialize: vi.fn().mockResolvedValue(undefined),
+        getSkillManager: vi.fn().mockReturnValue({
+          getAllSkills: vi.fn().mockReturnValue(skills),
+        }),
+      };
+      mockLoadCliConfig.mockResolvedValue(mockConfig as unknown as Config);
+
+      await handleList({ verbose: true });
+
+      expect(stdoutWriteSpy).toHaveBeenCalledWith('  Load Time:   12ms\n');
+      expect(stdoutWriteSpy).toHaveBeenCalledWith('\n');
     });
 
     it('should filter built-in skills by default and show them with { all: true }', async () => {
@@ -172,7 +204,7 @@ describe('skills list command', () => {
     const command = listCommand;
 
     it('should have correct command and describe', () => {
-      expect(command.command).toBe('list [--all]');
+      expect(command.command).toBe('list [--all] [--verbose]');
       expect(command.describe).toBe('Lists discovered agent skills.');
     });
   });

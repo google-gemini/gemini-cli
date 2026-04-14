@@ -73,6 +73,7 @@ describe('skillsCommand', () => {
             getAllSkills: vi.fn().mockReturnValue(skills),
             getSkills: vi.fn().mockReturnValue(skills),
             isAdminEnabled: vi.fn().mockReturnValue(true),
+            getSlowestSkillLoadTime: vi.fn().mockReturnValue(null),
             getSkill: vi
               .fn()
               .mockImplementation(
@@ -111,6 +112,7 @@ describe('skillsCommand', () => {
             disabled: undefined,
             location: '/loc1',
             body: 'body1',
+            loadMetadata: undefined,
           },
           {
             name: 'skill2',
@@ -118,6 +120,7 @@ describe('skillsCommand', () => {
             disabled: undefined,
             location: '/loc2',
             body: 'body2',
+            loadMetadata: undefined,
           },
         ],
         showDescriptions: true,
@@ -139,6 +142,7 @@ describe('skillsCommand', () => {
             disabled: undefined,
             location: '/loc1',
             body: 'body1',
+            loadMetadata: undefined,
           },
           {
             name: 'skill2',
@@ -146,6 +150,7 @@ describe('skillsCommand', () => {
             disabled: undefined,
             location: '/loc2',
             body: 'body2',
+            loadMetadata: undefined,
           },
         ],
         showDescriptions: true,
@@ -160,6 +165,17 @@ describe('skillsCommand', () => {
     expect(context.ui.addItem).toHaveBeenCalledWith(
       expect.objectContaining({
         showDescriptions: false,
+      }),
+    );
+  });
+
+  it('should enable verbose skill listing when requested', async () => {
+    const listCmd = skillsCommand.subCommands!.find((s) => s.name === 'list')!;
+    await listCmd.action!(context, 'verbose');
+
+    expect(context.ui.addItem).toHaveBeenCalledWith(
+      expect.objectContaining({
+        showVerbose: true,
       }),
     );
   });
@@ -606,6 +622,29 @@ describe('skillsCommand', () => {
         expect.objectContaining({
           type: MessageType.INFO,
           text: 'Agent skills reloaded successfully. 1 newly available skill and 1 skill no longer available.',
+        }),
+      );
+    });
+
+    it('should add verbose inspection guidance when a slow skill is detected', async () => {
+      const reloadCmd = skillsCommand.subCommands!.find(
+        (s) => s.name === 'reload',
+      )!;
+      const skillManager =
+        context.services.agentContext!.config.getSkillManager() as unknown as {
+          getSlowestSkillLoadTime: ReturnType<typeof vi.fn>;
+        };
+      skillManager.getSlowestSkillLoadTime.mockReturnValue(250);
+      context.services.agentContext!.config.reloadSkills = vi
+        .fn()
+        .mockResolvedValue(undefined);
+
+      await reloadCmd.action!(context, '');
+
+      expect(context.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: 'Agent skills reloaded successfully. Run "/skills list verbose" to inspect skill load timings.',
         }),
       );
     });

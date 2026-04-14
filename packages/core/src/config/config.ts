@@ -1468,11 +1468,15 @@ export class Config implements McpContext, AgentLoopContext {
     if (this.skillsSupport) {
       this.getSkillManager().setAdminSettings(this.adminSkillsEnabled);
       if (this.adminSkillsEnabled) {
+        const discoverSkillsHandle = startupProfiler.start('discover_skills');
         await this.getSkillManager().discoverSkills(
           this.storage,
           this.getExtensions(),
           this.isTrustedFolder(),
         );
+        discoverSkillsHandle?.end({
+          discovered_skill_count: this.getSkillManager().getAllSkills().length,
+        });
         this.getSkillManager().setDisabledSkills(this.disabledSkills);
 
         // Re-register ActivateSkillTool to update its schema with the discovered enabled skill enums

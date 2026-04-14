@@ -150,7 +150,7 @@ export async function listInboxSkills(config: Config): Promise<InboxSkill[]> {
   const skills: InboxSkill[] = [];
   for (const dir of dirs) {
     const skillPath = path.join(skillsDir, dir.name, 'SKILL.md');
-    const skillDef = await loadSkillFromFile(skillPath);
+    const { skill: skillDef } = await loadSkillFromFile(skillPath);
     if (!skillDef) continue;
 
     skills.push({
@@ -180,7 +180,7 @@ async function getSkillNameForConflictCheck(
   skillDir: string,
   fallbackName: string,
 ): Promise<string> {
-  const skill = await loadSkillFromFile(path.join(skillDir, 'SKILL.md'));
+  const { skill } = await loadSkillFromFile(path.join(skillDir, 'SKILL.md'));
   return skill?.name ?? fallbackName;
 }
 

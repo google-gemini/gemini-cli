@@ -10,14 +10,20 @@ import { theme } from '../../semantic-colors.js';
 import { type SkillDefinition } from '../../types.js';
 import { SKILLS_DOCS_URL } from '../../constants.js';
 
+interface SkillLoadMetadataView {
+  duration_ms?: number;
+}
+
 interface SkillsListProps {
   skills: readonly SkillDefinition[];
   showDescriptions: boolean;
+  showVerbose?: boolean;
 }
 
 export const SkillsList: React.FC<SkillsListProps> = ({
   skills,
   showDescriptions,
+  showVerbose = false,
 }) => {
   const sortSkills = (a: SkillDefinition, b: SkillDefinition) => {
     if (a.isBuiltin === b.isBuiltin) {
@@ -30,33 +36,46 @@ export const SkillsList: React.FC<SkillsListProps> = ({
 
   const disabledSkills = skills.filter((s) => s.disabled).sort(sortSkills);
 
-  const renderSkill = (skill: SkillDefinition) => (
-    <Box key={skill.name} flexDirection="row">
-      <Text color={theme.text.primary}>{'  '}- </Text>
-      <Box flexDirection="column">
-        <Box flexDirection="row">
-          <Text
-            bold
-            color={skill.disabled ? theme.text.secondary : theme.text.link}
-          >
-            {skill.name}
-          </Text>
-          {skill.isBuiltin && (
-            <Text color={theme.text.secondary}>{' [Built-in]'}</Text>
+  const renderSkill = (skill: SkillDefinition) => {
+    const loadMetadata = (skill as { loadMetadata?: SkillLoadMetadataView })
+      .loadMetadata;
+
+    return (
+      <Box key={skill.name} flexDirection="row">
+        <Text color={theme.text.primary}>{'  '}- </Text>
+        <Box flexDirection="column">
+          <Box flexDirection="row">
+            <Text
+              bold
+              color={skill.disabled ? theme.text.secondary : theme.text.link}
+            >
+              {skill.name}
+            </Text>
+            {skill.isBuiltin && (
+              <Text color={theme.text.secondary}>{' [Built-in]'}</Text>
+            )}
+          </Box>
+          {showDescriptions && skill.description && (
+            <Box marginLeft={2}>
+              <Text
+                color={skill.disabled ? theme.text.secondary : theme.text.primary}
+              >
+                {skill.description}
+              </Text>
+            </Box>
+          )}
+          {showVerbose && (
+            <Box marginLeft={2} flexDirection="column">
+              <Text color={theme.text.secondary}>Location: {skill.location}</Text>
+              <Text color={theme.text.secondary}>
+                Load: {loadMetadata?.duration_ms ?? 'n/a'}ms
+              </Text>
+            </Box>
           )}
         </Box>
-        {showDescriptions && skill.description && (
-          <Box marginLeft={2}>
-            <Text
-              color={skill.disabled ? theme.text.secondary : theme.text.primary}
-            >
-              {skill.description}
-            </Text>
-          </Box>
-        )}
       </Box>
-    </Box>
-  );
+    );
+  };
 
   return (
     <Box flexDirection="column" marginBottom={1}>

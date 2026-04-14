@@ -10,7 +10,11 @@ import { loadCliConfig, type CliArgs } from '../../config/config.js';
 import { exitCli } from '../utils.js';
 import chalk from 'chalk';
 
-export async function handleList(args: { all?: boolean }) {
+interface SkillLoadMetadataView {
+  duration_ms?: number;
+}
+
+export async function handleList(args: { all?: boolean; verbose?: boolean }) {
   const workspaceDir = process.cwd();
   const settings = loadSettings(workspaceDir);
 
@@ -48,6 +52,8 @@ export async function handleList(args: { all?: boolean }) {
   process.stdout.write(chalk.bold('Discovered Agent Skills:') + '\n\n');
 
   for (const skill of skills) {
+    const loadMetadata = (skill as { loadMetadata?: SkillLoadMetadataView })
+      .loadMetadata;
     const status = skill.disabled
       ? chalk.red('[Disabled]')
       : chalk.green('[Enabled]');
@@ -59,21 +65,36 @@ export async function handleList(args: { all?: boolean }) {
     );
     process.stdout.write(`  Description: ${skill.description}\n`);
     process.stdout.write(`  Location:    ${skill.location}\n\n`);
+    if (args.verbose) {
+      process.stdout.write(
+        `  Load Time:   ${loadMetadata?.duration_ms ?? 'n/a'}ms\n`,
+      );
+      process.stdout.write('\n');
+    }
   }
 }
 
 export const listCommand: CommandModule = {
-  command: 'list [--all]',
+  command: 'list [--all] [--verbose]',
   describe: 'Lists discovered agent skills.',
   builder: (yargs) =>
-    yargs.option('all', {
-      type: 'boolean',
-      description: 'Show all skills, including built-in ones.',
-      default: false,
-    }),
+    yargs
+      .option('all', {
+        type: 'boolean',
+        description: 'Show all skills, including built-in ones.',
+        default: false,
+      })
+      .option('verbose', {
+        type: 'boolean',
+        description: 'Show skill load timings.',
+        default: false,
+      }),
   handler: async (argv) => {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    await handleList({ all: argv['all'] as boolean });
+    await handleList({
+      all: argv['all'] as boolean,
+      verbose: argv['verbose'] as boolean,
+    });
     await exitCli();
   },
 };
