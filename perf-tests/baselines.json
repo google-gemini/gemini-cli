@@ -12,6 +12,11 @@
       "cpuTotalUs": 12157,
       "timestamp": "2026-04-08T22:28:19.098Z"
     },
+    "asian-language-conv": {
+      "wallClockMs": 2315.1,
+      "cpuTotalUs": 6283,
+      "timestamp": "2026-04-14T15:22:56.133Z"
+    },
     "skill-loading-time": {
       "wallClockMs": 930.0920409999962,
       "cpuTotalUs": 1323,
