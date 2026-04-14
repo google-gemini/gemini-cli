@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import fsPromises from 'node:fs/promises';
 import path from 'node:path';
 import type { PartUnion } from '@google/genai';
+import { isBinaryFile as isBinaryFileCheck } from 'isbinaryfile';
 import mime from 'mime/lite';
 import type { FileSystemService } from '../services/fileSystemService.js';
 import { ToolErrorType } from '../tools/tool-error.js';
@@ -345,53 +346,17 @@ export async function isEmpty(filePath: string): Promise<boolean> {
 
 /**
  * Heuristic: determine if a file is likely binary.
- * Now BOM-aware: if a Unicode BOM is detected, we treat it as text.
- * For non-BOM files, retain the existing null-byte and non-printable ratio checks.
+ * Delegates to the `isbinaryfile` package for UTF-8-aware detection.
  */
 export async function isBinaryFile(filePath: string): Promise<boolean> {
-  let fh: fs.promises.FileHandle | null = null;
   try {
-    fh = await fs.promises.open(filePath, 'r');
-    const stats = await fh.stat();
-    const fileSize = stats.size;
-    if (fileSize === 0) return false; // empty is not binary
-
-    // Sample up to 4KB from the head (previous behavior)
-    const sampleSize = Math.min(4096, fileSize);
-    const buf = Buffer.alloc(sampleSize);
-    const { bytesRead } = await fh.read(buf, 0, sampleSize, 0);
-    if (bytesRead === 0) return false;
-
-    // BOM → text (avoid false positives for UTF‑16/32 with nulls)
-    const bom = detectBOM(buf.subarray(0, Math.min(4, bytesRead)));
-    if (bom) return false;
-
-    let nonPrintableCount = 0;
-    for (let i = 0; i < bytesRead; i++) {
-      if (buf[i] === 0) return true; // strong indicator of binary when no BOM
-      if (buf[i] < 9 || (buf[i] > 13 && buf[i] < 32)) {
-        nonPrintableCount++;
-      }
-    }
-    // If >30% non-printable characters, consider it binary
-    return nonPrintableCount / bytesRead > 0.3;
+    return await isBinaryFileCheck(filePath);
   } catch (error) {
     debugLogger.warn(
       `Failed to check if file is binary: ${filePath}`,
       error instanceof Error ? error.message : String(error),
     );
     return false;
-  } finally {
-    if (fh) {
-      try {
-        await fh.close();
-      } catch (closeError) {
-        debugLogger.warn(
-          `Failed to close file handle for: ${filePath}`,
-          closeError instanceof Error ? closeError.message : String(closeError),
-        );
-      }
-    }
   }
 }
 
