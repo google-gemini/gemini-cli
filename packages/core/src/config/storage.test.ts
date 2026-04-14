@@ -291,6 +291,40 @@ describe('Storage – additional helpers', () => {
     });
   });
 
+  describe('resolveWorkspaceRelativePath', () => {
+    it('resolves a relative path correctly', () => {
+      expect(storage.resolveWorkspaceRelativePath('foo/bar')).toBe(
+        path.join(projectRoot, 'foo/bar'),
+      );
+    });
+
+    it('throws if homedir path escapes workspace', () => {
+      // In this test, projectRoot is /tmp/project, and homedir is likely outside.
+      // We expect this to throw an error about escaping the project root.
+      expect(() => storage.resolveWorkspaceRelativePath('~/foo')).toThrow(
+        /outside the project root/,
+      );
+    });
+
+    it('throws if path escapes workspace', () => {
+      expect(() => storage.resolveWorkspaceRelativePath('../outside')).toThrow(
+        /outside the project root/,
+      );
+    });
+
+    it('resolves an absolute path within workspace', () => {
+      expect(
+        storage.resolveWorkspaceRelativePath(path.join(projectRoot, 'inner')),
+      ).toBe(path.join(projectRoot, 'inner'));
+    });
+
+    it('throws for an absolute path outside workspace', () => {
+      expect(() => storage.resolveWorkspaceRelativePath('/tmp/foo')).toThrow(
+        /outside the project root/,
+      );
+    });
+  });
+
   describe('getPlansDir', () => {
     interface TestCase {
       name: string;
@@ -310,7 +344,7 @@ describe('Storage – additional helpers', () => {
         name: 'custom absolute path outside throws',
         customDir: path.resolve('/absolute/path/to/plans'),
         expected: '',
-        expectedError: `Custom plans directory '${path.resolve('/absolute/path/to/plans')}' resolves to '${path.resolve('/absolute/path/to/plans')}', which is outside the project root '${resolveToRealPath(projectRoot)}'.`,
+        expectedError: `Path '${path.resolve('/absolute/path/to/plans')}' resolves to '${path.resolve('/absolute/path/to/plans')}', which is outside the project root '${resolveToRealPath(projectRoot)}'.`,
       },
       {
         name: 'absolute path that happens to be inside project root',
@@ -336,7 +370,7 @@ describe('Storage – additional helpers', () => {
         name: 'escaping relative path throws',
         customDir: '../escaped-plans',
         expected: '',
-        expectedError: `Custom plans directory '../escaped-plans' resolves to '${resolveToRealPath(path.resolve(projectRoot, '../escaped-plans'))}', which is outside the project root '${resolveToRealPath(projectRoot)}'.`,
+        expectedError: `Path '../escaped-plans' resolves to '${resolveToRealPath(path.resolve(projectRoot, '../escaped-plans'))}', which is outside the project root '${resolveToRealPath(projectRoot)}'.`,
       },
       {
         name: 'hidden directory starting with ..',
@@ -356,7 +390,7 @@ describe('Storage – additional helpers', () => {
           return () => vi.mocked(fs.realpathSync).mockRestore();
         },
         expected: '',
-        expectedError: `Custom plans directory 'symlink-to-outside' resolves to '${path.resolve('/outside/project/root')}', which is outside the project root '${resolveToRealPath(projectRoot)}'.`,
+        expectedError: `Path 'symlink-to-outside' resolves to '${path.resolve('/outside/project/root')}', which is outside the project root '${resolveToRealPath(projectRoot)}'.`,
       },
     ];
 

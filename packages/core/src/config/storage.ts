@@ -320,22 +320,47 @@ export class Storage {
     return path.join(this.getProjectTempDir(), 'tracker');
   }
 
-  getPlansDir(): string {
-    if (this.customPlansDir) {
-      const resolvedPath = path.resolve(
-        this.getProjectRoot(),
-        this.customPlansDir,
-      );
-      const realProjectRoot = resolveToRealPath(this.getProjectRoot());
-      const realResolvedPath = resolveToRealPath(resolvedPath);
-
-      if (!isSubpath(realProjectRoot, realResolvedPath)) {
-        throw new Error(
-          `Custom plans directory '${this.customPlansDir}' resolves to '${realResolvedPath}', which is outside the project root '${realProjectRoot}'.`,
-        );
+  /**
+   * Resolves a path securely relative to the project root.
+   * Throws if the path attempts to escape the workspace (e.g. via ../).
+   */
+  resolveWorkspaceRelativePath(customPath: string): string {
+    const isWindows = os.platform() === 'win32';
+    // Normalize tilde to homedir
+    let expandedPath = customPath;
+    if (
+      expandedPath.startsWith('~/') ||
+      (isWindows && expandedPath.startsWith('~\\'))
+    ) {
+      const home = homedir();
+      if (home) {
+        expandedPath = path.join(home, expandedPath.slice(2));
       }
+    } else if (expandedPath === '~') {
+      expandedPath = homedir() || expandedPath;
+    }
 
-      return resolvedPath;
+    const resolvedPath = path.resolve(this.getProjectRoot(), expandedPath);
+    const realProjectRoot = resolveToRealPath(this.getProjectRoot());
+
+    // By enforcing resolveToRealPath, we guarantee symlinks are evaluated.
+    // If the path doesn't exist, this will throw an error, strictly preventing
+    // traversal vulnerabilities via missing symlinks or permission gaps.
+    const realResolvedPath = resolveToRealPath(resolvedPath);
+
+    if (!isSubpath(realProjectRoot, realResolvedPath)) {
+      throw new Error(
+        `Path '${customPath}' resolves to '${realResolvedPath}', which is outside the project root '${realProjectRoot}'.`,
+      );
+    }
+
+    return resolvedPath;
+  }
+
+  getPlansDir(customDir?: string): string {
+    const dirToResolve = customDir ?? this.customPlansDir;
+    if (dirToResolve) {
+      return this.resolveWorkspaceRelativePath(dirToResolve);
     }
     return this.getProjectTempPlansDir();
   }
