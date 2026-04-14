@@ -55,6 +55,7 @@ const RETRYABLE_NETWORK_CODES = [
   'ECONNREFUSED',
   'ERR_SSL_WRONG_VERSION_NUMBER',
   'EPROTO', // Generic protocol error (often SSL-related)
+  'ERR_STREAM_PREMATURE_CLOSE', // Stream closed prematurely
 ];
 
 // Node.js builds SSL error codes by prepending ERR_SSL_ to the uppercased
