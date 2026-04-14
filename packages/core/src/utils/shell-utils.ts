@@ -1099,10 +1099,20 @@ function detectPowerShellSubstitution(command: string): boolean {
       i++;
       continue;
     }
-    if (char === '`' && !inSingleQuote && i + 1 < command.length) {
-      i += 2;
-      continue;
+
+    if (char === '\x60' && i + 1 < command.length) {
+      if (inDoubleQuote) {
+        const next = command[i + 1];
+        if (['$', '\x60', '"'].includes(next)) {
+          i += 2;
+          continue;
+        }
+      } else {
+        i += 2;
+        continue;
+      }
     }
+
     if (char === '$' && command[i + 1] === '(') {
       return true;
     }
