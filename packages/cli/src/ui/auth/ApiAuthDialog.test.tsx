@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { render } from '../../test-utils/render.js';
+import { renderWithProviders } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import { ApiAuthDialog } from './ApiAuthDialog.js';
@@ -40,11 +40,16 @@ vi.mock('../components/shared/text-buffer.js', async (importOriginal) => {
   };
 });
 
-vi.mock('../contexts/UIStateContext.js', () => ({
-  useUIState: vi.fn(() => ({
-    terminalWidth: 80,
-  })),
-}));
+vi.mock('../contexts/UIStateContext.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../contexts/UIStateContext.js')>();
+  return {
+    ...actual,
+    useUIState: vi.fn(() => ({
+      terminalWidth: 80,
+    })),
+  };
+});
 
 const mockedUseKeypress = useKeypress as Mock;
 const mockedUseTextBuffer = useTextBuffer as Mock;
@@ -73,7 +78,7 @@ describe('ApiAuthDialog', () => {
   });
 
   it('renders correctly', async () => {
-    const { lastFrame, unmount } = await render(
+    const { lastFrame, unmount } = await renderWithProviders(
       <ApiAuthDialog onSubmit={onSubmit} onCancel={onCancel} />,
     );
     expect(lastFrame()).toMatchSnapshot();
@@ -81,7 +86,7 @@ describe('ApiAuthDialog', () => {
   });
 
   it('renders with a defaultValue', async () => {
-    const { unmount } = await render(
+    const { unmount } = await renderWithProviders(
       <ApiAuthDialog
         onSubmit={onSubmit}
         onCancel={onCancel}
@@ -111,7 +116,7 @@ describe('ApiAuthDialog', () => {
     'calls $expectedCall.name when $keyName is pressed',
     async ({ keyName, sequence, expectedCall, args }) => {
       mockBuffer.text = 'submitted-key'; // Set for the onSubmit case
-      const { unmount } = await render(
+      const { unmount } = await renderWithProviders(
         <ApiAuthDialog onSubmit={onSubmit} onCancel={onCancel} />,
       );
       // calls[0] is the ApiAuthDialog's useKeypress (Ctrl+C handler)
@@ -133,7 +138,7 @@ describe('ApiAuthDialog', () => {
   );
 
   it('displays an error message', async () => {
-    const { lastFrame, unmount } = await render(
+    const { lastFrame, unmount } = await renderWithProviders(
       <ApiAuthDialog
         onSubmit={onSubmit}
         onCancel={onCancel}
@@ -146,7 +151,7 @@ describe('ApiAuthDialog', () => {
   });
 
   it('calls clearApiKey and clears buffer when Ctrl+C is pressed', async () => {
-    const { unmount } = await render(
+    const { unmount } = await renderWithProviders(
       <ApiAuthDialog onSubmit={onSubmit} onCancel={onCancel} />,
     );
     // Call 0 is ApiAuthDialog (isActive: true)

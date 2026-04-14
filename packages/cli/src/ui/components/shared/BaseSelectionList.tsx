@@ -5,13 +5,14 @@
  */
 
 import type React from 'react';
-import { useState } from 'react';
-import { Text, Box } from 'ink';
+import { useState, useRef } from 'react';
+import { Text, Box, type DOMElement } from 'ink';
 import { theme } from '../../semantic-colors.js';
 import {
   useSelectionList,
   type SelectionListItem,
 } from '../../hooks/useSelectionList.js';
+import { useMouseClick } from '../../hooks/useMouseClick.js';
 
 export interface RenderItemContext {
   isSelected: boolean;
@@ -36,6 +37,119 @@ export interface BaseSelectionListProps<
   priority?: boolean;
   selectedIndicator?: string;
   renderItem: (item: TItem, context: RenderItemContext) => React.ReactNode;
+}
+
+interface SelectionListItemRowProps<
+  T,
+  TItem extends SelectionListItem<T> = SelectionListItem<T>,
+> {
+  item: TItem;
+  itemIndex: number;
+  isSelected: boolean;
+  isFocused: boolean;
+  showNumbers: boolean;
+  selectedIndicator: string;
+  numberColumnWidth: number;
+  onSelect: (value: T) => void;
+  setActiveIndex: (index: number) => void;
+  renderItem: (item: TItem, context: RenderItemContext) => React.ReactNode;
+}
+
+function SelectionListItemRow<
+  T,
+  TItem extends SelectionListItem<T> = SelectionListItem<T>,
+>({
+  item,
+  itemIndex,
+  isSelected,
+  isFocused,
+  showNumbers,
+  selectedIndicator,
+  numberColumnWidth,
+  onSelect,
+  setActiveIndex,
+  renderItem,
+}: SelectionListItemRowProps<T, TItem>) {
+  const containerRef = useRef<DOMElement>(null);
+
+  useMouseClick(
+    containerRef,
+    () => {
+      if (!item.disabled) {
+        if (isSelected) {
+          // Second click on the same item triggers submission
+          onSelect(item.value);
+        } else {
+          // First click highlights the item
+          setActiveIndex(itemIndex);
+        }
+      }
+    },
+    { isActive: isFocused },
+  );
+
+  let titleColor = theme.text.primary;
+  let numberColor = theme.text.primary;
+
+  if (isSelected) {
+    titleColor = theme.ui.focus;
+    numberColor = theme.ui.focus;
+  } else if (item.disabled) {
+    titleColor = theme.text.secondary;
+    numberColor = theme.text.secondary;
+  }
+
+  if (!isFocused && !item.disabled) {
+    numberColor = theme.text.secondary;
+  }
+
+  if (!showNumbers) {
+    numberColor = theme.text.secondary;
+  }
+
+  const itemNumberText = `${String(itemIndex + 1).padStart(
+    numberColumnWidth,
+  )}.`;
+
+  return (
+    <Box
+      ref={containerRef}
+      key={item.key}
+      alignItems="flex-start"
+      backgroundColor={isSelected ? theme.background.focus : undefined}
+    >
+      {/* Radio button indicator */}
+      <Box minWidth={2} flexShrink={0}>
+        <Text
+          color={isSelected ? theme.ui.focus : theme.text.primary}
+          aria-hidden
+        >
+          {isSelected ? selectedIndicator : ' '}
+        </Text>
+      </Box>
+
+      {/* Item number */}
+      {showNumbers && !item.hideNumber && (
+        <Box
+          marginRight={1}
+          flexShrink={0}
+          minWidth={itemNumberText.length}
+          aria-state={{ checked: isSelected }}
+        >
+          <Text color={numberColor}>{itemNumberText}</Text>
+        </Box>
+      )}
+
+      {/* Custom content via render prop */}
+      <Box flexGrow={1}>
+        {renderItem(item, {
+          isSelected,
+          titleColor,
+          numberColor,
+        })}
+      </Box>
+    </Box>
+  );
 }
 
 /**
@@ -70,7 +184,7 @@ export function BaseSelectionList<
   selectedIndicator = '●',
   renderItem,
 }: BaseSelectionListProps<T, TItem>): React.JSX.Element {
-  const { activeIndex } = useSelectionList({
+  const { activeIndex, setActiveIndex } = useSelectionList({
     items,
     initialIndex,
     onSelect,
@@ -107,10 +221,12 @@ export function BaseSelectionList<
   );
   const numberColumnWidth = String(items.length).length;
 
+  const showArrows = showScrollArrows && items.length > maxItemsToShow;
+
   return (
     <Box flexDirection="column">
       {/* Use conditional coloring instead of conditional rendering */}
-      {showScrollArrows && items.length > maxItemsToShow && (
+      {showArrows && (
         <Text
           color={
             effectiveScrollOffset > 0
@@ -126,71 +242,24 @@ export function BaseSelectionList<
         const itemIndex = effectiveScrollOffset + index;
         const isSelected = activeIndex === itemIndex;
 
-        // Determine colors based on selection and disabled state
-        let titleColor = theme.text.primary;
-        let numberColor = theme.text.primary;
-
-        if (isSelected) {
-          titleColor = theme.ui.focus;
-          numberColor = theme.ui.focus;
-        } else if (item.disabled) {
-          titleColor = theme.text.secondary;
-          numberColor = theme.text.secondary;
-        }
-
-        if (!isFocused && !item.disabled) {
-          numberColor = theme.text.secondary;
-        }
-
-        if (!showNumbers) {
-          numberColor = theme.text.secondary;
-        }
-
-        const itemNumberText = `${String(itemIndex + 1).padStart(
-          numberColumnWidth,
-        )}.`;
-
         return (
-          <Box
+          <SelectionListItemRow
             key={item.key}
-            alignItems="flex-start"
-            backgroundColor={isSelected ? theme.background.focus : undefined}
-          >
-            {/* Radio button indicator */}
-            <Box minWidth={2} flexShrink={0}>
-              <Text
-                color={isSelected ? theme.ui.focus : theme.text.primary}
-                aria-hidden
-              >
-                {isSelected ? selectedIndicator : ' '}
-              </Text>
-            </Box>
-
-            {/* Item number */}
-            {showNumbers && !item.hideNumber && (
-              <Box
-                marginRight={1}
-                flexShrink={0}
-                minWidth={itemNumberText.length}
-                aria-state={{ checked: isSelected }}
-              >
-                <Text color={numberColor}>{itemNumberText}</Text>
-              </Box>
-            )}
-
-            {/* Custom content via render prop */}
-            <Box flexGrow={1}>
-              {renderItem(item, {
-                isSelected,
-                titleColor,
-                numberColor,
-              })}
-            </Box>
-          </Box>
+            item={item}
+            itemIndex={itemIndex}
+            isSelected={isSelected}
+            isFocused={isFocused}
+            showNumbers={showNumbers}
+            selectedIndicator={selectedIndicator}
+            numberColumnWidth={numberColumnWidth}
+            onSelect={onSelect}
+            setActiveIndex={setActiveIndex}
+            renderItem={renderItem}
+          />
         );
       })}
 
-      {showScrollArrows && items.length > maxItemsToShow && (
+      {showArrows && (
         <Text
           color={
             effectiveScrollOffset + maxItemsToShow < items.length
