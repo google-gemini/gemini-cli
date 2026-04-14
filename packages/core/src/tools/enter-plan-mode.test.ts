@@ -39,6 +39,8 @@ describe('EnterPlanModeTool', () => {
 
     mockConfig = {
       setApprovalMode: vi.fn(),
+      getExtensions: vi.fn().mockReturnValue([]),
+      getExtensionSetting: vi.fn(),
       storage: {
         getPlansDir: vi.fn().mockReturnValue('/mock/plans/dir'),
       } as unknown as Config['storage'],
@@ -132,15 +134,114 @@ describe('EnterPlanModeTool', () => {
       expect(result.returnDisplay).toBe('Switching to Plan mode');
     });
 
-    it('should create plans directory if it does not exist', async () => {
-      const invocation = tool.build({});
-      vi.mocked(fs.existsSync).mockReturnValue(false);
+    it('should create custom plan directories for active extensions, handling overrides and fallbacks', async () => {
+      vi.mocked(mockConfig.getExtensions!).mockReturnValue([
+        {
+          name: 'ext-user-override',
+          isActive: true,
+          plan: { directory: '.manifest-dir' }, // Manifest default exists
+        } as import('../config/config.js').GeminiCLIExtension,
+        {
+          name: 'ext-manifest-fallback',
+          isActive: true,
+          plan: { directory: '.manifest-dir' }, // Only manifest default
+        } as import('../config/config.js').GeminiCLIExtension,
+        {
+          name: 'ext-no-custom',
+          isActive: true,
+        } as import('../config/config.js').GeminiCLIExtension,
+        {
+          name: 'ext-inactive',
+          isActive: false,
+          plan: { directory: '.inactive-dir' },
+        } as import('../config/config.js').GeminiCLIExtension,
+      ]);
 
+      vi.mocked(mockConfig.getExtensionSetting!).mockImplementation(
+        (name, setting) => {
+          if (name === 'ext-user-override' && setting === 'plan.directory') {
+            return '.user-override-dir'; // User setting wins
+          }
+          return undefined;
+        },
+      );
+
+      vi.mocked(mockConfig.storage!.getPlansDir).mockImplementation(
+        (customDir?: string) => {
+          if (customDir === '.user-override-dir')
+            return '/mock/plans/user-override';
+          if (customDir === '.manifest-dir')
+            return '/mock/plans/manifest-default';
+          return '/mock/plans/global-default';
+        },
+      );
+
+      const invocation = tool.build({});
       await invocation.execute({ abortSignal: new AbortController().signal });
 
-      expect(fs.mkdirSync).toHaveBeenCalledWith('/mock/plans/dir', {
+      // 1. Global default should be created
+      expect(fs.mkdirSync).toHaveBeenCalledWith('/mock/plans/global-default', {
         recursive: true,
       });
+      // 2. User override should be created for ext-user-override
+      expect(fs.mkdirSync).toHaveBeenCalledWith('/mock/plans/user-override', {
+        recursive: true,
+      });
+      // 3. Manifest default should be created for ext-manifest-fallback
+      expect(fs.mkdirSync).toHaveBeenCalledWith(
+        '/mock/plans/manifest-default',
+        {
+          recursive: true,
+        },
+      );
+      // 4. No folder should be created for ext-no-custom
+      // 5. No folder should be created for ext-inactive
+      expect(fs.mkdirSync).not.toHaveBeenCalledWith(
+        '/mock/plans/inactive-dir',
+        {
+          recursive: true,
+        },
+      );
+
+      expect(fs.mkdirSync).toHaveBeenCalledTimes(3);
+    });
+
+    it('should ignore validation failures for extension-specific plan directories and continue', async () => {
+      vi.mocked(mockConfig.getExtensions!).mockReturnValue([
+        {
+          name: 'ext-invalid',
+          isActive: true,
+          plan: { directory: '../illegal' },
+        } as import('../config/config.js').GeminiCLIExtension,
+        {
+          name: 'ext-valid',
+          isActive: true,
+          plan: { directory: '.valid' },
+        } as import('../config/config.js').GeminiCLIExtension,
+      ]);
+
+      vi.mocked(mockConfig.storage!.getPlansDir).mockImplementation(
+        (customDir?: string) => {
+          if (customDir === '../illegal')
+            throw new Error('Path traversal detected');
+          if (customDir === '.valid') return '/mock/plans/valid';
+          return '/mock/plans/global-default';
+        },
+      );
+
+      const invocation = tool.build({});
+      await invocation.execute({ abortSignal: new AbortController().signal });
+
+      // Should create global default
+      expect(fs.mkdirSync).toHaveBeenCalledWith('/mock/plans/global-default', {
+        recursive: true,
+      });
+      // Should create valid extension dir
+      expect(fs.mkdirSync).toHaveBeenCalledWith('/mock/plans/valid', {
+        recursive: true,
+      });
+      // Should NOT have crashed on illegal dir
+      expect(fs.mkdirSync).toHaveBeenCalledTimes(2);
     });
 
     it('should include optional reason in output display but not in llmContent', async () => {
