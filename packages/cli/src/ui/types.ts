@@ -498,6 +498,8 @@ export interface ConsoleMessageItem {
 export interface SubmitPromptResult {
   type: 'submit_prompt';
   content: PartListUnion;
+  activeExtensionName?: string;
+  clearExtensionMRU?: boolean;
 }
 
 /**
@@ -509,9 +511,13 @@ export type SlashCommandProcessorResult =
       toolName: string;
       toolArgs: Record<string, unknown>;
       postSubmitPrompt?: PartListUnion;
+      activeExtensionName?: string;
+      clearExtensionMRU?: boolean;
     }
   | {
       type: 'handled'; // Indicates the command was processed and no further action is needed.
+      activeExtensionName?: string;
+      clearExtensionMRU?: boolean;
     }
   | SubmitPromptResult;
 

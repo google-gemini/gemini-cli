@@ -64,7 +64,6 @@ export class ExitPlanModeTool extends BaseDeclarativeTool<
     }
     return this.config.storage.getPlansDir(customDir);
   }
-
   protected override validateToolParamValues(
     params: ExitPlanModeParams,
   ): string | null {

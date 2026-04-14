@@ -670,6 +670,8 @@ describe('useSlashCommandProcessor', () => {
       expect(actionResult).toEqual({
         type: 'submit_prompt',
         content: [{ text: 'The actual prompt from the TOML file.' }],
+        activeExtensionName: undefined,
+        clearExtensionMRU: false,
       });
 
       expect(mockAddItem).toHaveBeenCalledWith(
@@ -704,6 +706,8 @@ describe('useSlashCommandProcessor', () => {
       expect(actionResult).toEqual({
         type: 'submit_prompt',
         content: [{ text: 'The actual prompt from the mcp command.' }],
+        activeExtensionName: undefined,
+        clearExtensionMRU: false,
       });
 
       expect(mockAddItem).toHaveBeenCalledWith(

@@ -935,6 +935,13 @@ export const useGeminiStream = (
             : false;
 
           if (slashCommandResult) {
+            if (slashCommandResult.clearExtensionMRU) {
+              config.setActiveExtensionName(undefined);
+            } else if (slashCommandResult.activeExtensionName) {
+              config.setActiveExtensionName(
+                slashCommandResult.activeExtensionName,
+              );
+            }
             switch (slashCommandResult.type) {
               case 'schedule_tool': {
                 const { toolName, toolArgs, postSubmitPrompt } =
@@ -1750,6 +1757,12 @@ export const useGeminiStream = (
 
   const handleApprovalModeChange = useCallback(
     async (newApprovalMode: ApprovalMode) => {
+      if (
+        previousApprovalModeRef.current === ApprovalMode.PLAN &&
+        newApprovalMode !== ApprovalMode.PLAN
+      ) {
+        config.setActiveExtensionName(undefined);
+      }
       if (
         previousApprovalModeRef.current === ApprovalMode.PLAN &&
         newApprovalMode !== ApprovalMode.PLAN &&

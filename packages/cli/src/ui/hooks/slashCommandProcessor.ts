@@ -448,6 +448,8 @@ export const useSlashCommandProcessor = (
                     toolName: result.toolName,
                     toolArgs: result.toolArgs,
                     postSubmitPrompt: result.postSubmitPrompt,
+                    activeExtensionName: commandToExecute?.extensionName,
+                    clearExtensionMRU: commandToExecute?.name === 'clear',
                   };
                 case 'message':
                   addItem(
@@ -460,7 +462,11 @@ export const useSlashCommandProcessor = (
                     },
                     Date.now(),
                   );
-                  return { type: 'handled' };
+                  return {
+                    type: 'handled',
+                    activeExtensionName: commandToExecute?.extensionName,
+                    clearExtensionMRU: commandToExecute?.name === 'clear',
+                  };
                 case 'logout':
                   // Show logout confirmation dialog with Login/Exit options
                   setCustomDialog(
@@ -476,30 +482,62 @@ export const useSlashCommandProcessor = (
                       },
                     }),
                   );
-                  return { type: 'handled' };
+                  return {
+                    type: 'handled',
+                    activeExtensionName: commandToExecute?.extensionName,
+                    clearExtensionMRU: commandToExecute?.name === 'clear',
+                  };
                 case 'dialog':
                   switch (result.dialog) {
                     case 'auth':
                       actions.openAuthDialog();
-                      return { type: 'handled' };
+                      return {
+                        type: 'handled',
+                        activeExtensionName: commandToExecute?.extensionName,
+                        clearExtensionMRU: commandToExecute?.name === 'clear',
+                      };
                     case 'theme':
                       actions.openThemeDialog();
-                      return { type: 'handled' };
+                      return {
+                        type: 'handled',
+                        activeExtensionName: commandToExecute?.extensionName,
+                        clearExtensionMRU: commandToExecute?.name === 'clear',
+                      };
                     case 'editor':
                       actions.openEditorDialog();
-                      return { type: 'handled' };
+                      return {
+                        type: 'handled',
+                        activeExtensionName: commandToExecute?.extensionName,
+                        clearExtensionMRU: commandToExecute?.name === 'clear',
+                      };
                     case 'privacy':
                       actions.openPrivacyNotice();
-                      return { type: 'handled' };
+                      return {
+                        type: 'handled',
+                        activeExtensionName: commandToExecute?.extensionName,
+                        clearExtensionMRU: commandToExecute?.name === 'clear',
+                      };
                     case 'sessionBrowser':
                       actions.openSessionBrowser();
-                      return { type: 'handled' };
+                      return {
+                        type: 'handled',
+                        activeExtensionName: commandToExecute?.extensionName,
+                        clearExtensionMRU: commandToExecute?.name === 'clear',
+                      };
                     case 'settings':
                       actions.openSettingsDialog();
-                      return { type: 'handled' };
+                      return {
+                        type: 'handled',
+                        activeExtensionName: commandToExecute?.extensionName,
+                        clearExtensionMRU: commandToExecute?.name === 'clear',
+                      };
                     case 'model':
                       actions.openModelDialog();
-                      return { type: 'handled' };
+                      return {
+                        type: 'handled',
+                        activeExtensionName: commandToExecute?.extensionName,
+                        clearExtensionMRU: commandToExecute?.name === 'clear',
+                      };
                     case 'agentConfig': {
                       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
                       const props = result.props as Record<string, unknown>;
@@ -522,16 +560,28 @@ export const useSlashCommandProcessor = (
                         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
                         props['definition'] as AgentDefinition,
                       );
-                      return { type: 'handled' };
+                      return {
+                        type: 'handled',
+                        activeExtensionName: commandToExecute?.extensionName,
+                        clearExtensionMRU: commandToExecute?.name === 'clear',
+                      };
                     }
                     case 'permissions':
                       actions.openPermissionsDialog(
                         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
                         result.props as { targetDirectory?: string },
                       );
-                      return { type: 'handled' };
+                      return {
+                        type: 'handled',
+                        activeExtensionName: commandToExecute?.extensionName,
+                        clearExtensionMRU: commandToExecute?.name === 'clear',
+                      };
                     case 'help':
-                      return { type: 'handled' };
+                      return {
+                        type: 'handled',
+                        activeExtensionName: commandToExecute?.extensionName,
+                        clearExtensionMRU: commandToExecute?.name === 'clear',
+                      };
                     default: {
                       const unhandled: never = result.dialog;
                       throw new Error(
@@ -545,16 +595,26 @@ export const useSlashCommandProcessor = (
                   result.history.forEach((item, index) => {
                     fullCommandContext.ui.addItem(item, index);
                   });
-                  return { type: 'handled' };
+                  return {
+                    type: 'handled',
+                    activeExtensionName: commandToExecute?.extensionName,
+                    clearExtensionMRU: commandToExecute?.name === 'clear',
+                  };
                 }
                 case 'quit':
                   actions.quit(result.messages);
-                  return { type: 'handled' };
+                  return {
+                    type: 'handled',
+                    activeExtensionName: commandToExecute?.extensionName,
+                    clearExtensionMRU: commandToExecute?.name === 'clear',
+                  };
 
                 case 'submit_prompt':
                   return {
                     type: 'submit_prompt',
                     content: result.content,
+                    activeExtensionName: commandToExecute?.extensionName,
+                    clearExtensionMRU: commandToExecute?.name === 'clear',
                   };
                 case 'confirm_shell_commands': {
                   const callId = `expansion-${Date.now()}`;
@@ -611,7 +671,11 @@ export const useSlashCommandProcessor = (
                       },
                       Date.now(),
                     );
-                    return { type: 'handled' };
+                    return {
+                      type: 'handled',
+                      activeExtensionName: commandToExecute?.extensionName,
+                      clearExtensionMRU: commandToExecute?.name === 'clear',
+                    };
                   }
 
                   if (outcome === ToolConfirmationOutcome.ProceedAlways) {
@@ -649,7 +713,11 @@ export const useSlashCommandProcessor = (
                       },
                       Date.now(),
                     );
-                    return { type: 'handled' };
+                    return {
+                      type: 'handled',
+                      activeExtensionName: commandToExecute?.extensionName,
+                      clearExtensionMRU: commandToExecute?.name === 'clear',
+                    };
                   }
 
                   return await handleSlashCommand(
@@ -660,7 +728,11 @@ export const useSlashCommandProcessor = (
                 }
                 case 'custom_dialog': {
                   setCustomDialog(result.component);
-                  return { type: 'handled' };
+                  return {
+                    type: 'handled',
+                    activeExtensionName: commandToExecute?.extensionName,
+                    clearExtensionMRU: commandToExecute?.name === 'clear',
+                  };
                 }
                 default: {
                   const unhandled: never = result;
@@ -671,7 +743,11 @@ export const useSlashCommandProcessor = (
               }
             }
 
-            return { type: 'handled' };
+            return {
+              type: 'handled',
+              activeExtensionName: commandToExecute?.extensionName,
+              clearExtensionMRU: commandToExecute?.name === 'clear',
+            };
           } else if (commandToExecute.subCommands) {
             const helpText = `Command '/${commandToExecute.name}' requires a subcommand. Available:\n${commandToExecute.subCommands
               .map((sc) => `  - ${sc.name}: ${sc.description || ''}`)
@@ -681,11 +757,19 @@ export const useSlashCommandProcessor = (
               content: helpText,
               timestamp: new Date(),
             });
-            return { type: 'handled' };
+            return {
+              type: 'handled',
+              activeExtensionName: commandToExecute?.extensionName,
+              clearExtensionMRU: commandToExecute?.name === 'clear',
+            };
           }
         }
 
-        return { type: 'handled' };
+        return {
+          type: 'handled',
+          activeExtensionName: commandToExecute?.extensionName,
+          clearExtensionMRU: commandToExecute?.name === 'clear',
+        };
       } catch (e: unknown) {
         hasError = true;
         if (config) {
@@ -704,7 +788,11 @@ export const useSlashCommandProcessor = (
           },
           Date.now(),
         );
-        return { type: 'handled' };
+        return {
+          type: 'handled',
+          activeExtensionName: commandToExecute?.extensionName,
+          clearExtensionMRU: commandToExecute?.name === 'clear',
+        };
       } finally {
         if (config && resolvedCommandPath[0] && !hasError) {
           const event = makeSlashCommandEvent({
