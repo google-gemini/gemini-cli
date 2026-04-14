@@ -1,0 +1,132 @@
+# yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
+
+name: 'Agent Session Drift Check'
+
+on:
+  pull_request:
+    branches:
+      - 'main'
+      - 'release/**'
+    paths:
+      - 'packages/cli/src/nonInteractiveCli.ts'
+      - 'packages/cli/src/nonInteractiveCliAgentSession.ts'
+
+concurrency:
+  group: '${{ github.workflow }}-${{ github.head_ref || github.ref }}'
+  cancel-in-progress: true
+
+jobs:
+  check-drift:
+    name: 'Check Agent Session Drift'
+    runs-on: 'ubuntu-latest'
+    if: "github.repository == 'google-gemini/gemini-cli'"
+    permissions:
+      contents: 'read'
+      pull-requests: 'write'
+    steps:
+      - name: 'Detect drift and comment'
+        uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea' # ratchet:actions/github-script@v8
+        with:
+          script: |-
+            // === Pair configuration — append here to cover more pairs ===
+            const PAIRS = [
+              {
+                legacy: 'packages/cli/src/nonInteractiveCli.ts',
+                session: 'packages/cli/src/nonInteractiveCliAgentSession.ts',
+                label: 'non-interactive CLI',
+              },
+              // Future pairs can be added here. Remember to also add both
+              // paths to the `paths:` filter at the top of this workflow.
+              // Example:
+              // {
+              //   legacy: 'packages/core/src/agents/local-invocation.ts',
+              //   session: 'packages/core/src/agents/local-session-invocation.ts',
+              //   label: 'local subagent invocation',
+              // },
+            ];
+            // ============================================================
+
+            const prNumber = context.payload.pull_request.number;
+            const { owner, repo } = context.repo;
+
+            // Use the API to list changed files — no checkout/git diff needed.
+            const files = await github.paginate(github.rest.pulls.listFiles, {
+              owner,
+              repo,
+              pull_number: prNumber,
+              per_page: 100,
+            });
+            const changed = new Set(files.map((f) => f.filename));
+
+            const warnings = [];
+            for (const { legacy, session, label } of PAIRS) {
+              const legacyChanged = changed.has(legacy);
+              const sessionChanged = changed.has(session);
+              if (legacyChanged && !sessionChanged) {
+                warnings.push(
+                  `**${label}**: \`${legacy}\` was modified but \`${session}\` was not.`,
+                );
+              } else if (!legacyChanged && sessionChanged) {
+                warnings.push(
+                  `**${label}**: \`${session}\` was modified but \`${legacy}\` was not.`,
+                );
+              }
+            }
+
+            const MARKER = '<!-- agent-session-drift-check -->';
+
+            // Look up our existing drift comment (for upsert/cleanup).
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number: prNumber,
+              per_page: 100,
+            });
+            const existing = comments.find(
+              (c) => c.user?.type === 'Bot' && c.body?.includes(MARKER),
+            );
+
+            if (warnings.length === 0) {
+              core.info('No drift detected.');
+              // If drift was previously flagged and is now resolved, remove the comment.
+              if (existing) {
+                await github.rest.issues.deleteComment({
+                  owner,
+                  repo,
+                  comment_id: existing.id,
+                });
+                core.info(`Deleted stale drift comment ${existing.id}.`);
+              }
+              return;
+            }
+
+            const body = [
+              MARKER,
+              '### ⚠️ Invocation Drift Warning',
+              '',
+              'The following file pairs should generally be kept in sync during the AgentSession migration:',
+              '',
+              ...warnings.map((w) => `- ${w}`),
+              '',
+              'If this is intentional (e.g., a bug fix specific to one implementation), you can ignore this comment.',
+              '',
+              '_This check will be removed once the legacy implementations are deleted._',
+            ].join('\n');
+
+            if (existing) {
+              core.info(`Updating existing drift comment ${existing.id}.`);
+              await github.rest.issues.updateComment({
+                owner,
+                repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              core.info('Creating new drift comment.');
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: prNumber,
+                body,
+              });
+            }
