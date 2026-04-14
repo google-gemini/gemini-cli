@@ -37,6 +37,7 @@ import {
   createSandboxDenialCache,
   type SandboxDenialCache,
 } from '../utils/sandboxDenialUtils.js';
+import { isErrnoException } from '../utils/fsUtils.js';
 import { handleReadWriteCommands } from '../utils/sandboxReadWriteUtils.js';
 import { buildBwrapArgs } from './bwrapArgsBuilder.js';
 
@@ -116,9 +117,12 @@ function touch(filePath: string, isDirectory: boolean) {
   assertValidPathString(filePath);
   try {
     // If it exists (even as a broken symlink), do nothing
-    if (fs.lstatSync(filePath)) return;
-  } catch {
-    // Ignore ENOENT
+    fs.lstatSync(filePath);
+    return;
+  } catch (e: unknown) {
+    if (isErrnoException(e) && e.code !== 'ENOENT') {
+      throw e;
+    }
   }
 
   if (isDirectory) {
@@ -136,8 +140,21 @@ function touch(filePath: string, isDirectory: boolean) {
 export class LinuxSandboxManager implements SandboxManager {
   private static maskFilePath: string | undefined;
   private readonly denialCache: SandboxDenialCache = createSandboxDenialCache();
+  private governanceFilesInitialized = false;
 
   constructor(private readonly options: GlobalSandboxOptions) {}
+
+  private ensureGovernanceFilesExist(workspace: string): void {
+    if (this.governanceFilesInitialized) return;
+
+    // These must exist on the host before running the sandbox to ensure they are protected.
+    for (const file of GOVERNANCE_FILES) {
+      const filePath = join(workspace, file.path);
+      touch(filePath, file.isDirectory);
+    }
+
+    this.governanceFilesInitialized = true;
+  }
 
   isKnownSafeCommand(args: string[]): boolean {
     return isKnownSafeCommand(args);
@@ -258,17 +275,14 @@ export class LinuxSandboxManager implements SandboxManager {
       mergedAdditional,
     );
 
-    for (const file of GOVERNANCE_FILES) {
-      const filePath = join(this.options.workspace, file.path);
-      touch(filePath, file.isDirectory);
-    }
+    this.ensureGovernanceFilesExist(resolvedPaths.workspace.resolved);
 
     const bwrapArgs = await buildBwrapArgs({
       resolvedPaths,
       workspaceWrite,
       networkAccess: mergedAdditional.network ?? false,
       maskFilePath: this.getMaskFilePath(),
-      isWriteCommand: req.command === '__write',
+      isReadOnlyCommand: req.command === '__read',
     });
 
     const bpfPath = getSeccompBpfPath();
