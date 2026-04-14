@@ -115,7 +115,11 @@ describe('runInDevTraceSpan', () => {
     const fn = vi.fn(async () => 'result');
 
     const result = await runInDevTraceSpan(
-      { operation: GeminiCliOperation.LLMCall, sessionId: 'test-session-id' },
+      {
+        operation: GeminiCliOperation.LLMCall,
+        sessionId: 'test-session-id',
+        tracesEnabled: true,
+      },
       fn,
     );
 
@@ -134,7 +138,11 @@ describe('runInDevTraceSpan', () => {
 
   it('should set default attributes on the span metadata', async () => {
     await runInDevTraceSpan(
-      { operation: GeminiCliOperation.LLMCall, sessionId: 'test-session-id' },
+      {
+        operation: GeminiCliOperation.LLMCall,
+        sessionId: 'test-session-id',
+        tracesEnabled: true,
+      },
       async ({ metadata }) => {
         expect(metadata.attributes[GEN_AI_OPERATION_NAME]).toBe(
           GeminiCliOperation.LLMCall,
@@ -152,7 +160,11 @@ describe('runInDevTraceSpan', () => {
 
   it('should set span attributes from metadata on completion', async () => {
     await runInDevTraceSpan(
-      { operation: GeminiCliOperation.LLMCall, sessionId: 'test-session-id' },
+      {
+        operation: GeminiCliOperation.LLMCall,
+        sessionId: 'test-session-id',
+        tracesEnabled: true,
+      },
       async ({ metadata }) => {
         metadata.input = { query: 'hello' };
         metadata.output = { response: 'world' };
@@ -179,7 +191,11 @@ describe('runInDevTraceSpan', () => {
     const error = new Error('test error');
     await expect(
       runInDevTraceSpan(
-        { operation: GeminiCliOperation.LLMCall, sessionId: 'test-session-id' },
+        {
+          operation: GeminiCliOperation.LLMCall,
+          sessionId: 'test-session-id',
+          tracesEnabled: true,
+        },
         async () => {
           throw error;
         },
@@ -201,7 +217,11 @@ describe('runInDevTraceSpan', () => {
     }
 
     const resultStream = await runInDevTraceSpan(
-      { operation: GeminiCliOperation.LLMCall, sessionId: 'test-session-id' },
+      {
+        operation: GeminiCliOperation.LLMCall,
+        sessionId: 'test-session-id',
+        tracesEnabled: true,
+      },
       async () => testStream(),
     );
 
@@ -223,7 +243,11 @@ describe('runInDevTraceSpan', () => {
     }
 
     const resultStream = await runInDevTraceSpan(
-      { operation: GeminiCliOperation.LLMCall, sessionId: 'test-session-id' },
+      {
+        operation: GeminiCliOperation.LLMCall,
+        sessionId: 'test-session-id',
+        tracesEnabled: true,
+      },
       async () => testStream(),
     );
 
@@ -237,7 +261,11 @@ describe('runInDevTraceSpan', () => {
     }
 
     const resultStream = await runInDevTraceSpan(
-      { operation: GeminiCliOperation.LLMCall, sessionId: 'test-session-id' },
+      {
+        operation: GeminiCliOperation.LLMCall,
+        sessionId: 'test-session-id',
+        tracesEnabled: true,
+      },
       async () => testStream(),
     );
 
@@ -263,7 +291,11 @@ describe('runInDevTraceSpan', () => {
     }
 
     const resultStream = await runInDevTraceSpan(
-      { operation: GeminiCliOperation.LLMCall, sessionId: 'test-session-id' },
+      {
+        operation: GeminiCliOperation.LLMCall,
+        sessionId: 'test-session-id',
+        tracesEnabled: true,
+      },
       async () => errorStream(),
     );
 
@@ -282,7 +314,11 @@ describe('runInDevTraceSpan', () => {
     });
 
     await runInDevTraceSpan(
-      { operation: GeminiCliOperation.LLMCall, sessionId: 'test-session-id' },
+      {
+        operation: GeminiCliOperation.LLMCall,
+        sessionId: 'test-session-id',
+        tracesEnabled: true,
+      },
       async ({ metadata }) => {
         metadata.input = 'trigger error';
       },
