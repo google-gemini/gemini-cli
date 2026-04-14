@@ -44,6 +44,17 @@ export const spanRegistry = new FinalizationRegistry((endSpan: () => void) => {
   }
 });
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function isHasToJSON(value: unknown): value is { toJSON: () => unknown } {
+  if (!isRecord(value)) return false;
+  if (!('toJSON' in value)) return false;
+  const toJSONFn = value['toJSON'];
+  return typeof toJSONFn === 'function';
+}
+
 /**
  * Truncates a value for inclusion in telemetry attributes.
  *
@@ -56,6 +67,7 @@ export function truncateForTelemetry(
   maxStringLength = 10000,
   maxArrayLength = 100,
   maxDepth = 4,
+  maxGlobalStringLength = 50000,
 ): AttributeValue | undefined {
   const truncateObj = (v: unknown, depth: number): unknown => {
     if (typeof v === 'string') {
@@ -76,6 +88,13 @@ export function truncateForTelemetry(
     ) {
       return v;
     }
+    if (isHasToJSON(v)) {
+      try {
+        return truncateObj(v.toJSON(), depth);
+      } catch {
+        // Ignore and fall back to manual structural iteration
+      }
+    }
     if (typeof v === 'object') {
       if (depth >= maxDepth) {
         return `[TRUNCATED: Max Depth Reached]`;
@@ -94,15 +113,20 @@ export function truncateForTelemetry(
       const newObj: Record<string, unknown> = {};
       let numKeys = 0;
       const MAX_KEYS = 100;
-      for (const key in v) {
-        if (!Object.prototype.hasOwnProperty.call(v, key)) continue;
+      const recordV = isRecord(v) ? v : {};
+      for (const key in recordV) {
+        if (!Object.prototype.hasOwnProperty.call(recordV, key)) continue;
         if (numKeys >= MAX_KEYS) {
           newObj['__truncated'] = `[TRUNCATED: Object with >${MAX_KEYS} keys]`;
           break;
         }
-        const descriptor = Object.getOwnPropertyDescriptor(v, key);
-        if (descriptor) {
-          newObj[key] = truncateObj(descriptor.value, depth + 1);
+        try {
+          const val = recordV[key];
+          const truncatedKey =
+            key.length > 100 ? key.slice(0, 100) + '...[TRUNCATED_KEY]' : key;
+          newObj[truncatedKey] = truncateObj(val, depth + 1);
+        } catch {
+          newObj[key] = '[ERROR: Failed to read property]';
         }
         numKeys++;
       }
@@ -124,7 +148,16 @@ export function truncateForTelemetry(
     return undefined;
   }
 
-  return safeJsonStringify(truncated) as AttributeValue;
+  const stringified = safeJsonStringify(truncated);
+  if (stringified.length > maxGlobalStringLength) {
+    const graphemes = Array.from(stringified);
+    if (graphemes.length > maxGlobalStringLength) {
+      return (graphemes.slice(0, maxGlobalStringLength).join('') +
+        `...[TRUNCATED: original payload length ${graphemes.length}]`) as AttributeValue;
+    }
+  }
+
+  return stringified as AttributeValue;
 }
 
 function isAsyncIterable<T>(value: T): value is T & AsyncIterable<unknown> {
