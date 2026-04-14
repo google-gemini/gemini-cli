@@ -606,40 +606,42 @@ describe('resolveExecutable', () => {
   });
 });
 
-  describe('inferFileOperation', () => {
-    it('should infer sed -i as an EDIT operation', () => {
-      mockPlatform.mockReturnValue('linux');
-      const result = inferFileOperation("sed -i 's/foo/bar/g' test.ts");
-      expect(result).toBeDefined();
-      expect(result?.type).toBe(FileOperationType.EDIT);
-      expect(result?.filePath).toBe('test.ts');
-      expect(result?.metadata?.['sedExpression']).toBe('s/foo/bar/g');
-    });
-
-    it('should infer echo redirection as a WRITE operation', () => {
-      mockPlatform.mockReturnValue('linux');
-      const result = inferFileOperation("echo 'hello' > hello.txt");
-      expect(result).toBeDefined();
-      expect(result?.type).toBe(FileOperationType.WRITE);
-      expect(result?.filePath).toBe('hello.txt');
-    });
-
-    it('should infer grep as a SEARCH operation', () => {
-      mockPlatform.mockReturnValue('linux');
-      const result = inferFileOperation("grep 'pattern' file.txt");
-      expect(result).toBeDefined();
-      expect(result?.type).toBe(FileOperationType.SEARCH);
-      expect(result?.filePath).toBe('file.txt');
-      expect(result?.metadata?.['pattern']).toBe('pattern');
-    });
-
-    it('should infer PowerShell -replace as an EDIT operation', () => {
-      mockPlatform.mockReturnValue('win32');
-      const result = inferFileOperation("(Get-Content file.txt) -replace 'a', 'b' | Set-Content file.txt");
-      expect(result).toBeDefined();
-      expect(result?.type).toBe(FileOperationType.EDIT);
-      expect(result?.filePath).toBe('file.txt');
-      expect(result?.metadata?.['oldString']).toBe('a');
-      expect(result?.metadata?.['newString']).toBe('b');
-    });
+describe('inferFileOperation', () => {
+  it('should infer sed -i as an EDIT operation', () => {
+    mockPlatform.mockReturnValue('linux');
+    const result = inferFileOperation("sed -i 's/foo/bar/g' test.ts");
+    expect(result).toBeDefined();
+    expect(result?.type).toBe(FileOperationType.EDIT);
+    expect(result?.filePath).toBe('test.ts');
+    expect(result?.metadata?.['sedExpression']).toBe('s/foo/bar/g');
   });
+
+  it('should infer echo redirection as a WRITE operation', () => {
+    mockPlatform.mockReturnValue('linux');
+    const result = inferFileOperation("echo 'hello' > hello.txt");
+    expect(result).toBeDefined();
+    expect(result?.type).toBe(FileOperationType.WRITE);
+    expect(result?.filePath).toBe('hello.txt');
+  });
+
+  it('should infer grep as a SEARCH operation', () => {
+    mockPlatform.mockReturnValue('linux');
+    const result = inferFileOperation("grep 'pattern' file.txt");
+    expect(result).toBeDefined();
+    expect(result?.type).toBe(FileOperationType.SEARCH);
+    expect(result?.filePath).toBe('file.txt');
+    expect(result?.metadata?.['pattern']).toBe('pattern');
+  });
+
+  it('should infer PowerShell -replace as an EDIT operation', () => {
+    mockPlatform.mockReturnValue('win32');
+    const result = inferFileOperation(
+      "(Get-Content file.txt) -replace 'a', 'b' | Set-Content file.txt",
+    );
+    expect(result).toBeDefined();
+    expect(result?.type).toBe(FileOperationType.EDIT);
+    expect(result?.filePath).toBe('file.txt');
+    expect(result?.metadata?.['oldString']).toBe('a');
+    expect(result?.metadata?.['newString']).toBe('b');
+  });
+});

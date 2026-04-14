@@ -6,6 +6,12 @@ Narrow Container
 "
 `;
 
+exports[`<SectionHeader /> > 'renders correctly in a narrow contain…' 2`] = `
+"─────────────────────────
+Narrow Container
+"
+`;
+
 exports[`<SectionHeader /> > 'renders correctly when title is trunc…' 1`] = `
 "────────────────────
 Very Long Header Ti…

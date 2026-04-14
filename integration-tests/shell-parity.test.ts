@@ -5,9 +5,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import {
-  TestRig,
-} from './test-helper.js';
+import { TestRig } from './test-helper.js';
 
 describe('shell-parity', () => {
   let rig: TestRig;
@@ -19,20 +17,29 @@ describe('shell-parity', () => {
   afterEach(async () => await rig.cleanup());
 
   it('should use run_shell_command for replace when sandboxing is enabled', async () => {
-    await rig.setup('should use run_shell_command for replace when sandboxing is enabled', {
-      settings: {
-        security: { toolSandboxing: true },
+    await rig.setup(
+      'should use run_shell_command for replace when sandboxing is enabled',
+      {
+        settings: {
+          security: { toolSandboxing: true },
+        },
       },
-    });
+    );
     rig.createFile('test.ts', 'const foo = "bar";');
 
     // We expect the model to use run_shell_command because edit/replace/write_file are filtered out.
-    const result = await rig.run({
+    await rig.run({
       args: `Replace "bar" with "baz" in test.ts`,
     });
 
     // Verify forbidden tools were NOT used
-    const forbiddenTools = ['grep_search', 'replace', 'write_file', 'edit', 'read_file'];
+    const forbiddenTools = [
+      'grep_search',
+      'replace',
+      'write_file',
+      'edit',
+      'read_file',
+    ];
     const toolLogs = rig.readToolLogs();
     const usedForbidden = toolLogs.filter((t) =>
       forbiddenTools.includes(t.toolRequest.name),
@@ -55,11 +62,14 @@ describe('shell-parity', () => {
   });
 
   it('should use run_shell_command for search when sandboxing is enabled', async () => {
-    await rig.setup('should use run_shell_command for search when sandboxing is enabled', {
-      settings: {
-        security: { toolSandboxing: true },
+    await rig.setup(
+      'should use run_shell_command for search when sandboxing is enabled',
+      {
+        settings: {
+          security: { toolSandboxing: true },
+        },
       },
-    });
+    );
     rig.createFile('search-me.txt', 'target-string');
 
     await rig.run({
@@ -68,7 +78,9 @@ describe('shell-parity', () => {
 
     // Verify grep_search was NOT used
     const toolLogs = rig.readToolLogs();
-    const usedGrep = toolLogs.filter((t) => t.toolRequest.name === 'grep_search');
+    const usedGrep = toolLogs.filter(
+      (t) => t.toolRequest.name === 'grep_search',
+    );
     expect(usedGrep).toHaveLength(0);
 
     // Verify run_shell_command was used
@@ -80,11 +92,14 @@ describe('shell-parity', () => {
   });
 
   it('should use run_shell_command for read when sandboxing is enabled', async () => {
-    await rig.setup('should use run_shell_command for read when sandboxing is enabled', {
-      settings: {
-        security: { toolSandboxing: true },
+    await rig.setup(
+      'should use run_shell_command for read when sandboxing is enabled',
+      {
+        settings: {
+          security: { toolSandboxing: true },
+        },
       },
-    });
+    );
     rig.createFile('read-me.txt', 'hello world');
 
     const result = await rig.run({

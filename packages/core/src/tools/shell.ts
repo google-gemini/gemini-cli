@@ -151,6 +151,8 @@ export class ShellToolInvocation extends BaseToolInvocation<
           return `Shell (Write File)`;
         case FileOperationType.READ:
           return `Shell (Read File)`;
+        default:
+          break;
       }
     }
     return this.params.command;
@@ -218,7 +220,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
   }
 
   protected override async getConfirmationDetails(
-    abortSignal: AbortSignal,
+    _abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
     const command = stripShellWrapper(this.params.command);
     const inferred = inferFileOperation(this.params.command);
@@ -244,25 +246,29 @@ export class ShellToolInvocation extends BaseToolInvocation<
         inferred.type === FileOperationType.EDIT &&
         originalContent !== null
       ) {
-        if (inferred.metadata?.['sedExpression']) {
+        if (typeof inferred.metadata?.['sedExpression'] === 'string') {
           newContent = this.simulateSed(
             originalContent,
-            inferred.metadata['sedExpression'] as string,
+            inferred.metadata['sedExpression'],
           );
         } else if (
-          inferred.metadata?.['oldString'] &&
-          inferred.metadata?.['newString']
+          typeof inferred.metadata?.['oldString'] === 'string' &&
+          typeof inferred.metadata?.['newString'] === 'string'
         ) {
           newContent = this.simulatePsReplace(
             originalContent,
-            inferred.metadata['oldString'] as string,
-            inferred.metadata['newString'] as string,
+            inferred.metadata['oldString'],
+            inferred.metadata['newString'],
           );
         }
       }
 
       if (newContent !== undefined && originalContent !== null) {
-        const fileDiff = Diff.createPatch(filePath, originalContent, newContent);
+        const fileDiff = Diff.createPatch(
+          filePath,
+          originalContent,
+          newContent,
+        );
         const editDetails: ToolEditConfirmationDetails = {
           type: 'edit',
           title: this.getDisplayTitle(),
@@ -510,6 +516,8 @@ export class ShellToolInvocation extends BaseToolInvocation<
           case FileOperationType.WRITE:
             operation = FileOperation.UPDATE;
             canonicalToolName = WRITE_FILE_TOOL_NAME;
+            break;
+          default:
             break;
         }
 

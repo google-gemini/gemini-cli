@@ -835,7 +835,9 @@ export function inferFileOperation(
     }
 
     // ... | tee file
-    const teeMatch = stripped.match(/\|\s*tee\s+(?:-a\s+)?['"]?([^'"]+)['"]?\s*$/);
+    const teeMatch = stripped.match(
+      /\|\s*tee\s+(?:-a\s+)?['"]?([^'"]+)['"]?\s*$/,
+    );
     if (teeMatch) {
       return {
         type: FileOperationType.WRITE,
@@ -874,7 +876,10 @@ export function inferFileOperation(
       return {
         type: FileOperationType.EDIT,
         filePath: psReplaceMatch[1].trim(),
-        metadata: { oldString: psReplaceMatch[2], newString: psReplaceMatch[3] },
+        metadata: {
+          oldString: psReplaceMatch[2],
+          newString: psReplaceMatch[3],
+        },
       };
     }
 

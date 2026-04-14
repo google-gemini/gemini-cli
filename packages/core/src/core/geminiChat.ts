@@ -1032,7 +1032,10 @@ export class GeminiChat {
 
       let description: string | undefined = undefined;
       if ('invocation' in call && call.invocation) {
-        description = typeof call.invocation.getDisplayTitle === 'function' ? call.invocation.getDisplayTitle() : call.invocation.getDescription();
+        description =
+          typeof call.invocation.getDisplayTitle === 'function'
+            ? call.invocation.getDisplayTitle()
+            : call.invocation.getDescription();
       }
 
       return {
