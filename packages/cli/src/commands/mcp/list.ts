@@ -170,9 +170,11 @@ async function getServerStatus(
   return testMCPConnection(serverName, server, isTrusted, activeSettings);
 }
 
-export async function listMcpServers(
-  loadedSettingsArg?: LoadedSettings,
+export async function listMcpServers( //
+  loadedSettingsArg?: LoadedSettings, //
+  checkConnections = false, //
 ): Promise<void> {
+  //
   const loadedSettings = loadedSettingsArg ?? loadSettings();
   const activeSettings = loadedSettings.merged;
 
@@ -200,40 +202,16 @@ export async function listMcpServers(
   for (const serverName of serverNames) {
     const server = mcpServers[serverName];
 
-    const status = await getServerStatus(
-      serverName,
-      server,
-      loadedSettings.isTrusted,
-      activeSettings,
-    );
+    const status = checkConnections //
+      ? await getServerStatus(
+          serverName,
+          server,
+          loadedSettings.isTrusted,
+          activeSettings,
+        )
+      : MCPServerStatus.DISCONNECTED; //
 
-    let statusIndicator = '';
-    let statusText = '';
-    switch (status) {
-      case MCPServerStatus.CONNECTED:
-        statusIndicator = chalk.green('✓');
-        statusText = 'Connected';
-        break;
-      case MCPServerStatus.CONNECTING:
-        statusIndicator = chalk.yellow('…');
-        statusText = 'Connecting';
-        break;
-      case MCPServerStatus.BLOCKED:
-        statusIndicator = chalk.red('⛔');
-        statusText = 'Blocked';
-        break;
-      case MCPServerStatus.DISABLED:
-        statusIndicator = chalk.gray('○');
-        statusText = 'Disabled';
-        break;
-      case MCPServerStatus.DISCONNECTED:
-      default:
-        statusIndicator = chalk.red('✗');
-        statusText = 'Disconnected';
-        break;
-    }
-
-    let serverInfo =
+    let serverInfo = //
       serverName +
       (server.extension?.name ? ` (from ${server.extension.name})` : '') +
       ': ';
@@ -246,19 +224,55 @@ export async function listMcpServers(
       serverInfo += `${server.command} ${server.args?.join(' ') || ''} (stdio)`;
     }
 
-    debugLogger.log(`${statusIndicator} ${serverInfo} - ${statusText}`);
-  }
-}
+    if (checkConnections) {
+      let statusIndicator = '';
+      let statusText = '';
+      switch (status) {
+        case MCPServerStatus.CONNECTED:
+          statusIndicator = chalk.green('✓');
+          statusText = 'Connected';
+          break;
+        case MCPServerStatus.CONNECTING:
+          statusIndicator = chalk.yellow('…');
+          statusText = 'Connecting';
+          break;
+        case MCPServerStatus.BLOCKED:
+          statusIndicator = chalk.red('⛔');
+          statusText = 'Blocked';
+          break;
+        case MCPServerStatus.DISABLED:
+          statusIndicator = chalk.gray('○');
+          statusText = 'Disabled';
+          break;
+        case MCPServerStatus.DISCONNECTED:
+        default:
+          statusIndicator = chalk.red('✗');
+          statusText = 'Disconnected';
+          break;
+      }
+      debugLogger.log(`${statusIndicator} ${serverInfo} - ${statusText}`);
+    } else {
+      debugLogger.log(`• ${serverInfo}`);
+    }
+  } // fix
+} // fix
 
 interface ListArgs {
   loadedSettings?: LoadedSettings;
+  check?: boolean;
 }
 
 export const listCommand: CommandModule<object, ListArgs> = {
   command: 'list',
   describe: 'List all configured MCP servers',
+  builder: (yargs) =>
+    yargs.option('check', {
+      type: 'boolean',
+      default: false,
+      describe: 'Test connection to each MCP server',
+    }),
   handler: async (argv) => {
-    await listMcpServers(argv.loadedSettings);
+    await listMcpServers(argv.loadedSettings, argv.check);
     await exitCli();
   },
 };
