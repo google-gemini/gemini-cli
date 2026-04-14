@@ -4,24 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect, useContext } from 'react';
-import {
-  sessionId as globalSessionId,
-  Logger,
-  type Storage,
-} from '@google/gemini-cli-core';
-import { ConfigContext } from '../contexts/ConfigContext.js';
+import { useState, useEffect } from 'react';
+import { Logger, type Config } from '@google/gemini-cli-core';
 
 /**
  * Hook to manage the logger instance.
  */
-export const useLogger = (storage: Storage): Logger | null => {
+export const useLogger = (config: Config): Logger | null => {
   const [logger, setLogger] = useState<Logger | null>(null);
-  const config = useContext(ConfigContext);
 
   useEffect(() => {
-    const activeSessionId = config?.getSessionId() ?? globalSessionId;
-    const newLogger = new Logger(activeSessionId, storage);
+    const newLogger = new Logger(config.getSessionId(), config.storage);
 
     /**
      * Start async initialization, no need to await. Using await slows down the
@@ -30,11 +23,9 @@ export const useLogger = (storage: Storage): Logger | null => {
      */
     newLogger
       .initialize()
-      .then(() => {
-        setLogger(newLogger);
-      })
+      .then(() => setLogger(newLogger))
       .catch(() => {});
-  }, [storage, config]);
+  }, [config]);
 
   return logger;
 };

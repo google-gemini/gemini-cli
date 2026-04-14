@@ -1836,7 +1836,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                 height={Math.min(buffer.viewportHeight, scrollableData.length)}
                 width="100%"
               >
-                {isAlternateBuffer ? (
+                {config.getUseTerminalBuffer() ? (
                   <ScrollableList
                     ref={listRef}
                     hasFocus={focus}
