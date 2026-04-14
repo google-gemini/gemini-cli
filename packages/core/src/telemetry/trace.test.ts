@@ -86,6 +86,56 @@ describe('truncateForTelemetry', () => {
     );
   });
 
+  it('should handle objects with a toJSON method', () => {
+    const date = new Date('2026-04-13T00:00:00.000Z');
+    const result = truncateForTelemetry(date);
+    expect(result).toBe('2026-04-13T00:00:00.000Z');
+  });
+
+  it('should handle getters via direct property access', () => {
+    const obj = {
+      get myGetter() {
+        return 'getter value';
+      },
+      get errorGetter() {
+        throw new Error('getter error');
+      },
+    };
+    const result = truncateForTelemetry(obj);
+    expect(result).toBe(
+      JSON.stringify({
+        myGetter: 'getter value',
+        errorGetter: '[ERROR: Failed to read property]',
+      }),
+    );
+  });
+
+  it('should truncate extremely long keys', () => {
+    const longKey = 'a'.repeat(150);
+    const obj = {
+      [longKey]: 'value',
+    };
+    const result = truncateForTelemetry(obj);
+    const expectedKey = 'a'.repeat(100) + '...[TRUNCATED_KEY]';
+    expect(result).toBe(
+      JSON.stringify({
+        [expectedKey]: 'value',
+      }),
+    );
+  });
+
+  it('should enforce a global payload string limit', () => {
+    const obj = {
+      a: 'x'.repeat(100),
+      b: 'y'.repeat(100),
+    };
+    // Let's cap global string length to 50
+    const result = truncateForTelemetry(obj, 100, 100, 4, 50) as string;
+    expect(result.length).toBeGreaterThan(50);
+    expect(result).toContain('...[TRUNCATED: original payload length');
+    expect(result.startsWith('{"a":"xxxx')).toBe(true);
+  });
+
   it('should stringify objects unchanged if within maxLength', () => {
     const obj = { a: 1 };
     expect(truncateForTelemetry(obj, 100)).toBe(JSON.stringify(obj));
