@@ -45,6 +45,12 @@ import {
   hasRedirection,
   inferFileOperation,
 } from '../utils/shell-utils.js';
+import {
+  getSpecificMimeType,
+  readFileWithEncoding,
+  detectFileType,
+} from '../utils/fileUtils.js';
+import { getLanguageFromFilePath } from '../utils/language-detection.js';
 import { logFileOperation } from '../telemetry/loggers.js';
 import { FileOperationEvent } from '../telemetry/types.js';
 import { FileOperation } from '../telemetry/metrics.js';
@@ -518,16 +524,33 @@ export class ShellToolInvocation extends BaseToolInvocation<
         }
 
         if (operation) {
-          const extension = path.extname(inferred.filePath);
+          const absolutePath = path.resolve(cwd, inferred.filePath);
+          const extension = path.extname(absolutePath);
+
+          let lines = 0;
+          const mimetype = getSpecificMimeType(absolutePath) || '';
+          const programmingLanguage =
+            getLanguageFromFilePath(absolutePath) || '';
+
+          try {
+            const fileType = await detectFileType(absolutePath);
+            if (fileType === 'text' || fileType === 'svg') {
+              const content = await readFileWithEncoding(absolutePath);
+              lines = content.split('\n').length;
+            }
+          } catch {
+            // Best effort line counting
+          }
+
           logFileOperation(
             this.context.config,
             new FileOperationEvent(
               canonicalToolName,
               operation,
-              0, // Lines changed not easily available
-              '', // mimetype
+              lines,
+              mimetype,
               extension,
-              '', // programming language
+              programmingLanguage,
             ),
           );
         }
