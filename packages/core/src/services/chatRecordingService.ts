@@ -405,9 +405,10 @@ export class ChatRecordingService {
       if (isNodeError(error) && error.code === 'ENOSPC') {
         this.conversationFile = null;
         debugLogger.warn(ENOSPC_WARNING_MESSAGE);
-      } else if (error instanceof RangeError) {
+      } else if (error instanceof RangeError || error instanceof TypeError) {
         this.conversationFile = null;
-        debugLogger.warn(RANGE_WARNING_MESSAGE);
+        const message = error instanceof RangeError ? RANGE_WARNING_MESSAGE : 'Chat recording disabled: Conversation data could not be serialized.';
+        debugLogger.warn(message, error);
       } else {
         throw error;
       }
