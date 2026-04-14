@@ -33,11 +33,5 @@ export const resumeCommand: SlashCommand = {
       dialog: 'sessionBrowser',
     };
   },
-  completion: async (context, partialArg) => {
-    if (resumeCheckpointCommand.completion) {
-      return resumeCheckpointCommand.completion(context, partialArg);
-    }
-    return [];
-  },
   subCommands: chatResumeSubCommands,
 };

@@ -442,14 +442,5 @@ export const chatCommand: SlashCommand = {
       dialog: 'sessionBrowser',
     };
   },
-  completion: async (context, partialArg) => {
-    // If the partial arg starts to match a subcommand, don't mix in checkpoints here, 
-    // the command processor handles subcommand completions automatically.
-    // We only want to autocomplete checkpoints here.
-    if (resumeCheckpointCommand.completion) {
-      return resumeCheckpointCommand.completion(context, partialArg);
-    }
-    return [];
-  },
   subCommands: chatResumeSubCommands,
 };
