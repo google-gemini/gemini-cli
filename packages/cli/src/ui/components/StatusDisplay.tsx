@@ -39,6 +39,7 @@ export const StatusDisplay: React.FC<StatusDisplayProps> = ({
         }
         skillCount={config.getSkillManager().getDisplayableSkills().length}
         backgroundProcessCount={uiState.backgroundTaskCount}
+        activeExtensionName={config.activeExtensionName}
       />
     );
   }

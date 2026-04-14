@@ -175,6 +175,13 @@ export type SlashCommandActionReturn =
   | OpenCustomDialogActionReturn
   | LogoutActionReturn;
 
+export enum CommandSource {
+  CORE = 'core',
+  EXTENSION = 'extension',
+  USER = 'user',
+  WORKSPACE = 'workspace',
+}
+
 export enum CommandKind {
   BUILT_IN = 'built-in',
   USER_FILE = 'user-file',

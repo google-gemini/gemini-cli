@@ -83,6 +83,13 @@ export function useSessionResume({
           workspaceContext.addDirectories(resumedData.conversation.directories);
         }
 
+        // Restore active extension context
+        if (resumedData.conversation.activeExtensionName) {
+          config.setActiveExtensionName(
+            resumedData.conversation.activeExtensionName,
+          );
+        }
+
         // Give the history to the Gemini client.
         await config.getGeminiClient()?.resumeChat(clientHistory, resumedData);
       } catch (error) {

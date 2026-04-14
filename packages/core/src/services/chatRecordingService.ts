@@ -603,6 +603,18 @@ export class ChatRecordingService {
     }
   }
 
+  recordActiveExtensionName(activeExtensionName: string | undefined): void {
+    if (!this.conversationFile) return;
+    try {
+      this.updateMetadata({ activeExtensionName });
+    } catch (error) {
+      debugLogger.error(
+        'Error saving active extension to chat history.',
+        error,
+      );
+    }
+  }
+
   getConversation(): ConversationRecord | null {
     if (!this.conversationFile) return null;
     return this.cachedConversation;

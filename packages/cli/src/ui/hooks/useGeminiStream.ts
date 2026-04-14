@@ -937,10 +937,20 @@ export const useGeminiStream = (
           if (slashCommandResult) {
             if (slashCommandResult.clearExtensionMRU) {
               config.setActiveExtensionName(undefined);
+              config
+                .getGeminiClient()
+                ?.getChatRecordingService()
+                ?.recordActiveExtensionName(undefined);
             } else if (slashCommandResult.activeExtensionName) {
               config.setActiveExtensionName(
                 slashCommandResult.activeExtensionName,
               );
+              config
+                .getGeminiClient()
+                ?.getChatRecordingService()
+                ?.recordActiveExtensionName(
+                  slashCommandResult.activeExtensionName,
+                );
             }
             switch (slashCommandResult.type) {
               case 'schedule_tool': {
@@ -1762,6 +1772,10 @@ export const useGeminiStream = (
         newApprovalMode !== ApprovalMode.PLAN
       ) {
         config.setActiveExtensionName(undefined);
+        config
+          .getGeminiClient()
+          ?.getChatRecordingService()
+          ?.recordActiveExtensionName(undefined);
       }
       if (
         previousApprovalModeRef.current === ApprovalMode.PLAN &&

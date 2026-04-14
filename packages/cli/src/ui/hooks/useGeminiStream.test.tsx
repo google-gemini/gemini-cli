@@ -100,6 +100,7 @@ const MockedGeminiClientClass = vi.hoisted(() =>
       recordMessageTokens: vi.fn(),
       recordToolCalls: vi.fn(),
       getConversationFile: vi.fn(),
+      recordActiveExtensionName: vi.fn(),
     });
     this.getCurrentSequenceModel = vi
       .fn()
@@ -310,6 +311,8 @@ describe('useGeminiStream', () => {
     debugMode: false,
     question: undefined,
     coreTools: [],
+    activeExtensionName: undefined,
+    setActiveExtensionName: vi.fn(),
     toolDiscoveryCommand: undefined,
     toolCallCommand: undefined,
     mcpServerCommand: undefined,

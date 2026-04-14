@@ -12,6 +12,7 @@ import { Command } from '../key/keyMatchers.js';
 import { formatCommand } from '../key/keybindingUtils.js';
 
 interface ContextSummaryDisplayProps {
+  activeExtensionName?: string;
   geminiMdFileCount: number;
   contextFileNames: string[];
   mcpServers?: Record<string, MCPServerConfig>;
@@ -29,6 +30,7 @@ export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
   ideContext,
   skillCount,
   backgroundProcessCount = 0,
+  activeExtensionName,
 }) => {
   const mcpServerCount = Object.keys(mcpServers || {}).length;
   const blockedMcpServerCount = blockedMcpServers?.length || 0;
@@ -40,7 +42,8 @@ export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
     blockedMcpServerCount === 0 &&
     openFileCount === 0 &&
     skillCount === 0 &&
-    backgroundProcessCount === 0
+    backgroundProcessCount === 0 &&
+    !activeExtensionName
   ) {
     return null;
   }
@@ -103,12 +106,20 @@ export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
     }`;
   })();
 
+  const extensionText = (() => {
+    if (!activeExtensionName) {
+      return '';
+    }
+    return `Extension: ${activeExtensionName}`;
+  })();
+
   const summaryParts = [
     openFilesText,
     geminiMdText,
     mcpText,
     skillText,
     backgroundText,
+    extensionText,
   ].filter(Boolean);
 
   return (

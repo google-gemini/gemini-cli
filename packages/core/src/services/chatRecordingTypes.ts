@@ -87,6 +87,8 @@ export interface ConversationRecord {
   directories?: string[];
   /** The kind of conversation (main agent or subagent) */
   kind?: 'main' | 'subagent';
+  /** The last active extension context for the session */
+  activeExtensionName?: string;
 }
 
 /**
