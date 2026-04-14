@@ -30,6 +30,8 @@ import {
   getToolAliases,
   WRITE_FILE_TOOL_NAME,
   EDIT_TOOL_NAME,
+  GREP_TOOL_NAME,
+  READ_FILE_TOOL_NAME,
   UPDATE_TOPIC_TOOL_NAME,
 } from './tool-names.js';
 
@@ -631,6 +633,17 @@ export class ToolRegistry {
         !mainAgentTools.includes(toolName) &&
         !mainAgentTools.includes(tool.constructor.name) &&
         !mainAgentTools.some((t) => t.startsWith(`${tool.constructor.name}(`))
+      ) {
+        return;
+      }
+
+      if (
+        this.isMainRegistry &&
+        this.config.getSandboxEnabled() &&
+        (toolName === GREP_TOOL_NAME ||
+          toolName === EDIT_TOOL_NAME ||
+          toolName === WRITE_FILE_TOOL_NAME ||
+          toolName === READ_FILE_TOOL_NAME)
       ) {
         return;
       }

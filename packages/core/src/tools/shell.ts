@@ -12,6 +12,7 @@ import crypto from 'node:crypto';
 import { debugLogger } from '../index.js';
 import type { SandboxPermissions } from '../services/sandboxManager.js';
 import { ToolErrorType } from './tool-error.js';
+import * as Diff from 'diff';
 import {
   BaseDeclarativeTool,
   BaseToolInvocation,
@@ -22,6 +23,7 @@ import {
   type BackgroundExecutionData,
   type ToolCallConfirmationDetails,
   type ToolExecuteConfirmationDetails,
+  type ToolEditConfirmationDetails,
   type PolicyUpdateOptions,
   type ToolLiveOutput,
   type ExecuteOptions,
@@ -41,8 +43,19 @@ import {
   stripShellWrapper,
   parseCommandDetails,
   hasRedirection,
+  inferFileOperation,
+  FileOperationType,
 } from '../utils/shell-utils.js';
-import { SHELL_TOOL_NAME } from './tool-names.js';
+import { logFileOperation } from '../telemetry/loggers.js';
+import { FileOperationEvent } from '../telemetry/types.js';
+import { FileOperation } from '../telemetry/metrics.js';
+import {
+  SHELL_TOOL_NAME,
+  EDIT_TOOL_NAME,
+  WRITE_FILE_TOOL_NAME,
+  GREP_TOOL_NAME,
+  READ_FILE_TOOL_NAME,
+} from './tool-names.js';
 import { PARAM_ADDITIONAL_PERMISSIONS } from './definitions/base-declarations.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { getShellDefinition } from './definitions/coreTools.js';
@@ -127,6 +140,19 @@ export class ShellToolInvocation extends BaseToolInvocation<
   }
 
   override getDisplayTitle(): string {
+    const inferred = inferFileOperation(this.params.command);
+    if (inferred) {
+      switch (inferred.type) {
+        case FileOperationType.SEARCH:
+          return `Shell (Search)`;
+        case FileOperationType.EDIT:
+          return `Shell (Replace)`;
+        case FileOperationType.WRITE:
+          return `Shell (Write File)`;
+        case FileOperationType.READ:
+          return `Shell (Read File)`;
+      }
+    }
     return this.params.command;
   }
 
@@ -162,10 +188,96 @@ export class ShellToolInvocation extends BaseToolInvocation<
     return super.shouldConfirmExecute(abortSignal);
   }
 
+  private simulateSed(
+    content: string,
+    sedExpression: string,
+  ): string | undefined {
+    const match = sedExpression.match(/^s\/(.+)\/(.+)\/([g]*)?$/);
+    if (!match) return undefined;
+    const [_, oldStr, newStr, flags] = match;
+    try {
+      const regex = new RegExp(oldStr, flags?.includes('g') ? 'g' : '');
+      return content.replace(regex, newStr);
+    } catch {
+      return undefined;
+    }
+  }
+
+  private simulatePsReplace(
+    content: string,
+    oldString: string,
+    newString: string,
+  ): string {
+    try {
+      // PowerShell -replace is regex-based and case-insensitive by default.
+      const regex = new RegExp(oldString, 'gi');
+      return content.replace(regex, newString);
+    } catch {
+      return content;
+    }
+  }
+
   protected override async getConfirmationDetails(
-    _abortSignal: AbortSignal,
+    abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
     const command = stripShellWrapper(this.params.command);
+    const inferred = inferFileOperation(this.params.command);
+
+    if (
+      inferred &&
+      (inferred.type === FileOperationType.EDIT ||
+        inferred.type === FileOperationType.WRITE)
+    ) {
+      const filePath = path.resolve(
+        this.context.config.getTargetDir(),
+        inferred.filePath,
+      );
+      let originalContent: string | null = null;
+      try {
+        originalContent = await fsPromises.readFile(filePath, 'utf-8');
+      } catch {
+        // file might not exist yet if it's a WRITE
+      }
+
+      let newContent: string | undefined;
+      if (
+        inferred.type === FileOperationType.EDIT &&
+        originalContent !== null
+      ) {
+        if (inferred.metadata?.['sedExpression']) {
+          newContent = this.simulateSed(
+            originalContent,
+            inferred.metadata['sedExpression'] as string,
+          );
+        } else if (
+          inferred.metadata?.['oldString'] &&
+          inferred.metadata?.['newString']
+        ) {
+          newContent = this.simulatePsReplace(
+            originalContent,
+            inferred.metadata['oldString'] as string,
+            inferred.metadata['newString'] as string,
+          );
+        }
+      }
+
+      if (newContent !== undefined && originalContent !== null) {
+        const fileDiff = Diff.createPatch(filePath, originalContent, newContent);
+        const editDetails: ToolEditConfirmationDetails = {
+          type: 'edit',
+          title: this.getDisplayTitle(),
+          fileName: path.basename(filePath),
+          filePath: inferred.filePath,
+          fileDiff,
+          originalContent,
+          newContent,
+          onConfirm: async (_outcome: ToolConfirmationOutcome) => {
+            // Policy updates are now handled centrally by the scheduler
+          },
+        };
+        return editDetails;
+      }
+    }
 
     const parsed = parseCommandDetails(command);
     let rootCommandDisplay = '';
@@ -216,7 +328,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
 
     const confirmationDetails: ToolExecuteConfirmationDetails = {
       type: 'exec',
-      title: 'Confirm Shell Command',
+      title: this.getDisplayTitle(),
       command: this.params.command,
       rootCommand: rootCommandDisplay,
       rootCommands,
@@ -376,6 +488,46 @@ export class ShellToolInvocation extends BaseToolInvocation<
       }
 
       const result = await resultPromise;
+
+      // Telemetry parity
+      const inferred = inferFileOperation(this.params.command);
+      if (inferred && result.exitCode === 0) {
+        let operation: FileOperation | undefined;
+        let canonicalToolName = SHELL_TOOL_NAME;
+        switch (inferred.type) {
+          case FileOperationType.SEARCH:
+            operation = FileOperation.READ;
+            canonicalToolName = GREP_TOOL_NAME;
+            break;
+          case FileOperationType.READ:
+            operation = FileOperation.READ;
+            canonicalToolName = READ_FILE_TOOL_NAME;
+            break;
+          case FileOperationType.EDIT:
+            operation = FileOperation.UPDATE;
+            canonicalToolName = EDIT_TOOL_NAME;
+            break;
+          case FileOperationType.WRITE:
+            operation = FileOperation.UPDATE;
+            canonicalToolName = WRITE_FILE_TOOL_NAME;
+            break;
+        }
+
+        if (operation) {
+          const extension = path.extname(inferred.filePath);
+          logFileOperation(
+            this.context.config,
+            new FileOperationEvent(
+              canonicalToolName,
+              operation,
+              0, // Lines changed not easily available
+              '', // mimetype
+              extension,
+              '', // programming language
+            ),
+          );
+        }
+      }
 
       const backgroundPIDs: number[] = [];
       if (os.platform() !== 'win32') {

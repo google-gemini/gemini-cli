@@ -623,6 +623,20 @@ export function getShellConfiguration(): ShellConfiguration {
  */
 export const isWindows = () => os.platform() === 'win32';
 
+export enum FileOperationType {
+  SEARCH = 'SEARCH',
+  EDIT = 'EDIT',
+  WRITE = 'WRITE',
+  READ = 'READ',
+}
+
+export interface InferredFileOperation {
+  type: FileOperationType;
+  filePath: string;
+  /** Inferred details (e.g., the sed expression or replacement string) */
+  metadata?: Record<string, unknown>;
+}
+
 /**
  * Escapes a string so that it can be safely used as a single argument
  * in a shell command, preventing command injection.
@@ -749,6 +763,157 @@ export function getCommandRoots(command: string): string[] {
     .map((detail) => detail.name)
     .filter((name) => !REDIRECTION_NAMES.has(name))
     .filter(Boolean);
+}
+
+/**
+ * Attempts to infer if a shell command is performing a common file operation
+ * like search, edit, or write.
+ */
+export function inferFileOperation(
+  command: string,
+): InferredFileOperation | undefined {
+  const stripped = stripShellWrapper(command);
+  const shellType = getShellConfiguration().shell;
+
+  if (shellType === 'bash') {
+    // sed -i 's/foo/bar/g' file
+    // Handle both -i and --in-place, and optional space after -i
+    const sedMatch = stripped.match(
+      /^sed\s+(?:-i|--in-place)(?:\s*['"]?\.?['"]?)?\s+['"]?([^'"]+)['"]?\s+['"]?([^'"]+)['"]?\s*$/,
+    );
+    if (sedMatch) {
+      return {
+        type: FileOperationType.EDIT,
+        filePath: sedMatch[2].trim(),
+        metadata: { sedExpression: sedMatch[1] },
+      };
+    }
+
+    // echo "content" > file
+    // Simple redirection check
+    const redirectionMatch = stripped.match(
+      /(?:^|&&|\|\||;)\s*(?:echo|printf)\s+.*?\s*>\s*(\S+)\s*$/,
+    );
+    if (redirectionMatch) {
+      return {
+        type: FileOperationType.WRITE,
+        filePath: redirectionMatch[1].trim(),
+      };
+    }
+
+    // cat > file <<EOF ...
+    const heredocMatch = stripped.match(
+      /(?:^|&&|\|\||;)\s*cat\s*>\s*(\S+)\s*<<\s*(\S+)/,
+    );
+    if (heredocMatch) {
+      return {
+        type: FileOperationType.WRITE,
+        filePath: heredocMatch[1].trim(),
+      };
+    }
+
+    // cp src dest
+    const cpMatch = stripped.match(
+      /^(?:cp)\s+(?:-[^ ]+\s+)*['"]?([^'"]+)['"]?\s+['"]?([^'"]+)['"]?\s*$/,
+    );
+    if (cpMatch) {
+      return {
+        type: FileOperationType.WRITE,
+        filePath: cpMatch[2].trim(),
+      };
+    }
+
+    // mv src dest
+    const mvMatch = stripped.match(
+      /^(?:mv)\s+(?:-[^ ]+\s+)*['"]?([^'"]+)['"]?\s+['"]?([^'"]+)['"]?\s*$/,
+    );
+    if (mvMatch) {
+      return {
+        type: FileOperationType.WRITE,
+        filePath: mvMatch[2].trim(),
+      };
+    }
+
+    // ... | tee file
+    const teeMatch = stripped.match(/\|\s*tee\s+(?:-a\s+)?['"]?([^'"]+)['"]?\s*$/);
+    if (teeMatch) {
+      return {
+        type: FileOperationType.WRITE,
+        filePath: teeMatch[1].trim(),
+      };
+    }
+
+    // grep "pattern" file
+    const grepMatch = stripped.match(
+      /^(?:grep|rg|ripgrep)\s+(?:-[^ ]+\s+)*['"]?([^'"]+)['"]?\s+['"]?([^'"]+)['"]?\s*$/,
+    );
+    if (grepMatch) {
+      return {
+        type: FileOperationType.SEARCH,
+        filePath: grepMatch[2].trim(),
+        metadata: { pattern: grepMatch[1] },
+      };
+    }
+
+    // cat file, head file, tail file
+    const readMatch = stripped.match(
+      /^(?:cat|head|tail|less|more)\s+(?:-[^ ]+\s+)*['"]?([^'"]+)['"]?\s*$/,
+    );
+    if (readMatch) {
+      return {
+        type: FileOperationType.READ,
+        filePath: readMatch[1].trim(),
+      };
+    }
+  } else if (shellType === 'powershell') {
+    // (Get-Content file) -replace 'a', 'b' | Set-Content file
+    const psReplaceMatch = stripped.match(
+      /\(Get-Content\s+['"]?([^'"]+)['"]?\)\s+-replace\s+['"]?([^'"]+)['"]?,\s*['"]?([^'"]+)['"]?\s*\|\s*Set-Content\s+['"]?([^'"]+)['"]?/i,
+    );
+    if (psReplaceMatch) {
+      return {
+        type: FileOperationType.EDIT,
+        filePath: psReplaceMatch[1].trim(),
+        metadata: { oldString: psReplaceMatch[2], newString: psReplaceMatch[3] },
+      };
+    }
+
+    // Set-Content -Path file -Value "..."
+    const psSetContentMatch = stripped.match(
+      /Set-Content\s+-(?:Path|LiteralPath)\s+['"]?([^'"]+)['"]?/i,
+    );
+    if (psSetContentMatch) {
+      return {
+        type: FileOperationType.WRITE,
+        filePath: psSetContentMatch[1].trim(),
+      };
+    }
+
+    // Select-String -Path file -Pattern "..."
+    const psSearchMatch = stripped.match(
+      /Select-String\s+-(?:Path|LiteralPath)\s+['"]?([^'"]+)['"]?\s+-Pattern\s+['"]?([^'"]+)['"]?/i,
+    );
+    if (psSearchMatch) {
+      return {
+        type: FileOperationType.SEARCH,
+        filePath: psSearchMatch[1].trim(),
+        metadata: { pattern: psSearchMatch[2] },
+      };
+    }
+
+    // Get-Content file, type file, cat file
+    const psReadMatch = stripped.match(
+      /^(?:Get-Content|type|cat)\s+(?:-(?:Path|LiteralPath|Tail|Head|TotalCount|Wait)\s+[^ ]+\s+)*['"]?([^'"]+)['"]?\s*$/i,
+    );
+    if (psReadMatch) {
+      return {
+        type: FileOperationType.READ,
+        filePath: psReadMatch[1].trim(),
+      };
+    }
+  }
+
+  return undefined;
 }
 
 export function stripShellWrapper(command: string): string {

@@ -1030,6 +1030,11 @@ export class GeminiChat {
           ? resultDisplayRaw
           : undefined;
 
+      let description: string | undefined = undefined;
+      if ('invocation' in call && call.invocation) {
+        description = typeof call.invocation.getDisplayTitle === 'function' ? call.invocation.getDisplayTitle() : call.invocation.getDescription();
+      }
+
       return {
         id: call.request.callId,
         name: call.request.originalRequestName ?? call.request.name,
@@ -1038,8 +1043,7 @@ export class GeminiChat {
         status: call.status,
         timestamp: new Date().toISOString(),
         resultDisplay,
-        description:
-          'invocation' in call ? call.invocation?.getDescription() : undefined,
+        description,
       };
     });
 

@@ -22,6 +22,11 @@ import { ToolRegistry, DiscoveredTool } from './tool-registry.js';
 import {
   DISCOVERED_TOOL_PREFIX,
   UPDATE_TOPIC_TOOL_NAME,
+  GREP_TOOL_NAME,
+  EDIT_TOOL_NAME,
+  WRITE_FILE_TOOL_NAME,
+  READ_FILE_TOOL_NAME,
+  SHELL_TOOL_NAME,
 } from './tool-names.js';
 import { DiscoveredMCPTool } from './mcp-tool.js';
 import {
@@ -732,6 +737,33 @@ describe('ToolRegistry', () => {
       const declarations = toolRegistry.getFunctionDeclarations();
       expect(declarations).toHaveLength(1);
       expect(declarations[0].name).toBe(`mcp_${serverName}_${toolName}`);
+    });
+
+    it('should exclude lower fidelity tools when sandboxing is enabled for the main agent', () => {
+      vi.spyOn(config, 'getSandboxEnabled').mockReturnValue(true);
+      (toolRegistry as any).isMainRegistry = true;
+
+      // Register the tools that should be excluded
+      const grepTool = new MockTool({ name: GREP_TOOL_NAME });
+      const editTool = new MockTool({ name: EDIT_TOOL_NAME });
+      const writeTool = new MockTool({ name: WRITE_FILE_TOOL_NAME });
+      const readTool = new MockTool({ name: READ_FILE_TOOL_NAME });
+      const shellTool = new MockTool({ name: SHELL_TOOL_NAME });
+
+      toolRegistry.registerTool(grepTool);
+      toolRegistry.registerTool(editTool);
+      toolRegistry.registerTool(writeTool);
+      toolRegistry.registerTool(readTool);
+      toolRegistry.registerTool(shellTool);
+
+      const declarations = toolRegistry.getFunctionDeclarations();
+      const names = declarations.map((d) => d.name);
+
+      expect(names).not.toContain(GREP_TOOL_NAME);
+      expect(names).not.toContain(EDIT_TOOL_NAME);
+      expect(names).not.toContain(WRITE_FILE_TOOL_NAME);
+      expect(names).not.toContain(READ_FILE_TOOL_NAME);
+      expect(names).toContain(SHELL_TOOL_NAME);
     });
   });
 
