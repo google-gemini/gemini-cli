@@ -7,9 +7,11 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { z } from 'zod';
-import type {
-  ExtensionInstallMetadata,
-  GeminiCLIExtension,
+import {
+  loadSkillsFromDir,
+  type ExtensionInstallMetadata,
+  type GeminiCLIExtension,
+  type SkillDefinition,
 } from '@google/gemini-cli-core';
 import {
   EXTENSIONS_CONFIG_FILENAME,
@@ -116,7 +118,7 @@ export async function loadOpenPluginConfig(
   manifestPath: string,
   extensionDir: string,
   workspaceDir: string,
-): Promise<ExtensionConfig> {
+): Promise<ExtensionConfig & { skills?: OpenPluginDiscoveryField }> {
   const content = await fs.promises.readFile(manifestPath, 'utf-8');
   const json = JSON.parse(content) as unknown;
   const result = openPluginSchema.safeParse(json);
@@ -150,13 +152,13 @@ export async function loadOpenPluginConfig(
     keywords: hydratedConfig.keywords,
     homepage: hydratedConfig.homepage,
     repository: hydratedConfig.repository,
+    skills: hydratedConfig.skills,
     // Features are explicitly NOT mapped here for v1 plugins
   };
 }
 
 /**
  * Creates a GeminiCLIExtension from an Open Plugin directory.
- * v1: Does not enable skills, mcp servers, context files, or settings.
  */
 export async function createOpenPlugin(
   pluginDir: string,
@@ -171,6 +173,21 @@ export async function createOpenPlugin(
     manifestPath,
     pluginDir,
     workspaceDir,
+  );
+
+  const hydrationContext = {
+    extensionPath: pluginDir,
+    PLUGIN_ROOT: pluginDir,
+    workspacePath: workspaceDir,
+    '/': path.sep,
+    pathSeparator: path.sep,
+  };
+
+  const skills = await resolvePluginSkills(
+    pluginDir,
+    config.name,
+    hydrationContext,
+    config.skills,
   );
 
   return {
@@ -193,8 +210,52 @@ export async function createOpenPlugin(
     excludeTools: undefined,
     settings: undefined,
     resolvedSettings: undefined,
-    skills: undefined,
+    skills,
     agents: undefined,
     themes: undefined,
   };
+}
+
+/**
+ * Discovers and namespaces skills for an Open Plugin.
+ */
+export async function resolvePluginSkills(
+  pluginDir: string,
+  pluginName: string,
+  hydrationContext: Record<string, string>,
+  skillsConfig?: OpenPluginDiscoveryField,
+): Promise<GeminiCLIExtension['skills']> {
+  let resolvedPaths: string[] = [];
+
+  if (skillsConfig) {
+    if (typeof skillsConfig === 'string') {
+      resolvedPaths = [skillsConfig];
+    } else if (Array.isArray(skillsConfig)) {
+      resolvedPaths = skillsConfig;
+    } else if (typeof skillsConfig === 'object' && 'paths' in skillsConfig) {
+      resolvedPaths = skillsConfig.paths;
+    }
+  } else {
+    resolvedPaths = ['./skills/'];
+  }
+
+  const allDiscoveredSkills: SkillDefinition[] = [];
+
+  for (const relPath of resolvedPaths) {
+    const absPath = path.resolve(pluginDir, relPath);
+    if (fs.existsSync(absPath)) {
+      const discovered = await loadSkillsFromDir(absPath);
+      allDiscoveredSkills.push(...discovered);
+    }
+  }
+
+  if (allDiscoveredSkills.length === 0) {
+    return undefined;
+  }
+
+  return allDiscoveredSkills.map((skill) => ({
+    ...recursivelyHydrateStrings(skill, hydrationContext),
+    name: `${pluginName}:${skill.name}`,
+    extensionName: pluginName,
+  }));
 }

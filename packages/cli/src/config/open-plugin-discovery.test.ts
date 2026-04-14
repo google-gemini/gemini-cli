@@ -129,11 +129,11 @@ describe('ExtensionManager - Open Plugin Support', () => {
     expect(plugin?.description).toBe(`Uses root: ${pluginDir}`);
   });
 
-  it('should NOT load skills or context files for Open Plugins in v1', async () => {
+  it('should load skills for Open Plugins', async () => {
     const pluginDir = path.join(userExtensionsDir, 'feature-plugin');
     const hiddenDir = path.join(pluginDir, '.plugin');
     fs.mkdirSync(hiddenDir, { recursive: true });
-    const skillsDir = path.join(pluginDir, 'skills', 'test');
+    const skillsDir = path.join(pluginDir, 'skills', 'test-skill');
     fs.mkdirSync(skillsDir, { recursive: true });
 
     fs.writeFileSync(
@@ -147,20 +147,174 @@ describe('ExtensionManager - Open Plugin Support', () => {
     fs.writeFileSync(
       path.join(skillsDir, 'SKILL.md'),
       `---
-  name: test-skill
-  description: "Test"
-  ---
-  Body`,
+name: my-skill
+description: "Test description"
+---
+Body`,
     );
-
-    fs.writeFileSync(path.join(pluginDir, 'GEMINI.md'), '# Context');
 
     const extensions = await extensionManager.loadExtensions();
     const plugin = extensions.find((ext) => ext.name === 'feature-plugin');
 
     expect(plugin).toBeDefined();
-    expect(plugin?.skills).toBeUndefined();
-    expect(plugin?.contextFiles).toEqual([]);
+    expect(plugin?.skills).toBeDefined();
+    expect(plugin?.skills?.[0].name).toBe('feature-plugin:my-skill');
+    expect(plugin?.skills?.[0].extensionName).toBe('feature-plugin');
+  });
+
+  it('should load skills from custom path specified as string', async () => {
+    const pluginDir = path.join(userExtensionsDir, 'custom-path-plugin');
+    const hiddenDir = path.join(pluginDir, '.plugin');
+    fs.mkdirSync(hiddenDir, { recursive: true });
+    const skillsDir = path.join(pluginDir, 'custom-skills', 'test-skill');
+    fs.mkdirSync(skillsDir, { recursive: true });
+
+    fs.writeFileSync(
+      path.join(hiddenDir, 'plugin.json'),
+      JSON.stringify({
+        name: 'custom-path-plugin',
+        version: '1.0.0',
+        skills: './custom-skills',
+      }),
+    );
+
+    fs.writeFileSync(
+      path.join(skillsDir, 'SKILL.md'),
+      `---
+name: my-skill
+description: "Test description"
+---
+Body`,
+    );
+
+    const extensions = await extensionManager.loadExtensions();
+    const plugin = extensions.find((ext) => ext.name === 'custom-path-plugin');
+
+    expect(plugin).toBeDefined();
+    expect(plugin?.skills).toBeDefined();
+    expect(plugin?.skills?.[0].name).toBe('custom-path-plugin:my-skill');
+  });
+
+  it('should load skills from custom paths specified as array', async () => {
+    const pluginDir = path.join(userExtensionsDir, 'array-path-plugin');
+    const hiddenDir = path.join(pluginDir, '.plugin');
+    fs.mkdirSync(hiddenDir, { recursive: true });
+    const skillsDir1 = path.join(pluginDir, 'skills1', 'skill1');
+    const skillsDir2 = path.join(pluginDir, 'skills2', 'skill2');
+    fs.mkdirSync(skillsDir1, { recursive: true });
+    fs.mkdirSync(skillsDir2, { recursive: true });
+
+    fs.writeFileSync(
+      path.join(hiddenDir, 'plugin.json'),
+      JSON.stringify({
+        name: 'array-path-plugin',
+        version: '1.0.0',
+        skills: ['./skills1', './skills2'],
+      }),
+    );
+
+    fs.writeFileSync(
+      path.join(skillsDir1, 'SKILL.md'),
+      `---
+name: skill1
+description: "Desc 1"
+---
+Body`,
+    );
+
+    fs.writeFileSync(
+      path.join(skillsDir2, 'SKILL.md'),
+      `---
+name: skill2
+description: "Desc 2"
+---
+Body`,
+    );
+
+    const extensions = await extensionManager.loadExtensions();
+    const plugin = extensions.find((ext) => ext.name === 'array-path-plugin');
+
+    expect(plugin).toBeDefined();
+    expect(plugin?.skills).toHaveLength(2);
+    const skillNames = plugin?.skills?.map((s) => s.name);
+    expect(skillNames).toContain('array-path-plugin:skill1');
+    expect(skillNames).toContain('array-path-plugin:skill2');
+  });
+
+  it('should load skills from custom paths specified as object', async () => {
+    const pluginDir = path.join(userExtensionsDir, 'object-path-plugin');
+    const hiddenDir = path.join(pluginDir, '.plugin');
+    fs.mkdirSync(hiddenDir, { recursive: true });
+    const skillsDir = path.join(pluginDir, 'obj-skills', 'skill');
+    fs.mkdirSync(skillsDir, { recursive: true });
+
+    fs.writeFileSync(
+      path.join(hiddenDir, 'plugin.json'),
+      JSON.stringify({
+        name: 'object-path-plugin',
+        version: '1.0.0',
+        skills: { paths: ['./obj-skills'] },
+      }),
+    );
+
+    fs.writeFileSync(
+      path.join(skillsDir, 'SKILL.md'),
+      `---
+name: skill1
+description: "Desc 1"
+---
+Body`,
+    );
+
+    const extensions = await extensionManager.loadExtensions();
+    const plugin = extensions.find((ext) => ext.name === 'object-path-plugin');
+
+    expect(plugin).toBeDefined();
+    expect(plugin?.skills?.[0].name).toBe('object-path-plugin:skill1');
+  });
+
+  it('should NOT load skills from default location if custom paths are specified', async () => {
+    const pluginDir = path.join(userExtensionsDir, 'override-plugin');
+    const hiddenDir = path.join(pluginDir, '.plugin');
+    fs.mkdirSync(hiddenDir, { recursive: true });
+    const defaultDir = path.join(pluginDir, 'skills', 'skill1');
+    const customDir = path.join(pluginDir, 'custom-skills', 'skill2');
+    fs.mkdirSync(defaultDir, { recursive: true });
+    fs.mkdirSync(customDir, { recursive: true });
+
+    fs.writeFileSync(
+      path.join(hiddenDir, 'plugin.json'),
+      JSON.stringify({
+        name: 'override-plugin',
+        version: '1.0.0',
+        skills: './custom-skills',
+      }),
+    );
+
+    fs.writeFileSync(
+      path.join(defaultDir, 'SKILL.md'),
+      `---
+name: skill1
+description: "Default"
+---
+Body`,
+    );
+
+    fs.writeFileSync(
+      path.join(customDir, 'SKILL.md'),
+      `---
+name: skill2
+description: "Custom"
+---
+Body`,
+    );
+
+    const extensions = await extensionManager.loadExtensions();
+    const plugin = extensions.find((ext) => ext.name === 'override-plugin');
+
+    expect(plugin).toBeDefined();
+    expect(plugin?.skills).toHaveLength(1);
+    expect(plugin?.skills?.[0].name).toBe('override-plugin:skill2');
   });
 
   it('should prioritize gemini-extension.json over plugin.json', async () => {
