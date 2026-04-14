@@ -99,6 +99,14 @@ export async function buildBwrapArgs(
     }
   }
 
+  // Apply explicit additional write permissions.
+  // We apply these after GOVERNANCE_FILES so that if a user explicitly requests
+  // write access to a protected directory (like .git), the explicit allow takes precedence.
+  // We apply these before gitWorktree rules so that git worktree read-only rules aren't overwritten.
+  for (const p of resolvedPaths.policyWrite) {
+    bwrapArgs.push('--bind-try', p, p);
+  }
+
   // Grant read-only access to git worktrees/submodules. We do this last in order to
   // ensure that these rules aren't overwritten by broader write policies.
   if (resolvedPaths.gitWorktree) {
@@ -109,13 +117,6 @@ export async function buildBwrapArgs(
     if (mainGitDir) {
       bwrapArgs.push('--ro-bind-try', mainGitDir, mainGitDir);
     }
-  }
-
-  // Apply explicit additional write permissions.
-  // We apply these after GOVERNANCE_FILES and gitWorktree rules so that if a user explicitly requests
-  // write access to a protected directory (like .git), the explicit allow takes precedence in bwrap.
-  for (const p of resolvedPaths.policyWrite) {
-    bwrapArgs.push('--bind-try', p, p);
   }
 
   for (const p of resolvedPaths.forbidden) {
