@@ -1,0 +1,45 @@
+name: 'Setup Gemini CLI'
+description: 'Sets up the environment and either builds from source or uses a pre-built bundle.'
+
+inputs:
+  mode:
+    description: 'Setup mode: "source" (build from scratch) or "bundle" (use pre-built artifact)'
+    required: true
+    default: 'source'
+  bundle-artifact:
+    description: 'The name of the bundle artifact to download if mode is "bundle"'
+    required: false
+
+runs:
+  using: 'composite'
+  steps:
+    - name: 'Set up Node.js'
+      uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
+      with:
+        node-version-file: '.nvmrc'
+        cache: 'npm'
+
+    - name: 'Install dependencies'
+      run: 'npm ci'
+      shell: 'bash'
+
+    - name: 'Build from source'
+      if: "${{ inputs.mode == 'source' }}"
+      run: 'npm run build'
+      shell: 'bash'
+
+    - name: 'Download Bundle Artifact'
+      if: "${{ inputs.mode == 'bundle' }}"
+      uses: 'actions/download-artifact@fa0b912c4d7dad43192612d645081918b6b3fb81' # v4
+      with:
+        name: '${{ inputs.bundle-artifact }}'
+        path: 'bundle'
+
+    - name: 'Post-bundle setup'
+      if: "${{ inputs.mode == 'bundle' }}"
+      run: |
+        # Ensure the bundle is ready for use
+        # In a real install, we might symlink bin/gemini to bundle/gemini.js
+        # For now, we just list it to verify it exists
+        ls -R bundle
+      shell: 'bash'
