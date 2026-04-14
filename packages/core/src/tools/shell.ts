@@ -934,13 +934,14 @@ export class ShellToolInvocation extends BaseToolInvocation<
       return {
         llmContent,
         display: {
-          name: this.getDisplayTitle(),
+          name: this._toolDisplayName,
           description: this.getDescription(),
           resultSummary: displayResultSummary,
           result:
             typeof returnDisplay === 'string'
               ? { type: 'text', text: returnDisplay }
-              : undefined,
+              : // TODO: Add support for terminal display type (AnsiOutput)
+                undefined,
         },
         returnDisplay,
         data,

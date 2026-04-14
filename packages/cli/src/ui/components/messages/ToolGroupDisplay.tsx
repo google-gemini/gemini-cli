@@ -149,11 +149,17 @@ const ToolDisplayMessage: React.FC<ToolDisplayMessageProps> = ({ tool }) => {
   }
 
   if (format === 'notice') {
+    // If the name is part of the description (typical for topic updates),
+    // suppress the bold name to avoid redundancy and match legacy UI.
+    const isRedundant = !!(name && description?.includes(`"${name}"`));
+
     return (
       <Box paddingLeft={2} flexDirection="column">
-        <Text color={theme.text.primary} bold wrap="truncate-end">
-          {name || 'Topic'}:
-        </Text>
+        {name && !isRedundant && (
+          <Text color={theme.text.primary} bold wrap="truncate-end">
+            {name}:
+          </Text>
+        )}
         {description && (
           <Text color={theme.text.secondary} wrap="wrap">
             {description}
@@ -190,8 +196,8 @@ const ToolDisplayMessage: React.FC<ToolDisplayMessageProps> = ({ tool }) => {
 
   // Box format (full)
   return (
-    <Box flexDirection="column" paddingLeft={2} marginBottom={1}>
-      <Box flexDirection="row">
+    <Box flexDirection="column" paddingLeft={0}>
+      <Box flexDirection="row" paddingLeft={1}>
         <ToolStatusIndicator
           status={status}
           name={name || tool.originalRequestName || ''}
@@ -203,12 +209,12 @@ const ToolDisplayMessage: React.FC<ToolDisplayMessageProps> = ({ tool }) => {
         {description && <Text color={theme.text.secondary}>{description}</Text>}
       </Box>
       {resultSummary && !result && (
-        <Box paddingLeft={2}>
-          <Text color={theme.text.accent}>→ {resultSummary}</Text>
+        <Box paddingLeft={1} marginTop={1}>
+          <Text color={theme.text.primary}>{resultSummary}</Text>
         </Box>
       )}
       {result && (
-        <Box paddingLeft={2} marginTop={0}>
+        <Box paddingLeft={1} marginTop={1}>
           <ToolResultDisplayContent content={result} summary={resultSummary} />
         </Box>
       )}
@@ -231,10 +237,10 @@ const ToolResultDisplayContent: React.FC<ToolResultDisplayContentProps> = ({
     case 'text':
       return (
         <Box flexDirection="column">
-          <Text color={theme.text.secondary}>{content.text}</Text>
+          <Text color={theme.text.primary}>{content.text}</Text>
           {summary && (
-            <Box marginTop={1}>
-              <Text color={theme.text.secondary}>{summary}</Text>
+            <Box marginTop={0}>
+              <Text color={theme.text.primary}>{summary}</Text>
             </Box>
           )}
         </Box>
@@ -243,7 +249,7 @@ const ToolResultDisplayContent: React.FC<ToolResultDisplayContentProps> = ({
       // Simplified diff display for now
       return (
         <Box flexDirection="column">
-          {summary && <Text color={theme.text.accent}>{summary}</Text>}
+          {summary && <Text color={theme.text.primary}>{summary}</Text>}
           <Text color={theme.text.secondary}>
             {`[Diff Display: ${content.beforeText.length} -> ${content.afterText.length} chars]`}
           </Text>
