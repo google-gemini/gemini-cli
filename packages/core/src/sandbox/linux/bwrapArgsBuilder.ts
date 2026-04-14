@@ -23,7 +23,7 @@ export interface BwrapArgsOptions {
   workspaceWrite: boolean;
   networkAccess: boolean;
   maskFilePath: string;
-  isWriteCommand: boolean;
+  isReadOnlyCommand: boolean;
 }
 
 /**
@@ -37,7 +37,7 @@ export async function buildBwrapArgs(
     workspaceWrite,
     networkAccess,
     maskFilePath,
-    isWriteCommand,
+    isReadOnlyCommand,
   } = options;
   const { workspace } = resolvedPaths;
 
@@ -79,10 +79,13 @@ export async function buildBwrapArgs(
       bwrapArgs.push('--bind-try', allowedPath, allowedPath);
     } else {
       // If the path doesn't exist, we still want to allow access to its parent
-      // to enable creating it. Since allowedPath is already resolved by resolveSandboxPaths,
-      // its parent is also correctly resolved.
+      // to enable creating it.
       const parent = dirname(allowedPath);
-      bwrapArgs.push(isWriteCommand ? '--bind-try' : bindFlag, parent, parent);
+      bwrapArgs.push(
+        isReadOnlyCommand ? '--ro-bind-try' : '--bind-try',
+        parent,
+        parent,
+      );
     }
   }
 
