@@ -57,6 +57,37 @@ describe('textUtils', () => {
       expect(() => getCachedStringWidth(charWithAnsi)).not.toThrow();
       expect(typeof getCachedStringWidth(charWithAnsi)).toBe('number');
     });
+
+    it('should return width 2 for Thai Consonant + SARA AM (U+0E33)', () => {
+      // กำ = ก (1 col) + ำ (1 col) = 2 columns in terminal
+      // string-width@8.1.0 returns 1 due to Intl.Segmenter merging them
+      expect(getCachedStringWidth('\u0E01\u0E33')).toBe(2);
+    });
+
+    it('should return width 2 for Lao Consonant + SARA AM (U+0EB3)', () => {
+      // ກຳ = ກ (1 col) + ຳ (1 col) = 2 columns in terminal
+      expect(getCachedStringWidth('\u0E81\u0EB3')).toBe(2);
+    });
+
+    it('should return correct width for Thai text with multiple SARA AM', () => {
+      // กำหนด = ก+ำ(2) + ห(1) + น(1) + ด(1) = 5 columns
+      expect(getCachedStringWidth('\u0E01\u0E33\u0E2B\u0E19\u0E14')).toBe(5);
+    });
+
+    it('should return correct width for two consecutive SARA AM clusters', () => {
+      // กำคำ = ก+ำ(2) + ค+ำ(2) = 4 columns
+      expect(getCachedStringWidth('\u0E01\u0E33\u0E04\u0E33')).toBe(4);
+    });
+
+    it('should return width 1 for standalone SARA AM', () => {
+      // Standalone ำ at position 0 = 1 column (no preceding char to merge with)
+      expect(getCachedStringWidth('\u0E33')).toBe(1);
+    });
+
+    it('should return correct width for mixed Thai and ASCII text', () => {
+      // "Hi กำ" = H(1) + i(1) + space(1) + ก+ำ(2) = 5
+      expect(getCachedStringWidth('Hi \u0E01\u0E33')).toBe(5);
+    });
   });
 
   describe('stripUnsafeCharacters', () => {
