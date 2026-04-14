@@ -369,7 +369,10 @@ describe('CPU Performance Tests', () => {
           const snapshot = await harness.measureWithEventLoop(
             'typing',
             async () => {
-              await run.type('Hello');
+              // On average, the expected latency per key is under 30ms.
+              for (const char of 'Hello') {
+                await run.type(char);
+              }
             },
           );
 
@@ -400,7 +403,7 @@ describe('CPU Performance Tests', () => {
             },
           });
 
-          await run.expectText('type your message');
+          await run.expectText('Type your message');
 
           const snapshot = await harness.measureWithEventLoop(
             'execution',
@@ -447,11 +450,18 @@ describe('CPU Performance Tests', () => {
             },
           });
 
-          await run.expectText('type your message');
+          await run.expectText('Type your message');
 
-          // Start the interaction but do not wait for test runner overhead
           for (let i = 0; i < 5; i++) {
             await run.sendKeys('\u001b[5~'); // PageUp
+          }
+
+          // Scroll to the very top
+          await run.sendKeys('\u001b[H'); // Home
+          // Verify top line of chat is visible.
+          await run.expectText('Authenticated with');
+
+          for (let i = 0; i < 5; i++) {
             await run.sendKeys('\u001b[6~'); // PageDown
           }
 
@@ -496,7 +506,7 @@ describe('CPU Performance Tests', () => {
           const snapshot: PerfSnapshot = {
             timestamp: Date.now(),
             label: 'scrolling',
-            wallClockMs: p50Ms,
+            wallClockMs: Math.round(p50Ms * 10) / 10,
             cpuTotalUs,
             cpuUserUs,
             cpuSystemUs,
@@ -541,11 +551,18 @@ describe('CPU Performance Tests', () => {
             },
           });
 
-          await run.expectText('type your message');
+          await run.expectText('Type your message');
 
-          // Start the interaction but do not wait for test runner overhead
           for (let i = 0; i < 5; i++) {
             await run.sendKeys('\u001b[5~'); // PageUp
+          }
+
+          // Scroll to the very top
+          await run.sendKeys('\u001b[H'); // Home
+          // Verify top line of chat is visible.
+          await run.expectText('Authenticated with');
+
+          for (let i = 0; i < 5; i++) {
             await run.sendKeys('\u001b[6~'); // PageDown
           }
 
@@ -590,7 +607,7 @@ describe('CPU Performance Tests', () => {
           const snapshot: PerfSnapshot = {
             timestamp: Date.now(),
             label: 'scrolling',
-            wallClockMs: p50Ms,
+            wallClockMs: Math.round(p50Ms * 10) / 10,
             cpuTotalUs,
             cpuUserUs,
             cpuSystemUs,
