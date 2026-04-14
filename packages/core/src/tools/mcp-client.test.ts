@@ -20,6 +20,8 @@ import { MCPOAuthTokenStorage } from '../mcp/oauth-token-storage.js';
 import { OAuthUtils } from '../mcp/oauth-utils.js';
 import type { PromptRegistry } from '../prompts/prompt-registry.js';
 import {
+  ErrorCode,
+  McpError,
   PromptListChangedNotificationSchema,
   ResourceListChangedNotificationSchema,
   ToolListChangedNotificationSchema,
@@ -35,6 +37,8 @@ import {
   isEnabled,
   McpClient,
   populateMcpServerCommand,
+  discoverPrompts,
+  discoverResources,
   type McpContext,
 } from './mcp-client.js';
 import type { ToolRegistry } from './tool-registry.js';
@@ -262,7 +266,7 @@ describe('mcp-client', () => {
       consoleWarnSpy.mockRestore();
     });
 
-    it('should propagate errors when discovering prompts', async () => {
+    it('should not throw when discovering prompts fails and should still discover tools', async () => {
       const mockedClient = {
         connect: vi.fn(),
         discover: vi.fn(),
@@ -271,10 +275,20 @@ describe('mcp-client', () => {
         registerCapabilities: vi.fn(),
         setRequestHandler: vi.fn(),
         setNotificationHandler: vi.fn(),
-        getServerCapabilities: vi.fn().mockReturnValue({ prompts: {} }),
-        listTools: vi.fn().mockResolvedValue({ tools: [] }),
+        getServerCapabilities: vi
+          .fn()
+          .mockReturnValue({ prompts: {}, tools: {} }),
+        listTools: vi.fn().mockResolvedValue({
+          tools: [
+            {
+              name: 'tool1',
+              description: 'Test tool',
+              inputSchema: { type: 'object' },
+            },
+          ],
+        }),
         listPrompts: vi.fn().mockRejectedValue(new Error('Test error')),
-        request: vi.fn().mockResolvedValue({}),
+        request: vi.fn().mockResolvedValue({ resources: [] }),
       };
       vi.mocked(ClientLib.Client).mockReturnValue(
         mockedClient as unknown as ClientLib.Client,
@@ -284,6 +298,8 @@ describe('mcp-client', () => {
       );
       const mockedToolRegistry = {
         registerTool: vi.fn(),
+        sortTools: vi.fn(),
+        getToolsByServer: vi.fn().mockReturnValue([]),
         getMessageBus: vi.fn().mockReturnValue(undefined),
       } as unknown as ToolRegistry;
       const promptRegistry = {
@@ -305,19 +321,98 @@ describe('mcp-client', () => {
         '0.0.1',
       );
       await client.connect();
-      await expect(
-        client.discoverInto(MOCK_CONTEXT, {
-          toolRegistry: mockedToolRegistry,
-          promptRegistry,
-          resourceRegistry,
-        }),
-      ).rejects.toThrow('Test error');
+      // Should NOT throw despite prompt discovery failure
+      await client.discoverInto(MOCK_CONTEXT, {
+        toolRegistry: mockedToolRegistry,
+        promptRegistry,
+        resourceRegistry,
+      });
+      // Diagnostic should still be emitted
       expect(MOCK_CONTEXT.emitMcpDiagnostic).toHaveBeenCalledWith(
         'error',
         `Error discovering prompts from test-server: Test error`,
         expect.any(Error),
         'test-server',
       );
+      // Tools should still be discovered
+      expect(mockedToolRegistry.registerTool).toHaveBeenCalledTimes(1);
+    });
+
+    it('should return empty array for discoverPrompts on MethodNotFound error without diagnostic', async () => {
+      const mockedClient = {
+        getServerCapabilities: vi.fn().mockReturnValue({ prompts: {} }),
+        listPrompts: vi
+          .fn()
+          .mockRejectedValue(
+            new McpError(ErrorCode.MethodNotFound, 'Method not supported'),
+          ),
+      };
+      const result = await discoverPrompts(
+        'test-server',
+        mockedClient as unknown as ClientLib.Client,
+        MOCK_CONTEXT,
+      );
+      expect(result).toEqual([]);
+      // MethodNotFound errors should be silently ignored regardless of message text
+      expect(MOCK_CONTEXT.emitMcpDiagnostic).not.toHaveBeenCalled();
+    });
+
+    it('should return empty array for discoverPrompts on non-MethodNotFound error with diagnostic', async () => {
+      const mockedClient = {
+        getServerCapabilities: vi.fn().mockReturnValue({ prompts: {} }),
+        listPrompts: vi.fn().mockRejectedValue(new Error('Connection reset')),
+      };
+      const result = await discoverPrompts(
+        'test-server',
+        mockedClient as unknown as ClientLib.Client,
+        MOCK_CONTEXT,
+      );
+      expect(result).toEqual([]);
+      expect(MOCK_CONTEXT.emitMcpDiagnostic).toHaveBeenCalledWith(
+        'error',
+        expect.stringContaining('Connection reset'),
+        expect.any(Error),
+        'test-server',
+      );
+    });
+
+    it('should return empty array for discoverResources on error without throwing', async () => {
+      const mockedClient = {
+        getServerCapabilities: vi.fn().mockReturnValue({ resources: {} }),
+        request: vi
+          .fn()
+          .mockRejectedValue(new Error('Resource listing failed')),
+      };
+      const result = await discoverResources(
+        'test-server',
+        mockedClient as unknown as ClientLib.Client,
+        MOCK_CONTEXT,
+      );
+      expect(result).toEqual([]);
+      expect(MOCK_CONTEXT.emitMcpDiagnostic).toHaveBeenCalledWith(
+        'error',
+        expect.stringContaining('Resource listing failed'),
+        expect.any(Error),
+        'test-server',
+      );
+    });
+
+    it('should return empty array for discoverResources on MethodNotFound without diagnostic', async () => {
+      const mockedClient = {
+        getServerCapabilities: vi.fn().mockReturnValue({ resources: {} }),
+        request: vi
+          .fn()
+          .mockRejectedValue(
+            new McpError(ErrorCode.MethodNotFound, 'Method not found'),
+          ),
+      };
+      const result = await discoverResources(
+        'test-server',
+        mockedClient as unknown as ClientLib.Client,
+        MOCK_CONTEXT,
+      );
+      expect(result).toEqual([]);
+      expect(MOCK_CONTEXT.emitMcpDiagnostic).not.toHaveBeenCalled();
     });
 
     it('should not discover tools if server does not support them', async () => {

@@ -27,6 +27,8 @@ import {
   ReadResourceResultSchema,
   ResourceListChangedNotificationSchema,
   ToolListChangedNotificationSchema,
+  ErrorCode,
+  McpError,
   PromptListChangedNotificationSchema,
   ProgressNotificationSchema,
   type GetPromptResult,
@@ -1330,8 +1332,7 @@ export async function discoverTools(
     return discoveredTools;
   } catch (error) {
     if (
-      error instanceof Error &&
-      !error.message?.includes('Method not found')
+      !(error instanceof McpError && error.code === ErrorCode.MethodNotFound)
     ) {
       cliConfig.emitMcpDiagnostic(
         'error',
@@ -1456,19 +1457,19 @@ export async function discoverPrompts(
         ),
     }));
   } catch (error) {
-    // It's okay if the method is not found, which is a common case.
-    if (error instanceof Error && error.message?.includes('Method not found')) {
-      return [];
-    }
-    cliConfig.emitMcpDiagnostic(
-      'error',
-      `Error discovering prompts from ${mcpServerName}: ${getErrorMessage(
+    if (
+      !(error instanceof McpError && error.code === ErrorCode.MethodNotFound)
+    ) {
+      cliConfig.emitMcpDiagnostic(
+        'error',
+        `Error discovering prompts from ${mcpServerName}: ${getErrorMessage(
+          error,
+        )}`,
         error,
-      )}`,
-      error,
-      mcpServerName,
-    );
-    throw error;
+        mcpServerName,
+      );
+    }
+    return [];
   }
 }
 
@@ -1505,18 +1506,19 @@ async function listResources(
       cursor = response.nextCursor ?? undefined;
     } while (cursor);
   } catch (error) {
-    if (error instanceof Error && error.message?.includes('Method not found')) {
-      return [];
-    }
-    cliConfig.emitMcpDiagnostic(
-      'error',
-      `Error discovering resources from ${mcpServerName}: ${getErrorMessage(
+    if (
+      !(error instanceof McpError && error.code === ErrorCode.MethodNotFound)
+    ) {
+      cliConfig.emitMcpDiagnostic(
+        'error',
+        `Error discovering resources from ${mcpServerName}: ${getErrorMessage(
+          error,
+        )}`,
         error,
-      )}`,
-      error,
-      mcpServerName,
-    );
-    throw error;
+        mcpServerName,
+      );
+    }
+    return [];
   }
   return resources;
 }
