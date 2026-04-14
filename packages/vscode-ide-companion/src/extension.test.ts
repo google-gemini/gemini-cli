@@ -22,6 +22,14 @@ vi.mock('@google/gemini-cli-core/src/ide/detect-ide.js', async () => {
   };
 });
 
+vi.mock('./ide-server.js', () => ({
+  IDEServer: vi.fn().mockImplementation(() => ({
+    start: vi.fn(),
+    stop: vi.fn(),
+    syncEnvVars: vi.fn(),
+  })),
+}));
+
 vi.mock('vscode', () => ({
   window: {
     createOutputChannel: vi.fn(() => ({
@@ -33,7 +41,11 @@ vi.mock('vscode', () => ({
       sendText: vi.fn(),
     })),
     onDidChangeActiveTextEditor: vi.fn(),
+    onDidChangeTextEditorSelection: vi.fn(),
+    onDidCloseTerminal: vi.fn(),
     activeTextEditor: undefined,
+    registerTreeDataProvider: vi.fn(),
+    terminals: [],
     tabGroups: {
       all: [],
       close: vi.fn(),
@@ -43,6 +55,7 @@ vi.mock('vscode', () => ({
   },
   workspace: {
     workspaceFolders: [],
+    getWorkspaceFolder: vi.fn(),
     onDidCloseTextDocument: vi.fn(),
     registerTextDocumentContentProvider: vi.fn(),
     onDidChangeWorkspaceFolders: vi.fn(),
@@ -131,6 +144,19 @@ describe('activate', () => {
     expect(vscode.workspace.onDidGrantWorkspaceTrust).toHaveBeenCalled();
   });
 
+  it('should register the Newgate sidebar provider', async () => {
+    await activate(context);
+    expect(vscode.window.registerTreeDataProvider).toHaveBeenCalledWith(
+      'gemini-cli.newgateView',
+      expect.anything(),
+    );
+  });
+
+  it('should register a Newgate terminal close handler', async () => {
+    await activate(context);
+    expect(vscode.window.onDidCloseTerminal).toHaveBeenCalled();
+  });
+
   it('should launch the Gemini CLI when the user clicks the button', async () => {
     const showInformationMessageMock = vi
       .mocked(vscode.window.showInformationMessage)
@@ -172,6 +198,7 @@ describe('activate', () => {
       );
 
       await activate(context);
+      await new Promise((resolve) => setTimeout(resolve, 0));
 
       expect(showInformationMessageMock).toHaveBeenCalledWith(
         'A new version (1.2.0) of the Gemini CLI Companion extension is available.',

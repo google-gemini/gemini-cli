@@ -9,6 +9,7 @@ import { IDEServer } from './ide-server.js';
 import semver from 'semver';
 import { DiffContentProvider, DiffManager } from './diff-manager.js';
 import { createLogger } from './utils/logger.js';
+import { NewgateSidebarProvider, registerNewgateUi } from './newgate-ui.js';
 import {
   detectIdeFromEnv,
   IDE_DEFINITIONS,
@@ -121,6 +122,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
   const diffContentProvider = new DiffContentProvider();
   const diffManager = new DiffManager(log, diffContentProvider);
+  const newgateSidebarProvider = new NewgateSidebarProvider();
 
   context.subscriptions.push(
     vscode.workspace.onDidCloseTextDocument((doc) => {
@@ -162,6 +164,8 @@ export async function activate(context: vscode.ExtensionContext) {
     const message = err instanceof Error ? err.message : String(err);
     log(`Failed to start IDE server: ${message}`);
   }
+
+  registerNewgateUi(context, newgateSidebarProvider);
 
   if (
     !context.globalState.get(INFO_MESSAGE_SHOWN_KEY) &&

@@ -41,6 +41,23 @@
         }
       }
     },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "gemini-cli",
+          "title": "Gemini CLI",
+          "icon": "assets/icon.png"
+        }
+      ]
+    },
+    "views": {
+      "gemini-cli": [
+        {
+          "id": "gemini-cli.newgateView",
+          "name": "Newgate"
+        }
+      ]
+    },
     "languages": [
       {
         "id": "gemini-diff-editable"
@@ -64,6 +81,35 @@
       {
         "command": "gemini-cli.showNotices",
         "title": "Gemini CLI: View Third-Party Notices"
+      },
+      {
+        "command": "gemini-cli.newgateStart",
+        "title": "Gemini CLI: Newgate Start"
+      },
+      {
+        "command": "gemini-cli.newgateStartWithContext",
+        "title": "Gemini CLI: Newgate Start With Context"
+      },
+      {
+        "command": "gemini-cli.newgateSendContext",
+        "title": "Gemini CLI: Newgate Send Context"
+      },
+      {
+        "command": "gemini-cli.newgateFocusSession",
+        "title": "Gemini CLI: Newgate Focus Session"
+      },
+      {
+        "command": "gemini-cli.newgateDoctor",
+        "title": "Gemini CLI: Newgate Doctor"
+      },
+      {
+        "command": "gemini-cli.newgateInit",
+        "title": "Gemini CLI: Newgate Init"
+      },
+      {
+        "command": "gemini-cli.newgateRefresh",
+        "title": "Gemini CLI: Refresh Newgate View",
+        "icon": "$(refresh)"
       }
     ],
     "menus": {
@@ -86,6 +132,11 @@
         {
           "command": "gemini.diff.cancel",
           "when": "gemini.diff.isVisible",
+          "group": "navigation"
+        },
+        {
+          "command": "gemini-cli.newgateRefresh",
+          "when": "view == gemini-cli.newgateView",
           "group": "navigation"
         }
       ]
