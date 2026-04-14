@@ -644,6 +644,7 @@ describe('createContentGenerator', () => {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getProxy: vi.fn().mockReturnValue(undefined),
       getUsageStatisticsEnabled: () => false,
+      getClientName: vi.fn().mockReturnValue(undefined),
     } as unknown as Config;
 
     const mockGenerator = {
@@ -675,6 +676,7 @@ describe('createContentGenerator', () => {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getProxy: vi.fn().mockReturnValue(undefined),
       getUsageStatisticsEnabled: () => false,
+      getClientName: vi.fn().mockReturnValue(undefined),
     } as unknown as Config;
 
     const mockGenerator = {
@@ -695,6 +697,39 @@ describe('createContentGenerator', () => {
       expect.objectContaining({
         apiKey: undefined,
         vertexai: true,
+        httpOptions: expect.objectContaining({
+          baseUrl: 'https://vertex.test.local',
+        }),
+      }),
+    );
+  });
+
+  it('should prefer GOOGLE_VERTEX_BASE_URL when authType is USE_VERTEX_AI without inferred vertex credentials', async () => {
+    const mockConfig = {
+      getModel: vi.fn().mockReturnValue('gemini-pro'),
+      getProxy: vi.fn().mockReturnValue(undefined),
+      getUsageStatisticsEnabled: () => false,
+      getClientName: vi.fn().mockReturnValue(undefined),
+    } as unknown as Config;
+
+    const mockGenerator = {
+      models: {},
+    } as unknown as GoogleGenAI;
+    vi.mocked(GoogleGenAI).mockImplementation(() => mockGenerator as never);
+    vi.stubEnv('GOOGLE_GEMINI_BASE_URL', 'https://gemini.test.local');
+    vi.stubEnv('GOOGLE_VERTEX_BASE_URL', 'https://vertex.test.local');
+
+    await createContentGenerator(
+      {
+        authType: AuthType.USE_VERTEX_AI,
+      },
+      mockConfig,
+    );
+
+    expect(GoogleGenAI).toHaveBeenCalledWith(
+      expect.objectContaining({
+        apiKey: undefined,
+        vertexai: undefined,
         httpOptions: expect.objectContaining({
           baseUrl: 'https://vertex.test.local',
         }),
@@ -739,6 +774,7 @@ describe('createContentGenerator', () => {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getProxy: vi.fn().mockReturnValue(undefined),
       getUsageStatisticsEnabled: () => false,
+      getClientName: vi.fn().mockReturnValue(undefined),
     } as unknown as Config;
 
     const mockGenerator = {
@@ -787,11 +823,8 @@ describe('createContentGenerator', () => {
         },
         mockConfig,
       ),
-    ).rejects.toThrow(
-      'Custom base URL must use HTTPS unless it is localhost.',
-    );
+    ).rejects.toThrow('Custom base URL must use HTTPS unless it is localhost.');
   });
-
 });
 
 describe('createContentGeneratorConfig', () => {

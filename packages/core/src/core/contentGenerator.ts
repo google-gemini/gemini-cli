@@ -112,9 +112,7 @@ function validateBaseUrl(baseUrl: string): void {
   }
 
   if (url.protocol !== 'https:' && !LOCAL_HOSTNAMES.includes(url.hostname)) {
-    throw new Error(
-      'Custom base URL must use HTTPS unless it is localhost.',
-    );
+    throw new Error('Custom base URL must use HTTPS unless it is localhost.');
   }
 }
 
@@ -292,9 +290,10 @@ export async function createContentGenerator(
       }
       let baseUrl = config.baseUrl;
       if (!baseUrl) {
-        const envBaseUrl = config.vertexai
-          ? process.env['GOOGLE_VERTEX_BASE_URL']
-          : process.env['GOOGLE_GEMINI_BASE_URL'];
+        const envBaseUrl =
+          config.authType === AuthType.USE_VERTEX_AI
+            ? process.env['GOOGLE_VERTEX_BASE_URL']
+            : process.env['GOOGLE_GEMINI_BASE_URL'];
         if (envBaseUrl) {
           validateBaseUrl(envBaseUrl);
           baseUrl = envBaseUrl;
