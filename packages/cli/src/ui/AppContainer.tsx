@@ -26,6 +26,7 @@ import { App } from './App.js';
 import { AppContext } from './contexts/AppContext.js';
 import { VoiceContext } from './contexts/VoiceContext.js';
 import { UIStateContext, type UIState } from './contexts/UIStateContext.js';
+import { QuotaContext } from './contexts/QuotaContext.js';
 import {
   UIActionsContext,
   type UIActions,
@@ -2439,6 +2440,26 @@ Logging in with Google... Restarting Gemini CLI to continue.
     ],
   );
 
+  const quotaState = useMemo(
+    () => ({
+      userTier,
+      stats: quotaStats,
+      proQuotaRequest,
+      validationRequest,
+      // G1 AI Credits dialog state
+      overageMenuRequest,
+      emptyWalletRequest,
+    }),
+    [
+      userTier,
+      quotaStats,
+      proQuotaRequest,
+      validationRequest,
+      overageMenuRequest,
+      emptyWalletRequest,
+    ],
+  );
+
   const uiState: UIState = useMemo(
     () => ({
       history: historyManager.history,
@@ -2511,15 +2532,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       showApprovalModeIndicator,
       allowPlanMode,
       currentModel,
-      quota: {
-        userTier,
-        stats: quotaStats,
-        proQuotaRequest,
-        validationRequest,
-        // G1 AI Credits dialog state
-        overageMenuRequest,
-        emptyWalletRequest,
-      },
       contextFileNames,
       errorCount,
       availableTerminalHeight,
@@ -2630,12 +2642,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       queueErrorMessage,
       showApprovalModeIndicator,
       allowPlanMode,
-      userTier,
-      quotaStats,
-      proQuotaRequest,
-      validationRequest,
-      overageMenuRequest,
-      emptyWalletRequest,
       contextFileNames,
       errorCount,
       availableTerminalHeight,
@@ -2854,36 +2860,38 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   return (
     <UIStateContext.Provider value={uiState}>
-      <InputContext.Provider value={inputState}>
-        <UIActionsContext.Provider value={uiActions}>
-          <ConfigContext.Provider value={config}>
-            <AppContext.Provider
-              value={{
-                version: props.version,
-                startupWarnings: props.startupWarnings || [],
-              }}
-            >
-              <ToolActionsProvider
-                config={config}
-                toolCalls={allToolCalls}
-                isExpanded={isExpanded}
-                toggleExpansion={toggleExpansion}
-                toggleAllExpansion={toggleAllExpansion}
+      <QuotaContext.Provider value={quotaState}>
+        <InputContext.Provider value={inputState}>
+          <UIActionsContext.Provider value={uiActions}>
+            <ConfigContext.Provider value={config}>
+              <AppContext.Provider
+                value={{
+                  version: props.version,
+                  startupWarnings: props.startupWarnings || [],
+                }}
               >
-                <ShellFocusContext.Provider value={isFocused}>
-                  <VoiceContext.Provider value={voice}>
-                    <MouseProvider mouseEventsEnabled={mouseMode}>
-                      <ScrollProvider>
-                        <App key={`app-${forceRerenderKey}`} />
-                      </ScrollProvider>
-                    </MouseProvider>
-                  </VoiceContext.Provider>
-                </ShellFocusContext.Provider>
-              </ToolActionsProvider>
-            </AppContext.Provider>
-          </ConfigContext.Provider>
-        </UIActionsContext.Provider>
-      </InputContext.Provider>
+                <ToolActionsProvider
+                  config={config}
+                  toolCalls={allToolCalls}
+                  isExpanded={isExpanded}
+                  toggleExpansion={toggleExpansion}
+                  toggleAllExpansion={toggleAllExpansion}
+                >
+                  <ShellFocusContext.Provider value={isFocused}>
+                    <VoiceContext.Provider value={voice}>
+                      <MouseProvider mouseEventsEnabled={mouseMode}>
+                        <ScrollProvider>
+                          <App key={`app-${forceRerenderKey}`} />
+                        </ScrollProvider>
+                      </MouseProvider>
+                    </VoiceContext.Provider>
+                  </ShellFocusContext.Provider>
+                </ToolActionsProvider>
+              </AppContext.Provider>
+            </ConfigContext.Provider>
+          </UIActionsContext.Provider>
+        </InputContext.Provider>
+      </QuotaContext.Provider>
     </UIStateContext.Provider>
   );
 };
