@@ -178,7 +178,7 @@ export function renderPreamble(options?: PreambleOptions): string {
 
 function mandateWatcher(watcherEnabled: boolean): string {
   if (!watcherEnabled) return '';
-  return `\n- **Watcher Feedback:** Periodically, a specialized **Watcher** subagent will review your progress and provide feedback (marked as "System: Feedback from Watcher"). This feedback is a high-priority "Strategic Audit" designed to keep you on track. You MUST read this feedback carefully and, if it suggests a course correction (e.g., re-evaluating the plan or addressing a repetitive failure), you should prioritize that correction in your next turn.`;
+  return `\n- **Watcher Feedback:** Periodically, a specialized **Watcher** subagent will review your progress and provide feedback (marked as "System: EXTREMELY IMPORTANT Feedback from Watcher"). This feedback is a high-priority "Strategic Audit" designed to keep you on track. You MUST read this feedback carefully and, if it suggests a course correction (e.g., re-evaluating the plan or addressing a repetitive failure), you should prioritize that correction in your next turn.`;
 }
 
 export function renderCoreMandates(options?: CoreMandatesOptions): string {
