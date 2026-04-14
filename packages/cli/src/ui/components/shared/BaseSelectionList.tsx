@@ -88,7 +88,6 @@ function SelectionListItemRow<
     { isActive: isFocused },
   );
 
-  // Determine colors based on selection and disabled state
   let titleColor = theme.text.primary;
   let numberColor = theme.text.primary;
 
