@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "task_id": "pre-dispatch-gate",
+  "title": "Move strict PCC gating to pre-dispatch and actionable hook boundaries",
+  "role": "router",
+  "priority": "now",
+  "runtime": "gemini",
+  "preset": "監",
+  "model": "deep",
+  "objective": "Define the strict gating design that prevents Gemini CLI and Jules delegation from bypassing PCC. The gate must live before dispatch or at actionable hook boundaries rather than relying on SessionEnd best-effort hooks.",
+  "context": [
+    "Current project hooks default to audit-only and mostly observe write_file|replace and exit.",
+    "SessionEnd hooks are best effort and cannot enforce allow or deny decisions.",
+    "Future delegation tools and remote enqueue paths will bypass current matchers unless a stronger gate exists."
+  ],
+  "constraints": [
+    "Do not depend on SessionEnd for hard allow or deny decisions.",
+    "Prefer deterministic policy surfaces like controller pre-dispatch checks or actionable hook responses.",
+    "Map PCC verdicts to explicit controller actions: allow, review, reject, retry."
+  ],
+  "required_evidence": [
+    "A concrete gate placement recommendation with alternatives and tradeoffs.",
+    "Specific files or tool boundaries where the gate should run.",
+    "A machine-readable verdict-to-action policy proposal."
+  ],
+  "success_criteria": [
+    "There is one preferred gate point for strict PCC enforcement.",
+    "The design closes obvious bypass paths for delegated Gemini and Jules work.",
+    "Controller actions are deterministic and not based on freeform prose."
+  ],
+  "artifacts_expected": [
+    "Gate design note",
+    "Verdict-to-action policy table",
+    "Candidate implementation entry points"
+  ],
+  "dispatch_gate": {
+    "execution_mode": "analysis",
+    "allowed_runtimes": ["gemini", "claude"],
+    "require_artifacts": true,
+    "min_required_evidence": 3,
+    "min_success_criteria": 3
+  },
+  "next_actions": {
+    "allow": "Implement the policy table and controller pre-dispatch checks.",
+    "review": "Simplify the gate to one boundary and revisit hooks later.",
+    "reject": "Reframe the task around a single delegation path before retrying.",
+    "retry": "Retry once runtime configuration is stable."
+  }
+}

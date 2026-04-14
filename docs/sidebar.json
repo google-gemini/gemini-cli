@@ -144,6 +144,10 @@
             "label": "Remote subagents",
             "slug": "docs/core/remote-agents"
           },
+          {
+            "label": "PCC delegation",
+            "slug": "docs/tools/pcc-delegation"
+          },
           { "label": "Rewind", "slug": "docs/cli/rewind" },
           { "label": "Sandboxing", "slug": "docs/cli/sandbox" },
           { "label": "Settings", "slug": "docs/cli/settings" },

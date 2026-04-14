@@ -357,16 +357,19 @@ export async function main() {
   }
 
   const isDebugMode = cliConfig.isDebugMode(argv);
+  const isAcpMode = !!argv.acp || !!argv.experimentalAcp;
   const consolePatcher = new ConsolePatcher({
     stderr: true,
-    interactive: isHeadlessMode() ? false : true,
+    interactive: isAcpMode ? false : !isHeadlessMode(),
     debugMode: isDebugMode,
     onNewMessage: (msg) => {
       coreEvents.emitConsoleLog(msg.type, msg.content);
     },
   });
   consolePatcher.patch();
-  registerCleanup(consolePatcher.cleanup);
+  if (!isAcpMode) {
+    registerCleanup(consolePatcher.cleanup);
+  }
 
   dns.setDefaultResultOrder(
     validateDnsResolutionOrder(settings.merged.advanced.dnsResolutionOrder),

@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "task_id": "live-jules-routing",
+  "title": "Replace fake Jules validation with a documented live routing contract",
+  "role": "discoverer",
+  "priority": "later",
+  "runtime": "gemini",
+  "preset": "監",
+  "model": "deep",
+  "objective": "Work out the safest live routing contract for Jules so the controller can move beyond fake runtime tests without fragmenting between the generic runtime_commands adapter, Gemini's Jules extension flow, and remote subagent paths.",
+  "context": [
+    "Current ACP coverage proves only a fake Jules runtime wired through runtime_commands.jules.",
+    "Gemini CLI docs already describe a Jules extension and remote subagent concepts.",
+    "The repo does not yet have one canonical live Jules path for the controller layer."
+  ],
+  "constraints": [
+    "Prefer one canonical live route instead of supporting every path equally.",
+    "Keep PCC in front of the live route.",
+    "Document failure and retry boundaries for unavailable Jules runtimes."
+  ],
+  "required_evidence": [
+    "A recommendation for the primary live Jules route.",
+    "Tradeoffs vs the other available routes.",
+    "A plan for how to validate the live route without destabilizing ACP regressions."
+  ],
+  "success_criteria": [
+    "The controller layer has one documented live Jules routing decision.",
+    "The design includes validation and fallback behavior.",
+    "The route can later replace or complement the fake runtime test."
+  ],
+  "artifacts_expected": [
+    "Routing decision note",
+    "Validation plan",
+    "Fallback behavior summary"
+  ],
+  "dispatch_gate": {
+    "execution_mode": "analysis",
+    "allowed_runtimes": ["gemini", "claude"],
+    "require_artifacts": true,
+    "min_required_evidence": 3,
+    "min_success_criteria": 3
+  },
+  "next_actions": {
+    "allow": "Document the chosen live route and add the first real validation hook.",
+    "review": "Reduce the comparison set and decide between only two routes.",
+    "reject": "Postpone live routing until the controller ledger and report reader exist.",
+    "retry": "Retry once live Jules connectivity is available."
+  }
+}

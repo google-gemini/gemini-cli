@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "task_id": "controller-ledger",
+  "title": "Add a typed controller ledger for ACP, reports, and external worker jobs",
+  "role": "builder",
+  "priority": "now",
+  "runtime": "jules",
+  "preset": "刃",
+  "model": "deep",
+  "objective": "Design and implement a typed controller/router state ledger that tracks workspace, terminal, ACP session id, chosen runtime, report paths, and Jules job ids instead of relying on a transient in-memory terminal map.",
+  "context": [
+    "Newgate UI currently remembers only workspace to terminal mappings in memory.",
+    "ACP hook reports already exist under .gemini/pcc-reports but no product code reads them.",
+    "The future controller layer needs stable state for delegation, retries, and UI status."
+  ],
+  "constraints": [
+    "Do not break the current Newgate sidebar commands.",
+    "Keep the first pass minimal: typed schema, persistence boundary, and read/write helpers.",
+    "Treat Gemini CLI ACP as the primary execution lane and Jules as an external worker lane."
+  ],
+  "required_evidence": [
+    "Concrete ledger type or schema covering workspace, ACP session id, runtime, report files, and external job ids.",
+    "Code references for where the ledger is written and read.",
+    "Validation or tests proving the state survives beyond a single in-memory map."
+  ],
+  "success_criteria": [
+    "A typed ledger abstraction exists in product code.",
+    "Newgate controller state is no longer implicit-only state.",
+    "The design supports future report-reader and job-status UI work without redesign."
+  ],
+  "artifacts_expected": [
+    "Ledger type or schema file",
+    "Controller persistence helper",
+    "Targeted tests or verification notes"
+  ],
+  "dispatch_gate": {
+    "execution_mode": "execute",
+    "allowed_runtimes": ["jules"],
+    "require_artifacts": true,
+    "min_required_evidence": 3,
+    "min_success_criteria": 3
+  },
+  "next_actions": {
+    "allow": "Implement the ledger and add targeted persistence tests.",
+    "review": "Narrow the ledger scope to the minimum fields needed for ACP and report tracking.",
+    "reject": "Rewrite the task to separate typed schema from persistence implementation.",
+    "retry": "Fix runtime or config issues and rerun the same task."
+  }
+}

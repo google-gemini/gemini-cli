@@ -1,0 +1,599 @@
+#!/usr/bin/env python3
+"""Deterministic task handoff to PCC-controlled Gemini CLI / Jules / Claude workers."""
+
+import argparse
+import json
+import os
+import pathlib
+import subprocess
+import sys
+import time
+from typing import Any
+
+
+REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
+PCC_CRITIC = REPO_ROOT / "scripts" / "pcc-critic"
+DEFAULT_OUTPUT_DIR = pathlib.Path(".gemini") / "pcc-delegation-reports"
+REQUIRED_TASK_FIELDS = [
+    "version",
+    "task_id",
+    "title",
+    "role",
+    "runtime",
+    "preset",
+    "model",
+    "objective",
+    "context",
+    "constraints",
+    "required_evidence",
+    "success_criteria",
+    "artifacts_expected",
+    "dispatch_gate",
+    "next_actions",
+]
+DEFAULT_NEXT_ACTIONS = {
+    "allow": "Proceed with implementation using the reported evidence.",
+    "review": "Tighten evidence requirements and rerun the delegated task.",
+    "reject": "Rewrite the task contract before retrying.",
+    "retry": "Fix runtime or configuration errors and retry the same task.",
+}
+RUNTIME_EXECUTION_POLICY = {
+    "gemini": {"allowed_modes": {"analysis", "plan"}},
+    "claude": {"allowed_modes": {"analysis", "plan"}},
+    "jules": {"allowed_modes": {"analysis", "plan", "execute"}},
+}
+VERDICT_TO_DECISION = {
+    "PASS": "allow",
+    "REVIEW": "review",
+    "NEEDS_EVIDENCE": "review",
+    "NO_OP": "reject",
+    "SYCOPHANTIC": "reject",
+    "FAIL": "reject",
+}
+ERROR_TO_DECISION = {
+    "TIMEOUT": "retry",
+    "NOT_FOUND": "reject",
+    "RUNTIME_NOT_CONFIGURED": "reject",
+    "empty-output": "reject",
+}
+
+
+def resolve_path(path_text: str) -> pathlib.Path:
+    path = pathlib.Path(path_text).expanduser()
+    if not path.is_absolute():
+        path = pathlib.Path.cwd() / path
+    return path
+
+
+def resolve_task_paths(task_path: pathlib.Path) -> list[pathlib.Path]:
+    if not task_path.exists():
+        raise FileNotFoundError(f"Task path does not exist: {task_path}")
+    if task_path.is_dir():
+        files = sorted(
+            path for path in task_path.iterdir() if path.is_file() and path.suffix == ".json"
+        )
+        if not files:
+            raise FileNotFoundError(f"No task json files found in: {task_path}")
+        return files
+    return [task_path]
+
+
+def ensure_string_list(value: Any, field_name: str) -> list[str]:
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        raise ValueError(f"Task field '{field_name}' must be a list of strings")
+    return list(value)
+
+
+def normalize_dispatch_gate(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise ValueError("Task field 'dispatch_gate' must be an object")
+
+    execution_mode = value.get("execution_mode")
+    if execution_mode not in {"analysis", "plan", "execute"}:
+        raise ValueError(
+            "Task field 'dispatch_gate.execution_mode' must be analysis, plan, or execute"
+        )
+
+    allowed_runtimes = ensure_string_list(
+        value.get("allowed_runtimes"),
+        "dispatch_gate.allowed_runtimes",
+    )
+    if not allowed_runtimes:
+        raise ValueError(
+            "Task field 'dispatch_gate.allowed_runtimes' must not be empty"
+        )
+    invalid_runtimes = [
+        runtime for runtime in allowed_runtimes if runtime not in RUNTIME_EXECUTION_POLICY
+    ]
+    if invalid_runtimes:
+        raise ValueError(
+            f"Task field 'dispatch_gate.allowed_runtimes' contains unsupported runtimes {invalid_runtimes}"
+        )
+
+    require_artifacts = value.get("require_artifacts")
+    if not isinstance(require_artifacts, bool):
+        raise ValueError(
+            "Task field 'dispatch_gate.require_artifacts' must be a boolean"
+        )
+
+    min_required_evidence = value.get("min_required_evidence")
+    min_success_criteria = value.get("min_success_criteria")
+    if not isinstance(min_required_evidence, int) or min_required_evidence < 0:
+        raise ValueError(
+            "Task field 'dispatch_gate.min_required_evidence' must be a non-negative integer"
+        )
+    if not isinstance(min_success_criteria, int) or min_success_criteria < 0:
+        raise ValueError(
+            "Task field 'dispatch_gate.min_success_criteria' must be a non-negative integer"
+        )
+
+    return {
+        "execution_mode": execution_mode,
+        "allowed_runtimes": allowed_runtimes,
+        "require_artifacts": require_artifacts,
+        "min_required_evidence": min_required_evidence,
+        "min_success_criteria": min_success_criteria,
+    }
+
+
+def load_task(task_path: pathlib.Path) -> dict[str, Any]:
+    task = json.loads(task_path.read_text(encoding="utf-8"))
+    if not isinstance(task, dict):
+        raise ValueError(f"Task file must contain a JSON object: {task_path}")
+
+    missing = [field for field in REQUIRED_TASK_FIELDS if field not in task]
+    if missing:
+        raise ValueError(f"Task file is missing required fields {missing}: {task_path}")
+
+    for field_name in [
+        "task_id",
+        "title",
+        "role",
+        "runtime",
+        "preset",
+        "model",
+        "objective",
+    ]:
+        if not isinstance(task[field_name], str) or not task[field_name].strip():
+            raise ValueError(f"Task field '{field_name}' must be a non-empty string")
+
+    task["context"] = ensure_string_list(task["context"], "context")
+    task["constraints"] = ensure_string_list(task["constraints"], "constraints")
+    task["required_evidence"] = ensure_string_list(
+        task["required_evidence"],
+        "required_evidence",
+    )
+    task["success_criteria"] = ensure_string_list(
+        task["success_criteria"],
+        "success_criteria",
+    )
+    task["artifacts_expected"] = ensure_string_list(
+        task["artifacts_expected"],
+        "artifacts_expected",
+    )
+    task["dispatch_gate"] = normalize_dispatch_gate(task["dispatch_gate"])
+    if not isinstance(task["next_actions"], dict):
+        raise ValueError("Task field 'next_actions' must be an object")
+
+    next_actions = dict(DEFAULT_NEXT_ACTIONS)
+    for key, value in task["next_actions"].items():
+        if key in next_actions and isinstance(value, str) and value.strip():
+            next_actions[key] = value
+    task["next_actions"] = next_actions
+    return task
+
+
+def build_prompt(task: dict[str, Any]) -> str:
+    dispatch_gate = task["dispatch_gate"]
+    mode_rule = {
+        "analysis": (
+            "Dispatch mode: analysis-only. Do not claim files were modified, commands were run, or jobs were executed. "
+            "Return analysis, evidence, and recommended next actions only."
+        ),
+        "plan": (
+            "Dispatch mode: plan-only. Do not execute changes. Return a concrete plan with risks, artifacts, and missing evidence."
+        ),
+        "execute": (
+            "Dispatch mode: execution-allowed. Stay inside the declared scope, and back every claim with concrete artifacts or verifiable evidence."
+        ),
+    }[dispatch_gate["execution_mode"]]
+    sections = [
+        "You are executing a delegated engineering task under a PCC-controlled controller.",
+        f"Task ID: {task['task_id']}",
+        f"Title: {task['title']}",
+        f"Role: {task['role']}",
+        (
+            "Dispatch gate:\n"
+            f"- execution_mode: {dispatch_gate['execution_mode']}\n"
+            f"- allowed_runtimes: {', '.join(dispatch_gate['allowed_runtimes'])}\n"
+            f"- require_artifacts: {dispatch_gate['require_artifacts']}\n"
+            f"- min_required_evidence: {dispatch_gate['min_required_evidence']}\n"
+            f"- min_success_criteria: {dispatch_gate['min_success_criteria']}"
+        ),
+        mode_rule,
+        f"Objective:\n{task['objective']}",
+        "Context:",
+        "\n".join(f"- {item}" for item in task["context"]),
+        "Constraints:",
+        "\n".join(f"- {item}" for item in task["constraints"]),
+        "Required evidence:",
+        "\n".join(f"- {item}" for item in task["required_evidence"]),
+        "Success criteria:",
+        "\n".join(f"- {item}" for item in task["success_criteria"]),
+        "Expected artifacts:",
+        "\n".join(f"- {item}" for item in task["artifacts_expected"]),
+        (
+            "Return format (MANDATORY):\n"
+            "1. Summary\n"
+            "2. Evidence\n"
+            "3. Risks\n"
+            "4. Verdict\n"
+            "5. Recommended Next Action\n"
+            "6. Artifacts\n"
+            "7. Missing Evidence"
+        ),
+        (
+            "Rules:\n"
+            "- Do not claim completion without evidence.\n"
+            "- If evidence is missing, say exactly what is missing.\n"
+            "- Prefer concrete repo changes, tests, or artifact paths over prose."
+        ),
+    ]
+    return "\n\n".join(sections)
+
+
+def evaluate_pre_dispatch_gate(
+    task: dict[str, Any],
+    runtime: str,
+    config_path: pathlib.Path | None,
+) -> dict[str, Any]:
+    dispatch_gate = task["dispatch_gate"]
+    reasons: list[str] = []
+
+    if runtime not in dispatch_gate["allowed_runtimes"]:
+        reasons.append(
+            f"Runtime '{runtime}' is not allowlisted by dispatch_gate.allowed_runtimes"
+        )
+        return {
+            "decision": "reject",
+            "reasons": reasons,
+            "dispatch_gate": dispatch_gate,
+        }
+
+    runtime_policy = RUNTIME_EXECUTION_POLICY[runtime]
+    execution_mode = dispatch_gate["execution_mode"]
+    if execution_mode not in runtime_policy["allowed_modes"]:
+        reasons.append(
+            f"Runtime '{runtime}' cannot be used for execution_mode '{execution_mode}'"
+        )
+        return {
+            "decision": "reject",
+            "reasons": reasons,
+            "dispatch_gate": dispatch_gate,
+        }
+
+    if execution_mode == "execute" and task["preset"] not in {"刃", "監"}:
+        reasons.append(
+            "Execution-mode tasks must use a strict PCC preset such as 刃 or 監"
+        )
+        return {
+            "decision": "review",
+            "reasons": reasons,
+            "dispatch_gate": dispatch_gate,
+        }
+
+    if len(task["required_evidence"]) < dispatch_gate["min_required_evidence"]:
+        reasons.append(
+            "The task does not declare enough required evidence for strict dispatch"
+        )
+        return {
+            "decision": "review",
+            "reasons": reasons,
+            "dispatch_gate": dispatch_gate,
+        }
+
+    if len(task["success_criteria"]) < dispatch_gate["min_success_criteria"]:
+        reasons.append(
+            "The task does not declare enough success criteria for strict dispatch"
+        )
+        return {
+            "decision": "review",
+            "reasons": reasons,
+            "dispatch_gate": dispatch_gate,
+        }
+
+    if dispatch_gate["require_artifacts"] and not task["artifacts_expected"]:
+        reasons.append(
+            "The task requires artifacts but artifacts_expected is empty"
+        )
+        return {
+            "decision": "review",
+            "reasons": reasons,
+            "dispatch_gate": dispatch_gate,
+        }
+
+    if runtime == "jules" and not (config_path or os.environ.get("PCC_CRITIC_CONFIG_PATH")):
+        reasons.append(
+            "Jules dispatch requires an explicit PCC runtime config via --config or PCC_CRITIC_CONFIG_PATH"
+        )
+        return {
+            "decision": "retry",
+            "reasons": reasons,
+            "dispatch_gate": dispatch_gate,
+        }
+
+    reasons.append("Dispatch gate passed")
+    return {
+        "decision": "allow",
+        "reasons": reasons,
+        "dispatch_gate": dispatch_gate,
+    }
+
+
+def build_blocked_result(
+    *,
+    runtime: str,
+    model: str,
+    config_path: pathlib.Path | None,
+    decision: str,
+    reasons: list[str],
+) -> dict[str, Any]:
+    verdict = "NEEDS_EVIDENCE" if decision == "review" else "NO_OP"
+    return {
+        "runtime": runtime,
+        "model": model,
+        "config_path": str(config_path) if config_path else None,
+        "response": "",
+        "elapsed": 0,
+        "exit_code": 0,
+        "stderr": "\n".join(reasons),
+        "audit": {
+            "verdict": verdict,
+            "sycophancy": 0.0,
+            "evidence_count": 0,
+            "words": 0,
+        },
+        "error": f"PRE_DISPATCH_{decision.upper()}",
+    }
+
+
+def run_delegate(
+    task: dict[str, Any],
+    *,
+    runtime: str,
+    preset: str,
+    model: str,
+    timeout: int,
+    config_path: pathlib.Path | None,
+) -> dict[str, Any]:
+    python_bin = os.environ.get("PCC_CRITIC_PYTHON") or sys.executable
+    prompt = build_prompt(task)
+    command = [
+        python_bin,
+        str(PCC_CRITIC),
+        "--json",
+        "--preset",
+        preset,
+        "--model",
+        model,
+        "--runtime",
+        runtime,
+        "--timeout",
+        str(timeout),
+    ]
+    if config_path:
+        command.extend(["--config", str(config_path)])
+
+    try:
+        result = subprocess.run(
+            command,
+            input=prompt,
+            text=True,
+            capture_output=True,
+            cwd=str(REPO_ROOT),
+            timeout=timeout + 10,
+        )
+    except subprocess.TimeoutExpired:
+        return {
+            "runtime": runtime,
+            "model": model,
+            "config_path": str(config_path) if config_path else None,
+            "response": "",
+            "elapsed": timeout + 10,
+            "exit_code": -1,
+            "stderr": "pcc-delegate timed out while waiting for pcc-critic",
+            "audit": {
+                "verdict": "NO_OP",
+                "sycophancy": 0.0,
+                "evidence_count": 0,
+                "words": 0,
+            },
+            "error": "TIMEOUT",
+        }
+    if result.stderr.strip():
+        print(result.stderr.strip(), file=sys.stderr)
+    if not result.stdout.strip():
+        return {
+            "runtime": runtime,
+            "model": model,
+            "config_path": str(config_path) if config_path else None,
+            "response": "",
+            "elapsed": 0,
+            "exit_code": result.returncode,
+            "stderr": result.stderr.strip(),
+            "audit": {
+                "verdict": "NO_OP",
+                "sycophancy": 0.0,
+                "evidence_count": 0,
+                "words": 0,
+            },
+            "error": "empty-output",
+        }
+    return json.loads(result.stdout)
+
+
+
+def controller_decision(result: dict[str, Any]) -> str:
+    error = result.get("error")
+    if error in ERROR_TO_DECISION:
+        return ERROR_TO_DECISION[error]
+
+    verdict = result.get("audit", {}).get("verdict")
+    return VERDICT_TO_DECISION.get(verdict, "review")
+
+
+def resolve_output_dir(path_text: str | None) -> pathlib.Path:
+    if path_text:
+        return resolve_path(path_text)
+    return pathlib.Path.cwd() / DEFAULT_OUTPUT_DIR
+
+
+def build_report(
+    task: dict[str, Any],
+    task_path: pathlib.Path,
+    result: dict[str, Any],
+    *,
+    pre_dispatch_gate: dict[str, Any],
+    runtime: str,
+    preset: str,
+    model: str,
+    config_path: pathlib.Path | None,
+    dry_run: bool,
+) -> dict[str, Any]:
+    if pre_dispatch_gate["decision"] != "allow":
+        decision = pre_dispatch_gate["decision"]
+    elif dry_run:
+        decision = "review"
+    else:
+        decision = controller_decision(result)
+    return {
+        "version": 1,
+        "task_id": task["task_id"],
+        "title": task["title"],
+        "role": task["role"],
+        "priority": task.get("priority", "unspecified"),
+        "source_task_path": str(task_path),
+        "runtime": runtime,
+        "preset": preset,
+        "model": model,
+        "config_path": str(config_path) if config_path else None,
+        "delegated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "objective": task["objective"],
+        "required_evidence": task["required_evidence"],
+        "success_criteria": task["success_criteria"],
+        "artifacts_expected": task["artifacts_expected"],
+        "dispatch_gate": pre_dispatch_gate["dispatch_gate"],
+        "pre_dispatch_decision": pre_dispatch_gate["decision"],
+        "pre_dispatch_reasons": pre_dispatch_gate["reasons"],
+        "decision_policy": {
+            "runtime_execution_policy": {
+                runtime_name: {
+                    "allowed_modes": sorted(policy["allowed_modes"])
+                }
+                for runtime_name, policy in RUNTIME_EXECUTION_POLICY.items()
+            },
+            "verdict_to_decision": VERDICT_TO_DECISION,
+            "error_to_decision": ERROR_TO_DECISION,
+        },
+        "controller_decision": decision,
+        "controller_next_action": task["next_actions"][decision],
+        "dry_run": dry_run,
+        "result": result,
+    }
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Dispatch structured tasks to PCC-controlled Gemini CLI / Jules workers.",
+    )
+    parser.add_argument(
+        "--task-path",
+        required=True,
+        help="Task json file or directory containing task json files",
+    )
+    parser.add_argument("--runtime", choices=["gemini", "claude", "jules"])
+    parser.add_argument("--preset", choices=["探", "極", "均", "監", "刃"])
+    parser.add_argument("--model")
+    parser.add_argument("--config", help="Override PCC runtime config path")
+    parser.add_argument("--timeout", type=int, default=180)
+    parser.add_argument("--output-dir", help="Directory to write delegation reports")
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Validate tasks and emit deterministic reports without calling runtimes",
+    )
+    args = parser.parse_args()
+
+    task_path = resolve_path(args.task_path)
+    output_dir = resolve_output_dir(args.output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    config_path = resolve_path(args.config) if args.config else None
+
+    reports: list[dict[str, Any]] = []
+    for candidate in resolve_task_paths(task_path):
+        task = load_task(candidate)
+        runtime = args.runtime or task["runtime"]
+        preset = args.preset or task["preset"]
+        model = args.model or task["model"]
+        pre_dispatch_gate = evaluate_pre_dispatch_gate(task, runtime, config_path)
+
+        if pre_dispatch_gate["decision"] != "allow":
+            result = build_blocked_result(
+                runtime=runtime,
+                model=model,
+                config_path=config_path,
+                decision=pre_dispatch_gate["decision"],
+                reasons=pre_dispatch_gate["reasons"],
+            )
+        elif args.dry_run:
+            result = {
+                "runtime": runtime,
+                "model": model,
+                "config_path": str(config_path) if config_path else None,
+                "response": "",
+                "elapsed": 0,
+                "exit_code": 0,
+                "audit": {
+                    "verdict": "NEEDS_EVIDENCE",
+                    "sycophancy": 0.0,
+                    "evidence_count": 0,
+                    "words": 0,
+                },
+                "error": None,
+                "prompt": build_prompt(task),
+            }
+        else:
+            result = run_delegate(
+                task,
+                runtime=runtime,
+                preset=preset,
+                model=model,
+                timeout=args.timeout,
+                config_path=config_path,
+            )
+
+        report = build_report(
+            task,
+            candidate,
+            result,
+            pre_dispatch_gate=pre_dispatch_gate,
+            runtime=runtime,
+            preset=preset,
+            model=model,
+            config_path=config_path,
+            dry_run=args.dry_run,
+        )
+        report_name = f"{task['task_id']}-{int(time.time())}.json"
+        report_path = output_dir / report_name
+        report["report_path"] = str(report_path)
+        report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+        reports.append(report)
+
+    if len(reports) == 1:
+        print(json.dumps(reports[0], ensure_ascii=False, indent=2))
+    else:
+        print(json.dumps(reports, ensure_ascii=False, indent=2))
+
+
+if __name__ == "__main__":
+    main()

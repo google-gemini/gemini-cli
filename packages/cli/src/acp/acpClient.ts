@@ -52,6 +52,7 @@ import {
   InvalidStreamError,
   type AgentLoopContext,
   updatePolicy,
+  executeToolWithHooks,
 } from '@google/gemini-cli-core';
 import * as acp from '@agentclientprotocol/sdk';
 import { AcpFileSystemService } from './fileSystemService.js';
@@ -76,6 +77,7 @@ import { randomUUID } from 'node:crypto';
 import { loadCliConfig, type CliArgs } from '../config/config.js';
 import { runExitCleanup } from '../utils/cleanup.js';
 import { SessionSelector } from '../utils/sessionUtils.js';
+import { ConsolePatcher } from '../ui/utils/ConsolePatcher.js';
 
 import { CommandHandler } from './commandHandler.js';
 
@@ -94,23 +96,32 @@ export async function runAcpClient(
   settings: LoadedSettings,
   argv: CliArgs,
 ) {
-  // ... (skip unchanged lines) ...
+  const consolePatcher = new ConsolePatcher({
+    stderr: true,
+    interactive: false,
+    debugMode: config.getDebugMode(),
+  });
+  consolePatcher.patch();
 
-  const { stdout: workingStdout } = createWorkingStdio();
-  const stdout = Writable.toWeb(workingStdout) as WritableStream;
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-  const stdin = Readable.toWeb(process.stdin) as ReadableStream<Uint8Array>;
+  try {
+    const { stdout: workingStdout } = createWorkingStdio();
+    const stdout = Writable.toWeb(workingStdout) as WritableStream;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    const stdin = Readable.toWeb(process.stdin) as ReadableStream<Uint8Array>;
 
-  const stream = acp.ndJsonStream(stdout, stdin);
-  const connection = new acp.AgentSideConnection(
-    (connection) => new GeminiAgent(config, settings, argv, connection),
-    stream,
-  );
+    const stream = acp.ndJsonStream(stdout, stdin);
+    const connection = new acp.AgentSideConnection(
+      (connection) => new GeminiAgent(config, settings, argv, connection),
+      stream,
+    );
 
-  // SIGTERM/SIGINT handlers (in sdk.ts) don't fire when stdin closes.
-  // We must explicitly await the connection close to flush telemetry.
-  // Use finally() to ensure cleanup runs even on stream errors.
-  await connection.closed.finally(runExitCleanup);
+    // SIGTERM/SIGINT handlers (in sdk.ts) don't fire when stdin closes.
+    // We must explicitly await the connection close to flush telemetry.
+    // Use finally() to ensure cleanup runs even on stream errors.
+    await connection.closed.finally(runExitCleanup);
+  } finally {
+    consolePatcher.cleanup();
+  }
 }
 
 export class GeminiAgent {
@@ -1129,9 +1140,15 @@ export class Session {
         });
       }
 
-      const toolResult: ToolResult = await invocation.execute({
+      const toolResult: ToolResult = await executeToolWithHooks(
+        invocation,
+        fc.name,
         abortSignal,
-      });
+        tool,
+        undefined,
+        undefined,
+        this.context.config,
+      );
       const content = toToolCallContent(toolResult);
 
       const updateContent: acp.ToolCallContent[] = content ? [content] : [];

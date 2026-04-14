@@ -1,0 +1,139 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://geminicli.com/schemas/pcc-delegation-task.schema.json",
+  "title": "PCC Delegation Task",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "task_id",
+    "title",
+    "role",
+    "runtime",
+    "preset",
+    "model",
+    "objective",
+    "context",
+    "constraints",
+    "required_evidence",
+    "success_criteria",
+    "artifacts_expected",
+    "dispatch_gate",
+    "next_actions"
+  ],
+  "properties": {
+    "version": {
+      "type": "integer",
+      "const": 1
+    },
+    "task_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "role": {
+      "type": "string",
+      "enum": ["discoverer", "builder", "verifier", "auditor", "router"]
+    },
+    "priority": {
+      "type": "string",
+      "enum": ["now", "next", "later", "unspecified"]
+    },
+    "runtime": {
+      "type": "string",
+      "enum": ["gemini", "claude", "jules"]
+    },
+    "preset": {
+      "type": "string",
+      "enum": ["探", "極", "均", "監", "刃"]
+    },
+    "model": {
+      "type": "string",
+      "minLength": 1
+    },
+    "objective": {
+      "type": "string",
+      "minLength": 1
+    },
+    "context": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "constraints": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "required_evidence": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "success_criteria": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "artifacts_expected": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "dispatch_gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "execution_mode",
+        "allowed_runtimes",
+        "require_artifacts",
+        "min_required_evidence",
+        "min_success_criteria"
+      ],
+      "properties": {
+        "execution_mode": {
+          "type": "string",
+          "enum": ["analysis", "plan", "execute"]
+        },
+        "allowed_runtimes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "enum": ["gemini", "claude", "jules"]
+          }
+        },
+        "require_artifacts": {
+          "type": "boolean"
+        },
+        "min_required_evidence": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "min_success_criteria": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "next_actions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["allow", "review", "reject", "retry"],
+      "properties": {
+        "allow": { "type": "string" },
+        "review": { "type": "string" },
+        "reject": { "type": "string" },
+        "retry": { "type": "string" }
+      }
+    }
+  }
+}

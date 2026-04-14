@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "task_id": "report-reader-e2e",
+  "title": "Add report-reader product code and end-to-end validation from VS Code surface to ACP reports",
+  "role": "verifier",
+  "priority": "next",
+  "runtime": "jules",
+  "preset": "刃",
+  "model": "deep",
+  "objective": "Implement a report-reader surface that can consume .gemini/pcc-reports and expose verdict, artifact path, and runtime metadata to the controller or UI, then validate the path end to end from the VS Code companion surface through ACP-generated reports.",
+  "context": [
+    "Hook scripts already emit structured JSON reports under .gemini/pcc-reports.",
+    "No product code currently reads those reports.",
+    "Existing UI tests stop at terminal sendText mocks and ACP tests stop before the VS Code surface."
+  ],
+  "constraints": [
+    "Reuse the existing report JSON where practical instead of inventing a second ad hoc shape.",
+    "Keep UI coupling light in the first pass.",
+    "Prefer targeted validation over generic test runners for this area."
+  ],
+  "required_evidence": [
+    "A report-reader API or helper in product code.",
+    "At least one targeted validation path connecting the UI/controller side to ACP report artifacts.",
+    "Proof that verdict and report path can be surfaced without manual file inspection."
+  ],
+  "success_criteria": [
+    "Controller or UI code can read PCC reports deterministically.",
+    "There is at least one end-to-end or near-end-to-end validation path for report visibility.",
+    "The result is suitable for future job dashboards or lane status."
+  ],
+  "artifacts_expected": [
+    "Report-reader implementation",
+    "Targeted validation or integration test",
+    "Visible controller fields for verdict and report path"
+  ],
+  "dispatch_gate": {
+    "execution_mode": "execute",
+    "allowed_runtimes": ["jules"],
+    "require_artifacts": true,
+    "min_required_evidence": 3,
+    "min_success_criteria": 3
+  },
+  "next_actions": {
+    "allow": "Implement the report reader and add the targeted validation path.",
+    "review": "Split report reading from UI exposure and ship the smaller part first.",
+    "reject": "Reduce scope to a non-UI report-reader helper and retry.",
+    "retry": "Retry after the controller ledger exists."
+  }
+}
