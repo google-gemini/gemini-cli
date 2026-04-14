@@ -349,6 +349,27 @@ describe('Server Config (config.ts)', () => {
         }),
       );
     });
+
+    it('should ignore properties that are explicitly undefined and preserve existing values', () => {
+      const config = new Config(baseParams);
+
+      config.setShellExecutionConfig({
+        terminalWidth: 80,
+        showColor: true,
+      });
+
+      expect(config.getShellExecutionConfig().terminalWidth).toBe(80);
+      expect(config.getShellExecutionConfig().showColor).toBe(true);
+
+      // Provide undefined for terminalWidth, which should be ignored
+      config.setShellExecutionConfig({
+        terminalWidth: undefined,
+        showColor: false,
+      });
+
+      expect(config.getShellExecutionConfig().terminalWidth).toBe(80); // Should still be 80, not undefined
+      expect(config.getShellExecutionConfig().showColor).toBe(false); // Should be updated
+    });
   });
 
   beforeEach(() => {
