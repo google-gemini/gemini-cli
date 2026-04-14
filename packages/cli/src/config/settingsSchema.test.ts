@@ -529,6 +529,18 @@ describe('SettingsSchema', () => {
       expect(agentSessionNoninteractiveEnabled.description).toBe(
         'Enable non-interactive agent sessions.',
       );
+
+      const agentSessionSubagentEnabled =
+        adk.properties.agentSessionSubagentEnabled;
+      expect(agentSessionSubagentEnabled).toBeDefined();
+      expect(agentSessionSubagentEnabled.type).toBe('boolean');
+      expect(agentSessionSubagentEnabled.category).toBe('Experimental');
+      expect(agentSessionSubagentEnabled.default).toBe(false);
+      expect(agentSessionSubagentEnabled.requiresRestart).toBe(true);
+      expect(agentSessionSubagentEnabled.showInDialog).toBe(false);
+      expect(agentSessionSubagentEnabled.description).toBe(
+        'Route subagent invocations through the AgentSession protocol instead of legacy executors.',
+      );
     });
   });
 
