@@ -366,7 +366,13 @@ export async function main() {
     },
   });
   consolePatcher.patch();
-  registerCleanup(consolePatcher.cleanup);
+  // In ACP mode, keep the console patch active for the entire process lifecycle.
+  // Cleaning it up before SessionEnd hooks fire would let debugLogger output
+  // leak to stdout, corrupting the ACP NDJSON stream.
+  // See: https://github.com/google-gemini/gemini-cli/issues/25345
+  if (!argv.acp && !argv.experimentalAcp) {
+    registerCleanup(consolePatcher.cleanup);
+  }
 
   dns.setDefaultResultOrder(
     validateDnsResolutionOrder(settings.merged.advanced.dnsResolutionOrder),
