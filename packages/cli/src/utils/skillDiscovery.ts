@@ -18,8 +18,8 @@ export function getDiscoveryReportForSkill<T extends SkillDiscoveryTiming>(
 ): T | undefined {
   const resolvedLocation = resolveToRealPath(location);
 
-  return reports
-    ?.filter((report) => {
+  return (reports ?? [])
+    .filter((report) => {
       const resolvedSourceDir = resolveToRealPath(report.source_dir);
       return (
         resolvedLocation === resolvedSourceDir ||
