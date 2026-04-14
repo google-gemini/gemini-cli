@@ -273,6 +273,22 @@ describe('PolicyEngine', () => {
       expect(decision).toBe(PolicyDecision.DENY);
     });
 
+    it('should match subagent name as alias for invoke_agent', async () => {
+      const rules: PolicyRule[] = [
+        { toolName: 'codebase_investigator', decision: PolicyDecision.DENY },
+      ];
+
+      engine = new PolicyEngine({ rules });
+
+      const toolCall: FunctionCall = {
+        name: 'invoke_agent',
+        args: { agent_name: 'codebase_investigator', prompt: 'Hello' },
+      };
+
+      const { decision } = await engine.check(toolCall, undefined);
+      expect(decision).toBe(PolicyDecision.DENY);
+    });
+
     it('should apply wildcard rules (no toolName)', async () => {
       const rules: PolicyRule[] = [
         { toolName: '*', decision: PolicyDecision.DENY }, // Applies to all tools
@@ -1715,13 +1731,13 @@ describe('PolicyEngine', () => {
 
   describe('Plan Mode vs Subagent Priority (Regression)', () => {
     it('should DENY subagents in Plan Mode despite dynamic allow rules', async () => {
-      // Plan Mode Deny (1.06) > Subagent Allow (1.05)
+      // Plan Mode Deny (1.04) > Subagent Allow (1.03)
 
       const fixedRules: PolicyRule[] = [
         {
           toolName: '*',
           decision: PolicyDecision.DENY,
-          priority: 1.06,
+          priority: 1.04,
           modes: [ApprovalMode.PLAN],
         },
         {

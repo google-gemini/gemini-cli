@@ -74,6 +74,7 @@ describe('LoggingContentGenerator', () => {
       }),
       getTelemetryLogPromptsEnabled: vi.fn().mockReturnValue(true),
       refreshUserQuotaIfStale: vi.fn().mockResolvedValue(undefined),
+      getSessionId: vi.fn().mockReturnValue('test-session-id'),
     } as unknown as Config;
     loggingContentGenerator = new LoggingContentGenerator(wrapped, config);
     vi.useFakeTimers();
@@ -311,6 +312,100 @@ describe('LoggingContentGenerator', () => {
         ).rejects.toSatisfy((error: unknown) => {
           const gError = error as { response: { data: unknown } };
           expect(gError.response.data).toBe(invalidAscii);
+          return true;
+        });
+      });
+
+      it('should decode Uint8Array data in Gaxios errors', async () => {
+        const req = { contents: [], model: 'gemini-pro' };
+
+        const gaxiosError = Object.assign(new Error('Gaxios Error'), {
+          response: { data: new Uint8Array([72, 101, 108, 108, 111]) },
+        });
+
+        vi.mocked(wrapped.generateContent).mockRejectedValue(gaxiosError);
+
+        await expect(
+          loggingContentGenerator.generateContent(
+            req,
+            'prompt-123',
+            LlmRole.MAIN,
+          ),
+        ).rejects.toSatisfy((error: unknown) => {
+          const gError = error as { response: { data: unknown } };
+          expect(gError.response.data).toBe('Hello');
+          return true;
+        });
+      });
+
+      it('should decode multi-byte UTF-8 from comma-separated byte strings', async () => {
+        const req = { contents: [], model: 'gemini-pro' };
+
+        // "Héllo" in UTF-8 bytes: H=72, é=195,169, l=108, l=108, o=111
+        const utf8Data = '72,195,169,108,108,111';
+        const gaxiosError = Object.assign(new Error('Gaxios Error'), {
+          response: { data: utf8Data },
+        });
+
+        vi.mocked(wrapped.generateContent).mockRejectedValue(gaxiosError);
+
+        await expect(
+          loggingContentGenerator.generateContent(
+            req,
+            'prompt-123',
+            LlmRole.MAIN,
+          ),
+        ).rejects.toSatisfy((error: unknown) => {
+          const gError = error as { response: { data: unknown } };
+          expect(gError.response.data).toBe('Héllo');
+          return true;
+        });
+      });
+
+      it('should decode 3-byte UTF-8 from comma-separated byte strings', async () => {
+        const req = { contents: [], model: 'gemini-pro' };
+
+        // "こんにちは" in UTF-8 bytes (3 bytes per character)
+        const utf8Data =
+          '227,129,147,227,130,147,227,129,171,227,129,161,227,129,175';
+        const gaxiosError = Object.assign(new Error('Gaxios Error'), {
+          response: { data: utf8Data },
+        });
+
+        vi.mocked(wrapped.generateContent).mockRejectedValue(gaxiosError);
+
+        await expect(
+          loggingContentGenerator.generateContent(
+            req,
+            'prompt-123',
+            LlmRole.MAIN,
+          ),
+        ).rejects.toSatisfy((error: unknown) => {
+          const gError = error as { response: { data: unknown } };
+          expect(gError.response.data).toBe('こんにちは');
+          return true;
+        });
+      });
+
+      it('should reject byte strings with values outside 0-255 range', async () => {
+        const req = { contents: [], model: 'gemini-pro' };
+
+        const outOfRange = '72,256,108';
+        const gaxiosError = Object.assign(new Error('Gaxios Error'), {
+          response: { data: outOfRange },
+        });
+
+        vi.mocked(wrapped.generateContent).mockRejectedValue(gaxiosError);
+
+        await expect(
+          loggingContentGenerator.generateContent(
+            req,
+            'prompt-123',
+            LlmRole.MAIN,
+          ),
+        ).rejects.toSatisfy((error: unknown) => {
+          const gError = error as { response: { data: unknown } };
+          expect(gError.response.data).toBe(outOfRange);
           return true;
         });
       });

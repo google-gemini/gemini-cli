@@ -158,6 +158,7 @@ Implement a comprehensive authentication system with multiple providers.
           getIdeMode: () => false,
           isTrustedFolder: () => true,
           getPreferredEditor: () => undefined,
+          getSessionId: () => 'test-session-id',
           storage: {
             getPlansDir: () => mockPlansDir,
           },
@@ -464,6 +465,7 @@ Implement a comprehensive authentication system with multiple providers.
                 getTargetDir: () => mockTargetDir,
                 getIdeMode: () => false,
                 isTrustedFolder: () => true,
+                getSessionId: () => 'test-session-id',
                 storage: {
                   getPlansDir: () => mockPlansDir,
                 },
@@ -587,7 +589,7 @@ Implement a comprehensive authentication system with multiple providers.
         expect(onFeedback).not.toHaveBeenCalled();
       });
 
-      it('automatically submits feedback when Ctrl+X is used to edit the plan', async () => {
+      it('automatically submits feedback when Ctrl+G is used to edit the plan', async () => {
         const { stdin, lastFrame } = await act(async () =>
           renderDialog({ useAlternateBuffer }),
         );
@@ -600,9 +602,9 @@ Implement a comprehensive authentication system with multiple providers.
           expect(lastFrame()).toContain('Add user authentication');
         });
 
-        // Press Ctrl+X
+        // Press Ctrl+G
         await act(async () => {
-          writeKey(stdin, '\x18'); // Ctrl+X
+          writeKey(stdin, '\x07'); // Ctrl+G
         });
 
         await waitFor(() => {

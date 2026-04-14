@@ -5,7 +5,14 @@
  */
 
 import type React from 'react';
-import { useCallback, useEffect, useState, useRef, useMemo } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useState,
+  useRef,
+  useMemo,
+  Fragment,
+} from 'react';
 import clipboardy from 'clipboardy';
 import { Box, Text, useStdout, type DOMElement } from 'ink';
 import { SuggestionsDisplay, MAX_WIDTH } from './SuggestionsDisplay.js';
@@ -432,7 +439,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             slashCommands,
           );
           if (commandToExecute?.isSafeConcurrent) {
-            inputHistory.handleSubmit(trimmedMessage);
+            handleSubmitAndClear(trimmedMessage);
             return;
           }
         }
@@ -450,6 +457,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       streamingState,
       setQueueErrorMessage,
       slashCommands,
+      handleSubmitAndClear,
     ],
   );
 
@@ -1264,6 +1272,15 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return true;
       }
 
+      if (keyMatchers[Command.DEPRECATED_OPEN_EXTERNAL_EDITOR](key)) {
+        const cmdKey = formatCommand(Command.OPEN_EXTERNAL_EDITOR);
+        appEvents.emit(AppEvent.TransientMessage, {
+          message: `Use ${cmdKey} to open the external editor.`,
+          type: TransientMessageType.Hint,
+        });
+        return true;
+      }
+
       // Ctrl+V for clipboard paste
       if (keyMatchers[Command.PASTE_CLIPBOARD](key)) {
         // eslint-disable-next-line @typescript-eslint/no-floating-promises
@@ -1819,24 +1836,45 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                 height={Math.min(buffer.viewportHeight, scrollableData.length)}
                 width="100%"
               >
-                <ScrollableList
-                  ref={listRef}
-                  hasFocus={focus}
-                  data={scrollableData}
-                  renderItem={renderItem}
-                  estimatedItemHeight={() => 1}
-                  keyExtractor={(item) =>
-                    item.type === 'visualLine'
-                      ? `line-${item.absoluteVisualIdx}`
-                      : `ghost-${item.index}`
-                  }
-                  width="100%"
-                  backgroundColor={listBackgroundColor}
-                  containerHeight={Math.min(
-                    buffer.viewportHeight,
-                    scrollableData.length,
-                  )}
-                />
+                {config.getUseTerminalBuffer() ? (
+                  <ScrollableList
+                    ref={listRef}
+                    hasFocus={focus}
+                    data={scrollableData}
+                    renderItem={renderItem}
+                    estimatedItemHeight={() => 1}
+                    fixedItemHeight={true}
+                    keyExtractor={(item) =>
+                      item.type === 'visualLine'
+                        ? `line-${item.absoluteVisualIdx}`
+                        : `ghost-${item.index}`
+                    }
+                    width={inputWidth}
+                    backgroundColor={listBackgroundColor}
+                    containerHeight={Math.min(
+                      buffer.viewportHeight,
+                      scrollableData.length,
+                    )}
+                  />
+                ) : (
+                  scrollableData
+                    .slice(
+                      buffer.visualScrollRow,
+                      buffer.visualScrollRow + buffer.viewportHeight,
+                    )
+                    .map((item, index) => {
+                      const actualIndex = buffer.visualScrollRow + index;
+                      const key =
+                        item.type === 'visualLine'
+                          ? `line-${item.absoluteVisualIdx}`
+                          : `ghost-${item.index}`;
+                      return (
+                        <Fragment key={key}>
+                          {renderItem({ item, index: actualIndex })}
+                        </Fragment>
+                      );
+                    })
+                )}
               </Box>
             )}
           </Box>

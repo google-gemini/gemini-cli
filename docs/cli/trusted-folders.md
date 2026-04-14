@@ -1,7 +1,7 @@
 # Trusted Folders
 
 The Trusted Folders feature is a security setting that gives you control over
-which projects can use the full capabilities of the Gemini CLI. It prevents
+which projects can use the full capabilities of Gemini CLI. It prevents
 potentially malicious code from running by asking you to approve a folder before
 the CLI loads any project-specific configurations from it.
 
@@ -24,12 +24,12 @@ Add the following to your user `settings.json` file:
 
 ## How it works: The trust dialog
 
-Once the feature is enabled, the first time you run the Gemini CLI from a
-folder, a dialog will automatically appear, prompting you to make a choice:
+Once the feature is enabled, the first time you run Gemini CLI from a folder, a
+dialog will automatically appear, prompting you to make a choice:
 
-- **Trust folder**: Grants full trust to the current folder (e.g.,
+- **Trust folder**: Grants full trust to the current folder (for example,
   `my-project`).
-- **Trust parent folder**: Grants trust to the parent directory (e.g.,
+- **Trust parent folder**: Grants trust to the parent directory (for example,
   `safe-projects`), which automatically trusts all of its subdirectories as
   well. This is useful if you keep all your safe projects in one place.
 - **Don't trust**: Marks the folder as untrusted. The CLI will operate in a
@@ -40,9 +40,9 @@ will only be asked once per folder.
 
 ## Understanding folder contents: The discovery phase
 
-Before you make a choice, the Gemini CLI performs a **discovery phase** to scan
-the folder for potential configurations. This information is displayed in the
-trust dialog to help you make an informed decision.
+Before you make a choice, Gemini CLI performs a **discovery phase** to scan the
+folder for potential configurations. This information is displayed in the trust
+dialog to help you make an informed decision.
 
 The discovery UI lists the following categories of items found in the project:
 
@@ -63,16 +63,16 @@ attention:
   settings, such as auto-approving certain tools or disabling the security
   sandbox.
 - **Discovery Errors**: If the CLI encounters issues while scanning the folder
-  (e.g., a malformed `settings.json` file), these errors will be displayed
-  prominently.
+  (for example, a malformed `settings.json` file), these errors will be
+  displayed prominently.
 
 By reviewing these details, you can ensure that you only grant trust to projects
 that you know are safe.
 
 ## Why trust matters: The impact of an untrusted workspace
 
-When a folder is **untrusted**, the Gemini CLI runs in a restricted "safe mode"
-to protect you. In this mode, the following features are disabled:
+When a folder is **untrusted**, Gemini CLI runs in a restricted "safe mode" to
+protect you. In this mode, the following features are disabled:
 
 1.  **Workspace settings are ignored**: The CLI will **not** load the
     `.gemini/settings.json` file from the project. This prevents the loading of
@@ -97,8 +97,8 @@ to protect you. In this mode, the following features are disabled:
     commands from .toml files, including both project-specific and global user
     commands.
 
-Granting trust to a folder unlocks the full functionality of the Gemini CLI for
-that workspace.
+Granting trust to a folder unlocks the full functionality of Gemini CLI for that
+workspace.
 
 ## Managing your trust settings
 

@@ -22,7 +22,7 @@ import { LocalAgentExecutor } from '../local-executor.js';
 import {
   BaseToolInvocation,
   type ToolResult,
-  type ToolLiveOutput,
+  type ExecuteOptions,
 } from '../../tools/tools.js';
 import { ToolErrorType } from '../../tools/tool-error.js';
 import {
@@ -34,12 +34,9 @@ import {
   isToolActivityError,
 } from '../types.js';
 import type { MessageBus } from '../../confirmation-bus/message-bus.js';
-import {
-  createBrowserAgentDefinition,
-  cleanupBrowserAgent,
-} from './browserAgentFactory.js';
+import { createBrowserAgentDefinition } from './browserAgentFactory.js';
 import { removeInputBlocker } from './inputBlocker.js';
-import { recordBrowserAgentTaskOutcome } from '../../telemetry/metrics.js';
+import { logBrowserAgentTaskOutcome } from '../../telemetry/loggers.js';
 import {
   sanitizeThoughtContent,
   sanitizeToolArgs,
@@ -110,10 +107,8 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
    * 3. Runs the agent via LocalAgentExecutor
    * 4. Cleans up browser resources
    */
-  async execute(
-    signal: AbortSignal,
-    updateOutput?: (output: ToolLiveOutput) => void,
-  ): Promise<ToolResult> {
+  async execute(options: ExecuteOptions): Promise<ToolResult> {
+    const { abortSignal: signal, updateOutput } = options;
     const invocationStartMs = Date.now();
     let browserManager;
     let recentActivity: SubagentActivityItem[] = [];
@@ -400,7 +395,7 @@ ${output.result}`;
         },
       };
     } finally {
-      recordBrowserAgentTaskOutcome(this.config, {
+      logBrowserAgentTaskOutcome(this.config, {
         success: taskSuccess,
         session_mode: sessionMode,
         vision_enabled: visionEnabled,
@@ -443,8 +438,9 @@ ${output.result}`;
           }
         } catch {
           // Ignore errors for removing the overlays.
+        } finally {
+          browserManager.release();
         }
-        await cleanupBrowserAgent(browserManager, this.config, sessionMode);
       }
     }
   }

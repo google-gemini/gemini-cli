@@ -1,6 +1,6 @@
 {
   "name": "@google/gemini-cli-core",
-  "version": "0.36.0-nightly.20260317.2f90b4653",
+  "version": "0.39.0-nightly.20260408.e77b22e63",
   "description": "Gemini CLI Core",
   "license": "Apache-2.0",
   "repository": {
@@ -68,6 +68,7 @@
     "https-proxy-agent": "^7.0.6",
     "ignore": "^7.0.0",
     "ipaddr.js": "^1.9.1",
+    "isbinaryfile": "^5.0.7",
     "js-yaml": "^4.1.1",
     "json-stable-stringify": "^1.3.0",
     "marked": "^15.0.12",
@@ -91,13 +92,13 @@
     "zod-to-json-schema": "^3.25.1"
   },
   "optionalDependencies": {
+    "@github/keytar": "^7.10.6",
     "@lydell/node-pty": "1.1.0",
     "@lydell/node-pty-darwin-arm64": "1.1.0",
     "@lydell/node-pty-darwin-x64": "1.1.0",
     "@lydell/node-pty-linux-x64": "1.1.0",
     "@lydell/node-pty-win32-arm64": "1.1.0",
     "@lydell/node-pty-win32-x64": "1.1.0",
-    "keytar": "^7.9.0",
     "node-pty": "^1.0.0"
   },
   "devDependencies": {

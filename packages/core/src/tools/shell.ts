@@ -10,10 +10,7 @@ import path from 'node:path';
 import os from 'node:os';
 import crypto from 'node:crypto';
 import { debugLogger } from '../index.js';
-import {
-  type SandboxPermissions,
-  getPathIdentity,
-} from '../services/sandboxManager.js';
+import { type SandboxPermissions } from '../services/sandboxManager.js';
 import { ToolErrorType } from './tool-error.js';
 import {
   BaseDeclarativeTool,
@@ -26,7 +23,6 @@ import {
   type ToolCallConfirmationDetails,
   type ToolExecuteConfirmationDetails,
   type PolicyUpdateOptions,
-  type ToolLiveOutput,
   type ExecuteOptions,
   type ForcedToolDecision,
 } from './tools.js';
@@ -53,7 +49,7 @@ import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { getShellDefinition } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
-import { isSubpath, resolveToRealPath } from '../utils/paths.js';
+import { toPathKey, isSubpath, resolveToRealPath } from '../utils/paths.js';
 import {
   getProactiveToolSuggestions,
   isNetworkReliantCommand,
@@ -63,6 +59,7 @@ export const OUTPUT_UPDATE_INTERVAL_MS = 1000;
 
 // Delay so user does not see the output of the process before the process is moved to the background.
 const BACKGROUND_DELAY_MS = 200;
+const SHOW_NL_DESCRIPTION_THRESHOLD = 150;
 
 export interface ShellToolParams {
   command: string;
@@ -136,7 +133,12 @@ export class ShellToolInvocation extends BaseToolInvocation<
   }
 
   getDescription(): string {
-    return this.params.description || '';
+    const descStr = this.params.description?.trim();
+    const commandStr = this.params.command;
+    return Array.from(commandStr).length <= SHOW_NL_DESCRIPTION_THRESHOLD ||
+      !descStr
+      ? commandStr
+      : descStr;
   }
 
   private simplifyPaths(paths: Set<string>): string[] {
@@ -302,15 +304,13 @@ export class ShellToolInvocation extends BaseToolInvocation<
               approvedPaths?: string[],
             ): boolean => {
               if (!approvedPaths || approvedPaths.length === 0) return false;
-              const requestedRealIdentity = getPathIdentity(
+              const requestedRealIdentity = toPathKey(
                 resolveToRealPath(requestedPath),
               );
 
               // Identity check is fast, subpath check is slower
               return approvedPaths.some((p) => {
-                const approvedRealIdentity = getPathIdentity(
-                  resolveToRealPath(p),
-                );
+                const approvedRealIdentity = toPathKey(resolveToRealPath(p));
                 return (
                   requestedRealIdentity === approvedRealIdentity ||
                   isSubpath(approvedRealIdentity, requestedRealIdentity)
@@ -428,12 +428,13 @@ export class ShellToolInvocation extends BaseToolInvocation<
     return confirmationDetails;
   }
 
-  async execute(
-    signal: AbortSignal,
-    updateOutput?: (output: ToolLiveOutput) => void,
-    options?: ExecuteOptions,
-  ): Promise<ToolResult> {
-    const { shellExecutionConfig, setExecutionIdCallback } = options ?? {};
+  async execute(options: ExecuteOptions): Promise<ToolResult> {
+    const {
+      abortSignal: signal,
+      updateOutput,
+      shellExecutionConfig,
+      setExecutionIdCallback,
+    } = options;
     const strippedCommand = stripShellWrapper(this.params.command);
 
     if (signal.aborted) {
