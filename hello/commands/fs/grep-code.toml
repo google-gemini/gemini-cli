@@ -4,3 +4,4 @@ Please summarize the findings for the pattern `{{args}}`.
 Search Results:
 !{grep -r {{args}} .}
 """
+0cfaeedf03f73f427c74184cb08b6779c11bd7d3
