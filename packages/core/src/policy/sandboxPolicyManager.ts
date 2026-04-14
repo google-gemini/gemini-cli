@@ -12,7 +12,7 @@ import { z } from 'zod';
 import { fileURLToPath } from 'node:url';
 import { debugLogger } from '../utils/debugLogger.js';
 import { type SandboxPermissions } from '../services/sandboxManager.js';
-import { sanitizePaths } from '../services/sandboxManager.js';
+import { deduplicateAbsolutePaths } from '../utils/paths.js';
 import { normalizeCommand } from '../utils/shell-utils.js';
 
 export const SandboxModeConfigSchema = z.object({
@@ -199,11 +199,11 @@ export class SandboxPolicyManager {
 
     this.sessionApprovals[normalized] = {
       fileSystem: {
-        read: sanitizePaths([
+        read: deduplicateAbsolutePaths([
           ...(existing.fileSystem?.read ?? []),
           ...(permissions.fileSystem?.read ?? []),
         ]),
-        write: sanitizePaths([
+        write: deduplicateAbsolutePaths([
           ...(existing.fileSystem?.write ?? []),
           ...(permissions.fileSystem?.write ?? []),
         ]),
@@ -230,7 +230,7 @@ export class SandboxPolicyManager {
       ...(permissions.fileSystem?.read ?? []),
       ...(permissions.fileSystem?.write ?? []),
     ];
-    const newPaths = new Set(sanitizePaths(newPathsArray));
+    const newPaths = new Set(deduplicateAbsolutePaths(newPathsArray));
 
     this.config.commands[normalized] = {
       allowed_paths: Array.from(newPaths),
