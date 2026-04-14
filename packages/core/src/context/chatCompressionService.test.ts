@@ -193,6 +193,7 @@ describe('ChatCompressionService', () => {
         getProjectTempDir: vi.fn().mockReturnValue(testTempDir),
       },
       getApprovedPlanPath: vi.fn().mockReturnValue('/path/to/plan.md'),
+      getCompressionStrategy: vi.fn().mockReturnValue('flat'),
     } as unknown as Config;
 
     vi.mocked(getInitialChatHistory).mockImplementation(
@@ -895,6 +896,146 @@ describe('ChatCompressionService', () => {
       expect(summarizerGrepResponse?.response?.['output']).toContain(
         'Output too large.',
       );
+    });
+  });
+
+  describe('Compression strategy dispatch', () => {
+    it('should route to flat compression when strategy is flat', async () => {
+      vi.mocked(
+        mockConfig as unknown as { getCompressionStrategy: () => string },
+      ).getCompressionStrategy = vi.fn().mockReturnValue('flat');
+
+      const history: Content[] = [
+        { role: 'user', parts: [{ text: 'msg1' }] },
+        { role: 'model', parts: [{ text: 'msg2' }] },
+        { role: 'user', parts: [{ text: 'msg3' }] },
+        { role: 'model', parts: [{ text: 'msg4' }] },
+      ];
+      vi.mocked(mockChat.getHistory).mockReturnValue(history);
+      vi.mocked(mockChat.getLastPromptTokenCount).mockReturnValue(600000);
+
+      const result = await service.compress(
+        mockChat,
+        mockPromptId,
+        false,
+        mockModel,
+        mockConfig,
+        false,
+      );
+
+      expect(result.info.compressionStatus).toBe(CompressionStatus.COMPRESSED);
+      // Flat uses 2 LLM calls (generate + verify)
+      expect(
+        mockConfig.getBaseLlmClient().generateContent,
+      ).toHaveBeenCalledTimes(2);
+    });
+
+    it('should route to union-find compression when strategy is union-find', async () => {
+      vi.mocked(
+        mockConfig as unknown as { getCompressionStrategy: () => string },
+      ).getCompressionStrategy = vi.fn().mockReturnValue('union-find');
+
+      // Mock for cluster summarization
+      const mockLlmClient = {
+        generateContent: vi.fn().mockResolvedValue({
+          candidates: [
+            {
+              content: {
+                parts: [{ text: 'Cluster summary' }],
+              },
+            },
+          ],
+        } as unknown as GenerateContentResponse),
+      };
+      vi.mocked(mockConfig.getBaseLlmClient).mockReturnValue(
+        mockLlmClient as unknown as BaseLlmClient,
+      );
+
+      // Need enough messages to trigger graduation (> UNION_FIND_HOT_SIZE = 30)
+      const history: Content[] = [];
+      for (let i = 0; i < 35; i++) {
+        history.push({
+          role: i % 2 === 0 ? 'user' : 'model',
+          parts: [{ text: `message ${i}` }],
+        });
+      }
+      vi.mocked(mockChat.getHistory).mockReturnValue(history);
+      vi.mocked(mockChat.getLastPromptTokenCount).mockReturnValue(600000);
+
+      const result = await service.compress(
+        mockChat,
+        mockPromptId,
+        false,
+        mockModel,
+        mockConfig,
+        false,
+      );
+
+      expect(result.info.compressionStatus).toBe(CompressionStatus.COMPRESSED);
+      expect(result.newHistory).not.toBeNull();
+    });
+
+    it('should return valid ChatCompressionInfo for union-find path', async () => {
+      vi.mocked(
+        mockConfig as unknown as { getCompressionStrategy: () => string },
+      ).getCompressionStrategy = vi.fn().mockReturnValue('union-find');
+
+      const mockLlmClient = {
+        generateContent: vi.fn().mockResolvedValue({
+          candidates: [
+            {
+              content: {
+                parts: [{ text: 'Summary' }],
+              },
+            },
+          ],
+        } as unknown as GenerateContentResponse),
+      };
+      vi.mocked(mockConfig.getBaseLlmClient).mockReturnValue(
+        mockLlmClient as unknown as BaseLlmClient,
+      );
+
+      const history: Content[] = [];
+      for (let i = 0; i < 35; i++) {
+        history.push({
+          role: i % 2 === 0 ? 'user' : 'model',
+          parts: [{ text: `msg ${i}` }],
+        });
+      }
+      vi.mocked(mockChat.getHistory).mockReturnValue(history);
+      vi.mocked(mockChat.getLastPromptTokenCount).mockReturnValue(600000);
+
+      const result = await service.compress(
+        mockChat,
+        mockPromptId,
+        false,
+        mockModel,
+        mockConfig,
+        false,
+      );
+
+      expect(result.info.originalTokenCount).toBe(600000);
+      expect(result.info.newTokenCount).toBeDefined();
+      expect(typeof result.info.newTokenCount).toBe('number');
+    });
+
+    it('should return NOOP for union-find with empty history', async () => {
+      vi.mocked(
+        mockConfig as unknown as { getCompressionStrategy: () => string },
+      ).getCompressionStrategy = vi.fn().mockReturnValue('union-find');
+      vi.mocked(mockChat.getHistory).mockReturnValue([]);
+
+      const result = await service.compress(
+        mockChat,
+        mockPromptId,
+        false,
+        mockModel,
+        mockConfig,
+        false,
+      );
+
+      expect(result.info.compressionStatus).toBe(CompressionStatus.NOOP);
+      expect(result.newHistory).toBeNull();
     });
   });
 });

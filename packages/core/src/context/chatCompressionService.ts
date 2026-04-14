@@ -33,6 +33,9 @@ import {
   PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL,
 } from '../config/models.js';
 import { PreCompressTrigger } from '../hooks/types.js';
+import { ContextWindow } from '../services/contextWindow.js';
+import { TFIDFEmbedder } from '../services/embeddingService.js';
+import { ClusterSummarizer } from '../services/clusterSummarizer.js';
 
 /**
  * Default threshold for compression token count as a fraction of the model's
@@ -159,14 +162,12 @@ async function truncateHistoryToBudget(
           } else if (responseObj && typeof responseObj === 'object') {
             if (
               'output' in responseObj &&
-              // eslint-disable-next-line no-restricted-syntax
-              typeof responseObj['output'] === 'string'
+              typeof responseObj['output'] === 'string' // eslint-disable-line no-restricted-syntax
             ) {
               contentStr = responseObj['output'];
             } else if (
               'content' in responseObj &&
-              // eslint-disable-next-line no-restricted-syntax
-              typeof responseObj['content'] === 'string'
+              typeof responseObj['content'] === 'string' // eslint-disable-line no-restricted-syntax
             ) {
               contentStr = responseObj['content'];
             } else {
@@ -234,8 +235,60 @@ async function truncateHistoryToBudget(
   return truncatedHistory;
 }
 
+/** Start graduating messages when hot zone exceeds this count. */
+const UNION_FIND_GRADUATE_AT = 26;
+
+/** Evict oldest from hot zone when it exceeds this count. */
+const UNION_FIND_EVICT_AT = 30;
+
+/** Maximum number of clusters in the cold zone. */
+const UNION_FIND_MAX_COLD_CLUSTERS = 10;
+
+/** TF-IDF cosine similarity floor for merging. */
+const UNION_FIND_MERGE_THRESHOLD = 0.15;
+
+/** Top-k clusters to retrieve for render. */
+const UNION_FIND_RETRIEVE_K = 3;
+
+/** Minimum similarity to include a cluster in render. */
+const UNION_FIND_RETRIEVE_MIN_SIM = 0.05;
+
 export class ChatCompressionService {
   async compress(
+    chat: GeminiChat,
+    promptId: string,
+    force: boolean,
+    model: string,
+    config: Config,
+    hasFailedCompressionAttempt: boolean,
+    abortSignal?: AbortSignal,
+  ): Promise<{ newHistory: Content[] | null; info: ChatCompressionInfo }> {
+    const strategy = await config.getCompressionStrategy();
+
+    if (strategy === 'union-find') {
+      return this.compactWithUnionFind(
+        chat,
+        promptId,
+        force,
+        model,
+        config,
+        hasFailedCompressionAttempt,
+        abortSignal,
+      );
+    }
+
+    return this.compressWithFlat(
+      chat,
+      promptId,
+      force,
+      model,
+      config,
+      hasFailedCompressionAttempt,
+      abortSignal,
+    );
+  }
+
+  private async compressWithFlat(
     chat: GeminiChat,
     promptId: string,
     force: boolean,
@@ -475,5 +528,197 @@ export class ChatCompressionService {
         },
       };
     }
+  }
+
+  private async compactWithUnionFind(
+    chat: GeminiChat,
+    promptId: string,
+    force: boolean,
+    model: string,
+    config: Config,
+    hasFailedCompressionAttempt: boolean,
+    abortSignal?: AbortSignal,
+  ): Promise<{ newHistory: Content[] | null; info: ChatCompressionInfo }> {
+    const curatedHistory = chat.getHistory(true);
+
+    if (curatedHistory.length === 0) {
+      return {
+        newHistory: null,
+        info: {
+          originalTokenCount: 0,
+          newTokenCount: 0,
+          compressionStatus: CompressionStatus.NOOP,
+        },
+      };
+    }
+
+    const trigger = force ? PreCompressTrigger.Manual : PreCompressTrigger.Auto;
+    await config.getHookSystem()?.firePreCompressEvent(trigger);
+
+    const originalTokenCount = chat.getLastPromptTokenCount();
+
+    if (!force) {
+      const threshold =
+        (await config.getCompressionThreshold()) ??
+        DEFAULT_COMPRESSION_TOKEN_THRESHOLD;
+      if (originalTokenCount < threshold * tokenLimit(model)) {
+        return {
+          newHistory: null,
+          info: {
+            originalTokenCount,
+            newTokenCount: originalTokenCount,
+            compressionStatus: CompressionStatus.NOOP,
+          },
+        };
+      }
+    }
+
+    // Apply token-based truncation before graduation
+    const truncatedHistory = await truncateHistoryToBudget(
+      curatedHistory,
+      config,
+    );
+
+    // If summarization previously failed, fall back to truncation only
+    if (hasFailedCompressionAttempt && !force) {
+      const truncatedTokenCount = estimateTokenCountSync(
+        truncatedHistory.flatMap((c) => c.parts || []),
+      );
+      if (truncatedTokenCount < originalTokenCount) {
+        return {
+          newHistory: truncatedHistory,
+          info: {
+            originalTokenCount,
+            newTokenCount: truncatedTokenCount,
+            compressionStatus: CompressionStatus.CONTENT_TRUNCATED,
+          },
+        };
+      }
+      return {
+        newHistory: null,
+        info: {
+          originalTokenCount,
+          newTokenCount: originalTokenCount,
+          compressionStatus: CompressionStatus.NOOP,
+        },
+      };
+    }
+
+    // Build ContextWindow from truncated history
+    const embedder = new TFIDFEmbedder();
+    const summarizer = new ClusterSummarizer(
+      config.getBaseLlmClient(),
+      modelStringToModelConfigAlias(model),
+      abortSignal,
+    );
+    const contextWindow = new ContextWindow(embedder, summarizer, {
+      graduateAt: UNION_FIND_GRADUATE_AT,
+      evictAt: UNION_FIND_EVICT_AT,
+      maxColdClusters: UNION_FIND_MAX_COLD_CLUSTERS,
+      mergeThreshold: UNION_FIND_MERGE_THRESHOLD,
+    });
+
+    // Feed all truncated history into the context window
+    for (const content of truncatedHistory) {
+      const text = content.parts
+        ?.map((p) => {
+          if (p.text) return p.text;
+          if (p.functionCall) return `[Tool call: ${p.functionCall.name}]`;
+          if (p.functionResponse) {
+            const responseStr = JSON.stringify(
+              p.functionResponse.response ?? '',
+            );
+            const graphemes = Array.from(responseStr);
+            const preview =
+              graphemes.length > 500
+                ? graphemes.slice(0, 500).join('') + '...'
+                : responseStr;
+            return `[Tool response: ${p.functionResponse.name}] ${preview}`;
+          }
+          return '';
+        })
+        .join(' ')
+        .trim();
+      if (text) {
+        contextWindow.append(text);
+      }
+    }
+
+    // Resolve dirty clusters before rendering so summaries are available
+    await contextWindow.resolveDirty();
+
+    const rendered = contextWindow.render(
+      null,
+      UNION_FIND_RETRIEVE_K,
+      UNION_FIND_RETRIEVE_MIN_SIM,
+    );
+
+    // Build new history: cold summaries as a single user message, then hot messages
+    const coldSummaries = rendered.slice(
+      0,
+      rendered.length - contextWindow.hotCount,
+    );
+
+    const extraHistory: Content[] = [];
+
+    if (coldSummaries.length > 0) {
+      extraHistory.push({
+        role: 'user',
+        parts: [
+          {
+            text: `<context_clusters>\n${coldSummaries.join('\n---\n')}\n</context_clusters>`,
+          },
+        ],
+      });
+      extraHistory.push({
+        role: 'model',
+        parts: [{ text: 'Got it. I have the context from previous messages.' }],
+      });
+    }
+
+    // Map hot messages back to their original Content objects
+    // Use the last N items from truncatedHistory where N = hotCount
+    const hotStart = Math.max(
+      0,
+      truncatedHistory.length - contextWindow.hotCount,
+    );
+    extraHistory.push(...truncatedHistory.slice(hotStart));
+
+    const fullNewHistory = await getInitialChatHistory(config, extraHistory);
+
+    const newTokenCount = await calculateRequestTokenCount(
+      fullNewHistory.flatMap((c) => c.parts || []),
+      config.getContentGenerator(),
+      model,
+    );
+
+    logChatCompression(
+      config,
+      makeChatCompressionEvent({
+        tokens_before: originalTokenCount,
+        tokens_after: newTokenCount,
+      }),
+    );
+
+    if (newTokenCount > originalTokenCount) {
+      return {
+        newHistory: null,
+        info: {
+          originalTokenCount,
+          newTokenCount,
+          compressionStatus:
+            CompressionStatus.COMPRESSION_FAILED_INFLATED_TOKEN_COUNT,
+        },
+      };
+    }
+
+    return {
+      newHistory: extraHistory,
+      info: {
+        originalTokenCount,
+        newTokenCount,
+        compressionStatus: CompressionStatus.COMPRESSED,
+      },
+    };
   }
 }

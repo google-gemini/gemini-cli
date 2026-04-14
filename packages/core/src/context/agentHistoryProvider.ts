@@ -20,6 +20,15 @@ import {
   normalizeFunctionResponse,
 } from './truncation.js';
 
+function sanitizePromptInput(value: unknown): string {
+  return (JSON.stringify(value) ?? '')
+    .replace(/\\[rn]/g, ' ')
+    .replace(/[\r\n\u2028\u2029]+/g, ' ')
+    .replace(/```/g, "'''")
+    .replace(/[<>]/g, (char) => (char === '<' ? '&lt;' : '&gt;'))
+    .replace(/[\x00-\x1f\x7f]/g, ''); // eslint-disable-line no-control-regex
+}
+
 export class AgentHistoryProvider {
   // TODO(joshualitt): just pass the BaseLlmClient instead of the whole Config.
   constructor(
@@ -379,10 +388,10 @@ Distill these into a high-density Markdown block that orientates the agent on th
 - **Brevity:** Maximum 15 lines. No conversational preamble.
 
 ${hasPreviousSummary ? 'PREVIOUS SUMMARY AND TRUNCATED HISTORY:' : 'TRUNCATED HISTORY:'}
-${JSON.stringify(messagesToTruncate)}
+${sanitizePromptInput(messagesToTruncate)}
 
 ACTIVE BRIDGE (LOOKAHEAD):
-${JSON.stringify(bridge)}`;
+${sanitizePromptInput(bridge)}`;
 
     const summaryResponse = await this.config
       .getBaseLlmClient()

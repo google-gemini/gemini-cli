@@ -27,9 +27,18 @@ import {
   normalizeFunctionResponse,
 } from './truncation.js';
 
+function sanitizePromptInput(value: string): string {
+  return value
+    .replace(/\\[rn]/g, ' ')
+    .replace(/[\r\n\u2028\u2029]+/g, ' ')
+    .replace(/```/g, "'''")
+    .replace(/[<>]/g, (char) => (char === '<' ? '&lt;' : '&gt;'))
+    .replace(/[\x00-\x1f\x7f]/g, ''); // eslint-disable-line no-control-regex
+}
+
 // Skip structural map generation for outputs larger than this threshold (in characters)
 // as it consumes excessive tokens and may not be representative of the full content.
-const MAX_DISTILLATION_SIZE = 1_000_000;
+const MAX_DISTILLATION_SIZE = 64_000;
 
 export interface DistilledToolOutput {
   truncatedContent: PartListUnion;
@@ -53,6 +62,7 @@ export class ToolOutputDistillationService {
     toolName: string,
     callId: string,
     content: PartListUnion,
+    abortSignal?: AbortSignal,
   ): Promise<DistilledToolOutput> {
     // Explicitly bypass escape hatches that natively handle large outputs
     if (this.isExemptFromDistillation(toolName)) {
@@ -74,6 +84,7 @@ export class ToolOutputDistillationService {
         content,
         originalContentLength,
         thresholdChars,
+        abortSignal,
       );
     }
 
@@ -119,6 +130,7 @@ export class ToolOutputDistillationService {
     content: PartListUnion,
     originalContentLength: number,
     threshold: number,
+    abortSignal?: AbortSignal,
   ): Promise<DistilledToolOutput> {
     const stringifiedContent = this.stringifyContent(content);
 
@@ -145,6 +157,7 @@ export class ToolOutputDistillationService {
         toolName,
         stringifiedContent,
         Math.floor(MAX_DISTILLATION_SIZE),
+        abortSignal,
       );
 
       if (summary) {
@@ -254,10 +267,13 @@ export class ToolOutputDistillationService {
     toolName: string,
     stringifiedContent: string,
     maxPreviewLen: number,
+    abortSignal?: AbortSignal,
   ): Promise<string | undefined> {
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+      const timeoutSignal = AbortSignal.timeout(15000);
+      const summaryAbortSignal = abortSignal
+        ? AbortSignal.any([abortSignal, timeoutSignal])
+        : timeoutSignal;
 
       const promptText = `The following output from the tool '${toolName}' is large and has been truncated. Extract the most critical factual information from this output so the main agent doesn't lose context.
 
@@ -269,16 +285,14 @@ Focus strictly on concrete data points:
 Do not philosophize about the strategic intent. Keep the extraction under 10 lines and use exact quotes where helpful.
 
 Output to summarize:
-${stringifiedContent.slice(0, maxPreviewLen)}...`;
+${sanitizePromptInput(Array.from(stringifiedContent).slice(0, maxPreviewLen).join(''))}...`;
 
       const summaryResponse = await this.geminiClient.generateContent(
         { model: 'agent-history-provider-summarizer' },
         [{ role: 'user', parts: [{ text: promptText }] }],
-        controller.signal,
+        summaryAbortSignal,
         LlmRole.UTILITY_COMPRESSOR,
       );
-
-      clearTimeout(timeoutId);
 
       return summaryResponse.candidates?.[0]?.content?.parts?.[0]?.text;
     } catch (e) {
