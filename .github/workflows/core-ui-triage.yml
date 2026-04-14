@@ -118,9 +118,19 @@ jobs:
                 // 2. Inactive over 60 days?
                 if (updatedAt < days60) {
                   console.log(`Issue #${issue.number} inactive over 60 days. Closing as Not Planned.`);
+                  
+                  let commentBody = "This issue has been inactive for over 60 days and is being closed as not planned. ";
+                  if (labels.includes('type/bug')) {
+                    commentBody += "If this was a bug, please try reproducing it with the latest build. If it still occurs, feel free to reopen the issue.";
+                  } else if (labels.includes('type/enhancement') || labels.includes('type/feature-request')) {
+                    commentBody += "If this was a feature request, please re-evaluate if it is still needed. If so, feel free to reopen the issue with updated context.";
+                  } else {
+                    commentBody += "Please reopen if this is still relevant.";
+                  }
+                  
                   await github.rest.issues.createComment({
                     owner, repo, issue_number: issue.number,
-                    body: "This issue has been inactive for over 60 days. Closing as not planned. Please reopen if this is still relevant."
+                    body: commentBody
                   });
                   await github.rest.issues.update({
                     owner, repo, issue_number: issue.number,
