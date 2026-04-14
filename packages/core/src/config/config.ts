@@ -2844,6 +2844,26 @@ export class Config implements McpContext, AgentLoopContext {
     return this._extensionLoader.getExtensions();
   }
 
+  /**
+   * Retrieves a setting value for a specific extension.
+   *
+   * @param extensionName - The name of the extension.
+   * @param settingName - The name of the setting to retrieve.
+   */
+  getExtensionSetting<T>(
+    extensionName: string,
+    settingName: string,
+  ): T | undefined {
+    const ext = this.getExtensions().find((e) => e.name === extensionName);
+    if (!ext || !ext.resolvedSettings) {
+      return undefined;
+    }
+
+    const setting = ext.resolvedSettings.find((s) => s.name === settingName);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    return setting?.value as T | undefined;
+  }
+
   getExtensionLoader(): ExtensionLoader {
     return this._extensionLoader;
   }

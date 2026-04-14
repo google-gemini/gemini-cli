@@ -320,22 +320,54 @@ export class Storage {
     return path.join(this.getProjectTempDir(), 'tracker');
   }
 
-  getPlansDir(): string {
-    if (this.customPlansDir) {
-      const resolvedPath = path.resolve(
-        this.getProjectRoot(),
-        this.customPlansDir,
-      );
-      const realProjectRoot = resolveToRealPath(this.getProjectRoot());
-      const realResolvedPath = resolveToRealPath(resolvedPath);
-
-      if (!isSubpath(realProjectRoot, realResolvedPath)) {
-        throw new Error(
-          `Custom plans directory '${this.customPlansDir}' resolves to '${realResolvedPath}', which is outside the project root '${realProjectRoot}'.`,
-        );
+  /**
+   * Resolves a path securely relative to the project root.
+   * Throws if the path attempts to escape the workspace (e.g. via ../).
+   */
+  resolveWorkspaceRelativePath(customPath: string): string {
+    const isWindows = os.platform() === 'win32';
+    // Normalize tilde to homedir
+    let expandedPath = customPath;
+    if (
+      expandedPath.startsWith('~/') ||
+      (isWindows && expandedPath.startsWith('~\\'))
+    ) {
+      const home = homedir();
+      if (home) {
+        expandedPath = path.join(home, expandedPath.slice(2));
       }
+    } else if (expandedPath === '~') {
+      expandedPath = homedir() || expandedPath;
+    }
 
-      return resolvedPath;
+    const resolvedPath = path.resolve(this.getProjectRoot(), expandedPath);
+    const realProjectRoot = resolveToRealPath(this.getProjectRoot());
+
+    // We cannot use resolveToRealPath on resolvedPath directly if it doesn't exist yet
+    // To prevent traversal attacks via symlinks that don't exist yet, we check the un-real resolved path
+    // against the real project root, assuming the resolved path doesn't contain unresolved symlinks escaping the root.
+    // However, if it exists, we resolve it.
+    let realResolvedPath = resolvedPath;
+    try {
+      realResolvedPath = resolveToRealPath(resolvedPath);
+    } catch {
+      // Path doesn't exist, use the absolute normalized path
+      realResolvedPath = normalizePath(resolvedPath);
+    }
+
+    if (!isSubpath(realProjectRoot, realResolvedPath)) {
+      throw new Error(
+        `Path '${customPath}' resolves to '${realResolvedPath}', which is outside the project root '${realProjectRoot}'.`,
+      );
+    }
+
+    return resolvedPath;
+  }
+
+  getPlansDir(customDir?: string): string {
+    const dirToResolve = customDir ?? this.customPlansDir;
+    if (dirToResolve) {
+      return this.resolveWorkspaceRelativePath(dirToResolve);
     }
     return this.getProjectTempPlansDir();
   }
