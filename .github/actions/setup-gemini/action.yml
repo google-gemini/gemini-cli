@@ -30,7 +30,7 @@ runs:
 
     - name: 'Download Bundle Artifact'
       if: "${{ inputs.mode == 'bundle' }}"
-      uses: 'actions/download-artifact@fa0b912c4d7dad43192612d645081918b6b3fb81' # v4
+      uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806' # v4
       with:
         name: '${{ inputs.bundle-artifact }}'
         path: 'bundle'
