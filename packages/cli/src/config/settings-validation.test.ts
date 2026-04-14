@@ -161,6 +161,7 @@ describe('settings-validation', () => {
       const validSettings = {
         general: {
           vimMode: true,
+          vimModeCursorShape: true,
           disableAutoUpdate: false,
         },
       };
@@ -173,6 +174,7 @@ describe('settings-validation', () => {
       const invalidSettings = {
         general: {
           vimMode: 'yes',
+          vimModeCursorShape: 'no',
         },
       };
 

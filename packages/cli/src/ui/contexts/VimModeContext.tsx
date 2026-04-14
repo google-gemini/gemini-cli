@@ -4,9 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { createContext, useCallback, useContext, useState } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+} from 'react';
 import { SettingScope } from '../../config/settings.js';
 import { useSettingsStore } from './SettingsContext.js';
+import { useVimCursorShape } from '../hooks/useVimCursorShape.js';
 
 export type VimMode = 'NORMAL' | 'INSERT';
 
@@ -25,8 +32,21 @@ export const VimModeProvider = ({
   children: React.ReactNode;
 }) => {
   const { settings, setSetting } = useSettingsStore();
-  const vimEnabled = settings.merged.general.vimMode;
+  const generalSettings = settings.merged.general;
+  const vimEnabled = generalSettings.vimMode;
   const [vimMode, setVimMode] = useState<VimMode>('INSERT');
+
+  useVimCursorShape({
+    enabled: generalSettings.vimModeCursorShape,
+    vimEnabled,
+    vimMode,
+  });
+
+  useEffect(() => {
+    if (vimEnabled) {
+      setVimMode('INSERT');
+    }
+  }, [vimEnabled]);
 
   const toggleVimEnabled = useCallback(async () => {
     const newValue = !vimEnabled;
