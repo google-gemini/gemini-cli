@@ -45,6 +45,13 @@ import type { ContentGenerator } from './contentGenerator.js';
 import { LoopDetectionService } from '../services/loopDetectionService.js';
 import { ChatCompressionService } from '../context/chatCompressionService.js';
 import { AgentHistoryProvider } from '../context/agentHistoryProvider.js';
+import { ContextManager } from '../context/contextManager.js';
+import { AgentChatHistory } from './agentChatHistory.js';
+import { defaultContextProfile } from '../context/config/profiles.js';
+import { ContextEnvironmentImpl } from '../context/pipeline/environmentImpl.js';
+import { PipelineOrchestrator } from '../context/pipeline/orchestrator.js';
+import { ContextTracer } from '../context/tracer.js';
+import { ContextEventBus } from '../context/eventBus.js';
 import { ideContextStore } from '../ide/ideContext.js';
 import {
   logContentRetryFailure,
@@ -97,6 +104,8 @@ export class GeminiClient {
   private readonly compressionService: ChatCompressionService;
   private readonly agentHistoryProvider: AgentHistoryProvider;
   private readonly toolOutputMaskingService: ToolOutputMaskingService;
+  private agentChatHistory: AgentChatHistory;
+  private contextManager?: ContextManager;
   private lastPromptId: string;
   private currentSequenceModel: string | null = null;
   private lastSentIdeContext: IdeContext | undefined;
@@ -119,6 +128,7 @@ export class GeminiClient {
     this.lastPromptId = this.config.getSessionId();
 
     coreEvents.on(CoreEvent.ModelChanged, this.handleModelChanged);
+    this.agentChatHistory = new AgentChatHistory();
     coreEvents.on(CoreEvent.MemoryChanged, this.handleMemoryChanged);
   }
 
@@ -374,6 +384,44 @@ export class GeminiClient {
     const tools: Tool[] = [{ functionDeclarations: toolDeclarations }];
 
     const history = await getInitialChatHistory(this.config, extraHistory);
+    this.agentChatHistory.clear();
+    for (const h of history) {
+      this.agentChatHistory.push(h);
+    }
+
+    if (this.config.getContextManagementConfig().enabled) {
+      const tracer = new ContextTracer({
+        targetDir: '/tmp',
+        sessionId: this.lastPromptId,
+      });
+      const eventBus = new ContextEventBus();
+      const env = new ContextEnvironmentImpl(
+        this.config.getBaseLlmClient(),
+        this.lastPromptId, // promptId
+        this.lastPromptId, // sessionId
+        '/tmp',
+        '/tmp', // projectTempDir
+        tracer,
+        4, // charsPerToken
+        eventBus,
+      );
+
+      const orchestrator = new PipelineOrchestrator(
+        defaultContextProfile.buildPipelines(env),
+        defaultContextProfile.buildAsyncPipelines(env),
+        env,
+        eventBus,
+        tracer,
+      );
+
+      this.contextManager = new ContextManager(
+        defaultContextProfile,
+        env,
+        tracer,
+        orchestrator,
+        this.agentChatHistory,
+      );
+    }
 
     try {
       const systemMemory = this.config.getSystemInstructionMemory();
@@ -618,10 +666,12 @@ export class GeminiClient {
     const modelForLimitCheck = this._getActiveModelForCurrentTurn();
 
     if (this.config.getContextManagementConfig().enabled) {
-      const newHistory = await this.agentHistoryProvider.manageHistory(
-        this.getHistory(),
-        signal,
-      );
+      const newHistory = this.contextManager
+        ? await this.contextManager.renderHistory()
+        : await this.agentHistoryProvider.manageHistory(
+            this.getHistory(),
+            signal,
+          );
       if (newHistory.length !== this.getHistory().length) {
         this.getChat().setHistory(newHistory);
       }
