@@ -20,6 +20,8 @@ import { MCPOAuthTokenStorage } from '../mcp/oauth-token-storage.js';
 import { OAuthUtils } from '../mcp/oauth-utils.js';
 import type { PromptRegistry } from '../prompts/prompt-registry.js';
 import {
+  ErrorCode,
+  McpError,
   PromptListChangedNotificationSchema,
   ResourceListChangedNotificationSchema,
   ToolListChangedNotificationSchema,
@@ -35,6 +37,7 @@ import {
   isEnabled,
   McpClient,
   populateMcpServerCommand,
+  discoverPrompts,
   type McpContext,
 } from './mcp-client.js';
 import type { ToolRegistry } from './tool-registry.js';
@@ -318,6 +321,25 @@ describe('mcp-client', () => {
         expect.any(Error),
         'test-server',
       );
+    });
+
+    it('should return empty array for discoverPrompts on MethodNotFound error without diagnostic', async () => {
+      const mockedClient = {
+        getServerCapabilities: vi.fn().mockReturnValue({ prompts: {} }),
+        listPrompts: vi
+          .fn()
+          .mockRejectedValue(
+            new McpError(ErrorCode.MethodNotFound, 'Method not supported'),
+          ),
+      };
+      const result = await discoverPrompts(
+        'test-server',
+        mockedClient as unknown as ClientLib.Client,
+        MOCK_CONTEXT,
+      );
+      expect(result).toEqual([]);
+      // MethodNotFound errors should be silently ignored regardless of message text
+      expect(MOCK_CONTEXT.emitMcpDiagnostic).not.toHaveBeenCalled();
     });
 
     it('should not discover tools if server does not support them', async () => {
