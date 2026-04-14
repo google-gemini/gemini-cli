@@ -12,6 +12,8 @@ import type { Config } from '../config/config.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { LocalSubagentInvocation } from './local-invocation.js';
 import { RemoteAgentInvocation } from './remote-invocation.js';
+import { LocalSessionInvocation } from './local-session-invocation.js';
+import { RemoteSessionInvocation } from './remote-session-invocation.js';
 import { BrowserAgentInvocation } from './browser/browserAgentInvocation.js';
 import { BROWSER_AGENT_NAME } from './browser/browserAgentDefinition.js';
 import { AgentRegistry } from './registry.js';
@@ -19,6 +21,8 @@ import type { LocalAgentDefinition, RemoteAgentDefinition } from './types.js';
 
 vi.mock('./local-invocation.js');
 vi.mock('./remote-invocation.js');
+vi.mock('./local-session-invocation.js');
+vi.mock('./remote-session-invocation.js');
 vi.mock('./browser/browserAgentInvocation.js');
 
 describe('AgentTool', () => {
@@ -140,5 +144,113 @@ describe('AgentTool', () => {
       'invoke_agent',
       'Invoke Browser Agent',
     );
+  });
+
+  describe('agentSessionSubagentEnabled feature flag', () => {
+    it('should use LocalSessionInvocation when flag is enabled for local agent', async () => {
+      vi.spyOn(mockConfig, 'isAgentSessionEnabled').mockReturnValue(true);
+      tool = new AgentTool(mockConfig, mockMessageBus);
+
+      const params = {
+        agent_name: 'TestLocalAgent',
+        prompt: 'Do something',
+      };
+      const invocation = tool['createInvocation'](params, mockMessageBus);
+      await invocation.shouldConfirmExecute(new AbortController().signal);
+
+      expect(LocalSessionInvocation).toHaveBeenCalledWith(
+        testLocalDefinition,
+        mockConfig,
+        { objective: 'Do something' },
+        mockMessageBus,
+        undefined,
+      );
+      expect(LocalSubagentInvocation).not.toHaveBeenCalled();
+    });
+
+    it('should use RemoteSessionInvocation when flag is enabled for remote agent', async () => {
+      vi.spyOn(mockConfig, 'isAgentSessionEnabled').mockReturnValue(true);
+      tool = new AgentTool(mockConfig, mockMessageBus);
+
+      const params = {
+        agent_name: 'TestRemoteAgent',
+        prompt: 'Search something',
+      };
+      const invocation = tool['createInvocation'](params, mockMessageBus);
+      await invocation.shouldConfirmExecute(new AbortController().signal);
+
+      expect(RemoteSessionInvocation).toHaveBeenCalledWith(
+        testRemoteDefinition,
+        mockConfig,
+        { query: 'Search something' },
+        mockMessageBus,
+        undefined,
+      );
+      expect(RemoteAgentInvocation).not.toHaveBeenCalled();
+    });
+
+    it('should use legacy invocations when flag is disabled (default)', async () => {
+      vi.spyOn(mockConfig, 'isAgentSessionEnabled').mockReturnValue(false);
+      tool = new AgentTool(mockConfig, mockMessageBus);
+
+      const localParams = {
+        agent_name: 'TestLocalAgent',
+        prompt: 'Do something',
+      };
+      const localInv = tool['createInvocation'](localParams, mockMessageBus);
+      await localInv.shouldConfirmExecute(new AbortController().signal);
+
+      expect(LocalSubagentInvocation).toHaveBeenCalled();
+      expect(LocalSessionInvocation).not.toHaveBeenCalled();
+
+      vi.clearAllMocks();
+
+      const remoteParams = {
+        agent_name: 'TestRemoteAgent',
+        prompt: 'Search',
+      };
+      const remoteInv = tool['createInvocation'](remoteParams, mockMessageBus);
+      await remoteInv.shouldConfirmExecute(new AbortController().signal);
+
+      expect(RemoteAgentInvocation).toHaveBeenCalled();
+      expect(RemoteSessionInvocation).not.toHaveBeenCalled();
+    });
+
+    it('should thread onAgentEvent to session invocations', async () => {
+      vi.spyOn(mockConfig, 'isAgentSessionEnabled').mockReturnValue(true);
+      const onEvent = vi.fn();
+      tool = new AgentTool(mockConfig, mockMessageBus, onEvent);
+
+      const params = {
+        agent_name: 'TestLocalAgent',
+        prompt: 'Do something',
+      };
+      const invocation = tool['createInvocation'](params, mockMessageBus);
+      await invocation.shouldConfirmExecute(new AbortController().signal);
+
+      expect(LocalSessionInvocation).toHaveBeenCalledWith(
+        testLocalDefinition,
+        mockConfig,
+        { objective: 'Do something' },
+        mockMessageBus,
+        { onAgentEvent: onEvent },
+      );
+    });
+
+    it('should always use BrowserAgentInvocation for browser agent regardless of flag', async () => {
+      vi.spyOn(mockConfig, 'isAgentSessionEnabled').mockReturnValue(true);
+      tool = new AgentTool(mockConfig, mockMessageBus);
+
+      const params = {
+        agent_name: BROWSER_AGENT_NAME,
+        prompt: 'Open page',
+      };
+      const invocation = tool['createInvocation'](params, mockMessageBus);
+      await invocation.shouldConfirmExecute(new AbortController().signal);
+
+      expect(BrowserAgentInvocation).toHaveBeenCalled();
+      expect(LocalSessionInvocation).not.toHaveBeenCalled();
+      expect(RemoteSessionInvocation).not.toHaveBeenCalled();
+    });
   });
 });

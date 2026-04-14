@@ -18,8 +18,11 @@ import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { AgentDefinition, AgentInputs } from './types.js';
 import { LocalSubagentInvocation } from './local-invocation.js';
 import { RemoteAgentInvocation } from './remote-invocation.js';
+import { LocalSessionInvocation } from './local-session-invocation.js';
+import { RemoteSessionInvocation } from './remote-session-invocation.js';
 import { BROWSER_AGENT_NAME } from './browser/browserAgentDefinition.js';
 import { BrowserAgentInvocation } from './browser/browserAgentInvocation.js';
+import type { AgentEvent } from '../agent/types.js';
 import { formatUserHintsForModel } from '../utils/fastAckHelper.js';
 import { isRecord } from '../utils/markdownUtils.js';
 import { runInDevTraceSpan } from '../telemetry/trace.js';
@@ -46,6 +49,7 @@ export class AgentTool extends BaseDeclarativeTool<
   constructor(
     private readonly context: AgentLoopContext,
     messageBus: MessageBus,
+    private readonly onAgentEvent?: (event: AgentEvent) => void,
   ) {
     super(
       AGENT_TOOL_NAME,
@@ -100,6 +104,7 @@ export class AgentTool extends BaseDeclarativeTool<
       this.context,
       _toolName,
       _toolDisplayName,
+      this.onAgentEvent,
     );
   }
 
@@ -133,6 +138,7 @@ class DelegateInvocation extends BaseToolInvocation<
     private readonly context: AgentLoopContext,
     _toolName?: string,
     _toolDisplayName?: string,
+    private readonly onAgentEvent?: (event: AgentEvent) => void,
   ) {
     super(
       params,
@@ -160,7 +166,21 @@ class DelegateInvocation extends BaseToolInvocation<
       );
     }
 
+    const useSession = this.context.config.isAgentSessionEnabled();
+    const options = this.onAgentEvent
+      ? { onAgentEvent: this.onAgentEvent }
+      : undefined;
+
     if (this.definition.kind === 'remote') {
+      if (useSession) {
+        return new RemoteSessionInvocation(
+          this.definition,
+          this.context,
+          agentArgs,
+          this.messageBus,
+          options,
+        );
+      }
       return new RemoteAgentInvocation(
         this.definition,
         this.context,
@@ -168,6 +188,15 @@ class DelegateInvocation extends BaseToolInvocation<
         this.messageBus,
       );
     } else {
+      if (useSession) {
+        return new LocalSessionInvocation(
+          this.definition,
+          this.context,
+          agentArgs,
+          this.messageBus,
+          options,
+        );
+      }
       return new LocalSubagentInvocation(
         this.definition,
         this.context,
