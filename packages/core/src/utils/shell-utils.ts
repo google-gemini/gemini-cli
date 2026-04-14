@@ -186,6 +186,7 @@ interface CommandParseResult {
   details: ParsedCommandDetail[];
   hasError: boolean;
   hasRedirection?: boolean;
+  hasEnvPrefix?: boolean;
 }
 
 const POWERSHELL_COMMAND_ENV = '__GCLI_POWERSHELL_COMMAND__';
@@ -506,6 +507,8 @@ export function parseBashCommandDetails(
   return {
     details: details.sort((a, b) => a.startIndex - b.startIndex),
     hasError,
+    hasRedirection: hasRedirection(command),
+    hasEnvPrefix: hasEnvPrefix(command),
   };
 }
 
@@ -729,20 +732,43 @@ export function hasRedirection(command: string): boolean {
     const tree = parseCommandTree(command);
     if (!tree) return fallbackCheck();
 
-    const stack: Node[] = [tree.rootNode];
+    const root = tree.rootNode;
+    // tree-sitter-bash wraps everything in a program/document root.
+    // We check if the command is a simple, non-compound command.
+    const stack: Node[] = [root];
     while (stack.length > 0) {
       const current = stack.pop()!;
-      if (
-        current.type === 'redirected_statement' ||
-        current.type === 'file_redirect' ||
-        current.type === 'heredoc_redirect' ||
-        current.type === 'herestring_redirect'
-      ) {
-        return true;
+      if (current.type === 'list' || current.type === 'pipeline') {
+        return false;
       }
       for (let i = current.childCount - 1; i >= 0; i -= 1) {
         const child = current.child(i);
         if (child) stack.push(child);
+      }
+    }
+
+    if (root.namedChildCount === 1) {
+      const firstChild = root.namedChild(0);
+      if (
+        firstChild?.type === 'command' ||
+        firstChild?.type === 'redirected_statement'
+      ) {
+        const stack: Node[] = [firstChild];
+        while (stack.length > 0) {
+          const current = stack.pop()!;
+          if (
+            current.type === 'redirected_statement' ||
+            current.type === 'file_redirect' ||
+            current.type === 'heredoc_redirect' ||
+            current.type === 'herestring_redirect'
+          ) {
+            return true;
+          }
+          for (let i = current.childCount - 1; i >= 0; i -= 1) {
+            const child = current.child(i);
+            if (child) stack.push(child);
+          }
+        }
       }
     }
     return false;
@@ -765,18 +791,43 @@ export function hasEnvPrefix(command: string): boolean {
     const tree = parseCommandTree(command);
     if (!tree) return fallbackCheck();
 
-    const stack: Node[] = [tree.rootNode];
-    while (stack.length > 0) {
-      const current = stack.pop()!;
-      if (current.type === 'variable_assignment') {
-        return true;
-      }
-      if (current.type === 'command_name' && current.text === 'env') {
-        return true;
+    // Check if the root is a single command. If it's a compound command
+    // (pipeline, list, etc.), we return false because we only want to allow
+    // environment prefixes for simple, standalone commands.
+    const root = tree.rootNode;
+    // tree-sitter-bash wraps everything in a program/document root.
+    const compoundStack: Node[] = [root];
+    while (compoundStack.length > 0) {
+      const current = compoundStack.pop()!;
+      if (current.type === 'list' || current.type === 'pipeline') {
+        return false;
       }
       for (let i = current.childCount - 1; i >= 0; i -= 1) {
         const child = current.child(i);
-        if (child) stack.push(child);
+        if (child) compoundStack.push(child);
+      }
+    }
+
+    if (root.namedChildCount === 1) {
+      const firstChild = root.namedChild(0);
+      if (
+        firstChild?.type === 'command' ||
+        firstChild?.type === 'variable_assignment'
+      ) {
+        const stack: Node[] = [firstChild];
+        while (stack.length > 0) {
+          const current = stack.pop()!;
+          if (current.type === 'variable_assignment') {
+            return true;
+          }
+          if (current.type === 'command_name' && current.text === 'env') {
+            return true;
+          }
+          for (let i = current.childCount - 1; i >= 0; i -= 1) {
+            const child = current.child(i);
+            if (child) stack.push(child);
+          }
+        }
       }
     }
     return false;

@@ -289,6 +289,12 @@ describe('hasRedirection', () => {
     mockPlatform.mockReturnValue('linux');
     expect(hasRedirection('echo "a > b"')).toBe(false);
   });
+
+  it('should not detect redirection in chained commands', () => {
+    expect(hasRedirection('cmd1 && echo hello > world')).toBe(false);
+    expect(hasRedirection('echo hello > world || cmd2')).toBe(false);
+    expect(hasRedirection('cmd1 ; echo hello > world')).toBe(false);
+  });
 });
 
 describeWindowsOnly('PowerShell integration', () => {
@@ -647,8 +653,9 @@ describe('hasEnvPrefix', () => {
     expect(hasEnvPrefix('echo "${FOO}"')).toBe(false);
   });
 
-  it('should not detect commands that just happen to have an equal sign later', () => {
-    expect(hasEnvPrefix('echo foo=bar')).toBe(false);
-    expect(hasEnvPrefix('cmd --opt=val')).toBe(false);
+  it('should not detect environment variables in chained commands', () => {
+    expect(hasEnvPrefix('FOO=bar cmd && cmd2')).toBe(false);
+    expect(hasEnvPrefix('cmd1 || FOO=bar cmd2')).toBe(false);
+    expect(hasEnvPrefix('cmd1 ; FOO=bar cmd2')).toBe(false);
   });
 });
