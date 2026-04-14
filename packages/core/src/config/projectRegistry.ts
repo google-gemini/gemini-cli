@@ -10,6 +10,7 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import { lock } from 'proper-lockfile';
 import { debugLogger } from '../utils/debugLogger.js';
+import { isNodeError } from '../utils/errors.js';
 
 export interface RegistryData {
   projects: Record<string, string>;
@@ -83,17 +84,48 @@ export class ProjectRegistry {
       await fs.promises.mkdir(dir, { recursive: true });
     }
 
+    const tmpPath = this.registryPath + '.' + randomUUID() + '.tmp';
     try {
       const content = JSON.stringify(data, null, 2);
-      // Use a randomized tmp path to avoid ENOENT crashes when save() is called concurrently
-      const tmpPath = this.registryPath + '.' + randomUUID() + '.tmp';
       await fs.promises.writeFile(tmpPath, content, 'utf8');
-      await fs.promises.rename(tmpPath, this.registryPath);
+
+      // Exponential backoff for OS-level file locks (EBUSY/EPERM) during rename
+      const maxRetries = 5;
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+          await fs.promises.rename(tmpPath, this.registryPath);
+          break; // Success
+        } catch (error: unknown) {
+          const code = isNodeError(error) ? error.code : '';
+
+          if (
+            (code === 'EBUSY' || code === 'EPERM') &&
+            attempt < maxRetries - 1
+          ) {
+            const delayMs = Math.pow(2, attempt) * 50;
+            debugLogger.debug(
+              `Rename failed with ${code}, retrying in ${delayMs}ms (attempt ${attempt + 1}/${maxRetries})...`,
+            );
+            await new Promise((resolve) => setTimeout(resolve, delayMs));
+            continue;
+          }
+          throw error;
+        }
+      }
     } catch (error) {
       debugLogger.error(
         `Failed to save project registry to ${this.registryPath}:`,
         error,
       );
+    } finally {
+      // Clean up the temporary file if it was left behind
+      try {
+        if (fs.existsSync(tmpPath)) {
+          await fs.promises.unlink(tmpPath);
+        }
+      } catch {
+        // Ignore errors during cleanup
+      }
     }
   }
 

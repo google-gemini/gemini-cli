@@ -3340,20 +3340,10 @@ export class Config implements McpContext, AgentLoopContext {
     return this.shellExecutionConfig;
   }
 
-  setShellExecutionConfig(config: ShellExecutionConfig): void {
+  setShellExecutionConfig(config: Partial<ShellExecutionConfig>): void {
     this.shellExecutionConfig = {
       ...this.shellExecutionConfig,
-      terminalWidth:
-        config.terminalWidth ?? this.shellExecutionConfig.terminalWidth,
-      terminalHeight:
-        config.terminalHeight ?? this.shellExecutionConfig.terminalHeight,
-      showColor: config.showColor ?? this.shellExecutionConfig.showColor,
-      pager: config.pager ?? this.shellExecutionConfig.pager,
-      sanitizationConfig:
-        config.sanitizationConfig ??
-        this.shellExecutionConfig.sanitizationConfig,
-      sandboxManager:
-        config.sandboxManager ?? this.shellExecutionConfig.sandboxManager,
+      ...config,
     };
   }
   getScreenReader(): boolean {
