@@ -128,7 +128,7 @@ export class LocalWhisperBackend implements VoiceBackend {
       setTimeout(() => {
         try {
           proc.kill('SIGKILL');
-        } catch (_e) {
+        } catch {
           // ignore
         }
         resolve();
@@ -156,7 +156,7 @@ export class LocalWhisperBackend implements VoiceBackend {
       setTimeout(() => {
         try {
           proc.kill('SIGKILL');
-        } catch (_e) {
+        } catch {
           // ignore
         }
         resolve();

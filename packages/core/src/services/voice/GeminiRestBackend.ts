@@ -133,7 +133,7 @@ export class GeminiRestBackend implements VoiceBackend {
       setTimeout(() => {
         try {
           proc.kill('SIGKILL');
-        } catch (_e) {
+        } catch {
           // ignore
         }
         resolve();
@@ -162,7 +162,7 @@ export class GeminiRestBackend implements VoiceBackend {
       setTimeout(() => {
         try {
           proc.kill('SIGKILL');
-        } catch (_e) {
+        } catch {
           // ignore
         }
         resolve();
