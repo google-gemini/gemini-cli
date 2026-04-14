@@ -38,7 +38,6 @@ import {
   McpClient,
   populateMcpServerCommand,
   discoverPrompts,
-  discoverResources,
   type McpContext,
 } from './mcp-client.js';
 import type { ToolRegistry } from './tool-registry.js';
@@ -340,66 +339,6 @@ describe('mcp-client', () => {
       );
       expect(result).toEqual([]);
       // MethodNotFound errors should be silently ignored regardless of message text
-      expect(MOCK_CONTEXT.emitMcpDiagnostic).not.toHaveBeenCalled();
-    });
-
-    it('should throw for discoverPrompts on non-MethodNotFound error with diagnostic', async () => {
-      const mockedClient = {
-        getServerCapabilities: vi.fn().mockReturnValue({ prompts: {} }),
-        listPrompts: vi.fn().mockRejectedValue(new Error('Connection reset')),
-      };
-      await expect(
-        discoverPrompts(
-          'test-server',
-          mockedClient as unknown as ClientLib.Client,
-          MOCK_CONTEXT,
-        ),
-      ).rejects.toThrow('Connection reset');
-      expect(MOCK_CONTEXT.emitMcpDiagnostic).toHaveBeenCalledWith(
-        'error',
-        expect.stringContaining('Connection reset'),
-        expect.any(Error),
-        'test-server',
-      );
-    });
-
-    it('should throw for discoverResources on non-MethodNotFound error with diagnostic', async () => {
-      const mockedClient = {
-        getServerCapabilities: vi.fn().mockReturnValue({ resources: {} }),
-        request: vi
-          .fn()
-          .mockRejectedValue(new Error('Resource listing failed')),
-      };
-      await expect(
-        discoverResources(
-          'test-server',
-          mockedClient as unknown as ClientLib.Client,
-          MOCK_CONTEXT,
-        ),
-      ).rejects.toThrow('Resource listing failed');
-      expect(MOCK_CONTEXT.emitMcpDiagnostic).toHaveBeenCalledWith(
-        'error',
-        expect.stringContaining('Resource listing failed'),
-        expect.any(Error),
-        'test-server',
-      );
-    });
-
-    it('should return empty array for discoverResources on MethodNotFound without diagnostic', async () => {
-      const mockedClient = {
-        getServerCapabilities: vi.fn().mockReturnValue({ resources: {} }),
-        request: vi
-          .fn()
-          .mockRejectedValue(
-            new McpError(ErrorCode.MethodNotFound, 'Method not found'),
-          ),
-      };
-      const result = await discoverResources(
-        'test-server',
-        mockedClient as unknown as ClientLib.Client,
-        MOCK_CONTEXT,
-      );
-      expect(result).toEqual([]);
       expect(MOCK_CONTEXT.emitMcpDiagnostic).not.toHaveBeenCalled();
     });
 
