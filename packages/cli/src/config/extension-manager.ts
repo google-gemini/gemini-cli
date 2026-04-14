@@ -23,6 +23,8 @@ import {
   createOpenPlugin,
   type OpenPluginConfig,
   OPEN_PLUGIN_NAME_REGEX,
+  resolvePluginSkills,
+  type OpenPluginDiscoveryField,
 } from './plugin.js';
 import {
   isWorkspaceTrusted,
@@ -51,6 +53,7 @@ import {
   logExtensionUninstall,
   logExtensionUpdateEvent,
   loadSkillsFromDir,
+  type SkillDefinition,
   loadAgentsFromDirectory,
   homedir,
   ExtensionIntegrityManager,
@@ -343,9 +346,30 @@ Would you like to attempt to install via "git clone" instead?`,
           Object.keys(previous.hooks).length > 0
         );
 
-        const newSkills = await loadSkillsFromDir(
-          path.join(localSourcePath, 'skills'),
-        );
+        let newSkills: SkillDefinition[] = [];
+        if (newExtensionConfig.manifestType === 'open-plugin') {
+          const openPluginConfig = newExtensionConfig as OpenPluginConfig & {
+            skills?: OpenPluginDiscoveryField;
+          };
+          const hydrationContext = {
+            extensionPath: localSourcePath,
+            PLUGIN_ROOT: localSourcePath,
+            workspacePath: this.workspaceDir,
+            '/': path.sep,
+            pathSeparator: path.sep,
+          };
+          const resolvedSkills = await resolvePluginSkills(
+            localSourcePath,
+            newExtensionConfig.name,
+            hydrationContext,
+            openPluginConfig.skills,
+          );
+          newSkills = resolvedSkills || [];
+        } else {
+          newSkills = await loadSkillsFromDir(
+            path.join(localSourcePath, 'skills'),
+          );
+        }
         const previousSkills = previous?.skills ?? [];
         const isMigrating = Boolean(
           previous &&
