@@ -132,7 +132,7 @@ export async function runInDevTraceSpan<R>(
   const { operation, logPrompts, sessionId, tracesEnabled, ...restOfSpanOpts } =
     opts;
 
-  if (tracesEnabled === false) {
+  if (!tracesEnabled) {
     const meta: SpanMetadata = {
       name: operation,
       attributes: {
