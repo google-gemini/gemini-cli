@@ -14,7 +14,6 @@ import {
   type HistoryItemInfo,
   type HistoryItemSkillsList,
   type SkillListItem,
-  type SkillDiscoveryReportView,
   MessageType,
 } from '../types.js';
 import { disableSkill, enableSkill } from '../../utils/skillSettings.js';
@@ -30,11 +29,6 @@ import {
   skillsConsentString,
 } from '../../config/extensions/consent.js';
 import { getDiscoveryReportForSkill } from '../../utils/skillDiscovery.js';
-
-interface SkillManagerWithLoadTiming {
-  getSlowestSkillLoadTime?: (thresholdMs?: number) => number | null;
-  getLatestDiscoveryReport?: () => SkillDiscoveryReportView[];
-}
 
 async function listAction(
   context: CommandContext,
@@ -69,9 +63,7 @@ async function listAction(
   const skills = showAll
     ? skillManager.getAllSkills()
     : skillManager.getAllSkills().filter((s) => !s.isBuiltin);
-  const reports = (
-    skillManager as SkillManagerWithLoadTiming
-  ).getLatestDiscoveryReport?.();
+  const reports = skillManager.getLatestDiscoveryReport();
   const skillsWithReports: SkillListItem[] = skills.map((skill) => ({
     ...skill,
     loadDiscoveryReport: getDiscoveryReportForSkill(skill.location, reports),
@@ -324,10 +316,8 @@ async function reloadAction(
     if (details.length > 0) {
       successText += ` ${details.join(' and ')}.`;
     }
-    const slowestSkillLoadTime = (
-      skillManager as typeof skillManager & SkillManagerWithLoadTiming
-    ).getSlowestSkillLoadTime?.();
-    if (slowestSkillLoadTime !== null && slowestSkillLoadTime !== undefined) {
+    const slowestSkillLoadTime = skillManager.getSlowestSkillLoadTime();
+    if (slowestSkillLoadTime !== null) {
       successText +=
         ' Run "/skills list verbose" to inspect skill load timings.';
     }

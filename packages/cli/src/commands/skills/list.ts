@@ -35,11 +35,7 @@ export async function handleList(args: { all?: boolean; verbose?: boolean }) {
   const skills = args.all
     ? skillManager.getAllSkills()
     : skillManager.getAllSkills().filter((s) => !s.isBuiltin);
-  const reports = (
-    skillManager as {
-      getLatestDiscoveryReport?: () => SkillDiscoveryTiming[];
-    }
-  ).getLatestDiscoveryReport?.();
+  const reports: SkillDiscoveryTiming[] = skillManager.getLatestDiscoveryReport();
 
   // Sort skills: non-built-in first, then alphabetically by name
   skills.sort((a, b) => {
