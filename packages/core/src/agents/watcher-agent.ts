@@ -12,7 +12,7 @@ import { GEMINI_MODEL_ALIAS_FLASH } from '../config/models.js';
 import * as path from 'node:path';
 
 export const WatcherReportSchema = z.object({
-  userDirections: z
+  primaryUserGoal: z
     .string()
     .describe(
       'High level user directions/redirections and any change of plans.',
@@ -142,14 +142,14 @@ Analyze the recent history against the North Star. Actively look for anti-patter
 
 *(Note: If this is a Standalone Short-Horizon task with no ongoing goal, just set all fields to "EMPTY" or "N/A" and omit feedback.)*
 
-* \`userDirections\`: Any parsed _strategic_ changes, or note if the user transitioned/aborted tasks.
-* \`progressSummary\`: Brief text of what was achieved, or "N/A" for short-horizon.
+* \`primaryUserGoal\`: A concise, 1-2 sentence strictly HIGH LEVEL GOAL. Any parsed _strategic_ changes, or note if the user transitioned/aborted tasks.
+* \`progressSummary\`: Brief text of what was achieved, or "N/A" for short-horizon. Use bullet points.
 * \`evaluation\`: "ON_TRACK", "DEVIATING", "STUCK", "LOOPING", or "NOT_APPLICABLE".
-* \`feedback\`:
-    * **If Short-Horizon or ON_TRACK**: Leave empty.
-    * **If DEVIATING/STUCK/LOOPING**: Provide a strong, authoritative directive to the main agent. (e.g., _"WARNING: You are in a loop trying to fix test_utils.py. The original goal is to build the API endpoint. Revert your last change, ignore the test warning for now, and return to the API endpoint."_)
+* \`feedback\`:  **CRITICAL: THIS IS INJECTED INTO THE AGENT'S CHAT HISTORY.**
+    * **If Short-Horizon or ON_TRACK**: You MUST leave this field empty.
+    * **If DEVIATING/STUCK/LOOPING**: Provide a strong, authoritative directive to the main agent. (e.g., _"WARNING: You are hyper fixating on fixing test_utils.py and looping as a result. The original goal is to build the API endpoint. Revert your last change, ignore the test warning for now, and return to the API endpoint."_). If the agent is truly stuck, provide the directive to stop unless the agent can get new information.
 
-You MUST call \`complete_task\` with a JSON report containing \`userDirections\`, \`progressSummary\`, \`evaluation\`, and optional \`feedback\`.`,
+You MUST call \`complete_task\` with a JSON report containing \`primaryUserGoal\`, \`progressSummary\`, \`evaluation\`, and optional \`feedback\`.`,
     },
   };
 };

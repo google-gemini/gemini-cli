@@ -87,7 +87,7 @@ describe('GeminiClient Watcher Integration', () => {
     vi.spyOn(config, 'getApprovalMode').mockReturnValue(ApprovalMode.DEFAULT);
 
     const mockWatcherTool = createMockWatcherTool({
-      userDirections: 'Keep testing',
+      primaryUserGoal: 'Keep testing',
       progressSummary: 'Test in progress',
       evaluation: 'Good',
       feedback: 'Keep going',
@@ -204,7 +204,7 @@ describe('GeminiClient Watcher Integration', () => {
     vi.spyOn(config, 'getApprovalMode').mockReturnValue(ApprovalMode.DEFAULT);
 
     const mockWatcherTool = createMockWatcherTool({
-      userDirections: 'Keep testing',
+      primaryUserGoal: 'Keep testing',
       progressSummary: 'Test in progress',
       evaluation: 'Good',
       feedback: 'Keep going',
@@ -278,7 +278,7 @@ describe('GeminiClient Watcher Integration', () => {
     vi.spyOn(config, 'getApprovalMode').mockReturnValue(ApprovalMode.DEFAULT);
 
     const reportData = {
-      userDirections: 'Messy test direction',
+      primaryUserGoal: 'Messy test direction',
       progressSummary: 'Messy progress',
       evaluation: 'ON_TRACK',
     };

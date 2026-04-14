@@ -106,7 +106,7 @@ export interface SubagentProgress {
 }
 
 export interface WatcherProgress {
-  userDirections: string;
+  primaryUserGoal: string;
   progressSummary: string;
   evaluation: string;
   feedback?: string;

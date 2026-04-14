@@ -1423,8 +1423,8 @@ export class GeminiClient {
           const reportLines = [
             '# Watcher Memory State',
             '',
-            '## 1. User Directions',
-            parsed.userDirections,
+            '## 1. Primary User Goal',
+            parsed.primaryUserGoal,
             '',
             '## 2. Progress Summary',
             parsed.progressSummary,
