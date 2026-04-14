@@ -133,7 +133,10 @@ import type { GenerateContentParameters } from '@google/genai';
 export type { MCPOAuthConfig, AnyToolInvocation, AnyDeclarativeTool };
 import type { AnyToolInvocation, AnyDeclarativeTool } from '../tools/tools.js';
 import { WorkspaceContext } from '../utils/workspaceContext.js';
-import { getWorkspaceContextOverride } from './scoped-config.js';
+import {
+  getWorkspaceContextOverride,
+  getActiveExtensionOverride,
+} from './scoped-config.js';
 import { Storage } from './storage.js';
 import type { ShellExecutionConfig } from '../services/shellExecutionService.js';
 import { FileExclusions } from '../utils/ignorePatterns.js';
@@ -740,13 +743,22 @@ export class Config implements McpContext, AgentLoopContext {
   private _activeExtensionName?: string;
 
   get activeExtensionName(): string | undefined {
+    const override = getActiveExtensionOverride();
+    if (override !== undefined) {
+      return override.name === null ? undefined : override.name;
+    }
     return (
       this._activeExtensionName || process.env['GEMINI_CLI_ACTIVE_EXTENSION']
     );
   }
 
   setActiveExtensionName(name: string | undefined): void {
-    this._activeExtensionName = name;
+    const override = getActiveExtensionOverride();
+    if (override !== undefined) {
+      override.name = name ?? null;
+    } else {
+      this._activeExtensionName = name;
+    }
   }
   private _resourceRegistry!: ResourceRegistry;
   private agentRegistry!: AgentRegistry;
