@@ -192,7 +192,7 @@ describe('Line Ending Preservation', () => {
         await confirmDetails.onConfirm(ToolConfirmationOutcome.ProceedOnce);
       }
 
-      await invocation.execute(abortSignal);
+      await invocation.execute({ abortSignal });
 
       const writtenContent = fs.readFileSync(filePath, 'utf8');
       // Expect all newlines to be CRLF
@@ -217,7 +217,7 @@ describe('Line Ending Preservation', () => {
         await confirmDetails.onConfirm(ToolConfirmationOutcome.ProceedOnce);
       }
 
-      await invocation.execute(abortSignal);
+      await invocation.execute({ abortSignal });
 
       const writtenContent = fs.readFileSync(filePath, 'utf8');
 
@@ -265,7 +265,7 @@ describe('Line Ending Preservation', () => {
         await confirmDetails.onConfirm(ToolConfirmationOutcome.ProceedOnce);
       }
 
-      await invocation.execute(abortSignal);
+      await invocation.execute({ abortSignal });
 
       const writtenContent = fs.readFileSync(filePath, 'utf8');
 
