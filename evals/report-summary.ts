@@ -1,4 +1,9 @@
-import fs from 'fs';
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+import fs from 'node:fs';
 
 const path = 'evals/logs/report.json';
 
