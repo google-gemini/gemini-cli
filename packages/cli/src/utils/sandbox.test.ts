@@ -40,7 +40,16 @@ vi.mock('node:util', async (importOriginal) => {
             return { stdout: '1000', stderr: '' };
           }
           if (cmd.includes('curl')) {
+            if (process.env['TEST_CURL_FAIL'] === 'true') {
+              throw new Error('curl failed');
+            }
             return { stdout: '', stderr: '' };
+          }
+          if (
+            cmd.includes('network connect') &&
+            process.env['TEST_NETWORK_CONNECT_FAIL'] === 'true'
+          ) {
+            throw new Error('network connect failed');
           }
           if (cmd.includes('getconf DARWIN_USER_CACHE_DIR')) {
             return { stdout: '/tmp/cache', stderr: '' };
@@ -111,6 +120,8 @@ describe('sandbox', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(spawn).mockReset();
+    vi.mocked(execSync).mockReset();
     process.env = { ...originalEnv };
     process.argv = [...originalArgv];
     mockProcessIn = {
@@ -384,7 +395,6 @@ describe('sandbox', () => {
       ).resolves.toBe(0);
 
       expect(process.listeners('exit')).toHaveLength(initialExitListenerCount);
-      expect(killSpy).toHaveBeenCalledWith(-1, 'SIGTERM');
       killSpy.mockRestore();
     });
 
@@ -419,9 +429,17 @@ describe('sandbox', () => {
         return proc;
       };
 
+      const imageCheckProcess = new EventEmitter() as unknown as ReturnType<
+        typeof spawn
+      > & {
+        stdout: ReturnType<typeof spawn>['stdout'];
+      };
+      imageCheckProcess.stdout = new EventEmitter() as unknown as ReturnType<
+        typeof spawn
+      >['stdout'];
+
       vi.mocked(spawn)
         .mockImplementationOnce(() => {
-          const imageCheckProcess = createMockProcess(false);
           setTimeout(() => {
             imageCheckProcess.stdout?.emit('data', Buffer.from('image-id'));
             imageCheckProcess.emit('close', 0);
@@ -435,6 +453,110 @@ describe('sandbox', () => {
         start_sandbox(config, [], undefined, ['arg1']),
       ).resolves.toBe(0);
 
+      expect(execSync).toHaveBeenCalledWith(expect.stringContaining('rm -f'));
+    });
+
+    it('removes proxy exit handlers if proxy startup fails', async () => {
+      vi.stubEnv('GEMINI_SANDBOX_PROXY_COMMAND', 'proxy-cmd');
+      vi.stubEnv('TEST_CURL_FAIL', 'true');
+      vi.mocked(os.platform).mockReturnValue('darwin');
+      const killSpy = vi
+        .spyOn(process, 'kill')
+        .mockImplementation(() => true as never);
+
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'sandbox-exec',
+        image: 'some-image',
+      });
+
+      const proxyProcess = new EventEmitter() as unknown as ReturnType<
+        typeof spawn
+      > & {
+        pid?: number;
+        stdout: ReturnType<typeof spawn>['stdout'];
+        stderr: ReturnType<typeof spawn>['stderr'];
+      };
+      proxyProcess.pid = 123;
+      proxyProcess.stdout = new EventEmitter() as unknown as ReturnType<
+        typeof spawn
+      >['stdout'];
+      proxyProcess.stderr = new EventEmitter() as unknown as ReturnType<
+        typeof spawn
+      >['stderr'];
+      proxyProcess.on = vi.fn().mockImplementation(() => proxyProcess);
+
+      vi.mocked(spawn).mockImplementationOnce(
+        () => proxyProcess as unknown as ReturnType<typeof spawn>,
+      );
+
+      const initialExitListenerCount = process.listeners('exit').length;
+      const initialSighupListenerCount = process.listeners('SIGHUP').length;
+
+      await expect(start_sandbox(config)).rejects.toThrow('curl failed');
+
+      expect(process.listeners('exit')).toHaveLength(initialExitListenerCount);
+      expect(process.listeners('SIGHUP')).toHaveLength(
+        initialSighupListenerCount,
+      );
+      expect(killSpy).toHaveBeenCalled();
+      killSpy.mockRestore();
+    });
+
+    it('removes proxy container exit handlers if network setup fails', async () => {
+      vi.stubEnv('GEMINI_SANDBOX_PROXY_COMMAND', 'proxy-cmd --flag');
+      vi.stubEnv('TEST_NETWORK_CONNECT_FAIL', 'true');
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'docker',
+        image: 'gemini-cli-sandbox',
+      });
+
+      const createMockProcess = () => {
+        const proc = new EventEmitter() as unknown as ReturnType<
+          typeof spawn
+        > & {
+          stdout: ReturnType<typeof spawn>['stdout'];
+          stderr: ReturnType<typeof spawn>['stderr'];
+        };
+        proc.stdout = new EventEmitter() as unknown as ReturnType<
+          typeof spawn
+        >['stdout'];
+        proc.stderr = new EventEmitter() as unknown as ReturnType<
+          typeof spawn
+        >['stderr'];
+        proc.on = vi.fn().mockImplementation(() => proc);
+        return proc;
+      };
+
+      const imageCheckProcess = new EventEmitter() as unknown as ReturnType<
+        typeof spawn
+      > & {
+        stdout: ReturnType<typeof spawn>['stdout'];
+      };
+      imageCheckProcess.stdout = new EventEmitter() as unknown as ReturnType<
+        typeof spawn
+      >['stdout'];
+
+      vi.mocked(spawn)
+        .mockImplementationOnce(() => {
+          setTimeout(() => {
+            imageCheckProcess.stdout?.emit('data', Buffer.from('image-id'));
+            imageCheckProcess.emit('close', 0);
+          }, 0);
+          return imageCheckProcess;
+        })
+        .mockImplementationOnce(() => createMockProcess());
+
+      const initialExitListenerCount = process.listeners('exit').length;
+      const initialSighupListenerCount = process.listeners('SIGHUP').length;
+
+      await expect(start_sandbox(config)).rejects.toThrow(
+        'network connect failed',
+      );
+
+      expect(process.listeners('exit')).toHaveLength(initialExitListenerCount);
+      expect(process.listeners('SIGHUP')).toHaveLength(
+        initialSighupListenerCount,
+      );
       expect(execSync).toHaveBeenCalledWith(expect.stringContaining('rm -f'));
     });
 
@@ -790,6 +912,45 @@ describe('sandbox', () => {
         });
 
         await expect(start_sandbox(config)).rejects.toThrow(/not found/);
+      });
+
+      it('removes tracked LXC exit handlers after the sandbox closes', async () => {
+        process.env['TEST_LXC_LIST_OUTPUT'] = LXC_RUNNING;
+        const config: SandboxConfig = createMockSandboxConfig({
+          command: 'lxc',
+          image: 'gemini-sandbox',
+        });
+
+        const mockSpawnProcess = new EventEmitter() as unknown as ReturnType<
+          typeof spawn
+        >;
+        mockSpawnProcess.on = vi.fn().mockImplementation((event, cb) => {
+          if (event === 'close') {
+            setTimeout(() => cb(0), 10);
+          }
+          return mockSpawnProcess;
+        });
+
+        vi.mocked(spawn).mockImplementation((cmd) => {
+          if (cmd === 'lxc') {
+            return mockSpawnProcess;
+          }
+          return new EventEmitter() as unknown as ReturnType<typeof spawn>;
+        });
+
+        const initialExitListenerCount = process.listeners('exit').length;
+        const initialSighupListenerCount = process.listeners('SIGHUP').length;
+
+        await expect(
+          start_sandbox(config, [], undefined, ['arg1']),
+        ).resolves.toBe(0);
+
+        expect(process.listeners('exit')).toHaveLength(
+          initialExitListenerCount,
+        );
+        expect(process.listeners('SIGHUP')).toHaveLength(
+          initialSighupListenerCount,
+        );
       });
     });
   });

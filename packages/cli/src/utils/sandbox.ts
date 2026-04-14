@@ -42,7 +42,7 @@ import {
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
-const PROCESS_EXIT_SIGNALS = ['exit', 'SIGINT', 'SIGTERM'] as const;
+const PROCESS_EXIT_SIGNALS = ['exit', 'SIGHUP', 'SIGINT', 'SIGTERM'] as const;
 const activeProcessExitHandlers = new Set<() => void>();
 let processExitDispatcherInstalled = false;
 
@@ -93,7 +93,9 @@ function removeProcessExitHandler(
 function runAndRemoveProcessExitHandler(
   currentHandler: (() => void) | undefined,
 ): undefined {
-  currentHandler?.();
+  if (currentHandler && activeProcessExitHandlers.has(currentHandler)) {
+    currentHandler();
+  }
   return removeProcessExitHandler(currentHandler);
 }
 
@@ -238,7 +240,11 @@ export async function start_sandbox(
         const stopProxy = () => {
           debugLogger.log('stopping proxy ...');
           if (proxyProcess?.pid) {
-            process.kill(-proxyProcess.pid, 'SIGTERM');
+            try {
+              process.kill(-proxyProcess.pid, 'SIGTERM');
+            } catch {
+              // Ignore cleanup races during shutdown.
+            }
           }
         };
         proxyStopHandler = addProcessExitHandler(stopProxy);
@@ -260,9 +266,14 @@ export async function start_sandbox(
           );
         });
         debugLogger.log('waiting for proxy to start ...');
-        await execAsync(
-          `until timeout 0.25 curl -s http://localhost:8877; do sleep 0.25; done`,
-        );
+        try {
+          await execAsync(
+            `until timeout 0.25 curl -s http://localhost:8877; do sleep 0.25; done`,
+          );
+        } catch (err) {
+          runAndRemoveProcessExitHandler(proxyStopHandler);
+          throw err;
+        }
       }
       // spawn child and let it inherit stdio
       process.stdin.pause();
@@ -270,7 +281,10 @@ export async function start_sandbox(
         stdio: 'inherit',
       });
       return await new Promise((resolve, reject) => {
-        sandboxProcess?.on('error', reject);
+        sandboxProcess?.on('error', (err) => {
+          runAndRemoveProcessExitHandler(proxyStopHandler);
+          reject(err);
+        });
         sandboxProcess?.on('close', (code) => {
           runAndRemoveProcessExitHandler(proxyStopHandler);
           process.stdin.resume();
@@ -814,14 +828,19 @@ export async function start_sandbox(
         );
       });
       debugLogger.log('waiting for proxy to start ...');
-      await execAsync(
-        `until timeout 0.25 curl -s http://localhost:8877; do sleep 0.25; done`,
-      );
-      // connect proxy container to sandbox network
-      // (workaround for older versions of docker that don't support multiple --network args)
-      await execAsync(
-        `${command} network connect ${SANDBOX_NETWORK_NAME} ${SANDBOX_PROXY_NAME}`,
-      );
+      try {
+        await execAsync(
+          `until timeout 0.25 curl -s http://localhost:8877; do sleep 0.25; done`,
+        );
+        // connect proxy container to sandbox network
+        // (workaround for older versions of docker that don't support multiple --network args)
+        await execAsync(
+          `${command} network connect ${SANDBOX_NETWORK_NAME} ${SANDBOX_PROXY_NAME}`,
+        );
+      } catch (err) {
+        runAndRemoveProcessExitHandler(proxyContainerStopHandler);
+        throw err;
+      }
     }
 
     // spawn child and let it inherit stdio
@@ -832,6 +851,7 @@ export async function start_sandbox(
 
     return await new Promise<number>((resolve, reject) => {
       sandboxProcess.on('error', (err) => {
+        runAndRemoveProcessExitHandler(proxyContainerStopHandler);
         coreEvents.emitFeedback('error', 'Sandbox process error', err);
         reject(err);
       });
@@ -936,6 +956,7 @@ async function start_lxc_sandbox(
       }
     }
   };
+  let removeDevicesHandler: (() => void) | undefined;
 
   try {
     // Bind-mount the working directory into the container at the same path.
@@ -1000,7 +1021,7 @@ async function start_lxc_sandbox(
     // Remove the devices from the container when the process exits.
     // Only the 'exit' event is needed — the CLI's cleanup.ts already handles
     // SIGINT and SIGTERM by calling process.exit(), which fires 'exit'.
-    process.on('exit', removeDevices);
+    removeDevicesHandler = addProcessExitHandler(removeDevices);
 
     // Build the environment variable arguments for `lxc exec`.
     const envArgs: string[] = [];
@@ -1093,8 +1114,7 @@ async function start_lxc_sandbox(
       });
     });
   } finally {
-    process.off('exit', removeDevices);
-    removeDevices();
+    runAndRemoveProcessExitHandler(removeDevicesHandler);
   }
 }
 
