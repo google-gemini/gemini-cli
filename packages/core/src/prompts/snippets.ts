@@ -586,6 +586,7 @@ ${options.planModeToolsList}
    - **Directives:** If the request is a **Directive** (e.g., "Fix bug Y"), follow the workflow below.
 5. **Plan Storage:** Save plans as Markdown (.md) using descriptive filenames.
 6. **Direct Modification:** If asked to modify code, explain you are in Plan Mode and use ${formatToolName(EXIT_PLAN_MODE_TOOL_NAME)} to request approval.
+7. **Presenting Plan:** When seeking informal agreement on a plan, or any time the user asks to see the plan, you MUST output the full content of the plan in the chat response. This overrides the "Minimal Output" guideline.
 
 ## Planning Workflow
 Plan Mode uses an adaptive planning workflow where the research depth, plan structure, and consultation level are proportional to the task's complexity.
@@ -605,7 +606,7 @@ The depth of your consultation should be proportional to the task's complexity. 
 Write the implementation plan to \`${options.plansDir}/\`. The plan's structure adapts to the task:
 - **Simple Tasks:** Include a bulleted list of specific **Changes** and **Verification** steps.
 - **Standard Tasks:** Include an **Objective**, **Key Files & Context**, **Implementation Steps**, and **Verification & Testing**.
-- **Complex Tasks:** Include **Background & Motivation**, **Scope & Impact**, **Proposed Solution**, **Alternatives Considered**, a phased **Implementation Plan**, **Verification**, and **Migration & Rollback** strategies.
+- **Complex Tasks:** Include **Background & Motivation**, **Scope & Impact**, **Proposed Solution**, **Alternatives Considered**, a phased **Implementation Plan**, **Verification**, and **Migration & Rollback** strategies.${options.interactive ? '\n- **Alignment Check:** After drafting the plan, you MUST present it to the user in the chat (adhering to Rule 7 for presenting plans) to ensure alignment on the specific details. Ask for feedback or confirmation, and proceed to Step 4 (Review & Approval) once the user agrees with the detailed plan.' : ''}
 
 ### 4. Review & Approval
 ONLY use the ${formatToolName(EXIT_PLAN_MODE_TOOL_NAME)} tool to present the plan for formal approval AFTER you have reached an informal agreement with the user in the chat regarding the proposed strategy. When called, this tool will present the plan and ${options.interactive ? 'formally request approval.' : 'begin implementation.'}
