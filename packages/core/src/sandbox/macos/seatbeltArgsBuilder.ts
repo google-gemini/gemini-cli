@@ -38,6 +38,23 @@ export function escapeSchemeString(str: string): string {
 }
 
 /**
+ * Checks if a path is explicitly allowed by additional write permissions.
+ */
+function isPathExplicitlyAllowed(
+  filePath: string,
+  realFilePath: string,
+  policyWrite: string[],
+): boolean {
+  return policyWrite.some(
+    (p) =>
+      p === filePath ||
+      p === realFilePath ||
+      filePath.startsWith(p + path.sep) ||
+      realFilePath.startsWith(p + path.sep),
+  );
+}
+
+/**
  * Builds a complete macOS Seatbelt profile string using a strict allowlist.
  * It embeds paths directly into the profile, properly escaped for Scheme.
  */
@@ -151,12 +168,10 @@ export function buildSeatbeltProfile(options: SeatbeltArgsOptions): string {
     const realGovernanceFile = resolveToRealPath(governanceFile);
 
     // Skip deny if explicitly allowed by additional write permissions
-    const isExplicitlyAllowed = resolvedPaths.policyWrite.some(
-      (p) =>
-        p === governanceFile ||
-        p === realGovernanceFile ||
-        governanceFile.startsWith(p + path.sep) ||
-        realGovernanceFile.startsWith(p + path.sep),
+    const isExplicitlyAllowed = isPathExplicitlyAllowed(
+      governanceFile,
+      realGovernanceFile,
+      resolvedPaths.policyWrite,
     );
 
     if (isExplicitlyAllowed) {
@@ -189,16 +204,32 @@ export function buildSeatbeltProfile(options: SeatbeltArgsOptions): string {
     const { worktreeGitDir, mainGitDir } = resolvedPaths.gitWorktree;
     if (worktreeGitDir) {
       const realWorktreeGitDir = resolveToRealPath(worktreeGitDir);
-      profile += `(deny file-write* (subpath "${escapeSchemeString(worktreeGitDir)}"))\n`;
-      if (realWorktreeGitDir !== worktreeGitDir) {
-        profile += `(deny file-write* (subpath "${escapeSchemeString(realWorktreeGitDir)}"))\n`;
+      if (
+        !isPathExplicitlyAllowed(
+          worktreeGitDir,
+          realWorktreeGitDir,
+          resolvedPaths.policyWrite,
+        )
+      ) {
+        profile += `(deny file-write* (subpath "${escapeSchemeString(worktreeGitDir)}"))\n`;
+        if (realWorktreeGitDir !== worktreeGitDir) {
+          profile += `(deny file-write* (subpath "${escapeSchemeString(realWorktreeGitDir)}"))\n`;
+        }
       }
     }
     if (mainGitDir) {
       const realMainGitDir = resolveToRealPath(mainGitDir);
-      profile += `(deny file-write* (subpath "${escapeSchemeString(mainGitDir)}"))\n`;
-      if (realMainGitDir !== mainGitDir) {
-        profile += `(deny file-write* (subpath "${escapeSchemeString(realMainGitDir)}"))\n`;
+      if (
+        !isPathExplicitlyAllowed(
+          mainGitDir,
+          realMainGitDir,
+          resolvedPaths.policyWrite,
+        )
+      ) {
+        profile += `(deny file-write* (subpath "${escapeSchemeString(mainGitDir)}"))\n`;
+        if (realMainGitDir !== mainGitDir) {
+          profile += `(deny file-write* (subpath "${escapeSchemeString(realMainGitDir)}"))\n`;
+        }
       }
     }
   }

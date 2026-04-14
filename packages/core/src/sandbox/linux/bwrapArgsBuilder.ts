@@ -90,10 +90,6 @@ export async function buildBwrapArgs(
     bwrapArgs.push('--ro-bind-try', p, p);
   }
 
-  for (const p of resolvedPaths.policyWrite) {
-    bwrapArgs.push('--bind-try', p, p);
-  }
-
   for (const file of GOVERNANCE_FILES) {
     const filePath = join(workspace.original, file.path);
     const realPath = join(workspace.resolved, file.path);
