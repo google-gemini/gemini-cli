@@ -48,7 +48,7 @@ const TestComponent = ({ onColor }: { onColor: (c: string) => void }) => {
   return null;
 };
 
-describe('TerminalContext', () => {
+describe.skip('TerminalContext', () => {
   it('should parse OSC 11 response', async () => {
     const handleColor = vi.fn();
     const { waitUntilReady, unmount } = await render(

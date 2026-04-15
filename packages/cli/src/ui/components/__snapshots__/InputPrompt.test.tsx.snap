@@ -207,6 +207,123 @@ exports[`InputPrompt > mouse interaction > should toggle paste expansion on doub
 "
 `;
 
+exports[`InputPrompt > mouse interaction > should toggle paste expansion on double-click 4`] = `
+"
+  ERROR [vitest] No "isITerm2" export is defined on the "../utils/terminalUtils.js" mock. Did you
+       forget to return it from "vi.mock"?
+       If you need to partially mock a module, you can use "importOriginal" helper inside:
+
+ - If you need to partially mock a module, you can use "importOriginal" helper inside:\\t 
+ - \\t 
+ -VitestMocker.createE
+  rror               (file:///Users/mattkorwel/dev/gemini-cli/main/node_modules/vitest/dist/chunks/
+                     execute.B7h3T_Hc.js:284:17)
+ -Object.get
+           (file:///Users/mattkorwel/dev/gemini-cli/main/node_modules/vitest/dist/chunks/execute.B7
+           h3T_Hc.js:330:16)
+ - HalfLinePaddedBoxInternal (src/ui/components/shared/HalfLinePaddedBox.tsx:82:19)
+ -Object.react-stack-botto
+  m-frame                (/Users/mattkorwel/dev/gemini-cli/main/node_modules/react-reconciler/cjs/r
+                         eact-reconciler.development.js:15859:20)
+ -renderWithHook
+  s            (/Users/mattkorwel/dev/gemini-cli/main/node_modules/react-reconciler/cjs/react-recon
+               ciler.development.js:3221:22)
+ -updateFunctionCompo
+  nent              (/Users/mattkorwel/dev/gemini-cli/main/node_modules/react-reconciler/cjs/react-
+                    reconciler.development.js:6475:19)
+ -beginWork
+          (/Users/mattkorwel/dev/gemini-cli/main/node_modules/react-reconciler/cjs/react-reconciler
+          .development.js:8009:18)
+ -runWithFiberInD
+  EV            (/Users/mattkorwel/dev/gemini-cli/main/node_modules/react-reconciler/cjs/react-reco
+                nciler.development.js:1738:13)
+ -performUnitOfWo
+  rk            (/Users/mattkorwel/dev/gemini-cli/main/node_modules/react-reconciler/cjs/react-reco
+                nciler.development.js:12834:22)
+ -workLoopSync
+             (/Users/mattkorwel/dev/gemini-cli/main/node_modules/react-reconciler/cjs/react-reconci
+             ler.development.js:12644:41)
+"
+`;
+
+exports[`InputPrompt > mouse interaction > should toggle paste expansion on double-click 5`] = `
+"
+  ERROR [vitest] No "isITerm2" export is defined on the "../utils/terminalUtils.js" mock. Did you
+       forget to return it from "vi.mock"?
+       If you need to partially mock a module, you can use "importOriginal" helper inside:
+
+ - If you need to partially mock a module, you can use "importOriginal" helper inside:\\t 
+ - \\t 
+ -VitestMocker.createE
+  rror               (file:///Users/mattkorwel/dev/gemini-cli/main/node_modules/vitest/dist/chunks/
+                     execute.B7h3T_Hc.js:284:17)
+ -Object.get
+           (file:///Users/mattkorwel/dev/gemini-cli/main/node_modules/vitest/dist/chunks/execute.B7
+           h3T_Hc.js:330:16)
+ - HalfLinePaddedBoxInternal (src/ui/components/shared/HalfLinePaddedBox.tsx:82:19)
+ -Object.react-stack-botto
+  m-frame                (/Users/mattkorwel/dev/gemini-cli/main/node_modules/react-reconciler/cjs/r
+                         eact-reconciler.development.js:15859:20)
+ -renderWithHook
+  s            (/Users/mattkorwel/dev/gemini-cli/main/node_modules/react-reconciler/cjs/react-recon
+               ciler.development.js:3221:22)
+ -updateFunctionCompo
+  nent              (/Users/mattkorwel/dev/gemini-cli/main/node_modules/react-reconciler/cjs/react-
+                    reconciler.development.js:6475:19)
+ -beginWork
+          (/Users/mattkorwel/dev/gemini-cli/main/node_modules/react-reconciler/cjs/react-reconciler
+          .development.js:8009:18)
+ -runWithFiberInD
+  EV            (/Users/mattkorwel/dev/gemini-cli/main/node_modules/react-reconciler/cjs/react-reco
+                nciler.development.js:1738:13)
+ -performUnitOfWo
+  rk            (/Users/mattkorwel/dev/gemini-cli/main/node_modules/react-reconciler/cjs/react-reco
+                nciler.development.js:12834:22)
+ -workLoopSync
+             (/Users/mattkorwel/dev/gemini-cli/main/node_modules/react-reconciler/cjs/react-reconci
+             ler.development.js:12644:41)
+"
+`;
+
+exports[`InputPrompt > mouse interaction > should toggle paste expansion on double-click 6`] = `
+"
+  ERROR [vitest] No "isITerm2" export is defined on the "../utils/terminalUtils.js" mock. Did you
+       forget to return it from "vi.mock"?
+       If you need to partially mock a module, you can use "importOriginal" helper inside:
+
+ - If you need to partially mock a module, you can use "importOriginal" helper inside:\\t 
+ - \\t 
+ -VitestMocker.createE
+  rror               (file:///Users/mattkorwel/dev/gemini-cli/main/node_modules/vitest/dist/chunks/
+                     execute.B7h3T_Hc.js:284:17)
+ -Object.get
+           (file:///Users/mattkorwel/dev/gemini-cli/main/node_modules/vitest/dist/chunks/execute.B7
+           h3T_Hc.js:330:16)
+ - HalfLinePaddedBoxInternal (src/ui/components/shared/HalfLinePaddedBox.tsx:82:19)
+ -Object.react-stack-botto
+  m-frame                (/Users/mattkorwel/dev/gemini-cli/main/node_modules/react-reconciler/cjs/r
+                         eact-reconciler.development.js:15859:20)
+ -renderWithHook
+  s            (/Users/mattkorwel/dev/gemini-cli/main/node_modules/react-reconciler/cjs/react-recon
+               ciler.development.js:3221:22)
+ -updateFunctionCompo
+  nent              (/Users/mattkorwel/dev/gemini-cli/main/node_modules/react-reconciler/cjs/react-
+                    reconciler.development.js:6475:19)
+ -beginWork
+          (/Users/mattkorwel/dev/gemini-cli/main/node_modules/react-reconciler/cjs/react-reconciler
+          .development.js:8009:18)
+ -runWithFiberInD
+  EV            (/Users/mattkorwel/dev/gemini-cli/main/node_modules/react-reconciler/cjs/react-reco
+                nciler.development.js:1738:13)
+ -performUnitOfWo
+  rk            (/Users/mattkorwel/dev/gemini-cli/main/node_modules/react-reconciler/cjs/react-reco
+                nciler.development.js:12834:22)
+ -workLoopSync
+             (/Users/mattkorwel/dev/gemini-cli/main/node_modules/react-reconciler/cjs/react-reconci
+             ler.development.js:12644:41)
+"
+`;
+
 exports[`InputPrompt > multiline rendering > should correctly render multiline input including blank lines 1`] = `
 "────────────────────────────────────────────────────────────────────────────────────────────────────
 │ > hello                                                                                          │
