@@ -690,6 +690,40 @@ describe('SandboxManager Integration', () => {
       assertResult(result, sandboxed, 'success');
       expect(fs.existsSync(targetFile)).toBe(true);
     });
+
+    it('allows write access to external git directory in a non-worktree environment when explicitly requested via additionalPermissions', async () => {
+      const externalGitDir = createTempDir('external-git-');
+      const workspaceDir = createTempDir('workspace-');
+
+      fs.mkdirSync(externalGitDir, { recursive: true });
+
+      fs.writeFileSync(
+        path.join(workspaceDir, '.git'),
+        `gitdir: ${externalGitDir}\n`,
+      );
+
+      const targetFile = path.join(externalGitDir, 'secret.txt');
+
+      const osManager = createSandboxManager(
+        { enabled: true },
+        { workspace: workspaceDir },
+      );
+
+      const { command, args } = Platform.touch(targetFile);
+      const sandboxed = await osManager.prepareCommand({
+        command,
+        args,
+        cwd: workspaceDir,
+        env: process.env,
+        policy: {
+          additionalPermissions: { fileSystem: { write: [externalGitDir] } },
+        },
+      });
+
+      const result = await runCommand(sandboxed);
+      assertResult(result, sandboxed, 'success');
+      expect(fs.existsSync(targetFile)).toBe(true);
+    });
   });
 
   describe('Network Access', () => {
