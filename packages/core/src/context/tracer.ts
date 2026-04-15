@@ -25,27 +25,22 @@ export class ContextTracer {
   constructor(options: ContextTracerOptions) {
     this.enabled = options.enabled ?? false;
 
-
-    this.traceDir = process.env['GEMINI_CONTEXT_TRACE_DIR'] || path.join(
-      options.targetDir,
-      'context_trace',
-      options.sessionId,
-    );
+    this.traceDir =
+      process.env['GEMINI_CONTEXT_TRACE_DIR'] ||
+      path.join(options.targetDir, 'context_trace', options.sessionId);
     this.assetsDir = path.join(this.traceDir, 'assets');
-    
 
     if (this.enabled) {
       try {
         fsSync.mkdirSync(this.assetsDir, { recursive: true });
-            this.logEvent('SYSTEM', 'Context Tracer Initialized', {
+        this.logEvent('SYSTEM', 'Context Tracer Initialized', {
           sessionId: options.sessionId,
         });
       } catch (e) {
-            debugLogger.error('Failed to initialize ContextTracer', e);
+        debugLogger.error('Failed to initialize ContextTracer', e);
         this.enabled = false;
       }
     }
-
   }
 
   logEvent(

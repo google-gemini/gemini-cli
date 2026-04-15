@@ -17,7 +17,7 @@ describe('SidecarLoader (Real FS)', () => {
   let tmpDir: string;
   let registry: ContextProcessorRegistry;
   let sidecarPath: string;
-  
+
   beforeEach(async () => {
     tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'gemini-sidecar-test-'));
     sidecarPath = path.join(tmpDir, 'sidecar.json');
@@ -30,8 +30,6 @@ describe('SidecarLoader (Real FS)', () => {
         required: ['maxTokens'],
       } as unknown as JSONSchemaType<{ maxTokens: number }>,
     });
-
-    
   });
 
   afterEach(async () => {

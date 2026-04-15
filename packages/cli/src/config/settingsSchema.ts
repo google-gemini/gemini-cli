@@ -2188,6 +2188,17 @@ const SETTINGS_SCHEMA = {
           'Replace the built-in save_memory tool with a memory manager subagent that supports adding, removing, de-duplicating, and organizing memories.',
         showInDialog: true,
       },
+      stressTestProfile: {
+        type: 'boolean',
+        label:
+          'Use the stress test profile to aggressively trigger context management.',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Significantly lowers token limits to force early garbage collection and distillation for testing purposes.',
+        showInDialog: false,
+      },
       generalistProfile: {
         type: 'boolean',
         label: 'Use the generalist profile to manage agent contexts.',

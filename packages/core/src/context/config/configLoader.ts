@@ -7,7 +7,11 @@
 import * as fsSync from 'node:fs';
 import * as fs from 'node:fs/promises';
 import type { ContextManagementConfig } from './types.js';
-import { generalistProfile, type ContextProfile } from './profiles.js';
+import {
+  generalistProfile,
+  stressTestProfile,
+  type ContextProfile,
+} from './profiles.js';
 import { SchemaValidator } from '../../utils/schemaValidator.js';
 import { getContextManagementConfigSchema } from './schema.js';
 import type { ContextProcessorRegistry } from './registry.js';
@@ -72,6 +76,13 @@ export async function loadContextManagementConfig(
   sidecarPath: string | undefined,
   registry: ContextProcessorRegistry,
 ): Promise<ContextProfile> {
+  if (sidecarPath === 'stressTestProfile') {
+    return stressTestProfile;
+  }
+
+  if (sidecarPath === 'generalistProfile') {
+    return generalistProfile;
+  }
 
   if (sidecarPath && fsSync.existsSync(sidecarPath)) {
     const size = fsSync.statSync(sidecarPath).size;

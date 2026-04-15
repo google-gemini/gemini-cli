@@ -107,25 +107,24 @@ export class ContextWorkingBufferImpl implements ContextWorkingBuffer {
 
     // Calculate new node array
     const removedSet = new Set(removedIds);
-    
+
     const newGraph = [];
     let addedNodesInserted = false;
-    
+
     for (const node of this.nodes) {
-       if (removedSet.has(node.id)) {
-           if (!addedNodesInserted) {
-               newGraph.push(...addedNodes);
-               addedNodesInserted = true;
-           }
-       } else {
-           newGraph.push(node);
-       }
-    }
-    
-    if (!addedNodesInserted) {
-       newGraph.push(...addedNodes);
+      if (removedSet.has(node.id)) {
+        if (!addedNodesInserted) {
+          newGraph.push(...addedNodes);
+          addedNodesInserted = true;
+        }
+      } else {
+        newGraph.push(node);
+      }
     }
 
+    if (!addedNodesInserted) {
+      newGraph.push(...addedNodes);
+    }
 
     // Calculate new provenance map
     const newProvenanceMap = new Map(this.provenanceMap);

@@ -143,3 +143,41 @@ export const generalistProfile: ContextProfile = {
     },
   ],
 };
+
+/**
+ * A highly aggressive profile designed exclusively for testing Context Management.
+ * Lowers token limits dramatically to force garbage collection and distillation loops
+ * within a few conversational turns.
+ */
+export const stressTestProfile: ContextProfile = {
+  config: {
+    budget: {
+      retainedTokens: 4000,
+      maxTokens: 10000,
+    },
+    processorOptions: {
+      ToolMasking: {
+        type: 'ToolMaskingProcessor',
+        options: {
+          stringLengthThresholdTokens: 500,
+        },
+      },
+      NodeTruncation: {
+        type: 'NodeTruncationProcessor',
+        options: {
+          maxTokensPerNode: 1000,
+        },
+      },
+      NodeDistillation: {
+        type: 'NodeDistillationProcessor',
+        options: {
+          nodeThresholdTokens: 1500,
+        },
+      },
+    },
+  },
+  // Re-use the generalist pipeline architecture exactly, but the `config` above
+  // will be passed into `resolveProcessorOptions` to aggressively override the thresholds.
+  buildPipelines: generalistProfile.buildPipelines,
+  buildAsyncPipelines: generalistProfile.buildAsyncPipelines,
+};

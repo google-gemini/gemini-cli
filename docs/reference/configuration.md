@@ -1719,6 +1719,12 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
+- **`experimental.stressTestProfile`** (boolean):
+  - **Description:** Significantly lowers token limits to force early garbage
+    collection and distillation for testing purposes.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
 - **`experimental.generalistProfile`** (boolean):
   - **Description:** Suitable for general coding and software development tasks.
   - **Default:** `false`

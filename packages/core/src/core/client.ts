@@ -1,4 +1,3 @@
-import { initializeContextManager } from '../context/initializer.js';
 /**
  * @license
  * Copyright 2025 Google LLC
@@ -46,7 +45,7 @@ import type { ContentGenerator } from './contentGenerator.js';
 import { LoopDetectionService } from '../services/loopDetectionService.js';
 import { ChatCompressionService } from '../context/chatCompressionService.js';
 import { AgentHistoryProvider } from '../context/agentHistoryProvider.js';
-import { ContextManager } from '../context/contextManager.js';
+import type { ContextManager } from '../context/contextManager.js';
 import { ideContextStore } from '../ide/ideContext.js';
 import {
   logContentRetryFailure,
@@ -76,6 +75,7 @@ import {
 import { getDisplayString, resolveModel } from '../config/models.js';
 import { partToString } from '../utils/partUtils.js';
 import { coreEvents, CoreEvent } from '../utils/events.js';
+import { initializeContextManager } from '../context/initializer.js';
 
 const MAX_TURNS = 100;
 
@@ -396,7 +396,11 @@ export class GeminiClient {
         },
       );
       await chat.initialize(resumedSessionData, 'main');
-      this.contextManager = await initializeContextManager(this.config, chat, this.lastPromptId);
+      this.contextManager = await initializeContextManager(
+        this.config,
+        chat,
+        this.lastPromptId,
+      );
       return chat;
     } catch (error) {
       await reportError(
@@ -409,7 +413,6 @@ export class GeminiClient {
     }
   }
 
-  
   private getIdeContextParts(forceFullContext: boolean): {
     contextParts: string[];
     newIdeContext: IdeContext | undefined;
