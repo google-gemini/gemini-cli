@@ -1,0 +1,57 @@
+sequenceDiagram
+    accTitle: Detailed Gemini CLI Request Flow
+    accDescr: Exhaustive sequential flow from user input to Ink rendering, including prompt construction, tool scheduling, and user confirmation loops.
+
+    participant U as User
+    participant Ink as Ink UI (AppContainer)
+    participant AS as AgentSession (Core)
+    participant PP as PromptProvider
+    participant GC as GeminiClient
+    participant Sch as Scheduler
+    participant TR as ToolRegistry
+    participant Bus as MessageBus / Confirmation
+    participant TE as ToolExecutor
+
+    U->>Ink: Type Command / Text
+    Ink->>AS: sendStream(payload)
+    
+    rect rgb(240, 240, 255)
+        Note over AS,PP: Turn Loop (_runLoop)
+        AS->>PP: getCoreSystemPrompt()
+        PP->>PP: Resolve Config & Approval Mode
+        PP->>PP: Gather Agent/Skill Metadata
+        PP->>PP: Render Template (snippets.ts)
+        PP-->>AS: Full System Prompt
+        
+        AS->>GC: sendMessageStream(Prompt + History)
+        GC-->>AS: Stream [ContentChunk | ToolCallRequest]
+    end
+
+    loop For each ToolCallRequest
+        AS->>Sch: schedule(ToolCallRequests)
+        Sch->>TR: getTool(name)
+        TR-->>Sch: Tool Definition
+        
+        Sch->>Sch: checkPolicy() & evaluateHooks()
+        
+        alt Policy requires Confirmation
+            Sch->>Bus: publish(TOOL_CONFIRMATION_REQUEST)
+            Bus->>Ink: Event: Confirmation Required
+            Ink-->>U: Render [Approve/Deny] Prompt
+            U->>Ink: Click "Approve"
+            Ink->>Bus: publish(TOOL_CONFIRMATION_RESPONSE)
+            Bus-->>Sch: Confirmed
+        end
+
+        Sch->>TE: execute(invocation)
+        TE->>TE: Run Shell / Read FS / Web Fetch
+        TE-->>Sch: ToolOutput
+        Sch-->>AS: [CompletedToolCall]
+        
+        Note over AS: Feedback Turn
+        AS->>GC: send(ToolOutput)
+        GC-->>AS: Stream [Final Response]
+    end
+
+    AS-->>Ink: Stream [AgentEvent]
+    Ink-->>U: Re-render UI (Ink Components)
