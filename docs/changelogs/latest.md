@@ -1,6 +1,6 @@
-# Latest stable release: v0.37.2
+# Latest stable release: v0.38.1
 
-Released: April 13, 2026
+Released: April 15, 2026
 
 For most users, our latest stable release is the recommended release. Install
 the latest stable version with:
@@ -26,6 +26,9 @@ npm install -g @google/gemini-cli
 
 ## What's Changed
 
+- fix(patch): cherry-pick 050c303 to release/v0.38.0-pr-25317 to patch version
+  v0.38.0 and create version 0.38.1 by @gemini-cli-robot in
+  [#25466](https://github.com/google-gemini/gemini-cli/pull/25466)
 - fix(patch): cherry-pick 9d741ab to release/v0.37.1-pr-24565 to patch version
   v0.37.1 and create version 0.37.2 by @gemini-cli-robot in
   [#25322](https://github.com/google-gemini/gemini-cli/pull/25322)
@@ -425,4 +428,4 @@ npm install -g @google/gemini-cli
   [#24842](https://github.com/google-gemini/gemini-cli/pull/24842)
 
 **Full Changelog**:
-https://github.com/google-gemini/gemini-cli/compare/v0.36.0...v0.37.2
+https://github.com/google-gemini/gemini-cli/compare/v0.38.0...v0.38.1
