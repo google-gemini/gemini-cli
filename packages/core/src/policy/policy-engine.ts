@@ -312,6 +312,13 @@ export class PolicyEngine {
       const parsedArgs = parsedObjArgs.map(extractStringFromParseEntry);
 
       if (this.sandboxManager.isDangerousCommand(parsedArgs)) {
+        if (this.approvalMode === ApprovalMode.YOLO) {
+          debugLogger.debug(
+            `[PolicyEngine.check] Command evaluated as dangerous, but YOLO mode is active. Preserving decision: ${command}`,
+          );
+          return decision;
+        }
+
         debugLogger.debug(
           `[PolicyEngine.check] Command evaluated as dangerous, forcing ASK_USER: ${command}`,
         );
