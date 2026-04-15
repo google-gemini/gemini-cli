@@ -7,5 +7,21 @@
   },
   "general": {
     "devtools": true
+  },
+  "telemetry": {
+    "enableTelemetry": false
+  },
+  "cloudcode": {
+    "telemetry": "off",
+    "survey": false
+  },
+  "google": {
+    "disable_usage_reporting": true,
+    "analytics": false
+  },
+  "gemini": {
+    "shareDataForTraining": false,
+    "allowDataCollection": false
   }
 }
+ 
