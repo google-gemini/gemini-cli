@@ -21,11 +21,13 @@ export async function initializeContextManager(
   chat: GeminiChat,
   lastPromptId: string,
 ): Promise<ContextManager | undefined> {
+
   const isV1Enabled = config.getContextManagementConfig().enabled;
 
   if (!isV1Enabled) {
-    return undefined;
+      return undefined;
   }
+
 
   const registry = new ContextProcessorRegistry();
   registry.registerProcessor({ id: 'NodeTruncationProcessor', schema: NodeTruncationProcessorOptionsSchema });
@@ -39,12 +41,15 @@ export async function initializeContextManager(
 
   const sidecarProfile = await loadContextManagementConfig(config.getExperimentalContextManagementConfig(), registry);
 
+
   const storage = config.storage;
   const logDir = storage.getProjectTempLogsDir();
   const projectTempDir = storage.getProjectTempDir();
 
+
   const tracer = new ContextTracer({
-    targetDir: logDir,
+    enabled: !!process.env['GEMINI_CONTEXT_TRACE_DIR'],
+    targetDir: projectTempDir,
     sessionId: lastPromptId,
   });
 
