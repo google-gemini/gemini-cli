@@ -166,8 +166,10 @@ function FilterBar({
           }}
         />
         {search.searchText && (
-          <div
+          <button
             onClick={() => search.setSearchText('')}
+            type="button"
+            aria-label="Clear filter"
             style={{
               position: 'absolute',
               right: '8px',
@@ -177,11 +179,15 @@ function FilterBar({
               color: t.textSecondary,
               fontSize: '14px',
               userSelect: 'none',
+              border: 'none',
+              background: 'none',
+              padding: 0,
+              lineHeight: 1,
             }}
             title="Clear filter"
           >
             ×
-          </div>
+          </button>
         )}
       </div>
 
@@ -896,29 +902,28 @@ function loadSavedLevels(): Record<string, boolean> {
 function highlightMatches(text: string, regex: RegExp | null): React.ReactNode {
   if (!regex || !text) return text;
 
-  const parts = text.split(regex);
-  if (parts.length === 1) return text;
-
-  return parts.map((part, i) => {
-    if (regex.test(part)) {
-      regex.lastIndex = 0;
-      return (
-        <mark
-          key={i}
-          style={{
-            background: 'rgba(255, 213, 79, 0.35)',
-            color: 'inherit',
-            borderRadius: '2px',
-            padding: '0 1px',
-          }}
-        >
-          {part}
-        </mark>
-      );
-    }
-    regex.lastIndex = 0;
-    return part;
-  });
+  const result: React.ReactNode[] = [];
+  let lastIndex = 0;
+  for (const match of text.matchAll(regex)) {
+    const index = match.index;
+    result.push(text.slice(lastIndex, index));
+    result.push(
+      <mark
+        key={index}
+        style={{
+          background: 'rgba(255, 213, 79, 0.35)',
+          color: 'inherit',
+          borderRadius: '2px',
+          padding: '0 1px',
+        }}
+      >
+        {match[0]}
+      </mark>,
+    );
+    lastIndex = index + match[0].length;
+  }
+  result.push(text.slice(lastIndex));
+  return result.length > 0 ? result : text;
 }
 
 function ConsoleLogEntry({
@@ -1078,14 +1083,17 @@ function ConsoleView({
   // Persist level toggle state
   const updateLevels = useCallback(
     (updater: (prev: Record<string, boolean>) => Record<string, boolean>) => {
-      setEnabledLevels((prev) => {
-        const next = updater(prev);
-        localStorage.setItem('devtools-console-levels', JSON.stringify(next));
-        return next;
-      });
+      setEnabledLevels((prev) => updater(prev));
     },
     [],
   );
+
+  useEffect(() => {
+    localStorage.setItem(
+      'devtools-console-levels',
+      JSON.stringify(enabledLevels),
+    );
+  }, [enabledLevels]);
 
   // Count logs per level from the full (unfiltered) set
   const levelCounts = useMemo(() => {
