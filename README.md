@@ -16,6 +16,9 @@ Learn all about Gemini CLI in our [documentation](https://geminicli.com/docs/).
 
 ## 🚀 Why Gemini CLI?
 
+- **🚀 Gemma 4 Support**: Route requests to Gemma 4 models (`gemma-4-26b-a4b-it`
+  or `gemma-4-31b-it`) using the `model.gemma4Variant` configuration setting.
+
 - **🎯 Free tier**: 60 requests/min and 1,000 requests/day with personal Google
   account.
 - **🧠 Powerful Gemini 3 models**: Access to improved reasoning and 1M token
