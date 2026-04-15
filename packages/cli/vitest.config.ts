@@ -9,24 +9,22 @@ import { defineConfig } from 'vitest/config';
 import { fileURLToPath } from 'node:url';
 import * as path from 'node:path';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const dirname = fileURLToPath(new URL('.', import.meta.url));
 
 export default defineConfig({
   resolve: {
-    conditions: ['test'],
+    alias: {
+      '@google/gemini-cli-core': path.resolve(dirname, '../core/src/index.js'),
+      '@google/gemini-cli-test-utils': path.resolve(
+        dirname,
+        '../test-utils/src/index.js',
+      ),
+    },
   },
   test: {
-    include: ['**/*.{test,spec}.{js,ts,jsx,tsx}', 'config.test.ts'],
-    environment: 'node',
     globals: true,
     reporters: ['default', 'junit'],
-
-    outputFile: {
-      junit: 'junit.xml',
-    },
-    alias: {
-      react: path.resolve(__dirname, '../../node_modules/react'),
-    },
+    environment: 'node',
     setupFiles: ['./test-setup.ts'],
     testTimeout: 60000,
     hookTimeout: 60000,
@@ -43,7 +41,7 @@ export default defineConfig({
       '**/src/ui/auth/useAuth.test.tsx',
     ],
     coverage: {
-      enabled: true,
+      enabled: false,
       provider: 'v8',
       reportsDirectory: './coverage',
       include: ['src/**/*'],

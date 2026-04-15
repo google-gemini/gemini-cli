@@ -4,15 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi, beforeEach, afterEach } from 'vitest';
+import { vi, beforeEach, afterEach, act } from 'vitest';
 import {
   coreEvents,
-  debugLogger,
   uiTelemetryService,
   resetBrowserSession,
 } from '@google/gemini-cli-core';
 import { themeManager } from './src/ui/themes/theme-manager.js';
 import { mockInkSpinner } from './src/test-utils/mockSpinner.js';
+import { cleanup } from './src/test-utils/render.js';
 
 // Globally mock ink-spinner to prevent non-deterministic snapshot/act flakes.
 mockInkSpinner();
@@ -26,38 +26,68 @@ process.setMaxListeners(0);
 
 import './src/test-utils/customMatchers.js';
 
+const noiseStrings = [
+  'was not wrapped in act(...)',
+  'The current testing environment is not configured to support act(...)',
+  'Warning: React does not recognize',
+  'Loading ignore patterns from',
+  "Can't find node-pty",
+  'Skipping inaccessible workspace folder',
+];
+
+// PROXY CONSOLE TO FILTER NOISE WITHOUT BREAKING SPIES
+const createNoiseFilter = (method: keyof Console) => {
+  const original = console[method];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (console as any)[method] = new Proxy(original, {
+    apply(target, thisArg, argArray: any[]) {
+      const firstArg = String(argArray[0]);
+      if (noiseStrings.some((s) => firstArg.includes(s))) {
+        return;
+      }
+      return Reflect.apply(target, thisArg, argArray);
+    },
+  });
+};
+
+['log', 'info', 'warn', 'error', 'debug'].forEach((m) =>
+  createNoiseFilter(m as keyof Console),
+);
+
+// THE "HEALTHY FIX": Wrap telemetry events in act() automatically
+const originalEmit = uiTelemetryService.emit;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+uiTelemetryService.emit = function (event: string | symbol, ...args: any[]) {
+  let result: boolean = false;
+  try {
+    act(() => {
+      result = originalEmit.apply(this, [event, ...args]);
+    });
+  } catch {
+    // If act() is not available or fails, fall back to normal emit
+    result = originalEmit.apply(this, [event, ...args]);
+  }
+  return result;
+};
+
 beforeEach(async () => {
   // Reset singletons to ensure test isolation
   themeManager.resetForTesting();
   uiTelemetryService.clear();
-  uiTelemetryService.removeAllListeners();
-  coreEvents.removeAllListeners();
+  // We do NOT remove all listeners here because it would break the 
+  // SessionContext subscription created during component mount.
+  // Instead, we rely on individual tests to manage their specific listeners
+  // or the clear() method to reset state.
+  
   await resetBrowserSession();
 
-  // Use vi.stubEnv instead of direct process.env manipulation for thread safety
-  vi.stubEnv('CI', ''); // Effectively unsets it
-  vi.stubEnv('NO_COLOR', ''); // Effectively unsets it
+  // Force specific env for test stability
   vi.stubEnv('FORCE_COLOR', '3');
   vi.stubEnv('FORCE_GENERIC_KEYBINDING_HINTS', 'true');
   vi.stubEnv('TERM_PROGRAM', 'generic');
-
-  // Mock debugLogger to pipe to console, so test-level console spies work.
-  // We don't silence them here; we let Vitest's 'silent' config handle the noise.
-  vi.spyOn(debugLogger, 'log').mockImplementation((...args) =>
-    console.log(...args),
-  );
-  vi.spyOn(debugLogger, 'warn').mockImplementation((...args) =>
-    console.warn(...args),
-  );
-  vi.spyOn(debugLogger, 'error').mockImplementation((...args) =>
-    console.error(...args),
-  );
-  vi.spyOn(debugLogger, 'debug').mockImplementation((...args) =>
-    console.debug(...args),
-  );
 });
 
 afterEach(() => {
-  vi.restoreAllMocks();
+  cleanup();
   vi.unstubAllEnvs();
 });

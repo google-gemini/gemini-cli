@@ -14,7 +14,7 @@ import { vi } from 'vitest';
 // for React state updates.
 export async function waitFor(
   assertion: () => void | Promise<void>,
-  { timeout = 2000, interval = 50 } = {},
+  { timeout = 2000, interval = 10 } = {},
 ): Promise<void> {
   const startTime = Date.now();
 

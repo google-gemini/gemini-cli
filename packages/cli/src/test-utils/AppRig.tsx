@@ -751,7 +751,7 @@ export class AppRig {
     }
 
     await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      await new Promise((resolve) => setTimeout(resolve, 20));
     });
 
     vi.unstubAllEnvs();

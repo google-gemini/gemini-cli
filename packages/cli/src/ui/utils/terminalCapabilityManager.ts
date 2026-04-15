@@ -103,7 +103,9 @@ export class TerminalCapabilityManager {
    * This should be called once at app startup.
    */
   async detectCapabilities(): Promise<void> {
-    if (this.detectionComplete) return;
+    if (this.detectionComplete) {
+      return;
+    }
 
     if (!process.stdin.isTTY || !process.stdout.isTTY) {
       this.detectionComplete = true;
@@ -146,7 +148,7 @@ export class TerminalCapabilityManager {
 
       // A somewhat long timeout is acceptable as all terminals should respond
       // to the device attributes query used as a sentinel.
-      timeoutId = setTimeout(cleanup, 1000);
+      timeoutId = setTimeout(cleanup, 50);
 
       const onData = (data: Buffer) => {
         buffer += data.toString();

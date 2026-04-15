@@ -1,0 +1,39 @@
+
+> @google/gemini-cli@0.39.0-nightly.20260408.e77b22e63 test
+> vitest run --pool=threads
+
+✘ [ERROR] Expected "]" but found ":"
+
+    vitest.config.ts:44:12:
+      44 │     coverage: {
+         │             ^
+         ╵             ]
+
+failed to load config from /Users/mattkorwel/dev/gemini-cli/main/packages/cli/vitest.config.ts
+
+⎯⎯⎯⎯⎯⎯⎯ Startup Error ⎯⎯⎯⎯⎯⎯⎯⎯
+Error: Build failed with 1 error:
+vitest.config.ts:44:12: ERROR: Expected "]" but found ":"
+    at failureErrorWithLog (/Users/mattkorwel/dev/gemini-cli/main/node_modules/vite/node_modules/esbuild/lib/main.js:1748:15)
+    at /Users/mattkorwel/dev/gemini-cli/main/node_modules/vite/node_modules/esbuild/lib/main.js:1207:25
+    at runOnEndCallbacks (/Users/mattkorwel/dev/gemini-cli/main/node_modules/vite/node_modules/esbuild/lib/main.js:1588:45)
+    at buildResponseToResult (/Users/mattkorwel/dev/gemini-cli/main/node_modules/vite/node_modules/esbuild/lib/main.js:1205:7)
+    at /Users/mattkorwel/dev/gemini-cli/main/node_modules/vite/node_modules/esbuild/lib/main.js:1232:16
+    at responseCallbacks.<computed> (/Users/mattkorwel/dev/gemini-cli/main/node_modules/vite/node_modules/esbuild/lib/main.js:884:9)
+    at handleIncomingPacket (/Users/mattkorwel/dev/gemini-cli/main/node_modules/vite/node_modules/esbuild/lib/main.js:939:12)
+    at Socket.readFromStdout (/Users/mattkorwel/dev/gemini-cli/main/node_modules/vite/node_modules/esbuild/lib/main.js:862:7)
+    at Socket.emit (node:events:524:28)
+    at addChunk (node:internal/streams/readable:561:12) {
+  errors: [Getter/Setter],
+  warnings: [Getter/Setter]
+}
+
+
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /Users/mattkorwel/dev/gemini-cli/main/packages/cli
+npm error workspace @google/gemini-cli@0.39.0-nightly.20260408.e77b22e63
+npm error location /Users/mattkorwel/dev/gemini-cli/main/packages/cli
+npm error command failed
+npm error command sh -c vitest run --pool=threads

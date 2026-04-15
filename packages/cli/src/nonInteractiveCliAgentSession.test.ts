@@ -1206,12 +1206,12 @@ describe('runNonInteractive', () => {
         (async function* () {
           yield events[0];
           await new Promise((resolve, reject) => {
-            const timeout = setTimeout(resolve, 1000);
+            const timeout = setTimeout(resolve, 20);
             signal.addEventListener('abort', () => {
               clearTimeout(timeout);
               setTimeout(() => {
                 reject(new Error('Aborted'));
-              }, 300);
+              }, 20);
             });
           });
         })(),
@@ -1225,7 +1225,7 @@ describe('runNonInteractive', () => {
     });
 
     // Wait a bit for setup to complete and listeners to be registered
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await new Promise((resolve) => setTimeout(resolve, 50));
 
     // Find the keypress handler registered by runNonInteractive
     const keypressCall = stdinOnSpy.mock.calls.find(

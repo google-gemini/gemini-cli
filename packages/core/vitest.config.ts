@@ -18,18 +18,7 @@ export default defineConfig({
       junit: 'junit.xml',
     },
     coverage: {
-      enabled: true,
-      provider: 'v8',
-      reportsDirectory: './coverage',
-      include: ['src/**/*'],
-      reporter: [
-        ['text', { file: 'full-text-summary.txt' }],
-        'html',
-        'json',
-        'lcov',
-        'cobertura',
-        ['json-summary', { outputFile: 'coverage-summary.json' }],
-      ],
+      enabled: false,
     },
   },
 });

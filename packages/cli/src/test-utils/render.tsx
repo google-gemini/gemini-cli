@@ -42,7 +42,7 @@ import {
   type OverflowState,
 } from '../ui/contexts/OverflowContext.js';
 
-import { makeFakeConfig } from '@google/gemini-cli-core';
+import { makeFakeConfig } from '../../../../packages/core/src/test-utils/config.js';
 import { type Config } from '@google/gemini-cli-core';
 import { FakePersistentState } from './persistentStateFake.js';
 import { AppContext, type AppState } from '../ui/contexts/AppContext.js';
@@ -223,7 +223,7 @@ class XtermStdout extends EventEmitter {
             this.once('render', resolve),
           );
           const timeoutPromise = new Promise((resolve) =>
-            setTimeout(resolve, 20),
+            setTimeout(resolve, 5),
           );
           await Promise.race([renderPromise, timeoutPromise]);
         }
@@ -290,9 +290,9 @@ class XtermStdout extends EventEmitter {
       attempts++;
       await act(async () => {
         if (vi.isFakeTimers()) {
-          await vi.advanceTimersByTimeAsync(10);
+          await vi.advanceTimersByTimeAsync(5);
         } else {
-          await new Promise((resolve) => setTimeout(resolve, 10));
+          await new Promise((resolve) => setTimeout(resolve, 5));
         }
       });
     }
