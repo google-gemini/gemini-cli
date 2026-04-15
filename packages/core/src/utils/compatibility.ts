@@ -114,6 +114,33 @@ export function supportsTrueColor(): boolean {
   return false;
 }
 
+/**
+ * Detects if the current environment is running inside WSL.
+ */
+export function isWSL(): boolean {
+  if (process.platform !== 'linux') {
+    return false;
+  }
+  return !!(
+    process.env['WSL_DISTRO_NAME'] ||
+    process.env['WSLENV'] ||
+    process.env['WSL_INTEROP']
+  );
+}
+
+/**
+ * Detects if the current working directory is a cross-OS mount in WSL.
+ * Heavy I/O operations in these directories (like /mnt/c/) can overwhelm the 9P bridge,
+ * causing deadlocks or hangs.
+ */
+export function isWslCrossOsMount(cwd: string = process.cwd()): boolean {
+  if (!isWSL()) return false;
+  // Cross-OS mounts typically reside under /mnt/ in WSL
+  // We'll consider any path starting with /mnt/ as a cross-OS mount,
+  // focusing primarily on /mnt/c, /mnt/d, etc. (sometimes just /mnt/something).
+  return cwd.startsWith('/mnt/');
+}
+
 export enum WarningPriority {
   Low = 'low',
   High = 'high',
@@ -132,6 +159,15 @@ export function getCompatibilityWarnings(options?: {
   isAlternateBuffer?: boolean;
 }): StartupWarning[] {
   const warnings: StartupWarning[] = [];
+
+  if (isWslCrossOsMount()) {
+    warnings.push({
+      id: 'wsl-cross-os-mount',
+      message:
+        'Warning: Running Gemini CLI in a mounted Windows drive (/mnt/...) under WSL can trigger severe deadlocks resulting in freezing, due to the 9P filesystem bridge protocol caching constraints. For the best experience, move your workspace to the native Linux filesystem (e.g. ~/) or run the tool from a native Windows terminal (e.g. PowerShell).',
+      priority: WarningPriority.High,
+    });
+  }
 
   if (isWindows10()) {
     warnings.push({

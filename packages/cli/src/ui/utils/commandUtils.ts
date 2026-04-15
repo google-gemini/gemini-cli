@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { debugLogger } from '@google/gemini-cli-core';
+import { debugLogger, isWSL } from '@google/gemini-cli-core';
 import clipboardy from 'clipboardy';
 import type { SlashCommand } from '../commands/types.js';
 import fs from 'node:fs';
@@ -155,13 +155,6 @@ const isSSH = (): boolean =>
     process.env['SSH_TTY'] ||
       process.env['SSH_CONNECTION'] ||
       process.env['SSH_CLIENT'],
-  );
-
-const isWSL = (): boolean =>
-  Boolean(
-    process.env['WSL_DISTRO_NAME'] ||
-      process.env['WSLENV'] ||
-      process.env['WSL_INTEROP'],
   );
 
 const isWindowsTerminal = (): boolean =>

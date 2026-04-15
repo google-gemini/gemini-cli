@@ -267,12 +267,29 @@ describe('compatibility', () => {
       vi.stubEnv('JETBRAINS_IDE', '');
       vi.stubEnv('TMUX', '');
       vi.stubEnv('STY', '');
+      vi.stubEnv('WSL_DISTRO_NAME', '');
+      vi.stubEnv('WSLENV', '');
+      vi.stubEnv('WSL_INTEROP', '');
       vi.stubEnv('TERM', 'xterm-256color'); // Prevent dumb terminal warning
       vi.stubEnv('TERM_PROGRAM', '');
 
       // Default to supporting true color to keep existing tests simple
       vi.stubEnv('COLORTERM', 'truecolor');
       process.stdout.getColorDepth = vi.fn().mockReturnValue(24);
+    });
+
+    it('should return WSL cross-OS mount warning when inside WSL and running on /mnt/', () => {
+      vi.mocked(process.cwd).mockReturnValue('/mnt/c/Users/Name/Project');
+      vi.stubEnv('WSL_DISTRO_NAME', 'Ubuntu');
+      Object.defineProperty(process, 'platform', {
+        value: 'linux',
+        configurable: true,
+      });
+
+      const warnings = getCompatibilityWarnings();
+      expect(warnings).toContainEqual(
+        expect.objectContaining({ id: 'wsl-cross-os-mount' }),
+      );
     });
 
     it('should return Windows 10 warning when detected', () => {
