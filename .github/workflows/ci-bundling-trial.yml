@@ -22,6 +22,7 @@ jobs:
       - name: 'Install & Build'
         run: |
           npm ci
+          npm run build
           npm run bundle
 
       - name: 'Upload Bundle'
@@ -30,8 +31,8 @@ jobs:
           name: 'gemini-bundle'
           path: 'bundle/'
 
-  test_cli_unit:
-    name: 'Test (Linux) - CLI Unit (Source)'
+  test_linux:
+    name: 'Test (Linux) - CLI Unit'
     runs-on: 'gemini-cli-ubuntu-16-core'
     steps:
       - name: 'Checkout'
@@ -46,7 +47,39 @@ jobs:
         run: 'npx vitest run packages/cli'
         shell: 'bash'
 
-  test_with_bundle:
+  test_mac:
+    name: 'Test (Mac) - CLI Unit'
+    runs-on: 'macos-large-latest'
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
+
+      - name: 'Setup and Build'
+        uses: './.github/actions/setup-gemini'
+        with:
+          mode: 'source'
+
+      - name: 'Run CLI Unit Tests'
+        run: 'npx vitest run packages/cli'
+        shell: 'bash'
+
+  test_windows:
+    name: 'Test (Windows) - CLI Unit'
+    runs-on: 'gemini-cli-windows-16-core'
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
+
+      - name: 'Setup and Build'
+        uses: './.github/actions/setup-gemini'
+        with:
+          mode: 'source'
+
+      - name: 'Run CLI Unit Tests'
+        run: 'npx vitest run packages/cli'
+        shell: 'bash'
+
+  test_integration:
     name: 'Test (Linux) - Bundled Integration'
     needs: 'build_bundle'
     runs-on: 'gemini-cli-ubuntu-16-core'
@@ -61,5 +94,7 @@ jobs:
           bundle-artifact: 'gemini-bundle'
 
       - name: 'Run Integration Tests'
+        env:
+          GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
         run: 'npm run test:integration:sandbox:none'
         shell: 'bash'
