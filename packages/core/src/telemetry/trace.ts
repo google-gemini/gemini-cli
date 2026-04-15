@@ -67,6 +67,7 @@ export function truncateForTelemetry(
   maxStringLength = 10000,
   maxArrayLength = 100,
   maxDepth = 4,
+  maxGlobalStringLength = 50000,
 ): AttributeValue | undefined {
   const truncateObj = (v: unknown, depth: number): unknown => {
     if (typeof v === 'string') {
@@ -148,6 +149,13 @@ export function truncateForTelemetry(
   }
 
   const stringified = safeJsonStringify(truncated);
+
+  if (stringified.length > maxGlobalStringLength) {
+    const graphemes = Array.from(stringified);
+    if (graphemes.length > maxGlobalStringLength) {
+      return `"[TRUNCATED: Payload exceeded global limit of ${maxGlobalStringLength} characters. Original length: ${graphemes.length}]"`;
+    }
+  }
 
   return stringified as AttributeValue;
 }

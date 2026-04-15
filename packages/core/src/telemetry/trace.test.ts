@@ -124,6 +124,23 @@ describe('truncateForTelemetry', () => {
     );
   });
 
+  it('should enforce a global payload string limit without breaking JSON', () => {
+    const obj = {
+      a: 'x'.repeat(100),
+      b: 'y'.repeat(100),
+    };
+    // Capping global string length to 50
+    const result = truncateForTelemetry(obj, 100, 100, 4, 50) as string;
+
+    // It should replace the entire object with a valid JSON string indicating truncation
+    expect(result).toBe(
+      '"[TRUNCATED: Payload exceeded global limit of 50 characters. Original length: 215]"',
+    );
+
+    // Prove it remains perfectly parseable JSON
+    expect(() => JSON.parse(result)).not.toThrow();
+  });
+
   it('should stringify objects unchanged if within maxLength', () => {
     const obj = { a: 1 };
     expect(truncateForTelemetry(obj, 100)).toBe(JSON.stringify(obj));
