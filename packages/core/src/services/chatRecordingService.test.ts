@@ -733,6 +733,37 @@ describe('ChatRecordingService', () => {
         chatRecordingService.deleteSession('non-existent'),
       ).resolves.not.toThrow();
     });
+
+    it('should not double-close FileHandle when deleting an empty session file', async () => {
+      const shortId = 'empt0000';
+      const chatsDir = path.join(testTempDir, 'chats');
+      fs.mkdirSync(chatsDir, { recursive: true });
+
+      // Create an empty session file (0 bytes)
+      const sessionFile = path.join(
+        chatsDir,
+        `session-2023-01-01T00-00-${shortId}.jsonl`,
+      );
+      fs.writeFileSync(sessionFile, '');
+
+      // Create a fake FileHandle that simulates an empty file (bytesRead = 0)
+      const mockClose = vi.fn().mockResolvedValue(undefined);
+      const mockFd = {
+        read: vi
+          .fn()
+          .mockResolvedValue({ bytesRead: 0, buffer: Buffer.alloc(4096) }),
+        close: mockClose,
+      };
+      vi.mocked(fs.promises.open).mockResolvedValue(
+        mockFd as unknown as fs.promises.FileHandle,
+      );
+
+      await chatRecordingService.deleteSession(shortId);
+
+      // Bug: close() is called 2 times (once in the if-branch, once in finally)
+      // Fix: close() should only be called 1 time
+      expect(mockClose).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('recordDirectories', () => {
