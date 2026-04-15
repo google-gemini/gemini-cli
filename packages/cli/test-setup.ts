@@ -40,7 +40,7 @@ const createNoiseFilter = (method: keyof Console) => {
   const original = console[method];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (console as any)[method] = new Proxy(original, {
-    apply(target, thisArg, argArray: any[]) {
+    apply(target: any, thisArg: any, argArray: any[]) {
       const firstArg = String(argArray[0]);
       if (noiseStrings.some((s) => firstArg.includes(s))) {
         return;
