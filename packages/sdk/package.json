@@ -14,8 +14,8 @@
     "build": "node ../../scripts/build_package.js",
     "lint": "eslint . --ext .ts,.tsx",
     "format": "prettier --write .",
-    "test": "vitest run",
-    "test:ci": "vitest run",
+    "test": "node ../../scripts/run-vitest.js run --config ./vitest.config.ts",
+    "test:ci": "node ../../scripts/run-vitest.js run --config ./vitest.config.ts",
     "typecheck": "tsc --noEmit"
   },
   "files": [
