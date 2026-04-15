@@ -147,7 +147,9 @@ export class PerfTestHarness {
       throw new Error(`No active timer found for label "${label}"`);
     }
 
-    const wallClockMs = performance.now() - timer.startTime;
+    // Round wall-clock time to nearest 0.1 ms
+    const wallClockMs =
+      Math.round((performance.now() - timer.startTime) * 10) / 10;
     const cpuDelta = process.cpuUsage(timer.startCpuUsage);
     this.activeTimers.delete(label);
 
