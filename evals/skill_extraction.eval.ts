@@ -161,7 +161,7 @@ const EXTRACTION_CONFIG_OVERRIDES = {
 describe('Skill Extraction', () => {
   componentEvalTest('USUALLY_PASSES', {
     suiteName: 'skill-extraction',
-    suiteType: 'component',
+    suiteType: 'component-level',
     name: 'ignores one-off incidents even when session summaries look similar',
     files: WORKSPACE_FILES,
     timeout: 180000,
@@ -217,7 +217,7 @@ describe('Skill Extraction', () => {
 
   componentEvalTest('USUALLY_PASSES', {
     suiteName: 'skill-extraction',
-    suiteType: 'component',
+    suiteType: 'component-level',
     name: 'extracts a repeated project-specific workflow into a skill',
     files: WORKSPACE_FILES,
     timeout: 180000,
@@ -279,7 +279,7 @@ describe('Skill Extraction', () => {
 
   componentEvalTest('USUALLY_PASSES', {
     suiteName: 'skill-extraction',
-    suiteType: 'component',
+    suiteType: 'component-level',
     name: 'extracts a repeated multi-step migration workflow with ordering constraints',
     files: WORKSPACE_FILES,
     timeout: 180000,
