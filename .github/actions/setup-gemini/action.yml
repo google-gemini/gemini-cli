@@ -26,6 +26,14 @@ runs:
       run: 'npm ci'
       shell: 'bash'
 
+    - name: 'Install system dependencies (Linux)'
+      if: "${{ runner.os == 'Linux' }}"
+      run: |
+        sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq bubblewrap
+        # Ubuntu 24.04+ requires this to allow bwrap to function in CI
+        sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+      shell: 'bash'
+
     - name: 'Build Core (Required for all tests)'
       run: 'npm run build --workspace @google/gemini-cli-core'
       shell: 'bash'
