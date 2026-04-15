@@ -668,10 +668,6 @@ export function getShellConfiguration(): ShellConfiguration {
  */
 export const isWindows = () => os.platform() === 'win32';
 
-/**
- * Detects if the current process is running inside WSL2 (Windows Subsystem for Linux).
- * Checks for the presence of WSL-specific environment variables or kernel version strings.
- */
 export function isWsl(): boolean {
   if (os.platform() !== 'linux') {
     return false;
