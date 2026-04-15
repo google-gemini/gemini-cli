@@ -42,22 +42,25 @@ export function isSafeRegExp(pattern: string): boolean {
   return true;
 }
 
+export interface ArgsPatternResult {
+  pattern: string | undefined;
+  display: string | undefined;
+}
+
 /**
- * Builds a list of args patterns for policy matching.
- *
- * This function handles the transformation of command prefixes and regexes into
- * the internal argsPattern representation used by the PolicyEngine.
+ * Normalizes tool arguments (command prefix or raw regex) into strict Regular Expressions
+ * for the policy engine. Returns both the compiled string pattern and a human-readable display string.
  *
  * @param argsPattern An optional raw regex string for arguments.
  * @param commandPrefix An optional command prefix (or list of prefixes) to allow.
  * @param commandRegex An optional command regex string to allow.
- * @returns An array of string patterns (or undefined) for the PolicyEngine.
+ * @returns An array of pattern results for the PolicyEngine.
  */
 export function buildArgsPatterns(
   argsPattern?: string,
   commandPrefix?: string | string[],
   commandRegex?: string,
-): Array<string | undefined> {
+): ArgsPatternResult[] {
   if (commandPrefix) {
     const prefixes = Array.isArray(commandPrefix)
       ? commandPrefix
@@ -78,15 +81,35 @@ export function buildArgsPatterns(
       // We allow [\s], ["], or the specific sequence [\"] (for escaped quotes
       // in JSON). We do NOT allow generic [\\], which would match "git\status"
       // -> "gitstatus".
-      return `${matchSegment}(?:[\\s"]|\\\\")`;
+      const pattern = `${matchSegment}(?:[\\s"]|\\\\")`;
+      return { pattern, display: `${prefix}*` };
     });
   }
 
   if (commandRegex) {
-    return [`"command":"${commandRegex}`];
+    return [{ pattern: `"command":"${commandRegex}`, display: commandRegex }];
   }
 
-  return [argsPattern];
+  // Raw argsPattern fallback logic for display
+  let display: string | undefined = undefined;
+  if (argsPattern) {
+    if (argsPattern.includes('"file_path"')) {
+      const pathMatch = argsPattern.match(/"file_path":"(.+?)"/);
+      if (pathMatch) {
+        display = `path: ${pathMatch[1]}`;
+      } else {
+        display = 'path: ...';
+      }
+    } else {
+      const maxLen = 40;
+      display =
+        argsPattern.length > maxLen
+          ? argsPattern.substring(0, maxLen) + '...'
+          : argsPattern;
+    }
+  }
+
+  return [{ pattern: argsPattern, display }];
 }
 
 /**
