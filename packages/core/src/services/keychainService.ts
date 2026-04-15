@@ -177,14 +177,23 @@ export class KeychainService {
     const testAccount = `${KEYCHAIN_TEST_PREFIX}${crypto.randomBytes(8).toString('hex')}`;
     const testPassword = 'test';
 
-    await keychain.setPassword(this.serviceName, testAccount, testPassword);
-    const retrieved = await keychain.getPassword(this.serviceName, testAccount);
-    const deleted = await keychain.deletePassword(
-      this.serviceName,
-      testAccount,
-    );
-
-    return deleted && retrieved === testPassword;
+    try {
+      await keychain.setPassword(this.serviceName, testAccount, testPassword);
+      const retrieved = await keychain.getPassword(
+        this.serviceName,
+        testAccount,
+      );
+      const deleted = await keychain.deletePassword(
+        this.serviceName,
+        testAccount,
+      );
+      return deleted && retrieved === testPassword;
+    } catch {
+      await keychain
+        .deletePassword(this.serviceName, testAccount)
+        .catch(() => {});
+      return false;
+    }
   }
 
   /**

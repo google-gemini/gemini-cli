@@ -154,8 +154,7 @@ describe('KeychainService', () => {
       // Because it falls back to FileKeychain, it is always available.
       expect(available).toBe(true);
       expect(debugLogger.debug).toHaveBeenCalledWith(
-        expect.stringContaining('encountered an error'),
-        'locked',
+        expect.stringContaining('functional verification failed'),
       );
       expect(coreEvents.emitTelemetryKeychainAvailability).toHaveBeenCalledWith(
         expect.objectContaining({ available: false }),
@@ -215,6 +214,19 @@ describe('KeychainService', () => {
       ]);
 
       expect(mockKeytar.setPassword).toHaveBeenCalledTimes(1);
+    });
+
+    it('should clean up test credential when getPassword throws during functional test', async () => {
+      // setPassword succeeds (credential is stored in keychain)
+      // getPassword throws (simulating a keychain error mid-test)
+      mockKeytar.getPassword?.mockRejectedValue(new Error('keychain locked'));
+
+      await service.isAvailable();
+
+      // Bug: deletePassword is never called because getPassword threw,
+      //      leaving the test credential in the OS keychain forever
+      // Fix: deletePassword should be called in a catch/finally block
+      expect(mockKeytar.deletePassword).toHaveBeenCalled();
     });
   });
 
