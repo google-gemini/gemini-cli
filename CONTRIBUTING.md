@@ -14,7 +14,7 @@ document includes:
 
 We're looking forward to seeing your contributions!
 
-## For Beginners
+## For beginners
 New to open source? Here's how to get started:
 - **Documentation improvements are a great first contribution** - no code required!
   
