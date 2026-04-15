@@ -5,15 +5,6 @@ session. They are designed to handle specific, complex tasks—like deep codebas
 analysis, documentation lookup, or domain-specific reasoning—without cluttering
 the main agent's context or toolset.
 
-Subagents are enabled by default. To disable them, set `enableAgents` to `false`
-in your `settings.json`:
-
-```json
-{
-  "experimental": { "enableAgents": false }
-}
-```
-
 ## What are subagents?
 
 Subagents are "specialists" that the main Gemini agent can hire for a specific
@@ -96,11 +87,23 @@ Gemini CLI comes with the following built-in subagents:
 
 ### Generalist Agent
 
-- **Name:** `generalist_agent`
-- **Purpose:** Route tasks to the appropriate specialized subagent.
-- **When to use:** Implicitly used by the main agent for routing. Not directly
-  invoked by the user.
-- **Configuration:** Enabled by default. No specific configuration options.
+- **Name:** `generalist`
+- **Purpose:** A general, all-purpose subagent that uses the inherited tool
+  access and configurations from the main agent. Useful for executing broad,
+  resource-heavy subtasks in an isolated conversation, optimizing your main
+  agent's context by returning only the final result of that given task.
+- **When to use:** Use this agent when a task requires many steps, handles large
+  volumes of information, or requires the same full capabilities as the main
+  agent. It is ideal for:
+  - **Multi-file modifications:** Applying refactors or fixing errors across
+    several files at once.
+  - **High-volume execution:** Running commands or tests that produce extensive
+    terminal output.
+  - **Action-oriented research:** Investigations where the agent needs to both
+    search code and run commands or make edits to find a solution. By delegating
+    these tasks, you prevent your main conversation from becoming cluttered or
+    slow. You can invoke it explicitly using `@generalist`.
+- **Configuration:** Enabled by default.
 
 ### Browser Agent (experimental)
 
@@ -367,7 +370,7 @@ it yourself; just report it.
 | `kind`         | string | No       | `local` (default) or `remote`.                                                                                                                                                                                |
 | `tools`        | array  | No       | List of tool names this agent can use. Supports wildcards: `*` (all tools), `mcp_*` (all MCP tools), `mcp_server_*` (all tools from a server). **If omitted, it inherits all tools from the parent session.** |
 | `mcpServers`   | object | No       | Configuration for inline Model Context Protocol (MCP) servers isolated to this specific agent.                                                                                                                |
-| `model`        | string | No       | Specific model to use (e.g., `gemini-3-preview`). Defaults to `inherit` (uses the main session model).                                                                                                        |
+| `model`        | string | No       | Specific model to use (for example, `gemini-3-preview`). Defaults to `inherit` (uses the main session model).                                                                                                 |
 | `temperature`  | number | No       | Model temperature (0.0 - 2.0). Defaults to `1`.                                                                                                                                                               |
 | `max_turns`    | number | No       | Maximum number of conversation turns allowed for this agent before it must return. Defaults to `30`.                                                                                                          |
 | `timeout_mins` | number | No       | Maximum execution time in minutes. Defaults to `10`.                                                                                                                                                          |
@@ -419,8 +422,8 @@ With this feature, you can:
 ### Configuring isolated tools and servers
 
 You can configure tool isolation for a subagent by updating its markdown
-frontmatter. This allows you to explicitly state which tools the subagent can
-use, rather than relying on the global registry.
+frontmatter. This lets you explicitly state which tools the subagent can use,
+rather than relying on the global registry.
 
 Add an `mcpServers` object to define inline MCP servers that are unique to the
 agent.
@@ -530,6 +533,24 @@ field.
 }
 ```
 
+#### Safety policies (TOML)
+
+You can restrict access to specific subagents using the CLI's **Policy Engine**.
+Subagents are treated as virtual tool names for policy matching purposes.
+
+To govern access to a subagent, create a `.toml` file in your policy directory
+(e.g., `~/.gemini/policies/`):
+
+```toml
+[[rule]]
+toolName = "codebase_investigator"
+decision = "deny"
+deny_message = "Deep codebase analysis is restricted for this session."
+```
+
+For more information on setting up fine-grained safety guardrails, see the
+[Policy Engine reference](../reference/policy-engine.md#special-syntax-for-subagents).
+
 ### Optimizing your subagent
 
 The main agent's system prompt encourages it to use an expert subagent when one
@@ -568,3 +589,14 @@ configuration, authentication, and usage instructions.
 Extensions can bundle and distribute subagents. See the
 [Extensions documentation](../extensions/index.md#subagents) for details on how
 to package agents within an extension.
+
+## Disabling subagents
+
+Subagents are enabled by default. To disable them, set `enableAgents` to `false`
+in your `settings.json`:
+
+```json
+{
+  "experimental": { "enableAgents": false }
+}
+```

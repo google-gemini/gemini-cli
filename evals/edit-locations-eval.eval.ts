@@ -13,6 +13,8 @@ describe('Edits location eval', () => {
    * instead of creating a new one.
    */
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should update existing test file instead of creating a new one',
     files: {
       'package.json': JSON.stringify(

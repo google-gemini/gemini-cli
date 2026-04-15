@@ -15,13 +15,14 @@
  */
 
 import { randomUUID } from 'node:crypto';
+import { debugLogger } from '../../utils/debugLogger.js';
 import type { Config } from '../../config/config.js';
 import { type AgentLoopContext } from '../../config/agent-loop-context.js';
 import { LocalAgentExecutor } from '../local-executor.js';
 import {
   BaseToolInvocation,
   type ToolResult,
-  type ToolLiveOutput,
+  type ExecuteOptions,
 } from '../../tools/tools.js';
 import { ToolErrorType } from '../../tools/tool-error.js';
 import {
@@ -35,6 +36,7 @@ import {
 import type { MessageBus } from '../../confirmation-bus/message-bus.js';
 import { createBrowserAgentDefinition } from './browserAgentFactory.js';
 import { removeInputBlocker } from './inputBlocker.js';
+import { logBrowserAgentTaskOutcome } from '../../telemetry/loggers.js';
 import {
   sanitizeThoughtContent,
   sanitizeToolArgs,
@@ -105,12 +107,14 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
    * 3. Runs the agent via LocalAgentExecutor
    * 4. Cleans up browser resources
    */
-  async execute(
-    signal: AbortSignal,
-    updateOutput?: (output: ToolLiveOutput) => void,
-  ): Promise<ToolResult> {
+  async execute(options: ExecuteOptions): Promise<ToolResult> {
+    const { abortSignal: signal, updateOutput } = options;
+    const invocationStartMs = Date.now();
     let browserManager;
     let recentActivity: SubagentActivityItem[] = [];
+    let sessionMode: 'persistent' | 'isolated' | 'existing' = 'persistent';
+    let visionEnabled = false;
+    let taskSuccess = false;
 
     try {
       if (updateOutput) {
@@ -154,6 +158,8 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
       );
       const { definition } = result;
       browserManager = result.browserManager;
+      visionEnabled = result.visionEnabled;
+      sessionMode = result.sessionMode;
 
       // Create activity callback for streaming output
       const onActivity = (activity: SubagentActivityEvent): void => {
@@ -302,6 +308,19 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
 
       const output = await executor.run(this.params, signal);
 
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        const parsed = JSON.parse(output.result);
+
+        taskSuccess = parsed?.success === true;
+      } catch (parseError) {
+        // non-JSON result -> treat as unknown, default false
+        debugLogger.log(
+          'Failed to parse browser agent output as JSON:',
+          parseError,
+        );
+      }
+
       const resultContent = `Browser agent finished.
 Termination Reason: ${output.terminate_reason}
 Result:
@@ -376,6 +395,14 @@ ${output.result}`;
         },
       };
     } finally {
+      logBrowserAgentTaskOutcome(this.config, {
+        success: taskSuccess,
+        session_mode: sessionMode,
+        vision_enabled: visionEnabled,
+        headless: !!this.config.getBrowserAgentConfig().customConfig.headless,
+        duration_ms: Date.now() - invocationStartMs,
+      });
+
       // Clean up input blocker, but keep browserManager alive for persistent sessions
       if (browserManager) {
         await removeInputBlocker(browserManager, signal);
@@ -411,6 +438,8 @@ ${output.result}`;
           }
         } catch {
           // Ignore errors for removing the overlays.
+        } finally {
+          browserManager.release();
         }
       }
     }
