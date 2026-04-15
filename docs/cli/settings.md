@@ -106,6 +106,15 @@ they appear in the UI.
 | Disable Loop Detection        | `model.disableLoopDetection` | Disable automatic detection and prevention of infinite loops.                          | `false`     |
 | Skip Next Speaker Check       | `model.skipNextSpeakerCheck` | Skip the next speaker check.                                                           | `true`      |
 
+### Voice
+
+| UI Label               | Setting                   | Description                                                        | Default              |
+| ---------------------- | ------------------------- | ------------------------------------------------------------------ | -------------------- |
+| Activation Mode        | `voice.activationMode`    | How to trigger voice recording with the Space key.                 | `"push-to-talk"`     |
+| Transcription Backend  | `voice.backend`           | The backend to use for voice transcription.                        | `"gemini-live"`      |
+| Whisper Model          | `voice.whisperModel`      | The Whisper model to use for local transcription.                  | `"ggml-base.en.bin"` |
+| Stop Grace Period (ms) | `voice.stopGracePeriodMs` | How long to wait for final transcription after stopping recording. | `1000`               |
+
 ### Agents
 
 | UI Label                  | Setting                                  | Description                                                                                   | Default |
@@ -162,6 +171,7 @@ they appear in the UI.
 
 | UI Label                                             | Setting                             | Description                                                                                                                                               | Default |
 | ---------------------------------------------------- | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| Voice Mode                                           | `experimental.voiceMode`            | Enable experimental voice dictation and commands (/voice, /voice model).                                                                                  | `false` |
 | Enable Git Worktrees                                 | `experimental.worktrees`            | Enable automated Git worktree management for parallel work.                                                                                               | `false` |
 | Use OSC 52 Paste                                     | `experimental.useOSC52Paste`        | Use OSC 52 for pasting. This may be more robust than the default system when using remote terminal sessions (if your terminal is configured to allow it). | `false` |
 | Use OSC 52 Copy                                      | `experimental.useOSC52Copy`         | Use OSC 52 for copying. This may be more robust than the default system when using remote terminal sessions (if your terminal is configured to allow it). | `false` |
