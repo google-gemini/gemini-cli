@@ -46,8 +46,6 @@ import { LoopDetectionService } from '../services/loopDetectionService.js';
 import { ChatCompressionService } from '../context/chatCompressionService.js';
 import { AgentHistoryProvider } from '../context/agentHistoryProvider.js';
 import { ContextManager } from '../context/contextManager.js';
-import { AgentChatHistory } from './agentChatHistory.js';
-import { defaultContextProfile } from '../context/config/profiles.js';
 import { ContextEnvironmentImpl } from '../context/pipeline/environmentImpl.js';
 import { PipelineOrchestrator } from '../context/pipeline/orchestrator.js';
 import { ContextTracer } from '../context/tracer.js';
@@ -104,7 +102,6 @@ export class GeminiClient {
   private readonly compressionService: ChatCompressionService;
   private readonly agentHistoryProvider: AgentHistoryProvider;
   private readonly toolOutputMaskingService: ToolOutputMaskingService;
-  private agentChatHistory: AgentChatHistory;
   private contextManager?: ContextManager;
   private lastPromptId: string;
   private currentSequenceModel: string | null = null;
@@ -128,7 +125,6 @@ export class GeminiClient {
     this.lastPromptId = this.config.getSessionId();
 
     coreEvents.on(CoreEvent.ModelChanged, this.handleModelChanged);
-    this.agentChatHistory = new AgentChatHistory();
     coreEvents.on(CoreEvent.MemoryChanged, this.handleMemoryChanged);
   }
 
@@ -384,44 +380,6 @@ export class GeminiClient {
     const tools: Tool[] = [{ functionDeclarations: toolDeclarations }];
 
     const history = await getInitialChatHistory(this.config, extraHistory);
-    this.agentChatHistory.clear();
-    for (const h of history) {
-      this.agentChatHistory.push(h);
-    }
-
-    if (this.config.getContextManagementConfig().enabled) {
-      const tracer = new ContextTracer({
-        targetDir: '/tmp',
-        sessionId: this.lastPromptId,
-      });
-      const eventBus = new ContextEventBus();
-      const env = new ContextEnvironmentImpl(
-        this.config.getBaseLlmClient(),
-        this.lastPromptId, // promptId
-        this.lastPromptId, // sessionId
-        '/tmp',
-        '/tmp', // projectTempDir
-        tracer,
-        4, // charsPerToken
-        eventBus,
-      );
-
-      const orchestrator = new PipelineOrchestrator(
-        defaultContextProfile.buildPipelines(env),
-        defaultContextProfile.buildAsyncPipelines(env),
-        env,
-        eventBus,
-        tracer,
-      );
-
-      this.contextManager = new ContextManager(
-        defaultContextProfile,
-        env,
-        tracer,
-        orchestrator,
-        this.agentChatHistory,
-      );
-    }
 
     try {
       const systemMemory = this.config.getSystemInstructionMemory();
@@ -441,6 +399,7 @@ export class GeminiClient {
         },
       );
       await chat.initialize(resumedSessionData, 'main');
+      await this.initializeContextManager(chat);
       return chat;
     } catch (error) {
       await reportError(
@@ -451,6 +410,75 @@ export class GeminiClient {
       );
       throw new Error(`Failed to initialize chat: ${getErrorMessage(error)}`);
     }
+  }
+
+  
+  private async initializeContextManager(chat: GeminiChat) {
+    if (!this.config.getContextManagementConfig().enabled) {
+      return;
+    }
+
+    const { ContextProcessorRegistry } = await import('../context/config/registry.js');
+    const { loadContextManagementConfig } = await import('../context/config/configLoader.js');
+                                
+    const registry = new ContextProcessorRegistry();
+    const { NodeTruncationProcessorOptionsSchema } = await import('../context/processors/nodeTruncationProcessor.js');
+    const { ToolMaskingProcessorOptionsSchema } = await import('../context/processors/toolMaskingProcessor.js');
+    const { HistoryTruncationProcessorOptionsSchema } = await import('../context/processors/historyTruncationProcessor.js');
+    const { BlobDegradationProcessorOptionsSchema } = await import('../context/processors/blobDegradationProcessor.js');
+    const { NodeDistillationProcessorOptionsSchema } = await import('../context/processors/nodeDistillationProcessor.js');
+    const { StateSnapshotProcessorOptionsSchema } = await import('../context/processors/stateSnapshotProcessor.js');
+    const { StateSnapshotAsyncProcessorOptionsSchema } = await import('../context/processors/stateSnapshotAsyncProcessor.js');
+    const { RollingSummaryProcessorOptionsSchema } = await import('../context/processors/rollingSummaryProcessor.js');
+
+    registry.registerProcessor({ id: 'NodeTruncationProcessor', schema: NodeTruncationProcessorOptionsSchema });
+    registry.registerProcessor({ id: 'ToolMaskingProcessor', schema: ToolMaskingProcessorOptionsSchema });
+    registry.registerProcessor({ id: 'HistoryTruncationProcessor', schema: HistoryTruncationProcessorOptionsSchema });
+    registry.registerProcessor({ id: 'BlobDegradationProcessor', schema: BlobDegradationProcessorOptionsSchema });
+    registry.registerProcessor({ id: 'NodeDistillationProcessor', schema: NodeDistillationProcessorOptionsSchema });
+    registry.registerProcessor({ id: 'StateSnapshotProcessor', schema: StateSnapshotProcessorOptionsSchema });
+    registry.registerProcessor({ id: 'StateSnapshotAsyncProcessor', schema: StateSnapshotAsyncProcessorOptionsSchema });
+    registry.registerProcessor({ id: 'RollingSummaryProcessor', schema: RollingSummaryProcessorOptionsSchema });
+
+    const sidecarProfile = await loadContextManagementConfig(this.config.getExperimentalContextManagementConfig(), registry);
+
+    const storage = this.config.storage;
+    const logDir = storage.getProjectTempLogsDir();
+    const projectTempDir = storage.getProjectTempDir();
+
+    const tracer = new ContextTracer({
+      targetDir: logDir,
+      sessionId: this.lastPromptId,
+    });
+    
+    const eventBus = new ContextEventBus();
+    
+    const env = new ContextEnvironmentImpl(
+      this.config.getBaseLlmClient(),
+      this.lastPromptId, // promptId
+      this.config.getSessionId(), // sessionId
+      logDir,
+      projectTempDir,
+      tracer,
+      4, // charsPerToken
+      eventBus,
+    );
+
+    const orchestrator = new PipelineOrchestrator(
+      sidecarProfile.buildPipelines(env),
+      sidecarProfile.buildAsyncPipelines(env),
+      env,
+      eventBus,
+      tracer,
+    );
+
+    this.contextManager = new ContextManager(
+      sidecarProfile,
+      env,
+      tracer,
+      orchestrator,
+      chat.agentHistory,
+    );
   }
 
   private getIdeContextParts(forceFullContext: boolean): {

@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Config } from '../../config/config.js';
 import * as fsSync from 'node:fs';
 import * as fs from 'node:fs/promises';
 import type { ContextManagementConfig } from './types.js';
@@ -70,10 +69,9 @@ async function loadConfigFromFile(
  * If a config file is present but invalid, this will THROW to prevent silent misconfiguration.
  */
 export async function loadContextManagementConfig(
-  config: Config,
+  sidecarPath: string | undefined,
   registry: ContextProcessorRegistry,
 ): Promise<ContextProfile> {
-  const sidecarPath = config.getExperimentalContextManagementConfig();
 
   if (sidecarPath && fsSync.existsSync(sidecarPath)) {
     const size = fsSync.statSync(sidecarPath).size;

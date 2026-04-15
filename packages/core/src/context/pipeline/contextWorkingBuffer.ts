@@ -107,13 +107,25 @@ export class ContextWorkingBufferImpl implements ContextWorkingBuffer {
 
     // Calculate new node array
     const removedSet = new Set(removedIds);
-    const retainedNodes = this.nodes.filter((n) => !removedSet.has(n.id));
-    const newGraph = [...retainedNodes];
+    
+    const newGraph = [];
+    let addedNodesInserted = false;
+    
+    for (const node of this.nodes) {
+       if (removedSet.has(node.id)) {
+           if (!addedNodesInserted) {
+               newGraph.push(...addedNodes);
+               addedNodesInserted = true;
+           }
+       } else {
+           newGraph.push(node);
+       }
+    }
+    
+    if (!addedNodesInserted) {
+       newGraph.push(...addedNodes);
+    }
 
-    // We append the output nodes in the same general position if possible,
-    // but in a complex graph we just ensure they exist. V2 graph uses timestamps for order.
-    // For simplicity, we just push added nodes to the end of the retained array
-    newGraph.push(...addedNodes);
 
     // Calculate new provenance map
     const newProvenanceMap = new Map(this.provenanceMap);
