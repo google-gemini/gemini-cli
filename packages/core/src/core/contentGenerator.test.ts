@@ -148,7 +148,7 @@ describe('createContentGenerator', () => {
     );
     expect(GoogleGenAI).toHaveBeenCalledWith({
       apiKey: 'test-api-key',
-      vertexai: undefined,
+      vertexai: false,
       httpOptions: expect.objectContaining({
         headers: expect.objectContaining({
           'User-Agent': expect.stringMatching(
@@ -365,7 +365,7 @@ describe('createContentGenerator', () => {
 
     expect(GoogleGenAI).toHaveBeenCalledWith({
       apiKey: 'test-api-key',
-      vertexai: undefined,
+      vertexai: false,
       httpOptions: expect.objectContaining({
         headers: expect.objectContaining({
           'User-Agent': expect.any(String),
@@ -409,7 +409,7 @@ describe('createContentGenerator', () => {
 
     expect(GoogleGenAI).toHaveBeenCalledWith({
       apiKey: 'test-api-key',
-      vertexai: undefined,
+      vertexai: false,
       httpOptions: expect.objectContaining({
         headers: expect.objectContaining({
           'User-Agent': expect.any(String),
@@ -443,7 +443,7 @@ describe('createContentGenerator', () => {
 
     expect(GoogleGenAI).toHaveBeenCalledWith({
       apiKey: 'test-api-key',
-      vertexai: undefined,
+      vertexai: false,
       httpOptions: expect.objectContaining({
         headers: expect.objectContaining({
           'User-Agent': expect.any(String),
@@ -481,7 +481,7 @@ describe('createContentGenerator', () => {
     );
     expect(GoogleGenAI).toHaveBeenCalledWith({
       apiKey: 'test-api-key',
-      vertexai: undefined,
+      vertexai: false,
       httpOptions: expect.objectContaining({
         headers: {
           'User-Agent': expect.any(String),
@@ -517,7 +517,7 @@ describe('createContentGenerator', () => {
 
     expect(GoogleGenAI).toHaveBeenCalledWith({
       apiKey: 'test-api-key',
-      vertexai: undefined,
+      vertexai: false,
       httpOptions: expect.objectContaining({
         headers: expect.objectContaining({
           'User-Agent': expect.any(String),
@@ -550,7 +550,7 @@ describe('createContentGenerator', () => {
 
     expect(GoogleGenAI).toHaveBeenCalledWith({
       apiKey: 'test-api-key',
-      vertexai: undefined,
+      vertexai: false,
       httpOptions: expect.objectContaining({
         headers: expect.objectContaining({
           'User-Agent': expect.any(String),
@@ -589,7 +589,7 @@ describe('createContentGenerator', () => {
 
     expect(GoogleGenAI).toHaveBeenCalledWith({
       apiKey: 'test-api-key',
-      vertexai: undefined,
+      vertexai: false,
       httpOptions: expect.objectContaining({
         headers: expect.objectContaining({
           'User-Agent': expect.any(String),
@@ -729,7 +729,7 @@ describe('createContentGenerator', () => {
     expect(GoogleGenAI).toHaveBeenCalledWith(
       expect.objectContaining({
         apiKey: undefined,
-        vertexai: undefined,
+        vertexai: true,
         httpOptions: expect.objectContaining({
           baseUrl: 'https://vertex.test.local',
         }),

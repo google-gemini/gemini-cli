@@ -313,7 +313,7 @@ export async function createContentGenerator(
 
       const googleGenAI = new GoogleGenAI({
         apiKey: config.apiKey === '' ? undefined : config.apiKey,
-        vertexai: config.vertexai,
+        vertexai: config.vertexai ?? config.authType === AuthType.USE_VERTEX_AI,
         httpOptions,
         ...(apiVersionEnv && { apiVersion: apiVersionEnv }),
       });
