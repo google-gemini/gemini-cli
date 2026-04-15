@@ -6,8 +6,8 @@ on:
       - 'feat/ci-bundling-revamp'
 
 jobs:
-  build:
-    name: 'Build All Artifacts'
+  build_bundle:
+    name: 'Build Bundle'
     runs-on: 'gemini-cli-ubuntu-16-core'
     steps:
       - name: 'Checkout'
@@ -22,7 +22,6 @@ jobs:
       - name: 'Install & Build'
         run: |
           npm ci
-          npm run build
           npm run bundle
 
       - name: 'Upload Bundle'
@@ -31,25 +30,17 @@ jobs:
           name: 'gemini-bundle'
           path: 'bundle/'
 
-      - name: 'Upload Compiled Dist'
-        uses: 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02' # v4
-        with:
-          name: 'gemini-dist'
-          path: 'packages/*/dist/'
-
   test_cli_unit:
-    name: 'Test (Linux) - CLI Unit (Shared Dist)'
-    needs: 'build'
+    name: 'Test (Linux) - CLI Unit (Source)'
     runs-on: 'gemini-cli-ubuntu-16-core'
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
 
-      - name: 'Setup with Dist'
+      - name: 'Setup and Build'
         uses: './.github/actions/setup-gemini'
         with:
-          mode: 'dist'
-          dist-artifact: 'gemini-dist'
+          mode: 'source'
 
       - name: 'Run CLI Unit Tests'
         run: 'npx vitest run packages/cli'
@@ -57,7 +48,7 @@ jobs:
 
   test_with_bundle:
     name: 'Test (Linux) - Bundled Integration'
-    needs: 'build'
+    needs: 'build_bundle'
     runs-on: 'gemini-cli-ubuntu-16-core'
     steps:
       - name: 'Checkout'

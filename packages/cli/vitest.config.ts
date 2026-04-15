@@ -55,10 +55,5 @@ export default defineConfig({
         ['json-summary', { outputFile: 'coverage-summary.json' }],
       ],
     },
-    server: {
-      deps: {
-        inline: [/@google\/gemini-cli-core/],
-      },
-    },
   },
 });
