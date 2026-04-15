@@ -30,33 +30,27 @@ if (!existsSync(join(root, 'node_modules'))) {
   execSync('npm install', { stdio: 'inherit', cwd: root });
 }
 
-// build all workspaces/packages
-execSync('npm run generate', { stdio: 'inherit', cwd: root });
+const workspaces = [
+  '@google/gemini-cli-test-utils',
+  '@google/gemini-cli-core',
+  '@google/gemini-cli-a2a-server',
+  '@google/gemini-cli',
+  'gemini-cli-vscode-ide-companion',
+];
 
-if (process.env.CI) {
-  console.log('CI environment detected. Building workspaces sequentially...');
-  execSync('npm run build --workspaces', { stdio: 'inherit', cwd: root });
-} else {
-  // Build core first because everyone depends on it
-  console.log('Building @google/gemini-cli-core...');
-  execSync('npm run build -w @google/gemini-cli-core', {
+function buildWorkspace(workspace) {
+  console.log(`Building ${workspace}...`);
+  execSync(`npm run build --workspace ${workspace}`, {
     stdio: 'inherit',
     cwd: root,
   });
+}
 
-  // Build the rest in parallel
-  console.log('Building other workspaces in parallel...');
-  const workspaceInfo = JSON.parse(
-    execSync('npm query .workspace --json', { cwd: root, encoding: 'utf-8' }),
-  );
-  const parallelWorkspaces = workspaceInfo
-    .map((w) => w.name)
-    .filter((name) => name !== '@google/gemini-cli-core');
+// build all workspaces/packages
+execSync('npm run generate', { stdio: 'inherit', cwd: root });
 
-  execSync(
-    `npx npm-run-all --parallel ${parallelWorkspaces.map((w) => `"build -w ${w}"`).join(' ')}`,
-    { stdio: 'inherit', cwd: root },
-  );
+for (const workspace of workspaces) {
+  buildWorkspace(workspace);
 }
 
 // also build container image if sandboxing is enabled
