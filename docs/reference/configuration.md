@@ -202,6 +202,12 @@ their corresponding top-level category object in your `settings.json` file.
 
 #### `ui`
 
+- **`ui.debugRainbow`** (boolean):
+  - **Description:** Enable debug rainbow rendering. Only useful for debugging
+    rendering bugs and performance issues.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
 - **`ui.theme`** (string):
   - **Description:** The color theme for the UI. See the CLI themes guide for
     available options.
@@ -2502,6 +2508,10 @@ sandbox image:
 ```bash
 BUILD_SANDBOX=1 gemini -s
 ```
+
+Building a custom sandbox with `BUILD_SANDBOX` is only supported when running
+Gemini CLI from source. If you installed the CLI with npm, build the Docker
+image separately and reference that image in your sandbox configuration.
 
 ## Usage statistics
 

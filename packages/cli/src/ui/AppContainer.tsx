@@ -25,6 +25,7 @@ import {
 import { App } from './App.js';
 import { AppContext } from './contexts/AppContext.js';
 import { UIStateContext, type UIState } from './contexts/UIStateContext.js';
+import { QuotaContext } from './contexts/QuotaContext.js';
 import {
   UIActionsContext,
   type UIActions,
@@ -136,7 +137,11 @@ import { type IdeIntegrationNudgeResult } from './IdeIntegrationNudge.js';
 import { appEvents, AppEvent, TransientMessageType } from '../utils/events.js';
 import { type UpdateObject } from './utils/updateCheck.js';
 import { setUpdateHandler } from '../utils/handleAutoUpdate.js';
-import { registerCleanup, runExitCleanup } from '../utils/cleanup.js';
+import {
+  registerCleanup,
+  removeCleanup,
+  runExitCleanup,
+} from '../utils/cleanup.js';
 import { relaunchApp } from '../utils/processUtils.js';
 import type { SessionInfo } from '../utils/sessionUtils.js';
 import { useMessageQueue } from './hooks/useMessageQueue.js';
@@ -519,7 +524,7 @@ export const AppContainer = (props: AppContainerProps) => {
         debugLogger.warn('Background summary generation failed:', e);
       });
     })();
-    registerCleanup(async () => {
+    const cleanupFn = async () => {
       // Turn off mouse scroll.
       disableMouseEvents();
 
@@ -535,7 +540,15 @@ export const AppContainer = (props: AppContainerProps) => {
 
       // Fire SessionEnd hook on cleanup (only if hooks are enabled)
       await config?.getHookSystem()?.fireSessionEndEvent(SessionEndReason.Exit);
-    });
+    };
+    registerCleanup(cleanupFn);
+
+    return () => {
+      removeCleanup(cleanupFn);
+      cleanupFn().catch((e: unknown) =>
+        debugLogger.error('Error during cleanup:', e),
+      );
+    };
     // Disable the dependencies check here. historyManager gets flagged
     // but we don't want to react to changes to it because each new history
     // item, including the ones from the start session hook will cause a
@@ -2389,6 +2402,26 @@ Logging in with Google... Restarting Gemini CLI to continue.
     ],
   );
 
+  const quotaState = useMemo(
+    () => ({
+      userTier,
+      stats: quotaStats,
+      proQuotaRequest,
+      validationRequest,
+      // G1 AI Credits dialog state
+      overageMenuRequest,
+      emptyWalletRequest,
+    }),
+    [
+      userTier,
+      quotaStats,
+      proQuotaRequest,
+      validationRequest,
+      overageMenuRequest,
+      emptyWalletRequest,
+    ],
+  );
+
   const uiState: UIState = useMemo(
     () => ({
       history: historyManager.history,
@@ -2461,15 +2494,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       showApprovalModeIndicator,
       allowPlanMode,
       currentModel,
-      quota: {
-        userTier,
-        stats: quotaStats,
-        proQuotaRequest,
-        validationRequest,
-        // G1 AI Credits dialog state
-        overageMenuRequest,
-        emptyWalletRequest,
-      },
       contextFileNames,
       errorCount,
       availableTerminalHeight,
@@ -2580,12 +2604,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       queueErrorMessage,
       showApprovalModeIndicator,
       allowPlanMode,
-      userTier,
-      quotaStats,
-      proQuotaRequest,
-      validationRequest,
-      overageMenuRequest,
-      emptyWalletRequest,
       contextFileNames,
       errorCount,
       availableTerminalHeight,
@@ -2804,34 +2822,36 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   return (
     <UIStateContext.Provider value={uiState}>
-      <InputContext.Provider value={inputState}>
-        <UIActionsContext.Provider value={uiActions}>
-          <ConfigContext.Provider value={config}>
-            <AppContext.Provider
-              value={{
-                version: props.version,
-                startupWarnings: props.startupWarnings || [],
-              }}
-            >
-              <ToolActionsProvider
-                config={config}
-                toolCalls={allToolCalls}
-                isExpanded={isExpanded}
-                toggleExpansion={toggleExpansion}
-                toggleAllExpansion={toggleAllExpansion}
+      <QuotaContext.Provider value={quotaState}>
+        <InputContext.Provider value={inputState}>
+          <UIActionsContext.Provider value={uiActions}>
+            <ConfigContext.Provider value={config}>
+              <AppContext.Provider
+                value={{
+                  version: props.version,
+                  startupWarnings: props.startupWarnings || [],
+                }}
               >
-                <ShellFocusContext.Provider value={isFocused}>
-                  <MouseProvider mouseEventsEnabled={mouseMode}>
-                    <ScrollProvider>
-                      <App key={`app-${forceRerenderKey}`} />
-                    </ScrollProvider>
-                  </MouseProvider>
-                </ShellFocusContext.Provider>
-              </ToolActionsProvider>
-            </AppContext.Provider>
-          </ConfigContext.Provider>
-        </UIActionsContext.Provider>
-      </InputContext.Provider>
+                <ToolActionsProvider
+                  config={config}
+                  toolCalls={allToolCalls}
+                  isExpanded={isExpanded}
+                  toggleExpansion={toggleExpansion}
+                  toggleAllExpansion={toggleAllExpansion}
+                >
+                  <ShellFocusContext.Provider value={isFocused}>
+                    <MouseProvider mouseEventsEnabled={mouseMode}>
+                      <ScrollProvider>
+                        <App key={`app-${forceRerenderKey}`} />
+                      </ScrollProvider>
+                    </MouseProvider>
+                  </ShellFocusContext.Provider>
+                </ToolActionsProvider>
+              </AppContext.Provider>
+            </ConfigContext.Provider>
+          </UIActionsContext.Provider>
+        </InputContext.Provider>
+      </QuotaContext.Provider>
     </UIStateContext.Provider>
   );
 };

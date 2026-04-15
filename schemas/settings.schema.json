@@ -230,6 +230,13 @@
       "default": {},
       "type": "object",
       "properties": {
+        "debugRainbow": {
+          "title": "Debug Rainbow",
+          "description": "Enable debug rainbow rendering. Only useful for debugging rendering bugs and performance issues.",
+          "markdownDescription": "Enable debug rainbow rendering. Only useful for debugging rendering bugs and performance issues.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "theme": {
           "title": "Theme",
           "description": "The color theme for the UI. See the CLI themes guide for available options.",

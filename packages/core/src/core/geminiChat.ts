@@ -1050,6 +1050,10 @@ export class GeminiChat {
         result: call.response?.responseParts || null,
         status: call.status,
         timestamp: new Date().toISOString(),
+        agentId:
+          typeof call.response?.data?.['agentId'] === 'string'
+            ? call.response.data['agentId']
+            : undefined,
         resultDisplay,
         description:
           'invocation' in call ? call.invocation?.getDescription() : undefined,

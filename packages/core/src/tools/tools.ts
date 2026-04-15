@@ -34,6 +34,8 @@ export type ForcedToolDecision = 'allow' | 'deny' | 'ask_user';
  * only relevant to specific tool types.
  */
 export interface ExecuteOptions {
+  abortSignal: AbortSignal;
+  updateOutput?: (output: ToolLiveOutput) => void;
   shellExecutionConfig?: ShellExecutionConfig;
   setExecutionIdCallback?: (executionId: number) => void;
 }
@@ -90,16 +92,10 @@ export interface ToolInvocation<
 
   /**
    * Executes the tool with the validated parameters.
-   * @param signal AbortSignal for tool cancellation.
-   * @param updateOutput Optional callback to stream output.
-   * @param setExecutionIdCallback Optional callback for tools that expose a background execution handle.
+   * @param options Options for tool execution including signal and output updates.
    * @returns Result of the tool execution.
    */
-  execute(
-    signal: AbortSignal,
-    updateOutput?: (output: ToolLiveOutput) => void,
-    options?: ExecuteOptions,
-  ): Promise<TResult>;
+  execute(options: ExecuteOptions): Promise<TResult>;
 
   /**
    * Returns tool-specific options for policy updates.
@@ -372,11 +368,7 @@ export abstract class BaseToolInvocation<
     });
   }
 
-  abstract execute(
-    signal: AbortSignal,
-    updateOutput?: (output: ToolLiveOutput) => void,
-    options?: ExecuteOptions,
-  ): Promise<TResult>;
+  abstract execute(options: ExecuteOptions): Promise<TResult>;
 
   toJSON() {
     return {
@@ -607,10 +599,14 @@ export abstract class DeclarativeTool<
     params: TParams,
     signal: AbortSignal,
     updateOutput?: (output: ToolLiveOutput) => void,
-    options?: ExecuteOptions,
+    options?: Omit<ExecuteOptions, 'abortSignal' | 'updateOutput'>,
   ): Promise<TResult> {
     const invocation = this.build(params);
-    return invocation.execute(signal, updateOutput, options);
+    return invocation.execute({
+      ...options,
+      abortSignal: signal,
+      updateOutput,
+    });
   }
 
   /**
@@ -656,7 +652,7 @@ export abstract class DeclarativeTool<
     }
 
     try {
-      return await invocationOrError.execute(abortSignal);
+      return await invocationOrError.execute({ abortSignal });
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
