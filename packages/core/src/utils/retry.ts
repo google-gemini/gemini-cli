@@ -66,11 +66,11 @@ const RETRYABLE_NETWORK_CODES = [
 const RETRYABLE_SSL_ERROR_PATTERN = /^ERR_SSL_.*BAD_RECORD_MAC/i;
 
 /**
- * Returns true if the error code is a known retryable network code, either
- * by exact match against RETRYABLE_NETWORK_CODES or by matching the SSL
- * BAD_RECORD_MAC pattern (to absorb OpenSSL version differences).
+ * Returns true if the error code should be retried: either an exact match
+ * against RETRYABLE_NETWORK_CODES, or an SSL BAD_RECORD_MAC variant (the
+ * OpenSSL reason-string portion of the code varies across OpenSSL versions).
  */
-function isRetryableNetworkErrorCode(code: string): boolean {
+function isRetryableSslErrorCode(code: string): boolean {
   return (
     RETRYABLE_NETWORK_CODES.includes(code) ||
     RETRYABLE_SSL_ERROR_PATTERN.test(code)
@@ -128,7 +128,7 @@ export function getRetryErrorType(error: unknown): string {
   }
 
   const errorCode = getNetworkErrorCode(error);
-  if (errorCode && isRetryableNetworkErrorCode(errorCode)) {
+  if (errorCode && isRetryableSslErrorCode(errorCode)) {
     return errorCode;
   }
 
@@ -169,7 +169,7 @@ export function isRetryableError(
 ): boolean {
   // Check for common network error codes
   const errorCode = getNetworkErrorCode(error);
-  if (errorCode && isRetryableNetworkErrorCode(errorCode)) {
+  if (errorCode && isRetryableSslErrorCode(errorCode)) {
     return true;
   }
 
