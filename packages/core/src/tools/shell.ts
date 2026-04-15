@@ -454,9 +454,6 @@ export class ShellToolInvocation extends BaseToolInvocation<
       };
     }
 
-    // WSL2 cross-OS safety checks:
-    // Running commands on /mnt/c/ (Windows 9P mounts) or invoking .exe files from
-    // WSL2 can cause 9P protocol deadlocks, forkpty failures, and OOM crashes.
     const effectiveCwd = this.params.dir_path
       ? path.resolve(this.config.getTargetDir(), this.params.dir_path)
       : this.config.getTargetDir();
