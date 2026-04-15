@@ -20,13 +20,6 @@ const PROJECT_ROOT_FILE = '.project_root';
 const LOCK_TIMEOUT_MS = 10000;
 const LOCK_RETRY_DELAY_MS = 100;
 
-class SlugCollisionError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'SlugCollisionError';
-  }
-}
-
 /**
  * Manages a mapping between absolute project paths and short, human-readable identifiers.
  * This helps reduce context bloat and makes temporary directories easier to work with.
@@ -56,46 +49,9 @@ export class ProjectRegistry {
       }
 
       this.data = await this.loadData();
-
-      // Cleanup orphaned .tmp files in the background without blocking initialization
-      this.cleanupOrphanedTempFiles().catch((e) => {
-        debugLogger.debug('Failed to cleanup orphaned temp files', e);
-      });
     })();
 
     return this.initPromise;
-  }
-
-  private async cleanupOrphanedTempFiles(): Promise<void> {
-    const dir = path.dirname(this.registryPath);
-    const baseName = path.basename(this.registryPath);
-
-    try {
-      const files = await fs.promises.readdir(dir);
-      const now = Date.now();
-
-      for (const file of files) {
-        if (file.startsWith(`${baseName}.`) && file.endsWith('.tmp')) {
-          const filePath = path.join(dir, file);
-          try {
-            const stats = await fs.promises.stat(filePath);
-            // Delete if older than 1 hour (3,600,000 ms) to avoid deleting actively written files
-            if (now - stats.mtimeMs > 3600000) {
-              await fs.promises.unlink(filePath);
-            }
-          } catch {
-            // Ignore stat or unlink errors (e.g., if the file was just successfully renamed by another process)
-          }
-        }
-      }
-    } catch (e: unknown) {
-      // Directory might not exist yet or be unreadable.
-      // We log at debug level rather than swallowing silently so leaks can be investigated.
-      debugLogger.debug(
-        'Failed to read directory for orphaned temp file cleanup:',
-        e,
-      );
-    }
   }
 
   private async loadData(): Promise<RegistryData> {
@@ -125,14 +81,6 @@ export class ProjectRegistry {
 
   private normalizePath(projectPath: string): string {
     let resolved = path.resolve(projectPath);
-    try {
-      // Resolve symlinks and Windows shortnames to get the true physical path.
-      // We use the sync version because this is called synchronously across the system.
-      resolved = fs.realpathSync.native(resolved);
-    } catch {
-      // Ignore errors if the path doesn't exist yet on disk
-    }
-
     if (os.platform() === 'win32') {
       resolved = resolved.toLowerCase();
     }
@@ -141,6 +89,9 @@ export class ProjectRegistry {
 
   private async save(data: RegistryData): Promise<void> {
     const dir = path.dirname(this.registryPath);
+    if (!fs.existsSync(dir)) {
+      await fs.promises.mkdir(dir, { recursive: true });
+    }
     // Use a randomized tmp path to avoid ENOENT crashes when save() is called concurrently
     const tmpPath = this.registryPath + '.' + randomUUID() + '.tmp';
     let savedSuccessfully = false;
@@ -205,24 +156,15 @@ export class ProjectRegistry {
 
     // Ensure directory exists so we can create a lock file
     const dir = path.dirname(this.registryPath);
-    await fs.promises.mkdir(dir, { recursive: true });
-
-    // Atomic creation: Prevents TOCTOU races by asking the OS to create the file
-    // only if it doesn't exist. If another CLI instance beats us to it, it throws EEXIST.
-    try {
-      await fs.promises.writeFile(
-        this.registryPath,
-        JSON.stringify({ projects: {} }),
-        { flag: 'wx' },
-      );
-    } catch (error: unknown) {
-      if (isNodeError(error) && error.code !== 'EEXIST') {
-        throw error;
-      }
-      // EEXIST means the file is already there, which is exactly what we want.
+    if (!fs.existsSync(dir)) {
+      await fs.promises.mkdir(dir, { recursive: true });
+    }
+    // Ensure the registry file exists so proper-lockfile can lock it
+    if (!fs.existsSync(this.registryPath)) {
+      await this.save({ projects: {} });
     }
 
-    // Now that the file is guaranteed to exist, we can safely lock it.
+    // Use proper-lockfile to prevent racy updates
     const release = await lock(this.registryPath, {
       retries: {
         retries: Math.floor(LOCK_TIMEOUT_MS / LOCK_RETRY_DELAY_MS),
@@ -233,18 +175,6 @@ export class ProjectRegistry {
     try {
       // Re-load data under lock to get the latest state
       const currentData = await this.loadData();
-
-      // JIT Migration: Normalize all existing keys in the loaded registry.
-      // This ensures backward compatibility with older registries that
-      // stored paths before realpath or lowercase normalization was introduced.
-      const migratedProjects: Record<string, string> = {};
-      for (const [oldPath, existingSlug] of Object.entries(
-        currentData.projects,
-      )) {
-        const migratedPath = this.normalizePath(oldPath);
-        migratedProjects[migratedPath] = existingSlug;
-      }
-      currentData.projects = migratedProjects;
       this.data = currentData;
 
       let shortId: string | undefined = currentData.projects[normalizedPath];
@@ -253,18 +183,10 @@ export class ProjectRegistry {
       if (shortId) {
         if (await this.verifySlugOwnership(shortId, normalizedPath)) {
           // HEAL: If it passed verification but markers are missing (e.g. new base dir or deleted marker), recreate them.
-          try {
-            await this.ensureOwnershipMarkers(shortId, normalizedPath);
-            return shortId;
-          } catch (e) {
-            if (!(e instanceof SlugCollisionError)) {
-              throw e; // Bubble up true filesystem failures (EACCES, ENOSPC)
-            }
-            // If it's a collision during healing, someone else stole the slug.
-            // We will just fall through to delete the mapping and generate a new one.
-          }
+          await this.ensureOwnershipMarkers(shortId, normalizedPath);
+          return shortId;
         }
-        // If verification fails or healing collides, it means the registry is out of sync.
+        // If verification fails, it means the registry is out of sync or someone else took it.
         // We'll remove the mapping and find/generate a new one.
         delete currentData.projects[normalizedPath];
       }
@@ -322,46 +244,35 @@ export class ProjectRegistry {
   private async findExistingSlugForPath(
     projectPath: string,
   ): Promise<string | undefined> {
+    if (this.baseDirs.length === 0) {
+      return undefined;
+    }
+
     const normalizedTarget = this.normalizePath(projectPath);
 
     // Scan all base dirs to see if any slug already belongs to this project
     for (const baseDir of this.baseDirs) {
-      let candidates: string[];
-      try {
-        candidates = await fs.promises.readdir(baseDir);
-      } catch (e: unknown) {
-        if (isNodeError(e) && e.code === 'ENOENT') {
-          continue; // Base dir doesn't exist yet
-        }
-        debugLogger.debug(`Failed to scan base dir ${baseDir}:`, e);
+      if (!fs.existsSync(baseDir)) {
         continue;
       }
 
-      for (const candidate of candidates) {
-        const markerPath = path.join(baseDir, candidate, PROJECT_ROOT_FILE);
-        try {
-          const owner = (await fs.promises.readFile(markerPath, 'utf8')).trim();
-          if (this.normalizePath(owner) === normalizedTarget) {
-            // Found it! Ensure all base dirs have the marker
-            try {
+      try {
+        const candidates = await fs.promises.readdir(baseDir);
+        for (const candidate of candidates) {
+          const markerPath = path.join(baseDir, candidate, PROJECT_ROOT_FILE);
+          if (fs.existsSync(markerPath)) {
+            const owner = (
+              await fs.promises.readFile(markerPath, 'utf8')
+            ).trim();
+            if (this.normalizePath(owner) === normalizedTarget) {
+              // Found it! Ensure all base dirs have the marker
               await this.ensureOwnershipMarkers(candidate, normalizedTarget);
               return candidate;
-            } catch (e) {
-              if (e instanceof SlugCollisionError) {
-                // Split-brain scenario: This candidate is valid in this baseDir,
-                // but collides with a different project in another baseDir.
-                // Abandon this corrupted candidate and keep searching.
-                continue;
-              }
-              throw e;
             }
           }
-        } catch (e: unknown) {
-          if (isNodeError(e) && e.code === 'ENOENT') {
-            continue; // No marker, not a project dir
-          }
-          debugLogger.debug(`Failed to read marker ${markerPath}:`, e);
         }
+      } catch (e) {
+        debugLogger.debug(`Failed to scan base dir ${baseDir}:`, e);
       }
     }
 
@@ -377,9 +288,8 @@ export class ProjectRegistry {
 
     let counter = 0;
     const existingIds = new Set(Object.values(existingMappings));
-    const maxAttempts = 1000;
 
-    while (counter < maxAttempts) {
+    while (true) {
       const candidate = counter === 0 ? slug : `${slug}-${counter}`;
       counter++;
 
@@ -388,23 +298,41 @@ export class ProjectRegistry {
         continue;
       }
 
-      // Try to claim it atomically on disk across all base dirs
+      // Check if taken on disk
+      let diskCollision = false;
+      for (const baseDir of this.baseDirs) {
+        const markerPath = path.join(baseDir, candidate, PROJECT_ROOT_FILE);
+        if (fs.existsSync(markerPath)) {
+          try {
+            const owner = (
+              await fs.promises.readFile(markerPath, 'utf8')
+            ).trim();
+            if (this.normalizePath(owner) !== this.normalizePath(projectPath)) {
+              diskCollision = true;
+              break;
+            }
+          } catch {
+            // If we can't read it, assume it's someone else's to be safe
+            diskCollision = true;
+            break;
+          }
+        }
+      }
+
+      if (diskCollision) {
+        continue;
+      }
+
+      // Try to claim it
       try {
         await this.ensureOwnershipMarkers(candidate, projectPath);
         return candidate;
-      } catch (e) {
-        if (e instanceof SlugCollisionError) {
-          // Try the next candidate.
-          continue;
-        }
-        // If it's a real filesystem error (e.g. ENOSPC, EACCES), do not swallow it.
-        throw e;
+      } catch {
+        // Someone might have claimed it between our check and our write.
+        // Try next candidate.
+        continue;
       }
     }
-
-    throw new Error(
-      `Failed to claim a unique slug for ${projectPath} after ${maxAttempts} attempts. The filesystem may be corrupted.`,
-    );
   }
 
   private async ensureOwnershipMarkers(
@@ -414,44 +342,23 @@ export class ProjectRegistry {
     const normalizedProject = this.normalizePath(projectPath);
     for (const baseDir of this.baseDirs) {
       const slugDir = path.join(baseDir, slug);
-      await fs.promises.mkdir(slugDir, { recursive: true });
-
-      const markerPath = path.join(slugDir, PROJECT_ROOT_FILE);
-
-      while (true) {
-        try {
-          // Use flag: 'wx' to ensure atomic creation. Fails with EEXIST if it already exists.
-          await fs.promises.writeFile(markerPath, normalizedProject, {
-            encoding: 'utf8',
-            flag: 'wx',
-          });
-          break; // Created successfully
-        } catch (error: unknown) {
-          if (isNodeError(error) && error.code === 'EEXIST') {
-            // It already exists. Let's see who owns it to resolve the race condition.
-            try {
-              const owner = (
-                await fs.promises.readFile(markerPath, 'utf8')
-              ).trim();
-              if (this.normalizePath(owner) === normalizedProject) {
-                break; // We won the race (or a previous execution of ours did)
-              }
-              // Collision! Someone else beat us to it.
-              throw new SlugCollisionError(
-                `Slug ${slug} is already owned by ${owner}`,
-              );
-            } catch (readError: unknown) {
-              if (isNodeError(readError) && readError.code === 'ENOENT') {
-                // The file vanished between our EEXIST and readFile.
-                // Loop around and try creating it again.
-                continue;
-              }
-              throw readError;
-            }
-          }
-          throw error;
-        }
+      if (!fs.existsSync(slugDir)) {
+        await fs.promises.mkdir(slugDir, { recursive: true });
       }
+      const markerPath = path.join(slugDir, PROJECT_ROOT_FILE);
+      if (fs.existsSync(markerPath)) {
+        const owner = (await fs.promises.readFile(markerPath, 'utf8')).trim();
+        if (this.normalizePath(owner) === normalizedProject) {
+          continue;
+        }
+        // Collision!
+        throw new Error(`Slug ${slug} is already owned by ${owner}`);
+      }
+      // Use flag: 'wx' to ensure atomic creation
+      await fs.promises.writeFile(markerPath, normalizedProject, {
+        encoding: 'utf8',
+        flag: 'wx',
+      });
     }
   }
 
