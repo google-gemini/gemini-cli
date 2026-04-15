@@ -108,7 +108,7 @@ describe('Plan Mode', () => {
     ).toBeDefined();
     expect(
       planWrite?.toolRequest.success,
-      `Expected write_file to succeed, but it failed with error: ${(planWrite?.toolRequest as { error?: string })?.error}`,
+      `Expected write_file to succeed, but it failed with error: ${'error' in (planWrite?.toolRequest || {}) ? (planWrite?.toolRequest as unknown as Record<string, string>)['error'] : 'unknown'}`,
     ).toBe(true);
   });
 
@@ -221,7 +221,7 @@ describe('Plan Mode', () => {
     ).toBeDefined();
     expect(
       planWrite?.toolRequest.success,
-      `Expected write_file to succeed, but it failed with error: ${(planWrite?.toolRequest as { error?: string })?.error}`,
+      `Expected write_file to succeed, but it failed with error: ${'error' in (planWrite?.toolRequest || {}) ? (planWrite?.toolRequest as unknown as Record<string, string>)['error'] : 'unknown'}`,
     ).toBe(true);
   });
   it('should switch from a pro model to a flash model after exiting plan mode', async () => {
@@ -271,14 +271,23 @@ describe('Plan Mode', () => {
 
     const apiRequests = rig.readAllApiRequest();
     const modelNames = apiRequests.map(
-      (r) => (r.attributes as { model?: string })?.model || 'unknown',
+      (r) =>
+        ('model' in (r.attributes || {})
+          ? (r.attributes as unknown as Record<string, string>)['model']
+          : 'unknown') || 'unknown',
     );
 
     const proRequests = apiRequests.filter((r) =>
-      (r.attributes as { model?: string })?.model?.includes('pro'),
+      ('model' in (r.attributes || {})
+        ? (r.attributes as unknown as Record<string, string>)['model']
+        : 'unknown'
+      )?.includes('pro'),
     );
     const flashRequests = apiRequests.filter((r) =>
-      (r.attributes as { model?: string })?.model?.includes('flash'),
+      ('model' in (r.attributes || {})
+        ? (r.attributes as unknown as Record<string, string>)['model']
+        : 'unknown'
+      )?.includes('flash'),
     );
 
     expect(
