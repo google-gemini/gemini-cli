@@ -188,7 +188,7 @@ describe('gemini.tsx main function cleanup', () => {
     vi.restoreAllMocks();
   });
 
-  it.skip('should log error when cleanupExpiredSessions fails', async () => {
+  it('should log error when cleanupExpiredSessions fails', async () => {
     const { loadCliConfig, parseArguments } = await import(
       './config/config.js'
     );

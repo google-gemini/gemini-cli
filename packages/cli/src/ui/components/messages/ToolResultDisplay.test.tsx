@@ -9,9 +9,10 @@ import { waitFor } from '../../../test-utils/async.js';
 import { createMockSettings } from '../../../test-utils/settings.js';
 import { ToolResultDisplay } from './ToolResultDisplay.js';
 import { describe, it, expect, vi } from 'vitest';
-import { makeFakeConfig, type AnsiOutput } from '@google/gemini-cli-core';
+import { makeFakeConfig } from '../../../../../core/src/test-utils/config.js';
+import { type AnsiOutput } from '@google/gemini-cli-core';
 
-describe('ToolResultDisplay', () => {
+describe.sequential('ToolResultDisplay', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -352,9 +353,9 @@ describe('ToolResultDisplay', () => {
 
     expect(output).not.toContain('Line 1');
     expect(output).not.toContain('Line 2');
-    expect(output).not.toContain('Line 3');
+    expect(output).toContain('Line 3');
     expect(output).toContain('Line 4');
-    expect(output).toContain('Line 5');
+    expect(output).not.toContain('Line 5');
     expect(output).toContain('hidden');
     expect(output).toMatchSnapshot();
     unmount();

@@ -112,7 +112,8 @@ exports[`<HistoryItemDisplay /> > gemini items (alternateBuffer=false) > should 
 
 exports[`<HistoryItemDisplay /> > gemini items (alternateBuffer=false) > should render a truncated gemini item 1`] = `
 "✦ Example code block:
-   ... 42 hidden (Ctrl+O) ...
+   ... 41 hidden (Ctrl+O) ...
+   42 Line 42
    43 Line 43
    44 Line 44
    45 Line 45
@@ -120,13 +121,13 @@ exports[`<HistoryItemDisplay /> > gemini items (alternateBuffer=false) > should 
    47 Line 47
    48 Line 48
    49 Line 49
-   50 Line 50
 "
 `;
 
 exports[`<HistoryItemDisplay /> > gemini items (alternateBuffer=false) > should render a truncated gemini_content item 1`] = `
 "  Example code block:
-   ... 42 hidden (Ctrl+O) ...
+   ... 41 hidden (Ctrl+O) ...
+   42 Line 42
    43 Line 43
    44 Line 44
    45 Line 45
@@ -134,7 +135,6 @@ exports[`<HistoryItemDisplay /> > gemini items (alternateBuffer=false) > should 
    47 Line 47
    48 Line 48
    49 Line 49
-   50 Line 50
 "
 `;
 
@@ -389,7 +389,7 @@ exports[`<HistoryItemDisplay /> > renders InfoMessage for "info" type with multi
 `;
 
 exports[`<HistoryItemDisplay /> > thinking items > renders "Thinking..." header when isFirstThinking is true 1`] = `
-" Thinking... 
+" Thinking...
  │
  │ Thinking
  │ test

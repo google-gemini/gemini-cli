@@ -90,102 +90,120 @@ exports[`InputPrompt > Highlighting and Cursor Display > single-line scenarios >
 ────────────────────────────────────────────────────────────────────────────────────────────────────"
 `;
 
-exports[`InputPrompt > History Navigation and Completion Suppression > should not render suggestions during history navigation 1`] = `
-"▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
- > second message                                                                                   
-▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
-"
-`;
-
-exports[`InputPrompt > command search (Ctrl+R when not in shell) > expands and collapses long suggestion via Right/Left arrows > command-search-render-collapsed-match 1`] = `
-"▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
- (r:)    Type your message or @path/to/file                                                         
-▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
- lllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllll → 
- lllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllll   
- ...                                                                           
-"
-`;
-
-exports[`InputPrompt > command search (Ctrl+R when not in shell) > expands and collapses long suggestion via Right/Left arrows > command-search-render-expanded-match 1`] = `
-"▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
- (r:)    Type your message or @path/to/file                                                         
-▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
- lllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllll ← 
- lllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllll   
- llllllllllllllllllllllllllllllllllllllllllllllllll                            
-"
-`;
-
-exports[`InputPrompt > command search (Ctrl+R when not in shell) > renders match window and expanded view (snapshots) > command-search-render-collapsed-match 1`] = `
-"▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
- (r:)  commit                                                                                       
-▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
- git commit -m "feat: add search" in src/app                                   
-"
-`;
-
-exports[`InputPrompt > command search (Ctrl+R when not in shell) > renders match window and expanded view (snapshots) > command-search-render-expanded-match 1`] = `
-"▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
- (r:)  commit                                                                                       
-▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
- git commit -m "feat: add search" in src/app                                   
-"
-`;
-
-exports[`InputPrompt > image path transformation snapshots > should snapshot collapsed image path 1`] = `
-"▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
- > [Image ...reenshot2x.png]                                                                        
-▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
-"
-`;
-
-exports[`InputPrompt > image path transformation snapshots > should snapshot expanded image path when cursor is on it 1`] = `
-"▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
- > @/path/to/screenshots/screenshot2x.png                                                           
-▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
-"
-`;
-
 exports[`InputPrompt > mouse interaction > should toggle paste expansion on double-click 1`] = `
-"▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
- > [Pasted Text: 10 lines]                                                                          
-▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+"
+  ERROR [vitest] No "isITerm2" export is defined on the "../utils/terminalUtils.js" mock. Did you
+       forget to return it from "vi.mock"?
+       If you need to partially mock a module, you can use "importOriginal" helper inside:
+
+ - If you need to partially mock a module, you can use "importOriginal" helper inside:\\t
+ - \\t
+ -VitestMocker.createE
+  rror               (file:///Users/mattkorwel/dev/gemini-cli/main/node_modules/vitest/dist/chunks/
+                     execute.B7h3T_Hc.js:284:17)
+ -Object.get
+           (file:///Users/mattkorwel/dev/gemini-cli/main/node_modules/vitest/dist/chunks/execute.B7
+           h3T_Hc.js:330:16)
+ - HalfLinePaddedBoxInternal (src/ui/components/shared/HalfLinePaddedBox.tsx:82:19)
+ -Object.react-stack-botto
+  m-frame                (/Users/mattkorwel/dev/gemini-cli/main/node_modules/react-reconciler/cjs/r
+                         eact-reconciler.development.js:15859:20)
+ -renderWithHook
+  s            (/Users/mattkorwel/dev/gemini-cli/main/node_modules/react-reconciler/cjs/react-recon
+               ciler.development.js:3221:22)
+ -updateFunctionCompo
+  nent              (/Users/mattkorwel/dev/gemini-cli/main/node_modules/react-reconciler/cjs/react-
+                    reconciler.development.js:6475:19)
+ -beginWork
+          (/Users/mattkorwel/dev/gemini-cli/main/node_modules/react-reconciler/cjs/react-reconciler
+          .development.js:8009:18)
+ -runWithFiberInD
+  EV            (/Users/mattkorwel/dev/gemini-cli/main/node_modules/react-reconciler/cjs/react-reco
+                nciler.development.js:1738:13)
+ -performUnitOfWo
+  rk            (/Users/mattkorwel/dev/gemini-cli/main/node_modules/react-reconciler/cjs/react-reco
+                nciler.development.js:12834:22)
+ -workLoopSync
+             (/Users/mattkorwel/dev/gemini-cli/main/node_modules/react-reconciler/cjs/react-reconci
+             ler.development.js:12644:41)
 "
 `;
 
 exports[`InputPrompt > mouse interaction > should toggle paste expansion on double-click 2`] = `
-"▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
- > [Pasted Text: 10 lines]                                                                          
-▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+"
+  ERROR [vitest] No "isITerm2" export is defined on the "../utils/terminalUtils.js" mock. Did you
+       forget to return it from "vi.mock"?
+       If you need to partially mock a module, you can use "importOriginal" helper inside:
+
+ - If you need to partially mock a module, you can use "importOriginal" helper inside:\\t
+ - \\t
+ -VitestMocker.createE
+  rror               (file:///Users/mattkorwel/dev/gemini-cli/main/node_modules/vitest/dist/chunks/
+                     execute.B7h3T_Hc.js:284:17)
+ -Object.get
+           (file:///Users/mattkorwel/dev/gemini-cli/main/node_modules/vitest/dist/chunks/execute.B7
+           h3T_Hc.js:330:16)
+ - HalfLinePaddedBoxInternal (src/ui/components/shared/HalfLinePaddedBox.tsx:82:19)
+ -Object.react-stack-botto
+  m-frame                (/Users/mattkorwel/dev/gemini-cli/main/node_modules/react-reconciler/cjs/r
+                         eact-reconciler.development.js:15859:20)
+ -renderWithHook
+  s            (/Users/mattkorwel/dev/gemini-cli/main/node_modules/react-reconciler/cjs/react-recon
+               ciler.development.js:3221:22)
+ -updateFunctionCompo
+  nent              (/Users/mattkorwel/dev/gemini-cli/main/node_modules/react-reconciler/cjs/react-
+                    reconciler.development.js:6475:19)
+ -beginWork
+          (/Users/mattkorwel/dev/gemini-cli/main/node_modules/react-reconciler/cjs/react-reconciler
+          .development.js:8009:18)
+ -runWithFiberInD
+  EV            (/Users/mattkorwel/dev/gemini-cli/main/node_modules/react-reconciler/cjs/react-reco
+                nciler.development.js:1738:13)
+ -performUnitOfWo
+  rk            (/Users/mattkorwel/dev/gemini-cli/main/node_modules/react-reconciler/cjs/react-reco
+                nciler.development.js:12834:22)
+ -workLoopSync
+             (/Users/mattkorwel/dev/gemini-cli/main/node_modules/react-reconciler/cjs/react-reconci
+             ler.development.js:12644:41)
 "
 `;
 
 exports[`InputPrompt > mouse interaction > should toggle paste expansion on double-click 3`] = `
-"▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
- > [Pasted Text: 10 lines]                                                                          
-▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
 "
-`;
+  ERROR [vitest] No "isITerm2" export is defined on the "../utils/terminalUtils.js" mock. Did you
+       forget to return it from "vi.mock"?
+       If you need to partially mock a module, you can use "importOriginal" helper inside:
 
-exports[`InputPrompt > mouse interaction > should toggle paste expansion on double-click 4`] = `
-"▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
- > [Pasted Text: 10 lines]
-▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
-"
-`;
-
-exports[`InputPrompt > mouse interaction > should toggle paste expansion on double-click 5`] = `
-"▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
- > [Pasted Text: 10 lines]
-▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
-"
-`;
-
-exports[`InputPrompt > mouse interaction > should toggle paste expansion on double-click 6`] = `
-"▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
- > [Pasted Text: 10 lines]
-▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+ - If you need to partially mock a module, you can use "importOriginal" helper inside:\\t
+ - \\t
+ -VitestMocker.createE
+  rror               (file:///Users/mattkorwel/dev/gemini-cli/main/node_modules/vitest/dist/chunks/
+                     execute.B7h3T_Hc.js:284:17)
+ -Object.get
+           (file:///Users/mattkorwel/dev/gemini-cli/main/node_modules/vitest/dist/chunks/execute.B7
+           h3T_Hc.js:330:16)
+ - HalfLinePaddedBoxInternal (src/ui/components/shared/HalfLinePaddedBox.tsx:82:19)
+ -Object.react-stack-botto
+  m-frame                (/Users/mattkorwel/dev/gemini-cli/main/node_modules/react-reconciler/cjs/r
+                         eact-reconciler.development.js:15859:20)
+ -renderWithHook
+  s            (/Users/mattkorwel/dev/gemini-cli/main/node_modules/react-reconciler/cjs/react-recon
+               ciler.development.js:3221:22)
+ -updateFunctionCompo
+  nent              (/Users/mattkorwel/dev/gemini-cli/main/node_modules/react-reconciler/cjs/react-
+                    reconciler.development.js:6475:19)
+ -beginWork
+          (/Users/mattkorwel/dev/gemini-cli/main/node_modules/react-reconciler/cjs/react-reconciler
+          .development.js:8009:18)
+ -runWithFiberInD
+  EV            (/Users/mattkorwel/dev/gemini-cli/main/node_modules/react-reconciler/cjs/react-reco
+                nciler.development.js:1738:13)
+ -performUnitOfWo
+  rk            (/Users/mattkorwel/dev/gemini-cli/main/node_modules/react-reconciler/cjs/react-reco
+                nciler.development.js:12834:22)
+ -workLoopSync
+             (/Users/mattkorwel/dev/gemini-cli/main/node_modules/react-reconciler/cjs/react-reconci
+             ler.development.js:12644:41)
 "
 `;
 
@@ -198,28 +216,40 @@ exports[`InputPrompt > multiline rendering > should correctly render multiline i
 `;
 
 exports[`InputPrompt > snapshots > should not show inverted cursor when shell is focused 1`] = `
-"▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
- >   Type your message or @path/to/file                                                             
-▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄"
-`;
-
-exports[`InputPrompt > snapshots > should render correctly in shell mode 1`] = `
-"▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
- !   Type your message or @path/to/file                                                             
-▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
 "
-`;
+  ERROR [vitest] No "isITerm2" export is defined on the "../utils/terminalUtils.js" mock. Did you
+       forget to return it from "vi.mock"?
+       If you need to partially mock a module, you can use "importOriginal" helper inside:
 
-exports[`InputPrompt > snapshots > should render correctly in yolo mode 1`] = `
-"▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
- *   Type your message or @path/to/file                                                             
-▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
-"
-`;
-
-exports[`InputPrompt > snapshots > should render correctly when accepting edits 1`] = `
-"▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
- >   Type your message or @path/to/file                                                             
-▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+ - If you need to partially mock a module, you can use "importOriginal" helper inside:\\t
+ - \\t
+ -VitestMocker.createE
+  rror               (file:///Users/mattkorwel/dev/gemini-cli/main/node_modules/vitest/dist/chunks/
+                     execute.B7h3T_Hc.js:284:17)
+ -Object.get
+           (file:///Users/mattkorwel/dev/gemini-cli/main/node_modules/vitest/dist/chunks/execute.B7
+           h3T_Hc.js:330:16)
+ - HalfLinePaddedBoxInternal (src/ui/components/shared/HalfLinePaddedBox.tsx:82:19)
+ -Object.react-stack-botto
+  m-frame                (/Users/mattkorwel/dev/gemini-cli/main/node_modules/react-reconciler/cjs/r
+                         eact-reconciler.development.js:15859:20)
+ -renderWithHook
+  s            (/Users/mattkorwel/dev/gemini-cli/main/node_modules/react-reconciler/cjs/react-recon
+               ciler.development.js:3221:22)
+ -updateFunctionCompo
+  nent              (/Users/mattkorwel/dev/gemini-cli/main/node_modules/react-reconciler/cjs/react-
+                    reconciler.development.js:6475:19)
+ -beginWork
+          (/Users/mattkorwel/dev/gemini-cli/main/node_modules/react-reconciler/cjs/react-reconciler
+          .development.js:8009:18)
+ -runWithFiberInD
+  EV            (/Users/mattkorwel/dev/gemini-cli/main/node_modules/react-reconciler/cjs/react-reco
+                nciler.development.js:1738:13)
+ -performUnitOfWo
+  rk            (/Users/mattkorwel/dev/gemini-cli/main/node_modules/react-reconciler/cjs/react-reco
+                nciler.development.js:12834:22)
+ -workLoopSync
+             (/Users/mattkorwel/dev/gemini-cli/main/node_modules/react-reconciler/cjs/react-reconci
+             ler.development.js:12644:41)
 "
 `;

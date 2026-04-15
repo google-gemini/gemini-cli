@@ -8,7 +8,7 @@ exports[`ToolConfirmationMessage > enablePermanentToolApproval setting > should 
 ╰──────────────────────────────────────────────────────────────────────────────╯
 Apply this change?
 
-● 1. Allow once                                                                   
+● 1. Allow once
   2. Allow for this session
   3. Allow for this file in all future sessions ~/.gemini/policies/auto-saved.toml
   4. Modify with external editor
@@ -18,7 +18,16 @@ Apply this change?
 
 exports[`ToolConfirmationMessage > height allocation and layout > should expand to available height for large edit diffs 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
-│ ... 10 hidden (Ctrl+O) ...                                                   │
+│  1 - const oldLine1 = true;                                                  │
+│  1 + const newLine1 = true;                                                  │
+│  2 - const oldLine2 = true;                                                  │
+│  2 + const newLine2 = true;                                                  │
+│  3 - const oldLine3 = true;                                                  │
+│  3 + const newLine3 = true;                                                  │
+│  4 - const oldLine4 = true;                                                  │
+│  4 + const newLine4 = true;                                                  │
+│  5 - const oldLine5 = true;                                                  │
+│  5 + const newLine5 = true;                                                  │
 │  6 - const oldLine6 = true;                                                  │
 │  6 + const newLine6 = true;                                                  │
 │  7 - const oldLine7 = true;                                                  │
@@ -40,19 +49,10 @@ exports[`ToolConfirmationMessage > height allocation and layout > should expand 
 │ 15 - const oldLine15 = true;                                                 │
 │ 15 + const newLine15 = true;                                                 │
 │ 16 - const oldLine16 = true;                                                 │
-│ 16 + const newLine16 = true;                                                 │
-│ 17 - const oldLine17 = true;                                                 │
-│ 17 + const newLine17 = true;                                                 │
-│ 18 - const oldLine18 = true;                                                 │
-│ 18 + const newLine18 = true;                                                 │
-│ 19 - const oldLine19 = true;                                                 │
-│ 19 + const newLine19 = true;                                                 │
-│ 20 - const oldLine20 = true;                                                 │
-│ 20 + const newLine20 = true;                                                 │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 Apply this change?
 
-● 1. Allow once                 
+● 1. Allow once
   2. Allow for this session
   3. Modify with external editor
   4. No, suggest changes (esc)
@@ -61,7 +61,8 @@ Apply this change?
 
 exports[`ToolConfirmationMessage > height allocation and layout > should expand to available height for large exec commands 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
-│ ... 19 hidden (Ctrl+O) ...                                                   │
+│ ... 18 hidden (Ctrl+O) ...                                                   │
+│ echo "Line 19"                                                               │
 │ echo "Line 20"                                                               │
 │ echo "Line 21"                                                               │
 │ echo "Line 22"                                                               │
@@ -92,11 +93,10 @@ exports[`ToolConfirmationMessage > height allocation and layout > should expand 
 │ echo "Line 47"                                                               │
 │ echo "Line 48"                                                               │
 │ echo "Line 49"                                                               │
-│ echo "Line 50"                                                               │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 Allow execution of [echo]?
 
-● 1. Allow once               
+● 1. Allow once
   2. Allow for this session
   3. No, suggest changes (esc)
 "
@@ -112,7 +112,7 @@ exports[`ToolConfirmationMessage > should display multiple commands for exec typ
 ╰──────────────────────────────────────────────────────────────────────────────╯
 Allow execution of [echo, ls, whoami]?
 
-● 1. Allow once               
+● 1. Allow once
   2. Allow for this session
   3. No, suggest changes (esc)
 "
@@ -125,7 +125,7 @@ URLs to fetch:
  - https://raw.githubusercontent.com/google/gemini-react/main/README.md
 Do you want to proceed?
 
-● 1. Allow once               
+● 1. Allow once
   2. Allow for this session
   3. No, suggest changes (esc)
 "
@@ -135,7 +135,7 @@ exports[`ToolConfirmationMessage > should not display urls if prompt and url are
 "https://example.com
 Do you want to proceed?
 
-● 1. Allow once               
+● 1. Allow once
   2. Allow for this session
   3. No, suggest changes (esc)
 "
@@ -150,7 +150,7 @@ exports[`ToolConfirmationMessage > should render multiline shell scripts with co
 ╰──────────────────────────────────────────────────────────────────────────────╯
 Allow execution of [echo]?
 
-● 1. Allow once               
+● 1. Allow once
   2. Allow for this session
   3. No, suggest changes (esc)"
 `;
@@ -160,7 +160,7 @@ exports[`ToolConfirmationMessage > should strip BiDi characters from MCP tool an
 Tool: testtool
 Allow execution of MCP tool "testtool" from server "testserver"?
 
-● 1. Allow once                             
+● 1. Allow once
   2. Allow tool for this session
   3. Allow all server tools for this session
   4. No, suggest changes (esc)
@@ -175,7 +175,7 @@ exports[`ToolConfirmationMessage > with folder trust > 'for edit confirmations' 
 ╰──────────────────────────────────────────────────────────────────────────────╯
 Apply this change?
 
-● 1. Allow once                 
+● 1. Allow once
   2. Modify with external editor
   3. No, suggest changes (esc)
 "
@@ -189,7 +189,7 @@ exports[`ToolConfirmationMessage > with folder trust > 'for edit confirmations' 
 ╰──────────────────────────────────────────────────────────────────────────────╯
 Apply this change?
 
-● 1. Allow once                 
+● 1. Allow once
   2. Allow for this session
   3. Modify with external editor
   4. No, suggest changes (esc)
@@ -202,7 +202,7 @@ exports[`ToolConfirmationMessage > with folder trust > 'for exec confirmations' 
 ╰──────────────────────────────────────────────────────────────────────────────╯
 Allow execution of [echo]?
 
-● 1. Allow once               
+● 1. Allow once
   2. No, suggest changes (esc)
 "
 `;
@@ -213,7 +213,7 @@ exports[`ToolConfirmationMessage > with folder trust > 'for exec confirmations' 
 ╰──────────────────────────────────────────────────────────────────────────────╯
 Allow execution of [echo]?
 
-● 1. Allow once               
+● 1. Allow once
   2. Allow for this session
   3. No, suggest changes (esc)
 "
@@ -223,7 +223,7 @@ exports[`ToolConfirmationMessage > with folder trust > 'for info confirmations' 
 "https://example.com
 Do you want to proceed?
 
-● 1. Allow once               
+● 1. Allow once
   2. No, suggest changes (esc)
 "
 `;
@@ -232,7 +232,7 @@ exports[`ToolConfirmationMessage > with folder trust > 'for info confirmations' 
 "https://example.com
 Do you want to proceed?
 
-● 1. Allow once               
+● 1. Allow once
   2. Allow for this session
   3. No, suggest changes (esc)
 "
@@ -243,7 +243,7 @@ exports[`ToolConfirmationMessage > with folder trust > 'for mcp confirmations' >
 Tool: test-tool
 Allow execution of MCP tool "test-tool" from server "test-server"?
 
-● 1. Allow once               
+● 1. Allow once
   2. No, suggest changes (esc)
 "
 `;
@@ -253,7 +253,7 @@ exports[`ToolConfirmationMessage > with folder trust > 'for mcp confirmations' >
 Tool: test-tool
 Allow execution of MCP tool "test-tool" from server "test-server"?
 
-● 1. Allow once                             
+● 1. Allow once
   2. Allow tool for this session
   3. Allow all server tools for this session
   4. No, suggest changes (esc)

@@ -4,7 +4,7 @@
   </style>
   <rect width="920" height="54" fill="#000000" />
   <g transform="translate(10, 10)">
-    <text x="0" y="2" fill="#e5e5e5" textLength="900" lengthAdjust="spacingAndGlyphs">yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy</text>
-    <text x="0" y="19" fill="#e5e5e5" textLength="675" lengthAdjust="spacingAndGlyphs">yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy</text>
+    <text x="0" y="2" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy</text>
+    <text x="0" y="19" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy                         </text>
   </g>
 </svg>

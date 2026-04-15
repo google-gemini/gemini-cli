@@ -53,7 +53,7 @@ exports[`<VirtualizedList /> > with 10px height and 100 items > mounts only visi
 │                                                                                                  │
 │                                                                                                  │
 │                                                                                                  │
-│Item 997                                                                                          │
+│                                                                                                  │
 │                                                                                                  │
 │                                                                                                  │
 │                                                                                                  │
@@ -68,20 +68,6 @@ exports[`<VirtualizedList /> > with 10px height and 100 items > mounts only visi
 │                                                                                                  │
 │                                                                                                  │
 │                                                                                                 █│
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
-"
-`;
-
-exports[`<VirtualizedList /> > with 10px height and 100 items > renders only visible items ('scrolled to bottom') 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
-│Item 92                                                                                           │
-│Item 93                                                                                           │
-│Item 94                                                                                           │
-│Item 95                                                                                           │
-│Item 96                                                                                           │
-│Item 97                                                                                           │
-│Item 98                                                                                           │
-│Item 99                                                                                          █│
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 "
 `;

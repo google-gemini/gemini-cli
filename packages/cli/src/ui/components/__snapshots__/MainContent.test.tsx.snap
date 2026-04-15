@@ -1,52 +1,10 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`MainContent > MainContent Tool Output Height Logic > 'ASB mode - Focused shell should expand' 1`] = `
-"ScrollableList
-AppHeader(full)
-
-╭──────────────────────────────────────────────────────────────────────────────────────────────╮
-│ ⠋  Shell Command Running a long command...                                                   │
-│                                                                                              │
-│ Line 11                                                                                      │
-│ Line 12                                                                                      │
-│ Line 13                                                                                      │
-│ Line 14                                                                                      │
-│ Line 15                                                                                      │
-│ Line 16                                                                                    █ │
-│ Line 17                                                                                    █ │
-│ Line 18                                                                                    █ │
-│ Line 19                                                                                    █ │
-│ Line 20                                                                                    █ │
-╰──────────────────────────────────────────────────────────────────────────────────────────────╯
-"
-`;
-
-exports[`MainContent > MainContent Tool Output Height Logic > 'ASB mode - Unfocused shell' 1`] = `
-"ScrollableList
-AppHeader(full)
-
-╭──────────────────────────────────────────────────────────────────────────────────────────────╮
-│ ⠋  Shell Command Running a long command...                                                   │
-│                                                                                              │
-│ Line 11                                                                                      │
-│ Line 12                                                                                      │
-│ Line 13                                                                                      │
-│ Line 14                                                                                      │
-│ Line 15                                                                                      │
-│ Line 16                                                                                    █ │
-│ Line 17                                                                                    █ │
-│ Line 18                                                                                    █ │
-│ Line 19                                                                                    █ │
-│ Line 20                                                                                    █ │
-╰──────────────────────────────────────────────────────────────────────────────────────────────╯
-"
-`;
-
 exports[`MainContent > MainContent Tool Output Height Logic > 'Normal mode - Constrained height' 1`] = `
 "AppHeader(full)
 
 ╭──────────────────────────────────────────────────────────────────────────────────────────────╮
-│ ⠋  Shell Command Running a long command...                                                   │
+│ ⊶  Shell Command Running a long command...                                                   │
 │                                                                                              │
 │ ... first 11 lines hidden (Ctrl+O to show) ...                                               │
 │ Line 12                                                                                      │
@@ -66,7 +24,7 @@ exports[`MainContent > MainContent Tool Output Height Logic > 'Normal mode - Unc
 "AppHeader(full)
 
 ╭──────────────────────────────────────────────────────────────────────────────────────────────╮
-│ ⠋  Shell Command Running a long command...                                                   │
+│ ⊶  Shell Command Running a long command...                                                   │
 │                                                                                              │
 │ Line 1                                                                                       │
 │ Line 2                                                                                       │
@@ -95,7 +53,7 @@ exports[`MainContent > MainContent Tool Output Height Logic > 'Normal mode - Unc
 exports[`MainContent > renders a ToolConfirmationQueue without an extra line when preceded by hidden tools 1`] = `
 "AppHeader(full)
 ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
- > Apply plan                                                                   
+ > Apply plan
 ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
 
 ╭──────────────────────────────────────────────────────────────────────────────╮
@@ -124,7 +82,7 @@ exports[`MainContent > renders a split tool group without a gap between static a
 exports[`MainContent > renders a spurious line when a tool group has only hidden tools and borderBottom true 1`] = `
 "AppHeader(full)
 ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
- > Apply plan                                                                   
+ > Apply plan
 ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
 "
 `;
@@ -132,7 +90,7 @@ exports[`MainContent > renders a spurious line when a tool group has only hidden
 exports[`MainContent > renders a subagent with a complete box including bottom border 1`] = `
 "AppHeader(full)
 ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
- > Investigate                                                                  
+ > Investigate
 ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
 
 ╭──────────────────────────────────────────────────────────────────────────╮
@@ -150,7 +108,7 @@ exports[`MainContent > renders mixed history items (user + gemini) with single l
 "ScrollableList
 AppHeader(full)
 ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
- > User message                                                                                     
+ > User message
 ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
 ✦ Gemini response
   Gemini response
@@ -196,9 +154,9 @@ exports[`MainContent > renders multiple thinking messages sequentially correctly
 "ScrollableList
 AppHeader(full)
 ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
- > Plan a solution                                                                                  
+ > Plan a solution
 ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
- Thinking... 
+ Thinking...
  │
  │ Initial analysis
  │ This is a multiple line paragraph for the first thinking message of how the
@@ -218,9 +176,9 @@ exports[`MainContent > renders multiple thinking messages sequentially correctly
 "ScrollableList
 AppHeader(full)
 ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
- > Plan a solution                                                                                  
+ > Plan a solution
 ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
- Thinking... 
+ Thinking...
  │
  │ Initial analysis
  │ This is a multiple line paragraph for the first thinking message of how the

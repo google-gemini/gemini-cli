@@ -73,7 +73,7 @@ const mockExtensions: RegistryExtension[] = [
   },
 ];
 
-describe('ExtensionRegistryView', () => {
+describe.sequential('ExtensionRegistryView', () => {
   let mockExtensionManager: ExtensionManager;
   let mockOnSelect: ReturnType<typeof vi.fn>;
   let mockOnClose: ReturnType<typeof vi.fn>;

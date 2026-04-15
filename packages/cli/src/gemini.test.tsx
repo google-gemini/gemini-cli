@@ -51,6 +51,12 @@ import {
 import { act } from 'react';
 import { type InitializationResult } from './core/initializer.js';
 import { runNonInteractive } from './nonInteractiveCli.js';
+import {
+  cleanupExpiredSessions,
+  cleanupToolOutputFiles,
+} from './utils/sessionCleanup.js';
+import { cleanupCheckpoints } from './utils/cleanup.js';
+import { cleanupBackgroundLogs } from './utils/logCleanup.js';
 // Hoisted constants and mocks
 const performance = vi.hoisted(() => ({
   now: vi.fn(),
@@ -245,13 +251,28 @@ vi.mock('./utils/relaunch.js', () => ({
 }));
 
 vi.mock('./config/sandboxConfig.js', () => ({
-  loadSandboxConfig: vi.fn().mockResolvedValue({
-    enabled: true,
-    allowedPaths: [],
-    networkAccess: false,
-    command: 'docker',
-    image: 'test-image',
-  }),
+  loadSandboxConfig: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('./utils/sessionCleanup.js', () => ({
+  cleanupExpiredSessions: vi.fn(),
+  cleanupToolOutputFiles: vi.fn(),
+}));
+
+vi.mock('./utils/cleanup.js', () => ({
+  cleanupCheckpoints: vi.fn(),
+  registerCleanup: vi.fn(),
+  removeCleanup: vi.fn(),
+  runExitCleanup: vi.fn(),
+  registerSyncCleanup: vi.fn(),
+  removeSyncCleanup: vi.fn(),
+  registerTelemetryConfig: vi.fn(),
+  setupSignalHandlers: vi.fn(),
+  setupTtyCheck: vi.fn(() => vi.fn()),
+}));
+
+vi.mock('./utils/logCleanup.js', () => ({
+  cleanupBackgroundLogs: vi.fn(),
 }));
 
 vi.mock('./deferred.js', () => ({
@@ -269,6 +290,24 @@ vi.mock('./ui/utils/mouse.js', () => ({
 vi.mock('./validateNonInterActiveAuth.js', () => ({
   validateNonInteractiveAuth: vi.fn().mockResolvedValue('google'),
 }));
+
+beforeEach(() => {
+  vi.mocked(cleanupExpiredSessions).mockResolvedValue({
+    disabled: false,
+    scanned: 0,
+    deleted: 0,
+    skipped: 0,
+    failed: 0,
+  });
+  vi.mocked(cleanupToolOutputFiles).mockResolvedValue({
+    disabled: false,
+    scanned: 0,
+    deleted: 0,
+    failed: 0,
+  });
+  vi.mocked(cleanupCheckpoints).mockResolvedValue(undefined);
+  vi.mocked(cleanupBackgroundLogs).mockResolvedValue(undefined);
+});
 
 describe('gemini.tsx main function', () => {
   let originalIsTTY: boolean | undefined;
@@ -932,7 +971,7 @@ describe('gemini.tsx main function kitty protocol', () => {
     emitFeedbackSpy.mockRestore();
   });
 
-  it.skip('should log error when cleanupExpiredSessions fails', async () => {
+  it('should log error when cleanupExpiredSessions fails', async () => {
     const { cleanupExpiredSessions } = await import(
       './utils/sessionCleanup.js'
     );
@@ -980,9 +1019,8 @@ describe('gemini.tsx main function kitty protocol', () => {
     }
 
     expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
-      expect.stringContaining(
-        'Failed to cleanup expired sessions: Cleanup failed',
-      ),
+      expect.stringContaining('Failed to cleanup expired sessions:'),
+      expect.any(Error),
     );
     expect(processExitSpy).toHaveBeenCalledWith(0); // Should not exit on cleanup failure
     processExitSpy.mockRestore();
@@ -1427,17 +1465,6 @@ describe('startInteractiveUI', () => {
 
   vi.mock('./ui/utils/updateCheck.js', () => ({
     checkForUpdates: vi.fn(() => Promise.resolve(null)),
-  }));
-  vi.mock('./utils/cleanup.js', () => ({
-    cleanupCheckpoints: vi.fn(() => Promise.resolve()),
-    registerCleanup: vi.fn(),
-    removeCleanup: vi.fn(),
-    runExitCleanup: vi.fn(),
-    registerSyncCleanup: vi.fn(),
-    removeSyncCleanup: vi.fn(),
-    registerTelemetryConfig: vi.fn(),
-    setupSignalHandlers: vi.fn(),
-    setupTtyCheck: vi.fn(() => vi.fn()),
   }));
 
   beforeEach(() => {

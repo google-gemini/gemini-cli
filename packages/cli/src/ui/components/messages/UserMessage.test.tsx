@@ -13,7 +13,7 @@ vi.mock('../../utils/commandUtils.js', () => ({
   isSlashCommand: vi.fn((text: string) => text.startsWith('/')),
 }));
 
-describe('UserMessage', () => {
+describe.sequential('UserMessage', () => {
   it('renders normal user message with correct prefix', async () => {
     const { lastFrame, unmount } = await renderWithProviders(
       <UserMessage text="Hello Gemini" width={80} />,

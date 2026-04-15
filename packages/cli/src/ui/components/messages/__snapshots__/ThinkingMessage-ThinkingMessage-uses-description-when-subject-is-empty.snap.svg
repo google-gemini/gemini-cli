@@ -4,9 +4,8 @@
   </style>
   <rect width="920" height="71" fill="#000000" />
   <g transform="translate(10, 10)">
-    <text x="0" y="2" fill="#ffffff" textLength="117" lengthAdjust="spacingAndGlyphs" font-style="italic"> Thinking... </text>
-    <text x="9" y="19" fill="#afafaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="9" y="36" fill="#afafaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="27" y="36" fill="#ffffff" textLength="162" lengthAdjust="spacingAndGlyphs" font-weight="bold" font-style="italic">Processing details</text>
+    <text x="0" y="2" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs"> Thinking...                                                                                        </text>
+    <text x="0" y="19" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs"> │                                                                                                  </text>
+    <text x="0" y="36" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs"> │ Processing details                                                                               </text>
   </g>
 </svg>

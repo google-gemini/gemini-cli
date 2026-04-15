@@ -784,6 +784,8 @@ export function KeypressProvider({
   children: React.ReactNode;
   config?: Config;
 }) {
+  if (process.env['NODE_ENV'] === 'test') {
+  }
   const { settings } = useSettingsStore();
   const debugKeystrokeLogging = settings.merged.general.debugKeystrokeLogging;
 

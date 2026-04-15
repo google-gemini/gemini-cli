@@ -9,7 +9,7 @@ import { renderWithProviders } from '../../../test-utils/render.js';
 import { ThinkingMessage } from './ThinkingMessage.js';
 import React from 'react';
 
-describe('ThinkingMessage', () => {
+describe.sequential('ThinkingMessage', () => {
   it('renders subject line with vertical rule and "Thinking..." header', async () => {
     const renderResult = await renderWithProviders(
       <ThinkingMessage

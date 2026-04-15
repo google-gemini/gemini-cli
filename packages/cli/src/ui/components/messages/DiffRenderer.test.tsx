@@ -12,7 +12,7 @@ import { DiffRenderer } from './DiffRenderer.js';
 import * as CodeColorizer from '../../utils/CodeColorizer.js';
 import { vi } from 'vitest';
 
-describe('<OverflowProvider><DiffRenderer /></OverflowProvider>', () => {
+describe.sequential('<OverflowProvider><DiffRenderer /></OverflowProvider>', () => {
   const mockColorizeCode = vi.spyOn(CodeColorizer, 'colorizeCode');
 
   beforeEach(() => {
@@ -277,7 +277,7 @@ index abc..def 100644
         expect(lastFrame()).toMatchSnapshot();
       });
 
-      describe('should correctly render a diff with multiple hunks and a gap indicator', () => {
+      describe.sequential('should correctly render a diff with multiple hunks and a gap indicator', () => {
         const diffWithMultipleHunks = `
 
 diff --git a/multi.js b/multi.js

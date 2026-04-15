@@ -4,8 +4,6 @@
   </style>
   <rect width="920" height="37" fill="#000000" />
   <g transform="translate(10, 10)">
-    <text x="18" y="2" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs" font-weight="bold">-</text>
-    <text x="45" y="2" fill="#ffffff" textLength="90" lengthAdjust="spacingAndGlyphs" font-weight="bold">read_file </text>
-    <text x="144" y="2" fill="#afafaf" textLength="189" lengthAdjust="spacingAndGlyphs">Reading important.txt</text>
+    <text x="0" y="2" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">  -  read_file  Reading important.txt                                                               </text>
   </g>
 </svg>

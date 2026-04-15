@@ -10,7 +10,7 @@ import { ToolResultDisplay } from './ToolResultDisplay.js';
 import { describe, it, expect } from 'vitest';
 import { makeFakeConfig, type AnsiOutput } from '@google/gemini-cli-core';
 
-describe('ToolResultDisplay Overflow', () => {
+describe.sequential('ToolResultDisplay Overflow', () => {
   it('shows the head of the content when overflowDirection is bottom (string)', async () => {
     const content = 'Line 1\nLine 2\nLine 3\nLine 4\nLine 5';
     const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(

@@ -74,6 +74,7 @@ vi.mock('../ui/utils/terminalUtils.js', () => ({
   isLowColorDepth: vi.fn(() => false),
   getColorDepth: vi.fn(() => 24),
   isITerm2: vi.fn(() => false),
+  isVSCode: vi.fn(() => false),
 }));
 
 type TerminalState = {
@@ -770,7 +771,7 @@ export const renderWithProviders = async (
                                 onSubmit={vi.fn()}
                                 onCancel={vi.fn()}
                               >
-                                <KeypressProvider>
+                                <KeypressProvider config={config}>
                                   <MouseProvider
                                     mouseEventsEnabled={mouseEventsEnabled}
                                   >

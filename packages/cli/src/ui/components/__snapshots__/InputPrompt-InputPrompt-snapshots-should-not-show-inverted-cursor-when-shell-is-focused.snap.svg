@@ -1,18 +1,41 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="920" height="71" viewBox="0 0 920 71">
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="615" viewBox="0 0 920 615">
   <style>
     text { font-family: Consolas, "Courier New", monospace; font-size: 14px; dominant-baseline: text-before-edge; white-space: pre; }
   </style>
-  <rect width="920" height="71" fill="#000000" />
+  <rect width="920" height="615" fill="#000000" />
   <g transform="translate(10, 10)">
-    <rect x="0" y="0" width="900" height="17" fill="#1f1f1f" />
-    <text x="0" y="2" fill="#000000" textLength="900" lengthAdjust="spacingAndGlyphs">▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀</text>
-    <rect x="0" y="17" width="9" height="17" fill="#1f1f1f" />
-    <rect x="9" y="17" width="18" height="17" fill="#1f1f1f" />
-    <text x="9" y="19" fill="#d7afff" textLength="18" lengthAdjust="spacingAndGlyphs">&gt; </text>
-    <rect x="27" y="17" width="324" height="17" fill="#1f1f1f" />
-    <text x="27" y="19" fill="#afafaf" textLength="324" lengthAdjust="spacingAndGlyphs">  Type your message or @path/to/file</text>
-    <rect x="351" y="17" width="549" height="17" fill="#1f1f1f" />
-    <rect x="0" y="34" width="900" height="17" fill="#1f1f1f" />
-    <text x="0" y="36" fill="#000000" textLength="900" lengthAdjust="spacingAndGlyphs">▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄</text>
+    <text x="0" y="19" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">  ERROR [vitest] No &quot;isITerm2&quot; export is defined on the &quot;../utils/terminalUtils.js&quot; mock. Did you   </text>
+    <text x="0" y="36" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">       forget to return it from &quot;vi.mock&quot;?                                                          </text>
+    <text x="0" y="53" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">       If you need to partially mock a module, you can use &quot;importOriginal&quot; helper inside:          </text>
+    <text x="0" y="87" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs"> - If you need to partially mock a module, you can use &quot;importOriginal&quot; helper inside:\t            </text>
+    <text x="0" y="104" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs"> - \t                                                                                               </text>
+    <text x="0" y="121" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs"> -VitestMocker.createE                                                                              </text>
+    <text x="0" y="138" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">  rror               (file:///Users/mattkorwel/dev/gemini-cli/main/node_modules/vitest/dist/chunks/ </text>
+    <text x="0" y="155" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">                     execute.B7h3T_Hc.js:284:17)                                                    </text>
+    <text x="0" y="172" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs"> -Object.get                                                                                        </text>
+    <text x="0" y="189" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">           (file:///Users/mattkorwel/dev/gemini-cli/main/node_modules/vitest/dist/chunks/execute.B7 </text>
+    <text x="0" y="206" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">           h3T_Hc.js:330:16)                                                                        </text>
+    <text x="0" y="223" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs"> - HalfLinePaddedBoxInternal (src/ui/components/shared/HalfLinePaddedBox.tsx:82:19)                 </text>
+    <text x="0" y="240" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs"> -Object.react-stack-botto                                                                          </text>
+    <text x="0" y="257" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">  m-frame                (/Users/mattkorwel/dev/gemini-cli/main/node_modules/react-reconciler/cjs/r </text>
+    <text x="0" y="274" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">                         eact-reconciler.development.js:15859:20)                                   </text>
+    <text x="0" y="291" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs"> -renderWithHook                                                                                    </text>
+    <text x="0" y="308" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">  s            (/Users/mattkorwel/dev/gemini-cli/main/node_modules/react-reconciler/cjs/react-recon </text>
+    <text x="0" y="325" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">               ciler.development.js:3221:22)                                                        </text>
+    <text x="0" y="342" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs"> -updateFunctionCompo                                                                               </text>
+    <text x="0" y="359" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">  nent              (/Users/mattkorwel/dev/gemini-cli/main/node_modules/react-reconciler/cjs/react- </text>
+    <text x="0" y="376" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">                    reconciler.development.js:6475:19)                                              </text>
+    <text x="0" y="393" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs"> -beginWork                                                                                         </text>
+    <text x="0" y="410" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">          (/Users/mattkorwel/dev/gemini-cli/main/node_modules/react-reconciler/cjs/react-reconciler </text>
+    <text x="0" y="427" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">          .development.js:8009:18)                                                                  </text>
+    <text x="0" y="444" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs"> -runWithFiberInD                                                                                   </text>
+    <text x="0" y="461" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">  EV            (/Users/mattkorwel/dev/gemini-cli/main/node_modules/react-reconciler/cjs/react-reco </text>
+    <text x="0" y="478" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">                nciler.development.js:1738:13)                                                      </text>
+    <text x="0" y="495" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs"> -performUnitOfWo                                                                                   </text>
+    <text x="0" y="512" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">  rk            (/Users/mattkorwel/dev/gemini-cli/main/node_modules/react-reconciler/cjs/react-reco </text>
+    <text x="0" y="529" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">                nciler.development.js:12834:22)                                                     </text>
+    <text x="0" y="546" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs"> -workLoopSync                                                                                      </text>
+    <text x="0" y="563" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">             (/Users/mattkorwel/dev/gemini-cli/main/node_modules/react-reconciler/cjs/react-reconci </text>
+    <text x="0" y="580" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">             ler.development.js:12644:41)                                                           </text>
   </g>
 </svg>
