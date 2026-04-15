@@ -259,6 +259,13 @@ export class ToolOutputDistillationService {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
 
+      // Sanitize untrusted tool output before injecting into the prompt to
+      // mitigate indirect prompt injection. Replace newlines with a literal
+      // "\n" token and escape ']' which could break prompt structure.
+      const sanitizedContent = stringifiedContent
+        .replace(/\r\n|\r|\n/g, ' \\n ')
+        .replace(/]/g, '\\]');
+
       const promptText = `The following output from the tool '${toolName}' is large and has been truncated. Extract the most critical factual information from this output so the main agent doesn't lose context.
 
 Focus strictly on concrete data points:
@@ -269,18 +276,20 @@ Focus strictly on concrete data points:
 Do not philosophize about the strategic intent. Keep the extraction under 10 lines and use exact quotes where helpful.
 
 Output to summarize:
-${stringifiedContent.slice(0, maxPreviewLen)}...`;
+${sanitizedContent.slice(0, maxPreviewLen)}...`;
 
-      const summaryResponse = await this.geminiClient.generateContent(
-        { model: 'agent-history-provider-summarizer' },
-        [{ role: 'user', parts: [{ text: promptText }] }],
-        controller.signal,
-        LlmRole.UTILITY_COMPRESSOR,
-      );
+      try {
+        const summaryResponse = await this.geminiClient.generateContent(
+          { model: 'agent-history-provider-summarizer' },
+          [{ role: 'user', parts: [{ text: promptText }] }],
+          controller.signal,
+          LlmRole.UTILITY_COMPRESSOR,
+        );
 
-      clearTimeout(timeoutId);
-
-      return summaryResponse.candidates?.[0]?.content?.parts?.[0]?.text;
+        return summaryResponse.candidates?.[0]?.content?.parts?.[0]?.text;
+      } finally {
+        clearTimeout(timeoutId);
+      }
     } catch (e) {
       // Fail gracefully, summarization is a progressive enhancement
       debugLogger.debug(
