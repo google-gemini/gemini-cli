@@ -443,7 +443,7 @@ export class ApiRequestEvent implements BaseTelemetryEvent {
       attributes['server.port'] = this.prompt.server.port;
     }
 
-    if (config.getTelemetryLogPromptsEnabled() && this.prompt.contents) {
+    if (config.getTelemetryTracesEnabled() && this.prompt.contents) {
       attributes['gen_ai.input.messages'] = JSON.stringify(
         toInputMessages(this.prompt.contents),
       );
@@ -540,7 +540,7 @@ export class ApiErrorEvent implements BaseTelemetryEvent {
       attributes['server.port'] = this.prompt.server.port;
     }
 
-    if (config.getTelemetryLogPromptsEnabled() && this.prompt.contents) {
+    if (config.getTelemetryTracesEnabled() && this.prompt.contents) {
       attributes['gen_ai.input.messages'] = JSON.stringify(
         toInputMessages(this.prompt.contents),
       );
@@ -707,9 +707,13 @@ export class ApiResponseEvent implements BaseTelemetryEvent {
       'event.timestamp': this['event.timestamp'],
       'gen_ai.response.id': this.response.response_id,
       'gen_ai.response.finish_reasons': this.finish_reasons,
-      'gen_ai.output.messages': JSON.stringify(
-        toOutputMessages(this.response.candidates),
-      ),
+      ...(config.getTelemetryTracesEnabled()
+        ? {
+            'gen_ai.output.messages': JSON.stringify(
+              toOutputMessages(this.response.candidates),
+            ),
+          }
+        : {}),
       ...toGenerateContentConfigAttributes(this.prompt.generate_content_config),
       ...getConventionAttributes(this),
     };
@@ -719,7 +723,7 @@ export class ApiResponseEvent implements BaseTelemetryEvent {
       attributes['server.port'] = this.prompt.server.port;
     }
 
-    if (config.getTelemetryLogPromptsEnabled() && this.prompt.contents) {
+    if (config.getTelemetryTracesEnabled() && this.prompt.contents) {
       attributes['gen_ai.input.messages'] = JSON.stringify(
         toInputMessages(this.prompt.contents),
       );
