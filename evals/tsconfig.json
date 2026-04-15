@@ -1,0 +1,12 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "paths": {
+      "@google/gemini-cli-core": ["../packages/core/index.ts"]
+    }
+  },
+  "include": ["**/*.ts"],
+  "exclude": ["logs"],
+  "references": [{ "path": "../packages/core" }, { "path": "../packages/cli" }]
+}
