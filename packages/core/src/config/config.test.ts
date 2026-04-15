@@ -1522,16 +1522,16 @@ describe('Server Config (config.ts)', () => {
       const config = new Config(baseParams);
       vi.spyOn(config, 'getExtensions').mockReturnValue([
         {
-          name: 'my-ext',
+          name: 'my-ext-name',
           version: '1.0',
           isActive: true,
           path: '/ext',
           contextFiles: [],
-          id: 'my-ext',
+          id: 'my-ext-id',
         },
       ]);
       expect(
-        config.getExtensionSetting('my-ext', 'some.setting'),
+        config.getExtensionSetting('my-ext-id', 'some.setting'),
       ).toBeUndefined();
     });
 
@@ -1539,12 +1539,12 @@ describe('Server Config (config.ts)', () => {
       const config = new Config(baseParams);
       vi.spyOn(config, 'getExtensions').mockReturnValue([
         {
-          name: 'my-ext',
+          name: 'my-ext-name',
           version: '1.0',
           isActive: true,
           path: '/ext',
           contextFiles: [],
-          id: 'my-ext',
+          id: 'my-ext-id',
           resolvedSettings: [
             {
               name: 'some.setting',
@@ -1555,7 +1555,7 @@ describe('Server Config (config.ts)', () => {
           ],
         },
       ]);
-      expect(config.getExtensionSetting('my-ext', 'some.setting')).toBe(
+      expect(config.getExtensionSetting('my-ext-id', 'some.setting')).toBe(
         'custom-val',
       );
     });
