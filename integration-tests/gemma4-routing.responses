@@ -1,0 +1,1 @@
+{"method":"generateContentStream","response":[{"candidates":[{"content":{"parts":[{"text":"I am Gemma 4."}],"role":"model"},"index":0,"finishReason":"STOP"}]}]}
