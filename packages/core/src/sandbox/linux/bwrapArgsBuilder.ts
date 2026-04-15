@@ -111,12 +111,13 @@ export async function buildBwrapArgs(
 
   // Grant read-only access to git worktrees/submodules. We do this after policyWrite
   // in order to ensure that git directories are read-only and protected, even if their parent directory has write access.
+  // We skip read-only bindings if the directory is explicitly requested to be writable via policyWrite.
   if (resolvedPaths.gitWorktree) {
     const { worktreeGitDir, mainGitDir } = resolvedPaths.gitWorktree;
-    if (worktreeGitDir) {
+    if (worktreeGitDir && !resolvedPaths.policyWrite.includes(worktreeGitDir)) {
       bwrapArgs.push('--ro-bind-try', worktreeGitDir, worktreeGitDir);
     }
-    if (mainGitDir) {
+    if (mainGitDir && !resolvedPaths.policyWrite.includes(mainGitDir)) {
       bwrapArgs.push('--ro-bind-try', mainGitDir, mainGitDir);
     }
   }
