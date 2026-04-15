@@ -248,6 +248,42 @@ describe('useSlashCommandProcessor', () => {
   };
 
   describe('Console Clear Safety', () => {
+    it('removes the IDE status listener on unmount after async initialization', async () => {
+      let resolveIdeClient:
+        | ((client: {
+            addStatusChangeListener: (listener: () => void) => void;
+            removeStatusChangeListener: (listener: () => void) => void;
+          }) => void)
+        | undefined;
+      const addStatusChangeListener = vi.fn();
+      const removeStatusChangeListener = vi.fn();
+
+      mockIdeClientGetInstance.mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            resolveIdeClient = resolve;
+          }),
+      );
+
+      const result = await setupProcessorHook();
+
+      await act(async () => {
+        resolveIdeClient?.({
+          addStatusChangeListener,
+          removeStatusChangeListener,
+        });
+      });
+
+      result.unmount();
+      unmountHook = undefined;
+
+      expect(addStatusChangeListener).toHaveBeenCalledTimes(1);
+      expect(removeStatusChangeListener).toHaveBeenCalledTimes(1);
+      expect(removeStatusChangeListener).toHaveBeenCalledWith(
+        addStatusChangeListener.mock.calls[0]?.[0],
+      );
+    });
+
     it('should not call console.clear if alternate buffer is active', async () => {
       mockUseAlternateBuffer.mockReturnValue(true);
       const clearCommand = createTestCommand({
