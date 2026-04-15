@@ -132,19 +132,6 @@ export async function runInDevTraceSpan<R>(
   const { operation, logPrompts, sessionId, tracesEnabled, ...restOfSpanOpts } =
     opts;
 
-  if (!tracesEnabled) {
-    const meta: SpanMetadata = {
-      name: operation,
-      attributes: {
-        [GEN_AI_OPERATION_NAME]: operation,
-        [GEN_AI_AGENT_NAME]: SERVICE_NAME,
-        [GEN_AI_AGENT_DESCRIPTION]: SERVICE_DESCRIPTION,
-        [GEN_AI_CONVERSATION_ID]: sessionId,
-      },
-    };
-    return fn({ metadata: meta });
-  }
-
   restOfSpanOpts.attributes = {
     ...restOfSpanOpts.attributes,
     [GEN_AI_CONVERSATION_ID]: sessionId,
@@ -168,24 +155,41 @@ export async function runInDevTraceSpan<R>(
       }
       spanEnded = true;
       try {
-        if (logPrompts !== false) {
-          if (meta.input !== undefined) {
-            const truncated = truncateForTelemetry(meta.input);
-            if (truncated !== undefined) {
-              span.setAttribute(GEN_AI_INPUT_MESSAGES, truncated);
+        if (tracesEnabled) {
+          if (logPrompts !== false) {
+            if (meta.input !== undefined) {
+              const truncated = truncateForTelemetry(meta.input);
+              if (truncated !== undefined) {
+                span.setAttribute(GEN_AI_INPUT_MESSAGES, truncated);
+              }
+            }
+            if (meta.output !== undefined) {
+              const truncated = truncateForTelemetry(meta.output);
+              if (truncated !== undefined) {
+                span.setAttribute(GEN_AI_OUTPUT_MESSAGES, truncated);
+              }
             }
           }
-          if (meta.output !== undefined) {
-            const truncated = truncateForTelemetry(meta.output);
+          for (const [key, value] of Object.entries(meta.attributes)) {
+            const truncated = truncateForTelemetry(value);
             if (truncated !== undefined) {
-              span.setAttribute(GEN_AI_OUTPUT_MESSAGES, truncated);
+              span.setAttribute(key, truncated);
             }
           }
-        }
-        for (const [key, value] of Object.entries(meta.attributes)) {
-          const truncated = truncateForTelemetry(value);
-          if (truncated !== undefined) {
-            span.setAttribute(key, truncated);
+        } else {
+          // Add basic attributes even when traces are disabled
+          for (const [key, value] of Object.entries(meta.attributes)) {
+            if (
+              key === GEN_AI_OPERATION_NAME ||
+              key === GEN_AI_AGENT_NAME ||
+              key === GEN_AI_AGENT_DESCRIPTION ||
+              key === GEN_AI_CONVERSATION_ID
+            ) {
+              const truncated = truncateForTelemetry(value);
+              if (truncated !== undefined) {
+                span.setAttribute(key, truncated);
+              }
+            }
           }
         }
         if (meta.error) {
