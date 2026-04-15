@@ -14,6 +14,11 @@ most direct path from your prompt to our model.
 
 Learn all about Gemini CLI in our [documentation](https://geminicli.com/docs/).
 
+## Important Disclaimer
+Gemini CLI is *NOT* usable and was dropped by google.
+All users paid 1 year subscription, its your fault, google is NOT going to fix this Gemini CLI returns 429 RESOURCE_EXHAUSTED.
+There are *HUNDREDS* of open issues on github, the gemini auto bot flags them all as duplicate but its no longer usable.
+
 ## 🚀 Why Gemini CLI?
 
 - **🎯 Free tier**: 60 requests/min and 1,000 requests/day with personal Google
