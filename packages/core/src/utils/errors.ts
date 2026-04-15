@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { parseGoogleApiError, type ErrorInfo } from './googleErrors.js';
+
 interface GaxiosError {
   response?: {
     data?: unknown;
@@ -22,6 +24,13 @@ function isGaxiosError(error: unknown): error is GaxiosError {
 
 export function isNodeError(error: unknown): error is NodeJS.ErrnoException {
   return error instanceof Error && 'code' in error;
+}
+
+/**
+ * Checks if an error is an AbortError.
+ */
+export function isAbortError(error: unknown): boolean {
+  return error instanceof Error && error.name === 'AbortError';
 }
 
 export function getErrorMessage(error: unknown): string {
@@ -48,10 +57,15 @@ export function getErrorMessage(error: unknown): string {
 export function getErrorType(error: unknown): string {
   if (!(error instanceof Error)) return 'unknown';
 
-  // Return constructor name if the generic 'Error' name is used (for custom errors)
-  return error.name === 'Error'
-    ? (error.constructor?.name ?? 'Error')
-    : error.name;
+  // Use the constructor name if the standard error name is missing or generic.
+  const name =
+    error.name && error.name !== 'Error'
+      ? error.name
+      : (error.constructor?.name ?? 'Error');
+
+  // Strip leading underscore from error names. Bundlers like esbuild sometimes
+  // rename classes to avoid scope collisions.
+  return name.replace(/^_+/, '');
 }
 
 export class FatalError extends Error {
@@ -60,42 +74,50 @@ export class FatalError extends Error {
     readonly exitCode: number,
   ) {
     super(message);
+    this.name = 'FatalError';
   }
 }
 
 export class FatalAuthenticationError extends FatalError {
   constructor(message: string) {
     super(message, 41);
+    this.name = 'FatalAuthenticationError';
   }
 }
 export class FatalInputError extends FatalError {
   constructor(message: string) {
     super(message, 42);
+    this.name = 'FatalInputError';
   }
 }
 export class FatalSandboxError extends FatalError {
   constructor(message: string) {
     super(message, 44);
+    this.name = 'FatalSandboxError';
   }
 }
 export class FatalConfigError extends FatalError {
   constructor(message: string) {
     super(message, 52);
+    this.name = 'FatalConfigError';
   }
 }
 export class FatalTurnLimitedError extends FatalError {
   constructor(message: string) {
     super(message, 53);
+    this.name = 'FatalTurnLimitedError';
   }
 }
 export class FatalToolExecutionError extends FatalError {
   constructor(message: string) {
     super(message, 54);
+    this.name = 'FatalToolExecutionError';
   }
 }
 export class FatalCancellationError extends FatalError {
   constructor(message: string) {
     super(message, 130); // Standard exit code for SIGINT
+    this.name = 'FatalCancellationError';
   }
 }
 
@@ -106,9 +128,35 @@ export class CanceledError extends Error {
   }
 }
 
-export class ForbiddenError extends Error {}
-export class UnauthorizedError extends Error {}
-export class BadRequestError extends Error {}
+export class ForbiddenError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ForbiddenError';
+  }
+}
+export class AccountSuspendedError extends ForbiddenError {
+  readonly appealUrl?: string;
+  readonly appealLinkText?: string;
+
+  constructor(message: string, metadata?: Record<string, string>) {
+    super(message);
+    this.name = 'AccountSuspendedError';
+    this.appealUrl = metadata?.['appeal_url'];
+    this.appealLinkText = metadata?.['appeal_url_link_text'];
+  }
+}
+export class UnauthorizedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'UnauthorizedError';
+  }
+}
+export class BadRequestError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'BadRequestError';
+  }
+}
 
 export class ChangeAuthRequestedError extends Error {
   constructor() {
@@ -157,6 +205,24 @@ function isResponseData(data: unknown): data is ResponseData {
 }
 
 export function toFriendlyError(error: unknown): unknown {
+  // First, try structured parsing for TOS_VIOLATION detection.
+  const googleApiError = parseGoogleApiError(error);
+  if (googleApiError && googleApiError.code === 403) {
+    const tosDetail = googleApiError.details.find(
+      (d): d is ErrorInfo =>
+        d['@type'] === 'type.googleapis.com/google.rpc.ErrorInfo' &&
+        'reason' in d &&
+        d.reason === 'TOS_VIOLATION',
+    );
+    if (tosDetail) {
+      return new AccountSuspendedError(
+        googleApiError.message,
+        tosDetail.metadata,
+      );
+    }
+  }
+
+  // Fall back to basic Gaxios error parsing for other HTTP errors.
   if (isGaxiosError(error)) {
     const data = parseResponseData(error);
     if (data && data.error && data.error.message && data.error.code) {
@@ -166,15 +232,19 @@ export function toFriendlyError(error: unknown): unknown {
         case 401:
           return new UnauthorizedError(data.error.message);
         case 403:
-          // It's import to pass the message here since it might
-          // explain the cause like "the cloud project you're
-          // using doesn't have code assist enabled".
           return new ForbiddenError(data.error.message);
         default:
       }
     }
   }
   return error;
+}
+
+export function isAccountSuspendedError(
+  error: unknown,
+): AccountSuspendedError | null {
+  const friendly = toFriendlyError(error);
+  return friendly instanceof AccountSuspendedError ? friendly : null;
 }
 
 function parseResponseData(error: GaxiosError): ResponseData | undefined {
@@ -219,10 +289,7 @@ export function isAuthenticationError(error: unknown): boolean {
   }
 
   // Check for UnauthorizedError class (from MCP SDK or our own)
-  if (
-    error instanceof Error &&
-    error.constructor.name === 'UnauthorizedError'
-  ) {
+  if (error instanceof Error && error.name === 'UnauthorizedError') {
     return true;
   }
 

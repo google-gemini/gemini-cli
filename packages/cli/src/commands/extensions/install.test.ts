@@ -12,46 +12,46 @@ import {
   beforeEach,
   afterEach,
   type MockInstance,
-  type Mock,
 } from 'vitest';
 import { handleInstall, installCommand } from './install.js';
 import yargs from 'yargs';
 import * as core from '@google/gemini-cli-core';
-import type { inferInstallMetadata } from '../../config/extension-manager.js';
-import { ExtensionManager } from '../../config/extension-manager.js';
-import type {
-  promptForConsentNonInteractive,
-  requestConsentNonInteractive,
-} from '../../config/extensions/consent.js';
-import type {
-  isWorkspaceTrusted,
-  loadTrustedFolders,
-} from '../../config/trustedFolders.js';
-import type * as fs from 'node:fs/promises';
 import type { Stats } from 'node:fs';
 import * as path from 'node:path';
+import { promptForSetting } from '../../config/extensions/extensionSettings.js';
 
-const mockInstallOrUpdateExtension: Mock<
-  typeof ExtensionManager.prototype.installOrUpdateExtension
-> = vi.hoisted(() => vi.fn());
-const mockRequestConsentNonInteractive: Mock<
-  typeof requestConsentNonInteractive
-> = vi.hoisted(() => vi.fn());
-const mockPromptForConsentNonInteractive: Mock<
-  typeof promptForConsentNonInteractive
-> = vi.hoisted(() => vi.fn());
-const mockStat: Mock<typeof fs.stat> = vi.hoisted(() => vi.fn());
-const mockInferInstallMetadata: Mock<typeof inferInstallMetadata> = vi.hoisted(
-  () => vi.fn(),
-);
-const mockIsWorkspaceTrusted: Mock<typeof isWorkspaceTrusted> = vi.hoisted(() =>
-  vi.fn(),
-);
-const mockLoadTrustedFolders: Mock<typeof loadTrustedFolders> = vi.hoisted(() =>
-  vi.fn(),
-);
-const mockDiscover: Mock<typeof core.FolderTrustDiscoveryService.discover> =
-  vi.hoisted(() => vi.fn());
+const {
+  mockInstallOrUpdateExtension,
+  mockLoadExtensions,
+  mockExtensionManager,
+  mockRequestConsentNonInteractive,
+  mockPromptForConsentNonInteractive,
+  mockStat,
+  mockInferInstallMetadata,
+  mockIsWorkspaceTrusted,
+  mockLoadTrustedFolders,
+  mockDiscover,
+} = vi.hoisted(() => {
+  const mockLoadExtensions = vi.fn();
+  const mockInstallOrUpdateExtension = vi.fn();
+  const mockExtensionManager = vi.fn().mockImplementation(() => ({
+    loadExtensions: mockLoadExtensions,
+    installOrUpdateExtension: mockInstallOrUpdateExtension,
+  }));
+
+  return {
+    mockLoadExtensions,
+    mockInstallOrUpdateExtension,
+    mockExtensionManager,
+    mockRequestConsentNonInteractive: vi.fn(),
+    mockPromptForConsentNonInteractive: vi.fn(),
+    mockStat: vi.fn(),
+    mockInferInstallMetadata: vi.fn(),
+    mockIsWorkspaceTrusted: vi.fn(),
+    mockLoadTrustedFolders: vi.fn(),
+    mockDiscover: vi.fn(),
+  };
+});
 
 vi.mock('../../config/extensions/consent.js', () => ({
   requestConsentNonInteractive: mockRequestConsentNonInteractive,
@@ -82,6 +82,7 @@ vi.mock('../../config/extension-manager.js', async (importOriginal) => ({
   ...(await importOriginal<
     typeof import('../../config/extension-manager.js')
   >()),
+  ExtensionManager: mockExtensionManager,
   inferInstallMetadata: mockInferInstallMetadata,
 }));
 
@@ -115,19 +116,18 @@ describe('handleInstall', () => {
   let processSpy: MockInstance;
 
   beforeEach(() => {
-    debugLogSpy = vi.spyOn(core.debugLogger, 'log');
-    debugErrorSpy = vi.spyOn(core.debugLogger, 'error');
+    debugLogSpy = vi
+      .spyOn(core.debugLogger, 'log')
+      .mockImplementation(() => {});
+    debugErrorSpy = vi
+      .spyOn(core.debugLogger, 'error')
+      .mockImplementation(() => {});
     processSpy = vi
       .spyOn(process, 'exit')
       .mockImplementation(() => undefined as never);
 
-    vi.spyOn(ExtensionManager.prototype, 'loadExtensions').mockResolvedValue(
-      [],
-    );
-    vi.spyOn(
-      ExtensionManager.prototype,
-      'installOrUpdateExtension',
-    ).mockImplementation(mockInstallOrUpdateExtension);
+    mockLoadExtensions.mockResolvedValue([]);
+    mockInstallOrUpdateExtension.mockReset();
 
     mockIsWorkspaceTrusted.mockReturnValue({ isTrusted: true, source: 'file' });
     mockDiscover.mockResolvedValue({
@@ -135,6 +135,7 @@ describe('handleInstall', () => {
       mcps: [],
       hooks: [],
       skills: [],
+      agents: [],
       settings: [],
       securityWarnings: [],
       discoveryErrors: [],
@@ -160,12 +161,7 @@ describe('handleInstall', () => {
   });
 
   afterEach(() => {
-    mockInstallOrUpdateExtension.mockClear();
-    mockRequestConsentNonInteractive.mockClear();
-    mockStat.mockClear();
-    mockInferInstallMetadata.mockClear();
     vi.clearAllMocks();
-    vi.restoreAllMocks();
   });
 
   function createMockExtension(
@@ -285,6 +281,39 @@ describe('handleInstall', () => {
     expect(processSpy).toHaveBeenCalledWith(1);
   });
 
+  it('should pass promptForSetting when skipSettings is not provided', async () => {
+    mockInstallOrUpdateExtension.mockResolvedValue({
+      name: 'test-extension',
+    } as unknown as core.GeminiCLIExtension);
+
+    await handleInstall({
+      source: 'http://google.com',
+    });
+
+    expect(mockExtensionManager).toHaveBeenCalledWith(
+      expect.objectContaining({
+        requestSetting: promptForSetting,
+      }),
+    );
+  });
+
+  it('should pass null for requestSetting when skipSettings is true', async () => {
+    mockInstallOrUpdateExtension.mockResolvedValue({
+      name: 'test-extension',
+    } as unknown as core.GeminiCLIExtension);
+
+    await handleInstall({
+      source: 'http://google.com',
+      skipSettings: true,
+    });
+
+    expect(mockExtensionManager).toHaveBeenCalledWith(
+      expect.objectContaining({
+        requestSetting: null,
+      }),
+    );
+  });
+
   it('should proceed if local path is already trusted', async () => {
     mockInstallOrUpdateExtension.mockResolvedValue(
       createMockExtension({
@@ -377,6 +406,7 @@ describe('handleInstall', () => {
       mcps: [],
       hooks: [],
       skills: ['cool-skill'],
+      agents: ['cool-agent'],
       settings: [],
       securityWarnings: ['Security risk!'],
       discoveryErrors: ['Read error'],
@@ -404,6 +434,10 @@ describe('handleInstall', () => {
     );
     expect(mockPromptForConsentNonInteractive).toHaveBeenCalledWith(
       expect.stringContaining('cool-skill'),
+      false,
+    );
+    expect(mockPromptForConsentNonInteractive).toHaveBeenCalledWith(
+      expect.stringContaining('cool-agent'),
       false,
     );
     expect(mockPromptForConsentNonInteractive).toHaveBeenCalledWith(

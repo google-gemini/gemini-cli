@@ -4,11 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  Config,
-  ToolCallConfirmationDetails,
+import {
+  GeminiEventType,
+  ApprovalMode,
+  type Config,
+  type ToolCallConfirmationDetails,
 } from '@google/gemini-cli-core';
-import { GeminiEventType, ApprovalMode } from '@google/gemini-cli-core';
 import type {
   TaskStatusUpdateEvent,
   SendStreamingMessageSuccessResponse,
@@ -64,7 +65,12 @@ vi.mock('../utils/logger.js', () => ({
 }));
 
 let config: Config;
-const getToolRegistrySpy = vi.fn().mockReturnValue(ApprovalMode.DEFAULT);
+const getToolRegistrySpy = vi.fn().mockReturnValue({
+  getTool: vi.fn(),
+  getAllToolNames: vi.fn().mockReturnValue([]),
+  getAllTools: vi.fn().mockReturnValue([]),
+  getToolsByServer: vi.fn().mockReturnValue([]),
+});
 const getApprovalModeSpy = vi.fn();
 const getShellExecutionConfigSpy = vi.fn();
 const getExtensionsSpy = vi.fn();

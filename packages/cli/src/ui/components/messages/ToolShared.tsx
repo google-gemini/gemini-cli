@@ -7,7 +7,7 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Text } from 'ink';
 import { ToolCallStatus, mapCoreStatusToDisplayStatus } from '../../types.js';
-import { GeminiRespondingSpinner } from '../GeminiRespondingSpinner.js';
+import { CliSpinner } from '../CliSpinner.js';
 import {
   SHELL_COMMAND_NAME,
   SHELL_NAME,
@@ -23,8 +23,8 @@ import {
   CoreToolCallStatus,
 } from '@google/gemini-cli-core';
 import { useInactivityTimer } from '../../hooks/useInactivityTimer.js';
-import { formatCommand } from '../../utils/keybindingUtils.js';
-import { Command } from '../../../config/keyBindings.js';
+import { formatCommand } from '../../key/keybindingUtils.js';
+import { Command } from '../../key/keyBindings.js';
 
 export const STATUS_INDICATOR_WIDTH = 3;
 
@@ -123,7 +123,7 @@ export const FocusHint: React.FC<{
 
   return (
     <Box marginLeft={1} flexShrink={0}>
-      <Text color={theme.text.accent}>
+      <Text color={isThisShellFocused ? theme.ui.focus : theme.ui.active}>
         {isThisShellFocused
           ? `(${formatCommand(Command.UNFOCUS_SHELL_INPUT)} to unfocus)`
           : `(${formatCommand(Command.FOCUS_SHELL_INPUT)} to focus)`}
@@ -137,15 +137,21 @@ export type TextEmphasis = 'high' | 'medium' | 'low';
 type ToolStatusIndicatorProps = {
   status: CoreToolCallStatus;
   name: string;
+  isFocused?: boolean;
 };
 
 export const ToolStatusIndicator: React.FC<ToolStatusIndicatorProps> = ({
   status: coreStatus,
   name,
+  isFocused,
 }) => {
   const status = mapCoreStatusToDisplayStatus(coreStatus);
   const isShell = isShellTool(name);
-  const statusColor = isShell ? theme.ui.symbol : theme.status.warning;
+  const statusColor = isFocused
+    ? theme.ui.focus
+    : isShell
+      ? theme.ui.active
+      : theme.status.warning;
 
   return (
     <Box minWidth={STATUS_INDICATOR_WIDTH}>
@@ -153,10 +159,9 @@ export const ToolStatusIndicator: React.FC<ToolStatusIndicatorProps> = ({
         <Text color={theme.status.success}>{TOOL_STATUS.PENDING}</Text>
       )}
       {status === ToolCallStatus.Executing && (
-        <GeminiRespondingSpinner
-          spinnerType="toggle"
-          nonRespondingDisplay={TOOL_STATUS.EXECUTING}
-        />
+        <Text color={statusColor}>
+          <CliSpinner type="toggle" />
+        </Text>
       )}
       {status === ToolCallStatus.Success && (
         <Text color={theme.status.success} aria-label={'Success:'}>
@@ -187,6 +192,7 @@ type ToolInfoProps = {
   description: string;
   status: CoreToolCallStatus;
   emphasis: TextEmphasis;
+  progressMessage?: string;
   originalRequestName?: string;
 };
 
@@ -195,6 +201,7 @@ export const ToolInfo: React.FC<ToolInfoProps> = ({
   description,
   status: coreStatus,
   emphasis,
+  progressMessage: _progressMessage,
   originalRequestName,
 }) => {
   const status = mapCoreStatusToDisplayStatus(coreStatus);

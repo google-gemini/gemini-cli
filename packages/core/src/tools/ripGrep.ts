@@ -8,15 +8,21 @@ import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import fs from 'node:fs';
 import fsPromises from 'node:fs/promises';
 import path from 'node:path';
-import { downloadRipGrep } from '@joshua.litt/get-ripgrep';
-import type { ToolInvocation, ToolResult } from './tools.js';
-import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
+import os from 'node:os';
+import { fileURLToPath } from 'node:url';
+import {
+  BaseDeclarativeTool,
+  BaseToolInvocation,
+  Kind,
+  type ToolInvocation,
+  type ToolResult,
+  type ExecuteOptions,
+} from './tools.js';
 import { ToolErrorType } from './tool-error.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { getErrorMessage, isNodeError } from '../utils/errors.js';
 import type { Config } from '../config/config.js';
 import { fileExists } from '../utils/fileUtils.js';
-import { Storage } from '../config/storage.js';
 import { GREP_TOOL_NAME } from './tool-names.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import {
@@ -33,57 +39,48 @@ import { RIP_GREP_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
 import { type GrepMatch, formatGrepResults } from './grep-utils.js';
 
-function getRgCandidateFilenames(): readonly string[] {
-  return process.platform === 'win32' ? ['rg.exe', 'rg'] : ['rg'];
-}
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-async function resolveExistingRgPath(): Promise<string | null> {
-  const binDir = Storage.getGlobalBinDir();
-  for (const fileName of getRgCandidateFilenames()) {
-    const candidatePath = path.join(binDir, fileName);
-    if (await fileExists(candidatePath)) {
-      return candidatePath;
+export async function getRipgrepPath(): Promise<string | null> {
+  const platform = os.platform();
+  const arch = os.arch();
+
+  // Map to the correct bundled binary
+  const binName = `rg-${platform}-${arch}${platform === 'win32' ? '.exe' : ''}`;
+
+  const candidatePaths = [
+    // 1. SEA runtime layout: everything is flattened into the root dir
+    path.resolve(__dirname, 'vendor/ripgrep', binName),
+    // 2. Dev/Dist layout: packages/core/dist/tools/ripGrep.js -> packages/core/vendor/ripgrep
+    path.resolve(__dirname, '../../vendor/ripgrep', binName),
+  ];
+
+  for (const candidate of candidatePaths) {
+    if (await fileExists(candidate)) {
+      return candidate;
     }
   }
+
   return null;
 }
 
-let ripgrepAcquisitionPromise: Promise<string | null> | null = null;
-
-async function ensureRipgrepAvailable(): Promise<string | null> {
-  const existingPath = await resolveExistingRgPath();
-  if (existingPath) {
-    return existingPath;
-  }
-  if (!ripgrepAcquisitionPromise) {
-    ripgrepAcquisitionPromise = (async () => {
-      try {
-        await downloadRipGrep(Storage.getGlobalBinDir());
-        return await resolveExistingRgPath();
-      } finally {
-        ripgrepAcquisitionPromise = null;
-      }
-    })();
-  }
-  return ripgrepAcquisitionPromise;
-}
-
 /**
- * Checks if `rg` exists, if not then attempt to download it.
+ * Checks if `rg` exists in the bundled vendor directory.
  */
 export async function canUseRipgrep(): Promise<boolean> {
-  return (await ensureRipgrepAvailable()) !== null;
+  const binPath = await getRipgrepPath();
+  return binPath !== null;
 }
 
 /**
- * Ensures `rg` is downloaded, or throws.
+ * Ensures `rg` is available, or throws.
  */
 export async function ensureRgPath(): Promise<string> {
-  const downloadedPath = await ensureRipgrepAvailable();
-  if (downloadedPath) {
-    return downloadedPath;
+  const binPath = await getRipgrepPath();
+  if (binPath !== null) {
+    return binPath;
   }
-  throw new Error('Cannot use ripgrep.');
+  throw new Error(`Cannot find bundled ripgrep binary.`);
 }
 
 /**
@@ -171,7 +168,7 @@ class GrepToolInvocation extends BaseToolInvocation<
     super(params, messageBus, _toolName, _toolDisplayName);
   }
 
-  async execute(signal: AbortSignal): Promise<ToolResult> {
+  async execute({ abortSignal: signal }: ExecuteOptions): Promise<ToolResult> {
     try {
       // Default to '.' if path is explicitly undefined/null.
       // This forces CWD search instead of 'all workspaces' search by default.
@@ -229,9 +226,17 @@ class GrepToolInvocation extends BaseToolInvocation<
 
       // Create a timeout controller to prevent indefinitely hanging searches
       const timeoutController = new AbortController();
+      const configTimeout = this.config.getFileFilteringOptions().searchTimeout;
+      // If configTimeout is less than standard default, it might be too short for grep.
+      // We check if it's greater or if we should use DEFAULT_SEARCH_TIMEOUT_MS as a fallback.
+      // Let's assume the user can set it higher if they want. Using it directly if it exists, otherwise fallback.
+      const timeoutMs =
+        configTimeout && configTimeout > DEFAULT_SEARCH_TIMEOUT_MS
+          ? configTimeout
+          : DEFAULT_SEARCH_TIMEOUT_MS;
       const timeoutId = setTimeout(() => {
         timeoutController.abort();
-      }, DEFAULT_SEARCH_TIMEOUT_MS);
+      }, timeoutMs);
 
       // Link the passed signal to our timeout controller
       const onAbort = () => timeoutController.abort();
@@ -258,6 +263,13 @@ class GrepToolInvocation extends BaseToolInvocation<
           max_matches_per_file: this.params.max_matches_per_file,
           signal: timeoutController.signal,
         });
+      } catch (error) {
+        if (timeoutController.signal.aborted) {
+          throw new Error(
+            `Operation timed out after ${timeoutMs}ms. In large repositories, consider narrowing your search scope by specifying a 'dir_path' or an 'include_pattern'.`,
+          );
+        }
+        throw error;
       } finally {
         clearTimeout(timeoutId);
         signal.removeEventListener('abort', onAbort);
@@ -455,6 +467,7 @@ class GrepToolInvocation extends BaseToolInvocation<
       const generator = execStreaming(rgPath, rgArgs, {
         signal: options.signal,
         allowedExitCodes: [0, 1],
+        sandboxManager: this.config.sandboxManager,
       });
 
       let matchesFound = 0;

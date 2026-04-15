@@ -9,8 +9,7 @@ import path from 'node:path';
 import toml from '@iarna/toml';
 import { glob } from 'glob';
 import { z } from 'zod';
-import type { Config } from '@google/gemini-cli-core';
-import { Storage, coreEvents } from '@google/gemini-cli-core';
+import { Storage, coreEvents, type Config } from '@google/gemini-cli-core';
 import type { ICommandLoader } from './types.js';
 import type {
   CommandContext,
@@ -37,6 +36,7 @@ import { sanitizeForDisplay } from '../ui/utils/textUtils.js';
 
 interface CommandDirectory {
   path: string;
+  kind: CommandKind;
   extensionName?: string;
   extensionId?: string;
 }
@@ -111,6 +111,7 @@ export class FileCommandLoader implements ICommandLoader {
           this.parseAndAdaptFile(
             path.join(dirInfo.path, file),
             dirInfo.path,
+            dirInfo.kind,
             dirInfo.extensionName,
             dirInfo.extensionId,
           ),
@@ -151,10 +152,16 @@ export class FileCommandLoader implements ICommandLoader {
     const storage = this.config?.storage ?? new Storage(this.projectRoot);
 
     // 1. User commands
-    dirs.push({ path: Storage.getUserCommandsDir() });
+    dirs.push({
+      path: Storage.getUserCommandsDir(),
+      kind: CommandKind.USER_FILE,
+    });
 
-    // 2. Project commands (override user commands)
-    dirs.push({ path: storage.getProjectCommandsDir() });
+    // 2. Project commands
+    dirs.push({
+      path: storage.getProjectCommandsDir(),
+      kind: CommandKind.WORKSPACE_FILE,
+    });
 
     // 3. Extension commands (processed last to detect all conflicts)
     if (this.config) {
@@ -165,6 +172,7 @@ export class FileCommandLoader implements ICommandLoader {
 
       const extensionCommandDirs = activeExtensions.map((ext) => ({
         path: path.join(ext.path, 'commands'),
+        kind: CommandKind.EXTENSION_FILE,
         extensionName: ext.name,
         extensionId: ext.id,
       }));
@@ -179,12 +187,14 @@ export class FileCommandLoader implements ICommandLoader {
    * Parses a single .toml file and transforms it into a SlashCommand object.
    * @param filePath The absolute path to the .toml file.
    * @param baseDir The root command directory for name calculation.
+   * @param kind The CommandKind.
    * @param extensionName Optional extension name to prefix commands with.
    * @returns A promise resolving to a SlashCommand, or null if the file is invalid.
    */
   private async parseAndAdaptFile(
     filePath: string,
     baseDir: string,
+    kind: CommandKind,
     extensionName?: string,
     extensionId?: string,
   ): Promise<SlashCommand | null> {
@@ -286,7 +296,7 @@ export class FileCommandLoader implements ICommandLoader {
     return {
       name: baseCommandName,
       description,
-      kind: CommandKind.FILE,
+      kind,
       extensionName,
       extensionId,
       action: async (

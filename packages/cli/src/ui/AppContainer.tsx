@@ -11,18 +11,21 @@ import {
   useEffect,
   useRef,
   useLayoutEffect,
+  useContext,
 } from 'react';
 import {
   type DOMElement,
-  measureElement,
+  ResizeObserver,
   useApp,
   useStdout,
   useStdin,
   type AppProps,
+  AppContext as InkAppContext,
 } from 'ink';
 import { App } from './App.js';
 import { AppContext } from './contexts/AppContext.js';
 import { UIStateContext, type UIState } from './contexts/UIStateContext.js';
+import { QuotaContext } from './contexts/QuotaContext.js';
 import {
   UIActionsContext,
   type UIActions,
@@ -30,16 +33,18 @@ import {
 import { ConfigContext } from './contexts/ConfigContext.js';
 import {
   type HistoryItem,
-  type HistoryItemWithoutId,
-  type HistoryItemToolGroup,
   AuthState,
   type ConfirmationRequest,
   type PermissionConfirmationRequest,
   type QuotaStats,
+  MessageType,
+  StreamingState,
+  type HistoryItemInfo,
 } from './types.js';
 import { checkPermissions } from './hooks/atCommandProcessor.js';
-import { MessageType, StreamingState } from './types.js';
 import { ToolActionsProvider } from './contexts/ToolActionsContext.js';
+import { MouseProvider } from './contexts/MouseContext.js';
+import { ScrollProvider } from './contexts/ScrollProvider.js';
 import {
   type StartupWarning,
   type EditorType,
@@ -47,7 +52,9 @@ import {
   type IdeInfo,
   type IdeContext,
   type UserTierId,
+  type GeminiUserTier,
   type UserFeedbackPayload,
+  type HookSystemMessagePayload,
   type AgentDefinition,
   type ApprovalMode,
   IdeClient,
@@ -79,9 +86,13 @@ import {
   type ConsentRequestPayload,
   type AgentsDiscoveredPayload,
   ChangeAuthRequestedError,
-  CoreToolCallStatus,
-  generateSteeringAckMessage,
+  ProjectIdRequiredError,
   buildUserSteeringHintPrompt,
+  logBillingEvent,
+  ApiKeyUpdatedEvent,
+  LegacyAgentProtocol,
+  type InjectionSource,
+  startMemoryService,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import process from 'node:process';
@@ -99,7 +110,7 @@ import {
   useOverflowActions,
   useOverflowState,
 } from './contexts/OverflowContext.js';
-import { useConsoleMessages } from './hooks/useConsoleMessages.js';
+import { useErrorCount } from './hooks/useConsoleMessages.js';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
 import { calculatePromptWidths } from './components/InputPrompt.js';
 import { calculateMainAreaWidth } from './utils/ui-sizing.js';
@@ -109,14 +120,15 @@ import { computeTerminalTitle } from '../utils/windowTitle.js';
 import { useTextBuffer } from './components/shared/text-buffer.js';
 import { useLogger } from './hooks/useLogger.js';
 import { useGeminiStream } from './hooks/useGeminiStream.js';
-import { type BackgroundShell } from './hooks/shellCommandProcessor.js';
+import { useAgentStream } from './hooks/useAgentStream.js';
+import { type BackgroundTask } from './hooks/useExecutionLifecycle.js';
 import { useVim } from './hooks/vim.js';
 import { type LoadableSettingScope, SettingScope } from '../config/settings.js';
 import { type InitializationResult } from '../core/initializer.js';
 import { useFocus } from './hooks/useFocus.js';
 import { useKeypress, type Key } from './hooks/useKeypress.js';
 import { KeypressPriority } from './contexts/KeypressContext.js';
-import { keyMatchers, Command } from './keyMatchers.js';
+import { Command } from './key/keyMatchers.js';
 import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
 import { useShellInactivityStatus } from './hooks/useShellInactivityStatus.js';
 import { useFolderTrust } from './hooks/useFolderTrust.js';
@@ -125,8 +137,12 @@ import { type IdeIntegrationNudgeResult } from './IdeIntegrationNudge.js';
 import { appEvents, AppEvent, TransientMessageType } from '../utils/events.js';
 import { type UpdateObject } from './utils/updateCheck.js';
 import { setUpdateHandler } from '../utils/handleAutoUpdate.js';
-import { registerCleanup, runExitCleanup } from '../utils/cleanup.js';
-import { RELAUNCH_EXIT_CODE } from '../utils/processUtils.js';
+import {
+  registerCleanup,
+  removeCleanup,
+  runExitCleanup,
+} from '../utils/cleanup.js';
+import { relaunchApp } from '../utils/processUtils.js';
 import type { SessionInfo } from '../utils/sessionUtils.js';
 import { useMessageQueue } from './hooks/useMessageQueue.js';
 import { useMcpStatus } from './hooks/useMcpStatus.js';
@@ -143,16 +159,14 @@ import { requestConsentInteractive } from '../config/extensions/consent.js';
 import { useSessionBrowser } from './hooks/useSessionBrowser.js';
 import { useSessionResume } from './hooks/useSessionResume.js';
 import { useIncludeDirsTrust } from './hooks/useIncludeDirsTrust.js';
-import { useSessionRetentionCheck } from './hooks/useSessionRetentionCheck.js';
 import { isWorkspaceTrusted } from '../config/trustedFolders.js';
-import { useAlternateBuffer } from './hooks/useAlternateBuffer.js';
 import { useSettings } from './contexts/SettingsContext.js';
 import { terminalCapabilityManager } from './utils/terminalCapabilityManager.js';
 import { useInputHistoryStore } from './hooks/useInputHistoryStore.js';
 import { useBanner } from './hooks/useBanner.js';
 import { useTerminalSetupPrompt } from './utils/terminalSetup.js';
 import { useHookDisplayState } from './hooks/useHookDisplayState.js';
-import { useBackgroundShellManager } from './hooks/useBackgroundShellManager.js';
+import { useBackgroundTaskManager } from './hooks/useBackgroundTaskManager.js';
 import {
   WARNING_PROMPT_DURATION_MS,
   QUEUE_ERROR_DISPLAY_DURATION_MS,
@@ -161,35 +175,19 @@ import {
 import { LoginWithGoogleRestartDialog } from './auth/LoginWithGoogleRestartDialog.js';
 import { NewAgentsChoice } from './components/NewAgentsNotification.js';
 import { isSlashCommand } from './utils/commandUtils.js';
+import { parseSlashCommand } from '../utils/commands.js';
 import { useTerminalTheme } from './hooks/useTerminalTheme.js';
 import { useTimedMessage } from './hooks/useTimedMessage.js';
-import { shouldDismissShortcutsHelpOnHotkey } from './utils/shortcutsHelp.js';
+import { useIsHelpDismissKey } from './utils/shortcutsHelp.js';
 import { useSuspend } from './hooks/useSuspend.js';
 import { useRunEventNotifications } from './hooks/useRunEventNotifications.js';
 import { isNotificationsEnabled } from '../utils/terminalNotifications.js';
-
-function isToolExecuting(pendingHistoryItems: HistoryItemWithoutId[]) {
-  return pendingHistoryItems.some((item) => {
-    if (item && item.type === 'tool_group') {
-      return item.tools.some(
-        (tool) => CoreToolCallStatus.Executing === tool.status,
-      );
-    }
-    return false;
-  });
-}
-
-function isToolAwaitingConfirmation(
-  pendingHistoryItems: HistoryItemWithoutId[],
-) {
-  return pendingHistoryItems
-    .filter((item): item is HistoryItemToolGroup => item.type === 'tool_group')
-    .some((item) =>
-      item.tools.some(
-        (tool) => CoreToolCallStatus.AwaitingApproval === tool.status,
-      ),
-    );
-}
+import {
+  getLastTurnToolCallIds,
+  isToolExecuting,
+  isToolAwaitingConfirmation,
+  getAllToolCalls,
+} from './utils/historyUtils.js';
 
 interface AppContainerProps {
   config: Config;
@@ -204,6 +202,9 @@ import {
   useVisibilityToggle,
   APPROVAL_MODE_REVEAL_DURATION_MS,
 } from './hooks/useVisibilityToggle.js';
+import { useKeyMatchers } from './hooks/useKeyMatchers.js';
+
+import { InputContext } from './contexts/InputContext.js';
 
 /**
  * The fraction of the terminal width to allocate to the shell.
@@ -218,17 +219,37 @@ const SHELL_WIDTH_FRACTION = 0.89;
 const SHELL_HEIGHT_PADDING = 10;
 
 export const AppContainer = (props: AppContainerProps) => {
+  const isHelpDismissKey = useIsHelpDismissKey();
+  const keyMatchers = useKeyMatchers();
   const { config, initializationResult, resumedSessionData } = props;
   const settings = useSettings();
   const { reset } = useOverflowActions()!;
   const notificationsEnabled = isNotificationsEnabled(settings);
 
+  const { setOptions, dumpCurrentFrame, startRecording, stopRecording } =
+    useContext(InkAppContext);
+  const recordingFilenameRef = useRef<string | null>(null);
   const historyManager = useHistory({
     chatRecordingService: config.getGeminiClient()?.getChatRecordingService(),
   });
 
   useMemoryMonitor(historyManager);
-  const isAlternateBuffer = useAlternateBuffer();
+  const isAlternateBuffer = config.getUseAlternateBuffer();
+  const [mouseMode, setMouseMode] = useState(() =>
+    config.getUseAlternateBuffer(),
+  );
+
+  useEffect(() => {
+    setOptions({
+      stickyHeadersInBackbuffer: mouseMode,
+    });
+    if (mouseMode) {
+      enableMouseEvents();
+    } else {
+      disableMouseEvents();
+    }
+  }, [mouseMode, setOptions]);
+
   const [corgiMode, setCorgiMode] = useState(false);
   const [forceRerenderKey, setForceRerenderKey] = useState(0);
   const [debugMessage, setDebugMessage] = useState<string>('');
@@ -247,11 +268,44 @@ export const AppContainer = (props: AppContainerProps) => {
   );
   const [copyModeEnabled, setCopyModeEnabled] = useState(false);
   const [pendingRestorePrompt, setPendingRestorePrompt] = useState(false);
-  const toggleBackgroundShellRef = useRef<() => void>(() => {});
-  const isBackgroundShellVisibleRef = useRef<boolean>(false);
-  const backgroundShellsRef = useRef<Map<number, BackgroundShell>>(new Map());
+  const toggleBackgroundTasksRef = useRef<() => void>(() => {});
+  const isBackgroundTaskVisibleRef = useRef<boolean>(false);
+  const backgroundTasksRef = useRef<Map<number, BackgroundTask>>(new Map());
 
   const [adminSettingsChanged, setAdminSettingsChanged] = useState(false);
+
+  const [expandedTools, setExpandedTools] = useState<Set<string>>(new Set());
+
+  const toggleExpansion = useCallback((callId: string) => {
+    setExpandedTools((prev) => {
+      const next = new Set(prev);
+      if (next.has(callId)) {
+        next.delete(callId);
+      } else {
+        next.add(callId);
+      }
+      return next;
+    });
+  }, []);
+
+  const toggleAllExpansion = useCallback((callIds: string[]) => {
+    setExpandedTools((prev) => {
+      const next = new Set(prev);
+      const anyCollapsed = callIds.some((id) => !next.has(id));
+
+      if (anyCollapsed) {
+        callIds.forEach((id) => next.add(id));
+      } else {
+        callIds.forEach((id) => next.delete(id));
+      }
+      return next;
+    });
+  }, []);
+
+  const isExpanded = useCallback(
+    (callId: string) => expandedTools.has(callId),
+    [expandedTools],
+  );
 
   const [shellModeActive, setShellModeActive] = useState(false);
   const [modelSwitchedFromQuotaError, setModelSwitchedFromQuotaError] =
@@ -264,14 +318,16 @@ export const AppContainer = (props: AppContainerProps) => {
     () => isWorkspaceTrusted(settings.merged).isTrusted,
   );
 
-  const [queueErrorMessage, setQueueErrorMessage] = useState<string | null>(
-    null,
+  const [queueErrorMessage, setQueueErrorMessage] = useTimedMessage<string>(
+    QUEUE_ERROR_DISPLAY_DURATION_MS,
   );
 
   const [newAgents, setNewAgents] = useState<AgentDefinition[] | null>(null);
   const [constrainHeight, setConstrainHeight] = useState<boolean>(true);
-  const [showIsExpandableHint, setShowIsExpandableHint] = useState(false);
-  const expandHintTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [expandHintTrigger, triggerExpandHint] = useTimedMessage<boolean>(
+    EXPAND_HINT_DURATION_MS,
+  );
+  const showIsExpandableHint = Boolean(expandHintTrigger);
   const overflowState = useOverflowState();
   const overflowingIdsSize = overflowState?.overflowingIds.size ?? 0;
   const hasOverflowState = overflowingIdsSize > 0 || !constrainHeight;
@@ -280,43 +336,18 @@ export const AppContainer = (props: AppContainerProps) => {
    * Manages the visibility and x-second timer for the expansion hint.
    *
    * This effect triggers the timer countdown whenever an overflow is detected
-   * or the user manually toggles the expansion state with Ctrl+O. We use a stable
-   * boolean dependency (hasOverflowState) to ensure the timer only resets on
-   * genuine state transitions, preventing it from infinitely resetting during
-   * active text streaming.
+   * or the user manually toggles the expansion state with Ctrl+O.
+   * By depending on overflowingIdsSize, the timer resets when *new* views
+   * overflow, but avoids infinitely resetting during single-view streaming.
+   *
+   * In alternate buffer mode, we don't trigger the hint automatically on overflow
+   * to avoid noise, but the user can still trigger it manually with Ctrl+O.
    */
   useEffect(() => {
-    if (isAlternateBuffer) {
-      setShowIsExpandableHint(false);
-      if (expandHintTimerRef.current) {
-        clearTimeout(expandHintTimerRef.current);
-      }
-      return;
-    }
-
     if (hasOverflowState) {
-      setShowIsExpandableHint(true);
-      if (expandHintTimerRef.current) {
-        clearTimeout(expandHintTimerRef.current);
-      }
-      expandHintTimerRef.current = setTimeout(() => {
-        setShowIsExpandableHint(false);
-      }, EXPAND_HINT_DURATION_MS);
+      triggerExpandHint(true);
     }
-  }, [hasOverflowState, isAlternateBuffer, constrainHeight]);
-
-  /**
-   * Safe cleanup to ensure the expansion hint timer is cancelled when the
-   * component unmounts, preventing memory leaks.
-   */
-  useEffect(
-    () => () => {
-      if (expandHintTimerRef.current) {
-        clearTimeout(expandHintTimerRef.current);
-      }
-    },
-    [],
-  );
+  }, [hasOverflowState, overflowingIdsSize, triggerExpandHint]);
 
   const [defaultBannerText, setDefaultBannerText] = useState('');
   const [warningBannerText, setWarningBannerText] = useState('');
@@ -414,10 +445,13 @@ export const AppContainer = (props: AppContainerProps) => {
       ? { remaining, limit, resetTime }
       : undefined;
   });
+  const [paidTier, setPaidTier] = useState<GeminiUserTier | undefined>(
+    undefined,
+  );
 
   const [isConfigInitialized, setConfigInitialized] = useState(false);
 
-  const logger = useLogger(config.storage);
+  const logger = useLogger(config);
   const { inputHistory, addInput, initializeFromLogger } =
     useInputHistoryStore();
 
@@ -432,7 +466,6 @@ export const AppContainer = (props: AppContainerProps) => {
   const branchName = useGitBranchName(config.getTargetDir());
 
   // Layout measurements
-  const mainControlsRef = useRef<DOMElement>(null);
   // For performance profiling only
   const rootUiRef = useRef<DOMElement>(null);
   const lastTitleRef = useRef<string | null>(null);
@@ -448,6 +481,13 @@ export const AppContainer = (props: AppContainerProps) => {
       }
       setConfigInitialized(true);
       startupProfiler.flush(config);
+
+      // Fire-and-forget memory service (skill extraction from past sessions)
+      if (config.isMemoryManagerEnabled()) {
+        startMemoryService(config).catch((e) => {
+          debugLogger.error('Failed to start memory service:', e);
+        });
+      }
 
       const sessionStartSource = resumedSessionData
         ? SessionStartSource.Resume
@@ -484,21 +524,31 @@ export const AppContainer = (props: AppContainerProps) => {
         debugLogger.warn('Background summary generation failed:', e);
       });
     })();
-    registerCleanup(async () => {
+    const cleanupFn = async () => {
       // Turn off mouse scroll.
       disableMouseEvents();
 
       // Kill all background shells
-      for (const pid of backgroundShellsRef.current.keys()) {
-        ShellExecutionService.kill(pid);
-      }
+      await Promise.all(
+        Array.from(backgroundTasksRef.current.keys()).map((pid) =>
+          ShellExecutionService.kill(pid),
+        ),
+      );
 
       const ideClient = await IdeClient.getInstance();
       await ideClient.disconnect();
 
       // Fire SessionEnd hook on cleanup (only if hooks are enabled)
       await config?.getHookSystem()?.fireSessionEndEvent(SessionEndReason.Exit);
-    });
+    };
+    registerCleanup(cleanupFn);
+
+    return () => {
+      removeCleanup(cleanupFn);
+      cleanupFn().catch((e: unknown) =>
+        debugLogger.error('Error during cleanup:', e),
+      );
+    };
     // Disable the dependencies check here. historyManager gets flagged
     // but we don't want to react to changes to it because each new history
     // item, including the ones from the start session hook will cause a
@@ -564,10 +614,9 @@ export const AppContainer = (props: AppContainerProps) => {
     };
   }, [settings]);
 
-  const { consoleMessages, clearConsoleMessages: clearConsoleMessagesState } =
-    useConsoleMessages();
+  const { errorCount, clearErrorCount } = useErrorCount();
 
-  const mainAreaWidth = calculateMainAreaWidth(terminalWidth, settings);
+  const mainAreaWidth = calculateMainAreaWidth(terminalWidth, config);
   // Derive widths for InputPrompt using shared helper
   const { inputWidth, suggestionsWidth } = useMemo(() => {
     const { inputWidth, suggestionsWidth } =
@@ -614,11 +663,11 @@ export const AppContainer = (props: AppContainerProps) => {
   });
 
   const refreshStatic = useCallback(() => {
-    if (!isAlternateBuffer) {
+    if (!isAlternateBuffer && !config.getUseTerminalBuffer()) {
       stdout.write(ansiEscapes.clearTerminal);
+      setHistoryRemountKey((prev) => prev + 1);
     }
-    setHistoryRemountKey((prev) => prev + 1);
-  }, [setHistoryRemountKey, isAlternateBuffer, stdout]);
+  }, [setHistoryRemountKey, isAlternateBuffer, stdout, config]);
 
   const shouldUseAlternateScreen = shouldEnterAlternateScreen(
     isAlternateBuffer,
@@ -692,7 +741,14 @@ export const AppContainer = (props: AppContainerProps) => {
     onAuthError,
     apiKeyDefaultValue,
     reloadApiKey,
-  } = useAuthCommand(settings, config, initializationResult.authError);
+    accountSuspensionInfo,
+    setAccountSuspensionInfo,
+  } = useAuthCommand(
+    settings,
+    config,
+    initializationResult.authError,
+    initializationResult.accountSuspensionInfo,
+  );
   const [authContext, setAuthContext] = useState<{ requiresRestart?: boolean }>(
     {},
   );
@@ -709,17 +765,28 @@ export const AppContainer = (props: AppContainerProps) => {
     handleProQuotaChoice,
     validationRequest,
     handleValidationChoice,
+    // G1 AI Credits
+    overageMenuRequest,
+    handleOverageMenuChoice,
+    emptyWalletRequest,
+    handleEmptyWalletChoice,
   } = useQuotaAndFallback({
     config,
     historyManager,
     userTier,
+    paidTier,
+    settings,
     setModelSwitchedFromQuotaError,
     onShowAuthSelection: () => setAuthState(AuthState.Updating),
+    errorVerbosity: settings.merged.ui.errorVerbosity,
   });
 
   // Derive auth state variables for backward compatibility with UIStateContext
   const isAuthDialogOpen = authState === AuthState.Updating;
-  const isAuthenticating = authState === AuthState.Unauthenticated;
+  // TODO: Consider handling other auth types that should also skip the blocking screen
+  const isAuthenticating =
+    authState === AuthState.Unauthenticated &&
+    settings.merged.security.auth.selectedType !== AuthType.USE_GEMINI;
 
   // Session browser and resume functionality
   const isGeminiClientInitialized = config.getGeminiClient()?.isInitialized();
@@ -743,7 +810,7 @@ export const AppContainer = (props: AppContainerProps) => {
   // Wrap handleDeleteSession to return a Promise for UIActions interface
   const handleDeleteSession = useCallback(
     async (session: SessionInfo): Promise<void> => {
-      handleDeleteSessionSync(session);
+      await handleDeleteSessionSync(session);
     },
     [handleDeleteSessionSync],
   );
@@ -752,6 +819,8 @@ export const AppContainer = (props: AppContainerProps) => {
   const handleAuthSelect = useCallback(
     async (authType: AuthType | undefined, scope: LoadableSettingScope) => {
       if (authType) {
+        const previousAuthType =
+          config.getContentGeneratorConfig()?.authType ?? 'unknown';
         if (authType === AuthType.LOGIN_WITH_GOOGLE) {
           setAuthContext({ requiresRestart: true });
         } else {
@@ -764,8 +833,18 @@ export const AppContainer = (props: AppContainerProps) => {
           config.setRemoteAdminSettings(undefined);
           await config.refreshAuth(authType);
           setAuthState(AuthState.Authenticated);
+          logBillingEvent(
+            config,
+            new ApiKeyUpdatedEvent(previousAuthType, authType),
+          );
         } catch (e) {
           if (e instanceof ChangeAuthRequestedError) {
+            return;
+          }
+          if (e instanceof ProjectIdRequiredError) {
+            // OAuth succeeded but account setup requires project ID
+            // Show the error message directly without "Failed to authenticate" prefix
+            onAuthError(getErrorMessage(e));
             return;
           }
           onAuthError(
@@ -778,13 +857,12 @@ export const AppContainer = (props: AppContainerProps) => {
           authType === AuthType.LOGIN_WITH_GOOGLE &&
           config.isBrowserLaunchSuppressed()
         ) {
-          await runExitCleanup();
           writeToStdout(`
 ----------------------------------------------------------------
 Logging in with Google... Restarting Gemini CLI to continue.
 ----------------------------------------------------------------
           `);
-          process.exit(RELAUNCH_EXIT_CODE);
+          await relaunchApp();
         }
       }
       setAuthState(AuthState.Authenticated);
@@ -826,6 +904,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     // Only sync when not currently authenticating
     if (authState === AuthState.Authenticated) {
       setUserTier(config.getUserTier());
+      setPaidTier(config.getUserPaidTier());
     }
   }, [config, authState]);
 
@@ -870,7 +949,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   const { toggleVimEnabled } = useVimMode();
 
-  const setIsBackgroundShellListOpenRef = useRef<(open: boolean) => void>(
+  const setIsBackgroundTaskListOpenRef = useRef<(open: boolean) => void>(
     () => {},
   );
   const [shortcutsHelpVisible, setShortcutsHelpVisible] = useState(false);
@@ -905,14 +984,14 @@ Logging in with Google... Restarting Gemini CLI to continue.
       toggleDebugProfiler,
       dispatchExtensionStateUpdate,
       addConfirmUpdateExtensionRequest,
-      toggleBackgroundShell: () => {
-        toggleBackgroundShellRef.current();
-        if (!isBackgroundShellVisibleRef.current) {
+      toggleBackgroundTasks: () => {
+        toggleBackgroundTasksRef.current();
+        if (!isBackgroundTaskVisibleRef.current) {
           setEmbeddedShellFocused(true);
-          if (backgroundShellsRef.current.size > 1) {
-            setIsBackgroundShellListOpenRef.current(true);
+          if (backgroundTasksRef.current.size > 1) {
+            setIsBackgroundTaskListOpenRef.current(true);
           } else {
-            setIsBackgroundShellListOpenRef.current(false);
+            setIsBackgroundTaskListOpenRef.current(false);
           }
         }
       },
@@ -993,18 +1072,27 @@ Logging in with Google... Restarting Gemini CLI to continue.
       Date.now(),
     );
     try {
-      const { memoryContent, fileCount } =
-        await refreshServerHierarchicalMemory(config);
+      let flattenedMemory: string;
+      let fileCount: number;
 
-      const flattenedMemory = flattenMemory(memoryContent);
+      if (config.isJitContextEnabled()) {
+        await config.getMemoryContextManager()?.refresh();
+        config.updateSystemInstructionIfInitialized();
+        flattenedMemory = flattenMemory(config.getUserMemory());
+        fileCount = config.getGeminiMdFileCount();
+      } else {
+        const result = await refreshServerHierarchicalMemory(config);
+        flattenedMemory = flattenMemory(result.memoryContent);
+        fileCount = result.fileCount;
+      }
 
       historyManager.addItem(
         {
           type: MessageType.INFO,
-          text: `Memory refreshed successfully. ${
+          text: `Memory reloaded successfully. ${
             flattenedMemory.length > 0
-              ? `Loaded ${flattenedMemory.length} characters from ${fileCount} file(s).`
-              : 'No memory content found.'
+              ? `Loaded ${flattenedMemory.length} characters from ${fileCount} file(s)`
+              : 'No memory content found'
           }`,
         },
         Date.now(),
@@ -1075,15 +1163,58 @@ Logging in with Google... Restarting Gemini CLI to continue.
   }, []);
 
   useEffect(() => {
-    const hintListener = (hint: string) => {
-      pendingHintsRef.current.push(hint);
+    const hintListener = (text: string, source: InjectionSource) => {
+      if (source !== 'user_steering' && source !== 'background_completion') {
+        return;
+      }
+      pendingHintsRef.current.push(text);
       setPendingHintCount((prev) => prev + 1);
     };
-    config.userHintService.onUserHint(hintListener);
+    config.injectionService.onInjection(hintListener);
     return () => {
-      config.userHintService.offUserHint(hintListener);
+      config.injectionService.offInjection(hintListener);
     };
   }, [config]);
+
+  const streamAgent = useMemo(
+    () =>
+      config?.getAgentSessionInteractiveEnabled()
+        ? new LegacyAgentProtocol({ config, getPreferredEditor })
+        : undefined,
+    [config, getPreferredEditor],
+  );
+
+  const activeStream = streamAgent
+    ? // eslint-disable-next-line react-hooks/rules-of-hooks
+      useAgentStream({
+        agent: streamAgent,
+        addItem: historyManager.addItem,
+        onCancelSubmit,
+        isShellFocused: embeddedShellFocused,
+        logger,
+      })
+    : // eslint-disable-next-line react-hooks/rules-of-hooks
+      useGeminiStream(
+        config.getGeminiClient(),
+        historyManager.history,
+        historyManager.addItem,
+        config,
+        settings,
+        setDebugMessage,
+        handleSlashCommand,
+        shellModeActive,
+        getPreferredEditor,
+        onAuthError,
+        performMemoryRefresh,
+        modelSwitchedFromQuotaError,
+        setModelSwitchedFromQuotaError,
+        onCancelSubmit,
+        setEmbeddedShellFocused,
+        terminalWidth,
+        terminalHeight,
+        embeddedShellFocused,
+        consumePendingHints,
+      );
 
   const {
     streamingState,
@@ -1097,56 +1228,41 @@ Logging in with Google... Restarting Gemini CLI to continue.
     activePtyId,
     loopDetectionConfirmationRequest,
     lastOutputTime,
-    backgroundShellCount,
-    isBackgroundShellVisible,
-    toggleBackgroundShell,
-    backgroundCurrentShell,
-    backgroundShells,
-    dismissBackgroundShell,
+    backgroundTaskCount,
+    isBackgroundTaskVisible,
+    toggleBackgroundTasks,
+    backgroundCurrentExecution,
+    backgroundTasks,
+    dismissBackgroundTask,
     retryStatus,
-  } = useGeminiStream(
-    config.getGeminiClient(),
-    historyManager.history,
-    historyManager.addItem,
-    config,
-    settings,
-    setDebugMessage,
-    handleSlashCommand,
-    shellModeActive,
-    getPreferredEditor,
-    onAuthError,
-    performMemoryRefresh,
-    modelSwitchedFromQuotaError,
-    setModelSwitchedFromQuotaError,
-    onCancelSubmit,
-    setEmbeddedShellFocused,
-    terminalWidth,
-    terminalHeight,
-    embeddedShellFocused,
-    consumePendingHints,
+  } = activeStream;
+
+  const pendingHistoryItems = useMemo(
+    () => [...pendingSlashCommandHistoryItems, ...pendingGeminiHistoryItems],
+    [pendingSlashCommandHistoryItems, pendingGeminiHistoryItems],
   );
 
-  toggleBackgroundShellRef.current = toggleBackgroundShell;
-  isBackgroundShellVisibleRef.current = isBackgroundShellVisible;
-  backgroundShellsRef.current = backgroundShells;
+  toggleBackgroundTasksRef.current = toggleBackgroundTasks;
+  isBackgroundTaskVisibleRef.current = isBackgroundTaskVisible;
+  backgroundTasksRef.current = backgroundTasks;
 
   const {
-    activeBackgroundShellPid,
-    setIsBackgroundShellListOpen,
-    isBackgroundShellListOpen,
-    setActiveBackgroundShellPid,
-    backgroundShellHeight,
-  } = useBackgroundShellManager({
-    backgroundShells,
-    backgroundShellCount,
-    isBackgroundShellVisible,
+    activeBackgroundTaskPid,
+    setIsBackgroundTaskListOpen,
+    isBackgroundTaskListOpen,
+    setActiveBackgroundTaskPid,
+    backgroundTaskHeight,
+  } = useBackgroundTaskManager({
+    backgroundTasks,
+    backgroundTaskCount,
+    isBackgroundTaskVisible,
     activePtyId,
     embeddedShellFocused,
     setEmbeddedShellFocused,
     terminalHeight,
   });
 
-  setIsBackgroundShellListOpenRef.current = setIsBackgroundShellListOpen;
+  setIsBackgroundTaskListOpenRef.current = setIsBackgroundTaskListOpen;
 
   const lastOutputTimeRef = useRef(0);
 
@@ -1197,10 +1313,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   cancelHandlerRef.current = useCallback(
     (shouldRestorePrompt: boolean = true) => {
-      const pendingHistoryItems = [
-        ...pendingSlashCommandHistoryItems,
-        ...pendingGeminiHistoryItems,
-      ];
       if (isToolAwaitingConfirmation(pendingHistoryItems)) {
         return; // Don't clear - user may be composing a follow-up message
       }
@@ -1209,8 +1321,15 @@ Logging in with Google... Restarting Gemini CLI to continue.
         return;
       }
 
+      // If cancelling (shouldRestorePrompt=false), never modify the buffer
+      // User is in control - preserve whatever text they typed, pasted, or restored
+      if (!shouldRestorePrompt) {
+        return;
+      }
+
+      // Restore the last message when shouldRestorePrompt=true
       const lastUserMessage = inputHistory.at(-1);
-      let textToSet = shouldRestorePrompt ? lastUserMessage || '' : '';
+      let textToSet = lastUserMessage || '';
 
       const queuedText = getQueuedMessagesText();
       if (queuedText) {
@@ -1218,7 +1337,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
         clearQueue();
       }
 
-      if (textToSet || !shouldRestorePrompt) {
+      if (textToSet) {
         buffer.setText(textToSet);
       }
     },
@@ -1227,8 +1346,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       inputHistory,
       getQueuedMessagesText,
       clearQueue,
-      pendingSlashCommandHistoryItems,
-      pendingGeminiHistoryItems,
+      pendingHistoryItems,
     ],
   );
 
@@ -1238,7 +1356,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       if (!trimmed) {
         return;
       }
-      config.userHintService.addUserHint(trimmed);
+      config.injectionService.addInjection(trimmed, 'user_steering');
       // Render hints with a distinct style.
       historyManager.addItem({
         type: 'hint',
@@ -1252,10 +1370,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     async (submittedValue: string) => {
       reset();
       // Explicitly hide the expansion hint and clear its x-second timer when a new turn begins.
-      setShowIsExpandableHint(false);
-      if (expandHintTimerRef.current) {
-        clearTimeout(expandHintTimerRef.current);
-      }
+      triggerExpandHint(null);
       if (!constrainHeight) {
         setConstrainHeight(true);
         if (!isAlternateBuffer) {
@@ -1267,10 +1382,19 @@ Logging in with Google... Restarting Gemini CLI to continue.
       const isIdle = streamingState === StreamingState.Idle;
       const isAgentRunning =
         streamingState === StreamingState.Responding ||
-        isToolExecuting([
-          ...pendingSlashCommandHistoryItems,
-          ...pendingGeminiHistoryItems,
-        ]);
+        isToolExecuting(pendingHistoryItems);
+
+      if (isSlash && isAgentRunning) {
+        const { commandToExecute } = parseSlashCommand(
+          submittedValue,
+          slashCommands ?? [],
+        );
+        if (commandToExecute?.isSafeConcurrent) {
+          void handleSlashCommand(submittedValue);
+          addInput(submittedValue);
+          return;
+        }
+      }
 
       if (config.isModelSteeringEnabled() && isAgentRunning && !isSlash) {
         handleHintSubmit(submittedValue);
@@ -1278,7 +1402,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
         return;
       }
 
-      if (isSlash || (isIdle && isMcpReady)) {
+      const isMcpOrConfigReady = isConfigInitialized && isMcpReady;
+      if ((isSlash && isConfigInitialized) || (isIdle && isMcpOrConfigReady)) {
         if (!isSlash) {
           const permissions = await checkPermissions(submittedValue, config);
           if (permissions.length > 0) {
@@ -1301,10 +1426,12 @@ Logging in with Google... Restarting Gemini CLI to continue.
         void submitQuery(submittedValue);
       } else {
         // Check messageQueue.length === 0 to only notify on the first queued item
-        if (isIdle && !isMcpReady && messageQueue.length === 0) {
+        if (isIdle && !isMcpOrConfigReady && messageQueue.length === 0) {
           coreEvents.emitFeedback(
             'info',
-            'Waiting for MCP servers to initialize... Slash commands are still available and prompts will be queued.',
+            !isConfigInitialized
+              ? 'Initializing... Prompts will be queued.'
+              : 'Waiting for MCP servers to initialize... Slash commands are still available and prompts will be queued.',
           );
         }
         addMessage(submittedValue);
@@ -1315,11 +1442,12 @@ Logging in with Google... Restarting Gemini CLI to continue.
       addMessage,
       addInput,
       submitQuery,
+      handleSlashCommand,
+      slashCommands,
       isMcpReady,
       streamingState,
       messageQueue.length,
-      pendingSlashCommandHistoryItems,
-      pendingGeminiHistoryItems,
+      pendingHistoryItems,
       config,
       constrainHeight,
       setConstrainHeight,
@@ -1327,25 +1455,24 @@ Logging in with Google... Restarting Gemini CLI to continue.
       refreshStatic,
       reset,
       handleHintSubmit,
+      isConfigInitialized,
+      triggerExpandHint,
     ],
   );
 
   const handleClearScreen = useCallback(() => {
     reset();
     // Explicitly hide the expansion hint and clear its x-second timer when clearing the screen.
-    setShowIsExpandableHint(false);
-    if (expandHintTimerRef.current) {
-      clearTimeout(expandHintTimerRef.current);
-    }
+    triggerExpandHint(null);
     historyManager.clearItems();
-    clearConsoleMessagesState();
+    clearErrorCount();
     refreshStatic();
   }, [
     historyManager,
-    clearConsoleMessagesState,
+    clearErrorCount,
     refreshStatic,
     reset,
-    setShowIsExpandableHint,
+    triggerExpandHint,
   ]);
 
   const { handleInput: vimHandleInput } = useVim(buffer, handleFinalSubmit);
@@ -1359,35 +1486,62 @@ Logging in with Google... Restarting Gemini CLI to continue.
    * - Any future streaming states not explicitly allowed
    */
   const isInputActive =
-    isConfigInitialized &&
     !initError &&
     !isProcessing &&
     !isResuming &&
-    !!slashCommands &&
     (streamingState === StreamingState.Idle ||
-      streamingState === StreamingState.Responding) &&
+      streamingState === StreamingState.Responding ||
+      streamingState === StreamingState.WaitingForConfirmation) &&
     !proQuotaRequest;
 
+  const observerRef = useRef<ResizeObserver | null>(null);
+
+  useEffect(
+    () => () => {
+      observerRef.current?.disconnect();
+    },
+    [],
+  );
+
   const [controlsHeight, setControlsHeight] = useState(0);
+  const [lastNonCopyControlsHeight, setLastNonCopyControlsHeight] = useState(0);
 
   useLayoutEffect(() => {
-    if (mainControlsRef.current) {
-      const fullFooterMeasurement = measureElement(mainControlsRef.current);
-      const roundedHeight = Math.round(fullFooterMeasurement.height);
-      if (roundedHeight > 0 && roundedHeight !== controlsHeight) {
-        setControlsHeight(roundedHeight);
-      }
+    if (!copyModeEnabled && controlsHeight > 0) {
+      setLastNonCopyControlsHeight(controlsHeight);
     }
-  }, [buffer, terminalWidth, terminalHeight, controlsHeight]);
+  }, [copyModeEnabled, controlsHeight]);
 
-  // Compute available terminal height based on controls measurement
+  const stableControlsHeight =
+    copyModeEnabled && lastNonCopyControlsHeight > 0
+      ? lastNonCopyControlsHeight
+      : controlsHeight;
+
+  const mainControlsRef = useCallback((node: DOMElement | null) => {
+    if (observerRef.current) {
+      observerRef.current.disconnect();
+      observerRef.current = null;
+    }
+
+    if (node) {
+      const observer = new ResizeObserver((entries) => {
+        const entry = entries[0];
+        if (entry) {
+          const roundedHeight = Math.round(entry.contentRect.height);
+          setControlsHeight((prev) =>
+            roundedHeight !== prev ? roundedHeight : prev,
+          );
+        }
+      });
+      observer.observe(node);
+      observerRef.current = observer;
+    }
+  }, []);
+
+  // Compute available terminal height based on stable controls measurement
   const availableTerminalHeight = Math.max(
     0,
-    terminalHeight -
-      controlsHeight -
-      staticExtraHeight -
-      2 -
-      backgroundShellHeight,
+    terminalHeight - stableControlsHeight - backgroundTaskHeight - 1,
   );
 
   config.setShellExecutionConfig({
@@ -1399,6 +1553,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     pager: settings.merged.tools.shell.pager,
     showColor: settings.merged.tools.shell.showColor,
     sanitizationConfig: config.sanitizationConfig,
+    sandboxManager: config.sandboxManager,
   });
 
   const { isFocused, hasReceivedFocusEvent } = useFocus();
@@ -1416,32 +1571,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
   const initialPrompt = useMemo(() => config.getQuestion(), [config]);
   const initialPromptSubmitted = useRef(false);
   const geminiClient = config.getGeminiClient();
-
-  useEffect(() => {
-    if (activePtyId) {
-      try {
-        ShellExecutionService.resizePty(
-          activePtyId,
-          Math.floor(terminalWidth * SHELL_WIDTH_FRACTION),
-          Math.max(
-            Math.floor(availableTerminalHeight - SHELL_HEIGHT_PADDING),
-            1,
-          ),
-        );
-      } catch (e) {
-        // This can happen in a race condition where the pty exits
-        // right before we try to resize it.
-        if (
-          !(
-            e instanceof Error &&
-            e.message.includes('Cannot resize a pty that has already exited')
-          )
-        ) {
-          throw e;
-        }
-      }
-    }
-  }, [terminalWidth, availableTerminalHeight, activePtyId]);
 
   useEffect(() => {
     if (
@@ -1548,28 +1677,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   useIncludeDirsTrust(config, isTrustedFolder, historyManager, setCustomDialog);
 
-  const handleAutoEnableRetention = useCallback(() => {
-    const userSettings = settings.forScope(SettingScope.User).settings;
-    const currentRetention = userSettings.general?.sessionRetention ?? {};
-
-    settings.setValue(SettingScope.User, 'general.sessionRetention', {
-      ...currentRetention,
-      enabled: true,
-      maxAge: '30d',
-      warningAcknowledged: true,
-    });
-  }, [settings]);
-
-  const {
-    shouldShowWarning: shouldShowRetentionWarning,
-    checkComplete: retentionCheckComplete,
-    sessionsToDeleteCount,
-  } = useSessionRetentionCheck(
-    config,
-    settings.merged,
-    handleAutoEnableRetention,
-  );
-
   const tabFocusTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
@@ -1633,17 +1740,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
   }, [ideNeedsRestart]);
 
   useEffect(() => {
-    if (queueErrorMessage) {
-      const timer = setTimeout(() => {
-        setQueueErrorMessage(null);
-      }, QUEUE_ERROR_DISPLAY_DURATION_MS);
-
-      return () => clearTimeout(timer);
-    }
-    return undefined;
-  }, [queueErrorMessage, setQueueErrorMessage]);
-
-  useEffect(() => {
     if (isInitialMount.current) {
       isInitialMount.current = false;
       return;
@@ -1694,14 +1790,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
     [handleSlashCommand, settings],
   );
 
-  const { elapsedTime, currentLoadingPhrase } = useLoadingIndicator({
-    streamingState,
-    shouldShowFocusHint,
-    retryStatus,
-    loadingPhrasesMode: settings.merged.ui.loadingPhrases,
-    customWittyPhrases: settings.merged.ui.customWittyPhrases,
-  });
-
   const handleGlobalKeypress = useCallback(
     (key: Key): boolean => {
       // Debug log keystrokes if enabled
@@ -1709,8 +1797,16 @@ Logging in with Google... Restarting Gemini CLI to continue.
         debugLogger.log('[DEBUG] Keystroke:', JSON.stringify(key));
       }
 
-      if (shortcutsHelpVisible && shouldDismissShortcutsHelpOnHotkey(key)) {
+      if (shortcutsHelpVisible && isHelpDismissKey(key)) {
         setShortcutsHelpVisible(false);
+      }
+
+      if (keyMatchers[Command.TOGGLE_MOUSE_MODE](key)) {
+        setMouseMode((prev) => !prev);
+        if (mouseMode && !isAlternateBuffer) {
+          appEvents.emit(AppEvent.ScrollToBottom);
+        }
+        return true;
       }
 
       if (isAlternateBuffer && keyMatchers[Command.TOGGLE_COPY_MODE](key)) {
@@ -1722,15 +1818,45 @@ Logging in with Google... Restarting Gemini CLI to continue.
       if (keyMatchers[Command.QUIT](key)) {
         // If the user presses Ctrl+C, we want to cancel any ongoing requests.
         // This should happen regardless of the count.
-        cancelOngoingRequest?.();
+        void cancelOngoingRequest?.();
 
         handleCtrlCPress();
         return true;
       } else if (keyMatchers[Command.EXIT](key)) {
+        // If the input field is non-empty, do not exit.
+        if (bufferRef.current.text.length > 0) {
+          return false;
+        }
         handleCtrlDPress();
         return true;
       } else if (keyMatchers[Command.SUSPEND_APP](key)) {
         handleSuspend();
+      } else if (keyMatchers[Command.DUMP_FRAME](key)) {
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const filename = `snapshot-${timestamp}.json`;
+        if (dumpCurrentFrame) {
+          dumpCurrentFrame(filename);
+          debugLogger.log(`Dumped frame to: ${filename}`);
+        }
+        return true;
+      } else if (keyMatchers[Command.START_RECORDING](key)) {
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const filename = `recording-${timestamp}.json`;
+        if (startRecording) {
+          startRecording(filename);
+          recordingFilenameRef.current = filename;
+          debugLogger.log(`Started recording to: ${filename}`);
+        }
+        return true;
+      } else if (keyMatchers[Command.STOP_RECORDING](key)) {
+        if (stopRecording) {
+          stopRecording();
+          debugLogger.log(
+            `Stopped recording, saved to: ${recordingFilenameRef.current ?? 'unknown'}`,
+          );
+          recordingFilenameRef.current = null;
+        }
+        return true;
       } else if (
         keyMatchers[Command.TOGGLE_COPY_MODE](key) &&
         !isAlternateBuffer
@@ -1742,19 +1868,25 @@ Logging in with Google... Restarting Gemini CLI to continue.
         return true;
       }
 
+      const toggleLastTurnTools = () => {
+        triggerExpandHint(true);
+
+        const targetToolCallIds = getLastTurnToolCallIds(
+          historyManager.history,
+          pendingHistoryItems,
+        );
+
+        if (targetToolCallIds.length > 0) {
+          toggleAllExpansion(targetToolCallIds);
+        }
+      };
+
       let enteringConstrainHeightMode = false;
       if (!constrainHeight) {
         enteringConstrainHeightMode = true;
         setConstrainHeight(true);
         if (keyMatchers[Command.SHOW_MORE_LINES](key)) {
-          // If the user manually collapses the view, show the hint and reset the x-second timer.
-          setShowIsExpandableHint(true);
-          if (expandHintTimerRef.current) {
-            clearTimeout(expandHintTimerRef.current);
-          }
-          expandHintTimerRef.current = setTimeout(() => {
-            setShowIsExpandableHint(false);
-          }, EXPAND_HINT_DURATION_MS);
+          toggleLastTurnTools();
         }
         if (!isAlternateBuffer) {
           refreshStatic();
@@ -1802,22 +1934,13 @@ Logging in with Google... Restarting Gemini CLI to continue.
         !enteringConstrainHeightMode
       ) {
         setConstrainHeight(false);
-        // If the user manually expands the view, show the hint and reset the x-second timer.
-        setShowIsExpandableHint(true);
-        if (expandHintTimerRef.current) {
-          clearTimeout(expandHintTimerRef.current);
-        }
-        expandHintTimerRef.current = setTimeout(() => {
-          setShowIsExpandableHint(false);
-        }, EXPAND_HINT_DURATION_MS);
-        if (!isAlternateBuffer) {
-          refreshStatic();
-        }
+        toggleLastTurnTools();
+        refreshStatic();
         return true;
       } else if (
         (keyMatchers[Command.FOCUS_SHELL_INPUT](key) ||
           keyMatchers[Command.UNFOCUS_BACKGROUND_SHELL_LIST](key)) &&
-        (activePtyId || (isBackgroundShellVisible && backgroundShells.size > 0))
+        (activePtyId || (isBackgroundTaskVisible && backgroundTasks.size > 0))
       ) {
         if (embeddedShellFocused) {
           const capturedTime = lastOutputTimeRef.current;
@@ -1838,12 +1961,12 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
         const isIdle = Date.now() - lastOutputTimeRef.current >= 100;
 
-        if (isIdle && !activePtyId && !isBackgroundShellVisible) {
+        if (isIdle && !activePtyId && !isBackgroundTaskVisible) {
           if (tabFocusTimeoutRef.current)
             clearTimeout(tabFocusTimeoutRef.current);
-          toggleBackgroundShell();
+          toggleBackgroundTasks();
           setEmbeddedShellFocused(true);
-          if (backgroundShells.size > 1) setIsBackgroundShellListOpen(true);
+          if (backgroundTasks.size > 1) setIsBackgroundTaskListOpen(true);
           return true;
         }
 
@@ -1860,15 +1983,15 @@ Logging in with Google... Restarting Gemini CLI to continue.
         return false;
       } else if (keyMatchers[Command.TOGGLE_BACKGROUND_SHELL](key)) {
         if (activePtyId) {
-          backgroundCurrentShell();
+          backgroundCurrentExecution();
           // After backgrounding, we explicitly do NOT show or focus the background UI.
         } else {
-          toggleBackgroundShell();
+          toggleBackgroundTasks();
           // Toggle focus based on intent: if we were hiding, unfocus; if showing, focus.
-          if (!isBackgroundShellVisible && backgroundShells.size > 0) {
+          if (!isBackgroundTaskVisible && backgroundTasks.size > 0) {
             setEmbeddedShellFocused(true);
-            if (backgroundShells.size > 1) {
-              setIsBackgroundShellListOpen(true);
+            if (backgroundTasks.size > 1) {
+              setIsBackgroundTaskListOpen(true);
             }
           } else {
             setEmbeddedShellFocused(false);
@@ -1876,11 +1999,11 @@ Logging in with Google... Restarting Gemini CLI to continue.
         }
         return true;
       } else if (keyMatchers[Command.TOGGLE_BACKGROUND_SHELL_LIST](key)) {
-        if (backgroundShells.size > 0 && isBackgroundShellVisible) {
+        if (backgroundTasks.size > 0 && isBackgroundTaskVisible) {
           if (!embeddedShellFocused) {
             setEmbeddedShellFocused(true);
           }
-          setIsBackgroundShellListOpen(true);
+          setIsBackgroundTaskListOpen(true);
         }
         return true;
       }
@@ -1905,24 +2028,47 @@ Logging in with Google... Restarting Gemini CLI to continue.
       tabFocusTimeoutRef,
       isAlternateBuffer,
       shortcutsHelpVisible,
-      backgroundCurrentShell,
-      toggleBackgroundShell,
-      backgroundShells,
-      isBackgroundShellVisible,
-      setIsBackgroundShellListOpen,
+      backgroundCurrentExecution,
+      toggleBackgroundTasks,
+      backgroundTasks,
+      isBackgroundTaskVisible,
+      setIsBackgroundTaskListOpen,
       lastOutputTimeRef,
       showTransientMessage,
       settings.merged.general.devtools,
       showErrorDetails,
+      triggerExpandHint,
+      keyMatchers,
+      isHelpDismissKey,
+      historyManager.history,
+      pendingHistoryItems,
+      toggleAllExpansion,
+      dumpCurrentFrame,
+      startRecording,
+      stopRecording,
+      mouseMode,
     ],
   );
 
   useKeypress(handleGlobalKeypress, { isActive: true, priority: true });
 
   useKeypress(
-    () => {
+    (key: Key) => {
+      if (
+        keyMatchers[Command.SCROLL_UP](key) ||
+        keyMatchers[Command.SCROLL_DOWN](key) ||
+        keyMatchers[Command.PAGE_UP](key) ||
+        keyMatchers[Command.PAGE_DOWN](key) ||
+        keyMatchers[Command.SCROLL_HOME](key) ||
+        keyMatchers[Command.SCROLL_END](key)
+      ) {
+        return false;
+      }
+
       setCopyModeEnabled(false);
-      enableMouseEvents();
+      if (mouseMode) {
+        enableMouseEvents();
+      }
       return true;
     },
     {
@@ -2003,7 +2149,19 @@ Logging in with Google... Restarting Gemini CLI to continue.
       }
     };
 
+    const handleHookSystemMessage = (payload: HookSystemMessagePayload) => {
+      historyManager.addItem(
+        {
+          type: MessageType.INFO,
+          text: payload.message,
+          source: payload.hookName,
+        } as HistoryItemInfo,
+        Date.now(),
+      );
+    };
+
     coreEvents.on(CoreEvent.UserFeedback, handleUserFeedback);
+    coreEvents.on(CoreEvent.HookSystemMessage, handleHookSystemMessage);
 
     // Flush any messages that happened during startup before this component
     // mounted.
@@ -2011,29 +2169,14 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
     return () => {
       coreEvents.off(CoreEvent.UserFeedback, handleUserFeedback);
+      coreEvents.off(CoreEvent.HookSystemMessage, handleHookSystemMessage);
     };
   }, [historyManager]);
-
-  const filteredConsoleMessages = useMemo(() => {
-    if (config.getDebugMode()) {
-      return consoleMessages;
-    }
-    return consoleMessages.filter((msg) => msg.type !== 'debug');
-  }, [consoleMessages, config]);
-
-  // Computed values
-  const errorCount = useMemo(
-    () =>
-      filteredConsoleMessages
-        .filter((msg) => msg.type === 'error')
-        .reduce((total, msg) => total + msg.count, 0),
-    [filteredConsoleMessages],
-  );
 
   const nightly = props.version.includes('nightly');
 
   const dialogsVisible =
-    (shouldShowRetentionWarning && retentionCheckComplete) ||
+    shouldShowIdePrompt ||
     shouldShowIdePrompt ||
     isFolderTrustDialogOpen ||
     isPolicyUpdateDialogOpen ||
@@ -2056,14 +2199,11 @@ Logging in with Google... Restarting Gemini CLI to continue.
     showIdeRestartPrompt ||
     !!proQuotaRequest ||
     !!validationRequest ||
+    !!overageMenuRequest ||
+    !!emptyWalletRequest ||
     isSessionBrowserOpen ||
     authState === AuthState.AwaitingApiKeyInput ||
     !!newAgents;
-
-  const pendingHistoryItems = useMemo(
-    () => [...pendingSlashCommandHistoryItems, ...pendingGeminiHistoryItems],
-    [pendingSlashCommandHistoryItems, pendingGeminiHistoryItems],
-  );
 
   const hasPendingToolConfirmation = useMemo(
     () => isToolAwaitingConfirmation(pendingHistoryItems),
@@ -2083,7 +2223,51 @@ Logging in with Google... Restarting Gemini CLI to continue.
     hasLoopDetectionConfirmationRequest ||
     !!proQuotaRequest ||
     !!validationRequest ||
+    !!overageMenuRequest ||
+    !!emptyWalletRequest ||
     !!customDialog;
+
+  const loadingPhrases = settings.merged.ui.loadingPhrases;
+  const showStatusTips = loadingPhrases === 'tips' || loadingPhrases === 'all';
+  const showStatusWit = loadingPhrases === 'witty' || loadingPhrases === 'all';
+
+  const showLoadingIndicator =
+    (!embeddedShellFocused || isBackgroundTaskVisible) &&
+    streamingState === StreamingState.Responding &&
+    !hasPendingActionRequired;
+
+  let estimatedStatusLength = 0;
+  if (activeHooks.length > 0 && settings.merged.hooksConfig.notifications) {
+    const hookLabel =
+      activeHooks.length > 1 ? 'Executing Hooks' : 'Executing Hook';
+    const hookNames = activeHooks
+      .map(
+        (h) =>
+          h.name +
+          (h.index && h.total && h.total > 1 ? ` (${h.index}/${h.total})` : ''),
+      )
+      .join(', ');
+    estimatedStatusLength = hookLabel.length + hookNames.length + 10;
+  } else if (showLoadingIndicator) {
+    const thoughtText = thought?.subject || 'Waiting for model...';
+    estimatedStatusLength = thoughtText.length + 25;
+  } else if (hasPendingActionRequired) {
+    estimatedStatusLength = 35;
+  }
+
+  const maxLength = terminalWidth - estimatedStatusLength - 5;
+
+  const { elapsedTime, currentLoadingPhrase, currentTip, currentWittyPhrase } =
+    useLoadingIndicator({
+      streamingState,
+      shouldShowFocusHint,
+      retryStatus,
+      showTips: showStatusTips,
+      showWit: showStatusWit,
+      customWittyPhrases: settings.merged.ui.customWittyPhrases,
+      errorVerbosity: settings.merged.ui.errorVerbosity,
+      maxLength,
+    });
 
   const allowPlanMode =
     config.isPlanEnabled() &&
@@ -2143,15 +2327,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       return;
     }
 
-    void generateSteeringAckMessage(
-      config.getBaseLlmClient(),
-      pendingHint,
-    ).then((ackText) => {
-      historyManager.addItem({
-        type: 'info',
-        text: ackText,
-      });
-    });
     void submitQuery([{ text: buildUserSteeringHintPrompt(pendingHint) }]);
   }, [
     config,
@@ -2166,12 +2341,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
   ]);
 
   const allToolCalls = useMemo(
-    () =>
-      pendingHistoryItems
-        .filter(
-          (item): item is HistoryItemToolGroup => item.type === 'tool_group',
-        )
-        .flatMap((item) => item.tools),
+    () => getAllToolCalls(pendingHistoryItems),
     [pendingHistoryItems],
   );
 
@@ -2211,24 +2381,65 @@ Logging in with Google... Restarting Gemini CLI to continue.
     };
   }, [config, refreshStatic]);
 
+  const inputState = useMemo(
+    () => ({
+      buffer,
+      userMessages: inputHistory,
+      shellModeActive,
+      showEscapePrompt,
+      copyModeEnabled,
+      inputWidth,
+      suggestionsWidth,
+    }),
+    [
+      buffer,
+      inputHistory,
+      shellModeActive,
+      showEscapePrompt,
+      copyModeEnabled,
+      inputWidth,
+      suggestionsWidth,
+    ],
+  );
+
+  const quotaState = useMemo(
+    () => ({
+      userTier,
+      stats: quotaStats,
+      proQuotaRequest,
+      validationRequest,
+      // G1 AI Credits dialog state
+      overageMenuRequest,
+      emptyWalletRequest,
+    }),
+    [
+      userTier,
+      quotaStats,
+      proQuotaRequest,
+      validationRequest,
+      overageMenuRequest,
+      emptyWalletRequest,
+    ],
+  );
+
   const uiState: UIState = useMemo(
     () => ({
       history: historyManager.history,
       historyManager,
       isThemeDialogOpen,
-      shouldShowRetentionWarning:
-        shouldShowRetentionWarning && retentionCheckComplete,
-      sessionsToDeleteCount: sessionsToDeleteCount ?? 0,
+
       themeError,
       isAuthenticating,
       isConfigInitialized,
       authError,
+      accountSuspensionInfo,
       isAuthDialogOpen,
       isAwaitingApiKeyInput: authState === AuthState.AwaitingApiKeyInput,
       apiKeyDefaultValue,
       editorError,
       isEditorDialogOpen,
       showPrivacyNotice,
+      mouseMode,
       corgiMode,
       debugMessage,
       quittingMessages,
@@ -2254,11 +2465,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       initError,
       pendingGeminiHistoryItems,
       thought,
-      shellModeActive,
-      userMessages: inputHistory,
-      buffer,
-      inputWidth,
-      suggestionsWidth,
       isInputActive,
       isResuming,
       shouldShowIdePrompt,
@@ -2270,17 +2476,17 @@ Logging in with Google... Restarting Gemini CLI to continue.
       constrainHeight,
       showErrorDetails,
       showFullTodos,
-      filteredConsoleMessages,
       ideContextState,
       renderMarkdown,
       ctrlCPressedOnce: ctrlCPressCount >= 1,
       ctrlDPressedOnce: ctrlDPressCount >= 1,
-      showEscapePrompt,
       shortcutsHelpVisible,
       cleanUiDetailsVisible,
       isFocused,
       elapsedTime,
       currentLoadingPhrase,
+      currentTip,
+      currentWittyPhrase,
       historyRemountKey,
       activeHooks,
       messageQueue,
@@ -2288,15 +2494,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
       showApprovalModeIndicator,
       allowPlanMode,
       currentModel,
-      quota: {
-        userTier,
-        stats: quotaStats,
-        proQuotaRequest,
-        validationRequest,
-      },
       contextFileNames,
       errorCount,
       availableTerminalHeight,
+      stableControlsHeight,
       mainAreaWidth,
       staticAreaMaxItemHeight,
       staticExtraHeight,
@@ -2316,45 +2517,40 @@ Logging in with Google... Restarting Gemini CLI to continue.
       isRestarting,
       extensionsUpdateState,
       activePtyId,
-      backgroundShellCount,
-      isBackgroundShellVisible,
+      backgroundTaskCount,
+      isBackgroundTaskVisible,
       embeddedShellFocused,
       showDebugProfiler,
       customDialog,
-      copyModeEnabled,
       transientMessage,
       bannerData,
       bannerVisible,
       terminalBackgroundColor: config.getTerminalBackground(),
       settingsNonce,
-      backgroundShells,
-      activeBackgroundShellPid,
-      backgroundShellHeight,
-      isBackgroundShellListOpen,
+      backgroundTasks,
+      activeBackgroundTaskPid,
+      backgroundTaskHeight,
+      isBackgroundTaskListOpen,
       adminSettingsChanged,
       newAgents,
       showIsExpandableHint,
       hintMode:
-        config.isModelSteeringEnabled() &&
-        isToolExecuting([
-          ...pendingSlashCommandHistoryItems,
-          ...pendingGeminiHistoryItems,
-        ]),
+        config.isModelSteeringEnabled() && isToolExecuting(pendingHistoryItems),
       hintBuffer: '',
     }),
     [
       isThemeDialogOpen,
-      shouldShowRetentionWarning,
-      retentionCheckComplete,
-      sessionsToDeleteCount,
+
       themeError,
       isAuthenticating,
       isConfigInitialized,
       authError,
+      accountSuspensionInfo,
       isAuthDialogOpen,
       editorError,
       isEditorDialogOpen,
       showPrivacyNotice,
+      mouseMode,
       corgiMode,
       debugMessage,
       quittingMessages,
@@ -2380,11 +2576,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       initError,
       pendingGeminiHistoryItems,
       thought,
-      shellModeActive,
-      inputHistory,
-      buffer,
-      inputWidth,
-      suggestionsWidth,
       isInputActive,
       isResuming,
       shouldShowIdePrompt,
@@ -2396,30 +2587,27 @@ Logging in with Google... Restarting Gemini CLI to continue.
       constrainHeight,
       showErrorDetails,
       showFullTodos,
-      filteredConsoleMessages,
       ideContextState,
       renderMarkdown,
       ctrlCPressCount,
       ctrlDPressCount,
-      showEscapePrompt,
       shortcutsHelpVisible,
       cleanUiDetailsVisible,
       isFocused,
       elapsedTime,
       currentLoadingPhrase,
+      currentTip,
+      currentWittyPhrase,
       historyRemountKey,
       activeHooks,
       messageQueue,
       queueErrorMessage,
       showApprovalModeIndicator,
       allowPlanMode,
-      userTier,
-      quotaStats,
-      proQuotaRequest,
-      validationRequest,
       contextFileNames,
       errorCount,
       availableTerminalHeight,
+      stableControlsHeight,
       mainAreaWidth,
       staticAreaMaxItemHeight,
       staticExtraHeight,
@@ -2440,24 +2628,23 @@ Logging in with Google... Restarting Gemini CLI to continue.
       currentModel,
       extensionsUpdateState,
       activePtyId,
-      backgroundShellCount,
-      isBackgroundShellVisible,
+      backgroundTaskCount,
+      isBackgroundTaskVisible,
       historyManager,
       embeddedShellFocused,
       showDebugProfiler,
       customDialog,
       apiKeyDefaultValue,
       authState,
-      copyModeEnabled,
       transientMessage,
       bannerData,
       bannerVisible,
       config,
       settingsNonce,
-      backgroundShellHeight,
-      isBackgroundShellListOpen,
-      activeBackgroundShellPid,
-      backgroundShells,
+      backgroundTaskHeight,
+      isBackgroundTaskListOpen,
+      activeBackgroundTaskPid,
+      backgroundTasks,
       adminSettingsChanged,
       newAgents,
       showIsExpandableHint,
@@ -2498,11 +2685,15 @@ Logging in with Google... Restarting Gemini CLI to continue.
       handleClearScreen,
       handleProQuotaChoice,
       handleValidationChoice,
+      // G1 AI Credits handlers
+      handleOverageMenuChoice,
+      handleEmptyWalletChoice,
       openSessionBrowser,
       closeSessionBrowser,
       handleResumeSession,
       handleDeleteSession,
       setQueueErrorMessage,
+      addMessage,
       popAllMessages,
       handleApiKeySubmit,
       handleApiKeyCancel,
@@ -2513,9 +2704,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
       revealCleanUiDetailsTemporarily,
       handleWarning,
       setEmbeddedShellFocused,
-      dismissBackgroundShell,
-      setActiveBackgroundShellPid,
-      setIsBackgroundShellListOpen,
+      dismissBackgroundTask,
+      setActiveBackgroundTaskPid,
+      setIsBackgroundTaskListOpen,
       setAuthContext,
       onHintInput: () => {},
       onHintBackspace: () => {},
@@ -2531,8 +2722,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
             });
           }
         }
-        await runExitCleanup();
-        process.exit(RELAUNCH_EXIT_CODE);
+        await relaunchApp();
       },
       handleNewAgentsSelect: async (choice: NewAgentsChoice) => {
         if (newAgents && choice === NewAgentsChoice.ACKNOWLEDGE) {
@@ -2555,6 +2745,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
         setNewAgents(null);
       },
       getPreferredEditor,
+      clearAccountSuspension: () => {
+        setAccountSuspensionInfo(null);
+        setAuthState(AuthState.Updating);
+      },
     }),
     [
       handleThemeSelect,
@@ -2584,11 +2778,14 @@ Logging in with Google... Restarting Gemini CLI to continue.
       handleClearScreen,
       handleProQuotaChoice,
       handleValidationChoice,
+      handleOverageMenuChoice,
+      handleEmptyWalletChoice,
       openSessionBrowser,
       closeSessionBrowser,
       handleResumeSession,
       handleDeleteSession,
       setQueueErrorMessage,
+      addMessage,
       popAllMessages,
       handleApiKeySubmit,
       handleApiKeyCancel,
@@ -2599,10 +2796,11 @@ Logging in with Google... Restarting Gemini CLI to continue.
       revealCleanUiDetailsTemporarily,
       handleWarning,
       setEmbeddedShellFocused,
-      dismissBackgroundShell,
-      setActiveBackgroundShellPid,
-      setIsBackgroundShellListOpen,
+      dismissBackgroundTask,
+      setActiveBackgroundTaskPid,
+      setIsBackgroundTaskListOpen,
       setAuthContext,
+      setAccountSuspensionInfo,
       newAgents,
       config,
       historyManager,
@@ -2624,22 +2822,36 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   return (
     <UIStateContext.Provider value={uiState}>
-      <UIActionsContext.Provider value={uiActions}>
-        <ConfigContext.Provider value={config}>
-          <AppContext.Provider
-            value={{
-              version: props.version,
-              startupWarnings: props.startupWarnings || [],
-            }}
-          >
-            <ToolActionsProvider config={config} toolCalls={allToolCalls}>
-              <ShellFocusContext.Provider value={isFocused}>
-                <App key={`app-${forceRerenderKey}`} />
-              </ShellFocusContext.Provider>
-            </ToolActionsProvider>
-          </AppContext.Provider>
-        </ConfigContext.Provider>
-      </UIActionsContext.Provider>
+      <QuotaContext.Provider value={quotaState}>
+        <InputContext.Provider value={inputState}>
+          <UIActionsContext.Provider value={uiActions}>
+            <ConfigContext.Provider value={config}>
+              <AppContext.Provider
+                value={{
+                  version: props.version,
+                  startupWarnings: props.startupWarnings || [],
+                }}
+              >
+                <ToolActionsProvider
+                  config={config}
+                  toolCalls={allToolCalls}
+                  isExpanded={isExpanded}
+                  toggleExpansion={toggleExpansion}
+                  toggleAllExpansion={toggleAllExpansion}
+                >
+                  <ShellFocusContext.Provider value={isFocused}>
+                    <MouseProvider mouseEventsEnabled={mouseMode}>
+                      <ScrollProvider>
+                        <App key={`app-${forceRerenderKey}`} />
+                      </ScrollProvider>
+                    </MouseProvider>
+                  </ShellFocusContext.Provider>
+                </ToolActionsProvider>
+              </AppContext.Provider>
+            </ConfigContext.Provider>
+          </UIActionsContext.Provider>
+        </InputContext.Provider>
+      </QuotaContext.Provider>
     </UIStateContext.Provider>
   );
 };

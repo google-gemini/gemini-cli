@@ -7,13 +7,16 @@
 import * as path from 'node:path';
 import { getFolderStructure } from '../utils/getFolderStructure.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
-import type {
-  ToolResult,
-  ToolCallConfirmationDetails,
-  ToolInvocation,
-  ToolConfirmationOutcome,
+import {
+  BaseDeclarativeTool,
+  BaseToolInvocation,
+  Kind,
+  type ToolResult,
+  type ToolCallConfirmationDetails,
+  type ToolInvocation,
+  type ToolConfirmationOutcome,
+  type ExecuteOptions,
 } from './tools.js';
-import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
 import type { Config } from '../config/config.js';
 import { ACTIVATE_SKILL_TOOL_NAME } from './tool-names.js';
 import { ToolErrorType } from './tool-error.js';
@@ -105,7 +108,7 @@ ${folderStructure}`,
     return confirmationDetails;
   }
 
-  async execute(_signal: AbortSignal): Promise<ToolResult> {
+  async execute({ abortSignal: _signal }: ExecuteOptions): Promise<ToolResult> {
     const skillName = this.params.name;
     const skillManager = this.config.getSkillManager();
     const skill = skillManager.getSkill(skillName);

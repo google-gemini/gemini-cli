@@ -4,20 +4,22 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { spawn } from 'node:child_process';
-import type {
-  HookConfig,
-  CommandHookConfig,
-  RuntimeHookConfig,
-  HookInput,
-  HookOutput,
-  HookExecutionResult,
-  BeforeAgentInput,
-  BeforeModelInput,
-  BeforeModelOutput,
-  BeforeToolInput,
+import { spawn, execSync } from 'node:child_process';
+import {
+  HookEventName,
+  ConfigSource,
+  HookType,
+  type HookConfig,
+  type CommandHookConfig,
+  type RuntimeHookConfig,
+  type HookInput,
+  type HookOutput,
+  type HookExecutionResult,
+  type BeforeAgentInput,
+  type BeforeModelInput,
+  type BeforeModelOutput,
+  type BeforeToolInput,
 } from './types.js';
-import { HookEventName, ConfigSource, HookType } from './types.js';
 import type { Config } from '../config/config.js';
 import type { LLMRequest } from './hookTranslator.js';
 import { debugLogger } from '../utils/debugLogger.js';
@@ -331,16 +333,24 @@ export class HookRunner {
       let timedOut = false;
 
       const shellConfig = getShellConfiguration();
-      const command = this.expandCommand(
+      let command = this.expandCommand(
         hookConfig.command,
         input,
         shellConfig.shell,
       );
 
+      if (shellConfig.shell === 'powershell') {
+        // Append exit code check to ensure the exit code of the command is propagated
+        command = `${command}; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }`;
+      }
+
       // Set up environment variables
       const env = {
         ...sanitizeEnvironment(process.env, this.config.sanitizationConfig),
         GEMINI_PROJECT_DIR: input.cwd,
+        GEMINI_PLANS_DIR: this.config.storage.getPlansDir(),
+        GEMINI_CWD: input.cwd,
+        GEMINI_SESSION_ID: input.session_id,
         CLAUDE_PROJECT_DIR: input.cwd, // For compatibility
         ...hookConfig.env,
       };
@@ -359,12 +369,31 @@ export class HookRunner {
       // Set up timeout
       const timeoutHandle = setTimeout(() => {
         timedOut = true;
-        child.kill('SIGTERM');
+
+        if (process.platform === 'win32' && child.pid) {
+          try {
+            execSync(`taskkill /pid ${child.pid} /f /t`, { timeout: 2000 });
+          } catch (e) {
+            // Ignore errors if process is already dead or access denied
+            debugLogger.debug(`Taskkill failed: ${e}`);
+          }
+        } else {
+          child.kill('SIGTERM');
+        }
 
         // Force kill after 5 seconds
         setTimeout(() => {
           if (!child.killed) {
-            child.kill('SIGKILL');
+            if (process.platform === 'win32' && child.pid) {
+              try {
+                execSync(`taskkill /pid ${child.pid} /f /t`, { timeout: 2000 });
+              } catch (e) {
+                // Ignore
+                debugLogger.debug(`Taskkill failed: ${e}`);
+              }
+            } else {
+              child.kill('SIGKILL');
+            }
           }
         }, 5000);
       }, timeout);
@@ -421,6 +450,7 @@ export class HookRunner {
 
         // Parse output
         let output: HookOutput | undefined;
+        let outputFormat: 'json' | 'text' | undefined;
 
         const textToParse = stdout.trim() || stderr.trim();
         if (textToParse) {
@@ -434,6 +464,7 @@ export class HookRunner {
             if (parsed && typeof parsed === 'object') {
               // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
               output = parsed as HookOutput;
+              outputFormat = 'json';
             }
           } catch {
             // Not JSON, convert plain text to structured output
@@ -441,6 +472,7 @@ export class HookRunner {
               textToParse,
               exitCode || EXIT_CODE_SUCCESS,
             );
+            outputFormat = 'text';
           }
         }
 
@@ -449,6 +481,7 @@ export class HookRunner {
           eventName,
           success: exitCode === EXIT_CODE_SUCCESS,
           output,
+          outputFormat,
           stdout,
           stderr,
           exitCode: exitCode || EXIT_CODE_SUCCESS,
@@ -484,8 +517,17 @@ export class HookRunner {
   ): string {
     debugLogger.debug(`Expanding hook command: ${command} (cwd: ${input.cwd})`);
     const escapedCwd = escapeShellArg(input.cwd, shellType);
+    const escapedPlansDir = escapeShellArg(
+      this.config.storage.getPlansDir(),
+      shellType,
+    );
+    const escapedSessionId = escapeShellArg(input.session_id, shellType);
+
     return command
       .replace(/\$GEMINI_PROJECT_DIR/g, () => escapedCwd)
+      .replace(/\$GEMINI_CWD/g, () => escapedCwd)
+      .replace(/\$GEMINI_PLANS_DIR/g, () => escapedPlansDir)
+      .replace(/\$GEMINI_SESSION_ID/g, () => escapedSessionId)
       .replace(/\$CLAUDE_PROJECT_DIR/g, () => escapedCwd); // For compatibility
   }
 
@@ -497,7 +539,7 @@ export class HookRunner {
     exitCode: number,
   ): HookOutput {
     if (exitCode === EXIT_CODE_SUCCESS) {
-      // Success - treat as system message or additional context
+      // Success
       return {
         decision: 'allow',
         systemMessage: text,

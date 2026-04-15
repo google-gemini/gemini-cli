@@ -25,11 +25,34 @@ const __dirname = path.dirname(__filename);
 const projectRoot = __dirname;
 const currentYear = new Date().getFullYear();
 
+const commonRestrictedSyntaxRules = [
+  {
+    selector: 'CallExpression[callee.name="require"]',
+    message: 'Avoid using require(). Use ES6 imports instead.',
+  },
+  {
+    selector: 'ThrowStatement > Literal:not([value=/^\\w+Error:/])',
+    message:
+      'Do not throw string literals or non-Error objects. Throw new Error("...") instead.',
+  },
+  {
+    selector:
+      'UnaryExpression[operator="typeof"] > MemberExpression[computed=true][property.type="Literal"]',
+    message:
+      'Do not use typeof to check object properties. Define a TypeScript interface and a type guard function instead.',
+  },
+  {
+    selector: 'CatchClause > Identifier[name=/^_/]',
+    message:
+      'Do not use underscored identifiers in catch blocks. If the error is unused, use "catch {}". If it is used, remove the underscore.',
+  },
+];
+
 export default tseslint.config(
   {
     // Global ignores
     ignores: [
-      'node_modules/*',
+      '**/node_modules/**',
       'eslint.config.js',
       'packages/**/dist/**',
       'bundle/**',
@@ -38,7 +61,8 @@ export default tseslint.config(
       'dist/**',
       'evals/**',
       'packages/test-utils/**',
-      '.gemini/skills/**',
+      '.gemini/**',
+      '**/*.d.ts',
     ],
   },
   eslint.configs.recommended,
@@ -55,26 +79,8 @@ export default tseslint.config(
     },
   },
   {
-    // Import specific config
-    files: ['packages/*/src/**/*.{ts,tsx}'], // Target all TS/TSX in the packages
-    plugins: {
-      import: importPlugin,
-    },
-    settings: {
-      'import/resolver': {
-        node: true,
-      },
-    },
-    rules: {
-      ...importPlugin.configs.recommended.rules,
-      ...importPlugin.configs.typescript.rules,
-      'import/no-default-export': 'warn',
-      'import/no-unresolved': 'off', // Disable for now, can be noisy with monorepos/paths
-    },
-  },
-  {
-    // General overrides and rules for the project (TS/TSX files)
-    files: ['packages/*/src/**/*.{ts,tsx}'], // Target only TS/TSX in the cli package
+    // Rules for packages/*/src (TS/TSX)
+    files: ['packages/*/src/**/*.{ts,tsx}'],
     plugins: {
       import: importPlugin,
     },
@@ -95,6 +101,11 @@ export default tseslint.config(
       },
     },
     rules: {
+      ...importPlugin.configs.recommended.rules,
+      ...importPlugin.configs.typescript.rules,
+      'import/no-default-export': 'warn',
+      'import/no-unresolved': 'off',
+      'import/no-duplicates': 'error',
       // General Best Practice Rules (subset adapted for flat config)
       '@typescript-eslint/array-type': ['error', { default: 'array-simple' }],
       'arrow-body-style': ['error', 'as-needed'],
@@ -123,7 +134,7 @@ export default tseslint.config(
         {
           argsIgnorePattern: '^_',
           varsIgnorePattern: '^_',
-          caughtErrorsIgnorePattern: '^_',
+          caughtErrors: 'all',
         },
       ],
       // Prevent async errors from bypassing catch handlers
@@ -133,18 +144,7 @@ export default tseslint.config(
       'no-cond-assign': 'error',
       'no-debugger': 'error',
       'no-duplicate-case': 'error',
-      'no-restricted-syntax': [
-        'error',
-        {
-          selector: 'CallExpression[callee.name="require"]',
-          message: 'Avoid using require(). Use ES6 imports instead.',
-        },
-        {
-          selector: 'ThrowStatement > Literal:not([value=/^\\w+Error:/])',
-          message:
-            'Do not throw string literals or non-Error objects. Throw new Error("...") instead.',
-        },
-      ],
+      'no-restricted-syntax': ['error', ...commonRestrictedSyntaxRules],
       'no-unsafe-finally': 'error',
       'no-unused-expressions': 'off', // Disable base rule
       '@typescript-eslint/no-unused-expressions': [
@@ -163,6 +163,7 @@ export default tseslint.config(
       '@typescript-eslint/await-thenable': ['error'],
       '@typescript-eslint/no-floating-promises': ['error'],
       '@typescript-eslint/no-unnecessary-type-assertion': ['error'],
+      '@typescript-eslint/no-misused-spread': ['error'],
       'no-restricted-imports': [
         'error',
         {
@@ -185,13 +186,50 @@ export default tseslint.config(
     },
   },
   {
+    // API Response Optionality enforcement for Code Assist
+    files: ['packages/core/src/code_assist/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        ...commonRestrictedSyntaxRules,
+        {
+          selector:
+            'TSInterfaceDeclaration[id.name=/.+Response$/] TSPropertySignature:not([optional=true])',
+          message:
+            'All fields in API response interfaces (*Response) must be marked as optional (?) to prevent developers from accidentally assuming a field will always be present based on current backend behavior.',
+        },
+        {
+          selector:
+            'TSTypeAliasDeclaration[id.name=/.+Response$/] TSPropertySignature:not([optional=true])',
+          message:
+            'All fields in API response types (*Response) must be marked as optional (?) to prevent developers from accidentally assuming a field will always be present based on current backend behavior.',
+        },
+      ],
+    },
+  },
+  {
     // Rules that only apply to product code
     files: ['packages/*/src/**/*.{ts,tsx}'],
-    ignores: ['**/*.test.ts', '**/*.test.tsx'],
+    ignores: ['**/*.test.ts', '**/*.test.tsx', 'packages/*/src/test-utils/**'],
     rules: {
       '@typescript-eslint/no-unsafe-type-assertion': 'error',
       '@typescript-eslint/no-unsafe-assignment': 'error',
       '@typescript-eslint/no-unsafe-return': 'error',
+      'no-restricted-syntax': [
+        'error',
+        ...commonRestrictedSyntaxRules,
+        {
+          selector:
+            'CallExpression[callee.object.name="Object"][callee.property.name="create"]',
+          message:
+            'Avoid using Object.create() in product code. Use object spread {...obj}, explicit class instantiation, structuredClone(), or copy constructors instead.',
+        },
+        {
+          selector: 'Identifier[name="Reflect"]',
+          message:
+            'Avoid using Reflect namespace in product code. Do not use reflection to make copies. Instead, use explicit object copying or cloning (structuredClone() for values, new instance/clone function for classes).',
+        },
+      ],
     },
   },
   {
@@ -253,6 +291,7 @@ export default tseslint.config(
       ...vitest.configs.recommended.rules,
       'vitest/expect-expect': 'off',
       'vitest/no-commented-out-tests': 'off',
+      'no-restricted-syntax': ['error', ...commonRestrictedSyntaxRules],
     },
   },
   {
@@ -283,7 +322,12 @@ export default tseslint.config(
     },
   },
   {
-    files: ['./scripts/**/*.js', 'esbuild.config.js'],
+    files: [
+      './scripts/**/*.js',
+      'packages/*/scripts/**/*.js',
+      'esbuild.config.js',
+      'packages/core/scripts/**/*.{js,mjs}',
+    ],
     languageOptions: {
       globals: {
         ...globals.node,
@@ -297,7 +341,7 @@ export default tseslint.config(
         {
           argsIgnorePattern: '^_',
           varsIgnorePattern: '^_',
-          caughtErrorsIgnorePattern: '^_',
+          caughtErrors: 'all',
         },
       ],
     },
@@ -321,7 +365,7 @@ export default tseslint.config(
         {
           argsIgnorePattern: '^_',
           varsIgnorePattern: '^_',
-          caughtErrorsIgnorePattern: '^_',
+          caughtErrors: 'all',
         },
       ],
     },
@@ -383,7 +427,7 @@ export default tseslint.config(
         {
           argsIgnorePattern: '^_',
           varsIgnorePattern: '^_',
-          caughtErrorsIgnorePattern: '^_',
+          caughtErrors: 'all',
         },
       ],
     },

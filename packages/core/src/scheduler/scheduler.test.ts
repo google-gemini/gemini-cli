@@ -25,7 +25,6 @@ const runInDevTraceSpan = vi.hoisted(() =>
     const metadata = { attributes: opts.attributes || {} };
     return fn({
       metadata,
-      endSpan: vi.fn(),
     });
   }),
 );
@@ -50,6 +49,7 @@ import { resolveConfirmation } from './confirmation.js';
 import { checkPolicy, updatePolicy } from './policy.js';
 import { ToolExecutor } from './tool-executor.js';
 import { ToolModificationHandler } from './tool-modifier.js';
+import { MessageBusType, type Message } from '../confirmation-bus/types.js';
 
 vi.mock('./state-manager.js');
 vi.mock('./confirmation.js');
@@ -75,19 +75,21 @@ import {
   type AnyDeclarativeTool,
   type AnyToolInvocation,
 } from '../tools/tools.js';
-import type {
-  ToolCallRequestInfo,
-  ValidatingToolCall,
-  SuccessfulToolCall,
-  ErroredToolCall,
-  CancelledToolCall,
-  CompletedToolCall,
-  ToolCallResponseInfo,
-  ExecutingToolCall,
-  Status,
-  ToolCall,
+import { UPDATE_TOPIC_TOOL_NAME } from '../tools/tool-names.js';
+import {
+  CoreToolCallStatus,
+  ROOT_SCHEDULER_ID,
+  type ToolCallRequestInfo,
+  type ValidatingToolCall,
+  type SuccessfulToolCall,
+  type ErroredToolCall,
+  type CancelledToolCall,
+  type CompletedToolCall,
+  type ToolCallResponseInfo,
+  type ExecutingToolCall,
+  type Status,
+  type ToolCall,
 } from './types.js';
-import { CoreToolCallStatus, ROOT_SCHEDULER_ID } from './types.js';
 import { ToolErrorType } from '../tools/tool-error.js';
 import { GeminiCliOperation } from '../telemetry/constants.js';
 import * as ToolUtils from '../utils/tool-utils.js';
@@ -133,7 +135,7 @@ describe('Scheduler (Orchestrator)', () => {
   const req2: ToolCallRequestInfo = {
     callId: 'call-2',
     name: 'test-tool',
-    args: { foo: 'baz' },
+    args: { foo: 'baz', wait_for_previous: true },
     isClientInitiated: false,
     prompt_id: 'prompt-1',
     schedulerId: ROOT_SCHEDULER_ID,
@@ -168,17 +170,28 @@ describe('Scheduler (Orchestrator)', () => {
 
     mockConfig = {
       getPolicyEngine: vi.fn().mockReturnValue(mockPolicyEngine),
+      toolRegistry: mockToolRegistry,
       getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
+      getHookSystem: vi.fn().mockReturnValue(undefined),
       isInteractive: vi.fn().mockReturnValue(true),
       getEnableHooks: vi.fn().mockReturnValue(true),
       setApprovalMode: vi.fn(),
       getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
+      getTelemetryLogPromptsEnabled: vi.fn().mockReturnValue(false),
+      getSessionId: vi.fn().mockReturnValue('test-session-id'),
     } as unknown as Mocked<Config>;
+
+    (mockConfig as unknown as { config: Config }).config = mockConfig as Config;
 
     mockMessageBus = {
       publish: vi.fn(),
       subscribe: vi.fn(),
     } as unknown as Mocked<MessageBus>;
+
+    (mockConfig as unknown as { toolRegistry: ToolRegistry }).toolRegistry =
+      mockToolRegistry;
+    (mockConfig as unknown as { messageBus: MessageBus }).messageBus =
+      mockMessageBus;
 
     getPreferredEditor = vi.fn().mockReturnValue('vim');
 
@@ -303,7 +316,7 @@ describe('Scheduler (Orchestrator)', () => {
 
     // Initialize Scheduler
     scheduler = new Scheduler({
-      config: mockConfig,
+      context: mockConfig,
       messageBus: mockMessageBus,
       getPreferredEditor,
       schedulerId: 'root',
@@ -360,6 +373,32 @@ describe('Scheduler (Orchestrator)', () => {
       );
     });
 
+    it('should propagate subagent name to checkPolicy', async () => {
+      const { checkPolicy } = await import('./policy.js');
+      const scheduler = new Scheduler({
+        context: mockConfig,
+        schedulerId: 'sub-scheduler',
+        subagent: 'my-agent',
+        getPreferredEditor: () => undefined,
+      });
+
+      const request: ToolCallRequestInfo = {
+        callId: 'call-1',
+        name: 'test-tool',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'p1',
+      };
+
+      await scheduler.schedule([request], new AbortController().signal);
+
+      expect(checkPolicy).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.anything(),
+        'my-agent',
+      );
+    });
+
     it('should correctly build ValidatingToolCalls for happy path', async () => {
       await scheduler.schedule(req1, signal);
 
@@ -386,7 +425,7 @@ describe('Scheduler (Orchestrator)', () => {
       const spanArgs = vi.mocked(runInDevTraceSpan).mock.calls[0];
       const fn = spanArgs[1];
       const metadata = { attributes: {} };
-      await fn({ metadata, endSpan: vi.fn() });
+      await fn({ metadata });
       expect(metadata).toMatchObject({
         input: [req1],
       });
@@ -404,6 +443,44 @@ describe('Scheduler (Orchestrator)', () => {
           }),
         ]),
       );
+    });
+
+    it('should sort UPDATE_TOPIC_TOOL_NAME to the front of the batch', async () => {
+      const topicReq: ToolCallRequestInfo = {
+        callId: 'call-topic',
+        name: UPDATE_TOPIC_TOOL_NAME,
+        args: { title: 'New Chapter' },
+        prompt_id: 'p1',
+        isClientInitiated: false,
+      };
+      const otherReq: ToolCallRequestInfo = {
+        callId: 'call-other',
+        name: 'test-tool',
+        args: {},
+        prompt_id: 'p1',
+        isClientInitiated: false,
+      };
+
+      // Mock tool registry to return a tool for update_topic
+      vi.mocked(mockToolRegistry.getTool).mockImplementation((name) => {
+        if (name === UPDATE_TOPIC_TOOL_NAME) {
+          return {
+            name: UPDATE_TOPIC_TOOL_NAME,
+            build: vi.fn().mockReturnValue({}),
+          } as unknown as AnyDeclarativeTool;
+        }
+        return mockTool;
+      });
+
+      // Schedule in reverse order (other first, topic second)
+      await scheduler.schedule([otherReq, topicReq], signal);
+
+      // Verify they were enqueued in the correct sorted order (topic first)
+      const enqueueCalls = vi.mocked(mockStateManager.enqueue).mock.calls;
+      const lastCall = enqueueCalls[enqueueCalls.length - 1][0];
+
+      expect(lastCall[0].request.callId).toBe('call-topic');
+      expect(lastCall[1].request.callId).toBe('call-other');
     });
   });
 
@@ -606,6 +683,7 @@ describe('Scheduler (Orchestrator)', () => {
       vi.mocked(checkPolicy).mockResolvedValue({
         decision: PolicyDecision.DENY,
         rule: {
+          toolName: '*',
           decision: PolicyDecision.DENY,
           denyMessage: 'Custom denial reason',
         },
@@ -625,6 +703,30 @@ describe('Scheduler (Orchestrator)', () => {
                   error:
                     'Tool execution denied by policy. Custom denial reason',
                 },
+              }),
+            }),
+          ]),
+        }),
+      );
+    });
+
+    it('should use originalRequestName when generating an error response', async () => {
+      const error = new Error('Some error');
+      vi.mocked(checkPolicy).mockRejectedValue(error);
+
+      const tailReq = { ...req1, originalRequestName: 'original-tool-name' };
+      await scheduler.schedule(tailReq, signal);
+
+      expect(mockStateManager.updateStatus).toHaveBeenCalledWith(
+        'call-1',
+        CoreToolCallStatus.Error,
+        expect.objectContaining({
+          errorType: ToolErrorType.UNHANDLED_EXCEPTION,
+          responseParts: expect.arrayContaining([
+            expect.objectContaining({
+              functionResponse: expect.objectContaining({
+                name: 'original-tool-name',
+                response: { error: 'Some error' },
               }),
             }),
           ]),
@@ -657,7 +759,7 @@ describe('Scheduler (Orchestrator)', () => {
     it('should return POLICY_VIOLATION error type when denied in Plan Mode', async () => {
       vi.mocked(checkPolicy).mockResolvedValue({
         decision: PolicyDecision.DENY,
-        rule: { decision: PolicyDecision.DENY },
+        rule: { toolName: '*', decision: PolicyDecision.DENY },
       });
 
       mockConfig.getApprovalMode.mockReturnValue(ApprovalMode.PLAN);
@@ -686,7 +788,11 @@ describe('Scheduler (Orchestrator)', () => {
       const customMessage = 'Custom Plan Mode Deny';
       vi.mocked(checkPolicy).mockResolvedValue({
         decision: PolicyDecision.DENY,
-        rule: { decision: PolicyDecision.DENY, denyMessage: customMessage },
+        rule: {
+          toolName: '*',
+          decision: PolicyDecision.DENY,
+          denyMessage: customMessage,
+        },
       });
 
       mockConfig.getApprovalMode.mockReturnValue(ApprovalMode.PLAN);
@@ -799,7 +905,7 @@ describe('Scheduler (Orchestrator)', () => {
         signal,
         expect.objectContaining({
           config: mockConfig,
-          messageBus: mockMessageBus,
+          messageBus: expect.anything(),
           state: mockStateManager,
           schedulerId: ROOT_SCHEDULER_ID,
         }),
@@ -809,10 +915,9 @@ describe('Scheduler (Orchestrator)', () => {
         mockTool,
         resolution.outcome,
         resolution.lastDetails,
-        expect.objectContaining({
-          config: mockConfig,
-          messageBus: mockMessageBus,
-        }),
+        mockConfig,
+        expect.anything(),
+        expect.anything(),
       );
 
       expect(mockExecutor.execute).toHaveBeenCalled();
@@ -946,7 +1051,7 @@ describe('Scheduler (Orchestrator)', () => {
       expect(mockStateManager.updateStatus).toHaveBeenCalledWith(
         'call-1',
         CoreToolCallStatus.Cancelled,
-        'Operation cancelled',
+        { callId: 'call-1', responseParts: [] },
       );
     });
 
@@ -1091,6 +1196,7 @@ describe('Scheduler (Orchestrator)', () => {
               name: 'tool-b',
               args: { key: 'value' },
               originalRequestName: 'test-tool', // Preserves original name
+              originalRequestArgs: req1.args, // Preserves original args
             }),
             tool: mockToolB,
           }),
@@ -1155,7 +1261,7 @@ describe('Scheduler (Orchestrator)', () => {
       const schedulerId = 'custom-scheduler';
       const parentCallId = 'parent-call';
       const customScheduler = new Scheduler({
-        config: mockConfig,
+        context: mockConfig,
         messageBus: mockMessageBus,
         getPreferredEditor,
         schedulerId,
@@ -1194,13 +1300,71 @@ describe('Scheduler (Orchestrator)', () => {
     });
   });
 
+  describe('Fallback Handlers', () => {
+    it('should respond to TOOL_CONFIRMATION_REQUEST with requiresUserConfirmation: true', async () => {
+      const listeners: Record<
+        string,
+        Array<(message: Message) => void | Promise<void>>
+      > = {};
+
+      const mockBus = {
+        subscribe: vi.fn(
+          (
+            type: string,
+            handler: (message: Message) => void | Promise<void>,
+          ) => {
+            listeners[type] = listeners[type] || [];
+            listeners[type].push(handler);
+          },
+        ),
+        publish: vi.fn(async (message: Message) => {
+          const type = message.type as string;
+          if (listeners[type]) {
+            for (const handler of listeners[type]) {
+              await handler(message);
+            }
+          }
+        }),
+      } as unknown as MessageBus;
+
+      const scheduler = new Scheduler({
+        context: mockConfig,
+        messageBus: mockBus,
+        getPreferredEditor,
+        schedulerId: 'fallback-test',
+      });
+
+      const handler = vi.fn();
+      mockBus.subscribe(MessageBusType.TOOL_CONFIRMATION_RESPONSE, handler);
+
+      await mockBus.publish({
+        type: MessageBusType.TOOL_CONFIRMATION_REQUEST,
+        correlationId: 'test-correlation-id',
+        toolCall: { name: 'test-tool' },
+      });
+
+      // Wait for async handler to fire
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(handler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          correlationId: 'test-correlation-id',
+          confirmed: false,
+          requiresUserConfirmation: true,
+        }),
+      );
+
+      scheduler.dispose();
+    });
+  });
+
   describe('Cleanup', () => {
     it('should unregister McpProgress listener on dispose()', () => {
       const onSpy = vi.spyOn(coreEvents, 'on');
       const offSpy = vi.spyOn(coreEvents, 'off');
 
       const s = new Scheduler({
-        config: mockConfig,
+        context: mockConfig,
         messageBus: mockMessageBus,
         getPreferredEditor,
         schedulerId: 'cleanup-test',
@@ -1217,6 +1381,40 @@ describe('Scheduler (Orchestrator)', () => {
         CoreEvent.McpProgress,
         expect.any(Function),
       );
+    });
+
+    it('should abort disposeController signal on dispose()', () => {
+      const mockSubscribe =
+        vi.fn<
+          (
+            type: unknown,
+            listener: unknown,
+            options?: { signal?: AbortSignal },
+          ) => void
+        >();
+      const mockBus = {
+        subscribe: mockSubscribe,
+        publish: vi.fn(),
+      } as unknown as MessageBus;
+
+      let capturedSignal: AbortSignal | undefined;
+      mockSubscribe.mockImplementation((type, listener, options) => {
+        capturedSignal = options?.signal;
+      });
+
+      const s = new Scheduler({
+        context: mockConfig,
+        messageBus: mockBus,
+        getPreferredEditor,
+        schedulerId: 'cleanup-test-2',
+      });
+
+      expect(capturedSignal).toBeDefined();
+      expect(capturedSignal?.aborted).toBe(false);
+
+      s.dispose();
+
+      expect(capturedSignal?.aborted).toBe(true);
     });
   });
 });
@@ -1313,16 +1511,26 @@ describe('Scheduler MCP Progress', () => {
     mockConfig = {
       getPolicyEngine: vi.fn().mockReturnValue(mockPolicyEngine),
       getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
+      getHookSystem: vi.fn().mockReturnValue(undefined),
       isInteractive: vi.fn().mockReturnValue(true),
       getEnableHooks: vi.fn().mockReturnValue(true),
       setApprovalMode: vi.fn(),
       getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
+      getTelemetryLogPromptsEnabled: vi.fn().mockReturnValue(false),
+      getSessionId: vi.fn().mockReturnValue('test-session-id'),
     } as unknown as Mocked<Config>;
+
+    (mockConfig as unknown as { config: Config }).config = mockConfig as Config;
 
     mockMessageBus = {
       publish: vi.fn(),
       subscribe: vi.fn(),
     } as unknown as Mocked<MessageBus>;
+
+    (mockConfig as unknown as { toolRegistry: ToolRegistry }).toolRegistry =
+      mockToolRegistry;
+    (mockConfig as unknown as { messageBus: MessageBus }).messageBus =
+      mockMessageBus;
 
     getPreferredEditor = vi.fn().mockReturnValue('vim');
 
@@ -1332,7 +1540,7 @@ describe('Scheduler MCP Progress', () => {
     );
 
     scheduler = new Scheduler({
-      config: mockConfig,
+      context: mockConfig,
       messageBus: mockMessageBus,
       getPreferredEditor,
       schedulerId: 'progress-test',

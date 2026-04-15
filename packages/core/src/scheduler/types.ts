@@ -11,8 +11,8 @@ import type {
   ToolCallConfirmationDetails,
   ToolConfirmationOutcome,
   ToolResultDisplay,
+  ToolLiveOutput,
 } from '../tools/tools.js';
-import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import type { ToolErrorType } from '../tools/tool-error.js';
 import type { SerializableConfirmationDetails } from '../confirmation-bus/types.js';
 import { type ApprovalMode } from '../policy/types.js';
@@ -37,16 +37,20 @@ export interface ToolCallRequestInfo {
   name: string;
   args: Record<string, unknown>;
   /**
-   * The original name of the tool requested by the model.
-   * This is used for tail calls to ensure the final response retains the original name.
+   * The original name and arguments of the tool requested by the model.
+   * This is used for tail calls to ensure the final response and log retains
+   * the original values.
    */
   originalRequestName?: string;
+  originalRequestArgs?: Record<string, unknown>;
   isClientInitiated: boolean;
   prompt_id: string;
   checkpoint?: string;
   traceId?: string;
   parentCallId?: string;
   schedulerId?: string;
+  inputModifiedByHook?: boolean;
+  forcedAsk?: boolean;
 }
 
 export interface ToolCallResponseInfo {
@@ -125,7 +129,7 @@ export type ExecutingToolCall = {
   request: ToolCallRequestInfo;
   tool: AnyDeclarativeTool;
   invocation: AnyToolInvocation;
-  liveOutput?: string | AnsiOutput;
+  liveOutput?: ToolLiveOutput;
   progressMessage?: string;
   progressPercent?: number;
   progress?: number;
@@ -197,7 +201,7 @@ export type ConfirmHandler = (
 
 export type OutputUpdateHandler = (
   toolCallId: string,
-  outputChunk: string | AnsiOutput,
+  outputChunk: ToolLiveOutput,
 ) => void;
 
 export type AllToolCallsCompleteHandler = (

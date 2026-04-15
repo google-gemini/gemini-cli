@@ -5,9 +5,8 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import type { GrepToolParams } from './grep.js';
-import { GrepTool } from './grep.js';
-import type { ToolResult } from './tools.js';
+import { GrepTool, type GrepToolParams } from './grep.js';
+import type { ToolResult, GrepResult, ExecuteOptions } from './tools.js';
 import path from 'node:path';
 import { isSubpath } from '../utils/paths.js';
 import fs from 'node:fs/promises';
@@ -53,6 +52,13 @@ describe('GrepTool', () => {
       getWorkspaceContext: () => createMockWorkspaceContext(tempRootDir),
       getFileExclusions: () => ({
         getGlobExcludes: () => [],
+      }),
+      getFileFilteringOptions: () => ({
+        respectGitIgnore: true,
+        respectGeminiIgnore: true,
+        maxFileCount: 1000,
+        searchTimeout: 30000,
+        customIgnoreFilePaths: [],
       }),
       storage: {
         getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
@@ -170,7 +176,7 @@ describe('GrepTool', () => {
     it('should find matches for a simple pattern in all files', async () => {
       const params: GrepToolParams = { pattern: 'world' };
       const invocation = grepTool.build(params);
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
       expect(result.llmContent).toContain(
         'Found 3 matches for pattern "world" in the workspace directory',
       );
@@ -181,14 +187,16 @@ describe('GrepTool', () => {
         `File: ${path.join('sub', 'fileC.txt')}`,
       );
       expect(result.llmContent).toContain('L1: another world in sub dir');
-      expect(result.returnDisplay).toBe('Found 3 matches');
+      expect((result.returnDisplay as GrepResult)?.summary).toBe(
+        'Found 3 matches',
+      );
     }, 30000);
 
     it('should include files that start with ".." in JS fallback', async () => {
       await fs.writeFile(path.join(tempRootDir, '..env'), 'world in ..env');
       const params: GrepToolParams = { pattern: 'world' };
       const invocation = grepTool.build(params);
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
       expect(result.llmContent).toContain('File: ..env');
       expect(result.llmContent).toContain('L1: world in ..env');
     });
@@ -201,13 +209,13 @@ describe('GrepTool', () => {
       const params: GrepToolParams = { pattern: 'hello' };
       const invocation = grepTool.build(params) as unknown as {
         isCommandAvailable: (command: string) => Promise<boolean>;
-        execute: (signal: AbortSignal) => Promise<ToolResult>;
+        execute: (options: ExecuteOptions) => Promise<ToolResult>;
       };
       invocation.isCommandAvailable = vi.fn(
         async (command: string) => command === 'grep',
       );
 
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
       expect(result.llmContent).toContain('File: ..env');
       expect(result.llmContent).toContain('L1: hello');
       expect(result.llmContent).not.toContain('secret.txt');
@@ -216,13 +224,15 @@ describe('GrepTool', () => {
     it('should find matches in a specific path', async () => {
       const params: GrepToolParams = { pattern: 'world', dir_path: 'sub' };
       const invocation = grepTool.build(params);
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
       expect(result.llmContent).toContain(
         'Found 1 match for pattern "world" in path "sub"',
       );
       expect(result.llmContent).toContain('File: fileC.txt'); // Path relative to 'sub'
       expect(result.llmContent).toContain('L1: another world in sub dir');
-      expect(result.returnDisplay).toBe('Found 1 match');
+      expect((result.returnDisplay as GrepResult)?.summary).toBe(
+        'Found 1 match',
+      );
     }, 30000);
 
     it('should find matches with an include glob', async () => {
@@ -231,7 +241,7 @@ describe('GrepTool', () => {
         include_pattern: '*.js',
       };
       const invocation = grepTool.build(params);
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
       expect(result.llmContent).toContain(
         'Found 1 match for pattern "hello" in the workspace directory (filter: "*.js"):',
       );
@@ -239,7 +249,9 @@ describe('GrepTool', () => {
       expect(result.llmContent).toContain(
         'L2: function baz() { return "hello"; }',
       );
-      expect(result.returnDisplay).toBe('Found 1 match');
+      expect((result.returnDisplay as GrepResult)?.summary).toBe(
+        'Found 1 match',
+      );
     }, 30000);
 
     it('should find matches with an include glob and path', async () => {
@@ -253,29 +265,33 @@ describe('GrepTool', () => {
         include_pattern: '*.js',
       };
       const invocation = grepTool.build(params);
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
       expect(result.llmContent).toContain(
         'Found 1 match for pattern "hello" in path "sub" (filter: "*.js")',
       );
       expect(result.llmContent).toContain('File: another.js');
       expect(result.llmContent).toContain('L1: const greeting = "hello";');
-      expect(result.returnDisplay).toBe('Found 1 match');
+      expect((result.returnDisplay as GrepResult)?.summary).toBe(
+        'Found 1 match',
+      );
     }, 30000);
 
     it('should return "No matches found" when pattern does not exist', async () => {
       const params: GrepToolParams = { pattern: 'nonexistentpattern' };
       const invocation = grepTool.build(params);
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
       expect(result.llmContent).toContain(
         'No matches found for pattern "nonexistentpattern" in the workspace directory.',
       );
-      expect(result.returnDisplay).toBe('No matches found');
+      expect((result.returnDisplay as GrepResult)?.summary).toBe(
+        'No matches found',
+      );
     }, 30000);
 
     it('should handle regex special characters correctly', async () => {
       const params: GrepToolParams = { pattern: 'foo.*bar' }; // Matches 'const foo = "bar";'
       const invocation = grepTool.build(params);
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
       expect(result.llmContent).toContain(
         'Found 1 match for pattern "foo.*bar" in the workspace directory:',
       );
@@ -286,7 +302,7 @@ describe('GrepTool', () => {
     it('should be case-insensitive by default (JS fallback)', async () => {
       const params: GrepToolParams = { pattern: 'HELLO' };
       const invocation = grepTool.build(params);
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
       expect(result.llmContent).toContain(
         'Found 2 matches for pattern "HELLO" in the workspace directory:',
       );
@@ -309,7 +325,7 @@ describe('GrepTool', () => {
       vi.mocked(glob.globStream).mockRejectedValue(new Error('Glob failed'));
       const params: GrepToolParams = { pattern: 'hello' };
       const invocation = grepTool.build(params);
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
       expect(result.error?.type).toBe(ToolErrorType.GREP_EXECUTION_ERROR);
       vi.mocked(glob.globStream).mockReset();
     }, 30000);
@@ -337,6 +353,13 @@ describe('GrepTool', () => {
           createMockWorkspaceContext(tempRootDir, [secondDir]),
         getFileExclusions: () => ({
           getGlobExcludes: () => [],
+        }),
+        getFileFilteringOptions: () => ({
+          respectGitIgnore: true,
+          respectGeminiIgnore: true,
+          maxFileCount: 1000,
+          searchTimeout: 30000,
+          customIgnoreFilePaths: [],
         }),
         storage: {
           getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
@@ -367,7 +390,7 @@ describe('GrepTool', () => {
       );
       const params: GrepToolParams = { pattern: 'world' };
       const invocation = multiDirGrepTool.build(params);
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
 
       // Should find matches in both directories
       expect(result.llmContent).toContain(
@@ -415,6 +438,13 @@ describe('GrepTool', () => {
         getFileExclusions: () => ({
           getGlobExcludes: () => [],
         }),
+        getFileFilteringOptions: () => ({
+          respectGitIgnore: true,
+          respectGeminiIgnore: true,
+          maxFileCount: 1000,
+          searchTimeout: 30000,
+          customIgnoreFilePaths: [],
+        }),
         storage: {
           getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
         },
@@ -446,7 +476,7 @@ describe('GrepTool', () => {
       // Search only in the 'sub' directory of the first workspace
       const params: GrepToolParams = { pattern: 'world', dir_path: 'sub' };
       const invocation = multiDirGrepTool.build(params);
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
 
       // Should only find matches in the specified sub directory
       expect(result.llmContent).toContain(
@@ -469,7 +499,7 @@ describe('GrepTool', () => {
         total_max_matches: 2,
       };
       const invocation = grepTool.build(params);
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
 
       expect(result.llmContent).toContain('Found 2 matches');
       expect(result.llmContent).toContain(
@@ -481,7 +511,9 @@ describe('GrepTool', () => {
       expect(result.llmContent).toContain('L2: second line with world');
       // And sub/fileC.txt should be excluded because limit reached
       expect(result.llmContent).not.toContain('File: sub/fileC.txt');
-      expect(result.returnDisplay).toBe('Found 2 matches (limited)');
+      expect((result.returnDisplay as GrepResult)?.summary).toBe(
+        'Found 2 matches (limited)',
+      );
     });
 
     it('should respect max_matches_per_file in JS fallback', async () => {
@@ -490,7 +522,7 @@ describe('GrepTool', () => {
         max_matches_per_file: 1,
       };
       const invocation = grepTool.build(params);
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
 
       // fileA.txt has 2 worlds, but should only return 1.
       // sub/fileC.txt has 1 world, so total matches = 2.
@@ -500,7 +532,9 @@ describe('GrepTool', () => {
       expect(result.llmContent).toContain('L1: hello world');
       // Should NOT be a match (but might be in context as L2-)
       expect(result.llmContent).not.toContain('L2: second line with world');
-      expect(result.llmContent).toContain('File: sub/fileC.txt');
+      expect(result.llmContent).toContain(
+        `File: ${path.join('sub', 'fileC.txt')}`,
+      );
       expect(result.llmContent).toContain('L1: another world in sub dir');
     });
 
@@ -510,11 +544,11 @@ describe('GrepTool', () => {
         names_only: true,
       };
       const invocation = grepTool.build(params);
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
 
       expect(result.llmContent).toContain('Found 2 files with matches');
       expect(result.llmContent).toContain('fileA.txt');
-      expect(result.llmContent).toContain('sub/fileC.txt');
+      expect(result.llmContent).toContain(path.join('sub', 'fileC.txt'));
       expect(result.llmContent).not.toContain('L1:');
       expect(result.llmContent).not.toContain('hello world');
     });
@@ -531,7 +565,7 @@ describe('GrepTool', () => {
         dir_path: '.',
       };
       const invocation = grepTool.build(params);
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
 
       expect(result.llmContent).toContain('Found 1 match');
       expect(result.llmContent).toContain('copyright.txt');
@@ -551,7 +585,7 @@ describe('GrepTool', () => {
 
       const params: GrepToolParams = { pattern: 'Target match' };
       const invocation = grepTool.build(params);
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
 
       expect(result.llmContent).toContain(
         'Found 1 match for pattern "Target match"',
@@ -562,6 +596,22 @@ describe('GrepTool', () => {
       expect(result.llmContent).toContain('L51: Target match');
       // Verify context after
       expect(result.llmContent).toContain('L60- Line 60');
+    });
+
+    it('should truncate excessively long lines', async () => {
+      const longString = 'a'.repeat(3000);
+      await fs.writeFile(
+        path.join(tempRootDir, 'longline.txt'),
+        `Target match ${longString}`,
+      );
+
+      const params: GrepToolParams = { pattern: 'Target match' };
+      const invocation = grepTool.build(params);
+      const result = await invocation.execute({ abortSignal });
+
+      // MAX_LINE_LENGTH_TEXT_FILE is 2000. It should be truncated.
+      expect(result.llmContent).toContain('... [truncated]');
+      expect(result.llmContent).not.toContain(longString);
     });
   });
 
@@ -602,6 +652,13 @@ describe('GrepTool', () => {
           createMockWorkspaceContext(tempRootDir, ['/another/dir']),
         getFileExclusions: () => ({
           getGlobExcludes: () => [],
+        }),
+        getFileFilteringOptions: () => ({
+          respectGitIgnore: true,
+          respectGeminiIgnore: true,
+          maxFileCount: 1000,
+          searchTimeout: 30000,
+          customIgnoreFilePaths: [],
         }),
       } as unknown as Config;
 

@@ -1,9 +1,9 @@
 # Checkpointing
 
-The Gemini CLI includes a Checkpointing feature that automatically saves a
-snapshot of your project's state before any file modifications are made by
-AI-powered tools. This lets you safely experiment with and apply code changes,
-knowing you can instantly revert back to the state before the tool was run.
+Gemini CLI includes a Checkpointing feature that automatically saves a snapshot
+of your project's state before any file modifications are made by AI-powered
+tools. This lets you safely experiment with and apply code changes, knowing you
+can instantly revert back to the state before the tool was run.
 
 ## How it works
 
@@ -39,7 +39,9 @@ file in your project's temporary directory, typically located at
 The Checkpointing feature is disabled by default. To enable it, you need to edit
 your `settings.json` file.
 
-> **Note:** The `--checkpointing` command-line flag was removed in version
+<!-- prettier-ignore -->
+> [!CAUTION]
+> The `--checkpointing` command-line flag was removed in version
 > 0.11.0. Checkpointing can now only be enabled through the `settings.json`
 > configuration file.
 
@@ -70,7 +72,7 @@ To see a list of all saved checkpoints for the current project, simply run:
 
 The CLI will display a list of available checkpoint files. These file names are
 typically composed of a timestamp, the name of the file being modified, and the
-name of the tool that was about to be run (e.g.,
+name of the tool that was about to be run (for example,
 `2025-06-22T10-00-00_000Z-my-file.txt-write_file`).
 
 ### Restore a specific checkpoint

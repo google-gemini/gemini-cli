@@ -9,8 +9,10 @@ import type React from 'react';
 import { useEffect, useState, useCallback } from 'react';
 import { theme } from '../semantic-colors.js';
 import stripAnsi from 'strip-ansi';
-import type { RadioSelectItem } from './shared/RadioButtonSelect.js';
-import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
+import {
+  RadioButtonSelect,
+  type RadioSelectItem,
+} from './shared/RadioButtonSelect.js';
 import { MaxSizedBox } from './shared/MaxSizedBox.js';
 import { Scrollable } from './shared/Scrollable.js';
 import { useKeypress } from '../hooks/useKeypress.js';
@@ -54,9 +56,7 @@ export const FolderTrustDialog: React.FC<FolderTrustDialogProps> = ({
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>;
     if (isRestarting) {
-      timer = setTimeout(async () => {
-        await relaunchApp();
-      }, 250);
+      timer = setTimeout(relaunchApp, 250);
     }
     return () => {
       if (timer) clearTimeout(timer);
@@ -135,6 +135,7 @@ export const FolderTrustDialog: React.FC<FolderTrustDialogProps> = ({
     { label: 'MCP Servers', items: discoveryResults?.mcps ?? [] },
     { label: 'Hooks', items: discoveryResults?.hooks ?? [] },
     { label: 'Skills', items: discoveryResults?.skills ?? [] },
+    { label: 'Agents', items: discoveryResults?.agents ?? [] },
     { label: 'Setting overrides', items: discoveryResults?.settings ?? [] },
   ].filter((g) => g.items.length > 0);
 
@@ -313,9 +314,5 @@ export const FolderTrustDialog: React.FC<FolderTrustDialogProps> = ({
     </Box>
   );
 
-  return isAlternateBuffer ? (
-    <OverflowProvider>{content}</OverflowProvider>
-  ) : (
-    content
-  );
+  return <OverflowProvider>{content}</OverflowProvider>;
 };

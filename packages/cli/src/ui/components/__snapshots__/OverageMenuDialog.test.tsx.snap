@@ -1,0 +1,47 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`OverageMenuDialog > rendering > should match snapshot with fallback available 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                  │
+│ Usage limit reached for gemini-2.5-pro.                                                          │
+│ Access resets at 2:00 PM.                                                                        │
+│ /stats model for usage details                                                                   │
+│ /model to switch models.                                                                         │
+│ /auth to switch to API key.                                                                      │
+│                                                                                                  │
+│ You have 500 AI Credits available.                                                               │
+│                                                                                                  │
+│ How would you like to proceed?                                                                   │
+│                                                                                                  │
+│                                                                                                  │
+│ ● 1. Use AI Credits - Continue this request (Overage)                                            │
+│   2. Manage - View balance and purchase more credits                                             │
+│   3. Switch to gemini-3-flash-preview                                                            │
+│   4. Stop - Abort request                                                                        │
+│                                                                                                  │
+│                                                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
+`;
+
+exports[`OverageMenuDialog > rendering > should match snapshot without fallback 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                  │
+│ Usage limit reached for gemini-2.5-pro.                                                          │
+│ /stats model for usage details                                                                   │
+│ /model to switch models.                                                                         │
+│ /auth to switch to API key.                                                                      │
+│                                                                                                  │
+│ You have 500 AI Credits available.                                                               │
+│                                                                                                  │
+│ How would you like to proceed?                                                                   │
+│                                                                                                  │
+│                                                                                                  │
+│ ● 1. Use AI Credits - Continue this request (Overage)                                            │
+│   2. Manage - View balance and purchase more credits                                             │
+│   3. Stop - Abort request                                                                        │
+│                                                                                                  │
+│                                                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
+`;
