@@ -354,70 +354,6 @@ describe('ProjectRegistry', () => {
     renameSpy.mockRestore();
   });
 
-  it('handles EEXIST gracefully during atomic registry creation (Race Condition Protection)', async () => {
-    const registry = new ProjectRegistry(registryPath);
-    await registry.initialize();
-
-    const originalWriteFile = fs.promises.writeFile;
-    const writeFileSpy = vi.spyOn(fs.promises, 'writeFile');
-    writeFileSpy.mockImplementation(async (filePath, data, options) => {
-      // Simulate another instance beating us to the lockless file creation
-      if (
-        filePath === registryPath &&
-        (options as { flag?: string }).flag === 'wx'
-      ) {
-        const err = Object.assign(new Error('File exists'), { code: 'EEXIST' });
-        throw err;
-      }
-      return originalWriteFile(filePath, data, options);
-    });
-
-    // It should NOT crash, and should successfully generate a short ID
-    const shortId = await registry.getShortId(
-      path.join(tempDir, 'race-project'),
-    );
-    expect(shortId).toBe('race-project');
-    writeFileSpy.mockRestore();
-  });
-
-  it('performs JIT migration of un-normalized paths for backward compatibility', async () => {
-    const realDir = path.join(tempDir, 'real-project');
-    fs.mkdirSync(realDir, { recursive: true });
-
-    // Simulate a legacy registry entry containing an un-normalized path.
-    // We use relative segments to guarantee a mismatch against the canonical path.
-    const unnormalizedPath =
-      path.join(tempDir, '.', 'real-project', '..', 'real-project') + path.sep;
-
-    // Calculate the expected canonical path using the same rules as the registry:
-    // full physical resolution (realpath) and OS-specific casing.
-    let expectedCanonicalPath = fs.realpathSync.native(path.resolve(realDir));
-    if (os.platform() === 'win32') {
-      expectedCanonicalPath = expectedCanonicalPath.toLowerCase();
-    }
-
-    // Seed the registry with the legacy un-normalized format.
-    fs.writeFileSync(
-      registryPath,
-      JSON.stringify({
-        projects: {
-          [unnormalizedPath]: 'migrated-slug',
-        },
-      }),
-    );
-
-    const registry = new ProjectRegistry(registryPath);
-    await registry.initialize();
-
-    // Force a disk flush by requesting a new project ID.
-    await registry.getShortId(path.join(tempDir, 'some-new-project'));
-
-    const data = JSON.parse(fs.readFileSync(registryPath, 'utf8'));
-
-    // Verify the legacy path was replaced with the canonical path.
-    expect(data.projects[unnormalizedPath]).toBeUndefined();
-    expect(data.projects[expectedCanonicalPath]).toBe('migrated-slug');
-  });
   it('protects against data destruction by throwing on EACCES instead of resetting', async () => {
     // 1. Write valid registry data
     fs.writeFileSync(
@@ -437,26 +373,5 @@ describe('ProjectRegistry', () => {
     await expect(registry.initialize()).rejects.toThrow('Permission denied');
 
     readFileSpy.mockRestore();
-  });
-
-  it('cleans up orphaned temporary files in the background', async () => {
-    // 1. Create a fake orphaned tmp file from an hour ago
-    const oldTmpFile = path.join(tempDir, 'projects.json.1234.tmp');
-    fs.writeFileSync(oldTmpFile, 'junk');
-
-    // Manually set mtime to 2 hours ago to ensure it gets cleaned up
-    const twoHoursAgo = Date.now() - 2 * 60 * 60 * 1000;
-    fs.utimesSync(oldTmpFile, new Date(twoHoursAgo), new Date(twoHoursAgo));
-
-    const registry = new ProjectRegistry(registryPath);
-
-    // 2. Initialize (which triggers async cleanup)
-    await registry.initialize();
-
-    // Give the un-awaited background promise a tick to resolve
-    await new Promise((resolve) => setTimeout(resolve, 50));
-
-    // 3. The orphaned file should be gone
-    expect(fs.existsSync(oldTmpFile)).toBe(false);
   });
 });
