@@ -2419,7 +2419,37 @@ describe('InputPrompt', () => {
     });
   });
 
-  describe('scrolling large inputs', () => {
+  describe('word-wrap infinite loop guard (issue #19985)', () => {
+    it('should not hang when a wide CJK character exceeds inputWidth', async () => {
+      // Regression test: when a single CJK/emoji character is wider than inputWidth,
+      // the word-wrap while-loop previously spun forever because splitIndex stayed 0
+      // and cpSlice(word, 0) returned the full word unchanged.
+      // The fix ensures splitIndex advances by at least 1 codepoint each iteration.
+      const narrowProps = { ...props, inputWidth: 1 };
+      const { stdin, unmount } = await renderWithProviders(
+        <TestInputPrompt {...narrowProps} />,
+        { isTTY: true },
+      );
+      // Type a CJK character (width=2) into a terminal that is only 1 column wide.
+      // Without the fix this blocks indefinitely; with the fix it completes promptly.
+      await stdin.write('中');
+      // If we reach here the loop did not hang — test passes.
+      unmount();
+    });
+
+    it('should not hang when a long ASCII word exceeds inputWidth', async () => {
+      const narrowProps = { ...props, inputWidth: 3 };
+      const { stdin, unmount } = await renderWithProviders(
+        <TestInputPrompt {...narrowProps} />,
+        { isTTY: true },
+      );
+      // "hello" is 5 chars wide but inputWidth is 3 — triggers the wrap loop.
+      await stdin.write('hello');
+      unmount();
+    });
+  });
+
+    describe('scrolling large inputs', () => {
     it('should correctly render scrolling down and up for large inputs', async () => {
       const lines = Array.from({ length: 50 }).map((_, i) => `testline ${i}`);
 
