@@ -1,6 +1,6 @@
 {
   "name": "@google/gemini-cli",
-  "version": "0.39.0-nightly.20260408.e77b22e63",
+  "version": "0.40.0-nightly.20260414.g5b1f7375a",
   "engines": {
     "node": ">=20.0.0"
   },
@@ -14,7 +14,7 @@
     "url": "git+https://github.com/google-gemini/gemini-cli.git"
   },
   "config": {
-    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.39.0-nightly.20260408.e77b22e63"
+    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.40.0-nightly.20260414.g5b1f7375a"
   },
   "scripts": {
     "start": "cross-env NODE_ENV=development node scripts/start.js",
@@ -150,13 +150,13 @@
     "simple-git": "^3.28.0"
   },
   "optionalDependencies": {
+    "@github/keytar": "^7.10.6",
     "@lydell/node-pty": "1.1.0",
     "@lydell/node-pty-darwin-arm64": "1.1.0",
     "@lydell/node-pty-darwin-x64": "1.1.0",
     "@lydell/node-pty-linux-x64": "1.1.0",
     "@lydell/node-pty-win32-arm64": "1.1.0",
     "@lydell/node-pty-win32-x64": "1.1.0",
-    "keytar": "^7.9.0",
     "node-pty": "^1.0.0"
   },
   "lint-staged": {

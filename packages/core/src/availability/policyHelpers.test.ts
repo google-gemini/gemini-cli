@@ -10,7 +10,7 @@ import {
   buildFallbackPolicyContext,
   applyModelSelection,
 } from './policyHelpers.js';
-import { createDefaultPolicy } from './policyCatalog.js';
+import { createDefaultPolicy, SILENT_ACTIONS } from './policyCatalog.js';
 import type { Config } from '../config/config.js';
 import {
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
@@ -21,6 +21,7 @@ import {
 import { AuthType } from '../core/contentGenerator.js';
 import { ModelConfigService } from '../services/modelConfigService.js';
 import { DEFAULT_MODEL_CONFIGS } from '../config/defaultModelConfigs.js';
+import { ApprovalMode } from '../policy/types.js';
 
 const createMockConfig = (overrides: Partial<Config> = {}): Config => {
   const config = {
@@ -163,6 +164,18 @@ describe('policyHelpers', () => {
       const chain = resolvePolicyChain(config);
       expect(chain[0]?.model).toBe(PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL);
       expect(chain[1]?.model).toBe('gemini-3-flash-preview');
+    });
+
+    it('applies SILENT_ACTIONS when ApprovalMode is PLAN', () => {
+      const config = createMockConfig({
+        getApprovalMode: () => ApprovalMode.PLAN,
+        getModel: () => DEFAULT_GEMINI_MODEL_AUTO,
+      });
+      const chain = resolvePolicyChain(config);
+
+      expect(chain).toHaveLength(2);
+      expect(chain[0]?.actions).toEqual(SILENT_ACTIONS);
+      expect(chain[1]?.actions).toEqual(SILENT_ACTIONS);
     });
   });
 
