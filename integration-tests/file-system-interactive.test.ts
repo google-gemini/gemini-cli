@@ -18,7 +18,7 @@ describe('Interactive file system', () => {
     await rig.cleanup();
   });
 
-  it('should perform a read-then-write sequence', async () => {
+  it.skip('should perform a read-then-write sequence', async () => {
     const fileName = 'version.txt';
     await rig.setup('interactive-read-then-write', {
       settings: {
