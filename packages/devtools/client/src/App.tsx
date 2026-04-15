@@ -926,7 +926,7 @@ function highlightMatches(text: string, regex: RegExp | null): React.ReactNode {
   return result.length > 0 ? result : text;
 }
 
-function ConsoleLogEntry({
+const ConsoleLogEntry = React.memo(function ConsoleLogEntry({
   log,
   t,
   compiledRegex,
@@ -1064,7 +1064,7 @@ function ConsoleLogEntry({
       </div>
     </div>
   );
-}
+});
 
 function ConsoleView({
   logs,
