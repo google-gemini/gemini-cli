@@ -137,20 +137,24 @@ describe('EnterPlanModeTool', () => {
     it('should create custom plan directories for active extensions, handling overrides and fallbacks', async () => {
       vi.mocked(mockConfig.getExtensions!).mockReturnValue([
         {
+          id: 'ext-user-override-id',
           name: 'ext-user-override',
           isActive: true,
           plan: { directory: '.manifest-dir' }, // Manifest default exists
         } as import('../config/config.js').GeminiCLIExtension,
         {
+          id: 'ext-manifest-fallback-id',
           name: 'ext-manifest-fallback',
           isActive: true,
           plan: { directory: '.manifest-dir' }, // Only manifest default
         } as import('../config/config.js').GeminiCLIExtension,
         {
+          id: 'ext-no-custom-id',
           name: 'ext-no-custom',
           isActive: true,
         } as import('../config/config.js').GeminiCLIExtension,
         {
+          id: 'ext-inactive-id',
           name: 'ext-inactive',
           isActive: false,
           plan: { directory: '.inactive-dir' },
@@ -158,8 +162,8 @@ describe('EnterPlanModeTool', () => {
       ]);
 
       vi.mocked(mockConfig.getExtensionSetting!).mockImplementation(
-        (name, setting) => {
-          if (name === 'ext-user-override' && setting === 'plan.directory') {
+        (id, setting) => {
+          if (id === 'ext-user-override-id' && setting === 'plan.directory') {
             return '.user-override-dir'; // User setting wins
           }
           return undefined;

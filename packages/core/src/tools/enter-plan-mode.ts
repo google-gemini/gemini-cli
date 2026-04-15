@@ -144,7 +144,7 @@ export class EnterPlanModeInvocation extends BaseToolInvocation<
       // Check for user-defined custom plan directory setting first.
       // If not set, fallback to the default directory defined in the extension's manifest.
       const customDir =
-        this.config.getExtensionSetting(ext.name, 'plan.directory') ??
+        this.config.getExtensionSetting(ext.id, 'plan.directory') ??
         ext.plan?.directory;
 
       if (customDir) {
