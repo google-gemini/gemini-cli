@@ -39,8 +39,15 @@ Investigation into the 10-minute CLI test runtime revealed:
    - `BackgroundTaskDisplay.test.tsx`
    - `useAuth.test.tsx`
 
+## Cross-Platform Matrix Trial
+
+- **Linux:** `gemini-cli-ubuntu-16-core` (Unleashed 16-core concurrency).
+- **Mac:** Upgraded to `macos-large-latest` (Higher core count).
+- **Windows:** `gemini-cli-windows-16-core` (High-performance runner).
+- **Integration Tests:** Now running with `GEMINI_API_KEY` for full verification
+  of the bundle.
+
 ## Current Goal
 
-- **Resuming Bundled CI:** Pushing these infrastructure optimizations to the
-  trial branch to measure the real-world CI speedup on the build box,
-  specifically for CLI unit tests.
+- **Green Cross-Platform Run:** Achieving a fully green run across the new
+  matrix with 2-minute CLI unit test targets and verified bundle integrity.
