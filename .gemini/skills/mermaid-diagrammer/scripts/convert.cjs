@@ -22,7 +22,8 @@ const fs = require('fs');
 
 const args = process.argv.slice(2);
 if (args.length < 2) {
-  console.error('Usage: node convert.cjs <input.mmd> <output.png>');
+  console.error('Usage: node convert.cjs <input.mmd> <output.png> [mermaid_cli_options...]');
+  console.error('Defaults: --scale 3, -b transparent');
   process.exit(1);
 }
 
@@ -34,14 +35,21 @@ if (!fs.existsSync(inputPath)) {
   process.exit(1);
 }
 
+const extraArgs = args.slice(2);
+
 console.log(`Converting ${inputPath} to ${outputPath}...`);
+if (extraArgs.length > 0) {
+  console.log(`With extra arguments: ${extraArgs.join(' ')}`);
+}
 
 const result = spawnSync('npx', [
   '--yes',
   '@mermaid-js/mermaid-cli',
   '-i', inputPath,
   '-o', outputPath,
-  '-b', 'transparent'
+  '-b', 'white',
+  '--scale', '3',
+  ...extraArgs
 ], { stdio: 'pipe', encoding: 'utf-8' });
 
 if (result.status !== 0) {

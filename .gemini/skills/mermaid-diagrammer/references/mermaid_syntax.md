@@ -36,6 +36,8 @@ graph TD
 
 ## Sequence Diagram
 Use `participant` aliases for cleaner code.
+- **Sync/Async:** Use `->>` for synchronous calls and `-->>` for asynchronous returns.
+- **Lifelines:** Ensure `activate` and `deactivate` are paired correctly.
 
 ```mermaid
 sequenceDiagram

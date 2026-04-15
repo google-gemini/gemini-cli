@@ -10,7 +10,13 @@ This skill enables the creation of professional Mermaid diagrams and their conve
 ## Workflow
 
 ### 1. Create Mermaid Diagram
-Select the appropriate diagram type based on the task (see `references/mermaid_syntax.md`).
+Select the appropriate diagram type based on the task. You MUST read `references/mermaid_syntax.md` to understand the required syntax rules and templates before creating any diagram.
+
+**Handling Existing Diagrams / Inputs:**
+- **If provided as a `.mmd` file:** Use `read_file` to examine the content and apply edits directly.
+- **If provided as an image (PNG/JPG):** Use `read_file` to read the image file, then use your vision capabilities to analyze the structure and interactions in the image, and translate it into Mermaid syntax.
+- **If provided as text:** Parse the description to map the nodes and edges.
+
 - **Syntax Guardrails:** Always use double quotes for labels containing special characters: `A["Label (with Parens)"]`.
 - **Accessibility:** Include `accTitle` and `accDescr` for all diagrams.
 - **Styling:** Use `classDef` and `subgraph` for complex diagrams to ensure readability.
@@ -18,8 +24,11 @@ Select the appropriate diagram type based on the task (see `references/mermaid_s
 
 ### 2. Convert to PNG
 Use the `scripts/convert.cjs` script.
-- **Command:** `node <skill_path>/scripts/convert.cjs <input.mmd> <output.png>`
-- If conversion fails, check the Mermaid CLI output for syntax errors (e.g., mismatched brackets or unquoted special characters).
+- **Command:** `node <skill_path>/scripts/convert.cjs <input.mmd> <output.png> [mermaid_cli_options...]`
+- **Defaults:** The script defaults to `--scale 3` (high resolution) and `-b white` (white background).
+- **Overrides:** You can pass additional flags (e.g., `-t dark` for dark theme, or `--width 800` for custom width) at the end of the command to override defaults.
+- **Transparency:** Use `-b transparent` if the user explicitly requests transparency (e.g., for dark-mode READMEs or presentation slides), but ensure the colors used are high-contrast and visible on dark backgrounds.
+- If conversion fails, check the Mermaid CLI output for syntax errors.
 
 ### 3. Validate & Verify
 Validate the PNG using `scripts/validate_png.cjs`.
