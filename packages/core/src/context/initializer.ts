@@ -1,36 +1,31 @@
 import type { Config } from '../config/config.js';
 import type { GeminiChat } from '../core/geminiChat.js';
+import { ContextProcessorRegistry } from './config/registry.js';
+import { loadContextManagementConfig } from './config/configLoader.js';
+import { ContextTracer } from './tracer.js';
+import { ContextEventBus } from './eventBus.js';
+import { ContextEnvironmentImpl } from './pipeline/environmentImpl.js';
+import { PipelineOrchestrator } from './pipeline/orchestrator.js';
+import { ContextManager } from './contextManager.js';
+import { NodeTruncationProcessorOptionsSchema } from './processors/nodeTruncationProcessor.js';
+import { ToolMaskingProcessorOptionsSchema } from './processors/toolMaskingProcessor.js';
+import { HistoryTruncationProcessorOptionsSchema } from './processors/historyTruncationProcessor.js';
+import { BlobDegradationProcessorOptionsSchema } from './processors/blobDegradationProcessor.js';
+import { NodeDistillationProcessorOptionsSchema } from './processors/nodeDistillationProcessor.js';
+import { StateSnapshotProcessorOptionsSchema } from './processors/stateSnapshotProcessor.js';
+import { StateSnapshotAsyncProcessorOptionsSchema } from './processors/stateSnapshotAsyncProcessor.js';
+import { RollingSummaryProcessorOptionsSchema } from './processors/rollingSummaryProcessor.js';
 
 export async function initializeContextManager(
   config: Config,
   chat: GeminiChat,
   lastPromptId: string,
-): Promise<any> {
-
+): Promise<ContextManager | undefined> {
   const isV1Enabled = config.getContextManagementConfig().enabled;
-  const isExperiment = config.getExperimentalContextManagementConfig() === 'generalistProfile';
 
-  if (!isV1Enabled && !isExperiment) {
-    return;
+  if (!isV1Enabled) {
+    return undefined;
   }
-
-
-  const { ContextProcessorRegistry } = await import('./config/registry.js');
-  const { loadContextManagementConfig } = await import('./config/configLoader.js');
-  const { ContextTracer } = await import('./tracer.js');
-  const { ContextEventBus } = await import('./eventBus.js');
-  const { ContextEnvironmentImpl } = await import('./pipeline/environmentImpl.js');
-  const { PipelineOrchestrator } = await import('./pipeline/orchestrator.js');
-  const { ContextManager } = await import('./contextManager.js');
-
-  const { NodeTruncationProcessorOptionsSchema } = await import('./processors/nodeTruncationProcessor.js');
-  const { ToolMaskingProcessorOptionsSchema } = await import('./processors/toolMaskingProcessor.js');
-  const { HistoryTruncationProcessorOptionsSchema } = await import('./processors/historyTruncationProcessor.js');
-  const { BlobDegradationProcessorOptionsSchema } = await import('./processors/blobDegradationProcessor.js');
-  const { NodeDistillationProcessorOptionsSchema } = await import('./processors/nodeDistillationProcessor.js');
-  const { StateSnapshotProcessorOptionsSchema } = await import('./processors/stateSnapshotProcessor.js');
-  const { StateSnapshotAsyncProcessorOptionsSchema } = await import('./processors/stateSnapshotAsyncProcessor.js');
-  const { RollingSummaryProcessorOptionsSchema } = await import('./processors/rollingSummaryProcessor.js');
 
   const registry = new ContextProcessorRegistry();
   registry.registerProcessor({ id: 'NodeTruncationProcessor', schema: NodeTruncationProcessorOptionsSchema });

@@ -1,3 +1,4 @@
+import { initializeContextManager } from '../context/initializer.js';
 /**
  * @license
  * Copyright 2025 Google LLC
@@ -395,7 +396,6 @@ export class GeminiClient {
         },
       );
       await chat.initialize(resumedSessionData, 'main');
-      const { initializeContextManager } = await import('../context/initializer.js');
       this.contextManager = await initializeContextManager(this.config, chat, this.lastPromptId);
       return chat;
     } catch (error) {
