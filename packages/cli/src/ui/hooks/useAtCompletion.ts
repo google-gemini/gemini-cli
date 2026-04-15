@@ -239,8 +239,7 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
   }, []);
 
   const resetFileSearchState = useCallback(() => {
-    // eslint-disable-next-line @typescript-eslint/no-floating-promises
-    disposeFileSearchers();
+    void disposeFileSearchers();
     dispatch({ type: 'RESET' });
   }, [disposeFileSearchers]);
 
@@ -258,14 +257,16 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
     return unsubscribe;
   }, [config, resetFileSearchState]);
 
-  useEffect(() => () => {
-      // eslint-disable-next-line @typescript-eslint/no-floating-promises
-      disposeFileSearchers();
+  useEffect(
+    () => () => {
+      void disposeFileSearchers();
       searchAbortController.current?.abort();
       if (slowSearchTimer.current) {
         clearTimeout(slowSearchTimer.current);
       }
-    }, [disposeFileSearchers]);
+    },
+    [disposeFileSearchers],
+  );
 
   // Reacts to user input (`pattern`) ONLY.
   useEffect(() => {

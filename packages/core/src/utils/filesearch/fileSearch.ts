@@ -199,45 +199,56 @@ class RecursiveFileSearch implements FileSearch {
     const directoryFilter = this.ignore?.getDirectoryFilter();
 
     let changed = false;
-    if (event.eventType === 'add') {
-      if (
-        fileFilter?.(normalizedPath) ||
-        this.allFiles.size >= (this.options.maxFiles ?? 20000)
-      ) {
-        return;
-      }
-      const sizeBefore = this.allFiles.size;
-      this.allFiles.add(normalizedPath);
-      changed = this.allFiles.size !== sizeBefore;
-    } else if (event.eventType === 'unlink') {
-      changed = this.allFiles.delete(normalizedPath);
-    } else if (event.eventType === 'addDir') {
-      const directoryPath = normalizedPath.endsWith('/')
-        ? normalizedPath
-        : `${normalizedPath}/`;
-      if (
-        directoryFilter?.(directoryPath) ||
-        this.allFiles.size >= (this.options.maxFiles ?? 20000)
-      ) {
-        return;
-      }
-      const sizeBefore = this.allFiles.size;
-      this.allFiles.add(directoryPath);
-      changed = this.allFiles.size !== sizeBefore;
-    } else if (event.eventType === 'unlinkDir') {
-      const directoryPath = normalizedPath.endsWith('/')
-        ? normalizedPath
-        : `${normalizedPath}/`;
-      const toDelete: string[] = [];
-      for (const file of this.allFiles) {
-        if (file === directoryPath || file.startsWith(directoryPath)) {
-          toDelete.push(file);
+    switch (event.eventType) {
+      case 'add': {
+        if (
+          fileFilter?.(normalizedPath) ||
+          this.allFiles.size >= (this.options.maxFiles ?? 20000)
+        ) {
+          return;
         }
+        const sizeBefore = this.allFiles.size;
+        this.allFiles.add(normalizedPath);
+        changed = this.allFiles.size !== sizeBefore;
+        break;
       }
-      changed = toDelete.length > 0;
-      for (const file of toDelete) {
-        this.allFiles.delete(file);
+      case 'unlink': {
+        changed = this.allFiles.delete(normalizedPath);
+        break;
       }
+      case 'addDir': {
+        const directoryPath = normalizedPath.endsWith('/')
+          ? normalizedPath
+          : `${normalizedPath}/`;
+        if (
+          directoryFilter?.(directoryPath) ||
+          this.allFiles.size >= (this.options.maxFiles ?? 20000)
+        ) {
+          return;
+        }
+        const sizeBefore = this.allFiles.size;
+        this.allFiles.add(directoryPath);
+        changed = this.allFiles.size !== sizeBefore;
+        break;
+      }
+      case 'unlinkDir': {
+        const directoryPath = normalizedPath.endsWith('/')
+          ? normalizedPath
+          : `${normalizedPath}/`;
+        const toDelete: string[] = [];
+        for (const file of this.allFiles) {
+          if (file === directoryPath || file.startsWith(directoryPath)) {
+            toDelete.push(file);
+          }
+        }
+        changed = toDelete.length > 0;
+        for (const file of toDelete) {
+          this.allFiles.delete(file);
+        }
+        break;
+      }
+      default:
+        return;
     }
 
     if (changed) {
