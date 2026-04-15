@@ -26,15 +26,7 @@ import {
   estimateCharsFromTokens,
   normalizeFunctionResponse,
 } from './truncation.js';
-
-function sanitizePromptInput(value: string): string {
-  return value
-    .replace(/\\[rn]/g, ' ')
-    .replace(/[\r\n\u2028\u2029]+/g, ' ')
-    .replace(/```/g, "'''")
-    .replace(/[<>]/g, (char) => (char === '<' ? '&lt;' : '&gt;'))
-    .replace(/[\x00-\x1f\x7f]/g, ''); // eslint-disable-line no-control-regex
-}
+import { sanitizePromptString } from '../utils/sanitizePromptInput.js';
 
 // Skip structural map generation for outputs larger than this threshold (in characters)
 // as it consumes excessive tokens and may not be representative of the full content.
@@ -285,7 +277,7 @@ Focus strictly on concrete data points:
 Do not philosophize about the strategic intent. Keep the extraction under 10 lines and use exact quotes where helpful.
 
 Output to summarize:
-${sanitizePromptInput(Array.from(stringifiedContent).slice(0, maxPreviewLen).join(''))}...`;
+${sanitizePromptString(Array.from(stringifiedContent).slice(0, maxPreviewLen).join(''))}...`;
 
       const summaryResponse = await this.geminiClient.generateContent(
         { model: 'agent-history-provider-summarizer' },

@@ -36,6 +36,7 @@ import { PreCompressTrigger } from '../hooks/types.js';
 import { ContextWindow } from '../services/contextWindow.js';
 import { TFIDFEmbedder } from '../services/embeddingService.js';
 import { ClusterSummarizer } from '../services/clusterSummarizer.js';
+import { sanitizePromptString } from '../utils/sanitizePromptInput.js';
 
 /**
  * Default threshold for compression token count as a fraction of the model's
@@ -618,11 +619,13 @@ export class ChatCompressionService {
       mergeThreshold: UNION_FIND_MERGE_THRESHOLD,
     });
 
-    // Feed all truncated history into the context window
+    // Feed all truncated history into the context window.
+    // Sanitize every appended string so tool-response content cannot inject
+    // the `<context_clusters>` delimiter the renderer wraps cold summaries in.
     for (const content of truncatedHistory) {
       const text = content.parts
         ?.map((p) => {
-          if (p.text) return p.text;
+          if (p.text) return sanitizePromptString(p.text);
           if (p.functionCall) return `[Tool call: ${p.functionCall.name}]`;
           if (p.functionResponse) {
             const responseStr = JSON.stringify(
@@ -633,7 +636,13 @@ export class ChatCompressionService {
               graphemes.length > 500
                 ? graphemes.slice(0, 500).join('') + '...'
                 : responseStr;
-            return `[Tool response: ${p.functionResponse.name}] ${preview}`;
+            return `[Tool response: ${p.functionResponse.name}] ${sanitizePromptString(preview)}`;
+          }
+          if (p.fileData) {
+            return `[File attachment omitted: ${p.fileData.mimeType ?? 'unknown'}]`;
+          }
+          if (p.inlineData) {
+            return `[Inline data omitted: ${p.inlineData.mimeType ?? 'unknown'}]`;
           }
           return '';
         })
