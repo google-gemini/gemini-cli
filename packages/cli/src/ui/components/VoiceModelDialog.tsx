@@ -102,13 +102,11 @@ export function VoiceModelDialog({
         setSetting(SettingScope.User, 'voice.whisperModel', modelName);
       } else {
         setError(null);
+        const onProgress = (p: WhisperModelProgress) => setDownloadProgress(p);
+        modelManager.on('progress', onProgress);
+
         try {
-          const onProgress = (p: WhisperModelProgress) =>
-            setDownloadProgress(p);
-          modelManager.on('progress', onProgress);
           await modelManager.downloadModel(modelName);
-          modelManager.off('progress', onProgress);
-          setDownloadProgress(null);
 
           setSetting(SettingScope.User, 'voice.backend', 'whisper');
           setSetting(SettingScope.User, 'voice.whisperModel', modelName);
@@ -116,6 +114,8 @@ export function VoiceModelDialog({
           setError(
             `Failed to download: ${err instanceof Error ? err.message : String(err)}`,
           );
+        } finally {
+          modelManager.off('progress', onProgress);
           setDownloadProgress(null);
         }
       }

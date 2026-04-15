@@ -407,24 +407,43 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return;
       }
 
-      recorderRef.current = new AudioRecorder();
+      if (voiceBackend === 'gemini-live') {
+        recorderRef.current = new AudioRecorder();
+      }
+
       transcriptionServiceRef.current = TranscriptionFactory.createProvider(
         settings.voice,
         apiKey,
       );
 
       // TranscriptionProviders may be session-cumulative (full text so far) or
-      // turn-based (resetting text after turnComplete). We maintain a baseline
-      // that updates on every turnComplete to handle both cases transparently.
+      // turn-based (resetting text after turnComplete).
       transcriptionServiceRef.current.on('transcription', (text) => {
         if (text) {
-          const baseline = turnBaselineRef.current ?? '';
-          const separator =
-            baseline && !baseline.endsWith(' ') && !baseline.endsWith('\n')
-              ? ' '
-              : '';
-          const newTotalText = baseline + separator + text;
+          const currentBufferText = bufferRef.current.text;
+          const previousTranscription = liveTranscriptionRef.current;
 
+          let newTotalText = currentBufferText;
+
+          // If we have a previous transcription chunk, find it at the end of the buffer and remove it
+          if (
+            previousTranscription &&
+            currentBufferText.endsWith(previousTranscription)
+          ) {
+            newTotalText = currentBufferText.slice(
+              0,
+              -previousTranscription.length,
+            );
+          } else if (
+            currentBufferText &&
+            !currentBufferText.endsWith(' ') &&
+            !currentBufferText.endsWith('\n')
+          ) {
+            // If this is the start of a new transcription and the buffer doesn't end with whitespace, add a space
+            newTotalText += ' ';
+          }
+
+          newTotalText += text;
           bufferRef.current.setText(newTotalText, 'end');
         }
 
@@ -433,9 +452,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
       transcriptionServiceRef.current.on('turnComplete', () => {
         // When a turn is complete, some providers (like Gemini Live) will start a new
-        // transcription from empty. We capture the current buffer as the NEW baseline
-        // so that the next turn appends to what we have so far.
-        turnBaselineRef.current = bufferRef.current.text;
+        // transcription from empty.
         liveTranscriptionRef.current = '';
       });
 
