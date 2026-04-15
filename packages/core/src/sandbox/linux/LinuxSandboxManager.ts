@@ -28,84 +28,83 @@ import {
 } from '../abstractOsSandboxManager.js';
 import { isStrictlyApproved } from '../utils/commandUtils.js';
 
-let cachedBpfPath: string | undefined;
-
-function getSeccompBpfPath(): string {
-  if (cachedBpfPath) return cachedBpfPath;
-
-  const arch = os.arch();
-  let AUDIT_ARCH: number;
-  let SYS_ptrace: number;
-
-  if (arch === 'x64') {
-    AUDIT_ARCH = 0xc000003e; // AUDIT_ARCH_X86_64
-    SYS_ptrace = 101;
-  } else if (arch === 'arm64') {
-    AUDIT_ARCH = 0xc00000b7; // AUDIT_ARCH_AARCH64
-    SYS_ptrace = 117;
-  } else if (arch === 'arm') {
-    AUDIT_ARCH = 0x40000028; // AUDIT_ARCH_ARM
-    SYS_ptrace = 26;
-  } else if (arch === 'ia32') {
-    AUDIT_ARCH = 0x40000003; // AUDIT_ARCH_I386
-    SYS_ptrace = 26;
-  } else {
-    throw new Error(`Unsupported architecture for seccomp filter: ${arch}`);
-  }
-
-  const EPERM = 1;
-  const SECCOMP_RET_KILL_PROCESS = 0x80000000;
-  const SECCOMP_RET_ERRNO = 0x00050000;
-  const SECCOMP_RET_ALLOW = 0x7fff0000;
-
-  const instructions = [
-    { code: 0x20, jt: 0, jf: 0, k: 4 }, // Load arch
-    { code: 0x15, jt: 1, jf: 0, k: AUDIT_ARCH }, // Jump to kill if arch != native arch
-    { code: 0x06, jt: 0, jf: 0, k: SECCOMP_RET_KILL_PROCESS }, // Kill
-
-    { code: 0x20, jt: 0, jf: 0, k: 0 }, // Load nr
-    { code: 0x15, jt: 0, jf: 1, k: SYS_ptrace }, // If ptrace, jump to ERRNO
-    { code: 0x06, jt: 0, jf: 0, k: SECCOMP_RET_ERRNO | EPERM }, // ERRNO
-
-    { code: 0x06, jt: 0, jf: 0, k: SECCOMP_RET_ALLOW }, // Allow
-  ];
-
-  const buf = Buffer.alloc(8 * instructions.length);
-  for (let i = 0; i < instructions.length; i++) {
-    const inst = instructions[i];
-    const offset = i * 8;
-    buf.writeUInt16LE(inst.code, offset);
-    buf.writeUInt8(inst.jt, offset + 2);
-    buf.writeUInt8(inst.jf, offset + 3);
-    buf.writeUInt32LE(inst.k, offset + 4);
-  }
-
-  const tempDir = fs.mkdtempSync(join(os.tmpdir(), 'gemini-cli-seccomp-'));
-  const bpfPath = join(tempDir, 'seccomp.bpf');
-  fs.writeFileSync(bpfPath, buf);
-  cachedBpfPath = bpfPath;
-
-  // Cleanup on exit
-  process.on('exit', () => {
-    try {
-      fs.rmSync(tempDir, { recursive: true, force: true });
-    } catch {
-      // Ignore errors
-    }
-  });
-
-  return bpfPath;
-}
-
 /**
  * A SandboxManager implementation for Linux that uses Bubblewrap (bwrap).
  */
 
 export class LinuxSandboxManager extends AbstractOsSandboxManager {
-  private static maskFilePath: string | undefined;
+  private cachedBpfPath: string | undefined;
+  private maskFilePath: string | undefined;
 
   protected override async initialize(): Promise<void> {
     // Default no-op
+  }
+
+  private getSeccompBpfPath(): string {
+    if (this.cachedBpfPath) return this.cachedBpfPath;
+
+    const arch = os.arch();
+    let AUDIT_ARCH: number;
+    let SYS_ptrace: number;
+
+    if (arch === 'x64') {
+      AUDIT_ARCH = 0xc000003e; // AUDIT_ARCH_X86_64
+      SYS_ptrace = 101;
+    } else if (arch === 'arm64') {
+      AUDIT_ARCH = 0xc00000b7; // AUDIT_ARCH_AARCH64
+      SYS_ptrace = 117;
+    } else if (arch === 'arm') {
+      AUDIT_ARCH = 0x40000028; // AUDIT_ARCH_ARM
+      SYS_ptrace = 26;
+    } else if (arch === 'ia32') {
+      AUDIT_ARCH = 0x40000003; // AUDIT_ARCH_I386
+      SYS_ptrace = 26;
+    } else {
+      throw new Error(`Unsupported architecture for seccomp filter: ${arch}`);
+    }
+
+    const EPERM = 1;
+    const SECCOMP_RET_KILL_PROCESS = 0x80000000;
+    const SECCOMP_RET_ERRNO = 0x00050000;
+    const SECCOMP_RET_ALLOW = 0x7fff0000;
+
+    const instructions = [
+      { code: 0x20, jt: 0, jf: 0, k: 4 }, // Load arch
+      { code: 0x15, jt: 1, jf: 0, k: AUDIT_ARCH }, // Jump to kill if arch != native arch
+      { code: 0x06, jt: 0, jf: 0, k: SECCOMP_RET_KILL_PROCESS }, // Kill
+
+      { code: 0x20, jt: 0, jf: 0, k: 0 }, // Load nr
+      { code: 0x15, jt: 0, jf: 1, k: SYS_ptrace }, // If ptrace, jump to ERRNO
+      { code: 0x06, jt: 0, jf: 0, k: SECCOMP_RET_ERRNO | EPERM }, // ERRNO
+
+      { code: 0x06, jt: 0, jf: 0, k: SECCOMP_RET_ALLOW }, // Allow
+    ];
+
+    const buf = Buffer.alloc(8 * instructions.length);
+    for (let i = 0; i < instructions.length; i++) {
+      const inst = instructions[i];
+      const offset = i * 8;
+      buf.writeUInt16LE(inst.code, offset);
+      buf.writeUInt8(inst.jt, offset + 2);
+      buf.writeUInt8(inst.jf, offset + 3);
+      buf.writeUInt32LE(inst.k, offset + 4);
+    }
+
+    const tempDir = fs.mkdtempSync(join(os.tmpdir(), 'gemini-cli-seccomp-'));
+    const bpfPath = join(tempDir, 'seccomp.bpf');
+    fs.writeFileSync(bpfPath, buf);
+    this.cachedBpfPath = bpfPath;
+
+    // Cleanup on exit
+    process.on('exit', () => {
+      try {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      } catch {
+        // Ignore errors
+      }
+    });
+
+    return bpfPath;
   }
 
   protected override ensureGovernanceFilesExist(workspace: string): void {
@@ -179,7 +178,7 @@ export class LinuxSandboxManager extends AbstractOsSandboxManager {
       isReadOnlyCommand: req.command === '__read',
     });
 
-    const bpfPath = getSeccompBpfPath();
+    const bpfPath = this.getSeccompBpfPath();
     bwrapArgs.push('--seccomp', '9');
 
     const argsPath = this.writeArgsToTempFile(bwrapArgs);
@@ -248,17 +247,14 @@ export class LinuxSandboxManager extends AbstractOsSandboxManager {
   }
 
   private getMaskFilePath(): string {
-    if (
-      LinuxSandboxManager.maskFilePath &&
-      fs.existsSync(LinuxSandboxManager.maskFilePath)
-    ) {
-      return LinuxSandboxManager.maskFilePath;
+    if (this.maskFilePath && fs.existsSync(this.maskFilePath)) {
+      return this.maskFilePath;
     }
     const tempDir = fs.mkdtempSync(join(os.tmpdir(), 'gemini-cli-mask-file-'));
     const maskPath = join(tempDir, 'mask');
     fs.writeFileSync(maskPath, '');
     fs.chmodSync(maskPath, 0);
-    LinuxSandboxManager.maskFilePath = maskPath;
+    this.maskFilePath = maskPath;
 
     // Cleanup on exit
     process.on('exit', () => {
