@@ -8,8 +8,19 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
-    projects: ['packages/*', 'scripts/tests'],
+    projects: [
+      'packages/cli',
+      'packages/core',
+      'packages/sdk',
+      'packages/a2a-server',
+      'packages/test-utils',
+      'scripts/tests',
+    ],
     // Global test settings
+    coverage: {
+      enabled: false, // Disabled by default for speed, enabled via CLI if needed
+      provider: 'v8',
+    },
     fileParallelism: true,
     poolOptions: {
       threads: {
@@ -18,10 +29,6 @@ export default defineConfig({
       vmThreads: {
         useAtomics: true,
       },
-    },
-    coverage: {
-      enabled: false, // Disabled by default for speed, enabled via CLI if needed
-      provider: 'v8',
     },
   },
 });
