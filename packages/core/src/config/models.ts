@@ -10,6 +10,7 @@ export interface ModelResolutionContext {
   useCustomTools?: boolean;
   hasAccessToPreview?: boolean;
   requestedModel?: string;
+  gemma4Variant?: 'gemma-4-26b-a4b-it' | 'gemma-4-31b-it';
 }
 
 /**
@@ -48,6 +49,7 @@ export interface IModelConfigService {
 export interface ModelCapabilityContext {
   readonly modelConfigService: IModelConfigService;
   getExperimentalDynamicModelConfiguration(): boolean;
+  getGemma4Variant?: () => 'gemma-4-26b-a4b-it' | 'gemma-4-31b-it' | undefined;
 }
 
 export const PREVIEW_GEMINI_MODEL = 'gemini-3-pro-preview';
@@ -60,6 +62,8 @@ export const PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL =
 export const DEFAULT_GEMINI_MODEL = 'gemini-2.5-pro';
 export const DEFAULT_GEMINI_FLASH_MODEL = 'gemini-2.5-flash';
 export const DEFAULT_GEMINI_FLASH_LITE_MODEL = 'gemini-2.5-flash-lite';
+export const GEMMA_4_26B_IT = 'gemma-4-26b-a4b-it';
+export const GEMMA_4_31B_IT = 'gemma-4-31b-it';
 
 export const VALID_GEMINI_MODELS = new Set([
   PREVIEW_GEMINI_MODEL,
@@ -70,6 +74,8 @@ export const VALID_GEMINI_MODELS = new Set([
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
+  GEMMA_4_26B_IT,
+  GEMMA_4_31B_IT,
 ]);
 
 export const PREVIEW_GEMINI_MODEL_AUTO = 'auto-gemini-3';
@@ -109,6 +115,7 @@ export function resolveModel(
       useGemini3_1FlashLite,
       useCustomTools: useCustomToolModel,
       hasAccessToPreview,
+      gemma4Variant: config.getGemma4Variant?.(),
     });
 
     if (!hasAccessToPreview && isPreviewModel(resolved, config)) {
@@ -158,6 +165,17 @@ export function resolveModel(
       resolved = requestedModel;
       break;
     }
+  }
+
+  const variant = config?.getGemma4Variant?.();
+  if (
+    variant &&
+    (resolved === PREVIEW_GEMINI_MODEL ||
+      resolved === DEFAULT_GEMINI_MODEL ||
+      resolved === PREVIEW_GEMINI_FLASH_MODEL ||
+      resolved === DEFAULT_GEMINI_FLASH_MODEL)
+  ) {
+    return variant;
   }
 
   if (!hasAccessToPreview && isPreviewModel(resolved)) {
@@ -214,6 +232,7 @@ export function resolveClassifierModel(
         useGemini3_1FlashLite,
         useCustomTools: useCustomToolModel,
         hasAccessToPreview,
+        gemma4Variant: config.getGemma4Variant?.(),
       },
     );
   }

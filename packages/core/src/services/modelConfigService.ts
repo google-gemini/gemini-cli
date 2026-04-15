@@ -101,6 +101,7 @@ export interface ResolutionContext {
   hasAccessToPreview?: boolean;
   hasAccessToProModel?: boolean;
   requestedModel?: string;
+  gemma4Variant?: 'gemma-4-26b-a4b-it' | 'gemma-4-31b-it';
 }
 
 /** The requirements defined in the registry. */
@@ -109,6 +110,7 @@ export interface ResolutionCondition {
   useGemini3_1FlashLite?: boolean;
   useCustomTools?: boolean;
   hasAccessToPreview?: boolean;
+  gemma4Variant?: 'gemma-4-26b-a4b-it' | 'gemma-4-31b-it';
   /** Matches if the current model is in this list. */
   requestedModels?: string[];
 }
@@ -252,6 +254,8 @@ export class ModelConfigService {
           return value === context.useCustomTools;
         case 'hasAccessToPreview':
           return value === context.hasAccessToPreview;
+        case 'gemma4Variant':
+          return value === context.gemma4Variant;
         case 'requestedModels':
           return (
             Array.isArray(value) &&

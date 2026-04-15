@@ -89,6 +89,18 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
         model: 'gemini-2.5-flash-lite',
       },
     },
+    'gemma-4-26b-a4b-it': {
+      extends: 'chat-base',
+      modelConfig: {
+        model: 'gemma-4-26b-a4b-it',
+      },
+    },
+    'gemma-4-31b-it': {
+      extends: 'chat-base',
+      modelConfig: {
+        model: 'gemma-4-31b-it',
+      },
+    },
     // Bases for the internal model configs.
     'gemini-2.5-flash-base': {
       extends: 'base',
@@ -317,6 +329,20 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       isVisible: true,
       features: { thinking: false, multimodalToolUse: false },
     },
+    'gemma-4-26b-a4b-it': {
+      tier: 'pro',
+      family: 'gemma-4',
+      isPreview: true,
+      isVisible: true,
+      features: { thinking: false, multimodalToolUse: false },
+    },
+    'gemma-4-31b-it': {
+      tier: 'pro',
+      family: 'gemma-4',
+      isPreview: true,
+      isVisible: true,
+      features: { thinking: false, multimodalToolUse: false },
+    },
     // Aliases
     auto: {
       tier: 'auto',
@@ -362,9 +388,43 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
     },
   },
   modelIdResolutions: {
+    'gemini-2.5-flash': {
+      default: 'gemini-2.5-flash',
+      contexts: [
+        {
+          condition: { gemma4Variant: 'gemma-4-26b-a4b-it' },
+          target: 'gemma-4-26b-a4b-it',
+        },
+        {
+          condition: { gemma4Variant: 'gemma-4-31b-it' },
+          target: 'gemma-4-31b-it',
+        },
+      ],
+    },
+    'gemini-2.5-pro': {
+      default: 'gemini-2.5-pro',
+      contexts: [
+        {
+          condition: { gemma4Variant: 'gemma-4-26b-a4b-it' },
+          target: 'gemma-4-26b-a4b-it',
+        },
+        {
+          condition: { gemma4Variant: 'gemma-4-31b-it' },
+          target: 'gemma-4-31b-it',
+        },
+      ],
+    },
     'gemini-3.1-pro-preview': {
       default: 'gemini-3.1-pro-preview',
       contexts: [
+        {
+          condition: { gemma4Variant: 'gemma-4-26b-a4b-it' },
+          target: 'gemma-4-26b-a4b-it',
+        },
+        {
+          condition: { gemma4Variant: 'gemma-4-31b-it' },
+          target: 'gemma-4-31b-it',
+        },
         { condition: { hasAccessToPreview: false }, target: 'gemini-2.5-pro' },
         {
           condition: { useCustomTools: true },
@@ -375,12 +435,28 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
     'gemini-3.1-pro-preview-customtools': {
       default: 'gemini-3.1-pro-preview-customtools',
       contexts: [
+        {
+          condition: { gemma4Variant: 'gemma-4-26b-a4b-it' },
+          target: 'gemma-4-26b-a4b-it',
+        },
+        {
+          condition: { gemma4Variant: 'gemma-4-31b-it' },
+          target: 'gemma-4-31b-it',
+        },
         { condition: { hasAccessToPreview: false }, target: 'gemini-2.5-pro' },
       ],
     },
     'gemini-3-flash-preview': {
       default: 'gemini-3-flash-preview',
       contexts: [
+        {
+          condition: { gemma4Variant: 'gemma-4-26b-a4b-it' },
+          target: 'gemma-4-26b-a4b-it',
+        },
+        {
+          condition: { gemma4Variant: 'gemma-4-31b-it' },
+          target: 'gemma-4-31b-it',
+        },
         {
           condition: { hasAccessToPreview: false },
           target: 'gemini-2.5-flash',
@@ -390,6 +466,14 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
     'gemini-3-pro-preview': {
       default: 'gemini-3-pro-preview',
       contexts: [
+        {
+          condition: { gemma4Variant: 'gemma-4-26b-a4b-it' },
+          target: 'gemma-4-26b-a4b-it',
+        },
+        {
+          condition: { gemma4Variant: 'gemma-4-31b-it' },
+          target: 'gemma-4-31b-it',
+        },
         { condition: { hasAccessToPreview: false }, target: 'gemini-2.5-pro' },
         {
           condition: { useGemini3_1: true, useCustomTools: true },
@@ -404,6 +488,14 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
     'auto-gemini-3': {
       default: 'gemini-3-pro-preview',
       contexts: [
+        {
+          condition: { gemma4Variant: 'gemma-4-26b-a4b-it' },
+          target: 'gemma-4-26b-a4b-it',
+        },
+        {
+          condition: { gemma4Variant: 'gemma-4-31b-it' },
+          target: 'gemma-4-31b-it',
+        },
         { condition: { hasAccessToPreview: false }, target: 'gemini-2.5-pro' },
         {
           condition: { useGemini3_1: true, useCustomTools: true },
@@ -418,6 +510,14 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
     auto: {
       default: 'gemini-3-pro-preview',
       contexts: [
+        {
+          condition: { gemma4Variant: 'gemma-4-26b-a4b-it' },
+          target: 'gemma-4-26b-a4b-it',
+        },
+        {
+          condition: { gemma4Variant: 'gemma-4-31b-it' },
+          target: 'gemma-4-31b-it',
+        },
         { condition: { hasAccessToPreview: false }, target: 'gemini-2.5-pro' },
         {
           condition: { useGemini3_1: true, useCustomTools: true },
@@ -432,6 +532,14 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
     pro: {
       default: 'gemini-3-pro-preview',
       contexts: [
+        {
+          condition: { gemma4Variant: 'gemma-4-26b-a4b-it' },
+          target: 'gemma-4-26b-a4b-it',
+        },
+        {
+          condition: { gemma4Variant: 'gemma-4-31b-it' },
+          target: 'gemma-4-31b-it',
+        },
         { condition: { hasAccessToPreview: false }, target: 'gemini-2.5-pro' },
         {
           condition: { useGemini3_1: true, useCustomTools: true },
@@ -445,6 +553,16 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
     },
     'auto-gemini-2.5': {
       default: 'gemini-2.5-pro',
+      contexts: [
+        {
+          condition: { gemma4Variant: 'gemma-4-26b-a4b-it' },
+          target: 'gemma-4-26b-a4b-it',
+        },
+        {
+          condition: { gemma4Variant: 'gemma-4-31b-it' },
+          target: 'gemma-4-31b-it',
+        },
+      ],
     },
     'gemini-3.1-flash-lite-preview': {
       default: 'gemini-3.1-flash-lite-preview',
@@ -458,6 +576,14 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
     flash: {
       default: 'gemini-3-flash-preview',
       contexts: [
+        {
+          condition: { gemma4Variant: 'gemma-4-26b-a4b-it' },
+          target: 'gemma-4-26b-a4b-it',
+        },
+        {
+          condition: { gemma4Variant: 'gemma-4-31b-it' },
+          target: 'gemma-4-31b-it',
+        },
         {
           condition: { hasAccessToPreview: false },
           target: 'gemini-2.5-flash',
@@ -479,6 +605,22 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       default: 'gemini-3-flash-preview',
       contexts: [
         {
+          condition: { gemma4Variant: 'gemma-4-26b-a4b-it' },
+          target: 'gemma-4-26b-a4b-it',
+        },
+        {
+          condition: { gemma4Variant: 'gemma-4-31b-it' },
+          target: 'gemma-4-31b-it',
+        },
+        {
+          condition: { gemma4Variant: 'gemma-4-26b-a4b-it' },
+          target: 'gemma-4-26b-a4b-it',
+        },
+        {
+          condition: { gemma4Variant: 'gemma-4-31b-it' },
+          target: 'gemma-4-31b-it',
+        },
+        {
           condition: { requestedModels: ['auto-gemini-2.5', 'gemini-2.5-pro'] },
           target: 'gemini-2.5-flash',
         },
@@ -493,6 +635,22 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
     pro: {
       default: 'gemini-3-pro-preview',
       contexts: [
+        {
+          condition: { gemma4Variant: 'gemma-4-26b-a4b-it' },
+          target: 'gemma-4-26b-a4b-it',
+        },
+        {
+          condition: { gemma4Variant: 'gemma-4-31b-it' },
+          target: 'gemma-4-31b-it',
+        },
+        {
+          condition: { gemma4Variant: 'gemma-4-26b-a4b-it' },
+          target: 'gemma-4-26b-a4b-it',
+        },
+        {
+          condition: { gemma4Variant: 'gemma-4-31b-it' },
+          target: 'gemma-4-31b-it',
+        },
         {
           condition: { requestedModels: ['auto-gemini-2.5', 'gemini-2.5-pro'] },
           target: 'gemini-2.5-pro',

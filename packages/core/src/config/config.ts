@@ -726,6 +726,7 @@ export interface ConfigParameters {
   billing?: {
     overageStrategy?: OverageStrategy;
   };
+  gemma4Variant?: 'gemma-4-26b-a4b-it' | 'gemma-4-31b-it';
 }
 
 export class Config implements McpContext, AgentLoopContext {
@@ -759,6 +760,10 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly debugMode: boolean;
   private readonly question: string | undefined;
   private readonly worktreeSettings: WorktreeSettings | undefined;
+  private readonly gemma4Variant:
+    | 'gemma-4-26b-a4b-it'
+    | 'gemma-4-31b-it'
+    | undefined;
   readonly enableConseca: boolean;
 
   private readonly coreTools: string[] | undefined;
@@ -1027,6 +1032,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.debugMode = params.debugMode;
     this.question = params.question;
     this.worktreeSettings = params.worktreeSettings;
+    this.gemma4Variant = params.gemma4Variant;
 
     this.coreTools = params.coreTools;
     this.mainAgentTools = params.mainAgentTools;
@@ -1753,6 +1759,10 @@ export class Config implements McpContext, AgentLoopContext {
 
   getWorktreeSettings(): WorktreeSettings | undefined {
     return this.worktreeSettings;
+  }
+
+  getGemma4Variant(): 'gemma-4-26b-a4b-it' | 'gemma-4-31b-it' | undefined {
+    return this.gemma4Variant;
   }
 
   getClientName(): string | undefined {

@@ -913,6 +913,7 @@ export async function loadCliConfig(
     debugMode,
     question,
     worktreeSettings,
+    gemma4Variant: settings.model?.gemma4Variant,
 
     coreTools: settings.tools?.core || undefined,
     allowedTools: allowedTools.length > 0 ? allowedTools : undefined,
