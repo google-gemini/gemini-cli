@@ -17,6 +17,7 @@ import {
   type ToolMcpConfirmationDetails,
   type ToolResult,
   type PolicyUpdateOptions,
+  type ExecuteOptions,
 } from './tools.js';
 import type {
   CallableTool,
@@ -270,7 +271,7 @@ export class DiscoveredMCPToolInvocation extends BaseToolInvocation<
     return false;
   }
 
-  async execute(signal: AbortSignal): Promise<ToolResult> {
+  async execute({ abortSignal: signal }: ExecuteOptions): Promise<ToolResult> {
     this.cliConfig?.setUserInteractedWithMcp?.();
     const functionCalls: FunctionCall[] = [
       {

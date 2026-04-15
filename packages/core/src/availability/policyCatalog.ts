@@ -41,7 +41,7 @@ const DEFAULT_ACTIONS: ModelPolicyActionMap = {
   unknown: 'prompt',
 };
 
-const SILENT_ACTIONS: ModelPolicyActionMap = {
+export const SILENT_ACTIONS: ModelPolicyActionMap = {
   terminal: 'silent',
   transient: 'silent',
   not_found: 'silent',
