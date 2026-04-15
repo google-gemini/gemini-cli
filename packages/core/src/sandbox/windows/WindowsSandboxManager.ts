@@ -446,7 +446,13 @@ export function isSecretFile(fileName: string): boolean {
   return SECRET_FILES.some((s) => {
     if (s.pattern.includes('*')) {
       const regex = new RegExp(
-        '^' + s.pattern.replace(/\./g, '\\.').replace(/\*/g, '.*') + '$',
+        '^' +
+          s.pattern
+            // Escape all regex special chars
+            .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+            // Convert the escaped asterisk back to a regex wildcard
+            .replace(/\\\*/g, '.*') +
+          '$',
       );
       return regex.test(fileName);
     }
