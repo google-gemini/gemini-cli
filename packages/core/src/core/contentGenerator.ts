@@ -101,6 +101,21 @@ export type ContentGeneratorConfig = {
   customHeaders?: Record<string, string>;
 };
 
+const LOCAL_HOSTNAMES = ['localhost', '127.0.0.1', '[::1]'];
+
+function validateBaseUrl(baseUrl: string): void {
+  let url: URL;
+  try {
+    url = new URL(baseUrl);
+  } catch {
+    throw new Error(`Invalid custom base URL: ${baseUrl}`);
+  }
+
+  if (url.protocol !== 'https:' && !LOCAL_HOSTNAMES.includes(url.hostname)) {
+    throw new Error('Custom base URL must use HTTPS unless it is localhost.');
+  }
+}
+
 export async function createContentGeneratorConfig(
   config: Config,
   authType: AuthType | undefined,
@@ -273,18 +288,32 @@ export async function createContentGenerator(
           'x-gemini-api-privileged-user-id': `${installationId}`,
         };
       }
+      let baseUrl = config.baseUrl;
+      if (!baseUrl) {
+        const envBaseUrl =
+          config.authType === AuthType.USE_VERTEX_AI
+            ? process.env['GOOGLE_VERTEX_BASE_URL']
+            : process.env['GOOGLE_GEMINI_BASE_URL'];
+        if (envBaseUrl) {
+          validateBaseUrl(envBaseUrl);
+          baseUrl = envBaseUrl;
+        }
+      } else {
+        validateBaseUrl(baseUrl);
+      }
+
       const httpOptions: {
         baseUrl?: string;
         headers: Record<string, string>;
       } = { headers };
 
-      if (config.baseUrl) {
-        httpOptions.baseUrl = config.baseUrl;
+      if (baseUrl) {
+        httpOptions.baseUrl = baseUrl;
       }
 
       const googleGenAI = new GoogleGenAI({
         apiKey: config.apiKey === '' ? undefined : config.apiKey,
-        vertexai: config.vertexai,
+        vertexai: config.vertexai ?? config.authType === AuthType.USE_VERTEX_AI,
         httpOptions,
         ...(apiVersionEnv && { apiVersion: apiVersionEnv }),
       });
