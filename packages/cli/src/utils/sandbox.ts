@@ -48,7 +48,13 @@ let processExitDispatcherInstalled = false;
 
 function runProcessExitHandlers() {
   for (const handler of [...activeProcessExitHandlers]) {
-    handler();
+    try {
+      handler();
+    } catch (error) {
+      debugLogger.debug(
+        `process exit handler failed: ${error instanceof Error ? error.stack ?? error.message : String(error)}`,
+      );
+    }
   }
 }
 
@@ -93,10 +99,14 @@ function removeProcessExitHandler(
 function runAndRemoveProcessExitHandler(
   currentHandler: (() => void) | undefined,
 ): undefined {
-  if (currentHandler && activeProcessExitHandlers.has(currentHandler)) {
-    currentHandler();
+  try {
+    if (currentHandler && activeProcessExitHandlers.has(currentHandler)) {
+      currentHandler();
+    }
+  } finally {
+    removeProcessExitHandler(currentHandler);
   }
-  return removeProcessExitHandler(currentHandler);
+  return undefined;
 }
 
 export async function start_sandbox(
@@ -807,7 +817,13 @@ export async function start_sandbox(
       // install handlers to stop proxy on exit/signal
       const stopProxy = () => {
         debugLogger.log('stopping proxy container ...');
-        execSync(`${command} rm -f ${SANDBOX_PROXY_NAME}`);
+        try {
+          execSync(`${command} rm -f ${SANDBOX_PROXY_NAME}`);
+        } catch (error) {
+          debugLogger.debug(
+            `failed to stop proxy container: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
       };
       proxyContainerStopHandler = addProcessExitHandler(stopProxy);
 
