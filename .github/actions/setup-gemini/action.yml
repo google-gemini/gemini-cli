@@ -9,6 +9,9 @@ inputs:
   bundle-artifact:
     description: 'The name of the bundle artifact to download if mode is "bundle"'
     required: false
+  dist-artifact:
+    description: 'The name of the dist artifact to download if mode is "dist"'
+    required: false
 
 runs:
   using: 'composite'
@@ -35,11 +38,22 @@ runs:
         name: '${{ inputs.bundle-artifact }}'
         path: 'bundle'
 
+    - name: 'Download Dist Artifact'
+      if: "${{ inputs.mode == 'dist' }}"
+      uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806' # v4
+      with:
+        name: '${{ inputs.dist-artifact }}'
+
     - name: 'Post-bundle setup'
       if: "${{ inputs.mode == 'bundle' }}"
       run: |
         # Ensure the bundle is ready for use
-        # In a real install, we might symlink bin/gemini to bundle/gemini.js
-        # For now, we just list it to verify it exists
         ls -R bundle
+      shell: 'bash'
+
+    - name: 'Post-dist setup'
+      if: "${{ inputs.mode == 'dist' }}"
+      run: |
+        # Verify dist files were restored
+        ls -d packages/*/dist
       shell: 'bash'
