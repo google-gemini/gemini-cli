@@ -13,6 +13,7 @@ import {
   Kind,
   type ToolInvocation,
   type ToolResult,
+  type ExecuteOptions,
 } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
 
@@ -84,7 +85,9 @@ class WebSearchToolInvocation extends BaseToolInvocation<
     return `Searching the web for: "${this.params.query}"`;
   }
 
-  async execute(signal: AbortSignal): Promise<WebSearchToolResult> {
+  async execute({
+    abortSignal: signal,
+  }: ExecuteOptions): Promise<WebSearchToolResult> {
     const geminiClient = this.context.geminiClient;
 
     try {
