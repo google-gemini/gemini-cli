@@ -16,7 +16,7 @@ import {
   SECRET_FILES,
   type ResolvedSandboxPaths,
 } from '../../services/sandboxManager.js';
-import { resolveToRealPath } from '../../utils/paths.js';
+import { isSubpath, resolveToRealPath } from '../../utils/paths.js';
 
 /**
  * Options for building macOS Seatbelt profile.
@@ -49,9 +49,28 @@ function isPathExplicitlyAllowed(
     (p) =>
       p === filePath ||
       p === realFilePath ||
-      filePath.startsWith(p + path.sep) ||
-      realFilePath.startsWith(p + path.sep),
+      isSubpath(p, filePath) ||
+      isSubpath(p, realFilePath),
   );
+}
+
+function denyUnlessExplicitlyAllowed(
+  targetPath: string,
+  ruleType: 'literal' | 'subpath',
+  policyWrite: string[],
+): string {
+  const realPath = resolveToRealPath(targetPath);
+
+  if (isPathExplicitlyAllowed(targetPath, realPath, policyWrite)) {
+    return ''; // Skip if explicitly allowed
+  }
+
+  let rules = `(deny file-write* (${ruleType} "${escapeSchemeString(targetPath)}"))\n`;
+  if (realPath !== targetPath) {
+    rules += `(deny file-write* (${ruleType} "${escapeSchemeString(realPath)}"))\n`;
+  }
+
+  return rules;
 }
 
 /**
@@ -135,17 +154,6 @@ export function buildSeatbeltProfile(options: SeatbeltArgsOptions): string {
     );
     const realGovernanceFile = resolveToRealPath(governanceFile);
 
-    // Skip deny if explicitly allowed by additional write permissions
-    const isExplicitlyAllowed = isPathExplicitlyAllowed(
-      governanceFile,
-      realGovernanceFile,
-      resolvedPaths.policyWrite,
-    );
-
-    if (isExplicitlyAllowed) {
-      continue;
-    }
-
     // Determine if it should be treated as a directory (subpath) or a file (literal).
     // .git is generally a directory, while ignore files are literals.
     let isDirectory = GOVERNANCE_FILES[i].isDirectory;
@@ -157,13 +165,11 @@ export function buildSeatbeltProfile(options: SeatbeltArgsOptions): string {
       // Ignore errors, use default guess
     }
 
-    const ruleType = isDirectory ? 'subpath' : 'literal';
-
-    profile += `(deny file-write* (${ruleType} "${escapeSchemeString(governanceFile)}"))\n`;
-
-    if (realGovernanceFile !== governanceFile) {
-      profile += `(deny file-write* (${ruleType} "${escapeSchemeString(realGovernanceFile)}"))\n`;
-    }
+    profile += denyUnlessExplicitlyAllowed(
+      governanceFile,
+      isDirectory ? 'subpath' : 'literal',
+      resolvedPaths.policyWrite,
+    );
   }
 
   // Grant read-only access to git worktrees/submodules. We do this last in order to
@@ -171,34 +177,18 @@ export function buildSeatbeltProfile(options: SeatbeltArgsOptions): string {
   if (resolvedPaths.gitWorktree) {
     const { worktreeGitDir, mainGitDir } = resolvedPaths.gitWorktree;
     if (worktreeGitDir) {
-      const realWorktreeGitDir = resolveToRealPath(worktreeGitDir);
-      if (
-        !isPathExplicitlyAllowed(
-          worktreeGitDir,
-          realWorktreeGitDir,
-          resolvedPaths.policyWrite,
-        )
-      ) {
-        profile += `(deny file-write* (subpath "${escapeSchemeString(worktreeGitDir)}"))\n`;
-        if (realWorktreeGitDir !== worktreeGitDir) {
-          profile += `(deny file-write* (subpath "${escapeSchemeString(realWorktreeGitDir)}"))\n`;
-        }
-      }
+      profile += denyUnlessExplicitlyAllowed(
+        worktreeGitDir,
+        'subpath',
+        resolvedPaths.policyWrite,
+      );
     }
     if (mainGitDir) {
-      const realMainGitDir = resolveToRealPath(mainGitDir);
-      if (
-        !isPathExplicitlyAllowed(
-          mainGitDir,
-          realMainGitDir,
-          resolvedPaths.policyWrite,
-        )
-      ) {
-        profile += `(deny file-write* (subpath "${escapeSchemeString(mainGitDir)}"))\n`;
-        if (realMainGitDir !== mainGitDir) {
-          profile += `(deny file-write* (subpath "${escapeSchemeString(realMainGitDir)}"))\n`;
-        }
-      }
+      profile += denyUnlessExplicitlyAllowed(
+        mainGitDir,
+        'subpath',
+        resolvedPaths.policyWrite,
+      );
     }
   }
 

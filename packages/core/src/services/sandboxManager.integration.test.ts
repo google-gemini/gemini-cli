@@ -507,6 +507,59 @@ describe('SandboxManager Integration', () => {
     });
   });
 
+  describe('Governance Files', () => {
+    it('blocks write access to governance files in the workspace', async () => {
+      const tempWorkspace = createTempDir('workspace-');
+      const gitDir = path.join(tempWorkspace, '.git');
+      fs.mkdirSync(gitDir);
+      const testFile = path.join(gitDir, 'config');
+
+      const osManager = createSandboxManager(
+        { enabled: true },
+        { workspace: tempWorkspace },
+      );
+
+      const { command, args } = Platform.touch(testFile);
+      const sandboxed = await osManager.prepareCommand({
+        command,
+        args,
+        cwd: tempWorkspace,
+        env: process.env,
+      });
+
+      const result = await runCommand(sandboxed);
+      assertResult(result, sandboxed, 'failure');
+      expect(fs.existsSync(testFile)).toBe(false);
+    });
+
+    it('allows write access to governance files when explicitly requested via additionalPermissions', async () => {
+      const tempWorkspace = createTempDir('workspace-');
+      const gitDir = path.join(tempWorkspace, '.git');
+      fs.mkdirSync(gitDir);
+      const testFile = path.join(gitDir, 'config');
+
+      const osManager = createSandboxManager(
+        { enabled: true },
+        { workspace: tempWorkspace },
+      );
+
+      const { command, args } = Platform.touch(testFile);
+      const sandboxed = await osManager.prepareCommand({
+        command,
+        args,
+        cwd: tempWorkspace,
+        env: process.env,
+        policy: {
+          additionalPermissions: { fileSystem: { write: [gitDir] } },
+        },
+      });
+
+      const result = await runCommand(sandboxed);
+      assertResult(result, sandboxed, 'success');
+      expect(fs.existsSync(testFile)).toBe(true);
+    });
+  });
+
   describe('Git Worktree Support', () => {
     it('allows access to git common directory in a worktree', async () => {
       const mainRepo = createTempDir('main-repo-');
