@@ -62,7 +62,7 @@ export interface ContextProfile {
  * The standard default context management profile.
  * Optimized for safety, precision, and reliable summarization.
  */
-export const defaultContextProfile: ContextProfile = {
+export const generalistProfile: ContextProfile = {
   config: {
     budget: {
       retainedTokens: 65000,

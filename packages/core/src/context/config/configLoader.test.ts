@@ -6,7 +6,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { loadContextManagementConfig } from './configLoader.js';
-import { defaultContextProfile } from './profiles.js';
+import { generalistProfile } from './profiles.js';
 import { ContextProcessorRegistry } from './registry.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
@@ -40,13 +40,13 @@ describe('SidecarLoader (Real FS)', () => {
 
   it('returns default profile if file does not exist', async () => {
     const result = await loadContextManagementConfig(sidecarPath, registry);
-    expect(result).toBe(defaultContextProfile);
+    expect(result).toBe(generalistProfile);
   });
 
   it('returns default profile if file exists but is 0 bytes', async () => {
     await fs.writeFile(sidecarPath, '');
     const result = await loadContextManagementConfig(sidecarPath, registry);
-    expect(result).toBe(defaultContextProfile);
+    expect(result).toBe(generalistProfile);
   });
 
   it('returns parsed config if file is valid', async () => {

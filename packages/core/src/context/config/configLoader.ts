@@ -7,7 +7,7 @@
 import * as fsSync from 'node:fs';
 import * as fs from 'node:fs/promises';
 import type { ContextManagementConfig } from './types.js';
-import { defaultContextProfile, type ContextProfile } from './profiles.js';
+import { generalistProfile, type ContextProfile } from './profiles.js';
 import { SchemaValidator } from '../../utils/schemaValidator.js';
 import { getContextManagementConfigSchema } from './schema.js';
 import type { ContextProcessorRegistry } from './registry.js';
@@ -53,9 +53,9 @@ async function loadConfigFromFile(
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const validConfig = parsed as ContextManagementConfig;
   return {
-    ...defaultContextProfile,
+    ...generalistProfile,
     config: {
-      ...defaultContextProfile.config,
+      ...generalistProfile.config,
       ...(validConfig.budget ? { budget: validConfig.budget } : {}),
       ...(validConfig.processorOptions
         ? { processorOptions: validConfig.processorOptions }
@@ -77,12 +77,12 @@ export async function loadContextManagementConfig(
     const size = fsSync.statSync(sidecarPath).size;
     // If the file exists but is completely empty (0 bytes), it's safe to fallback.
     if (size === 0) {
-      return defaultContextProfile;
+      return generalistProfile;
     }
 
     // If the file has content, enforce strict validation and throw on failure.
     return loadConfigFromFile(sidecarPath, registry);
   }
 
-  return defaultContextProfile;
+  return generalistProfile;
 }
