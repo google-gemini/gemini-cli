@@ -158,6 +158,7 @@ export interface UIState {
   showApprovalModeIndicator: ApprovalMode;
   allowPlanMode: boolean;
   isOfflineMode?: boolean;
+  cloudSubagentActive?: boolean;
   currentModel: string;
   contextFileNames: string[];
   errorCount: number;

@@ -62,18 +62,25 @@ export const SubagentProgressDisplay: React.FC<
   let headerText: string | undefined;
   let headerColor = theme.text.secondary;
 
+  const isCloud =
+    progress.agentName === 'cloud-subagent' ||
+    progress.agentName === 'cloud_subagent';
+  const prefix = isCloud ? '☁ Cloud' : `Subagent ${progress.agentName}`;
+
   if (progress.state === 'cancelled') {
-    headerText = `Subagent ${progress.agentName} was cancelled.`;
+    headerText = `${prefix} was cancelled.`;
     headerColor = theme.status.warning;
   } else if (progress.state === 'error') {
-    headerText = `Subagent ${progress.agentName} failed.`;
+    headerText = `${prefix} failed.`;
     headerColor = theme.status.error;
   } else if (progress.state === 'completed') {
-    headerText = `Subagent ${progress.agentName} completed.`;
+    headerText = `${prefix} completed.`;
     headerColor = theme.status.success;
   } else {
-    headerText = `Running subagent ${progress.agentName}...`;
-    headerColor = theme.text.primary;
+    headerText = isCloud
+      ? `☁ Running cloud subagent...`
+      : `Running subagent ${progress.agentName}...`;
+    headerColor = isCloud ? theme.status.warning : theme.text.primary;
   }
 
   return (

@@ -100,9 +100,9 @@ describe('ToolConfirmationMessage', () => {
   it('should use allow/always allow/deny labels for cloud-subagent confirmations', async () => {
     const confirmationDetails: SerializableConfirmationDetails = {
       type: 'info',
-      title: 'Delegate to cloud-subagent',
+      title: '☁ Delegate to cloud subagent',
       prompt:
-        'Delegating to cloud-subagent for cloud execution.\nReason: Complex task.\nTask: Analyze migration risks.',
+        'This will run with full tool access in cloud mode.\n\nAnalyze migration risks across the codebase.',
     };
 
     const { lastFrame, unmount } = await renderWithProviders(

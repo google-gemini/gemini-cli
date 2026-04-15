@@ -436,6 +436,7 @@ export const AppContainer = (props: AppContainerProps) => {
   const [isOfflineMode, setIsOfflineMode] = useState(
     config.isOfflineModeEnabled(),
   );
+  const [cloudSubagentActive, setCloudSubagentActive] = useState(false);
 
   const [userTier, setUserTier] = useState<UserTierId | undefined>(undefined);
   const [quotaStats, setQuotaStats] = useState<QuotaStats | undefined>(() => {
@@ -573,6 +574,11 @@ export const AppContainer = (props: AppContainerProps) => {
     const handleOfflineModeChanged = (payload: { enabled: boolean }) => {
       setIsOfflineMode(payload.enabled);
     };
+    const handleCloudSubagentExecution = (payload: {
+      state: 'started' | 'ended';
+    }) => {
+      setCloudSubagentActive(payload.state === 'started');
+    };
 
     const handleQuotaChanged = (payload: {
       remaining: number | undefined;
@@ -588,10 +594,18 @@ export const AppContainer = (props: AppContainerProps) => {
 
     coreEvents.on(CoreEvent.ModelChanged, handleModelChanged);
     coreEvents.on(CoreEvent.OfflineModeChanged, handleOfflineModeChanged);
+    coreEvents.on(
+      CoreEvent.CloudSubagentExecution,
+      handleCloudSubagentExecution,
+    );
     coreEvents.on(CoreEvent.QuotaChanged, handleQuotaChanged);
     return () => {
       coreEvents.off(CoreEvent.ModelChanged, handleModelChanged);
       coreEvents.off(CoreEvent.OfflineModeChanged, handleOfflineModeChanged);
+      coreEvents.off(
+        CoreEvent.CloudSubagentExecution,
+        handleCloudSubagentExecution,
+      );
       coreEvents.off(CoreEvent.QuotaChanged, handleQuotaChanged);
     };
   }, [config]);
@@ -2502,6 +2516,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       showApprovalModeIndicator,
       allowPlanMode,
       isOfflineMode,
+      cloudSubagentActive,
       currentModel,
       contextFileNames,
       errorCount,
@@ -2614,6 +2629,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       showApprovalModeIndicator,
       allowPlanMode,
       isOfflineMode,
+      cloudSubagentActive,
       contextFileNames,
       errorCount,
       availableTerminalHeight,

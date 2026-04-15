@@ -31,17 +31,13 @@ export const CloudSubagent = (
     inputSchema: {
       type: 'object',
       properties: {
-        task: {
-          type: 'string',
-          description: 'The delegated task to execute in the cloud context.',
-        },
-        reason: {
+        request: {
           type: 'string',
           description:
-            'Why delegation is necessary (complexity, volume, uncertainty, or long-running work).',
+            'The delegated task to execute in the cloud context. Include both what to do and why cloud delegation is justified.',
         },
       },
-      required: ['task', 'reason'],
+      required: ['request'],
     },
   },
   outputConfig: {
@@ -63,13 +59,7 @@ export const CloudSubagent = (
   },
   get promptConfig() {
     return {
-      query: `You are handling a delegated cloud task from the offline-mode orchestrator.
-
-Delegation reason:
-${'${reason}'}
-
-Task:
-${'${task}'}`,
+      query: '${request}',
       systemPrompt: `${getCoreSystemPrompt(
         context.config,
         /* useMemory */ undefined,

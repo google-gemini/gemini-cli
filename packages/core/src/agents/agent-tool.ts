@@ -30,30 +30,18 @@ import {
 } from '../telemetry/constants.js';
 import { AGENT_TOOL_NAME } from '../tools/tool-names.js';
 import { CLOUD_SUBAGENT_NAME } from './cloud-subagent.js';
+import { coreEvents } from '../utils/events.js';
 
-const CLOUD_DELEGATION_REASON_MAX_LENGTH = 120;
-const CLOUD_DELEGATION_TASK_MAX_LENGTH = 140;
-const CLOUD_DELEGATION_REASON_FALLBACK =
-  'Complex work is better handled by the cloud subagent.';
-const CLOUD_DELEGATION_TASK_FALLBACK = 'No task summary provided.';
+const CLOUD_DELEGATION_PROMPT_MAX_LENGTH = 280;
 
-function summarizeInputText(
-  value: unknown,
-  maxLength: number,
-): string | undefined {
-  if (typeof value !== 'string') {
-    return undefined;
+function truncateText(value: unknown, maxLength: number): string {
+  if (typeof value !== 'string' || !value.trim()) {
+    return 'Cloud delegation requested.';
   }
-
   const normalized = value.replace(/\s+/g, ' ').trim();
-  if (!normalized) {
-    return undefined;
-  }
-
   if (normalized.length <= maxLength) {
     return normalized;
   }
-
   return `${normalized.slice(0, maxLength - 3)}...`;
 }
 
@@ -225,21 +213,15 @@ class DelegateInvocation extends BaseToolInvocation<
       return false;
     }
 
-    const reason =
-      summarizeInputText(
-        this.mappedInputs['reason'],
-        CLOUD_DELEGATION_REASON_MAX_LENGTH,
-      ) ?? CLOUD_DELEGATION_REASON_FALLBACK;
-    const task =
-      summarizeInputText(
-        this.mappedInputs['task'],
-        CLOUD_DELEGATION_TASK_MAX_LENGTH,
-      ) ?? CLOUD_DELEGATION_TASK_FALLBACK;
+    const prompt = truncateText(
+      this.mappedInputs['request'] ?? this.params.prompt,
+      CLOUD_DELEGATION_PROMPT_MAX_LENGTH,
+    );
 
     return {
       type: 'info',
-      title: 'Delegate to cloud-subagent',
-      prompt: [`Reason: ${reason}`, `Task: ${task}`].join('\n'),
+      title: '☁ Delegate to cloud subagent',
+      prompt: `This will run with full tool access in cloud mode.\n\n${prompt}`,
       onConfirm: async (_outcome) => {
         // Policy updates are handled centrally by the scheduler.
       },
@@ -250,6 +232,11 @@ class DelegateInvocation extends BaseToolInvocation<
     const { abortSignal: signal, updateOutput } = options;
     const hintedParams = this.withUserHints(this.mappedInputs);
     const invocation = this.buildChildInvocation(hintedParams);
+    const isCloud = this.definition.name === CLOUD_SUBAGENT_NAME;
+
+    if (isCloud) {
+      coreEvents.emitCloudSubagentExecution(this.definition.name, 'started');
+    }
 
     return runInDevTraceSpan(
       {
@@ -263,12 +250,30 @@ class DelegateInvocation extends BaseToolInvocation<
       },
       async ({ metadata }) => {
         metadata.input = this.params;
-        const result = await invocation.execute({
-          abortSignal: signal,
-          updateOutput,
-        });
-        metadata.output = result;
-        return result;
+        try {
+          const result = await invocation.execute({
+            abortSignal: signal,
+            updateOutput,
+          });
+          metadata.output = result;
+          if (isCloud) {
+            coreEvents.emitCloudSubagentExecution(
+              this.definition.name,
+              'ended',
+              'success',
+            );
+          }
+          return result;
+        } catch (error) {
+          if (isCloud) {
+            coreEvents.emitCloudSubagentExecution(
+              this.definition.name,
+              'ended',
+              signal.aborted ? 'cancelled' : 'error',
+            );
+          }
+          throw error;
+        }
       },
     );
   }

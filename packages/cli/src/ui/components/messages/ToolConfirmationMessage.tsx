@@ -372,7 +372,9 @@ export const ToolConfirmationMessage: React.FC<
       });
     } else if (confirmationDetails.type === 'info') {
       const isCloudSubagentConfirmation =
-        toolName === 'cloud-subagent' || toolName === 'cloud_subagent';
+        toolName === 'cloud-subagent' ||
+        toolName === 'cloud_subagent' ||
+        confirmationDetails.title?.includes('cloud subagent');
 
       options.push({
         label: isCloudSubagentConfirmation ? 'Allow' : 'Allow once',

@@ -12,7 +12,7 @@ import {
   type ThoughtSummary,
 } from '@google/gemini-cli-core';
 import stripAnsi from 'strip-ansi';
-import { type ActiveHook } from '../types.js';
+import { type ActiveHook, StreamingState } from '../types.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 import { theme } from '../semantic-colors.js';
@@ -25,7 +25,9 @@ import { HorizontalLine } from './shared/HorizontalLine.js';
 import { ApprovalModeIndicator } from './ApprovalModeIndicator.js';
 import { ShellModeIndicator } from './ShellModeIndicator.js';
 import { RawMarkdownIndicator } from './RawMarkdownIndicator.js';
+import { PulsingDot } from './PulsingDot.js';
 import { useComposerStatus } from '../hooks/useComposerStatus.js';
+import { useStreamingContext } from '../contexts/StreamingContext.js';
 
 /**
  * Layout constants to prevent magic numbers.
@@ -173,7 +175,14 @@ export const StatusRow: React.FC<StatusRowProps> = ({
     showWit,
     modeContentObj,
     showMinimalContext,
+    isOfflineMode,
+    cloudSubagentActive,
   } = useComposerStatus();
+  const streamingState = useStreamingContext();
+  const isLocalActive =
+    isOfflineMode &&
+    streamingState === StreamingState.Responding &&
+    !cloudSubagentActive;
 
   const [statusWidth, setStatusWidth] = useState(0);
   const [tipWidth, setTipWidth] = useState(0);
@@ -411,9 +420,28 @@ export const StatusRow: React.FC<StatusRowProps> = ({
                     <RawMarkdownIndicator />
                   </Box>
                 )}
-                {uiState.isOfflineMode && (
-                  <Box marginLeft={LAYOUT.INDICATOR_LEFT_MARGIN}>
-                    <Text color={theme.status.success}>● offline</Text>
+                {isOfflineMode && (
+                  <Box
+                    marginLeft={LAYOUT.INDICATOR_LEFT_MARGIN}
+                    flexDirection="row"
+                    gap={1}
+                  >
+                    <PulsingDot
+                      color={theme.status.success}
+                      dimColor={theme.ui.dark}
+                      cycleDurationMs={1500}
+                      active={isLocalActive}
+                      label="offline"
+                    />
+                    {cloudSubagentActive && (
+                      <PulsingDot
+                        color={theme.status.warning}
+                        dimColor={theme.ui.dark}
+                        cycleDurationMs={800}
+                        active={true}
+                        label="cloud"
+                      />
+                    )}
                   </Box>
                 )}
               </>

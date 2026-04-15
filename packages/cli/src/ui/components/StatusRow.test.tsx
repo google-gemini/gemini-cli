@@ -47,6 +47,8 @@ describe('<StatusRow />', () => {
       showWit: true,
       modeContentObj: null,
       showMinimalContext: false,
+      isOfflineMode: false,
+      cloudSubagentActive: false,
     });
 
     const uiState: Partial<UIState> = {
@@ -87,6 +89,8 @@ describe('<StatusRow />', () => {
       showWit: false,
       modeContentObj: null,
       showMinimalContext: false,
+      isOfflineMode: false,
+      cloudSubagentActive: false,
     });
 
     const { lastFrame, waitUntilReady } = await renderWithProviders(
@@ -116,6 +120,8 @@ describe('<StatusRow />', () => {
       showWit: true,
       modeContentObj: null,
       showMinimalContext: false,
+      isOfflineMode: false,
+      cloudSubagentActive: false,
     });
 
     const uiState: Partial<UIState> = {
@@ -150,6 +156,8 @@ describe('<StatusRow />', () => {
       showWit: false,
       modeContentObj: null,
       showMinimalContext: false,
+      isOfflineMode: true,
+      cloudSubagentActive: false,
     });
 
     const uiState: Partial<UIState> = {
@@ -174,5 +182,44 @@ describe('<StatusRow />', () => {
 
     await waitUntilReady();
     expect(lastFrame()).toContain('offline');
+  });
+
+  it('renders cloud indicator when cloud subagent is active', async () => {
+    (useComposerStatus as Mock).mockReturnValue({
+      isInteractiveShellWaiting: false,
+      showLoadingIndicator: false,
+      showTips: false,
+      showWit: false,
+      modeContentObj: null,
+      showMinimalContext: false,
+      isOfflineMode: true,
+      cloudSubagentActive: true,
+    });
+
+    const uiState: Partial<UIState> = {
+      ...defaultUiState,
+      isOfflineMode: true,
+      cloudSubagentActive: true,
+    };
+
+    const { lastFrame, waitUntilReady } = await renderWithProviders(
+      <StatusRow
+        showUiDetails={true}
+        isNarrow={false}
+        terminalWidth={100}
+        hideContextSummary={false}
+        hideUiDetailsForSuggestions={false}
+        hasPendingActionRequired={false}
+      />,
+      {
+        width: 100,
+        uiState,
+      },
+    );
+
+    await waitUntilReady();
+    const output = lastFrame();
+    expect(output).toContain('offline');
+    expect(output).toContain('cloud');
   });
 });

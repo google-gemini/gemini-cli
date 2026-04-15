@@ -63,6 +63,15 @@ export interface OfflineModeChangedPayload {
 }
 
 /**
+ * Payload for cloud subagent execution lifecycle events.
+ */
+export interface CloudSubagentExecutionPayload {
+  agentName: string;
+  state: 'started' | 'ended';
+  outcome?: 'success' | 'error' | 'cancelled';
+}
+
+/**
  * Payload for the 'console-log' event.
  */
 export interface ConsoleLogPayload {
@@ -192,6 +201,7 @@ export enum CoreEvent {
   UserFeedback = 'user-feedback',
   ModelChanged = 'model-changed',
   OfflineModeChanged = 'offline-mode-changed',
+  CloudSubagentExecution = 'cloud-subagent-execution',
   ConsoleLog = 'console-log',
   Output = 'output',
   MemoryChanged = 'memory-changed',
@@ -227,6 +237,7 @@ export interface CoreEvents extends ExtensionEvents {
   [CoreEvent.UserFeedback]: [UserFeedbackPayload];
   [CoreEvent.ModelChanged]: [ModelChangedPayload];
   [CoreEvent.OfflineModeChanged]: [OfflineModeChangedPayload];
+  [CoreEvent.CloudSubagentExecution]: [CloudSubagentExecutionPayload];
   [CoreEvent.ConsoleLog]: [ConsoleLogPayload];
   [CoreEvent.Output]: [OutputPayload];
   [CoreEvent.MemoryChanged]: [MemoryChangedPayload];
@@ -342,6 +353,19 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
   emitOfflineModeChanged(enabled: boolean): void {
     const payload: OfflineModeChangedPayload = { enabled };
     this.emit(CoreEvent.OfflineModeChanged, payload);
+  }
+
+  emitCloudSubagentExecution(
+    agentName: string,
+    state: 'started' | 'ended',
+    outcome?: 'success' | 'error' | 'cancelled',
+  ): void {
+    const payload: CloudSubagentExecutionPayload = {
+      agentName,
+      state,
+      outcome,
+    };
+    this.emit(CoreEvent.CloudSubagentExecution, payload);
   }
 
   /**

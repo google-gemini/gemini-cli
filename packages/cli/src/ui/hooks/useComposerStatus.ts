@@ -22,6 +22,7 @@ export const useComposerStatus = () => {
   const quotaState = useQuotaState();
   const settings = useSettings();
   const isOfflineMode = Boolean(uiState.isOfflineMode);
+  const cloudSubagentActive = Boolean(uiState.cloudSubagentActive);
 
   const hasPendingToolConfirmation = useMemo(
     () =>
@@ -80,12 +81,21 @@ export const useComposerStatus = () => {
     })();
 
     if (approvalModeIndicator) {
-      return isOfflineMode
+      const suffix = cloudSubagentActive
+        ? ' + cloud'
+        : isOfflineMode
+          ? ' + offline'
+          : '';
+      return suffix
         ? {
-            text: `${approvalModeIndicator.text} + offline`,
+            text: `${approvalModeIndicator.text}${suffix}`,
             color: approvalModeIndicator.color,
           }
         : approvalModeIndicator;
+    }
+
+    if (cloudSubagentActive) {
+      return { text: 'cloud', color: theme.status.warning };
     }
 
     if (isOfflineMode) {
@@ -99,6 +109,7 @@ export const useComposerStatus = () => {
     uiState.activeHooks.length,
     showApprovalModeIndicator,
     isOfflineMode,
+    cloudSubagentActive,
   ]);
 
   const showMinimalContext = isContextUsageHigh(
@@ -127,5 +138,7 @@ export const useComposerStatus = () => {
     showWit,
     modeContentObj,
     showMinimalContext,
+    isOfflineMode,
+    cloudSubagentActive,
   };
 };

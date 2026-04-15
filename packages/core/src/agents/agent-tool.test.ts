@@ -67,10 +67,9 @@ describe('AgentTool', () => {
       inputSchema: {
         type: 'object',
         properties: {
-          task: { type: 'string' },
-          reason: { type: 'string' },
+          request: { type: 'string' },
         },
-        required: ['task', 'reason'],
+        required: ['request'],
       },
     },
     modelConfig: { model: 'test', generateContentConfig: {} },
@@ -194,7 +193,7 @@ describe('AgentTool', () => {
 
     expect(result).toMatchObject({
       type: 'info',
-      title: 'Delegate to cloud-subagent',
+      title: '☁ Delegate to cloud subagent',
     });
     // Should NOT delegate to child invocation for confirmation
     expect(LocalSubagentInvocation).not.toHaveBeenCalled();
