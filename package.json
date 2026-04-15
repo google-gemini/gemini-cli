@@ -62,7 +62,7 @@
     "lint:ci": "npm run lint:all",
     "lint:all": "node scripts/lint.js",
     "format": "prettier --experimental-cli --write .",
-    "typecheck": "npm run typecheck --workspaces --if-present && tsc --noEmit -p evals/tsconfig.json && tsc --noEmit -p integration-tests/tsconfig.json && tsc --noEmit -p memory-tests/tsconfig.json",
+    "typecheck": "npm run typecheck --workspaces --if-present && tsc -b evals/tsconfig.json integration-tests/tsconfig.json memory-tests/tsconfig.json",
     "preflight": "npm run clean && npm ci && npm run format && npm run build && npm run lint:ci && npm run typecheck && npm run test:ci",
     "prepare": "husky && npm run bundle",
     "prepare:package": "node scripts/prepare-package.js",
@@ -137,6 +137,7 @@
     "strip-ansi": "^7.1.2",
     "ts-prune": "^0.10.3",
     "tsx": "^4.20.3",
+    "typescript": "^5.8.3",
     "typescript-eslint": "^8.30.1",
     "vitest": "^3.2.4",
     "yargs": "^17.7.2"
