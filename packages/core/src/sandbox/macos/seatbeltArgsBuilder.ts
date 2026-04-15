@@ -125,38 +125,6 @@ export function buildSeatbeltProfile(options: SeatbeltArgsOptions): string {
     profile += `(allow file-read* file-write* (subpath "${escapeSchemeString(allowedPath)}"))\n`;
   }
 
-  // Handle granular additional read permissions
-  for (let i = 0; i < resolvedPaths.policyRead.length; i++) {
-    const resolved = resolvedPaths.policyRead[i];
-    let isFile = false;
-    try {
-      isFile = fs.statSync(resolved).isFile();
-    } catch {
-      // Ignore error
-    }
-    if (isFile) {
-      profile += `(allow file-read* (literal "${escapeSchemeString(resolved)}"))\n`;
-    } else {
-      profile += `(allow file-read* (subpath "${escapeSchemeString(resolved)}"))\n`;
-    }
-  }
-
-  // Handle granular additional write permissions
-  for (let i = 0; i < resolvedPaths.policyWrite.length; i++) {
-    const resolved = resolvedPaths.policyWrite[i];
-    let isFile = false;
-    try {
-      isFile = fs.statSync(resolved).isFile();
-    } catch {
-      // Ignore error
-    }
-    if (isFile) {
-      profile += `(allow file-read* file-write* (literal "${escapeSchemeString(resolved)}"))\n`;
-    } else {
-      profile += `(allow file-read* file-write* (subpath "${escapeSchemeString(resolved)}"))\n`;
-    }
-  }
-
   // Add explicit deny rules for governance files in the workspace.
   // These are added after the workspace allow rule to ensure they take precedence
   // (Seatbelt evaluates rules in order, later rules win for same path).
@@ -260,6 +228,38 @@ export function buildSeatbeltProfile(options: SeatbeltArgsOptions): string {
         regexPattern = `^${escapedBase}/(.*/)?${basePattern}$`;
       }
       profile += `(deny file-read* file-write* (regex #"${regexPattern}"))\n`;
+    }
+  }
+
+  // Handle granular additional read permissions
+  for (let i = 0; i < resolvedPaths.policyRead.length; i++) {
+    const resolved = resolvedPaths.policyRead[i];
+    let isFile = false;
+    try {
+      isFile = fs.statSync(resolved).isFile();
+    } catch {
+      // Ignore error
+    }
+    if (isFile) {
+      profile += `(allow file-read* (literal "${escapeSchemeString(resolved)}"))\n`;
+    } else {
+      profile += `(allow file-read* (subpath "${escapeSchemeString(resolved)}"))\n`;
+    }
+  }
+
+  // Handle granular additional write permissions
+  for (let i = 0; i < resolvedPaths.policyWrite.length; i++) {
+    const resolved = resolvedPaths.policyWrite[i];
+    let isFile = false;
+    try {
+      isFile = fs.statSync(resolved).isFile();
+    } catch {
+      // Ignore error
+    }
+    if (isFile) {
+      profile += `(allow file-read* file-write* (literal "${escapeSchemeString(resolved)}"))\n`;
+    } else {
+      profile += `(allow file-read* file-write* (subpath "${escapeSchemeString(resolved)}"))\n`;
     }
   }
 
