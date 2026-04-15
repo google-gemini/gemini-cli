@@ -395,7 +395,7 @@ describe('loggers', () => {
       getUsageStatisticsEnabled: () => true,
       getTelemetryEnabled: () => true,
       getTelemetryLogPromptsEnabled: () => true,
-      getTelemetryTracesEnabled: () => false,
+      getTelemetryTracesEnabled: () => true,
       isInteractive: () => false,
       getExperiments: () => undefined,
       getExperimentsAsync: async () => undefined,
@@ -492,6 +492,10 @@ describe('loggers', () => {
           'gen_ai.request.temperature': 1,
           'gen_ai.request.top_p': 2,
           'gen_ai.request.top_k': 3,
+          'gen_ai.input.messages':
+            '[{"role":"user","parts":[{"type":"text","content":"Hello"}]}]',
+          'gen_ai.output.messages':
+            '[{"finish_reason":"stop","role":"system","parts":[{"type":"text","content":"candidate 1"}]}]',
           'gen_ai.operation.name': 'generate_content',
           'gen_ai.response.model': 'test-model',
           'gen_ai.usage.input_tokens': 17,
@@ -563,6 +567,57 @@ describe('loggers', () => {
       });
     });
 
+    it('should not log input and output messages when traces are disabled', () => {
+      const mockConfigNoTraces = {
+        getSessionId: () => 'test-session-id',
+        getTargetDir: () => 'target-dir',
+        getUsageStatisticsEnabled: () => true,
+        getTelemetryEnabled: () => true,
+        getTelemetryLogPromptsEnabled: () => true,
+        getTelemetryTracesEnabled: () => false, // Disabled
+        isInteractive: () => false,
+        getExperiments: () => undefined,
+        getExperimentsAsync: async () => undefined,
+        getContentGeneratorConfig: () => undefined,
+      } as unknown as Config;
+
+      const event = new ApiResponseEvent(
+        'test-model',
+        100,
+        { prompt_id: 'prompt-id-1', contents: [] },
+        { candidates: [] },
+        AuthType.LOGIN_WITH_GOOGLE,
+        undefined,
+        'test-response',
+      );
+
+      logApiResponse(mockConfigNoTraces, event);
+
+      expect(mockLogger.emit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          body: 'GenAI operation details from test-model. Status: 200. Duration: 100ms.',
+          attributes: expect.objectContaining({
+            'event.name': 'gen_ai.client.inference.operation.details',
+            'gen_ai.operation.name': 'generate_content',
+          }),
+        }),
+      );
+
+      const emitCalls = mockLogger.emit.mock.calls;
+      const detailsCall = emitCalls.find(
+        (call) =>
+          call[0].attributes &&
+          call[0].attributes['event.name'] ===
+            'gen_ai.client.inference.operation.details',
+      );
+      expect(
+        detailsCall![0].attributes['gen_ai.input.messages'],
+      ).toBeUndefined();
+      expect(
+        detailsCall![0].attributes['gen_ai.output.messages'],
+      ).toBeUndefined();
+    });
+
     it('should log an API response with a role', () => {
       const event = new ApiResponseEvent(
         'test-model',
@@ -595,7 +650,7 @@ describe('loggers', () => {
       getUsageStatisticsEnabled: () => true,
       getTelemetryEnabled: () => true,
       getTelemetryLogPromptsEnabled: () => true,
-      getTelemetryTracesEnabled: () => false,
+      getTelemetryTracesEnabled: () => true,
       isInteractive: () => false,
       getExperiments: () => undefined,
       getExperimentsAsync: async () => undefined,
@@ -681,6 +736,8 @@ describe('loggers', () => {
           'gen_ai.request.frequency_penalty': 10,
           'gen_ai.request.presence_penalty': 6,
           'gen_ai.request.max_tokens': 8000,
+          'gen_ai.input.messages':
+            '[{"role":"user","parts":[{"type":"text","content":"Hello"}]}]',
           'server.address': 'foo.com',
           'server.port': 8080,
           'gen_ai.request.stop_sequences': ['stop', 'please stop'],
@@ -720,6 +777,52 @@ describe('loggers', () => {
         'event.name': EVENT_API_ERROR,
         'event.timestamp': '2025-01-01T00:00:00.000Z',
       });
+    });
+
+    it('should not log input messages when traces are disabled', () => {
+      const mockConfigNoTraces = {
+        getSessionId: () => 'test-session-id',
+        getTargetDir: () => 'target-dir',
+        getUsageStatisticsEnabled: () => true,
+        getTelemetryEnabled: () => true,
+        getTelemetryLogPromptsEnabled: () => true,
+        getTelemetryTracesEnabled: () => false, // Disabled
+        isInteractive: () => false,
+        getExperiments: () => undefined,
+        getExperimentsAsync: async () => undefined,
+        getContentGeneratorConfig: () => undefined,
+      } as unknown as Config;
+
+      const event = new ApiErrorEvent(
+        'test-model',
+        'error',
+        100,
+        { prompt_id: 'prompt-id-1', contents: [] },
+        AuthType.LOGIN_WITH_GOOGLE,
+        'ApiError',
+        500,
+      );
+
+      logApiError(mockConfigNoTraces, event);
+
+      expect(mockLogger.emit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          attributes: expect.objectContaining({
+            'event.name': 'gen_ai.client.inference.operation.details',
+          }),
+        }),
+      );
+
+      const emitCalls = mockLogger.emit.mock.calls;
+      const detailsCall = emitCalls.find(
+        (call) =>
+          call[0].attributes &&
+          call[0].attributes['event.name'] ===
+            'gen_ai.client.inference.operation.details',
+      );
+      expect(
+        detailsCall![0].attributes['gen_ai.input.messages'],
+      ).toBeUndefined();
     });
 
     it('should log an API error with a role', () => {
@@ -833,7 +936,7 @@ describe('loggers', () => {
         getUsageStatisticsEnabled: () => true,
         getTelemetryEnabled: () => true,
         getTelemetryLogPromptsEnabled: () => true,
-        getTelemetryTracesEnabled: () => false, // Enabled
+        getTelemetryTracesEnabled: () => true, // Enabled
         isInteractive: () => false,
         getExperiments: () => undefined,
         getExperimentsAsync: async () => undefined,
@@ -897,6 +1000,12 @@ describe('loggers', () => {
           'gen_ai.request.temperature': 0.5,
           'gen_ai.request.top_p': 0.8,
           'gen_ai.request.top_k': 10,
+          'gen_ai.input.messages': JSON.stringify([
+            {
+              role: 'user',
+              parts: [{ type: 'text', content: 'Semantic request test' }],
+            },
+          ]),
           'gen_ai.operation.name': 'generate_content',
           'server.port': 8080,
           'gen_ai.provider.name': 'gcp.gen_ai',
