@@ -74,6 +74,20 @@ exports[`<OverflowProvider><DiffRenderer /></OverflowProvider> > with useAlterna
 "
 `;
 
+exports[`<OverflowProvider><DiffRenderer /></OverflowProvider> > with useAlternateBuffer = false > should not render a gap indicator for small gaps (<= MAX_CONTEXT_LINES_WITHOUT_GAP) 2`] = `
+" 1   context line 1
+ 2   context line 2
+ 3   context line 3
+ 4   context line 4
+ 5   context line 5
+11   context line 11
+12   context line 12
+13   context line 13
+14   context line 14
+15   context line 15
+"
+`;
+
 exports[`<OverflowProvider><DiffRenderer /></OverflowProvider> > with useAlternateBuffer = false > should render a gap indicator for skipped lines 1`] = `
 " 1   context line 1
  2 - deleted line

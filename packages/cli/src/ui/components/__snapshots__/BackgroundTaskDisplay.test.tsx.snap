@@ -10,6 +10,16 @@ exports[`<BackgroundTaskDisplay /> > highlights the focused state 1`] = `
 "
 `;
 
+exports[`<BackgroundTaskDisplay /> > highlights the focused state 2`] = `
+"┌──────────────────────────────────────────────────────────────────────────────┐
+│  1: npm sta.. (PID: 1001)        Close (Ctrl+B) | Kill (Ctrl+K) | List       │
+│              (Focused)           (Ctrl+L)                                    │
+│ Starting server...                                                           │
+│ Log: ~/.gemini/tmp/background-processes/background-1001.log                  │
+└──────────────────────────────────────────────────────────────────────────────┘
+"
+`;
+
 exports[`<BackgroundTaskDisplay /> > keeps exit code status color even when selected 1`] = `
 "┌──────────────────────────────────────────────────────────────────────────────┐
 │  1: npm sta.. (PID: 1003)        Close (Ctrl+B) | Kill (Ctrl+K) | List       │

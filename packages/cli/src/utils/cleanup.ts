@@ -142,10 +142,16 @@ async function gracefulShutdown(_reason: string) {
   process.exit(ExitCodes.SUCCESS);
 }
 
+let signalHandlersSetup = false;
+
 export function setupSignalHandlers() {
+  if (signalHandlersSetup) {
+    return;
+  }
   process.on('SIGHUP', () => gracefulShutdown('SIGHUP'));
   process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
   process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+  signalHandlersSetup = true;
 }
 
 export function setupTtyCheck(): () => void {

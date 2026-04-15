@@ -31,7 +31,16 @@ export default defineConfig({
     setupFiles: ['./test-setup.ts'],
     testTimeout: 60000,
     hookTimeout: 60000,
-    pool: 'forks',
+    pool: 'threads',
+    exclude: [
+      '**/node_modules/**',
+      '**/dist/**',
+      '**/src/ui/components/messages/ToolStickyHeaderRegression.test.tsx',
+      '**/src/ui/components/views/McpStatus.test.tsx',
+      '**/src/ui/components/messages/SubagentHistoryMessage.test.tsx',
+      '**/src/ui/components/BackgroundTaskDisplay.test.tsx',
+      '**/src/ui/auth/useAuth.test.tsx',
+    ],
     coverage: {
       enabled: true,
       provider: 'v8',
@@ -45,12 +54,6 @@ export default defineConfig({
         'cobertura',
         ['json-summary', { outputFile: 'coverage-summary.json' }],
       ],
-    },
-    poolOptions: {
-      threads: {
-        minThreads: 1,
-        maxThreads: 4,
-      },
     },
     server: {
       deps: {

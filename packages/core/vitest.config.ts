@@ -11,7 +11,7 @@ export default defineConfig({
     reporters: ['default', 'junit'],
     testTimeout: 60000,
     hookTimeout: 60000,
-    pool: 'forks',
+    pool: 'threads',
     silent: true,
     setupFiles: ['./test-setup.ts'],
     outputFile: {
@@ -30,12 +30,6 @@ export default defineConfig({
         'cobertura',
         ['json-summary', { outputFile: 'coverage-summary.json' }],
       ],
-    },
-    poolOptions: {
-      threads: {
-        minThreads: 1,
-        maxThreads: 4,
-      },
     },
   },
 });
