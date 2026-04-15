@@ -1,6 +1,6 @@
 {
   "name": "@google/gemini-cli-core",
-  "version": "0.39.0-nightly.20260408.e77b22e63",
+  "version": "0.40.0-nightly.20260414.g5b1f7375a",
   "description": "Gemini CLI Core",
   "license": "Apache-2.0",
   "repository": {
@@ -20,7 +20,8 @@
     "typecheck": "tsc --noEmit"
   },
   "files": [
-    "dist"
+    "dist",
+    "vendor"
   ],
   "dependencies": {
     "@a2a-js/sdk": "0.3.11",
@@ -31,7 +32,6 @@
     "@google/genai": "1.30.0",
     "@grpc/grpc-js": "^1.14.3",
     "@iarna/toml": "^2.2.5",
-    "@joshua.litt/get-ripgrep": "^0.0.3",
     "@modelcontextprotocol/sdk": "^1.23.0",
     "@opentelemetry/api": "^1.9.0",
     "@opentelemetry/api-logs": "^0.211.0",
@@ -59,6 +59,7 @@
     "diff": "^8.0.3",
     "dotenv": "^17.2.4",
     "dotenv-expand": "^12.0.3",
+    "execa": "^9.6.1",
     "fast-levenshtein": "^2.0.6",
     "fdir": "^6.4.6",
     "fzf": "^0.5.2",

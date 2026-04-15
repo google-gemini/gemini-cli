@@ -224,7 +224,7 @@ jobs:
 
   test_mac:
     name: 'Test (Mac) - ${{ matrix.node-version }}, ${{ matrix.shard }}'
-    runs-on: 'macos-latest'
+    runs-on: 'macos-latest-large'
     needs:
       - 'merge_queue_skipper'
     if: "github.repository == 'google-gemini/gemini-cli' && needs.merge_queue_skipper.outputs.skip == 'false'"
