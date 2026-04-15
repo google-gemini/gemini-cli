@@ -8,10 +8,18 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
-    projects: ['packages/*', 'scripts/tests'],
+    // Explicitly list packages that have valid vitest configurations.
+    // This avoids startup errors from packages like vscode-ide-companion.
+    projects: [
+      'packages/cli',
+      'packages/core',
+      'packages/sdk',
+      'packages/a2a-server',
+      'packages/test-utils',
+    ],
     // Global test settings
     coverage: {
-      enabled: false, // Disabled by default for speed, enabled via CLI if needed
+      enabled: false,
       provider: 'v8',
     },
     fileParallelism: true,

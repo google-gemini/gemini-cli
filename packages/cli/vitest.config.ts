@@ -31,6 +31,7 @@ export default defineConfig({
     testTimeout: 60000,
     hookTimeout: 60000,
     pool: 'forks', // Back to forks for safe PTY isolation, but no worker cap
+    silent: true,
     exclude: [
       '**/node_modules/**',
       '**/dist/**',
