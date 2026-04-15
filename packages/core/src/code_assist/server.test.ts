@@ -347,7 +347,7 @@ describe('CodeAssistServer', () => {
     });
 
     it('should construct the default URL correctly', () => {
-      const server = new CodeAssistServer({} as never);
+      const server = new CodeAssistServer({} as never, 'test-project');
       const url = server.getMethodUrl('testMethod');
       expect(url).toBe(
         'https://cloudcode-pa.googleapis.com/v1internal:testMethod',
@@ -356,25 +356,78 @@ describe('CodeAssistServer', () => {
 
     it('should use the CODE_ASSIST_ENDPOINT environment variable if set', () => {
       process.env['CODE_ASSIST_ENDPOINT'] = 'https://custom-endpoint.com';
-      const server = new CodeAssistServer({} as never);
+      const server = new CodeAssistServer({} as never, 'test-project');
       const url = server.getMethodUrl('testMethod');
       expect(url).toBe('https://custom-endpoint.com/v1internal:testMethod');
     });
 
     it('should use the CODE_ASSIST_API_VERSION environment variable if set', () => {
       process.env['CODE_ASSIST_API_VERSION'] = 'v2beta';
-      const server = new CodeAssistServer({} as never);
+      const server = new CodeAssistServer({} as never, 'test-project');
       const url = server.getMethodUrl('testMethod');
       expect(url).toBe('https://cloudcode-pa.googleapis.com/v2beta:testMethod');
     });
 
     it('should use default value if CODE_ASSIST_API_VERSION env var is empty', () => {
       process.env['CODE_ASSIST_API_VERSION'] = '';
-      const server = new CodeAssistServer({} as never);
+      const server = new CodeAssistServer({} as never, 'test-project');
       const url = server.getMethodUrl('testMethod');
       expect(url).toBe(
         'https://cloudcode-pa.googleapis.com/v1internal:testMethod',
       );
+    });
+
+    it('should use standard API endpoint when no projectId is provided', () => {
+      const server = new CodeAssistServer({} as never);
+      const url = server.getMethodUrl('testMethod');
+      expect(url).toBe(
+        'https://generativelanguage.googleapis.com/v1beta:testMethod',
+      );
+    });
+  });
+
+  describe('loadCodeAssist project hijacking prevention', () => {
+    it('should strip cloudaicompanionProject from response when no projectId is set', async () => {
+      const mockRequest = vi.fn();
+      const client = { request: mockRequest } as unknown as OAuth2Client;
+      const server = new CodeAssistServer(client, undefined, {}, undefined);
+
+      mockRequest.mockResolvedValue({
+        data: {
+          cloudaicompanionProject: 'ghost-project-id',
+          currentTier: { id: 'standard-tier' },
+        },
+      });
+
+      const result = await server.loadCodeAssist({
+        metadata: { ideType: 'IDE_UNSPECIFIED' },
+      });
+
+      expect(result.cloudaicompanionProject).toBeUndefined();
+    });
+
+    it('should preserve cloudaicompanionProject when projectId is explicitly set', async () => {
+      const mockRequest = vi.fn();
+      const client = { request: mockRequest } as unknown as OAuth2Client;
+      const server = new CodeAssistServer(
+        client,
+        'explicit-project',
+        {},
+        undefined,
+      );
+
+      mockRequest.mockResolvedValue({
+        data: {
+          cloudaicompanionProject: 'server-project-id',
+          currentTier: { id: 'standard-tier' },
+        },
+      });
+
+      const result = await server.loadCodeAssist({
+        metadata: { ideType: 'IDE_UNSPECIFIED' },
+      });
+
+      expect(result.cloudaicompanionProject).toBe('server-project-id');
     });
   });
 
