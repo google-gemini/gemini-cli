@@ -31,6 +31,7 @@ import type { AgentTerminateMode } from '../agents/types.js';
 import { getCommonAttributes } from './telemetryAttributes.js';
 import { SemanticAttributes } from '@opentelemetry/semantic-conventions';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
+import { truncateForTelemetry } from './trace.js';
 import {
   toInputMessages,
   toOutputMessages,
@@ -451,7 +452,7 @@ export class ApiRequestEvent implements BaseTelemetryEvent {
     }
 
     if (shouldIncludePayloads(config) && this.prompt.contents) {
-      attributes['gen_ai.input.messages'] = JSON.stringify(
+      attributes['gen_ai.input.messages'] = truncateForTelemetry(
         toInputMessages(this.prompt.contents),
       );
     }
@@ -548,7 +549,7 @@ export class ApiErrorEvent implements BaseTelemetryEvent {
     }
 
     if (shouldIncludePayloads(config) && this.prompt.contents) {
-      attributes['gen_ai.input.messages'] = JSON.stringify(
+      attributes['gen_ai.input.messages'] = truncateForTelemetry(
         toInputMessages(this.prompt.contents),
       );
     }
@@ -618,7 +619,7 @@ function toGenerateContentConfigAttributes(
     'gen_ai.request.max_tokens': config.maxOutputTokens,
     'gen_ai.output.type': toOutputType(config.responseMimeType),
     'gen_ai.request.stop_sequences': config.stopSequences,
-    'gen_ai.system_instructions': JSON.stringify(
+    'gen_ai.system_instructions': truncateForTelemetry(
       toSystemInstruction(config.systemInstruction),
     ),
   };
@@ -716,7 +717,7 @@ export class ApiResponseEvent implements BaseTelemetryEvent {
       'gen_ai.response.finish_reasons': this.finish_reasons,
       ...(shouldIncludePayloads(config)
         ? {
-            'gen_ai.output.messages': JSON.stringify(
+            'gen_ai.output.messages': truncateForTelemetry(
               toOutputMessages(this.response.candidates),
             ),
           }
@@ -731,7 +732,7 @@ export class ApiResponseEvent implements BaseTelemetryEvent {
     }
 
     if (shouldIncludePayloads(config) && this.prompt.contents) {
-      attributes['gen_ai.input.messages'] = JSON.stringify(
+      attributes['gen_ai.input.messages'] = truncateForTelemetry(
         toInputMessages(this.prompt.contents),
       );
     }
