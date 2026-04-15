@@ -393,9 +393,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
       if (cleanupIfStopped()) return;
 
-      if (!apiKey) {
+      const voiceBackend = settings.voice?.backend ?? 'gemini-live';
+
+      if (!apiKey && voiceBackend === 'gemini-live') {
         setQueueErrorMessage(
-          'Voice mode requires a GEMINI_API_KEY. Please set it in your environment or ~/.gemini/.env.',
+          'Cloud voice mode requires a GEMINI_API_KEY. Please set it in your environment or ~/.gemini/.env.',
         );
         setIsRecording(false);
         isRecordingRef.current = false;

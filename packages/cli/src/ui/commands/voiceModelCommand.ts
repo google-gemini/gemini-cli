@@ -13,7 +13,7 @@ export const voiceModelCommand: SlashCommand = {
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: async () => ({
-      type: 'dialog',
-      dialog: 'voice-model',
-    }),
+    type: 'dialog',
+    dialog: 'voice-model',
+  }),
 };
