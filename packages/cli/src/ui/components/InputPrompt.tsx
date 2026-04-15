@@ -1907,7 +1907,13 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             color={statusColor ?? theme.text.accent}
             aria-label={statusText || undefined}
           >
-            {shellModeActive ? (
+            {voiceState.isRecording ? (
+              '● '
+            ) : voiceState.isTranscribing ? (
+              <>
+                <Spinner type="dots" />{' '}
+              </>
+            ) : shellModeActive ? (
               reverseSearchActive ? (
                 <Text
                   color={theme.text.link}
@@ -1922,12 +1928,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
               <Text color={theme.text.accent}>(r:) </Text>
             ) : showYoloStyling ? (
               '* '
-            ) : voiceState.isRecording ? (
-              '● '
-            ) : voiceState.isTranscribing ? (
-              <>
-                <Spinner type="dots" />{' '}
-              </>
             ) : (
               '> '
             )}
