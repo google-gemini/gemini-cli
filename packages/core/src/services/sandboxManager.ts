@@ -15,7 +15,6 @@ import {
   isKnownSafeCommand as isWindowsSafeCommand,
   isDangerousCommand as isWindowsDangerousCommand,
 } from '../sandbox/windows/commandSafety.js';
-import { isNodeError } from '../utils/errors.js';
 import {
   sanitizeEnvironment,
   getSecureSanitizationConfig,
@@ -23,7 +22,12 @@ import {
 } from './environmentSanitization.js';
 import type { ShellExecutionResult } from './shellExecutionService.js';
 import type { SandboxPolicyManager } from '../policy/sandboxPolicyManager.js';
-import { resolveToRealPath } from '../utils/paths.js';
+import {
+  toPathKey,
+  deduplicateAbsolutePaths,
+  resolveToRealPath,
+} from '../utils/paths.js';
+import { resolveGitWorktreePaths } from '../sandbox/utils/fsUtils.js';
 
 /**
  * A structured result of fully resolved sandbox paths.
@@ -48,6 +52,13 @@ export interface ResolvedSandboxPaths {
   policyRead: string[];
   /** Paths granted temporary write access by the current command's dynamic permissions. */
   policyWrite: string[];
+  /** Auto-detected paths for git worktrees/submodules. */
+  gitWorktree?: {
+    /** The actual .git directory for this worktree. */
+    worktreeGitDir: string;
+    /** The main repository's .git directory (if applicable). */
+    mainGitDir?: string;
+  };
 }
 
 export interface SandboxPermissions {
@@ -362,7 +373,7 @@ export async function resolveSandboxPaths(
 ): Promise<ResolvedSandboxPaths> {
   /**
    * Helper that expands each path to include its realpath (if it's a symlink)
-   * and pipes the result through sanitizePaths for deduplication and absolute path enforcement.
+   * and pipes the result through deduplicateAbsolutePaths for deduplication and absolute path enforcement.
    */
   const expand = (paths?: string[] | null): string[] => {
     if (!paths || paths.length === 0) return [];
@@ -374,7 +385,7 @@ export async function resolveSandboxPaths(
         return [p];
       }
     });
-    return sanitizePaths(expanded);
+    return deduplicateAbsolutePaths(expanded);
   };
 
   const forbidden = expand(await options.forbiddenPaths?.());
@@ -388,16 +399,22 @@ export async function resolveSandboxPaths(
   const resolvedWorkspace = resolveToRealPath(options.workspace);
 
   const workspaceIdentities = new Set(
-    [options.workspace, resolvedWorkspace].map(getPathIdentity),
+    [options.workspace, resolvedWorkspace].map(toPathKey),
   );
-  const forbiddenIdentities = new Set(forbidden.map(getPathIdentity));
+  const forbiddenIdentities = new Set(forbidden.map(toPathKey));
+
+  const { worktreeGitDir, mainGitDir } =
+    await resolveGitWorktreePaths(resolvedWorkspace);
+  const gitWorktree = worktreeGitDir
+    ? { gitWorktree: { worktreeGitDir, mainGitDir } }
+    : undefined;
 
   /**
    * Filters out any paths that are explicitly forbidden or match the workspace root (original or resolved).
    */
   const filter = (paths: string[]) =>
     paths.filter((p) => {
-      const identity = getPathIdentity(p);
+      const identity = toPathKey(p);
       return (
         !workspaceIdentities.has(identity) && !forbiddenIdentities.has(identity)
       );
@@ -413,62 +430,8 @@ export async function resolveSandboxPaths(
     policyAllowed: filter(policyAllowed),
     policyRead: filter(policyRead),
     policyWrite: filter(policyWrite),
+    ...gitWorktree,
   };
-}
-/**
- * Sanitizes an array of paths by deduplicating them and ensuring they are absolute.
- * Always returns an array (empty if input is null/undefined).
- */
-export function sanitizePaths(paths?: string[] | null): string[] {
-  if (!paths || paths.length === 0) return [];
-
-  const uniquePathsMap = new Map<string, string>();
-  for (const p of paths) {
-    if (!path.isAbsolute(p)) {
-      throw new Error(`Sandbox path must be absolute: ${p}`);
-    }
-
-    const key = getPathIdentity(p);
-    if (!uniquePathsMap.has(key)) {
-      uniquePathsMap.set(key, p);
-    }
-  }
-
-  return Array.from(uniquePathsMap.values());
-}
-
-/** Returns a normalized identity for a path, stripping trailing slashes and handling case sensitivity. */
-export function getPathIdentity(p: string): string {
-  let norm = path.normalize(p);
-
-  // Strip trailing slashes (except for root paths)
-  if (norm.length > 1 && (norm.endsWith('/') || norm.endsWith('\\'))) {
-    norm = norm.slice(0, -1);
-  }
-
-  const platform = os.platform();
-  const isCaseInsensitive = platform === 'win32' || platform === 'darwin';
-  return isCaseInsensitive ? norm.toLowerCase() : norm;
-}
-
-/**
- * Resolves symlinks for a given path to prevent sandbox escapes.
- * If a file does not exist (ENOENT), it recursively resolves the parent directory.
- * Other errors (e.g. EACCES) are re-thrown.
- */
-export async function tryRealpath(p: string): Promise<string> {
-  try {
-    return await fs.realpath(p);
-  } catch (e) {
-    if (isNodeError(e) && e.code === 'ENOENT') {
-      const parentDir = path.dirname(p);
-      if (parentDir === p) {
-        return p;
-      }
-      return path.join(await tryRealpath(parentDir), path.basename(p));
-    }
-    throw e;
-  }
 }
 
 export { createSandboxManager } from './sandboxManagerFactory.js';
