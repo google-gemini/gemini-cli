@@ -17,7 +17,6 @@ export default defineConfig({
   },
   test: {
     include: ['**/*.{test,spec}.{js,ts,jsx,tsx}', 'config.test.ts'],
-    exclude: ['**/node_modules/**', '**/dist/**', '**/cypress/**'],
     environment: 'node',
     globals: true,
     reporters: ['default', 'junit'],
@@ -35,6 +34,7 @@ export default defineConfig({
     exclude: [
       '**/node_modules/**',
       '**/dist/**',
+      '**/cypress/**',
       '**/src/ui/components/messages/ToolStickyHeaderRegression.test.tsx',
       '**/src/ui/components/views/McpStatus.test.tsx',
       '**/src/ui/components/messages/SubagentHistoryMessage.test.tsx',
