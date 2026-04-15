@@ -44,6 +44,6 @@ jobs:
           mode: 'bundle'
           bundle-artifact: 'gemini-bundle'
 
-      - name: 'Run Unit Tests'
-        run: 'npm run test'
+      - name: 'Run CLI Unit Tests'
+        run: 'npx vitest run packages/cli'
         shell: 'bash'

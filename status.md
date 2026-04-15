@@ -42,4 +42,5 @@ Investigation into the 10-minute CLI test runtime revealed:
 ## Current Goal
 
 - **Resuming Bundled CI:** Pushing these infrastructure optimizations to the
-  trial branch to measure the real-world CI speedup on the build box.
+  trial branch to measure the real-world CI speedup on the build box,
+  specifically for CLI unit tests.
