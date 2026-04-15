@@ -34,6 +34,7 @@ describe('<StatusRow />', () => {
     contextFileNames: [],
     showApprovalModeIndicator: ApprovalMode.DEFAULT,
     allowPlanMode: false,
+    isOfflineMode: false,
     renderMarkdown: true,
     currentModel: 'gemini-3',
   };
@@ -139,5 +140,39 @@ describe('<StatusRow />', () => {
 
     await waitUntilReady();
     expect(lastFrame()).toContain('Tip: Test Tip');
+  });
+
+  it('renders offline mode indicator in detailed UI', async () => {
+    (useComposerStatus as Mock).mockReturnValue({
+      isInteractiveShellWaiting: false,
+      showLoadingIndicator: false,
+      showTips: false,
+      showWit: false,
+      modeContentObj: null,
+      showMinimalContext: false,
+    });
+
+    const uiState: Partial<UIState> = {
+      ...defaultUiState,
+      isOfflineMode: true,
+    };
+
+    const { lastFrame, waitUntilReady } = await renderWithProviders(
+      <StatusRow
+        showUiDetails={true}
+        isNarrow={false}
+        terminalWidth={100}
+        hideContextSummary={false}
+        hideUiDetailsForSuggestions={false}
+        hasPendingActionRequired={false}
+      />,
+      {
+        width: 100,
+        uiState,
+      },
+    );
+
+    await waitUntilReady();
+    expect(lastFrame()).toContain('offline');
   });
 });

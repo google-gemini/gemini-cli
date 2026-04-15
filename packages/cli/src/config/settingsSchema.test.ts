@@ -431,6 +431,31 @@ describe('SettingsSchema', () => {
       );
     });
 
+    it('should have offline mode settings in schema', () => {
+      const offline = getSettingsSchema().general.properties.offline;
+      expect(offline).toBeDefined();
+      expect(offline.type).toBe('object');
+      expect(offline.category).toBe('General');
+      expect(offline.default).toEqual({});
+      expect(offline.requiresRestart).toBe(false);
+      expect(offline.showInDialog).toBe(true);
+
+      const enabled = offline.properties.enabled;
+      expect(enabled).toBeDefined();
+      expect(enabled.type).toBe('boolean');
+      expect(enabled.default).toBe(true);
+      expect(enabled.requiresRestart).toBe(false);
+      expect(enabled.showInDialog).toBe(true);
+
+      const localModelRouting = offline.properties.localModelRouting;
+      expect(localModelRouting).toBeDefined();
+      expect(localModelRouting.type).toBe('enum');
+      expect(localModelRouting.default).toBe('stub_default_api');
+      expect(localModelRouting.options?.map((o) => o.value)).toEqual([
+        'stub_default_api',
+      ]);
+    });
+
     it('should have hooksConfig.notifications setting in schema', () => {
       const setting = getSettingsSchema().hooksConfig?.properties.notifications;
       expect(setting).toBeDefined();

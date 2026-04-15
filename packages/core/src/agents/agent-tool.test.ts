@@ -7,13 +7,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { AgentTool } from './agent-tool.js';
 import { makeFakeConfig } from '../test-utils/config.js';
-import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
+import {
+  createMockMessageBus,
+  getMockMessageBusInstance,
+} from '../test-utils/mock-message-bus.js';
 import type { Config } from '../config/config.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { LocalSubagentInvocation } from './local-invocation.js';
 import { RemoteAgentInvocation } from './remote-invocation.js';
 import { BrowserAgentInvocation } from './browser/browserAgentInvocation.js';
 import { BROWSER_AGENT_NAME } from './browser/browserAgentDefinition.js';
+import { CLOUD_SUBAGENT_NAME } from './cloud-subagent.js';
 import { AgentRegistry } from './registry.js';
 import type { LocalAgentDefinition, RemoteAgentDefinition } from './types.js';
 
@@ -54,6 +58,26 @@ describe('AgentTool', () => {
     agentCardUrl: 'http://example.com/agent',
   };
 
+  const cloudSubagentDefinition: LocalAgentDefinition = {
+    kind: 'local',
+    name: CLOUD_SUBAGENT_NAME,
+    displayName: 'cloud-subagent',
+    description: 'Cloud delegation specialist.',
+    inputConfig: {
+      inputSchema: {
+        type: 'object',
+        properties: {
+          task: { type: 'string' },
+          reason: { type: 'string' },
+        },
+        required: ['task', 'reason'],
+      },
+    },
+    modelConfig: { model: 'test', generateContentConfig: {} },
+    runConfig: { maxTimeMinutes: 1 },
+    promptConfig: { systemPrompt: 'test' },
+  };
+
   beforeEach(() => {
     vi.clearAllMocks();
     mockConfig = makeFakeConfig();
@@ -67,6 +91,7 @@ describe('AgentTool', () => {
     vi.spyOn(registry, 'getDefinition').mockImplementation((name: string) => {
       if (name === 'TestLocalAgent') return testLocalDefinition;
       if (name === 'TestRemoteAgent') return testRemoteDefinition;
+      if (name === CLOUD_SUBAGENT_NAME) return cloudSubagentDefinition;
       if (name === BROWSER_AGENT_NAME) {
         return {
           kind: 'remote',
@@ -140,5 +165,38 @@ describe('AgentTool', () => {
       'invoke_agent',
       'Invoke Browser Agent',
     );
+  });
+
+  it('should use concise cloud-subagent description text', () => {
+    const params = {
+      agent_name: CLOUD_SUBAGENT_NAME,
+      prompt: 'Analyze all package-level config and summarize migration risks.',
+    };
+    const invocation = tool['createInvocation'](params, mockMessageBus);
+    const description = invocation.getDescription();
+
+    expect(description).toBe(
+      'Delegating to cloud-subagent for complex cloud execution',
+    );
+  });
+
+  it('should return custom confirmation details for cloud-subagent', async () => {
+    getMockMessageBusInstance(mockMessageBus).defaultToolDecision = 'ask_user';
+    const params = {
+      agent_name: CLOUD_SUBAGENT_NAME,
+      prompt: 'Summarize risk hotspots and propose migration sequencing.',
+    };
+    const invocation = tool['createInvocation'](params, mockMessageBus);
+
+    const result = await invocation.shouldConfirmExecute(
+      new AbortController().signal,
+    );
+
+    expect(result).toMatchObject({
+      type: 'info',
+      title: 'Delegate to cloud-subagent',
+    });
+    // Should NOT delegate to child invocation for confirmation
+    expect(LocalSubagentInvocation).not.toHaveBeenCalled();
   });
 });

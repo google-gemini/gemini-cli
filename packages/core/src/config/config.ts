@@ -200,6 +200,13 @@ export interface PlanSettings {
   modelRouting?: boolean;
 }
 
+export type OfflineLocalModelRouting = 'stub_default_api';
+
+export interface OfflineSettings {
+  enabled?: boolean;
+  localModelRouting?: OfflineLocalModelRouting;
+}
+
 export interface TelemetrySettings {
   enabled?: boolean;
   target?: TelemetryTarget;
@@ -710,6 +717,7 @@ export interface ConfigParameters {
   disableLLMCorrection?: boolean;
   plan?: boolean;
   tracker?: boolean;
+  offline?: OfflineSettings;
   planSettings?: PlanSettings;
   worktreeSettings?: WorktreeSettings;
   modelSteering?: boolean;
@@ -946,6 +954,10 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly disableLLMCorrection: boolean;
   private readonly planEnabled: boolean;
   private readonly trackerEnabled: boolean;
+  private offlineSettings: {
+    enabled: boolean;
+    localModelRouting: OfflineLocalModelRouting;
+  };
   private readonly planModeRoutingEnabled: boolean;
   private readonly modelSteering: boolean;
   private memoryContextManager?: MemoryContextManager;
@@ -1095,6 +1107,11 @@ export class Config implements McpContext, AgentLoopContext {
     this.disableLLMCorrection = params.disableLLMCorrection ?? true;
     this.planEnabled = params.plan ?? true;
     this.trackerEnabled = params.tracker ?? false;
+    this.offlineSettings = {
+      enabled: params.offline?.enabled ?? false,
+      localModelRouting:
+        params.offline?.localModelRouting ?? 'stub_default_api',
+    };
     this.planModeRoutingEnabled = params.planSettings?.modelRouting ?? true;
     this.enableEventDrivenScheduler = params.enableEventDrivenScheduler ?? true;
     this.skillsSupport = params.skillsSupport ?? true;
@@ -2886,6 +2903,17 @@ export class Config implements McpContext, AgentLoopContext {
     return this.directWebFetch;
   }
 
+  isOfflineModeEnabled(): boolean {
+    return this.offlineSettings.enabled;
+  }
+
+  getOfflineSettings(): {
+    enabled: boolean;
+    localModelRouting: OfflineLocalModelRouting;
+  } {
+    return { ...this.offlineSettings };
+  }
+
   setApprovedPlanPath(path: string | undefined): void {
     this.approvedPlanPath = path;
   }
@@ -2943,6 +2971,22 @@ export class Config implements McpContext, AgentLoopContext {
 
   setIdeMode(value: boolean): void {
     this.ideMode = value;
+  }
+
+  async setOfflineMode(enabled: boolean): Promise<void> {
+    if (this.offlineSettings.enabled === enabled) {
+      return;
+    }
+
+    this.offlineSettings.enabled = enabled;
+    coreEvents.emitOfflineModeChanged(enabled);
+
+    if (!this.initialized) {
+      return;
+    }
+
+    await this.agentRegistry.reload();
+    this.updateSystemInstructionIfInitialized();
   }
 
   /**

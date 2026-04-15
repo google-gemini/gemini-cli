@@ -53,6 +53,16 @@ export interface ModelChangedPayload {
 }
 
 /**
+ * Payload for the 'offline-mode-changed' event.
+ */
+export interface OfflineModeChangedPayload {
+  /**
+   * Whether offline mode is currently enabled.
+   */
+  enabled: boolean;
+}
+
+/**
  * Payload for the 'console-log' event.
  */
 export interface ConsoleLogPayload {
@@ -181,6 +191,7 @@ export interface QuotaChangedPayload {
 export enum CoreEvent {
   UserFeedback = 'user-feedback',
   ModelChanged = 'model-changed',
+  OfflineModeChanged = 'offline-mode-changed',
   ConsoleLog = 'console-log',
   Output = 'output',
   MemoryChanged = 'memory-changed',
@@ -215,6 +226,7 @@ export interface EditorSelectedPayload {
 export interface CoreEvents extends ExtensionEvents {
   [CoreEvent.UserFeedback]: [UserFeedbackPayload];
   [CoreEvent.ModelChanged]: [ModelChangedPayload];
+  [CoreEvent.OfflineModeChanged]: [OfflineModeChangedPayload];
   [CoreEvent.ConsoleLog]: [ConsoleLogPayload];
   [CoreEvent.Output]: [OutputPayload];
   [CoreEvent.MemoryChanged]: [MemoryChangedPayload];
@@ -325,6 +337,11 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
   emitModelChanged(model: string): void {
     const payload: ModelChangedPayload = { model };
     this.emit(CoreEvent.ModelChanged, payload);
+  }
+
+  emitOfflineModeChanged(enabled: boolean): void {
+    const payload: OfflineModeChangedPayload = { enabled };
+    this.emit(CoreEvent.OfflineModeChanged, payload);
   }
 
   /**

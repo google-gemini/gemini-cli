@@ -72,6 +72,11 @@ describe('PromptProvider', () => {
       isInteractiveShellEnabled: vi.fn().mockReturnValue(true),
       isTopicUpdateNarrationEnabled: vi.fn().mockReturnValue(false),
       isMemoryManagerEnabled: vi.fn().mockReturnValue(false),
+      isOfflineModeEnabled: vi.fn().mockReturnValue(false),
+      getOfflineSettings: vi.fn().mockReturnValue({
+        enabled: false,
+        localModelRouting: 'stub_default_api',
+      }),
       getSkillManager: vi.fn().mockReturnValue({
         getSkills: vi.fn().mockReturnValue([]),
       }),
@@ -154,6 +159,39 @@ describe('PromptProvider', () => {
     expect(prompt).toContain(
       `# Contextual Instructions (${DEFAULT_CONTEXT_FILENAME}, CUSTOM.md)`,
     );
+  });
+
+  it('should include offline strategy section when offline mode is enabled', () => {
+    vi.mocked(mockConfig.isOfflineModeEnabled).mockReturnValue(true);
+    vi.mocked(mockConfig.getOfflineSettings).mockReturnValue({
+      enabled: true,
+      localModelRouting: 'stub_default_api',
+    });
+
+    const provider = new PromptProvider();
+    const prompt = provider.getCoreSystemPrompt(mockConfig);
+
+    expect(prompt).toContain('# Offline Mode Strategy');
+    expect(prompt).toContain('cloud_subagent');
+    expect(prompt).toContain('stub_default_api');
+  });
+
+  it('should omit offline strategy section when offline mode is disabled', () => {
+    vi.mocked(mockConfig.isOfflineModeEnabled).mockReturnValue(false);
+
+    const provider = new PromptProvider();
+    const prompt = provider.getCoreSystemPrompt(mockConfig);
+
+    expect(prompt).not.toContain('# Offline Mode Strategy');
+  });
+
+  it('should not throw when tool registry is not initialized', () => {
+    vi.mocked(mockConfig.getToolRegistry).mockReturnValue(
+      undefined as unknown as ToolRegistry,
+    );
+
+    const provider = new PromptProvider();
+    expect(() => provider.getCoreSystemPrompt(mockConfig)).not.toThrow();
   });
 
   describe('plan mode prompt', () => {

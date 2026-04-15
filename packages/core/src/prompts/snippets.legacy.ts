@@ -33,6 +33,7 @@ import {
 export interface SystemPromptOptions {
   preamble?: PreambleOptions;
   coreMandates?: CoreMandatesOptions;
+  offlineMode?: OfflineModeOptions;
   subAgents?: SubAgentOptions[];
   agentSkills?: AgentSkillOptions[];
   hookContext?: boolean;
@@ -109,6 +110,11 @@ export interface SubAgentOptions {
   description: string;
 }
 
+export interface OfflineModeOptions {
+  cloudSubagentName: string;
+  localModelRouting: string;
+}
+
 // --- High Level Composition ---
 
 /**
@@ -120,6 +126,8 @@ export function getCoreSystemPrompt(options: SystemPromptOptions): string {
 ${renderPreamble(options.preamble)}
 
 ${renderCoreMandates(options.coreMandates)}
+
+${renderOfflineMode(options.offlineMode)}
 
 ${renderSubAgents(options.subAgents)}
 ${renderAgentSkills(options.agentSkills)}
@@ -214,6 +222,19 @@ Remember that the closest relevant sub-agent should still be used even if its ex
 For example:
 - A license-agent -> Should be used for a range of tasks, including reading, validating, and updating licenses and headers.
 - A test-fixing-agent -> Should be used both for fixing tests as well as investigating test failures.`;
+}
+
+export function renderOfflineMode(options?: OfflineModeOptions): string {
+  if (!options) return '';
+  return `
+# Offline Mode Strategy
+
+- You are operating with **Offline Mode** enabled.
+- Handle simple work directly and delegate complex tasks to \`${options.cloudSubagentName}\`.
+- Use cloud delegation for high-volume output, speculative investigations, and long-running execution.
+- Cloud delegation should use the standard confirmation flow and include audit-friendly context.
+- Always include a brief delegation reason so the confirmation request can be audited.
+- Current local model routing mode: \`${options.localModelRouting}\` (stubbed to default API backend for now).`;
 }
 
 export function renderAgentSkills(skills?: AgentSkillOptions[]): string {

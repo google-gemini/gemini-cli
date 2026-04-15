@@ -21,6 +21,7 @@ export const useComposerStatus = () => {
   const uiState = useUIState();
   const quotaState = useQuotaState();
   const settings = useSettings();
+  const isOfflineMode = Boolean(uiState.isOfflineMode);
 
   const hasPendingToolConfirmation = useMemo(
     () =>
@@ -64,22 +65,40 @@ export const useComposerStatus = () => {
 
     if (hideMinimalModeHintWhileBusy) return null;
 
-    switch (showApprovalModeIndicator) {
-      case ApprovalMode.YOLO:
-        return { text: 'YOLO', color: theme.status.error };
-      case ApprovalMode.PLAN:
-        return { text: 'plan', color: theme.status.success };
-      case ApprovalMode.AUTO_EDIT:
-        return { text: 'auto edit', color: theme.status.warning };
-      case ApprovalMode.DEFAULT:
-      default:
-        return null;
+    const approvalModeIndicator = (() => {
+      switch (showApprovalModeIndicator) {
+        case ApprovalMode.YOLO:
+          return { text: 'YOLO', color: theme.status.error };
+        case ApprovalMode.PLAN:
+          return { text: 'plan', color: theme.status.success };
+        case ApprovalMode.AUTO_EDIT:
+          return { text: 'auto edit', color: theme.status.warning };
+        case ApprovalMode.DEFAULT:
+        default:
+          return null;
+      }
+    })();
+
+    if (approvalModeIndicator) {
+      return isOfflineMode
+        ? {
+            text: `${approvalModeIndicator.text} + offline`,
+            color: approvalModeIndicator.color,
+          }
+        : approvalModeIndicator;
     }
+
+    if (isOfflineMode) {
+      return { text: 'offline', color: theme.status.success };
+    }
+
+    return null;
   }, [
     uiState.cleanUiDetailsVisible,
     showLoadingIndicator,
     uiState.activeHooks.length,
     showApprovalModeIndicator,
+    isOfflineMode,
   ]);
 
   const showMinimalContext = isContextUsageHigh(

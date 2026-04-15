@@ -199,6 +199,7 @@ vi.mock('../resources/resource-registry.js', () => ({
 const mockCoreEvents = vi.hoisted(() => ({
   emitFeedback: vi.fn(),
   emitModelChanged: vi.fn(),
+  emitOfflineModeChanged: vi.fn(),
   emitConsoleLog: vi.fn(),
   emitQuotaChanged: vi.fn(),
   on: vi.fn(),
@@ -1846,6 +1847,48 @@ describe('GemmaModelRouterSettings', () => {
     expect(settings.enabled).toBe(true);
     expect(settings.classifier?.host).toBe('http://localhost:9379');
     expect(settings.classifier?.model).toBe('gemma3-1b-gpu-custom');
+  });
+});
+
+describe('OfflineSettings', () => {
+  const baseParams: ConfigParameters = {
+    sessionId: 'test-offline',
+    targetDir: '.',
+    debugMode: false,
+    model: DEFAULT_GEMINI_MODEL,
+    cwd: '.',
+  };
+
+  it('should default offline mode to disabled when not provided', () => {
+    const config = new Config(baseParams);
+    expect(config.isOfflineModeEnabled()).toBe(false);
+    expect(config.getOfflineSettings().localModelRouting).toBe(
+      'stub_default_api',
+    );
+  });
+
+  it('should use provided offline settings', () => {
+    const config = new Config({
+      ...baseParams,
+      offline: {
+        enabled: true,
+        localModelRouting: 'stub_default_api',
+      },
+    });
+
+    expect(config.isOfflineModeEnabled()).toBe(true);
+    expect(config.getOfflineSettings()).toEqual({
+      enabled: true,
+      localModelRouting: 'stub_default_api',
+    });
+  });
+
+  it('should emit offline mode change events when toggled', async () => {
+    const config = new Config(baseParams);
+
+    await config.setOfflineMode(true);
+    expect(mockCoreEvents.emitOfflineModeChanged).toHaveBeenCalledWith(true);
+    expect(config.isOfflineModeEnabled()).toBe(true);
   });
 });
 

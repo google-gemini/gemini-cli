@@ -14,6 +14,7 @@ import { loadAgentsFromDirectory } from './agentLoader.js';
 import { CodebaseInvestigatorAgent } from './codebase-investigator.js';
 import { CliHelpAgent } from './cli-help-agent.js';
 import { GeneralistAgent } from './generalist-agent.js';
+import { CloudSubagent, CLOUD_SUBAGENT_NAME } from './cloud-subagent.js';
 import { BrowserAgentDefinition } from './browser/browserAgentDefinition.js';
 import { MemoryManagerAgent } from './memory-manager-agent.js';
 import { AgentTool } from './agent-tool.js';
@@ -266,6 +267,9 @@ export class AgentRegistry {
     this.registerLocalAgent(CodebaseInvestigatorAgent(this.config));
     this.registerLocalAgent(CliHelpAgent(this.config));
     this.registerLocalAgent(GeneralistAgent(this.config));
+    if (this.config.isOfflineModeEnabled()) {
+      this.registerLocalAgent(CloudSubagent(this.config));
+    }
 
     // Register the browser agent if enabled in settings.
     // Tools are configured dynamically at invocation time via browserAgentFactory.
@@ -391,8 +395,10 @@ export class AgentRegistry {
       return;
     }
 
-    // Only add override for remote agents. Local agents are handled by blanket allow.
-    if (definition.kind === 'remote') {
+    // Only add override for remote agents and cloud subagent.
+    // Local agents are handled by blanket allow, but cloud subagent needs
+    // explicit ASK_USER since it delegates work to a cloud model.
+    if (definition.kind === 'remote' || definition.name === CLOUD_SUBAGENT_NAME) {
       policyEngine.addRule({
         toolName: AgentTool.Name,
         argsPattern: new RegExp(`"agent_name":\\s*"${definition.name}"`),

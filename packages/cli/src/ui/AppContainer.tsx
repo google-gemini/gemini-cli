@@ -433,6 +433,9 @@ export const AppContainer = (props: AppContainerProps) => {
   );
 
   const [currentModel, setCurrentModel] = useState(config.getModel());
+  const [isOfflineMode, setIsOfflineMode] = useState(
+    config.isOfflineModeEnabled(),
+  );
 
   const [userTier, setUserTier] = useState<UserTierId | undefined>(undefined);
   const [quotaStats, setQuotaStats] = useState<QuotaStats | undefined>(() => {
@@ -567,6 +570,9 @@ export const AppContainer = (props: AppContainerProps) => {
     const handleModelChanged = () => {
       setCurrentModel(config.getModel());
     };
+    const handleOfflineModeChanged = (payload: { enabled: boolean }) => {
+      setIsOfflineMode(payload.enabled);
+    };
 
     const handleQuotaChanged = (payload: {
       remaining: number | undefined;
@@ -581,9 +587,11 @@ export const AppContainer = (props: AppContainerProps) => {
     };
 
     coreEvents.on(CoreEvent.ModelChanged, handleModelChanged);
+    coreEvents.on(CoreEvent.OfflineModeChanged, handleOfflineModeChanged);
     coreEvents.on(CoreEvent.QuotaChanged, handleQuotaChanged);
     return () => {
       coreEvents.off(CoreEvent.ModelChanged, handleModelChanged);
+      coreEvents.off(CoreEvent.OfflineModeChanged, handleOfflineModeChanged);
       coreEvents.off(CoreEvent.QuotaChanged, handleQuotaChanged);
     };
   }, [config]);
@@ -2493,6 +2501,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       queueErrorMessage,
       showApprovalModeIndicator,
       allowPlanMode,
+      isOfflineMode,
       currentModel,
       contextFileNames,
       errorCount,
@@ -2604,6 +2613,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       queueErrorMessage,
       showApprovalModeIndicator,
       allowPlanMode,
+      isOfflineMode,
       contextFileNames,
       errorCount,
       availableTerminalHeight,

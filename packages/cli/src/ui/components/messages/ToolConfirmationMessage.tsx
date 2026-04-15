@@ -371,29 +371,44 @@ export const ToolConfirmationMessage: React.FC<
         key: 'No, suggest changes (esc)',
       });
     } else if (confirmationDetails.type === 'info') {
+      const isCloudSubagentConfirmation =
+        toolName === 'cloud-subagent' || toolName === 'cloud_subagent';
+
       options.push({
-        label: 'Allow once',
+        label: isCloudSubagentConfirmation ? 'Allow' : 'Allow once',
         value: ToolConfirmationOutcome.ProceedOnce,
-        key: 'Allow once',
+        key: isCloudSubagentConfirmation ? 'Allow' : 'Allow once',
       });
       if (isTrustedFolder) {
         options.push({
-          label: 'Allow for this session',
+          label: isCloudSubagentConfirmation
+            ? 'Always allow'
+            : 'Allow for this session',
           value: ToolConfirmationOutcome.ProceedAlways,
-          key: 'Allow for this session',
+          key: isCloudSubagentConfirmation
+            ? 'Always allow'
+            : 'Allow for this session',
         });
         if (allowPermanentApproval) {
           options.push({
-            label: 'Allow for all future sessions',
+            label: isCloudSubagentConfirmation
+              ? 'Always allow for all future sessions'
+              : 'Allow for all future sessions',
             value: ToolConfirmationOutcome.ProceedAlwaysAndSave,
-            key: 'Allow for all future sessions',
+            key: isCloudSubagentConfirmation
+              ? 'Always allow for all future sessions'
+              : 'Allow for all future sessions',
           });
         }
       }
       options.push({
-        label: 'No, suggest changes (esc)',
+        label: isCloudSubagentConfirmation
+          ? 'Deny (esc)'
+          : 'No, suggest changes (esc)',
         value: ToolConfirmationOutcome.Cancel,
-        key: 'No, suggest changes (esc)',
+        key: isCloudSubagentConfirmation
+          ? 'Deny (esc)'
+          : 'No, suggest changes (esc)',
       });
     } else if (confirmationDetails.type === 'mcp') {
       options.push({
@@ -433,6 +448,7 @@ export const ToolConfirmationMessage: React.FC<
     allowPermanentApproval,
     config,
     isDiffingEnabled,
+    toolName,
   ]);
 
   const availableBodyContentHeight = useCallback(() => {

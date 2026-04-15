@@ -325,6 +325,44 @@ const SETTINGS_SCHEMA = {
           },
         },
       },
+      offline: {
+        type: 'object',
+        label: 'Offline Mode',
+        category: 'General',
+        requiresRestart: false,
+        default: {},
+        description:
+          'Offline mode settings. Routes work locally by default and delegates complex tasks through a cloud subagent with confirmation.',
+        showInDialog: true,
+        properties: {
+          enabled: {
+            type: 'boolean',
+            label: 'Enable Offline Mode',
+            category: 'General',
+            requiresRestart: false,
+            default: true,
+            description:
+              'Enable offline mode behavior by default (local-first strategy with explicit cloud delegation).',
+            showInDialog: true,
+          },
+          localModelRouting: {
+            type: 'enum',
+            label: 'Offline Local Model Routing',
+            category: 'General',
+            requiresRestart: false,
+            default: 'stub_default_api',
+            description:
+              'Selects the offline local-model routing strategy. The current stub still routes through the default API backend.',
+            showInDialog: false,
+            options: [
+              {
+                value: 'stub_default_api',
+                label: 'Stub (Default API)',
+              },
+            ],
+          },
+        },
+      },
       retryFetchErrors: {
         type: 'boolean',
         label: 'Retry Fetch Errors',

@@ -411,6 +411,11 @@ export const StatusRow: React.FC<StatusRowProps> = ({
                     <RawMarkdownIndicator />
                   </Box>
                 )}
+                {uiState.isOfflineMode && (
+                  <Box marginLeft={LAYOUT.INDICATOR_LEFT_MARGIN}>
+                    <Text color={theme.status.success}>● offline</Text>
+                  </Box>
+                )}
               </>
             ) : (
               showRow2Minimal &&

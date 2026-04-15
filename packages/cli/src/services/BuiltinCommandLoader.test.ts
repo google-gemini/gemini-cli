@@ -101,6 +101,9 @@ vi.mock('../ui/commands/memoryCommand.js', () => ({ memoryCommand: {} }));
 vi.mock('../ui/commands/modelCommand.js', () => ({
   modelCommand: { name: 'model' },
 }));
+vi.mock('../ui/commands/offlineCommand.js', () => ({
+  offlineCommand: { name: 'offline' },
+}));
 vi.mock('../ui/commands/privacyCommand.js', () => ({ privacyCommand: {} }));
 vi.mock('../ui/commands/quitCommand.js', () => ({ quitCommand: {} }));
 vi.mock('../ui/commands/resumeCommand.js', () => ({
@@ -247,6 +250,9 @@ describe('BuiltinCommandLoader', () => {
 
     const mcpCmd = commands.find((c) => c.name === 'mcp');
     expect(mcpCmd).toBeDefined();
+
+    const offlineCmd = commands.find((c) => c.name === 'offline');
+    expect(offlineCmd).toBeDefined();
   });
 
   it('should include permissions command when folder trust is enabled', async () => {

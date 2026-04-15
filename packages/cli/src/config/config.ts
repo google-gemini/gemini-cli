@@ -982,6 +982,7 @@ export async function loadCliConfig(
     plan: settings.general?.plan?.enabled ?? true,
     tracker: settings.experimental?.taskTracker,
     directWebFetch: settings.experimental?.directWebFetch,
+    offline: settings.general?.offline,
     planSettings: settings.general?.plan?.directory
       ? settings.general.plan
       : (extensionPlanSettings ?? settings.general?.plan),

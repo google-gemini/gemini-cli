@@ -29,6 +29,33 @@ import {
   GEN_AI_AGENT_NAME,
 } from '../telemetry/constants.js';
 import { AGENT_TOOL_NAME } from '../tools/tool-names.js';
+import { CLOUD_SUBAGENT_NAME } from './cloud-subagent.js';
+
+const CLOUD_DELEGATION_REASON_MAX_LENGTH = 120;
+const CLOUD_DELEGATION_TASK_MAX_LENGTH = 140;
+const CLOUD_DELEGATION_REASON_FALLBACK =
+  'Complex work is better handled by the cloud subagent.';
+const CLOUD_DELEGATION_TASK_FALLBACK = 'No task summary provided.';
+
+function summarizeInputText(
+  value: unknown,
+  maxLength: number,
+): string | undefined {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+
+  const normalized = value.replace(/\s+/g, ' ').trim();
+  if (!normalized) {
+    return undefined;
+  }
+
+  if (normalized.length <= maxLength) {
+    return normalized;
+  }
+
+  return `${normalized.slice(0, maxLength - 3)}...`;
+}
 
 /**
  * A unified tool for invoking subagents.
@@ -144,6 +171,9 @@ class DelegateInvocation extends BaseToolInvocation<
   }
 
   getDescription(): string {
+    if (this.definition.name === CLOUD_SUBAGENT_NAME) {
+      return 'Delegating to cloud-subagent for complex cloud execution';
+    }
     return `Delegating to agent '${this.definition.name}'`;
   }
 
@@ -180,9 +210,40 @@ class DelegateInvocation extends BaseToolInvocation<
   override async shouldConfirmExecute(
     abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
+    if (this.definition.name === CLOUD_SUBAGENT_NAME) {
+      return super.shouldConfirmExecute(abortSignal);
+    }
     const hintedParams = this.withUserHints(this.mappedInputs);
     const invocation = this.buildChildInvocation(hintedParams);
     return invocation.shouldConfirmExecute(abortSignal);
+  }
+
+  protected override async getConfirmationDetails(
+    _abortSignal: AbortSignal,
+  ): Promise<ToolCallConfirmationDetails | false> {
+    if (this.definition.name !== CLOUD_SUBAGENT_NAME) {
+      return false;
+    }
+
+    const reason =
+      summarizeInputText(
+        this.mappedInputs['reason'],
+        CLOUD_DELEGATION_REASON_MAX_LENGTH,
+      ) ?? CLOUD_DELEGATION_REASON_FALLBACK;
+    const task =
+      summarizeInputText(
+        this.mappedInputs['task'],
+        CLOUD_DELEGATION_TASK_MAX_LENGTH,
+      ) ?? CLOUD_DELEGATION_TASK_FALLBACK;
+
+    return {
+      type: 'info',
+      title: 'Delegate to cloud-subagent',
+      prompt: [`Reason: ${reason}`, `Task: ${task}`].join('\n'),
+      onConfirm: async (_outcome) => {
+        // Policy updates are handled centrally by the scheduler.
+      },
+    };
   }
 
   async execute(options: ExecuteOptions): Promise<ToolResult> {

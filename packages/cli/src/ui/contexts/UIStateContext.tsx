@@ -157,6 +157,7 @@ export interface UIState {
   queueErrorMessage: string | null;
   showApprovalModeIndicator: ApprovalMode;
   allowPlanMode: boolean;
+  isOfflineMode?: boolean;
   currentModel: string;
   contextFileNames: string[];
   errorCount: number;

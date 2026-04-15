@@ -97,6 +97,33 @@ describe('ToolConfirmationMessage', () => {
     unmount();
   });
 
+  it('should use allow/always allow/deny labels for cloud-subagent confirmations', async () => {
+    const confirmationDetails: SerializableConfirmationDetails = {
+      type: 'info',
+      title: 'Delegate to cloud-subagent',
+      prompt:
+        'Delegating to cloud-subagent for cloud execution.\nReason: Complex task.\nTask: Analyze migration risks.',
+    };
+
+    const { lastFrame, unmount } = await renderWithProviders(
+      <ToolConfirmationMessage
+        callId="test-call-id"
+        confirmationDetails={confirmationDetails}
+        config={mockConfig}
+        getPreferredEditor={vi.fn()}
+        availableTerminalHeight={30}
+        terminalWidth={80}
+        toolName="cloud-subagent"
+      />,
+    );
+
+    const output = lastFrame();
+    expect(output).toContain('1. Allow');
+    expect(output).toContain('2. Always allow');
+    expect(output).toContain('3. Deny (esc)');
+    unmount();
+  });
+
   it('should display WarningMessage for deceptive URLs in info type', async () => {
     const confirmationDetails: SerializableConfirmationDetails = {
       type: 'info',

@@ -56,7 +56,8 @@ export class PromptProvider {
     const isPlanMode = approvalMode === ApprovalMode.PLAN;
     const isYoloMode = approvalMode === ApprovalMode.YOLO;
     const skills = context.config.getSkillManager().getSkills();
-    const toolNames = context.toolRegistry.getAllToolNames();
+    const toolRegistry = context.toolRegistry;
+    const toolNames = toolRegistry?.getAllToolNames?.() ?? [];
     const enabledToolNames = new Set(toolNames);
 
     const approvedPlanPath = context.config.getApprovedPlanPath();
@@ -85,7 +86,7 @@ export class PromptProvider {
     // --- Context Gathering ---
     let planModeToolsList = '';
     if (isPlanMode) {
-      const allTools = context.toolRegistry.getAllTools();
+      const allTools = toolRegistry?.getAllTools?.() ?? [];
       planModeToolsList = allTools
         .map((t) => {
           if (t instanceof DiscoveredMCPTool) {
@@ -129,6 +130,11 @@ export class PromptProvider {
         (!!userMemory.global?.trim() ||
           !!userMemory.extension?.trim() ||
           !!userMemory.project?.trim());
+      const offlineModeEnabled =
+        context.config.isOfflineModeEnabled?.() ?? false;
+      const offlineSettings = context.config.getOfflineSettings?.() ?? {
+        localModelRouting: 'stub_default_api',
+      };
 
       const options: snippets.SystemPromptOptions = {
         preamble: this.withSection('preamble', () => ({
@@ -141,6 +147,14 @@ export class PromptProvider {
           contextFilenames,
           topicUpdateNarration: context.config.isTopicUpdateNarrationEnabled(),
         })),
+        offlineMode: this.withSection(
+          'offlineMode',
+          () => ({
+            cloudSubagentName: 'cloud_subagent',
+            localModelRouting: offlineSettings.localModelRouting,
+          }),
+          offlineModeEnabled,
+        ),
         subAgents: this.withSection(
           'agentContexts',
           () =>

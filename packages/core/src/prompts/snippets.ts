@@ -43,6 +43,7 @@ import { DEFAULT_CONTEXT_FILENAME } from '../tools/memoryTool.js';
 export interface SystemPromptOptions {
   preamble?: PreambleOptions;
   coreMandates?: CoreMandatesOptions;
+  offlineMode?: OfflineModeOptions;
   subAgents?: SubAgentOptions[];
   agentSkills?: AgentSkillOptions[];
   hookContext?: boolean;
@@ -115,6 +116,11 @@ export interface SubAgentOptions {
   description: string;
 }
 
+export interface OfflineModeOptions {
+  cloudSubagentName: string;
+  localModelRouting: string;
+}
+
 // --- High Level Composition ---
 
 /**
@@ -126,6 +132,8 @@ export function getCoreSystemPrompt(options: SystemPromptOptions): string {
 ${renderPreamble(options.preamble)}
 
 ${renderCoreMandates(options.coreMandates)}
+
+${renderOfflineMode(options.offlineMode)}
 
 ${renderSubAgents(options.subAgents)}
 
@@ -288,6 +296,20 @@ Remember that the closest relevant sub-agent should still be used even if its ex
 For example:
 - A license-agent -> Should be used for a range of tasks, including reading, validating, and updating licenses and headers.
 - A test-fixing-agent -> Should be used both for fixing tests as well as investigating test failures.`.trim();
+}
+
+export function renderOfflineMode(options?: OfflineModeOptions): string {
+  if (!options) return '';
+  return `
+# Offline Mode Strategy
+
+- You are operating with **Offline Mode** enabled.
+- Treat your own thread as local-first: handle surgical or straightforward tasks directly.
+- Delegate complex, long-running, high-output, or highly exploratory work to \`${options.cloudSubagentName}\`.
+- Cloud delegation should use the standard confirmation flow and include audit-friendly context.
+- Every delegation MUST include a concise reason that explains why cloud delegation is justified.
+- Keep the main conversation lean by preferring delegation for work that would otherwise bloat context.
+- Current local model routing mode: \`${options.localModelRouting}\` (stubbed to default API backend for now).`.trim();
 }
 
 export function renderAgentSkills(skills?: AgentSkillOptions[]): string {

@@ -3062,6 +3062,46 @@ describe('loadCliConfig gemmaModelRouter', () => {
   });
 });
 
+describe('loadCliConfig offline mode', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
+    vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
+    vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([]);
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it('should enable offline mode by default from schema defaults', async () => {
+    process.argv = ['node', 'script.js'];
+    const settings = createTestMergedSettings();
+    const argv = await parseArguments(settings);
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.isOfflineModeEnabled()).toBe(true);
+    expect(config.getOfflineSettings().localModelRouting).toBe(
+      'stub_default_api',
+    );
+  });
+
+  it('should load explicit offline settings from merged settings', async () => {
+    process.argv = ['node', 'script.js'];
+    const settings = createTestMergedSettings({
+      general: {
+        offline: {
+          enabled: false,
+          localModelRouting: 'stub_default_api',
+        },
+      },
+    });
+    const argv = await parseArguments(settings);
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.isOfflineModeEnabled()).toBe(false);
+  });
+});
+
 describe('loadCliConfig fileFiltering', () => {
   const originalArgv = process.argv;
 
