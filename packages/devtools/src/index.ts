@@ -392,3 +392,18 @@ export class DevTools extends EventEmitter {
     }
   }
 }
+
+// Start the server if this module is being run directly.
+// This is used for the bundled version of the CLI.
+if (
+  import.meta.url.endsWith('index.js') ||
+  process.argv[1]?.endsWith('index.js')
+) {
+  DevTools.getInstance()
+    .start()
+    .catch((err) => {
+      // eslint-disable-next-line no-console
+      console.error('Failed to start DevTools server:', err);
+      process.exit(1);
+    });
+}
