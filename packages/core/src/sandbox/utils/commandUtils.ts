@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { type SandboxRequest } from '../../services/sandboxManager.js';
+import type { SandboxRequest } from '../../services/sandboxManager.js';
 import {
   getCommandRoots,
   initializeShellParsers,

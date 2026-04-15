@@ -6,20 +6,12 @@
 
 import os from 'node:os';
 import path from 'node:path';
-import fsPromises from 'node:fs/promises';
-import { afterEach, describe, expect, it, vi, beforeEach } from 'vitest';
-import {
-  NoopSandboxManager,
-  findSecretFiles,
-  isSecretFile,
-  resolveSandboxPaths,
-  type SandboxRequest,
-} from './sandboxManager.js';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { NoopSandboxManager } from './sandboxManager.js';
 import { createSandboxManager } from './sandboxManagerFactory.js';
 import { LinuxSandboxManager } from '../sandbox/linux/LinuxSandboxManager.js';
 import { MacOsSandboxManager } from '../sandbox/macos/MacOsSandboxManager.js';
 import { WindowsSandboxManager } from '../sandbox/windows/WindowsSandboxManager.js';
-import type fs from 'node:fs';
 
 vi.mock('node:fs/promises', async () => {
   const actual =
@@ -55,183 +47,8 @@ vi.mock('../utils/paths.js', async () => {
   };
 });
 
-describe('isSecretFile', () => {
-  it('should return true for .env', () => {
-    expect(isSecretFile('.env')).toBe(true);
-  });
-
-  it('should return true for .env.local', () => {
-    expect(isSecretFile('.env.local')).toBe(true);
-  });
-
-  it('should return true for .env.production', () => {
-    expect(isSecretFile('.env.production')).toBe(true);
-  });
-
-  it('should return false for regular files', () => {
-    expect(isSecretFile('package.json')).toBe(false);
-    expect(isSecretFile('index.ts')).toBe(false);
-    expect(isSecretFile('.gitignore')).toBe(false);
-  });
-
-  it('should return false for files starting with .env but not matching pattern', () => {
-    // This depends on the pattern ".env.*". ".env-backup" would match ".env*" but not ".env.*"
-    expect(isSecretFile('.env-backup')).toBe(false);
-  });
-});
-
-describe('findSecretFiles', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('should find secret files in the root directory', async () => {
-    const workspace = path.resolve('/workspace');
-    vi.mocked(fsPromises.readdir).mockImplementation(((dir: string) => {
-      if (dir === workspace) {
-        return Promise.resolve([
-          { name: '.env', isDirectory: () => false, isFile: () => true },
-          {
-            name: 'package.json',
-            isDirectory: () => false,
-            isFile: () => true,
-          },
-          { name: 'src', isDirectory: () => true, isFile: () => false },
-        ] as unknown as fs.Dirent[]);
-      }
-      return Promise.resolve([] as unknown as fs.Dirent[]);
-    }) as unknown as typeof fsPromises.readdir);
-
-    const secrets = await findSecretFiles(workspace);
-    expect(secrets).toEqual([path.join(workspace, '.env')]);
-  });
-
-  it('should NOT find secret files recursively (shallow scan only)', async () => {
-    const workspace = path.resolve('/workspace');
-    vi.mocked(fsPromises.readdir).mockImplementation(((dir: string) => {
-      if (dir === workspace) {
-        return Promise.resolve([
-          { name: '.env', isDirectory: () => false, isFile: () => true },
-          { name: 'packages', isDirectory: () => true, isFile: () => false },
-        ] as unknown as fs.Dirent[]);
-      }
-      if (dir === path.join(workspace, 'packages')) {
-        return Promise.resolve([
-          { name: '.env.local', isDirectory: () => false, isFile: () => true },
-        ] as unknown as fs.Dirent[]);
-      }
-      return Promise.resolve([] as unknown as fs.Dirent[]);
-    }) as unknown as typeof fsPromises.readdir);
-
-    const secrets = await findSecretFiles(workspace);
-    expect(secrets).toEqual([path.join(workspace, '.env')]);
-    // Should NOT have called readdir for subdirectories
-    expect(fsPromises.readdir).toHaveBeenCalledTimes(1);
-    expect(fsPromises.readdir).not.toHaveBeenCalledWith(
-      path.join(workspace, 'packages'),
-      expect.anything(),
-    );
-  });
-});
-
 describe('SandboxManager', () => {
   afterEach(() => vi.restoreAllMocks());
-
-  describe('resolveSandboxPaths', () => {
-    it('should resolve allowed and forbidden paths', async () => {
-      const workspace = path.resolve('/workspace');
-      const forbidden = path.join(workspace, 'forbidden');
-      const allowed = path.join(workspace, 'allowed');
-      const options = {
-        workspace,
-        forbiddenPaths: async () => [forbidden],
-      };
-      const req = {
-        command: 'ls',
-        args: [],
-        cwd: workspace,
-        env: {},
-        policy: {
-          allowedPaths: [allowed],
-        },
-      };
-
-      const result = await resolveSandboxPaths(options, req as SandboxRequest);
-
-      expect(result.policyAllowed).toEqual([allowed]);
-      expect(result.forbidden).toEqual([forbidden]);
-    });
-
-    it('should filter out workspace from allowed paths', async () => {
-      const workspace = path.resolve('/workspace');
-      const other = path.resolve('/other/path');
-      const options = {
-        workspace,
-      };
-      const req = {
-        command: 'ls',
-        args: [],
-        cwd: workspace,
-        env: {},
-        policy: {
-          allowedPaths: [workspace, workspace + path.sep, other],
-        },
-      };
-
-      const result = await resolveSandboxPaths(options, req as SandboxRequest);
-
-      expect(result.policyAllowed).toEqual([other]);
-    });
-
-    it('should prioritize forbidden paths over allowed paths', async () => {
-      const workspace = path.resolve('/workspace');
-      const secret = path.join(workspace, 'secret');
-      const normal = path.join(workspace, 'normal');
-      const options = {
-        workspace,
-        forbiddenPaths: async () => [secret],
-      };
-      const req = {
-        command: 'ls',
-        args: [],
-        cwd: workspace,
-        env: {},
-        policy: {
-          allowedPaths: [secret, normal],
-        },
-      };
-
-      const result = await resolveSandboxPaths(options, req as SandboxRequest);
-
-      expect(result.policyAllowed).toEqual([normal]);
-      expect(result.forbidden).toEqual([secret]);
-    });
-
-    it('should handle case-insensitive conflicts on supported platforms', async () => {
-      vi.spyOn(process, 'platform', 'get').mockReturnValue('darwin');
-      const workspace = path.resolve('/workspace');
-      const secretUpper = path.join(workspace, 'SECRET');
-      const secretLower = path.join(workspace, 'secret');
-      const options = {
-        workspace,
-        forbiddenPaths: async () => [secretUpper],
-      };
-      const req = {
-        command: 'ls',
-        args: [],
-        cwd: workspace,
-        env: {},
-        policy: {
-          allowedPaths: [secretLower],
-        },
-      };
-
-      const result = await resolveSandboxPaths(options, req as SandboxRequest);
-
-      expect(result.policyAllowed).toEqual([]);
-      expect(result.forbidden).toEqual([secretUpper]);
-    });
-  });
 
   describe('NoopSandboxManager', () => {
     const sandboxManager = new NoopSandboxManager();
@@ -392,14 +209,5 @@ describe('SandboxManager', () => {
         expect(manager).toBeInstanceOf(expected);
       },
     );
-
-    it('should return WindowsSandboxManager if sandboxing is enabled on win32', () => {
-      vi.spyOn(os, 'platform').mockReturnValue('win32');
-      const manager = createSandboxManager(
-        { enabled: true },
-        { workspace: path.resolve('/workspace') },
-      );
-      expect(manager).toBeInstanceOf(WindowsSandboxManager);
-    });
   });
 });

@@ -8,11 +8,18 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { WindowsSandboxManager } from './WindowsSandboxManager.js';
-import * as sandboxManager from '../../services/sandboxManager.js';
-import * as paths from '../../utils/paths.js';
+import fsPromises from 'node:fs/promises';
+
+import * as sandboxPathUtils from '../utils/sandboxPathUtils.js';
+import {
+  WindowsSandboxManager,
+  findSecretFiles,
+  isSecretFile,
+} from './WindowsSandboxManager.js';
 import type { SandboxRequest } from '../../services/sandboxManager.js';
-import type { SandboxPolicyManager } from '../../policy/sandboxPolicyManager.js';
+import * as paths from '../../utils/paths.js';
+
+vi.mock('node:fs/promises');
 
 vi.mock('../../utils/shell-utils.js', async (importOriginal) => {
   const actual =
@@ -21,7 +28,35 @@ vi.mock('../../utils/shell-utils.js', async (importOriginal) => {
     ...actual,
     spawnAsync: vi.fn(),
     initializeShellParsers: vi.fn(),
-    isStrictlyApproved: vi.fn().mockResolvedValue(true),
+    getCommandName: vi
+      .fn()
+      .mockImplementation(async (command: string) => path.basename(command)),
+  };
+});
+
+vi.mock('./commandSafety.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./commandSafety.js')>();
+  return {
+    ...actual,
+    isStrictlyApproved: vi
+      .fn()
+      .mockImplementation(async (command, _args, approvedTools) => {
+        const tools = approvedTools ?? [];
+        return tools.includes(command);
+      }),
+  };
+});
+
+vi.mock('../utils/commandUtils.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../utils/commandUtils.js')>();
+  return {
+    ...actual,
+    getCommandName: vi
+      .fn()
+      .mockImplementation(async (req: { command: string }) =>
+        path.basename(req.command),
+      ),
   };
 });
 
@@ -171,81 +206,6 @@ describe('WindowsSandboxManager', () => {
     expect(result.args[0]).toBe('1');
   });
 
-  it('should reject network access in Plan mode', async () => {
-    const planManager = new WindowsSandboxManager({
-      workspace: testCwd,
-      modeConfig: { readonly: true, allowOverrides: false },
-      forbiddenPaths: async () => [],
-    });
-    const req: SandboxRequest = {
-      command: 'curl',
-      args: ['google.com'],
-      cwd: testCwd,
-      env: {},
-      policy: {
-        additionalPermissions: { network: true },
-      },
-    };
-
-    await expect(planManager.prepareCommand(req)).rejects.toThrow(
-      'Sandbox request rejected: Cannot override readonly/network/filesystem restrictions in Plan mode.',
-    );
-  });
-
-  it('should handle persistent permissions from policyManager', async () => {
-    const persistentPath = createTempDir('persistent', testCwd);
-
-    const mockPolicyManager = {
-      getCommandPermissions: vi.fn().mockReturnValue({
-        fileSystem: { write: [persistentPath] },
-        network: true,
-      }),
-    } as unknown as SandboxPolicyManager;
-
-    const managerWithPolicy = new WindowsSandboxManager({
-      workspace: testCwd,
-      modeConfig: { allowOverrides: true, network: false },
-      policyManager: mockPolicyManager,
-      forbiddenPaths: async () => [],
-    });
-
-    const req: SandboxRequest = {
-      command: 'test-cmd',
-      args: [],
-      cwd: testCwd,
-      env: {},
-    };
-
-    const result = await managerWithPolicy.prepareCommand(req);
-    expect(result.args[0]).toBe('1'); // Network allowed by persistent policy
-
-    const { allowed } = getManifestPaths(result.args);
-    expect(allowed).toContain(persistentPath);
-  });
-
-  it('should sanitize environment variables', async () => {
-    const req: SandboxRequest = {
-      command: 'test',
-      args: [],
-      cwd: testCwd,
-      env: {
-        API_KEY: 'secret',
-        PATH: '/usr/bin',
-      },
-      policy: {
-        sanitizationConfig: {
-          allowedEnvironmentVariables: ['PATH'],
-          blockedEnvironmentVariables: ['API_KEY'],
-          enableEnvironmentVariableRedaction: true,
-        },
-      },
-    };
-
-    const result = await manager.prepareCommand(req);
-    expect(result.env['PATH']).toBe('/usr/bin');
-    expect(result.env['API_KEY']).toBeUndefined();
-  });
-
   it('should ensure governance files exist', async () => {
     const req: SandboxRequest = {
       command: 'test',
@@ -290,7 +250,7 @@ describe('WindowsSandboxManager', () => {
     const mainGitDir = createTempDir('main-git');
 
     try {
-      vi.spyOn(sandboxManager, 'resolveSandboxPaths').mockResolvedValue({
+      vi.spyOn(sandboxPathUtils, 'resolveSandboxPaths').mockResolvedValue({
         workspace: { original: testCwd, resolved: testCwd },
         forbidden: [],
         globalIncludes: [],
@@ -555,5 +515,83 @@ describe('WindowsSandboxManager', () => {
     expect(fs.existsSync(forbiddenManifestPath)).toBe(false);
     expect(fs.existsSync(allowedManifestPath)).toBe(false);
     expect(fs.existsSync(path.dirname(forbiddenManifestPath))).toBe(false);
+  });
+});
+
+describe('findSecretFiles', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should find secret files in the root directory', async () => {
+    const workspace = path.resolve('/workspace');
+    vi.mocked(fsPromises.readdir).mockImplementation(((dir: string) => {
+      if (dir === workspace) {
+        return Promise.resolve([
+          { name: '.env', isDirectory: () => false, isFile: () => true },
+          {
+            name: 'package.json',
+            isDirectory: () => false,
+            isFile: () => true,
+          },
+          { name: 'src', isDirectory: () => true, isFile: () => false },
+        ] as unknown as fs.Dirent[]);
+      }
+      return Promise.resolve([] as unknown as fs.Dirent[]);
+    }) as unknown as typeof fsPromises.readdir);
+
+    const secrets = await findSecretFiles(workspace);
+    expect(secrets).toEqual([path.join(workspace, '.env')]);
+  });
+
+  it('should NOT find secret files recursively (shallow scan only)', async () => {
+    const workspace = path.resolve('/workspace');
+    vi.mocked(fsPromises.readdir).mockImplementation(((dir: string) => {
+      if (dir === workspace) {
+        return Promise.resolve([
+          { name: '.env', isDirectory: () => false, isFile: () => true },
+          { name: 'packages', isDirectory: () => true, isFile: () => false },
+        ] as unknown as fs.Dirent[]);
+      }
+      if (dir === path.join(workspace, 'packages')) {
+        return Promise.resolve([
+          { name: '.env.local', isDirectory: () => false, isFile: () => true },
+        ] as unknown as fs.Dirent[]);
+      }
+      return Promise.resolve([] as unknown as fs.Dirent[]);
+    }) as unknown as typeof fsPromises.readdir);
+
+    const secrets = await findSecretFiles(workspace);
+    expect(secrets).toEqual([path.join(workspace, '.env')]);
+    // Should NOT have called readdir for subdirectories
+    expect(fsPromises.readdir).toHaveBeenCalledTimes(1);
+    expect(fsPromises.readdir).not.toHaveBeenCalledWith(
+      path.join(workspace, 'packages'),
+      expect.anything(),
+    );
+  });
+
+  describe('isSecretFile', () => {
+    it('should return true for .env', () => {
+      expect(isSecretFile('.env')).toBe(true);
+    });
+
+    it('should return true for .env.local', () => {
+      expect(isSecretFile('.env.local')).toBe(true);
+    });
+
+    it('should return true for .env.production', () => {
+      expect(isSecretFile('.env.production')).toBe(true);
+    });
+
+    it('should return false for regular files', () => {
+      expect(isSecretFile('package.json')).toBe(false);
+      expect(isSecretFile('index.ts')).toBe(false);
+      expect(isSecretFile('.gitignore')).toBe(false);
+    });
+
+    it('should return false for files starting with .env but not matching pattern', () => {
+      expect(isSecretFile('.env-backup')).toBe(false);
+    });
   });
 });

@@ -5,41 +5,28 @@
  */
 
 import fs from 'node:fs';
-import { join, dirname } from 'node:path';
+import { join } from 'node:path';
 import os from 'node:os';
 import {
-  type SandboxManager,
-  type GlobalSandboxOptions,
   type SandboxRequest,
   type SandboxedCommand,
   type SandboxPermissions,
-  GOVERNANCE_FILES,
   type ParsedSandboxDenial,
-  resolveSandboxPaths,
 } from '../../services/sandboxManager.js';
 import type { ShellExecutionResult } from '../../services/shellExecutionService.js';
 import {
-  sanitizeEnvironment,
-  getSecureSanitizationConfig,
-} from '../../services/environmentSanitization.js';
-import {
-  isStrictlyApproved,
-  verifySandboxOverrides,
-  getCommandName,
-} from '../utils/commandUtils.js';
-import { assertValidPathString } from '../../utils/paths.js';
-import {
-  isKnownSafeCommand,
-  isDangerousCommand,
+  isKnownSafeCommand as isPosixSafeCommand,
+  isDangerousCommand as isPosixDangerousCommand,
 } from '../utils/commandSafety.js';
-import {
-  parsePosixSandboxDenials,
-  createSandboxDenialCache,
-  type SandboxDenialCache,
-} from '../utils/sandboxDenialUtils.js';
-import { isErrnoException } from '../utils/fsUtils.js';
+import { ensureGovernanceFilesExist } from '../utils/governanceUtils.js';
+import { parsePosixSandboxDenials } from '../utils/sandboxDenialUtils.js';
 import { handleReadWriteCommands } from '../utils/sandboxReadWriteUtils.js';
 import { buildBwrapArgs } from './bwrapArgsBuilder.js';
+import {
+  AbstractOsSandboxManager,
+  type PreparedExecutionDetails,
+} from '../abstractOsSandboxManager.js';
+import { isStrictlyApproved } from '../utils/commandUtils.js';
 
 let cachedBpfPath: string | undefined;
 
@@ -111,176 +98,83 @@ function getSeccompBpfPath(): string {
 }
 
 /**
- * Ensures a file or directory exists.
- */
-function touch(filePath: string, isDirectory: boolean) {
-  assertValidPathString(filePath);
-  try {
-    // If it exists (even as a broken symlink), do nothing
-    fs.lstatSync(filePath);
-    return;
-  } catch (e: unknown) {
-    if (isErrnoException(e) && e.code !== 'ENOENT') {
-      throw e;
-    }
-  }
-
-  if (isDirectory) {
-    fs.mkdirSync(filePath, { recursive: true });
-  } else {
-    fs.mkdirSync(dirname(filePath), { recursive: true });
-    fs.closeSync(fs.openSync(filePath, 'a'));
-  }
-}
-
-/**
  * A SandboxManager implementation for Linux that uses Bubblewrap (bwrap).
  */
 
-export class LinuxSandboxManager implements SandboxManager {
+export class LinuxSandboxManager extends AbstractOsSandboxManager {
   private static maskFilePath: string | undefined;
-  private readonly denialCache: SandboxDenialCache = createSandboxDenialCache();
-  private governanceFilesInitialized = false;
 
-  constructor(private readonly options: GlobalSandboxOptions) {}
+  protected override async initialize(): Promise<void> {
+    // Default no-op
+  }
 
-  private ensureGovernanceFilesExist(workspace: string): void {
+  protected override ensureGovernanceFilesExist(workspace: string): void {
     if (this.governanceFilesInitialized) return;
-
-    // These must exist on the host before running the sandbox to ensure they are protected.
-    for (const file of GOVERNANCE_FILES) {
-      const filePath = join(workspace, file.path);
-      touch(filePath, file.isDirectory);
-    }
-
+    ensureGovernanceFilesExist(workspace);
     this.governanceFilesInitialized = true;
   }
 
-  isKnownSafeCommand(args: string[]): boolean {
-    return isKnownSafeCommand(args);
-  }
-
-  isDangerousCommand(args: string[]): boolean {
-    return isDangerousCommand(args);
-  }
-
-  parseDenials(result: ShellExecutionResult): ParsedSandboxDenial | undefined {
-    return parsePosixSandboxDenials(result, this.denialCache);
-  }
-
-  getWorkspace(): string {
-    return this.options.workspace;
-  }
-
-  getOptions(): GlobalSandboxOptions {
-    return this.options;
-  }
-
-  private getMaskFilePath(): string {
-    if (
-      LinuxSandboxManager.maskFilePath &&
-      fs.existsSync(LinuxSandboxManager.maskFilePath)
-    ) {
-      return LinuxSandboxManager.maskFilePath;
-    }
-    const tempDir = fs.mkdtempSync(join(os.tmpdir(), 'gemini-cli-mask-file-'));
-    const maskPath = join(tempDir, 'mask');
-    fs.writeFileSync(maskPath, '');
-    fs.chmodSync(maskPath, 0);
-    LinuxSandboxManager.maskFilePath = maskPath;
-
-    // Cleanup on exit
-    process.on('exit', () => {
-      try {
-        fs.rmSync(tempDir, { recursive: true, force: true });
-      } catch {
-        // Ignore errors
-      }
-    });
-
-    return maskPath;
-  }
-
-  async prepareCommand(req: SandboxRequest): Promise<SandboxedCommand> {
-    const isReadonlyMode = this.options.modeConfig?.readonly ?? true;
-    const allowOverrides = this.options.modeConfig?.allowOverrides ?? true;
-
-    verifySandboxOverrides(allowOverrides, req.policy);
-
-    let command = req.command;
-    let args = req.args;
-
-    // Translate virtual commands for sandboxed file system access
+  /**
+   * Virtual commands like __read and __write must be mapped to native POSIX tools
+   * so that Bubblewrap can enforce file access policies on real executables.
+   */
+  protected override mapVirtualCommandToNative(
+    command: string,
+    args: string[],
+  ): { command: string; args: string[] } {
     if (command === '__read') {
-      command = 'cat';
-    } else if (command === '__write') {
-      command = 'sh';
-      args = ['-c', 'cat > "$1"', '_', ...args];
+      return { command: 'cat', args };
     }
+    if (command === '__write') {
+      return { command: 'sh', args: ['-c', 'cat > "$1"', '_', ...args] };
+    }
+    return { command, args };
+  }
 
-    const commandName = await getCommandName({ ...req, command, args });
-    const isApproved = allowOverrides
-      ? await isStrictlyApproved(
-          { ...req, command, args },
-          this.options.modeConfig?.approvedTools,
-        )
-      : false;
-    const isYolo = this.options.modeConfig?.yolo ?? false;
-    const workspaceWrite = !isReadonlyMode || isApproved || isYolo;
+  /**
+   * Linux permissions are entirely driven by Bubblewrap bind mounts and seccomp filters
+   * resolved from paths later in the flow. No intermediate tweaking is needed here.
+   */
+  protected override updateReadWritePermissions(
+    _permissions: SandboxPermissions,
+    _req: SandboxRequest,
+  ): void {
+    // Default no-op
+  }
 
-    const networkAccess =
-      this.options.modeConfig?.network || req.policy?.networkAccess || isYolo;
+  /**
+   * Ensures read/write commands strictly respect allowed paths and workspace boundaries
+   * before the final sandbox invocation is constructed.
+   */
+  protected override rewriteReadWriteCommand(
+    req: SandboxRequest,
+    command: string,
+    args: string[],
+    permissions: SandboxPermissions,
+  ): { command: string; args: string[] } {
+    return handleReadWriteCommands(req, permissions, this.options.workspace, [
+      ...(req.policy?.allowedPaths || []),
+      ...(this.options.includeDirectories || []),
+    ]);
+  }
 
-    const persistentPermissions = allowOverrides
-      ? this.options.policyManager?.getCommandPermissions(commandName)
-      : undefined;
-
-    const mergedAdditional: SandboxPermissions = {
-      fileSystem: {
-        read: [
-          ...(persistentPermissions?.fileSystem?.read ?? []),
-          ...(req.policy?.additionalPermissions?.fileSystem?.read ?? []),
-        ],
-        write: [
-          ...(persistentPermissions?.fileSystem?.write ?? []),
-          ...(req.policy?.additionalPermissions?.fileSystem?.write ?? []),
-        ],
-      },
-      network:
-        networkAccess ||
-        persistentPermissions?.network ||
-        req.policy?.additionalPermissions?.network ||
-        false,
-    };
-
-    const { command: finalCommand, args: finalArgs } = handleReadWriteCommands(
+  protected async buildSandboxedCommand(
+    details: PreparedExecutionDetails,
+  ): Promise<SandboxedCommand> {
+    const {
+      finalCommand,
+      finalArgs,
+      sanitizedEnv,
+      resolvedPaths,
+      workspaceWrite,
+      networkAccess,
       req,
-      mergedAdditional,
-      this.options.workspace,
-      [
-        ...(req.policy?.allowedPaths || []),
-        ...(this.options.includeDirectories || []),
-      ],
-    );
-
-    const sanitizationConfig = getSecureSanitizationConfig(
-      req.policy?.sanitizationConfig,
-    );
-
-    const sanitizedEnv = sanitizeEnvironment(req.env, sanitizationConfig);
-
-    const resolvedPaths = await resolveSandboxPaths(
-      this.options,
-      req,
-      mergedAdditional,
-    );
-
-    this.ensureGovernanceFilesExist(resolvedPaths.workspace.resolved);
+    } = details;
 
     const bwrapArgs = await buildBwrapArgs({
       resolvedPaths,
       workspaceWrite,
-      networkAccess: mergedAdditional.network ?? false,
+      networkAccess,
       maskFilePath: this.getMaskFilePath(),
       isReadOnlyCommand: req.command === '__read',
     });
@@ -316,6 +210,33 @@ export class LinuxSandboxManager implements SandboxManager {
     };
   }
 
+  protected override isCaseInsensitive(): boolean {
+    return false;
+  }
+
+  isDangerousCommand(args: string[]): boolean {
+    return isPosixDangerousCommand(args);
+  }
+
+  protected override isOsSafeCommand(args: string[]): boolean {
+    return isPosixSafeCommand(args);
+  }
+
+  protected override async isStrictlyApproved(
+    command: string,
+    args: string[],
+    req: SandboxRequest,
+  ): Promise<boolean> {
+    return isStrictlyApproved(
+      { ...req, command, args },
+      this.options.modeConfig?.approvedTools,
+    );
+  }
+
+  parseDenials(result: ShellExecutionResult): ParsedSandboxDenial | undefined {
+    return parsePosixSandboxDenials(result, this.denialCache);
+  }
+
   private writeArgsToTempFile(args: string[]): string {
     const tempFile = join(
       os.tmpdir(),
@@ -324,5 +245,30 @@ export class LinuxSandboxManager implements SandboxManager {
     const content = Buffer.from(args.join('\0') + '\0');
     fs.writeFileSync(tempFile, content, { mode: 0o600 });
     return tempFile;
+  }
+
+  private getMaskFilePath(): string {
+    if (
+      LinuxSandboxManager.maskFilePath &&
+      fs.existsSync(LinuxSandboxManager.maskFilePath)
+    ) {
+      return LinuxSandboxManager.maskFilePath;
+    }
+    const tempDir = fs.mkdtempSync(join(os.tmpdir(), 'gemini-cli-mask-file-'));
+    const maskPath = join(tempDir, 'mask');
+    fs.writeFileSync(maskPath, '');
+    fs.chmodSync(maskPath, 0);
+    LinuxSandboxManager.maskFilePath = maskPath;
+
+    // Cleanup on exit
+    process.on('exit', () => {
+      try {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      } catch {
+        // Ignore errors
+      }
+    });
+
+    return maskPath;
   }
 }

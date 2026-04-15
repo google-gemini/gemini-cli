@@ -9,7 +9,7 @@ import { buildBwrapArgs, type BwrapArgsOptions } from './bwrapArgsBuilder.js';
 import fs from 'node:fs';
 import * as shellUtils from '../../utils/shell-utils.js';
 import os from 'node:os';
-import { type ResolvedSandboxPaths } from '../../services/sandboxManager.js';
+import type { ResolvedSandboxPaths } from '../utils/sandboxPathUtils.js';
 
 vi.mock('node:fs', async () => {
   const actual = await vi.importActual<typeof import('node:fs')>('node:fs');
