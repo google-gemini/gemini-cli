@@ -18,7 +18,7 @@ describe('WhisperTranscriptionProvider', () => {
   });
 
   it('should throw a friendly error if whisper-stream is not available', async () => {
-    vi.mocked(commandExists).mockResolvedValue(false as never);
+    vi.mocked(commandExists).mockRejectedValue(new Error('not found'));
 
     const provider = new WhisperTranscriptionProvider({
       modelPath: 'test-model.bin',
