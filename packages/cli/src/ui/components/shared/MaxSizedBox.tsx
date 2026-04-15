@@ -26,6 +26,7 @@ export interface MaxSizedBoxProps {
   maxHeight?: number;
   overflowDirection?: 'top' | 'bottom';
   additionalHiddenLinesCount?: number;
+  paddingX?: number;
 }
 
 /**
@@ -38,6 +39,7 @@ export const MaxSizedBox: React.FC<MaxSizedBoxProps> = ({
   maxHeight,
   overflowDirection = 'top',
   additionalHiddenLinesCount = 0,
+  paddingX = 0,
 }) => {
   const id = useId();
   const { addOverflowingId, removeOverflowingId } = useOverflowActions() || {};
@@ -113,7 +115,7 @@ export const MaxSizedBox: React.FC<MaxSizedBoxProps> = ({
     [id, removeOverflowingId],
   );
 
-  if (effectiveMaxHeight === undefined) {
+  if (effectiveMaxHeight === undefined && totalHiddenLines === 0) {
     return (
       <Box flexDirection="column" width={maxWidth}>
         {children}
@@ -132,11 +134,13 @@ export const MaxSizedBox: React.FC<MaxSizedBoxProps> = ({
       flexShrink={0}
     >
       {totalHiddenLines > 0 && overflowDirection === 'top' && (
-        <Text color={theme.text.secondary} wrap="truncate">
-          {isNarrow
-            ? `... ${totalHiddenLines} hidden (${showMoreKey}) ...`
-            : `... first ${totalHiddenLines} line${totalHiddenLines === 1 ? '' : 's'} hidden (${showMoreKey} to show) ...`}
-        </Text>
+        <Box paddingX={paddingX}>
+          <Text color={theme.text.secondary} wrap="truncate">
+            {isNarrow
+              ? `... ${totalHiddenLines} hidden (${showMoreKey}) ...`
+              : `... first ${totalHiddenLines} line${totalHiddenLines === 1 ? '' : 's'} hidden (${showMoreKey} to show) ...`}
+          </Text>
+        </Box>
       )}
       <Box
         flexDirection="column"
@@ -154,11 +158,13 @@ export const MaxSizedBox: React.FC<MaxSizedBoxProps> = ({
         </Box>
       </Box>
       {totalHiddenLines > 0 && overflowDirection === 'bottom' && (
-        <Text color={theme.text.secondary} wrap="truncate">
-          {isNarrow
-            ? `... ${totalHiddenLines} hidden (${showMoreKey}) ...`
-            : `... last ${totalHiddenLines} line${totalHiddenLines === 1 ? '' : 's'} hidden (${showMoreKey} to show) ...`}
-        </Text>
+        <Box paddingX={paddingX}>
+          <Text color={theme.text.secondary} wrap="truncate">
+            {isNarrow
+              ? `... ${totalHiddenLines} hidden (${showMoreKey}) ...`
+              : `... last ${totalHiddenLines} line${totalHiddenLines === 1 ? '' : 's'} hidden (${showMoreKey} to show) ...`}
+          </Text>
+        </Box>
       )}
     </Box>
   );

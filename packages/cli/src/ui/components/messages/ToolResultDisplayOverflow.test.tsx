@@ -29,11 +29,12 @@ describe('ToolResultDisplay Overflow', () => {
     await waitUntilReady();
     const output = lastFrame();
 
-    expect(output).not.toContain('Line 1');
-    expect(output).not.toContain('Line 2');
-    expect(output).toContain('Line 3');
-    expect(output).toContain('Line 4');
-    expect(output).toContain('Line 5');
+    expect(output).toContain('Line 1');
+    expect(output).toContain('Line 2');
+    expect(output).not.toContain('Line 3');
+    expect(output).not.toContain('Line 4');
+    expect(output).not.toContain('Line 5');
+    expect(output).toContain('hidden');
     unmount();
   });
 
@@ -57,9 +58,10 @@ describe('ToolResultDisplay Overflow', () => {
 
     expect(output).not.toContain('Line 1');
     expect(output).not.toContain('Line 2');
-    expect(output).toContain('Line 3');
+    expect(output).not.toContain('Line 3');
     expect(output).toContain('Line 4');
     expect(output).toContain('Line 5');
+    expect(output).toContain('hidden');
     unmount();
   });
 
@@ -74,6 +76,7 @@ describe('ToolResultDisplay Overflow', () => {
         underline: false,
         dim: false,
         inverse: false,
+        isUninitialized: false,
       },
     ]);
     const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
@@ -94,11 +97,10 @@ describe('ToolResultDisplay Overflow', () => {
 
     expect(output).toContain('Line 1');
     expect(output).toContain('Line 2');
-    expect(output).toContain('Line 3');
+    expect(output).not.toContain('Line 3');
     expect(output).not.toContain('Line 4');
     expect(output).not.toContain('Line 5');
-    // ScrollableList uses a scroll thumb rather than writing "hidden"
-    expect(output).toContain('█');
+    expect(output).toContain('hidden');
     unmount();
   });
 });

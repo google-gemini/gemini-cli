@@ -27,11 +27,17 @@ import {
   verifySandboxOverrides,
   getCommandName,
 } from '../utils/commandUtils.js';
+import { assertValidPathString } from '../../utils/paths.js';
 import {
   isKnownSafeCommand,
   isDangerousCommand,
 } from '../utils/commandSafety.js';
-import { parsePosixSandboxDenials } from '../utils/sandboxDenialUtils.js';
+import {
+  parsePosixSandboxDenials,
+  createSandboxDenialCache,
+  type SandboxDenialCache,
+} from '../utils/sandboxDenialUtils.js';
+import { isErrnoException } from '../utils/fsUtils.js';
 import { handleReadWriteCommands } from '../utils/sandboxReadWriteUtils.js';
 import { buildBwrapArgs } from './bwrapArgsBuilder.js';
 
@@ -108,11 +114,15 @@ function getSeccompBpfPath(): string {
  * Ensures a file or directory exists.
  */
 function touch(filePath: string, isDirectory: boolean) {
+  assertValidPathString(filePath);
   try {
     // If it exists (even as a broken symlink), do nothing
-    if (fs.lstatSync(filePath)) return;
-  } catch {
-    // Ignore ENOENT
+    fs.lstatSync(filePath);
+    return;
+  } catch (e: unknown) {
+    if (isErrnoException(e) && e.code !== 'ENOENT') {
+      throw e;
+    }
   }
 
   if (isDirectory) {
@@ -129,8 +139,22 @@ function touch(filePath: string, isDirectory: boolean) {
 
 export class LinuxSandboxManager implements SandboxManager {
   private static maskFilePath: string | undefined;
+  private readonly denialCache: SandboxDenialCache = createSandboxDenialCache();
+  private governanceFilesInitialized = false;
 
   constructor(private readonly options: GlobalSandboxOptions) {}
+
+  private ensureGovernanceFilesExist(workspace: string): void {
+    if (this.governanceFilesInitialized) return;
+
+    // These must exist on the host before running the sandbox to ensure they are protected.
+    for (const file of GOVERNANCE_FILES) {
+      const filePath = join(workspace, file.path);
+      touch(filePath, file.isDirectory);
+    }
+
+    this.governanceFilesInitialized = true;
+  }
 
   isKnownSafeCommand(args: string[]): boolean {
     return isKnownSafeCommand(args);
@@ -141,11 +165,15 @@ export class LinuxSandboxManager implements SandboxManager {
   }
 
   parseDenials(result: ShellExecutionResult): ParsedSandboxDenial | undefined {
-    return parsePosixSandboxDenials(result);
+    return parsePosixSandboxDenials(result, this.denialCache);
   }
 
   getWorkspace(): string {
     return this.options.workspace;
+  }
+
+  getOptions(): GlobalSandboxOptions {
+    return this.options;
   }
 
   private getMaskFilePath(): string {
@@ -229,7 +257,10 @@ export class LinuxSandboxManager implements SandboxManager {
       req,
       mergedAdditional,
       this.options.workspace,
-      req.policy?.allowedPaths,
+      [
+        ...(req.policy?.allowedPaths || []),
+        ...(this.options.includeDirectories || []),
+      ],
     );
 
     const sanitizationConfig = getSecureSanitizationConfig(
@@ -238,24 +269,20 @@ export class LinuxSandboxManager implements SandboxManager {
 
     const sanitizedEnv = sanitizeEnvironment(req.env, sanitizationConfig);
 
-    const { allowed: allowedPaths, forbidden: forbiddenPaths } =
-      await resolveSandboxPaths(this.options, req);
+    const resolvedPaths = await resolveSandboxPaths(
+      this.options,
+      req,
+      mergedAdditional,
+    );
 
-    for (const file of GOVERNANCE_FILES) {
-      const filePath = join(this.options.workspace, file.path);
-      touch(filePath, file.isDirectory);
-    }
+    this.ensureGovernanceFilesExist(resolvedPaths.workspace.resolved);
 
     const bwrapArgs = await buildBwrapArgs({
-      workspace: this.options.workspace,
+      resolvedPaths,
       workspaceWrite,
-      networkAccess,
-      allowedPaths,
-      forbiddenPaths,
-      additionalPermissions: mergedAdditional,
-      includeDirectories: this.options.includeDirectories || [],
+      networkAccess: mergedAdditional.network ?? false,
       maskFilePath: this.getMaskFilePath(),
-      isWriteCommand: req.command === '__write',
+      isReadOnlyCommand: req.command === '__read',
     });
 
     const bpfPath = getSeccompBpfPath();

@@ -15,6 +15,9 @@ import {
   shortenPath,
   normalizePath,
   resolveToRealPath,
+  makeRelative,
+  deduplicateAbsolutePaths,
+  toPathKey,
 } from './paths.js';
 
 vi.mock('node:fs', async (importOriginal) => {
@@ -215,7 +218,7 @@ describe('isSubpath', () => {
   });
 });
 
-describe('isSubpath on Windows', () => {
+describe.skipIf(process.platform !== 'win32')('isSubpath on Windows', () => {
   afterEach(() => vi.unstubAllGlobals());
 
   beforeEach(() => mockPlatform('win32'));
@@ -265,6 +268,20 @@ describe('isSubpath on Windows', () => {
   it('should handle relative paths correctly on Windows', () => {
     expect(isSubpath('Users\\Test', 'Users\\Test\\file.txt')).toBe(true);
     expect(isSubpath('Users\\Test\\file.txt', 'Users\\Test')).toBe(false);
+  });
+});
+
+describe.skipIf(process.platform !== 'darwin')('isSubpath on Darwin', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  beforeEach(() => mockPlatform('darwin'));
+
+  it('should be case-insensitive for path components on Darwin', () => {
+    expect(isSubpath('/PROJECT', '/project/src')).toBe(true);
+  });
+
+  it('should return true for a direct subpath on Darwin', () => {
+    expect(isSubpath('/Users/Test', '/Users/Test/file.txt')).toBe(true);
   });
 });
 
@@ -586,6 +603,54 @@ describe('resolveToRealPath', () => {
   });
 });
 
+describe('makeRelative', () => {
+  describe.skipIf(process.platform === 'win32')('on POSIX', () => {
+    it('should return relative path if targetPath is already relative', () => {
+      expect(makeRelative('foo/bar', '/root')).toBe('foo/bar');
+    });
+
+    it('should return relative path from root to target', () => {
+      const root = '/Users/test/project';
+      const target = '/Users/test/project/src/file.ts';
+      expect(makeRelative(target, root)).toBe('src/file.ts');
+    });
+
+    it('should return "." if target and root are the same', () => {
+      const root = '/Users/test/project';
+      expect(makeRelative(root, root)).toBe('.');
+    });
+
+    it('should handle parent directories with ..', () => {
+      const root = '/Users/test/project/src';
+      const target = '/Users/test/project/docs/readme.md';
+      expect(makeRelative(target, root)).toBe('../docs/readme.md');
+    });
+  });
+
+  describe.skipIf(process.platform !== 'win32')('on Windows', () => {
+    it('should return relative path if targetPath is already relative', () => {
+      expect(makeRelative('foo/bar', 'C:\\root')).toBe('foo/bar');
+    });
+
+    it('should return relative path from root to target', () => {
+      const root = 'C:\\Users\\test\\project';
+      const target = 'C:\\Users\\test\\project\\src\\file.ts';
+      expect(makeRelative(target, root)).toBe('src\\file.ts');
+    });
+
+    it('should return "." if target and root are the same', () => {
+      const root = 'C:\\Users\\test\\project';
+      expect(makeRelative(root, root)).toBe('.');
+    });
+
+    it('should handle parent directories with ..', () => {
+      const root = 'C:\\Users\\test\\project\\src';
+      const target = 'C:\\Users\\test\\project\\docs\\readme.md';
+      expect(makeRelative(target, root)).toBe('..\\docs\\readme.md');
+    });
+  });
+});
+
 describe('normalizePath', () => {
   it('should resolve a relative path to an absolute path', () => {
     const result = normalizePath('some/relative/path');
@@ -615,7 +680,19 @@ describe('normalizePath', () => {
     });
   });
 
-  describe.skipIf(process.platform === 'win32')('on POSIX', () => {
+  describe.skipIf(process.platform !== 'darwin')('on Darwin', () => {
+    beforeEach(() => mockPlatform('darwin'));
+    afterEach(() => vi.unstubAllGlobals());
+
+    it('should lowercase the entire path', () => {
+      const result = normalizePath('/Users/TEST');
+      expect(result).toBe('/users/test');
+    });
+  });
+
+  describe.skipIf(
+    process.platform === 'win32' || process.platform === 'darwin',
+  )('on Linux', () => {
     it('should preserve case', () => {
       const result = normalizePath('/usr/Local/Bin');
       expect(result).toContain('Local');
@@ -625,6 +702,64 @@ describe('normalizePath', () => {
     it('should use forward slashes', () => {
       const result = normalizePath('/usr/local/bin');
       expect(result).toBe('/usr/local/bin');
+    });
+  });
+
+  describe('deduplicateAbsolutePaths', () => {
+    it('should return an empty array if no paths are provided', () => {
+      expect(deduplicateAbsolutePaths(undefined)).toEqual([]);
+      expect(deduplicateAbsolutePaths(null)).toEqual([]);
+      expect(deduplicateAbsolutePaths([])).toEqual([]);
+    });
+
+    it('should deduplicate paths using their normalized identity', () => {
+      const paths = ['/workspace/foo', '/workspace/foo/'];
+      expect(deduplicateAbsolutePaths(paths)).toEqual(['/workspace/foo']);
+    });
+
+    it('should handle case-insensitivity on Windows and macOS', () => {
+      mockPlatform('win32');
+      const paths = ['/workspace/foo', '/Workspace/Foo'];
+      expect(deduplicateAbsolutePaths(paths)).toEqual(['/workspace/foo']);
+
+      mockPlatform('darwin');
+      const macPaths = ['/tmp/foo', '/Tmp/Foo'];
+      expect(deduplicateAbsolutePaths(macPaths)).toEqual(['/tmp/foo']);
+
+      mockPlatform('linux');
+      const linuxPaths = ['/tmp/foo', '/tmp/FOO'];
+      expect(deduplicateAbsolutePaths(linuxPaths)).toEqual([
+        '/tmp/foo',
+        '/tmp/FOO',
+      ]);
+    });
+
+    it('should throw an error if a path is not absolute', () => {
+      const paths = ['relative/path'];
+      expect(() => deduplicateAbsolutePaths(paths)).toThrow(
+        'Path must be absolute: relative/path',
+      );
+    });
+  });
+
+  describe('toPathKey', () => {
+    it('should normalize paths and strip trailing slashes', () => {
+      expect(toPathKey('/foo/bar//baz/')).toBe(path.normalize('/foo/bar/baz'));
+    });
+
+    it('should convert paths to lowercase on Windows and macOS', () => {
+      mockPlatform('win32');
+      expect(toPathKey('/Workspace/Foo')).toBe(
+        path.normalize('/workspace/foo'),
+      );
+      // Ensure drive roots are preserved
+      expect(toPathKey('C:\\')).toBe('c:\\');
+
+      mockPlatform('darwin');
+      expect(toPathKey('/Tmp/Foo')).toBe(path.normalize('/tmp/foo'));
+
+      mockPlatform('linux');
+      expect(toPathKey('/Tmp/Foo')).toBe(path.normalize('/Tmp/Foo'));
     });
   });
 });

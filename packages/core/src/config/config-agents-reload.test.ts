@@ -9,7 +9,6 @@ import { Config, type ConfigParameters } from './config.js';
 import { createTmpDir, cleanupTmpDir } from '@google/gemini-cli-test-utils';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
-import { SubagentTool } from '../agents/subagent-tool.js';
 
 // Mock minimum dependencies that have side effects or external calls
 vi.mock('../core/client.js', () => ({
@@ -44,7 +43,7 @@ describe('Config Agents Reload Integration', () => {
     vi.clearAllMocks();
   });
 
-  it('should unregister subagents as tools when they are disabled after being enabled', async () => {
+  it('should unregister agents from the agent registry when they are disabled after being enabled', async () => {
     const agentName = 'test-agent';
     const agentPath = path.join(tmpDir, '.gemini', 'agents', `${agentName}.md`);
 
@@ -81,14 +80,12 @@ Test System Prompt`;
     ).mockResolvedValue(true);
     await config.initialize();
 
-    const toolRegistry = config.getToolRegistry();
+    const agentRegistry = config.getAgentRegistry();
 
-    // Verify the tool was registered initially
-    // Note: Subagent tools use the agent name as the tool name.
-    const initialTools = toolRegistry.getAllToolNames();
-    expect(initialTools).toContain(agentName);
-    const toolInstance = toolRegistry.getTool(agentName);
-    expect(toolInstance).toBeInstanceOf(SubagentTool);
+    // Verify the agent was registered initially
+    const initialAgents = agentRegistry.getAllDefinitions().map((d) => d.name);
+    expect(initialAgents).toContain(agentName);
+    expect(agentRegistry.getDefinition(agentName)).toBeDefined();
 
     // Disable agent in settings for reload simulation
     vi.spyOn(config, 'getAgentsSettings').mockReturnValue({
@@ -101,13 +98,13 @@ Test System Prompt`;
     // @ts-expect-error accessing private method for testing
     await config.onAgentsRefreshed();
 
-    // 4. Verify the tool is UNREGISTERED
-    const finalTools = toolRegistry.getAllToolNames();
-    expect(finalTools).not.toContain(agentName);
-    expect(toolRegistry.getTool(agentName)).toBeUndefined();
+    // 4. Verify the agent is UNREGISTERED
+    const finalAgents = agentRegistry.getAllDefinitions().map((d) => d.name);
+    expect(finalAgents).not.toContain(agentName);
+    expect(agentRegistry.getDefinition(agentName)).toBeUndefined();
   });
 
-  it('should not register subagents as tools when agents are disabled from the start', async () => {
+  it('should not register agents in the agent registry when agents are disabled from the start', async () => {
     const agentName = 'test-agent-disabled';
     const agentPath = path.join(tmpDir, '.gemini', 'agents', `${agentName}.md`);
 
@@ -142,14 +139,14 @@ Test System Prompt`;
     ).mockResolvedValue(true);
     await config.initialize();
 
-    const toolRegistry = config.getToolRegistry();
+    const agentRegistry = config.getAgentRegistry();
 
-    const tools = toolRegistry.getAllToolNames();
-    expect(tools).not.toContain(agentName);
-    expect(toolRegistry.getTool(agentName)).toBeUndefined();
+    const agents = agentRegistry.getAllDefinitions().map((d) => d.name);
+    expect(agents).not.toContain(agentName);
+    expect(agentRegistry.getDefinition(agentName)).toBeUndefined();
   });
 
-  it('should register subagents as tools even when they are not in allowedTools', async () => {
+  it('should register agents in the agent registry even when they are not in allowedTools', async () => {
     const agentName = 'test-agent-allowed';
     const agentPath = path.join(tmpDir, '.gemini', 'agents', `${agentName}.md`);
 
@@ -185,13 +182,13 @@ Test System Prompt`;
     ).mockResolvedValue(true);
     await config.initialize();
 
-    const toolRegistry = config.getToolRegistry();
+    const agentRegistry = config.getAgentRegistry();
 
-    const tools = toolRegistry.getAllToolNames();
-    expect(tools).toContain(agentName);
+    const agents = agentRegistry.getAllDefinitions().map((d) => d.name);
+    expect(agents).toContain(agentName);
   });
 
-  it('should register subagents as tools when they are enabled after being disabled', async () => {
+  it('should register agents in the agent registry when they are enabled after being disabled', async () => {
     const agentName = 'test-agent-enable';
     const agentPath = path.join(tmpDir, '.gemini', 'agents', `${agentName}.md`);
 
@@ -226,9 +223,11 @@ Test System Prompt`;
     ).mockResolvedValue(true);
     await config.initialize();
 
-    const toolRegistry = config.getToolRegistry();
+    const agentRegistry = config.getAgentRegistry();
 
-    expect(toolRegistry.getAllToolNames()).not.toContain(agentName);
+    expect(agentRegistry.getAllDefinitions().map((d) => d.name)).not.toContain(
+      agentName,
+    );
 
     // Enable agent in settings for reload simulation
     vi.spyOn(config, 'getAgentsSettings').mockReturnValue({
@@ -237,10 +236,12 @@ Test System Prompt`;
       },
     });
 
-    // Trigger refresh
+    // Trigger the refresh action that follows reloading
     // @ts-expect-error accessing private method for testing
     await config.onAgentsRefreshed();
 
-    expect(toolRegistry.getAllToolNames()).toContain(agentName);
+    expect(agentRegistry.getAllDefinitions().map((d) => d.name)).toContain(
+      agentName,
+    );
   });
 });
