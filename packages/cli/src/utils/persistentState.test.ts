@@ -5,6 +5,9 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+vi.unmock('./persistentState.js');
+
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { Storage, debugLogger } from '@google/gemini-cli-core';

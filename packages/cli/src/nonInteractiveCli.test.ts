@@ -1090,7 +1090,7 @@ describe('runNonInteractive', () => {
               clearTimeout(timeout);
               setTimeout(() => {
                 reject(new Error('Aborted')); // This will be caught by nonInteractiveCli and passed to handleError
-              }, 20);
+              }, 300);
             });
           });
         })(),

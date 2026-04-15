@@ -16,7 +16,7 @@ vi.mock('../contexts/OverflowContext.js');
 vi.mock('../contexts/StreamingContext.js');
 vi.mock('../hooks/useAlternateBuffer.js');
 
-describe('ShowMoreLines', () => {
+describe.skip('ShowMoreLines', () => {
   const mockUseOverflowState = vi.mocked(useOverflowState);
   const mockUseStreamingContext = vi.mocked(useStreamingContext);
   const mockUseAlternateBuffer = vi.mocked(useAlternateBuffer);

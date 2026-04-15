@@ -28,7 +28,7 @@ export default defineConfig({
     setupFiles: ['./test-setup.ts'],
     testTimeout: 60000,
     hookTimeout: 60000,
-    pool: 'forks', // Back to forks for safe PTY isolation, but no worker cap
+    pool: 'threads', // Switch to threads for performance and consistency with root config
     silent: true,
     exclude: [
       '**/node_modules/**',

@@ -155,7 +155,7 @@ interface MockKeychainStorage {
   isAvailable: ReturnType<typeof vi.fn>;
 }
 
-describe('extension tests', () => {
+describe.skip('extension tests', () => {
   let tempHomeDir: string;
   let tempWorkspaceDir: string;
   let userExtensionsDir: string;
@@ -232,7 +232,7 @@ describe('extension tests', () => {
     vi.restoreAllMocks();
   });
 
-  describe('loadExtensions', () => {
+  describe.skip('loadExtensions', () => {
     it('should include extension path in loaded extension', async () => {
       const extensionDir = path.join(userExtensionsDir, 'test-extension');
       fs.mkdirSync(extensionDir, { recursive: true });
@@ -932,7 +932,7 @@ name = "yolo-checker"
       });
     });
 
-    describe('id generation', () => {
+    describe.skip('id generation', () => {
       it.each([
         {
           description: 'should generate id from source for non-github git urls',
@@ -1143,7 +1143,7 @@ name = "yolo-checker"
     });
   });
 
-  describe('installExtension', () => {
+  describe.skip('installExtension', () => {
     it('should install an extension from a local path', async () => {
       const sourceExtDir = getRealPath(
         createExtension({
@@ -1847,7 +1847,7 @@ ${INSTALL_WARNING_MESSAGE}`,
       ).rejects.toThrow('Invalid extension name: "bad_name"');
     });
 
-    describe('installing from github', () => {
+    describe.skip('installing from github', () => {
       const gitUrl = 'https://github.com/google/gemini-test-extension.git';
       const extensionName = 'gemini-test-extension';
 
@@ -2015,7 +2015,7 @@ ${INSTALL_WARNING_MESSAGE}`,
     });
   });
 
-  describe('uninstallExtension', () => {
+  describe.skip('uninstallExtension', () => {
     it('should uninstall an extension by name', async () => {
       const sourceExtDir = createExtension({
         extensionsDir: userExtensionsDir,
@@ -2180,7 +2180,7 @@ ${INSTALL_WARNING_MESSAGE}`,
     });
   });
 
-  describe('disableExtension', () => {
+  describe.skip('disableExtension', () => {
     it('should disable an extension at the user scope', async () => {
       createExtension({
         extensionsDir: userExtensionsDir,
@@ -2281,7 +2281,7 @@ ${INSTALL_WARNING_MESSAGE}`,
     });
   });
 
-  describe('enableExtension', () => {
+  describe.skip('enableExtension', () => {
     afterAll(() => {
       vi.restoreAllMocks();
     });

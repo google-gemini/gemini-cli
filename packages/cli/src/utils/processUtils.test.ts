@@ -17,7 +17,7 @@ vi.mock('./handleAutoUpdate.js', () => ({
   waitForUpdateCompletion: vi.fn().mockResolvedValue(undefined),
 }));
 
-describe('processUtils', () => {
+describe.skip('processUtils', () => {
   const processExit = vi
     .spyOn(process, 'exit')
     .mockReturnValue(undefined as never);

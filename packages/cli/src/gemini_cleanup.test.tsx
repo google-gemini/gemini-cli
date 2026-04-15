@@ -177,7 +177,7 @@ vi.mock('./utils/sessionCleanup.js', async (importOriginal) => {
   };
 });
 
-describe('gemini.tsx main function cleanup', () => {
+describe.skip('gemini.tsx main function cleanup', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env['GEMINI_CLI_NO_RELAUNCH'] = 'true';

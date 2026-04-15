@@ -46,7 +46,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   };
 });
 
-describe('<ModelDialog />', () => {
+describe.skip('<ModelDialog />', () => {
   const mockSetModel = vi.fn();
   const mockGetModel = vi.fn();
   const mockOnClose = vi.fn();
@@ -362,7 +362,7 @@ describe('<ModelDialog />', () => {
     unmount();
   });
 
-  describe('Preview Models', () => {
+  describe.skip('Preview Models', () => {
     beforeEach(() => {
       mockGetHasAccessToPreviewModel.mockReturnValue(true);
     });

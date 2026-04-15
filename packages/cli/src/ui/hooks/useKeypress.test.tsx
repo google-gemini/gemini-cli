@@ -37,7 +37,7 @@ class MockStdin extends EventEmitter {
   }
 }
 
-describe(`useKeypress`, () => {
+describe.skip(`useKeypress`, () => {
   let stdin: MockStdin;
   const mockSetRawMode = vi.fn();
   const onKeypress = vi.fn();

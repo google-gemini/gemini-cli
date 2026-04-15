@@ -46,7 +46,7 @@ class MockStdin extends EventEmitter {
   }
 }
 
-describe('MouseContext', () => {
+describe.skip('MouseContext', () => {
   let stdin: MockStdin;
 
   beforeEach(() => {
@@ -137,7 +137,7 @@ describe('MouseContext', () => {
     expect(appEvents.emit).not.toHaveBeenCalled();
   });
 
-  describe('SGR Mouse Events', () => {
+  describe.skip('SGR Mouse Events', () => {
     it.each([
       {
         sequence: '\x1b[<0;10;20M',

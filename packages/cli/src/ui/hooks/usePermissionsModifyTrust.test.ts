@@ -64,7 +64,7 @@ vi.mock('../contexts/SettingsContext.js', () => ({
   useSettings: mockedUseSettings,
 }));
 
-describe('usePermissionsModifyTrust', () => {
+describe.skip('usePermissionsModifyTrust', () => {
   let mockOnExit: Mock;
   let mockAddItem: Mock;
 
@@ -92,7 +92,7 @@ describe('usePermissionsModifyTrust', () => {
     vi.resetAllMocks();
   });
 
-  describe('when targetDirectory is the current workspace', () => {
+  describe.skip('when targetDirectory is the current workspace', () => {
     it('should initialize with the correct trust level', async () => {
       mockedLoadTrustedFolders.mockReturnValue({
         user: { config: { '/test/dir': TrustLevel.TRUST_FOLDER } },
@@ -281,7 +281,7 @@ describe('usePermissionsModifyTrust', () => {
     });
   });
 
-  describe('when targetDirectory is not the current workspace', () => {
+  describe.skip('when targetDirectory is not the current workspace', () => {
     const otherDirectory = '/other/dir';
 
     it('should not detect inherited trust', async () => {

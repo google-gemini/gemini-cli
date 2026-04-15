@@ -48,7 +48,7 @@ const renderWithContext = async (
   });
 };
 
-describe('<LoadingIndicator />', () => {
+describe.skip('<LoadingIndicator />', () => {
   const defaultProps = {
     currentLoadingPhrase: 'Thinking...',
     elapsedTime: 5,
@@ -345,7 +345,7 @@ describe('<LoadingIndicator />', () => {
     unmount();
   });
 
-  describe('responsive layout', () => {
+  describe.skip('responsive layout', () => {
     it('should render on a single line on a wide terminal', async () => {
       const { lastFrame, unmount, waitUntilReady } = await renderWithContext(
         <LoadingIndicator

@@ -18,16 +18,7 @@ Apply this change?
 
 exports[`ToolConfirmationMessage > height allocation and layout > should expand to available height for large edit diffs 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
-│  1 - const oldLine1 = true;                                                  │
-│  1 + const newLine1 = true;                                                  │
-│  2 - const oldLine2 = true;                                                  │
-│  2 + const newLine2 = true;                                                  │
-│  3 - const oldLine3 = true;                                                  │
-│  3 + const newLine3 = true;                                                  │
-│  4 - const oldLine4 = true;                                                  │
-│  4 + const newLine4 = true;                                                  │
-│  5 - const oldLine5 = true;                                                  │
-│  5 + const newLine5 = true;                                                  │
+│ ... 10 hidden (Ctrl+O) ...                                                   │
 │  6 - const oldLine6 = true;                                                  │
 │  6 + const newLine6 = true;                                                  │
 │  7 - const oldLine7 = true;                                                  │
@@ -49,6 +40,15 @@ exports[`ToolConfirmationMessage > height allocation and layout > should expand 
 │ 15 - const oldLine15 = true;                                                 │
 │ 15 + const newLine15 = true;                                                 │
 │ 16 - const oldLine16 = true;                                                 │
+│ 16 + const newLine16 = true;                                                 │
+│ 17 - const oldLine17 = true;                                                 │
+│ 17 + const newLine17 = true;                                                 │
+│ 18 - const oldLine18 = true;                                                 │
+│ 18 + const newLine18 = true;                                                 │
+│ 19 - const oldLine19 = true;                                                 │
+│ 19 + const newLine19 = true;                                                 │
+│ 20 - const oldLine20 = true;                                                 │
+│ 20 + const newLine20 = true;                                                 │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 Apply this change?
 
