@@ -5141,7 +5141,7 @@ describe('InputPrompt', () => {
         mockBuffer.setText('');
       });
       const { stdin, unmount, lastFrame } = await renderWithProviders(
-        <InputPrompt {...props} focus={true} buffer={mockBuffer} />,
+        <TestInputPrompt {...props} focus={true} buffer={mockBuffer} />,
         {
           uiState: { isVoiceModeEnabled: true } as UIState,
           settings: createMockSettings({
@@ -5174,7 +5174,7 @@ describe('InputPrompt', () => {
         mockBuffer.setText('');
       });
       const { stdin, unmount, lastFrame } = await renderWithProviders(
-        <InputPrompt {...props} focus={true} buffer={mockBuffer} />,
+        <TestInputPrompt {...props} focus={true} buffer={mockBuffer} />,
         {
           uiState: { isVoiceModeEnabled: true } as UIState,
           settings: createMockSettings({
@@ -5210,7 +5210,7 @@ describe('InputPrompt', () => {
         mockBuffer.setText('some existing text');
       });
       const { stdin, unmount, lastFrame } = await renderWithProviders(
-        <InputPrompt {...props} focus={true} buffer={mockBuffer} />,
+        <TestInputPrompt {...props} focus={true} buffer={mockBuffer} />,
         {
           uiState: { isVoiceModeEnabled: true } as UIState,
           settings: createMockSettings({
@@ -5242,7 +5242,7 @@ describe('InputPrompt', () => {
         mockBuffer.setText('');
       });
       const { stdin, unmount, lastFrame } = await renderWithProviders(
-        <InputPrompt {...props} focus={true} buffer={mockBuffer} />,
+        <TestInputPrompt {...props} focus={true} buffer={mockBuffer} />,
         {
           uiState: { isVoiceModeEnabled: false } as UIState,
           settings: createMockSettings({
@@ -5267,7 +5267,7 @@ describe('InputPrompt', () => {
         mockBuffer.setText('initial');
       });
       const { stdin, unmount } = await renderWithProviders(
-        <InputPrompt {...props} focus={true} buffer={mockBuffer} />,
+        <TestInputPrompt {...props} focus={true} buffer={mockBuffer} />,
         {
           uiState: { isVoiceModeEnabled: true } as UIState,
           settings: createMockSettings({
@@ -5322,7 +5322,7 @@ describe('InputPrompt', () => {
         mockBuffer.setText('First turn.');
       });
       const { stdin, unmount } = await renderWithProviders(
-        <InputPrompt {...props} focus={true} buffer={mockBuffer} />,
+        <TestInputPrompt {...props} focus={true} buffer={mockBuffer} />,
         {
           uiState: { isVoiceModeEnabled: true } as UIState,
           settings: createMockSettings({
@@ -5365,7 +5365,7 @@ describe('InputPrompt', () => {
 
       it('should insert a space on a single tap', async () => {
         const { stdin, unmount, lastFrame } = await renderWithProviders(
-          <InputPrompt {...props} focus={true} buffer={mockBuffer} />,
+          <TestInputPrompt {...props} focus={true} buffer={mockBuffer} />,
           {
             uiState: { isVoiceModeEnabled: true } as UIState,
             settings: createMockSettings({
@@ -5396,7 +5396,7 @@ describe('InputPrompt', () => {
 
       it('should start recording on hold (simulated by repeat spaces)', async () => {
         const { stdin, unmount, lastFrame } = await renderWithProviders(
-          <InputPrompt {...props} focus={true} buffer={mockBuffer} />,
+          <TestInputPrompt {...props} focus={true} buffer={mockBuffer} />,
           {
             uiState: { isVoiceModeEnabled: true } as UIState,
             settings: createMockSettings({
@@ -5428,7 +5428,7 @@ describe('InputPrompt', () => {
 
       it('should stop recording when space heartbeat stops (release)', async () => {
         const { stdin, unmount, lastFrame } = await renderWithProviders(
-          <InputPrompt {...props} focus={true} buffer={mockBuffer} />,
+          <TestInputPrompt {...props} focus={true} buffer={mockBuffer} />,
           {
             uiState: { isVoiceModeEnabled: true } as UIState,
             settings: createMockSettings({
@@ -5468,7 +5468,7 @@ describe('InputPrompt', () => {
 
       it('should cancel hold state if non-space key is pressed after first space', async () => {
         const { stdin, unmount } = await renderWithProviders(
-          <InputPrompt {...props} focus={true} buffer={mockBuffer} />,
+          <TestInputPrompt {...props} focus={true} buffer={mockBuffer} />,
           {
             uiState: { isVoiceModeEnabled: true } as UIState,
             settings: createMockSettings({
