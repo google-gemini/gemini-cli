@@ -10,7 +10,11 @@ This skill enables the creation of professional Mermaid diagrams and their conve
 ## Workflow
 
 ### 1. Create Mermaid Diagram
-Select the appropriate diagram type based on the task. You MUST read `references/mermaid_syntax.md` to understand the required syntax rules and templates before creating any diagram.
+Select the appropriate diagram type based on the task. 
+
+**Standard Operating Procedure (Precedence):**
+1. **Local Standards:** You MUST first read `references/mermaid_syntax.md`. This local file contains project-specific syntax templates and takes absolute precedence.
+2. **Supplemental Standards:** Call `mcp_mermaid-guide_get_mermaid_style_guide` to retrieve broader organization standards. Use these only if they do not contradict the local file.
 
 **Handling Existing Diagrams / Inputs:**
 - **If provided as a `.mmd` file:** Use `read_file` to examine the content and apply edits directly.

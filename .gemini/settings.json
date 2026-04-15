@@ -7,5 +7,13 @@
   },
   "general": {
     "devtools": true
+  },
+  "mcpServers": {
+    "mermaid-guide": {
+      "command": "node",
+      "args": [
+        "/usr/local/google/home/aishaneeshah/mcp-mermaid-guide/index.mjs"
+      ]
+    }
   }
 }

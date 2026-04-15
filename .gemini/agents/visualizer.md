@@ -16,6 +16,7 @@ tools:
   - read_file
   - activate_skill
   - replace
+  - mcp_mermaid-guide_get_mermaid_style_guide
 model: inherit
 max_turns: 30
 ---
@@ -52,7 +53,10 @@ You must execute your tasks following a strict, sequential three-phase pipeline:
 
 ## Phase 1: Explore & Verify
 
-1. **Activate Skill:** When asked to generate a diagram, you MUST first call `activate_skill` with `skill_name: "mermaid-diagrammer"` to load the specialized syntax rules and conversion scripts.
+1. **Activate Skill & Style Guide:** When asked to generate a diagram, you MUST:
+   - Call `activate_skill` with `skill_name: "mermaid-diagrammer"` to load scripts.
+   - Read `references/mermaid_syntax.md` within the skill directory; this local file is the primary source of truth for syntax and styling.
+   - Call `mcp_mermaid-guide_get_mermaid_style_guide` for supplemental organizational best practices.
 2. **Evaluate Payload:** Before writing any diagram syntax, evaluate the payload provided by the orchestrator:
    - **If `<known_context>` is provided:** Do NOT perform a full repository scan. Instead, use targeted commands (like `read_file` or `grep_search`) to quickly verify that the components, interactions, and files listed in the context actually exist in the code. If they do, use them to build the diagram.
    - **If `<known_context>` is missing or insufficient:** You must assume total ownership. Proactively explore the filesystem using `list_directory` and `grep_search` to map the architecture from scratch.
