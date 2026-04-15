@@ -578,6 +578,58 @@ export function getShellConfiguration(): ShellConfiguration {
 export const isWindows = () => os.platform() === 'win32';
 
 /**
+ * Detects if the current process is running inside WSL2 (Windows Subsystem for Linux).
+ * Checks for the presence of WSL-specific environment variables or kernel version strings.
+ */
+export function isWsl(): boolean {
+  if (os.platform() !== 'linux') {
+    return false;
+  }
+  // WSL sets WSLENV or WSL_DISTRO_NAME in the environment
+  if (process.env['WSL_DISTRO_NAME'] || process.env['WSLENV']) {
+    return true;
+  }
+  // Fallback: check /proc/version for 'microsoft' or 'WSL'
+  try {
+    const procVersion = fs.readFileSync('/proc/version', 'utf8');
+    return /microsoft|wsl/i.test(procVersion);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Detects if the given path is on a Windows host filesystem mount inside WSL2
+ * (i.e., paths under /mnt/<drive-letter>/ which use the slow 9P protocol bridge).
+ *
+ * @param dirPath The directory path to check.
+ * @returns true if the path is a cross-OS Windows mount under WSL2.
+ */
+export function isWslCrossOsPath(dirPath: string): boolean {
+  if (!isWsl()) {
+    return false;
+  }
+  // Windows drives are mounted at /mnt/<single-letter>/ in WSL2
+  return /^\/mnt\/[a-zA-Z](\/|$)/.test(dirPath);
+}
+
+/**
+ * Detects if the given command attempts to invoke a Windows host executable
+ * (e.g., powershell.exe, cmd.exe, chrome.exe) from within WSL2.
+ * Running such cross-OS processes can trigger 9P protocol deadlocks.
+ *
+ * @param command The shell command string to inspect.
+ * @returns true if the command appears to invoke a Windows .exe from WSL2.
+ */
+export function isWslCrossOsCommand(command: string): boolean {
+  if (!isWsl()) {
+    return false;
+  }
+  // Match common Windows executables invoked from WSL (e.g. powershell.exe, cmd.exe, chrome.exe)
+  return /\b\w+\.exe\b/i.test(command);
+}
+
+/**
  * Escapes a string so that it can be safely used as a single argument
  * in a shell command, preventing command injection.
  *
