@@ -14,6 +14,18 @@ document includes:
 
 We're looking forward to seeing your contributions!
 
+## For Beginners
+New to open source? Here's how to get started:
+- **Documentation improvements are a great first contribution** - no code required!
+  
+- Look for issues labeled `good first issue` or `help wanted`
+  
+- Don't hesitate to ask questions in the issue comments
+  
+- We welcome improvements to docs, examples, and README files
+  
+We value all contributions, big and small!
+
 ## Before you begin
 
 ### Sign our Contributor License Agreement
