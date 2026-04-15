@@ -54,6 +54,7 @@ export async function getMcpServersFromConfig(
         return;
       }
       mcpServers[key] = {
+        // eslint-disable-next-line @typescript-eslint/no-misused-spread
         ...server,
         extension,
       };
@@ -120,7 +121,7 @@ async function testMCPConnection(
   try {
     // Use the same transport creation logic as core
     transport = await createTransport(serverName, config, false, mcpContext);
-  } catch (_error) {
+  } catch {
     await client.close();
     return MCPServerStatus.DISCONNECTED;
   }
@@ -134,7 +135,7 @@ async function testMCPConnection(
 
     await client.close();
     return MCPServerStatus.CONNECTED;
-  } catch (_error) {
+  } catch {
     await transport.close();
     return MCPServerStatus.DISCONNECTED;
   }

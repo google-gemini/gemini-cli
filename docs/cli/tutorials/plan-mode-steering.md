@@ -5,9 +5,10 @@ structured environment with model steering's real-time feedback, you can guide
 Gemini CLI through the research and design phases to ensure the final
 implementation plan is exactly what you need.
 
-> **Note:** This is a preview feature under active development. Preview features
-> may only be available in the **Preview** channel or may need to be enabled
-> under `/settings`.
+<!-- prettier-ignore -->
+> [!NOTE]
+> This is an experimental feature currently under active development and
+> may need to be enabled under `/settings`.
 
 ## Prerequisites
 
@@ -78,8 +79,8 @@ each step with higher confidence and fewer errors.
 - **Steer early:** Providing feedback during the research phase is more
   efficient than waiting for the final plan to be drafted.
 - **Use for context:** Steering is a great way to provide knowledge that might
-  not be obvious from reading the code (e.g., "We are planning to deprecate this
-  module next month").
+  not be obvious from reading the code (for example, "We are planning to
+  deprecate this module next month").
 
 ## Next steps
 

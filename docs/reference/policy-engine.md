@@ -1,8 +1,8 @@
 # Policy engine
 
-The Gemini CLI includes a powerful policy engine that provides fine-grained
-control over tool execution. It allows users and administrators to define rules
-that determine whether a tool call should be allowed, denied, or require user
+Gemini CLI includes a powerful policy engine that provides fine-grained control
+over tool execution. It allows users and administrators to define rules that
+determine whether a tool call should be allowed, denied, or require user
 confirmation.
 
 ## Quick start
@@ -23,19 +23,18 @@ To create your first policy:
     New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.gemini\policies"
     ```
 
-2.  **Create a new policy file** (e.g., `~/.gemini/policies/my-rules.toml`). You
-    can use any filename ending in `.toml`; all such files in this directory
-    will be loaded and combined:
+2.  **Create a new policy file** (for example,
+    `~/.gemini/policies/my-rules.toml`). You can use any filename ending in
+    `.toml`; all such files in this directory will be loaded and combined:
     ```toml
     [[rule]]
     toolName = "run_shell_command"
-    commandPrefix = "git status"
-    decision = "allow"
+    commandPrefix = "rm -rf"
+    decision = "deny"
     priority = 100
     ```
-3.  **Run a command** that triggers the policy (e.g., ask Gemini CLI to
-    `git status`). The tool will now execute automatically without prompting for
-    confirmation.
+3.  **Run a command** that triggers the policy (for example, ask Gemini CLI to
+    `rm -rf /`). The tool will now be blocked automatically.
 
 ## Core concepts
 
@@ -60,7 +59,7 @@ command.
 ```toml
 [[rule]]
 toolName = "run_shell_command"
-commandPrefix = "git "
+commandPrefix = "git"
 decision = "ask_user"
 priority = 100
 ```
@@ -90,6 +89,17 @@ If `argsPattern` is specified, the tool's arguments are converted to a stable
 JSON string, which is then tested against the provided regular expression. If
 the arguments don't match the pattern, the rule does not apply.
 
+#### Execution environment
+
+If `interactive` is specified, the rule will only apply if the CLI's execution
+environment matches the specified boolean value:
+
+- `true`: The rule applies only in interactive mode.
+- `false`: The rule applies only in non-interactive (headless) mode.
+
+If omitted, the rule applies to both interactive and non-interactive
+environments.
+
 ### Decisions
 
 There are three possible decisions a rule can enforce:
@@ -102,7 +112,9 @@ There are three possible decisions a rule can enforce:
 - `ask_user`: The user is prompted to approve or deny the tool call. (In
   non-interactive mode, this is treated as `deny`.)
 
-> **Note:** The `deny` decision is the recommended way to exclude tools. The
+<!-- prettier-ignore -->
+> [!NOTE]
+> The `deny` decision is the recommended way to exclude tools. The
 > legacy `tools.exclude` setting in `settings.json` is deprecated in favor of
 > policy rules with a `deny` decision.
 
@@ -115,13 +127,13 @@ rule with the highest priority wins**.
 To provide a clear hierarchy, policies are organized into three tiers. Each tier
 has a designated number that forms the base of the final priority calculation.
 
-| Tier      | Base | Description                                                                |
-| :-------- | :--- | :------------------------------------------------------------------------- |
-| Default   | 1    | Built-in policies that ship with the Gemini CLI.                           |
-| Extension | 2    | Policies defined in extensions.                                            |
-| Workspace | 3    | Policies defined in the current workspace's configuration directory.       |
-| User      | 4    | Custom policies defined by the user.                                       |
-| Admin     | 5    | Policies managed by an administrator (e.g., in an enterprise environment). |
+| Tier      | Base | Description                                                                       |
+| :-------- | :--- | :-------------------------------------------------------------------------------- |
+| Default   | 1    | Built-in policies that ship with Gemini CLI.                                      |
+| Extension | 2    | Policies defined in extensions.                                                   |
+| Workspace | 3    | Policies defined in the current workspace's configuration directory.              |
+| User      | 4    | Custom policies defined by the user.                                              |
+| Admin     | 5    | Policies managed by an administrator (for example, in an enterprise environment). |
 
 Within a TOML policy file, you assign a priority value from **0 to 999**. The
 engine transforms this into a final priority using the following formula:
@@ -130,25 +142,26 @@ engine transforms this into a final priority using the following formula:
 
 This system guarantees that:
 
-- Admin policies always override User, Workspace, and Default policies.
+- Admin policies always override User, Workspace, and Default policies (defined
+  in policy TOML files).
 - User policies override Workspace and Default policies.
 - Workspace policies override Default policies.
 - You can still order rules within a single tier with fine-grained control.
 
 For example:
 
-- A `priority: 50` rule in a Default policy file becomes `1.050`.
-- A `priority: 10` rule in a Workspace policy policy file becomes `2.010`.
-- A `priority: 100` rule in a User policy file becomes `3.100`.
-- A `priority: 20` rule in an Admin policy file becomes `4.020`.
+- A `priority: 50` rule in a Default policy TOML becomes `1.050`.
+- A `priority: 10` rule in a Workspace policy TOML becomes `2.010`.
+- A `priority: 100` rule in a User policy TOML becomes `3.100`.
+- A `priority: 20` rule in an Admin policy TOML becomes `4.020`.
 
 ### Approval modes
 
 Approval modes allow the policy engine to apply different sets of rules based on
-the CLI's operational mode. A rule can be associated with one or more modes
-(e.g., `yolo`, `autoEdit`, `plan`). The rule will only be active if the CLI is
-running in one of its specified modes. If a rule has no modes specified, it is
-always active.
+the CLI's operational mode. A rule in a TOML policy file can be associated with
+one or more modes (for example, `yolo`, `autoEdit`, `plan`). The rule will only
+be active if the CLI is running in one of its specified modes. If a rule has no
+modes specified, it is always active.
 
 - `default`: The standard interactive mode where most write tools require
   confirmation.
@@ -158,6 +171,24 @@ always active.
   [Customizing Plan Mode Policies](../cli/plan-mode.md#customizing-policies).
 - `yolo`: A mode where all tools are auto-approved (use with extreme caution).
 
+To maintain the integrity of Plan Mode as a safe research environment,
+persistent tool approvals are context-aware. When you select **"Allow for all
+future sessions"**, the policy engine explicitly includes the current mode and
+all more permissive modes in the hierarchy (`plan` < `default` < `autoEdit` <
+`yolo`).
+
+- **Approvals in `plan` mode**: These represent an intentional choice to trust a
+  tool globally. The resulting rule explicitly includes all modes (`plan`,
+  `default`, `autoEdit`, and `yolo`).
+- **Approvals in other modes**: These only apply to the current mode and those
+  more permissive. For example:
+  - An approval granted in **`default`** mode applies to `default`, `autoEdit`,
+    and `yolo`.
+  - An approval granted in **`autoEdit`** mode applies to `autoEdit` and `yolo`.
+  - An approval granted in **`yolo`** mode applies only to `yolo`. This ensures
+    that trust flows correctly to more permissive environments while maintaining
+    the safety of more restricted modes like `plan`.
+
 ## Rule matching
 
 When a tool call is made, the engine checks it against all active rules,
@@ -166,8 +197,8 @@ outcome.
 
 A rule matches a tool call if all of its conditions are met:
 
-1.  **Tool name**: The `toolName` in the rule must match the name of the tool
-    being called.
+1.  **Tool name**: The `toolName` in the TOML rule must match the name of the
+    tool being called.
     - **Wildcards**: You can use wildcards like `*`, `mcp_server_*`, or
       `mcp_*_toolName` to match multiple tools. See [Tool Name](#tool-name) for
       details.
@@ -226,17 +257,19 @@ To prevent privilege escalation, the CLI enforces strict security checks on the
 directory are **ignored**.
 
 - **Linux / macOS:** Must be owned by `root` (UID 0) and NOT writable by group
-  or others (e.g., `chmod 755`).
+  or others (for example, `chmod 755`).
 - **Windows:** Must be in `C:\ProgramData`. Standard users (`Users`, `Everyone`)
-  must NOT have `Write`, `Modify`, or `Full Control` permissions. _Tip: If you
-  see a security warning, use the folder properties to remove write permissions
-  for non-admin groups. You may need to "Disable inheritance" in Advanced
-  Security Settings._
+  must NOT have `Write`, `Modify`, or `Full Control` permissions. If you see a
+  security warning, use the folder properties to remove write permissions for
+  non-admin groups. You may need to "Disable inheritance" in Advanced Security
+  Settings.
 
-**Note:** Supplemental admin policies (provided via `--admin-policy` or
-`adminPolicyPaths` settings) are **NOT** subject to these strict ownership
-checks, as they are explicitly provided by the user or administrator in their
-current execution context.
+<!-- prettier-ignore -->
+> [!NOTE]
+> Supplemental admin policies (provided via `--admin-policy` or
+> `adminPolicyPaths` settings) are **NOT** subject to these strict ownership
+> checks, as they are explicitly provided by the user or administrator in their
+> current execution context.
 
 ### TOML rule schema
 
@@ -247,9 +280,9 @@ Here is a breakdown of the fields available in a TOML policy rule:
 # A unique name for the tool, or an array of names.
 toolName = "run_shell_command"
 
-# (Optional) The name of a subagent. If provided, the rule only applies to tool calls
-# made by this specific subagent.
-subagent = "generalist"
+# (Optional) The name of a subagent. If provided, the rule only applies to tool
+# calls made by this specific subagent.
+subagent = "codebase_investigator"
 
 # (Optional) The name of an MCP server. Can be combined with toolName
 # to form a composite FQN internally like "mcp_mcpName_toolName".
@@ -263,14 +296,17 @@ toolAnnotations = { readOnlyHint = true }
 argsPattern = '"command":"(git|npm)'
 
 # (Optional) A string or array of strings that a shell command must start with.
-# This is syntactic sugar for `toolName = "run_shell_command"` and an `argsPattern`.
-commandPrefix = "git "
+# This is syntactic sugar for `toolName = "run_shell_command"` and an
+# `argsPattern`.
+commandPrefix = "git"
 
 # (Optional) A regex to match against the entire shell command.
 # This is also syntactic sugar for `toolName = "run_shell_command"`.
-# Note: This pattern is tested against the JSON representation of the arguments (e.g., `{"command":"<your_command>"}`).
-# Because it prepends `"command":"`, it effectively matches from the start of the command.
-# Anchors like `^` or `$` apply to the full JSON string, so `^` should usually be avoided here.
+# Note: This pattern is tested against the JSON representation of the arguments
+# (e.g., `{"command":"<your_command>"}`). Because it prepends `"command":"`,
+# it effectively matches from the start of the command.
+# Anchors like `^` or `$` apply to the full JSON string,
+# so `^` should usually be avoided here.
 # You cannot use commandPrefix and commandRegex in the same rule.
 commandRegex = "git (commit|push)"
 
@@ -280,12 +316,27 @@ decision = "ask_user"
 # The priority of the rule, from 0 to 999.
 priority = 10
 
-# (Optional) A custom message to display when a tool call is denied by this rule.
-# This message is returned to the model and user, useful for explaining *why* it was denied.
-deny_message = "Deletion is permanent"
+# (Optional) A custom message to display when a tool call is denied by this
+# rule. This message is returned to the model and user,
+# useful for explaining *why* it was denied.
+denyMessage = "Deletion is permanent"
 
 # (Optional) An array of approval modes where this rule is active.
-modes = ["autoEdit"]
+# If omitted or empty, the rule applies to all modes.
+modes = ["default", "autoEdit", "yolo"]
+
+# (Optional) A boolean to restrict the rule to interactive (true) or
+# non-interactive (false) environments.
+# If omitted, the rule applies to both.
+interactive = true
+
+# (Optional) If true, lets shell commands use redirection operators
+# (>, >>, <, <<, <<<). By default, the policy engine asks for confirmation
+# when redirection is detected, even if a rule matches the command.
+# This permission is granular; it only applies to the specific rule it's
+# defined in. In chained commands (e.g., cmd1 > file && cmd2), each
+# individual command rule must permit redirection if it's used.
+allowRedirection = true
 ```
 
 ### Using arrays (lists)
@@ -321,7 +372,7 @@ This rule will ask for user confirmation before executing any `git` command.
 ```toml
 [[rule]]
 toolName = "run_shell_command"
-commandPrefix = "git "
+commandPrefix = "git"
 decision = "ask_user"
 priority = 100
 ```
@@ -333,7 +384,9 @@ using the `mcpName` field. **This is the recommended approach** for defining MCP
 policies, as it is much more robust than manually writing Fully Qualified Names
 (FQNs) or string wildcards.
 
-> **Warning:** Do not use underscores (`_`) in your MCP server names (e.g., use
+<!-- prettier-ignore -->
+> [!WARNING]
+> Do not use underscores (`_`) in your MCP server names (for example, use
 > `my-server` rather than `my_server`). The policy parser splits Fully Qualified
 > Names (`mcp_server_tool`) on the _first_ underscore following the `mcp_`
 > prefix. If your server name contains an underscore, the parser will
@@ -344,7 +397,8 @@ policies, as it is much more robust than manually writing Fully Qualified Names
 
 Combine `mcpName` and `toolName` to target a single operation. When using
 `mcpName`, the `toolName` field should strictly be the simple name of the tool
-(e.g., `search`), **not** the Fully Qualified Name (e.g., `mcp_server_search`).
+(for example, `search`), **not** the Fully Qualified Name (for example,
+`mcp_server_search`).
 
 ```toml
 # Allows the `search` tool on the `my-jira-server` MCP
@@ -360,13 +414,15 @@ priority = 200
 Specify only the `mcpName` to apply a rule to every tool provided by that
 server.
 
+**Note:** This applies to all decision types (`allow`, `deny`, `ask_user`).
+
 ```toml
 # Denies all tools from the `untrusted-server` MCP
 [[rule]]
 mcpName = "untrusted-server"
 decision = "deny"
 priority = 500
-deny_message = "This server is not trusted by the admin."
+denyMessage = "This server is not trusted by the admin."
 ```
 
 **3. Targeting all MCP servers**
@@ -377,29 +433,43 @@ registered MCP server. This is useful for setting category-wide defaults.
 ```toml
 # Ask user for any tool call from any MCP server
 [[rule]]
+toolName = "*"
 mcpName = "*"
 decision = "ask_user"
 priority = 10
 ```
 
-**4. Targeting a tool name across all servers**
+### Special syntax for subagents
 
-Use `mcpName = "*"` with a specific `toolName` to target that operation
-regardless of which server provides it.
+You can secure and govern subagents using standard policy rules by treating the
+subagent's name as the `toolName`.
+
+When the main agent invokes a subagent (e.g., using the unified `invoke_agent`
+tool), the Policy Engine automatically treats the target `agent_name` as a
+virtual tool alias for rule matching.
+
+**Example:**
+
+This rule denies access to the `codebase_investigator` subagent.
 
 ```toml
-# Allow the `search` tool across all connected MCP servers
 [[rule]]
-mcpName = "*"
-toolName = "search"
-decision = "allow"
-priority = 50
+toolName = "codebase_investigator"
+decision = "deny"
+priority = 500
+deny_message = "Deep codebase analysis is restricted for this session."
 ```
+
+- **Backward Compatibility**: Any rules written targeting historical 1:1
+  subagent tool names will continue to match transparently.
+- **Context differentiation**: To create rules based on **who** is calling a
+  tool, use the `subagent` field instead. See
+  [TOML rule schema](#toml-rule-schema).
 
 ## Default policies
 
-The Gemini CLI ships with a set of default policies to provide a safe
-out-of-the-box experience.
+Gemini CLI ships with a set of default policies to provide a safe out-of-the-box
+experience.
 
 - **Read-only tools** (like `read_file`, `glob`) are generally **allowed**.
 - **Agent delegation** defaults to **`ask_user`** to ensure remote agents can

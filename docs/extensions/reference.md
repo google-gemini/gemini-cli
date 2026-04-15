@@ -23,7 +23,7 @@ Gemini CLI creates a copy of the extension during installation. You must run
 GitHub, you must have `git` installed on your machine.
 
 ```bash
-gemini extensions install <source> [--ref <ref>] [--auto-update] [--pre-release] [--consent]
+gemini extensions install <source> [--ref <ref>] [--auto-update] [--pre-release] [--consent] [--skip-settings]
 ```
 
 - `<source>`: The GitHub URL or local path of the extension.
@@ -31,6 +31,7 @@ gemini extensions install <source> [--ref <ref>] [--auto-update] [--pre-release]
 - `--auto-update`: Enable automatic updates for this extension.
 - `--pre-release`: Enable installation of pre-release versions.
 - `--consent`: Acknowledge security risks and skip the confirmation prompt.
+- `--skip-settings`: Skip the configuration on install process.
 
 ### Uninstall an extension
 
@@ -87,12 +88,12 @@ gemini extensions new <path> [template]
 ```
 
 - `<path>`: The directory to create.
-- `[template]`: The template to use (e.g., `mcp-server`, `context`,
+- `[template]`: The template to use (for example, `mcp-server`, `context`,
   `custom-commands`).
 
 ### Link a local extension
 
-Create a symbolic link between your development directory and the Gemini CLI
+Create a symbolic link between your development directory and Gemini CLI
 extensions directory. This lets you test changes immediately without
 reinstalling.
 
@@ -234,14 +235,16 @@ skill definitions in a `skills/` directory. For example,
 
 ### Sub-agents
 
-> **Note:** Sub-agents are a preview feature currently under active development.
+<!-- prettier-ignore -->
+> [!NOTE]
+> Sub-agents are a preview feature currently under active development.
 
 Provide [sub-agents](../core/subagents.md) that users can delegate tasks to. Add
 agent definition files (`.md`) to an `agents/` directory in your extension root.
 
 ### <a id="policy-engine"></a>Policy Engine
 
-Extensions can contribute policy rules and safety checkers to the Gemini CLI
+Extensions can contribute policy rules and safety checkers to Gemini CLI
 [Policy Engine](../reference/policy-engine.md). These rules are defined in
 `.toml` files and take effect when the extension is activated.
 
@@ -253,7 +256,9 @@ Rules contributed by extensions run in their own tier (tier 2), alongside
 workspace-defined policies. This tier has higher priority than the default rules
 but lower priority than user or admin policies.
 
-> **Warning:** For security, Gemini CLI ignores any `allow` decisions or `yolo`
+<!-- prettier-ignore -->
+> [!WARNING]
+> For security, Gemini CLI ignores any `allow` decisions or `yolo`
 > mode configurations in extension policies. This ensures that an extension
 > cannot automatically approve tool calls or bypass security measures without
 > your confirmation.
@@ -319,13 +324,14 @@ defined in the `themes` array in `gemini-extension.json`.
 Custom themes provided by extensions can be selected using the `/theme` command
 or by setting the `ui.theme` property in your `settings.json` file. Note that
 when referring to a theme from an extension, the extension name is appended to
-the theme name in parentheses, e.g., `shades-of-green (my-green-extension)`.
+the theme name in parentheses, for example,
+`shades-of-green (my-green-extension)`.
 
 ### Conflict resolution
 
 Extension commands have the lowest precedence. If an extension command name
 conflicts with a user or project command, the extension command is prefixed with
-the extension name (e.g., `/gcp.deploy`) using a dot separator.
+the extension name (for example, `/gcp.deploy`) using a dot separator.
 
 ## Variables
 
