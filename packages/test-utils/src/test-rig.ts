@@ -193,6 +193,28 @@ export function checkModelOutputContent(
   return isValid;
 }
 
+export interface MetricDataPoint {
+  attributes?: Record<string, unknown>;
+  value?: {
+    sum?: number;
+    min?: number;
+    max?: number;
+    count?: number;
+  };
+  startTime?: [number, number];
+  endTime?: string;
+}
+
+export interface TelemetryMetric {
+  descriptor: {
+    name: string;
+    type?: string;
+    description?: string;
+    unit?: string;
+  };
+  dataPoints: MetricDataPoint[];
+}
+
 export interface ParsedLog {
   attributes?: {
     'event.name'?: string;
@@ -213,11 +235,7 @@ export interface ParsedLog {
     prompt_id?: string;
   };
   scopeMetrics?: {
-    metrics: {
-      descriptor: {
-        name: string;
-      };
-    }[];
+    metrics: TelemetryMetric[];
   }[];
 }
 
@@ -1297,6 +1315,10 @@ export class TestRig {
     return logs;
   }
 
+  readTelemetryLogs(): ParsedLog[] {
+    return this._readAndParseTelemetryLog();
+  }
+
   private _readAndParseTelemetryLog(): ParsedLog[] {
     // Telemetry is always written to the test directory
     const logFilePath = join(this.homeDir!, 'telemetry.log');
@@ -1450,7 +1472,7 @@ export class TestRig {
     );
   }
 
-  readMetric(metricName: string): Record<string, unknown> | null {
+  readMetric(metricName: string): TelemetryMetric | null {
     const logs = this._readAndParseTelemetryLog();
     for (const logData of logs) {
       if (logData.scopeMetrics) {
