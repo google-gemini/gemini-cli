@@ -70,6 +70,7 @@ interface HandleAtCommandParams {
   messageId: number;
   signal: AbortSignal;
   escapePastedAtSymbols?: boolean;
+  depth?: number;
 }
 
 interface HandleAtCommandResult {
@@ -667,7 +668,12 @@ export async function handleAtCommand({
   messageId: userMessageTimestamp,
   signal,
   escapePastedAtSymbols = false,
+  depth = 0,
 }: HandleAtCommandParams): Promise<HandleAtCommandResult> {
+  if (depth > 2) {
+    return { processedQuery: [{ text: query }] };
+  }
+
   const commandParts = parseAllAtCommands(query, escapePastedAtSymbols);
 
   const { agentParts, resourceParts, fileParts } = categorizeAtCommands(

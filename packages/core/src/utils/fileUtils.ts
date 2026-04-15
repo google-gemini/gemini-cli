@@ -287,6 +287,7 @@ export async function isBinaryFile(filePath: string): Promise<boolean> {
   try {
     fh = await fs.promises.open(filePath, 'r');
     const stats = await fh.stat();
+    if (stats.isDirectory()) return false;
     const fileSize = stats.size;
     if (fileSize === 0) return false; // empty is not binary
 
