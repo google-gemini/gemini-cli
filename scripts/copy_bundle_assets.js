@@ -108,4 +108,16 @@ if (!existsSync(bundleMcpSrc)) {
 cpSync(bundleMcpSrc, bundleMcpDest, { recursive: true, dereference: true });
 console.log('Copied bundled chrome-devtools-mcp to bundle/bundled/');
 
+// 7. Copy pre-built ripgrep vendor binaries
+const ripgrepVendorSrc = join(root, 'packages/core/vendor/ripgrep');
+const ripgrepVendorDest = join(bundleDir, 'vendor', 'ripgrep');
+if (existsSync(ripgrepVendorSrc)) {
+  mkdirSync(ripgrepVendorDest, { recursive: true });
+  cpSync(ripgrepVendorSrc, ripgrepVendorDest, {
+    recursive: true,
+    dereference: true,
+  });
+  console.log('Copied ripgrep vendor binaries to bundle/vendor/ripgrep/');
+}
+
 console.log('Assets copied to bundle/');
