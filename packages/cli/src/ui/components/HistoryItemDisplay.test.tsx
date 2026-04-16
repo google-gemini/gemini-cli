@@ -248,6 +248,7 @@ describe('<HistoryItemDisplay />', () => {
         terminalWidth={80}
         isPending={false}
       />,
+      { allowEmptyFrame: true },
     );
 
     const passedProps = vi.mocked(ToolGroupMessage).mock.calls[0][0];
@@ -305,6 +306,7 @@ describe('<HistoryItemDisplay />', () => {
         <HistoryItemDisplay {...baseItem} item={item} />,
         {
           settings: createMockSettings({ ui: { inlineThinkingMode: 'off' } }),
+          allowEmptyFrame: true,
         },
       );
 

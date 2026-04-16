@@ -12,6 +12,9 @@ describe('ConsoleSummaryDisplay', () => {
   it('renders nothing when errorCount is 0', async () => {
     const { lastFrame, unmount } = await render(
       <ConsoleSummaryDisplay errorCount={0} />,
+      undefined,
+      undefined,
+      true,
     );
     expect(lastFrame({ allowEmpty: true })).toBe('');
     unmount();

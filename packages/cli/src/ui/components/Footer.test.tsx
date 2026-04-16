@@ -448,6 +448,7 @@ describe('<Footer />', () => {
       const { lastFrame, unmount } = await renderWithProviders(<Footer />, {
         config: mockConfig,
         width: 120,
+        allowEmptyFrame: true,
         uiState: { sessionStats: mockSessionStats },
         settings: createMockSettings({
           ui: {
@@ -826,6 +827,7 @@ describe('<Footer />', () => {
       const { lastFrame, unmount } = await renderWithProviders(<Footer />, {
         config: mockConfig,
         width: 120,
+        allowEmptyFrame: true,
         uiState: { sessionStats: mockSessionStats },
         settings: createMockSettings({
           ui: {

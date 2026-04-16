@@ -242,7 +242,12 @@ describe('DebugProfiler Component', () => {
       showDebugProfiler: false,
       constrainHeight: false,
     } as unknown as UIState);
-    const { lastFrame, unmount } = await render(<DebugProfiler />);
+    const { lastFrame, unmount } = await render(
+      <DebugProfiler />,
+      undefined,
+      undefined,
+      true,
+    );
     expect(lastFrame({ allowEmpty: true })).toBe('');
     unmount();
   });
