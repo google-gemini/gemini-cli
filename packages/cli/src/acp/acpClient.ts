@@ -40,6 +40,7 @@ import {
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
+  DEFAULT_GEMMA_4_MODEL,
   PREVIEW_GEMINI_MODEL,
   PREVIEW_GEMINI_3_1_MODEL,
   PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
@@ -1653,6 +1654,10 @@ function buildAvailableModels(
     {
       value: DEFAULT_GEMINI_FLASH_LITE_MODEL,
       title: getDisplayString(DEFAULT_GEMINI_FLASH_LITE_MODEL),
+    },
+    {
+      value: DEFAULT_GEMMA_4_MODEL,
+      title: getDisplayString(DEFAULT_GEMMA_4_MODEL),
     },
   ];
 

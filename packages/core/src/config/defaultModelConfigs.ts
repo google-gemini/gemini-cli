@@ -89,6 +89,17 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
         model: 'gemini-2.5-flash-lite',
       },
     },
+    gemma4: {
+      extends: 'base',
+      modelConfig: {
+        model: 'gemma-4-26b-a4b-it',
+        generateContentConfig: {
+          temperature: 1,
+          topP: 0.95,
+          topK: 64,
+        },
+      },
+    },
     // Bases for the internal model configs.
     'gemini-2.5-flash-base': {
       extends: 'base',
@@ -300,12 +311,25 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       isVisible: true,
       features: { thinking: false, multimodalToolUse: false },
     },
+    'gemma-4-26b-a4b-it': {
+      tier: 'pro',
+      family: 'gemma-4',
+      isPreview: false,
+      isVisible: true,
+      features: { thinking: false, multimodalToolUse: false },
+    },
     // Aliases
     auto: {
       tier: 'auto',
       isPreview: true,
       isVisible: false,
       features: { thinking: true, multimodalToolUse: false },
+    },
+    gemma4: {
+      tier: 'pro',
+      isPreview: false,
+      isVisible: true,
+      features: { thinking: false, multimodalToolUse: false },
     },
     pro: {
       tier: 'pro',
@@ -415,6 +439,9 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
     },
     'flash-lite': {
       default: 'gemini-2.5-flash-lite',
+    },
+    gemma4: {
+      default: 'gemma-4-26b-a4b-it',
     },
   },
   classifierIdResolutions: {

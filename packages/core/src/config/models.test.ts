@@ -15,12 +15,14 @@ import {
   isAutoModel,
   getDisplayString,
   DEFAULT_GEMINI_MODEL,
+  DEFAULT_GEMMA_4_MODEL,
   PREVIEW_GEMINI_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
   supportsMultimodalFunctionResponse,
   GEMINI_MODEL_ALIAS_PRO,
   GEMINI_MODEL_ALIAS_FLASH,
+  GEMMA_MODEL_ALIAS_4,
   GEMINI_MODEL_ALIAS_AUTO,
   PREVIEW_GEMINI_FLASH_MODEL,
   PREVIEW_GEMINI_MODEL_AUTO,
@@ -336,6 +338,10 @@ describe('getDisplayString', () => {
     );
   });
 
+  it('should return the correct display string for Gemma 4', () => {
+    expect(getDisplayString(DEFAULT_GEMMA_4_MODEL)).toBe('Gemma 4 (26B)');
+  });
+
   it('should return the model name as is for other models', () => {
     expect(getDisplayString('custom-model')).toBe('custom-model');
     expect(getDisplayString(DEFAULT_GEMINI_FLASH_LITE_MODEL)).toBe(
@@ -390,6 +396,11 @@ describe('resolveModel', () => {
       expect(resolveModel(DEFAULT_GEMINI_FLASH_LITE_MODEL)).toBe(
         DEFAULT_GEMINI_FLASH_LITE_MODEL,
       );
+    });
+
+    it('should return Gemma 4 when gemma4 alias is requested', () => {
+      const model = resolveModel(GEMMA_MODEL_ALIAS_4);
+      expect(model).toBe(DEFAULT_GEMMA_4_MODEL);
     });
 
     it('should return a custom model name when requested', () => {
@@ -537,9 +548,10 @@ describe('isActiveModel', () => {
     expect(isActiveModel(PREVIEW_GEMINI_MODEL)).toBe(true);
     expect(isActiveModel(DEFAULT_GEMINI_FLASH_MODEL)).toBe(true);
     expect(isActiveModel(PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL)).toBe(true);
+    expect(isActiveModel(DEFAULT_GEMMA_4_MODEL)).toBe(true);
   });
 
-  it('should return true for unknown models and aliases', () => {
+  it('should return false for unknown models and aliases', () => {
     expect(isActiveModel('invalid-model')).toBe(false);
     expect(isActiveModel(GEMINI_MODEL_ALIAS_AUTO)).toBe(false);
   });

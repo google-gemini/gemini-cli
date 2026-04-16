@@ -15,6 +15,7 @@ import {
   DEFAULT_GEMINI_MODEL_AUTO,
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
+  DEFAULT_GEMMA_4_MODEL,
   PREVIEW_GEMINI_MODEL,
   PREVIEW_GEMINI_3_1_MODEL,
   PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
@@ -208,6 +209,33 @@ describe('<ModelDialog />', () => {
       expect(output).toContain('Formatted Pro Model');
       expect(output).toContain('Formatted Flash Model');
       expect(output).toContain('Formatted Lite Model');
+    });
+    unmount();
+  });
+
+  it('shows Gemma 4 in manual view', async () => {
+    mockGetDisplayString.mockImplementation((val: string) => {
+      if (val === DEFAULT_GEMMA_4_MODEL) return 'Gemma 4 (26B)';
+      return val;
+    });
+
+    const { lastFrame, stdin, waitUntilReady, unmount } =
+      await renderComponent();
+
+    // Select "Manual" (index 1)
+    await act(async () => {
+      stdin.write('\u001B[B'); // Arrow Down
+    });
+    await waitUntilReady();
+    await act(async () => {
+      stdin.write('\r');
+    });
+    await waitUntilReady();
+
+    // Should now show manual options including Gemma 4
+    await waitFor(() => {
+      const output = lastFrame();
+      expect(output).toContain('Gemma 4 (26B)');
     });
     unmount();
   });

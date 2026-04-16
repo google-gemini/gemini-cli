@@ -59,6 +59,7 @@ export const PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL =
 export const DEFAULT_GEMINI_MODEL = 'gemini-2.5-pro';
 export const DEFAULT_GEMINI_FLASH_MODEL = 'gemini-2.5-flash';
 export const DEFAULT_GEMINI_FLASH_LITE_MODEL = 'gemini-2.5-flash-lite';
+export const DEFAULT_GEMMA_4_MODEL = 'gemma-4-26b-a4b-it';
 
 export const VALID_GEMINI_MODELS = new Set([
   PREVIEW_GEMINI_MODEL,
@@ -69,6 +70,7 @@ export const VALID_GEMINI_MODELS = new Set([
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
+  DEFAULT_GEMMA_4_MODEL,
 ]);
 
 export const PREVIEW_GEMINI_MODEL_AUTO = 'auto-gemini-3';
@@ -79,6 +81,7 @@ export const GEMINI_MODEL_ALIAS_AUTO = 'auto';
 export const GEMINI_MODEL_ALIAS_PRO = 'pro';
 export const GEMINI_MODEL_ALIAS_FLASH = 'flash';
 export const GEMINI_MODEL_ALIAS_FLASH_LITE = 'flash-lite';
+export const GEMMA_MODEL_ALIAS_4 = 'gemma4';
 
 export const DEFAULT_GEMINI_EMBEDDING_MODEL = 'gemini-embedding-001';
 
@@ -134,6 +137,10 @@ export function resolveModel(
     }
     case GEMINI_MODEL_ALIAS_FLASH_LITE: {
       resolved = DEFAULT_GEMINI_FLASH_LITE_MODEL;
+      break;
+    }
+    case GEMMA_MODEL_ALIAS_4: {
+      resolved = DEFAULT_GEMMA_4_MODEL;
       break;
     }
     default: {
@@ -236,6 +243,8 @@ export function getDisplayString(
       return PREVIEW_GEMINI_FLASH_MODEL;
     case PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL:
       return PREVIEW_GEMINI_3_1_MODEL;
+    case DEFAULT_GEMMA_4_MODEL:
+      return 'Gemma 4 (26B)';
     default:
       return model;
   }
