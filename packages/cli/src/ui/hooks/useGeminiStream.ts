@@ -914,6 +914,7 @@ export const useGeminiStream = (
     ): Promise<{
       queryToSend: PartListUnion | null;
       shouldProceed: boolean;
+      modelOverride?: string;
     }> => {
       if (turnCancelledRef.current) {
         return { queryToSend: null, shouldProceed: false };
@@ -964,6 +965,7 @@ export const useGeminiStream = (
                 return {
                   queryToSend: localQueryToSendToGemini,
                   shouldProceed: true,
+                  modelOverride: slashCommandResult.modelOverride,
                 };
               }
               case 'handled': {
@@ -1596,15 +1598,22 @@ export const useGeminiStream = (
             prompt_id = config.getSessionId() + '########' + getPromptCount();
           }
           return promptIdContext.run(prompt_id, async () => {
-            const { queryToSend, shouldProceed } = await prepareQueryForGemini(
-              query,
-              userMessageTimestamp,
-              abortSignal,
-              prompt_id!,
-            );
+            const { queryToSend, shouldProceed, modelOverride } =
+              await prepareQueryForGemini(
+                query,
+                userMessageTimestamp,
+                abortSignal,
+                prompt_id!,
+              );
 
             if (!shouldProceed || queryToSend === null) {
               return;
+            }
+
+            // Temporarily override the model for this prompt if specified
+            const previousModel = modelOverride ? config.getModel() : undefined;
+            if (modelOverride) {
+              config.setModel(modelOverride, true);
             }
 
             if (!options?.isContinuation) {
@@ -1718,6 +1727,9 @@ export const useGeminiStream = (
                 maybeAddLowVerbosityFailureNote(userMessageTimestamp);
               }
             } finally {
+              if (previousModel !== undefined) {
+                config.setModel(previousModel, true);
+              }
               if (activeQueryIdRef.current === queryId) {
                 setIsResponding(false);
               }

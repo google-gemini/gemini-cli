@@ -25,7 +25,20 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, '..');
 
 // remove npm install/build artifacts
-rmSync(join(root, 'node_modules'), { recursive: true, force: true });
+// On Windows, native .node files (e.g. conpty.node) may be locked by running
+// processes (like the IDE terminal). Skip gracefully — `npm ci` will
+// recreate node_modules anyway.
+try {
+  rmSync(join(root, 'node_modules'), { recursive: true, force: true });
+} catch (e) {
+  if (e.code === 'EPERM' || e.code === 'EBUSY') {
+    console.warn(
+      `Warning: could not fully remove node_modules (${e.code}: ${e.path}). Continuing...`,
+    );
+  } else {
+    throw e;
+  }
+}
 rmSync(join(root, 'bundle'), { recursive: true, force: true });
 rmSync(join(root, 'packages/cli/src/generated/'), {
   recursive: true,
