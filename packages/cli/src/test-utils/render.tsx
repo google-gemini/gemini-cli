@@ -136,6 +136,7 @@ class XtermStdout extends EventEmitter {
   }
 
   write = (data: string) => {
+    console.log(`[XtermStdout.write] data: ${JSON.stringify(data)}`);
     this.pendingWrites++;
     this.queue.promise = this.queue.promise.then(async () => {
       await new Promise<void>((resolve) =>
@@ -244,6 +245,7 @@ class XtermStdout extends EventEmitter {
       const currentFrame = stripAnsi(
         this.lastFrame({ allowEmpty: true }),
       ).trim();
+      console.log(`[waitUntilReady] currentFrame: ${JSON.stringify(currentFrame)}`);
       const expectedFrame = this.normalizeFrame(
         stripAnsi(
           (this.lastRenderStaticContent ?? '') + (this.lastRenderOutput ?? ''),
