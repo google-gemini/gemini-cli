@@ -253,6 +253,15 @@ export class LinuxSandboxManager implements SandboxManager {
         false,
     };
 
+    // If the workspace is writable and we're running a git command,
+    // automatically allow write access to the .git directory.
+    if (workspaceWrite && commandName === 'git') {
+      const gitDir = join(this.options.workspace, '.git');
+      if (!mergedAdditional.fileSystem!.write!.includes(gitDir)) {
+        mergedAdditional.fileSystem!.write!.push(gitDir);
+      }
+    }
+
     const { command: finalCommand, args: finalArgs } = handleReadWriteCommands(
       req,
       mergedAdditional,

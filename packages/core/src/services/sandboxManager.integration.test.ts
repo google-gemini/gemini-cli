@@ -1137,6 +1137,55 @@ describe('SandboxManager Integration', () => {
     });
   });
 
+  describe('Git and Governance Write Access', () => {
+    it('allows write access to .gitignore when workspace is writable', async () => {
+      const testFile = path.join(workspace, '.gitignore');
+      fs.writeFileSync(testFile, 'initial');
+
+      const editManager = createSandboxManager(
+        { enabled: true },
+        { workspace, modeConfig: { readonly: false, allowOverrides: true } },
+      );
+
+      const { command, args } = Platform.touch(testFile);
+      const sandboxed = await editManager.prepareCommand({
+        command,
+        args,
+        cwd: workspace,
+        env: process.env,
+      });
+
+      const result = await runCommand(sandboxed);
+      assertResult(result, sandboxed, 'success');
+      expect(fs.existsSync(testFile)).toBe(true);
+    });
+
+    it('automatically allows write access to .git when running git command and workspace is writable', async () => {
+      const gitDir = path.join(workspace, '.git');
+      if (!fs.existsSync(gitDir)) fs.mkdirSync(gitDir);
+      const lockFile = path.join(gitDir, 'index.lock');
+
+      const editManager = createSandboxManager(
+        { enabled: true },
+        { workspace, modeConfig: { readonly: false, allowOverrides: true } },
+      );
+
+      // We use a command that looks like git to trigger the special handling
+      const { command: nodePath, args: nodeArgs } = Platform.touch(lockFile);
+      const sandboxed = await editManager.prepareCommand({
+        // sh -c "git ..." will be identified as command 'git'
+        command: 'sh',
+        args: ['-c', `${nodePath} ${nodeArgs.join(' ')}`, 'git'],
+        cwd: workspace,
+        env: process.env,
+      });
+
+      const result = await runCommand(sandboxed);
+      assertResult(result, sandboxed, 'success');
+      expect(fs.existsSync(lockFile)).toBe(true);
+    });
+  });
+
   describe('Network Security', () => {
     describe('Network Access', () => {
       let server: http.Server;
