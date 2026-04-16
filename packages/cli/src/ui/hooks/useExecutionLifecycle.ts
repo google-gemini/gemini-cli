@@ -367,11 +367,7 @@ export const useExecutionLifecycle = (
         let command = rawQuery.trim();
         const pwdFileName = `shell_pwd_${crypto.randomBytes(6).toString('hex')}.tmp`;
         pwdFilePath = path.join(os.tmpdir(), pwdFileName);
-        // Ensure command ends with a separator before adding our own.
-        if (!command.endsWith(';') && !command.endsWith('&')) {
-          command += ';';
-        }
-        commandToExecute = `{ ${command} }; __code=$?; pwd > "${pwdFilePath}"; exit $__code`;
+        commandToExecute = `{ ${command}\n}; __code=$?; pwd > "${pwdFilePath}"; exit $__code`;
       }
 
       const executeCommand = async () => {

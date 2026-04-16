@@ -240,7 +240,7 @@ describe('useExecutionLifecycle', () => {
       ],
     });
     const tmpFile = path.join(os.tmpdir(), 'shell_pwd_abcdef.tmp');
-    const wrappedCommand = `{ ls -l; }; __code=$?; pwd > "${tmpFile}"; exit $__code`;
+    const wrappedCommand = `{ ls -l\n}; __code=$?; pwd > "${tmpFile}"; exit $__code`;
     expect(mockShellExecutionService).toHaveBeenCalledWith(
       wrappedCommand,
       '/test/dir',
@@ -252,6 +252,30 @@ describe('useExecutionLifecycle', () => {
       }),
     );
     expect(onExecMock).toHaveBeenCalledWith(expect.any(Promise));
+  });
+
+  it('should not break heredoc commands ending in a delimiter', async () => {
+    const { result } = await renderProcessorHook();
+    const command = `cat << 'EOF'
+hello world
+EOF`;
+
+    await act(async () => {
+      result.current.handleShellCommand(command, new AbortController().signal);
+    });
+
+    const tmpFile = path.join(os.tmpdir(), 'shell_pwd_abcdef.tmp');
+    // Verify that the delimiter EOF is on its own line and NOT followed by a semicolon
+    const wrappedCommand = `{ ${command}\n}; __code=$?; pwd > "${tmpFile}"; exit $__code`;
+    expect(mockShellExecutionService).toHaveBeenCalledWith(
+      wrappedCommand,
+      expect.any(String),
+      expect.any(Function),
+      expect.any(Object),
+      false,
+      expect.any(Object),
+    );
+    expect(wrappedCommand).toMatch(/\nEOF\n\};/);
   });
 
   it('should pass the config sessionId into shell execution config', async () => {
@@ -350,7 +374,7 @@ describe('useExecutionLifecycle', () => {
       });
 
       // Verify it's using the non-pty shell
-      const wrappedCommand = `{ stream; }; __code=$?; pwd > "${path.join(
+      const wrappedCommand = `{ stream\n}; __code=$?; pwd > "${path.join(
         os.tmpdir(),
         'shell_pwd_abcdef.tmp',
       )}"; exit $__code`;
