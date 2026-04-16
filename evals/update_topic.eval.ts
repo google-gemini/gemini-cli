@@ -21,6 +21,8 @@ describe('update_topic_behavior', () => {
    * more than 1/4 turns.
    */
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'update_topic should be used at start, end and middle for complex tasks',
     prompt: `Create a simple users REST API using Express. 
 1. Initialize a new npm project and install express.
@@ -117,6 +119,8 @@ describe('update_topic_behavior', () => {
   });
 
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'update_topic should NOT be used for informational coding tasks (Obvious)',
     approvalMode: 'default',
     prompt:
@@ -142,6 +146,8 @@ describe('update_topic_behavior', () => {
   });
 
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'update_topic should NOT be used for surgical symbol searches (Grey Area)',
     approvalMode: 'default',
     prompt:
@@ -169,6 +175,8 @@ describe('update_topic_behavior', () => {
   });
 
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'update_topic should be used for medium complexity multi-step tasks',
     prompt:
       'Refactor the `users-api` project. Move the routing logic from src/app.ts into a new file src/routes.ts, and update app.ts to use the new routes file.',
@@ -212,7 +220,9 @@ export default app;
       expect(topicCalls.length).toBeGreaterThanOrEqual(2);
 
       // Verify it actually did the refactoring to ensure it didn't just fail immediately
-      expect(fs.existsSync(path.join(rig.testDir, 'src/routes.ts'))).toBe(true);
+      expect(fs.existsSync(path.join(rig.testDir!, 'src/routes.ts'))).toBe(
+        true,
+      );
     },
   });
 
@@ -224,6 +234,8 @@ export default app;
    * the prompt change that improves the behavior.
    */
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'update_topic should not be called twice in a row',
     prompt: `
       We need to build a C compiler.

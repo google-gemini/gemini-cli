@@ -298,6 +298,8 @@ describe('plan_mode', () => {
   });
 
   evalTest('ALWAYS_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should transition from plan mode to normal execution and create a plan file from scratch',
     params: {
       settings,
@@ -333,7 +335,7 @@ describe('plan_mode', () => {
 
       expect(
         planWrite?.toolRequest.success,
-        `Expected write_file to succeed, but got error: ${planWrite?.toolRequest.error}`,
+        `Expected write_file to succeed, but got error: ${(planWrite?.toolRequest as any).error}`,
       ).toBe(true);
 
       assertModelHasOutput(result);
@@ -341,6 +343,8 @@ describe('plan_mode', () => {
   });
 
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should not exit plan mode or draft before informal agreement',
     approvalMode: ApprovalMode.PLAN,
     params: {
