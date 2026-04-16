@@ -18,10 +18,7 @@ exports[`<ShellToolMessage /> > Height Constraints > defaults to ACTIVE_SHELL_MA
 `;
 
 exports[`<ShellToolMessage /> > Height Constraints > fully expands in alternate buffer mode when constrainHeight is false and isExpandable is true 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────╮
-│ ✓  Shell Command A shell command                                             │
-│                                                                              │
-│ Line 1                                                                       │
+"│ Line 1                                                                       │
 │ Line 2                                                                       │
 │ Line 3                                                                       │
 │ Line 4                                                                       │
@@ -276,7 +273,7 @@ exports[`<ShellToolMessage /> > Height Constraints > uses full availableTerminal
 
 exports[`<ShellToolMessage /> > Snapshots > renders in Alternate Buffer mode while focused 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
-│ ⊶  Shell Command A shell command                      (Shift+Tab to unfocus) │
+│ ⊶  Shell Command A shell command                                             │
 │                                                                              │
 │ Test result                                                                  │
 "
