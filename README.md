@@ -4,7 +4,6 @@
 [![Gemini CLI E2E (Chained)](https://github.com/google-gemini/gemini-cli/actions/workflows/chained_e2e.yml/badge.svg)](https://github.com/google-gemini/gemini-cli/actions/workflows/chained_e2e.yml)
 [![Version](https://img.shields.io/npm/v/@google/gemini-cli)](https://www.npmjs.com/package/@google/gemini-cli)
 [![License](https://img.shields.io/github/license/google-gemini/gemini-cli)](https://github.com/google-gemini/gemini-cli/blob/main/LICENSE)
-[![View Code Wiki](https://assets.codewiki.google/readme-badge/static.svg)](https://codewiki.google/github.com/google-gemini/gemini-cli?utm_source=badge&utm_medium=github&utm_campaign=github.com/google-gemini/gemini-cli)
 
 ![Gemini CLI Screenshot](/docs/assets/gemini-screenshot.png)
 
@@ -316,8 +315,7 @@ gemini
 - [**Headless Mode (Scripting)**](https://www.geminicli.com/docs/cli/headless) -
   Use Gemini CLI in automated workflows.
 - [**IDE Integration**](https://www.geminicli.com/docs/ide-integration) - VS
-  Code companion.
-- [**Sandboxing & Security**](https://www.geminicli.com/docs/cli/sandbox) - Safe
+- [**IDE Integration**](https://www.geminicli.com/docs/ide-integration) - Visual Studio Code companion.
   execution environments.
 - [**Trusted Folders**](https://www.geminicli.com/docs/cli/trusted-folders) -
   Control execution policies by folder.
@@ -389,7 +387,7 @@ for removal instructions.
 ## 📄 Legal
 
 - **License**: [Apache License 2.0](LICENSE)
-- **Terms of Service**:
+- **License**: [Apache License 2.0](https://github.com/google-gemini/gemini-cli/blob/main/LICENSE)
   [Terms & Privacy](https://www.geminicli.com/docs/resources/tos-privacy)
 - **Security**: [Security Policy](SECURITY.md)
 
