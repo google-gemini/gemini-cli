@@ -47,21 +47,7 @@ jobs:
         run: 'npx vitest run packages/cli'
         shell: 'bash'
 
-  test_mac:
-    name: 'Test (Mac) - CLI Unit'
-    runs-on: 'macos-large-latest'
-    steps:
-      - name: 'Checkout'
-        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
 
-      - name: 'Setup and Build'
-        uses: './.github/actions/setup-gemini'
-        with:
-          mode: 'source'
-
-      - name: 'Run CLI Unit Tests'
-        run: 'npx vitest run packages/cli'
-        shell: 'bash'
 
   test_windows:
     name: 'Test (Windows) - CLI Unit'
