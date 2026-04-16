@@ -211,6 +211,27 @@ describe('Storage – additional helpers', () => {
     expect(storageWithSession.getProjectTempTrackerDir()).toBe(expected);
   });
 
+  it('updates session-scoped directories when the sessionId changes', async () => {
+    const storageWithSession = new Storage(projectRoot, 'session-one');
+    ProjectRegistry.prototype.getShortId = vi
+      .fn()
+      .mockReturnValue(PROJECT_SLUG);
+    await storageWithSession.initialize();
+    const tempDir = storageWithSession.getProjectTempDir();
+
+    storageWithSession.setSessionId('session-two');
+
+    expect(storageWithSession.getProjectTempPlansDir()).toBe(
+      path.join(tempDir, 'session-two', 'plans'),
+    );
+    expect(storageWithSession.getProjectTempTrackerDir()).toBe(
+      path.join(tempDir, 'session-two', 'tracker'),
+    );
+    expect(storageWithSession.getProjectTempTasksDir()).toBe(
+      path.join(tempDir, 'session-two', 'tasks'),
+    );
+  });
+
   describe('Session and JSON Loading', () => {
     beforeEach(async () => {
       await storage.initialize();

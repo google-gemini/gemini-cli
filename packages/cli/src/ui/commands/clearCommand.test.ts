@@ -39,7 +39,7 @@ describe('clearCommand', () => {
         agentContext: {
           config: {
             getEnableHooks: vi.fn().mockReturnValue(false),
-            setSessionId: vi.fn(),
+            resetNewSessionState: vi.fn(),
             getMessageBus: vi.fn().mockReturnValue(undefined),
             getHookSystem: vi.fn().mockReturnValue({
               fireSessionEndEvent: vi.fn().mockResolvedValue(undefined),
@@ -74,6 +74,9 @@ describe('clearCommand', () => {
 
     expect(mockResetChat).toHaveBeenCalledTimes(1);
     expect(mockHintClear).toHaveBeenCalledTimes(1);
+    expect(
+      mockContext.services.agentContext?.config.resetNewSessionState,
+    ).toHaveBeenCalledTimes(1);
     expect(uiTelemetryService.clear).toHaveBeenCalled();
     expect(uiTelemetryService.clear).toHaveBeenCalledTimes(1);
     expect(mockContext.ui.clear).toHaveBeenCalledTimes(1);
