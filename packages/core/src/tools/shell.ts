@@ -453,12 +453,6 @@ export class ShellToolInvocation extends BaseToolInvocation<
     const isWindows = os.platform() === 'win32';
     let tempFilePath = '';
     let tempDir = '';
-    if (!isWindows) {
-      tempDir = await fsPromises.mkdtemp(
-        path.join(os.tmpdir(), 'gemini-shell-'),
-      );
-      tempFilePath = path.join(tempDir, 'pgrep.tmp');
-    }
 
     const timeoutMs = this.context.config.getShellToolInactivityTimeout();
     const timeoutController = new AbortController();
@@ -468,8 +462,12 @@ export class ShellToolInvocation extends BaseToolInvocation<
     const combinedController = new AbortController();
 
     const onAbort = () => combinedController.abort();
-
     try {
+      if (!isWindows) {
+        tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gemini-shell-'));
+        tempFilePath = path.join(tempDir, 'pgrep.tmp');
+      }
+
       // pgrep is not available on Windows, so we can't get background PIDs
       const commandToExecute = this.wrapCommandForPgrep(
         strippedCommand,
@@ -643,7 +641,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
 
         if (tempFileExists) {
           const pgrepContent = await fsPromises.readFile(tempFilePath, 'utf8');
-          const pgrepLines = pgrepContent.split(os.EOL).filter(Boolean);
+          const pgrepLines = pgrepContent.split('\n').filter(Boolean);
           for (const line of pgrepLines) {
             if (!/^\d+$/.test(line)) {
               if (
