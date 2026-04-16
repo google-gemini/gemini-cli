@@ -109,12 +109,50 @@ const subagentProgressSchema = z
         })
         .strict();
 
+const grepResultSchema = z
+        .object({
+                summary: z.string(),
+                matches: z.array(z.unknown()),
+                payload: z.string().optional(),
+        })
+        .strict();
+
+const listDirectoryResultSchema = z
+        .object({
+                summary: z.string(),
+                files: z.array(z.string()),
+                payload: z.string().optional(),
+        })
+        .strict();
+
+const readManyFilesResultSchema = z
+        .object({
+                summary: z.string(),
+                files: z.array(z.string()),
+                skipped: z
+                        .array(
+                                z.object({
+                                        path: z.string(),
+                                        reason: z.string(),
+                                })
+                        )
+                        .optional(),
+                include: z.array(z.string()).optional(),
+                excludes: z.array(z.string()).optional(),
+                targetDir: z.string().optional(),
+                payload: z.string().optional(),
+        })
+        .strict();
+
 export const toolResultDisplaySchema: z.ZodType<ToolResultDisplay> = z.union([     
         z.string(),
         fileDiffSchema,
         ansiOutputSchema,
         todoListSchema,
         subagentProgressSchema,
+        grepResultSchema,
+        listDirectoryResultSchema,
+        readManyFilesResultSchema,
 ]);
 
 const inlineDataPartSchema = z
@@ -189,6 +227,8 @@ const partObjectSchema: z.ZodTypeAny = z.lazy(() =>
                 .refine(
                         (part) =>
                                 part.text !== undefined ||
+                                part.thought !== undefined ||
+                                part.thoughtSignature !== undefined ||
                                 part.inlineData !== undefined ||
                                 part.fileData !== undefined ||
                                 part.functionCall !== undefined ||
@@ -198,7 +238,7 @@ const partObjectSchema: z.ZodTypeAny = z.lazy(() =>
                                 part.videoMetadata !== undefined,
                         {
                                 message:
-                                        'Part must include at least one content field (text, inlineData, fileData, functionCall, functionResponse, executableCode, codeExecutionResult, or videoMetadata).',
+                                        'Part must include at least one content field (text, thought, thoughtSignature, inlineData, fileData, functionCall, functionResponse, executableCode, codeExecutionResult, or videoMetadata).',
                         },
                 ),
 );
