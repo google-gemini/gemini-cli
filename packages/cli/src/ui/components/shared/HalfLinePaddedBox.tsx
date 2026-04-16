@@ -93,14 +93,14 @@ const HalfLinePaddedBoxInternal: React.FC<HalfLinePaddedBoxProps> = ({
         backgroundColor={backgroundColor}
       >
         <Box width={terminalWidth} flexDirection="row">
-          <Text backgroundColor={backgroundColor} color={terminalBg}>
-            {'▀'.repeat(terminalWidth)}
+          <Text backgroundColor={backgroundColor}>
+            {' '.repeat(terminalWidth)}
           </Text>
         </Box>
         {children}
         <Box width={terminalWidth} flexDirection="row">
-          <Text color={terminalBg} backgroundColor={backgroundColor}>
-            {'▄'.repeat(terminalWidth)}
+          <Text backgroundColor={backgroundColor}>
+            {' '.repeat(terminalWidth)}
           </Text>
         </Box>
       </Box>
