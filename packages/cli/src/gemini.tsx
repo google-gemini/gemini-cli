@@ -319,7 +319,9 @@ export async function main() {
 
   const argv = await argvPromise;
 
-  const { sessionId, resumedSessionData } = await resolveSessionId(argv.resume);
+  const { sessionId: resolvedSessionId, resumedSessionData } =
+    await resolveSessionId(argv.resume);
+  const sessionId = argv.sessionId ?? resolvedSessionId;
 
   if (
     (argv.allowedTools && argv.allowedTools.length > 0) ||
@@ -709,7 +711,7 @@ export async function main() {
       process.exit(ExitCodes.FATAL_INPUT_ERROR);
     }
 
-    const prompt_id = sessionId;
+    const prompt_id = config.getSessionId();
     logUserPrompt(
       config,
       new UserPromptEvent(
@@ -729,7 +731,7 @@ export async function main() {
     await config.refreshAuth(authType);
 
     if (config.getDebugMode()) {
-      debugLogger.log('Session ID: %s', sessionId);
+      debugLogger.log('Session ID: %s', config.getSessionId());
     }
 
     initializeOutputListenersAndFlush();

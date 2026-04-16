@@ -94,6 +94,7 @@ export interface CliArgs {
   extensions: string[] | undefined;
   listExtensions: boolean | undefined;
   resume: string | typeof RESUME_LATEST | undefined;
+  sessionId: string | undefined;
   listSessions: boolean | undefined;
   deleteSession: string | undefined;
   includeDirectories: string[] | undefined;
@@ -241,6 +242,23 @@ export async function parseArguments(
       }
       if (argv['yolo'] && argv['approvalMode']) {
         return 'Cannot use both --yolo (-y) and --approval-mode together. Use --approval-mode=yolo instead.';
+      }
+      if (argv['sessionId'] && argv['resume']) {
+        return 'Cannot use both --session-id and --resume together';
+      }
+
+      const providedSessionId = argv['sessionId'];
+      if (typeof providedSessionId === 'string') {
+        const trimmedSessionId = providedSessionId.trim();
+
+        if (!trimmedSessionId) {
+          return 'The --session-id flag requires a non-empty value';
+        }
+
+        if (!/^[a-zA-Z0-9_-]+$/.test(trimmedSessionId)) {
+          return 'Invalid --session-id value. Only alphanumeric characters, hyphens, and underscores are allowed.';
+        }
+        argv['sessionId'] = trimmedSessionId;
       }
 
       const outputFormat = argv['outputFormat'];
@@ -395,6 +413,11 @@ export async function parseArguments(
             }
             return trimmed;
           },
+        })
+        .option('session-id', {
+          type: 'string',
+          description:
+            'Start a new session with a specific session ID (for deterministic orchestration).',
         })
         .option('list-sessions', {
           type: 'boolean',

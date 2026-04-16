@@ -547,6 +547,7 @@ describe('gemini.tsx main function kitty protocol', () => {
       screenReader: undefined,
       useWriteTodos: undefined,
       resume: undefined,
+      sessionId: undefined,
       listSessions: undefined,
       deleteSession: undefined,
       outputFormat: undefined,
@@ -605,6 +606,7 @@ describe('gemini.tsx main function kitty protocol', () => {
       screenReader: undefined,
       useWriteTodos: undefined,
       resume: undefined,
+      sessionId: undefined,
       listSessions: undefined,
       deleteSession: undefined,
       outputFormat: undefined,
@@ -621,6 +623,67 @@ describe('gemini.tsx main function kitty protocol', () => {
 
     expect(resumeSpy).toHaveBeenCalledTimes(1);
     resumeSpy.mockRestore();
+  });
+
+  it('should pass provided --session-id to loadCliConfig', async () => {
+    vi.mocked(loadCliConfig).mockResolvedValue(
+      createMockConfig({
+        isInteractive: () => true,
+        getQuestion: () => '',
+        getSandbox: () => undefined,
+      }),
+    );
+    vi.mocked(loadSettings).mockReturnValue(
+      createMockSettings({
+        merged: {
+          advanced: {},
+          security: { auth: {} },
+          ui: {},
+        },
+      }),
+    );
+    vi.mocked(parseArguments).mockResolvedValue({
+      model: undefined,
+      sandbox: undefined,
+      debug: undefined,
+      prompt: undefined,
+      promptInteractive: undefined,
+      query: undefined,
+      yolo: undefined,
+      approvalMode: undefined,
+      policy: undefined,
+      adminPolicy: undefined,
+      allowedMcpServerNames: undefined,
+      allowedTools: undefined,
+      experimentalAcp: undefined,
+      extensions: undefined,
+      listExtensions: undefined,
+      includeDirectories: undefined,
+      screenReader: undefined,
+      useWriteTodos: undefined,
+      resume: undefined,
+      sessionId: 'fixed-session-id',
+      listSessions: undefined,
+      deleteSession: undefined,
+      outputFormat: undefined,
+      fakeResponses: undefined,
+      recordResponses: undefined,
+      rawOutput: undefined,
+      acceptRawOutputRisk: undefined,
+      isCommand: undefined,
+    });
+
+    await act(async () => {
+      await main();
+    });
+
+    const sessionIdsPassedToConfig = vi
+      .mocked(loadCliConfig)
+      .mock.calls.map((call) => call[1]);
+    expect(sessionIdsPassedToConfig.length).toBeGreaterThan(0);
+    expect(
+      sessionIdsPassedToConfig.every((id) => id === 'fixed-session-id'),
+    ).toBe(true);
   });
 
   it.each([
@@ -876,9 +939,8 @@ describe('gemini.tsx main function kitty protocol', () => {
   });
 
   it('should start normally with a warning when no sessions found for resume', async () => {
-    const { SessionSelector, SessionError } = await import(
-      './utils/sessionUtils.js'
-    );
+    const { SessionSelector, SessionError } =
+      await import('./utils/sessionUtils.js');
     vi.mocked(SessionSelector).mockImplementation(
       () =>
         ({
@@ -933,9 +995,8 @@ describe('gemini.tsx main function kitty protocol', () => {
   });
 
   it.skip('should log error when cleanupExpiredSessions fails', async () => {
-    const { cleanupExpiredSessions } = await import(
-      './utils/sessionCleanup.js'
-    );
+    const { cleanupExpiredSessions } =
+      await import('./utils/sessionCleanup.js');
     vi.mocked(cleanupExpiredSessions).mockRejectedValue(
       new Error('Cleanup failed'),
     );
