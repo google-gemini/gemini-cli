@@ -60,7 +60,7 @@ vi.mock('./components/Footer.js', async () => {
   };
 });
 
-describe('App', () => {
+describe.sequential('App', () => {
   beforeEach(() => {
     (useIsScreenReaderEnabled as Mock).mockReturnValue(false);
   });

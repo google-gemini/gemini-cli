@@ -12,7 +12,7 @@ import { debugLogger } from '@google/gemini-cli-core';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-describe('AppRig', () => {
+describe.sequential('AppRig', () => {
   let rig: AppRig | undefined;
 
   afterEach(async () => {

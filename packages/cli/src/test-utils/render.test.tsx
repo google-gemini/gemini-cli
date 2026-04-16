@@ -10,7 +10,7 @@ import { Text } from 'ink';
 import { renderHook, render } from './render.js';
 import { waitFor } from './async.js';
 
-describe('render', () => {
+describe.sequential('render', () => {
   it('should render a component', async () => {
     const { lastFrame, unmount } = await render(<Text>Hello World</Text>);
     expect(lastFrame()).toBe('Hello World\n');
@@ -42,7 +42,7 @@ describe('render', () => {
   });
 });
 
-describe('renderHook', () => {
+describe.sequential('renderHook', () => {
   it('should rerender with previous props when called without arguments', async () => {
     const useTestHook = ({ value }: { value: number }) => {
       const [count, setCount] = useState(0);
