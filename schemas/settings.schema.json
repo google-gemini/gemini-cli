@@ -92,11 +92,19 @@
           "type": "boolean"
         },
         "enableNotifications": {
-          "title": "Enable Notifications",
-          "description": "Enable run-event notifications for action-required prompts and session completion.",
-          "markdownDescription": "Enable run-event notifications for action-required prompts and session completion.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `false`",
+          "title": "Enable Terminal Notifications",
+          "description": "Enable terminal run-event notifications for action-required prompts and session completion.",
+          "markdownDescription": "Enable terminal run-event notifications for action-required prompts and session completion.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
           "type": "boolean"
+        },
+        "notificationMethod": {
+          "title": "Terminal Notification Method",
+          "description": "How to send terminal notifications.",
+          "markdownDescription": "How to send terminal notifications.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `auto`",
+          "default": "auto",
+          "type": "string",
+          "enum": ["auto", "osc9", "osc777", "bell"]
         },
         "checkpointing": {
           "title": "Checkpointing",
