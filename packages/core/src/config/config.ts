@@ -1760,7 +1760,22 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   setSessionId(sessionId: string): void {
+    const previousPlansDir = this.storage.isInitialized()
+      ? this.storage.getPlansDir()
+      : undefined;
+
     this._sessionId = sessionId;
+    this.storage.setSessionId(sessionId);
+    this.trackerService = undefined;
+
+    if (previousPlansDir) {
+      this.refreshSessionScopedPlansDirectory(previousPlansDir);
+    }
+  }
+
+  resetNewSessionState(sessionId: string): void {
+    this.setSessionId(sessionId);
+    this.approvedPlanPath = undefined;
   }
 
   setTerminalBackground(terminalBackground: string | undefined): void {
@@ -2047,6 +2062,30 @@ export class Config implements McpContext, AgentLoopContext {
 
   getWorkspaceContext(): WorkspaceContext {
     return getWorkspaceContextOverride() ?? this.workspaceContext;
+  }
+
+  private refreshSessionScopedPlansDirectory(previousPlansDir: string): void {
+    const nextPlansDir = this.storage.getPlansDir();
+    if (previousPlansDir === nextPlansDir) {
+      return;
+    }
+
+    const previousPlansDirRealPath = resolveToRealPath(previousPlansDir);
+    const currentDirectories = this.workspaceContext
+      .getDirectories()
+      .filter((dir) => dir !== previousPlansDirRealPath);
+
+    this.workspaceContext.setDirectories(currentDirectories);
+
+    try {
+      if (fs.existsSync(nextPlansDir)) {
+        this.workspaceContext.addDirectory(nextPlansDir);
+      }
+    } catch {
+      // Ignore invalid or unreadable plans directories here. This mirrors
+      // initialization behavior, which only adds the plans directory when it
+      // already exists and is readable.
+    }
   }
 
   getAgentRegistry(): AgentRegistry {

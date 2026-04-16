@@ -1774,6 +1774,50 @@ describe('Server Config (config.ts)', () => {
     expect(config1.topicState.getTopic()).toBe('Topic 1');
     expect(config2.topicState.getTopic()).toBe('Topic 2');
   });
+
+  it('updates storage session-scoped directories when the sessionId changes', async () => {
+    const config = new Config({
+      ...baseParams,
+      sessionId: 'session-one',
+      plan: true,
+    });
+
+    await config.initialize();
+    const tempDir = config.storage.getProjectTempDir();
+    const oldPlansDir = path.join(tempDir, 'session-one', 'plans');
+    const oldTrackerService = config.getTrackerService();
+
+    config.setSessionId('session-two');
+
+    expect(config.getSessionId()).toBe('session-two');
+    expect(config.storage.getProjectTempPlansDir()).toBe(
+      path.join(tempDir, 'session-two', 'plans'),
+    );
+    expect(config.storage.getProjectTempTrackerDir()).toBe(
+      path.join(tempDir, 'session-two', 'tracker'),
+    );
+    expect(config.getTrackerService()).not.toBe(oldTrackerService);
+    expect(config.getTrackerService().trackerDir).toBe(
+      path.join(tempDir, 'session-two', 'tracker'),
+    );
+    expect(config.getWorkspaceContext().getDirectories()).not.toContain(
+      oldPlansDir,
+    );
+  });
+
+  it('clears the approved plan when starting a new session', () => {
+    const config = new Config({
+      ...baseParams,
+      sessionId: 'session-one',
+    });
+
+    config.setApprovedPlanPath('/tmp/session-one/plans/approved.md');
+
+    expect(() => config.resetNewSessionState('session-two')).not.toThrow();
+
+    expect(config.getSessionId()).toBe('session-two');
+    expect(config.getApprovedPlanPath()).toBeUndefined();
+  });
 });
 
 describe('GemmaModelRouterSettings', () => {
