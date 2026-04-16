@@ -409,6 +409,23 @@ export async function resolveSandboxPaths(
     ? { gitWorktree: { worktreeGitDir, mainGitDir } }
     : undefined;
 
+  if (worktreeGitDir) {
+    const gitIdentities = new Set(
+      [
+        path.join(options.workspace, '.git'),
+        path.join(resolvedWorkspace, '.git'),
+      ].map(toPathKey),
+    );
+    if (policyRead.some((p) => gitIdentities.has(toPathKey(p)))) {
+      policyRead.push(worktreeGitDir);
+      if (mainGitDir) policyRead.push(mainGitDir);
+    }
+    if (policyWrite.some((p) => gitIdentities.has(toPathKey(p)))) {
+      policyWrite.push(worktreeGitDir);
+      if (mainGitDir) policyWrite.push(mainGitDir);
+    }
+  }
+
   /**
    * Filters out any paths that are explicitly forbidden or match the workspace root (original or resolved).
    */
