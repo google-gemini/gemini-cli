@@ -72,6 +72,12 @@ exports[`InputPrompt > Highlighting and Cursor Display > single-line scenarios >
 ────────────────────────────────────────────────────────────────────────────────────────────────────"
 `;
 
+exports[`InputPrompt > Highlighting and Cursor Display > single-line scenarios > should display cursor correctly 'on a full-width line with no whitespa…' 1`] = `
+"────────────────────────────────────────────────────────────────────────────────────────────────────
+│ > xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx │
+────────────────────────────────────────────────────────────────────────────────────────────────────"
+`;
+
 exports[`InputPrompt > Highlighting and Cursor Display > single-line scenarios > should display cursor correctly 'on a highlighted token' 1`] = `
 "────────────────────────────────────────────────────────────────────────────────────────────────────
 │ > run @path/to/file                                                                              │
