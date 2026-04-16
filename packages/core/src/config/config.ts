@@ -2070,10 +2070,17 @@ export class Config implements McpContext, AgentLoopContext {
       return;
     }
 
-    const previousPlansDirRealPath = resolveToRealPath(previousPlansDir);
+    const pathsToRemove = new Set([previousPlansDir]);
+    try {
+      pathsToRemove.add(resolveToRealPath(previousPlansDir));
+    } catch {
+      // The previous session's plans directory may never have been created.
+      // In that case there is nothing to resolve or remove beyond the raw path.
+    }
+
     const currentDirectories = this.workspaceContext
       .getDirectories()
-      .filter((dir) => dir !== previousPlansDirRealPath);
+      .filter((dir) => !pathsToRemove.has(dir));
 
     this.workspaceContext.setDirectories(currentDirectories);
 
