@@ -182,7 +182,10 @@ import { useTimedMessage } from './hooks/useTimedMessage.js';
 import { useIsHelpDismissKey } from './utils/shortcutsHelp.js';
 import { useSuspend } from './hooks/useSuspend.js';
 import { useRunEventNotifications } from './hooks/useRunEventNotifications.js';
-import { isNotificationsEnabled } from '../utils/terminalNotifications.js';
+import {
+  isNotificationsEnabled,
+  getNotificationMethod,
+} from '../utils/terminalNotifications.js';
 import {
   getLastTurnToolCallIds,
   isToolExecuting,
@@ -226,6 +229,7 @@ export const AppContainer = (props: AppContainerProps) => {
   const settings = useSettings();
   const { reset } = useOverflowActions()!;
   const notificationsEnabled = isNotificationsEnabled(settings);
+  const notificationMethod = getNotificationMethod(settings);
 
   const { setOptions, dumpCurrentFrame, startRecording, stopRecording } =
     useContext(InkAppContext);
@@ -2287,6 +2291,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   useRunEventNotifications({
     notificationsEnabled,
+    notificationMethod,
     isFocused,
     hasReceivedFocusEvent,
     streamingState,
