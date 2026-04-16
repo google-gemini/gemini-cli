@@ -84,6 +84,7 @@ export class ContextTokenCalculator {
     }
     return tokens;
   }
+
   /**
    * Slower, precise estimation for a Gemini Content/Part graph.
    * Deeply inspects the nested structure and uses the base tokenization math.
