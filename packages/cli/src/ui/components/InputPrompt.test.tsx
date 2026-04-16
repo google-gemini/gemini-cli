@@ -5443,14 +5443,18 @@ describe('InputPrompt', () => {
           stdin.write(' ');
         });
 
-        await waitFor(() => {
-          expect(lastFrame()).toContain('🎙️ Listening...');
-        });
+        // Use a short interval in waitFor to prevent advancing fake timers past the 300ms RELEASE_DELAY_MS
+        await waitFor(
+          () => {
+            expect(lastFrame()).toContain('🎙️ Listening...');
+          },
+          { interval: 10 },
+        );
 
-        // Simulate heartbeat (held key)
+        // Simulate heartbeat (held key) - send space first to reset timer, then advance
         await act(async () => {
-          vi.advanceTimersByTime(100);
           stdin.write(' ');
+          vi.advanceTimersByTime(100);
         });
         expect(lastFrame()).toContain('🎙️ Listening...');
 
