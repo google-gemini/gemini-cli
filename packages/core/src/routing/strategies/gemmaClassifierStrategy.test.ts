@@ -32,6 +32,9 @@ describe('GemmaClassifierStrategy', () => {
     mockGenerateJson = vi.fn();
 
     mockConfig = {
+      modelConfigService: {
+        resolveClassifierModelId: vi.fn(),
+      },
       getGemmaModelRouterSettings: vi.fn().mockReturnValue({
         enabled: true,
         classifier: { model: 'gemma3-1b-gpu-custom' },
@@ -81,6 +84,44 @@ describe('GemmaClassifierStrategy', () => {
         mockLocalLiteRtLmClient,
       ),
     ).rejects.toThrow('Only gemma3-1b-gpu-custom has been tested');
+  });
+
+  it('should skip classification if both pro and flash resolve to the same model', async () => {
+    // Setup the mock config to use the dynamic model config service.
+    Object.defineProperty(
+      mockConfig,
+      'getExperimentalDynamicModelConfiguration',
+      {
+        value: vi.fn().mockReturnValue(true),
+        writable: true,
+      },
+    );
+    Object.defineProperty(
+      mockConfig.modelConfigService,
+      'resolveClassifierModelId',
+      {
+        value: vi.fn().mockReturnValue('gemma-4-31b-it'),
+        writable: true,
+      },
+    );
+
+    const decision = await strategy.route(
+      mockContext,
+      mockConfig,
+      mockBaseLlmClient,
+      mockLocalLiteRtLmClient,
+    );
+
+    expect(decision).toEqual({
+      model: 'gemma-4-31b-it',
+      metadata: {
+        source: 'gemma-classifier',
+        latencyMs: 0,
+        reasoning:
+          'Skipped classification because both tiers resolve to the same model: gemma-4-31b-it',
+      },
+    });
+    expect(mockGenerateJson).not.toHaveBeenCalled();
   });
 
   it('should call generateJson with the correct parameters', async () => {

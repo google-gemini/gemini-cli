@@ -383,6 +383,56 @@ describe('ClassifierStrategy', () => {
     expect(decision?.model).toBe(DEFAULT_GEMINI_FLASH_MODEL);
   });
 
+  it('should skip classification if both pro and flash resolve to the same model', async () => {
+    // We mock the config to trigger the fast path by returning a specific model
+    // that the router will see as identical for both 'pro' and 'flash' tiers.
+    vi.mocked(mockConfig.getModel).mockReturnValue(DEFAULT_GEMINI_MODEL_AUTO);
+
+    // By overriding the modelConfigService, we can simulate gemma4Variant
+    // or any other scenario where both tiers resolve to the same target model.
+    const mockResolveClassifierModelId = vi
+      .fn()
+      .mockReturnValue('gemma-4-31b-it');
+    Object.defineProperty(
+      mockConfig.modelConfigService,
+      'resolveClassifierModelId',
+      {
+        value: mockResolveClassifierModelId,
+        writable: true,
+      },
+    );
+
+    // We also need to mock config.getExperimentalDynamicModelConfiguration()
+    // if that is what resolveClassifierModel uses. Since resolveClassifierModel
+    // is a standalone function, we can mock its behavior indirectly via config.
+    Object.defineProperty(
+      mockConfig,
+      'getExperimentalDynamicModelConfiguration',
+      {
+        value: vi.fn().mockReturnValue(true),
+        writable: true,
+      },
+    );
+
+    const decision = await strategy.route(
+      mockContext,
+      mockConfig,
+      mockBaseLlmClient,
+      mockLocalLiteRtLmClient,
+    );
+
+    expect(decision).toEqual({
+      model: 'gemma-4-31b-it',
+      metadata: {
+        source: 'classifier',
+        latencyMs: 0,
+        reasoning:
+          'Skipped classification because both tiers resolve to the same model: gemma-4-31b-it',
+      },
+    });
+    expect(mockBaseLlmClient.generateJson).not.toHaveBeenCalled();
+  });
+
   describe('Gemini 3.1 and Custom Tools Routing', () => {
     it('should route to PREVIEW_GEMINI_3_1_MODEL when Gemini 3.1 is launched', async () => {
       vi.mocked(mockConfig.getGemini31Launched).mockResolvedValue(true);
