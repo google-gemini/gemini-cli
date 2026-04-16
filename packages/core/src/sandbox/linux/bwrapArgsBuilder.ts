@@ -6,11 +6,8 @@
 
 import fs from 'node:fs';
 import { join, dirname } from 'node:path';
-import {
-  GOVERNANCE_FILES,
-  getSecretFileFindArgs,
-  type ResolvedSandboxPaths,
-} from '../../services/sandboxManager.js';
+import type { ResolvedSandboxPaths } from '../utils/sandboxPathUtils.js';
+import { GOVERNANCE_FILES, SECRET_FILES } from '../constants.js';
 import { isErrnoException } from '../utils/fsUtils.js';
 import { spawnAsync } from '../../utils/shell-utils.js';
 import { debugLogger } from '../../utils/debugLogger.js';
@@ -213,5 +210,18 @@ async function getSecretFilesArgs(
       );
     }
   }
+  return args;
+}
+
+/**
+ * Returns arguments for the Linux 'find' command to locate secret files.
+ */
+function getSecretFileFindArgs(): string[] {
+  const args: string[] = ['('];
+  SECRET_FILES.forEach((s, i) => {
+    if (i > 0) args.push('-o');
+    args.push('-name', s.pattern);
+  });
+  args.push(')');
   return args;
 }

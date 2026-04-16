@@ -18,8 +18,8 @@ import { getSecureSanitizationConfig } from './environmentSanitization.js';
 import {
   type SandboxManager,
   type SandboxedCommand,
-  GOVERNANCE_FILES,
 } from './sandboxManager.js';
+import { GOVERNANCE_FILES } from '../sandbox/constants.js';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import os from 'node:os';

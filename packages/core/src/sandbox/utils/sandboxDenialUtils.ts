@@ -5,7 +5,7 @@
  */
 
 import { LRUCache } from 'mnemonist';
-import { type ParsedSandboxDenial } from '../../services/sandboxManager.js';
+import type { ParsedSandboxDenial } from '../../services/sandboxManager.js';
 import type { ShellExecutionResult } from '../../services/shellExecutionService.js';
 import { isValidPathString } from '../../utils/paths.js';
 

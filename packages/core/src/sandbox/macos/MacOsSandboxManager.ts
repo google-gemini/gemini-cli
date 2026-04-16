@@ -8,150 +8,95 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {
-  type SandboxManager,
   type SandboxRequest,
   type SandboxedCommand,
   type SandboxPermissions,
-  type GlobalSandboxOptions,
   type ParsedSandboxDenial,
-  resolveSandboxPaths,
 } from '../../services/sandboxManager.js';
 import type { ShellExecutionResult } from '../../services/shellExecutionService.js';
-import {
-  sanitizeEnvironment,
-  getSecureSanitizationConfig,
-} from '../../services/environmentSanitization.js';
 import { buildSeatbeltProfile } from './seatbeltArgsBuilder.js';
+import { isStrictlyApproved } from '../utils/commandUtils.js';
 import { initializeShellParsers } from '../../utils/shell-utils.js';
 import {
-  isKnownSafeCommand,
-  isDangerousCommand,
+  isKnownSafeCommand as isPosixSafeCommand,
+  isDangerousCommand as isPosixDangerousCommand,
 } from '../utils/commandSafety.js';
-import {
-  verifySandboxOverrides,
-  getCommandName as getFullCommandName,
-  isStrictlyApproved,
-} from '../utils/commandUtils.js';
-import {
-  parsePosixSandboxDenials,
-  createSandboxDenialCache,
-  type SandboxDenialCache,
-} from '../utils/sandboxDenialUtils.js';
+import { parsePosixSandboxDenials } from '../utils/sandboxDenialUtils.js';
 import { handleReadWriteCommands } from '../utils/sandboxReadWriteUtils.js';
+import {
+  AbstractOsSandboxManager,
+  type PreparedExecutionDetails,
+} from '../abstractOsSandboxManager.js';
 
-export class MacOsSandboxManager implements SandboxManager {
-  private readonly denialCache: SandboxDenialCache = createSandboxDenialCache();
-
-  constructor(private readonly options: GlobalSandboxOptions) {}
-
-  isKnownSafeCommand(args: string[]): boolean {
-    const toolName = args[0];
-    const approvedTools = this.options.modeConfig?.approvedTools ?? [];
-    if (toolName && approvedTools.includes(toolName)) {
-      return true;
-    }
-    return isKnownSafeCommand(args);
-  }
-
-  isDangerousCommand(args: string[]): boolean {
-    return isDangerousCommand(args);
-  }
-
-  parseDenials(result: ShellExecutionResult): ParsedSandboxDenial | undefined {
-    return parsePosixSandboxDenials(result, this.denialCache);
-  }
-
-  getWorkspace(): string {
-    return this.options.workspace;
-  }
-
-  getOptions(): GlobalSandboxOptions {
-    return this.options;
-  }
-
-  async prepareCommand(req: SandboxRequest): Promise<SandboxedCommand> {
+export class MacOsSandboxManager extends AbstractOsSandboxManager {
+  protected override async initialize(): Promise<void> {
     await initializeShellParsers();
-    const sanitizationConfig = getSecureSanitizationConfig(
-      req.policy?.sanitizationConfig,
-    );
+  }
 
-    const sanitizedEnv = sanitizeEnvironment(req.env, sanitizationConfig);
+  protected override ensureGovernanceFilesExist(_workspace: string): void {
+    // Default no-op - Seatbelt is able to block non-existent files
+  }
 
-    const isReadonlyMode = this.options.modeConfig?.readonly ?? true;
-    const allowOverrides = this.options.modeConfig?.allowOverrides ?? true;
-
-    // Reject override attempts in plan mode
-    verifySandboxOverrides(allowOverrides, req.policy);
-
-    let command = req.command;
-    let args = req.args;
-
-    // Translate virtual commands for sandboxed file system access
+  /**
+   * Mapping virtual commands to absolute paths of native tools ensures that
+   * Seatbelt profiles can target the exact binaries accurately.
+   */
+  protected override mapVirtualCommandToNative(
+    command: string,
+    args: string[],
+  ): { command: string; args: string[] } {
     if (command === '__read') {
-      command = '/bin/cat';
-    } else if (command === '__write') {
-      command = '/bin/sh';
-      args = ['-c', 'cat > "$1"', '_', ...args];
+      return { command: '/bin/cat', args };
     }
+    if (command === '__write') {
+      return { command: '/bin/sh', args: ['-c', 'cat > "$1"', '_', ...args] };
+    }
+    return { command, args };
+  }
 
-    const currentReq = { ...req, command, args };
+  /**
+   * macOS permissions are enforced via dynamically generated Seatbelt profiles
+   * based on file paths. No dynamic tweaking of the request object is needed here.
+   */
+  protected override updateReadWritePermissions(
+    _permissions: SandboxPermissions,
+    _req: SandboxRequest,
+  ): void {
+    // Default no-op
+  }
 
-    // If not in readonly mode OR it's a strictly approved pipeline, allow workspace writes
-    const isApproved = allowOverrides
-      ? await isStrictlyApproved(
-          currentReq,
-          this.options.modeConfig?.approvedTools,
-        )
-      : false;
+  /**
+   * Ensures read/write commands strictly respect allowed paths and workspace boundaries
+   * before the Seatbelt profile is generated.
+   */
+  protected override rewriteReadWriteCommand(
+    req: SandboxRequest,
+    command: string,
+    args: string[],
+    permissions: SandboxPermissions,
+  ): { command: string; args: string[] } {
+    return handleReadWriteCommands(req, permissions, this.options.workspace, [
+      ...(req.policy?.allowedPaths || []),
+      ...(this.options.includeDirectories || []),
+    ]);
+  }
 
-    const isYolo = this.options.modeConfig?.yolo ?? false;
-    const workspaceWrite = !isReadonlyMode || isApproved || isYolo;
-    const defaultNetwork =
-      this.options.modeConfig?.network || req.policy?.networkAccess || isYolo;
-
-    // Fetch persistent approvals for this command
-    const commandName = await getFullCommandName(currentReq);
-    const persistentPermissions = allowOverrides
-      ? this.options.policyManager?.getCommandPermissions(commandName)
-      : undefined;
-
-    const mergedAdditional: SandboxPermissions = {
-      fileSystem: {
-        read: [
-          ...(persistentPermissions?.fileSystem?.read ?? []),
-          ...(req.policy?.additionalPermissions?.fileSystem?.read ?? []),
-        ],
-        write: [
-          ...(persistentPermissions?.fileSystem?.write ?? []),
-          ...(req.policy?.additionalPermissions?.fileSystem?.write ?? []),
-        ],
-      },
-      network:
-        defaultNetwork ||
-        persistentPermissions?.network ||
-        req.policy?.additionalPermissions?.network ||
-        false,
-    };
-
-    const { command: finalCommand, args: finalArgs } = handleReadWriteCommands(
+  protected async buildSandboxedCommand(
+    details: PreparedExecutionDetails,
+  ): Promise<SandboxedCommand> {
+    const {
+      finalCommand,
+      finalArgs,
+      sanitizedEnv,
+      resolvedPaths,
+      workspaceWrite,
+      networkAccess,
       req,
-      mergedAdditional,
-      this.options.workspace,
-      [
-        ...(req.policy?.allowedPaths || []),
-        ...(this.options.includeDirectories || []),
-      ],
-    );
-
-    const resolvedPaths = await resolveSandboxPaths(
-      this.options,
-      req,
-      mergedAdditional,
-    );
+    } = details;
 
     const sandboxArgs = buildSeatbeltProfile({
       resolvedPaths,
-      networkAccess: mergedAdditional.network,
+      networkAccess,
       workspaceWrite,
     });
 
@@ -170,6 +115,33 @@ export class MacOsSandboxManager implements SandboxManager {
         }
       },
     };
+  }
+
+  protected override isCaseInsensitive(): boolean {
+    return false;
+  }
+
+  isDangerousCommand(args: string[]): boolean {
+    return isPosixDangerousCommand(args);
+  }
+
+  protected override isOsSafeCommand(args: string[]): boolean {
+    return isPosixSafeCommand(args);
+  }
+
+  protected override async isStrictlyApproved(
+    command: string,
+    args: string[],
+    req: SandboxRequest,
+  ): Promise<boolean> {
+    return isStrictlyApproved(
+      { ...req, command, args },
+      this.options.modeConfig?.approvedTools,
+    );
+  }
+
+  parseDenials(result: ShellExecutionResult): ParsedSandboxDenial | undefined {
+    return parsePosixSandboxDenials(result, this.denialCache);
   }
 
   private writeProfileToTempFile(profile: string): string {

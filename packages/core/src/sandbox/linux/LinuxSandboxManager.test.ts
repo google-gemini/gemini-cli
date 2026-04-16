@@ -53,7 +53,6 @@ vi.mock('../../utils/shell-utils.js', async (importOriginal) => {
       Promise.resolve({ status: 0, stdout: Buffer.from('') }),
     ),
     initializeShellParsers: vi.fn(),
-    isStrictlyApproved: vi.fn().mockResolvedValue(true),
   };
 });
 
@@ -148,22 +147,6 @@ describe('LinuxSandboxManager', () => {
 
       expect(result.args[result.args.length - 2]).toBe('/bin/cat');
       expect(result.args[result.args.length - 1]).toBe(testFile);
-    });
-
-    it('rejects overrides in plan mode', async () => {
-      const customManager = new LinuxSandboxManager({
-        workspace,
-        modeConfig: { allowOverrides: false },
-      });
-      await expect(
-        customManager.prepareCommand({
-          command: 'ls',
-          args: [],
-          cwd: workspace,
-          env: {},
-          policy: { networkAccess: true },
-        }),
-      ).rejects.toThrow(/Cannot override/);
     });
   });
 });

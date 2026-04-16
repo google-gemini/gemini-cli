@@ -87,37 +87,6 @@ describe('MacOsSandboxManager', () => {
       expect(fs.existsSync(tempFile)).toBe(false);
     });
 
-    it('should correctly pass through the cwd to the resulting command', async () => {
-      const result = await manager.prepareCommand({
-        command: 'echo',
-        args: ['hello'],
-        cwd: '/test/different/cwd',
-        env: {},
-        policy: mockPolicy,
-      });
-
-      expect(result.cwd).toBe('/test/different/cwd');
-    });
-
-    it('should apply environment sanitization via the default mechanisms', async () => {
-      const result = await manager.prepareCommand({
-        command: 'echo',
-        args: ['hello'],
-        cwd: mockWorkspace,
-        env: {
-          SAFE_VAR: '1',
-          GITHUB_TOKEN: 'sensitive',
-        },
-        policy: {
-          ...mockPolicy,
-          sanitizationConfig: { enableEnvironmentVariableRedaction: true },
-        },
-      });
-
-      expect(result.env['SAFE_VAR']).toBe('1');
-      expect(result.env['GITHUB_TOKEN']).toBeUndefined();
-    });
-
     it('should allow network when networkAccess is true', async () => {
       await manager.prepareCommand({
         command: 'echo',

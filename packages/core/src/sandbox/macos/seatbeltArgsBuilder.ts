@@ -11,11 +11,8 @@ import {
   BASE_SEATBELT_PROFILE,
   NETWORK_SEATBELT_PROFILE,
 } from './baseProfile.js';
-import {
-  GOVERNANCE_FILES,
-  SECRET_FILES,
-  type ResolvedSandboxPaths,
-} from '../../services/sandboxManager.js';
+import type { ResolvedSandboxPaths } from '../utils/sandboxPathUtils.js';
+import { GOVERNANCE_FILES, SECRET_FILES } from '../constants.js';
 import { resolveToRealPath } from '../../utils/paths.js';
 
 /**
