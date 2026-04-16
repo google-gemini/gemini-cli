@@ -315,7 +315,7 @@ describe('ShellTool', () => {
       const result = await promise;
 
       expect(mockShellExecutionService).toHaveBeenCalledWith(
-        expect.stringMatching(/pgrep -g 0 >.*gemini-shell-.*\/pgrep\.tmp/),
+        expect.stringMatching(/pgrep -g 0 >.*gemini-shell-.*[/\\]pgrep\.tmp/),
         tempRootDir,
         expect.any(Function),
         expect.any(AbortSignal),
@@ -338,7 +338,7 @@ describe('ShellTool', () => {
       await promise;
 
       expect(mockShellExecutionService).toHaveBeenCalledWith(
-        expect.stringMatching(/pgrep -g 0 >.*gemini-shell-.*\/pgrep\.tmp/),
+        expect.stringMatching(/pgrep -g 0 >.*gemini-shell-.*[/\\]pgrep\.tmp/),
         tempRootDir,
         expect.any(Function),
         expect.any(AbortSignal),
@@ -354,7 +354,7 @@ describe('ShellTool', () => {
       await promise;
 
       expect(mockShellExecutionService).toHaveBeenCalledWith(
-        expect.stringMatching(/pgrep -g 0 >.*gemini-shell-.*\/pgrep\.tmp/),
+        expect.stringMatching(/pgrep -g 0 >.*gemini-shell-.*[/\\]pgrep\.tmp/),
         tempRootDir,
         expect.any(Function),
         expect.any(AbortSignal),
@@ -374,7 +374,7 @@ describe('ShellTool', () => {
       await promise;
 
       expect(mockShellExecutionService).toHaveBeenCalledWith(
-        expect.stringMatching(/pgrep -g 0 >.*gemini-shell-.*\/pgrep\.tmp/),
+        expect.stringMatching(/pgrep -g 0 >.*gemini-shell-.*[/\\]pgrep\.tmp/),
         subdir,
         expect.any(Function),
         expect.any(AbortSignal),
@@ -397,7 +397,7 @@ describe('ShellTool', () => {
       await promise;
 
       expect(mockShellExecutionService).toHaveBeenCalledWith(
-        expect.stringMatching(/pgrep -g 0 >.*gemini-shell-.*\/pgrep\.tmp/),
+        expect.stringMatching(/pgrep -g 0 >.*gemini-shell-.*[/\\]pgrep\.tmp/),
         path.join(tempRootDir, 'subdir'),
         expect.any(Function),
         expect.any(AbortSignal),
@@ -476,7 +476,7 @@ EOF`;
       await promise;
 
       expect(mockShellExecutionService).toHaveBeenCalledWith(
-        expect.stringMatching(/pgrep -g 0 >.*gemini-shell-.*\/pgrep\.tmp/),
+        expect.stringMatching(/pgrep -g 0 >.*gemini-shell-.*[/\\]pgrep\.tmp/),
         tempRootDir,
         expect.any(Function),
         expect.any(AbortSignal),
