@@ -25,7 +25,6 @@ import {
 import {
   isStrictlyApproved,
   verifySandboxOverrides,
-  getCommandName,
 } from '../utils/commandUtils.js';
 import { assertValidPathString } from '../../utils/paths.js';
 import {
@@ -40,6 +39,11 @@ import {
 import { isErrnoException } from '../utils/fsUtils.js';
 import { handleReadWriteCommands } from '../utils/sandboxReadWriteUtils.js';
 import { buildBwrapArgs } from './bwrapArgsBuilder.js';
+import {
+  getCommandRoots,
+  initializeShellParsers,
+  stripShellWrapper,
+} from '../../utils/shell-utils.js';
 
 let cachedBpfPath: string | undefined;
 
@@ -218,7 +222,15 @@ export class LinuxSandboxManager implements SandboxManager {
       args = ['-c', 'cat > "$1"', '_', ...args];
     }
 
-    const commandName = await getCommandName({ ...req, command, args });
+    await initializeShellParsers();
+    const fullCmd = [command, ...args].join(' ');
+    const stripped = stripShellWrapper(fullCmd);
+    const roots = getCommandRoots(stripped).filter(
+      (r) => r !== 'shopt' && r !== 'set',
+    );
+    const commandName = roots.length > 0 ? roots[0] : join(command);
+    const isGitCommand = roots.includes('git');
+
     const isApproved = allowOverrides
       ? await isStrictlyApproved(
           { ...req, command, args },
@@ -252,6 +264,15 @@ export class LinuxSandboxManager implements SandboxManager {
         req.policy?.additionalPermissions?.network ||
         false,
     };
+
+    // If the workspace is writable and we're running a git command,
+    // automatically allow write access to the .git directory.
+    if (workspaceWrite && isGitCommand) {
+      const gitDir = join(this.options.workspace, '.git');
+      if (!mergedAdditional.fileSystem!.write!.includes(gitDir)) {
+        mergedAdditional.fileSystem!.write!.push(gitDir);
+      }
+    }
 
     const { command: finalCommand, args: finalArgs } = handleReadWriteCommands(
       req,

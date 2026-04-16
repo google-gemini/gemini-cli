@@ -16,7 +16,7 @@ import {
   SECRET_FILES,
   type ResolvedSandboxPaths,
 } from '../../services/sandboxManager.js';
-import { resolveToRealPath } from '../../utils/paths.js';
+import { isSubpath, resolveToRealPath } from '../../utils/paths.js';
 
 /**
  * Options for building macOS Seatbelt profile.
@@ -35,6 +35,47 @@ export interface SeatbeltArgsOptions {
  */
 export function escapeSchemeString(str: string): string {
   return str.replace(/[\\"]/g, '\\$&');
+}
+
+/**
+ * Checks if a path is explicitly allowed by additional write permissions.
+ */
+function isPathExplicitlyAllowed(
+  filePath: string,
+  realFilePath: string,
+  policyWrite: string[],
+): boolean {
+  return policyWrite.some(
+    (p) =>
+      p === filePath ||
+      p === realFilePath ||
+      isSubpath(p, filePath) ||
+      isSubpath(p, realFilePath),
+  );
+}
+
+function denyUnlessExplicitlyAllowed(
+  targetPath: string,
+  ruleType: 'literal' | 'subpath',
+  policyWrite: string[],
+  implicitlyAllowed: boolean = false,
+): string {
+  if (implicitlyAllowed) {
+    return '';
+  }
+
+  const realPath = resolveToRealPath(targetPath);
+
+  if (isPathExplicitlyAllowed(targetPath, realPath, policyWrite)) {
+    return ''; // Skip if explicitly allowed
+  }
+
+  let rules = `(deny file-write* (${ruleType} "${escapeSchemeString(targetPath)}"))\n`;
+  if (realPath !== targetPath) {
+    rules += `(deny file-write* (${ruleType} "${escapeSchemeString(realPath)}"))\n`;
+  }
+
+  return rules;
 }
 
 /**
@@ -108,38 +149,6 @@ export function buildSeatbeltProfile(options: SeatbeltArgsOptions): string {
     profile += `(allow file-read* file-write* (subpath "${escapeSchemeString(allowedPath)}"))\n`;
   }
 
-  // Handle granular additional read permissions
-  for (let i = 0; i < resolvedPaths.policyRead.length; i++) {
-    const resolved = resolvedPaths.policyRead[i];
-    let isFile = false;
-    try {
-      isFile = fs.statSync(resolved).isFile();
-    } catch {
-      // Ignore error
-    }
-    if (isFile) {
-      profile += `(allow file-read* (literal "${escapeSchemeString(resolved)}"))\n`;
-    } else {
-      profile += `(allow file-read* (subpath "${escapeSchemeString(resolved)}"))\n`;
-    }
-  }
-
-  // Handle granular additional write permissions
-  for (let i = 0; i < resolvedPaths.policyWrite.length; i++) {
-    const resolved = resolvedPaths.policyWrite[i];
-    let isFile = false;
-    try {
-      isFile = fs.statSync(resolved).isFile();
-    } catch {
-      // Ignore error
-    }
-    if (isFile) {
-      profile += `(allow file-read* file-write* (literal "${escapeSchemeString(resolved)}"))\n`;
-    } else {
-      profile += `(allow file-read* file-write* (subpath "${escapeSchemeString(resolved)}"))\n`;
-    }
-  }
-
   // Add explicit deny rules for governance files in the workspace.
   // These are added after the workspace allow rule to ensure they take precedence
   // (Seatbelt evaluates rules in order, later rules win for same path).
@@ -161,13 +170,12 @@ export function buildSeatbeltProfile(options: SeatbeltArgsOptions): string {
       // Ignore errors, use default guess
     }
 
-    const ruleType = isDirectory ? 'subpath' : 'literal';
-
-    profile += `(deny file-write* (${ruleType} "${escapeSchemeString(governanceFile)}"))\n`;
-
-    if (realGovernanceFile !== governanceFile) {
-      profile += `(deny file-write* (${ruleType} "${escapeSchemeString(realGovernanceFile)}"))\n`;
-    }
+    profile += denyUnlessExplicitlyAllowed(
+      governanceFile,
+      isDirectory ? 'subpath' : 'literal',
+      resolvedPaths.policyWrite,
+      workspaceWrite && GOVERNANCE_FILES[i].path !== '.git',
+    );
   }
 
   // Grant read-only access to git worktrees/submodules. We do this last in order to
@@ -175,10 +183,18 @@ export function buildSeatbeltProfile(options: SeatbeltArgsOptions): string {
   if (resolvedPaths.gitWorktree) {
     const { worktreeGitDir, mainGitDir } = resolvedPaths.gitWorktree;
     if (worktreeGitDir) {
-      profile += `(deny file-write* (subpath "${escapeSchemeString(worktreeGitDir)}"))\n`;
+      profile += denyUnlessExplicitlyAllowed(
+        worktreeGitDir,
+        'subpath',
+        resolvedPaths.policyWrite,
+      );
     }
     if (mainGitDir) {
-      profile += `(deny file-write* (subpath "${escapeSchemeString(mainGitDir)}"))\n`;
+      profile += denyUnlessExplicitlyAllowed(
+        mainGitDir,
+        'subpath',
+        resolvedPaths.policyWrite,
+      );
     }
   }
 
@@ -208,6 +224,38 @@ export function buildSeatbeltProfile(options: SeatbeltArgsOptions): string {
         regexPattern = `^${escapedBase}/(.*/)?${basePattern}$`;
       }
       profile += `(deny file-read* file-write* (regex #"${regexPattern}"))\n`;
+    }
+  }
+
+  // Handle granular additional read permissions
+  for (let i = 0; i < resolvedPaths.policyRead.length; i++) {
+    const resolved = resolvedPaths.policyRead[i];
+    let isFile = false;
+    try {
+      isFile = fs.statSync(resolved).isFile();
+    } catch {
+      // Ignore error
+    }
+    if (isFile) {
+      profile += `(allow file-read* (literal "${escapeSchemeString(resolved)}"))\n`;
+    } else {
+      profile += `(allow file-read* (subpath "${escapeSchemeString(resolved)}"))\n`;
+    }
+  }
+
+  // Handle granular additional write permissions
+  for (let i = 0; i < resolvedPaths.policyWrite.length; i++) {
+    const resolved = resolvedPaths.policyWrite[i];
+    let isFile = false;
+    try {
+      isFile = fs.statSync(resolved).isFile();
+    } catch {
+      // Ignore error
+    }
+    if (isFile) {
+      profile += `(allow file-read* file-write* (literal "${escapeSchemeString(resolved)}"))\n`;
+    } else {
+      profile += `(allow file-read* file-write* (subpath "${escapeSchemeString(resolved)}"))\n`;
     }
   }
 
