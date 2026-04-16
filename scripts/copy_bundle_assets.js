@@ -120,4 +120,21 @@ if (existsSync(ripgrepVendorSrc)) {
   console.log('Copied ripgrep vendor binaries to bundle/vendor/ripgrep/');
 }
 
+// 8. Copy Extension Examples
+const extensionExamplesSrc = join(
+  root,
+  'packages/cli/src/commands/extensions/examples',
+);
+const extensionExamplesDest = join(bundleDir, 'examples');
+const EXCLUDED_EXAMPLE_DIRS = ['node_modules', 'dist'];
+
+if (existsSync(extensionExamplesSrc)) {
+  cpSync(extensionExamplesSrc, extensionExamplesDest, {
+    recursive: true,
+    dereference: true,
+    filter: (src) => !EXCLUDED_EXAMPLE_DIRS.some((dir) => src.includes(dir)),
+  });
+  console.log('Copied extension examples to bundle/examples/');
+}
+
 console.log('Assets copied to bundle/');
