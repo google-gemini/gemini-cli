@@ -188,6 +188,7 @@ import {
   isToolAwaitingConfirmation,
   getAllToolCalls,
 } from './utils/historyUtils.js';
+import { shouldAutoTriggerExpandHint } from './utils/expandHint.js';
 
 interface AppContainerProps {
   config: Config;
@@ -330,24 +331,35 @@ export const AppContainer = (props: AppContainerProps) => {
   const showIsExpandableHint = Boolean(expandHintTrigger);
   const overflowState = useOverflowState();
   const overflowingIdsSize = overflowState?.overflowingIds.size ?? 0;
-  const hasOverflowState = overflowingIdsSize > 0 || !constrainHeight;
+  const previousOverflowingIdsSizeRef = useRef(0);
 
   /**
    * Manages the visibility and x-second timer for the expansion hint.
    *
    * This effect triggers the timer countdown whenever an overflow is detected
-   * or the user manually toggles the expansion state with Ctrl+O.
-   * By depending on overflowingIdsSize, the timer resets when *new* views
-   * overflow, but avoids infinitely resetting during single-view streaming.
+   * while the response is actually constrained. The Ctrl+O handler still
+   * refreshes the hint manually when the user toggles expansion.
    *
-   * In alternate buffer mode, we don't trigger the hint automatically on overflow
-   * to avoid noise, but the user can still trigger it manually with Ctrl+O.
+   * We only auto-refresh when the number of overflowing regions grows. That
+   * keeps the "show more" hint responsive for newly truncated content without
+   * retriggering on layout churn, overflow shrinkage, or while the content is
+   * already expanded.
    */
   useEffect(() => {
-    if (hasOverflowState) {
+    const previousOverflowingIdsSize = previousOverflowingIdsSizeRef.current;
+
+    if (
+      shouldAutoTriggerExpandHint({
+        constrainHeight,
+        overflowingIdsSize,
+        previousOverflowingIdsSize,
+      })
+    ) {
       triggerExpandHint(true);
     }
-  }, [hasOverflowState, overflowingIdsSize, triggerExpandHint]);
+
+    previousOverflowingIdsSizeRef.current = overflowingIdsSize;
+  }, [constrainHeight, overflowingIdsSize, triggerExpandHint]);
 
   const [defaultBannerText, setDefaultBannerText] = useState('');
   const [warningBannerText, setWarningBannerText] = useState('');

@@ -3293,6 +3293,85 @@ describe('AppContainer State Management', () => {
       unmount();
     });
 
+    it('does not reset the hint timer when overflowingIdsSize decreases', async () => {
+      const { unmount } = await act(async () => renderAppContainer());
+      await waitFor(() => expect(capturedOverflowActions).toBeTruthy());
+
+      act(() => {
+        capturedOverflowActions.addOverflowingId('test-id-1');
+        capturedOverflowActions.addOverflowingId('test-id-2');
+      });
+
+      await waitFor(() => {
+        expect(capturedUIState.showIsExpandableHint).toBe(true);
+      });
+
+      act(() => {
+        vi.advanceTimersByTime(EXPAND_HINT_DURATION_MS / 2);
+      });
+      expect(capturedUIState.showIsExpandableHint).toBe(true);
+
+      act(() => {
+        capturedOverflowActions.removeOverflowingId('test-id-2');
+      });
+
+      act(() => {
+        vi.advanceTimersByTime(1);
+      });
+
+      act(() => {
+        vi.advanceTimersByTime(EXPAND_HINT_DURATION_MS / 2);
+      });
+
+      await waitFor(() => {
+        expect(capturedUIState.showIsExpandableHint).toBe(false);
+      });
+
+      unmount();
+    });
+
+    it('does not auto-reset the hint timer for new overflow while expanded', async () => {
+      const { stdin, unmount } = await act(async () => renderAppContainer());
+      await waitFor(() => expect(capturedOverflowActions).toBeTruthy());
+
+      act(() => {
+        capturedOverflowActions.addOverflowingId('test-id-1');
+      });
+
+      await waitFor(() => {
+        expect(capturedUIState.showIsExpandableHint).toBe(true);
+      });
+
+      act(() => {
+        stdin.write('\x0f'); // Ctrl+O
+      });
+
+      expect(capturedUIState.constrainHeight).toBe(false);
+
+      act(() => {
+        vi.advanceTimersByTime(EXPAND_HINT_DURATION_MS - 1000);
+      });
+      expect(capturedUIState.showIsExpandableHint).toBe(true);
+
+      act(() => {
+        capturedOverflowActions.addOverflowingId('test-id-2');
+      });
+
+      act(() => {
+        vi.advanceTimersByTime(1);
+      });
+
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+
+      await waitFor(() => {
+        expect(capturedUIState.showIsExpandableHint).toBe(false);
+      });
+
+      unmount();
+    });
+
     it('toggles expansion state and resets the hint timer when Ctrl+O is pressed in Standard Mode', async () => {
       const { stdin, unmount } = await act(async () => renderAppContainer());
       await waitFor(() => expect(capturedOverflowActions).toBeTruthy());
