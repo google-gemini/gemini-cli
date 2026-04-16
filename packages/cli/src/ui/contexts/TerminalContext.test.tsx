@@ -92,4 +92,78 @@ describe('TerminalContext', () => {
     });
     unmount();
   });
+
+  it('should handle highly fragmented black-background OSC 11 responses terminated by BEL', async () => {
+    const handleColor = vi.fn();
+    const { waitUntilReady, unmount } = await render(
+      <TerminalProvider>
+        <TestComponent onColor={handleColor} />
+      </TerminalProvider>,
+    );
+    await waitUntilReady();
+
+    const fragments = [
+      '\x1b]',
+      '1',
+      '1',
+      ';',
+      'r',
+      'g',
+      'b',
+      ':',
+      '0',
+      '0',
+      '0',
+      '0',
+      '/',
+      '0',
+      '0',
+      '0',
+      '0',
+      '/',
+      '0',
+      '0',
+      '0',
+      '0',
+      '\u0007',
+    ];
+
+    for (const fragment of fragments) {
+      await act(async () => {
+        mockStdin.emit('data', fragment);
+      });
+    }
+    await waitUntilReady();
+
+    await waitFor(() => {
+      expect(handleColor).toHaveBeenCalledWith('rgb:0000/0000/0000');
+    });
+    unmount();
+  });
+
+  it('should trim oversized noise and still parse a later OSC 11 response', async () => {
+    const handleColor = vi.fn();
+    const { waitUntilReady, unmount } = await render(
+      <TerminalProvider>
+        <TestComponent onColor={handleColor} />
+      </TerminalProvider>,
+    );
+    await waitUntilReady();
+
+    await act(async () => {
+      mockStdin.emit('data', 'x'.repeat(5000));
+    });
+    await waitUntilReady();
+    expect(handleColor).not.toHaveBeenCalled();
+
+    await act(async () => {
+      mockStdin.emit('data', '\x1b]11;rgb:0c0c/0c0c/0c0c\x1b\\');
+    });
+    await waitUntilReady();
+
+    await waitFor(() => {
+      expect(handleColor).toHaveBeenCalledWith('rgb:0c0c/0c0c/0c0c');
+    });
+    unmount();
+  });
 });
