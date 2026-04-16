@@ -496,6 +496,7 @@ describe('loggers', () => {
             '[{"role":"user","parts":[{"type":"text","content":"Hello"}]}]',
           'gen_ai.output.messages':
             '[{"finish_reason":"stop","role":"system","parts":[{"type":"text","content":"candidate 1"}]}]',
+          'gen_ai.response.finish_reasons': ['stop'],
           'gen_ai.operation.name': 'generate_content',
           'gen_ai.response.model': 'test-model',
           'gen_ai.usage.input_tokens': 17,
@@ -1006,8 +1007,9 @@ describe('loggers', () => {
               parts: [{ type: 'text', content: 'Semantic request test' }],
             },
           ]),
-          'gen_ai.operation.name': 'generate_content',
+          'server.address': 'semantic-api.example.com',
           'server.port': 8080,
+          'gen_ai.operation.name': 'generate_content',
           'gen_ai.provider.name': 'gcp.gen_ai',
           'gen_ai.output.type': 'json',
           'gen_ai.request.stop_sequences': ['end'],
