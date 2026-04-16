@@ -102,6 +102,12 @@ jobs:
       - name: 'Run yamllint'
         run: 'node scripts/lint.js --yamllint'
 
+      - name: 'Build project for typecheck'
+        run: 'npm run build'
+
+      - name: 'Run typecheck'
+        run: 'npm run typecheck'
+
       - name: 'Run Prettier'
         run: 'node scripts/lint.js --prettier'
 
