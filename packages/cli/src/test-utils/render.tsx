@@ -233,7 +233,7 @@ class XtermStdout extends EventEmitter {
     });
 
     let attempts = 0;
-    const maxAttempts = 100;
+    const maxAttempts = 300;
 
     let lastCurrent = '';
     let lastExpected = '';
