@@ -569,7 +569,10 @@ export class GeminiChat {
         abortSignal,
       };
 
-      let contentsToUse: Content[] = supportsModernFeatures(modelToUse)
+      let contentsToUse: Content[] = supportsModernFeatures(
+        modelToUse,
+        this.context.config,
+      )
         ? [...contentsForPreviewModel]
         : [...requestContents];
 
@@ -613,7 +616,10 @@ export class GeminiChat {
           );
           lastModelToUse = modelToUse;
           // Re-evaluate contentsToUse based on the new model's feature support
-          contentsToUse = supportsModernFeatures(modelToUse)
+          contentsToUse = supportsModernFeatures(
+            modelToUse,
+            this.context.config,
+          )
             ? [...contentsForPreviewModel]
             : [...requestContents];
         }

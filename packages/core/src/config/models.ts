@@ -397,11 +397,21 @@ export function isCustomModel(
  * This includes Gemini 3 models and any custom models.
  *
  * @param model The model name to check.
+ * @param config Optional config object for dynamic model configuration.
  * @returns True if the model supports modern features like thoughts.
  */
-export function supportsModernFeatures(model: string): boolean {
+export function supportsModernFeatures(
+  model: string,
+  config?: ModelCapabilityContext,
+): boolean {
+  if (config?.getExperimentalDynamicModelConfiguration?.() === true) {
+    const definition = config.modelConfigService.getModelDefinition(model);
+    if (definition?.features?.thinking !== undefined) {
+      return definition.features.thinking;
+    }
+  }
   if (isGemini3Model(model)) return true;
-  return isCustomModel(model);
+  return isCustomModel(model, config);
 }
 
 /**
