@@ -47,7 +47,10 @@ toolName = [
   # Topic grouping tool is innocuous and used for UI organization.
   "update_topic",
   # Core agent lifecycle tool
-  "complete_task"
+  "complete_task",
+  # MCP resource tools
+  "read_mcp_resource",
+  "list_mcp_resources"
 ]
 decision = "allow"
 priority = 50

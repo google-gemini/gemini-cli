@@ -92,6 +92,13 @@ each tool.
 | [`ask_user`](../tools/ask-user.md) | `Communicate` | Requests clarification or missing information via an interactive dialog.               |
 | [`write_todos`](../tools/todos.md) | `Other`       | Maintains an internal list of subtasks. The model uses this to track its own progress. |
 
+### MCP
+
+| Tool                                              | Kind     | Description                                                            |
+| :------------------------------------------------ | :------- | :--------------------------------------------------------------------- |
+| [`list_mcp_resources`](../tools/mcp-resources.md) | `Search` | Lists all available resources exposed by connected MCP servers.        |
+| [`read_mcp_resource`](../tools/mcp-resources.md)  | `Read`   | Reads the content of a specific Model Context Protocol (MCP) resource. |
+
 ### Memory
 
 | Tool                                             | Kind    | Description                                                                          |
