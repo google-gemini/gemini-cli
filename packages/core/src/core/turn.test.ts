@@ -733,7 +733,7 @@ describe('Turn', () => {
       },
       {
         description: 'should yield thought events with traceId',
-        part: { text: '[Thought: thinking]', thought: 'thinking' },
+        part: { text: '[Thought: thinking]', thought: true },
         responseId: 'trace-456',
         expectedEvent: {
           type: GeminiEventType.Thought,
@@ -774,7 +774,7 @@ describe('Turn', () => {
               {
                 content: {
                   parts: [
-                    { text: '**Planning** the solution', thought: 'planning' },
+                    { text: '**Planning** the solution', thought: true },
                     { text: 'I will help you with that.' },
                   ],
                 },

@@ -334,7 +334,7 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       family: 'gemma-4',
       isPreview: true,
       isVisible: true,
-      features: { thinking: false, multimodalToolUse: false },
+      features: { thinking: true, multimodalToolUse: false },
     },
     'gemma-4-31b-it': {
       tier: 'pro',
