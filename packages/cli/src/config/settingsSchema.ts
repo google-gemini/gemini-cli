@@ -354,6 +354,18 @@ const SETTINGS_SCHEMA = {
         description: 'Enable debug logging of keystrokes to the console.',
         showInDialog: true,
       },
+      idleShutdownMinutes: {
+        type: 'number',
+        label: 'Idle Shutdown (minutes)',
+        category: 'General',
+        requiresRestart: false,
+        default: undefined as number | undefined,
+        description: oneLine`
+          Automatically close the CLI after this many minutes of inactivity
+          (waiting for user input). Leave unset or set to 0 to disable.
+        `,
+        showInDialog: true,
+      },
       sessionRetention: {
         type: 'object',
         label: 'Session Retention',

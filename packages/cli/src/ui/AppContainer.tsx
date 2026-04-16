@@ -1739,6 +1739,25 @@ Logging in with Google... Restarting Gemini CLI to continue.
     }
   }, [ideNeedsRestart]);
 
+  const idleShutdownMinutes = settings.merged.general.idleShutdownMinutes;
+  useEffect(() => {
+    if (!idleShutdownMinutes || idleShutdownMinutes <= 0) {
+      return;
+    }
+    if (streamingState !== StreamingState.Idle) {
+      return;
+    }
+    const timer = setTimeout(
+      () => {
+        void handleSlashCommand('/quit', undefined, undefined, false);
+      },
+      idleShutdownMinutes * 60 * 1000,
+    );
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [streamingState, idleShutdownMinutes, handleSlashCommand]);
+
   useEffect(() => {
     if (isInitialMount.current) {
       isInitialMount.current = false;
