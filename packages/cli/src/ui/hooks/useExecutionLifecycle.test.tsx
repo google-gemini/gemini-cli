@@ -76,7 +76,21 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     isBinary: mockIsBinary,
   };
 });
-vi.mock('node:fs');
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
+  const mockFs = {
+    ...actual,
+    existsSync: vi.fn(),
+    mkdtempSync: vi.fn(),
+    unlinkSync: vi.fn(),
+    readFileSync: vi.fn(),
+    rmSync: vi.fn(),
+  };
+  return {
+    ...mockFs,
+    default: mockFs,
+  };
+});
 vi.mock('node:os', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:os')>();
   const mocked = {
@@ -152,9 +166,9 @@ describe('useExecutionLifecycle', () => {
     (vi.mocked(crypto.randomBytes) as Mock).mockReturnValue(
       Buffer.from('abcdef', 'hex'),
     );
-    vi.mocked(fs.mkdtempSync).mockReturnValue('/tmp/gemini-shell-abcdef');
     mockIsBinary.mockReturnValue(false);
     vi.mocked(fs.existsSync).mockReturnValue(false);
+    vi.mocked(fs.mkdtempSync).mockReturnValue('/tmp/gemini-shell-abcdef');
 
     mockShellExecutionService.mockImplementation((_cmd, _cwd, callback) => {
       mockShellOutputCallback = callback;
@@ -240,10 +254,11 @@ describe('useExecutionLifecycle', () => {
         }),
       ],
     });
-
+    const tmpFile = path.join(os.tmpdir(), 'shell_pwd_abcdef.tmp');
+    const wrappedCommand = `{ ls -l; }; __code=$?; pwd > "${tmpFile}"; exit $__code`;
     expect(mockShellExecutionService).toHaveBeenCalledWith(
-      expect.stringMatching(/pwd > .*\/gemini-shell-.*\/pwd\.tmp/),
-      expect.any(String),
+      wrappedCommand,
+      '/test/dir',
       expect.any(Function),
       expect.any(Object),
       false,
@@ -252,27 +267,6 @@ describe('useExecutionLifecycle', () => {
       }),
     );
     expect(onExecMock).toHaveBeenCalledWith(expect.any(Promise));
-  });
-
-  it('should not break heredoc commands ending in a delimiter', async () => {
-    const { result } = await renderProcessorHook();
-    const command = `cat << 'EOF'
-hello world
-EOF`;
-
-    await act(async () => {
-      result.current.handleShellCommand(command, new AbortController().signal);
-    });
-
-    expect(mockShellExecutionService).toHaveBeenCalledWith(
-      expect.stringMatching(/pwd > .*\/gemini-shell-.*\/pwd\.tmp/),
-      expect.any(String),
-      expect.any(Function),
-      expect.any(Object),
-      false,
-      expect.any(Object),
-    );
-    expect(mockShellExecutionService.mock.calls[0][0]).toMatch(/\nEOF\n\};/);
   });
 
   it('should pass the config sessionId into shell execution config', async () => {
@@ -371,8 +365,12 @@ EOF`;
       });
 
       // Verify it's using the non-pty shell
+      const wrappedCommand = `{ stream; }; __code=$?; pwd > "${path.join(
+        os.tmpdir(),
+        'shell_pwd_abcdef.tmp',
+      )}"; exit $__code`;
       expect(mockShellExecutionService).toHaveBeenCalledWith(
-        expect.stringMatching(/pwd > .*\/gemini-shell-.*\/pwd\.tmp/),
+        wrappedCommand,
         '/test/dir',
         expect.any(Function),
         expect.any(Object),

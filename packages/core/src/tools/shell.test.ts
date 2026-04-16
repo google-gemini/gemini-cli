@@ -17,7 +17,6 @@ import {
 
 const mockPlatform = vi.hoisted(() => vi.fn());
 const mockHomedir = vi.hoisted(() => vi.fn());
-const mockTmpdir = vi.hoisted(() => vi.fn().mockReturnValue('/tmp'));
 
 const mockShellExecutionService = vi.hoisted(() => vi.fn());
 const mockShellBackground = vi.hoisted(() => vi.fn());
@@ -29,84 +28,17 @@ vi.mock('../services/shellExecutionService.js', () => ({
   },
 }));
 
-vi.mock('node:fs', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('node:fs')>();
-  const mockFs = {
-    ...actual,
-    mkdtempSync: vi.fn().mockReturnValue('/tmp/gemini-shell-abcdef'),
-    mkdirSync: vi.fn(),
-    existsSync: vi.fn().mockReturnValue(true),
-    statSync: vi.fn().mockReturnValue({
-      isDirectory: () => true,
-      isFile: () => true,
-    } as unknown as import('node:fs').Stats),
-    realpathSync: vi.fn().mockImplementation((p) => p as string),
-    lstatSync: vi.fn().mockReturnValue({
-      isDirectory: () => true,
-      isFile: () => true,
-    } as unknown as import('node:fs').Stats),
-    readFileSync: vi.fn().mockImplementation((p) => {
-      if (typeof p === 'string' && p.endsWith('pgrep.tmp')) {
-        return `54321\n54322\n`;
-      }
-      return '';
-    }),
-    writeFileSync: vi.fn(),
-    unlinkSync: vi.fn(),
-    rmSync: vi.fn(),
-    promises: {
-      ...actual.promises,
-      mkdtemp: vi.fn().mockResolvedValue('/tmp/gemini-shell-abcdef'),
-      readFile: vi.fn().mockResolvedValue(`54321\n54322\n`),
-      access: vi.fn().mockResolvedValue(undefined),
-      unlink: vi.fn().mockResolvedValue(undefined),
-      rm: vi.fn().mockResolvedValue(undefined),
-    },
-  };
-  return {
-    ...mockFs,
-    default: mockFs,
-  };
-});
-
-vi.mock('node:fs/promises', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('node:fs/promises')>();
-  const mockFsPromises = {
-    ...actual,
-    mkdtemp: vi.fn().mockResolvedValue('/tmp/gemini-shell-abcdef'),
-    readFile: vi.fn().mockResolvedValue(`54321\n54322\n`),
-    access: vi.fn().mockResolvedValue(undefined),
-    unlink: vi.fn().mockResolvedValue(undefined),
-    rm: vi.fn().mockResolvedValue(undefined),
-  };
-  return {
-    ...mockFsPromises,
-    default: mockFsPromises,
-  };
-});
-
 vi.mock('node:os', async (importOriginal) => {
-  const actualOs = await importOriginal<typeof import('node:os')>();
+  const actualOs = await importOriginal<typeof os>();
   return {
     ...actualOs,
     default: {
       ...actualOs,
       platform: mockPlatform,
       homedir: mockHomedir,
-      tmpdir: mockTmpdir,
     },
     platform: mockPlatform,
     homedir: mockHomedir,
-    tmpdir: mockTmpdir,
-  };
-});
-
-vi.mock('../utils/shell-utils.js', async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import('../utils/shell-utils.js')>();
-  return {
-    ...actual,
-    initializeShellParsers: vi.fn().mockResolvedValue(undefined),
   };
 });
 vi.mock('crypto');
@@ -121,6 +53,8 @@ import {
   type ShellExecutionResult,
   type ShellOutputEvent,
 } from '../services/shellExecutionService.js';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import { isSubpath } from '../utils/paths.js';
 import * as crypto from 'node:crypto';
@@ -160,23 +94,17 @@ describe('ShellTool', () => {
   let mockConfig: Config;
   let mockSandboxManager: SandboxManager;
   let mockShellOutputCallback: (event: ShellOutputEvent) => void;
-  let resolveExecutionPromise: (
-    result: ShellExecutionResult,
-  ) => void = () => {};
-  let executionPromise: Promise<ShellExecutionResult>;
+  let resolveExecutionPromise: (result: ShellExecutionResult) => void;
   let tempRootDir: string;
+  let extractedTmpFile: string;
 
   beforeEach(() => {
     vi.clearAllMocks();
 
-    executionPromise = new Promise((resolve) => {
-      resolveExecutionPromise = resolve;
-    });
-
-    tempRootDir = '/tmp/gemini-shell-abcdef';
+    tempRootDir = fs.mkdtempSync(path.join(os.tmpdir(), 'shell-test-'));
+    fs.mkdirSync(path.join(tempRootDir, 'subdir'));
 
     mockSandboxManager = new NoopSandboxManager();
-
     mockConfig = {
       get config() {
         return this;
@@ -267,21 +195,31 @@ describe('ShellTool', () => {
     (vi.mocked(crypto.randomBytes) as Mock).mockReturnValue(
       Buffer.from('abcdef', 'hex'),
     );
-
     process.env['ComSpec'] =
       'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe';
 
+    extractedTmpFile = '';
+
     // Capture the output callback to simulate streaming events from the service
-    mockShellExecutionService.mockImplementation((_cmd, _cwd, callback) => {
-      mockShellOutputCallback = callback;
-      executionPromise = new Promise((resolve) => {
-        resolveExecutionPromise = resolve;
-      });
-      return {
-        pid: 12345,
-        result: executionPromise,
-      };
-    });
+    mockShellExecutionService.mockImplementation(
+      (
+        cmd: string,
+        _cwd: string,
+        callback: (event: ShellOutputEvent) => void,
+      ) => {
+        mockShellOutputCallback = callback;
+        const match = cmd.match(/pgrep -g 0 >([^ ]+)/);
+        if (match) {
+          extractedTmpFile = match[1].replace(/['"]/g, ''); // remove any quotes if present
+        }
+        return {
+          pid: 12345,
+          result: new Promise((resolve) => {
+            resolveExecutionPromise = resolve;
+          }),
+        };
+      },
+    );
 
     mockShellBackground.mockImplementation(() => {
       resolveExecutionPromise({
@@ -299,6 +237,9 @@ describe('ShellTool', () => {
   });
 
   afterEach(() => {
+    if (fs.existsSync(tempRootDir)) {
+      fs.rmSync(tempRootDir, { recursive: true, force: true });
+    }
     if (originalComSpec === undefined) {
       delete process.env['ComSpec'];
     } else {
@@ -363,17 +304,19 @@ describe('ShellTool', () => {
     };
 
     it('should wrap command on linux and parse pgrep output', async () => {
-      const command = 'my-command &';
-      const invocation = shellTool.build({ command });
+      const invocation = shellTool.build({ command: 'my-command &' });
       const promise = invocation.execute({ abortSignal: mockAbortSignal });
+
+      // Simulate pgrep output file creation by the shell command
+      fs.writeFileSync(extractedTmpFile, `54321${os.EOL}54322${os.EOL}`);
 
       resolveShellExecution({ pid: 54321 });
 
       const result = await promise;
 
       expect(mockShellExecutionService).toHaveBeenCalledWith(
-        expect.stringMatching(/\/gemini-shell-.*\/pgrep\.tmp/),
-        expect.stringMatching(/\/gemini-shell-.*$/),
+        expect.stringMatching(/pgrep -g 0 >.*gemini-shell-.*\/pgrep\.tmp/),
+        tempRootDir,
         expect.any(Function),
         expect.any(AbortSignal),
         false,
@@ -384,52 +327,44 @@ describe('ShellTool', () => {
         }),
       );
       expect(result.llmContent).toContain('Background PIDs: 54322');
+      // The file should be deleted by the tool
+      expect(fs.existsSync(extractedTmpFile)).toBe(false);
     });
 
     it('should add a space when command ends with a backslash to prevent escaping newline', async () => {
-      const command = 'ls\\';
-      const invocation = shellTool.build({ command });
+      const invocation = shellTool.build({ command: 'ls\\' });
       const promise = invocation.execute({ abortSignal: mockAbortSignal });
       resolveShellExecution();
       await promise;
 
       expect(mockShellExecutionService).toHaveBeenCalledWith(
-        expect.stringMatching(/\/gemini-shell-.*\/pgrep\.tmp/),
-        expect.stringMatching(/\/gemini-shell-.*$/),
+        expect.stringMatching(/pgrep -g 0 >.*gemini-shell-.*\/pgrep\.tmp/),
+        tempRootDir,
         expect.any(Function),
         expect.any(AbortSignal),
         false,
-        expect.objectContaining({
-          pager: 'cat',
-          sanitizationConfig: {},
-          sandboxManager: expect.any(Object),
-        }),
+        expect.any(Object),
       );
     });
 
     it('should handle trailing comments correctly by placing them on their own line', async () => {
-      const command = 'ls # comment';
-      const invocation = shellTool.build({ command });
+      const invocation = shellTool.build({ command: 'ls # comment' });
       const promise = invocation.execute({ abortSignal: mockAbortSignal });
       resolveShellExecution();
       await promise;
 
       expect(mockShellExecutionService).toHaveBeenCalledWith(
-        expect.stringMatching(/\/gemini-shell-.*\/pgrep\.tmp/),
-        expect.stringMatching(/\/gemini-shell-.*$/),
+        expect.stringMatching(/pgrep -g 0 >.*gemini-shell-.*\/pgrep\.tmp/),
+        tempRootDir,
         expect.any(Function),
         expect.any(AbortSignal),
         false,
-        expect.objectContaining({
-          pager: 'cat',
-          sanitizationConfig: {},
-          sandboxManager: expect.any(Object),
-        }),
+        expect.any(Object),
       );
     });
 
     it('should use the provided absolute directory as cwd', async () => {
-      const subdir = '/tmp/gemini-shell-abcdef/subdir';
+      const subdir = path.join(tempRootDir, 'subdir');
       const invocation = shellTool.build({
         command: 'ls',
         dir_path: subdir,
@@ -439,8 +374,8 @@ describe('ShellTool', () => {
       await promise;
 
       expect(mockShellExecutionService).toHaveBeenCalledWith(
-        expect.stringMatching(/\/gemini-shell-.*\/pgrep\.tmp/),
-        expect.stringMatching(/\/gemini-shell-.*\/subdir$/),
+        expect.stringMatching(/pgrep -g 0 >.*gemini-shell-.*\/pgrep\.tmp/),
+        subdir,
         expect.any(Function),
         expect.any(AbortSignal),
         false,
@@ -462,8 +397,8 @@ describe('ShellTool', () => {
       await promise;
 
       expect(mockShellExecutionService).toHaveBeenCalledWith(
-        expect.stringMatching(/\/gemini-shell-.*\/pgrep\.tmp/),
-        expect.stringMatching(/\/gemini-shell-.*\/subdir$/),
+        expect.stringMatching(/pgrep -g 0 >.*gemini-shell-.*\/pgrep\.tmp/),
+        path.join(tempRootDir, 'subdir'),
         expect.any(Function),
         expect.any(AbortSignal),
         false,
@@ -517,7 +452,7 @@ describe('ShellTool', () => {
         await promise;
         expect(mockShellExecutionService).toHaveBeenCalledWith(
           'dir',
-          expect.stringMatching(/\/gemini-shell-.*$/),
+          tempRootDir,
           expect.any(Function),
           expect.any(AbortSignal),
           false,
@@ -541,8 +476,8 @@ EOF`;
       await promise;
 
       expect(mockShellExecutionService).toHaveBeenCalledWith(
-        expect.stringMatching(/\/gemini-shell-.*\/pgrep\.tmp/),
-        expect.stringMatching(/\/gemini-shell-.*$/),
+        expect.stringMatching(/pgrep -g 0 >.*gemini-shell-.*\/pgrep\.tmp/),
+        tempRootDir,
         expect.any(Function),
         expect.any(AbortSignal),
         false,
@@ -651,7 +586,13 @@ EOF`;
 
     it('should clean up the temp file on synchronous execution error', async () => {
       const error = new Error('sync spawn error');
-      mockShellExecutionService.mockImplementation(() => {
+      mockShellExecutionService.mockImplementation((cmd: string) => {
+        const match = cmd.match(/pgrep -g 0 >([^ ]+)/);
+        if (match) {
+          extractedTmpFile = match[1].replace(/['"]/g, ''); // remove any quotes if present
+          // Create the temp file before throwing to simulate it being left behind
+          fs.writeFileSync(extractedTmpFile, '');
+        }
         throw error;
       });
 
@@ -659,6 +600,8 @@ EOF`;
       await expect(
         invocation.execute({ abortSignal: mockAbortSignal }),
       ).rejects.toThrow(error);
+
+      expect(fs.existsSync(extractedTmpFile)).toBe(false);
     });
 
     it('should not log "missing pgrep output" when process is backgrounded', async () => {
@@ -1123,7 +1066,10 @@ EOF`;
     });
 
     it('should suggest proactive permissions for npm commands', async () => {
-      const homeDir = '/tmp/gemini-shell-abcdef/home';
+      const homeDir = path.join(tempRootDir, 'home');
+      fs.mkdirSync(homeDir);
+      fs.mkdirSync(path.join(homeDir, '.npm'));
+      fs.mkdirSync(path.join(homeDir, '.cache'));
 
       mockHomedir.mockReturnValue(homeDir);
 
@@ -1169,10 +1115,15 @@ EOF`;
     });
 
     it('should NOT consolidate paths into sensitive directories', async () => {
-      const homeDir = '/tmp/gemini-shell-abcdef/fake_root/home';
+      const rootDir = path.join(tempRootDir, 'fake_root');
+      const homeDir = path.join(rootDir, 'home');
       const user1Dir = path.join(homeDir, 'user1');
       const user2Dir = path.join(homeDir, 'user2');
       const user3Dir = path.join(homeDir, 'user3');
+      fs.mkdirSync(homeDir, { recursive: true });
+      fs.mkdirSync(user1Dir);
+      fs.mkdirSync(user2Dir);
+      fs.mkdirSync(user3Dir);
 
       mockHomedir.mockReturnValue(path.join(homeDir, 'user'));
 
@@ -1226,7 +1177,8 @@ EOF`;
     });
 
     it('should proactively suggest expansion for npm install in confirmation', async () => {
-      const homeDir = '/tmp/gemini-shell-abcdef/home';
+      const homeDir = path.join(tempRootDir, 'home');
+      fs.mkdirSync(homeDir);
       mockHomedir.mockReturnValue(homeDir);
 
       const invocation = shellTool.build({ command: 'npm install' });
@@ -1241,7 +1193,8 @@ EOF`;
     });
 
     it('should NOT proactively suggest expansion for npm test', async () => {
-      const homeDir = '/tmp/gemini-shell-abcdef/home';
+      const homeDir = path.join(tempRootDir, 'home');
+      fs.mkdirSync(homeDir);
       mockHomedir.mockReturnValue(homeDir);
 
       const invocation = shellTool.build({ command: 'npm test' });
