@@ -55,6 +55,7 @@ import { statsCommand } from '../ui/commands/statsCommand.js';
 import { themeCommand } from '../ui/commands/themeCommand.js';
 import { toolsCommand } from '../ui/commands/toolsCommand.js';
 import { skillsCommand } from '../ui/commands/skillsCommand.js';
+import { reloadCommand } from '../ui/commands/reloadCommand.js';
 import { settingsCommand } from '../ui/commands/settingsCommand.js';
 import { tasksCommand } from '../ui/commands/tasksCommand.js';
 import { vimCommand } from '../ui/commands/vimCommand.js';
@@ -187,6 +188,7 @@ export class BuiltinCommandLoader implements ICommandLoader {
       ...(this.config?.isPlanEnabled() ? [planCommand] : []),
       policiesCommand,
       privacyCommand,
+      reloadCommand,
       ...(isDevelopment ? [profileCommand] : []),
       quitCommand,
       restoreCommand(this.config),
