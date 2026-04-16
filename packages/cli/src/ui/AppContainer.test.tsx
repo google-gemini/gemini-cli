@@ -53,6 +53,7 @@ const mocks = vi.hoisted(() => ({
 const terminalNotificationsMocks = vi.hoisted(() => ({
   notifyViaTerminal: vi.fn().mockResolvedValue(true),
   isNotificationsEnabled: vi.fn(() => true),
+  getNotificationMethod: vi.fn(() => 'auto'),
   buildRunEventNotificationContent: vi.fn((event) => ({
     title: 'Mock Notification',
     subtitle: 'Mock Subtitle',
@@ -194,6 +195,7 @@ vi.mock('./hooks/useShellInactivityStatus.js', () => ({
 vi.mock('../utils/terminalNotifications.js', () => ({
   notifyViaTerminal: terminalNotificationsMocks.notifyViaTerminal,
   isNotificationsEnabled: terminalNotificationsMocks.isNotificationsEnabled,
+  getNotificationMethod: terminalNotificationsMocks.getNotificationMethod,
   buildRunEventNotificationContent:
     terminalNotificationsMocks.buildRunEventNotificationContent,
 }));

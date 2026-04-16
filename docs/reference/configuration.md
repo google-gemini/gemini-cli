@@ -134,9 +134,14 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `true`
 
 - **`general.enableNotifications`** (boolean):
-  - **Description:** Enable run-event notifications for action-required prompts
-    and session completion.
+  - **Description:** Enable terminal run-event notifications for action-required
+    prompts and session completion.
   - **Default:** `false`
+
+- **`general.notificationMethod`** (enum):
+  - **Description:** How to send terminal notifications.
+  - **Default:** `"auto"`
+  - **Values:** `"auto"`, `"osc9"`, `"osc777"`, `"bell"`
 
 - **`general.checkpointing.enabled`** (boolean):
   - **Description:** Enable session checkpointing for recovery

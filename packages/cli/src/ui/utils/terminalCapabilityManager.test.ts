@@ -365,76 +365,123 @@ describe('TerminalCapabilityManager', () => {
     );
   });
 
-  describe('supportsOsc9Notifications', () => {
+  describe('isTmux', () => {
     const manager = TerminalCapabilityManager.getInstance();
 
-    it.each([
-      {
-        name: 'WezTerm (terminal name)',
-        terminalName: 'WezTerm',
-        env: {},
-        expected: true,
-      },
-      {
-        name: 'iTerm.app (terminal name)',
-        terminalName: 'iTerm.app',
-        env: {},
-        expected: true,
-      },
-      {
-        name: 'ghostty (terminal name)',
-        terminalName: 'ghostty',
-        env: {},
-        expected: true,
-      },
-      {
-        name: 'kitty (terminal name)',
-        terminalName: 'kitty',
-        env: {},
-        expected: true,
-      },
-      {
-        name: 'some-other-term (terminal name)',
-        terminalName: 'some-other-term',
-        env: {},
-        expected: false,
-      },
-      {
-        name: 'iTerm.app (TERM_PROGRAM)',
-        terminalName: undefined,
-        env: { TERM_PROGRAM: 'iTerm.app' },
-        expected: true,
-      },
-      {
-        name: 'vscode (TERM_PROGRAM)',
-        terminalName: undefined,
-        env: { TERM_PROGRAM: 'vscode' },
-        expected: false,
-      },
-      {
-        name: 'xterm-kitty (TERM)',
-        terminalName: undefined,
-        env: { TERM: 'xterm-kitty' },
-        expected: true,
-      },
-      {
-        name: 'xterm-256color (TERM)',
-        terminalName: undefined,
-        env: { TERM: 'xterm-256color' },
-        expected: false,
-      },
-      {
-        name: 'Windows Terminal (WT_SESSION)',
-        terminalName: 'iTerm.app',
-        env: { WT_SESSION: 'some-guid' },
-        expected: false,
-      },
-    ])(
-      'should return $expected for $name',
-      ({ terminalName, env, expected }) => {
-        vi.spyOn(manager, 'getTerminalName').mockReturnValue(terminalName);
-        expect(manager.supportsOsc9Notifications(env)).toBe(expected);
-      },
-    );
+    it('returns true when TMUX is set', () => {
+      expect(manager.isTmux({ TMUX: '1' })).toBe(true);
+      expect(manager.isTmux({ TMUX: 'tmux-1234' })).toBe(true);
+    });
+
+    it('returns false when TMUX is not set', () => {
+      expect(manager.isTmux({})).toBe(false);
+      expect(manager.isTmux({ STY: '1' })).toBe(false);
+    });
+  });
+
+  describe('isScreen', () => {
+    const manager = TerminalCapabilityManager.getInstance();
+
+    it('returns true when STY is set', () => {
+      expect(manager.isScreen({ STY: '1' })).toBe(true);
+      expect(manager.isScreen({ STY: 'screen.1234' })).toBe(true);
+    });
+
+    it('returns false when STY is not set', () => {
+      expect(manager.isScreen({})).toBe(false);
+      expect(manager.isScreen({ TMUX: '1' })).toBe(false);
+    });
+  });
+
+  describe('isITerm2', () => {
+    const manager = TerminalCapabilityManager.getInstance();
+
+    it('returns true when iTerm is in terminal name', () => {
+      vi.spyOn(manager, 'getTerminalName').mockReturnValue('iTerm.app');
+      expect(manager.isITerm2({})).toBe(true);
+    });
+
+    it('returns true when TERM_PROGRAM is iTerm.app', () => {
+      vi.spyOn(manager, 'getTerminalName').mockReturnValue(undefined);
+      expect(manager.isITerm2({ TERM_PROGRAM: 'iTerm.app' })).toBe(true);
+    });
+
+    it('returns false otherwise', () => {
+      vi.spyOn(manager, 'getTerminalName').mockReturnValue('xterm');
+      expect(manager.isITerm2({ TERM_PROGRAM: 'Apple_Terminal' })).toBe(false);
+    });
+  });
+
+  describe('isAlacritty', () => {
+    const manager = TerminalCapabilityManager.getInstance();
+
+    it('returns true when ALACRITTY_WINDOW_ID is set', () => {
+      vi.spyOn(manager, 'getTerminalName').mockReturnValue(undefined);
+      expect(manager.isAlacritty({ ALACRITTY_WINDOW_ID: '123' })).toBe(true);
+    });
+
+    it('returns true when TERM is alacritty', () => {
+      vi.spyOn(manager, 'getTerminalName').mockReturnValue(undefined);
+      expect(manager.isAlacritty({ TERM: 'alacritty' })).toBe(true);
+    });
+
+    it('returns true when terminal name contains alacritty', () => {
+      vi.spyOn(manager, 'getTerminalName').mockReturnValue('alacritty');
+      expect(manager.isAlacritty({})).toBe(true);
+    });
+
+    it('returns false otherwise', () => {
+      vi.spyOn(manager, 'getTerminalName').mockReturnValue(undefined);
+      expect(manager.isAlacritty({ TERM: 'xterm' })).toBe(false);
+    });
+  });
+
+  describe('isAppleTerminal', () => {
+    const manager = TerminalCapabilityManager.getInstance();
+
+    it('returns true when apple_terminal is in terminal name', () => {
+      vi.spyOn(manager, 'getTerminalName').mockReturnValue('apple_terminal');
+      expect(manager.isAppleTerminal({})).toBe(true);
+    });
+
+    it('returns true when TERM_PROGRAM is Apple_Terminal', () => {
+      vi.spyOn(manager, 'getTerminalName').mockReturnValue(undefined);
+      expect(manager.isAppleTerminal({ TERM_PROGRAM: 'Apple_Terminal' })).toBe(
+        true,
+      );
+    });
+
+    it('returns false otherwise', () => {
+      vi.spyOn(manager, 'getTerminalName').mockReturnValue('xterm');
+      expect(manager.isAppleTerminal({ TERM_PROGRAM: 'iTerm.app' })).toBe(
+        false,
+      );
+    });
+  });
+
+  describe('isVSCodeTerminal', () => {
+    const manager = TerminalCapabilityManager.getInstance();
+
+    it('returns true when TERM_PROGRAM is vscode', () => {
+      expect(manager.isVSCodeTerminal({ TERM_PROGRAM: 'vscode' })).toBe(true);
+    });
+
+    it('returns false otherwise', () => {
+      expect(manager.isVSCodeTerminal({ TERM_PROGRAM: 'iTerm.app' })).toBe(
+        false,
+      );
+    });
+  });
+
+  describe('isWindowsTerminal', () => {
+    const manager = TerminalCapabilityManager.getInstance();
+
+    it('returns true when WT_SESSION is set', () => {
+      expect(manager.isWindowsTerminal({ WT_SESSION: 'some-guid' })).toBe(true);
+    });
+
+    it('returns false otherwise', () => {
+      expect(manager.isWindowsTerminal({})).toBe(false);
+    });
   });
 });

@@ -15,12 +15,8 @@ export const MAX_NOTIFICATION_BODY_CHARS = 180;
 
 const BEL = '\x07';
 const OSC9_PREFIX = '\x1b]9;';
-const OSC9_SEPARATOR = ' | ';
-const MAX_OSC9_MESSAGE_CHARS =
-  MAX_NOTIFICATION_TITLE_CHARS +
-  MAX_NOTIFICATION_SUBTITLE_CHARS +
-  MAX_NOTIFICATION_BODY_CHARS +
-  OSC9_SEPARATOR.length * 2;
+const OSC777_PREFIX = '\x1b]777;notify;';
+const OSC_TEXT_SEPARATOR = ' | ';
 
 export interface RunEventNotificationContent {
   title: string;
@@ -81,36 +77,100 @@ export function isNotificationsEnabled(settings: LoadedSettings): boolean {
   return general?.enableNotifications === true;
 }
 
-function buildTerminalNotificationMessage(
-  content: RunEventNotificationContent,
-): string {
-  const pieces = [content.title, content.subtitle, content.body].filter(
-    Boolean,
-  );
-  const combined = pieces.join(OSC9_SEPARATOR);
-  return sanitizeForDisplay(combined, MAX_OSC9_MESSAGE_CHARS);
+export enum TerminalNotificationMethod {
+  Auto = 'auto',
+  Osc9 = 'osc9',
+  Osc777 = 'osc777',
+  Bell = 'bell',
+}
+
+export function getNotificationMethod(
+  settings: LoadedSettings,
+): TerminalNotificationMethod {
+  switch (settings.merged.general?.notificationMethod) {
+    case TerminalNotificationMethod.Osc9:
+      return TerminalNotificationMethod.Osc9;
+    case TerminalNotificationMethod.Osc777:
+      return TerminalNotificationMethod.Osc777;
+    case TerminalNotificationMethod.Bell:
+      return TerminalNotificationMethod.Bell;
+    default:
+      return TerminalNotificationMethod.Auto;
+  }
+}
+
+function wrapWithPassthrough(sequence: string): string {
+  const capabilityManager = TerminalCapabilityManager.getInstance();
+  if (capabilityManager.isTmux()) {
+    // eslint-disable-next-line no-control-regex
+    return `\x1bPtmux;${sequence.replace(/\x1b/g, '\x1b\x1b')}\x1b\\`;
+  } else if (capabilityManager.isScreen()) {
+    return `\x1bP${sequence}\x1b\\`;
+  }
+  return sequence;
 }
 
 function emitOsc9Notification(content: RunEventNotificationContent): void {
-  const message = buildTerminalNotificationMessage(content);
-  if (!TerminalCapabilityManager.getInstance().supportsOsc9Notifications()) {
-    writeToStdout(BEL);
-    return;
-  }
+  const sanitized = sanitizeNotificationContent(content);
+  const pieces = [sanitized.title, sanitized.subtitle, sanitized.body].filter(
+    Boolean,
+  );
+  const combined = pieces.join(OSC_TEXT_SEPARATOR);
 
-  writeToStdout(`${OSC9_PREFIX}${message}${BEL}`);
+  writeToStdout(wrapWithPassthrough(`${OSC9_PREFIX}${combined}${BEL}`));
+}
+
+function emitOsc777Notification(content: RunEventNotificationContent): void {
+  const sanitized = sanitizeNotificationContent(content);
+  const bodyParts = [sanitized.subtitle, sanitized.body].filter(Boolean);
+  const body = bodyParts.join(OSC_TEXT_SEPARATOR);
+
+  // Replace ';' with ':' to avoid breaking the OSC 777 sequence
+  const safeTitle = sanitized.title.replace(/;/g, ':');
+  const safeBody = body.replace(/;/g, ':');
+
+  writeToStdout(
+    wrapWithPassthrough(`${OSC777_PREFIX}${safeTitle};${safeBody}${BEL}`),
+  );
+}
+
+function emitBellNotification(): void {
+  writeToStdout(BEL);
 }
 
 export async function notifyViaTerminal(
   notificationsEnabled: boolean,
   content: RunEventNotificationContent,
+  method: TerminalNotificationMethod = TerminalNotificationMethod.Auto,
 ): Promise<boolean> {
   if (!notificationsEnabled) {
     return false;
   }
 
   try {
-    emitOsc9Notification(sanitizeNotificationContent(content));
+    if (method === TerminalNotificationMethod.Osc9) {
+      emitOsc9Notification(content);
+    } else if (method === TerminalNotificationMethod.Osc777) {
+      emitOsc777Notification(content);
+    } else if (method === TerminalNotificationMethod.Bell) {
+      emitBellNotification();
+    } else {
+      // auto
+      const capabilityManager = TerminalCapabilityManager.getInstance();
+      if (capabilityManager.isITerm2()) {
+        emitOsc9Notification(content);
+      } else if (
+        capabilityManager.isAlacritty() ||
+        capabilityManager.isAppleTerminal() ||
+        capabilityManager.isVSCodeTerminal() ||
+        capabilityManager.isWindowsTerminal()
+      ) {
+        emitBellNotification();
+      } else {
+        emitOsc777Notification(content);
+      }
+    }
+
     return true;
   } catch (error) {
     debugLogger.debug('Failed to emit terminal notification:', error);
