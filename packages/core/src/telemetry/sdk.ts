@@ -91,8 +91,6 @@ class DiagLoggerAdapter {
   }
 }
 
-diag.setLogger(new DiagLoggerAdapter(), DiagLogLevel.INFO);
-
 let sdk: NodeSDK | undefined;
 let spanProcessor: BatchSpanProcessor | undefined;
 let logRecordProcessor: BatchLogRecordProcessor | undefined;
@@ -169,6 +167,8 @@ export async function initializeTelemetry(
   if (!config.getTelemetryEnabled()) {
     return;
   }
+
+  diag.setLogger(new DiagLoggerAdapter(), DiagLogLevel.INFO);
 
   if (telemetryInitialized) {
     if (
