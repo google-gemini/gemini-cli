@@ -19,6 +19,7 @@ import {
   type GeminiChat,
 } from './geminiChat.js';
 import { LlmRole } from '../telemetry/types.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 const mockSendMessageStream = vi.fn();
 const mockGetHistory = vi.fn();
@@ -241,6 +242,42 @@ describe('Turn', () => {
       expect(events).toEqual([{ type: GeminiEventType.InvalidStream }]);
       expect(turn.getDebugResponses().length).toBe(0);
       expect(reportError).not.toHaveBeenCalled(); // Should not report as error
+    });
+
+    it('should warn and skip stream events without a response body', async () => {
+      const warnSpy = vi
+        .spyOn(debugLogger, 'warn')
+        .mockImplementation(() => {});
+      const mockResponseStream = (async function* () {
+        yield {
+          type: StreamEventType.CHUNK,
+          value: undefined,
+        };
+        yield {
+          type: StreamEventType.CHUNK,
+          value: {
+            candidates: [{ content: { parts: [{ text: 'Recovered chunk' }] } }],
+          } as GenerateContentResponse,
+        };
+      })();
+      mockSendMessageStream.mockResolvedValue(mockResponseStream);
+
+      const events = [];
+      for await (const event of turn.run(
+        { model: 'gemini' },
+        [{ text: 'test skipped chunk' }],
+        new AbortController().signal,
+      )) {
+        events.push(event);
+      }
+
+      expect(events).toEqual([
+        { type: GeminiEventType.Content, value: 'Recovered chunk' },
+      ]);
+      expect(warnSpy).toHaveBeenCalledWith(
+        '[Turn.run] Received stream event without a response body; skipping chunk.',
+      );
+      expect(turn.getDebugResponses()).toHaveLength(1);
     });
 
     it('should yield Error event and report if sendMessageStream throws', async () => {

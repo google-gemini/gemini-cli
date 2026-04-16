@@ -38,6 +38,7 @@ import * as policyHelpers from '../availability/policyHelpers.js';
 import { makeResolvedModelConfig } from '../services/modelConfigServiceTestUtils.js';
 import type { HookSystem } from '../hooks/hookSystem.js';
 import { LlmRole } from '../telemetry/types.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 // Mock fs module to prevent actual file system operations during tests
 const mockFileSystem = new Map<string, string>();
@@ -434,6 +435,55 @@ describe('GeminiChat', () => {
       const modelTurn = history[1];
       expect(modelTurn?.parts?.length).toBe(1);
       expect(modelTurn?.parts![0].text).toBe('Initial valid content...');
+    });
+
+    it('should warn when invalid stream chunks are skipped before a valid completion', async () => {
+      const warnSpy = vi
+        .spyOn(debugLogger, 'warn')
+        .mockImplementation(() => {});
+      const streamWithInvalidChunk = (async function* () {
+        yield {
+          candidates: [],
+        } as unknown as GenerateContentResponse;
+        yield {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [{ text: 'Recovered response' }],
+              },
+              finishReason: 'STOP',
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+      })();
+
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        streamWithInvalidChunk,
+      );
+
+      const stream = await chat.sendMessageStream(
+        { model: 'test-model' },
+        'test message',
+        'prompt-id-invalid-then-valid',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+
+      await expect(
+        (async () => {
+          for await (const _ of stream) {
+            // consume stream
+          }
+        })(),
+      ).resolves.not.toThrow();
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        '[GeminiChat.processStreamResponse] Skipping invalid streaming response chunk.',
+      );
+      const history = chat.getHistory();
+      const modelTurn = history[1];
+      expect(modelTurn?.parts?.[0]?.text).toBe('Recovered response');
     });
 
     it('should consolidate subsequent text chunks after receiving an empty text chunk', async () => {

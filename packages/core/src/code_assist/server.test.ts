@@ -915,6 +915,29 @@ data: ${jsonString}
       expect(results[0]).toEqual(jsonObj);
     });
 
+    it('should parse a final SSE data chunk without a trailing blank line', async () => {
+      const { server, mockRequest } = createTestServer();
+      const { Readable } = await import('node:stream');
+      const jsonObj = { foo: 'bar' };
+
+      const mockStream = new Readable({
+        read() {
+          this.push(`data: ${JSON.stringify(jsonObj)}\n`);
+          this.push(null);
+        },
+      });
+      mockRequest.mockResolvedValueOnce({ data: mockStream });
+
+      const stream = await server.requestStreamingPost('testStream', {});
+      const results = [];
+      for await (const res of stream) {
+        results.push(res);
+      }
+
+      expect(results).toHaveLength(1);
+      expect(results[0]).toEqual(jsonObj);
+    });
+
     it('should log InvalidChunkEvent when SSE chunk is not valid JSON', async () => {
       const config = makeFakeConfig();
       const mockRequest = vi.fn();
