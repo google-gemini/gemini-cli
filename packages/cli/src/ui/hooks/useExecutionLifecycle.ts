@@ -364,10 +364,13 @@ export const useExecutionLifecycle = (
 
       // On non-windows, wrap the command to capture the final working directory.
       if (!isWindows) {
-        const command = rawQuery.trim();
-        const pwdFileName = `shell_pwd_${crypto.randomBytes(6).toString('hex')}.tmp`;
-        pwdFilePath = path.join(os.tmpdir(), pwdFileName);
-        commandToExecute = `{ ${command}\n}; __code=$?; pwd > "${pwdFilePath}"; exit $__code`;
+        let command = rawQuery.trim();
+        if (command.endsWith('\\')) {
+          command += ' ';
+        }
+        const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gemini-shell-'));
+        pwdFilePath = path.join(tmpDir, 'pwd.tmp');
+        commandToExecute = `{\n${command}\n}; __code=$?; pwd > "${pwdFilePath}"; exit $__code`;
       }
 
       const executeCommand = async () => {
@@ -626,8 +629,18 @@ export const useExecutionLifecycle = (
           );
         } finally {
           abortSignal.removeEventListener('abort', abortHandler);
-          if (pwdFilePath && fs.existsSync(pwdFilePath)) {
-            fs.unlinkSync(pwdFilePath);
+          if (pwdFilePath) {
+            const tmpDir = path.dirname(pwdFilePath);
+            try {
+              if (fs.existsSync(pwdFilePath)) {
+                fs.unlinkSync(pwdFilePath);
+              }
+              if (fs.existsSync(tmpDir)) {
+                fs.rmSync(tmpDir, { recursive: true, force: true });
+              }
+            } catch {
+              // Ignore cleanup errors
+            }
           }
 
           dispatch({ type: 'SET_ACTIVE_PTY', pid: null });

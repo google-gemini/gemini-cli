@@ -450,10 +450,12 @@ export class ShellToolInvocation extends BaseToolInvocation<
     }
 
     const isWindows = os.platform() === 'win32';
-    const tempFileName = `shell_pgrep_${crypto
-      .randomBytes(6)
-      .toString('hex')}.tmp`;
-    const tempFilePath = path.join(os.tmpdir(), tempFileName);
+    let tempFilePath = '';
+    let tempDir = '';
+    if (!isWindows) {
+      tempDir = await fsPromises.mkdtemp(path.join(os.tmpdir(), 'gemini-shell-'));
+      tempFilePath = path.join(tempDir, 'pgrep.tmp');
+    }
 
     const timeoutMs = this.context.config.getShellToolInactivityTimeout();
     const timeoutController = new AbortController();
@@ -935,10 +937,19 @@ export class ShellToolInvocation extends BaseToolInvocation<
       if (timeoutTimer) clearTimeout(timeoutTimer);
       signal.removeEventListener('abort', onAbort);
       timeoutController.signal.removeEventListener('abort', onAbort);
-      try {
-        await fsPromises.unlink(tempFilePath);
-      } catch {
-        // Ignore errors during unlink
+      if (tempFilePath) {
+        try {
+          await fsPromises.unlink(tempFilePath);
+        } catch {
+          // Ignore errors during unlink
+        }
+      }
+      if (tempDir) {
+        try {
+          await fsPromises.rm(tempDir, { recursive: true, force: true });
+        } catch {
+          // Ignore errors during rm
+        }
       }
     }
   }

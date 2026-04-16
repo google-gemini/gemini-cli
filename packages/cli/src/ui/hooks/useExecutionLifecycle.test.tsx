@@ -152,6 +152,7 @@ describe('useExecutionLifecycle', () => {
     (vi.mocked(crypto.randomBytes) as Mock).mockReturnValue(
       Buffer.from('abcdef', 'hex'),
     );
+    vi.mocked(fs.mkdtempSync).mockReturnValue('/tmp/gemini-shell-abcdef');
     mockIsBinary.mockReturnValue(false);
     vi.mocked(fs.existsSync).mockReturnValue(false);
 
@@ -239,8 +240,9 @@ describe('useExecutionLifecycle', () => {
         }),
       ],
     });
-    const tmpFile = path.join(os.tmpdir(), 'shell_pwd_abcdef.tmp');
-    const wrappedCommand = `{ ls -l\n}; __code=$?; pwd > "${tmpFile}"; exit $__code`;
+    const tmpDir = '/tmp/gemini-shell-abcdef';
+    const tmpFile = path.join(tmpDir, 'pwd.tmp');
+    const wrappedCommand = `{\nls -l\n}; __code=$?; pwd > "${tmpFile}"; exit $__code`;
     expect(mockShellExecutionService).toHaveBeenCalledWith(
       wrappedCommand,
       '/test/dir',
@@ -264,9 +266,10 @@ EOF`;
       result.current.handleShellCommand(command, new AbortController().signal);
     });
 
-    const tmpFile = path.join(os.tmpdir(), 'shell_pwd_abcdef.tmp');
+    const tmpDir = '/tmp/gemini-shell-abcdef';
+    const tmpFile = path.join(tmpDir, 'pwd.tmp');
     // Verify that the delimiter EOF is on its own line and NOT followed by a semicolon
-    const wrappedCommand = `{ ${command}\n}; __code=$?; pwd > "${tmpFile}"; exit $__code`;
+    const wrappedCommand = `{\n${command}\n}; __code=$?; pwd > "${tmpFile}"; exit $__code`;
     expect(mockShellExecutionService).toHaveBeenCalledWith(
       wrappedCommand,
       expect.any(String),
@@ -374,10 +377,9 @@ EOF`;
       });
 
       // Verify it's using the non-pty shell
-      const wrappedCommand = `{ stream\n}; __code=$?; pwd > "${path.join(
-        os.tmpdir(),
-        'shell_pwd_abcdef.tmp',
-      )}"; exit $__code`;
+      const tmpDir = '/tmp/gemini-shell-abcdef';
+      const tmpFile = path.join(tmpDir, 'pwd.tmp');
+      const wrappedCommand = `{\nstream\n}; __code=$?; pwd > "${tmpFile}"; exit $__code`;
       expect(mockShellExecutionService).toHaveBeenCalledWith(
         wrappedCommand,
         '/test/dir',
