@@ -158,6 +158,14 @@ const handleOutput = (payload: {
 };
 
 /**
+ * Returns the current console messages without requiring a React hook.
+ * Useful for non-component code like slash commands.
+ */
+export function getConsoleMessages(): ConsoleMessageItem[] {
+  return globalConsoleMessages;
+}
+
+/**
  * Hook to access the global console message history.
  * Decoupled from any component lifecycle to ensure history is preserved even
  * when the UI is unmounted.

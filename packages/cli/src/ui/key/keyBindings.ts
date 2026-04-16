@@ -112,6 +112,7 @@ export enum Command {
   UPDATE_EXTENSION = 'extension.update',
   LINK_EXTENSION = 'extension.link',
 
+  EXPORT_LOGS = 'app.exportLogs',
   DUMP_FRAME = 'app.dumpFrame',
   START_RECORDING = 'app.startRecording',
   STOP_RECORDING = 'app.stopRecording',
@@ -407,6 +408,7 @@ export const defaultKeyBindingConfig: KeyBindingConfig = new Map([
   [Command.RESTART_APP, [new KeyBinding('r'), new KeyBinding('shift+r')]],
   [Command.SUSPEND_APP, [new KeyBinding('ctrl+z')]],
   [Command.SHOW_SHELL_INPUT_UNFOCUS_WARNING, [new KeyBinding('tab')]],
+  [Command.EXPORT_LOGS, [new KeyBinding('f10')]],
   [Command.DUMP_FRAME, [new KeyBinding('f8')]],
   [Command.START_RECORDING, [new KeyBinding('f6')]],
   [Command.STOP_RECORDING, [new KeyBinding('f7')]],
@@ -538,6 +540,7 @@ export const commandCategories: readonly CommandCategory[] = [
       Command.RESTART_APP,
       Command.SUSPEND_APP,
       Command.SHOW_SHELL_INPUT_UNFOCUS_WARNING,
+      Command.EXPORT_LOGS,
     ],
   },
   {
@@ -678,6 +681,7 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.UPDATE_EXTENSION]: 'Update the current extension if available.',
   [Command.LINK_EXTENSION]: 'Link the current extension to a local path.',
 
+  [Command.EXPORT_LOGS]: 'Export debug console logs to a file.',
   [Command.DUMP_FRAME]: 'Dump the current frame as a snapshot.',
   [Command.START_RECORDING]: 'Start recording the session.',
   [Command.STOP_RECORDING]: 'Stop recording the session.',
