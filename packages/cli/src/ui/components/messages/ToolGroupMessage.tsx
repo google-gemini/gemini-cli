@@ -439,7 +439,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
               {isCompact ? (
                 <DenseToolMessage {...commonProps} />
               ) : isTopicToolCall ? (
-                <Box marginTop={1} marginBottom={1}>
+                <Box marginBottom={1}>
                   <TopicMessage {...commonProps} />
                 </Box>
               ) : isShellToolCall ? (
