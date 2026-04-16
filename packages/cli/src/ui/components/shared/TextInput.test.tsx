@@ -76,7 +76,7 @@ const mockedUseKeypress = useKeypress as Mock;
 const mockedUseTextBuffer = useTextBuffer as Mock;
 const mockedUseMouseClick = useMouseClick as Mock;
 
-describe('TextInput', () => {
+describe.sequential('TextInput', () => {
   const onCancel = vi.fn();
   const onSubmit = vi.fn();
   let mockBuffer: TextBuffer;
