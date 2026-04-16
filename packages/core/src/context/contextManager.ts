@@ -66,7 +66,6 @@ export class ContextManager {
         event.returnedNodes,
       );
     });
-
   }
 
   /**
