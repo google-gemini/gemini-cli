@@ -170,8 +170,11 @@ describe.sequential('TextInput', () => {
   });
 
   it('handles character input', async () => {
-    const { waitUntilReady, unmount } = await render(
+    const { unmount } = await render(
       <TextInput buffer={mockBuffer} onSubmit={onSubmit} onCancel={onCancel} />,
+      undefined,
+      undefined,
+      true,
     );
     const keypressHandler = mockedUseKeypress.mock.calls[0][0];
 
@@ -185,17 +188,18 @@ describe.sequential('TextInput', () => {
         sequence: 'a',
       });
     });
-    await waitUntilReady();
 
-    expect(mockBuffer.handleInput).toHaveBeenCalledWith({
-      name: 'a',
-      shift: false,
-      alt: false,
-      ctrl: false,
-      cmd: false,
-      sequence: 'a',
+    await waitFor(() => {
+      expect(mockBuffer.handleInput).toHaveBeenCalledWith({
+        name: 'a',
+        shift: false,
+        alt: false,
+        ctrl: false,
+        cmd: false,
+        sequence: 'a',
+      });
+      expect(mockBuffer.text).toBe('a');
     });
-    expect(mockBuffer.text).toBe('a');
     unmount();
   });
 
@@ -353,8 +357,11 @@ describe.sequential('TextInput', () => {
 
   it('calls onCancel on escape', async () => {
     vi.useFakeTimers();
-    const { waitUntilReady, unmount } = await render(
+    const { unmount } = await render(
       <TextInput buffer={mockBuffer} onCancel={onCancel} onSubmit={onSubmit} />,
+      undefined,
+      undefined,
+      true,
     );
     const keypressHandler = mockedUseKeypress.mock.calls[0][0];
 
@@ -367,10 +374,6 @@ describe.sequential('TextInput', () => {
         cmd: false,
         sequence: '',
       });
-    });
-    // Escape key has a 50ms timeout in KeypressContext, so we need to wrap waitUntilReady in act
-    await act(async () => {
-      await waitUntilReady();
     });
 
     await waitFor(() => {
@@ -419,6 +422,9 @@ describe.sequential('TextInput', () => {
   it('registers mouse click handler for free-form text input', async () => {
     const { unmount } = await render(
       <TextInput buffer={mockBuffer} onSubmit={onSubmit} onCancel={onCancel} />,
+      undefined,
+      undefined,
+      true,
     );
 
     expect(mockedUseMouseClick).toHaveBeenCalledWith(
@@ -438,6 +444,9 @@ describe.sequential('TextInput', () => {
         onSubmit={onSubmit}
         onCancel={onCancel}
       />,
+      undefined,
+      undefined,
+      true,
     );
 
     expect(mockedUseMouseClick).toHaveBeenCalledWith(
