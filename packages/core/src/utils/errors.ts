@@ -33,6 +33,34 @@ export function isAbortError(error: unknown): boolean {
   return error instanceof Error && error.name === 'AbortError';
 }
 
+const CANCELLATION_ERROR_MESSAGE_PATTERNS = [
+  /\bthe user aborted a request\b/i,
+  /\boperation cancel(?:led|ed)\b/i,
+  /\buser cancel(?:led|ed)\b/i,
+  /\b(?:this )?operation was aborted\b/i,
+  /\b(?:request|tool call|tool execution|execution) was aborted\b/i,
+  /\b(?:request|tool call|tool execution|execution) aborted\b/i,
+];
+
+/**
+ * Checks if an error represents a cancelled operation, even when lower layers
+ * do not preserve AbortError typing.
+ */
+export function isCancellationError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  if (isAbortError(error) || error.name === 'CanceledError') {
+    return true;
+  }
+
+  const message = error.message.trim();
+  return CANCELLATION_ERROR_MESSAGE_PATTERNS.some((pattern) =>
+    pattern.test(message),
+  );
+}
+
 export function getErrorMessage(error: unknown): string {
   const friendlyError = toFriendlyError(error);
   if (friendlyError instanceof Error) {
