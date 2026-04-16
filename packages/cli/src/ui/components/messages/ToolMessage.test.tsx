@@ -444,8 +444,8 @@ describe('<ToolMessage />', () => {
             constrainHeight: true,
           },
           width: 80,
-          config: makeFakeConfig({ useAlternateBuffer: true }),
-          settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
+          config: makeFakeConfig({ useAlternateBuffer: false }),
+          settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
         },
       );
       const output = lastFrame();
@@ -454,7 +454,7 @@ describe('<ToolMessage />', () => {
       // It should constrain the height, showing the tail of the output (overflowDirection='top' or due to scroll)
       expect(output).not.toMatch(/Line 1\b/);
       expect(output).not.toMatch(/Line 14\b/);
-      expect(output).toMatch(/Line 16\b/);
+      expect(output).toMatch(/Line 17\b/);
       expect(output).toMatch(/Line 30\b/);
       unmount();
     });

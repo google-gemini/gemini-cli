@@ -109,7 +109,7 @@ class XtermStdout extends EventEmitter {
   renderCount = 0;
   private queue: { promise: Promise<void> };
   isTTY = true;
-  public clearScreenOnRender = true;
+  clearScreenOnRender = true;
 
   getColorDepth(): number {
     return 24;
@@ -118,7 +118,11 @@ class XtermStdout extends EventEmitter {
   private lastRenderOutput: string | undefined = undefined;
   private lastRenderStaticContent: string | undefined = undefined;
 
-  constructor(state: TerminalState, queue: { promise: Promise<void> }, clearScreenOnRender = true) {
+  constructor(
+    state: TerminalState,
+    queue: { promise: Promise<void> },
+    clearScreenOnRender = true,
+  ) {
     super();
     this.state = state;
     this.queue = queue;
@@ -250,9 +254,12 @@ class XtermStdout extends EventEmitter {
       // Ensure all pending writes to the terminal are processed.
       await this.queue.promise;
 
-      const currentFrame = stripAnsi(
-        this.lastFrame({ allowEmpty: true }),
-      ).trim();
+      const buffer = this.state.terminal.buffer.active;
+      const allLines: string[] = [];
+      for (let i = 0; i < buffer.length; i++) {
+        allLines.push(buffer.getLine(i)?.translateToString(true) ?? '');
+      }
+      const currentFrame = stripAnsi(allLines.join('\n')).trim();
       const expectedFrame = this.normalizeFrame(
         stripAnsi(
           (this.lastRenderStaticContent ?? '') + (this.lastRenderOutput ?? ''),
@@ -461,7 +468,10 @@ export const render = async (
   instances.push(instance);
 
   if (!allowEmptyFrame) {
-    while (stdout.renderCount === 0 || stdout.lastFrame({ allowEmpty: true }) === '') {
+    while (
+      stdout.renderCount === 0 ||
+      stdout.lastFrame({ allowEmpty: true }) === ''
+    ) {
       if (vi.isFakeTimers()) {
         await vi.advanceTimersByTimeAsync(10);
       } else {

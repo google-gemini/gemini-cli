@@ -23,6 +23,7 @@ describe('<MarkdownDisplay />', () => {
   it('renders nothing for empty text', async () => {
     const { lastFrame, unmount } = await renderWithProviders(
       <MarkdownDisplay {...baseProps} text="" />,
+      { allowEmptyFrame: true },
     );
     expect(lastFrame({ allowEmpty: true })).toMatchSnapshot();
     unmount();

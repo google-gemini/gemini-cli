@@ -140,7 +140,7 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
               ? SUBAGENT_MAX_LINES
               : undefined
           }
-          overflowDirection={kind === Kind.Agent ? 'bottom' : 'top'}
+          overflowDirection={kind === Kind.Agent ? 'top' : 'bottom'}
         />
         {isThisShellFocused && config && (
           <Box paddingLeft={STATUS_INDICATOR_WIDTH} marginTop={1}>

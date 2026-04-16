@@ -27,6 +27,7 @@ describe('Model Steering Integration', () => {
     rig = new AppRig({
       fakeResponsesPath,
       configOverrides: { modelSteering: true },
+      terminalHeight: 100,
     });
     await rig.initialize();
     await rig.render();
