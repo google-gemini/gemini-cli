@@ -313,6 +313,22 @@ describe('SettingsSchema', () => {
       ).toBe(false);
     });
 
+    it('should have Vertex AI routing settings in schema', () => {
+      const vertexAi =
+        getSettingsSchema().billing.properties.vertexAi.properties;
+
+      expect(vertexAi.requestType).toBeDefined();
+      expect(vertexAi.requestType.type).toBe('enum');
+      expect(
+        vertexAi.requestType.options?.map((option) => option.value),
+      ).toEqual(['dedicated', 'shared']);
+      expect(vertexAi.sharedRequestType).toBeDefined();
+      expect(vertexAi.sharedRequestType.type).toBe('enum');
+      expect(
+        vertexAi.sharedRequestType.options?.map((option) => option.value),
+      ).toEqual(['priority', 'flex']);
+    });
+
     it('should have folderTrustFeature setting in schema', () => {
       expect(
         getSettingsSchema().security.properties.folderTrust.properties.enabled,

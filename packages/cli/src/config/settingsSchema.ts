@@ -21,6 +21,7 @@ import {
   type AgentOverride,
   type CustomTheme,
   type SandboxConfig,
+  type VertexAiRoutingConfig,
 } from '@google/gemini-cli-core';
 import type { SessionRetentionSettings } from './settings.js';
 import { DEFAULT_MIN_RETENTION } from '../utils/sessionCleanup.js';
@@ -964,6 +965,45 @@ const SETTINGS_SCHEMA = {
           { value: 'always', label: 'Always use credits' },
           { value: 'never', label: 'Never use credits' },
         ],
+      },
+      vertexAi: {
+        type: 'object',
+        label: 'Vertex AI',
+        category: 'Advanced',
+        requiresRestart: true,
+        default: undefined as VertexAiRoutingConfig | undefined,
+        description: 'Vertex AI request routing settings.',
+        showInDialog: false,
+        properties: {
+          requestType: {
+            type: 'enum',
+            label: 'Vertex AI Request Type',
+            category: 'Advanced',
+            requiresRestart: true,
+            default: undefined as VertexAiRoutingConfig['requestType'],
+            description:
+              'Sets the X-Vertex-AI-LLM-Request-Type header for Vertex AI requests.',
+            showInDialog: false,
+            options: [
+              { value: 'dedicated', label: 'Dedicated' },
+              { value: 'shared', label: 'Shared' },
+            ],
+          },
+          sharedRequestType: {
+            type: 'enum',
+            label: 'Vertex AI Shared Request Type',
+            category: 'Advanced',
+            requiresRestart: true,
+            default: undefined as VertexAiRoutingConfig['sharedRequestType'],
+            description:
+              'Sets the X-Vertex-AI-LLM-Shared-Request-Type header for Vertex AI requests.',
+            showInDialog: false,
+            options: [
+              { value: 'priority', label: 'Priority' },
+              { value: 'flex', label: 'Flex' },
+            ],
+          },
+        },
       },
     },
   },
