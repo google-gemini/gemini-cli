@@ -204,6 +204,11 @@ export class PipelineOrchestrator {
           allowedTargets,
           returnedNodes,
         );
+        this.eventBus.emitProcessorResult({
+          processorId: processor.id,
+          targets: allowedTargets,
+          returnedNodes,
+        });
       } catch (error) {
         debugLogger.error(
           `Pipeline ${pipeline.name} failed async at ${processor.id}:`,
