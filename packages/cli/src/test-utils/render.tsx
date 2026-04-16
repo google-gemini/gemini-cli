@@ -460,7 +460,11 @@ export const render = async (
   instances.push(instance);
 
   while (stdout.renderCount === 0 || stdout.lastFrame({ allowEmpty: true }) === '') {
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    if (vi.isFakeTimers()) {
+      await vi.advanceTimersByTimeAsync(10);
+    } else {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
   }
 
   return {

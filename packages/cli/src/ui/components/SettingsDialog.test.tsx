@@ -253,6 +253,7 @@ const renderDialog = async (
 
 describe.sequential('SettingsDialog', () => {
   beforeEach(() => {
+    vi.useFakeTimers();
     vi.clearAllMocks();
     vi.spyOn(
       terminalCapabilityManager,
@@ -264,6 +265,7 @@ describe.sequential('SettingsDialog', () => {
     TEST_ONLY.clearFlattenedSchema();
     vi.clearAllMocks();
     vi.resetAllMocks();
+    vi.useRealTimers();
   });
 
   describe.sequential('Initial Rendering', () => {
