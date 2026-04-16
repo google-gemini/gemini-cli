@@ -68,9 +68,17 @@ export async function start_sandbox(
       let profileFile = fileURLToPath(
         new URL(`sandbox-macos-${profile}.sb`, import.meta.url),
       );
-      // if profile name is not recognized, then look for file under project settings directory
+      // if profile name is not recognized, look in user-level ~/.gemini first,
+      // then fall back to project-level .gemini. path.basename() strips any
+      // directory separators to prevent path traversal via SEATBELT_PROFILE.
       if (!BUILTIN_SEATBELT_PROFILES.includes(profile)) {
-        profileFile = path.join(GEMINI_DIR, `sandbox-macos-${profile}.sb`);
+        const safeProfile = path.basename(profile);
+        const fileName = `sandbox-macos-${safeProfile}.sb`;
+        const userProfileFile = path.join(homedir(), GEMINI_DIR, fileName);
+        const projectProfileFile = path.join(GEMINI_DIR, fileName);
+        profileFile = fs.existsSync(userProfileFile)
+          ? userProfileFile
+          : projectProfileFile;
       }
       if (!fs.existsSync(profileFile)) {
         throw new FatalSandboxError(
