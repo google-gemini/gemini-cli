@@ -88,7 +88,7 @@ describe('SkillCommandLoader', () => {
       type: 'tool',
       toolName: ACTIVATE_SKILL_TOOL_NAME,
       toolArgs: { name: 'test-skill' },
-      postSubmitPrompt: undefined,
+      postSubmitPrompt: 'Use the skill test-skill',
     });
   });
 
