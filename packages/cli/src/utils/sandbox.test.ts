@@ -138,6 +138,7 @@ describe('sandbox', () => {
   afterEach(() => {
     process.env = originalEnv;
     process.argv = originalArgv;
+    vi.unstubAllEnvs();
   });
 
   describe('start_sandbox', () => {
@@ -178,7 +179,7 @@ describe('sandbox', () => {
 
     it('should resolve custom seatbelt profile from user home directory', async () => {
       vi.mocked(os.platform).mockReturnValue('darwin');
-      process.env['SEATBELT_PROFILE'] = 'custom-test';
+      vi.stubEnv('SEATBELT_PROFILE', 'custom-test');
       vi.mocked(fs.existsSync).mockImplementation((p) =>
         String(p).includes(
           path.join(homedir(), '.gemini', 'sandbox-macos-custom-test.sb'),
@@ -226,7 +227,7 @@ describe('sandbox', () => {
 
     it('should fall back to project .gemini directory when user profile is missing', async () => {
       vi.mocked(os.platform).mockReturnValue('darwin');
-      process.env['SEATBELT_PROFILE'] = 'custom-test';
+      vi.stubEnv('SEATBELT_PROFILE', 'custom-test');
       vi.mocked(fs.existsSync).mockImplementation((p) => {
         const s = String(p);
         return (
