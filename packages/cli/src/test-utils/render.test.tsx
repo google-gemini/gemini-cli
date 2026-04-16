@@ -25,14 +25,6 @@ describe.sequential('render', () => {
     unmount();
   });
 
-  it('should render a component with fixed sleep', async () => {
-    vi.useRealTimers();
-    const { lastFrame, unmount } = await render(<Text>Hello World</Text>);
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-    console.log(`[Test] lastFrame after sleep: ${JSON.stringify(lastFrame())}`);
-    unmount();
-  });
-
   it('should support rerender', async () => {
     const { lastFrame, rerender, waitUntilReady, unmount } = await render(
       <Text>Hello</Text>,
