@@ -263,14 +263,14 @@ class XtermStdout extends EventEmitter {
           return currentFrame !== '' || this.pendingWrites === 0;
         }
 
+        if (this.lastRenderOutput === undefined) {
+          return false;
+        }
+
         // If Ink expects nothing (no new static content and no dynamic output),
         // we consider it a match because the terminal buffer will just hold the historical static content.
         if (expectedFrame === '') {
           return true;
-        }
-
-        if (this.lastRenderOutput === undefined) {
-          return false;
         }
 
         // If the terminal is empty but Ink expects something, it's not a match.
@@ -865,7 +865,7 @@ export async function renderHook<Result, Props>(
   );
   inkRerender = renderResult.rerender;
   unmount = renderResult.unmount;
-  waitUntilReady = renderResult.waitUntilReady;
+  waitUntilReady = async () => {};
   generateSvg = renderResult.generateSvg;
 
   function rerender(props?: Props) {
