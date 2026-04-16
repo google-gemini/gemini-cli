@@ -58,7 +58,12 @@ function denyUnlessExplicitlyAllowed(
   targetPath: string,
   ruleType: 'literal' | 'subpath',
   policyWrite: string[],
+  implicitlyAllowed: boolean = false,
 ): string {
+  if (implicitlyAllowed) {
+    return '';
+  }
+
   const realPath = resolveToRealPath(targetPath);
 
   if (isPathExplicitlyAllowed(targetPath, realPath, policyWrite)) {
@@ -169,6 +174,7 @@ export function buildSeatbeltProfile(options: SeatbeltArgsOptions): string {
       governanceFile,
       isDirectory ? 'subpath' : 'literal',
       resolvedPaths.policyWrite,
+      workspaceWrite && GOVERNANCE_FILES[i].path !== '.git',
     );
   }
 
