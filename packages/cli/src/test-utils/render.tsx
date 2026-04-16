@@ -233,7 +233,7 @@ class XtermStdout extends EventEmitter {
     });
 
     let attempts = 0;
-    const maxAttempts = 2000;
+    const maxAttempts = 100;
 
     let lastCurrent = '';
     let lastExpected = '';
@@ -293,9 +293,9 @@ class XtermStdout extends EventEmitter {
       attempts++;
       await act(async () => {
         if (vi.isFakeTimers()) {
-          await vi.advanceTimersByTimeAsync(5);
+          await vi.advanceTimersByTimeAsync(100);
         } else {
-          await new Promise((resolve) => setTimeout(resolve, 5));
+          await new Promise((resolve) => setTimeout(resolve, 100));
         }
       });
     }
