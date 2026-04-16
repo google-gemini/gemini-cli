@@ -10,6 +10,7 @@ import { LoginWithGoogleRestartDialog } from './LoginWithGoogleRestartDialog.js'
 import { useKeypress } from '../hooks/useKeypress.js';
 import {
   _resetRelaunchStateForTesting,
+  relaunchApp,
 } from '../../utils/processUtils.js';
 import { type Config } from '@google/gemini-cli-core';
 
@@ -25,7 +26,7 @@ vi.mock('../../utils/processUtils.js', () => ({
 }));
 
 const mockedUseKeypress = useKeypress as Mock;
-import { relaunchApp } from '../../utils/processUtils.js';
+
 const mockedRelaunchApp = relaunchApp as Mock;
 
 describe('LoginWithGoogleRestartDialog', () => {

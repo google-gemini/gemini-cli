@@ -40,7 +40,8 @@ const createNoiseFilter = (method: keyof Console) => {
   const original = console[method];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (console as any)[method] = new Proxy(original, {
-    apply(target: any, thisArg: any, argArray: any[]) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
+    apply(target: Function, thisArg: unknown, argArray: unknown[]) {
       const firstArg = String(argArray[0]);
       if (noiseStrings.some((s) => firstArg.includes(s))) {
         return;
@@ -74,11 +75,11 @@ beforeEach(async () => {
   // Reset singletons to ensure test isolation
   themeManager.resetForTesting();
   uiTelemetryService.clear();
-  // We do NOT remove all listeners here because it would break the 
+  // We do NOT remove all listeners here because it would break the
   // SessionContext subscription created during component mount.
   // Instead, we rely on individual tests to manage their specific listeners
   // or the clear() method to reset state.
-  
+
   await resetBrowserSession();
 
   // Force specific env for test stability
