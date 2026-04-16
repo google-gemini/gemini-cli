@@ -474,6 +474,44 @@ describe('AgentRegistry', () => {
     });
   });
 
+  describe('getDefinitionForExplicitUse', () => {
+    it('returns an active agent when available', async () => {
+      await registry.initialize();
+
+      const agent = registry.getDefinitionForExplicitUse(
+        'codebase_investigator',
+      );
+
+      expect(agent?.name).toBe('codebase_investigator');
+      expect(agent).toBe(registry.getDefinition('codebase_investigator'));
+    });
+
+    it('falls back to discovered disabled agents', async () => {
+      const disabledConfig = makeMockedConfig({
+        enableAgents: true,
+        agents: {
+          overrides: {
+            codebase_investigator: {
+              enabled: false,
+            },
+          },
+        },
+      });
+      const disabledRegistry = new TestableAgentRegistry(disabledConfig);
+
+      await disabledRegistry.initialize();
+
+      expect(disabledRegistry.getDefinition('codebase_investigator')).toBe(
+        undefined,
+      );
+      expect(
+        disabledRegistry.getDefinitionForExplicitUse('codebase_investigator'),
+      )?.toMatchObject({
+        name: 'codebase_investigator',
+      });
+    });
+  });
+
   describe('registration logic', () => {
     it('should register runtime overrides when the model is "auto"', async () => {
       const autoAgent: LocalAgentDefinition = {

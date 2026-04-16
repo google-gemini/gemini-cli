@@ -216,6 +216,9 @@ describe('useSlashCommandProcessor', () => {
             toggleBackgroundTasks: vi.fn(),
             toggleShortcutsHelp: vi.fn(),
             setText: vi.fn(),
+            startForumMode: vi.fn(),
+            stopForumMode: vi.fn(),
+            getForumSession: vi.fn(() => null),
           },
           new Map(), // extensionsUpdateState
           true, // isConfigInitialized

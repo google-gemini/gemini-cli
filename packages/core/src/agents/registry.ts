@@ -687,6 +687,18 @@ export class AgentRegistry {
   }
 
   /**
+   * Retrieves an agent definition for an explicit reference.
+   *
+   * This differs from `getDefinition()` by falling back to discovered-but-disabled
+   * agents, which allows features like forums to opt into a specific preset member
+   * even if that agent is disabled in the default active set.
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  getDefinitionForExplicitUse(name: string): AgentDefinition<any> | undefined {
+    return this.getDefinition(name) ?? this.getDiscoveredDefinition(name);
+  }
+
+  /**
    * Returns all active agent definitions.
    */
   getAllDefinitions(): AgentDefinition[] {

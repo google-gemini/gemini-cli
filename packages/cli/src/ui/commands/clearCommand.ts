@@ -23,6 +23,9 @@ export const clearCommand: SlashCommand = {
   action: async (context, _args) => {
     const geminiClient = context.services.agentContext?.geminiClient;
     const config = context.services.agentContext?.config;
+    if (context.ui.getForumSession()) {
+      await context.ui.stopForumMode('Forum stopped by /clear.');
+    }
 
     // Fire SessionEnd hook before clearing
     const hookSystem = config?.getHookSystem();

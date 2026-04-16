@@ -20,6 +20,8 @@ import type {
   ExtensionsStoppingEvent,
   ToolCallConfirmationDetails,
   AgentDefinition,
+  ForumSessionOptions,
+  ForumSessionSnapshot,
 } from '@google/gemini-cli-core';
 import {
   GitService,
@@ -87,6 +89,12 @@ interface SlashCommandProcessorActions {
   toggleBackgroundTasks: () => void;
   toggleShortcutsHelp: () => void;
   setText: (text: string) => void;
+  startForumMode: (
+    presetName: string,
+    options?: ForumSessionOptions,
+  ) => Promise<void>;
+  stopForumMode: (reason?: string) => Promise<void>;
+  getForumSession: () => ForumSessionSnapshot | null;
 }
 
 /**
@@ -235,6 +243,9 @@ export const useSlashCommandProcessor = (
         toggleDebugProfiler: actions.toggleDebugProfiler,
         toggleVimEnabled,
         reloadCommands,
+        startForumMode: actions.startForumMode,
+        stopForumMode: actions.stopForumMode,
+        getForumSession: actions.getForumSession,
         openAgentConfigDialog: actions.openAgentConfigDialog,
         extensionsUpdateState,
         dispatchExtensionStateUpdate: actions.dispatchExtensionStateUpdate,

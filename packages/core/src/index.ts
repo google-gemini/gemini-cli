@@ -55,6 +55,9 @@ export * from './routing/modelRouterService.js';
 
 export * from './fallback/types.js';
 export * from './fallback/handler.js';
+export * from './forum/types.js';
+export * from './forum/preset-loader.js';
+export * from './forum/session-controller.js';
 
 export * from './code_assist/codeAssist.js';
 export * from './code_assist/oauth2.js';

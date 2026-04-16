@@ -33,6 +33,7 @@ import { directoryCommand } from '../ui/commands/directoryCommand.js';
 import { editorCommand } from '../ui/commands/editorCommand.js';
 import { extensionsCommand } from '../ui/commands/extensionsCommand.js';
 import { footerCommand } from '../ui/commands/footerCommand.js';
+import { forumCommand } from '../ui/commands/forumCommand.js';
 import { helpCommand } from '../ui/commands/helpCommand.js';
 import { shortcutsCommand } from '../ui/commands/shortcutsCommand.js';
 import { rewindCommand } from '../ui/commands/rewindCommand.js';
@@ -156,6 +157,7 @@ export class BuiltinCommandLoader implements ICommandLoader {
         : [extensionsCommand(this.config?.getEnableExtensionReloading())]),
       helpCommand,
       footerCommand,
+      forumCommand,
       shortcutsCommand,
       ...(this.config?.getEnableHooksUI() ? [hooksCommand] : []),
       rewindCommand,

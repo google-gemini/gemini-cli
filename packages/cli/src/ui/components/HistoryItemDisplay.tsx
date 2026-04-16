@@ -36,6 +36,13 @@ import { ChatList } from './views/ChatList.js';
 import { ModelMessage } from './messages/ModelMessage.js';
 import { ThinkingMessage } from './messages/ThinkingMessage.js';
 import { HintMessage } from './messages/HintMessage.js';
+import {
+  ForumActivityMessage,
+  ForumAgentMessage,
+  ForumFinalMessage,
+  ForumSystemMessage,
+  ForumUserMessage,
+} from './messages/ForumMessage.js';
 import { getInlineThinkingMode } from '../utils/inlineThinkingMode.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 
@@ -90,6 +97,43 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
       )}
       {itemForDisplay.type === 'hint' && (
         <HintMessage text={itemForDisplay.text} />
+      )}
+      {itemForDisplay.type === 'forum_system' && (
+        <ForumSystemMessage
+          text={itemForDisplay.text}
+          terminalWidth={terminalWidth}
+        />
+      )}
+      {itemForDisplay.type === 'forum_user' && (
+        <ForumUserMessage
+          text={itemForDisplay.text}
+          isTask={itemForDisplay.isTask}
+          terminalWidth={terminalWidth}
+        />
+      )}
+      {itemForDisplay.type === 'forum_agent' && (
+        <ForumAgentMessage
+          label={itemForDisplay.label}
+          memberId={itemForDisplay.memberId}
+          text={itemForDisplay.text}
+          terminalWidth={terminalWidth}
+        />
+      )}
+      {itemForDisplay.type === 'forum_activity' && (
+        <ForumActivityMessage
+          label={itemForDisplay.label}
+          activityKind={itemForDisplay.activityKind}
+          text={itemForDisplay.text}
+          terminalWidth={terminalWidth}
+        />
+      )}
+      {itemForDisplay.type === 'forum_final' && (
+        <ForumFinalMessage
+          label={itemForDisplay.label}
+          memberId={itemForDisplay.memberId}
+          text={itemForDisplay.text}
+          terminalWidth={terminalWidth}
+        />
       )}
       {itemForDisplay.type === 'user' && (
         <UserMessage text={itemForDisplay.text} width={terminalWidth} />

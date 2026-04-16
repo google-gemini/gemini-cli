@@ -181,6 +181,7 @@ import { useTimedMessage } from './hooks/useTimedMessage.js';
 import { useIsHelpDismissKey } from './utils/shortcutsHelp.js';
 import { useSuspend } from './hooks/useSuspend.js';
 import { useRunEventNotifications } from './hooks/useRunEventNotifications.js';
+import { useForumMode } from './hooks/useForumMode.js';
 import { isNotificationsEnabled } from '../utils/terminalNotifications.js';
 import {
   getLastTurnToolCallIds,
@@ -232,6 +233,13 @@ export const AppContainer = (props: AppContainerProps) => {
   const historyManager = useHistory({
     chatRecordingService: config.getGeminiClient()?.getChatRecordingService(),
   });
+  const {
+    forumSession,
+    pendingForumHistoryItems,
+    startForumMode,
+    stopForumMode,
+    submitForumInput,
+  } = useForumMode(config, historyManager.addItem);
 
   useMemoryMonitor(historyManager);
   const isAlternateBuffer = config.getUseAlternateBuffer();
@@ -997,6 +1005,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
       },
       toggleShortcutsHelp: () => setShortcutsHelpVisible((visible) => !visible),
       setText: stableSetText,
+      startForumMode,
+      stopForumMode,
+      getForumSession: () => forumSession,
     }),
     [
       setAuthState,
@@ -1016,6 +1027,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
       toggleDebugProfiler,
       setShortcutsHelpVisible,
       stableSetText,
+      startForumMode,
+      stopForumMode,
+      forumSession,
     ],
   );
 
@@ -1238,8 +1252,16 @@ Logging in with Google... Restarting Gemini CLI to continue.
   } = activeStream;
 
   const pendingHistoryItems = useMemo(
-    () => [...pendingSlashCommandHistoryItems, ...pendingGeminiHistoryItems],
-    [pendingSlashCommandHistoryItems, pendingGeminiHistoryItems],
+    () => [
+      ...pendingSlashCommandHistoryItems,
+      ...pendingGeminiHistoryItems,
+      ...pendingForumHistoryItems,
+    ],
+    [
+      pendingSlashCommandHistoryItems,
+      pendingGeminiHistoryItems,
+      pendingForumHistoryItems,
+    ],
   );
 
   toggleBackgroundTasksRef.current = toggleBackgroundTasks;
@@ -1396,6 +1418,12 @@ Logging in with Google... Restarting Gemini CLI to continue.
         }
       }
 
+      if (forumSession && !isSlash) {
+        await submitForumInput(submittedValue);
+        addInput(submittedValue);
+        return;
+      }
+
       if (config.isModelSteeringEnabled() && isAgentRunning && !isSlash) {
         handleHintSubmit(submittedValue);
         addInput(submittedValue);
@@ -1449,6 +1477,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       messageQueue.length,
       pendingHistoryItems,
       config,
+      forumSession,
       constrainHeight,
       setConstrainHeight,
       isAlternateBuffer,
@@ -1456,6 +1485,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       reset,
       handleHintSubmit,
       isConfigInitialized,
+      submitForumInput,
       triggerExpandHint,
     ],
   );
@@ -2464,6 +2494,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       streamingState,
       initError,
       pendingGeminiHistoryItems,
+      forumSession,
       thought,
       isInputActive,
       isResuming,
@@ -2575,6 +2606,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       streamingState,
       initError,
       pendingGeminiHistoryItems,
+      forumSession,
       thought,
       isInputActive,
       isResuming,

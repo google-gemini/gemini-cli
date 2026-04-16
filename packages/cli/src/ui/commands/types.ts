@@ -16,6 +16,8 @@ import type {
   CommandActionReturn,
   AgentDefinition,
   AgentLoopContext,
+  ForumSessionOptions,
+  ForumSessionSnapshot,
 } from '@google/gemini-cli-core';
 import type { LoadedSettings } from '../../config/settings.js';
 import type { UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
@@ -75,6 +77,12 @@ export interface CommandContext {
     toggleDebugProfiler: () => void;
     toggleVimEnabled: () => Promise<boolean>;
     reloadCommands: () => void;
+    startForumMode: (
+      presetName: string,
+      options?: ForumSessionOptions,
+    ) => Promise<void>;
+    stopForumMode: (reason?: string) => Promise<void>;
+    getForumSession: () => ForumSessionSnapshot | null;
     openAgentConfigDialog: (
       name: string,
       displayName: string,

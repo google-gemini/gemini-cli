@@ -205,6 +205,7 @@ export const Footer: React.FC = () => {
     promptTokenCount,
     isTrustedFolder,
     terminalWidth,
+    forumSession,
   } = {
     model: uiState.currentModel,
     targetDir: config.getTargetDir(),
@@ -217,6 +218,7 @@ export const Footer: React.FC = () => {
     promptTokenCount: uiState.sessionStats.lastPromptTokenCount,
     isTrustedFolder: uiState.isTrustedFolder,
     terminalWidth: uiState.terminalWidth,
+    forumSession: uiState.forumSession,
   };
 
   const quotaStats = quotaState.stats;
@@ -263,6 +265,24 @@ export const Footer: React.FC = () => {
       '',
       () => <Text color={theme.text.accent}>{vimStr}</Text>,
       vimStr.length,
+      true,
+    );
+  }
+  if (forumSession) {
+    const runningMembers = forumSession.members.filter(
+      (member) => member.status === 'running',
+    ).length;
+    const totalMembers = forumSession.members.length;
+    const pendingSteerSuffix =
+      forumSession.pendingSteerCount > 0
+        ? ` +${forumSession.pendingSteerCount}`
+        : '';
+    const forumStr = `${forumSession.presetName} r${forumSession.round} ${runningMembers}/${totalMembers} ${forumSession.status}${pendingSteerSuffix}`;
+    addCol(
+      'forum',
+      'forum',
+      () => <Text color={theme.text.accent}>{forumStr}</Text>,
+      forumStr.length,
       true,
     );
   }

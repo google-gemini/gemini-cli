@@ -27,6 +27,7 @@ import type {
   AgentDefinition,
   FolderDiscoveryResults,
   PolicyUpdateConfirmationRequest,
+  ForumSessionSnapshot,
 } from '@google/gemini-cli-core';
 import { type TransientMessageType } from '../../utils/events.js';
 import type { DOMElement } from 'ink';
@@ -130,6 +131,7 @@ export interface UIState {
   streamingState: StreamingState;
   initError: string | null;
   pendingGeminiHistoryItems: HistoryItemWithoutId[];
+  forumSession: ForumSessionSnapshot | null;
   thought: ThoughtSummary | null;
   isInputActive: boolean;
   isResuming: boolean;

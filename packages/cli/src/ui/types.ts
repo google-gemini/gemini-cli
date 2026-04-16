@@ -301,6 +301,41 @@ export type HistoryItemSubagent = HistoryItemBase & {
   history: SubagentActivityItem[];
 };
 
+export type HistoryItemForumSystem = HistoryItemBase & {
+  type: 'forum_system';
+  label: string;
+  text: string;
+};
+
+export type HistoryItemForumUser = HistoryItemBase & {
+  type: 'forum_user';
+  label: string;
+  text: string;
+  isTask: boolean;
+};
+
+export type HistoryItemForumAgent = HistoryItemBase & {
+  type: 'forum_agent';
+  label: string;
+  memberId: string;
+  text: string;
+};
+
+export type HistoryItemForumActivity = HistoryItemBase & {
+  type: 'forum_activity';
+  label: string;
+  memberId: string;
+  activityKind: 'thinking' | 'tool' | 'error';
+  text: string;
+};
+
+export type HistoryItemForumFinal = HistoryItemBase & {
+  type: 'forum_final';
+  label: string;
+  memberId: string;
+  text: string;
+};
+
 export interface ToolDefinition {
   name: string;
   displayName: string;
@@ -407,7 +442,12 @@ export type HistoryItemWithoutId =
   | HistoryItemChatList
   | HistoryItemThinking
   | HistoryItemHint
-  | HistoryItemSubagent;
+  | HistoryItemSubagent
+  | HistoryItemForumSystem
+  | HistoryItemForumUser
+  | HistoryItemForumAgent
+  | HistoryItemForumActivity
+  | HistoryItemForumFinal;
 
 export type HistoryItem = HistoryItemWithoutId & { id: number };
 

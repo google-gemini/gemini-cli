@@ -164,7 +164,11 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
                 : "  Press 'i' for INSERT mode."
               : inputState.shellModeActive
                 ? '  Type your shell command'
-                : '  Type your message or @path/to/file'
+                : uiState.forumSession
+                  ? uiState.forumSession.task
+                    ? '  Steer forum discussion'
+                    : '  Start forum task'
+                  : '  Type your message or @path/to/file'
           }
           setQueueErrorMessage={uiActions.setQueueErrorMessage}
           streamingState={uiState.streamingState}

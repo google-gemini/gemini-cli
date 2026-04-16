@@ -106,6 +106,10 @@ export class Storage {
     return path.join(Storage.getGlobalGeminiDir(), 'agents');
   }
 
+  static getUserForumsDir(): string {
+    return path.join(Storage.getGlobalGeminiDir(), 'forums');
+  }
+
   static getAcknowledgedAgentsPath(): string {
     return path.join(
       Storage.getGlobalGeminiDir(),
@@ -296,6 +300,10 @@ export class Storage {
 
   getProjectAgentsDir(): string {
     return path.join(this.getGeminiDir(), 'agents');
+  }
+
+  getProjectForumsDir(): string {
+    return path.join(this.getGeminiDir(), 'forums');
   }
 
   getProjectTempCheckpointsDir(): string {
