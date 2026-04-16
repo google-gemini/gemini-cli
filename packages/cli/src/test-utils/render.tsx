@@ -291,13 +291,11 @@ class XtermStdout extends EventEmitter {
       }
 
       attempts++;
-      await act(async () => {
-        if (vi.isFakeTimers()) {
-          await vi.advanceTimersByTimeAsync(100);
-        } else {
-          await new Promise((resolve) => setTimeout(resolve, 100));
-        }
-      });
+      if (vi.isFakeTimers()) {
+        await vi.advanceTimersByTimeAsync(100);
+      } else {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
     }
 
     throw new Error(
