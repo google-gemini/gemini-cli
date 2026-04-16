@@ -121,8 +121,10 @@ describe('Telemetry Metrics', () => {
       return actualApi;
     });
 
-    const { getCommonAttributes } = await import('./telemetryAttributes.js');
-    (getCommonAttributes as Mock).mockReturnValue({
+    const { getCommonMetricAttributes } = await import(
+      './telemetryAttributes.js'
+    );
+    (getCommonMetricAttributes as Mock).mockReturnValue({
       'session.id': 'test-session-id',
       'installation.id': 'test-installation-id',
       'user.email': 'test@example.com',

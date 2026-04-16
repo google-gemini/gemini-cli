@@ -52,24 +52,93 @@ describe('truncateForTelemetry', () => {
   });
 
   it('should correctly truncate strings with multi-byte unicode characters (emojis)', () => {
-    // 5 emojis, each is multiple bytes in UTF-16
+    // 5 emojis, each is a single grapheme cluster
     const emojis = '👋🌍🚀🔥🎉';
 
-    // Truncating to length 5 (which is 2.5 emojis in UTF-16 length terms)
-    // truncateString will stop after the full grapheme clusters that fit within 5
-    const result = truncateForTelemetry(emojis, 5);
+    // Truncating to 2 graphemes
+    const result = truncateForTelemetry(emojis, 2);
 
-    expect(result).toBe('👋🌍...[TRUNCATED: original length 10]');
+    expect(result).toBe('👋🌍...[TRUNCATED: original length 5]');
   });
 
-  it('should stringify and truncate objects if exceeding maxLength', () => {
+  it('should stringify and structurally truncate objects if exceeding limits', () => {
     const obj = { message: 'hello world', nested: { a: 1 } };
-    const stringified = JSON.stringify(obj);
     const result = truncateForTelemetry(obj, 10);
     expect(result).toBe(
-      stringified.substring(0, 10) +
-        `...[TRUNCATED: original length ${stringified.length}]`,
+      JSON.stringify({
+        message: 'hello worl...[TRUNCATED: original length 11]',
+        nested: { a: 1 },
+      }),
     );
+  });
+
+  it('should structurally truncate arrays and depth', () => {
+    const obj = {
+      arr: [1, 2, 3],
+      deep: { level1: { level2: { level3: { a: 1 } } } },
+    };
+    const result = truncateForTelemetry(obj, 100, 2, 3);
+    expect(result).toBe(
+      JSON.stringify({
+        arr: [1, 2, '[TRUNCATED: Array of length 3]'],
+        deep: { level1: { level2: '[TRUNCATED: Max Depth Reached]' } },
+      }),
+    );
+  });
+
+  it('should handle objects with a toJSON method', () => {
+    const date = new Date('2026-04-13T00:00:00.000Z');
+    const result = truncateForTelemetry(date);
+    expect(result).toBe('2026-04-13T00:00:00.000Z');
+  });
+
+  it('should handle getters via direct property access', () => {
+    const obj = {
+      get myGetter() {
+        return 'getter value';
+      },
+      get errorGetter() {
+        throw new Error('getter error');
+      },
+    };
+    const result = truncateForTelemetry(obj);
+    expect(result).toBe(
+      JSON.stringify({
+        myGetter: 'getter value',
+        errorGetter: '[ERROR: Failed to read property]',
+      }),
+    );
+  });
+
+  it('should truncate extremely long keys', () => {
+    const longKey = 'a'.repeat(150);
+    const obj = {
+      [longKey]: 'value',
+    };
+    const result = truncateForTelemetry(obj);
+    const expectedKey = 'a'.repeat(100) + '...[TRUNCATED_KEY]';
+    expect(result).toBe(
+      JSON.stringify({
+        [expectedKey]: 'value',
+      }),
+    );
+  });
+
+  it('should enforce a global payload string limit without breaking JSON', () => {
+    const obj = {
+      a: 'x'.repeat(100),
+      b: 'y'.repeat(100),
+    };
+    // Capping global string length to 50
+    const result = truncateForTelemetry(obj, 100, 100, 4, 50) as string;
+
+    // It should replace the entire object with a valid JSON string indicating truncation
+    expect(result).toBe(
+      '"[TRUNCATED: Payload exceeded global limit of 50 characters. Original length: 215]"',
+    );
+
+    // Prove it remains perfectly parseable JSON
+    expect(() => JSON.parse(result)).not.toThrow();
   });
 
   it('should stringify objects unchanged if within maxLength', () => {
