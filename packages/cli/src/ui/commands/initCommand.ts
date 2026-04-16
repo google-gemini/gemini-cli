@@ -33,7 +33,23 @@ export const initCommand: SlashCommand = {
     const targetDir = context.services.agentContext.config.getTargetDir();
     const geminiMdPath = path.join(targetDir, 'GEMINI.md');
 
-    const result = performInit(fs.existsSync(geminiMdPath));
+    let fileHasContent = false;
+    try {
+      const content = await fs.promises.readFile(geminiMdPath, 'utf8');
+      fileHasContent = content.trim().length > 0;
+    } catch (e) {
+      if (
+        e instanceof Error &&
+        (e as NodeJS.ErrnoException).code !== 'ENOENT'
+      ) {
+        return {
+          type: 'message',
+          messageType: 'error',
+          content: `Failed to read GEMINI.md: ${e.message}`,
+        };
+      }
+    }
+    const result = performInit(fileHasContent);
 
     if (result.type === 'submit_prompt') {
       // Create an empty GEMINI.md file
