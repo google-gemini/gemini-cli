@@ -39,7 +39,33 @@ export function resolveAndValidatePlanPath(
     throw new Error('Plan file path must be non-empty.');
   }
 
-  const resolvedPath = path.resolve(plansDir, trimmedPath);
+  // Normalize separators to forward slashes for easier manipulation
+  const normalizedInput = trimmedPath.replace(/\\/g, '/');
+
+  // Prevent redundant nesting if the agent includes the plans directory name in the path.
+  // E.g. plansDir='/repo/conductor', planPath='conductor/test.md' -> we want '/repo/conductor/test.md'
+  // Also handle './conductor/test.md' or 'conductor/nested/test.md'
+  let normalizedPlanPath = normalizedInput;
+  const plansDirName = path.basename(plansDir);
+
+  // Split into segments and remove empty or '.' segments from the beginning
+  const segments = normalizedInput.split('/').filter((s) => s !== '');
+  if (segments[0] === '.') {
+    segments.shift();
+  }
+
+  if (segments[0] === plansDirName) {
+    // Strip the redundant prefix.
+    segments.shift();
+    normalizedPlanPath = segments.join('/');
+
+    // If the path was EXACTLY just the directory name (e.g. "conductor"), it's invalid for a file.
+    if (!normalizedPlanPath) {
+      throw new Error('Plan file path must include a filename.');
+    }
+  }
+
+  const resolvedPath = path.resolve(plansDir, normalizedPlanPath);
   const realPath = resolveToRealPath(resolvedPath);
   const realPlansDir = resolveToRealPath(plansDir);
 

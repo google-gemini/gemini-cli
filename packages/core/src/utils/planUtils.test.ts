@@ -8,7 +8,11 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import path from 'node:path';
 import * as fs from 'node:fs';
 import os from 'node:os';
-import { validatePlanPath, validatePlanContent } from './planUtils.js';
+import {
+  validatePlanPath,
+  validatePlanContent,
+  resolveAndValidatePlanPath,
+} from './planUtils.js';
 
 describe('planUtils', () => {
   let tempRootDir: string;
@@ -27,6 +31,56 @@ describe('planUtils', () => {
     if (fs.existsSync(tempRootDir)) {
       fs.rmSync(tempRootDir, { recursive: true, force: true });
     }
+  });
+
+  describe('resolveAndValidatePlanPath', () => {
+    it('should strip redundant prefix matching plansDir basename', () => {
+      const result = resolveAndValidatePlanPath('plans/test.md', plansDir);
+      expect(result).toBe(path.join(plansDir, 'test.md'));
+    });
+
+    it('should strip redundant prefix when path starts with ./', () => {
+      const result = resolveAndValidatePlanPath('./plans/test.md', plansDir);
+      expect(result).toBe(path.join(plansDir, 'test.md'));
+    });
+
+    it('should strip redundant prefix matching plansDir basename (with nested path)', () => {
+      const result = resolveAndValidatePlanPath(
+        'plans/nested/test.md',
+        plansDir,
+      );
+      expect(result).toBe(path.join(plansDir, 'nested/test.md'));
+    });
+
+    it('should handle standard paths without the prefix', () => {
+      const result = resolveAndValidatePlanPath('test.md', plansDir);
+      expect(result).toBe(path.join(plansDir, 'test.md'));
+    });
+
+    it('should handle standard paths with ./ prefix', () => {
+      const result = resolveAndValidatePlanPath('./test.md', plansDir);
+      expect(result).toBe(path.join(plansDir, 'test.md'));
+    });
+
+    it('should throw if path is empty after stripping prefix', () => {
+      expect(() => resolveAndValidatePlanPath('plans', plansDir)).toThrowError(
+        /must include a filename/,
+      );
+      expect(() => resolveAndValidatePlanPath('plans/', plansDir)).toThrowError(
+        /must include a filename/,
+      );
+      expect(() =>
+        resolveAndValidatePlanPath('./plans', plansDir),
+      ).toThrowError(/must include a filename/);
+    });
+
+    it('should handle mixed separators', () => {
+      const result = resolveAndValidatePlanPath(
+        'plans\\windows-style.md',
+        plansDir,
+      );
+      expect(result).toBe(path.join(plansDir, 'windows-style.md'));
+    });
   });
 
   describe('validatePlanPath', () => {
