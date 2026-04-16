@@ -1200,14 +1200,18 @@ describe('ShellTool', () => {
     it('should block $() command substitution', async () => {
       const tool = new ShellTool(mockConfig, createMockMessageBus());
       const invocation = tool.build({ command: 'echo $(whoami)' });
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
       expect(result.returnDisplay).toContain('Blocked');
     });
 
     it('should block backtick command substitution', async () => {
       const tool = new ShellTool(mockConfig, createMockMessageBus());
       const invocation = tool.build({ command: 'echo `whoami`' });
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
       expect(result.returnDisplay).toContain('Blocked');
     });
 
@@ -1228,7 +1232,9 @@ describe('ShellTool', () => {
       }));
       const tool = new ShellTool(mockConfig, createMockMessageBus());
       const invocation = tool.build({ command: 'echo hello' });
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
       expect(result.returnDisplay).not.toContain('Blocked');
     });
 
@@ -1251,7 +1257,9 @@ describe('ShellTool', () => {
       const invocation = tool.build({
         command: "echo '$(not substituted)'",
       });
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
       expect(result.returnDisplay).not.toContain('Blocked');
     });
 
@@ -1272,21 +1280,27 @@ describe('ShellTool', () => {
       }));
       const tool = new ShellTool(mockConfig, createMockMessageBus());
       const invocation = tool.build({ command: 'echo \\`hello\\`' });
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
       expect(result.returnDisplay).not.toContain('Blocked');
     });
 
     it('should block $() inside double quotes', async () => {
       const tool = new ShellTool(mockConfig, createMockMessageBus());
       const invocation = tool.build({ command: 'echo "$(whoami)"' });
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
       expect(result.returnDisplay).toContain('Blocked');
     });
 
     it('should block >() process substitution', async () => {
       const tool = new ShellTool(mockConfig, createMockMessageBus());
       const invocation = tool.build({ command: 'echo >(whoami)' });
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
       expect(result.returnDisplay).toContain('Blocked');
     });
 
@@ -1309,14 +1323,18 @@ describe('ShellTool', () => {
       const invocation = tool.build({
         command: "echo '$(whoami)'",
       });
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
       expect(result.returnDisplay).not.toContain('Blocked');
     });
     it('should block PowerShell @() array subexpression', async () => {
       mockPlatform.mockReturnValue('win32');
       const tool = new ShellTool(mockConfig, createMockMessageBus());
       const invocation = tool.build({ command: 'echo @(whoami)' });
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
       expect(result.returnDisplay).toContain('Blocked');
     });
 
@@ -1324,7 +1342,9 @@ describe('ShellTool', () => {
       mockPlatform.mockReturnValue('win32');
       const tool = new ShellTool(mockConfig, createMockMessageBus());
       const invocation = tool.build({ command: 'echo $(whoami)' });
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
       expect(result.returnDisplay).toContain('Blocked');
     });
 
@@ -1348,7 +1368,9 @@ describe('ShellTool', () => {
       const invocation = tool.build({
         command: "echo '$(whoami)'",
       });
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
       expect(result.returnDisplay).not.toContain('Blocked');
     });
     it('should allow escaped substitution outside quotes', async () => {
@@ -1368,7 +1390,9 @@ describe('ShellTool', () => {
       }));
       const tool = new ShellTool(mockConfig, createMockMessageBus());
       const invocation = tool.build({ command: 'echo \\$(whoami)' });
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
       expect(result.returnDisplay).not.toContain('Blocked');
     });
 
@@ -1389,14 +1413,18 @@ describe('ShellTool', () => {
       }));
       const tool = new ShellTool(mockConfig, createMockMessageBus());
       const invocation = tool.build({ command: 'echo "<(whoami)"' });
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
       expect(result.returnDisplay).not.toContain('Blocked');
     });
 
     it('should block process substitution without quotes', async () => {
       const tool = new ShellTool(mockConfig, createMockMessageBus());
       const invocation = tool.build({ command: 'echo <(whoami)' });
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
       expect(result.returnDisplay).toContain('Blocked');
     });
 
@@ -1417,7 +1445,9 @@ describe('ShellTool', () => {
       }));
       const tool = new ShellTool(mockConfig, createMockMessageBus());
       const invocation = tool.build({ command: 'echo "\\$(whoami)"' });
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
       expect(result.returnDisplay).not.toContain('Blocked');
     });
   });
