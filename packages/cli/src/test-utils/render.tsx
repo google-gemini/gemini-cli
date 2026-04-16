@@ -10,6 +10,7 @@ import {
   type RenderOptions,
 } from 'ink';
 import { EventEmitter } from 'node:events';
+import { Writable } from 'node:stream';
 import { Box } from 'ink';
 import { Terminal } from '@xterm/headless';
 import { vi } from 'vitest';
@@ -298,9 +299,6 @@ class XtermStdout extends EventEmitter {
       if (vi.isFakeTimers()) {
         await vi.advanceTimersByTimeAsync(100);
       } else {
-        await act(async () => {
-          await new Promise((resolve) => process.nextTick(resolve));
-        });
         await new Promise((resolve) => setTimeout(resolve, 100));
       }
     }
@@ -430,9 +428,14 @@ export const render = async (
 
   let instance!: InkInstance;
   stdout.clear();
+  const dummyStdout = new Writable({
+    write(_chunk, _encoding, callback) {
+      callback();
+    },
+  });
   act(() => {
     instance = inkRenderDirect(tree, {
-      stdout: stdout as unknown as NodeJS.WriteStream,
+      stdout: dummyStdout as unknown as NodeJS.WriteStream,
 
       stderr: stderr as unknown as NodeJS.WriteStream,
 

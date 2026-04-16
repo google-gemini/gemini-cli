@@ -4,21 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { useState, useEffect, act } from 'react';
 import { Text } from 'ink';
 import { renderHook, render } from './render.js';
 import { waitFor } from './async.js';
 
 describe.sequential('render', () => {
-  beforeEach(() => {
-    vi.useFakeTimers();
-  });
-
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
   it('should render a component', async () => {
     const { lastFrame, unmount } = await render(<Text>Hello World</Text>);
     expect(lastFrame()).toBe('Hello World\n');
