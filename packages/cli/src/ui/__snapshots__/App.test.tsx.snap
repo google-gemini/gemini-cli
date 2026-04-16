@@ -37,24 +37,45 @@ Tips for getting started:
 
 
 
-Notifications
-
-Composer
-
- ▝▜▄      ▗█▀▀▜▙▝█▛▀▀▌▜██▖▟██▘▜█▘▜██▖▝█▛▝█▛
-   ▝▜▄    █▌     █▙▟  ▐█▝█▛▐█ ▐█ ▐█▝█▖█▌ █▌
-  ▗▟▀     ▜▙ ▝█▛ █▌▝ ▖▐█   ▐█ ▐█ ▐█ ▝██▌ █▌
- ▝▀        ▀▀▀▀▘▝▀▀▀▀▘▀▀▘  ▀▀▘▀▀▘▀▀▘ ▝▀▀▝▀▀
-
- Gemini CLI v1.2.3
 
 
 
-Tips for getting started:
-1. Create GEMINI.md files to customize your interactions
-2. /help for more information
-3. Ask coding questions, edit code or run commands
-4. Be specific for the best results
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -100,23 +121,6 @@ Tips for getting started:
 2. /help for more information
 3. Ask coding questions, edit code or run commands
 4. Be specific for the best results
-ComposerNotifications
-Footer
-
- ▝▜▄      ▗█▀▀▜▙▝█▛▀▀▌▜██▖▟██▘▜█▘▜██▖▝█▛▝█▛
-   ▝▜▄    █▌     █▙▟  ▐█▝█▛▐█ ▐█ ▐█▝█▖█▌ █▌
-  ▗▟▀     ▜▙ ▝█▛ █▌▝ ▖▐█   ▐█ ▐█ ▐█ ▝██▌ █▌
- ▝▀        ▀▀▀▀▘▝▀▀▀▀▘▀▀▘  ▀▀▘▀▀▘▀▀▘ ▝▀▀▝▀▀
-
- Gemini CLI v1.2.3
-
-
-
-Tips for getting started:
-1. Create GEMINI.md files to customize your interactions
-2. /help for more information
-3. Ask coding questions, edit code or run commands
-4. Be specific for the best results
 Composer
 "
 `;
@@ -132,6 +136,11 @@ exports[`App > Snapshots > renders with dialogs visible 1`] = `
 
 
 
+Tips for getting started:
+1. Create GEMINI.md files to customize your interactions
+2. /help for more information
+3. Ask coding questions, edit code or run commands
+4. Be specific for the best results
 
 
 
@@ -158,16 +167,32 @@ exports[`App > Snapshots > renders with dialogs visible 1`] = `
 
 
 
-Notifications
 
-DialogManager
 
- ▝▜▄      ▗█▀▀▜▙▝█▛▀▀▌▜██▖▟██▘▜█▘▜██▖▝█▛▝█▛
-   ▝▜▄    █▌     █▙▟  ▐█▝█▛▐█ ▐█ ▐█▝█▖█▌ █▌
-  ▗▟▀     ▜▙ ▝█▛ █▌▝ ▖▐█   ▐█ ▐█ ▐█ ▝██▌ █▌
- ▝▀        ▀▀▀▀▘▝▀▀▀▀▘▀▀▘  ▀▀▘▀▀▘▀▀▘ ▝▀▀▝▀▀
 
- Gemini CLI v1.2.3
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -220,59 +245,80 @@ Tips for getting started:
 3. Ask coding questions, edit code or run commands
 4. Be specific for the best results
 HistoryItemDisplay
-╭───────────────────────────────────────────────────────────────────────────────
-│ Action Required
-│
-│ ?  ls list directory
-│
-│ ╭─────────────────────────────────────────────────────────────────────────────
-│ │ ls
-│ ╰─────────────────────────────────────────────────────────────────────────────
-│ Allow execution of [ls]?
-│
-│ ● 1. Allow once
-│   2. Allow for this session
-│   3. No, suggest changes (esc)
-╰───────────────────────────────────────────────────────────────────────────────
+╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ Action Required                                                                                  │
+│                                                                                                  │
+│ ?  ls list directory                                                                             │
+│                                                                                                  │
+│ ╭──────────────────────────────────────────────────────────────────────────────────────────────╮ │
+│ │ ls                                                                                           │ │
+│ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │
+│ Allow execution of [ls]?                                                                         │
+│                                                                                                  │
+│ ● 1. Allow once                                                                                  │
+│   2. Allow for this session                                                                      │
+│   3. No, suggest changes (esc)                                                                   │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 
 
 
 
 
 
-Notifications
-
-Composer
-
- ▝▜▄      ▗█▀▀▜▙▝█▛▀▀▌▜██▖▟██▘▜█▘▜██▖▝█▛▝█▛
-   ▝▜▄    █▌     █▙▟  ▐█▝█▛▐█ ▐█ ▐█▝█▖█▌ █▌
-  ▗▟▀     ▜▙ ▝█▛ █▌▝ ▖▐█   ▐█ ▐█ ▐█ ▝██▌ █▌
- ▝▀        ▀▀▀▀▘▝▀▀▀▀▘▀▀▘  ▀▀▘▀▀▘▀▀▘ ▝▀▀▝▀▀
-
- Gemini CLI v1.2.3
 
 
 
-Tips for getting started:
-1. Create GEMINI.md files to customize your interactions
-2. /help for more information
-3. Ask coding questions, edit code or run commands
-4. Be specific for the best results
-HistoryItemDisplay
-╭───────────────────────────────────────────────────────────────────────────────
-│ Action Required
-│
-│ ?  ls list directory
-│
-│ ╭─────────────────────────────────────────────────────────────────────────────
-│ │ ls
-│ ╰─────────────────────────────────────────────────────────────────────────────
-│ Allow execution of [ls]?
-│
-│ ● 1. Allow once
-│   2. Allow for this session
-│   3. No, suggest changes (esc)
-╰───────────────────────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

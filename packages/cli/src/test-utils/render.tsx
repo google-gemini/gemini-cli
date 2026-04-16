@@ -10,7 +10,6 @@ import {
   type RenderOptions,
 } from 'ink';
 import { EventEmitter } from 'node:events';
-import { Writable } from 'node:stream';
 import { Box } from 'ink';
 import { Terminal } from '@xterm/headless';
 import { vi } from 'vitest';
@@ -110,6 +109,7 @@ class XtermStdout extends EventEmitter {
   renderCount = 0;
   private queue: { promise: Promise<void> };
   isTTY = true;
+  public clearScreenOnRender = true;
 
   getColorDepth(): number {
     return 24;
@@ -118,10 +118,11 @@ class XtermStdout extends EventEmitter {
   private lastRenderOutput: string | undefined = undefined;
   private lastRenderStaticContent: string | undefined = undefined;
 
-  constructor(state: TerminalState, queue: { promise: Promise<void> }) {
+  constructor(state: TerminalState, queue: { promise: Promise<void> }, clearScreenOnRender = true) {
     super();
     this.state = state;
     this.queue = queue;
+    this.clearScreenOnRender = clearScreenOnRender;
   }
 
   get columns() {
@@ -160,8 +161,11 @@ class XtermStdout extends EventEmitter {
     this.renderCount++;
     this.lastRenderStaticContent = staticContent;
     this.lastRenderOutput = output;
-    // Clear screen and move cursor to home before writing the new frame
-    this.write('\x1b[2J\x1b[H' + staticContent + output);
+    if (this.clearScreenOnRender) {
+      this.write('\x1b[2J\x1b[H' + staticContent + output);
+    } else {
+      this.write(staticContent + output);
+    }
     this.emit('render');
   };
 
@@ -405,6 +409,7 @@ export const render = async (
   terminalWidth?: number,
   terminalHeight?: number,
   allowEmptyFrame = false,
+  clearScreenOnRender = true,
 ): Promise<
   Omit<RenderInstance, 'capturedOverflowState' | 'capturedOverflowActions'>
 > => {
@@ -426,21 +431,16 @@ export const render = async (
     cols,
     rows,
   };
-  const writeQueue = { promise: Promise.resolve() };
-  const stdout = new XtermStdout(state, writeQueue);
-  const stderr = new XtermStderr(state, writeQueue);
+  const queue = { promise: Promise.resolve() };
+  const stdout = new XtermStdout(state, queue, clearScreenOnRender);
+  const stderr = new XtermStderr(state, queue);
   const stdin = new XtermStdin();
 
   let instance!: InkInstance;
   stdout.clear();
-  const dummyStdout = new Writable({
-    write(_chunk, _encoding, callback) {
-      callback();
-    },
-  });
   act(() => {
     instance = inkRenderDirect(tree, {
-      stdout: dummyStdout as unknown as NodeJS.WriteStream,
+      stdout: stdout as unknown as NodeJS.WriteStream,
 
       stderr: stderr as unknown as NodeJS.WriteStream,
 
@@ -654,6 +654,7 @@ export const renderWithProviders = async (
     toolActions,
     persistentState,
     appState = mockAppState,
+    clearScreenOnRender = true,
   }: {
     shellFocus?: boolean;
     settings?: LoadedSettings;
@@ -675,6 +676,7 @@ export const renderWithProviders = async (
       set?: typeof persistentStateMock.set;
     };
     appState?: AppState;
+    clearScreenOnRender?: boolean;
   } = {},
 ): Promise<RenderWithProvidersInstance> => {
   const baseState: UIState = new Proxy(
@@ -837,6 +839,8 @@ export const renderWithProviders = async (
     wrapWithProviders(component),
     terminalWidth,
     terminalHeight,
+    false,
+    clearScreenOnRender,
   );
 
   return {

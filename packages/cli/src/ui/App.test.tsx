@@ -11,6 +11,10 @@ import { createMockSettings } from '../test-utils/settings.js';
 import { Text, useIsScreenReaderEnabled, type DOMElement } from 'ink';
 import { App } from './App.js';
 import { type UIState } from './contexts/UIStateContext.js';
+
+vi.mock('./hooks/useTips.js', () => ({
+  useTips: () => ({ showTips: true }),
+}));
 import { StreamingState } from './types.js';
 import { makeFakeConfig, CoreToolCallStatus } from '@google/gemini-cli-core';
 
@@ -95,11 +99,27 @@ describe.sequential('App', () => {
     const { lastFrame, unmount } = await renderWithProviders(<App />, {
       uiState: mockUIState,
       settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
+      clearScreenOnRender: false,
     });
 
-    expect(lastFrame()).toContain('Tips for getting started');
-    expect(lastFrame()).toContain('Notifications');
-    expect(lastFrame()).toContain('Composer');
+    let attempts = 0;
+    let frame = '';
+    while (attempts < 100) {
+      frame = lastFrame();
+      if (
+        frame.includes('Tips for getting started') &&
+        frame.includes('Notifications') &&
+        frame.includes('Composer')
+      ) {
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      attempts++;
+    }
+
+    expect(frame).toContain('Tips for getting started');
+    expect(frame).toContain('Notifications');
+    expect(frame).toContain('Composer');
     unmount();
   });
 
