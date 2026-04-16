@@ -1,4 +1,12 @@
-# Gemini CLI
+" I'd like to map a web app that can help me visualise on a map datasets that look like the one I'm sharing below. Please make it so I can drag and drop any dataset, and that it works locally on the rboweer. ID GlideNumber Country multi_country anonymous_long anonymous_lat Area Began Ended Validation Dead Displaced MainCause Severity categorised_cause
+2178 0 Mozambique Multi-country 5.262369185 5.262369185 137205.77 37685 37696 News 8 8300 Heavy rain 1 Heavy Rain
+5015 Mozambique Multi-country 2.115965791 5.262369185 1148874.13 44218 44221 FloodList 6 0 Tropical Storm Eloise 1.5 Storm
+4023 Mozambique Multi-country 17.42039284 5.262369185 83155.21 41291 41337 News 135 170000 Heavy Rain 1.5 Heavy Rain
+2430 0 Namibia Multi-country 5.756881091 5.262369185 615606.17 38018 38140 News 10 40000 Heavy rain 2 Heavy Rain
+
+
+
+"# Gemini CLI
 
 [![Gemini CLI CI](https://github.com/google-gemini/gemini-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/google-gemini/gemini-cli/actions/workflows/ci.yml)
 [![Gemini CLI E2E (Chained)](https://github.com/google-gemini/gemini-cli/actions/workflows/chained_e2e.yml/badge.svg)](https://github.com/google-gemini/gemini-cli/actions/workflows/chained_e2e.yml)
