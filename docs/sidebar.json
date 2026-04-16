@@ -186,6 +186,10 @@
           { "label": "Contribution guide", "slug": "docs/contributing" },
           { "label": "Integration testing", "slug": "docs/integration-tests" },
           {
+            "label": "Visual validation and TTY",
+            "slug": "docs/cli/visual-validation"
+          },
+          {
             "label": "Issue and PR automation",
             "slug": "docs/issue-and-pr-automation"
           },
