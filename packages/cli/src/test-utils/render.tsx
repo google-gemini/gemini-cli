@@ -107,7 +107,7 @@ function isInkRenderMetrics(
 class XtermStdout extends EventEmitter {
   private state: TerminalState;
   private pendingWrites = 0;
-  private renderCount = 0;
+  renderCount = 0;
   private queue: { promise: Promise<void> };
   isTTY = true;
 
@@ -160,7 +160,8 @@ class XtermStdout extends EventEmitter {
     this.renderCount++;
     this.lastRenderStaticContent = staticContent;
     this.lastRenderOutput = output;
-    this.write(staticContent + output);
+    // Clear screen and move cursor to home before writing the new frame
+    this.write('\x1b[2J\x1b[H' + staticContent + output);
     this.emit('render');
   };
 
@@ -188,7 +189,9 @@ class XtermStdout extends EventEmitter {
   lastFrame = (options: { allowEmpty?: boolean } = {}) => {
     const buffer = this.state.terminal.buffer.active;
     const allLines: string[] = [];
-    for (let i = 0; i < buffer.length; i++) {
+    const startLine = buffer.baseY;
+    const endLine = buffer.baseY + this.rows;
+    for (let i = startLine; i < endLine; i++) {
       allLines.push(buffer.getLine(i)?.translateToString(true) ?? '');
     }
 
@@ -400,6 +403,7 @@ const instances: InkInstance[] = [];
 export const render = async (
   tree: React.ReactElement,
   terminalWidth?: number,
+  terminalHeight?: number,
 ): Promise<
   Omit<RenderInstance, 'capturedOverflowState' | 'capturedOverflowActions'>
 > => {
@@ -408,7 +412,7 @@ export const render = async (
   // value was used (e.g. 40 rows). The alternatives to make things worse are
   // windows unfortunately with odd duplicate content in the backbuffer
   // which does not match actual behavior in xterm.js on windows.
-  const rows = 1000;
+  const rows = terminalHeight ?? 1000;
   const terminal = new Terminal({
     cols,
     rows,
@@ -455,7 +459,9 @@ export const render = async (
 
   instances.push(instance);
 
-  await stdout.waitUntilReady();
+  while (stdout.renderCount === 0 || stdout.lastFrame({ allowEmpty: true }) === '') {
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
 
   return {
     rerender: (newTree: React.ReactElement) => {
@@ -518,7 +524,7 @@ const baseMockUiState = {
   isConfigInitialized: true,
   isAuthenticating: false,
   terminalWidth: 100,
-  terminalHeight: 40,
+  terminalHeight: 100,
   currentModel: 'gemini-pro',
   terminalBackgroundColor: 'black' as const,
   cleanUiDetailsVisible: false,
@@ -634,6 +640,7 @@ export const renderWithProviders = async (
     quotaState: providedQuotaState,
     inputState: providedInputState,
     width,
+    height,
     mouseEventsEnabled = false,
     config,
     uiActions,
@@ -647,6 +654,7 @@ export const renderWithProviders = async (
     quotaState?: Partial<QuotaState>;
     inputState?: Partial<InputState>;
     width?: number;
+    height?: number;
     mouseEventsEnabled?: boolean;
     config?: Config;
     uiActions?: Partial<UIActions>;
@@ -712,6 +720,7 @@ export const renderWithProviders = async (
   persistentStateMock.mockClear();
 
   const terminalWidth = width ?? baseState.terminalWidth;
+  const terminalHeight = height ?? baseState.terminalHeight;
 
   if (!config) {
     config = makeFakeConfig({
@@ -820,6 +829,7 @@ export const renderWithProviders = async (
   const renderResult = await render(
     wrapWithProviders(component),
     terminalWidth,
+    terminalHeight,
   );
 
   return {

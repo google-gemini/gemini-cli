@@ -247,6 +247,7 @@ const renderDialog = async (
       settings,
       config: makeFakeConfig(),
       uiState: { terminalBackgroundColor: undefined },
+      height: options?.availableTerminalHeight ?? 100,
     },
   );
 
@@ -284,10 +285,11 @@ describe.sequential('SettingsDialog', () => {
       const settings = createMockSettings();
       const onSelect = vi.fn();
 
-      const { lastFrame, unmount } = await renderDialog(settings, onSelect, {
-        availableTerminalHeight: 20,
+      const { lastFrame, unmount, waitUntilReady } = await renderDialog(settings, onSelect, {
+        availableTerminalHeight: 25,
       });
 
+      await waitUntilReady();
       const output = lastFrame();
       // Should still render properly with the height prop
       expect(output).toContain('Settings');
