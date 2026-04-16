@@ -5,13 +5,18 @@
  */
 
 import { describe, it, beforeAll, afterAll } from 'vitest';
-import { TestRig, PerfTestHarness } from '@google/gemini-cli-test-utils';
+import {
+  TestRig,
+  PerfTestHarness,
+  resolvePerfBaselinesPath,
+} from '@google/gemini-cli-test-utils';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { existsSync, readFileSync } from 'node:fs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const BASELINES_PATH = join(__dirname, 'baselines.json');
+const MACHINE_FAMILY = process.env['PERF_MACHINE_FAMILY'];
+const BASELINES_PATH = resolvePerfBaselinesPath(__dirname, MACHINE_FAMILY);
 const UPDATE_BASELINES = process.env['UPDATE_PERF_BASELINES'] === 'true';
 const TOLERANCE_PERCENT = 15;
 
@@ -28,6 +33,7 @@ describe('CPU Performance Tests', () => {
       defaultTolerancePercent: TOLERANCE_PERCENT,
       sampleCount: SAMPLE_COUNT,
       warmupCount: WARMUP_COUNT,
+      machineFamily: MACHINE_FAMILY,
     });
   });
 

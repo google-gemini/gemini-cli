@@ -6,6 +6,8 @@
 
 import v8 from 'node:v8';
 import { setTimeout as sleep } from 'node:timers/promises';
+import { mkdirSync } from 'node:fs';
+import { join, dirname } from 'node:path';
 import { loadBaselines, updateBaseline } from './memory-baselines.js';
 import type { MemoryBaseline, MemoryBaselineFile } from './memory-baselines.js';
 
@@ -66,6 +68,14 @@ export interface MemoryTestHarnessOptions {
   sampleCount?: number;
   /** Pause in ms between samples. Default: 50 */
   samplePauseMs?: number;
+  /**
+   * The CI machine family (e.g. 'gemini-cli-ubuntu-16-core').
+   * When set, baselines are loaded from and saved to
+   * `<dir>/baselines/<machineFamily>.json`. If the file does not exist and
+   * UPDATE_MEMORY_BASELINES is not set, tests hard-fail with an actionable
+   * message instead of silently falling back.
+   */
+  machineFamily?: string;
 }
 
 /**
@@ -85,6 +95,7 @@ export class MemoryTestHarness {
   private readonly gcDelayMs: number;
   private readonly sampleCount: number;
   private readonly samplePauseMs: number;
+  private readonly machineFamily?: string;
   private allResults: MemoryTestResult[] = [];
 
   constructor(options: MemoryTestHarnessOptions) {
@@ -94,6 +105,7 @@ export class MemoryTestHarness {
     this.gcDelayMs = options.gcDelayMs ?? 100;
     this.sampleCount = options.sampleCount ?? 3;
     this.samplePauseMs = options.samplePauseMs ?? 50;
+    this.machineFamily = options.machineFamily;
     this.baselines = loadBaselines(this.baselinesPath);
   }
 
@@ -240,6 +252,16 @@ export class MemoryTestHarness {
     const tolerance = tolerancePercent ?? this.defaultTolerancePercent;
 
     if (!result.baseline) {
+      if (this.machineFamily) {
+        throw new Error(
+          `No baseline found for scenario "${result.scenarioName}" on machine family "${this.machineFamily}".\n` +
+            `  Expected file: ${this.baselinesPath}\n` +
+            `  To create it, trigger the 'Update Baselines' workflow:\n` +
+            `    .github/workflows/update-baselines.yml\n` +
+            `  Or locally:\n` +
+            `    UPDATE_MEMORY_BASELINES=true MEMORY_MACHINE_FAMILY=${this.machineFamily} npm run test:memory`,
+        );
+      }
       console.warn(
         `⚠ No baseline found for "${result.scenarioName}". ` +
           `Run with UPDATE_MEMORY_BASELINES=true to create one. ` +
@@ -268,9 +290,21 @@ export class MemoryTestHarness {
 
   /**
    * Update the baseline for a scenario with the current measured values.
+   * When `machineFamily` is set, writes to `baselines/<machineFamily>.json`
+   * (creating the directory if needed). Otherwise writes to `baselinesPath`.
    */
   updateScenarioBaseline(result: MemoryTestResult): void {
-    updateBaseline(this.baselinesPath, result.scenarioName, {
+    const targetPath = this.machineFamily
+      ? join(
+          dirname(this.baselinesPath),
+          'baselines',
+          `${this.machineFamily}.json`,
+        )
+      : this.baselinesPath;
+    if (this.machineFamily) {
+      mkdirSync(dirname(targetPath), { recursive: true });
+    }
+    updateBaseline(targetPath, result.scenarioName, {
       heapUsedBytes: result.finalHeapUsed,
       heapTotalBytes:
         result.snapshots[result.snapshots.length - 1]?.heapTotal ?? 0,
@@ -391,6 +425,9 @@ export class MemoryTestHarness {
     lines.push('');
     lines.push('═══════════════════════════════════════════════════');
     lines.push('         MEMORY USAGE TEST REPORT');
+    if (this.machineFamily) {
+      lines.push(`         Machine family: ${this.machineFamily}`);
+    }
     lines.push('═══════════════════════════════════════════════════');
     lines.push('');
 

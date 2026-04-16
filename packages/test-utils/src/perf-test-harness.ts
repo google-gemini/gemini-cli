@@ -6,7 +6,8 @@
 
 import { performance } from 'node:perf_hooks';
 import { setTimeout as sleep } from 'node:timers/promises';
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { join, dirname } from 'node:path';
 
 /** Configuration for asciichart plot function. */
 interface PlotConfig {
@@ -83,6 +84,14 @@ export interface PerfTestHarnessOptions {
   warmupCount?: number;
   /** Pause in ms between samples. Default: 100 */
   samplePauseMs?: number;
+  /**
+   * The CI machine family (e.g. 'gemini-cli-ubuntu-16-core').
+   * When set, baselines are loaded from and saved to
+   * `<dir>/baselines/<machineFamily>.json`. If the file does not exist and
+   * UPDATE_PERF_BASELINES is not set, tests hard-fail with an actionable
+   * message instead of silently falling back.
+   */
+  machineFamily?: string;
 }
 
 /**
@@ -114,6 +123,7 @@ export class PerfTestHarness {
   private readonly sampleCount: number;
   private readonly warmupCount: number;
   private readonly samplePauseMs: number;
+  private readonly machineFamily?: string;
   private allResults: PerfTestResult[] = [];
   private activeTimers: Map<string, ActiveTimer> = new Map();
 
@@ -124,6 +134,7 @@ export class PerfTestHarness {
     this.sampleCount = options.sampleCount ?? 5;
     this.warmupCount = options.warmupCount ?? 1;
     this.samplePauseMs = options.samplePauseMs ?? 100;
+    this.machineFamily = options.machineFamily;
     this.baselines = loadPerfBaselines(this.baselinesPath);
   }
 
@@ -284,6 +295,18 @@ export class PerfTestHarness {
     const cpuTolerance = cpuTolerancePercent ?? this.defaultCpuTolerancePercent;
 
     if (!result.baseline) {
+      if (this.machineFamily) {
+        // In CI with a declared machine family: hard-fail so the problem is
+        // immediately visible, rather than silently skipping the assertion.
+        throw new Error(
+          `No baseline found for scenario "${result.scenarioName}" on machine family "${this.machineFamily}".\n` +
+            `  Expected file: ${this.baselinesPath}\n` +
+            `  To create it, trigger the 'Update Baselines' workflow:\n` +
+            `    .github/workflows/update-baselines.yml\n` +
+            `  Or locally:\n` +
+            `    UPDATE_PERF_BASELINES=true PERF_MACHINE_FAMILY=${this.machineFamily} npm run test:perf`,
+        );
+      }
       console.warn(
         `⚠ No baseline found for "${result.scenarioName}". ` +
           `Run with UPDATE_PERF_BASELINES=true to create one. ` +
@@ -321,16 +344,30 @@ export class PerfTestHarness {
 
   /**
    * Update the baseline for a scenario with the current measured values.
+   * When `machineFamily` is set, writes to `baselines/<machineFamily>.json`
+   * (creating the directory if needed). Otherwise writes to `baselinesPath`.
    */
   updateScenarioBaseline(result: PerfTestResult): void {
-    updatePerfBaseline(this.baselinesPath, result.scenarioName, {
+    const targetPath = this.machineFamily
+      ? join(
+          dirname(this.baselinesPath),
+          'baselines',
+          `${this.machineFamily}.json`,
+        )
+      : this.baselinesPath;
+    // Ensure the baselines/ subdirectory exists
+    if (this.machineFamily) {
+      mkdirSync(dirname(targetPath), { recursive: true });
+    }
+    updatePerfBaseline(targetPath, result.scenarioName, {
       wallClockMs: result.median.wallClockMs,
       cpuTotalUs: result.median.cpuTotalUs,
     });
     // Reload baselines after update
     this.baselines = loadPerfBaselines(this.baselinesPath);
     console.log(
-      `Updated baseline for ${result.scenarioName}: ${result.median.wallClockMs.toFixed(1)} ms`,
+      `Updated baseline for ${result.scenarioName}: ${result.median.wallClockMs.toFixed(1)} ms` +
+        (this.machineFamily ? ` [${this.machineFamily}]` : ''),
     );
   }
 
@@ -344,6 +381,9 @@ export class PerfTestHarness {
     lines.push('');
     lines.push('═══════════════════════════════════════════════════');
     lines.push('         PERFORMANCE TEST REPORT');
+    if (this.machineFamily) {
+      lines.push(`         Machine family: ${this.machineFamily}`);
+    }
     lines.push('═══════════════════════════════════════════════════');
     lines.push('');
 
@@ -482,6 +522,30 @@ export class PerfTestHarness {
     const medianIdx = Math.floor(sorted.length / 2);
     return { ...sorted[medianIdx]! };
   }
+}
+
+// ─── Baseline path resolution ────────────────────────────────────────
+
+/**
+ * Resolve the path to the correct perf baselines JSON file.
+ *
+ * - If `machineFamily` is provided → returns `<testRootDir>/baselines/<machineFamily>.json`.
+ *   This file may not exist yet; the harness will hard-fail at assertion time if it doesn't.
+ * - If `machineFamily` is absent → returns `<testRootDir>/baselines.json`
+ *   (the legacy generic file used for local development).
+ *
+ * @param testRootDir - Absolute path to the directory containing the test root
+ *   (e.g. `__dirname` inside `perf-tests/`).
+ * @param machineFamily - Optional CI runner label (e.g. `'gemini-cli-ubuntu-16-core'`).
+ */
+export function resolvePerfBaselinesPath(
+  testRootDir: string,
+  machineFamily?: string,
+): string {
+  if (machineFamily) {
+    return join(testRootDir, 'baselines', `${machineFamily}.json`);
+  }
+  return join(testRootDir, 'baselines.json');
 }
 
 // ─── Baseline management ─────────────────────────────────────────────

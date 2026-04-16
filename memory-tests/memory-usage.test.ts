@@ -5,7 +5,11 @@
  */
 
 import { describe, it, beforeAll, afterAll, afterEach } from 'vitest';
-import { TestRig, MemoryTestHarness } from '@google/gemini-cli-test-utils';
+import {
+  TestRig,
+  MemoryTestHarness,
+  resolveMemoryBaselinesPath,
+} from '@google/gemini-cli-test-utils';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -19,7 +23,8 @@ import {
 import { randomUUID } from 'node:crypto';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const BASELINES_PATH = join(__dirname, 'baselines.json');
+const MACHINE_FAMILY = process.env['MEMORY_MACHINE_FAMILY'];
+const BASELINES_PATH = resolveMemoryBaselinesPath(__dirname, MACHINE_FAMILY);
 const UPDATE_BASELINES = process.env['UPDATE_MEMORY_BASELINES'] === 'true';
 const TOLERANCE_PERCENT = 10;
 
@@ -37,6 +42,7 @@ describe('Memory Usage Tests', () => {
       gcCycles: 3,
       gcDelayMs: 100,
       sampleCount: 3,
+      machineFamily: MACHINE_FAMILY,
     });
   });
 

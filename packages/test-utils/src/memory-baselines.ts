@@ -5,6 +5,7 @@
  */
 
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
 
 /**
  * Baseline entry for a single memory test scenario.
@@ -76,4 +77,26 @@ export function updateBaseline(
     timestamp: new Date().toISOString(),
   };
   saveBaselines(path, baselines);
+}
+
+/**
+ * Resolve the path to the correct memory baselines JSON file.
+ *
+ * - If `machineFamily` is provided → returns `<testRootDir>/baselines/<machineFamily>.json`.
+ *   This file may not exist yet; the harness will hard-fail at assertion time if it doesn't.
+ * - If `machineFamily` is absent → returns `<testRootDir>/baselines.json`
+ *   (the legacy generic file used for local development).
+ *
+ * @param testRootDir - Absolute path to the directory containing the test root
+ *   (e.g. `__dirname` inside `memory-tests/`).
+ * @param machineFamily - Optional CI runner label (e.g. `'gemini-cli-ubuntu-16-core'`).
+ */
+export function resolveMemoryBaselinesPath(
+  testRootDir: string,
+  machineFamily?: string,
+): string {
+  if (machineFamily) {
+    return join(testRootDir, 'baselines', `${machineFamily}.json`);
+  }
+  return join(testRootDir, 'baselines.json');
 }

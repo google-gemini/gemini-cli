@@ -1,0 +1,243 @@
+# Copyright 2026 Google LLC
+# SPDX-License-Identifier: Apache-2.0
+#
+# Update Perf/Memory Baselines
+#
+# Triggered by:
+#   1. A PR comment starting with one of:
+#        /run perf         — updates only perf baselines
+#        /run mem          — updates only memory baselines
+#        /run perf+mem     — updates both (default)
+#   2. Manual workflow_dispatch from the Actions tab.
+#
+# Both paths are gated behind the 'perf-approvers' GitHub environment,
+# which requires approval from the designated approvers group before the
+# matrix runners are provisioned.
+#
+# After all per-platform runs complete, the updated baseline JSON files
+# are committed back to the triggering branch automatically.
+
+name: 'Update Perf/Memory Baselines'
+
+on:
+  issue_comment:
+    types: ['created']
+  workflow_dispatch:
+    inputs:
+      test_type:
+        description: 'Which baselines to update'
+        required: true
+        default: 'perf+mem'
+        type: 'choice'
+        options:
+          - 'perf'
+          - 'mem'
+          - 'perf+mem'
+      ref:
+        description: 'Branch/SHA to checkout and update baselines on (default: main)'
+        required: false
+        default: 'main'
+
+permissions:
+  contents: 'write' # push the updated baseline commit
+  pull-requests: 'write' # post the result comment
+  issues: 'read'
+
+jobs:
+  # ── 1. Parse slash command / workflow_dispatch ──────────────────────────
+  parse-command:
+    name: 'Parse Command'
+    runs-on: 'gemini-cli-ubuntu-16-core'
+    if: |
+      github.repository == 'google-gemini/gemini-cli' && (
+        github.event_name == 'workflow_dispatch' || (
+          github.event_name == 'issue_comment' &&
+          github.event.issue.pull_request != null &&
+          (
+            startsWith(github.event.comment.body, '/run perf+mem') ||
+            startsWith(github.event.comment.body, '/run perf') ||
+            startsWith(github.event.comment.body, '/run mem')
+          )
+        )
+      )
+    outputs:
+      test_type: '${{ steps.parse.outputs.test_type }}'
+      ref: '${{ steps.parse.outputs.ref }}'
+      pr_number: '${{ steps.parse.outputs.pr_number }}'
+    steps:
+      - name: 'Parse inputs'
+        id: 'parse'
+        env:
+          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          COMMENT_BODY: '${{ github.event.comment.body }}'
+          DISPATCH_TEST_TYPE: '${{ inputs.test_type }}'
+          DISPATCH_REF: '${{ inputs.ref }}'
+          PR_NUMBER: '${{ github.event.issue.number }}'
+          EVENT_NAME: '${{ github.event_name }}'
+        run: |
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            TEST_TYPE="${DISPATCH_TEST_TYPE:-perf+mem}"
+            REF="${DISPATCH_REF:-main}"
+            echo "pr_number=" >> "$GITHUB_OUTPUT"
+          else
+            # Slash command: determine test_type from comment
+            if echo "$COMMENT_BODY" | grep -q "^/run perf+mem"; then
+              TEST_TYPE="perf+mem"
+            elif echo "$COMMENT_BODY" | grep -q "^/run perf"; then
+              TEST_TYPE="perf"
+            else
+              TEST_TYPE="mem"
+            fi
+            # Get the HEAD sha of the PR
+            REF=$(gh pr view "$PR_NUMBER" --json headRefName --jq '.headRefName')
+            echo "pr_number=${PR_NUMBER}" >> "$GITHUB_OUTPUT"
+          fi
+          echo "test_type=${TEST_TYPE}" >> "$GITHUB_OUTPUT"
+          echo "ref=${REF}" >> "$GITHUB_OUTPUT"
+
+      - name: 'Post acknowledgement comment on PR'
+        if: "steps.parse.outputs.pr_number != ''"
+        env:
+          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+        run: |
+          gh pr comment "${{ steps.parse.outputs.pr_number }}" --body \
+            "⏳ **Baseline update requested** (\`${{ steps.parse.outputs.test_type }}\`).
+            A member of the \`perf-approvers\` group must approve this workflow before the runners start.
+            <!-- baseline-update-ack -->"
+
+  # ── 2. Approval gate (perf-approvers environment) ──────────────────────
+  await-approval:
+    name: 'Await perf-approvers Approval'
+    needs: 'parse-command'
+    # This environment requires manual approval from the perf-approvers group
+    # before GitHub provisions any of the downstream runners.
+    environment: 'perf-approvers'
+    runs-on: 'gemini-cli-ubuntu-16-core'
+    steps:
+      - name: 'Approved'
+        run: 'echo "Approved by perf-approvers — launching baseline update matrix."'
+
+  # ── 3. Run tests to capture fresh baselines on each platform ───────────
+  update-baselines:
+    name: 'Update Baselines (${{ matrix.machine_family }})'
+    needs: 'await-approval'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runs_on: 'gemini-cli-ubuntu-16-core'
+            machine_family: 'gemini-cli-ubuntu-16-core'
+          - runs_on: 'macos-latest'
+            machine_family: 'macos-latest'
+          - runs_on: 'gemini-cli-windows-16-core'
+            machine_family: 'gemini-cli-windows-16-core'
+    runs-on: '${{ matrix.runs_on }}'
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
+        with:
+          ref: '${{ needs.parse-command.outputs.ref }}'
+          # Need full history so we can push back
+          fetch-depth: 0
+
+      - name: 'Set up Node.js'
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: 'Install dependencies'
+        run: 'npm ci'
+
+      - name: 'Build project'
+        run: 'npm run build'
+
+      - name: 'Update Perf Baselines'
+        if: "contains(needs.parse-command.outputs.test_type, 'perf')"
+        run: 'npm run test:perf:update-baselines'
+        env:
+          PERF_MACHINE_FAMILY: '${{ matrix.machine_family }}'
+
+      - name: 'Update Memory Baselines'
+        if: "contains(needs.parse-command.outputs.test_type, 'mem')"
+        run: 'npm run test:memory:update-baselines'
+        env:
+          MEMORY_MACHINE_FAMILY: '${{ matrix.machine_family }}'
+
+      - name: 'Upload updated baseline files'
+        uses: 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02' # ratchet:actions/upload-artifact@v4
+        with:
+          name: 'baselines-${{ matrix.machine_family }}'
+          # Upload the entire baselines/ subdirectories from both test roots
+          path: |
+            perf-tests/baselines/
+            memory-tests/baselines/
+          if-no-files-found: 'warn'
+
+  # ── 4. Gather artifacts and commit everything back to the branch ────────
+  commit-baselines:
+    name: 'Commit Updated Baselines'
+    needs:
+      - 'parse-command'
+      - 'update-baselines'
+    runs-on: 'gemini-cli-ubuntu-16-core'
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
+        with:
+          ref: '${{ needs.parse-command.outputs.ref }}'
+          fetch-depth: 0
+
+      - name: 'Download all baseline artifacts'
+        uses: 'actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093' # ratchet:actions/download-artifact@v4
+        with:
+          # Download each per-platform artifact into its own subdirectory so
+          # the paths mirror the test directory layout.
+          pattern: 'baselines-*'
+          merge-multiple: true
+          path: '.'
+
+      - name: 'Commit and push'
+        env:
+          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Stage only the per-platform baseline files (not the generic ones)
+          git add perf-tests/baselines/ memory-tests/baselines/ || true
+
+          if git diff --cached --quiet; then
+            echo "No baseline files changed — nothing to commit."
+          else
+            git commit -m "chore: update ${{ needs.parse-command.outputs.test_type }} baselines [skip ci]
+
+            Updated by 'Update Perf/Memory Baselines' workflow run #${{ github.run_id }}.
+            Platforms: gemini-cli-ubuntu-16-core, macos-latest, gemini-cli-windows-16-core"
+            git push
+          fi
+
+      - name: 'Post result comment on PR'
+        if: "needs.parse-command.outputs.pr_number != ''"
+        env:
+          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+        run: |
+          # Remove the acknowledgement comment before posting the result
+          COMMENT_ID=$(gh pr view "${{ needs.parse-command.outputs.pr_number }}" \
+            --json comments \
+            --jq '.comments[] | select(.body | contains("<!-- baseline-update-ack -->")) | .url' \
+            | grep -oE '[0-9]+$' | head -n 1)
+          if [ -n "$COMMENT_ID" ]; then
+            gh api -X DELETE "repos/${{ github.repository }}/issues/comments/${COMMENT_ID}"
+          fi
+
+          gh pr comment "${{ needs.parse-command.outputs.pr_number }}" --body \
+            "✅ **Baselines updated** (\`${{ needs.parse-command.outputs.test_type }}\`).
+
+            Fresh per-platform baseline files have been committed to this branch for:
+            - \`gemini-cli-ubuntu-16-core\`
+            - \`macos-latest\`
+            - \`gemini-cli-windows-16-core\`
+
+            The nightly tests will now compare against these values.
+            <!-- baseline-update-result -->"
