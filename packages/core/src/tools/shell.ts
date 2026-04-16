@@ -8,7 +8,6 @@ import fsPromises from 'node:fs/promises';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import crypto from 'node:crypto';
 import { debugLogger } from '../index.js';
 import { type SandboxPermissions } from '../services/sandboxManager.js';
 import { ToolErrorType } from './tool-error.js';
