@@ -89,7 +89,22 @@ export class ContextTokenCalculator {
    * Slower, precise estimation for a Gemini Content/Part graph.
    * Deeply inspects the nested structure and uses the base tokenization math.
    */
+  private readonly partTokenCache = new WeakMap<object, number>();
+
   estimateTokensForParts(parts: Part[]): number {
-    return estimateTokenCountSync(parts, 0, this.charsPerToken);
+    let total = 0;
+    for (const part of parts) {
+      if (part !== null && typeof part === 'object') {
+        let cost = this.partTokenCache.get(part);
+        if (cost === undefined) {
+          cost = estimateTokenCountSync([part], 0, this.charsPerToken);
+          this.partTokenCache.set(part, cost);
+        }
+        total += cost;
+      } else {
+        total += estimateTokenCountSync([part], 0, this.charsPerToken);
+      }
+    }
+    return total;
   }
 }

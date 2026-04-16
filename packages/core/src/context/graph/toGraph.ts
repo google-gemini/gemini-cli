@@ -42,7 +42,6 @@ export function toGraph(
   history: readonly Content[],
   tokenCalculator: ContextTokenCalculator,
   nodeIdentityMap: WeakMap<object, string>,
-  partTokenCache: WeakMap<Part, number>,
 ): Episode[] {
   const episodes: Episode[] = [];
   let currentEpisode: Partial<Episode> | null = null;
@@ -71,7 +70,6 @@ export function toGraph(
           pendingCallParts,
           tokenCalculator,
           nodeIdentityMap,
-          partTokenCache,
         );
       }
 
@@ -103,7 +101,6 @@ function parseToolResponses(
   pendingCallParts: Map<string, Part>,
   tokenCalculator: ContextTokenCalculator,
   nodeIdentityMap: WeakMap<object, string>,
-  partTokenCache: WeakMap<Part, number>,
 ): Partial<Episode> {
   if (!currentEpisode) {
     currentEpisode = {
@@ -119,20 +116,10 @@ function parseToolResponses(
       const callId = part.functionResponse.id || '';
       const matchingCall = pendingCallParts.get(callId);
 
-      let intentTokens = 0;
-      if (matchingCall) {
-        intentTokens = partTokenCache.get(matchingCall) ?? 0;
-        if (!intentTokens) {
-          intentTokens = tokenCalculator.estimateTokensForParts([matchingCall]);
-          partTokenCache.set(matchingCall, intentTokens);
-        }
-      }
-
-      let obsTokens = partTokenCache.get(part);
-      if (obsTokens === undefined) {
-        obsTokens = tokenCalculator.estimateTokensForParts([part]);
-        partTokenCache.set(part, obsTokens);
-      }
+      const intentTokens = matchingCall
+        ? tokenCalculator.estimateTokensForParts([matchingCall])
+        : 0;
+      const obsTokens = tokenCalculator.estimateTokensForParts([part]);
 
       const step: ToolExecution = {
         id: getStableId(part, nodeIdentityMap),
