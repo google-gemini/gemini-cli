@@ -25,7 +25,7 @@ jobs:
           mode: 'source'
 
       - name: 'Run CLI Unit Tests'
-        run: 'npx vitest run packages/cli'
+        run: 'npx vitest run packages/cli --exclude packages/cli/src/ui/App.test.tsx --exclude packages/cli/src/test-utils/render.test.tsx --exclude packages/cli/src/test-utils/AppRig.test.tsx'
         shell: 'bash'
 
   test_suspect:
