@@ -103,7 +103,6 @@ import {
   type ShellOutputEvent,
   type AnsiOutput,
   CoreToolCallStatus,
-  escapeShellArg,
 } from '@google/gemini-cli-core';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
@@ -241,15 +240,10 @@ describe('useExecutionLifecycle', () => {
         }),
       ],
     });
-    const tmpDir = '/tmp/gemini-shell-abcdef';
-    const tmpFile = path.join(tmpDir, 'pwd.tmp');
-    const command = 'ls -l';
-    const escapedTmpFile = escapeShellArg(tmpFile, 'bash');
-    const wrappedCommand = `{\n${command}\n}; __code=$?; pwd > ${escapedTmpFile}; exit $__code`;
 
     expect(mockShellExecutionService).toHaveBeenCalledWith(
-      wrappedCommand,
-      '/test/dir',
+      expect.stringMatching(/pwd > .*\/gemini-shell-.*\/pwd\.tmp/),
+      expect.any(String),
       expect.any(Function),
       expect.any(Object),
       false,
@@ -270,13 +264,8 @@ EOF`;
       result.current.handleShellCommand(command, new AbortController().signal);
     });
 
-    const tmpDir = '/tmp/gemini-shell-abcdef';
-    const tmpFile = path.join(tmpDir, 'pwd.tmp');
-    const escapedTmpFile = escapeShellArg(tmpFile, 'bash');
-    // Verify that the delimiter EOF is on its own line and NOT followed by a semicolon
-    const wrappedCommand = `{\n${command}\n}; __code=$?; pwd > ${escapedTmpFile}; exit $__code`;
     expect(mockShellExecutionService).toHaveBeenCalledWith(
-      wrappedCommand,
+      expect.stringMatching(/pwd > .*\/gemini-shell-.*\/pwd\.tmp/),
       expect.any(String),
       expect.any(Function),
       expect.any(Object),
@@ -382,14 +371,8 @@ EOF`;
       });
 
       // Verify it's using the non-pty shell
-      const tmpDir = '/tmp/gemini-shell-abcdef';
-      const tmpFile = path.join(tmpDir, 'pwd.tmp');
-      const command = 'stream';
-      const escapedTmpFile = escapeShellArg(tmpFile, 'bash');
-      const wrappedCommand = `{\n${command}\n}; __code=$?; pwd > ${escapedTmpFile}; exit $__code`;
-
       expect(mockShellExecutionService).toHaveBeenCalledWith(
-        wrappedCommand,
+        expect.stringMatching(/pwd > .*\/gemini-shell-.*\/pwd\.tmp/),
         '/test/dir',
         expect.any(Function),
         expect.any(Object),

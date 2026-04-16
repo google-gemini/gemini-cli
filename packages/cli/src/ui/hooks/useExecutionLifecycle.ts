@@ -362,18 +362,6 @@ export const useExecutionLifecycle = (
       let commandToExecute = rawQuery;
       let pwdFilePath: string | undefined;
 
-      // On non-windows, wrap the command to capture the final working directory.
-      if (!isWindows) {
-        let command = rawQuery.trim();
-        if (command.endsWith('\\')) {
-          command += ' ';
-        }
-        const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gemini-shell-'));
-        pwdFilePath = path.join(tmpDir, 'pwd.tmp');
-        const escapedPwdFilePath = escapeShellArg(pwdFilePath, 'bash');
-        commandToExecute = `{\n${command}\n}; __code=$?; pwd > ${escapedPwdFilePath}; exit $__code`;
-      }
-
       const executeCommand = async () => {
         let cumulativeStdout: string | AnsiOutput = '';
         let isBinaryStream = false;
@@ -403,9 +391,23 @@ export const useExecutionLifecycle = (
         };
         abortSignal.addEventListener('abort', abortHandler, { once: true });
 
-        onDebugMessage(`Executing in ${targetDir}: ${commandToExecute}`);
-
         try {
+          // On non-windows, wrap the command to capture the final working directory.
+          if (!isWindows) {
+            let command = rawQuery.trim();
+            if (command.endsWith('\\')) {
+              command += ' ';
+            }
+            const tmpDir = fs.mkdtempSync(
+              path.join(os.tmpdir(), 'gemini-shell-'),
+            );
+            pwdFilePath = path.join(tmpDir, 'pwd.tmp');
+            const escapedPwdFilePath = escapeShellArg(pwdFilePath, 'bash');
+            commandToExecute = `{\n${command}\n}; __code=$?; pwd > ${escapedPwdFilePath}; exit $__code`;
+          }
+
+          onDebugMessage(`Executing in ${targetDir}: ${commandToExecute}`);
+
           const activeTheme = themeManager.getActiveTheme();
           const shellExecutionConfig = {
             ...config.getShellExecutionConfig(),
