@@ -20,7 +20,7 @@ import {
   isProjectSkillPatchTarget,
   validateParsedSkillPatchHeaders,
 } from '../services/memoryPatchUtils.js';
-import { readExtractionState } from '../services/memoryService.js';
+import { readExtractionState } from '../services/defaultMemoryProvider.js';
 import { refreshServerHierarchicalMemory } from '../utils/memoryDiscovery.js';
 import type { MessageActionReturn, ToolActionReturn } from './types.js';
 

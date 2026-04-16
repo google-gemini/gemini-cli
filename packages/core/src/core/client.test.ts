@@ -34,6 +34,7 @@ import {
 import { getCoreSystemPrompt } from './prompts.js';
 import { DEFAULT_GEMINI_MODEL_AUTO } from '../config/models.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
+import { MemoryService } from '../services/memoryService.js';
 import { setSimulate429 } from '../utils/testUtils.js';
 import { tokenLimit } from './tokenLimits.js';
 import { ideContextStore } from '../ide/ideContext.js';
@@ -94,6 +95,29 @@ interface MockTurnContext {
 }
 
 const mockTurnRunFn = vi.fn();
+const memoryServiceMocks = vi.hoisted(() => {
+  const onSessionStart = vi.fn();
+  const getSystemInstructions = vi.fn().mockResolvedValue('');
+  const getTurnContext = vi.fn().mockResolvedValue('');
+  const onTurnComplete = vi.fn();
+  const onSessionEnd = vi.fn();
+  const factory = vi.fn(() => ({
+    onSessionStart,
+    getSystemInstructions,
+    getTurnContext,
+    onTurnComplete,
+    onSessionEnd,
+  }));
+
+  return {
+    onSessionStart,
+    getSystemInstructions,
+    getTurnContext,
+    onTurnComplete,
+    onSessionEnd,
+    factory,
+  };
+});
 
 vi.mock('./turn', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./turn.js')>();
@@ -117,6 +141,9 @@ vi.mock('./turn', async (importOriginal) => {
 });
 
 vi.mock('../config/config.js');
+vi.mock('../services/memoryService.js', () => ({
+  MemoryService: vi.fn().mockImplementation(() => memoryServiceMocks.factory()),
+}));
 vi.mock('./prompts');
 vi.mock('../utils/getFolderStructure', () => ({
   getFolderStructure: vi.fn().mockResolvedValue('Mock Folder Structure'),
@@ -172,6 +199,15 @@ describe('Gemini Client (client.ts)', () => {
     vi.resetAllMocks();
     ClearcutLogger.clearInstance();
     vi.mocked(uiTelemetryService.setLastPromptTokenCount).mockClear();
+    vi.mocked(MemoryService).mockImplementation(
+      () => memoryServiceMocks.factory() as unknown as MemoryService,
+    );
+    memoryServiceMocks.factory.mockClear();
+    memoryServiceMocks.onSessionStart.mockReset();
+    memoryServiceMocks.getSystemInstructions.mockReset().mockResolvedValue('');
+    memoryServiceMocks.getTurnContext.mockReset().mockResolvedValue('');
+    memoryServiceMocks.onTurnComplete.mockReset();
+    memoryServiceMocks.onSessionEnd.mockReset();
 
     mockGenerateContentFn = vi.fn().mockResolvedValue({
       candidates: [{ content: { parts: [{ text: '{"key": "value"}' }] } }],
@@ -231,6 +267,8 @@ describe('Gemini Client (client.ts)', () => {
         minPrunableThresholdTokens: 30000,
         protectLatestTurn: true,
       }),
+      getExtensions: vi.fn().mockReturnValue([]),
+      isMemoryManagerEnabled: vi.fn().mockReturnValue(false),
 
       getSessionId: vi.fn().mockReturnValue('test-session-id'),
       getProxy: vi.fn().mockReturnValue(undefined),
@@ -428,6 +466,112 @@ describe('Gemini Client (client.ts)', () => {
       // The subsequent messages should be the extra history
       expect(history[1]).toEqual(extraHistory[0]);
       expect(history[2]).toEqual(extraHistory[1]);
+    });
+  });
+
+  describe('memory service integration', () => {
+    it('does not construct the memory service when the experimental flag is off', async () => {
+      vi.mocked(mockConfig.isMemoryManagerEnabled).mockReturnValue(false);
+
+      client.dispose();
+      client = new GeminiClient(mockConfig as unknown as AgentLoopContext);
+      await client.initialize();
+
+      expect(memoryServiceMocks.factory).not.toHaveBeenCalled();
+      expect(memoryServiceMocks.onSessionStart).not.toHaveBeenCalled();
+    });
+
+    it('initializes the memory service and injects system instructions when the experimental flag is on', async () => {
+      vi.mocked(mockConfig.isMemoryManagerEnabled).mockReturnValue(true);
+      memoryServiceMocks.getSystemInstructions.mockResolvedValue(
+        'Memory instructions',
+      );
+      vi.mocked(getCoreSystemPrompt).mockReturnValue('Base prompt');
+
+      client.dispose();
+      client = new GeminiClient(mockConfig as unknown as AgentLoopContext);
+      await client.initialize();
+
+      const mockChat = {
+        setSystemInstruction: vi.fn(),
+      } as unknown as GeminiChat;
+      client['chat'] = mockChat;
+      client.updateSystemInstruction();
+
+      expect(memoryServiceMocks.factory).toHaveBeenCalledTimes(1);
+      expect(memoryServiceMocks.onSessionStart).toHaveBeenCalledWith(
+        'test-session-id',
+      );
+      expect(mockChat.setSystemInstruction).toHaveBeenCalledWith(
+        'Base prompt\n\n<memory_system_instructions>\nMemory instructions\n</memory_system_instructions>',
+      );
+    });
+
+    it('injects turn context and completes the prompt lifecycle after the final turn', async () => {
+      vi.mocked(mockConfig.isMemoryManagerEnabled).mockReturnValue(true);
+      memoryServiceMocks.getTurnContext.mockResolvedValue('recalled context');
+      mockTurnRunFn.mockReturnValue(
+        (async function* () {
+          yield {
+            type: GeminiEventType.Finished,
+            value: { reason: 'STOP', usageMetadata: undefined },
+          };
+        })(),
+      );
+
+      const stream = client.sendMessageStream(
+        [{ text: 'How do I deploy this?' }],
+        new AbortController().signal,
+        'prompt-id-memory',
+      );
+
+      await fromAsync(stream);
+
+      expect(memoryServiceMocks.getTurnContext).toHaveBeenCalledWith(
+        'How do I deploy this?',
+      );
+      expect(mockTurnRunFn).toHaveBeenCalledWith(
+        { model: 'default-routed-model', isChatModel: true },
+        [
+          { text: 'How do I deploy this?' },
+          { text: '<memory_context>recalled context</memory_context>' },
+        ],
+        expect.any(AbortSignal),
+        undefined,
+      );
+      expect(memoryServiceMocks.onTurnComplete).toHaveBeenCalledWith(
+        'How do I deploy this?',
+        'Mock Response',
+      );
+    });
+
+    it('invokes onSessionEnd when shutdownSessionServices is called', async () => {
+      vi.mocked(mockConfig.isMemoryManagerEnabled).mockReturnValue(true);
+
+      client.dispose();
+      client = new GeminiClient(mockConfig as unknown as AgentLoopContext);
+      await client.initialize();
+
+      await client.shutdownSessionServices();
+
+      expect(memoryServiceMocks.onSessionEnd).toHaveBeenCalledTimes(1);
+    });
+
+    it('skips the memory service for subagent-scoped clients', async () => {
+      vi.mocked(mockConfig.isMemoryManagerEnabled).mockReturnValue(true);
+
+      client.dispose();
+      const subagentContext = Object.assign(Object.create(mockConfig), {
+        config: mockConfig,
+        promptId: 'subagent-prompt-id',
+        parentSessionId: 'main-prompt-id',
+      }) as AgentLoopContext;
+      const subagentClient = new GeminiClient(subagentContext);
+
+      await subagentClient.initialize();
+
+      expect(memoryServiceMocks.factory).not.toHaveBeenCalled();
+      subagentClient.dispose();
     });
   });
 

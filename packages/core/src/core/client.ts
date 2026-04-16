@@ -43,6 +43,7 @@ import type {
 } from '../services/chatRecordingService.js';
 import type { ContentGenerator } from './contentGenerator.js';
 import { LoopDetectionService } from '../services/loopDetectionService.js';
+import { MemoryService } from '../services/memoryService.js';
 import { ChatCompressionService } from '../context/chatCompressionService.js';
 import { AgentHistoryProvider } from '../context/agentHistoryProvider.js';
 import { ideContextStore } from '../ide/ideContext.js';
@@ -89,6 +90,14 @@ type BeforeAgentHookReturn =
   | { additionalContext: string | undefined }
   | undefined;
 
+interface PromptLifecycleState {
+  originalUserMessage: string;
+}
+
+interface SendMessageStreamOptions {
+  internalContinuation?: boolean;
+}
+
 export class GeminiClient {
   private chat?: GeminiChat;
   private sessionTurnCount = 0;
@@ -107,6 +116,10 @@ export class GeminiClient {
    * being forced and did it fail?
    */
   private hasFailedCompressionAttempt = false;
+  private memoryService?: MemoryService;
+  private memorySystemInstructions = '';
+  private memorySessionStarted = false;
+  private promptLifecycleStateMap = new Map<string, PromptLifecycleState>();
 
   constructor(private readonly context: AgentLoopContext) {
     this.loopDetector = new LoopDetectionService(this.config);
@@ -248,6 +261,150 @@ export class GeminiClient {
     }
   }
 
+  private shouldUseMemoryService(): boolean {
+    if (this.context.parentSessionId) {
+      return false;
+    }
+    // The entire memory subsystem (built-in extractor and any
+    // extension-contributed providers) is gated behind a single
+    // experimental flag while the architecture stabilizes.
+    return this.config.isMemoryManagerEnabled();
+  }
+
+  private getOrCreateMemoryService(): MemoryService | undefined {
+    if (!this.shouldUseMemoryService()) {
+      return undefined;
+    }
+
+    if (!this.memoryService) {
+      this.memoryService = new MemoryService(this.config);
+    }
+
+    return this.memoryService;
+  }
+
+  private async refreshMemorySystemInstructions(): Promise<void> {
+    if (!this.memoryService) {
+      this.memorySystemInstructions = '';
+      return;
+    }
+
+    this.memorySystemInstructions =
+      await this.memoryService.getSystemInstructions();
+  }
+
+  private async ensureMemoryServiceInitialized(): Promise<void> {
+    const memoryService = this.getOrCreateMemoryService();
+    if (!memoryService) {
+      return;
+    }
+
+    if (!this.memorySessionStarted) {
+      this.memorySessionStarted = true;
+      await memoryService.onSessionStart(this.config.getSessionId());
+    }
+
+    await this.refreshMemorySystemInstructions();
+  }
+
+  private buildSystemInstruction(): string {
+    const systemMemory = this.config.getSystemInstructionMemory();
+    const systemInstruction = getCoreSystemPrompt(this.config, systemMemory);
+    const memoryInstructions = this.memorySystemInstructions.trim();
+
+    if (!memoryInstructions) {
+      return systemInstruction;
+    }
+
+    return `${systemInstruction}\n\n<memory_system_instructions>\n${memoryInstructions}\n</memory_system_instructions>`;
+  }
+
+  private getOrCreatePromptLifecycleState(
+    prompt_id: string,
+    request: PartListUnion,
+  ): PromptLifecycleState {
+    let state = this.promptLifecycleStateMap.get(prompt_id);
+    if (!state) {
+      state = {
+        originalUserMessage: partListUnionToString(request),
+      };
+      this.promptLifecycleStateMap.set(prompt_id, state);
+    }
+
+    return state;
+  }
+
+  private clearPromptLifecycleState(prompt_id: string): void {
+    this.promptLifecycleStateMap.delete(prompt_id);
+  }
+
+  private requestHasFunctionResponse(request: PartListUnion): boolean {
+    const parts = Array.isArray(request) ? request : [request];
+    return parts.some(
+      (part) =>
+        typeof part === 'object' && part !== null && 'functionResponse' in part,
+    );
+  }
+
+  private appendMemoryContextToRequest(
+    request: PartListUnion,
+    memoryContext: string,
+  ): PartListUnion {
+    const trimmedContext = memoryContext.trim();
+    if (!trimmedContext) {
+      return request;
+    }
+
+    const requestParts = Array.isArray(request) ? request : [request];
+    return [
+      ...requestParts,
+      { text: `<memory_context>${trimmedContext}</memory_context>` },
+    ];
+  }
+
+  private async withMemoryTurnContext(
+    request: PartListUnion,
+    originalUserMessage: string,
+    isInternalContinuation: boolean,
+  ): Promise<PartListUnion> {
+    if (isInternalContinuation || this.requestHasFunctionResponse(request)) {
+      return request;
+    }
+
+    await this.ensureMemoryServiceInitialized();
+    if (!this.memoryService || !originalUserMessage.trim()) {
+      return request;
+    }
+
+    const memoryContext =
+      await this.memoryService.getTurnContext(originalUserMessage);
+
+    return this.appendMemoryContextToRequest(request, memoryContext);
+  }
+
+  private async finalizePromptLifecycle(
+    prompt_id: string,
+    turn: Turn,
+  ): Promise<void> {
+    try {
+      const assistantMessage = turn.getResponseText() || '';
+      const lifecycleState = this.promptLifecycleStateMap.get(prompt_id);
+      const userMessage = lifecycleState?.originalUserMessage ?? '';
+
+      if (
+        this.memoryService &&
+        (assistantMessage.trim().length > 0 || turn.finishReason !== undefined)
+      ) {
+        // Fire-and-forget by contract — provider does its own async work.
+        this.memoryService.onTurnComplete(userMessage, assistantMessage);
+        await this.refreshMemorySystemInstructions();
+        this.updateSystemInstruction();
+      }
+    } finally {
+      this.clearPromptLifecycleState(prompt_id);
+    }
+  }
+
   async initialize() {
     this.chat = await this.startChat();
     this.updateTelemetryTokenCount();
@@ -356,9 +513,7 @@ export class GeminiClient {
       return;
     }
 
-    const systemMemory = this.config.getSystemInstructionMemory();
-    const systemInstruction = getCoreSystemPrompt(this.config, systemMemory);
-    this.getChat().setSystemInstruction(systemInstruction);
+    this.getChat().setSystemInstruction(this.buildSystemInstruction());
   }
 
   async startChat(
@@ -376,8 +531,8 @@ export class GeminiClient {
     const history = await getInitialChatHistory(this.config, extraHistory);
 
     try {
-      const systemMemory = this.config.getSystemInstructionMemory();
-      const systemInstruction = getCoreSystemPrompt(this.config, systemMemory);
+      await this.ensureMemoryServiceInitialized();
+      const systemInstruction = this.buildSystemInstruction();
       const chat = new GeminiChat(
         this.config,
         systemInstruction,
@@ -839,6 +994,8 @@ export class GeminiClient {
           boundedTurns - 1,
           true,
           displayContent,
+          false,
+          { internalContinuation: true },
         );
         return turn;
       }
@@ -872,6 +1029,8 @@ export class GeminiClient {
             boundedTurns - 1,
             false, // isInvalidStreamRetry is false
             displayContent,
+            false,
+            { internalContinuation: true },
           );
           return turn;
         }
@@ -888,7 +1047,14 @@ export class GeminiClient {
     isInvalidStreamRetry: boolean = false,
     displayContent?: PartListUnion,
     stopHookActive: boolean = false,
+    options?: SendMessageStreamOptions,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
+    const isInternalContinuation = options?.internalContinuation ?? false;
+    const promptLifecycleState = this.getOrCreatePromptLifecycleState(
+      prompt_id,
+      displayContent ?? request,
+    );
+
     if (!isInvalidStreamRetry) {
       this.config.resetTurn();
     }
@@ -910,6 +1076,9 @@ export class GeminiClient {
           'type' in hookResult &&
           hookResult.type === GeminiEventType.AgentExecutionStopped
         ) {
+          if (!isInternalContinuation) {
+            this.clearPromptLifecycleState(prompt_id);
+          }
           // Add user message to history before returning so it's kept in the transcript
           this.getChat().addHistory(createUserContent(request));
           yield hookResult;
@@ -918,6 +1087,9 @@ export class GeminiClient {
           'type' in hookResult &&
           hookResult.type === GeminiEventType.AgentExecutionBlocked
         ) {
+          if (!isInternalContinuation) {
+            this.clearPromptLifecycleState(prompt_id);
+          }
           yield hookResult;
           return new Turn(this.getChat(), prompt_id);
         } else if ('additionalContext' in hookResult) {
@@ -932,6 +1104,12 @@ export class GeminiClient {
         }
       }
     }
+
+    request = await this.withMemoryTurnContext(
+      request,
+      promptLifecycleState.originalUserMessage,
+      isInternalContinuation,
+    );
 
     const boundedTurns = Math.min(turns, MAX_TURNS);
     let turn = new Turn(this.getChat(), prompt_id);
@@ -1008,11 +1186,15 @@ export class GeminiClient {
             false,
             displayContent,
             true, // stopHookActive: signal retry to AfterAgent hooks
+            { internalContinuation: true },
           );
         }
       }
     } catch (error) {
       if (signal?.aborted || isAbortError(error)) {
+        if (!isInternalContinuation) {
+          this.clearPromptLifecycleState(prompt_id);
+        }
         yield { type: GeminiEventType.UserCancelled };
         return turn;
       }
@@ -1035,7 +1217,29 @@ export class GeminiClient {
       }
     }
 
+    if (
+      !isInternalContinuation &&
+      !turn.pendingToolCalls.length &&
+      !signal.aborted
+    ) {
+      await this.finalizePromptLifecycle(prompt_id, turn);
+    }
+
     return turn;
+  }
+
+  async shutdownSessionServices(): Promise<void> {
+    if (!this.memoryService) {
+      this.promptLifecycleStateMap.clear();
+      return;
+    }
+
+    try {
+      await this.memoryService.onSessionEnd();
+      await this.refreshMemorySystemInstructions();
+    } finally {
+      this.promptLifecycleStateMap.clear();
+    }
   }
 
   async generateContent(
@@ -1277,6 +1481,8 @@ export class GeminiClient {
       boundedTurns - 1,
       isInvalidStreamRetry,
       displayContent,
+      false,
+      { internalContinuation: true },
     );
   }
 }

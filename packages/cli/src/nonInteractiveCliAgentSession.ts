@@ -616,6 +616,7 @@ export async function runNonInteractive({
       cleanupStdinCancellation();
       abortController.signal.removeEventListener('abort', abortSession);
 
+      await config.getGeminiClient()?.shutdownSessionServices?.();
       scheduler?.dispose();
       consolePatcher.cleanup();
       coreEvents.off(CoreEvent.UserFeedback, handleUserFeedback);

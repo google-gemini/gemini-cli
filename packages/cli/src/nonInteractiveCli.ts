@@ -529,6 +529,7 @@ export async function runNonInteractive(
       // Cleanup stdin cancellation before other cleanup
       cleanupStdinCancellation();
 
+      await config.getGeminiClient()?.shutdownSessionServices?.();
       scheduler?.dispose();
       consolePatcher.cleanup();
       coreEvents.off(CoreEvent.UserFeedback, handleUserFeedback);

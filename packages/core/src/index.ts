@@ -141,9 +141,10 @@ export * from './services/modelConfigService.js';
 export * from './sandbox/windows/WindowsSandboxManager.js';
 export * from './services/sessionSummaryUtils.js';
 export {
-  startMemoryService,
+  DefaultMemoryProvider,
   validatePatches,
-} from './services/memoryService.js';
+} from './services/defaultMemoryProvider.js';
+export { MemoryService } from './services/memoryService.js';
 export { isProjectSkillPatchTarget } from './services/memoryPatchUtils.js';
 export * from './context/memoryContextManager.js';
 export * from './services/trackerService.js';
