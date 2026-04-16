@@ -272,7 +272,7 @@ EOF`;
       false,
       expect.any(Object),
     );
-    expect(wrappedCommand).toMatch(/\nEOF\n\};/);
+    expect(mockShellExecutionService.mock.calls[0][0]).toMatch(/\nEOF\n\};/);
   });
 
   it('should pass the config sessionId into shell execution config', async () => {
