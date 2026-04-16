@@ -82,6 +82,7 @@ const mockConfigPlain = {
   getExtensionRegistryURI: () => undefined,
   getContentGeneratorConfig: () => ({ authType: undefined }),
   getSandboxEnabled: () => false,
+  getSessionId: () => 'test-session-id',
 };
 
 const mockConfig = mockConfigPlain as unknown as Config;
@@ -266,21 +267,16 @@ describe('<Footer />', () => {
       width: 120,
       uiState: {
         sessionStats: mockSessionStats,
-        quota: {
-          userTier: undefined,
-          stats: {
-            remaining: 15,
-            limit: 100,
-            resetTime: undefined,
-          },
-          proQuotaRequest: null,
-          validationRequest: null,
-          overageMenuRequest: null,
-          emptyWalletRequest: null,
+      },
+      quotaState: {
+        stats: {
+          remaining: 15,
+          limit: 100,
+          resetTime: undefined,
         },
       },
     });
-    expect(lastFrame()).toContain('85%');
+    expect(lastFrame()).toContain('85% used');
     expect(normalizeFrame(lastFrame())).toMatchSnapshot();
     unmount();
   });
@@ -291,21 +287,16 @@ describe('<Footer />', () => {
       width: 120,
       uiState: {
         sessionStats: mockSessionStats,
-        quota: {
-          userTier: undefined,
-          stats: {
-            remaining: 85,
-            limit: 100,
-            resetTime: undefined,
-          },
-          proQuotaRequest: null,
-          validationRequest: null,
-          overageMenuRequest: null,
-          emptyWalletRequest: null,
+      },
+      quotaState: {
+        stats: {
+          remaining: 85,
+          limit: 100,
+          resetTime: undefined,
         },
       },
     });
-    expect(normalizeFrame(lastFrame())).not.toContain('used');
+    expect(normalizeFrame(lastFrame())).toContain('15% used');
     expect(normalizeFrame(lastFrame())).toMatchSnapshot();
     unmount();
   });
@@ -316,17 +307,12 @@ describe('<Footer />', () => {
       width: 120,
       uiState: {
         sessionStats: mockSessionStats,
-        quota: {
-          userTier: undefined,
-          stats: {
-            remaining: 0,
-            limit: 100,
-            resetTime: undefined,
-          },
-          proQuotaRequest: null,
-          validationRequest: null,
-          overageMenuRequest: null,
-          emptyWalletRequest: null,
+      },
+      quotaState: {
+        stats: {
+          remaining: 0,
+          limit: 100,
+          resetTime: undefined,
         },
       },
     });

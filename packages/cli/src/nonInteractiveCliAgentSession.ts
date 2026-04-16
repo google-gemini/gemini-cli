@@ -37,6 +37,8 @@ import {
   LegacyAgentSession,
   ToolErrorType,
   geminiPartsToContentParts,
+  displayContentToString,
+  debugLogger,
 } from '@google/gemini-cli-core';
 
 import type { Part } from '@google/genai';
@@ -183,6 +185,7 @@ export async function runNonInteractive({
     };
 
     let errorToHandle: unknown | undefined;
+    let scheduler: Scheduler | undefined;
     let abortSession = () => {};
     try {
       consolePatcher.patch();
@@ -214,7 +217,7 @@ export async function runNonInteractive({
       });
 
       const geminiClient = config.getGeminiClient();
-      const scheduler = new Scheduler({
+      scheduler = new Scheduler({
         context: config,
         messageBus: config.getMessageBus(),
         getPreferredEditor: () => undefined,
@@ -468,7 +471,8 @@ export async function runNonInteractive({
           case 'tool_response': {
             textOutput.ensureTrailingNewline();
             if (streamFormatter) {
-              const displayText = getTextContent(event.displayContent);
+              const display = event.display?.result;
+              const displayText = displayContentToString(display);
               const errorMsg = getTextContent(event.content) ?? 'Tool error';
               streamFormatter.emitEvent({
                 type: JsonStreamEventType.TOOL_RESULT,
@@ -488,7 +492,8 @@ export async function runNonInteractive({
               });
             }
             if (event.isError) {
-              const displayText = getTextContent(event.displayContent);
+              const display = event.display?.result;
+              const displayText = displayContentToString(display);
               const errorMsg = getTextContent(event.content) ?? 'Tool error';
 
               if (event.data?.['errorType'] === ToolErrorType.STOP_EXECUTION) {
@@ -599,6 +604,7 @@ export async function runNonInteractive({
             // Explicitly ignore these non-interactive events
             break;
           default:
+            debugLogger.error('Unknown agent event type:', event);
             event satisfies never;
             break;
         }
@@ -610,6 +616,7 @@ export async function runNonInteractive({
       cleanupStdinCancellation();
       abortController.signal.removeEventListener('abort', abortSession);
 
+      scheduler?.dispose();
       consolePatcher.cleanup();
       coreEvents.off(CoreEvent.UserFeedback, handleUserFeedback);
     }
