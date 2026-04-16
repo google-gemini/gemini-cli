@@ -44,6 +44,7 @@ export const createMockConfig = (overrides: Partial<Config> = {}): Config =>
     getListSessions: vi.fn(() => false),
     getDeleteSession: vi.fn(() => undefined),
     setSessionId: vi.fn(),
+    resetNewSessionState: vi.fn(),
     getSessionId: vi.fn().mockReturnValue('mock-session-id'),
     getWorktreeSettings: vi.fn(() => undefined),
     getContentGeneratorConfig: vi.fn(() => ({ authType: 'google' })),
