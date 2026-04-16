@@ -619,13 +619,15 @@ export class ChatCompressionService {
       mergeThreshold: UNION_FIND_MERGE_THRESHOLD,
     });
 
-    // Feed all truncated history into the context window.
-    // Sanitize every appended string so tool-response content cannot inject
-    // the `<context_clusters>` delimiter the renderer wraps cold summaries in.
+    // Feed all truncated history into the context window. Sanitize untrusted
+    // tool output so it cannot inject the `<context_clusters>` delimiter the
+    // renderer wraps cold summaries in. Trusted conversation text (p.text) is
+    // passed through unchanged to preserve formatting in the reconstructed
+    // history; the cold summaries themselves are sanitized at the wrap site.
     for (const content of truncatedHistory) {
       const text = content.parts
         ?.map((p) => {
-          if (p.text) return sanitizePromptString(p.text);
+          if (p.text) return p.text;
           if (p.functionCall) return `[Tool call: ${p.functionCall.name}]`;
           if (p.functionResponse) {
             const responseStr = JSON.stringify(
@@ -675,7 +677,7 @@ export class ChatCompressionService {
         role: 'user',
         parts: [
           {
-            text: `<context_clusters>\n${coldSummaries.join('\n---\n')}\n</context_clusters>`,
+            text: `<context_clusters>\n${coldSummaries.map(sanitizePromptString).join('\n---\n')}\n</context_clusters>`,
           },
         ],
       });
