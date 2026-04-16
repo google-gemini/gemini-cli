@@ -160,6 +160,7 @@ class XtermStdout extends EventEmitter {
     this.renderCount++;
     this.lastRenderStaticContent = staticContent;
     this.lastRenderOutput = output;
+    this.write(staticContent + output);
     this.emit('render');
   };
 
