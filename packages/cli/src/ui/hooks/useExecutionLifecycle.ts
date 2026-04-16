@@ -20,6 +20,7 @@ import {
   ShellExecutionService,
   ExecutionLifecycleService,
   CoreToolCallStatus,
+  escapeShellArg,
 } from '@google/gemini-cli-core';
 import { type PartListUnion } from '@google/genai';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
@@ -369,7 +370,8 @@ export const useExecutionLifecycle = (
         }
         const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gemini-shell-'));
         pwdFilePath = path.join(tmpDir, 'pwd.tmp');
-        commandToExecute = `{\n${command}\n}; __code=$?; pwd > "${pwdFilePath}"; exit $__code`;
+        const escapedPwdFilePath = escapeShellArg(pwdFilePath, 'bash');
+        commandToExecute = `{\n${command}\n}; __code=$?; pwd > ${escapedPwdFilePath}; exit $__code`;
       }
 
       const executeCommand = async () => {
