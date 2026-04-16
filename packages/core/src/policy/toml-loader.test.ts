@@ -10,6 +10,7 @@ import {
   ApprovalMode,
   PRIORITY_SUBAGENT_TOOL,
 } from './types.js';
+import { stableStringify } from './stable-stringify.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import * as os from 'node:os';
@@ -94,11 +95,15 @@ priority = 100
       expect(result.rules[0].toolName).toBe('run_shell_command');
       expect(result.rules[1].toolName).toBe('run_shell_command');
       expect(
-        result.rules[0].argsPattern?.test('{"command":"git status"}'),
+        result.rules[0].argsPattern?.test(
+          stableStringify({ command: 'git status' }),
+        ),
       ).toBe(true);
-      expect(result.rules[1].argsPattern?.test('{"command":"git log"}')).toBe(
-        true,
-      );
+      expect(
+        result.rules[1].argsPattern?.test(
+          stableStringify({ command: 'git log' }),
+        ),
+      ).toBe(true);
       expect(result.errors).toHaveLength(0);
     });
 
@@ -160,13 +165,19 @@ priority = 100
 
       expect(result.rules).toHaveLength(1);
       expect(
-        result.rules[0].argsPattern?.test('{"command":"git status"}'),
+        result.rules[0].argsPattern?.test(
+          stableStringify({ command: 'git status' }),
+        ),
       ).toBe(true);
       expect(
-        result.rules[0].argsPattern?.test('{"command":"git log --all"}'),
+        result.rules[0].argsPattern?.test(
+          stableStringify({ command: 'git log --all' }),
+        ),
       ).toBe(true);
       expect(
-        result.rules[0].argsPattern?.test('{"command":"git branch"}'),
+        result.rules[0].argsPattern?.test(
+          stableStringify({ command: 'git branch' }),
+        ),
       ).toBe(false);
       expect(result.errors).toHaveLength(0);
     });
@@ -184,7 +195,9 @@ priority = 100
       // The generated pattern is "command":"^git status
       // This will NOT match '{"command":"git status"}' because of the '{"' at the start.
       expect(
-        result.rules[0].argsPattern?.test('{"command":"git status"}'),
+        result.rules[0].argsPattern?.test(
+          stableStringify({ command: 'git status' }),
+        ),
       ).toBe(false);
       expect(result.errors).toHaveLength(0);
     });
@@ -421,10 +434,14 @@ priority = 100
       expect(result.rules).toHaveLength(1);
       // The regex should have escaped the * and .
       expect(
-        result.rules[0].argsPattern?.test('{"command":"git log file.txt"}'),
+        result.rules[0].argsPattern?.test(
+          stableStringify({ command: 'git log file.txt' }),
+        ),
       ).toBe(false);
       expect(
-        result.rules[0].argsPattern?.test('{"command":"git log *.txt"}'),
+        result.rules[0].argsPattern?.test(
+          stableStringify({ command: 'git log *.txt' }),
+        ),
       ).toBe(true);
       expect(result.errors).toHaveLength(0);
     });
