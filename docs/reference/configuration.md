@@ -113,6 +113,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Enable Vim keybindings
   - **Default:** `false`
 
+- **`general.vimModeCursorShape`** (boolean):
+  - **Description:** Change the cursor shape to reflect Vim mode when supported
+    by the terminal
+  - **Default:** `false`
+
 - **`general.defaultApprovalMode`** (enum):
   - **Description:** The default approval mode for tool execution. 'default'
     prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is

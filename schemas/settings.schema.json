@@ -62,6 +62,13 @@
           "default": false,
           "type": "boolean"
         },
+        "vimModeCursorShape": {
+          "title": "Vim Cursor Shape",
+          "description": "Change the cursor shape to reflect Vim mode when supported by the terminal",
+          "markdownDescription": "Change the cursor shape to reflect Vim mode when supported by the terminal\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "defaultApprovalMode": {
           "title": "Default Approval Mode",
           "description": "The default approval mode for tool execution. 'default' prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is read-only mode. YOLO mode (auto-approve all actions) can only be enabled via command line (--yolo or --approval-mode=yolo).",
