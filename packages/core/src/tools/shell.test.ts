@@ -469,7 +469,7 @@ describe('ShellTool', () => {
         'pgrep.tmp',
       );
       const escapedTmpFile = escapeShellArg(tmpFile, 'bash');
-      const wrappedCommand = `(\n${command}\n); __code=$?; pgrep -g 0 >${escapedTmpFile} 2>&1; exit $__code;`;
+      const wrappedCommand = `(\nls\n); __code=$?; pgrep -g 0 >${escapedTmpFile} 2>&1; exit $__code;`;
 
       expect(mockShellExecutionService).toHaveBeenCalledWith(
         wrappedCommand,
@@ -500,7 +500,7 @@ describe('ShellTool', () => {
         'pgrep.tmp',
       );
       const escapedTmpFile = escapeShellArg(tmpFile, 'bash');
-      const wrappedCommand = `(\n${command}\n); __code=$?; pgrep -g 0 >${escapedTmpFile} 2>&1; exit $__code;`;
+      const wrappedCommand = `(\nls\n); __code=$?; pgrep -g 0 >${escapedTmpFile} 2>&1; exit $__code;`;
 
       expect(mockShellExecutionService).toHaveBeenCalledWith(
         wrappedCommand,
