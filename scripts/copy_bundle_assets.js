@@ -126,10 +126,13 @@ const extensionExamplesSrc = join(
   'packages/cli/src/commands/extensions/examples',
 );
 const extensionExamplesDest = join(bundleDir, 'examples');
+const EXCLUDED_EXAMPLE_DIRS = ['node_modules', 'dist'];
+
 if (existsSync(extensionExamplesSrc)) {
   cpSync(extensionExamplesSrc, extensionExamplesDest, {
     recursive: true,
     dereference: true,
+    filter: (src) => !EXCLUDED_EXAMPLE_DIRS.some((dir) => src.includes(dir)),
   });
   console.log('Copied extension examples to bundle/examples/');
 }
