@@ -64,7 +64,8 @@ Gemini CLI supports three MCP transport types:
 
 Some MCP servers expose contextual “resources” in addition to the tools and
 prompts. Gemini CLI discovers these automatically and gives you the possibility
-to reference them in the chat.
+to reference them in the chat. For more information on the tools used to
+interact with these resources, see [MCP resource tools](mcp-resources.md).
 
 ### Discovery and listing
 

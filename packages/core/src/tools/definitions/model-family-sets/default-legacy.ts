@@ -25,6 +25,8 @@ import {
   GET_INTERNAL_DOCS_TOOL_NAME,
   ASK_USER_TOOL_NAME,
   ENTER_PLAN_MODE_TOOL_NAME,
+  READ_MCP_RESOURCE_TOOL_NAME,
+  LIST_MCP_RESOURCES_TOOL_NAME,
   // Shared parameter names
   PARAM_FILE_PATH,
   PARAM_DIR_PATH,
@@ -756,4 +758,37 @@ The agent did not use the todo list because this task could be completed by a ti
 
   exit_plan_mode: () => getExitPlanModeDeclaration(),
   activate_skill: (skillNames) => getActivateSkillDeclaration(skillNames),
+
+  read_mcp_resource: {
+    name: READ_MCP_RESOURCE_TOOL_NAME,
+    description:
+      'Reads the content of a specified Model Context Protocol (MCP) resource.',
+    parametersJsonSchema: {
+      type: 'object',
+      properties: {
+        uri: {
+          description: 'The URI of the MCP resource to read.',
+          type: 'string',
+        },
+      },
+      required: ['uri'],
+    },
+  },
+
+  list_mcp_resources: {
+    name: LIST_MCP_RESOURCES_TOOL_NAME,
+    description:
+      'Lists all available resources exposed by connected MCP servers.',
+    parametersJsonSchema: {
+      type: 'object',
+      properties: {
+        serverName: {
+          description:
+            'Optional filter to list resources from a specific server.',
+          type: 'string',
+        },
+      },
+      required: [],
+    },
+  },
 };
