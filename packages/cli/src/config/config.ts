@@ -8,6 +8,7 @@ import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import process from 'node:process';
 import * as path from 'node:path';
+import { existsSync, statSync } from 'node:fs';
 import { execa } from 'execa';
 import { mcpCommand } from '../commands/mcp.js';
 import { extensionsCommand } from '../commands/extensions.js';
@@ -106,6 +107,7 @@ export interface CliArgs {
   rawOutput: boolean | undefined;
   acceptRawOutputRisk: boolean | undefined;
   isCommand: boolean | undefined;
+  workspace?: string;
 }
 
 /**
@@ -122,6 +124,25 @@ const coerceCommaSeparated = (values: string[]): string[] => {
       .filter(Boolean),
   );
 };
+
+/**
+ * Pre-parses the command line arguments to find the workspace flag.
+ * Used for early setup before full argument parsing with settings,
+ * since settings are loaded from the workspace directory.
+ */
+export function getWorkspaceArg(argv: string[]): string | undefined {
+  const result = yargs(hideBin(argv))
+    .help(false)
+    .version(false)
+    .option('workspace', { type: 'string' })
+    .strict(false)
+    .exitProcess(false)
+    .parseSync();
+
+  return typeof result.workspace === 'string'
+    ? path.resolve(result.workspace.trim())
+    : undefined;
+}
 
 /**
  * Pre-parses the command line arguments to find the worktree flag.
@@ -301,6 +322,13 @@ export async function parseArguments(
             }
             return trimmed;
           },
+        })
+        .option('workspace', {
+          type: 'string',
+          nargs: 1,
+          description:
+            'Use this directory as the workspace root. Prevents the CLI from walking upward to find .git, GEMINI.md, or .gemini directories.',
+          coerce: (value: string): string => path.resolve(value.trim()),
         })
         .option('sandbox', {
           alias: 's',
@@ -523,7 +551,26 @@ export async function loadCliConfig(
   argv: CliArgs,
   options: LoadCliConfigOptions = {},
 ): Promise<Config> {
-  const { cwd = process.cwd(), projectHooks } = options;
+  const { cwd: cwdOption = process.cwd(), projectHooks } = options;
+
+  // --workspace takes priority over the default cwd. Resolve symlinks and
+  // validate it is an existing directory before using it for anything else.
+  if (argv.workspace) {
+    const resolvedWorkspace = resolveToRealPath(argv.workspace);
+    if (!existsSync(resolvedWorkspace)) {
+      throw new FatalConfigError(
+        `--workspace directory does not exist: ${argv.workspace}`,
+      );
+    }
+    if (!statSync(resolvedWorkspace).isDirectory()) {
+      throw new FatalConfigError(
+        `--workspace path is not a directory: ${argv.workspace}`,
+      );
+    }
+    argv.workspace = resolvedWorkspace;
+  }
+
+  const cwd = argv.workspace ?? cwdOption;
   const debugMode = isDebugMode(argv);
 
   const worktreeSettings =
@@ -644,6 +691,7 @@ export async function loadCliConfig(
       memoryFileFiltering,
       settings.context?.discoveryMaxDirs,
       settings.context?.memoryBoundaryMarkers,
+      argv.workspace,
     );
     memoryContent = result.memoryContent;
     fileCount = result.fileCount;

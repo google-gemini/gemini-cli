@@ -269,8 +269,12 @@ export async function main() {
   slashCommandConflictHandler.start();
   registerCleanup(() => slashCommandConflictHandler.stop());
 
+  // Pre-parse --workspace before loading settings, since project settings
+  // (.gemini/settings.json) are loaded relative to the workspace directory.
+  const workspaceArg = cliConfig.getWorkspaceArg(process.argv);
+
   const loadSettingsHandle = startupProfiler.start('load_settings');
-  const settings = loadSettings();
+  const settings = loadSettings(workspaceArg ?? process.cwd());
   loadSettingsHandle?.end();
 
   // If a worktree is requested and enabled, set it up early.
