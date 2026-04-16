@@ -404,6 +404,7 @@ export const render = async (
   tree: React.ReactElement,
   terminalWidth?: number,
   terminalHeight?: number,
+  allowEmptyFrame = false,
 ): Promise<
   Omit<RenderInstance, 'capturedOverflowState' | 'capturedOverflowActions'>
 > => {
@@ -459,11 +460,13 @@ export const render = async (
 
   instances.push(instance);
 
-  while (stdout.renderCount === 0 || stdout.lastFrame({ allowEmpty: true }) === '') {
-    if (vi.isFakeTimers()) {
-      await vi.advanceTimersByTimeAsync(10);
-    } else {
-      await new Promise((resolve) => setTimeout(resolve, 10));
+  if (!allowEmptyFrame) {
+    while (stdout.renderCount === 0 || stdout.lastFrame({ allowEmpty: true }) === '') {
+      if (vi.isFakeTimers()) {
+        await vi.advanceTimersByTimeAsync(10);
+      } else {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
     }
   }
 
@@ -886,6 +889,9 @@ export async function renderHook<Result, Props>(
     <Wrapper>
       <TestComponent renderCallback={renderCallback} props={currentProps} />
     </Wrapper>,
+    undefined,
+    undefined,
+    true,
   );
   inkRerender = renderResult.rerender;
   unmount = renderResult.unmount;
