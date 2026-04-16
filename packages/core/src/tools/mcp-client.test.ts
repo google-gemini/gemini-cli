@@ -18,6 +18,7 @@ import { GoogleCredentialProvider } from '../mcp/google-auth-provider.js';
 import { MCPOAuthProvider } from '../mcp/oauth-provider.js';
 import { MCPOAuthTokenStorage } from '../mcp/oauth-token-storage.js';
 import { OAuthUtils } from '../mcp/oauth-utils.js';
+import type { McpAuthProvider } from '../mcp/auth-provider.js';
 import type { PromptRegistry } from '../prompts/prompt-registry.js';
 import {
   ErrorCode,
@@ -35,6 +36,7 @@ import {
   createTransport,
   hasNetworkTransport,
   isEnabled,
+  MCPServerStatus,
   McpClient,
   populateMcpServerCommand,
   discoverPrompts,
@@ -49,7 +51,7 @@ import { coreEvents } from '../utils/events.js';
 import type { EnvironmentSanitizationConfig } from '../services/environmentSanitization.js';
 
 interface TestableTransport {
-  _authProvider?: GoogleCredentialProvider;
+  _authProvider?: McpAuthProvider;
   _requestInit?: {
     headers?: Record<string, string>;
   };
@@ -458,6 +460,269 @@ describe('mcp-client', () => {
         resourceRegistry,
       });
       expect(mockedToolRegistry.registerTool).toHaveBeenCalledOnce();
+    });
+
+    it('surfaces recoverable auth transport errors when no auth recovery is in progress', async () => {
+      const mockedClient = {
+        connect: vi.fn(),
+        discover: vi.fn(),
+        disconnect: vi.fn(),
+        close: vi.fn(),
+        getStatus: vi.fn(),
+        registerCapabilities: vi.fn(),
+        setRequestHandler: vi.fn(),
+        setNotificationHandler: vi.fn(),
+        getServerCapabilities: vi.fn().mockReturnValue({ tools: {} }),
+        listTools: vi.fn().mockResolvedValue({ tools: [] }),
+        listPrompts: vi.fn().mockResolvedValue({ prompts: [] }),
+        request: vi.fn().mockResolvedValue({}),
+        onerror: undefined,
+      };
+      vi.mocked(ClientLib.Client).mockReturnValue(
+        mockedClient as unknown as ClientLib.Client,
+      );
+      vi.spyOn(SdkClientStdioLib, 'StdioClientTransport').mockReturnValue(
+        {} as SdkClientStdioLib.StdioClientTransport,
+      );
+
+      const client = new McpClient(
+        'test-server',
+        { command: 'test-command' },
+        workspaceContext,
+        MOCK_CONTEXT,
+        false,
+        '0.0.1',
+      );
+
+      await client.connect();
+      (
+        mockedClient as {
+          onerror?: (error: unknown) => void;
+        }
+      ).onerror?.(
+        new StreamableHTTPError(
+          401,
+          'Server returned 401 after successful authentication',
+        ),
+      );
+
+      expect(client.getStatus()).toBe(MCPServerStatus.DISCONNECTED);
+      expect(MOCK_CONTEXT.emitMcpDiagnostic).toHaveBeenCalledWith(
+        'error',
+        'MCP ERROR (test-server)',
+        expect.anything(),
+        'test-server',
+      );
+    });
+
+    it('ignores transient Streamable HTTP background SSE disconnects', async () => {
+      const mockedClient = {
+        connect: vi.fn(),
+        discover: vi.fn(),
+        disconnect: vi.fn(),
+        close: vi.fn(),
+        getStatus: vi.fn(),
+        registerCapabilities: vi.fn(),
+        setRequestHandler: vi.fn(),
+        setNotificationHandler: vi.fn(),
+        getServerCapabilities: vi.fn().mockReturnValue({ tools: {} }),
+        listTools: vi.fn().mockResolvedValue({ tools: [] }),
+        listPrompts: vi.fn().mockResolvedValue({ prompts: [] }),
+        request: vi.fn().mockResolvedValue({}),
+        onerror: undefined,
+      };
+      vi.mocked(ClientLib.Client).mockReturnValue(
+        mockedClient as unknown as ClientLib.Client,
+      );
+      vi.spyOn(SdkClientStdioLib, 'StdioClientTransport').mockReturnValue(
+        {} as SdkClientStdioLib.StdioClientTransport,
+      );
+
+      const client = new McpClient(
+        'test-server',
+        { url: 'http://test-server', type: 'http' },
+        workspaceContext,
+        MOCK_CONTEXT,
+        false,
+        '0.0.1',
+      );
+
+      await client.connect();
+      (
+        mockedClient as {
+          onerror?: (error: unknown) => void;
+        }
+      ).onerror?.(new Error('SSE stream disconnected: TypeError: terminated'));
+
+      expect(client.getStatus()).toBe(MCPServerStatus.CONNECTED);
+      expect(MOCK_CONTEXT.emitMcpDiagnostic).not.toHaveBeenCalledWith(
+        'error',
+        'MCP ERROR (test-server)',
+        expect.anything(),
+        'test-server',
+      );
+    });
+
+    it('surfaces terminal Streamable HTTP reconnect exhaustion errors', async () => {
+      const mockedClient = {
+        connect: vi.fn(),
+        discover: vi.fn(),
+        disconnect: vi.fn(),
+        close: vi.fn(),
+        getStatus: vi.fn(),
+        registerCapabilities: vi.fn(),
+        setRequestHandler: vi.fn(),
+        setNotificationHandler: vi.fn(),
+        getServerCapabilities: vi.fn().mockReturnValue({ tools: {} }),
+        listTools: vi.fn().mockResolvedValue({ tools: [] }),
+        listPrompts: vi.fn().mockResolvedValue({ prompts: [] }),
+        request: vi.fn().mockResolvedValue({}),
+        onerror: undefined,
+      };
+      vi.mocked(ClientLib.Client).mockReturnValue(
+        mockedClient as unknown as ClientLib.Client,
+      );
+      vi.spyOn(SdkClientStdioLib, 'StdioClientTransport').mockReturnValue(
+        {} as SdkClientStdioLib.StdioClientTransport,
+      );
+
+      const client = new McpClient(
+        'test-server',
+        { url: 'http://test-server', type: 'http' },
+        workspaceContext,
+        MOCK_CONTEXT,
+        false,
+        '0.0.1',
+      );
+
+      await client.connect();
+      (
+        mockedClient as {
+          onerror?: (error: unknown) => void;
+        }
+      ).onerror?.(new Error('Maximum reconnection attempts (2) exceeded.'));
+
+      expect(client.getStatus()).toBe(MCPServerStatus.DISCONNECTED);
+      expect(MOCK_CONTEXT.emitMcpDiagnostic).toHaveBeenCalledWith(
+        'error',
+        'MCP ERROR (test-server)',
+        expect.anything(),
+        'test-server',
+      );
+    });
+
+    it('reconnects and retries a tool call once after a recoverable auth error', async () => {
+      const firstClient = {
+        connect: vi.fn(),
+        discover: vi.fn(),
+        disconnect: vi.fn(),
+        close: vi.fn(),
+        getStatus: vi.fn(),
+        registerCapabilities: vi.fn(),
+        setRequestHandler: vi.fn(),
+        setNotificationHandler: vi.fn(),
+        getServerCapabilities: vi.fn().mockReturnValue({ tools: {} }),
+        listTools: vi.fn().mockResolvedValue({
+          tools: [
+            {
+              name: 'testTool',
+              description: 'A test tool',
+              inputSchema: { type: 'object', properties: {} },
+            },
+          ],
+        }),
+        listPrompts: vi.fn().mockResolvedValue({ prompts: [] }),
+        request: vi.fn().mockResolvedValue({}),
+        callTool: vi
+          .fn()
+          .mockRejectedValue(
+            new StreamableHTTPError(
+              401,
+              'Server returned 401 after successful authentication',
+            ),
+          ),
+      };
+      const secondClient = {
+        connect: vi.fn(),
+        discover: vi.fn(),
+        disconnect: vi.fn(),
+        close: vi.fn(),
+        getStatus: vi.fn(),
+        registerCapabilities: vi.fn(),
+        setRequestHandler: vi.fn(),
+        setNotificationHandler: vi.fn(),
+        getServerCapabilities: vi.fn().mockReturnValue({ tools: {} }),
+        listTools: vi.fn().mockResolvedValue({
+          tools: [
+            {
+              name: 'testTool',
+              description: 'A test tool',
+              inputSchema: { type: 'object', properties: {} },
+            },
+          ],
+        }),
+        listPrompts: vi.fn().mockResolvedValue({ prompts: [] }),
+        request: vi.fn().mockResolvedValue({}),
+        callTool: vi.fn().mockResolvedValue({
+          content: [{ type: 'text', text: 'ok' }],
+        }),
+      };
+      vi.mocked(ClientLib.Client)
+        .mockReturnValueOnce(firstClient as unknown as ClientLib.Client)
+        .mockReturnValueOnce(secondClient as unknown as ClientLib.Client);
+      vi.spyOn(SdkClientStdioLib, 'StdioClientTransport').mockReturnValue(
+        {} as SdkClientStdioLib.StdioClientTransport,
+      );
+
+      const mockedToolRegistry = {
+        registerTool: vi.fn(),
+        sortTools: vi.fn(),
+        getToolsByServer: vi.fn().mockReturnValue([]),
+        getMessageBus: vi.fn().mockReturnValue(undefined),
+      } as unknown as ToolRegistry;
+      const promptRegistry = {
+        registerPrompt: vi.fn(),
+        getPromptsByServer: vi.fn().mockReturnValue([]),
+        removePromptsByServer: vi.fn(),
+      } as unknown as PromptRegistry;
+      const resourceRegistry = {
+        getResourcesByServer: vi.fn().mockReturnValue([]),
+        setResourcesForServer: vi.fn(),
+        removeResourcesByServer: vi.fn(),
+      } as unknown as ResourceRegistry;
+
+      const client = new McpClient(
+        'test-server',
+        { command: 'test-command' },
+        workspaceContext,
+        MOCK_CONTEXT,
+        false,
+        '0.0.1',
+      );
+
+      await client.connect();
+      await client.discoverInto(MOCK_CONTEXT, {
+        toolRegistry: mockedToolRegistry,
+        promptRegistry,
+        resourceRegistry,
+      });
+
+      const discoveredTool = vi.mocked(mockedToolRegistry.registerTool).mock
+        .calls[0][0] as DiscoveredMCPTool;
+      const invocation = discoveredTool.build({});
+      const result = await invocation.execute(new AbortController().signal);
+
+      expect(result.error).toBeUndefined();
+      expect(firstClient.callTool).toHaveBeenCalledTimes(1);
+      expect(firstClient.close).toHaveBeenCalledTimes(1);
+      expect(secondClient.callTool).toHaveBeenCalledTimes(1);
+      expect(client.getStatus()).toBe(MCPServerStatus.CONNECTED);
+      expect(MOCK_CONTEXT.emitMcpDiagnostic).not.toHaveBeenCalledWith(
+        'error',
+        'MCP ERROR (test-server)',
+        expect.anything(),
+        'test-server',
+      );
     });
 
     it('should register tool with readOnlyHint and preserve annotations', async () => {
@@ -1903,6 +2168,41 @@ describe('mcp-client', () => {
           _url: new URL('http://test-server'),
           _requestInit: { headers: {} },
         });
+      });
+
+      it('uses a refresh-capable auth provider for stored OAuth credentials on HTTP transport', async () => {
+        const mockStoredCredentials = {
+          serverName: 'test-server',
+          token: {
+            accessToken: 'stored-access-token',
+            refreshToken: 'stored-refresh-token',
+            tokenType: 'Bearer',
+            expiresAt: Date.now() - 1000,
+          },
+          clientId: 'stored-client-id',
+          tokenUrl: 'https://auth.example.com/token',
+          updatedAt: Date.now(),
+        };
+        vi.mocked(MCPOAuthTokenStorage).mockReturnValue({
+          getCredentials: vi.fn().mockResolvedValue(mockStoredCredentials),
+        } as unknown as MCPOAuthTokenStorage);
+
+        const transport = await createTransport(
+          'test-server',
+          {
+            url: 'http://test-server',
+          },
+          false,
+          MOCK_CONTEXT,
+        );
+
+        expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
+        const testableTransport = transport as unknown as TestableTransport;
+        expect(testableTransport._authProvider).toBeDefined();
+        expect(
+          testableTransport._requestInit?.headers?.['Authorization'],
+        ).toBeUndefined();
+        expect(vi.mocked(MCPOAuthProvider)).not.toHaveBeenCalled();
       });
 
       it('with type="http" and headers applies headers correctly', async () => {
