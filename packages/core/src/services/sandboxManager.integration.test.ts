@@ -1174,11 +1174,13 @@ describe('SandboxManager Integration', () => {
       // LinuxSandboxManager identifies the command root from the shell wrapper.
       const { command: nodePath, args: nodeArgs } = Platform.touch(lockFile);
 
-      // Construct a command string that is valid for sh -c
-      // We prepend 'git --version > /dev/null;' so that 'git' is the first command root.
-      const commandString = `git --version > /dev/null; ${nodePath} ${nodeArgs
-        .map((a) => (a.includes(' ') || a.includes('(') ? `'${a}'` : a))
-        .join(' ')}`;
+      const commandString = Platform.isWindows
+        ? `git --version > NUL && "${nodePath}" ${nodeArgs
+            .map((a) => (a.includes(' ') || a.includes('(') ? `"${a}"` : a))
+            .join(' ')}`
+        : `git --version > /dev/null; ${nodePath} ${nodeArgs
+            .map((a) => (a.includes(' ') || a.includes('(') ? `'${a}'` : a))
+            .join(' ')}`;
 
       const sandboxed = await editManager.prepareCommand({
         command: 'sh',
