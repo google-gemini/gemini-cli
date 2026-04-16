@@ -2779,7 +2779,41 @@ export function textBufferReducer(
   action: TextBufferAction,
   options: TextBufferOptions = {},
 ): TextBufferState {
-  const newState = textBufferReducerLogic(state, action, options);
+  let newState = textBufferReducerLogic(state, action, options);
+
+  const MAX_TEXT_BUFFER_LINES = 10000;
+  if (newState.lines.length > MAX_TEXT_BUFFER_LINES) {
+    const excess = newState.lines.length - MAX_TEXT_BUFFER_LINES;
+    const newLines = newState.lines.slice(excess);
+    const newCursorRow = Math.max(0, newState.cursorRow - excess);
+    let newExpandedPaste = newState.expandedPaste;
+    if (newExpandedPaste) {
+      const newStartLine = newExpandedPaste.startLine - excess;
+      if (newStartLine < 0) {
+        newExpandedPaste = null;
+      } else {
+        newExpandedPaste = { ...newExpandedPaste, startLine: newStartLine };
+      }
+    }
+    let newSelectionAnchor = newState.selectionAnchor;
+    if (newSelectionAnchor) {
+      const newAnchorRow = newSelectionAnchor[0] - excess;
+      if (newAnchorRow < 0) {
+        newSelectionAnchor = null;
+      } else {
+        newSelectionAnchor = [newAnchorRow, newSelectionAnchor[1]];
+      }
+    }
+    newState = {
+      ...newState,
+      lines: newLines,
+      cursorRow: newCursorRow,
+      expandedPaste: newExpandedPaste,
+      selectionAnchor: newSelectionAnchor,
+      undoStack: [],
+      redoStack: [],
+    };
+  }
 
   const newTransformedLines =
     newState.lines !== state.lines

@@ -86,8 +86,9 @@ export const SubagentProgressDisplay: React.FC<
         </Box>
       )}
       <Box flexDirection="column" marginLeft={0} gap={0}>
-        {(historyOverrides ?? progress.recentActivity).map(
-          (item: SubagentActivityItem) => {
+        {(historyOverrides ?? progress.recentActivity)
+          .slice(-100)
+          .map((item: SubagentActivityItem) => {
             if (item.type === 'thought') {
               const isCancellation = item.content === 'Request cancelled.';
               const icon = isCancellation ? 'ℹ ' : '💭';
@@ -155,8 +156,7 @@ export const SubagentProgressDisplay: React.FC<
               );
             }
             return null;
-          },
-        )}
+          })}
       </Box>
 
       {progress.result && (

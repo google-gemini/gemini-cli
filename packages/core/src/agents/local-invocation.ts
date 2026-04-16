@@ -263,6 +263,13 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
         }
 
         if (updated) {
+          const MAX_RECENT_ACTIVITY = 100;
+          if (recentActivity.length > MAX_RECENT_ACTIVITY) {
+            recentActivity.splice(
+              0,
+              recentActivity.length - MAX_RECENT_ACTIVITY,
+            );
+          }
           const progress: SubagentProgress = {
             isSubagentProgress: true,
             agentName: this.definition.name,
