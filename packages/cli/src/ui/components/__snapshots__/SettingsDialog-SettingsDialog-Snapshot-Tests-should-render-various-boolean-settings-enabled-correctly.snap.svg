@@ -4,48 +4,48 @@
   </style>
   <rect width="920" height="751" fill="#000000" />
   <g transform="translate(10, 10)">
-    <text x="0" y="2" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">╭───────────────────────────────────────────────────────────────────────────────                    </text>
-    <text x="0" y="19" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│                                                                                                   </text>
-    <text x="0" y="36" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│  &gt; Settings                                                                                       </text>
-    <text x="0" y="53" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│                                                                                                   </text>
-    <text x="0" y="70" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│ ╭─────────────────────────────────────────────────────────────────────────────                    </text>
-    <text x="0" y="87" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│ │ Search to filter                                                                                </text>
-    <text x="0" y="104" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│ ╰─────────────────────────────────────────────────────────────────────────────                    </text>
-    <text x="0" y="121" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│                                                                                                   </text>
-    <text x="0" y="138" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│  ▲                                                                                                </text>
-    <text x="0" y="155" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│  ● Vim Mode                                                                                       </text>
-    <text x="0" y="172" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│    Enable Vim keybindings                                                                         </text>
-    <text x="0" y="189" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│                                                                                                   </text>
-    <text x="0" y="206" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│    Default Approval Mode                                                                          </text>
-    <text x="0" y="223" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│    The default approval mode for tool execution. &apos;default&apos; prompts for approva                    </text>
-    <text x="0" y="240" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│                                                                                                   </text>
-    <text x="0" y="257" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│    Enable Auto Update                                                                             </text>
-    <text x="0" y="274" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│    Enable automatic updates.                                                                      </text>
-    <text x="0" y="291" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│                                                                                                   </text>
-    <text x="0" y="308" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│    Enable Notifications                                                                           </text>
-    <text x="0" y="325" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│    Enable run-event notifications for action-required prompts and session comp                    </text>
-    <text x="0" y="342" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│                                                                                                   </text>
-    <text x="0" y="359" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│    Enable Plan Mode                                                                               </text>
-    <text x="0" y="376" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│    Enable Plan Mode for read-only safety during planning.                                         </text>
-    <text x="0" y="393" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│                                                                                                   </text>
-    <text x="0" y="410" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│    Plan Directory                                                                                 </text>
-    <text x="0" y="427" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│    The directory where planning artifacts are stored. If not specified, defaul                    </text>
-    <text x="0" y="444" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│                                                                                                   </text>
-    <text x="0" y="461" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│    Plan Model Routing                                                                             </text>
-    <text x="0" y="478" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│    Automatically switch between Pro and Flash models based on Plan Mode status                    </text>
-    <text x="0" y="495" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│                                                                                                   </text>
-    <text x="0" y="512" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│    Retry Fetch Errors                                                                             </text>
-    <text x="0" y="529" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│    Retry on &quot;exception TypeError: fetch failed sending request&quot; errors.                           </text>
-    <text x="0" y="546" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│                                                                                                   </text>
-    <text x="0" y="563" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│  ▼                                                                                                </text>
-    <text x="0" y="580" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│                                                                                                   </text>
-    <text x="0" y="597" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│    Apply To                                                                                       </text>
-    <text x="0" y="614" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│  ● User Settings                                                                                  </text>
-    <text x="0" y="631" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│    Workspace Settings                                                                             </text>
-    <text x="0" y="648" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│    System Settings                                                                                </text>
-    <text x="0" y="665" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│                                                                                                   </text>
-    <text x="0" y="682" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                        </text>
-    <text x="0" y="699" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│                                                                                                   </text>
-    <text x="0" y="716" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">╰───────────────────────────────────────────────────────────────────────────────                    </text>
+    <text x="0" y="2" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">╭──────────────────────────────────────────────────────────────────────────────────────────────────╮</text>
+    <text x="0" y="19" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│                                                                                                  │</text>
+    <text x="0" y="36" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│  &gt; Settings                                                                                      │</text>
+    <text x="0" y="53" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│                                                                                                  │</text>
+    <text x="0" y="70" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│ ╭──────────────────────────────────────────────────────────────────────────────────────────────╮ │</text>
+    <text x="0" y="87" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│ │ Search to filter                                                                             │ │</text>
+    <text x="0" y="104" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │</text>
+    <text x="0" y="121" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│                                                                                                  │</text>
+    <text x="0" y="138" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│  ▲                                                                                               │</text>
+    <text x="0" y="155" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│  ● Vim Mode                                                                               true*  │</text>
+    <text x="0" y="172" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│    Enable Vim keybindings                                                                        │</text>
+    <text x="0" y="189" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│                                                                                                  │</text>
+    <text x="0" y="206" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│    Default Approval Mode                                                                Default  │</text>
+    <text x="0" y="223" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│    The default approval mode for tool execution. &apos;default&apos; prompts for approval, &apos;au…            │</text>
+    <text x="0" y="240" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│                                                                                                  │</text>
+    <text x="0" y="257" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│    Enable Auto Update                                                                    false*  │</text>
+    <text x="0" y="274" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│    Enable automatic updates.                                                                     │</text>
+    <text x="0" y="291" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│                                                                                                  │</text>
+    <text x="0" y="308" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│    Enable Notifications                                                                   false  │</text>
+    <text x="0" y="325" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│    Enable run-event notifications for action-required prompts and session completion.            │</text>
+    <text x="0" y="342" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│                                                                                                  │</text>
+    <text x="0" y="359" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│    Enable Plan Mode                                                                        true  │</text>
+    <text x="0" y="376" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│    Enable Plan Mode for read-only safety during planning.                                        │</text>
+    <text x="0" y="393" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│                                                                                                  │</text>
+    <text x="0" y="410" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│    Plan Directory                                                                     undefined  │</text>
+    <text x="0" y="427" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│    The directory where planning artifacts are stored. If not specified, defaults t…              │</text>
+    <text x="0" y="444" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│                                                                                                  │</text>
+    <text x="0" y="461" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│    Plan Model Routing                                                                      true  │</text>
+    <text x="0" y="478" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pr…         │</text>
+    <text x="0" y="495" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│                                                                                                  │</text>
+    <text x="0" y="512" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│    Retry Fetch Errors                                                                      true  │</text>
+    <text x="0" y="529" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│    Retry on &quot;exception TypeError: fetch failed sending request&quot; errors.                          │</text>
+    <text x="0" y="546" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│                                                                                                  │</text>
+    <text x="0" y="563" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│  ▼                                                                                               │</text>
+    <text x="0" y="580" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│                                                                                                  │</text>
+    <text x="0" y="597" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│    Apply To                                                                                      │</text>
+    <text x="0" y="614" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│  ● User Settings                                                                                 │</text>
+    <text x="0" y="631" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│    Workspace Settings                                                                            │</text>
+    <text x="0" y="648" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│    System Settings                                                                               │</text>
+    <text x="0" y="665" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│                                                                                                  │</text>
+    <text x="0" y="682" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │</text>
+    <text x="0" y="699" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│                                                                                                  │</text>
+    <text x="0" y="716" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">╰──────────────────────────────────────────────────────────────────────────────────────────────────╯</text>
   </g>
 </svg>

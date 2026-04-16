@@ -1,415 +1,415 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`SettingsDialog > Initial Rendering > should render settings list with visual indicators 1`] = `
-"╭───────────────────────────────────────────────────────────────────────────────
-│
-│  > Settings
-│
-│ ╭─────────────────────────────────────────────────────────────────────────────
-│ │ Search to filter
-│ ╰─────────────────────────────────────────────────────────────────────────────
-│
-│  ▲
-│  ● Vim Mode
-│    Enable Vim keybindings
-│
-│    Default Approval Mode
-│    The default approval mode for tool execution. 'default' prompts for approva
-│
-│    Enable Auto Update
-│    Enable automatic updates.
-│
-│    Enable Notifications
-│    Enable run-event notifications for action-required prompts and session comp
-│
-│    Enable Plan Mode
-│    Enable Plan Mode for read-only safety during planning.
-│
-│    Plan Directory
-│    The directory where planning artifacts are stored. If not specified, defaul
-│
-│    Plan Model Routing
-│    Automatically switch between Pro and Flash models based on Plan Mode status
-│
-│    Retry Fetch Errors
-│    Retry on "exception TypeError: fetch failed sending request" errors.
-│
-│  ▼
-│
-│    Apply To
-│  ● User Settings
-│    Workspace Settings
-│    System Settings
-│
-│  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)
-│
-╰───────────────────────────────────────────────────────────────────────────────"
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                  │
+│  > Settings                                                                                      │
+│                                                                                                  │
+│ ╭──────────────────────────────────────────────────────────────────────────────────────────────╮ │
+│ │ Search to filter                                                                             │ │
+│ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │
+│                                                                                                  │
+│  ▲                                                                                               │
+│  ● Vim Mode                                                                               false  │
+│    Enable Vim keybindings                                                                        │
+│                                                                                                  │
+│    Default Approval Mode                                                                Default  │
+│    The default approval mode for tool execution. 'default' prompts for approval, 'au…            │
+│                                                                                                  │
+│    Enable Auto Update                                                                      true  │
+│    Enable automatic updates.                                                                     │
+│                                                                                                  │
+│    Enable Notifications                                                                   false  │
+│    Enable run-event notifications for action-required prompts and session completion.            │
+│                                                                                                  │
+│    Enable Plan Mode                                                                        true  │
+│    Enable Plan Mode for read-only safety during planning.                                        │
+│                                                                                                  │
+│    Plan Directory                                                                     undefined  │
+│    The directory where planning artifacts are stored. If not specified, defaults t…              │
+│                                                                                                  │
+│    Plan Model Routing                                                                      true  │
+│    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pr…         │
+│                                                                                                  │
+│    Retry Fetch Errors                                                                      true  │
+│    Retry on "exception TypeError: fetch failed sending request" errors.                          │
+│                                                                                                  │
+│  ▼                                                                                               │
+│                                                                                                  │
+│    Apply To                                                                                      │
+│  ● User Settings                                                                                 │
+│    Workspace Settings                                                                            │
+│    System Settings                                                                               │
+│                                                                                                  │
+│  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
+│                                                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
 
 exports[`SettingsDialog > Snapshot Tests > should render 'accessibility settings enabled' correctly 1`] = `
-"╭───────────────────────────────────────────────────────────────────────────────
-│
-│  > Settings
-│
-│ ╭─────────────────────────────────────────────────────────────────────────────
-│ │ Search to filter
-│ ╰─────────────────────────────────────────────────────────────────────────────
-│
-│  ▲
-│  ● Vim Mode
-│    Enable Vim keybindings
-│
-│    Default Approval Mode
-│    The default approval mode for tool execution. 'default' prompts for approva
-│
-│    Enable Auto Update
-│    Enable automatic updates.
-│
-│    Enable Notifications
-│    Enable run-event notifications for action-required prompts and session comp
-│
-│    Enable Plan Mode
-│    Enable Plan Mode for read-only safety during planning.
-│
-│    Plan Directory
-│    The directory where planning artifacts are stored. If not specified, defaul
-│
-│    Plan Model Routing
-│    Automatically switch between Pro and Flash models based on Plan Mode status
-│
-│    Retry Fetch Errors
-│    Retry on "exception TypeError: fetch failed sending request" errors.
-│
-│  ▼
-│
-│    Apply To
-│  ● User Settings
-│    Workspace Settings
-│    System Settings
-│
-│  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)
-│
-╰───────────────────────────────────────────────────────────────────────────────"
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                  │
+│  > Settings                                                                                      │
+│                                                                                                  │
+│ ╭──────────────────────────────────────────────────────────────────────────────────────────────╮ │
+│ │ Search to filter                                                                             │ │
+│ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │
+│                                                                                                  │
+│  ▲                                                                                               │
+│  ● Vim Mode                                                                               true*  │
+│    Enable Vim keybindings                                                                        │
+│                                                                                                  │
+│    Default Approval Mode                                                                Default  │
+│    The default approval mode for tool execution. 'default' prompts for approval, 'au…            │
+│                                                                                                  │
+│    Enable Auto Update                                                                      true  │
+│    Enable automatic updates.                                                                     │
+│                                                                                                  │
+│    Enable Notifications                                                                   false  │
+│    Enable run-event notifications for action-required prompts and session completion.            │
+│                                                                                                  │
+│    Enable Plan Mode                                                                        true  │
+│    Enable Plan Mode for read-only safety during planning.                                        │
+│                                                                                                  │
+│    Plan Directory                                                                     undefined  │
+│    The directory where planning artifacts are stored. If not specified, defaults t…              │
+│                                                                                                  │
+│    Plan Model Routing                                                                      true  │
+│    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pr…         │
+│                                                                                                  │
+│    Retry Fetch Errors                                                                      true  │
+│    Retry on "exception TypeError: fetch failed sending request" errors.                          │
+│                                                                                                  │
+│  ▼                                                                                               │
+│                                                                                                  │
+│    Apply To                                                                                      │
+│  ● User Settings                                                                                 │
+│    Workspace Settings                                                                            │
+│    System Settings                                                                               │
+│                                                                                                  │
+│  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
+│                                                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
 
 exports[`SettingsDialog > Snapshot Tests > should render 'all boolean settings disabled' correctly 1`] = `
-"╭───────────────────────────────────────────────────────────────────────────────
-│
-│  > Settings
-│
-│ ╭─────────────────────────────────────────────────────────────────────────────
-│ │ Search to filter
-│ ╰─────────────────────────────────────────────────────────────────────────────
-│
-│  ▲
-│  ● Vim Mode
-│    Enable Vim keybindings
-│
-│    Default Approval Mode
-│    The default approval mode for tool execution. 'default' prompts for approva
-│
-│    Enable Auto Update
-│    Enable automatic updates.
-│
-│    Enable Notifications
-│    Enable run-event notifications for action-required prompts and session comp
-│
-│    Enable Plan Mode
-│    Enable Plan Mode for read-only safety during planning.
-│
-│    Plan Directory
-│    The directory where planning artifacts are stored. If not specified, defaul
-│
-│    Plan Model Routing
-│    Automatically switch between Pro and Flash models based on Plan Mode status
-│
-│    Retry Fetch Errors
-│    Retry on "exception TypeError: fetch failed sending request" errors.
-│
-│  ▼
-│
-│    Apply To
-│  ● User Settings
-│    Workspace Settings
-│    System Settings
-│
-│  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)
-│
-╰───────────────────────────────────────────────────────────────────────────────"
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                  │
+│  > Settings                                                                                      │
+│                                                                                                  │
+│ ╭──────────────────────────────────────────────────────────────────────────────────────────────╮ │
+│ │ Search to filter                                                                             │ │
+│ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │
+│                                                                                                  │
+│  ▲                                                                                               │
+│  ● Vim Mode                                                                              false*  │
+│    Enable Vim keybindings                                                                        │
+│                                                                                                  │
+│    Default Approval Mode                                                                Default  │
+│    The default approval mode for tool execution. 'default' prompts for approval, 'au…            │
+│                                                                                                  │
+│    Enable Auto Update                                                                     true*  │
+│    Enable automatic updates.                                                                     │
+│                                                                                                  │
+│    Enable Notifications                                                                   false  │
+│    Enable run-event notifications for action-required prompts and session completion.            │
+│                                                                                                  │
+│    Enable Plan Mode                                                                        true  │
+│    Enable Plan Mode for read-only safety during planning.                                        │
+│                                                                                                  │
+│    Plan Directory                                                                     undefined  │
+│    The directory where planning artifacts are stored. If not specified, defaults t…              │
+│                                                                                                  │
+│    Plan Model Routing                                                                      true  │
+│    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pr…         │
+│                                                                                                  │
+│    Retry Fetch Errors                                                                      true  │
+│    Retry on "exception TypeError: fetch failed sending request" errors.                          │
+│                                                                                                  │
+│  ▼                                                                                               │
+│                                                                                                  │
+│    Apply To                                                                                      │
+│  ● User Settings                                                                                 │
+│    Workspace Settings                                                                            │
+│    System Settings                                                                               │
+│                                                                                                  │
+│  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
+│                                                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
 
 exports[`SettingsDialog > Snapshot Tests > should render 'default state' correctly 1`] = `
-"╭───────────────────────────────────────────────────────────────────────────────
-│
-│  > Settings
-│
-│ ╭─────────────────────────────────────────────────────────────────────────────
-│ │ Search to filter
-│ ╰─────────────────────────────────────────────────────────────────────────────
-│
-│  ▲
-│  ● Vim Mode
-│    Enable Vim keybindings
-│
-│    Default Approval Mode
-│    The default approval mode for tool execution. 'default' prompts for approva
-│
-│    Enable Auto Update
-│    Enable automatic updates.
-│
-│    Enable Notifications
-│    Enable run-event notifications for action-required prompts and session comp
-│
-│    Enable Plan Mode
-│    Enable Plan Mode for read-only safety during planning.
-│
-│    Plan Directory
-│    The directory where planning artifacts are stored. If not specified, defaul
-│
-│    Plan Model Routing
-│    Automatically switch between Pro and Flash models based on Plan Mode status
-│
-│    Retry Fetch Errors
-│    Retry on "exception TypeError: fetch failed sending request" errors.
-│
-│  ▼
-│
-│    Apply To
-│  ● User Settings
-│    Workspace Settings
-│    System Settings
-│
-│  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)
-│
-╰───────────────────────────────────────────────────────────────────────────────"
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                  │
+│  > Settings                                                                                      │
+│                                                                                                  │
+│ ╭──────────────────────────────────────────────────────────────────────────────────────────────╮ │
+│ │ Search to filter                                                                             │ │
+│ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │
+│                                                                                                  │
+│  ▲                                                                                               │
+│  ● Vim Mode                                                                               false  │
+│    Enable Vim keybindings                                                                        │
+│                                                                                                  │
+│    Default Approval Mode                                                                Default  │
+│    The default approval mode for tool execution. 'default' prompts for approval, 'au…            │
+│                                                                                                  │
+│    Enable Auto Update                                                                      true  │
+│    Enable automatic updates.                                                                     │
+│                                                                                                  │
+│    Enable Notifications                                                                   false  │
+│    Enable run-event notifications for action-required prompts and session completion.            │
+│                                                                                                  │
+│    Enable Plan Mode                                                                        true  │
+│    Enable Plan Mode for read-only safety during planning.                                        │
+│                                                                                                  │
+│    Plan Directory                                                                     undefined  │
+│    The directory where planning artifacts are stored. If not specified, defaults t…              │
+│                                                                                                  │
+│    Plan Model Routing                                                                      true  │
+│    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pr…         │
+│                                                                                                  │
+│    Retry Fetch Errors                                                                      true  │
+│    Retry on "exception TypeError: fetch failed sending request" errors.                          │
+│                                                                                                  │
+│  ▼                                                                                               │
+│                                                                                                  │
+│    Apply To                                                                                      │
+│  ● User Settings                                                                                 │
+│    Workspace Settings                                                                            │
+│    System Settings                                                                               │
+│                                                                                                  │
+│  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
+│                                                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
 
 exports[`SettingsDialog > Snapshot Tests > should render 'file filtering settings configured' correctly 1`] = `
-"╭───────────────────────────────────────────────────────────────────────────────
-│
-│  > Settings
-│
-│ ╭─────────────────────────────────────────────────────────────────────────────
-│ │ Search to filter
-│ ╰─────────────────────────────────────────────────────────────────────────────
-│
-│  ▲
-│  ● Vim Mode
-│    Enable Vim keybindings
-│
-│    Default Approval Mode
-│    The default approval mode for tool execution. 'default' prompts for approva
-│
-│    Enable Auto Update
-│    Enable automatic updates.
-│
-│    Enable Notifications
-│    Enable run-event notifications for action-required prompts and session comp
-│
-│    Enable Plan Mode
-│    Enable Plan Mode for read-only safety during planning.
-│
-│    Plan Directory
-│    The directory where planning artifacts are stored. If not specified, defaul
-│
-│    Plan Model Routing
-│    Automatically switch between Pro and Flash models based on Plan Mode status
-│
-│    Retry Fetch Errors
-│    Retry on "exception TypeError: fetch failed sending request" errors.
-│
-│  ▼
-│
-│    Apply To
-│  ● User Settings
-│    Workspace Settings
-│    System Settings
-│
-│  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)
-│
-╰───────────────────────────────────────────────────────────────────────────────"
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                  │
+│  > Settings                                                                                      │
+│                                                                                                  │
+│ ╭──────────────────────────────────────────────────────────────────────────────────────────────╮ │
+│ │ Search to filter                                                                             │ │
+│ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │
+│                                                                                                  │
+│  ▲                                                                                               │
+│  ● Vim Mode                                                                               false  │
+│    Enable Vim keybindings                                                                        │
+│                                                                                                  │
+│    Default Approval Mode                                                                Default  │
+│    The default approval mode for tool execution. 'default' prompts for approval, 'au…            │
+│                                                                                                  │
+│    Enable Auto Update                                                                      true  │
+│    Enable automatic updates.                                                                     │
+│                                                                                                  │
+│    Enable Notifications                                                                   false  │
+│    Enable run-event notifications for action-required prompts and session completion.            │
+│                                                                                                  │
+│    Enable Plan Mode                                                                        true  │
+│    Enable Plan Mode for read-only safety during planning.                                        │
+│                                                                                                  │
+│    Plan Directory                                                                     undefined  │
+│    The directory where planning artifacts are stored. If not specified, defaults t…              │
+│                                                                                                  │
+│    Plan Model Routing                                                                      true  │
+│    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pr…         │
+│                                                                                                  │
+│    Retry Fetch Errors                                                                      true  │
+│    Retry on "exception TypeError: fetch failed sending request" errors.                          │
+│                                                                                                  │
+│  ▼                                                                                               │
+│                                                                                                  │
+│    Apply To                                                                                      │
+│  ● User Settings                                                                                 │
+│    Workspace Settings                                                                            │
+│    System Settings                                                                               │
+│                                                                                                  │
+│  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
+│                                                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
 
 exports[`SettingsDialog > Snapshot Tests > should render 'focused on scope selector' correctly 1`] = `
-"╭───────────────────────────────────────────────────────────────────────────────
-│
-│    Settings
-│
-│ ╭─────────────────────────────────────────────────────────────────────────────
-│ │ Search to filter
-│ ╰─────────────────────────────────────────────────────────────────────────────
-│
-│  ▲
-│    Vim Mode
-│    Enable Vim keybindings
-│
-│    Default Approval Mode
-│    The default approval mode for tool execution. 'default' prompts for approva
-│
-│    Enable Auto Update
-│    Enable automatic updates.
-│
-│    Enable Notifications
-│    Enable run-event notifications for action-required prompts and session comp
-│
-│    Enable Plan Mode
-│    Enable Plan Mode for read-only safety during planning.
-│
-│    Plan Directory
-│    The directory where planning artifacts are stored. If not specified, defaul
-│
-│    Plan Model Routing
-│    Automatically switch between Pro and Flash models based on Plan Mode status
-│
-│    Retry Fetch Errors
-│    Retry on "exception TypeError: fetch failed sending request" errors.
-│
-│  ▼
-│
-│  > Apply To
-│  ● 1. User Settings
-│    2. Workspace Settings
-│    3. System Settings
-│
-│  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)
-│
-╰───────────────────────────────────────────────────────────────────────────────"
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                  │
+│    Settings                                                                                      │
+│                                                                                                  │
+│ ╭──────────────────────────────────────────────────────────────────────────────────────────────╮ │
+│ │ Search to filter                                                                             │ │
+│ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │
+│                                                                                                  │
+│  ▲                                                                                               │
+│    Vim Mode                                                                               false  │
+│    Enable Vim keybindings                                                                        │
+│                                                                                                  │
+│    Default Approval Mode                                                                Default  │
+│    The default approval mode for tool execution. 'default' prompts for approval, 'au…            │
+│                                                                                                  │
+│    Enable Auto Update                                                                      true  │
+│    Enable automatic updates.                                                                     │
+│                                                                                                  │
+│    Enable Notifications                                                                   false  │
+│    Enable run-event notifications for action-required prompts and session completion.            │
+│                                                                                                  │
+│    Enable Plan Mode                                                                        true  │
+│    Enable Plan Mode for read-only safety during planning.                                        │
+│                                                                                                  │
+│    Plan Directory                                                                     undefined  │
+│    The directory where planning artifacts are stored. If not specified, defaults t…              │
+│                                                                                                  │
+│    Plan Model Routing                                                                      true  │
+│    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pr…         │
+│                                                                                                  │
+│    Retry Fetch Errors                                                                      true  │
+│    Retry on "exception TypeError: fetch failed sending request" errors.                          │
+│                                                                                                  │
+│  ▼                                                                                               │
+│                                                                                                  │
+│  > Apply To                                                                                      │
+│  ● 1. User Settings                                                                              │
+│    2. Workspace Settings                                                                         │
+│    3. System Settings                                                                            │
+│                                                                                                  │
+│  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
+│                                                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
 
 exports[`SettingsDialog > Snapshot Tests > should render 'mixed boolean and number settings' correctly 1`] = `
-"╭───────────────────────────────────────────────────────────────────────────────
-│
-│  > Settings
-│
-│ ╭─────────────────────────────────────────────────────────────────────────────
-│ │ Search to filter
-│ ╰─────────────────────────────────────────────────────────────────────────────
-│
-│  ▲
-│  ● Vim Mode
-│    Enable Vim keybindings
-│
-│    Default Approval Mode
-│    The default approval mode for tool execution. 'default' prompts for approva
-│
-│    Enable Auto Update
-│    Enable automatic updates.
-│
-│    Enable Notifications
-│    Enable run-event notifications for action-required prompts and session comp
-│
-│    Enable Plan Mode
-│    Enable Plan Mode for read-only safety during planning.
-│
-│    Plan Directory
-│    The directory where planning artifacts are stored. If not specified, defaul
-│
-│    Plan Model Routing
-│    Automatically switch between Pro and Flash models based on Plan Mode status
-│
-│    Retry Fetch Errors
-│    Retry on "exception TypeError: fetch failed sending request" errors.
-│
-│  ▼
-│
-│    Apply To
-│  ● User Settings
-│    Workspace Settings
-│    System Settings
-│
-│  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)
-│
-╰───────────────────────────────────────────────────────────────────────────────"
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                  │
+│  > Settings                                                                                      │
+│                                                                                                  │
+│ ╭──────────────────────────────────────────────────────────────────────────────────────────────╮ │
+│ │ Search to filter                                                                             │ │
+│ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │
+│                                                                                                  │
+│  ▲                                                                                               │
+│  ● Vim Mode                                                                              false*  │
+│    Enable Vim keybindings                                                                        │
+│                                                                                                  │
+│    Default Approval Mode                                                                Default  │
+│    The default approval mode for tool execution. 'default' prompts for approval, 'au…            │
+│                                                                                                  │
+│    Enable Auto Update                                                                    false*  │
+│    Enable automatic updates.                                                                     │
+│                                                                                                  │
+│    Enable Notifications                                                                   false  │
+│    Enable run-event notifications for action-required prompts and session completion.            │
+│                                                                                                  │
+│    Enable Plan Mode                                                                        true  │
+│    Enable Plan Mode for read-only safety during planning.                                        │
+│                                                                                                  │
+│    Plan Directory                                                                     undefined  │
+│    The directory where planning artifacts are stored. If not specified, defaults t…              │
+│                                                                                                  │
+│    Plan Model Routing                                                                      true  │
+│    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pr…         │
+│                                                                                                  │
+│    Retry Fetch Errors                                                                      true  │
+│    Retry on "exception TypeError: fetch failed sending request" errors.                          │
+│                                                                                                  │
+│  ▼                                                                                               │
+│                                                                                                  │
+│    Apply To                                                                                      │
+│  ● User Settings                                                                                 │
+│    Workspace Settings                                                                            │
+│    System Settings                                                                               │
+│                                                                                                  │
+│  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
+│                                                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
 
 exports[`SettingsDialog > Snapshot Tests > should render 'tools and security settings' correctly 1`] = `
-"╭───────────────────────────────────────────────────────────────────────────────
-│
-│  > Settings
-│
-│ ╭─────────────────────────────────────────────────────────────────────────────
-│ │ Search to filter
-│ ╰─────────────────────────────────────────────────────────────────────────────
-│
-│  ▲
-│  ● Vim Mode
-│    Enable Vim keybindings
-│
-│    Default Approval Mode
-│    The default approval mode for tool execution. 'default' prompts for approva
-│
-│    Enable Auto Update
-│    Enable automatic updates.
-│
-│    Enable Notifications
-│    Enable run-event notifications for action-required prompts and session comp
-│
-│    Enable Plan Mode
-│    Enable Plan Mode for read-only safety during planning.
-│
-│    Plan Directory
-│    The directory where planning artifacts are stored. If not specified, defaul
-│
-│    Plan Model Routing
-│    Automatically switch between Pro and Flash models based on Plan Mode status
-│
-│    Retry Fetch Errors
-│    Retry on "exception TypeError: fetch failed sending request" errors.
-│
-│  ▼
-│
-│    Apply To
-│  ● User Settings
-│    Workspace Settings
-│    System Settings
-│
-│  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)
-│
-╰───────────────────────────────────────────────────────────────────────────────"
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                  │
+│  > Settings                                                                                      │
+│                                                                                                  │
+│ ╭──────────────────────────────────────────────────────────────────────────────────────────────╮ │
+│ │ Search to filter                                                                             │ │
+│ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │
+│                                                                                                  │
+│  ▲                                                                                               │
+│  ● Vim Mode                                                                               false  │
+│    Enable Vim keybindings                                                                        │
+│                                                                                                  │
+│    Default Approval Mode                                                                Default  │
+│    The default approval mode for tool execution. 'default' prompts for approval, 'au…            │
+│                                                                                                  │
+│    Enable Auto Update                                                                      true  │
+│    Enable automatic updates.                                                                     │
+│                                                                                                  │
+│    Enable Notifications                                                                   false  │
+│    Enable run-event notifications for action-required prompts and session completion.            │
+│                                                                                                  │
+│    Enable Plan Mode                                                                        true  │
+│    Enable Plan Mode for read-only safety during planning.                                        │
+│                                                                                                  │
+│    Plan Directory                                                                     undefined  │
+│    The directory where planning artifacts are stored. If not specified, defaults t…              │
+│                                                                                                  │
+│    Plan Model Routing                                                                      true  │
+│    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pr…         │
+│                                                                                                  │
+│    Retry Fetch Errors                                                                      true  │
+│    Retry on "exception TypeError: fetch failed sending request" errors.                          │
+│                                                                                                  │
+│  ▼                                                                                               │
+│                                                                                                  │
+│    Apply To                                                                                      │
+│  ● User Settings                                                                                 │
+│    Workspace Settings                                                                            │
+│    System Settings                                                                               │
+│                                                                                                  │
+│  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
+│                                                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
 
 exports[`SettingsDialog > Snapshot Tests > should render 'various boolean settings enabled' correctly 1`] = `
-"╭───────────────────────────────────────────────────────────────────────────────
-│
-│  > Settings
-│
-│ ╭─────────────────────────────────────────────────────────────────────────────
-│ │ Search to filter
-│ ╰─────────────────────────────────────────────────────────────────────────────
-│
-│  ▲
-│  ● Vim Mode
-│    Enable Vim keybindings
-│
-│    Default Approval Mode
-│    The default approval mode for tool execution. 'default' prompts for approva
-│
-│    Enable Auto Update
-│    Enable automatic updates.
-│
-│    Enable Notifications
-│    Enable run-event notifications for action-required prompts and session comp
-│
-│    Enable Plan Mode
-│    Enable Plan Mode for read-only safety during planning.
-│
-│    Plan Directory
-│    The directory where planning artifacts are stored. If not specified, defaul
-│
-│    Plan Model Routing
-│    Automatically switch between Pro and Flash models based on Plan Mode status
-│
-│    Retry Fetch Errors
-│    Retry on "exception TypeError: fetch failed sending request" errors.
-│
-│  ▼
-│
-│    Apply To
-│  ● User Settings
-│    Workspace Settings
-│    System Settings
-│
-│  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)
-│
-╰───────────────────────────────────────────────────────────────────────────────"
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                  │
+│  > Settings                                                                                      │
+│                                                                                                  │
+│ ╭──────────────────────────────────────────────────────────────────────────────────────────────╮ │
+│ │ Search to filter                                                                             │ │
+│ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │
+│                                                                                                  │
+│  ▲                                                                                               │
+│  ● Vim Mode                                                                               true*  │
+│    Enable Vim keybindings                                                                        │
+│                                                                                                  │
+│    Default Approval Mode                                                                Default  │
+│    The default approval mode for tool execution. 'default' prompts for approval, 'au…            │
+│                                                                                                  │
+│    Enable Auto Update                                                                    false*  │
+│    Enable automatic updates.                                                                     │
+│                                                                                                  │
+│    Enable Notifications                                                                   false  │
+│    Enable run-event notifications for action-required prompts and session completion.            │
+│                                                                                                  │
+│    Enable Plan Mode                                                                        true  │
+│    Enable Plan Mode for read-only safety during planning.                                        │
+│                                                                                                  │
+│    Plan Directory                                                                     undefined  │
+│    The directory where planning artifacts are stored. If not specified, defaults t…              │
+│                                                                                                  │
+│    Plan Model Routing                                                                      true  │
+│    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pr…         │
+│                                                                                                  │
+│    Retry Fetch Errors                                                                      true  │
+│    Retry on "exception TypeError: fetch failed sending request" errors.                          │
+│                                                                                                  │
+│  ▼                                                                                               │
+│                                                                                                  │
+│    Apply To                                                                                      │
+│  ● User Settings                                                                                 │
+│    Workspace Settings                                                                            │
+│    System Settings                                                                               │
+│                                                                                                  │
+│  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
+│                                                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
