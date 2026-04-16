@@ -314,6 +314,7 @@ export class AppRig {
         authType: authMethod,
         proxy: gcConfig.getProxy(),
         apiKey: process.env['GEMINI_API_KEY'] || 'test-api-key',
+        fakeResponses: this.options.fakeResponsesPath,
       };
 
       gcConfig.contentGenerator = await createContentGenerator(
@@ -437,6 +438,7 @@ export class AppRig {
           uiState: {
             terminalHeight: this.options.terminalHeight ?? 40,
           },
+          clearScreenOnRender: false,
         },
       );
     });
@@ -500,7 +502,11 @@ export class AppRig {
       }
 
       await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, interval));
+        if (vi.isFakeTimers()) {
+          await vi.advanceTimersByTimeAsync(interval);
+        } else {
+          await new Promise((resolve) => setTimeout(resolve, interval));
+        }
       });
     }
   }
@@ -562,7 +568,11 @@ export class AppRig {
     await this.waitUntil(
       async () => {
         await act(async () => {
-          await new Promise((resolve) => setTimeout(resolve, 0));
+          if (vi.isFakeTimers()) {
+            await vi.advanceTimersByTimeAsync(0);
+          } else {
+            await new Promise((resolve) => setTimeout(resolve, 0));
+          }
         });
         confirmation = this.getPendingConfirmations()[0];
         // Now that we have a code-powered signal, this should be perfectly deterministic.
@@ -677,7 +687,11 @@ export class AppRig {
       this.renderResult!.stdin.write(text);
     });
     await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      if (vi.isFakeTimers()) {
+        await vi.advanceTimersByTimeAsync(50);
+      } else {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
     });
   }
 
@@ -691,7 +705,11 @@ export class AppRig {
       this.renderResult!.stdin.write(key);
     });
     await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      if (vi.isFakeTimers()) {
+        await vi.advanceTimersByTimeAsync(50);
+      } else {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
     });
   }
 
@@ -728,6 +746,9 @@ export class AppRig {
     this.awaitingResponse = true;
     await this.type(text);
     await this.pressEnter();
+    if (vi.isFakeTimers()) {
+      await vi.advanceTimersByTimeAsync(1000);
+    }
   }
 
   async unmount() {
