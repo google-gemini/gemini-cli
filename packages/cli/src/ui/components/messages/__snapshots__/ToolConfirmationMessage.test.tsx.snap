@@ -96,8 +96,8 @@ exports[`ToolConfirmationMessage > height allocation and layout > should expand 
 ╰──────────────────────────────────────────────────────────────────────────────╯
 Allow execution of [echo]?
 
-● 1. Allow once               
-  2. Allow for this session
+● 1. Allow once                                
+  2. Allow all 'echo' commands for this session
   3. No, suggest changes (esc)
 "
 `;
@@ -112,8 +112,8 @@ exports[`ToolConfirmationMessage > should display multiple commands for exec typ
 ╰──────────────────────────────────────────────────────────────────────────────╯
 Allow execution of [echo, ls, whoami]?
 
-● 1. Allow once               
-  2. Allow for this session
+● 1. Allow once                                
+  2. Allow all 'echo' commands for this session
   3. No, suggest changes (esc)
 "
 `;
@@ -150,8 +150,8 @@ exports[`ToolConfirmationMessage > should render multiline shell scripts with co
 ╰──────────────────────────────────────────────────────────────────────────────╯
 Allow execution of [echo]?
 
-● 1. Allow once               
-  2. Allow for this session
+● 1. Allow once                                
+  2. Allow all 'echo' commands for this session
   3. No, suggest changes (esc)"
 `;
 
@@ -213,8 +213,8 @@ exports[`ToolConfirmationMessage > with folder trust > 'for exec confirmations' 
 ╰──────────────────────────────────────────────────────────────────────────────╯
 Allow execution of [echo]?
 
-● 1. Allow once               
-  2. Allow for this session
+● 1. Allow once                                
+  2. Allow all 'echo' commands for this session
   3. No, suggest changes (esc)
 "
 `;

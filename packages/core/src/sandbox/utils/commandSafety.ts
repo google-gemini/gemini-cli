@@ -9,6 +9,7 @@ import {
   initializeShellParsers,
   splitCommands,
   stripShellWrapper,
+  normalizeCommand,
 } from '../../utils/shell-utils.js';
 
 /**
