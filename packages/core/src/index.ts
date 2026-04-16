@@ -168,6 +168,7 @@ export * from './ide/types.js';
 // Export Shell Execution Service
 export * from './services/shellExecutionService.js';
 export * from './services/sandboxManager.js';
+export { createSandboxManager } from './services/sandboxManagerFactory.js';
 
 // Export Execution Lifecycle Service
 export * from './services/executionLifecycleService.js';

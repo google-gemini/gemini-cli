@@ -63,6 +63,8 @@ export class McpClientManager {
    */
   private shownDiagnostics: Map<string, 'silent' | 'verbose'> = new Map();
 
+  private warnedAutoExecutingTools = new Set<string>();
+
   /**
    * Track whether the MCP "hint" has been shown.
    */
@@ -706,6 +708,7 @@ export class McpClientManager {
           this.pendingMcpContextRefresh = false;
           debugLogger.log('Executing MCP context refresh...');
           await this.cliConfig.refreshMcpContext();
+          this.warnAboutAutoExecutingTools();
           debugLogger.log('MCP context refresh complete.');
 
           // If more refresh requests came in during the execution, wait a bit
@@ -728,6 +731,29 @@ export class McpClientManager {
     })();
 
     return this.pendingRefreshPromise;
+  }
+
+  private warnAboutAutoExecutingTools() {
+    if (!this.cliConfig.isSandboxEnabled()) {
+      return;
+    }
+    const toolsToWarn: string[] = [];
+    for (const client of this.clients.values()) {
+      for (const toolName of client.getAutoExecutingTools()) {
+        if (!this.warnedAutoExecutingTools.has(toolName)) {
+          toolsToWarn.push(toolName);
+          this.warnedAutoExecutingTools.add(toolName);
+        }
+      }
+    }
+    if (toolsToWarn.length > 0) {
+      coreEvents.emitFeedback(
+        'warning',
+        `With sandboxing enabled, the following MCP tools will AUTO-EXECUTE without confirmation:\n${toolsToWarn
+          .map((t) => `  * ${t}`)
+          .join('\n')}`,
+      );
+    }
   }
 
   getMcpServerCount(): number {
