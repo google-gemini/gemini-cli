@@ -115,14 +115,14 @@ describe.skipIf(os.platform() === 'win32')('buildBwrapArgs', () => {
       workspace,
       workspace,
       '--ro-bind',
+      `${workspace}/.git`,
+      `${workspace}/.git`,
+      '--ro-bind',
       `${workspace}/.gitignore`,
       `${workspace}/.gitignore`,
       '--ro-bind',
       `${workspace}/.geminiignore`,
       `${workspace}/.geminiignore`,
-      '--ro-bind',
-      `${workspace}/.git`,
-      `${workspace}/.git`,
     ]);
   });
 

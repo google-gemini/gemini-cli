@@ -25,7 +25,13 @@ import {
   getSecureSanitizationConfig,
 } from '../../services/environmentSanitization.js';
 import { debugLogger } from '../../utils/debugLogger.js';
-import { spawnAsync, getCommandName } from '../../utils/shell-utils.js';
+import {
+  spawnAsync,
+  getCommandName,
+  initializeShellParsers,
+  getCommandRoots,
+  stripShellWrapper,
+} from '../../utils/shell-utils.js';
 import {
   isKnownSafeCommand,
   isDangerousCommand,
@@ -261,6 +267,14 @@ export class WindowsSandboxManager implements SandboxManager {
       this.options.modeConfig?.network ?? req.policy?.networkAccess ?? false;
     const networkAccess = defaultNetwork || mergedAdditional.network;
 
+    await initializeShellParsers();
+    const fullCmd = [command, ...args].join(' ');
+    const stripped = stripShellWrapper(fullCmd);
+    const roots = getCommandRoots(stripped).filter(
+      (r) => r !== 'shopt' && r !== 'set',
+    );
+    const isGitCommand = roots.includes('git');
+
     const resolvedPaths = await resolveSandboxPaths(
       this.options,
       req,
@@ -348,6 +362,13 @@ export class WindowsSandboxManager implements SandboxManager {
 
     if (workspaceWrite) {
       addWritableRoot(resolvedPaths.workspace.resolved);
+
+      // If the workspace is writable and we're running a git command,
+      // automatically allow write access to the .git directory.
+      if (isGitCommand) {
+        const gitDir = path.join(resolvedPaths.workspace.resolved, '.git');
+        addWritableRoot(gitDir);
+      }
     }
 
     // B. Globally included directories
