@@ -9,6 +9,7 @@ import {
   initializeShellParsers,
   splitCommands,
   stripShellWrapper,
+  normalizeCommand,
 } from '../../utils/shell-utils.js';
 
 /**
@@ -119,10 +120,7 @@ export function isKnownSafeCommand(args: string[]): boolean {
  */
 export function isDangerousCommand(args: string[]): boolean {
   if (!args || args.length === 0) return false;
-  let cmd = args[0].toLowerCase();
-  if (cmd.endsWith('.exe')) {
-    cmd = cmd.slice(0, -4);
-  }
+  const cmd = normalizeCommand(args[0]);
 
   const dangerous = new Set([
     'del',

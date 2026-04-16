@@ -9,6 +9,7 @@ import {
   initializeShellParsers,
   splitCommands,
   stripShellWrapper,
+  normalizeCommand,
 } from '../../utils/shell-utils.js';
 
 /**
@@ -428,10 +429,10 @@ export function isDangerousCommand(args: string[]): boolean {
     return false;
   }
 
-  const cmd = args[0];
+  const cmd = normalizeCommand(args[0]);
 
   if (cmd === 'rm') {
-    return args[1] === '-f' || args[1] === '-rf' || args[1] === '-fr';
+    return true;
   }
 
   if (cmd === 'sudo') {
