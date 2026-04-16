@@ -169,29 +169,9 @@ jobs:
 
       - name: 'Install system dependencies'
         run: |
-          sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq bubblewrap libsdl2-dev
+          sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq bubblewrap
           # Ubuntu 24.04+ requires this to allow bwrap to function in CI
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
-
-      - name: 'Cache whisper-stream (Linux)'
-        id: 'cache-whisper-linux'
-        uses: 'actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830' # ratchet:actions/cache@v4
-        with:
-          path: 'whisper-bin'
-          key: "${{ runner.os }}-whisper-stream-v1"
-
-      - name: 'Build whisper-cpp (Linux)'
-        if: "steps.cache-whisper-linux.outputs.cache-hit != 'true'"
-        run: |
-          git clone --depth 1 https://github.com/ggerganov/whisper.cpp.git
-          cd whisper.cpp
-          cmake -B build -DWHISPER_SDL2=ON
-          cmake --build build --config Release --target whisper-stream
-          mkdir -p ../whisper-bin
-          cp build/bin/whisper-stream ../whisper-bin/
-
-      - name: 'Add whisper-stream to PATH (Linux)'
-        run: 'echo "${{ github.workspace }}/whisper-bin" >> $GITHUB_PATH'
 
       - name: 'Install dependencies for testing'
         run: 'npm ci'
@@ -280,9 +260,6 @@ jobs:
 
       - name: 'Build project'
         run: 'npm run build'
-
-      - name: 'Install whisper-cpp (macOS)'
-        run: 'brew install whisper-cpp'
 
       - name: 'Install dependencies for testing'
         run: 'npm ci'
@@ -448,34 +425,6 @@ jobs:
           NODE_OPTIONS: '--max-old-space-size=32768 --max-semi-space-size=256'
           UV_THREADPOOL_SIZE: '32'
           NODE_ENV: 'production'
-
-      - name: 'Install SDL2 (Windows)'
-        run: 'vcpkg install sdl2:x64-windows'
-        shell: 'pwsh'
-
-      - name: 'Cache whisper-stream (Windows)'
-        id: 'cache-whisper-windows'
-        uses: 'actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830' # ratchet:actions/cache@v4
-        with:
-          path: 'whisper-bin'
-          key: "${{ runner.os }}-whisper-stream-v1"
-
-      - name: 'Build whisper-cpp (Windows)'
-        if: "steps.cache-whisper-windows.outputs.cache-hit != 'true'"
-        run: |
-          git clone --depth 1 https://github.com/ggerganov/whisper.cpp.git
-          cd whisper.cpp
-          cmake -B build -DWHISPER_SDL2=ON "-DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
-          cmake --build build --config Release --target whisper-stream
-          New-Item -ItemType Directory -Force -Path ../whisper-bin
-          Copy-Item build/bin/Release/whisper-stream.exe ../whisper-bin/
-        shell: 'pwsh'
-
-      - name: 'Add whisper-stream to PATH (Windows)'
-        run: |
-          $whisperPath = Join-Path "${{ github.workspace }}" "whisper-bin"
-          $whisperPath | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-        shell: 'pwsh'
 
       - name: 'Run tests and generate reports'
         env:
