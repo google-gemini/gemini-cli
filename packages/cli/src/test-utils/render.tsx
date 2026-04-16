@@ -286,7 +286,12 @@ class XtermStdout extends EventEmitter {
         return currentFrame.includes(expectedFrame);
       };
 
-      if (this.pendingWrites === 0 && isMatch()) {
+      let match = false;
+      await act(async () => {
+        match = isMatch();
+      });
+
+      if (this.pendingWrites === 0 && match) {
         return;
       }
 
@@ -294,9 +299,6 @@ class XtermStdout extends EventEmitter {
       if (vi.isFakeTimers()) {
         await vi.advanceTimersByTimeAsync(100);
       } else {
-        await act(async () => {
-          await new Promise((resolve) => setImmediate(resolve));
-        });
         await new Promise((resolve) => setTimeout(resolve, 100));
       }
     }
