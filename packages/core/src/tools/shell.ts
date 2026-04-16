@@ -41,6 +41,7 @@ import {
   parseCommandDetails,
   hasRedirection,
   normalizeCommand,
+  escapeShellArg,
 } from '../utils/shell-utils.js';
 import { SHELL_TOOL_NAME } from './tool-names.js';
 import { PARAM_ADDITIONAL_PERMISSIONS } from './definitions/base-declarations.js';
@@ -110,7 +111,8 @@ export class ShellToolInvocation extends BaseToolInvocation<
     if (trimmed.endsWith('\\')) {
       trimmed += ' ';
     }
-    return `(\n${trimmed}\n); __code=$?; pgrep -g 0 >${tempFilePath} 2>&1; exit $__code;`;
+    const escapedTempFilePath = escapeShellArg(tempFilePath, 'bash');
+    return `(\n${trimmed}\n); __code=$?; pgrep -g 0 >${escapedTempFilePath} 2>&1; exit $__code;`;
   }
 
   private getContextualDetails(): string {
@@ -452,7 +454,9 @@ export class ShellToolInvocation extends BaseToolInvocation<
     let tempFilePath = '';
     let tempDir = '';
     if (!isWindows) {
-      tempDir = await fsPromises.mkdtemp(path.join(os.tmpdir(), 'gemini-shell-'));
+      tempDir = await fsPromises.mkdtemp(
+        path.join(os.tmpdir(), 'gemini-shell-'),
+      );
       tempFilePath = path.join(tempDir, 'pgrep.tmp');
     }
 

@@ -103,6 +103,7 @@ import {
   type ShellOutputEvent,
   type AnsiOutput,
   CoreToolCallStatus,
+  escapeShellArg,
 } from '@google/gemini-cli-core';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
@@ -242,7 +243,10 @@ describe('useExecutionLifecycle', () => {
     });
     const tmpDir = '/tmp/gemini-shell-abcdef';
     const tmpFile = path.join(tmpDir, 'pwd.tmp');
-    const wrappedCommand = `{\nls -l\n}; __code=$?; pwd > "${tmpFile}"; exit $__code`;
+    const command = 'ls -l';
+    const escapedTmpFile = escapeShellArg(tmpFile, 'bash');
+    const wrappedCommand = `{\n${command}\n}; __code=$?; pwd > ${escapedTmpFile}; exit $__code`;
+
     expect(mockShellExecutionService).toHaveBeenCalledWith(
       wrappedCommand,
       '/test/dir',
@@ -268,8 +272,9 @@ EOF`;
 
     const tmpDir = '/tmp/gemini-shell-abcdef';
     const tmpFile = path.join(tmpDir, 'pwd.tmp');
+    const escapedTmpFile = escapeShellArg(tmpFile, 'bash');
     // Verify that the delimiter EOF is on its own line and NOT followed by a semicolon
-    const wrappedCommand = `{\n${command}\n}; __code=$?; pwd > "${tmpFile}"; exit $__code`;
+    const wrappedCommand = `{\n${command}\n}; __code=$?; pwd > ${escapedTmpFile}; exit $__code`;
     expect(mockShellExecutionService).toHaveBeenCalledWith(
       wrappedCommand,
       expect.any(String),
@@ -379,7 +384,10 @@ EOF`;
       // Verify it's using the non-pty shell
       const tmpDir = '/tmp/gemini-shell-abcdef';
       const tmpFile = path.join(tmpDir, 'pwd.tmp');
-      const wrappedCommand = `{\nstream\n}; __code=$?; pwd > "${tmpFile}"; exit $__code`;
+      const command = 'stream';
+      const escapedTmpFile = escapeShellArg(tmpFile, 'bash');
+      const wrappedCommand = `{\n${command}\n}; __code=$?; pwd > ${escapedTmpFile}; exit $__code`;
+
       expect(mockShellExecutionService).toHaveBeenCalledWith(
         wrappedCommand,
         '/test/dir',
