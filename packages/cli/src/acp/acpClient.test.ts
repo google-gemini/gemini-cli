@@ -39,7 +39,7 @@ import {
 import { loadCliConfig, type CliArgs } from '../config/config.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import { ApprovalMode } from '@google/gemini-cli-core/src/policy/types.js';
+import { ApprovalMode } from '@google/gemini-cli-core';
 
 vi.mock('../config/config.js', () => ({
   loadCliConfig: vi.fn(),
