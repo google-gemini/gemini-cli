@@ -19,6 +19,23 @@ const PROJECT_ROOT_FILE = '.project_root';
 const LOCK_TIMEOUT_MS = 10000;
 const LOCK_RETRY_DELAY_MS = 100;
 
+function createEmptyRegistry(): RegistryData {
+  return { projects: {} };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isStringRecord(value: unknown): value is Record<string, string> {
+  return (
+    isRecord(value) &&
+    Object.values(value).every(
+      (entry): entry is string => typeof entry === 'string',
+    )
+  );
+}
+
 /**
  * Manages a mapping between absolute project paths and short, human-readable identifiers.
  * This helps reduce context bloat and makes temporary directories easier to work with.
@@ -55,18 +72,25 @@ export class ProjectRegistry {
 
   private async loadData(): Promise<RegistryData> {
     if (!fs.existsSync(this.registryPath)) {
-      return { projects: {} };
+      return createEmptyRegistry();
     }
 
     try {
       const content = await fs.promises.readFile(this.registryPath, 'utf8');
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-      return JSON.parse(content);
+      return this.normalizeRegistryData(JSON.parse(content));
     } catch (e) {
       debugLogger.debug('Failed to load registry: ', e);
       // If the registry is corrupted, we'll start fresh to avoid blocking the CLI
-      return { projects: {} };
+      return createEmptyRegistry();
     }
+  }
+
+  private normalizeRegistryData(value: unknown): RegistryData {
+    if (!isRecord(value) || !isStringRecord(value['projects'])) {
+      return createEmptyRegistry();
+    }
+
+    return { projects: value['projects'] };
   }
 
   private normalizePath(projectPath: string): string {

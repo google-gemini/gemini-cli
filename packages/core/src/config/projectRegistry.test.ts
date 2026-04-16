@@ -95,6 +95,49 @@ describe('ProjectRegistry', () => {
     expect(data.projects[normalizedPath]).toBe('project-a');
   });
 
+  it('treats a missing projects map as an empty registry', async () => {
+    fs.writeFileSync(registryPath, '{}');
+
+    const registry = new ProjectRegistry(registryPath);
+    await registry.initialize();
+
+    const projectPath = path.join(tempDir, 'project-from-empty-object');
+    const shortId = await registry.getShortId(projectPath);
+
+    expect(shortId).toBe('project-from-empty-object');
+
+    const data = JSON.parse(fs.readFileSync(registryPath, 'utf8'));
+    expect(data).toEqual({
+      projects: {
+        [normalizePath(projectPath)]: 'project-from-empty-object',
+      },
+    });
+  });
+
+  it('treats an invalid projects value as an empty registry', async () => {
+    fs.writeFileSync(
+      registryPath,
+      JSON.stringify({
+        projects: [],
+      }),
+    );
+
+    const registry = new ProjectRegistry(registryPath);
+    await registry.initialize();
+
+    const projectPath = path.join(tempDir, 'project-from-invalid-projects');
+    const shortId = await registry.getShortId(projectPath);
+
+    expect(shortId).toBe('project-from-invalid-projects');
+
+    const data = JSON.parse(fs.readFileSync(registryPath, 'utf8'));
+    expect(data).toEqual({
+      projects: {
+        [normalizePath(projectPath)]: 'project-from-invalid-projects',
+      },
+    });
+  });
+
   it('normalizes paths', async () => {
     const registry = new ProjectRegistry(registryPath);
     await registry.initialize();
