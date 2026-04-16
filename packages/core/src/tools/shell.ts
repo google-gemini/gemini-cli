@@ -46,6 +46,7 @@ import {
 } from '../utils/shell-utils.js';
 import { SHELL_TOOL_NAME } from './tool-names.js';
 import { PARAM_ADDITIONAL_PERMISSIONS } from './definitions/base-declarations.js';
+import { ApprovalMode } from '../policy/types.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { getShellDefinition } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
@@ -250,6 +251,10 @@ export class ShellToolInvocation extends BaseToolInvocation<
     abortSignal: AbortSignal,
     forcedDecision?: ForcedToolDecision,
   ): Promise<ToolCallConfirmationDetails | false> {
+    if (this.context.config.getApprovalMode() === ApprovalMode.YOLO) {
+      return super.shouldConfirmExecute(abortSignal, forcedDecision);
+    }
+
     if (this.params[PARAM_ADDITIONAL_PERMISSIONS]) {
       return this.getConfirmationDetails(abortSignal);
     }
