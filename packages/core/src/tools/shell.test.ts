@@ -462,6 +462,29 @@ describe('ShellTool', () => {
       20000,
     );
 
+    it('should correctly wrap heredoc commands', async () => {
+      const command = `cat << 'EOF'
+hello world
+EOF`;
+      const invocation = shellTool.build({ command });
+      const promise = invocation.execute({ abortSignal: mockAbortSignal });
+      resolveShellExecution();
+      await promise;
+
+      const tmpFile = path.join(os.tmpdir(), 'shell_pgrep_abcdef.tmp');
+      // Core uses subshell () and places command on its own line with newlines
+      const wrappedCommand = `(\n${command}\n); __code=$?; pgrep -g 0 >${tmpFile} 2>&1; exit $__code;`;
+      expect(mockShellExecutionService).toHaveBeenCalledWith(
+        wrappedCommand,
+        tempRootDir,
+        expect.any(Function),
+        expect.any(AbortSignal),
+        false,
+        expect.any(Object),
+      );
+      expect(wrappedCommand).toMatch(/\nEOF\n\);/);
+    });
+
     it('should format error messages correctly', async () => {
       const error = new Error('wrapped command failed');
       const invocation = shellTool.build({ command: 'user-command' });
