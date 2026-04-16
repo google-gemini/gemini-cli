@@ -378,7 +378,7 @@ describe('ShellTool', () => {
       await promise;
 
       const tmpFile = path.join(os.tmpdir(), 'gemini-shell-abcdef', 'pgrep.tmp');
-      const wrappedCommand = `(\n${command}\n); __code=$?; pgrep -g 0 >${tmpFile} 2>&1; exit $__code;`;
+      const wrappedCommand = `(\nls\n); __code=$?; pgrep -g 0 >${tmpFile} 2>&1; exit $__code;`;
 
       expect(mockShellExecutionService).toHaveBeenCalledWith(
         wrappedCommand,
@@ -404,7 +404,7 @@ describe('ShellTool', () => {
       await promise;
 
       const tmpFile = path.join(os.tmpdir(), 'gemini-shell-abcdef', 'pgrep.tmp');
-      const wrappedCommand = `(\n${command}\n); __code=$?; pgrep -g 0 >${tmpFile} 2>&1; exit $__code;`;
+      const wrappedCommand = `(\nls\n); __code=$?; pgrep -g 0 >${tmpFile} 2>&1; exit $__code;`;
 
       expect(mockShellExecutionService).toHaveBeenCalledWith(
         wrappedCommand,
