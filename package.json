@@ -94,6 +94,7 @@
   ],
   "devDependencies": {
     "@agentclientprotocol/sdk": "^0.16.1",
+    "read-package-up": "^11.0.0",
     "@octokit/rest": "^22.0.0",
     "@types/marked": "^5.0.2",
     "@types/mime-types": "^3.0.1",
