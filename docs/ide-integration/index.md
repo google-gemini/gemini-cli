@@ -4,6 +4,10 @@ Gemini CLI can integrate with your IDE to provide a more seamless and
 context-aware experience. This integration allows the CLI to understand your
 workspace better and enables powerful features like native in-editor diffing.
 
+For a focused design note on investigating a Newgate-style worker-to-memory
+pipeline around the IDE companion, see
+[Newgate memory pipeline investigation design](./newgate-memory-pipeline-investigation.md).
+
 There are two primary ways to integrate Gemini CLI with an IDE:
 
 1.  **VS Code companion extension**: Install the "Gemini CLI Companion"
