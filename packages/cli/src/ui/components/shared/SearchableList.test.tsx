@@ -69,7 +69,7 @@ const mockItems: GenericListItem[] = [
   },
 ];
 
-describe('SearchableList', () => {
+describe.sequential('SearchableList', () => {
   let mockOnSelect: ReturnType<typeof vi.fn>;
   let mockOnClose: ReturnType<typeof vi.fn>;
 

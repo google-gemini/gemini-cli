@@ -545,6 +545,7 @@ function VirtualizedList<T>(
   const isReady =
     containerHeight > 0 ||
     process.env['NODE_ENV'] === 'test' ||
+    process.env['VITEST'] ||
     (width !== undefined && typeof width === 'number');
 
   const renderedItems = useMemo(() => {

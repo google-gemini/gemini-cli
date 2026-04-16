@@ -40,7 +40,7 @@ describe('<UserIdentity />', () => {
     vi.spyOn(mockConfig, 'getUserTierName').mockReturnValue(undefined);
 
     const { lastFrame, unmount } = await renderWithProviders(
-      <UserIdentity config={mockConfig} />,
+      <UserIdentity config={mockConfig} emailOverride="test@example.com" />,
     );
 
     const output = lastFrame();
@@ -59,7 +59,7 @@ describe('<UserIdentity />', () => {
     vi.spyOn(mockConfig, 'getUserTierName').mockReturnValue(undefined);
 
     const { lastFrameRaw, unmount } = await renderWithProviders(
-      <UserIdentity config={mockConfig} />,
+      <UserIdentity config={mockConfig} emailOverride="test@example.com" />,
     );
 
     // Assert immediately on the first available frame before any async ticks happen
@@ -105,7 +105,7 @@ describe('<UserIdentity />', () => {
     vi.spyOn(mockConfig, 'getUserTierName').mockReturnValue('Premium Plan');
 
     const { lastFrame, unmount } = await renderWithProviders(
-      <UserIdentity config={mockConfig} />,
+      <UserIdentity config={mockConfig} emailOverride="test@example.com" />,
     );
 
     const output = lastFrame();

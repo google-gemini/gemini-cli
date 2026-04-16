@@ -700,23 +700,30 @@ describe('<Footer />', () => {
         .spyOn(UserAccountManager.prototype, 'getCachedGoogleAccount')
         .mockReturnValue('test@example.com');
 
-      const { lastFrame, unmount } = await renderWithProviders(<Footer />, {
-        config: authConfig,
-        width: 120,
-        uiState: {
-          currentModel: 'gemini-pro',
-          sessionStats: mockSessionStats,
-        },
-        settings: createMockSettings({
-          ui: {
-            footer: {
-              items: ['auth'],
-            },
+      const { lastFrame, unmount, waitUntilReady } = await renderWithProviders(
+        <Footer />,
+        {
+          config: authConfig,
+          width: 120,
+          uiState: {
+            currentModel: 'gemini-pro',
+            sessionStats: mockSessionStats,
           },
-        }),
-      });
+          settings: createMockSettings({
+            ui: {
+              footer: {
+                items: ['auth'],
+              },
+            },
+          }),
+        },
+      );
+
+      await waitUntilReady();
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       expect(lastFrame()).toContain('auth');
+
       expect(lastFrame()).toContain('test@example.com');
       unmount();
       getCachedAccountSpy.mockRestore();

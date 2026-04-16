@@ -170,7 +170,7 @@ export const ConfigExtensionDialog: React.FC<ConfigExtensionDialogProps> = ({
         if (mounted.current) {
           setState({ type: 'DONE' });
           // Delay close slightly to show done
-          setTimeout(onClose, 1000);
+          setTimeout(onClose, 20);
         }
       } catch (err: unknown) {
         if (mounted.current) {

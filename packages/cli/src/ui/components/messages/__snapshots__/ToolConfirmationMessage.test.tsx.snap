@@ -8,7 +8,7 @@ exports[`ToolConfirmationMessage > enablePermanentToolApproval setting > should 
 ╰──────────────────────────────────────────────────────────────────────────────╯
 Apply this change?
 
-● 1. Allow once                                                                   
+● 1. Allow once
   2. Allow for this session
   3. Allow for this file in all future sessions ~/.gemini/policies/auto-saved.toml
   4. Modify with external editor
@@ -52,7 +52,7 @@ exports[`ToolConfirmationMessage > height allocation and layout > should expand 
 ╰──────────────────────────────────────────────────────────────────────────────╯
 Apply this change?
 
-● 1. Allow once                 
+● 1. Allow once
   2. Allow for this session
   3. Modify with external editor
   4. No, suggest changes (esc)
@@ -61,7 +61,8 @@ Apply this change?
 
 exports[`ToolConfirmationMessage > height allocation and layout > should expand to available height for large exec commands 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
-│ ... 19 hidden (Ctrl+O) ...                                                   │
+│ ... 18 hidden (Ctrl+O) ...                                                   │
+│ echo "Line 19"                                                               │
 │ echo "Line 20"                                                               │
 │ echo "Line 21"                                                               │
 │ echo "Line 22"                                                               │
@@ -92,11 +93,10 @@ exports[`ToolConfirmationMessage > height allocation and layout > should expand 
 │ echo "Line 47"                                                               │
 │ echo "Line 48"                                                               │
 │ echo "Line 49"                                                               │
-│ echo "Line 50"                                                               │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 Allow execution of [echo]?
 
-● 1. Allow once               
+● 1. Allow once
   2. Allow for this session
   3. No, suggest changes (esc)
 "
@@ -112,7 +112,7 @@ exports[`ToolConfirmationMessage > should display multiple commands for exec typ
 ╰──────────────────────────────────────────────────────────────────────────────╯
 Allow execution of [echo, ls, whoami]?
 
-● 1. Allow once               
+● 1. Allow once
   2. Allow for this session
   3. No, suggest changes (esc)
 "
@@ -125,7 +125,7 @@ URLs to fetch:
  - https://raw.githubusercontent.com/google/gemini-react/main/README.md
 Do you want to proceed?
 
-● 1. Allow once               
+● 1. Allow once
   2. Allow for this session
   3. No, suggest changes (esc)
 "
@@ -135,7 +135,7 @@ exports[`ToolConfirmationMessage > should not display urls if prompt and url are
 "https://example.com
 Do you want to proceed?
 
-● 1. Allow once               
+● 1. Allow once
   2. Allow for this session
   3. No, suggest changes (esc)
 "
@@ -150,7 +150,7 @@ exports[`ToolConfirmationMessage > should render multiline shell scripts with co
 ╰──────────────────────────────────────────────────────────────────────────────╯
 Allow execution of [echo]?
 
-● 1. Allow once               
+● 1. Allow once
   2. Allow for this session
   3. No, suggest changes (esc)"
 `;
@@ -160,7 +160,7 @@ exports[`ToolConfirmationMessage > should strip BiDi characters from MCP tool an
 Tool: testtool
 Allow execution of MCP tool "testtool" from server "testserver"?
 
-● 1. Allow once                             
+● 1. Allow once
   2. Allow tool for this session
   3. Allow all server tools for this session
   4. No, suggest changes (esc)
@@ -175,7 +175,7 @@ exports[`ToolConfirmationMessage > with folder trust > 'for edit confirmations' 
 ╰──────────────────────────────────────────────────────────────────────────────╯
 Apply this change?
 
-● 1. Allow once                 
+● 1. Allow once
   2. Modify with external editor
   3. No, suggest changes (esc)
 "
@@ -189,7 +189,7 @@ exports[`ToolConfirmationMessage > with folder trust > 'for edit confirmations' 
 ╰──────────────────────────────────────────────────────────────────────────────╯
 Apply this change?
 
-● 1. Allow once                 
+● 1. Allow once
   2. Allow for this session
   3. Modify with external editor
   4. No, suggest changes (esc)
@@ -202,7 +202,7 @@ exports[`ToolConfirmationMessage > with folder trust > 'for exec confirmations' 
 ╰──────────────────────────────────────────────────────────────────────────────╯
 Allow execution of [echo]?
 
-● 1. Allow once               
+● 1. Allow once
   2. No, suggest changes (esc)
 "
 `;
@@ -213,7 +213,7 @@ exports[`ToolConfirmationMessage > with folder trust > 'for exec confirmations' 
 ╰──────────────────────────────────────────────────────────────────────────────╯
 Allow execution of [echo]?
 
-● 1. Allow once               
+● 1. Allow once
   2. Allow for this session
   3. No, suggest changes (esc)
 "
@@ -223,7 +223,7 @@ exports[`ToolConfirmationMessage > with folder trust > 'for info confirmations' 
 "https://example.com
 Do you want to proceed?
 
-● 1. Allow once               
+● 1. Allow once
   2. No, suggest changes (esc)
 "
 `;
@@ -232,7 +232,7 @@ exports[`ToolConfirmationMessage > with folder trust > 'for info confirmations' 
 "https://example.com
 Do you want to proceed?
 
-● 1. Allow once               
+● 1. Allow once
   2. Allow for this session
   3. No, suggest changes (esc)
 "
@@ -243,7 +243,7 @@ exports[`ToolConfirmationMessage > with folder trust > 'for mcp confirmations' >
 Tool: test-tool
 Allow execution of MCP tool "test-tool" from server "test-server"?
 
-● 1. Allow once               
+● 1. Allow once
   2. No, suggest changes (esc)
 "
 `;
@@ -253,7 +253,7 @@ exports[`ToolConfirmationMessage > with folder trust > 'for mcp confirmations' >
 Tool: test-tool
 Allow execution of MCP tool "test-tool" from server "test-server"?
 
-● 1. Allow once                             
+● 1. Allow once
   2. Allow tool for this session
   3. Allow all server tools for this session
   4. No, suggest changes (esc)

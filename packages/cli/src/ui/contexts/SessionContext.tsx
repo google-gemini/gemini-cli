@@ -12,6 +12,7 @@ import {
   useState,
   useMemo,
   useEffect,
+  act,
 } from 'react';
 import type {
   SessionMetrics,
@@ -202,28 +203,52 @@ export const SessionStatsProvider: React.FC<{
       metrics: SessionMetrics;
       lastPromptTokenCount: number;
     }) => {
-      setStats((prevState) => {
-        if (
-          prevState.lastPromptTokenCount === lastPromptTokenCount &&
-          areMetricsEqual(prevState.metrics, metrics)
-        ) {
-          return prevState;
+      const update = () => {
+        setStats((prevState) => {
+          if (
+            prevState.lastPromptTokenCount === lastPromptTokenCount &&
+            areMetricsEqual(prevState.metrics, metrics)
+          ) {
+            return prevState;
+          }
+          return {
+            ...prevState,
+            metrics,
+            lastPromptTokenCount,
+          };
+        });
+      };
+
+      if (process.env['NODE_ENV'] === 'test') {
+        try {
+          act(update);
+        } catch {
+          update();
         }
-        return {
-          ...prevState,
-          metrics,
-          lastPromptTokenCount,
-        };
-      });
+      } else {
+        update();
+      }
     };
 
     const handleClear = (newSessionId?: string) => {
-      setStats((prevState) => ({
-        ...prevState,
-        sessionId: newSessionId || prevState.sessionId,
-        sessionStartTime: new Date(),
-        promptCount: 0,
-      }));
+      const clear = () => {
+        setStats((prevState) => ({
+          ...prevState,
+          sessionId: newSessionId || prevState.sessionId,
+          sessionStartTime: new Date(),
+          promptCount: 0,
+        }));
+      };
+
+      if (process.env['NODE_ENV'] === 'test') {
+        try {
+          act(clear);
+        } catch {
+          clear();
+        }
+      } else {
+        clear();
+      }
     };
 
     uiTelemetryService.on('update', handleUpdate);

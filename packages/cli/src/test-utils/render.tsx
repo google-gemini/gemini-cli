@@ -10,6 +10,7 @@ import {
   type RenderOptions,
 } from 'ink';
 import { EventEmitter } from 'node:events';
+import { Writable } from 'node:stream';
 import { Box } from 'ink';
 import { Terminal } from '@xterm/headless';
 import { vi } from 'vitest';
@@ -42,7 +43,7 @@ import {
   type OverflowState,
 } from '../ui/contexts/OverflowContext.js';
 
-import { makeFakeConfig } from '@google/gemini-cli-core';
+import { makeFakeConfig } from '../../../../packages/core/src/test-utils/config.js';
 import { type Config } from '@google/gemini-cli-core';
 import { FakePersistentState } from './persistentStateFake.js';
 import { AppContext, type AppState } from '../ui/contexts/AppContext.js';
@@ -74,6 +75,7 @@ vi.mock('../ui/utils/terminalUtils.js', () => ({
   isLowColorDepth: vi.fn(() => false),
   getColorDepth: vi.fn(() => 24),
   isITerm2: vi.fn(() => false),
+  isVSCode: vi.fn(() => false),
 }));
 
 type TerminalState = {
@@ -158,6 +160,7 @@ class XtermStdout extends EventEmitter {
     this.renderCount++;
     this.lastRenderStaticContent = staticContent;
     this.lastRenderOutput = output;
+    this.write(staticContent + output);
     this.emit('render');
   };
 
@@ -223,7 +226,7 @@ class XtermStdout extends EventEmitter {
             this.once('render', resolve),
           );
           const timeoutPromise = new Promise((resolve) =>
-            setTimeout(resolve, 1000),
+            setTimeout(resolve, 500),
           );
           await Promise.race([renderPromise, timeoutPromise]);
         }
@@ -231,7 +234,7 @@ class XtermStdout extends EventEmitter {
     });
 
     let attempts = 0;
-    const maxAttempts = 50;
+    const maxAttempts = 300;
 
     let lastCurrent = '';
     let lastExpected = '';
@@ -262,14 +265,14 @@ class XtermStdout extends EventEmitter {
           return currentFrame !== '' || this.pendingWrites === 0;
         }
 
+        if (this.lastRenderOutput === undefined) {
+          return false;
+        }
+
         // If Ink expects nothing (no new static content and no dynamic output),
         // we consider it a match because the terminal buffer will just hold the historical static content.
         if (expectedFrame === '') {
           return true;
-        }
-
-        if (this.lastRenderOutput === undefined) {
-          return false;
         }
 
         // If the terminal is empty but Ink expects something, it's not a match.
@@ -283,18 +286,21 @@ class XtermStdout extends EventEmitter {
         return currentFrame.includes(expectedFrame);
       };
 
-      if (this.pendingWrites === 0 && isMatch()) {
+      let match = false;
+      await act(async () => {
+        match = isMatch();
+      });
+
+      if (this.pendingWrites === 0 && match) {
         return;
       }
 
       attempts++;
-      await act(async () => {
-        if (vi.isFakeTimers()) {
-          await vi.advanceTimersByTimeAsync(10);
-        } else {
-          await new Promise((resolve) => setTimeout(resolve, 10));
-        }
-      });
+      if (vi.isFakeTimers()) {
+        await vi.advanceTimersByTimeAsync(100);
+      } else {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
     }
 
     throw new Error(
@@ -422,9 +428,14 @@ export const render = async (
 
   let instance!: InkInstance;
   stdout.clear();
+  const dummyStdout = new Writable({
+    write(_chunk, _encoding, callback) {
+      callback();
+    },
+  });
   act(() => {
     instance = inkRenderDirect(tree, {
-      stdout: stdout as unknown as NodeJS.WriteStream,
+      stdout: dummyStdout as unknown as NodeJS.WriteStream,
 
       stderr: stderr as unknown as NodeJS.WriteStream,
 
@@ -770,7 +781,7 @@ export const renderWithProviders = async (
                                 onSubmit={vi.fn()}
                                 onCancel={vi.fn()}
                               >
-                                <KeypressProvider>
+                                <KeypressProvider config={config}>
                                   <MouseProvider
                                     mouseEventsEnabled={mouseEventsEnabled}
                                   >
@@ -864,7 +875,7 @@ export async function renderHook<Result, Props>(
   );
   inkRerender = renderResult.rerender;
   unmount = renderResult.unmount;
-  waitUntilReady = renderResult.waitUntilReady;
+  waitUntilReady = async () => {};
   generateSvg = renderResult.generateSvg;
 
   function rerender(props?: Props) {

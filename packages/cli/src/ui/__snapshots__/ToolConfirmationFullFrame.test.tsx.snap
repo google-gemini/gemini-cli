@@ -1,7 +1,7 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`Full Terminal Tool Confirmation Snapshot > renders tool confirmation box in the frame of the entire terminal 1`] = `
-" > Can you edit InputPrompt.tsx for me?                                                             
+" > Can you edit InputPrompt.tsx for me?
 ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
 
 ╭─────────────────────────────────────────────────────────────────────────────────────────────────╮

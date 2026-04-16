@@ -69,7 +69,7 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
         setTimeout(() => {
           unsubscribe(handler);
           resolve();
-        }, 100);
+        }, 20);
       }),
     [stdout, subscribe, unsubscribe],
   );

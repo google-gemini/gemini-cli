@@ -11,31 +11,14 @@ export default defineConfig({
     reporters: ['default', 'junit'],
     testTimeout: 60000,
     hookTimeout: 60000,
-    pool: 'forks',
+    pool: 'threads',
     silent: true,
     setupFiles: ['./test-setup.ts'],
     outputFile: {
       junit: 'junit.xml',
     },
     coverage: {
-      enabled: true,
-      provider: 'v8',
-      reportsDirectory: './coverage',
-      include: ['src/**/*'],
-      reporter: [
-        ['text', { file: 'full-text-summary.txt' }],
-        'html',
-        'json',
-        'lcov',
-        'cobertura',
-        ['json-summary', { outputFile: 'coverage-summary.json' }],
-      ],
-    },
-    poolOptions: {
-      threads: {
-        minThreads: 1,
-        maxThreads: 4,
-      },
+      enabled: false,
     },
   },
 });

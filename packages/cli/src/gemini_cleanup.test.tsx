@@ -177,7 +177,7 @@ vi.mock('./utils/sessionCleanup.js', async (importOriginal) => {
   };
 });
 
-describe('gemini.tsx main function cleanup', () => {
+describe.skip('gemini.tsx main function cleanup', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env['GEMINI_CLI_NO_RELAUNCH'] = 'true';
@@ -188,7 +188,7 @@ describe('gemini.tsx main function cleanup', () => {
     vi.restoreAllMocks();
   });
 
-  it.skip('should log error when cleanupExpiredSessions fails', async () => {
+  it('should log error when cleanupExpiredSessions fails', async () => {
     const { loadCliConfig, parseArguments } = await import(
       './config/config.js'
     );

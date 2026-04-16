@@ -4,10 +4,8 @@
   </style>
   <rect width="920" height="71" fill="#000000" />
   <g transform="translate(10, 10)">
-    <text x="0" y="2" fill="#ffffaf" textLength="720" lengthAdjust="spacingAndGlyphs">╭──────────────────────────────────────────────────────────────────────────────╮</text>
-    <text x="0" y="19" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="18" y="19" fill="#ffffaf" textLength="135" lengthAdjust="spacingAndGlyphs" font-weight="bold">Warning Message</text>
-    <text x="711" y="19" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="0" y="36" fill="#ffffaf" textLength="720" lengthAdjust="spacingAndGlyphs">╰──────────────────────────────────────────────────────────────────────────────╯</text>
+    <text x="0" y="2" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">╭──────────────────────────────────────────────────────────────────────────────╮                    </text>
+    <text x="0" y="19" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│ Warning Message                                                              │                    </text>
+    <text x="0" y="36" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">╰──────────────────────────────────────────────────────────────────────────────╯                    </text>
   </g>
 </svg>

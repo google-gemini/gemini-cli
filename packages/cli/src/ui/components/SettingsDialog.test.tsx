@@ -26,7 +26,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { SettingsDialog } from './SettingsDialog.js';
 import { SettingScope } from '../../config/settings.js';
 import { createMockSettings } from '../../test-utils/settings.js';
-import { makeFakeConfig } from '@google/gemini-cli-core';
+import { makeFakeConfig } from '../../../../core/src/test-utils/config.js';
 import { act } from 'react';
 import { TEST_ONLY } from '../../utils/settingsUtils.js';
 import {
@@ -250,7 +250,7 @@ const renderDialog = async (
     },
   );
 
-describe('SettingsDialog', () => {
+describe.sequential('SettingsDialog', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.spyOn(
@@ -265,7 +265,7 @@ describe('SettingsDialog', () => {
     vi.resetAllMocks();
   });
 
-  describe('Initial Rendering', () => {
+  describe.sequential('Initial Rendering', () => {
     it('should render the settings dialog with default state', async () => {
       const settings = createMockSettings();
       const onSelect = vi.fn();
@@ -328,7 +328,7 @@ describe('SettingsDialog', () => {
     });
   });
 
-  describe('Setting Descriptions', () => {
+  describe.sequential('Setting Descriptions', () => {
     it('should render descriptions for settings that have them', async () => {
       const settings = createMockSettings();
       const onSelect = vi.fn();
@@ -346,7 +346,7 @@ describe('SettingsDialog', () => {
     });
   });
 
-  describe('Settings Navigation', () => {
+  describe.sequential('Settings Navigation', () => {
     it.each([
       {
         name: 'arrow keys',
@@ -441,7 +441,7 @@ describe('SettingsDialog', () => {
     });
   });
 
-  describe('Settings Toggling', () => {
+  describe.sequential('Settings Toggling', () => {
     it('should toggle setting with Enter key', async () => {
       const settings = createMockSettings();
       const setValueSpy = vi.spyOn(settings, 'setValue');
@@ -476,7 +476,7 @@ describe('SettingsDialog', () => {
       unmount();
     });
 
-    describe('enum values', () => {
+    describe.sequential('enum values', () => {
       it.each([
         {
           name: 'toggles to next value',
@@ -547,7 +547,7 @@ describe('SettingsDialog', () => {
     });
   });
 
-  describe('Scope Selection', () => {
+  describe.sequential('Scope Selection', () => {
     it('should switch between scopes', async () => {
       const settings = createMockSettings();
       const onSelect = vi.fn();
@@ -590,7 +590,7 @@ describe('SettingsDialog', () => {
     });
   });
 
-  describe('Restart Prompt', () => {
+  describe.sequential('Restart Prompt', () => {
     it('should show restart prompt for restart-required settings', async () => {
       const settings = createMockSettings();
       const onRestartRequest = vi.fn();
@@ -628,7 +628,7 @@ describe('SettingsDialog', () => {
     });
   });
 
-  describe('Escape Key Behavior', () => {
+  describe.sequential('Escape Key Behavior', () => {
     it('should call onSelect with undefined when Escape is pressed', async () => {
       const settings = createMockSettings();
       const onSelect = vi.fn();
@@ -651,7 +651,7 @@ describe('SettingsDialog', () => {
     });
   });
 
-  describe('Settings Persistence', () => {
+  describe.sequential('Settings Persistence', () => {
     it('should persist settings across scope changes', async () => {
       const settings = createMockSettings({ vimMode: true });
       const onSelect = vi.fn();
@@ -701,7 +701,7 @@ describe('SettingsDialog', () => {
     });
   });
 
-  describe('Complex State Management', () => {
+  describe.sequential('Complex State Management', () => {
     it('should track modified settings correctly', async () => {
       const settings = createMockSettings();
       const onSelect = vi.fn();
@@ -750,7 +750,7 @@ describe('SettingsDialog', () => {
     });
   });
 
-  describe('Specific Settings Behavior', () => {
+  describe.sequential('Specific Settings Behavior', () => {
     it('should show correct display values for settings with different states', async () => {
       const settings = createMockSettings({
         user: {
@@ -828,7 +828,7 @@ describe('SettingsDialog', () => {
     });
   });
 
-  describe('Settings Display Values', () => {
+  describe.sequential('Settings Display Values', () => {
     it('should show correct values for inherited settings', async () => {
       const settings = createMockSettings({
         system: {
@@ -871,7 +871,7 @@ describe('SettingsDialog', () => {
     });
   });
 
-  describe('Race Condition Regression Tests', () => {
+  describe.sequential('Race Condition Regression Tests', () => {
     it.each([
       {
         name: 'not reset sibling settings when toggling a nested setting multiple times',
@@ -934,7 +934,7 @@ describe('SettingsDialog', () => {
     });
   });
 
-  describe('Keyboard Shortcuts Edge Cases', () => {
+  describe.sequential('Keyboard Shortcuts Edge Cases', () => {
     it('should handle rapid key presses gracefully', async () => {
       const settings = createMockSettings();
       const onSelect = vi.fn();
@@ -1025,7 +1025,7 @@ describe('SettingsDialog', () => {
     });
   });
 
-  describe('Error Recovery', () => {
+  describe.sequential('Error Recovery', () => {
     it('should handle malformed settings gracefully', async () => {
       // Create settings with potentially problematic values
       const settings = createMockSettings({
@@ -1056,7 +1056,7 @@ describe('SettingsDialog', () => {
     });
   });
 
-  describe('Complex User Interactions', () => {
+  describe.sequential('Complex User Interactions', () => {
     it('should handle complete user workflow: navigate, toggle, change scope, exit', async () => {
       const settings = createMockSettings();
       const onSelect = vi.fn();
@@ -1178,7 +1178,7 @@ describe('SettingsDialog', () => {
     });
   });
 
-  describe('Restart and Search Conflict Regression', () => {
+  describe.sequential('Restart and Search Conflict Regression', () => {
     it('should prioritize restart request over search text box when showRestartPrompt is true', async () => {
       vi.mocked(getSettingsSchema).mockReturnValue(TOOLS_SHELL_FAKE_SCHEMA);
       const settings = createMockSettings();
@@ -1271,7 +1271,7 @@ describe('SettingsDialog', () => {
     });
   });
 
-  describe('String Settings Editing', () => {
+  describe.sequential('String Settings Editing', () => {
     it('should allow editing and committing a string setting', async () => {
       const settings = createMockSettings({
         'general.sessionCleanup.maxAge': 'initial',
@@ -1333,7 +1333,7 @@ describe('SettingsDialog', () => {
     });
   });
 
-  describe('Array Settings Editing', () => {
+  describe.sequential('Array Settings Editing', () => {
     const typeInput = async (
       stdin: { write: (data: string) => void },
       input: string,
@@ -1401,7 +1401,7 @@ describe('SettingsDialog', () => {
     });
   });
 
-  describe('Search Functionality', () => {
+  describe.sequential('Search Functionality', () => {
     it('should display text entered in search', async () => {
       const settings = createMockSettings();
       const onSelect = vi.fn();
@@ -1542,7 +1542,7 @@ describe('SettingsDialog', () => {
     });
   });
 
-  describe('Snapshot Tests', () => {
+  describe.sequential('Snapshot Tests', () => {
     /**
      * Snapshot tests for SettingsDialog component using ink-testing-library.
      * These tests capture the visual output of the component in various states.

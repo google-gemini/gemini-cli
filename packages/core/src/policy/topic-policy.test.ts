@@ -14,7 +14,7 @@ import { UPDATE_TOPIC_TOOL_NAME } from '../tools/tool-names.js';
 describe('Topic Tool Policy', () => {
   async function loadDefaultPolicies() {
     // Path relative to packages/core root
-    const policiesDir = path.resolve(process.cwd(), 'src/policy/policies');
+    const policiesDir = path.resolve(__dirname, 'policies');
     const getPolicyTier = () => 1; // Default tier
     const result = await loadPoliciesFromToml([policiesDir], getPolicyTier);
     return result.rules;

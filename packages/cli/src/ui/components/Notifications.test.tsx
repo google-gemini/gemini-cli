@@ -23,6 +23,11 @@ import { WarningPriority } from '@google/gemini-cli-core';
 // Mock dependencies
 vi.mock('../contexts/AppContext.js');
 vi.mock('../contexts/UIStateContext.js');
+vi.mock('../hooks/useKeypress.js', () => ({
+  useKeypress: vi.fn(),
+}));
+import { useKeypress } from '../hooks/useKeypress.js';
+
 vi.mock('ink', async () => {
   const actual = await vi.importActual('ink');
   return {
@@ -221,7 +226,7 @@ describe('Notifications', () => {
     } as AppState;
     mockUseAppContext.mockReturnValue(appState);
 
-    const { lastFrame, stdin, waitUntilReady, unmount } =
+    const { lastFrame, unmount } =
       await renderWithProviders(<Notifications />, {
         appState,
         settings,
@@ -229,12 +234,22 @@ describe('Notifications', () => {
       });
     expect(lastFrame()).toContain('High priority 1');
 
+    const keyHandler = vi.mocked(useKeypress).mock.calls[0][0];
     await act(async () => {
-      stdin.write('a');
+      keyHandler({
+        name: 'a',
+        sequence: 'a',
+        shift: false,
+        alt: false,
+        ctrl: false,
+        cmd: false,
+        insertable: true,
+      });
     });
-    await waitUntilReady();
 
-    expect(lastFrame({ allowEmpty: true })).not.toContain('High priority 1');
+    await waitFor(() => {
+      expect(lastFrame({ allowEmpty: true })).not.toContain('High priority 1');
+    });
     unmount();
   });
 

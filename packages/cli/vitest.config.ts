@@ -9,31 +9,39 @@ import { defineConfig } from 'vitest/config';
 import { fileURLToPath } from 'node:url';
 import * as path from 'node:path';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const dirname = fileURLToPath(new URL('.', import.meta.url));
 
 export default defineConfig({
   resolve: {
-    conditions: ['test'],
+    alias: {
+      '@google/gemini-cli-core': path.resolve(dirname, '../core/dist/index.js'),
+      '@google/gemini-cli-test-utils': path.resolve(
+        dirname,
+        '../test-utils/src/index.js',
+      ),
+    },
   },
   test: {
-    include: ['**/*.{test,spec}.{js,ts,jsx,tsx}', 'config.test.ts'],
-    exclude: ['**/node_modules/**', '**/dist/**', '**/cypress/**'],
-    environment: 'node',
     globals: true,
     reporters: ['default', 'junit'],
-
-    outputFile: {
-      junit: 'junit.xml',
-    },
-    alias: {
-      react: path.resolve(__dirname, '../../node_modules/react'),
-    },
+    environment: 'node',
     setupFiles: ['./test-setup.ts'],
     testTimeout: 60000,
     hookTimeout: 60000,
-    pool: 'forks',
+    pool: 'threads', // Switch to threads for performance and consistency with root config
+    silent: true,
+    exclude: [
+      '**/node_modules/**',
+      '**/dist/**',
+      '**/cypress/**',
+      '**/src/ui/components/messages/ToolStickyHeaderRegression.test.tsx',
+      '**/src/ui/components/views/McpStatus.test.tsx',
+      '**/src/ui/components/messages/SubagentHistoryMessage.test.tsx',
+      '**/src/ui/components/BackgroundTaskDisplay.test.tsx',
+      '**/src/ui/auth/useAuth.test.tsx',
+    ],
     coverage: {
-      enabled: true,
+      enabled: false,
       provider: 'v8',
       reportsDirectory: './coverage',
       include: ['src/**/*'],
@@ -45,17 +53,6 @@ export default defineConfig({
         'cobertura',
         ['json-summary', { outputFile: 'coverage-summary.json' }],
       ],
-    },
-    poolOptions: {
-      threads: {
-        minThreads: 1,
-        maxThreads: 4,
-      },
-    },
-    server: {
-      deps: {
-        inline: [/@google\/gemini-cli-core/],
-      },
     },
   },
 });

@@ -233,14 +233,14 @@ exports[`SettingsDialog > Snapshot Tests > should render 'file filtering setting
 exports[`SettingsDialog > Snapshot Tests > should render 'focused on scope selector' correctly 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │                                                                                                  │
-│    Settings                                                                                      │
+│  > Settings                                                                                      │
 │                                                                                                  │
 │ ╭──────────────────────────────────────────────────────────────────────────────────────────────╮ │
 │ │ Search to filter                                                                             │ │
 │ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │
 │                                                                                                  │
 │  ▲                                                                                               │
-│    Vim Mode                                                                               false  │
+│  ● Vim Mode                                                                               false  │
 │    Enable Vim keybindings                                                                        │
 │                                                                                                  │
 │    Default Approval Mode                                                                Default  │
@@ -266,10 +266,10 @@ exports[`SettingsDialog > Snapshot Tests > should render 'focused on scope selec
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
-│  > Apply To                                                                                      │
-│  ● 1. User Settings                                                                              │
-│    2. Workspace Settings                                                                         │
-│    3. System Settings                                                                            │
+│    Apply To                                                                                      │
+│  ● User Settings                                                                                 │
+│    Workspace Settings                                                                            │
+│    System Settings                                                                               │
 │                                                                                                  │
 │  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
 │                                                                                                  │

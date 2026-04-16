@@ -42,7 +42,7 @@ describe('render', () => {
   });
 });
 
-describe('renderHook', () => {
+describe.sequential('renderHook', () => {
   it('should rerender with previous props when called without arguments', async () => {
     const useTestHook = ({ value }: { value: number }) => {
       const [count, setCount] = useState(0);

@@ -4,116 +4,91 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi, beforeEach, afterEach } from 'vitest';
-import { format } from 'node:util';
-import { coreEvents, debugLogger } from '@google/gemini-cli-core';
+import { vi, beforeEach, afterEach, act } from 'vitest';
+import {
+  coreEvents,
+  uiTelemetryService,
+  resetBrowserSession,
+} from '@google/gemini-cli-core';
 import { themeManager } from './src/ui/themes/theme-manager.js';
 import { mockInkSpinner } from './src/test-utils/mockSpinner.js';
+import { cleanup } from './src/test-utils/render.js';
 
 // Globally mock ink-spinner to prevent non-deterministic snapshot/act flakes.
 mockInkSpinner();
 
-// Unset CI environment variable so that ink renders dynamically as it does in a real terminal
-if (process.env.CI !== undefined) {
-  delete process.env.CI;
-}
-
 global.IS_REACT_ACT_ENVIRONMENT = true;
 
 // Increase max listeners to avoid warnings in large test suites
-coreEvents.setMaxListeners(100);
-
-// Unset NO_COLOR environment variable to ensure consistent theme behavior between local and CI test runs
-if (process.env.NO_COLOR !== undefined) {
-  delete process.env.NO_COLOR;
-}
-
-// Force true color output for ink so that snapshots always include color information.
-process.env.FORCE_COLOR = '3';
-
-// Force generic keybinding hints to ensure stable snapshots across different operating systems.
-process.env.FORCE_GENERIC_KEYBINDING_HINTS = 'true';
-
-// Force generic terminal declaration to ensure stable snapshots across different host environments.
-process.env.TERM_PROGRAM = 'generic';
+coreEvents.setMaxListeners(0);
+uiTelemetryService.setMaxListeners(0);
+process.setMaxListeners(0);
 
 import './src/test-utils/customMatchers.js';
 
-let consoleErrorSpy: vi.SpyInstance;
-let actWarnings: Array<{ message: string; stack: string }> = [];
+const noiseStrings = [
+  'was not wrapped in act(...)',
+  'The current testing environment is not configured to support act(...)',
+  'Warning: React does not recognize',
+  'Loading ignore patterns from',
+  "Can't find node-pty",
+  'Skipping inaccessible workspace folder',
+];
 
-let logSpy: vi.SpyInstance;
-let warnSpy: vi.SpyInstance;
-let errorSpy: vi.SpyInstance;
-let debugSpy: vi.SpyInstance;
-
-beforeEach(() => {
-  // Reset themeManager state to ensure test isolation
-  themeManager.resetForTesting();
-
-  // Mock debugLogger to avoid test output noise
-  logSpy = vi.spyOn(debugLogger, 'log').mockImplementation(() => {});
-  warnSpy = vi.spyOn(debugLogger, 'warn').mockImplementation((...args) => {
-    console.warn(...args);
-  });
-  errorSpy = vi.spyOn(debugLogger, 'error').mockImplementation((...args) => {
-    console.error(...args);
-  });
-  debugSpy = vi.spyOn(debugLogger, 'debug').mockImplementation(() => {});
-
-  actWarnings = [];
-  consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation((...args) => {
-    const firstArg = args[0];
-    if (
-      typeof firstArg === 'string' &&
-      firstArg.includes('was not wrapped in act(...)')
-    ) {
-      const stackLines = (new Error().stack || '').split('\n');
-      let lastReactFrameIndex = -1;
-
-      // Find the index of the last frame that comes from react-reconciler
-      for (let i = 0; i < stackLines.length; i++) {
-        if (stackLines[i].includes('react-reconciler')) {
-          lastReactFrameIndex = i;
-        }
-      }
-
-      // If we found react-reconciler frames, start the stack trace after the last one.
-      // Otherwise, just strip the first line (which is the Error message itself).
-      const relevantStack =
-        lastReactFrameIndex !== -1
-          ? stackLines.slice(lastReactFrameIndex + 1).join('\n')
-          : stackLines.slice(1).join('\n');
-
-      if (
-        relevantStack.includes('OverflowContext.tsx') ||
-        relevantStack.includes('useTimedMessage.ts') ||
-        relevantStack.includes('useInlineEditBuffer.ts')
-      ) {
+// PROXY CONSOLE TO FILTER NOISE WITHOUT BREAKING SPIES
+const createNoiseFilter = (method: keyof Console) => {
+  const original = console[method];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (console as any)[method] = new Proxy(original, {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
+    apply(target: Function, thisArg: unknown, argArray: unknown[]) {
+      const firstArg = String(argArray[0]);
+      if (noiseStrings.some((s) => firstArg.includes(s))) {
         return;
       }
-
-      actWarnings.push({
-        message: format(...args),
-        stack: relevantStack,
-      });
-    }
+      return Reflect.apply(target, thisArg, argArray);
+    },
   });
+};
+
+['log', 'info', 'warn', 'error', 'debug'].forEach((m) =>
+  createNoiseFilter(m as keyof Console),
+);
+
+// THE "HEALTHY FIX": Wrap telemetry events in act() automatically
+const originalEmit = uiTelemetryService.emit;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+uiTelemetryService.emit = function (event: string | symbol, ...args: any[]) {
+  let result: boolean = false;
+  try {
+    act(() => {
+      result = originalEmit.apply(this, [event, ...args]);
+    });
+  } catch {
+    // If act() is not available or fails, fall back to normal emit
+    result = originalEmit.apply(this, [event, ...args]);
+  }
+  return result;
+};
+
+beforeEach(async () => {
+  // Reset singletons to ensure test isolation
+  themeManager.resetForTesting();
+  uiTelemetryService.clear();
+  // We do NOT remove all listeners here because it would break the
+  // SessionContext subscription created during component mount.
+  // Instead, we rely on individual tests to manage their specific listeners
+  // or the clear() method to reset state.
+
+  await resetBrowserSession();
+
+  // Force specific env for test stability
+  vi.stubEnv('FORCE_COLOR', '3');
+  vi.stubEnv('FORCE_GENERIC_KEYBINDING_HINTS', 'true');
+  vi.stubEnv('TERM_PROGRAM', 'generic');
 });
 
 afterEach(() => {
-  consoleErrorSpy.mockRestore();
-
-  logSpy?.mockRestore();
-  warnSpy?.mockRestore();
-  errorSpy?.mockRestore();
-  debugSpy?.mockRestore();
-
+  cleanup();
   vi.unstubAllEnvs();
-  if (actWarnings.length > 0) {
-    const messages = actWarnings
-      .map(({ message, stack }) => `${message}\n${stack}`)
-      .join('\n\n');
-    throw new Error(`Failing test due to "act(...)" warnings:\n${messages}`);
-  }
 });

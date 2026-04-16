@@ -6,6 +6,7 @@
 
 import { render } from '../../test-utils/render.js';
 import { act } from 'react';
+import { waitFor } from '../../test-utils/async.js';
 import {
   MultiFolderTrustDialog,
   MultiFolderTrustChoice,
@@ -218,7 +219,9 @@ describe('MultiFolderTrustDialog', () => {
     });
     await waitUntilReady();
 
-    expect(lastFrame()).toContain('Applying trust settings...');
+    await waitFor(() => {
+      expect(lastFrame()).toContain('Applying trust settings...');
+    });
     unmount();
   });
 

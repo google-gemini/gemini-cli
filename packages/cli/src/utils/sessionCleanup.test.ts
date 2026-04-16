@@ -21,20 +21,6 @@ import {
   cleanupToolOutputFiles,
 } from './sessionCleanup.js';
 
-vi.mock('@google/gemini-cli-core', async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import('@google/gemini-cli-core')>();
-  return {
-    ...actual,
-    debugLogger: {
-      error: vi.fn(),
-      warn: vi.fn(),
-      debug: vi.fn(),
-      info: vi.fn(),
-    },
-  };
-});
-
 describe('Session Cleanup (Refactored)', () => {
   let testTempDir: string;
   let chatsDir: string;
@@ -43,6 +29,10 @@ describe('Session Cleanup (Refactored)', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
+    vi.spyOn(debugLogger, 'error').mockImplementation(() => {});
+    vi.spyOn(debugLogger, 'warn').mockImplementation(() => {});
+    vi.spyOn(debugLogger, 'log').mockImplementation(() => {});
+    vi.spyOn(debugLogger, 'debug').mockImplementation(() => {});
     testTempDir = await fs.mkdtemp(
       path.join(os.tmpdir(), 'gemini-cli-cleanup-test-'),
     );

@@ -8,10 +8,9 @@ import { render } from '../../test-utils/render.js';
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import { LoginWithGoogleRestartDialog } from './LoginWithGoogleRestartDialog.js';
 import { useKeypress } from '../hooks/useKeypress.js';
-import { runExitCleanup } from '../../utils/cleanup.js';
 import {
-  RELAUNCH_EXIT_CODE,
   _resetRelaunchStateForTesting,
+  relaunchApp,
 } from '../../utils/processUtils.js';
 import { type Config } from '@google/gemini-cli-core';
 
@@ -20,12 +19,15 @@ vi.mock('../hooks/useKeypress.js', () => ({
   useKeypress: vi.fn(),
 }));
 
-vi.mock('../../utils/cleanup.js', () => ({
-  runExitCleanup: vi.fn(),
+vi.mock('../../utils/processUtils.js', () => ({
+  relaunchApp: vi.fn().mockResolvedValue(undefined),
+  RELAUNCH_EXIT_CODE: 199,
+  _resetRelaunchStateForTesting: vi.fn(),
 }));
 
 const mockedUseKeypress = useKeypress as Mock;
-const mockedRunExitCleanup = runExitCleanup as Mock;
+
+const mockedRelaunchApp = relaunchApp as Mock;
 
 describe('LoginWithGoogleRestartDialog', () => {
   const onDismiss = vi.fn();
@@ -100,8 +102,7 @@ describe('LoginWithGoogleRestartDialog', () => {
       // Advance timers to trigger the setTimeout callback
       await vi.runAllTimersAsync();
 
-      expect(mockedRunExitCleanup).toHaveBeenCalledTimes(1);
-      expect(exitSpy).toHaveBeenCalledWith(RELAUNCH_EXIT_CODE);
+      expect(mockedRelaunchApp).toHaveBeenCalledTimes(1);
 
       vi.useRealTimers();
       unmount();

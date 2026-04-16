@@ -1,7 +1,7 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`ThinkingMessage > filters out progress dots and empty lines 1`] = `
-" Thinking... 
+" Thinking...
  │
  │ Thinking
  │ Done
@@ -9,14 +9,14 @@ exports[`ThinkingMessage > filters out progress dots and empty lines 1`] = `
 `;
 
 exports[`ThinkingMessage > filters out progress dots and empty lines 2`] = `
-" Thinking... 
+" Thinking...
  │
  │ Thinking
  │ Done"
 `;
 
 exports[`ThinkingMessage > normalizes escaped newline tokens 1`] = `
-" Thinking... 
+" Thinking...
  │
  │ Matching the Blocks
  │ Some more text
@@ -24,14 +24,14 @@ exports[`ThinkingMessage > normalizes escaped newline tokens 1`] = `
 `;
 
 exports[`ThinkingMessage > normalizes escaped newline tokens 2`] = `
-" Thinking... 
+" Thinking...
  │
  │ Matching the Blocks
  │ Some more text"
 `;
 
 exports[`ThinkingMessage > renders "Thinking..." header when isFirstThinking is true 1`] = `
-" Thinking... 
+" Thinking...
  │
  │ Summary line
  │ First body line
@@ -39,14 +39,14 @@ exports[`ThinkingMessage > renders "Thinking..." header when isFirstThinking is 
 `;
 
 exports[`ThinkingMessage > renders "Thinking..." header when isFirstThinking is true 2`] = `
-" Thinking... 
+" Thinking...
  │
  │ Summary line
  │ First body line"
 `;
 
 exports[`ThinkingMessage > renders full mode with left border and full text 1`] = `
-" Thinking... 
+" Thinking...
  │
  │ Planning
  │ I am planning the solution.
@@ -54,14 +54,14 @@ exports[`ThinkingMessage > renders full mode with left border and full text 1`] 
 `;
 
 exports[`ThinkingMessage > renders full mode with left border and full text 2`] = `
-" Thinking... 
+" Thinking...
  │
  │ Planning
  │ I am planning the solution."
 `;
 
 exports[`ThinkingMessage > renders multiple thinking messages sequentially correctly 1`] = `
-" Thinking... 
+" Thinking...
  │
  │ Initial analysis
  │ This is a multiple line paragraph for the first thinking message of how the
@@ -78,7 +78,7 @@ exports[`ThinkingMessage > renders multiple thinking messages sequentially corre
 `;
 
 exports[`ThinkingMessage > renders multiple thinking messages sequentially correctly 2`] = `
-" Thinking... 
+" Thinking...
  │
  │ Initial analysis
  │ This is a multiple line paragraph for the first thinking message of how the
@@ -94,7 +94,7 @@ exports[`ThinkingMessage > renders multiple thinking messages sequentially corre
 `;
 
 exports[`ThinkingMessage > renders subject line with vertical rule and "Thinking..." header 1`] = `
-" Thinking... 
+" Thinking...
  │
  │ Planning
  │ test
@@ -102,21 +102,21 @@ exports[`ThinkingMessage > renders subject line with vertical rule and "Thinking
 `;
 
 exports[`ThinkingMessage > renders subject line with vertical rule and "Thinking..." header 2`] = `
-" Thinking... 
+" Thinking...
  │
  │ Planning
  │ test"
 `;
 
 exports[`ThinkingMessage > uses description when subject is empty 1`] = `
-" Thinking... 
+" Thinking...
  │
  │ Processing details
 "
 `;
 
 exports[`ThinkingMessage > uses description when subject is empty 2`] = `
-" Thinking... 
+" Thinking...
  │
  │ Processing details"
 `;

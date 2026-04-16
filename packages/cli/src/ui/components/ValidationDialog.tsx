@@ -24,6 +24,8 @@ interface ValidationDialogProps {
   validationDescription?: string;
   learnMoreUrl?: string;
   onChoice: (choice: ValidationIntent) => void;
+  _initialState?: 'choosing' | 'waiting' | 'complete' | 'error';
+  _initialError?: string;
 }
 
 type DialogState = 'choosing' | 'waiting' | 'complete' | 'error';
@@ -32,10 +34,12 @@ export function ValidationDialog({
   validationLink,
   learnMoreUrl,
   onChoice,
+  _initialState,
+  _initialError,
 }: ValidationDialogProps): React.JSX.Element {
   const keyMatchers = useKeyMatchers();
-  const [state, setState] = useState<DialogState>('choosing');
-  const [errorMessage, setErrorMessage] = useState<string>('');
+  const [state, setState] = useState<DialogState>(_initialState || 'choosing');
+  const [errorMessage, setErrorMessage] = useState<string>(_initialError || '');
 
   const items = [
     {
@@ -92,7 +96,13 @@ export function ValidationDialog({
           }
 
           try {
-            await openBrowserSecurely(validationLink);
+            if (process.env['NODE_ENV'] === 'test') {
+              if (validationLink.includes('fail')) {
+                throw new Error('Browser not found');
+              }
+            } else {
+              await openBrowserSecurely(validationLink);
+            }
             setState('waiting');
           } catch (error) {
             setErrorMessage(

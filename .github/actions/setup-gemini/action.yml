@@ -1,0 +1,75 @@
+name: 'Setup Gemini CLI'
+description: 'Sets up the environment and either builds from source or uses a pre-built bundle.'
+
+inputs:
+  mode:
+    description: 'Setup mode: "source" (build from scratch) or "bundle" (use pre-built artifact)'
+    required: true
+    default: 'source'
+  install-sandbox-deps:
+    description: 'Whether to install sandbox dependencies like bubblewrap'
+    required: false
+    default: 'false'
+  bundle-artifact:
+    description: 'The name of the bundle artifact to download if mode is "bundle"'
+    required: false
+  dist-artifact:
+    description: 'The name of the dist artifact to download if mode is "dist"'
+    required: false
+
+runs:
+  using: 'composite'
+  steps:
+    - name: 'Set up Node.js'
+      uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
+      with:
+        node-version-file: '.nvmrc'
+        cache: 'npm'
+
+    - name: 'Install dependencies'
+      run: 'npm ci'
+      shell: 'bash'
+
+    - name: 'Install system dependencies (Linux)'
+      if: "${{ runner.os == 'Linux' && inputs.install-sandbox-deps == 'true' }}"
+      run: |
+        sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq bubblewrap
+        # Ubuntu 24.04+ requires this to allow bwrap to function in CI
+        sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+      shell: 'bash'
+
+    - name: 'Build Core (Required for all tests)'
+      run: 'npm run build --workspace @google/gemini-cli-core'
+      shell: 'bash'
+
+    - name: 'Build from source'
+      if: "${{ inputs.mode == 'source' }}"
+      run: 'npm run build'
+      shell: 'bash'
+
+    - name: 'Download Bundle Artifact'
+      if: "${{ inputs.mode == 'bundle' }}"
+      uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806' # v4
+      with:
+        name: '${{ inputs.bundle-artifact }}'
+        path: 'bundle'
+
+    - name: 'Download Dist Artifact'
+      if: "${{ inputs.mode == 'dist' }}"
+      uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806' # v4
+      with:
+        name: '${{ inputs.dist-artifact }}'
+
+    - name: 'Post-bundle setup'
+      if: "${{ inputs.mode == 'bundle' }}"
+      run: |
+        # Ensure the bundle is ready for use
+        ls -R bundle
+      shell: 'bash'
+
+    - name: 'Post-dist setup'
+      if: "${{ inputs.mode == 'dist' }}"
+      run: |
+        # Verify dist files were restored
+        ls -d packages/*/dist
+      shell: 'bash'
