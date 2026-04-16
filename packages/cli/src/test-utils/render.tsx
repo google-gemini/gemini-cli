@@ -225,7 +225,7 @@ class XtermStdout extends EventEmitter {
             this.once('render', resolve),
           );
           const timeoutPromise = new Promise((resolve) =>
-            setTimeout(resolve, 5),
+            setTimeout(resolve, 500),
           );
           await Promise.race([renderPromise, timeoutPromise]);
         }
