@@ -12,21 +12,7 @@ concurrency:
 jobs:
 
 
-  test_linux:
-    name: 'Test (Linux) - CLI Unit'
-    runs-on: 'gemini-cli-ubuntu-16-core'
-    steps:
-      - name: 'Checkout'
-        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
 
-      - name: 'Setup and Build'
-        uses: './.github/actions/setup-gemini'
-        with:
-          mode: 'source'
-
-      - name: 'Run CLI Unit Tests'
-        run: 'npx vitest run packages/cli --exclude packages/cli/src/ui/App.test.tsx --exclude packages/cli/src/test-utils/render.test.tsx --exclude packages/cli/src/test-utils/AppRig.test.tsx'
-        shell: 'bash'
 
   test_suspect:
     name: 'Test (Linux) - Suspect Tests'
