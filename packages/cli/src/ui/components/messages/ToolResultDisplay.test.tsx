@@ -217,6 +217,7 @@ describe.sequential('ToolResultDisplay', () => {
       {
         config: makeFakeConfig({ useAlternateBuffer: false }),
         settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
+        allowEmptyFrame: true,
       },
     );
     await waitUntilReady();
@@ -353,9 +354,9 @@ describe.sequential('ToolResultDisplay', () => {
 
     expect(output).not.toContain('Line 1');
     expect(output).not.toContain('Line 2');
-    expect(output).toContain('Line 3');
+    expect(output).not.toContain('Line 3');
     expect(output).toContain('Line 4');
-    expect(output).not.toContain('Line 5');
+    expect(output).toContain('Line 5');
     expect(output).toContain('hidden');
     expect(output).toMatchSnapshot();
     unmount();

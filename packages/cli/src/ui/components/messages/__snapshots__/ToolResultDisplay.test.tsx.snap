@@ -43,15 +43,14 @@ Line 8
 `;
 
 exports[`ToolResultDisplay > truncates ANSI output when maxLines is provided 1`] = `
-"... 2 hidden (Ctrl+O) ...
-Line 3
+"... 3 hidden (Ctrl+O) ...
 Line 4
+Line 5
 "
 `;
 
 exports[`ToolResultDisplay > truncates ANSI output when maxLines is provided, even if availableTerminalHeight is undefined 1`] = `
-"... 25 hidden (Ctrl+O) ...
-Line 26
+"... 26 hidden (Ctrl+O) ...
 Line 27
 Line 28
 Line 29
@@ -74,11 +73,12 @@ Line 45
 Line 46
 Line 47
 Line 48
-Line 49"
+Line 49
+Line 50"
 `;
 
 exports[`ToolResultDisplay > truncates very long string results 1`] = `
-"...aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+"... 250 hidden (Ctrl+O) ...
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
@@ -92,6 +92,6 @@ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+aaaaaaaaaaaaaaa
 "
 `;

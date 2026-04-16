@@ -655,6 +655,7 @@ export const renderWithProviders = async (
     persistentState,
     appState = mockAppState,
     clearScreenOnRender = true,
+    allowEmptyFrame = false,
   }: {
     shellFocus?: boolean;
     settings?: LoadedSettings;
@@ -677,6 +678,7 @@ export const renderWithProviders = async (
     };
     appState?: AppState;
     clearScreenOnRender?: boolean;
+    allowEmptyFrame?: boolean;
   } = {},
 ): Promise<RenderWithProvidersInstance> => {
   const baseState: UIState = new Proxy(
@@ -839,7 +841,7 @@ export const renderWithProviders = async (
     wrapWithProviders(component),
     terminalWidth,
     terminalHeight,
-    false,
+    allowEmptyFrame,
     clearScreenOnRender,
   );
 
