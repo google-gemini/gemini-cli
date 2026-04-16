@@ -190,4 +190,52 @@ describe('<VoiceModelDialog />', () => {
     });
     unmount();
   });
+
+  it('ignores additional Whisper selections while a download is already in progress', async () => {
+    const deferred = createDeferred();
+    mockIsModelInstalled.mockReturnValue(false);
+    mockDownloadModel.mockReturnValue(deferred.promise);
+
+    const { stdin, lastFrame, waitUntilReady, unmount } =
+      await renderWithProviders(<VoiceModelDialog onClose={mockOnClose} />, {
+        settings: createMockSettings({
+          voice: {
+            backend: 'whisper',
+            whisperModel: 'ggml-base.en.bin',
+          },
+        }),
+      });
+
+    await act(async () => {
+      stdin.write('\r');
+    });
+    await waitUntilReady();
+
+    await act(async () => {
+      stdin.write('\r');
+    });
+    await waitUntilReady();
+
+    await waitFor(() => {
+      expect(lastFrame()).toContain('Downloading ggml-base.en.bin');
+    });
+
+    await act(async () => {
+      stdin.write('\u001B[B');
+      stdin.write('\r');
+    });
+    await waitUntilReady();
+
+    expect(mockDownloadModel).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      deferred.resolve();
+    });
+    await waitUntilReady();
+
+    await waitFor(() => {
+      expect(mockOnClose).toHaveBeenCalled();
+    });
+    unmount();
+  });
 });

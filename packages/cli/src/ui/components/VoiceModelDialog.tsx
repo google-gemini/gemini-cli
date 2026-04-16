@@ -110,6 +110,10 @@ export function VoiceModelDialog({
 
   const handleWhisperModelSelect = useCallback(
     async (modelName: string) => {
+      if (pendingDownloadModel) {
+        return;
+      }
+
       if (modelManager.isModelInstalled(modelName)) {
         setSetting(SettingScope.User, 'voice.backend', 'whisper');
         setSetting(SettingScope.User, 'voice.whisperModel', modelName);
@@ -137,7 +141,7 @@ export function VoiceModelDialog({
         }
       }
     },
-    [modelManager, onClose, setSetting],
+    [modelManager, onClose, pendingDownloadModel, setSetting],
   );
 
   const handleGeminiLiveNoticeSelect = useCallback(
