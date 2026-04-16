@@ -116,6 +116,9 @@ describe.sequential('ThinkingMessage', () => {
         terminalWidth={80}
         isFirstThinking={true}
       />,
+      {
+        allowEmptyFrame: true,
+      },
     );
     await renderResult.waitUntilReady();
 
