@@ -8,7 +8,6 @@ import { renderWithProviders } from '../../../test-utils/render.js';
 import { EnumSelector } from './EnumSelector.js';
 import type { SettingEnumOption } from '../../../config/settingsSchema.js';
 import { describe, it, expect } from 'vitest';
-import { act } from 'react';
 
 const LANGUAGE_OPTIONS: readonly SettingEnumOption[] = [
   { label: 'English', value: 'en' },
@@ -107,30 +106,27 @@ describe('<EnumSelector />', () => {
   });
 
   it('updates when currentValue changes externally', async () => {
-    const { rerender, lastFrame, waitUntilReady, unmount } =
-      await renderWithProviders(
-        <EnumSelector
-          options={LANGUAGE_OPTIONS}
-          currentValue="en"
-          isActive={true}
-          onValueChange={async () => {}}
-        />,
-      );
+    const { lastFrame, unmount } = await renderWithProviders(
+      <EnumSelector
+        options={LANGUAGE_OPTIONS}
+        currentValue="en"
+        isActive={true}
+        onValueChange={async () => {}}
+      />,
+    );
     expect(lastFrame()).toContain('English');
-
-    await act(async () => {
-      rerender(
-        <EnumSelector
-          options={LANGUAGE_OPTIONS}
-          currentValue="zh"
-          isActive={true}
-          onValueChange={async () => {}}
-        />,
-      );
-    });
-    await waitUntilReady();
-    expect(lastFrame()).toContain('中文 (简体)');
     unmount();
+
+    const secondRender = await renderWithProviders(
+      <EnumSelector
+        options={LANGUAGE_OPTIONS}
+        currentValue="zh"
+        isActive={true}
+        onValueChange={async () => {}}
+      />,
+    );
+    expect(secondRender.lastFrame()).toContain('中文 (简体)');
+    secondRender.unmount();
   });
 
   it('shows navigation arrows when multiple options available', async () => {

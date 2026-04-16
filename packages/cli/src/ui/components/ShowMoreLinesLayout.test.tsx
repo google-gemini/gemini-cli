@@ -8,17 +8,22 @@ import { Box, Text } from 'ink';
 import { render } from '../../test-utils/render.js';
 import { ShowMoreLines } from './ShowMoreLines.js';
 import { useOverflowState } from '../contexts/OverflowContext.js';
-import { useStreamingContext } from '../contexts/StreamingContext.js';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
-import { StreamingState } from '../types.js';
 
-vi.mock('../contexts/OverflowContext.js');
-vi.mock('../contexts/StreamingContext.js');
-vi.mock('../hooks/useAlternateBuffer.js');
+import type React from 'react';
+
+vi.mock('../contexts/OverflowContext.js', () => ({
+  useOverflowState: vi.fn().mockReturnValue({ overflowingIds: new Set(['1']) }),
+  OverflowProvider: ({ children }: { children: React.ReactNode }) => (
+    <>{children}</>
+  ),
+}));
+vi.mock('../hooks/useAlternateBuffer.js', () => ({
+  useAlternateBuffer: vi.fn(),
+}));
 
 describe('ShowMoreLines layout and padding', () => {
   const mockUseOverflowState = vi.mocked(useOverflowState);
-  const mockUseStreamingContext = vi.mocked(useStreamingContext);
   const mockUseAlternateBuffer = vi.mocked(useAlternateBuffer);
 
   beforeEach(() => {
@@ -27,7 +32,6 @@ describe('ShowMoreLines layout and padding', () => {
     mockUseOverflowState.mockReturnValue({
       overflowingIds: new Set(['1']),
     } as NonNullable<ReturnType<typeof useOverflowState>>);
-    mockUseStreamingContext.mockReturnValue(StreamingState.Idle);
   });
 
   afterEach(() => {
@@ -38,7 +42,7 @@ describe('ShowMoreLines layout and padding', () => {
     const TestComponent = () => (
       <Box flexDirection="column">
         <Text>Top</Text>
-        <ShowMoreLines constrainHeight={true} />
+        <ShowMoreLines constrainHeight={true} isOverflowing={true} />
         <Text>Bottom</Text>
       </Box>
     );
@@ -70,7 +74,7 @@ describe('ShowMoreLines layout and padding', () => {
     const TestComponent = () => (
       <Box flexDirection="column">
         <Text>Top</Text>
-        <ShowMoreLines constrainHeight={true} />
+        <ShowMoreLines constrainHeight={true} isOverflowing={true} />
         <Text>Bottom</Text>
       </Box>
     );

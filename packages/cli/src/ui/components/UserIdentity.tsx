@@ -17,20 +17,28 @@ import { isUltraTier } from '../../utils/tierUtils.js';
 
 interface UserIdentityProps {
   config: Config;
+  emailOverride?: string;
 }
 
-export const UserIdentity: React.FC<UserIdentityProps> = ({ config }) => {
+export const UserIdentity: React.FC<UserIdentityProps> = ({
+  config,
+  emailOverride,
+}) => {
   const authType = config.getContentGeneratorConfig()?.authType;
-  const [email, setEmail] = useState<string | undefined>();
+  const [email, setEmail] = useState<string | undefined>(emailOverride);
 
   useEffect(() => {
+    if (emailOverride !== undefined) {
+      setEmail(emailOverride);
+      return;
+    }
     if (authType) {
       const userAccountManager = new UserAccountManager();
       setEmail(userAccountManager.getCachedGoogleAccount() ?? undefined);
     } else {
       setEmail(undefined);
     }
-  }, [authType]);
+  }, [authType, emailOverride]);
 
   const tierName = useMemo(
     () => (authType ? config.getUserTierName() : undefined),

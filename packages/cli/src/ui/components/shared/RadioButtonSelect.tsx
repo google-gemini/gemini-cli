@@ -83,35 +83,36 @@ export function RadioButtonSelect<T>({
       showScrollArrows={showScrollArrows}
       maxItemsToShow={maxItemsToShow}
       priority={priority}
-      renderItem={
-        renderItem ||
-        ((item, { titleColor }) => {
-          // Handle special theme display case for ThemeDialog compatibility
-          if (item.themeNameDisplay && item.themeTypeDisplay) {
-            return (
-              <Text color={titleColor} wrap="truncate" key={item.key}>
-                {item.themeNameDisplay}{' '}
-                <Text color={theme.text.secondary}>
-                  {item.themeTypeDisplay}
-                </Text>
-              </Text>
-            );
-          }
-          // Regular label display
-          return (
-            <Box flexDirection="column">
-              <Text color={titleColor} wrap="truncate">
-                {item.label}
-              </Text>
-              {item.sublabel && (
-                <Text color={theme.text.secondary} wrap="truncate">
-                  {item.sublabel}
-                </Text>
-              )}
-            </Box>
-          );
-        })
-      }
+      renderItem={renderItem || defaultRadioRenderItem}
     />
+  );
+}
+
+/**
+ * Default item renderer for RadioButtonSelect.
+ */
+export function defaultRadioRenderItem(
+  item: RadioSelectItem<unknown>,
+  { titleColor }: RenderItemContext,
+): React.JSX.Element {
+  if (item.themeNameDisplay && item.themeTypeDisplay) {
+    return (
+      <Text color={titleColor} wrap="truncate" key={item.key}>
+        {item.themeNameDisplay}{' '}
+        <Text color={theme.text.secondary}>{item.themeTypeDisplay}</Text>
+      </Text>
+    );
+  }
+  return (
+    <Box flexDirection="column">
+      <Text color={titleColor} wrap="truncate">
+        {item.label}
+      </Text>
+      {item.sublabel && (
+        <Text color={theme.text.secondary} wrap="truncate">
+          {item.sublabel}
+        </Text>
+      )}
+    </Box>
   );
 }
