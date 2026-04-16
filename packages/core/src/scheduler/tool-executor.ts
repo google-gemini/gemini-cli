@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { recordToolExecutionBreakdown } from '../telemetry/metrics.js';
 import {
   ToolErrorType,
   ToolOutputTruncatedEvent,
@@ -95,6 +96,7 @@ export class ToolExecutor {
         spanMetadata.input = request;
 
         let completedToolCall: CompletedToolCall;
+        const startTime = performance.now();
 
         try {
           const setExecutionIdCallback = (executionId: number) => {
@@ -122,6 +124,11 @@ export class ToolExecutor {
           );
 
           const toolResult: ToolResult = await promise;
+          const duration = performance.now() - startTime;
+          recordToolExecutionBreakdown(this.config, duration, {
+            toolName,
+            status: 'success',
+          });
 
           if (call.request.inputModifiedByHook) {
             const modificationMsg = `\n\n[System] Tool input parameters were modified by a hook before execution.`;
@@ -162,7 +169,13 @@ export class ToolExecutor {
             );
           }
         } catch (executionError: unknown) {
+          const duration = performance.now() - startTime;
+          recordToolExecutionBreakdown(this.config, duration, {
+            toolName,
+            status: 'error',
+          });
           spanMetadata.error = executionError;
+
           const abortedByError =
             isAbortError(executionError) ||
             (executionError instanceof Error &&
