@@ -64,6 +64,35 @@ import {
 } from '../components/LogoutConfirmationDialog.js';
 import { runExitCleanup } from '../../utils/cleanup.js';
 
+/**
+ * Marks commands as hidden based on the user's hiddenSlashCommands setting.
+ * Hidden commands are excluded from the completion menu but remain
+ * invokable when typed directly.
+ *
+ * @param commands The full list of loaded slash commands.
+ * @param hiddenNames Command names to hide (without leading slash).
+ * @returns The commands with matching entries marked as hidden.
+ */
+export function applyHiddenSlashCommands(
+  commands: readonly SlashCommand[],
+  hiddenNames: readonly string[],
+): readonly SlashCommand[] {
+  if (hiddenNames.length === 0) {
+    return commands;
+  }
+
+  const hiddenSet = new Set(
+    hiddenNames.map((name) => name.replace(/^\//, '').toLowerCase()),
+  );
+
+  return commands.map((cmd) => {
+    const isMatch = [cmd.name, ...(cmd.altNames ?? [])].some((name) =>
+      hiddenSet.has(name.toLowerCase()),
+    );
+    return isMatch && !cmd.hidden ? { ...cmd, hidden: true } : cmd;
+  });
+}
+
 interface SlashCommandProcessorActions {
   openAuthDialog: () => void;
   openThemeDialog: () => void;
@@ -340,12 +369,17 @@ export const useSlashCommandProcessor = (
         return;
       }
 
-      setCommands(commandService.getCommands());
+      const loadedCommands = commandService.getCommands();
+      const hiddenNames = settings.merged?.ui?.hiddenSlashCommands ?? [];
+      setCommands(applyHiddenSlashCommands(loadedCommands, hiddenNames));
     })();
 
     return () => {
       controller.abort();
     };
+    // hiddenSlashCommands is read from settings.merged once per load; it is
+    // intentionally excluded from deps because it requires a CLI restart.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config, reloadTrigger, isConfigInitialized]);
 
   const handleSlashCommand = useCallback(

@@ -1064,3 +1064,109 @@ describe('useSlashCommandProcessor', () => {
     );
   });
 });
+
+describe('applyHiddenSlashCommands', () => {
+  // Import directly since it's a pure function
+  let applyHiddenSlashCommands: typeof import('./slashCommandProcessor.js').applyHiddenSlashCommands;
+
+  beforeAll(async () => {
+    const mod = await import('./slashCommandProcessor.js');
+    applyHiddenSlashCommands = mod.applyHiddenSlashCommands;
+  });
+
+  const makeCommand = (
+    name: string,
+    overrides: Partial<SlashCommand> = {},
+  ): SlashCommand => ({
+    name,
+    description: `${name} command`,
+    kind: CommandKind.BUILT_IN,
+    ...overrides,
+  });
+
+  it('should return the same reference when hiddenNames is empty', () => {
+    const commands = [makeCommand('skills'), makeCommand('mcp')];
+    const result = applyHiddenSlashCommands(commands, []);
+    expect(result).toBe(commands);
+  });
+
+  it('should mark a matching command as hidden', () => {
+    const commands = [makeCommand('skills'), makeCommand('help')];
+    const result = applyHiddenSlashCommands(commands, ['skills']);
+    expect(result[0]?.hidden).toBe(true);
+    expect(result[1]?.hidden).toBeUndefined();
+  });
+
+  it('should match case-insensitively', () => {
+    const commands = [makeCommand('skills')];
+    const result = applyHiddenSlashCommands(commands, ['SKILLS']);
+    expect(result[0]?.hidden).toBe(true);
+  });
+
+  it('should strip leading slash from config values', () => {
+    const commands = [makeCommand('mcp')];
+    const result = applyHiddenSlashCommands(commands, ['/mcp']);
+    expect(result[0]?.hidden).toBe(true);
+  });
+
+  it('should hide multiple commands simultaneously', () => {
+    const commands = [
+      makeCommand('skills'),
+      makeCommand('mcp'),
+      makeCommand('help'),
+    ];
+    const result = applyHiddenSlashCommands(commands, ['skills', 'mcp']);
+    expect(result[0]?.hidden).toBe(true);
+    expect(result[1]?.hidden).toBe(true);
+    expect(result[2]?.hidden).toBeUndefined();
+  });
+
+  it('should preserve already-hidden commands', () => {
+    const commands = [makeCommand('debug', { hidden: true })];
+    const result = applyHiddenSlashCommands(commands, ['debug']);
+    expect(result[0]?.hidden).toBe(true);
+  });
+
+  it('should return the same object reference for already-hidden commands', () => {
+    const commands = [makeCommand('debug', { hidden: true })];
+    const result = applyHiddenSlashCommands(commands, ['debug']);
+    expect(result[0]).toBe(commands[0]);
+  });
+
+  it('should hide a command when an altName matches', () => {
+    const commands = [makeCommand('quit', { altNames: ['exit', 'q'] })];
+    const result = applyHiddenSlashCommands(commands, ['exit']);
+    expect(result[0]?.hidden).toBe(true);
+    expect(result[0]?.name).toBe('quit');
+  });
+
+  it('should preserve original command properties', () => {
+    const action = vi.fn();
+    const commands = [
+      makeCommand('skills', {
+        description: 'Manage skills',
+        kind: CommandKind.SKILL,
+        action,
+      }),
+    ];
+    const result = applyHiddenSlashCommands(commands, ['skills']);
+    expect(result[0]?.name).toBe('skills');
+    expect(result[0]?.description).toBe('Manage skills');
+    expect(result[0]?.kind).toBe(CommandKind.SKILL);
+    expect(result[0]?.action).toBe(action);
+    expect(result[0]?.hidden).toBe(true);
+  });
+
+  it('should not remove hidden commands from the array', () => {
+    const commands = [makeCommand('skills'), makeCommand('help')];
+    const result = applyHiddenSlashCommands(commands, ['skills']);
+    expect(result).toHaveLength(2);
+    expect(result[0]?.name).toBe('skills');
+  });
+
+  it('should not modify commands not in the hidden list', () => {
+    const commands = [makeCommand('help')];
+    const result = applyHiddenSlashCommands(commands, ['skills']);
+    expect(result[0]).toEqual(commands[0]);
+  });
+});
