@@ -10,7 +10,7 @@ import { Text } from 'ink';
 import { renderHook, render } from './render.js';
 import { waitFor } from './async.js';
 
-describe.sequential('render', () => {
+describe('render', () => {
   it('should render a component', async () => {
     const { lastFrame, unmount } = await render(<Text>Hello World</Text>);
     expect(lastFrame()).toBe('Hello World\n');
