@@ -1032,6 +1032,23 @@ const SETTINGS_SCHEMA = {
           ref: 'SummarizeToolOutputSettings',
         },
       },
+      squeez: {
+        type: 'object',
+        label: 'Squeeze Tool Output Pruning',
+        category: 'Model',
+        requiresRestart: false,
+        default: undefined as
+          | { serverUrl: string; apiKey?: string; model?: string; timeoutMs?: number }
+          | undefined,
+        description: oneLine`
+          Configure Squeeze for task-conditioned tool output pruning.
+          Squeeze extracts only relevant lines from verbose tool output (pytest, grep, build logs, etc.)
+          achieving ~92% compression while preserving exact error messages and stack traces.
+          Requires a running Squeeze server (see https://github.com/KRLabsOrg/squeez).
+        `,
+        showInDialog: false,
+        ref: 'SqueezSettings',
+      },
       compressionThreshold: {
         type: 'number',
         label: 'Context Compression Threshold',
@@ -3025,6 +3042,35 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
           'Maximum number of tokens used when summarizing tool output.',
       },
     },
+  },
+  SqueezSettings: {
+    type: 'object',
+    description:
+      'Configuration for Squeeze tool output pruning. Connect to a Squeeze server to automatically compress verbose tool output.',
+    additionalProperties: false,
+    properties: {
+      serverUrl: {
+        type: 'string',
+        description:
+          'URL of the Squeeze OpenAI-compatible server (e.g. http://localhost:8000/v1).',
+      },
+      apiKey: {
+        type: 'string',
+        description:
+          'API key for the Squeeze server. Optional if the server does not require authentication.',
+      },
+      model: {
+        type: 'string',
+        description:
+          'Model name on the Squeeze server. Auto-detected from the server if not specified.',
+      },
+      timeoutMs: {
+        type: 'number',
+        description:
+          'Request timeout in milliseconds. Default: 30000.',
+      },
+    },
+    required: ['serverUrl'],
   },
   AgentOverride: {
     type: 'object',

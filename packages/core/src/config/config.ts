@@ -196,6 +196,17 @@ export interface SummarizeToolOutputSettings {
   tokenBudget?: number;
 }
 
+export interface SqueezSettings {
+  /** URL of the Squeeze OpenAI-compatible server (e.g. http://localhost:8000/v1) */
+  serverUrl: string;
+  /** API key for the Squeeze server (optional if server doesn't require auth) */
+  apiKey?: string;
+  /** Model name on the Squeeze server (default: auto-detected from server) */
+  model?: string;
+  /** Request timeout in milliseconds (default: 30000) */
+  timeoutMs?: number;
+}
+
 export interface PlanSettings {
   enabled?: boolean;
   directory?: string;
@@ -641,6 +652,7 @@ export interface ConfigParameters {
   enableEnvironmentVariableRedaction?: boolean;
   noBrowser?: boolean;
   summarizeToolOutput?: Record<string, SummarizeToolOutputSettings>;
+  squeez?: SqueezSettings;
   folderTrust?: boolean;
   ideMode?: boolean;
   loadMemoryFromIncludeDirectories?: boolean;
@@ -851,6 +863,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly summarizeToolOutput:
     | Record<string, SummarizeToolOutputSettings>
     | undefined;
+  private readonly squeez: SqueezSettings | undefined;
   private readonly acpMode: boolean = false;
   private readonly loadMemoryFromIncludeDirectories: boolean = false;
   private readonly includeDirectoryTree: boolean = true;
@@ -1212,6 +1225,7 @@ export class Config implements McpContext, AgentLoopContext {
     this._enabledExtensions = params.enabledExtensions ?? [];
     this.noBrowser = params.noBrowser ?? false;
     this.summarizeToolOutput = params.summarizeToolOutput;
+    this.squeez = params.squeez;
     this.folderTrust = params.folderTrust ?? false;
     this.ideMode = params.ideMode ?? false;
     this.includeDirectoryTree = params.includeDirectoryTree ?? true;
@@ -2962,6 +2976,10 @@ export class Config implements McpContext, AgentLoopContext {
     | Record<string, SummarizeToolOutputSettings>
     | undefined {
     return this.summarizeToolOutput;
+  }
+
+  getSqueezConfig(): SqueezSettings | undefined {
+    return this.squeez;
   }
 
   getIdeMode(): boolean {

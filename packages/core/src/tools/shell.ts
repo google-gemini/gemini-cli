@@ -28,7 +28,7 @@ import {
 } from './tools.js';
 
 import { getErrorMessage } from '../utils/errors.js';
-import { summarizeToolOutput } from '../utils/summarizer.js';
+import { llmSummarizer, createSqueezAwareSummarizer } from '../utils/summarizer.js';
 import {
   ShellExecutionService,
   type ShellOutputEvent,
@@ -902,6 +902,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
 
       const summarizeConfig =
         this.context.config.getSummarizeToolOutputConfig();
+      const squeezConfig = this.context.config.getSqueezConfig();
       const executionError = result.error
         ? {
             error: {
@@ -911,10 +912,19 @@ export class ShellToolInvocation extends BaseToolInvocation<
           }
         : {};
       if (summarizeConfig && summarizeConfig[SHELL_TOOL_NAME]) {
-        const summary = await summarizeToolOutput(
-          this.context.config,
-          { model: 'summarizer-shell' },
+        // Use Squeeze for pruning when configured, otherwise fall back to LLM summarization
+        const command = this.params.command;
+        const toolResult: ToolResult = {
           llmContent,
+          returnDisplay,
+          data: { command },
+        };
+        const summarizer = squeezConfig?.serverUrl
+          ? createSqueezAwareSummarizer(squeezConfig)
+          : llmSummarizer;
+        const summary = await summarizer(
+          this.context.config,
+          toolResult,
           this.context.geminiClient,
           signal,
         );
