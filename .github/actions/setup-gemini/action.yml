@@ -6,6 +6,10 @@ inputs:
     description: 'Setup mode: "source" (build from scratch) or "bundle" (use pre-built artifact)'
     required: true
     default: 'source'
+  install-sandbox-deps:
+    description: 'Whether to install sandbox dependencies like bubblewrap'
+    required: false
+    default: 'false'
   bundle-artifact:
     description: 'The name of the bundle artifact to download if mode is "bundle"'
     required: false
@@ -27,7 +31,7 @@ runs:
       shell: 'bash'
 
     - name: 'Install system dependencies (Linux)'
-      if: "${{ runner.os == 'Linux' }}"
+      if: "${{ runner.os == 'Linux' && inputs.install-sandbox-deps == 'true' }}"
       run: |
         sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq bubblewrap
         # Ubuntu 24.04+ requires this to allow bwrap to function in CI
