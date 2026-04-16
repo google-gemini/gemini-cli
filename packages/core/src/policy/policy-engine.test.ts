@@ -433,6 +433,17 @@ describe('PolicyEngine', () => {
       ).toBe(PolicyDecision.ALLOW);
     });
 
+    it('should downgrade dangerous commands to ASK_USER in YOLO mode', async () => {
+      engine = new PolicyEngine({ approvalMode: ApprovalMode.YOLO });
+
+      // rm is considered dangerous
+      const { decision } = await engine.check(
+        { name: 'run_shell_command', args: { command: 'rm test.txt' } },
+        undefined,
+      );
+      expect(decision).toBe(PolicyDecision.ASK_USER);
+    });
+
     it('should respect rule priority in YOLO mode when a match exists', async () => {
       const rules: PolicyRule[] = [
         {
@@ -1762,39 +1773,6 @@ describe('PolicyEngine', () => {
   });
 
   describe('shell command parsing failure', () => {
-    it('should return ALLOW in YOLO mode for dangerous commands due to heuristics override', async () => {
-      // Create an engine with YOLO mode and a sandbox manager that flags a command as dangerous
-      const rules: PolicyRule[] = [
-        {
-          toolName: '*',
-          decision: PolicyDecision.ALLOW,
-          priority: 999,
-          modes: [ApprovalMode.YOLO],
-        },
-      ];
-
-      const mockSandboxManager = new NoopSandboxManager();
-      mockSandboxManager.isDangerousCommand = vi.fn().mockReturnValue(true);
-      mockSandboxManager.isKnownSafeCommand = vi.fn().mockReturnValue(false);
-
-      engine = new PolicyEngine({
-        rules,
-        approvalMode: ApprovalMode.YOLO,
-        sandboxManager: mockSandboxManager,
-      });
-
-      const result = await engine.check(
-        {
-          name: 'run_shell_command',
-          args: { command: 'powershell echo "dangerous"' },
-        },
-        undefined,
-      );
-
-      // Even though the command is flagged as dangerous, YOLO mode should preserve the ALLOW decision
-      expect(result.decision).toBe(PolicyDecision.ALLOW);
-    });
-
     it('should return ALLOW in YOLO mode even if shell command parsing fails', async () => {
       const { splitCommands } = await import('../utils/shell-utils.js');
       const rules: PolicyRule[] = [

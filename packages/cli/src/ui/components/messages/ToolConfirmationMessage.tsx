@@ -352,14 +352,15 @@ export const ToolConfirmationMessage: React.FC<
         key: 'Allow once',
       });
       if (isTrustedFolder) {
+        const rootCommand = confirmationDetails.rootCommand || 'this command';
         options.push({
-          label: `Allow for this session`,
+          label: `Allow all '${rootCommand}' commands for this session`,
           value: ToolConfirmationOutcome.ProceedAlways,
           key: `Allow for this session`,
         });
         if (allowPermanentApproval) {
           options.push({
-            label: `Allow this command for all future sessions`,
+            label: `Allow all '${rootCommand}' commands for all future sessions`,
             value: ToolConfirmationOutcome.ProceedAlwaysAndSave,
             key: `Allow for all future sessions`,
           });

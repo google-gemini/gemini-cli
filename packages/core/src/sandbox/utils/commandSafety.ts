@@ -428,10 +428,20 @@ export function isDangerousCommand(args: string[]): boolean {
     return false;
   }
 
-  const cmd = args[0];
+  const cmd = normalizeCommand(args[0]);
 
   if (cmd === 'rm') {
-    return args[1] === '-f' || args[1] === '-rf' || args[1] === '-fr';
+    // rm is always destructive unless it's just a help or version request.
+    const isHelp = args.some((arg) => arg === '--help' || arg === '--version');
+    return !isHelp;
+  }
+
+  if (cmd === 'del' || cmd === 'erase') {
+    // del and erase are always destructive unless they are just help requests.
+    const isHelp = args.some(
+      (arg) => arg === '/?' || arg === '--help' || arg === '--version',
+    );
+    return !isHelp;
   }
 
   if (cmd === 'sudo') {
