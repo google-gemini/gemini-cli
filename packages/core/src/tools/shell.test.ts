@@ -320,38 +320,50 @@ describe('ShellTool', () => {
     });
 
     it('should add a space when command ends with a backslash to prevent escaping newline', async () => {
-      const invocation = shellTool.build({ command: 'ls\\' });
+      const command = 'ls\\';
+      const invocation = shellTool.build({ command });
       const promise = invocation.execute({ abortSignal: mockAbortSignal });
       resolveShellExecution();
       await promise;
 
-      const tmpFile = path.join(os.tmpdir(), 'shell_pgrep_abcdef.tmp');
+      const tmpFile = path.join(os.tmpdir(), 'gemini-shell-abcdef', 'pgrep.tmp');
       const wrappedCommand = `(\nls\\ \n); __code=$?; pgrep -g 0 >${tmpFile} 2>&1; exit $__code;`;
+
       expect(mockShellExecutionService).toHaveBeenCalledWith(
         wrappedCommand,
         tempRootDir,
         expect.any(Function),
         expect.any(AbortSignal),
         false,
-        expect.any(Object),
+        expect.objectContaining({
+          pager: 'cat',
+          sanitizationConfig: {},
+          sandboxManager: expect.any(Object),
+        }),
       );
     });
 
     it('should handle trailing comments correctly by placing them on their own line', async () => {
-      const invocation = shellTool.build({ command: 'ls # comment' });
+      const command = 'ls # comment';
+      const invocation = shellTool.build({ command });
       const promise = invocation.execute({ abortSignal: mockAbortSignal });
       resolveShellExecution();
       await promise;
 
-      const tmpFile = path.join(os.tmpdir(), 'shell_pgrep_abcdef.tmp');
+      const tmpFile = path.join(os.tmpdir(), 'gemini-shell-abcdef', 'pgrep.tmp');
       const wrappedCommand = `(\nls # comment\n); __code=$?; pgrep -g 0 >${tmpFile} 2>&1; exit $__code;`;
+
       expect(mockShellExecutionService).toHaveBeenCalledWith(
         wrappedCommand,
         tempRootDir,
         expect.any(Function),
         expect.any(AbortSignal),
         false,
-        expect.any(Object),
+        expect.objectContaining({
+          pager: 'cat',
+          sanitizationConfig: {},
+          sandboxManager: expect.any(Object),
+        }),
       );
     });
 
@@ -365,8 +377,9 @@ describe('ShellTool', () => {
       resolveShellExecution();
       await promise;
 
-      const tmpFile = path.join(os.tmpdir(), 'shell_pgrep_abcdef.tmp');
-      const wrappedCommand = `(\n${'ls'}\n); __code=$?; pgrep -g 0 >${tmpFile} 2>&1; exit $__code;`;
+      const tmpFile = path.join(os.tmpdir(), 'gemini-shell-abcdef', 'pgrep.tmp');
+      const wrappedCommand = `(\n${command}\n); __code=$?; pgrep -g 0 >${tmpFile} 2>&1; exit $__code;`;
+
       expect(mockShellExecutionService).toHaveBeenCalledWith(
         wrappedCommand,
         subdir,
@@ -390,8 +403,9 @@ describe('ShellTool', () => {
       resolveShellExecution();
       await promise;
 
-      const tmpFile = path.join(os.tmpdir(), 'shell_pgrep_abcdef.tmp');
-      const wrappedCommand = `(\n${'ls'}\n); __code=$?; pgrep -g 0 >${tmpFile} 2>&1; exit $__code;`;
+      const tmpFile = path.join(os.tmpdir(), 'gemini-shell-abcdef', 'pgrep.tmp');
+      const wrappedCommand = `(\n${command}\n); __code=$?; pgrep -g 0 >${tmpFile} 2>&1; exit $__code;`;
+
       expect(mockShellExecutionService).toHaveBeenCalledWith(
         wrappedCommand,
         path.join(tempRootDir, 'subdir'),
@@ -472,6 +486,30 @@ EOF`;
       await promise;
 
       const tmpFile = path.join(os.tmpdir(), 'shell_pgrep_abcdef.tmp');
+      // Core uses subshell () and places command on its own line with newlines
+      const wrappedCommand = `(\n${command}\n); __code=$?; pgrep -g 0 >${tmpFile} 2>&1; exit $__code;`;
+      expect(mockShellExecutionService).toHaveBeenCalledWith(
+        wrappedCommand,
+        tempRootDir,
+        expect.any(Function),
+        expect.any(AbortSignal),
+        false,
+        expect.any(Object),
+      );
+      expect(wrappedCommand).toMatch(/\nEOF\n\);/);
+    });
+
+    it('should correctly wrap heredoc commands', async () => {
+      const command = `cat << 'EOF'
+hello world
+EOF`;
+      const invocation = shellTool.build({ command });
+      const promise = invocation.execute({ abortSignal: mockAbortSignal });
+      resolveShellExecution();
+      await promise;
+
+      // New secure temp dir pattern
+      const tmpFile = path.join(os.tmpdir(), 'gemini-shell-abcdef', 'pgrep.tmp');
       // Core uses subshell () and places command on its own line with newlines
       const wrappedCommand = `(\n${command}\n); __code=$?; pgrep -g 0 >${tmpFile} 2>&1; exit $__code;`;
       expect(mockShellExecutionService).toHaveBeenCalledWith(
