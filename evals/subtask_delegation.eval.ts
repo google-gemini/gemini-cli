@@ -5,10 +5,7 @@
  */
 
 import { describe, expect } from 'vitest';
-import {
-  TRACKER_CREATE_TASK_TOOL_NAME,
-  TRACKER_UPDATE_TASK_TOOL_NAME,
-} from '@google/gemini-cli-core';
+import { TRACKER_CREATE_TASK_TOOL_NAME } from '@google/gemini-cli-core';
 import { evalTest, TEST_AGENTS } from './test-helper.js';
 
 describe('subtask delegation eval test cases', () => {
@@ -22,6 +19,8 @@ describe('subtask delegation eval test cases', () => {
    * 3. Documenting (doc expert)
    */
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should delegate sequential subtasks to relevant experts using the task tracker',
     params: {
       settings: {
@@ -90,6 +89,8 @@ You are the doc expert. Document the provided implementation clearly.`,
    * to multiple subagents in parallel using the task tracker to manage state.
    */
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should delegate independent subtasks to specialists using the task tracker',
     params: {
       settings: {
