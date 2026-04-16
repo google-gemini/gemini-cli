@@ -246,11 +246,10 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
           (showClosingBorder ? 1 : 0);
       } else if (isTopicToolCall) {
         // Topic Message Spacing Breakdown:
-        // 1. Top Margin (1): Always present for spacing.
-        // 2. Topic Content (1).
-        // 3. Bottom Margin (1): Always present around TopicMessage for breathing room.
-        // 4. Closing Border (1): Added if transition logic (showClosingBorder) requires it.
-        height += 1 + 1 + 1 + (showClosingBorder ? 1 : 0);
+        // 1. Topic Content (1).
+        // 2. Bottom Margin (1): Always present around TopicMessage for breathing room.
+        // 3. Closing Border (1): Added if transition logic (showClosingBorder) requires it.
+        height += 1 + 1 + (showClosingBorder ? 1 : 0);
       } else if (isCompact) {
         // Compact Tool: Always renders as a single dense line.
         height += 1;
@@ -439,7 +438,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
               {isCompact ? (
                 <DenseToolMessage {...commonProps} />
               ) : isTopicToolCall ? (
-                <Box marginTop={1} marginBottom={1}>
+                <Box marginBottom={1}>
                   <TopicMessage {...commonProps} />
                 </Box>
               ) : isShellToolCall ? (
