@@ -92,7 +92,7 @@ describe.skipIf(os.platform() === 'win32')('buildBwrapArgs', () => {
     workspaceWrite: false,
     networkAccess: false,
     maskFilePath: '/tmp/mask',
-    isWriteCommand: false,
+    isReadOnlyCommand: false,
   };
 
   it('should correctly format the base arguments', async () => {
@@ -188,7 +188,7 @@ describe.skipIf(os.platform() === 'win32')('buildBwrapArgs', () => {
     expect(args[args.indexOf('/opt/tools') - 1]).toBe('--bind-try');
   });
 
-  it('should bind the parent directory of a non-existent path', async () => {
+  it('should bind the parent directory of a non-existent path with --bind-try when isReadOnlyCommand is false', async () => {
     vi.mocked(fs.existsSync).mockImplementation((p) => {
       if (p === '/home/user/workspace/new-file.txt') return false;
       return true;
@@ -196,16 +196,36 @@ describe.skipIf(os.platform() === 'win32')('buildBwrapArgs', () => {
 
     const args = await buildBwrapArgs({
       ...defaultOptions,
+      isReadOnlyCommand: false,
       resolvedPaths: createResolvedPaths({
         policyAllowed: ['/home/user/workspace/new-file.txt'],
       }),
-      isWriteCommand: true,
     });
 
     const parentDir = '/home/user/workspace';
     const bindIndex = args.lastIndexOf(parentDir);
     expect(bindIndex).not.toBe(-1);
     expect(args[bindIndex - 2]).toBe('--bind-try');
+  });
+
+  it('should bind the parent directory of a non-existent path with --ro-bind-try when isReadOnlyCommand is true', async () => {
+    vi.mocked(fs.existsSync).mockImplementation((p) => {
+      if (p === '/home/user/workspace/new-file.txt') return false;
+      return true;
+    });
+
+    const args = await buildBwrapArgs({
+      ...defaultOptions,
+      isReadOnlyCommand: true,
+      resolvedPaths: createResolvedPaths({
+        policyAllowed: ['/home/user/workspace/new-file.txt'],
+      }),
+    });
+
+    const parentDir = '/home/user/workspace';
+    const bindIndex = args.lastIndexOf(parentDir);
+    expect(bindIndex).not.toBe(-1);
+    expect(args[bindIndex - 2]).toBe('--ro-bind-try');
   });
 
   it('should parameterize forbidden paths and explicitly deny them', async () => {
@@ -338,5 +358,62 @@ describe.skipIf(os.platform() === 'win32')('buildBwrapArgs', () => {
     expect(args).toContain(`${includeDir}/.env`);
     const envIndex = args.indexOf(`${includeDir}/.env`);
     expect(args[envIndex - 2]).toBe('--bind');
+  });
+
+  it('binds git worktree directories if present', async () => {
+    const worktreeGitDir = '/path/to/worktree/.git';
+    const mainGitDir = '/path/to/main/.git';
+
+    const args = await buildBwrapArgs({
+      ...defaultOptions,
+      resolvedPaths: createResolvedPaths({
+        gitWorktree: {
+          worktreeGitDir,
+          mainGitDir,
+        },
+      }),
+    });
+
+    expect(args).toContain(worktreeGitDir);
+    expect(args).toContain(mainGitDir);
+    expect(args[args.indexOf(worktreeGitDir) - 1]).toBe('--ro-bind-try');
+    expect(args[args.indexOf(mainGitDir) - 1]).toBe('--ro-bind-try');
+  });
+
+  it('enforces read-only binding for git worktrees even if workspaceWrite is true', async () => {
+    const worktreeGitDir = '/path/to/worktree/.git';
+
+    const args = await buildBwrapArgs({
+      ...defaultOptions,
+      workspaceWrite: true,
+      resolvedPaths: createResolvedPaths({
+        gitWorktree: {
+          worktreeGitDir,
+        },
+      }),
+    });
+
+    expect(args[args.indexOf(worktreeGitDir) - 1]).toBe('--ro-bind-try');
+  });
+
+  it('git worktree read-only bindings should override previous policyWrite bindings', async () => {
+    const worktreeGitDir = '/custom/worktree/.git';
+
+    const args = await buildBwrapArgs({
+      ...defaultOptions,
+      resolvedPaths: createResolvedPaths({
+        policyWrite: ['/custom/worktree'],
+        gitWorktree: {
+          worktreeGitDir,
+        },
+      }),
+    });
+
+    const writeBindIndex = args.indexOf('/custom/worktree');
+    const worktreeBindIndex = args.lastIndexOf(worktreeGitDir);
+
+    expect(writeBindIndex).toBeGreaterThan(-1);
+    expect(worktreeBindIndex).toBeGreaterThan(-1);
+    expect(worktreeBindIndex).toBeGreaterThan(writeBindIndex);
   });
 });

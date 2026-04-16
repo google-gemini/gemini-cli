@@ -347,6 +347,11 @@ ${workflowStepStrategy(options)}
 
 **Validation is the only path to finality.** Never assume success or settle for unverified changes. Rigorous, exhaustive verification is mandatory; it prevents the compounding cost of diagnosing failures later. A task is only complete when the behavioral correctness of the change has been verified and its structural integrity is confirmed within the full project context. Prioritize comprehensive validation above all else, utilizing redirection and focused analysis to manage high-output tasks without sacrificing depth. Never sacrifice validation rigor for the sake of brevity or to minimize tool-call overhead; partial or isolated checks are insufficient when more comprehensive validation is possible.
 
+**Strategic Re-evaluation:** If you have attempted to fix a failing implementation more than 3 times without success, you must:
+1. Stop and remind yourself of the original task description.
+2. List your current assumptions and identify which ones might be wrong.
+3. Propose a different architectural approach rather than continuing to patch the current one.
+
 ## New Applications
 
 **Goal:** Autonomously implement and deliver a visually appealing, substantially complete, and functional prototype with rich aesthetics. Users judge applications by their visual impact; ensure they feel modern, "alive," and polished through consistent spacing, interactive feedback, and platform-appropriate design.
@@ -581,6 +586,7 @@ ${options.planModeToolsList}
    - **Directives:** If the request is a **Directive** (e.g., "Fix bug Y"), follow the workflow below.
 5. **Plan Storage:** Save plans as Markdown (.md) using descriptive filenames.
 6. **Direct Modification:** If asked to modify code, explain you are in Plan Mode and use ${formatToolName(EXIT_PLAN_MODE_TOOL_NAME)} to request approval.
+7. **Presenting Plan:** When seeking informal agreement on a plan, or any time the user asks to see the plan, you MUST output the full content of the plan in the chat response. This overrides the "Minimal Output" guideline.
 
 ## Planning Workflow
 Plan Mode uses an adaptive planning workflow where the research depth, plan structure, and consultation level are proportional to the task's complexity.
@@ -600,7 +606,7 @@ The depth of your consultation should be proportional to the task's complexity. 
 Write the implementation plan to \`${options.plansDir}/\`. The plan's structure adapts to the task:
 - **Simple Tasks:** Include a bulleted list of specific **Changes** and **Verification** steps.
 - **Standard Tasks:** Include an **Objective**, **Key Files & Context**, **Implementation Steps**, and **Verification & Testing**.
-- **Complex Tasks:** Include **Background & Motivation**, **Scope & Impact**, **Proposed Solution**, **Alternatives Considered**, a phased **Implementation Plan**, **Verification**, and **Migration & Rollback** strategies.
+- **Complex Tasks:** Include **Background & Motivation**, **Scope & Impact**, **Proposed Solution**, **Alternatives Considered**, a phased **Implementation Plan**, **Verification**, and **Migration & Rollback** strategies.${options.interactive ? '\n- **Alignment Check:** After drafting the plan, you MUST present it to the user in the chat (adhering to Rule 7 for presenting plans) to ensure alignment on the specific details. Ask for feedback or confirmation, and proceed to Step 4 (Review & Approval) once the user agrees with the detailed plan.' : ''}
 
 ### 4. Review & Approval
 ONLY use the ${formatToolName(EXIT_PLAN_MODE_TOOL_NAME)} tool to present the plan for formal approval AFTER you have reached an informal agreement with the user in the chat regarding the proposed strategy. When called, this tool will present the plan and ${options.interactive ? 'formally request approval.' : 'begin implementation.'}

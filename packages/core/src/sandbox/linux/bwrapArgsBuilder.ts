@@ -11,7 +11,7 @@ import {
   getSecretFileFindArgs,
   type ResolvedSandboxPaths,
 } from '../../services/sandboxManager.js';
-import { resolveGitWorktreePaths, isErrnoException } from '../utils/fsUtils.js';
+import { isErrnoException } from '../utils/fsUtils.js';
 import { spawnAsync } from '../../utils/shell-utils.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 
@@ -23,7 +23,7 @@ export interface BwrapArgsOptions {
   workspaceWrite: boolean;
   networkAccess: boolean;
   maskFilePath: string;
-  isWriteCommand: boolean;
+  isReadOnlyCommand: boolean;
 }
 
 /**
@@ -37,7 +37,7 @@ export async function buildBwrapArgs(
     workspaceWrite,
     networkAccess,
     maskFilePath,
-    isWriteCommand,
+    isReadOnlyCommand,
   } = options;
   const { workspace } = resolvedPaths;
 
@@ -70,16 +70,6 @@ export async function buildBwrapArgs(
     bwrapArgs.push(bindFlag, workspace.resolved, workspace.resolved);
   }
 
-  const { worktreeGitDir, mainGitDir } = resolveGitWorktreePaths(
-    workspace.resolved,
-  );
-  if (worktreeGitDir) {
-    bwrapArgs.push(bindFlag, worktreeGitDir, worktreeGitDir);
-  }
-  if (mainGitDir) {
-    bwrapArgs.push(bindFlag, mainGitDir, mainGitDir);
-  }
-
   for (const includeDir of resolvedPaths.globalIncludes) {
     bwrapArgs.push('--ro-bind-try', includeDir, includeDir);
   }
@@ -89,10 +79,13 @@ export async function buildBwrapArgs(
       bwrapArgs.push('--bind-try', allowedPath, allowedPath);
     } else {
       // If the path doesn't exist, we still want to allow access to its parent
-      // to enable creating it. Since allowedPath is already resolved by resolveSandboxPaths,
-      // its parent is also correctly resolved.
+      // to enable creating it.
       const parent = dirname(allowedPath);
-      bwrapArgs.push(isWriteCommand ? '--bind-try' : bindFlag, parent, parent);
+      bwrapArgs.push(
+        isReadOnlyCommand ? '--ro-bind-try' : '--bind-try',
+        parent,
+        parent,
+      );
     }
   }
 
@@ -110,6 +103,18 @@ export async function buildBwrapArgs(
     bwrapArgs.push('--ro-bind', filePath, filePath);
     if (realPath !== filePath) {
       bwrapArgs.push('--ro-bind', realPath, realPath);
+    }
+  }
+
+  // Grant read-only access to git worktrees/submodules. We do this last in order to
+  // ensure that these rules aren't overwritten by broader write policies.
+  if (resolvedPaths.gitWorktree) {
+    const { worktreeGitDir, mainGitDir } = resolvedPaths.gitWorktree;
+    if (worktreeGitDir) {
+      bwrapArgs.push('--ro-bind-try', worktreeGitDir, worktreeGitDir);
+    }
+    if (mainGitDir) {
+      bwrapArgs.push('--ro-bind-try', mainGitDir, mainGitDir);
     }
   }
 

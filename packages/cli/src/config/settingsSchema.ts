@@ -256,13 +256,28 @@ const SETTINGS_SCHEMA = {
       },
       enableNotifications: {
         type: 'boolean',
-        label: 'Enable Notifications',
+        label: 'Enable Terminal Notifications',
         category: 'General',
         requiresRestart: false,
         default: false,
         description:
-          'Enable run-event notifications for action-required prompts and session completion.',
+          'Enable terminal run-event notifications for action-required prompts and session completion.',
         showInDialog: true,
+      },
+      notificationMethod: {
+        type: 'enum',
+        label: 'Terminal Notification Method',
+        category: 'General',
+        requiresRestart: false,
+        default: 'auto',
+        description: 'How to send terminal notifications.',
+        showInDialog: true,
+        options: [
+          { value: 'auto', label: 'Auto' },
+          { value: 'osc9', label: 'OSC 9' },
+          { value: 'osc777', label: 'OSC 777' },
+          { value: 'bell', label: 'Bell' },
+        ],
       },
       checkpointing: {
         type: 'object',
@@ -439,6 +454,16 @@ const SETTINGS_SCHEMA = {
     description: 'User interface settings.',
     showInDialog: false,
     properties: {
+      debugRainbow: {
+        type: 'boolean',
+        label: 'Debug Rainbow',
+        category: 'UI',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Enable debug rainbow rendering. Only useful for debugging rendering bugs and performance issues.',
+        showInDialog: false,
+      },
       theme: {
         type: 'string',
         label: 'Theme',

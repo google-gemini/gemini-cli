@@ -1,0 +1,62 @@
+name: 'Automated Documentation Audit'
+
+on:
+  schedule:
+    # Runs every Monday at 00:00 UTC
+    - cron: '0 0 * * MON'
+  workflow_dispatch:
+
+jobs:
+  audit-docs:
+    runs-on: 'ubuntu-latest'
+    permissions:
+      contents: 'write'
+      pull-requests: 'write'
+
+    steps:
+      - name: 'Checkout repository'
+        uses: 'actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5'
+        with:
+          fetch-depth: 0
+          ref: 'main'
+
+      - name: 'Set up Node.js'
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
+        with:
+          node-version: '20'
+
+      - name: 'Run Docs Audit with Gemini'
+        id: 'run_gemini'
+        uses: 'google-github-actions/run-gemini-cli@a3bf79042542528e91937b3a3a6fbc4967ee3c31'
+        with:
+          gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
+          prompt: |
+            Activate the 'docs-writer' skill.
+
+            **Task:** Execute the docs audit procedure, as defined in your 'docs-auditing.md' reference.
+            Provide a detailed summary of the changes you make.
+
+      - name: 'Get current date'
+        id: 'date'
+        run: |
+          echo "date=$(date +'%Y-%m-%d')" >> "$GITHUB_OUTPUT"
+
+      - name: 'Create Pull Request with Audit Results'
+        uses: 'peter-evans/create-pull-request@c5a7806660adbe173f04e3e038b0ccdcd758773c'
+        with:
+          token: '${{ secrets.GEMINI_CLI_ROBOT_GITHUB_PAT }}'
+          commit-message: 'docs: weekly audit results for ${{ github.run_id }}'
+          title: 'Docs audit: ${{ steps.date.outputs.date }}'
+          body: |
+            This PR contains the auto-generated documentation audit for the week. It includes a new `audit-results-*.md` file with findings and any direct fixes applied by the agent.
+
+            ### Audit Summary:
+            ${{ steps.run_gemini.outputs.summary || 'No summary provided.' }}
+
+            Please review the suggestions and merge.
+
+            Related to #25152
+          branch: 'docs-audit-${{ github.run_id }}'
+          base: 'main'
+          team-reviewers: 'gemini-cli-docs, gemini-cli-maintainers'
+          delete-branch: true

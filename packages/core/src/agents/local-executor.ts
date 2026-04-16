@@ -114,7 +114,7 @@ export function createUnauthorizedToolError(toolName: string): string {
 export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
   readonly definition: LocalAgentDefinition<TOutput>;
 
-  private readonly agentId: string;
+  readonly agentId: string;
   private readonly toolRegistry: ToolRegistry;
   private readonly promptRegistry: PromptRegistry;
   private readonly resourceRegistry: ResourceRegistry;
@@ -1021,15 +1021,16 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       : undefined;
 
     try {
-      return new GeminiChat(
+      const chat = new GeminiChat(
         this.executionContext,
         systemInstruction,
         [{ functionDeclarations: tools }],
         startHistory,
         undefined,
         undefined,
-        'subagent',
       );
+      await chat.initialize(undefined, 'subagent');
+      return chat;
     } catch (e: unknown) {
       await reportError(
         e,
