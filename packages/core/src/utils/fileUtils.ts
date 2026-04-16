@@ -12,6 +12,7 @@ import mime from 'mime/lite';
 import type { FileSystemService } from '../services/fileSystemService.js';
 import { ToolErrorType } from '../tools/tool-error.js';
 import { BINARY_EXTENSIONS } from './ignorePatterns.js';
+import { isBinaryFile as isBinaryFileCheck } from 'isbinaryfile';
 import { createRequire as createModuleRequire } from 'node:module';
 import { debugLogger } from './debugLogger.js';
 import {
@@ -278,103 +279,18 @@ export async function isEmpty(filePath: string): Promise<boolean> {
 }
 
 /**
- * Check whether a buffer region starting at `offset` is a valid UTF-8 multibyte
- * sequence. Returns the byte length of the sequence (2-4) if valid, or 0 if invalid.
- */
-function validUtf8SequenceLength(
-  buf: Buffer,
-  offset: number,
-  bytesRead: number,
-): number {
-  const b = buf[offset];
-  let expectedLen: number;
-  if (b >= 0xc2 && b <= 0xdf) {
-    expectedLen = 2;
-  } else if (b >= 0xe0 && b <= 0xef) {
-    expectedLen = 3;
-  } else if (b >= 0xf0 && b <= 0xf4) {
-    expectedLen = 4;
-  } else {
-    return 0; // Not a valid leading byte
-  }
-
-  if (offset + expectedLen > bytesRead) return 0; // Truncated sequence
-
-  for (let j = 1; j < expectedLen; j++) {
-    if ((buf[offset + j] & 0xc0) !== 0x80) return 0; // Bad continuation byte
-  }
-  return expectedLen;
-}
-
-/**
- * Heuristic: determine if a file is likely binary.
- * BOM-aware: if a Unicode BOM is detected, we treat it as text.
- * For non-BOM files we use null-byte detection and an invalid-byte ratio check.
- *
- * Importantly, valid UTF-8 multibyte sequences (including U+FFFD = EF BF BD)
- * are NOT counted as non-printable. This prevents false positives for text files
- * that legitimately contain the Unicode replacement character or other high-byte
- * codepoints.
+ * Determine if a file is likely binary using the `isbinaryfile` library.
+ * Returns false for empty files and files that cannot be read.
  */
 export async function isBinaryFile(filePath: string): Promise<boolean> {
-  let fh: fs.promises.FileHandle | null = null;
   try {
-    fh = await fs.promises.open(filePath, 'r');
-    const stats = await fh.stat();
-    const fileSize = stats.size;
-    if (fileSize === 0) return false; // empty is not binary
-
-    // Sample up to 4KB from the head (previous behavior)
-    const sampleSize = Math.min(4096, fileSize);
-    const buf = Buffer.alloc(sampleSize);
-    const { bytesRead } = await fh.read(buf, 0, sampleSize, 0);
-    if (bytesRead === 0) return false;
-
-    // BOM → text (avoid false positives for UTF‑16/32 with nulls)
-    const bom = detectBOM(buf.subarray(0, Math.min(4, bytesRead)));
-    if (bom) return false;
-
-    let nonPrintableCount = 0;
-    for (let i = 0; i < bytesRead; i++) {
-      if (buf[i] === 0) return true; // strong indicator of binary when no BOM
-
-      // For high bytes (>= 0x80), check if they form a valid UTF-8 multibyte
-      // sequence. Valid sequences (like U+FFFD encoded as EF BF BD) are normal
-      // text and should be skipped. Invalid sequences count toward the
-      // non-printable tally.
-      if (buf[i] >= 0x80) {
-        const seqLen = validUtf8SequenceLength(buf, i, bytesRead);
-        if (seqLen > 0) {
-          i += seqLen - 1; // skip the valid continuation bytes
-        } else {
-          nonPrintableCount++;
-        }
-        continue;
-      }
-
-      if (buf[i] < 9 || (buf[i] > 13 && buf[i] < 32) || buf[i] === 127) {
-        nonPrintableCount++;
-      }
-    }
-    // If >30% non-printable characters, consider it binary
-    return nonPrintableCount / bytesRead > 0.3;
+    return await isBinaryFileCheck(filePath);
   } catch (error) {
     debugLogger.warn(
       `Failed to check if file is binary: ${filePath}`,
       error instanceof Error ? error.message : String(error),
     );
     return false;
-  } finally {
-    if (fh) {
-      try {
-        await fh.close();
-      } catch (closeError) {
-        debugLogger.warn(
-          `Failed to close file handle for: ${filePath}`,
-          closeError instanceof Error ? closeError.message : String(closeError),
-        );
-      }
-    }
   }
 }
 
