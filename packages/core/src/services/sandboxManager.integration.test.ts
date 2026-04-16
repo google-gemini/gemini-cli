@@ -1175,10 +1175,10 @@ describe('SandboxManager Integration', () => {
       const { command: nodePath, args: nodeArgs } = Platform.touch(lockFile);
 
       const commandString = Platform.isWindows
-        ? `git --version > NUL && "${nodePath}" ${nodeArgs
-            .map((a) => (a.includes(' ') || a.includes('(') ? `"${a}"` : a))
+        ? `git --version > NUL && "${nodePath.replace(/\\/g, '/')}" ${nodeArgs
+            .map((a) => `'${a.replace(/\\/g, '/')}'`)
             .join(' ')}`
-        : `git --version > /dev/null; ${nodePath} ${nodeArgs
+        : `git --version > /dev/null; "${nodePath}" ${nodeArgs
             .map((a) => (a.includes(' ') || a.includes('(') ? `'${a}'` : a))
             .join(' ')}`;
 
