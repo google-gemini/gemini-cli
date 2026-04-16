@@ -364,7 +364,7 @@ export const useExecutionLifecycle = (
 
       // On non-windows, wrap the command to capture the final working directory.
       if (!isWindows) {
-        let command = rawQuery.trim();
+        const command = rawQuery.trim();
         const pwdFileName = `shell_pwd_${crypto.randomBytes(6).toString('hex')}.tmp`;
         pwdFilePath = path.join(os.tmpdir(), pwdFileName);
         commandToExecute = `{ ${command}\n}; __code=$?; pwd > "${pwdFilePath}"; exit $__code`;
