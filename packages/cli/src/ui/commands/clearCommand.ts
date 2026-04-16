@@ -39,7 +39,7 @@ export const clearCommand: SlashCommand = {
     let newSessionId: string | undefined;
     if (config) {
       newSessionId = randomUUID();
-      config.setSessionId(newSessionId);
+      config.resetNewSessionState(newSessionId);
     }
 
     if (geminiClient) {

@@ -1762,7 +1762,22 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   setSessionId(sessionId: string): void {
+    const previousPlansDir = this.storage.isInitialized()
+      ? this.storage.getPlansDir()
+      : undefined;
+
     this._sessionId = sessionId;
+    this.storage.setSessionId(sessionId);
+    this.trackerService = undefined;
+
+    if (previousPlansDir) {
+      this.refreshSessionScopedPlansDirectory(previousPlansDir);
+    }
+  }
+
+  resetNewSessionState(sessionId: string): void {
+    this.setSessionId(sessionId);
+    this.approvedPlanPath = undefined;
   }
 
   setTerminalBackground(terminalBackground: string | undefined): void {
@@ -2049,6 +2064,37 @@ export class Config implements McpContext, AgentLoopContext {
 
   getWorkspaceContext(): WorkspaceContext {
     return getWorkspaceContextOverride() ?? this.workspaceContext;
+  }
+
+  private refreshSessionScopedPlansDirectory(previousPlansDir: string): void {
+    const nextPlansDir = this.storage.getPlansDir();
+    if (previousPlansDir === nextPlansDir) {
+      return;
+    }
+
+    const pathsToRemove = new Set([previousPlansDir]);
+    try {
+      pathsToRemove.add(resolveToRealPath(previousPlansDir));
+    } catch {
+      // The previous session's plans directory may never have been created.
+      // In that case there is nothing to resolve or remove beyond the raw path.
+    }
+
+    const currentDirectories = this.workspaceContext
+      .getDirectories()
+      .filter((dir) => !pathsToRemove.has(dir));
+
+    this.workspaceContext.setDirectories(currentDirectories);
+
+    try {
+      if (fs.existsSync(nextPlansDir)) {
+        this.workspaceContext.addDirectory(nextPlansDir);
+      }
+    } catch {
+      // Ignore invalid or unreadable plans directories here. This mirrors
+      // initialization behavior, which only adds the plans directory when it
+      // already exists and is readable.
+    }
   }
 
   getAgentRegistry(): AgentRegistry {
