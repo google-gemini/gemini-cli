@@ -12,6 +12,43 @@ import type {
   TranscriptionEvents,
 } from './transcriptionProvider.js';
 
+import { z } from 'zod';
+
+const LiveAPIResponseSchema = z.object({
+  setupComplete: z.record(z.unknown()).optional(),
+  serverContent: z
+    .object({
+      turnComplete: z.boolean().optional(),
+      inputTranscription: z
+        .object({
+          text: z.string().optional(),
+        })
+        .optional(),
+      outputTranscription: z
+        .object({
+          text: z.string().optional(),
+        })
+        .optional(),
+      modelTurn: z
+        .object({
+          parts: z
+            .array(
+              z.object({
+                text: z.string().optional(),
+                inlineData: z
+                  .object({
+                    data: z.string(),
+                  })
+                  .optional(),
+              }),
+            )
+            .optional(),
+        })
+        .optional(),
+    })
+    .optional(),
+});
+
 /**
  * Connects to the Gemini Live API using raw WebSockets to support API Key authentication.
  */
@@ -63,23 +100,10 @@ export class GeminiLiveTranscriptionProvider
         this.ws.on('message', (data) => {
           try {
             const parsedData: unknown = JSON.parse(data.toString());
+            const result = LiveAPIResponseSchema.safeParse(parsedData);
 
-            if (typeof parsedData === 'object' && parsedData !== null) {
-              const response = parsedData as {
-                setupComplete?: Record<string, unknown>;
-                serverContent?: {
-                  turnComplete?: boolean;
-                  inputTranscription?: { text?: string };
-                  outputTranscription?: { text?: string };
-                  modelTurn?: {
-                    parts?: Array<{
-                      text?: string;
-                      inlineData?: { data: string };
-                    }>;
-                  };
-                };
-              };
-
+            if (result.success) {
+              const response = result.data;
               if (response.serverContent) {
                 const content = response.serverContent;
 
