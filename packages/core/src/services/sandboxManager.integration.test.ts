@@ -1170,12 +1170,19 @@ describe('SandboxManager Integration', () => {
         { workspace, modeConfig: { readonly: false, allowOverrides: true } },
       );
 
-      // We use a command that looks like git to trigger the special handling
+      // We use a command that looks like git to trigger the special handling.
+      // LinuxSandboxManager identifies the command root from the shell wrapper.
       const { command: nodePath, args: nodeArgs } = Platform.touch(lockFile);
+
+      // Construct a command string that is valid for sh -c
+      // We prepend 'git --version > /dev/null;' so that 'git' is the first command root.
+      const commandString = `git --version > /dev/null; ${nodePath} ${nodeArgs
+        .map((a) => (a.includes(' ') || a.includes('(') ? `'${a}'` : a))
+        .join(' ')}`;
+
       const sandboxed = await editManager.prepareCommand({
-        // sh -c "git ..." will be identified as command 'git'
         command: 'sh',
-        args: ['-c', `${nodePath} ${nodeArgs.join(' ')}`, 'git'],
+        args: ['-c', commandString],
         cwd: workspace,
         env: process.env,
       });
