@@ -27,7 +27,7 @@ jobs:
           mode: 'source'
 
       - name: 'Run Suspect Tests'
-        run: 'npx vitest run --pool=forks packages/cli/src/ui/components/shared/TextInput.test.tsx'
+        run: 'npx vitest run --pool=forks packages/cli/src/test-utils/render.test.tsx packages/cli/src/ui/App.test.tsx packages/cli/src/test-utils/AppRig.test.tsx packages/cli/src/ui/components/SettingsDialog.test.tsx packages/cli/src/ui/components/messages/DiffRenderer.test.tsx packages/cli/src/ui/components/messages/ThinkingMessage.test.tsx packages/cli/src/ui/components/messages/ToolResultDisplay.test.tsx packages/cli/src/ui/components/messages/ToolResultDisplayOverflow.test.tsx packages/cli/src/ui/components/messages/UserMessage.test.tsx packages/cli/src/ui/components/shared/SearchableList.test.tsx packages/cli/src/ui/components/shared/TextInput.test.tsx packages/cli/src/ui/components/views/ExtensionRegistryView.test.tsx'
         shell: 'bash'
 
 
