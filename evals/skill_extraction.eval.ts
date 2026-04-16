@@ -272,8 +272,12 @@ describe('Skill Extraction', () => {
       expect(combinedSkills).toContain('npm run predocs:settings');
       expect(combinedSkills).toContain('npm run schema:settings');
       expect(combinedSkills).toContain('npm run docs:settings');
-      expect(combinedSkills).toMatch(/When to Use/i);
       expect(combinedSkills).toMatch(/Verification/i);
+
+      // Verify the extraction agent activated skill-creator for design guidance.
+      expect(config.getSkillManager().isSkillActive('skill-creator')).toBe(
+        true,
+      );
     },
   });
 
@@ -335,7 +339,11 @@ describe('Skill Extraction', () => {
       expect(combinedSkills).toContain('npm run db:migrate');
       expect(combinedSkills).toContain('npm run db:validate');
       expect(combinedSkills).toMatch(/rollback/i);
-      expect(combinedSkills).toMatch(/When to Use/i);
+
+      // Verify the extraction agent activated skill-creator for design guidance.
+      expect(config.getSkillManager().isSkillActive('skill-creator')).toBe(
+        true,
+      );
     },
   });
 });
