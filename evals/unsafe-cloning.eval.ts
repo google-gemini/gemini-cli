@@ -7,6 +7,8 @@
 import { evalTest, TestRig } from './test-helper.js';
 
 evalTest('USUALLY_PASSES', {
+  suiteName: 'default',
+  suiteType: 'behavioral',
   name: 'Reproduction: Agent uses Object.create() for cloning/delegation',
   prompt:
     'Create a utility function `createScopedConfig(config: Config, additionalDirectories: string[]): Config` in `packages/core/src/config/scoped-config.ts` that returns a new Config instance. This instance should override `getWorkspaceContext()` to include the additional directories, but delegate all other method calls (like `isPathAllowed` or `validatePathAccess`) to the original config. Note that `Config` is a complex class with private state and cannot be easily shallow-copied or reconstructed.',
