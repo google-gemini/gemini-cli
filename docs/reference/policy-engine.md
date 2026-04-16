@@ -120,6 +120,12 @@ There are three possible decisions a rule can enforce:
 
 ### Priority system and tiers
 
+> [!WARNING] The **Workspace** tier (project-level policies) is currently
+> non-functional. Defining policies in a workspace's `.gemini/policies`
+> directory will not have any effect. See
+> [issue #18186](https://github.com/google-gemini/gemini-cli/issues/18186). Use
+> User or Admin policies instead.
+
 The policy engine uses a sophisticated priority system to resolve conflicts when
 multiple rules match a single tool call. The core principle is simple: **the
 rule with the highest priority wins**.
@@ -127,13 +133,13 @@ rule with the highest priority wins**.
 To provide a clear hierarchy, policies are organized into three tiers. Each tier
 has a designated number that forms the base of the final priority calculation.
 
-| Tier      | Base | Description                                                                       |
-| :-------- | :--- | :-------------------------------------------------------------------------------- |
-| Default   | 1    | Built-in policies that ship with Gemini CLI.                                      |
-| Extension | 2    | Policies defined in extensions.                                                   |
-| Workspace | 3    | Policies defined in the current workspace's configuration directory.              |
-| User      | 4    | Custom policies defined by the user.                                              |
-| Admin     | 5    | Policies managed by an administrator (for example, in an enterprise environment). |
+| Tier      | Base | Description                                                                                   |
+| :-------- | :--- | :-------------------------------------------------------------------------------------------- |
+| Default   | 1    | Built-in policies that ship with Gemini CLI.                                                  |
+| Extension | 2    | Policies defined in extensions.                                                               |
+| Workspace | 3    | **(Currently disabled)** Policies defined in the current workspace's configuration directory. |
+| User      | 4    | Custom policies defined by the user.                                                          |
+| Admin     | 5    | Policies managed by an administrator (for example, in an enterprise environment).             |
 
 Within a TOML policy file, you assign a priority value from **0 to 999**. The
 engine transforms this into a final priority using the following formula:
@@ -214,11 +220,11 @@ User, and (if configured) Admin directories.
 
 ### Policy locations
 
-| Tier          | Type   | Location                                  |
-| :------------ | :----- | :---------------------------------------- |
-| **User**      | Custom | `~/.gemini/policies/*.toml`               |
-| **Workspace** | Custom | `$WORKSPACE_ROOT/.gemini/policies/*.toml` |
-| **Admin**     | System | _See below (OS specific)_                 |
+| Tier          | Type   | Location                                                 |
+| :------------ | :----- | :------------------------------------------------------- |
+| **User**      | Custom | `~/.gemini/policies/*.toml`                              |
+| **Workspace** | Custom | **(Disabled)** `$WORKSPACE_ROOT/.gemini/policies/*.toml` |
+| **Admin**     | System | _See below (OS specific)_                                |
 
 #### System-wide policies (Admin)
 
