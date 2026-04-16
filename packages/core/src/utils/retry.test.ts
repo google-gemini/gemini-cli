@@ -9,12 +9,13 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ApiError } from '@google/genai';
 import { AuthType } from '../core/contentGenerator.js';
 import { type HttpError, ModelNotFoundError } from './httpErrors.js';
-import { retryWithBackoff } from './retry.js';
+import { retryWithBackoff, isRetryableError } from './retry.js';
 import { setSimulate429 } from './testUtils.js';
 import { debugLogger } from './debugLogger.js';
 import {
   TerminalQuotaError,
   RetryableQuotaError,
+  ValidationRequiredError,
 } from './googleQuotaErrors.js';
 import { PREVIEW_GEMINI_MODEL } from '../config/models.js';
 import type { ModelPolicy } from '../availability/modelPolicy.js';
@@ -330,6 +331,81 @@ describe('retryWithBackoff', () => {
       expect(d).toBeGreaterThanOrEqual(100 * 0.7);
       expect(d).toBeLessThanOrEqual(100 * 1.3);
     });
+  });
+
+  it('should call onRetry callback on each retry', async () => {
+    const mockFn = createFailingFunction(2);
+    const onRetry = vi.fn();
+    const promise = retryWithBackoff(mockFn, {
+      maxAttempts: 3,
+      initialDelayMs: 10,
+      onRetry,
+    });
+
+    await vi.runAllTimersAsync();
+
+    await promise;
+    expect(onRetry).toHaveBeenCalledTimes(2);
+    expect(onRetry).toHaveBeenCalledWith(
+      1,
+      expect.any(Error),
+      expect.any(Number),
+    );
+    expect(onRetry).toHaveBeenCalledWith(
+      2,
+      expect.any(Error),
+      expect.any(Number),
+    );
+  });
+
+  it('should handle ValidationRequiredError using onValidationRequired', async () => {
+    const error = new ValidationRequiredError('Validation required', {} as any);
+    let validationCalled = false;
+    const mockFn = vi.fn().mockImplementation(async () => {
+      if (!validationCalled) {
+        throw error;
+      }
+      return 'success';
+    });
+
+    const onValidationRequired = vi.fn().mockImplementation(async () => {
+      validationCalled = true;
+      return 'verify';
+    });
+
+    const promise = retryWithBackoff(mockFn, {
+      maxAttempts: 3,
+      initialDelayMs: 10,
+      onValidationRequired,
+    });
+
+    await vi.runAllTimersAsync();
+
+    const result = await promise;
+    expect(result).toBe('success');
+    expect(onValidationRequired).toHaveBeenCalledWith(error);
+    expect(mockFn).toHaveBeenCalledTimes(2);
+  });
+
+  it('should throw ValidationRequiredError if onValidationRequired returns cancel', async () => {
+    const error = new ValidationRequiredError('Validation required', {} as any);
+    const mockFn = vi.fn().mockImplementation(async () => {
+      throw error;
+    });
+
+    const onValidationRequired = vi.fn().mockResolvedValue('cancel');
+
+    const promise = retryWithBackoff(mockFn, {
+      maxAttempts: 3,
+      initialDelayMs: 10,
+      onValidationRequired,
+    });
+
+    await expect(promise).rejects.toThrow('Validation required');
+    await vi.runAllTimersAsync();
+
+    expect(error.userHandled).toBe(true);
+    expect(mockFn).toHaveBeenCalledTimes(1);
   });
 
   describe('Fetch error retries', () => {
@@ -918,5 +994,39 @@ describe('retryWithBackoff', () => {
       }).catch(() => {});
       expect(mockService.markTerminal).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe('isRetryableError', () => {
+  it('should return true for 429 errors', () => {
+    const error = new ApiError({ message: 'Quota exceeded', status: 429 });
+    expect(isRetryableError(error)).toBe(true);
+  });
+
+  it('should return true for 499 errors', () => {
+    const error = new ApiError({
+      message: 'Client closed request',
+      status: 499,
+    });
+    expect(isRetryableError(error)).toBe(true);
+  });
+
+  it('should return true for 500 errors', () => {
+    const error = new ApiError({
+      message: 'Internal Server Error',
+      status: 500,
+    });
+    expect(isRetryableError(error)).toBe(true);
+  });
+
+  it('should return false for 400 errors', () => {
+    const error = new ApiError({ message: 'Bad Request', status: 400 });
+    expect(isRetryableError(error)).toBe(false);
+  });
+
+  it('should return true for network error codes like ECONNRESET', () => {
+    const error = new Error('ECONNRESET');
+    (error as any).code = 'ECONNRESET';
+    expect(isRetryableError(error)).toBe(true);
   });
 });

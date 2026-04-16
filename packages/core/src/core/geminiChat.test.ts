@@ -180,7 +180,7 @@ describe('GeminiChat', () => {
       },
       getContentGenerator: vi.fn().mockReturnValue(mockContentGenerator),
       getRetryFetchErrors: vi.fn().mockReturnValue(false),
-      getMaxAttempts: vi.fn().mockReturnValue(10),
+      getMaxAttempts: vi.fn().mockReturnValue(4),
       getUserTier: vi.fn().mockReturnValue(undefined),
       modelConfigService: {
         getResolvedConfig: vi.fn().mockImplementation((modelConfigKey) => {

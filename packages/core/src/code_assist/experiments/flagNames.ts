@@ -20,6 +20,7 @@ export const ExperimentFlags = {
   PRO_MODEL_NO_ACCESS: 45768879,
   GEMINI_3_1_FLASH_LITE_LAUNCHED: 45771641,
   DEFAULT_REQUEST_TIMEOUT: 45773134,
+  MAX_ATTEMPTS: 45774515,
 } as const;
 
 export type ExperimentFlagName =

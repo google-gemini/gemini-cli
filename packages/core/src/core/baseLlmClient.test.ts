@@ -252,7 +252,7 @@ describe('BaseLlmClient', () => {
       expect(retryWithBackoff).toHaveBeenCalledWith(
         expect.any(Function),
         expect.objectContaining({
-          maxAttempts: 5,
+          maxAttempts: 3,
         }),
       );
     });

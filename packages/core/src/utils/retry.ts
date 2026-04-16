@@ -17,9 +17,18 @@ import { getErrorStatus, ModelNotFoundError } from './httpErrors.js';
 import type { RetryAvailabilityContext } from '../availability/modelPolicy.js';
 
 export type { RetryAvailabilityContext };
+
+/**
+ * Global fallback for maximum retry attempts when not explicitly provided.
+ * Most callers should use config.getMaxAttempts() instead.
+ */
 export const DEFAULT_MAX_ATTEMPTS = 10;
 
 export interface RetryOptions {
+  /**
+   * Total number of attempts (1 initial + N retries).
+   * Defaults to DEFAULT_MAX_ATTEMPTS (10) if not specified.
+   */
   maxAttempts: number;
   initialDelayMs: number;
   maxDelayMs: number;
