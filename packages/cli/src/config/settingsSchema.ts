@@ -1085,6 +1085,16 @@ const SETTINGS_SCHEMA = {
           { value: 'whisper', label: 'Whisper (Local)' },
         ],
       },
+      geminiLiveNoticeAcknowledged: {
+        type: 'boolean',
+        label: 'Gemini Live Notice Acknowledged',
+        category: 'Voice',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Tracks whether the Gemini Live cloud transcription notice has been acknowledged.',
+        showInDialog: false,
+      },
       whisperModel: {
         type: 'enum',
         label: 'Whisper Model',

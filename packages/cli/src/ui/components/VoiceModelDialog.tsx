@@ -24,6 +24,7 @@ interface VoiceModelDialogProps {
 }
 
 type DialogView = 'backend' | 'whisper-models';
+type DialogAction = 'continue' | 'back';
 
 const WHISPER_MODELS = [
   {
@@ -52,9 +53,14 @@ export function VoiceModelDialog({
   onClose,
 }: VoiceModelDialogProps): React.JSX.Element {
   const { settings, setSetting } = useSettingsStore();
-  const [view, setView] = useState<DialogView>('backend');
+  const [view, setView] = useState<DialogView | 'gemini-live-notice'>(
+    'backend',
+  );
   const [downloadProgress, setDownloadProgress] =
     useState<WhisperModelProgress | null>(null);
+  const [pendingDownloadModel, setPendingDownloadModel] = useState<
+    string | null
+  >(null);
   const [error, setError] = useState<string | null>(null);
 
   const whisperInstalled = useMemo(
@@ -66,11 +72,15 @@ export function VoiceModelDialog({
   const currentBackend = settings.merged.voice?.backend ?? 'gemini-live';
   const currentWhisperModel =
     settings.merged.voice?.whisperModel ?? 'ggml-base.en.bin';
+  const geminiLiveNoticeAcknowledged =
+    settings.merged.voice?.geminiLiveNoticeAcknowledged ?? false;
 
   const handleKeypress = useCallback(
     (key: Key) => {
       if (key.name === 'escape') {
         if (view === 'whisper-models') {
+          setView('backend');
+        } else if (view === 'gemini-live-notice') {
           setView('backend');
         } else {
           onClose();
@@ -88,11 +98,14 @@ export function VoiceModelDialog({
     (value: string) => {
       if (value === 'whisper') {
         setView('whisper-models');
-      } else {
+      } else if (geminiLiveNoticeAcknowledged) {
         setSetting(SettingScope.User, 'voice.backend', 'gemini-live');
+        onClose();
+      } else {
+        setView('gemini-live-notice');
       }
     },
-    [setSetting],
+    [geminiLiveNoticeAcknowledged, onClose, setSetting],
   );
 
   const handleWhisperModelSelect = useCallback(
@@ -100,8 +113,10 @@ export function VoiceModelDialog({
       if (modelManager.isModelInstalled(modelName)) {
         setSetting(SettingScope.User, 'voice.backend', 'whisper');
         setSetting(SettingScope.User, 'voice.whisperModel', modelName);
+        onClose();
       } else {
         setError(null);
+        setPendingDownloadModel(modelName);
         const onProgress = (p: WhisperModelProgress) => setDownloadProgress(p);
         modelManager.on('progress', onProgress);
 
@@ -110,6 +125,7 @@ export function VoiceModelDialog({
 
           setSetting(SettingScope.User, 'voice.backend', 'whisper');
           setSetting(SettingScope.User, 'voice.whisperModel', modelName);
+          onClose();
         } catch (err) {
           setError(
             `Failed to download: ${err instanceof Error ? err.message : String(err)}`,
@@ -117,10 +133,29 @@ export function VoiceModelDialog({
         } finally {
           modelManager.off('progress', onProgress);
           setDownloadProgress(null);
+          setPendingDownloadModel(null);
         }
       }
     },
-    [modelManager, setSetting],
+    [modelManager, onClose, setSetting],
+  );
+
+  const handleGeminiLiveNoticeSelect = useCallback(
+    (value: DialogAction) => {
+      if (value === 'back') {
+        setView('backend');
+        return;
+      }
+
+      setSetting(
+        SettingScope.User,
+        'voice.geminiLiveNoticeAcknowledged',
+        true,
+      );
+      setSetting(SettingScope.User, 'voice.backend', 'gemini-live');
+      onClose();
+    },
+    [onClose, setSetting],
   );
 
   const backendOptions = useMemo(
@@ -154,6 +189,24 @@ export function VoiceModelDialog({
     [modelManager],
   );
 
+  const geminiLiveNoticeOptions = useMemo(
+    () => [
+      {
+        value: 'continue' as const,
+        title: 'Continue with Gemini Live',
+        description: 'Use cloud transcription for voice mode.',
+        key: 'continue',
+      },
+      {
+        value: 'back' as const,
+        title: 'Back',
+        description: 'Return to backend selection.',
+        key: 'back',
+      },
+    ],
+    [],
+  );
+
   return (
     <Box
       borderStyle="round"
@@ -165,6 +218,8 @@ export function VoiceModelDialog({
       <Text bold>
         {view === 'backend'
           ? 'Select Voice Transcription Backend'
+          : view === 'gemini-live-notice'
+            ? 'Gemini Live Data Flow'
           : 'Select Whisper Model'}
       </Text>
 
@@ -174,12 +229,20 @@ export function VoiceModelDialog({
         </Box>
       )}
 
-      {downloadProgress ? (
+      {pendingDownloadModel || downloadProgress ? (
         <Box marginTop={1} flexDirection="column">
           <Box>
-            <Text>Downloading {downloadProgress.modelName}... </Text>
-            <CircularProgress percentage={downloadProgress.percentage} />
-            <Text> {Math.round(downloadProgress.percentage * 100)}%</Text>
+            <Text>
+              Downloading {downloadProgress?.modelName ?? pendingDownloadModel}
+              ...
+            </Text>
+            {downloadProgress && (
+              <>
+                <Text> </Text>
+                <CircularProgress percentage={downloadProgress.percentage} />
+                <Text> {Math.round(downloadProgress.percentage * 100)}%</Text>
+              </>
+            )}
           </Box>
         </Box>
       ) : (
@@ -191,6 +254,21 @@ export function VoiceModelDialog({
               initialIndex={currentBackend === 'whisper' ? 1 : 0}
               showNumbers={true}
             />
+          ) : view === 'gemini-live-notice' ? (
+            <Box flexDirection="column">
+              <Text>
+                Audio recorded with Gemini Live is sent to Gemini cloud services
+                for transcription. It is not processed entirely on-device.
+              </Text>
+              <Box marginTop={1}>
+                <DescriptiveRadioButtonSelect
+                  items={geminiLiveNoticeOptions}
+                  onSelect={handleGeminiLiveNoticeSelect}
+                  initialIndex={0}
+                  showNumbers={true}
+                />
+              </Box>
+            </Box>
           ) : (
             <DescriptiveRadioButtonSelect
               items={whisperOptions}
@@ -206,7 +284,7 @@ export function VoiceModelDialog({
 
       <Box marginTop={1} flexDirection="column">
         <Text color={theme.text.secondary}>
-          {view === 'whisper-models'
+          {view === 'whisper-models' || view === 'gemini-live-notice'
             ? '(Press Esc to go back)'
             : '(Press Esc to close)'}
         </Text>

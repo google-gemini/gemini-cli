@@ -691,6 +691,13 @@
           "type": "string",
           "enum": ["gemini-live", "whisper"]
         },
+        "geminiLiveNoticeAcknowledged": {
+          "title": "Gemini Live Notice Acknowledged",
+          "description": "Tracks whether the Gemini Live cloud transcription notice has been acknowledged.",
+          "markdownDescription": "Tracks whether the Gemini Live cloud transcription notice has been acknowledged.\n\n- Category: `Voice`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "whisperModel": {
           "title": "Whisper Model",
           "description": "The Whisper model to use for local transcription.",
