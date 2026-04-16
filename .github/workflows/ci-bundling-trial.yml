@@ -41,7 +41,7 @@ jobs:
           mode: 'source'
 
       - name: 'Run Suspect Tests'
-        run: 'npx vitest run packages/cli/src/ui/App.test.tsx packages/cli/src/test-utils/render.test.tsx packages/cli/src/test-utils/AppRig.test.tsx'
+        run: 'npx vitest run --pool=forks packages/cli/src/ui/App.test.tsx packages/cli/src/test-utils/render.test.tsx packages/cli/src/test-utils/AppRig.test.tsx'
         shell: 'bash'
 
 
