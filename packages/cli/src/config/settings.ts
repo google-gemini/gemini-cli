@@ -9,6 +9,7 @@ import * as path from 'node:path';
 import { platform } from 'node:os';
 import * as dotenv from 'dotenv';
 import process from 'node:process';
+import type { ZodIssue } from 'zod';
 import {
   CoreEvent,
   FatalConfigError,
@@ -201,6 +202,137 @@ export interface SettingsFile {
   path: string;
   rawJson?: string;
   readOnly?: boolean;
+}
+
+function isObjectRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function getContainerAtPath(
+  root: Record<string, unknown>,
+  path: Array<string | number>,
+): Record<string, unknown> | unknown[] | undefined {
+  let current: unknown = root;
+  for (const segment of path) {
+    if (typeof segment === 'number') {
+      if (!Array.isArray(current) || segment < 0 || segment >= current.length) {
+        return undefined;
+      }
+      current = current[segment];
+      continue;
+    }
+
+    if (!isObjectRecord(current) || !(segment in current)) {
+      return undefined;
+    }
+    current = current[segment];
+  }
+
+  if (isObjectRecord(current) || Array.isArray(current)) {
+    return current;
+  }
+  return undefined;
+}
+
+function removePathValue(
+  root: Record<string, unknown>,
+  path: Array<string | number>,
+): boolean {
+  if (path.length === 0) {
+    return false;
+  }
+
+  const parent = getContainerAtPath(root, path.slice(0, -1));
+  if (!parent) {
+    return false;
+  }
+
+  const lastSegment = path[path.length - 1];
+  if (typeof lastSegment === 'number') {
+    if (
+      !Array.isArray(parent) ||
+      lastSegment < 0 ||
+      lastSegment >= parent.length
+    ) {
+      return false;
+    }
+    parent.splice(lastSegment, 1);
+    return true;
+  }
+
+  if (!isObjectRecord(parent) || !(lastSegment in parent)) {
+    return false;
+  }
+
+  delete parent[lastSegment];
+  return true;
+}
+
+function removeInvalidSettingsIssue(
+  root: Record<string, unknown>,
+  issue: ZodIssue,
+): boolean {
+  if (issue.code === 'unrecognized_keys') {
+    const container = getContainerAtPath(root, issue.path);
+    if (!container || !isObjectRecord(container)) {
+      return false;
+    }
+
+    let removedAny = false;
+    for (const key of issue.keys) {
+      if (key in container) {
+        delete container[key];
+        removedAny = true;
+      }
+    }
+    return removedAny;
+  }
+
+  for (let depth = issue.path.length; depth > 0; depth--) {
+    if (removePathValue(root, issue.path.slice(0, depth))) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function sanitizeInvalidSettings(
+  rawSettings: Record<string, unknown>,
+): Settings {
+  const sanitizedSettings = structuredClone(rawSettings);
+
+  for (let attempts = 0; attempts < 100; attempts++) {
+    const validationResult = validateSettings(sanitizedSettings);
+    if (validationResult.success) {
+      assertValidatedSettings(sanitizedSettings, validationResult);
+      return sanitizedSettings;
+    }
+
+    const error = validationResult.error;
+    if (!error) {
+      return {};
+    }
+
+    const nextIssue = error.issues[0];
+    if (
+      !nextIssue ||
+      !removeInvalidSettingsIssue(sanitizedSettings, nextIssue)
+    ) {
+      return {};
+    }
+  }
+
+  return {};
+}
+
+function assertValidatedSettings(
+  settings: unknown,
+  validationResult: ReturnType<typeof validateSettings>,
+): asserts settings is Settings {
+  if (!validationResult.success) {
+    throw new Error('Expected validated settings');
+  }
 }
 
 function setNestedProperty(
@@ -670,11 +802,7 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
         const content = fs.readFileSync(filePath, 'utf-8');
         const rawSettings: unknown = JSON.parse(stripJsonComments(content));
 
-        if (
-          typeof rawSettings !== 'object' ||
-          rawSettings === null ||
-          Array.isArray(rawSettings)
-        ) {
+        if (!isObjectRecord(rawSettings)) {
           settingsErrors.push({
             message: 'Settings file is not a valid JSON object.',
             path: filePath,
@@ -683,11 +811,8 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
           return { settings: {} };
         }
 
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        const settingsObject = rawSettings as Record<string, unknown>;
-
         // Validate settings structure with Zod
-        const validationResult = validateSettings(settingsObject);
+        const validationResult = validateSettings(rawSettings);
         if (!validationResult.success && validationResult.error) {
           const errorMessage = formatValidationError(
             validationResult.error,
@@ -700,7 +825,15 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
           });
         }
 
-        return { settings: settingsObject as Settings, rawJson: content };
+        if (validationResult.success) {
+          assertValidatedSettings(rawSettings, validationResult);
+          return { settings: rawSettings, rawJson: content };
+        }
+
+        return {
+          settings: sanitizeInvalidSettings(rawSettings),
+          rawJson: content,
+        };
       }
     } catch (error: unknown) {
       settingsErrors.push({

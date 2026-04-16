@@ -11,7 +11,11 @@ import chalk from 'chalk';
 import { ExtensionEnablementManager } from './extensions/extensionEnablement.js';
 import { type MergedSettings, SettingScope } from './settings.js';
 import { createHash, randomUUID } from 'node:crypto';
-import { loadInstallMetadata, type ExtensionConfig } from './extension.js';
+import {
+  loadInstallMetadata,
+  parseExtensionConfig,
+  type ExtensionConfig,
+} from './extension.js';
 import {
   isWorkspaceTrusted,
   loadTrustedFolders,
@@ -1019,24 +1023,19 @@ Would you like to attempt to install via "git clone" instead?`,
     }
     try {
       const configContent = await fs.promises.readFile(configFilePath, 'utf-8');
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const rawConfig = JSON.parse(configContent) as ExtensionConfig;
-      if (!rawConfig.name || !rawConfig.version) {
-        throw new Error(
-          `Invalid configuration in ${configFilePath}: missing ${!rawConfig.name ? '"name"' : '"version"'}`,
-        );
-      }
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const config = recursivelyHydrateStrings(
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        rawConfig as unknown as JsonObject,
-        {
+      const rawConfig = parseExtensionConfig(
+        JSON.parse(configContent),
+        configFilePath,
+      );
+      const config = parseExtensionConfig(
+        recursivelyHydrateStrings(rawConfig, {
           extensionPath: extensionDir,
           workspacePath: this.workspaceDir,
           '/': path.sep,
           pathSeparator: path.sep,
-        },
-      ) as unknown as ExtensionConfig;
+        }),
+        configFilePath,
+      );
 
       validateName(config.name);
       return config;
