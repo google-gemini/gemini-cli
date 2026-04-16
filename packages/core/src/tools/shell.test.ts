@@ -12,6 +12,7 @@ import {
   beforeAll,
   beforeEach,
   afterEach,
+  type Mock,
 } from 'vitest';
 
 const mockPlatform = vi.hoisted(() => vi.fn());
@@ -547,6 +548,7 @@ EOF`;
         false,
         expect.any(Object),
       );
+      expect(mockShellExecutionService.mock.calls[0][0]).toMatch(/\nEOF\n\);/);
     });
 
     it('should format error messages correctly', async () => {
