@@ -68,7 +68,7 @@ export async function scheduleAgentTools(
     config,
     // Fork the promptId if this is a subagent or child call to isolate history
     promptId: parentCallId
-      ? `${config.promptId}-${parentCallId}`
+      ? config.promptId + '-' + parentCallId.replace(/[^a-zA-Z0-9-_]/g, '')
       : config.promptId,
     toolRegistry,
     promptRegistry: promptRegistry ?? config.getPromptRegistry(),
