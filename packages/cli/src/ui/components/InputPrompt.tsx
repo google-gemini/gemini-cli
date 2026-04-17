@@ -375,6 +375,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   const handleSubmitAndClear = useCallback(
     (submittedValue: string) => {
+      debugLogger.log(`[InputPrompt] handleSubmitAndClear: \${submittedValue}`);
       let processedValue = submittedValue;
       if (buffer.pastedContent) {
         processedValue = expandPastePlaceholders(
@@ -425,6 +426,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   const handleSubmit = useCallback(
     (submittedValue: string) => {
+      debugLogger.log(`[InputPrompt] handleSubmit: \${submittedValue}`);
       const trimmedMessage = submittedValue.trim();
       const isSlash = isSlashCommand(trimmedMessage);
 
@@ -1217,9 +1219,15 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
 
       if (keyMatchers[Command.SUBMIT](key)) {
+        debugLogger.log(
+          `[InputPrompt] Command.SUBMIT matched, buffer.text="${buffer.text}"`,
+        );
         if (buffer.text.trim()) {
           // Check if a paste operation occurred recently to prevent accidental auto-submission
           if (recentUnsafePasteTime !== null) {
+            debugLogger.log(
+              `[InputPrompt] Command.SUBMIT ignored due to recentUnsafePasteTime`,
+            );
             // Paste occurred recently in a terminal where we don't trust pastes
             // to be reported correctly so assume this paste was really a
             // newline that was part of the paste.
@@ -1237,8 +1245,15 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             buffer.backspace();
             buffer.newline();
           } else {
+            debugLogger.log(
+              `[InputPrompt] Calling handleSubmit from handleInput`,
+            );
             handleSubmit(buffer.text);
           }
+        } else {
+          debugLogger.log(
+            `[InputPrompt] Command.SUBMIT ignored because buffer is empty`,
+          );
         }
         return true;
       }
