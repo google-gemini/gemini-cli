@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { Text, Box } from 'ink';
+import { Text, Box, useIsScreenReaderEnabled } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { colorizeCode } from './CodeColorizer.js';
 import { TableRenderer } from './TableRenderer.js';
@@ -447,9 +447,41 @@ const RenderTableInternal: React.FC<RenderTableProps> = ({
   headers,
   rows,
   terminalWidth,
-}) => (
-  <TableRenderer headers={headers} rows={rows} terminalWidth={terminalWidth} />
-);
+}) => {
+  const isScreenReaderEnabled = useIsScreenReaderEnabled();
+
+  if (isScreenReaderEnabled) {
+    // Strip ANSI escape sequences (ESC + '[' + params + letter) and markdown markers.
+    // eslint-disable-next-line no-control-regex
+    const ansiRegex = /\u001b\[[0-9;]*[a-zA-Z]/g;
+    const sanitizeCell = (cell: string): string =>
+      cell
+        .replace(ansiRegex, '')
+        .replace(/(\*\*|__)(.*?)\1/g, '$2')
+        .replace(/([*_`~])(.*?)\1/g, '$2')
+        .trim();
+
+    const sanitizedHeaders = headers.map(sanitizeCell);
+    const separator = sanitizedHeaders.map(() => '---').join(' | ');
+    return (
+      <Box flexDirection="column">
+        <Text>{sanitizedHeaders.join(' | ')}</Text>
+        <Text>{separator}</Text>
+        {rows.map((row, index) => (
+          <Text key={index}>{row.map(sanitizeCell).join(' | ')}</Text>
+        ))}
+      </Box>
+    );
+  }
+
+  return (
+    <TableRenderer
+      headers={headers}
+      rows={rows}
+      terminalWidth={terminalWidth}
+    />
+  );
+};
 
 const RenderTable = React.memo(RenderTableInternal);
 
