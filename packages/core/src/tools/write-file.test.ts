@@ -1120,12 +1120,10 @@ describe('WriteFileTool', () => {
 
     it('should correctly resolve nested paths in plan mode', async () => {
       vi.mocked(mockConfig.isPlanMode).mockReturnValue(true);
-      if (!mockConfig.storage) {
-        Object.assign(mockConfig, { storage: {} });
-      }
+      // Extend storage mock with getPlansDir
       mockConfig.storage.getPlansDir = vi.fn().mockReturnValue(plansDir);
-      const nestedFilePath = 'conductor/tracks/test.md';
 
+      const nestedFilePath = 'conductor/tracks/test.md';
       const invocation = tool.build({
         file_path: nestedFilePath,
         content: 'nested content',
@@ -1134,9 +1132,6 @@ describe('WriteFileTool', () => {
       await invocation.execute({ abortSignal });
 
       const expectedWritePath = path.join(plansDir, 'conductor/tracks/test.md');
-
-      // Need to find exactly what to assert on, checking if the file actually exists
-      // in the mock file system since it's hard to assert on the exact service mock in this file
       expect(fs.existsSync(expectedWritePath)).toBe(true);
       expect(fs.readFileSync(expectedWritePath, 'utf8')).toBe('nested content');
     });
