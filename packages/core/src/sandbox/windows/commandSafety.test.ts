@@ -34,6 +34,12 @@ describe('Windows commandSafety', () => {
       expect(isDangerousCommand(['cmd', '/c', 'dir'])).toBe(true);
     });
 
+    it('should identify path-qualified dangerous commands', () => {
+      expect(
+        isDangerousCommand(['C:\\Windows\\System32\\del.exe', 'file.txt']),
+      ).toBe(true);
+    });
+
     it('should strip .exe extension for dangerous commands', () => {
       expect(isDangerousCommand(['del.exe', 'file.txt'])).toBe(true);
       expect(isDangerousCommand(['POWERSHELL.EXE', '-Command', 'echo'])).toBe(
