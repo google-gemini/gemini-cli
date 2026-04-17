@@ -198,6 +198,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Minimum retention period (safety limit, defaults to "1d")
   - **Default:** `"1d"`
 
+- **`general.topicUpdateNarration`** (boolean):
+  - **Description:** Enable the Topic & Update communication model for reduced
+    chattiness and structured progress reporting.
+  - **Default:** `true`
+
 #### `output`
 
 - **`output.format`** (enum):
@@ -1735,8 +1740,7 @@ their corresponding top-level category object in your `settings.json` file.
   - **Requires restart:** Yes
 
 - **`experimental.topicUpdateNarration`** (boolean):
-  - **Description:** Enable the experimental Topic & Update communication model
-    for reduced chattiness and structured progress reporting.
+  - **Description:** Deprecated: Use general.topicUpdateNarration instead.
   - **Default:** `false`
 
 #### `skills`
@@ -2075,7 +2079,7 @@ within your user's home folder.
 Environment variables are a common way to configure applications, especially for
 sensitive information like API keys or for settings that might change between
 environments. For authentication setup, see the
-[Authentication documentation](../get-started/authentication.md) which covers
+[Authentication documentation](../get-started/authentication.mdx) which covers
 all available authentication methods.
 
 The CLI automatically loads environment variables from an `.env` file. The
@@ -2096,7 +2100,7 @@ the `advanced.excludedEnvVars` setting in your `settings.json` file.
 - **`GEMINI_API_KEY`**:
   - Your API key for the Gemini API.
   - One of several available
-    [authentication methods](../get-started/authentication.md).
+    [authentication methods](../get-started/authentication.mdx).
   - Set this in your shell profile (for example, `~/.bashrc`, `~/.zshrc`) or an
     `.env` file.
 - **`GEMINI_MODEL`**:
