@@ -19,9 +19,12 @@ import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import path from 'node:path';
 import type { Config } from '../config/config.js';
 import { EXIT_PLAN_MODE_TOOL_NAME } from './tool-names.js';
-import { validatePlanPath, validatePlanContent } from '../utils/planUtils.js';
+import {
+  validatePlanPath,
+  validatePlanContent,
+  resolveAndValidatePlanPath,
+} from '../utils/planUtils.js';
 import { ApprovalMode } from '../policy/types.js';
-import { resolveToRealPath, isSubpath } from '../utils/paths.js';
 import { logPlanExecution } from '../telemetry/loggers.js';
 import { PlanExecutionEvent } from '../telemetry/types.js';
 import { getExitPlanModeDefinition } from './definitions/coreTools.js';
@@ -59,18 +62,20 @@ export class ExitPlanModeTool extends BaseDeclarativeTool<
     if (!params.plan_filename || params.plan_filename.trim() === '') {
       return 'plan_filename is required.';
     }
-
-    const safeFilename = path.basename(params.plan_filename);
-    const plansDir = resolveToRealPath(this.config.storage.getPlansDir());
-    const resolvedPath = path.join(
-      this.config.storage.getPlansDir(),
-      safeFilename,
-    );
-
-    const realPath = resolveToRealPath(resolvedPath);
-
-    if (!isSubpath(plansDir, realPath)) {
-      return `Access denied: plan path (${resolvedPath}) must be within the designated plans directory (${plansDir}).`;
+    try {
+      resolveAndValidatePlanPath(
+        params.plan_filename,
+        this.config.storage.getPlansDir(),
+        this.config.getProjectRoot(),
+      );
+    } catch (e) {
+      if (e instanceof Error && e.message.startsWith('Security violation')) {
+        return `Access denied: plan path (${path.join(
+          this.config.storage.getPlansDir(),
+          params.plan_filename,
+        )}) must be within the designated plans directory (${this.config.storage.getPlansDir()}).`;
+      }
+      return e instanceof Error ? e.message : String(e);
     }
 
     return null;
@@ -122,6 +127,7 @@ export class ExitPlanModeInvocation extends BaseToolInvocation<
     const pathError = await validatePlanPath(
       this.params.plan_filename,
       this.config.storage.getPlansDir(),
+      this.config.getProjectRoot(),
     );
     if (pathError) {
       this.planValidationError = pathError;
@@ -179,8 +185,11 @@ export class ExitPlanModeInvocation extends BaseToolInvocation<
    * Note: Validation is done in validateToolParamValues, so this assumes the path is valid.
    */
   private getResolvedPlanPath(): string {
-    const safeFilename = path.basename(this.params.plan_filename);
-    return path.join(this.config.storage.getPlansDir(), safeFilename);
+    return resolveAndValidatePlanPath(
+      this.params.plan_filename,
+      this.config.storage.getPlansDir(),
+      this.config.getProjectRoot(),
+    );
   }
 
   async execute({ abortSignal: _signal }: ExecuteOptions): Promise<ToolResult> {
