@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import type { HierarchicalMemory } from '../config/memory.js';
-import { GEMINI_DIR } from '../utils/paths.js';
+import { GEMINI_DIR, makeRelative } from '../utils/paths.js';
 import { ApprovalMode } from '../policy/types.js';
 import * as snippets from './snippets.js';
 import * as legacySnippets from './snippets.legacy.js';
@@ -199,8 +199,16 @@ export class PromptProvider {
           () => ({
             interactive: interactiveMode,
             planModeToolsList,
-            plansDir: context.config.storage.getPlansDir(),
-            approvedPlanPath: context.config.getApprovedPlanPath(),
+            plansDir: makeRelative(
+              context.config.storage.getPlansDir(),
+              context.config.getProjectRoot(),
+            ),
+            approvedPlanPath: context.config.getApprovedPlanPath()
+              ? makeRelative(
+                  context.config.getApprovedPlanPath()!,
+                  context.config.getProjectRoot(),
+                )
+              : undefined,
           }),
           isPlanMode,
         ),
