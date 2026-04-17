@@ -79,6 +79,7 @@ export enum Command {
   OPEN_EXTERNAL_EDITOR = 'input.openExternalEditor',
   DEPRECATED_OPEN_EXTERNAL_EDITOR = 'input.deprecatedOpenExternalEditor',
   PASTE_CLIPBOARD = 'input.paste',
+  ENHANCE_PROMPT = 'input.enhancePrompt',
 
   // App Controls
   SHOW_ERROR_DETAILS = 'app.showErrorDetails',
@@ -381,6 +382,7 @@ export const defaultKeyBindingConfig: KeyBindingConfig = new Map([
     [new KeyBinding('ctrl+g'), new KeyBinding('ctrl+shift+g')],
   ],
   [Command.DEPRECATED_OPEN_EXTERNAL_EDITOR, [new KeyBinding('ctrl+x')]],
+  [Command.ENHANCE_PROMPT, [new KeyBinding('alt+e')]],
   [
     Command.PASTE_CLIPBOARD,
     [
@@ -517,6 +519,7 @@ export const commandCategories: readonly CommandCategory[] = [
       Command.OPEN_EXTERNAL_EDITOR,
       Command.DEPRECATED_OPEN_EXTERNAL_EDITOR,
       Command.PASTE_CLIPBOARD,
+      Command.ENHANCE_PROMPT,
     ],
   },
   {
@@ -635,6 +638,7 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.DEPRECATED_OPEN_EXTERNAL_EDITOR]:
     'Deprecated command to open external editor.',
   [Command.PASTE_CLIPBOARD]: 'Paste from the clipboard.',
+  [Command.ENHANCE_PROMPT]: 'Enhance the current prompt using an LLM.',
 
   // App Controls
   [Command.SHOW_ERROR_DETAILS]:

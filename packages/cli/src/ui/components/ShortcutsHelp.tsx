@@ -44,6 +44,10 @@ const buildShortcutItems = (): ShortcutItem[] => [
     key: formatCommand(Command.OPEN_EXTERNAL_EDITOR),
     description: 'open external editor',
   },
+  {
+    key: formatCommand(Command.ENHANCE_PROMPT),
+    description: 'enhance prompt',
+  },
 ];
 
 const Shortcut: React.FC<{ item: ShortcutItem }> = ({ item }) => (

@@ -70,6 +70,12 @@ export interface CommandContext {
      * @param postLoadInput Optional text to set in the input buffer after loading history.
      */
     loadHistory: (history: HistoryItem[], postLoadInput?: string) => void;
+    /**
+     * Sets the text in the input buffer.
+     *
+     * @param text The text to set.
+     */
+    setInput: (text: string) => void;
     /** Toggles a special display mode. */
     toggleCorgiMode: () => void;
     toggleDebugProfiler: () => void;

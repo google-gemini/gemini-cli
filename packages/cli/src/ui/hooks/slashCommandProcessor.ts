@@ -228,6 +228,7 @@ export const useSlashCommandProcessor = (
             actions.setText(postLoadInput);
           }
         },
+        setInput: (text) => actions.setText(text),
         setDebugMessage: actions.setDebugMessage,
         pendingItem,
         setPendingItem,
