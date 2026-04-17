@@ -110,12 +110,10 @@ export async function isServerRunning(port: number): Promise<boolean> {
       () => controller.abort(),
       HEALTH_CHECK_TIMEOUT_MS,
     );
-    const response = await fetch(`http://localhost:${port}/`, {
-      signal: controller.signal,
-    });
+    await fetch(`http://localhost:${port}/`, { signal: controller.signal });
     clearTimeout(timeout);
     // Any response (even an error page) means the server is up.
-    return response.ok || response.status > 0;
+    return true;
   } catch {
     return false;
   }

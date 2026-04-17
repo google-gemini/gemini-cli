@@ -6,6 +6,7 @@
 
 import type { CommandModule } from 'yargs';
 import fs from 'node:fs';
+import path from 'node:path';
 import { spawn } from 'node:child_process';
 import chalk from 'chalk';
 import { debugLogger } from '@google/gemini-cli-core';
@@ -45,7 +46,7 @@ export async function startServer(
   const logPath = getLogFilePath();
   fs.mkdirSync(getLiteRtBinDir(), { recursive: true });
   // Ensure tmp dir exists for log and pid files
-  const tmpDir = getPidFilePath().replace(/\/[^/]+$/, '');
+  const tmpDir = path.dirname(getPidFilePath());
   fs.mkdirSync(tmpDir, { recursive: true });
 
   const logFd = fs.openSync(logPath, 'a');

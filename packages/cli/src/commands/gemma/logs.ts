@@ -11,6 +11,22 @@ import { debugLogger } from '@google/gemini-cli-core';
 import { exitCli } from '../utils.js';
 import { getLogFilePath } from './constants.js';
 
+/**
+ * Reads the last N lines from a file using Node.js APIs.
+ * Used as a cross-platform fallback when `tail` is unavailable (Windows).
+ */
+function readLastLines(filePath: string, count: number): string {
+  const content = fs.readFileSync(filePath, 'utf-8');
+  const lines = content.split('\n');
+  // If the file ends with a newline, the last element is empty — skip it.
+  if (lines.length > 0 && lines[lines.length - 1] === '') {
+    lines.pop();
+  }
+  return lines.slice(-count).join('\n') + '\n';
+}
+
+const isWindows = process.platform === 'win32';
+
 export const logsCommand: CommandModule = {
   command: 'logs',
   describe: 'View LiteRT-LM server logs',
@@ -43,12 +59,25 @@ export const logsCommand: CommandModule = {
     const lines = Number.isFinite(rawLines) ? Number(rawLines) : undefined;
 
     if (lines !== undefined) {
+      if (isWindows) {
+        process.stdout.write(readLastLines(logPath, lines));
+        await exitCli(0);
+        return;
+      }
       // Show last N lines and exit.
       const tailArgs = ['-n', String(lines), logPath];
       const child = spawn('tail', tailArgs, { stdio: 'inherit' });
       child.on('close', async (code) => {
         await exitCli(code ?? 0);
       });
+      return;
+    }
+
+    if (isWindows) {
+      debugLogger.log(
+        'Live log following is not supported on Windows. Use --lines N to view recent logs.',
+      );
+      await exitCli(1);
       return;
     }
 

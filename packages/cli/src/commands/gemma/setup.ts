@@ -105,7 +105,10 @@ async function downloadFile(url: string, destPath: string): Promise<void> {
     for (;;) {
       const { done, value } = await reader.read();
       if (done) break;
-      fileStream.write(value);
+      const writeOk = fileStream.write(value);
+      if (!writeOk) {
+        await new Promise<void>((resolve) => fileStream.once('drain', resolve));
+      }
       downloadedBytes += value.byteLength;
       renderProgress(downloadedBytes, totalBytes);
     }
@@ -147,7 +150,7 @@ interface SetupArgs {
   consent: boolean;
 }
 
-async function handleSetup(argv: SetupArgs): Promise<void> {
+async function handleSetup(argv: SetupArgs): Promise<number> {
   const { port, force } = argv;
 
   log('');
@@ -164,8 +167,7 @@ async function handleSetup(argv: SetupArgs): Promise<void> {
     logError(
       'LiteRT-LM binaries are available for: macOS (ARM64), Linux (x86_64), Windows (x86_64)',
     );
-    await exitCli(1);
-    return;
+    return 1;
   }
   log(chalk.dim(`  Platform: ${platform.key} → ${platform.binaryName}`));
 
@@ -182,8 +184,7 @@ async function handleSetup(argv: SetupArgs): Promise<void> {
     const accepted = await promptYesNo('Do you want to continue?');
     if (!accepted) {
       log('Setup cancelled.');
-      await exitCli(0);
-      return;
+      return 0;
     }
   }
 
@@ -213,8 +214,7 @@ async function handleSetup(argv: SetupArgs): Promise<void> {
         ),
       );
       logError('  Check your internet connection and try again.');
-      await exitCli(1);
-      return;
+      return 1;
     }
 
     // Step 4: Make executable and handle macOS gatekeeper
@@ -227,8 +227,7 @@ async function handleSetup(argv: SetupArgs): Promise<void> {
             `  ✗ Failed to set executable permission: ${error instanceof Error ? error.message : String(error)}`,
           ),
         );
-        await exitCli(1);
-        return;
+        return 1;
       }
     }
 
@@ -268,8 +267,7 @@ async function handleSetup(argv: SetupArgs): Promise<void> {
         logError(
           chalk.red(`  ✗ Model download failed (exit code ${exitCode})`),
         );
-        await exitCli(1);
-        return;
+        return 1;
       }
       log('');
       log(chalk.green(`  ✓ Model ${GEMMA_MODEL_NAME} downloaded`));
@@ -369,6 +367,8 @@ async function handleSetup(argv: SetupArgs): Promise<void> {
   log(chalk.dim('    gemini gemma stop     Stop the LiteRT server'));
   log(chalk.dim('    /gemma               Check status inside a session'));
   log('');
+
+  return 0;
 }
 
 export const setupCommand: CommandModule = {
@@ -402,13 +402,13 @@ export const setupCommand: CommandModule = {
         description: 'Skip interactive consent prompt (implies acceptance)',
       }),
   handler: async (argv) => {
-    await handleSetup({
+    const exitCode = await handleSetup({
       port: Number(argv['port']),
       skipModel: Boolean(argv['skipModel']),
       start: Boolean(argv['start']),
       force: Boolean(argv['force']),
       consent: Boolean(argv['consent']),
     });
-    await exitCli(0);
+    await exitCli(exitCode);
   },
 };

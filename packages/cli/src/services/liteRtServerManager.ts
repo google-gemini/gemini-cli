@@ -5,21 +5,13 @@
  */
 
 import { debugLogger } from '@google/gemini-cli-core';
+import type { GemmaModelRouterSettings } from '@google/gemini-cli-core';
 import {
   getBinaryPath,
   isBinaryInstalled,
   isServerRunning,
 } from '../commands/gemma/platform.js';
 import { DEFAULT_PORT } from '../commands/gemma/constants.js';
-
-// Use a local interface that includes the new fields, since the core
-// package's compiled types may not include them until rebuilt.
-interface GemmaSettings {
-  enabled?: boolean;
-  autoStartServer?: boolean;
-  binaryPath?: string;
-  classifier?: { host?: string; model?: string };
-}
 
 /**
  * Manages the LiteRT-LM server lifecycle for auto-start during CLI startup.
@@ -35,7 +27,7 @@ export class LiteRtServerManager {
    * This is fire-and-forget: failures are logged but never block startup.
    */
   static async ensureRunning(
-    gemmaSettings: GemmaSettings | undefined,
+    gemmaSettings: GemmaModelRouterSettings | undefined,
   ): Promise<void> {
     if (!gemmaSettings?.enabled) return;
     if (gemmaSettings.autoStartServer === false) return;
