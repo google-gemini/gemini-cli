@@ -60,6 +60,9 @@ describe('usePhraseCycler', () => {
     vi.spyOn(Math, 'random').mockImplementation(() => 0.5); // Always witty
     const { lastFrame, unmount, waitUntilReady } = await render(
       <TestComponent isActive={false} isWaiting={false} />,
+      undefined,
+      undefined,
+      true,
     );
     await waitUntilReady();
     expect(lastFrame({ allowEmpty: true }).trim()).toBe('');
@@ -124,8 +127,11 @@ describe('usePhraseCycler', () => {
   });
 
   it('should not cycle phrases if isActive is false and not waiting', async () => {
-    const { lastFrame, waitUntilReady, unmount } = await render(
+    const { lastFrame, unmount, waitUntilReady } = await render(
       <TestComponent isActive={false} isWaiting={false} />,
+      undefined,
+      undefined,
+      true,
     );
     await waitUntilReady();
     const initialPhrase = lastFrame({ allowEmpty: true }).trim();
@@ -194,7 +200,7 @@ describe('usePhraseCycler', () => {
       return val;
     });
 
-    const { lastFrame, rerender, waitUntilReady, unmount } = await render(
+    const { lastFrame, rerender, unmount, waitUntilReady } = await render(
       <TestComponent
         isActive={false}
         isWaiting={false}
@@ -202,8 +208,10 @@ describe('usePhraseCycler', () => {
         showWit={true}
         showTips={false}
       />,
+      undefined,
+      undefined,
+      true,
     );
-    await waitUntilReady();
 
     // Activate
     await act(async () => {
