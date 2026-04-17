@@ -27,7 +27,12 @@ describe('useBackgroundTaskManager', () => {
       hookResult = useBackgroundTaskManager(p);
       return null;
     }
-    const { rerender } = await render(<TestComponent p={props} />);
+    const { rerender } = await render(
+      <TestComponent p={props} />,
+      undefined,
+      undefined,
+      true,
+    );
     return {
       result: {
         get current() {
