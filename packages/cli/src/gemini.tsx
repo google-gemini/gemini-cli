@@ -615,7 +615,7 @@ export async function main() {
     import('./services/liteRtServerManager.js')
       .then(({ LiteRtServerManager }) =>
         LiteRtServerManager.ensureRunning(
-          settings.merged.experimental?.gemmaModelRouter,
+          settings.forScope(SettingScope.User).settings.experimental?.gemmaModelRouter,
         ),
       )
       .catch((e) => debugLogger.warn('LiteRT auto-start import failed:', e));
