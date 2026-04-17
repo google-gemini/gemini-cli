@@ -74,7 +74,7 @@ describe('useGitBranchName', () => {
       hookResult = useGitBranchName(cwd);
       return null;
     }
-    const result = await render(<TestComponent />);
+    const result = await render(<TestComponent />, undefined, undefined, true);
     return {
       result: {
         get current() {
