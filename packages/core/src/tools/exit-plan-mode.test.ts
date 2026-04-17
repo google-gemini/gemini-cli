@@ -504,7 +504,7 @@ Ask the user for specific feedback on how to improve the plan.`,
       });
 
       expect(result).toBe(
-        `Access denied: plan path (${path.join(mockPlansDir, 'malicious.md')}) must be within the designated plans directory (${mockPlansDir}).`,
+        `Access denied: plan path (malicious.md) must be within the designated plans directory (${mockPlansDir}).`,
       );
     });
 
