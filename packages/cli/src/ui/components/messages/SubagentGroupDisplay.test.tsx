@@ -67,6 +67,7 @@ describe('<SubagentGroupDisplay />', () => {
   const renderSubagentGroup = async (
     toolCallsToRender: IndividualToolCallDisplay[],
     height?: number,
+    allowEmptyFrame = false,
   ) =>
     renderWithProviders(
       <SubagentGroupDisplay
@@ -75,10 +76,11 @@ describe('<SubagentGroupDisplay />', () => {
         availableTerminalHeight={height}
         isExpandable={true}
       />,
+      { allowEmptyFrame },
     );
 
   it('renders nothing if there are no agent tool calls', async () => {
-    const { lastFrame } = await renderSubagentGroup([], 40);
+    const { lastFrame } = await renderSubagentGroup([], 40, true);
     expect(lastFrame({ allowEmpty: true })).toBe('');
   });
 
