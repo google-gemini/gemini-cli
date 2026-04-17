@@ -1947,6 +1947,22 @@ describe('loadCliConfig model selection', () => {
 
     expect(config.getModel()).toBe('auto-gemini-3');
   });
+
+  it('sets geminiApiPriority flag when provided via settings', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const config = await loadCliConfig(
+      createTestMergedSettings({
+        model: {
+          geminiApiPriority: true,
+        },
+      }),
+      'test-session',
+      argv,
+    );
+
+    expect(config.getGeminiApiPriority()).toBe(true);
+  });
 });
 
 describe('loadCliConfig folderTrust', () => {

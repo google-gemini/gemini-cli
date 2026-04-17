@@ -587,6 +587,7 @@ export interface ConfigParameters {
   toolSandboxing?: boolean;
   targetDir: string;
   debugMode: boolean;
+  geminiApiPriority?: boolean;
   question?: string;
 
   coreTools?: string[];
@@ -759,6 +760,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly targetDir: string;
   private workspaceContext: WorkspaceContext;
   private readonly debugMode: boolean;
+  private readonly geminiApiPriority: boolean | undefined;
   private readonly question: string | undefined;
   private readonly worktreeSettings: WorktreeSettings | undefined;
   readonly enableConseca: boolean;
@@ -991,6 +993,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.workspaceContext = new WorkspaceContext(this.targetDir, []);
     this.pendingIncludeDirectories = params.includeDirectories ?? [];
     this.debugMode = params.debugMode;
+    this.geminiApiPriority = params.geminiApiPriority;
     this.question = params.question;
     this.worktreeSettings = params.worktreeSettings;
 
@@ -1027,6 +1030,7 @@ export class Config implements McpContext, AgentLoopContext {
     }
 
     this.debugMode = params.debugMode;
+    this.geminiApiPriority = params.geminiApiPriority;
     this.question = params.question;
     this.worktreeSettings = params.worktreeSettings;
 
@@ -2124,6 +2128,9 @@ export class Config implements McpContext, AgentLoopContext {
 
   getDebugMode(): boolean {
     return this.debugMode;
+  }
+  getGeminiApiPriority(): boolean | undefined {
+    return this.geminiApiPriority;
   }
   getQuestion(): string | undefined {
     return this.question;

@@ -1001,6 +1001,15 @@ const SETTINGS_SCHEMA = {
         description: 'The Gemini model to use for conversations.',
         showInDialog: true,
       },
+      geminiApiPriority: {
+        type: 'boolean',
+        label: 'Gemini API Priority',
+        category: 'Model',
+        requiresRestart: false,
+        default: false,
+        description: 'Send priority requests to the Gemini API.',
+        showInDialog: true,
+      },
       maxSessionTurns: {
         type: 'number',
         label: 'Max Session Turns',

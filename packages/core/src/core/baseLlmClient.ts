@@ -307,9 +307,12 @@ export class BaseLlmClient {
           currentModel = resolvedModel;
           currentGenerateContentConfig = generateContentConfig;
         }
+        // Rationale: serviceTier is an internal SDK property used to enable priority processing.
+        interface InternalSdkConfig { serviceTier: string; }
         const finalConfig: GenerateContentConfig = {
           ...currentGenerateContentConfig,
           ...(systemInstruction && { systemInstruction }),
+          ...(this.config.getGeminiApiPriority() ? ({ serviceTier: 'priority' } as InternalSdkConfig) : {}),
           ...additionalProperties,
           abortSignal,
         };
