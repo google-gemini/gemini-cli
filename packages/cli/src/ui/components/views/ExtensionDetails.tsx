@@ -12,6 +12,7 @@ import { useKeypress } from '../../hooks/useKeypress.js';
 import { Command } from '../../key/keyMatchers.js';
 import { useKeyMatchers } from '../../hooks/useKeyMatchers.js';
 import { theme } from '../../semantic-colors.js';
+import { ExtensionUpdateState } from '../../state/extensions.js';
 
 export interface ExtensionDetailsProps {
   extension: RegistryExtension;
@@ -19,14 +20,22 @@ export interface ExtensionDetailsProps {
   onInstall: (
     requestConsentOverride: (consent: string) => Promise<boolean>,
   ) => void | Promise<void>;
+  onLink: (
+    requestConsentOverride: (consent: string) => Promise<boolean>,
+  ) => void | Promise<void>;
   isInstalled: boolean;
+  updateState?: ExtensionUpdateState;
+  onUpdate?: () => void | Promise<void>;
 }
 
 export function ExtensionDetails({
   extension,
   onBack,
   onInstall,
+  onLink,
   isInstalled,
+  updateState,
+  onUpdate,
 }: ExtensionDetailsProps): React.JSX.Element {
   const keyMatchers = useKeyMatchers();
   const [consentRequest, setConsentRequest] = useState<{
@@ -34,6 +43,11 @@ export function ExtensionDetails({
     resolve: (value: boolean) => void;
   } | null>(null);
   const [isInstalling, setIsInstalling] = useState(false);
+
+  const isLinkable =
+    !extension.url.startsWith('http') &&
+    !extension.url.startsWith('git@') &&
+    !extension.url.startsWith('sso://');
 
   useKeypress(
     (key) => {
@@ -56,6 +70,7 @@ export function ExtensionDetails({
         onBack();
         return true;
       }
+
       if (keyMatchers[Command.RETURN](key) && !isInstalled && !isInstalling) {
         setIsInstalling(true);
         void onInstall(
@@ -64,6 +79,29 @@ export function ExtensionDetails({
               setConsentRequest({ prompt, resolve });
             }),
         );
+        return true;
+      }
+      if (
+        keyMatchers[Command.LINK_EXTENSION](key) &&
+        isLinkable &&
+        !isInstalled &&
+        !isInstalling
+      ) {
+        setIsInstalling(true);
+        void onLink(
+          (prompt: string) =>
+            new Promise((resolve) => {
+              setConsentRequest({ prompt, resolve });
+            }),
+        );
+        return true;
+      }
+      if (
+        keyMatchers[Command.UPDATE_EXTENSION](key) &&
+        updateState === ExtensionUpdateState.UPDATE_AVAILABLE &&
+        !isInstalling
+      ) {
+        void onUpdate?.();
         return true;
       }
       return false;
@@ -130,6 +168,16 @@ export function ExtensionDetails({
           <Text color={theme.text.primary} bold>
             {extension.extensionName}
           </Text>
+          {updateState === ExtensionUpdateState.UPDATE_AVAILABLE && (
+            <Box marginLeft={1}>
+              <Text color={theme.status.warning}>[I] Update</Text>
+            </Box>
+          )}
+          {updateState === ExtensionUpdateState.UPDATING && (
+            <Box marginLeft={1}>
+              <Text color={theme.text.secondary}>[Updating...]</Text>
+            </Box>
+          )}
         </Box>
         <Box flexDirection="row">
           <Text color={theme.text.secondary}>
@@ -230,12 +278,15 @@ export function ExtensionDetails({
             understand the permissions it requires and the actions it may
             perform.
           </Text>
-          <Box marginTop={1}>
-            <Text color={theme.text.primary}>[{'Enter'}] Install</Text>
+          <Box marginTop={1} flexDirection="row">
+            <Box marginRight={2}>
+              <Text color={theme.text.primary}>[{'Enter'}] Install</Text>
+            </Box>
+            {isLinkable && <Text color={theme.text.primary}>[L] Link</Text>}
           </Box>
         </Box>
       )}
-      {isInstalled && (
+      {isInstalled && updateState !== ExtensionUpdateState.UPDATING && (
         <Box flexDirection="row" marginTop={1} justifyContent="center">
           <Text color={theme.status.success}>Already Installed</Text>
         </Box>

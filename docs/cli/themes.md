@@ -19,6 +19,7 @@ using the `/theme` command within Gemini CLI:
   - `Holiday`
   - `Shades Of Purple`
   - `Solarized Dark`
+  - `Tokyo Night`
 - **Light themes:**
   - `ANSI Light`
   - `Ayu Light`
@@ -36,9 +37,11 @@ using the `/theme` command within Gemini CLI:
     preview or highlight as you select.
 4.  Confirm your selection to apply the theme.
 
-**Note:** If a theme is defined in your `settings.json` file (either by name or
-by a file path), you must remove the `"theme"` setting from the file before you
-can change the theme using the `/theme` command.
+<!-- prettier-ignore -->
+> [!NOTE]
+> If a theme is defined in your `settings.json` file (either by name or
+> by a file path), you must remove the `"theme"` setting from the file before
+> you can change the theme using the `/theme` command.
 
 ### Theme persistence
 
@@ -114,8 +117,8 @@ least `background.primary`, `text.primary`, `text.secondary`, and the various
 accent colors via `text.link`, `text.accent`, and `status` to ensure a cohesive
 UI.
 
-You can use either hex codes (e.g., `#FF0000`) **or** standard CSS color names
-(e.g., `coral`, `teal`, `blue`) for any color value. See
+You can use either hex codes (for example, `#FF0000`) **or** standard CSS color
+names (for example, `coral`, `teal`, `blue`) for any color value. See
 [CSS color names](https://developer.mozilla.org/en-US/docs/Web/CSS/color_value#color_keywords)
 for a full list of supported names.
 
@@ -179,11 +182,13 @@ custom theme defined in `settings.json`.
 }
 ```
 
-**Security note:** For your safety, Gemini CLI will only load theme files that
-are located within your home directory. If you attempt to load a theme from
-outside your home directory, a warning will be displayed and the theme will not
-be loaded. This is to prevent loading potentially malicious theme files from
-untrusted sources.
+<!-- prettier-ignore -->
+> [!WARNING]
+> For your safety, Gemini CLI will only load theme files that
+> are located within your home directory. If you attempt to load a theme from
+> outside your home directory, a warning will be displayed and the theme will
+> not be loaded. This is to prevent loading potentially malicious theme files
+> from untrusted sources.
 
 ### Example custom theme
 
@@ -247,6 +252,10 @@ identify their source, for example: `shades-of-green (green-extension)`.
 ### Solarized Dark
 
 <img src="/docs/assets/theme-solarized-dark.png" alt="Solarized Dark theme" width="600">
+
+### Tokyo Night
+
+<img src="/docs/assets/theme-tokyonight-dark.png" alt="Tokyo Night theme" width="600">
 
 ## Light themes
 

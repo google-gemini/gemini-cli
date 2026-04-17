@@ -14,8 +14,8 @@ import type {
   ExecuteOptions,
 } from '../tools/tools.js';
 import { ToolErrorType } from '../tools/tool-error.js';
-import { debugLogger } from '../utils/debugLogger.js';
 import { DiscoveredMCPToolInvocation } from '../tools/mcp-tool.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 /**
  * Extracts MCP context from a tool invocation if it's an MCP tool.
@@ -24,7 +24,7 @@ import { DiscoveredMCPToolInvocation } from '../tools/mcp-tool.js';
  * @param config Config to look up server details
  * @returns MCP context if this is an MCP tool, undefined otherwise
  */
-function extractMcpContext(
+export function extractMcpContext(
   invocation: AnyToolInvocation,
   config: Config,
 ): McpToolContext | undefined {
@@ -71,9 +71,10 @@ export async function executeToolWithHooks(
   signal: AbortSignal,
   tool: AnyDeclarativeTool,
   liveOutputCallback?: (outputChunk: ToolLiveOutput) => void,
-  options?: ExecuteOptions,
+  options?: Omit<ExecuteOptions, 'abortSignal' | 'updateOutput'>,
   config?: Config,
   originalRequestName?: string,
+  skipBeforeHook?: boolean,
 ): Promise<ToolResult> {
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const toolInput = (invocation.params || {}) as Record<string, unknown>;
@@ -82,9 +83,9 @@ export async function executeToolWithHooks(
 
   // Extract MCP context if this is an MCP tool (only if config is provided)
   const mcpContext = config ? extractMcpContext(invocation, config) : undefined;
-
   const hookSystem = config?.getHookSystem();
-  if (hookSystem) {
+
+  if (hookSystem && !skipBeforeHook) {
     const beforeOutput = await hookSystem.fireBeforeToolEvent(
       toolName,
       toolInput,
@@ -153,11 +154,11 @@ export async function executeToolWithHooks(
 
   // Execute the actual tool. Tools that support backgrounding can optionally
   // surface an execution ID via the callback.
-  const toolResult: ToolResult = await invocation.execute(
-    signal,
-    liveOutputCallback,
-    options,
-  );
+  const toolResult: ToolResult = await invocation.execute({
+    ...options,
+    abortSignal: signal,
+    updateOutput: liveOutputCallback,
+  });
 
   // Append notification if parameters were modified
   if (inputWasModified) {

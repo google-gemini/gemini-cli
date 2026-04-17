@@ -51,7 +51,7 @@ const createMockUIState = (overrides: UIStateOverrides = {}): UIState =>
     ideContextState: null,
     geminiMdFileCount: 0,
     contextFileNames: [],
-    backgroundShellCount: 0,
+    backgroundTaskCount: 0,
     buffer: { text: '' },
     history: [{ id: 1, type: 'user', text: 'test' }],
     ...overrides,
@@ -75,7 +75,7 @@ const renderStatusDisplay = async (
   settings = createMockSettings(),
   config = createMockConfig(),
 ) => {
-  const result = render(
+  const result = await render(
     <ConfigContext.Provider value={config as unknown as Config}>
       <SettingsContext.Provider value={settings as unknown as LoadedSettings}>
         <UIStateContext.Provider value={uiState}>
@@ -84,7 +84,6 @@ const renderStatusDisplay = async (
       </SettingsContext.Provider>
     </ConfigContext.Provider>,
   );
-  await result.waitUntilReady();
   return result;
 };
 
@@ -160,9 +159,9 @@ describe('StatusDisplay', () => {
     unmount();
   });
 
-  it('passes backgroundShellCount to ContextSummaryDisplay', async () => {
+  it('passes backgroundTaskCount to ContextSummaryDisplay', async () => {
     const uiState = createMockUIState({
-      backgroundShellCount: 3,
+      backgroundTaskCount: 3,
     });
     const { lastFrame, unmount } = await renderStatusDisplay(
       { hideContextSummary: false },

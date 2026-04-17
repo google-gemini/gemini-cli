@@ -5,11 +5,12 @@
  */
 
 import { renderWithProviders } from '../../test-utils/render.js';
+import { createMockSettings } from '../../test-utils/settings.js';
+import { makeFakeConfig, ExitCodes } from '@google/gemini-cli-core';
 import { waitFor } from '../../test-utils/async.js';
 import { act } from 'react';
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { FolderTrustDialog } from './FolderTrustDialog.js';
-import { ExitCodes } from '@google/gemini-cli-core';
 import * as processUtils from '../../utils/processUtils.js';
 
 vi.mock('../../utils/processUtils.js', () => ({
@@ -17,7 +18,7 @@ vi.mock('../../utils/processUtils.js', () => ({
 }));
 
 const mockedExit = vi.hoisted(() => vi.fn());
-const mockedCwd = vi.hoisted(() => vi.fn());
+const mockedCwd = vi.hoisted(() => vi.fn().mockReturnValue('/mock/cwd'));
 const mockedRows = vi.hoisted(() => ({ current: 24 }));
 
 vi.mock('node:process', async () => {
@@ -47,10 +48,9 @@ describe('FolderTrustDialog', () => {
   });
 
   it('should render the dialog with title and description', async () => {
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <FolderTrustDialog onSelect={vi.fn()} />,
     );
-    await waitUntilReady();
 
     expect(lastFrame()).toContain('Do you trust the files in this folder?');
     expect(lastFrame()).toContain(
@@ -71,21 +71,21 @@ describe('FolderTrustDialog', () => {
       discoveryErrors: [],
       securityWarnings: [],
     };
-    const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <FolderTrustDialog
         onSelect={vi.fn()}
         discoveryResults={discoveryResults}
       />,
       {
         width: 80,
-        useAlternateBuffer: false,
+        config: makeFakeConfig({ useAlternateBuffer: false }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
         uiState: { constrainHeight: true, terminalHeight: 24 },
       },
     );
 
-    await waitUntilReady();
     expect(lastFrame()).toContain('This folder contains:');
-    expect(lastFrame()).toContain('hidden');
+    expect(lastFrame()).not.toContain('cmd9');
     unmount();
   });
 
@@ -101,22 +101,22 @@ describe('FolderTrustDialog', () => {
       discoveryErrors: [],
       securityWarnings: [],
     };
-    const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <FolderTrustDialog
         onSelect={vi.fn()}
         discoveryResults={discoveryResults}
       />,
       {
         width: 80,
-        useAlternateBuffer: false,
+        config: makeFakeConfig({ useAlternateBuffer: false }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
         uiState: { constrainHeight: true, terminalHeight: 14 },
       },
     );
 
-    await waitUntilReady();
     // With maxHeight=4, the intro text (4 lines) will take most of the space.
     // The discovery results will likely be hidden.
-    expect(lastFrame()).toContain('hidden');
+    expect(lastFrame()).not.toContain('cmd1');
     unmount();
   });
 
@@ -132,20 +132,20 @@ describe('FolderTrustDialog', () => {
       discoveryErrors: [],
       securityWarnings: [],
     };
-    const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <FolderTrustDialog
         onSelect={vi.fn()}
         discoveryResults={discoveryResults}
       />,
       {
         width: 80,
-        useAlternateBuffer: false,
+        config: makeFakeConfig({ useAlternateBuffer: false }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
         uiState: { constrainHeight: true, terminalHeight: 10 },
       },
     );
 
-    await waitUntilReady();
-    expect(lastFrame()).toContain('hidden');
+    expect(lastFrame()).not.toContain('cmd1');
     unmount();
   });
 
@@ -161,14 +161,15 @@ describe('FolderTrustDialog', () => {
       securityWarnings: [],
     };
 
-    const { lastFrame, unmount } = renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <FolderTrustDialog
         onSelect={vi.fn()}
         discoveryResults={discoveryResults}
       />,
       {
         width: 80,
-        useAlternateBuffer: false,
+        config: makeFakeConfig({ useAlternateBuffer: false }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
         // Initially constrained
         uiState: { constrainHeight: true, terminalHeight: 24 },
       },
@@ -177,25 +178,25 @@ describe('FolderTrustDialog', () => {
     // Initial state: truncated
     await waitFor(() => {
       expect(lastFrame()).toContain('Do you trust the files in this folder?');
-      // In standard terminal mode, the expansion hint is handled globally by ToastDisplay
-      // via AppContainer, so it should not be present in the dialog's local frame.
-      expect(lastFrame()).not.toContain('Press Ctrl+O');
-      expect(lastFrame()).toContain('hidden');
+      expect(lastFrame()).not.toContain('cmd9');
     });
+
+    unmount();
 
     // We can't easily simulate global Ctrl+O toggle in this unit test
     // because it's handled in AppContainer.
     // But we can re-render with constrainHeight: false.
     const { lastFrame: lastFrameExpanded, unmount: unmountExpanded } =
-      renderWithProviders(
+      await renderWithProviders(
         <FolderTrustDialog
           onSelect={vi.fn()}
           discoveryResults={discoveryResults}
         />,
         {
           width: 80,
-          useAlternateBuffer: false,
-          uiState: { constrainHeight: false, terminalHeight: 24 },
+          config: makeFakeConfig({ useAlternateBuffer: false }),
+          settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
+          uiState: { constrainHeight: false, terminalHeight: 50 },
         },
       );
 
@@ -205,16 +206,15 @@ describe('FolderTrustDialog', () => {
       expect(lastFrameExpanded()).toContain('- cmd4');
     });
 
-    unmount();
     unmountExpanded();
   });
 
   it('should display exit message and call process.exit and not call onSelect when escape is pressed', async () => {
     const onSelect = vi.fn();
-    const { lastFrame, stdin, waitUntilReady, unmount } = renderWithProviders(
-      <FolderTrustDialog onSelect={onSelect} isRestarting={false} />,
-    );
-    await waitUntilReady();
+    const { lastFrame, stdin, waitUntilReady, unmount } =
+      await renderWithProviders(
+        <FolderTrustDialog onSelect={onSelect} isRestarting={false} />,
+      );
 
     await act(async () => {
       stdin.write('\u001b[27u'); // Press kitty escape key
@@ -239,10 +239,9 @@ describe('FolderTrustDialog', () => {
   });
 
   it('should display restart message when isRestarting is true', async () => {
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <FolderTrustDialog onSelect={vi.fn()} isRestarting={true} />,
     );
-    await waitUntilReady();
 
     expect(lastFrame()).toContain('Gemini CLI is restarting');
     unmount();
@@ -253,10 +252,9 @@ describe('FolderTrustDialog', () => {
     const relaunchApp = vi
       .spyOn(processUtils, 'relaunchApp')
       .mockResolvedValue(undefined);
-    const { waitUntilReady, unmount } = renderWithProviders(
+    const { unmount } = await renderWithProviders(
       <FolderTrustDialog onSelect={vi.fn()} isRestarting={true} />,
     );
-    await waitUntilReady();
     await vi.advanceTimersByTimeAsync(250);
     expect(relaunchApp).toHaveBeenCalled();
     unmount();
@@ -268,10 +266,9 @@ describe('FolderTrustDialog', () => {
     const relaunchApp = vi
       .spyOn(processUtils, 'relaunchApp')
       .mockResolvedValue(undefined);
-    const { waitUntilReady, unmount } = renderWithProviders(
+    const { unmount } = await renderWithProviders(
       <FolderTrustDialog onSelect={vi.fn()} isRestarting={true} />,
     );
-    await waitUntilReady();
 
     // Unmount immediately (before 250ms)
     unmount();
@@ -282,10 +279,9 @@ describe('FolderTrustDialog', () => {
   });
 
   it('should not call process.exit when "r" is pressed and isRestarting is false', async () => {
-    const { stdin, waitUntilReady, unmount } = renderWithProviders(
+    const { stdin, waitUntilReady, unmount } = await renderWithProviders(
       <FolderTrustDialog onSelect={vi.fn()} isRestarting={false} />,
     );
-    await waitUntilReady();
 
     await act(async () => {
       stdin.write('r');
@@ -301,30 +297,27 @@ describe('FolderTrustDialog', () => {
   describe('directory display', () => {
     it('should correctly display the folder name for a nested directory', async () => {
       mockedCwd.mockReturnValue('/home/user/project');
-      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      const { lastFrame, unmount } = await renderWithProviders(
         <FolderTrustDialog onSelect={vi.fn()} />,
       );
-      await waitUntilReady();
       expect(lastFrame()).toContain('Trust folder (project)');
       unmount();
     });
 
     it('should correctly display the parent folder name for a nested directory', async () => {
       mockedCwd.mockReturnValue('/home/user/project');
-      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      const { lastFrame, unmount } = await renderWithProviders(
         <FolderTrustDialog onSelect={vi.fn()} />,
       );
-      await waitUntilReady();
       expect(lastFrame()).toContain('Trust parent folder (user)');
       unmount();
     });
 
     it('should correctly display an empty parent folder name for a directory directly under root', async () => {
       mockedCwd.mockReturnValue('/project');
-      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      const { lastFrame, unmount } = await renderWithProviders(
         <FolderTrustDialog onSelect={vi.fn()} />,
       );
-      await waitUntilReady();
       expect(lastFrame()).toContain('Trust parent folder ()');
       unmount();
     });
@@ -341,7 +334,7 @@ describe('FolderTrustDialog', () => {
         discoveryErrors: [],
         securityWarnings: [],
       };
-      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+      const { lastFrame, unmount } = await renderWithProviders(
         <FolderTrustDialog
           onSelect={vi.fn()}
           discoveryResults={discoveryResults}
@@ -349,7 +342,6 @@ describe('FolderTrustDialog', () => {
         { width: 80 },
       );
 
-      await waitUntilReady();
       expect(lastFrame()).toContain('This folder contains:');
       expect(lastFrame()).toContain('• Commands (2):');
       expect(lastFrame()).toContain('- cmd1');
@@ -379,14 +371,13 @@ describe('FolderTrustDialog', () => {
         discoveryErrors: [],
         securityWarnings: ['Dangerous setting detected!'],
       };
-      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+      const { lastFrame, unmount } = await renderWithProviders(
         <FolderTrustDialog
           onSelect={vi.fn()}
           discoveryResults={discoveryResults}
         />,
       );
 
-      await waitUntilReady();
       expect(lastFrame()).toContain('Security Warnings:');
       expect(lastFrame()).toContain('Dangerous setting detected!');
       unmount();
@@ -403,14 +394,13 @@ describe('FolderTrustDialog', () => {
         discoveryErrors: ['Failed to load custom commands'],
         securityWarnings: [],
       };
-      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+      const { lastFrame, unmount } = await renderWithProviders(
         <FolderTrustDialog
           onSelect={vi.fn()}
           discoveryResults={discoveryResults}
         />,
       );
 
-      await waitUntilReady();
       expect(lastFrame()).toContain('Discovery Errors:');
       expect(lastFrame()).toContain('Failed to load custom commands');
       unmount();
@@ -427,19 +417,19 @@ describe('FolderTrustDialog', () => {
         discoveryErrors: [],
         securityWarnings: [],
       };
-      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+      const { lastFrame, unmount } = await renderWithProviders(
         <FolderTrustDialog
           onSelect={vi.fn()}
           discoveryResults={discoveryResults}
         />,
         {
           width: 80,
-          useAlternateBuffer: true,
+          config: makeFakeConfig({ useAlternateBuffer: true }),
+          settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
           uiState: { constrainHeight: false, terminalHeight: 15 },
         },
       );
 
-      await waitUntilReady();
       // In alternate buffer + expanded, the title should be visible (StickyHeader)
       expect(lastFrame()).toContain('Do you trust the files in this folder?');
       // And it should NOT use MaxSizedBox truncation
@@ -462,7 +452,7 @@ describe('FolderTrustDialog', () => {
         securityWarnings: [`${ansiRed}warning-with-ansi${ansiReset}`],
       };
 
-      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+      const { lastFrame, unmount } = await renderWithProviders(
         <FolderTrustDialog
           onSelect={vi.fn()}
           discoveryResults={discoveryResults}
@@ -470,7 +460,6 @@ describe('FolderTrustDialog', () => {
         { width: 100, uiState: { terminalHeight: 40 } },
       );
 
-      await waitUntilReady();
       const output = lastFrame();
 
       expect(output).toContain('cmd-with-ansi');
