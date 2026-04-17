@@ -418,13 +418,22 @@ export class OAuthUtils {
   ): boolean {
     const normalize = (resource: string): string => {
       try {
-        return this.buildResourceParameter(resource);
+        let normalized = this.buildResourceParameter(resource);
+        if (!normalized.endsWith("/")) {
+          normalized += "/";
+        }
+        return normalized;
       } catch {
         return resource;
       }
     };
 
-    return normalize(discoveredResource) === normalize(expectedResource);
+    const normalizedDiscovered = normalize(discoveredResource);
+    const normalizedExpected = normalize(expectedResource);
+
+    // Allow if the discovered resource is a prefix of the expected resource.
+    // This supports path-based MCP servers where the OAuth resource is at the root.
+    return normalizedExpected.startsWith(normalizedDiscovered);
   }
 
   /**
