@@ -145,22 +145,30 @@ describe('save_memory', () => {
     },
   });
 
-  const ignoringDbSchemaLocation =
-    "Agent ignores workspace's database schema location";
+  const savingDbSchemaLocationAsProjectMemory =
+    'Agent saves workspace database schema location as project memory';
   evalTest('USUALLY_PASSES', {
     suiteName: 'default',
     suiteType: 'behavioral',
-    name: ignoringDbSchemaLocation,
+    name: savingDbSchemaLocationAsProjectMemory,
     prompt: `The database schema for this workspace is located in \`db/schema.sql\`.`,
     assert: async (rig, result) => {
-      await rig.waitForTelemetryReady();
-      const wasToolCalled = rig
-        .readToolLogs()
-        .some((log) => log.toolRequest.name === 'save_memory');
+      const wasToolCalled = await rig.waitForToolCall(
+        'save_memory',
+        undefined,
+        (args) => {
+          try {
+            const params = JSON.parse(args);
+            return params.scope === 'project';
+          } catch {
+            return false;
+          }
+        },
+      );
       expect(
         wasToolCalled,
-        'save_memory should not be called for workspace-specific information',
-      ).toBe(false);
+        'Expected save_memory to be called with scope="project" for workspace-specific information',
+      ).toBe(true);
 
       assertModelHasOutput(result);
     },
@@ -188,42 +196,59 @@ describe('save_memory', () => {
     },
   });
 
-  const ignoringBuildArtifactLocation =
-    'Agent ignores workspace build artifact location';
+  const savingBuildArtifactLocationAsProjectMemory =
+    'Agent saves workspace build artifact location as project memory';
   evalTest('USUALLY_PASSES', {
     suiteName: 'default',
     suiteType: 'behavioral',
-    name: ignoringBuildArtifactLocation,
+    name: savingBuildArtifactLocationAsProjectMemory,
     prompt: `In this workspace, build artifacts are stored in the \`dist/artifacts\` directory.`,
     assert: async (rig, result) => {
-      await rig.waitForTelemetryReady();
-      const wasToolCalled = rig
-        .readToolLogs()
-        .some((log) => log.toolRequest.name === 'save_memory');
+      const wasToolCalled = await rig.waitForToolCall(
+        'save_memory',
+        undefined,
+        (args) => {
+          try {
+            const params = JSON.parse(args);
+            return params.scope === 'project';
+          } catch {
+            return false;
+          }
+        },
+      );
       expect(
         wasToolCalled,
-        'save_memory should not be called for workspace-specific information',
-      ).toBe(false);
+        'Expected save_memory to be called with scope="project" for workspace-specific information',
+      ).toBe(true);
 
       assertModelHasOutput(result);
     },
   });
 
-  const ignoringMainEntryPoint = "Agent ignores workspace's main entry point";
+  const savingMainEntryPointAsProjectMemory =
+    'Agent saves workspace main entry point as project memory';
   evalTest('USUALLY_PASSES', {
     suiteName: 'default',
     suiteType: 'behavioral',
-    name: ignoringMainEntryPoint,
+    name: savingMainEntryPointAsProjectMemory,
     prompt: `The main entry point for this workspace is \`src/index.js\`.`,
     assert: async (rig, result) => {
-      await rig.waitForTelemetryReady();
-      const wasToolCalled = rig
-        .readToolLogs()
-        .some((log) => log.toolRequest.name === 'save_memory');
+      const wasToolCalled = await rig.waitForToolCall(
+        'save_memory',
+        undefined,
+        (args) => {
+          try {
+            const params = JSON.parse(args);
+            return params.scope === 'project';
+          } catch {
+            return false;
+          }
+        },
+      );
       expect(
         wasToolCalled,
-        'save_memory should not be called for workspace-specific information',
-      ).toBe(false);
+        'Expected save_memory to be called with scope="project" for workspace-specific information',
+      ).toBe(true);
 
       assertModelHasOutput(result);
     },
@@ -317,13 +342,13 @@ describe('save_memory', () => {
       'Please save any persistent preferences or facts about me from our conversation to memory.',
     assert: async (rig, result) => {
       const wasToolCalled = await rig.waitForToolCall(
-        'save_memory',
+        'invoke_agent',
         undefined,
-        (args) => /vitest/i.test(args),
+        (args) => /save_memory/i.test(args) && /vitest/i.test(args),
       );
       expect(
         wasToolCalled,
-        'Expected save_memory to be called with the Vitest preference from the conversation history',
+        'Expected invoke_agent to be called with save_memory agent and the Vitest preference from the conversation history',
       ).toBe(true);
 
       assertModelHasOutput(result);
@@ -379,8 +404,15 @@ describe('save_memory', () => {
     ],
     prompt: 'Please save the preferences I mentioned earlier to memory.',
     assert: async (rig, result) => {
-      const wasToolCalled = await rig.waitForToolCall('save_memory');
-      expect(wasToolCalled, 'Expected save_memory to be called').toBe(true);
+      const wasToolCalled = await rig.waitForToolCall(
+        'invoke_agent',
+        undefined,
+        (args) => /save_memory/i.test(args),
+      );
+      expect(
+        wasToolCalled,
+        'Expected invoke_agent to be called with save_memory agent',
+      ).toBe(true);
 
       assertModelHasOutput(result);
     },
