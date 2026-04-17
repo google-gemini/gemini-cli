@@ -3,7 +3,8 @@
     "extensionReloading": true,
     "modelSteering": true,
     "memoryManager": true,
-    "topicUpdateNarration": true
+    "topicUpdateNarration": true,
+    "voiceMode": true
   },
   "general": {
     "devtools": true

@@ -464,6 +464,29 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Skip the next speaker check.
   - **Default:** `true`
 
+#### `voice`
+
+- **`voice.activationMode`** (enum):
+  - **Description:** How to trigger voice recording with the Space key.
+  - **Default:** `"push-to-talk"`
+  - **Values:** `"push-to-talk"`, `"toggle"`
+
+- **`voice.backend`** (enum):
+  - **Description:** The backend to use for voice transcription.
+  - **Default:** `"gemini-live"`
+  - **Values:** `"gemini-live"`, `"whisper"`
+
+- **`voice.whisperModel`** (enum):
+  - **Description:** The Whisper model to use for local transcription.
+  - **Default:** `"ggml-base.en.bin"`
+  - **Values:** `"ggml-tiny.en.bin"`, `"ggml-base.en.bin"`,
+    `"ggml-large-v3-turbo-q5_0.bin"`, `"ggml-large-v3-turbo-q8_0.bin"`
+
+- **`voice.stopGracePeriodMs`** (number):
+  - **Description:** How long to wait for final transcription after stopping
+    recording.
+  - **Default:** `1000`
+
 #### `modelConfigs`
 
 - **`modelConfigs.aliases`** (object):
@@ -1614,6 +1637,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `undefined`
 
 #### `experimental`
+
+- **`experimental.voiceMode`** (boolean):
+  - **Description:** Enable experimental voice dictation and commands (/voice,
+    /voice model).
+  - **Default:** `false`
 
 - **`experimental.adk.agentSessionNoninteractiveEnabled`** (boolean):
   - **Description:** Enable non-interactive agent sessions.
