@@ -576,12 +576,95 @@ describe('HookEventHandler', () => {
         HookEventName.BeforeAgent,
         expect.objectContaining({
           prompt,
+          agent_name: undefined,
         }),
         expect.any(Function),
         expect.any(Function),
       );
 
       expect(result).toBe(mockAggregated);
+    });
+
+    it('should include agent_name when context has agentName', async () => {
+      const mockGeminiClient = {
+        getChatRecordingService: vi.fn().mockReturnValue({
+          getConversationFilePath: vi
+            .fn()
+            .mockReturnValue('/test/project/.gemini/tmp/chats/session.json'),
+        }),
+      };
+
+      const subagentContext = {
+        get config() {
+          return this;
+        },
+        promptId: 'subagent-abc123',
+        parentSessionId: 'test-prompt-id',
+        agentName: 'browser_agent',
+        geminiClient: mockGeminiClient,
+        getGeminiClient: vi.fn().mockReturnValue(mockGeminiClient),
+        getSessionId: vi.fn().mockReturnValue('test-session'),
+        getWorkingDir: vi.fn().mockReturnValue('/test/project'),
+      } as unknown as Config;
+
+      const subagentHandler = new HookEventHandler(
+        subagentContext,
+        mockHookPlanner,
+        mockHookRunner,
+        mockHookAggregator,
+      );
+
+      const mockPlan = [
+        {
+          hookConfig: {
+            type: HookType.Command,
+            command: './before_agent.sh',
+          } as unknown as HookConfig,
+          eventName: HookEventName.BeforeAgent,
+        },
+      ];
+      const mockResults: HookExecutionResult[] = [
+        {
+          success: true,
+          duration: 100,
+          hookConfig: {
+            type: HookType.Command,
+            command: './test.sh',
+            timeout: 30000,
+          },
+          eventName: HookEventName.BeforeAgent,
+        },
+      ];
+      const mockAggregated = {
+        success: true,
+        allOutputs: [],
+        errors: [],
+        totalDuration: 100,
+      };
+
+      vi.mocked(mockHookPlanner.createExecutionPlan).mockReturnValue({
+        eventName: HookEventName.BeforeAgent,
+        hookConfigs: mockPlan.map((p) => p.hookConfig),
+        sequential: false,
+      });
+      vi.mocked(mockHookRunner.executeHooksParallel).mockResolvedValue(
+        mockResults,
+      );
+      vi.mocked(mockHookAggregator.aggregateResults).mockReturnValue(
+        mockAggregated,
+      );
+
+      await subagentHandler.fireBeforeAgentEvent('test prompt');
+
+      expect(mockHookRunner.executeHooksParallel).toHaveBeenCalledWith(
+        [mockPlan[0].hookConfig],
+        HookEventName.BeforeAgent,
+        expect.objectContaining({
+          agent_name: 'browser_agent',
+        }),
+        expect.any(Function),
+        expect.any(Function),
+      );
     });
   });
 
@@ -885,6 +968,150 @@ describe('HookEventHandler', () => {
           cwd: '/test/project',
           hook_event_name: 'BeforeTool',
           timestamp: expect.any(String),
+        }),
+        expect.any(Function),
+        expect.any(Function),
+      );
+    });
+  });
+
+  describe('fireAfterAgentEvent', () => {
+    it('should include agent_name as undefined for main agent', async () => {
+      const mockPlan = [
+        {
+          hookConfig: {
+            type: HookType.Command,
+            command: './after_agent.sh',
+          } as unknown as HookConfig,
+          eventName: HookEventName.AfterAgent,
+        },
+      ];
+      const mockResults: HookExecutionResult[] = [
+        {
+          success: true,
+          duration: 100,
+          hookConfig: {
+            type: HookType.Command,
+            command: './after_agent.sh',
+            timeout: 30000,
+          },
+          eventName: HookEventName.AfterAgent,
+        },
+      ];
+      const mockAggregated = {
+        success: true,
+        allOutputs: [],
+        errors: [],
+        totalDuration: 100,
+      };
+
+      vi.mocked(mockHookPlanner.createExecutionPlan).mockReturnValue({
+        eventName: HookEventName.AfterAgent,
+        hookConfigs: mockPlan.map((p) => p.hookConfig),
+        sequential: false,
+      });
+      vi.mocked(mockHookRunner.executeHooksParallel).mockResolvedValue(
+        mockResults,
+      );
+      vi.mocked(mockHookAggregator.aggregateResults).mockReturnValue(
+        mockAggregated,
+      );
+
+      const result = await hookEventHandler.fireAfterAgentEvent(
+        'test prompt',
+        'test response',
+      );
+
+      expect(mockHookRunner.executeHooksParallel).toHaveBeenCalledWith(
+        [mockPlan[0].hookConfig],
+        HookEventName.AfterAgent,
+        expect.objectContaining({
+          prompt: 'test prompt',
+          prompt_response: 'test response',
+          stop_hook_active: false,
+          agent_name: undefined,
+        }),
+        expect.any(Function),
+        expect.any(Function),
+      );
+
+      expect(result).toBe(mockAggregated);
+    });
+
+    it('should include agent_name when context has agentName', async () => {
+      const mockGeminiClient = {
+        getChatRecordingService: vi.fn().mockReturnValue({
+          getConversationFilePath: vi
+            .fn()
+            .mockReturnValue('/test/project/.gemini/tmp/chats/session.json'),
+        }),
+      };
+
+      const subagentContext = {
+        get config() {
+          return this;
+        },
+        agentName: 'codebase_investigator',
+        geminiClient: mockGeminiClient,
+        getGeminiClient: vi.fn().mockReturnValue(mockGeminiClient),
+        getSessionId: vi.fn().mockReturnValue('test-session'),
+        getWorkingDir: vi.fn().mockReturnValue('/test/project'),
+      } as unknown as Config;
+
+      const subagentHandler = new HookEventHandler(
+        subagentContext,
+        mockHookPlanner,
+        mockHookRunner,
+        mockHookAggregator,
+      );
+
+      const mockPlan = [
+        {
+          hookConfig: {
+            type: HookType.Command,
+            command: './after_agent.sh',
+          } as unknown as HookConfig,
+          eventName: HookEventName.AfterAgent,
+        },
+      ];
+      const mockResults: HookExecutionResult[] = [
+        {
+          success: true,
+          duration: 100,
+          hookConfig: {
+            type: HookType.Command,
+            command: './after_agent.sh',
+            timeout: 30000,
+          },
+          eventName: HookEventName.AfterAgent,
+        },
+      ];
+      const mockAggregated = {
+        success: true,
+        allOutputs: [],
+        errors: [],
+        totalDuration: 100,
+      };
+
+      vi.mocked(mockHookPlanner.createExecutionPlan).mockReturnValue({
+        eventName: HookEventName.AfterAgent,
+        hookConfigs: mockPlan.map((p) => p.hookConfig),
+        sequential: false,
+      });
+      vi.mocked(mockHookRunner.executeHooksParallel).mockResolvedValue(
+        mockResults,
+      );
+      vi.mocked(mockHookAggregator.aggregateResults).mockReturnValue(
+        mockAggregated,
+      );
+
+      await subagentHandler.fireAfterAgentEvent('test prompt', 'test response');
+
+      expect(mockHookRunner.executeHooksParallel).toHaveBeenCalledWith(
+        [mockPlan[0].hookConfig],
+        HookEventName.AfterAgent,
+        expect.objectContaining({
+          agent_name: 'codebase_investigator',
         }),
         expect.any(Function),
         expect.any(Function),

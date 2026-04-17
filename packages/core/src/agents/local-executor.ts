@@ -129,6 +129,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       config: this.context.config,
       promptId: this.agentId,
       parentSessionId: this.context.parentSessionId || this.context.promptId, // Always preserve the main agent session ID
+      agentName: this.definition.name,
       geminiClient: this.context.geminiClient,
       sandboxManager: this.context.sandboxManager,
       toolRegistry: this.toolRegistry,
