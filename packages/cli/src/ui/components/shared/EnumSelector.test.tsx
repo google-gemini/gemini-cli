@@ -86,6 +86,7 @@ describe('<EnumSelector />', () => {
         isActive={true}
         onValueChange={async () => {}}
       />,
+      { allowEmptyFrame: true },
     );
     expect(lastFrame({ allowEmpty: true })).toBe('');
     unmount();
