@@ -99,7 +99,10 @@ describe('DialogManager', () => {
   it('renders nothing by default', async () => {
     const { lastFrame, unmount } = await renderWithProviders(
       <DialogManager {...defaultProps} />,
-      { uiState: baseUiState as Partial<UIState> as UIState },
+      {
+        uiState: baseUiState as Partial<UIState> as UIState,
+        allowEmptyFrame: true,
+      },
     );
     expect(lastFrame({ allowEmpty: true })).toBe('');
     unmount();
