@@ -1023,7 +1023,11 @@ export async function* execStreaming(
 
 export function detectCommandSubstitution(command: string): boolean {
   const shell = getShellConfiguration().shell;
-  if (shell === 'powershell') {
+  const isPowerShell =
+    typeof shell === 'string' &&
+    (shell.toLowerCase().includes('powershell') ||
+      shell.toLowerCase().includes('pwsh'));
+  if (isPowerShell) {
     return detectPowerShellSubstitution(command);
   }
   return detectBashSubstitution(command);
