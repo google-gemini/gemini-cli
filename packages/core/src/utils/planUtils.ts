@@ -67,7 +67,7 @@ export function resolveAndValidatePlanPath(
 
   if (!isSubpath(realPlansDir, realPath)) {
     throw new Error(
-      `Security violation: plan path (${trimmedPath}) must be within the designated plans directory (${plansDir}).`,
+      PlanErrorMessages.PATH_ACCESS_DENIED(trimmedPath, plansDir),
     );
   }
 

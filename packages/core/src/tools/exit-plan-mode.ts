@@ -69,12 +69,6 @@ export class ExitPlanModeTool extends BaseDeclarativeTool<
         this.config.getProjectRoot(),
       );
     } catch (e) {
-      if (e instanceof Error && e.message.startsWith('Security violation')) {
-        return `Access denied: plan path (${path.join(
-          this.config.storage.getPlansDir(),
-          params.plan_filename,
-        )}) must be within the designated plans directory (${this.config.storage.getPlansDir()}).`;
-      }
       return e instanceof Error ? e.message : String(e);
     }
 
