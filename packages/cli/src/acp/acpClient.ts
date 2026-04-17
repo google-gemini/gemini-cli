@@ -28,7 +28,7 @@ import {
   debugLogger,
   ReadManyFilesTool,
   REFERENCE_CONTENT_START,
-  resolveModel,
+  type RoutingContext,
   createWorkingStdio,
   startupProfiler,
   Kind,
@@ -42,6 +42,7 @@ import {
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
   PREVIEW_GEMINI_MODEL,
   PREVIEW_GEMINI_3_1_MODEL,
+  PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL,
   PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
   PREVIEW_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
@@ -371,7 +372,7 @@ export class GeminiAgent {
       mcpServers,
     );
 
-    const sessionSelector = new SessionSelector(config);
+    const sessionSelector = new SessionSelector(config.storage);
     const { sessionData, sessionPath } =
       await sessionSelector.resolveSession(sessionId);
 
@@ -758,10 +759,15 @@ export class Session {
       const functionCalls: FunctionCall[] = [];
 
       try {
-        const model = resolveModel(
-          this.context.config.getModel(),
-          (await this.context.config.getGemini31Launched?.()) ?? false,
-        );
+        const routingContext: RoutingContext = {
+          history: chat.getHistory(/*curated=*/ true),
+          request: nextMessage?.parts ?? [],
+          signal: pendingSend.signal,
+          requestedModel: this.context.config.getModel(),
+        };
+
+        const router = this.context.config.getModelRouterService();
+        const { model } = await router.route(routingContext);
         const responseStream = await chat.sendMessageStream(
           { model },
           nextMessage?.parts ?? [],
@@ -857,7 +863,10 @@ export class Session {
           (error &&
             typeof error === 'object' &&
             'type' in error &&
-            error.type === 'NO_RESPONSE_TEXT')
+            (error.type === 'NO_RESPONSE_TEXT' ||
+              error.type === 'NO_FINISH_REASON' ||
+              error.type === 'MALFORMED_FUNCTION_CALL' ||
+              error.type === 'UNEXPECTED_TOOL_CALL'))
         ) {
           // The stream ended with an empty response or malformed tool call.
           // Treat this as a graceful end to the model's turn rather than a crash.
@@ -1120,7 +1129,9 @@ export class Session {
         });
       }
 
-      const toolResult: ToolResult = await invocation.execute(abortSignal);
+      const toolResult: ToolResult = await invocation.execute({
+        abortSignal,
+      });
       const content = toToolCallContent(toolResult);
 
       const updateContent: acp.ToolCallContent[] = content ? [content] : [];
@@ -1662,7 +1673,7 @@ export class Session {
           kind: toAcpToolKind(readManyFilesTool.kind),
         });
 
-        const result = await invocation.execute(abortSignal);
+        const result = await invocation.execute({ abortSignal });
         const content = toToolCallContent(result) || {
           type: 'content',
           content: {
@@ -2009,10 +2020,31 @@ function buildAvailableModels(
   const preferredModel = config.getModel() || DEFAULT_GEMINI_MODEL_AUTO;
   const shouldShowPreviewModels = config.getHasAccessToPreviewModel();
   const useGemini31 = config.getGemini31LaunchedSync?.() ?? false;
+  const useGemini31FlashLite =
+    config.getGemini31FlashLiteLaunchedSync?.() ?? false;
   const selectedAuthType = settings.merged.security.auth.selectedType;
   const useCustomToolModel =
     useGemini31 && selectedAuthType === AuthType.USE_GEMINI;
 
+  // --- DYNAMIC PATH ---
+  if (
+    config.getExperimentalDynamicModelConfiguration?.() === true &&
+    config.getModelConfigService
+  ) {
+    const options = config.getModelConfigService().getAvailableModelOptions({
+      useGemini3_1: useGemini31,
+      useGemini3_1FlashLite: useGemini31FlashLite,
+      useCustomTools: useCustomToolModel,
+      hasAccessToPreview: shouldShowPreviewModels,
+    });
+
+    return {
+      availableModels: options,
+      currentModelId: preferredModel,
+    };
+  }
+
+  // --- LEGACY PATH ---
   const mainOptions = [
     {
       value: DEFAULT_GEMINI_MODEL_AUTO,
@@ -2056,7 +2088,7 @@ function buildAvailableModels(
       ? PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL
       : previewProModel;
 
-    manualOptions.unshift(
+    const previewOptions = [
       {
         value: previewProValue,
         title: getDisplayString(previewProModel),
@@ -2065,7 +2097,16 @@ function buildAvailableModels(
         value: PREVIEW_GEMINI_FLASH_MODEL,
         title: getDisplayString(PREVIEW_GEMINI_FLASH_MODEL),
       },
-    );
+    ];
+
+    if (useGemini31FlashLite) {
+      previewOptions.push({
+        value: PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL,
+        title: getDisplayString(PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL),
+      });
+    }
+
+    manualOptions.unshift(...previewOptions);
   }
 
   const scaleOptions = (

@@ -56,19 +56,21 @@ Gemini CLI takes action.
 
 1.  **Provide a goal:** Start by describing what you want to achieve. Gemini CLI
     will then enter Plan Mode (if it's not already) to research the task.
-2.  **Review research and provide input:** As Gemini CLI analyzes your codebase,
-    it may ask you questions or present different implementation options using
-    [`ask_user`](../tools/ask-user.md). Provide your preferences to help guide
-    the design.
-3.  **Review the plan:** Once Gemini CLI has a proposed strategy, it creates a
-    detailed implementation plan as a Markdown file in your plans directory.
+2.  **Discuss and agree on strategy:** As Gemini CLI analyzes your codebase, it
+    will discuss its findings and proposed strategy with you to ensure
+    alignment. It may ask you questions or present different implementation
+    options using [`ask_user`](../tools/ask-user.md). **Gemini CLI will stop and
+    wait for your confirmation** before drafting the formal plan. You should
+    reach an informal agreement on the approach before proceeding.
+3.  **Review the plan:** Once you've agreed on the strategy, Gemini CLI creates
+    a detailed implementation plan as a Markdown file in your plans directory.
     - **View:** You can open and read this file to understand the proposed
       changes.
     - **Edit:** Press `Ctrl+X` to open the plan directly in your configured
       external editor.
 
 4.  **Approve or iterate:** Gemini CLI will present the finalized plan for your
-    approval.
+    formal approval.
     - **Approve:** If you're satisfied with the plan, approve it to start the
       implementation immediately: **Yes, automatically accept edits** or **Yes,
       manually accept edits**.
@@ -121,13 +123,16 @@ These are the only allowed tools:
   [`glob`](../tools/file-system.md#4-glob-findfiles)
 - **Search:** [`grep_search`](../tools/file-system.md#5-grep_search-searchtext),
   [`google_web_search`](../tools/web-search.md),
+  [`web_fetch`](../tools/web-fetch.md) (requires explicit confirmation),
   [`get_internal_docs`](../tools/internal-docs.md)
 - **Research Subagents:**
   [`codebase_investigator`](../core/subagents.md#codebase-investigator),
   [`cli_help`](../core/subagents.md#cli-help-agent)
 - **Interaction:** [`ask_user`](../tools/ask-user.md)
 - **MCP tools (Read):** Read-only [MCP tools](../tools/mcp-server.md) (for
-  example, `github_read_issue`, `postgres_read_schema`) are allowed.
+  example, `github_read_issue`, `postgres_read_schema`) and core
+  [MCP resource tools](../tools/mcp-resources.md) (`list_mcp_resources`,
+  `read_mcp_resource`) are allowed.
 - **Planning (Write):**
   [`write_file`](../tools/file-system.md#3-write_file-writefile) and
   [`replace`](../tools/file-system.md#6-replace-edit) only allowed for `.md`
@@ -178,9 +183,16 @@ As described in the
 rule that does not explicitly specify `modes` is considered "always active" and
 will apply to Plan Mode as well.
 
-If you want a rule to apply to other modes but _not_ to Plan Mode, you must
-explicitly specify the target modes. For example, to allow `npm test` in default
-and Auto-Edit modes but not in Plan Mode:
+To maintain the integrity of Plan Mode as a safe research environment,
+persistent tool approvals are context-aware. Approvals granted in modes like
+Default or Auto-Edit do not apply to Plan Mode, ensuring that tools trusted for
+implementation don't automatically execute while you're researching. However,
+approvals granted while in Plan Mode are treated as intentional choices for
+global trust and apply to all modes.
+
+If you want to manually restrict a rule to other modes but _not_ to Plan Mode,
+you must explicitly specify the target modes. For example, to allow `npm test`
+in default and Auto-Edit modes but not in Plan Mode:
 
 ```toml
 [[rule]]
@@ -304,8 +316,8 @@ Hooks such as `BeforeTool` or `AfterTool` can be configured to intercept the
 > [!WARNING] When hooks are triggered by **tool executions**, they do **not**
 > run when you manually toggle Plan Mode using the `/plan` command or the
 > `Shift+Tab` keyboard shortcut. If you need hooks to execute on mode changes,
-> ensure the transition is initiated by the agent (e.g., by asking "start a plan
-> for...").
+> ensure the transition is initiated by the agent (for example, by asking "start
+> a plan for...").
 
 #### Example: Archive approved plans to GCS (`AfterTool`)
 
@@ -317,8 +329,12 @@ Storage whenever Gemini CLI exits Plan Mode to start the implementation.
 
 ```bash
 #!/usr/bin/env bash
-# Extract the plan path from the tool input JSON
-plan_path=$(jq -r '.tool_input.plan_path // empty')
+# Extract the plan filename from the tool input JSON
+plan_filename=$(jq -r '.tool_input.plan_filename // empty')
+plan_filename=$(basename -- "$plan_filename")
+
+# Construct the absolute path using the GEMINI_PLANS_DIR environment variable
+plan_path="$GEMINI_PLANS_DIR/$plan_filename"
 
 if [ -f "$plan_path" ]; then
   # Generate a unique filename using a timestamp
@@ -430,6 +446,10 @@ on the current phase of your task:
     the CLI detects the existence of the approved plan and automatically
     switches to a high-speed **Flash** model. This provides a faster, more
     responsive experience during the implementation of the plan.
+
+If the high-reasoning model is unavailable or you don't have access to it,
+Gemini CLI automatically and silently falls back to a faster model to ensure
+your workflow isn't interrupted.
 
 This behavior is enabled by default to provide the best balance of quality and
 performance. You can disable this automatic switching in your settings:

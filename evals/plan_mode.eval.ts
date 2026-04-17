@@ -33,6 +33,8 @@ describe('plan_mode', () => {
       .filter(Boolean);
 
   evalTest('ALWAYS_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should refuse file modification when in plan mode',
     approvalMode: ApprovalMode.PLAN,
     params: {
@@ -68,6 +70,8 @@ describe('plan_mode', () => {
   });
 
   evalTest('ALWAYS_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should refuse saving new documentation to the repo when in plan mode',
     approvalMode: ApprovalMode.PLAN,
     params: {
@@ -105,6 +109,8 @@ describe('plan_mode', () => {
   });
 
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should enter plan mode when asked to create a plan',
     approvalMode: ApprovalMode.DEFAULT,
     params: {
@@ -122,6 +128,8 @@ describe('plan_mode', () => {
   });
 
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should exit plan mode when plan is complete and implementation is requested',
     approvalMode: ApprovalMode.PLAN,
     params: {
@@ -169,12 +177,15 @@ describe('plan_mode', () => {
   });
 
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should allow file modification in plans directory when in plan mode',
     approvalMode: ApprovalMode.PLAN,
     params: {
       settings,
     },
-    prompt: 'Create a plan for a new login feature.',
+    prompt:
+      'I agree with the strategy to use a JWT-based login. Create a plan for a new login feature.',
     assert: async (rig, result) => {
       await rig.waitForTelemetryReady();
       const toolLogs = rig.readToolLogs();
@@ -200,6 +211,8 @@ describe('plan_mode', () => {
   });
 
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should create a plan in plan mode and implement it for a refactoring task',
     params: {
       settings,
@@ -211,7 +224,7 @@ describe('plan_mode', () => {
         'import { sum } from "./mathUtils";\nconsole.log(sum(1, 2));',
     },
     prompt:
-      'I want to refactor our math utilities. Move the `sum` function from `src/mathUtils.ts` to a new file `src/basicMath.ts` and update `src/main.ts` to use the new file. Please create a detailed implementation plan first, then execute it.',
+      'I want to refactor our math utilities. I agree with the strategy to move the `sum` function from `src/mathUtils.ts` to a new file `src/basicMath.ts` and update `src/main.ts`. Please create a detailed implementation plan first, then execute it.',
     assert: async (rig, result) => {
       const enterPlanCalled = await rig.waitForToolCall('enter_plan_mode');
       expect(
@@ -285,6 +298,8 @@ describe('plan_mode', () => {
   });
 
   evalTest('ALWAYS_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should transition from plan mode to normal execution and create a plan file from scratch',
     params: {
       settings,
@@ -320,8 +335,43 @@ describe('plan_mode', () => {
 
       expect(
         planWrite?.toolRequest.success,
-        `Expected write_file to succeed, but got error: ${planWrite?.toolRequest.error}`,
+        `Expected write_file to succeed, but got error: ${(planWrite?.toolRequest as any).error}`,
       ).toBe(true);
+
+      assertModelHasOutput(result);
+    },
+  });
+
+  evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
+    name: 'should not exit plan mode or draft before informal agreement',
+    approvalMode: ApprovalMode.PLAN,
+    params: {
+      settings,
+    },
+    prompt: 'I need to build a new login feature. Please plan it.',
+    assert: async (rig, result) => {
+      await rig.waitForTelemetryReady();
+      const toolLogs = rig.readToolLogs();
+
+      const exitPlanCall = toolLogs.find(
+        (log) => log.toolRequest.name === 'exit_plan_mode',
+      );
+      expect(
+        exitPlanCall,
+        'Should NOT call exit_plan_mode before informal agreement',
+      ).toBeUndefined();
+
+      const planWrite = toolLogs.find(
+        (log) =>
+          log.toolRequest.name === 'write_file' &&
+          log.toolRequest.args.includes('/plans/'),
+      );
+      expect(
+        planWrite,
+        'Should NOT draft the plan file before informal agreement',
+      ).toBeUndefined();
 
       assertModelHasOutput(result);
     },

@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/* eslint-disable @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-assignment */
+
 import React, { useMemo } from 'react';
 import {
   Text,
@@ -14,7 +16,7 @@ import {
   wrapStyledChars,
   widestLineFromStyledChars,
   styledCharsWidth,
-  styledCharsToString,
+  styledLineToString,
 } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { parseMarkdownToANSI } from './markdownParsingUtils.js';
@@ -196,7 +198,7 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
         );
 
         const lines = wrappedStyledLines.map((line) => ({
-          text: styledCharsToString(line),
+          text: styledLineToString(line),
           width: styledCharsWidth(line),
         }));
         rowResult.push(lines);
@@ -210,7 +212,7 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
     // Use the TIGHTEST widths that fit the wrapped content + padding
     const adjustedWidths = actualColumnWidths.map(
       (w) =>
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+         
         w + COLUMN_PADDING,
     );
 
@@ -263,7 +265,7 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
     isHeader = false,
   ): React.ReactNode => {
     const renderedCells = cells.map((cell, index) => {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+       
       const width = adjustedWidths[index] || 0;
       return renderCell(cell, width, isHeader);
     });
@@ -309,7 +311,7 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
   };
 
   return (
-    <Box flexDirection="column" marginY={1}>
+    <Box flexDirection="column">
       {/* Top border */}
       {renderBorder('top')}
 

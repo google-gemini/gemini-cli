@@ -5,7 +5,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { MacOsSandboxManager } from './MacOsSandboxManager.js';
-import type { ExecutionPolicy } from '../../services/sandboxManager.js';
+import { type ExecutionPolicy } from '../../services/sandboxManager.js';
 import * as seatbeltArgsBuilder from './seatbeltArgsBuilder.js';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -64,20 +64,12 @@ describe('MacOsSandboxManager', () => {
         policy: mockPolicy,
       });
 
-      expect(seatbeltArgsBuilder.buildSeatbeltProfile).toHaveBeenCalledWith({
-        workspace: mockWorkspace,
-        allowedPaths: mockAllowedPaths,
-        forbiddenPaths: undefined,
-        networkAccess: mockNetworkAccess,
-        workspaceWrite: false,
-        additionalPermissions: {
-          fileSystem: {
-            read: [],
-            write: [],
-          },
-          network: true,
-        },
-      });
+      expect(seatbeltArgsBuilder.buildSeatbeltProfile).toHaveBeenCalledWith(
+        expect.objectContaining({
+          networkAccess: true,
+          workspaceWrite: false,
+        }),
+      );
 
       expect(result.program).toBe('/usr/bin/sandbox-exec');
       expect(result.args[0]).toBe('-f');
@@ -140,6 +132,30 @@ describe('MacOsSandboxManager', () => {
       );
     });
 
+    it('should NOT whitelist root in YOLO mode', async () => {
+      manager = new MacOsSandboxManager({
+        workspace: mockWorkspace,
+        modeConfig: { readonly: false, allowOverrides: true, yolo: true },
+      });
+
+      await manager.prepareCommand({
+        command: 'ls',
+        args: ['/'],
+        cwd: mockWorkspace,
+        env: {},
+      });
+
+      expect(seatbeltArgsBuilder.buildSeatbeltProfile).toHaveBeenCalledWith(
+        expect.objectContaining({
+          workspaceWrite: true,
+          resolvedPaths: expect.objectContaining({
+            policyRead: expect.not.arrayContaining(['/']),
+            policyWrite: expect.not.arrayContaining(['/']),
+          }),
+        }),
+      );
+    });
+
     describe('virtual commands', () => {
       it('should translate __read to /bin/cat', async () => {
         const testFile = path.join(mockWorkspace, 'file.txt');
@@ -175,24 +191,6 @@ describe('MacOsSandboxManager', () => {
       });
     });
 
-    describe('governance files', () => {
-      it('should ensure governance files exist', async () => {
-        await manager.prepareCommand({
-          command: 'echo',
-          args: [],
-          cwd: mockWorkspace,
-          env: {},
-          policy: mockPolicy,
-        });
-
-        // The seatbelt builder internally handles governance files, so we simply verify
-        // it is invoked correctly with the right workspace.
-        expect(seatbeltArgsBuilder.buildSeatbeltProfile).toHaveBeenCalledWith(
-          expect.objectContaining({ workspace: mockWorkspace }),
-        );
-      });
-    });
-
     describe('allowedPaths', () => {
       it('should parameterize allowed paths and normalize them', async () => {
         await manager.prepareCommand({
@@ -208,7 +206,12 @@ describe('MacOsSandboxManager', () => {
 
         expect(seatbeltArgsBuilder.buildSeatbeltProfile).toHaveBeenCalledWith(
           expect.objectContaining({
-            allowedPaths: ['/tmp/allowed1', '/tmp/allowed2'],
+            resolvedPaths: expect.objectContaining({
+              policyAllowed: expect.arrayContaining([
+                '/tmp/allowed1',
+                '/tmp/allowed2',
+              ]),
+            }),
           }),
         );
       });
@@ -218,7 +221,7 @@ describe('MacOsSandboxManager', () => {
       it('should parameterize forbidden paths and explicitly deny them', async () => {
         const customManager = new MacOsSandboxManager({
           workspace: mockWorkspace,
-          forbiddenPaths: ['/tmp/forbidden1'],
+          forbiddenPaths: async () => ['/tmp/forbidden1'],
         });
         await customManager.prepareCommand({
           command: 'echo',
@@ -230,7 +233,9 @@ describe('MacOsSandboxManager', () => {
 
         expect(seatbeltArgsBuilder.buildSeatbeltProfile).toHaveBeenCalledWith(
           expect.objectContaining({
-            forbiddenPaths: ['/tmp/forbidden1'],
+            resolvedPaths: expect.objectContaining({
+              forbidden: expect.arrayContaining(['/tmp/forbidden1']),
+            }),
           }),
         );
       });
@@ -238,7 +243,7 @@ describe('MacOsSandboxManager', () => {
       it('explicitly denies non-existent forbidden paths to prevent creation', async () => {
         const customManager = new MacOsSandboxManager({
           workspace: mockWorkspace,
-          forbiddenPaths: ['/tmp/does-not-exist'],
+          forbiddenPaths: async () => ['/tmp/does-not-exist'],
         });
         await customManager.prepareCommand({
           command: 'echo',
@@ -250,7 +255,9 @@ describe('MacOsSandboxManager', () => {
 
         expect(seatbeltArgsBuilder.buildSeatbeltProfile).toHaveBeenCalledWith(
           expect.objectContaining({
-            forbiddenPaths: ['/tmp/does-not-exist'],
+            resolvedPaths: expect.objectContaining({
+              forbidden: expect.arrayContaining(['/tmp/does-not-exist']),
+            }),
           }),
         );
       });
@@ -258,7 +265,7 @@ describe('MacOsSandboxManager', () => {
       it('should override allowed paths if a path is also in forbidden paths', async () => {
         const customManager = new MacOsSandboxManager({
           workspace: mockWorkspace,
-          forbiddenPaths: ['/tmp/conflict'],
+          forbiddenPaths: async () => ['/tmp/conflict'],
         });
         await customManager.prepareCommand({
           command: 'echo',
@@ -273,8 +280,10 @@ describe('MacOsSandboxManager', () => {
 
         expect(seatbeltArgsBuilder.buildSeatbeltProfile).toHaveBeenCalledWith(
           expect.objectContaining({
-            allowedPaths: ['/tmp/conflict'],
-            forbiddenPaths: ['/tmp/conflict'],
+            resolvedPaths: expect.objectContaining({
+              policyAllowed: [],
+              forbidden: expect.arrayContaining(['/tmp/conflict']),
+            }),
           }),
         );
       });

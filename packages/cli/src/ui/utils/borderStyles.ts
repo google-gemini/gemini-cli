@@ -29,7 +29,10 @@ export function getToolGroupBorderAppearance(
   item:
     | HistoryItem
     | HistoryItemWithoutId
-    | { type: 'tool_group'; tools: TrackedToolCall[] },
+    | {
+        type: 'tool_group';
+        tools: Array<IndividualToolCallDisplay | TrackedToolCall>;
+      },
   activeShellPtyId: number | null | undefined,
   embeddedShellFocused: boolean | undefined,
   allPendingItems: HistoryItemWithoutId[] = [],
@@ -41,7 +44,7 @@ export function getToolGroupBorderAppearance(
 
   // If this item has no tools, it's a closing slice for the current batch.
   // We need to look at the last pending item to determine the batch's appearance.
-  const toolsToInspect: Array<IndividualToolCallDisplay | TrackedToolCall> =
+  const toolsToInspect =
     item.tools.length > 0
       ? item.tools
       : allPendingItems

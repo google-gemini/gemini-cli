@@ -25,6 +25,8 @@ import {
   GET_INTERNAL_DOCS_TOOL_NAME,
   ASK_USER_TOOL_NAME,
   ENTER_PLAN_MODE_TOOL_NAME,
+  READ_MCP_RESOURCE_TOOL_NAME,
+  LIST_MCP_RESOURCES_TOOL_NAME,
   // Shared parameter names
   PARAM_FILE_PATH,
   PARAM_DIR_PATH,
@@ -695,12 +697,12 @@ The agent did not use the todo list because this task could be completed by a ti
                 enum: ['choice', 'text', 'yesno'],
                 default: 'choice',
                 description:
-                  "Question type: 'choice' (default) for multiple-choice with options, 'text' for free-form input, 'yesno' for Yes/No confirmation.",
+                  "Question type: 'choice' (default) for multiple-choice with options, 'text' for free-form input, 'yesno' for Yes/No confirmation with optional 'Other' feedback.",
               },
               [ASK_USER_QUESTION_PARAM_OPTIONS]: {
                 type: 'array',
                 description:
-                  "The selectable choices for 'choice' type questions. Provide 2-4 options. An 'Other' option is automatically added. Not needed for 'text' or 'yesno' types.",
+                  "The selectable choices for 'choice' type questions. Provide 2-4 options. An 'Other' option is automatically added for 'choice' and 'yesno' types. Not needed for 'text' or 'yesno'.",
                 items: {
                   type: 'object',
                   required: [
@@ -729,7 +731,7 @@ The agent did not use the todo list because this task could be completed by a ti
               [ASK_USER_QUESTION_PARAM_PLACEHOLDER]: {
                 type: 'string',
                 description:
-                  "Hint text shown in the input field. For type='text', shown in the main input. For type='choice', shown in the 'Other' custom input.",
+                  "Hint text shown in the input field. For type='text', shown in the main input. For type='choice' and 'yesno', shown in the 'Other' custom input.",
               },
             },
           },
@@ -756,4 +758,37 @@ The agent did not use the todo list because this task could be completed by a ti
 
   exit_plan_mode: () => getExitPlanModeDeclaration(),
   activate_skill: (skillNames) => getActivateSkillDeclaration(skillNames),
+
+  read_mcp_resource: {
+    name: READ_MCP_RESOURCE_TOOL_NAME,
+    description:
+      'Reads the content of a specified Model Context Protocol (MCP) resource.',
+    parametersJsonSchema: {
+      type: 'object',
+      properties: {
+        uri: {
+          description: 'The URI of the MCP resource to read.',
+          type: 'string',
+        },
+      },
+      required: ['uri'],
+    },
+  },
+
+  list_mcp_resources: {
+    name: LIST_MCP_RESOURCES_TOOL_NAME,
+    description:
+      'Lists all available resources exposed by connected MCP servers.',
+    parametersJsonSchema: {
+      type: 'object',
+      properties: {
+        serverName: {
+          description:
+            'Optional filter to list resources from a specific server.',
+          type: 'string',
+        },
+      },
+      required: [],
+    },
+  },
 };

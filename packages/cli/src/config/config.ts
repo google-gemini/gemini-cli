@@ -47,6 +47,7 @@ import {
   type HookEventName,
   type OutputFormat,
   detectIdeFromEnv,
+  generalistProfile,
 } from '@google/gemini-cli-core';
 import {
   type Settings,
@@ -904,6 +905,16 @@ export async function loadCliConfig(
     }
   }
 
+  const useGeneralistProfile =
+    settings.experimental?.generalistProfile ?? false;
+  const useContextManagement =
+    settings.experimental?.contextManagement ?? false;
+  const contextManagement = {
+    ...(useGeneralistProfile ? generalistProfile : {}),
+    ...(useContextManagement ? settings?.contextManagement : {}),
+    enabled: useContextManagement || useGeneralistProfile,
+  };
+
   return new Config({
     acpMode: isAcpMode,
     clientName,
@@ -948,6 +959,8 @@ export async function loadCliConfig(
       : undefined,
     blockedEnvironmentVariables:
       settings.security?.environmentVariableRedaction?.blocked,
+    allowedEnvironmentVariables:
+      settings.security?.environmentVariableRedaction?.allowed,
     enableEnvironmentVariableRedaction:
       settings.security?.environmentVariableRedaction?.enabled,
     userMemory: memoryContent,
@@ -1002,13 +1015,9 @@ export async function loadCliConfig(
     disabledSkills: settings.skills?.disabled,
     experimentalJitContext: settings.experimental?.jitContext,
     experimentalMemoryManager: settings.experimental?.memoryManager,
-    contextManagement: {
-      enabled: settings.experimental?.contextManagement,
-      ...settings?.contextManagement,
-    },
+    contextManagement,
     modelSteering: settings.experimental?.modelSteering,
     topicUpdateNarration: settings.experimental?.topicUpdateNarration,
-    toolOutputMasking: settings.experimental?.toolOutputMasking,
     noBrowser: !!process.env['NO_BROWSER'],
     summarizeToolOutput: settings.model?.summarizeToolOutput,
     ideMode,
@@ -1019,6 +1028,8 @@ export async function loadCliConfig(
     trustedFolder,
     useBackgroundColor: settings.ui?.useBackgroundColor,
     useAlternateBuffer: settings.ui?.useAlternateBuffer,
+    useTerminalBuffer: settings.ui?.terminalBuffer,
+    useRenderProcess: settings.ui?.renderProcess,
     useRipgrep: settings.tools?.useRipgrep,
     enableInteractiveShell: settings.tools?.shell?.enableInteractiveShell,
     shellBackgroundCompletionBehavior: settings.tools?.shell
@@ -1035,6 +1046,7 @@ export async function loadCliConfig(
       format: (argv.outputFormat ?? settings.output?.format) as OutputFormat,
     },
     gemmaModelRouter: settings.experimental?.gemmaModelRouter,
+    adk: settings.experimental?.adk,
     fakeResponses: argv.fakeResponses,
     recordResponses: argv.recordResponses,
     retryFetchErrors: settings.general?.retryFetchErrors,
@@ -1089,7 +1101,7 @@ async function resolveWorktreeSettings(
     if (isGeminiWorktree(toplevel, projectRoot)) {
       worktreePath = toplevel;
     }
-  } catch (_e) {
+  } catch {
     return undefined;
   }
 

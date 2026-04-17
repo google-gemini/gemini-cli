@@ -64,6 +64,9 @@ describe('PromptProvider', () => {
       storage: {
         getProjectTempDir: vi.fn().mockReturnValue('/tmp/project-temp'),
         getPlansDir: vi.fn().mockReturnValue('/tmp/project-temp/plans'),
+        getProjectTempTrackerDir: vi
+          .fn()
+          .mockReturnValue('/tmp/project-temp/tracker'),
       },
       isInteractive: vi.fn().mockReturnValue(true),
       isInteractiveShellEnabled: vi.fn().mockReturnValue(true),
@@ -75,6 +78,7 @@ describe('PromptProvider', () => {
       getActiveModel: vi.fn().mockReturnValue(PREVIEW_GEMINI_MODEL),
       getAgentRegistry: vi.fn().mockReturnValue({
         getAllDefinitions: vi.fn().mockReturnValue([]),
+        getDefinition: vi.fn().mockReturnValue(undefined),
       }),
       getApprovedPlanPath: vi.fn().mockReturnValue(undefined),
       getApprovalMode: vi.fn(),
@@ -101,6 +105,36 @@ describe('PromptProvider', () => {
     // Verify renderCoreMandates usage
     expect(prompt).toContain(
       `Instructions found in \`${DEFAULT_CONTEXT_FILENAME}\`, \`CUSTOM.md\` or \`ANOTHER.md\` files are foundational mandates.`,
+    );
+  });
+
+  it('should include the task tracker storage location in the system prompt', () => {
+    vi.mocked(mockConfig.isTrackerEnabled).mockReturnValue(true);
+    const mockTrackerDir = '/mock/tracker/path';
+    vi.mocked(mockConfig.storage.getProjectTempTrackerDir).mockReturnValue(
+      mockTrackerDir,
+    );
+
+    const provider = new PromptProvider();
+    const prompt = provider.getCoreSystemPrompt(mockConfig);
+
+    expect(prompt).toContain('# TASK MANAGEMENT PROTOCOL');
+    expect(prompt).toContain(`located at \`${mockTrackerDir}\``);
+  });
+
+  it('should sanitize the task tracker storage location in the system prompt', () => {
+    vi.mocked(mockConfig.isTrackerEnabled).mockReturnValue(true);
+    const mockTrackerDir = '/mock/tracker/path\nwith-newline]and-bracket';
+    vi.mocked(mockConfig.storage.getProjectTempTrackerDir).mockReturnValue(
+      mockTrackerDir,
+    );
+
+    const provider = new PromptProvider();
+    const prompt = provider.getCoreSystemPrompt(mockConfig);
+
+    expect(prompt).toContain('# TASK MANAGEMENT PROTOCOL');
+    expect(prompt).toContain(
+      'located at `/mock/tracker/path with-newlineand-bracket`',
     );
   });
 

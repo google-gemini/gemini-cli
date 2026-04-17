@@ -7,7 +7,19 @@
 import { describe, expect, it } from 'vitest';
 import { AgentSession } from './agent-session.js';
 import { MockAgentProtocol } from './mock.js';
-import type { AgentEvent } from './types.js';
+import type { AgentEvent, AgentSend } from './types.js';
+
+function makeMessageSend(
+  text: string,
+  displayContent?: string,
+): Extract<AgentSend, { message: unknown }> {
+  return {
+    message: {
+      content: [{ type: 'text', text }],
+      ...(displayContent ? { displayContent } : {}),
+    },
+  };
+}
 
 describe('AgentSession', () => {
   it('should passthrough simple methods', async () => {
@@ -51,7 +63,7 @@ describe('AgentSession', () => {
 
     const events: AgentEvent[] = [];
     for await (const event of session.sendStream({
-      message: [{ type: 'text', text: 'hi' }],
+      ...makeMessageSend('hi'),
     })) {
       events.push(event);
     }
@@ -139,7 +151,7 @@ describe('AgentSession', () => {
 
     const events: AgentEvent[] = [];
     for await (const event of session.sendStream({
-      message: [{ type: 'text', text: 'hi' }],
+      ...makeMessageSend('hi'),
     })) {
       events.push(event);
     }
@@ -178,7 +190,7 @@ describe('AgentSession', () => {
 
       protocol.pushResponse([{ type: 'message' }]);
       const { streamId } = await session.send({
-        message: [{ type: 'text', text: 'request' }],
+        ...makeMessageSend('request'),
       });
       await new Promise((resolve) => setTimeout(resolve, 10));
 
@@ -242,7 +254,7 @@ describe('AgentSession', () => {
         },
       ]);
       await session.send({
-        message: [{ type: 'text', text: 'request' }],
+        ...makeMessageSend('request'),
       });
       await new Promise((resolve) => setTimeout(resolve, 10));
 
@@ -303,7 +315,7 @@ describe('AgentSession', () => {
         },
       ]);
       const { streamId: streamId1 } = await session.send({
-        message: [{ type: 'text', text: 'first request' }],
+        ...makeMessageSend('first request'),
       });
       await new Promise((resolve) => setTimeout(resolve, 10));
 
@@ -315,7 +327,7 @@ describe('AgentSession', () => {
         },
       ]);
       await session.send({
-        message: [{ type: 'text', text: 'second request' }],
+        ...makeMessageSend('second request'),
       });
       await new Promise((resolve) => setTimeout(resolve, 10));
 
