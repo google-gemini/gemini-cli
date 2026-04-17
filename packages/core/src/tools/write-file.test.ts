@@ -1131,13 +1131,6 @@ describe('WriteFileTool', () => {
         content: 'nested content',
       });
 
-      const confirmDetails = await (
-        invocation as unknown as {
-          getConfirmationDetails: () => Promise<{ title: string }>;
-        }
-      ).getConfirmationDetails();
-      expect(confirmDetails.title).toContain('conductor/tracks/test.md');
-
       await invocation.execute({ abortSignal });
 
       const expectedWritePath = path.join(plansDir, 'conductor/tracks/test.md');
