@@ -39,6 +39,13 @@ export abstract class BaseTokenStorage implements TokenStorage {
     if (!credentials.token.expiresAt) {
       return false;
     }
+    // If a refresh token exists, the caller (e.g. OAuth2Client) can silently
+    // refresh the access token.  Discarding the credentials here would lose
+    // the refresh token and force an interactive re-auth — which is fatal in
+    // non-interactive / headless sessions (swarms, CI, -p flag).
+    if (credentials.token.refreshToken) {
+      return false;
+    }
     const bufferMs = 5 * 60 * 1000;
     return Date.now() > credentials.token.expiresAt - bufferMs;
   }
