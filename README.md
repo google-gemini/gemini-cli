@@ -353,25 +353,6 @@ See the
 [MCP Server Integration guide](https://www.geminicli.com/docs/tools/mcp-server)
 for setup instructions.
 
-### Gemini-Cyber extension (this fork)
-
-This repository includes an extension scaffold at
-`extensions/gemini-cyber-cli` with custom `/scan` and `/report` commands plus a
-Python MCP bridge for HATS workflows.
-
-Set up the Python runtime dependency before linking the extension:
-
-```bash
-cd extensions/gemini-cyber-cli
-python3 -m pip install -r mcp/requirements.txt
-```
-
-Then link the extension:
-
-```bash
-gemini extensions link .
-```
-
 ## 🤝 Contributing
 
 We welcome contributions! Gemini CLI is fully open source (Apache 2.0), and we
