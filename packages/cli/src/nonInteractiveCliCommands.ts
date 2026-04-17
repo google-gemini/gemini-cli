@@ -21,11 +21,28 @@ import { createNonInteractiveUI } from './ui/noninteractive/nonInteractiveUi.js'
 import type { LoadedSettings } from './config/settings.js';
 import type { SessionStatsState } from './ui/contexts/SessionContext.js';
 
+export type NonInteractiveSlashCommandResult =
+  | {
+      kind: 'submit_prompt';
+      content: PartListUnion;
+    }
+  | {
+      kind: 'message';
+      messageType: 'info' | 'error';
+      content: string;
+    }
+  | {
+      kind: 'handled';
+    }
+  | {
+      kind: 'unhandled';
+    };
+
 /**
  * Processes a slash command in a non-interactive environment.
  *
- * @returns A Promise that resolves to `PartListUnion` if a valid command is
- *   found and results in a prompt, or `undefined` otherwise.
+ * @returns A structured result indicating whether the slash command was
+ *   handled, should fall back to prompt submission, or produced output.
  * @throws {FatalInputError} if the command result is not supported in
  *   non-interactive mode.
  */
@@ -34,10 +51,10 @@ export const handleSlashCommand = async (
   abortController: AbortController,
   config: Config,
   settings: LoadedSettings,
-): Promise<PartListUnion | undefined> => {
+): Promise<NonInteractiveSlashCommandResult> => {
   const trimmed = rawQuery.trim();
   if (!trimmed.startsWith('/')) {
-    return;
+    return { kind: 'unhandled' };
   }
 
   const commandService = await CommandService.create(
@@ -52,62 +69,69 @@ export const handleSlashCommand = async (
 
   const { commandToExecute, args } = parseSlashCommand(rawQuery, commands);
 
-  if (commandToExecute) {
-    if (commandToExecute.action) {
-      // Not used by custom commands but may be in the future.
-      const sessionStats: SessionStatsState = {
-        sessionId: config?.getSessionId(),
-        sessionStartTime: new Date(),
-        metrics: uiTelemetryService.getMetrics(),
-        lastPromptTokenCount: 0,
-        promptCount: 1,
-      };
+  if (!commandToExecute) {
+    return { kind: 'unhandled' };
+  }
 
-      const logger = new Logger(config?.getSessionId() || '', config?.storage);
+  if (commandToExecute.action) {
+    // Not used by custom commands but may be in the future.
+    const sessionStats: SessionStatsState = {
+      sessionId: config?.getSessionId(),
+      sessionStartTime: new Date(),
+      metrics: uiTelemetryService.getMetrics(),
+      lastPromptTokenCount: 0,
+      promptCount: 1,
+    };
+const logger = new Logger(config?.getSessionId() || '', config?.storage);
 
-      const commandContext: CommandContext = {
-        services: {
-          agentContext: config,
-          settings,
-          git: undefined,
-          logger,
-        },
-        ui: createNonInteractiveUI(),
-        session: {
-          stats: sessionStats,
-          sessionShellAllowlist: new Set(),
-        },
-        invocation: {
-          raw: trimmed,
-          name: commandToExecute.name,
-          args,
-        },
-      };
+const commandContext: CommandContext = {
+  services: {
+    agentContext: config,
+    settings,
+    git: undefined,
+    logger,
+  },
+  ui: createNonInteractiveUI(),
+  session: {
+    stats: sessionStats,
+    sessionShellAllowlist: new Set(),
+  },
+  invocation: {
+    raw: trimmed,
+    name: commandToExecute.name,
+    args,
+  },
+};
 
-      const result = await commandToExecute.action(commandContext, args);
+const result = await commandToExecute.action(commandContext, args);
 
-      if (result) {
-        switch (result.type) {
-          case 'submit_prompt':
-            return result.content;
-          case 'confirm_shell_commands':
-            // This result indicates a command attempted to confirm shell commands.
-            // However note that currently, ShellTool is excluded in non-interactive
-            // mode unless 'YOLO mode' is active, so confirmation actually won't
-            // occur because of YOLO mode.
-            // This ensures that if a command *does* request confirmation (e.g.
-            // in the future with more granular permissions), it's handled appropriately.
-            throw new FatalInputError(
-              'Exiting due to a confirmation prompt requested by the command.',
-            );
-          default:
-            throw new FatalInputError(
-              'Exiting due to command result that is not supported in non-interactive mode.',
-            );
-        }
+    if (result) {
+      switch (result.type) {
+        case 'submit_prompt':
+          return { kind: 'submit_prompt', content: result.content };
+        case 'message':
+          return {
+            kind: 'message',
+            messageType: result.messageType,
+            content: result.content,
+          };
+        case 'confirm_shell_commands':
+          // This result indicates a command attempted to confirm shell commands.
+          // However note that currently, ShellTool is excluded in non-interactive
+          // mode unless 'YOLO mode' is active, so confirmation actually won't
+          // occur because of YOLO mode.
+          // This ensures that if a command *does* request confirmation (e.g.
+          // in the future with more granular permissions), it's handled appropriately.
+          throw new FatalInputError(
+            'Exiting due to a confirmation prompt requested by the command.',
+          );
+        default:
+          throw new FatalInputError(
+            'Exiting due to command result that is not supported in non-interactive mode.',
+          );
       }
     }
   }
 
-  return;
+  return { kind: 'handled' };
 };

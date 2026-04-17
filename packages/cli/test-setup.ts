@@ -6,7 +6,7 @@
 
 import { vi, beforeEach, afterEach } from 'vitest';
 import { format } from 'node:util';
-import { coreEvents, debugLogger } from '@google/gemini-cli-core';
+import { coreEvents, uiTelemetryService, debugLogger } from '@google/gemini-cli-core';
 import { themeManager } from './src/ui/themes/theme-manager.js';
 import { mockInkSpinner } from './src/test-utils/mockSpinner.js';
 
@@ -22,6 +22,7 @@ global.IS_REACT_ACT_ENVIRONMENT = true;
 
 // Increase max listeners to avoid warnings in large test suites
 coreEvents.setMaxListeners(100);
+uiTelemetryService.setMaxListeners(100);
 
 // Unset NO_COLOR environment variable to ensure consistent theme behavior between local and CI test runs
 if (process.env.NO_COLOR !== undefined) {

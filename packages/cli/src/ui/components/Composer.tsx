@@ -143,6 +143,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
 
       {uiState.isInputActive && (
         <InputPrompt
+          key="input-prompt"
           onSubmit={uiActions.handleFinalSubmit}
           setBannerVisible={uiActions.setBannerVisible}
           onClearScreen={uiActions.handleClearScreen}

@@ -41,6 +41,8 @@ import {
   type OverflowActions,
   type OverflowState,
 } from '../ui/contexts/OverflowContext.js';
+import { VoiceContext } from '../ui/contexts/VoiceContext.js';
+import type { VoiceInputReturn } from '../ui/hooks/useVoiceInput.js';
 
 import { makeFakeConfig } from '@google/gemini-cli-core';
 import { type Config } from '@google/gemini-cli-core';
@@ -540,6 +542,19 @@ export const mockAppState: AppState = {
   startupWarnings: [],
 };
 
+const mockVoiceReturn: VoiceInputReturn = {
+  isEnabled: true,
+  state: {
+    isRecording: false,
+    isTranscribing: false,
+    error: null,
+  },
+  startRecording: vi.fn(async () => {}),
+  stopRecording: vi.fn(async () => {}),
+  cancelRecording: vi.fn(async () => {}),
+  toggleRecording: vi.fn(async () => {}),
+};
+
 const mockUIActions: UIActions = {
   handleThemeSelect: vi.fn(),
   closeThemeDialog: vi.fn(),
@@ -629,6 +644,7 @@ export const renderWithProviders = async (
     toolActions,
     persistentState,
     appState = mockAppState,
+    voice = mockVoiceReturn,
   }: {
     shellFocus?: boolean;
     settings?: LoadedSettings;
@@ -649,6 +665,7 @@ export const renderWithProviders = async (
       set?: typeof persistentStateMock.set;
     };
     appState?: AppState;
+    voice?: VoiceInputReturn;
   } = {},
 ): Promise<RenderWithProvidersInstance> => {
   const baseState: UIState = new Proxy(
@@ -765,39 +782,41 @@ export const renderWithProviders = async (
                                 toolActions?.toggleAllExpansion ?? vi.fn()
                               }
                             >
-                              <AskUserActionsProvider
-                                request={null}
-                                onSubmit={vi.fn()}
-                                onCancel={vi.fn()}
-                              >
-                                <KeypressProvider>
-                                  <MouseProvider
-                                    mouseEventsEnabled={mouseEventsEnabled}
-                                  >
-                                    <TerminalProvider>
-                                      <ScrollProvider>
-                                        <ContextCapture>
-                                          <Box
-                                            width={terminalWidth}
-                                            flexShrink={0}
-                                            flexGrow={0}
-                                            flexDirection="column"
-                                          >
-                                            {comp}
-                                          </Box>
-                                        </ContextCapture>
-                                      </ScrollProvider>
-                                    </TerminalProvider>
-                                  </MouseProvider>
-                                </KeypressProvider>
-                              </AskUserActionsProvider>
+                              <VoiceContext.Provider value={voice}>
+                                <AskUserActionsProvider
+                                  request={null}
+                                  onSubmit={vi.fn()}
+                                  onCancel={vi.fn()}
+                                >
+                                  <KeypressProvider>
+                                    <MouseProvider
+                                      mouseEventsEnabled={mouseEventsEnabled}
+                                    >
+                                      <TerminalProvider>
+                                        <ScrollProvider>
+                                          <ContextCapture>
+                                            <Box
+                                              width={terminalWidth}
+                                              flexShrink={0}
+                                              flexGrow={0}
+                                              flexDirection="column"
+                                            >
+                                              {comp}
+                                            </Box>
+                                          </ContextCapture>
+                                        </ScrollProvider>
+                                      </TerminalProvider>
+                                    </MouseProvider>
+                                  </KeypressProvider>
+                                </AskUserActionsProvider>
+                              </VoiceContext.Provider>
                             </ToolActionsProvider>
                           </OverflowProvider>
                         </UIActionsContext.Provider>
-                      </StreamingContext.Provider>
-                    </SessionStatsProvider>
-                  </ShellFocusContext.Provider>
-                </VimModeProvider>
+                    </StreamingContext.Provider>
+                  </SessionStatsProvider>
+                </ShellFocusContext.Provider>
+              </VimModeProvider>
               </UIStateContext.Provider>
             </InputContext.Provider>
           </QuotaContext.Provider>

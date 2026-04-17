@@ -37,6 +37,7 @@ import {
 } from '@google/gemini-cli-core';
 
 import { loadCliConfig, parseArguments } from './config/config.js';
+import { setupInitialActivityLogger } from './utils/devtoolsService.js';
 import * as cliConfig from './config/config.js';
 import { readStdin } from './utils/readStdin.js';
 import { createHash } from 'node:crypto';
@@ -529,9 +530,6 @@ export async function main() {
     adminControlsListner.setConfig(config);
 
     if (config.isInteractive() && settings.merged.general.devtools) {
-      const { setupInitialActivityLogger } = await import(
-        './utils/devtoolsService.js'
-      );
       await setupInitialActivityLogger(config);
     }
 

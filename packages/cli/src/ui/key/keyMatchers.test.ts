@@ -321,7 +321,11 @@ describe('keyMatchers', () => {
     },
     {
       command: Command.PASTE_CLIPBOARD,
-      positive: [createKey('v', { ctrl: true })],
+      positive: [
+        createKey('v', { ctrl: true }),
+        createKey('v', { cmd: true }),
+        createKey('v', { alt: true }),
+      ],
       negative: [createKey('v'), createKey('c', { ctrl: true })],
     },
 
@@ -386,6 +390,15 @@ describe('keyMatchers', () => {
         createKey('s', { ctrl: true }),
         createKey('s'),
         createKey('l', { ctrl: true }),
+      ],
+    },
+    {
+      command: Command.VOICE_INPUT,
+      positive: [],
+      negative: [
+        createKey('r', { alt: true }),
+        createKey('v'),
+        createKey('v', { ctrl: true }),
       ],
     },
     // Shell commands

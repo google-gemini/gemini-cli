@@ -46,6 +46,7 @@ import {
   handleMaxTurnsExceededError,
 } from './utils/errors.js';
 import { TextOutput } from './ui/utils/textOutput.js';
+import { setupInitialActivityLogger } from './utils/devtoolsService.js';
 import { runNonInteractive as runNonInteractiveAgentSession } from './nonInteractiveCliAgentSession.js';
 
 interface RunNonInteractiveParams {
@@ -77,14 +78,57 @@ export async function runNonInteractive(
     });
 
     if (process.env['GEMINI_CLI_ACTIVITY_LOG_TARGET']) {
-      const { setupInitialActivityLogger } = await import(
-        './utils/devtoolsService.js'
-      );
       await setupInitialActivityLogger(config);
     }
 
     const { stdout: workingStdout } = createWorkingStdio();
     const textOutput = new TextOutput(workingStdout);
+    const writeSlashCommandMessage = (
+      messageType: 'info' | 'error',
+      content: string,
+      streamFormatter: StreamJsonFormatter | null,
+    ) => {
+      const timestamp = new Date().toISOString();
+      if (streamFormatter) {
+        streamFormatter.emitEvent({
+          type: JsonStreamEventType.MESSAGE,
+          timestamp,
+          role: 'user',
+          content: input,
+        });
+        streamFormatter.emitEvent({
+          type: JsonStreamEventType.MESSAGE,
+          timestamp,
+          role: 'assistant',
+          content,
+        });
+        const metrics = uiTelemetryService.getMetrics();
+        const durationMs = Date.now() - startTime;
+        streamFormatter.emitEvent({
+          type: JsonStreamEventType.RESULT,
+          timestamp,
+          status: 'success',
+          stats: streamFormatter.convertToStreamStats(metrics, durationMs),
+        });
+        return;
+      }
+
+      if (config.getOutputFormat() === OutputFormat.JSON) {
+        const formatter = new JsonFormatter();
+        const stats = uiTelemetryService.getMetrics();
+        textOutput.write(
+          formatter.format(config.getSessionId(), content, stats),
+        );
+        return;
+      }
+
+      const output = `[${messageType.toUpperCase()}] ${content}\n`;
+      if (messageType === 'error') {
+        process.stderr.write(output);
+      } else {
+        textOutput.write(output);
+      }
+    };
 
     const handleUserFeedback = (payload: UserFeedbackPayload) => {
       const prefix = payload.severity.toUpperCase();
@@ -252,12 +296,18 @@ export async function runNonInteractive(
           config,
           settings,
         );
-        // If a slash command is found and returns a prompt, use it.
-        // Otherwise, slashCommandResult falls through to the default prompt
-        // handling.
-        if (slashCommandResult) {
+        if (slashCommandResult.kind === 'submit_prompt') {
           // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          query = slashCommandResult as Part[];
+          query = slashCommandResult.content as Part[];
+        } else if (slashCommandResult.kind === 'message') {
+          writeSlashCommandMessage(
+            slashCommandResult.messageType,
+            slashCommandResult.content,
+            streamFormatter,
+          );
+          return;
+        } else if (slashCommandResult.kind === 'handled') {
+          return;
         }
       }
 

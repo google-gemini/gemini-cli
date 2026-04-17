@@ -253,9 +253,21 @@ export async function runNonInteractive({
           config,
           settings,
         );
-        if (slashCommandResult) {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          query = slashCommandResult as Part[];
+        if (slashCommandResult.kind === 'submit_prompt') {
+          query = Array.isArray(slashCommandResult.content)
+            ? // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+              (slashCommandResult.content as Part[])
+            : // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+              [{ text: slashCommandResult.content as string }];
+        } else if (slashCommandResult.kind === 'message') {
+          if (slashCommandResult.messageType === 'error') {
+            throw new FatalInputError(slashCommandResult.content);
+          }
+          // eslint-disable-next-line no-console
+          console.log(slashCommandResult.content);
+          return;
+        } else if (slashCommandResult.kind === 'handled') {
+          return;
         }
       }
 
