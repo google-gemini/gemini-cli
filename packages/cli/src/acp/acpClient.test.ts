@@ -803,14 +803,123 @@ describe('Session', () => {
     });
 
     expect(mockChat.sendMessageStream).toHaveBeenCalled();
-    expect(mockConnection.sessionUpdate).toHaveBeenCalledWith({
-      sessionId: 'session-1',
-      update: {
-        sessionUpdate: 'agent_message_chunk',
-        content: { type: 'text', text: 'Hello' },
-      },
-    });
+    expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionId: 'session-1',
+        update: expect.objectContaining({
+          sessionUpdate: 'agent_message_chunk',
+          content: { type: 'text', text: 'Hello' },
+          messageId: expect.any(String),
+        }),
+      }),
+    );
+    expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionId: 'session-1',
+        update: expect.objectContaining({
+          sessionUpdate: 'agent_message_chunk',
+          content: { type: 'text', text: '' },
+          messageId: expect.any(String),
+          _meta: {
+            anyharness: {
+              transcriptEvent: 'assistant_message_completed',
+            },
+          },
+        }),
+      }),
+    );
     expect(result).toMatchObject({ stopReason: 'end_turn' });
+  });
+
+  it('should surface retry as transient status and close the active assistant stream', async () => {
+    const stream = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: {
+          candidates: [{ content: { parts: [{ text: 'Partial' }] } }],
+        },
+      },
+      { type: StreamEventType.RETRY },
+      {
+        type: StreamEventType.CHUNK,
+        value: {
+          candidates: [{ content: { parts: [{ text: 'Retry result' }] } }],
+        },
+      },
+    ]);
+    mockChat.sendMessageStream.mockResolvedValue(stream);
+
+    await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Hi' }],
+    });
+
+    expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({
+          sessionUpdate: 'agent_message_chunk',
+          content: { type: 'text', text: '' },
+          _meta: {
+            anyharness: {
+              transcriptEvent: 'assistant_message_completed',
+            },
+          },
+        }),
+      }),
+    );
+    expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({
+          sessionUpdate: 'agent_thought_chunk',
+          content: { type: 'text', text: 'Retrying Gemini request...' },
+          _meta: {
+            anyharness: {
+              transcriptEvent: 'transient_status',
+            },
+          },
+        }),
+      }),
+    );
+  });
+
+  it('should keep blocked and stopped execution messages durable', async () => {
+    const stream = createMockStream([
+      {
+        type: StreamEventType.AGENT_EXECUTION_BLOCKED,
+        reason: 'policy rejected the action',
+      },
+      {
+        type: StreamEventType.AGENT_EXECUTION_STOPPED,
+        reason: 'hook stopped execution',
+      },
+    ]);
+    mockChat.sendMessageStream.mockResolvedValue(stream);
+
+    await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Hi' }],
+    });
+
+    const updates = mockConnection.sessionUpdate.mock.calls.map(
+      ([call]) => call.update,
+    );
+    const blocked = updates.find(
+      (update) =>
+        update.sessionUpdate === 'agent_message_chunk' &&
+        update.content.type === 'text' &&
+        update.content.text ===
+          'Gemini agent execution blocked: policy rejected the action',
+    );
+    const stopped = updates.find(
+      (update) =>
+        update.sessionUpdate === 'agent_message_chunk' &&
+        update.content.type === 'text' &&
+        update.content.text ===
+          'Gemini agent execution stopped: hook stopped execution',
+    );
+
+    expect(blocked?._meta).toBeUndefined();
+    expect(stopped?._meta).toBeUndefined();
   });
 
   it('should use model router to determine model', async () => {
@@ -919,6 +1028,19 @@ describe('Session', () => {
     expect(handleCommandSpy).toHaveBeenCalledWith(
       '/memory view',
       expect.any(Object),
+    );
+    expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({
+          sessionUpdate: 'agent_thought_chunk',
+          content: { type: 'text', text: 'Running /memory...' },
+          _meta: {
+            anyharness: {
+              transcriptEvent: 'transient_status',
+            },
+          },
+        }),
+      }),
     );
     expect(mockChat.sendMessageStream).not.toHaveBeenCalled();
   });
@@ -1060,9 +1182,72 @@ describe('Session', () => {
     expect(result).toMatchObject({ stopReason: 'end_turn' });
   });
 
+  it('should bound raw tool input and output metadata', async () => {
+    const largeText = 'x'.repeat(40 * 1024);
+    mockTool.build.mockReturnValue({
+      getDescription: () => 'Test Tool',
+      toolLocations: () => [],
+      shouldConfirmExecute: vi.fn().mockResolvedValue(null),
+      execute: vi.fn().mockResolvedValue({
+        llmContent: largeText,
+        returnDisplay: largeText,
+      }),
+    });
+
+    const stream1 = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: {
+          functionCalls: [{ name: 'test_tool', args: { largeText } }],
+        },
+      },
+    ]);
+    const stream2 = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: { candidates: [] },
+      },
+    ]);
+
+    mockChat.sendMessageStream
+      .mockResolvedValueOnce(stream1)
+      .mockResolvedValueOnce(stream2);
+
+    await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Call tool' }],
+    });
+
+    expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({
+          sessionUpdate: 'tool_call',
+          rawInput: expect.objectContaining({
+            _truncated: true,
+            originalBytes: expect.any(Number),
+            preview: expect.any(String),
+          }),
+        }),
+      }),
+    );
+    expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({
+          sessionUpdate: 'tool_call_update',
+          rawOutput: expect.objectContaining({
+            _truncated: true,
+            originalBytes: expect.any(Number),
+            preview: expect.any(String),
+          }),
+        }),
+      }),
+    );
+  });
+
   it('should handle tool call permission request', async () => {
     const confirmationDetails = {
       type: 'info',
+      systemMessage: 'Confirm test tool',
       onConfirm: vi.fn(),
     };
     mockTool.build.mockReturnValue({
@@ -1103,7 +1288,31 @@ describe('Session', () => {
       prompt: [{ type: 'text', text: 'Call tool' }],
     });
 
-    expect(mockConnection.requestPermission).toHaveBeenCalled();
+    expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({
+          sessionUpdate: 'tool_call',
+          status: 'pending',
+          rawInput: {},
+        }),
+      }),
+    );
+    expect(mockConnection.requestPermission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        _meta: {
+          gemini: {
+            permissionContext: {
+              displayName: 'Test Tool',
+              decisionReason: 'Confirm test tool',
+              agentId: 'test_tool',
+            },
+          },
+        },
+        toolCall: expect.objectContaining({
+          rawInput: {},
+        }),
+      }),
+    );
     expect(confirmationDetails.onConfirm).toHaveBeenCalledWith(
       ToolConfirmationOutcome.ProceedOnce,
     );
@@ -1502,6 +1711,76 @@ describe('Session', () => {
     expect(updatePolicy).toHaveBeenCalled();
   });
 
+  it('should preserve exact MCP permission option IDs', async () => {
+    const confirmationDetails = {
+      type: 'mcp',
+      serverName: 'server-a',
+      toolName: 'search',
+      toolDisplayName: 'Search',
+      toolDescription: 'Search using MCP',
+      onConfirm: vi.fn(),
+    };
+    mockTool.build.mockReturnValue({
+      getDescription: () => 'MCP Search',
+      toolLocations: () => [],
+      shouldConfirmExecute: vi.fn().mockResolvedValue(confirmationDetails),
+      execute: vi.fn().mockResolvedValue({ llmContent: 'Tool Result' }),
+    });
+
+    mockConnection.requestPermission.mockResolvedValue({
+      outcome: {
+        outcome: 'selected',
+        optionId: ToolConfirmationOutcome.ProceedAlwaysTool,
+      },
+    });
+
+    const stream1 = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: {
+          functionCalls: [{ name: 'test_tool', args: {} }],
+        },
+      },
+    ]);
+    const stream2 = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: { candidates: [] },
+      },
+    ]);
+
+    mockChat.sendMessageStream
+      .mockResolvedValueOnce(stream1)
+      .mockResolvedValueOnce(stream2);
+
+    await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Call tool' }],
+    });
+
+    expect(mockConnection.requestPermission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        options: expect.arrayContaining([
+          expect.objectContaining({
+            optionId: ToolConfirmationOutcome.ProceedAlwaysServer,
+            name: 'Allow all server tools for this session',
+          }),
+          expect.objectContaining({
+            optionId: ToolConfirmationOutcome.ProceedAlwaysTool,
+            name: 'Allow tool for this session',
+          }),
+          expect.objectContaining({
+            optionId: ToolConfirmationOutcome.ProceedAlwaysAndSave,
+            name: 'Allow tool for all future sessions',
+          }),
+        ]),
+      }),
+    );
+    expect(confirmationDetails.onConfirm).toHaveBeenCalledWith(
+      ToolConfirmationOutcome.ProceedAlwaysTool,
+    );
+  });
+
   it('should use filePath for ACP diff content in tool result', async () => {
     mockTool.build.mockReturnValue({
       getDescription: () => 'Test Tool',
@@ -1604,6 +1883,22 @@ describe('Session', () => {
       sessionId: 'session-1',
       prompt: [{ type: 'text', text: 'Call tool' }],
     });
+
+    expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({
+          sessionUpdate: 'tool_call_update',
+          status: 'failed',
+          content: expect.arrayContaining([
+            expect.objectContaining({
+              content: expect.objectContaining({
+                text: expect.stringContaining('canceled by the user'),
+              }),
+            }),
+          ]),
+        }),
+      }),
+    );
 
     // When cancelled, it sends an error response to the model
     // We can verify that the second call to sendMessageStream contains the error
@@ -2224,6 +2519,13 @@ describe('Session', () => {
     expect(mockConfig.setApprovalMode).toHaveBeenCalledWith(
       ApprovalMode.AUTO_EDIT,
     );
+    expect(mockConnection.sessionUpdate).toHaveBeenCalledWith({
+      sessionId: 'session-1',
+      update: {
+        sessionUpdate: 'current_mode_update',
+        currentModeId: ApprovalMode.AUTO_EDIT,
+      },
+    });
   });
 
   it('should throw error for invalid mode', () => {

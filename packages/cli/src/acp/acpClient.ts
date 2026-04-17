@@ -57,6 +57,13 @@ import * as acp from '@agentclientprotocol/sdk';
 import { AcpFileSystemService } from './fileSystemService.js';
 import { getAcpErrorMessage } from './acpErrors.js';
 import { Readable, Writable } from 'node:stream';
+import {
+  assistantMessageCompletedUpdate,
+  boundedRawJson,
+  createAcpMessageId,
+  geminiPermissionContextMeta,
+  transientStatusUpdate,
+} from './anyharnessMetadata.js';
 
 function hasMeta(obj: unknown): obj is { _meta?: Record<string, unknown> } {
   return typeof obj === 'object' && obj !== null && '_meta' in obj;
@@ -595,6 +602,10 @@ export class Session {
     }
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     this.context.config.setApprovalMode(mode.id as ApprovalMode);
+    void this.sendUpdate({
+      sessionUpdate: 'current_mode_update',
+      currentModeId: mode.id,
+    });
     return {};
   }
 
@@ -730,6 +741,10 @@ export class Session {
       // If we found a command, pass it to handleCommand
       // Note: handleCommand currently expects `commandText` to be the command string
       // It uses `parts` argument but effectively ignores it in current implementation
+      await this.sendTransientStatus(
+        `Running ${commandText.split(/\s+/)[0]}...`,
+        createAcpMessageId(),
+      );
       const handled = await this.handleCommand(commandText, parts);
       if (handled) {
         return {
@@ -747,6 +762,9 @@ export class Session {
     let totalInputTokens = 0;
     let totalOutputTokens = 0;
     const modelUsageMap = new Map<string, { input: number; output: number }>();
+    let assistantMessageId = createAcpMessageId();
+    let thoughtMessageId = createAcpMessageId();
+    const retryStatusMessageId = createAcpMessageId();
 
     let nextMessage: Content | null = { role: 'user', parts };
 
@@ -786,6 +804,31 @@ export class Session {
             return { stopReason: CoreToolCallStatus.Cancelled };
           }
 
+          if (resp.type === StreamEventType.RETRY) {
+            await this.sendAssistantMessageCompleted(assistantMessageId);
+            await this.sendTransientStatus(
+              'Retrying Gemini request...',
+              retryStatusMessageId,
+            );
+            assistantMessageId = createAcpMessageId();
+            thoughtMessageId = createAcpMessageId();
+            continue;
+          }
+
+          if (resp.type === StreamEventType.AGENT_EXECUTION_STOPPED) {
+            await this.sendDurableWarning(
+              `Gemini agent execution stopped: ${resp.reason}`,
+            );
+            continue;
+          }
+
+          if (resp.type === StreamEventType.AGENT_EXECUTION_BLOCKED) {
+            await this.sendDurableWarning(
+              `Gemini agent execution blocked: ${resp.reason}`,
+            );
+            continue;
+          }
+
           if (resp.type === StreamEventType.CHUNK && resp.value.usageMetadata) {
             turnInputTokens =
               resp.value.usageMetadata.promptTokenCount ?? turnInputTokens;
@@ -818,6 +861,7 @@ export class Session {
                   ? 'agent_thought_chunk'
                   : 'agent_message_chunk',
                 content,
+                messageId: part.thought ? thoughtMessageId : assistantMessageId,
               });
             }
           }
@@ -840,6 +884,9 @@ export class Session {
           modelUsageMap.set(turnModelId, existing);
         }
 
+        await this.sendAssistantMessageCompleted(assistantMessageId);
+        assistantMessageId = createAcpMessageId();
+        thoughtMessageId = createAcpMessageId();
         if (pendingSend.signal.aborted) {
           return { stopReason: CoreToolCallStatus.Cancelled };
         }
@@ -870,6 +917,9 @@ export class Session {
         ) {
           // The stream ended with an empty response or malformed tool call.
           // Treat this as a graceful end to the model's turn rather than a crash.
+          await this.sendDurableWarning(
+            `Gemini ended the turn without a valid response: ${getAcpErrorMessage(error)}`,
+          );
           return {
             stopReason: 'end_turn',
             _meta: {
@@ -964,6 +1014,29 @@ export class Session {
     await this.connection.sessionUpdate(params);
   }
 
+  private async sendAssistantMessageCompleted(
+    messageId: string,
+  ): Promise<void> {
+    await this.sendUpdate(assistantMessageCompletedUpdate(messageId));
+  }
+
+  private async sendTransientStatus(
+    text: string,
+    messageId: string,
+  ): Promise<void> {
+    await this.sendUpdate(transientStatusUpdate(text, messageId));
+  }
+
+  private async sendDurableWarning(text: string): Promise<void> {
+    const messageId = createAcpMessageId();
+    await this.sendUpdate({
+      sessionUpdate: 'agent_message_chunk',
+      content: { type: 'text', text },
+      messageId,
+    });
+    await this.sendAssistantMessageCompleted(messageId);
+  }
+
   private async runTool(
     abortSignal: AbortSignal,
     promptId: string,
@@ -1023,6 +1096,7 @@ export class Session {
         typeof invocation.getDisplayTitle === 'function'
           ? invocation.getDisplayTitle()
           : invocation.getDescription();
+      const rawInput = boundedRawJson(args);
 
       const explanation =
         typeof invocation.getExplanation === 'function'
@@ -1058,8 +1132,26 @@ export class Session {
           });
         }
 
+        await this.sendUpdate({
+          sessionUpdate: 'tool_call',
+          toolCallId: callId,
+          status: 'pending',
+          title: displayTitle,
+          content,
+          locations: invocation.toolLocations(),
+          kind: toAcpToolKind(tool.kind),
+          rawInput,
+        });
+
         const params: acp.RequestPermissionRequest = {
           sessionId: this.id,
+          _meta: geminiPermissionContextMeta(
+            permissionContextForConfirmation(
+              confirmationDetails,
+              displayTitle,
+              fc.name,
+            ),
+          ),
           options: toPermissionOptions(
             confirmationDetails,
             this.context.config,
@@ -1072,6 +1164,7 @@ export class Session {
             content,
             locations: invocation.toolLocations(),
             kind: toAcpToolKind(tool.kind),
+            rawInput,
           },
         };
 
@@ -1100,6 +1193,27 @@ export class Session {
 
         switch (outcome) {
           case ToolConfirmationOutcome.Cancel:
+            await this.sendUpdate({
+              sessionUpdate: 'tool_call_update',
+              toolCallId: callId,
+              status: 'failed',
+              title: displayTitle,
+              content: [
+                {
+                  type: 'content',
+                  content: {
+                    type: 'text',
+                    text: `Tool "${fc.name}" was canceled by the user.`,
+                  },
+                },
+              ],
+              locations: invocation.toolLocations(),
+              kind: toAcpToolKind(tool.kind),
+              rawInput,
+              rawOutput: boundedRawJson({
+                error: `Tool "${fc.name}" was canceled by the user.`,
+              }),
+            });
             return errorResponse(
               new Error(`Tool "${fc.name}" was canceled by the user.`),
             );
@@ -1126,6 +1240,7 @@ export class Session {
           content,
           locations: invocation.toolLocations(),
           kind: toAcpToolKind(tool.kind),
+          rawInput,
         });
       }
 
@@ -1144,6 +1259,10 @@ export class Session {
         content: updateContent,
         locations: invocation.toolLocations(),
         kind: toAcpToolKind(tool.kind),
+        rawInput,
+        rawOutput: boundedRawJson(
+          toolResult.returnDisplay ?? toolResult.llmContent,
+        ),
       });
 
       const durationMs = Date.now() - startTime;
@@ -1208,6 +1327,8 @@ export class Session {
           { type: 'content', content: { type: 'text', text: error.message } },
         ],
         kind: toAcpToolKind(tool.kind),
+        rawInput: boundedRawJson(args),
+        rawOutput: boundedRawJson({ error: error.message }),
       });
 
       this.chat.recordCompletedToolCalls(this.context.config.getActiveModel(), [
@@ -1351,8 +1472,33 @@ export class Session {
             const stats = await fs.stat(absolutePath);
             if (stats.isFile()) {
               const syntheticCallId = `resolve-prompt-${pathName}-${randomUUID()}`;
+              const rawInput = boundedRawJson({ path: absolutePath });
+              await this.sendUpdate({
+                sessionUpdate: 'tool_call',
+                toolCallId: syntheticCallId,
+                status: 'pending',
+                title: `Allow access to absolute path: ${pathName}`,
+                content: [
+                  {
+                    type: 'content',
+                    content: {
+                      type: 'text',
+                      text: `The Agent needs access to read an attached file outside your workspace: ${pathName}`,
+                    },
+                  },
+                ],
+                locations: [],
+                kind: 'read',
+                rawInput,
+              });
               const params = {
                 sessionId: this.id,
+                _meta: geminiPermissionContextMeta({
+                  displayName: `Allow access to absolute path: ${pathName}`,
+                  blockedPath: absolutePath,
+                  decisionReason: 'Read attached file outside workspace',
+                  agentId: 'gemini',
+                }),
                 options: [
                   {
                     optionId: ToolConfirmationOutcome.ProceedOnce,
@@ -1380,6 +1526,7 @@ export class Session {
                   ],
                   locations: [],
                   kind: 'read',
+                  rawInput,
                 },
               };
 
@@ -1400,6 +1547,27 @@ export class Session {
                   .addReadOnlyPath(absolutePath);
                 validationError = null;
               } else {
+                await this.sendUpdate({
+                  sessionUpdate: 'tool_call_update',
+                  toolCallId: syntheticCallId,
+                  status: 'failed',
+                  title: `Allow access to absolute path: ${pathName}`,
+                  content: [
+                    {
+                      type: 'content',
+                      content: {
+                        type: 'text',
+                        text: `Access to absolute path \`${pathName}\` denied by user.`,
+                      },
+                    },
+                  ],
+                  locations: [],
+                  kind: 'read',
+                  rawInput,
+                  rawOutput: boundedRawJson({
+                    error: `Access to absolute path \`${pathName}\` denied by user.`,
+                  }),
+                });
                 this.debug(
                   `Direct read authorization denied for absolute path ${pathName}`,
                 );
@@ -1659,6 +1827,7 @@ export class Session {
       };
 
       const callId = GeminiAgent.generateCallId(readManyFilesTool.name);
+      const rawInput = boundedRawJson(toolArgs);
 
       try {
         const invocation = readManyFilesTool.build(toolArgs);
@@ -1671,6 +1840,7 @@ export class Session {
           content: [],
           locations: invocation.toolLocations(),
           kind: toAcpToolKind(readManyFilesTool.kind),
+          rawInput,
         });
 
         const result = await invocation.execute({ abortSignal });
@@ -1689,6 +1859,8 @@ export class Session {
           content: content ? [content] : [],
           locations: invocation.toolLocations(),
           kind: toAcpToolKind(readManyFilesTool.kind),
+          rawInput,
+          rawOutput: boundedRawJson(result.returnDisplay ?? result.llmContent),
         });
         if (Array.isArray(result.llmContent)) {
           const fileContentRegex = /^--- (.*?) ---\n\n([\s\S]*?)\n\n$/;
@@ -1733,6 +1905,8 @@ export class Session {
             },
           ],
           kind: toAcpToolKind(readManyFilesTool.kind),
+          rawInput,
+          rawOutput: boundedRawJson({ error: getErrorMessage(error) }),
         });
 
         throw error;
@@ -1948,6 +2122,60 @@ function toPermissionOptions(
   }
 
   return options;
+}
+
+function permissionContextForConfirmation(
+  confirmation: ToolCallConfirmationDetails,
+  displayName: string,
+  agentId: string | undefined,
+): {
+  displayName?: string;
+  blockedPath?: string;
+  decisionReason?: string;
+  agentId?: string;
+} {
+  switch (confirmation.type) {
+    case 'edit':
+      return {
+        displayName,
+        blockedPath: confirmation.filePath,
+        decisionReason: confirmation.systemMessage,
+        agentId,
+      };
+    case 'exec':
+      return {
+        displayName,
+        decisionReason: confirmation.systemMessage ?? confirmation.command,
+        agentId,
+      };
+    case 'mcp':
+      return {
+        displayName:
+          confirmation.toolDisplayName ||
+          `${confirmation.serverName}:${confirmation.toolName}`,
+        decisionReason:
+          confirmation.systemMessage ?? confirmation.toolDescription,
+        agentId: confirmation.serverName,
+      };
+    case 'info':
+      return {
+        displayName,
+        decisionReason: confirmation.systemMessage ?? confirmation.prompt,
+        agentId,
+      };
+    case 'ask_user':
+    case 'exit_plan_mode':
+    case 'sandbox_expansion':
+      return {
+        displayName,
+        decisionReason: confirmation.systemMessage,
+        agentId,
+      };
+    default: {
+      const unreachable: never = confirmation;
+      throw new Error(`Unexpected: ${unreachable}`);
+    }
+  }
 }
 
 /**
