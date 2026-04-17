@@ -472,7 +472,11 @@ class EditToolInvocation
           this.config.storage.getPlansDir(),
           this.config.getProjectRoot(),
         );
-      } catch {
+      } catch (e) {
+        debugLogger.error(
+          'Failed to resolve plan path during EditTool invocation setup',
+          e,
+        );
         // Validation fails, set resolvedPath to something that will fail validation downstream or just the raw path.
         // It's safer to store it so validation in execute() or getConfirmationDetails() catches it.
         this.resolvedPath = this.params.file_path;
