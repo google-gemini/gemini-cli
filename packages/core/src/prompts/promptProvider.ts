@@ -198,11 +198,14 @@ export class PromptProvider {
             plansDir: makeRelative(
               context.config.storage.getPlansDir(),
               context.config.getProjectRoot(),
-            ),
+            ).replaceAll('\\', '/'),
             approvedPlanPath: (() => {
               const approvedPath = context.config.getApprovedPlanPath();
               return approvedPath
-                ? makeRelative(approvedPath, context.config.getProjectRoot())
+                ? makeRelative(
+                    approvedPath,
+                    context.config.getProjectRoot(),
+                  ).replaceAll('\\', '/')
                 : undefined;
             })(),
           }),
