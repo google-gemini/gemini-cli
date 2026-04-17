@@ -31,29 +31,41 @@ const createTodoHistoryItem = (todos: Todo[]): HistoryItem =>
 describe.each([true, false])(
   '<TodoTray /> (showFullTodos: %s)',
   async (showFullTodos: boolean) => {
-    const renderWithUiState = async (uiState: Partial<UIState>) => {
+    const renderWithUiState = async (
+      uiState: Partial<UIState>,
+      allowEmptyFrame = false,
+    ) => {
       const result = await render(
         <UIStateContext.Provider value={uiState as UIState}>
           <TodoTray />
         </UIStateContext.Provider>,
+        undefined,
+        undefined,
+        allowEmptyFrame,
       );
       return result;
     };
 
     it('renders null when no todos are in the history', async () => {
-      const { lastFrame, unmount } = await renderWithUiState({
-        history: [],
-        showFullTodos,
-      });
+      const { lastFrame, unmount } = await renderWithUiState(
+        {
+          history: [],
+          showFullTodos,
+        },
+        true,
+      );
       expect(lastFrame({ allowEmpty: true })).toMatchSnapshot();
       unmount();
     });
 
     it('renders null when todo list is empty', async () => {
-      const { lastFrame, unmount } = await renderWithUiState({
-        history: [createTodoHistoryItem([])],
-        showFullTodos,
-      });
+      const { lastFrame, unmount } = await renderWithUiState(
+        {
+          history: [createTodoHistoryItem([])],
+          showFullTodos,
+        },
+        true,
+      );
       expect(lastFrame({ allowEmpty: true })).toMatchSnapshot();
       unmount();
     });
@@ -140,15 +152,18 @@ describe.each([true, false])(
     });
 
     it('renders full list when all todos are inactive', async () => {
-      const { lastFrame, unmount } = await renderWithUiState({
-        history: [
-          createTodoHistoryItem([
-            { description: 'Task 1', status: 'completed' },
-            { description: 'Task 2', status: 'cancelled' },
-          ]),
-        ],
-        showFullTodos,
-      });
+      const { lastFrame, unmount } = await renderWithUiState(
+        {
+          history: [
+            createTodoHistoryItem([
+              { description: 'Task 1', status: 'completed' },
+              { description: 'Task 2', status: 'cancelled' },
+            ]),
+          ],
+          showFullTodos,
+        },
+        !showFullTodos,
+      );
       expect(lastFrame({ allowEmpty: true })).toMatchSnapshot();
       unmount();
     });
