@@ -352,9 +352,22 @@ export class Storage {
     const realProjectRoot = resolveToRealPath(this.getProjectRoot());
 
     // By enforcing resolveToRealPath, we guarantee symlinks are evaluated.
-    // If the path doesn't exist, this will throw an error, strictly preventing
-    // traversal vulnerabilities via missing symlinks or permission gaps.
-    const realResolvedPath = resolveToRealPath(resolvedPath);
+    // If the path doesn't exist, we fallback to string normalization (JIT provisioning).
+    let realResolvedPath: string;
+    try {
+      realResolvedPath = resolveToRealPath(resolvedPath);
+    } catch (error: unknown) {
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        error.code === 'ENOENT'
+      ) {
+        realResolvedPath = path.normalize(resolvedPath);
+      } else {
+        throw error;
+      }
+    }
 
     if (!isSubpath(realProjectRoot, realResolvedPath)) {
       throw new Error(
