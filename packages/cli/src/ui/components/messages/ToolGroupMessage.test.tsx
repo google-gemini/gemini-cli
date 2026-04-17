@@ -115,7 +115,11 @@ describe('<ToolGroupMessage />', () => {
 
       const { lastFrame, unmount } = await renderWithProviders(
         <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
-        { config: baseMockConfig, settings: fullVerbositySettings },
+        {
+          config: baseMockConfig,
+          settings: fullVerbositySettings,
+          allowEmptyFrame: true,
+        },
       );
 
       // Should now hide confirming tools (to avoid duplication with Global Queue)
@@ -458,6 +462,7 @@ describe('<ToolGroupMessage />', () => {
               },
             ],
           },
+          allowEmptyFrame: true,
         },
       );
       expect(lastFrame({ allowEmpty: true })).toMatchSnapshot();
@@ -730,7 +735,11 @@ describe('<ToolGroupMessage />', () => {
 
         const { lastFrame, unmount } = await renderWithProviders(
           <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
-          { config: baseMockConfig, settings: fullVerbositySettings },
+          {
+            config: baseMockConfig,
+            settings: fullVerbositySettings,
+            allowEmptyFrame: shouldHide,
+          },
         );
         if (shouldHide) {
           expect(lastFrame({ allowEmpty: true })).toBe('');
@@ -785,7 +794,11 @@ describe('<ToolGroupMessage />', () => {
           toolCalls={toolCalls}
           borderBottom={false}
         />,
-        { config: baseMockConfig, settings: fullVerbositySettings },
+        {
+          config: baseMockConfig,
+          settings: fullVerbositySettings,
+          allowEmptyFrame: true,
+        },
       );
       // AskUser tools in progress are rendered by AskUserDialog, so we expect nothing.
       expect(lastFrame({ allowEmpty: true })).toBe('');
@@ -815,6 +828,7 @@ describe('<ToolGroupMessage />', () => {
         {
           config: baseMockConfig,
           settings: lowVerbositySettings,
+          allowEmptyFrame: true,
         },
       );
 
@@ -867,6 +881,7 @@ describe('<ToolGroupMessage />', () => {
         {
           config: baseMockConfig,
           settings: fullVerbositySettings,
+          allowEmptyFrame: true,
         },
       );
 
@@ -899,6 +914,7 @@ describe('<ToolGroupMessage />', () => {
         {
           config: baseMockConfig,
           settings: fullVerbositySettings,
+          allowEmptyFrame: true,
         },
       );
 
@@ -956,6 +972,7 @@ describe('<ToolGroupMessage />', () => {
         {
           config: baseMockConfig,
           settings: lowVerbositySettings,
+          allowEmptyFrame: true,
         },
       );
       await secondRender.waitUntilReady();
@@ -1055,7 +1072,11 @@ describe('<ToolGroupMessage />', () => {
 
         const { lastFrame, unmount } = await renderWithProviders(
           <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
-          { config: baseMockConfig, settings: fullVerbositySettings },
+          {
+            config: baseMockConfig,
+            settings: fullVerbositySettings,
+            allowEmptyFrame: !visible,
+          },
         );
 
         if (visible) {
