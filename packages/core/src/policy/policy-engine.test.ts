@@ -448,6 +448,58 @@ describe('PolicyEngine', () => {
       const { decision } = await engine.check({ name: 'test-tool' }, undefined);
       expect(decision).toBe(PolicyDecision.DENY);
     });
+
+    it('should ALLOW dangerous command in YOLO mode even with Noop sandbox (regression)', async () => {
+      engine = new PolicyEngine({
+        approvalMode: ApprovalMode.YOLO,
+        sandboxManager: new NoopSandboxManager(),
+        rules: [
+          {
+            toolName: '*',
+            decision: PolicyDecision.ALLOW,
+            priority: PRIORITY_YOLO_ALLOW_ALL,
+            modes: [ApprovalMode.YOLO],
+          },
+        ],
+      });
+
+      // On Windows, 'powershell' is dangerous
+      const result = await engine.check(
+        {
+          name: 'run_shell_command',
+          args: { command: 'powershell -c "echo hello"' },
+        },
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.ALLOW);
+    });
+
+    it('should ALLOW redirection in YOLO mode even with Noop sandbox (regression)', async () => {
+      engine = new PolicyEngine({
+        approvalMode: ApprovalMode.YOLO,
+        sandboxManager: new NoopSandboxManager(),
+        rules: [
+          {
+            toolName: '*',
+            decision: PolicyDecision.ALLOW,
+            priority: PRIORITY_YOLO_ALLOW_ALL,
+            modes: [ApprovalMode.YOLO],
+          },
+        ],
+      });
+
+      // With Noop sandbox, shouldDowngradeForRedirection would return true if not in YOLO
+      const result = await engine.check(
+        {
+          name: 'run_shell_command',
+          args: { command: 'echo hello > out.txt' },
+        },
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.ALLOW);
+    });
   });
 
   describe('addRule', () => {
