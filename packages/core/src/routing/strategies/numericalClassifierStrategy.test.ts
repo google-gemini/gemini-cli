@@ -211,9 +211,12 @@ describe('NumericalClassifierStrategy', () => {
   describe('Remote Threshold Logic', () => {
     it('should use the remote CLASSIFIER_THRESHOLD if provided (int value)', async () => {
       vi.mocked(mockConfig.getClassifierThreshold).mockResolvedValue(70);
+<<<<<<< HEAD
       vi.mocked(mockConfig.getResolvedClassifierThreshold).mockResolvedValue(
         70,
       );
+=======
+>>>>>>> b9035a18d (refactor(config): revert experiment getter names and async signatures)
       const mockApiResponse = {
         complexity_reasoning: 'Test task',
         complexity_score: 60,
@@ -241,9 +244,12 @@ describe('NumericalClassifierStrategy', () => {
 
     it('should use the remote CLASSIFIER_THRESHOLD if provided (float value)', async () => {
       vi.mocked(mockConfig.getClassifierThreshold).mockResolvedValue(45.5);
+<<<<<<< HEAD
       vi.mocked(mockConfig.getResolvedClassifierThreshold).mockResolvedValue(
         45.5,
       );
+=======
+>>>>>>> b9035a18d (refactor(config): revert experiment getter names and async signatures)
       const mockApiResponse = {
         complexity_reasoning: 'Test task',
         complexity_score: 40,
@@ -271,9 +277,12 @@ describe('NumericalClassifierStrategy', () => {
 
     it('should use PRO model if score >= remote CLASSIFIER_THRESHOLD', async () => {
       vi.mocked(mockConfig.getClassifierThreshold).mockResolvedValue(30);
+<<<<<<< HEAD
       vi.mocked(mockConfig.getResolvedClassifierThreshold).mockResolvedValue(
         30,
       );
+=======
+>>>>>>> b9035a18d (refactor(config): revert experiment getter names and async signatures)
       const mockApiResponse = {
         complexity_reasoning: 'Test task',
         complexity_score: 35,

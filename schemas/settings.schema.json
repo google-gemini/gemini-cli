@@ -2885,6 +2885,7 @@
           "default": false,
           "type": "boolean"
         },
+<<<<<<< HEAD
         "directWebFetch": {
           "title": "Direct Web Fetch",
           "description": "Enable web fetch behavior that bypasses LLM summarization.",
@@ -2965,6 +2966,13 @@
           "title": "Topic & Update Narration",
           "description": "Enable the experimental Topic & Update communication model for reduced chattiness and structured progress reporting.",
           "markdownDescription": "Enable the experimental Topic & Update communication model for reduced chattiness and structured progress reporting.\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "enable-awesome": {
+          "title": "Enable Awesome",
+          "description": "When enabled, the ASCII art says 'matt'.",
+          "markdownDescription": "When enabled, the ASCII art says 'matt'.\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         }
