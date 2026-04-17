@@ -1,0 +1,9 @@
+tests/visual/output/
+tests/visual/diff/
+
+# Visual Regression Artifacts
+tests/visual/__output__/
+tests/visual/__diff__/
+tests/visual/output/
+tests/visual/diff/
+tests/__output__/
