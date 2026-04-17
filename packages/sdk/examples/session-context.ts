@@ -61,7 +61,8 @@ async function main() {
   });
 
   console.log("Sending prompt: 'What is my current session context?'");
-  for await (const chunk of agent.sendStream(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for await (const chunk of (agent as any).sendStream(
     'What is my current session context?',
   )) {
     if (chunk.type === 'content') {

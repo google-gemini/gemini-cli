@@ -22,7 +22,7 @@ export class OpenFilesManager {
   private debounceTimer: NodeJS.Timeout | undefined;
   private openFiles: File[] = [];
 
-  constructor(private readonly context: vscode.ExtensionContext) {
+  constructor(context: vscode.ExtensionContext) {
     const editorWatcher = vscode.window.onDidChangeActiveTextEditor(
       (editor) => {
         if (editor && this.isFileUri(editor.document.uri)) {

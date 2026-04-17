@@ -56,10 +56,7 @@ export class DiffManager {
   private diffDocuments = new Map<string, DiffInfo>();
   private readonly subscriptions: vscode.Disposable[] = [];
 
-  constructor(
-    private readonly log: (message: string) => void,
-    private readonly diffContentProvider: DiffContentProvider,
-  ) {
+  constructor(private readonly diffContentProvider: DiffContentProvider) {
     this.subscriptions.push(
       vscode.window.onDidChangeActiveTextEditor((editor) => {
         // eslint-disable-next-line @typescript-eslint/no-floating-promises

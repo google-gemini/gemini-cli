@@ -11,7 +11,7 @@ import { getFolderStructure } from './getFolderStructure.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import * as path from 'node:path';
 import { GEMINI_DIR } from './paths.js';
-import { GEMINI_IGNORE_FILE_NAME } from 'src/config/constants.js';
+import { GEMINI_IGNORE_FILE_NAME } from '../config/constants.js';
 
 describe('getFolderStructure', () => {
   let testRootDir: string;

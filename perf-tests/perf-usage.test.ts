@@ -246,7 +246,7 @@ describe('CPU Performance Tests', () => {
               JSON.stringify(toolLatencyMetric),
             );
           }
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+           
           const logs = (rig as any)._readAndParseTelemetryLog();
           console.log(`  Total telemetry log entries: ${logs.length}`);
           for (const logData of logs) {
@@ -271,8 +271,8 @@ describe('CPU Performance Tests', () => {
             );
 
             const findValue = (percentile: string) => {
-              const dp = eventLoopMetric.dataPoints.find(
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const dp = (eventLoopMetric['dataPoints'] as any[]).find(
+                 
                 (p: any) => p.attributes.percentile === percentile,
               );
               return dp ? dp.value.min : undefined;

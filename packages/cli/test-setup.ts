@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi, beforeEach, afterEach, act } from 'vitest';
+import { vi, beforeEach, afterEach } from 'vitest';
+import { act } from 'react';
 import {
   coreEvents,
   uiTelemetryService,
@@ -17,7 +18,8 @@ import { cleanup } from './src/test-utils/render.js';
 // Globally mock ink-spinner to prevent non-deterministic snapshot/act flakes.
 mockInkSpinner();
 
-global.IS_REACT_ACT_ENVIRONMENT = true;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+(global as any).IS_REACT_ACT_ENVIRONMENT = true;
 
 // Increase max listeners to avoid warnings in large test suites
 coreEvents.setMaxListeners(0);

@@ -33,6 +33,7 @@ rmSync(join(root, 'packages/cli/src/generated/'), {
 });
 const RMRF_OPTIONS = { recursive: true, force: true };
 rmSync(join(root, 'bundle'), RMRF_OPTIONS);
+rmSync(join(root, '.cache'), RMRF_OPTIONS);
 // Dynamically clean dist directories in all workspaces
 const rootPackageJson = JSON.parse(
   readFileSync(join(root, 'package.json'), 'utf-8'),

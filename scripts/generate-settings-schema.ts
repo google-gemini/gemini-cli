@@ -133,7 +133,7 @@ function buildSchemaObject(schema: SettingsSchemaType): JsonSchema {
   }
 
   if (defs.size > 0) {
-    root.$defs = Object.fromEntries(defs.entries());
+    root['$defs'] = Object.fromEntries(defs.entries());
   }
 
   return root;

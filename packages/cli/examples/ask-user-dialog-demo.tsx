@@ -12,6 +12,7 @@ import { QuestionType, type Question } from '@google/gemini-cli-core';
 
 const DEMO_QUESTIONS: Question[] = [
   {
+    type: QuestionType.CHOICE,
     question: 'What type of project are you building?',
     header: 'Project Type',
     options: [
@@ -22,6 +23,7 @@ const DEMO_QUESTIONS: Question[] = [
     multiSelect: false,
   },
   {
+    type: QuestionType.CHOICE,
     question: 'Which features should be enabled?',
     header: 'Features',
     options: [
@@ -86,13 +88,14 @@ const Demo = () => {
   return (
     <KeypressProvider>
       <Box padding={1} flexDirection="column">
-        <Text bold marginBottom={1}>
-          AskUserDialog Demo
-        </Text>
+        <Box marginBottom={1}>
+          <Text bold>AskUserDialog Demo</Text>
+        </Box>
         <AskUserDialog
           questions={DEMO_QUESTIONS}
           onSubmit={setResult}
           onCancel={() => setCancelled(true)}
+          width={80}
         />
       </Box>
     </KeypressProvider>

@@ -26,7 +26,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { SettingsDialog } from './SettingsDialog.js';
 import { SettingScope } from '../../config/settings.js';
 import { createMockSettings } from '../../test-utils/settings.js';
-import { makeFakeConfig } from '../../../../core/src/test-utils/config.js';
+import { makeFakeConfig } from "@google/gemini-cli-core/src/test-utils/config.js";
 import { act } from 'react';
 import { TEST_ONLY } from '../../utils/settingsUtils.js';
 import {
@@ -287,9 +287,13 @@ describe.sequential('SettingsDialog', () => {
       const settings = createMockSettings();
       const onSelect = vi.fn();
 
-      const { lastFrame, unmount, waitUntilReady } = await renderDialog(settings, onSelect, {
-        availableTerminalHeight: 25,
-      });
+      const { lastFrame, unmount, waitUntilReady } = await renderDialog(
+        settings,
+        onSelect,
+        {
+          availableTerminalHeight: 25,
+        },
+      );
 
       await waitUntilReady();
       const output = lastFrame();

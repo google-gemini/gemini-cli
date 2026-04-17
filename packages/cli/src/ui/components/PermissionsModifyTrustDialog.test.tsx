@@ -153,7 +153,11 @@ describe.skip('PermissionsModifyTrustDialog', () => {
     const onExit = vi.fn();
     const { stdin, lastFrame, waitUntilReady, unmount } =
       await renderWithProviders(
-        <PermissionsModifyTrustDialog onExit={onExit} addItem={vi.fn()} targetDirectory="/test/dir" />,
+        <PermissionsModifyTrustDialog
+          onExit={onExit}
+          addItem={vi.fn()}
+          targetDirectory="/test/dir"
+        />,
       );
 
     await waitFor(() => expect(lastFrame()).not.toContain('Loading...'));
@@ -191,7 +195,11 @@ describe.skip('PermissionsModifyTrustDialog', () => {
     const onExit = vi.fn();
     const { stdin, lastFrame, waitUntilReady, unmount } =
       await renderWithProviders(
-        <PermissionsModifyTrustDialog onExit={onExit} addItem={vi.fn()} targetDirectory="/test/dir" />,
+        <PermissionsModifyTrustDialog
+          onExit={onExit}
+          addItem={vi.fn()}
+          targetDirectory="/test/dir"
+        />,
       );
 
     await waitFor(() => expect(lastFrame()).not.toContain('Loading...'));
@@ -225,7 +233,11 @@ describe.skip('PermissionsModifyTrustDialog', () => {
     const onExit = vi.fn();
     const { stdin, lastFrame, waitUntilReady, unmount } =
       await renderWithProviders(
-        <PermissionsModifyTrustDialog onExit={onExit} addItem={vi.fn()} targetDirectory="/test/dir" />,
+        <PermissionsModifyTrustDialog
+          onExit={onExit}
+          addItem={vi.fn()}
+          targetDirectory="/test/dir"
+        />,
       );
 
     await waitFor(() => expect(lastFrame()).not.toContain('Loading...'));

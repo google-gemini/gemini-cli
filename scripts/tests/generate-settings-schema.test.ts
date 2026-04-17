@@ -8,7 +8,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { main as generateSchema } from '../generate-settings-schema.ts';
+import { main as generateSchema } from '../generate-settings-schema.js';
 
 vi.mock('fs', () => ({
   readFileSync: vi.fn().mockReturnValue(''),

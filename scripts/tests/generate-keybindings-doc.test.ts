@@ -9,7 +9,7 @@ import {
   main as generateKeybindingDocs,
   renderDocumentation,
   type KeybindingDocSection,
-} from '../generate-keybindings-doc.ts';
+} from '../generate-keybindings-doc.js';
 import { KeyBinding } from '../../packages/cli/src/ui/key/keyBindings.js';
 
 describe('generate-keybindings-doc', () => {

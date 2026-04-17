@@ -60,16 +60,21 @@ import {
   CreditPurchaseClickEvent,
 } from '../billingEvents.js';
 
-interface CustomMatchers<R = unknown> {
-  toHaveMetadataValue: ([key, value]: [EventMetadataKey, string]) => R;
-  toHaveEventName: (name: EventNames) => R;
-  toHaveMetadataKey: (key: EventMetadataKey) => R;
-  toHaveGwsExperiments: (exps: number[]) => R;
-}
-
 declare module 'vitest' {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-empty-object-type
-  interface Matchers<T = any> extends CustomMatchers<T> {}
+  interface CustomMatchers<T = unknown> {
+    toHaveMetadataValue([key, value]: [
+      import('./event-metadata-key.js').EventMetadataKey,
+      string,
+    ]): T;
+    toHaveEventName(name: import('./clearcut-logger.js').EventNames): T;
+    toHaveMetadataKey(
+      key: import('./event-metadata-key.js').EventMetadataKey,
+    ): T;
+    toHaveGwsExperiments(exps: number[]): T;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-empty-object-type
+  interface Assertion<T = any> extends CustomMatchers<T> {}
 }
 
 expect.extend({
@@ -818,7 +823,7 @@ describe('ClearcutLogger', () => {
       const { logger } = setup();
       // Spy on flushToClearcut to prevent it from clearing the queue
       const flushSpy = vi
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         
         .spyOn(logger!, 'flushToClearcut' as any)
         .mockResolvedValue({ nextRequestWaitMs: 0 });
 
@@ -1480,7 +1485,7 @@ describe('ClearcutLogger', () => {
     it('should not flush if the interval has not passed', () => {
       const { logger } = setup();
       const flushSpy = vi
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         
         .spyOn(logger!, 'flushToClearcut' as any)
         .mockResolvedValue({ nextRequestWaitMs: 0 });
 
@@ -1491,7 +1496,7 @@ describe('ClearcutLogger', () => {
     it('should flush if the interval has passed', async () => {
       const { logger } = setup();
       const flushSpy = vi
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         
         .spyOn(logger!, 'flushToClearcut' as any)
         .mockResolvedValue({ nextRequestWaitMs: 0 });
 

@@ -226,12 +226,14 @@ describe('Notifications', () => {
     } as AppState;
     mockUseAppContext.mockReturnValue(appState);
 
-    const { lastFrame, unmount } =
-      await renderWithProviders(<Notifications />, {
+    const { lastFrame, unmount } = await renderWithProviders(
+      <Notifications />,
+      {
         appState,
         settings,
         width: 100,
-      });
+      },
+    );
     expect(lastFrame()).toContain('High priority 1');
 
     const keyHandler = vi.mocked(useKeypress).mock.calls[0][0];

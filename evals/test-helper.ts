@@ -402,8 +402,8 @@ interface ForbiddenToolSettings {
 }
 
 export interface BaseEvalCase {
-  suiteName: string;
-  suiteType: 'behavioral' | 'component-level' | 'hero-scenario';
+  suiteName?: string;
+  suiteType?: 'behavioral' | 'component-level' | 'hero-scenario';
   name: string;
   timeout?: number;
   files?: Record<string, string>;

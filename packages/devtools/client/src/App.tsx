@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { useDevToolsData, type ConsoleLog, type NetworkLog } from './hooks';
+import { useDevToolsData, type ConsoleLog, type NetworkLog } from './hooks.js';
 
 type ThemeMode = 'light' | 'dark' | null; // null means follow system
 
@@ -145,7 +145,7 @@ export default function App() {
                   ...existing,
                   ...payload,
                   // Ensure we don't overwrite the original timestamp or type
-                  type: existing.type,
+                  type: 'network',
                   timestamp: existing.timestamp,
                 } as NetworkLog);
               }
@@ -177,7 +177,7 @@ export default function App() {
     const entries: Array<{ timestamp: number; data: object }> = [];
 
     // Export console logs
-    filteredConsoleLogs.forEach((log) => {
+    filteredConsoleLogs.forEach((log: ConsoleLog) => {
       entries.push({
         timestamp: log.timestamp,
         data: {
@@ -190,7 +190,7 @@ export default function App() {
     });
 
     // Export network logs
-    filteredNetworkLogs.forEach((log) => {
+    filteredNetworkLogs.forEach((log: NetworkLog) => {
       entries.push({
         timestamp: log.timestamp,
         data: {
@@ -249,7 +249,9 @@ export default function App() {
     if (selectedSessionId === importedSessionId && importedLogs) {
       return importedLogs.console;
     }
-    return consoleLogs.filter((l) => l.sessionId === selectedSessionId);
+    return consoleLogs.filter(
+      (l: ConsoleLog) => l.sessionId === selectedSessionId,
+    );
   }, [consoleLogs, selectedSessionId, importedSessionId, importedLogs]);
 
   const filteredNetworkLogs = useMemo(() => {
@@ -257,7 +259,9 @@ export default function App() {
     if (selectedSessionId === importedSessionId && importedLogs) {
       return importedLogs.network;
     }
-    return networkLogs.filter((l) => l.sessionId === selectedSessionId);
+    return networkLogs.filter(
+      (l: NetworkLog) => l.sessionId === selectedSessionId,
+    );
   }, [networkLogs, selectedSessionId, importedSessionId, importedLogs]);
 
   return (

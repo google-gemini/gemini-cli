@@ -103,21 +103,25 @@ async function monitor() {
   if (RUN_ID_OVERRIDE) {
     targetRunIds = [RUN_ID_OVERRIDE];
   } else {
-    const headCommitTime = parseInt(
-      execSync(`git log -1 --format=%ct "${BRANCH}"`).toString().trim(),
-      10,
-    ) * 1000;
+    const headCommitTime =
+      parseInt(
+        execSync(`git log -1 --format=%ct "${BRANCH}"`).toString().trim(),
+        10,
+      ) * 1000;
 
     // 1. Get recent runs associated with the branch, taking only the latest per unique workflow
     const runListOutput = runGh(
       `run list --branch "${BRANCH}" --limit 30 --json databaseId,status,workflowName,createdAt`,
     );
     if (runListOutput) {
-      const runs = JSON.parse(runListOutput).filter(
-        (r) => new Date(r.createdAt).getTime() >= headCommitTime - 30000,
-      ).sort(
-        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-      );
+      const runs = JSON.parse(runListOutput)
+        .filter(
+          (r) => new Date(r.createdAt).getTime() >= headCommitTime - 30000,
+        )
+        .sort(
+          (a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+        );
       const seenWorkflows = new Set();
       for (const r of runs) {
         if (!seenWorkflows.has(r.workflowName)) {
@@ -129,7 +133,6 @@ async function monitor() {
 
     // 2. Get runs associated with commit statuses (handles chained/indirect runs)
     try {
-
       const headSha = execSync(`git rev-parse "${BRANCH}"`).toString().trim();
       const statusOutput = runGh(
         `api repos/${REPO}/commits/${headSha}/status -q '.statuses[] | select(.target_url | contains("actions/runs/")) | .target_url'`,

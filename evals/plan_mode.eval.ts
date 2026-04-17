@@ -333,7 +333,7 @@ describe('plan_mode', () => {
 
       expect(
         planWrite?.toolRequest.success,
-        `Expected write_file to succeed, but got error: ${planWrite?.toolRequest.error}`,
+        `Expected write_file to succeed, but got error: ${(planWrite?.toolRequest as any).error}`,
       ).toBe(true);
 
       assertModelHasOutput(result);

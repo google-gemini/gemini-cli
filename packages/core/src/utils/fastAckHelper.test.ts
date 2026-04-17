@@ -12,7 +12,7 @@ import {
   truncateFastAckInput,
   generateSteeringAckMessage,
 } from './fastAckHelper.js';
-import { LlmRole } from 'src/telemetry/llmRole.js';
+import { LlmRole } from '../telemetry/llmRole.js';
 
 describe('truncateFastAckInput', () => {
   it('returns input as-is when below limit', () => {

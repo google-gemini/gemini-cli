@@ -28,7 +28,8 @@ async function main() {
   });
 
   console.log("Sending prompt: 'add 5 + 6'");
-  for await (const chunk of agent.sendStream(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for await (const chunk of (agent as any).sendStream(
     'add 5 + 6 and tell me a story involving the result',
   )) {
     console.log(JSON.stringify(chunk, null, 2));

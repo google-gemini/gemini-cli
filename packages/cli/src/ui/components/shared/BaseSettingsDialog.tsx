@@ -325,7 +325,11 @@ export function BaseSettingsDialog({
         }
 
         // Enter in edit mode - commit
-        if (keyMatchers[Command.RETURN](key) || key.name === 'enter' || key.sequence === '\r') {
+        if (
+          keyMatchers[Command.RETURN](key) ||
+          key.name === 'enter' ||
+          key.sequence === '\r'
+        ) {
           commitEdit();
           return;
         }

@@ -120,7 +120,7 @@ export async function activate(context: vscode.ExtensionContext) {
   checkForUpdates(context, log, isManagedExtensionSurface);
 
   const diffContentProvider = new DiffContentProvider();
-  const diffManager = new DiffManager(log, diffContentProvider);
+  const diffManager = new DiffManager(diffContentProvider);
 
   context.subscriptions.push(
     vscode.workspace.onDidCloseTextDocument((doc) => {

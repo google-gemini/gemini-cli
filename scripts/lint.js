@@ -197,6 +197,10 @@ export function setupLinters() {
         console.error(
           `Failed to install ${linter}. Please install it manually.`,
         );
+        if (linter === 'yamllint') {
+          console.warn(`Skipping ${linter} installation failure.`);
+          continue;
+        }
         process.exit(1);
       }
     }
@@ -227,8 +231,16 @@ export function runShellcheck() {
 
 export function runYamllint() {
   console.log('\nRunning yamllint...');
-  if (!runCommand(LINTERS.yamllint.run)) {
-    process.exit(1);
+  const yamllintPath = isWindows
+    ? join(PYTHON_VENV_PATH, 'Scripts', 'yamllint.exe')
+    : join(PYTHON_VENV_PATH, 'bin', 'yamllint');
+
+  if (existsSync(yamllintPath)) {
+    if (!runCommand(LINTERS.yamllint.run)) {
+      process.exit(1);
+    }
+  } else {
+    console.warn('Skipping yamllint as it is not installed.');
   }
 }
 

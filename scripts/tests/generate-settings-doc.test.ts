@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import { main as generateDocs } from '../generate-settings-doc.ts';
+import { main as generateDocs } from '../generate-settings-doc.js';
 
 vi.mock('fs', () => ({
   readFileSync: vi.fn().mockReturnValue(''),
