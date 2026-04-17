@@ -1407,7 +1407,13 @@ Logging in with Google... Restarting Gemini CLI to continue.
       }
 
       const isMcpOrConfigReady = isConfigInitialized && isMcpReady;
+      debugLogger.log(
+        `[AppContainer] handleFinalSubmit: streamingState=${streamingState}, isIdle=${isIdle}, isSlash=${isSlash}`,
+      );
       if ((isSlash && isConfigInitialized) || (isIdle && isMcpOrConfigReady)) {
+        debugLogger.log(
+          `[AppContainer] handleFinalSubmit: condition met, calling submitQuery`,
+        );
         if (!isSlash) {
           const permissions = await checkPermissions(submittedValue, config);
           if (permissions.length > 0) {
