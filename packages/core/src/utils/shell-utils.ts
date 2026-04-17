@@ -1113,6 +1113,12 @@ function detectPowerShellSubstitution(command: string): boolean {
     if (char === '@' && command[i + 1] === '(') {
       return true;
     }
+    if (char === '(' && !inDoubleQuote) {
+      const prev = i > 0 ? command[i - 1] : '';
+      if (prev !== '$' && prev !== '@') {
+        return true;
+      }
+    }
     i++;
   }
   return false;

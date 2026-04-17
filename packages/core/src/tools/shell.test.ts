@@ -1482,6 +1482,15 @@ describe('ShellTool', () => {
       });
       expect(result.returnDisplay).toContain('Blocked');
     });
+    it('should block PowerShell bare () grouping operator', async () => {
+      mockPlatform.mockReturnValue('win32');
+      const tool = new ShellTool(mockConfig, createMockMessageBus());
+      const invocation = tool.build({ command: 'echo (whoami)' });
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+      expect(result.returnDisplay).toContain('Blocked');
+    });
 
     it('should allow escaped $() inside double quotes', async () => {
       mockShellExecutionService.mockImplementation((_cmd, _cwd, _callback) => ({
