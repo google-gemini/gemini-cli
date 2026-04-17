@@ -79,9 +79,10 @@ Slash commands provide meta-level control over the CLI itself.
       Gemini CLI from that project's directory.
     - **Equivalent:** `/resume resume <tag>`
   - **`save <tag>`**
-    - **Description:** Saves the current conversation history. You can add an optional
-      `[tag]` to identify the conversation state. If no tag is provided, it falls back
-      to the most recently used tag in the active session.
+    - **Description:** Saves the current conversation history. You can add an
+      optional `[tag]` to identify the conversation state. If no tag is
+      provided, it falls back to the most recently used tag in the active
+      session.
     - **Details on checkpoint location:** The default locations for saved chat
       checkpoints are:
       - Linux/macOS: `~/.gemini/tmp/<project_hash>/`
@@ -371,7 +372,8 @@ Slash commands provide meta-level control over the CLI itself.
   - **`list`**
     - **Description:** Lists available tags for manual chat checkpoints.
   - **`save [tag]`**
-    - **Description:** Saves the current conversation as a tagged checkpoint. If no tag is provided, it uses the active checkpoint tag of the session.
+    - **Description:** Saves the current conversation as a tagged checkpoint. If
+      no tag is provided, it uses the active checkpoint tag of the session.
   - **`resume <tag>`** (alias: `load`)
     - **Description:** Loads a previously saved tagged checkpoint.
   - **`delete <tag>`**

@@ -162,7 +162,8 @@ describe('chatCommand', () => {
       expect(result).toEqual({
         type: 'message',
         messageType: 'error',
-        content: 'Missing tag. Usage: /resume save [tag] (or save/resume a checkpoint first to set a default tag)',
+        content:
+          'Missing tag. Usage: /resume save [tag] (or save/resume a checkpoint first to set a default tag)',
       });
     });
 
@@ -185,7 +186,9 @@ describe('chatCommand', () => {
         messageType: 'info',
         content: `Conversation checkpoint saved with tag: active-tag.`,
       });
-      expect(mockContext.session.setActiveCheckpointTag).toHaveBeenCalledWith('active-tag');
+      expect(mockContext.session.setActiveCheckpointTag).toHaveBeenCalledWith(
+        'active-tag',
+      );
     });
 
     it('should inform if conversation history is empty or only contains system context', async () => {

@@ -430,8 +430,8 @@ export const chatCommand: SlashCommand = {
       if (parsed.commandToExecute?.action) {
         return parsed.commandToExecute.action(context, parsed.args);
       }
-      
-      // Fallback: If no subcommand matched but args were provided, 
+
+      // Fallback: If no subcommand matched but args were provided,
       // assume it's a legacy resume command and try to resume the checkpoint
       if (resumeCheckpointCommand.action) {
         return resumeCheckpointCommand.action(context, args);

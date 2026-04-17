@@ -98,9 +98,8 @@ describe('clearCommand', () => {
     expect(mockContext.session.setActiveCheckpointTag).toHaveBeenCalledWith(
       undefined,
     );
-    const clearTagOrder = (
-      mockContext.session.setActiveCheckpointTag as Mock
-    ).mock.invocationCallOrder[0];
+    const clearTagOrder = (mockContext.session.setActiveCheckpointTag as Mock)
+      .mock.invocationCallOrder[0];
     expect(clearTagOrder).toBeLessThan(clearOrder);
   });
 
