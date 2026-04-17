@@ -612,6 +612,15 @@ export async function main() {
     const initializationResult = await initializeApp(config, settings);
     initAppHandle?.end();
 
+    import('./services/liteRtServerManager.js')
+      .then(({ LiteRtServerManager }) =>
+        LiteRtServerManager.ensureRunning(
+          settings.forScope(SettingScope.User).settings.experimental
+            ?.gemmaModelRouter,
+        ),
+      )
+      .catch((e) => debugLogger.warn('LiteRT auto-start import failed:', e));
+
     if (
       settings.merged.security.auth.selectedType ===
         AuthType.LOGIN_WITH_GOOGLE &&
