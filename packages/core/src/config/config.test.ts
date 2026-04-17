@@ -1774,6 +1774,95 @@ describe('Server Config (config.ts)', () => {
     expect(config1.topicState.getTopic()).toBe('Topic 1');
     expect(config2.topicState.getTopic()).toBe('Topic 2');
   });
+
+  it('updates storage session-scoped directories when the sessionId changes', async () => {
+    const config = new Config({
+      ...baseParams,
+      sessionId: 'session-one',
+      plan: true,
+    });
+
+    await config.initialize();
+    const tempDir = config.storage.getProjectTempDir();
+    const oldPlansDir = path.join(tempDir, 'session-one', 'plans');
+    const oldTrackerService = config.getTrackerService();
+
+    config.setSessionId('session-two');
+
+    expect(config.getSessionId()).toBe('session-two');
+    expect(config.storage.getProjectTempPlansDir()).toBe(
+      path.join(tempDir, 'session-two', 'plans'),
+    );
+    expect(config.storage.getProjectTempTrackerDir()).toBe(
+      path.join(tempDir, 'session-two', 'tracker'),
+    );
+    expect(config.getTrackerService()).not.toBe(oldTrackerService);
+    expect(config.getTrackerService().trackerDir).toBe(
+      path.join(tempDir, 'session-two', 'tracker'),
+    );
+    expect(config.getWorkspaceContext().getDirectories()).not.toContain(
+      oldPlansDir,
+    );
+  });
+
+  it('does not throw when changing sessions before the previous plans dir exists', async () => {
+    const config = new Config({
+      ...baseParams,
+      sessionId: 'session-one',
+      plan: true,
+    });
+
+    await config.initialize();
+    const missingPlansDir = config.storage.getProjectTempPlansDir();
+    const realpathMock = vi.mocked(fs.realpathSync);
+    const originalImplementation = realpathMock.getMockImplementation();
+
+    try {
+      realpathMock.mockImplementation((input) => {
+        const normalizedInput =
+          typeof input === 'string' || Buffer.isBuffer(input)
+            ? input
+            : input.toString();
+
+        if (normalizedInput === missingPlansDir) {
+          const error = new Error(
+            `ENOENT: no such file or directory, ${normalizedInput}`,
+          );
+          Object.assign(error, { code: 'ENOENT' });
+          throw error;
+        }
+        if (originalImplementation) {
+          return originalImplementation(input);
+        }
+        return normalizedInput;
+      });
+
+      expect(() => config.setSessionId('session-two')).not.toThrow();
+    } finally {
+      realpathMock.mockImplementation((input) => {
+        if (originalImplementation) {
+          return originalImplementation(input);
+        }
+        return typeof input === 'string' || Buffer.isBuffer(input)
+          ? input
+          : input.toString();
+      });
+    }
+  });
+
+  it('clears the approved plan when starting a new session', () => {
+    const config = new Config({
+      ...baseParams,
+      sessionId: 'session-one',
+    });
+
+    config.setApprovedPlanPath('/tmp/session-one/plans/approved.md');
+
+    expect(() => config.resetNewSessionState('session-two')).not.toThrow();
+
+    expect(config.getSessionId()).toBe('session-two');
+    expect(config.getApprovedPlanPath()).toBeUndefined();
+  });
 });
 
 describe('GemmaModelRouterSettings', () => {
