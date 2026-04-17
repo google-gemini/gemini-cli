@@ -175,7 +175,11 @@ class WriteFileToolInvocation extends BaseToolInvocation<
           this.config.storage.getPlansDir(),
           this.config.getProjectRoot(),
         );
-      } catch {
+      } catch (e) {
+        debugLogger.error(
+          'Failed to resolve plan path during WriteFileTool invocation setup',
+          e,
+        );
         // Validation fails, set resolvedPath to something that will fail validation downstream or just the raw path.
         this.resolvedPath = this.params.file_path;
       }
