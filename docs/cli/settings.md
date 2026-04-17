@@ -39,6 +39,7 @@ they appear in the UI.
 | Debug Keystroke Logging       | `general.debugKeystrokeLogging`    | Enable debug logging of keystrokes to the console.                                                                                                                                                                                                            | `false`     |
 | Enable Session Cleanup        | `general.sessionRetention.enabled` | Enable automatic session cleanup                                                                                                                                                                                                                              | `true`      |
 | Keep chat history             | `general.sessionRetention.maxAge`  | Automatically delete chats older than this time period (e.g., "30d", "7d", "24h", "1w")                                                                                                                                                                       | `"30d"`     |
+| Topic & Update Narration      | `general.topicUpdateNarration`     | Enable the Topic & Update communication model for reduced chattiness and structured progress reporting.                                                                                                                                                       | `true`      |
 
 ### Output
 
@@ -160,17 +161,16 @@ they appear in the UI.
 
 ### Experimental
 
-| UI Label                                             | Setting                             | Description                                                                                                                                               | Default |
-| ---------------------------------------------------- | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
-| Enable Git Worktrees                                 | `experimental.worktrees`            | Enable automated Git worktree management for parallel work.                                                                                               | `false` |
-| Use OSC 52 Paste                                     | `experimental.useOSC52Paste`        | Use OSC 52 for pasting. This may be more robust than the default system when using remote terminal sessions (if your terminal is configured to allow it). | `false` |
-| Use OSC 52 Copy                                      | `experimental.useOSC52Copy`         | Use OSC 52 for copying. This may be more robust than the default system when using remote terminal sessions (if your terminal is configured to allow it). | `false` |
-| Model Steering                                       | `experimental.modelSteering`        | Enable model steering (user hints) to guide the model during tool execution.                                                                              | `false` |
-| Direct Web Fetch                                     | `experimental.directWebFetch`       | Enable web fetch behavior that bypasses LLM summarization.                                                                                                | `false` |
-| Memory Manager Agent                                 | `experimental.memoryManager`        | Replace the built-in save_memory tool with a memory manager subagent that supports adding, removing, de-duplicating, and organizing memories.             | `false` |
-| Use the generalist profile to manage agent contexts. | `experimental.generalistProfile`    | Suitable for general coding and software development tasks.                                                                                               | `false` |
-| Enable Context Management                            | `experimental.contextManagement`    | Enable logic for context management.                                                                                                                      | `false` |
-| Topic & Update Narration                             | `experimental.topicUpdateNarration` | Enable the experimental Topic & Update communication model for reduced chattiness and structured progress reporting.                                      | `false` |
+| UI Label                                             | Setting                          | Description                                                                                                                                               | Default |
+| ---------------------------------------------------- | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| Enable Git Worktrees                                 | `experimental.worktrees`         | Enable automated Git worktree management for parallel work.                                                                                               | `false` |
+| Use OSC 52 Paste                                     | `experimental.useOSC52Paste`     | Use OSC 52 for pasting. This may be more robust than the default system when using remote terminal sessions (if your terminal is configured to allow it). | `false` |
+| Use OSC 52 Copy                                      | `experimental.useOSC52Copy`      | Use OSC 52 for copying. This may be more robust than the default system when using remote terminal sessions (if your terminal is configured to allow it). | `false` |
+| Model Steering                                       | `experimental.modelSteering`     | Enable model steering (user hints) to guide the model during tool execution.                                                                              | `false` |
+| Direct Web Fetch                                     | `experimental.directWebFetch`    | Enable web fetch behavior that bypasses LLM summarization.                                                                                                | `false` |
+| Memory Manager Agent                                 | `experimental.memoryManager`     | Replace the built-in save_memory tool with a memory manager subagent that supports adding, removing, de-duplicating, and organizing memories.             | `false` |
+| Use the generalist profile to manage agent contexts. | `experimental.generalistProfile` | Suitable for general coding and software development tasks.                                                                                               | `false` |
+| Enable Context Management                            | `experimental.contextManagement` | Enable logic for context management.                                                                                                                      | `false` |
 
 ### Skills
 

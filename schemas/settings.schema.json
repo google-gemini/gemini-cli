@@ -209,6 +209,13 @@
             }
           },
           "additionalProperties": false
+        },
+        "topicUpdateNarration": {
+          "title": "Topic & Update Narration",
+          "description": "Enable the Topic & Update communication model for reduced chattiness and structured progress reporting.",
+          "markdownDescription": "Enable the Topic & Update communication model for reduced chattiness and structured progress reporting.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
         }
       },
       "additionalProperties": false
@@ -2963,8 +2970,8 @@
         },
         "topicUpdateNarration": {
           "title": "Topic & Update Narration",
-          "description": "Enable the experimental Topic & Update communication model for reduced chattiness and structured progress reporting.",
-          "markdownDescription": "Enable the experimental Topic & Update communication model for reduced chattiness and structured progress reporting.\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `false`",
+          "description": "Deprecated: Use general.topicUpdateNarration instead.",
+          "markdownDescription": "Deprecated: Use general.topicUpdateNarration instead.\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         }
