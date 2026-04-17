@@ -43,7 +43,7 @@ describe('update_topic_behavior', () => {
         2,
       ),
       '.gemini/settings.json': JSON.stringify({
-        experimental: {
+        general: {
           topicUpdateNarration: true,
         },
       }),
@@ -127,7 +127,7 @@ describe('update_topic_behavior', () => {
       'Explain the difference between Map and Object in JavaScript and provide a performance-focused code snippet for each.',
     files: {
       '.gemini/settings.json': JSON.stringify({
-        experimental: {
+        general: {
           topicUpdateNarration: true,
         },
       }),
@@ -156,7 +156,7 @@ describe('update_topic_behavior', () => {
       'packages/core/src/tools/tool-names.ts':
         "export const UPDATE_TOPIC_TOOL_NAME = 'update_topic';",
       '.gemini/settings.json': JSON.stringify({
-        experimental: {
+        general: {
           topicUpdateNarration: true,
         },
       }),
@@ -204,7 +204,7 @@ app.post('/users', (req, res) => {
 export default app;
       `,
       '.gemini/settings.json': JSON.stringify({
-        experimental: {
+        general: {
           topicUpdateNarration: true,
         },
       }),
@@ -249,7 +249,7 @@ export default app;
     files: {
       'package.json': JSON.stringify({ name: 'test-project' }),
       '.gemini/settings.json': JSON.stringify({
-        experimental: {
+        general: {
           topicUpdateNarration: true,
         },
       }),

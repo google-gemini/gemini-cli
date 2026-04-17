@@ -992,7 +992,9 @@ export async function loadCliConfig(
     experimentalMemoryManager: settings.experimental?.memoryManager,
     contextManagement,
     modelSteering: settings.experimental?.modelSteering,
-    topicUpdateNarration: settings.experimental?.topicUpdateNarration,
+    topicUpdateNarration:
+      settings.general?.topicUpdateNarration ??
+      settings.experimental?.topicUpdateNarration,
     noBrowser: !!process.env['NO_BROWSER'],
     summarizeToolOutput: settings.model?.summarizeToolOutput,
     ideMode,
