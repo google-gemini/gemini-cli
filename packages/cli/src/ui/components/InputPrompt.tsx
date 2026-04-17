@@ -686,6 +686,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     (key: Key) => {
       if (handleVoiceInput(key)) return true;
 
+      debugLogger.log(
+        `[UI INPUT] handleInput received key: ${JSON.stringify(key)}`,
+      );
       // Determine if this keypress is a history navigation command
       const isHistoryUp =
         !shellModeActive &&
