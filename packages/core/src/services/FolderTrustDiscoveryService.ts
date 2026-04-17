@@ -6,6 +6,7 @@
 
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
+import { glob } from 'glob';
 import stripJsonComments from 'strip-json-comments';
 import { GEMINI_DIR } from '../utils/paths.js';
 import { debugLogger } from '../utils/debugLogger.js';
@@ -85,14 +86,14 @@ export class FolderTrustDiscoveryService {
     const skillsDir = path.join(geminiDir, 'skills');
     if (await this.exists(skillsDir)) {
       try {
-        const entries = await fs.readdir(skillsDir, { withFileTypes: true });
-        for (const entry of entries) {
-          if (entry.isDirectory()) {
-            const skillMdPath = path.join(skillsDir, entry.name, 'SKILL.md');
-            if (await this.exists(skillMdPath)) {
-              results.skills.push(entry.name);
-            }
-          }
+        const skillFiles = await glob('**/SKILL.md', {
+          cwd: skillsDir,
+          nodir: true,
+          dot: true,
+          ignore: ['**/node_modules/**', '**/.git/**'],
+        });
+        for (const skillFile of skillFiles) {
+          results.skills.push(path.dirname(skillFile));
         }
       } catch (e) {
         results.discoveryErrors.push(
