@@ -1,0 +1,18 @@
+description = "Run the cyber recon chain: HATS Nmap -> service detection -> vulnerability lookup."
+prompt = """
+You are executing /scan for target input: {{args}}.
+
+Run this exact workflow with HATS MCP tools:
+1) hats_port_scan
+2) hats_service_detection
+3) hats_vulnerability_lookup
+
+If useful, run hats_recon_chain to consolidate outputs.
+
+Return:
+- Target and scan scope
+- Open ports
+- Identified services/versions
+- Correlated vulnerabilities with severity and confidence
+- Next recommended recon or verification step
+"""
