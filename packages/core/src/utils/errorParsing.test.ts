@@ -114,4 +114,20 @@ describe('parseAndFormatApiError', () => {
     const expected = '[API Error: An unknown error occurred.]';
     expect(parseAndFormatApiError(error)).toBe(expected);
   });
+
+  it('should decode and format a byte-array encoded error message', () => {
+    const json = JSON.stringify({
+      error: {
+        code: 429,
+        message: 'No capacity available',
+        status: 'RESOURCE_EXHAUSTED',
+      },
+    });
+    const byteString = Array.from(json)
+      .map((c) => c.charCodeAt(0))
+      .join(',');
+    const result = parseAndFormatApiError(byteString);
+    expect(result).toContain('[API Error: No capacity available');
+    expect(result).toContain('RESOURCE_EXHAUSTED');
+  });
 });
