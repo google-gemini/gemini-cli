@@ -19,6 +19,8 @@ import {
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
+  GEMMA_4_31B_IT_MODEL,
+  GEMMA_4_26B_A4B_IT_MODEL,
   ModelSlashCommandEvent,
   logModelSlashCommand,
   getDisplayString,
@@ -237,6 +239,16 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
         value: DEFAULT_GEMINI_FLASH_LITE_MODEL,
         title: getDisplayString(DEFAULT_GEMINI_FLASH_LITE_MODEL),
         key: DEFAULT_GEMINI_FLASH_LITE_MODEL,
+      },
+      {
+        value: GEMMA_4_31B_IT_MODEL,
+        title: getDisplayString(GEMMA_4_31B_IT_MODEL),
+        key: GEMMA_4_31B_IT_MODEL,
+      },
+      {
+        value: GEMMA_4_26B_A4B_IT_MODEL,
+        title: getDisplayString(GEMMA_4_26B_A4B_IT_MODEL),
+        key: GEMMA_4_26B_A4B_IT_MODEL,
       },
     ];
 
