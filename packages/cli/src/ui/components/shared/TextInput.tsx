@@ -8,6 +8,7 @@ import type React from 'react';
 import { useCallback, useRef } from 'react';
 import { Text, Box, type DOMElement } from 'ink';
 import { useKeypress, type Key } from '../../hooks/useKeypress.js';
+import { debugLogger } from '@google/gemini-cli-core';
 import chalk from 'chalk';
 import { theme } from '../../semantic-colors.js';
 import { expandPastePlaceholders, type TextBuffer } from './text-buffer.js';
@@ -56,6 +57,9 @@ export function TextInput({
 
   const handleKeyPress = useCallback(
     (key: Key) => {
+      debugLogger.log(
+        `[TEXT INPUT] handleKeyPress received key: ${JSON.stringify(key)}`,
+      );
       if (key.name === 'escape' && onCancel) {
         onCancel();
         return true;
