@@ -18,8 +18,9 @@ import { cleanup } from './src/test-utils/render.js';
 // Globally mock ink-spinner to prevent non-deterministic snapshot/act flakes.
 mockInkSpinner();
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-(global as any).IS_REACT_ACT_ENVIRONMENT = true;
+(
+  global as typeof global & { IS_REACT_ACT_ENVIRONMENT: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
 // Increase max listeners to avoid warnings in large test suites
 coreEvents.setMaxListeners(0);

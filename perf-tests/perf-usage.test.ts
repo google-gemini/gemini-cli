@@ -246,8 +246,19 @@ describe('CPU Performance Tests', () => {
               JSON.stringify(toolLatencyMetric),
             );
           }
-           
-          const logs = (rig as any)._readAndParseTelemetryLog();
+
+          interface TelemetryLogEntry {
+            scopeMetrics?: {
+              metrics: {
+                descriptor: { name: string };
+              }[];
+            }[];
+          }
+          const logs = (
+            rig as unknown as {
+              _readAndParseTelemetryLog: () => TelemetryLogEntry[];
+            }
+          )._readAndParseTelemetryLog();
           console.log(`  Total telemetry log entries: ${logs.length}`);
           for (const logData of logs) {
             if (logData.scopeMetrics) {
@@ -271,10 +282,12 @@ describe('CPU Performance Tests', () => {
             );
 
             const findValue = (percentile: string) => {
-              const dp = (eventLoopMetric['dataPoints'] as any[]).find(
-                 
-                (p: any) => p.attributes.percentile === percentile,
-              );
+              const dp = (
+                eventLoopMetric['dataPoints'] as {
+                  attributes: { percentile: string };
+                  value: { min: number };
+                }[]
+              ).find((p) => p.attributes.percentile === percentile);
               return dp ? dp.value.min : undefined;
             };
 

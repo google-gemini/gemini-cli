@@ -6,7 +6,7 @@
 
 import { useState, useRef, useCallback, useMemo } from 'react';
 import type { HistoryItem } from '../types.js';
-import type { ChatRecordingService } from '@google/gemini-cli-core/src/services/chatRecordingService.js';
+import { type ChatRecordingService } from '@google/gemini-cli-core';
 
 // Type for the updater function passed to updateHistoryItem
 type HistoryItemUpdater = (

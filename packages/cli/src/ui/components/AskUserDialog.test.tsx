@@ -8,10 +8,13 @@ import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { act } from 'react';
 import { renderWithProviders } from '../../test-utils/render.js';
 import { createMockSettings } from '../../test-utils/settings.js';
-import { makeFakeConfig } from '../../../../core/src/test-utils/config.js';
 import { waitFor } from '../../test-utils/async.js';
 import { AskUserDialog } from './AskUserDialog.js';
-import { QuestionType, type Question } from '@google/gemini-cli-core';
+import {
+  QuestionType,
+  type Question,
+  makeFakeConfig,
+} from '@google/gemini-cli-core';
 import { UIStateContext, type UIState } from '../contexts/UIStateContext.js';
 
 // Helper to write to stdin with proper act() wrapping

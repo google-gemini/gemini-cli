@@ -55,8 +55,14 @@ export default tseslint.config(
       '**/node_modules/**',
       'eslint.config.js',
       'packages/**/dist/**',
-      'packages/*/src/**/*.js',
-      'packages/*/src/**/*.js.map',
+      'packages/**/*.js',
+      'packages/**/*.js.map',
+      'integration-tests/**/*.js',
+      'integration-tests/**/*.js.map',
+      'memory-tests/**/*.js',
+      'memory-tests/**/*.js.map',
+      'perf-tests/**/*.js',
+      'perf-tests/**/*.js.map',
       'bundle/**',
       'package/bundle/**',
       '.integration-tests/**',
@@ -294,7 +300,6 @@ export default tseslint.config(
       'vitest/expect-expect': 'off',
       'vitest/no-commented-out-tests': 'off',
       'no-restricted-syntax': ['error', ...commonRestrictedSyntaxRules],
-      '@typescript-eslint/no-explicit-any': 'off',
     },
   },
   {
@@ -410,12 +415,6 @@ export default tseslint.config(
     rules: {
       'no-restricted-syntax': 'off',
       '@typescript-eslint/no-require-imports': 'off',
-    },
-  },
-  {
-    files: ['integration-tests/**/*.ts', 'memory-tests/**/*.ts', 'perf-tests/**/*.ts'],
-    rules: {
-      '@typescript-eslint/no-explicit-any': 'off',
     },
   },
   // Prettier config must be last

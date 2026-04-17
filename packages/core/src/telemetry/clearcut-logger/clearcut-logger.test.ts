@@ -74,7 +74,7 @@ declare module 'vitest' {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-  interface Assertion<T = any> extends CustomMatchers<T> {}
+  interface Assertion<T> extends CustomMatchers<T> {}
 }
 
 expect.extend({
@@ -823,8 +823,12 @@ describe('ClearcutLogger', () => {
       const { logger } = setup();
       // Spy on flushToClearcut to prevent it from clearing the queue
       const flushSpy = vi
-         
-        .spyOn(logger!, 'flushToClearcut' as any)
+        .spyOn(
+          (logger as unknown as {
+            flushToClearcut: () => Promise<{ nextRequestWaitMs: number }>;
+          }),
+          'flushToClearcut',
+        )
         .mockResolvedValue({ nextRequestWaitMs: 0 });
 
       logger?.logRipgrepFallbackEvent();
@@ -1485,8 +1489,12 @@ describe('ClearcutLogger', () => {
     it('should not flush if the interval has not passed', () => {
       const { logger } = setup();
       const flushSpy = vi
-         
-        .spyOn(logger!, 'flushToClearcut' as any)
+        .spyOn(
+          (logger as unknown as {
+            flushToClearcut: () => Promise<{ nextRequestWaitMs: number }>;
+          }),
+          'flushToClearcut',
+        )
         .mockResolvedValue({ nextRequestWaitMs: 0 });
 
       logger!.flushIfNeeded();
@@ -1496,8 +1504,12 @@ describe('ClearcutLogger', () => {
     it('should flush if the interval has passed', async () => {
       const { logger } = setup();
       const flushSpy = vi
-         
-        .spyOn(logger!, 'flushToClearcut' as any)
+        .spyOn(
+          (logger as unknown as {
+            flushToClearcut: () => Promise<{ nextRequestWaitMs: number }>;
+          }),
+          'flushToClearcut',
+        )
         .mockResolvedValue({ nextRequestWaitMs: 0 });
 
       // Advance time by more than the flush interval

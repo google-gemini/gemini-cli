@@ -9,8 +9,8 @@ import { waitFor } from '../../../test-utils/async.js';
 import { createMockSettings } from '../../../test-utils/settings.js';
 import { ToolResultDisplay } from './ToolResultDisplay.js';
 import { describe, it, expect, vi } from 'vitest';
-import { makeFakeConfig } from '../../../../../core/src/test-utils/config.js';
-import { type AnsiOutput } from '@google/gemini-cli-core';
+import { makeFakeConfig } from '@google/gemini-cli-core';
+import type { AnsiOutput, Config } from '@google/gemini-cli-core';
 
 describe.sequential('ToolResultDisplay', () => {
   beforeEach(() => {
@@ -41,7 +41,9 @@ describe.sequential('ToolResultDisplay', () => {
         maxLines={10}
       />,
       {
-        config: makeFakeConfig({ useAlternateBuffer: true }),
+        config: makeFakeConfig({
+          useAlternateBuffer: true,
+        }) as unknown as Config,
         settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
       },
     );
@@ -60,7 +62,9 @@ describe.sequential('ToolResultDisplay', () => {
         maxLines={10}
       />,
       {
-        config: makeFakeConfig({ useAlternateBuffer: true }),
+        config: makeFakeConfig({
+          useAlternateBuffer: true,
+        }) as unknown as Config,
         settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
       },
     );
@@ -80,7 +84,9 @@ describe.sequential('ToolResultDisplay', () => {
         hasFocus={true}
       />,
       {
-        config: makeFakeConfig({ useAlternateBuffer: true }),
+        config: makeFakeConfig({
+          useAlternateBuffer: true,
+        }) as unknown as Config,
         settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
       },
     );
@@ -94,7 +100,9 @@ describe.sequential('ToolResultDisplay', () => {
     const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <ToolResultDisplay resultDisplay="**Some result**" terminalWidth={80} />,
       {
-        config: makeFakeConfig({ useAlternateBuffer: false }),
+        config: makeFakeConfig({
+          useAlternateBuffer: false,
+        }) as unknown as Config,
         settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
       },
     );
@@ -114,7 +122,9 @@ describe.sequential('ToolResultDisplay', () => {
         renderOutputAsMarkdown={false}
       />,
       {
-        config: makeFakeConfig({ useAlternateBuffer: false }),
+        config: makeFakeConfig({
+          useAlternateBuffer: false,
+        }) as unknown as Config,
         settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
         uiState: { constrainHeight: true },
       },
@@ -135,7 +145,9 @@ describe.sequential('ToolResultDisplay', () => {
         availableTerminalHeight={20}
       />,
       {
-        config: makeFakeConfig({ useAlternateBuffer: false }),
+        config: makeFakeConfig({
+          useAlternateBuffer: false,
+        }) as unknown as Config,
         settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
         uiState: { constrainHeight: true },
       },
@@ -159,7 +171,9 @@ describe.sequential('ToolResultDisplay', () => {
         availableTerminalHeight={20}
       />,
       {
-        config: makeFakeConfig({ useAlternateBuffer: false }),
+        config: makeFakeConfig({
+          useAlternateBuffer: false,
+        }) as unknown as Config,
         settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
       },
     );
@@ -193,7 +207,9 @@ describe.sequential('ToolResultDisplay', () => {
         availableTerminalHeight={20}
       />,
       {
-        config: makeFakeConfig({ useAlternateBuffer: false }),
+        config: makeFakeConfig({
+          useAlternateBuffer: false,
+        }) as unknown as Config,
         settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
       },
     );
@@ -215,7 +231,9 @@ describe.sequential('ToolResultDisplay', () => {
         availableTerminalHeight={20}
       />,
       {
-        config: makeFakeConfig({ useAlternateBuffer: false }),
+        config: makeFakeConfig({
+          useAlternateBuffer: false,
+        }) as unknown as Config,
         settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
         allowEmptyFrame: true,
       },
@@ -237,7 +255,9 @@ describe.sequential('ToolResultDisplay', () => {
         renderOutputAsMarkdown={true}
       />,
       {
-        config: makeFakeConfig({ useAlternateBuffer: false }),
+        config: makeFakeConfig({
+          useAlternateBuffer: false,
+        }) as unknown as Config,
         settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
         uiState: { constrainHeight: true },
       },
@@ -257,7 +277,9 @@ describe.sequential('ToolResultDisplay', () => {
         renderOutputAsMarkdown={true}
       />,
       {
-        config: makeFakeConfig({ useAlternateBuffer: true }),
+        config: makeFakeConfig({
+          useAlternateBuffer: true,
+        }) as unknown as Config,
         settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
       },
     );
@@ -344,7 +366,9 @@ describe.sequential('ToolResultDisplay', () => {
         maxLines={3}
       />,
       {
-        config: makeFakeConfig({ useAlternateBuffer: false }),
+        config: makeFakeConfig({
+          useAlternateBuffer: false,
+        }) as unknown as Config,
         settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
         uiState: { constrainHeight: true },
       },
@@ -384,7 +408,9 @@ describe.sequential('ToolResultDisplay', () => {
         availableTerminalHeight={undefined}
       />,
       {
-        config: makeFakeConfig({ useAlternateBuffer: false }),
+        config: makeFakeConfig({
+          useAlternateBuffer: false,
+        }) as unknown as Config,
         settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
         uiState: { constrainHeight: true },
       },
@@ -427,7 +453,9 @@ describe.sequential('ToolResultDisplay', () => {
         overflowDirection="top"
       />,
       {
-        config: makeFakeConfig({ useAlternateBuffer: false }),
+        config: makeFakeConfig({
+          useAlternateBuffer: false,
+        }) as unknown as Config,
         settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
         uiState: { constrainHeight: true, terminalHeight: 10 },
       },

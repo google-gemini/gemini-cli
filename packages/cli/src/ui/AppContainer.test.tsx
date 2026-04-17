@@ -40,6 +40,7 @@ import {
   type AgentDefinition,
   CoreToolCallStatus,
   IdeClient,
+  MCPDiscoveryState,
 } from '@google/gemini-cli-core';
 
 // Mock coreEvents
@@ -363,22 +364,22 @@ describe('AppContainer State Management Brand New', () => {
 
   class ErrorBoundary extends Component<
     { children: ReactNode },
-    { hasError: boolean; error: any }
+    { hasError: boolean; error: unknown }
   > {
-    constructor(props: any) {
+    constructor(props: { children: ReactNode }) {
       super(props);
       this.state = { hasError: false, error: null };
     }
-    static getDerivedStateFromError(error: any) {
+    static getDerivedStateFromError(error: unknown) {
       return { hasError: true, error };
     }
-    override componentDidCatch(error: any, errorInfo: any) {
+    override componentDidCatch(error: unknown, errorInfo: unknown) {
       // eslint-disable-next-line no-console
       console.error('ErrorBoundary caught error:', error, errorInfo);
     }
     override render() {
       if (this.state.hasError) {
-        return <Text>Error: {this.state.error?.message}</Text>;
+        return <Text>Error: {(this.state.error as Error)?.message}</Text>;
       }
       return this.props.children;
     }
@@ -451,11 +452,20 @@ describe('AppContainer State Management Brand New', () => {
   beforeEach(() => {
     persistentStateMock.reset();
     vi.clearAllMocks();
-    (global as any).capturedUIState = null;
-    (global as any).capturedInputState = null;
-    (global as any).capturedQuotaState = null;
-    (global as any).capturedUIActions = null;
-    (global as any).capturedOverflowActions = null;
+    (global as typeof global & { capturedUIState: unknown }).capturedUIState =
+      null;
+    (
+      global as typeof global & { capturedInputState: unknown }
+    ).capturedInputState = null;
+    (
+      global as typeof global & { capturedQuotaState: unknown }
+    ).capturedQuotaState = null;
+    (
+      global as typeof global & { capturedUIActions: unknown }
+    ).capturedUIActions = null;
+    (
+      global as typeof global & { capturedOverflowActions: unknown }
+    ).capturedOverflowActions = null;
 
     vi.mocked(useSessionResume).mockReturnValue({
       loadHistoryForResume: vi.fn().mockResolvedValue(undefined),
@@ -474,14 +484,14 @@ describe('AppContainer State Management Brand New', () => {
 
     vi.spyOn(useMcpStatusModule, 'useMcpStatus').mockReturnValue({
       isMcpReady: true,
-      discoveryState: 'completed' as any,
+      discoveryState: MCPDiscoveryState.COMPLETED,
       mcpServerCount: 0,
     });
 
     vi.spyOn(IdeClient, 'getInstance').mockResolvedValue({
       disconnect: vi.fn().mockResolvedValue(undefined),
       getCurrentIde: vi.fn().mockReturnValue(null),
-    } as any);
+    } as unknown as IdeClient);
 
     // Initialize mock stdout for terminal title tests
 

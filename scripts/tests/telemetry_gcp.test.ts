@@ -49,8 +49,9 @@ describe('telemetry_gcp.js', () => {
     await import('../telemetry_gcp.js');
 
     expect(mockSpawn).toHaveBeenCalled();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const spawnOptions = (mockSpawn.mock.calls[0] as any[])[2];
+    const spawnOptions = (
+      mockSpawn.mock.calls[0] as { env?: Record<string, string> }[]
+    )[2];
     expect(spawnOptions?.env).not.toHaveProperty(
       'GOOGLE_APPLICATION_CREDENTIALS',
     );
