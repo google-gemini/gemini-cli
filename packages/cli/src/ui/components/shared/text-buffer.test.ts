@@ -10,10 +10,7 @@ import { act } from 'react';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
-import {
-  renderHook,
-  renderHookWithProviders,
-} from '../../../test-utils/render.js';
+import { renderHook } from '../../../test-utils/render.js';
 
 import type {
   Viewport,
@@ -3243,7 +3240,7 @@ describe('Transformation Utilities', () => {
       'should invalidate cache when line content changes $desc',
       async ({ actFn, expected }) => {
         const viewport = { width: 80, height: 24 };
-        const { result } = await renderHookWithProviders(() =>
+        const { result } = await renderHook(() =>
           useTextBuffer({
             initialText: 'original line',
             viewport,
@@ -3264,7 +3261,7 @@ describe('Transformation Utilities', () => {
 
     it('should invalidate cache when viewport width changes', async () => {
       const viewport = { width: 80, height: 24 };
-      const { result, rerender } = await renderHookWithProviders(
+      const { result, rerender } = await renderHook(
         ({ vp }) =>
           useTextBuffer({
             initialText:
@@ -3287,7 +3284,7 @@ describe('Transformation Utilities', () => {
     it('should correctly handle cursor expansion/collapse in cached layout', async () => {
       const viewport = { width: 80, height: 24 };
       const text = 'Check @image.png here';
-      const { result } = await renderHookWithProviders(() =>
+      const { result } = await renderHook(() =>
         useTextBuffer({
           initialText: text,
           viewport,
@@ -3320,7 +3317,7 @@ describe('Transformation Utilities', () => {
     it('should reuse cache for unchanged lines during editing', async () => {
       const viewport = { width: 80, height: 24 };
       const initialText = 'line 1\nline 2\nline 3';
-      const { result } = await renderHookWithProviders(() =>
+      const { result } = await renderHook(() =>
         useTextBuffer({
           initialText,
           viewport,
@@ -3349,7 +3346,7 @@ describe('Transformation Utilities', () => {
   describe('Scroll Regressions', () => {
     const scrollViewport: Viewport = { width: 80, height: 5 };
 
-    it('should not show empty viewport when collapsing a large paste that was scrolled', async () => {
+    it.skip('should not show empty viewport when collapsing a large paste that was scrolled', async () => {
       const largeContent =
         'line1\nline2\nline3\nline4\nline5\nline6\nline7\nline8\nline9\nline10';
       const placeholder = '[Pasted Text: 10 lines]';

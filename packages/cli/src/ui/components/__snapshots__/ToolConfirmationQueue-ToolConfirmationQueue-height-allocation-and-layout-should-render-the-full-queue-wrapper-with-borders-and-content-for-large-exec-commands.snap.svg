@@ -7,35 +7,35 @@
     <text x="0" y="2" fill="#ffffff" textLength="720" lengthAdjust="spacingAndGlyphs">╭──────────────────────────────────────────────────────────────────────────────╮</text>
     <text x="0" y="19" fill="#ffffff" textLength="720" lengthAdjust="spacingAndGlyphs">│ ? Shell  Executes a bash command                                      2 of 3 │</text>
     <text x="0" y="36" fill="#ffffff" textLength="720" lengthAdjust="spacingAndGlyphs">│ ╭──────────────────────────────────────────────────────────────────────────╮ │</text>
-    <text x="0" y="53" fill="#ffffff" textLength="720" lengthAdjust="spacingAndGlyphs">│ │ ... 21 hidden (Ctrl+O) ...                                               │ │</text>
-    <text x="0" y="70" fill="#ffffff" textLength="720" lengthAdjust="spacingAndGlyphs">│ │ echo &quot;Line 22&quot;                                                           │ │</text>
-    <text x="0" y="87" fill="#ffffff" textLength="720" lengthAdjust="spacingAndGlyphs">│ │ echo &quot;Line 23&quot;                                                           │ │</text>
-    <text x="0" y="104" fill="#ffffff" textLength="720" lengthAdjust="spacingAndGlyphs">│ │ echo &quot;Line 24&quot;                                                           │ │</text>
-    <text x="0" y="121" fill="#ffffff" textLength="720" lengthAdjust="spacingAndGlyphs">│ │ echo &quot;Line 25&quot;                                                           │ │</text>
-    <text x="0" y="138" fill="#ffffff" textLength="720" lengthAdjust="spacingAndGlyphs">│ │ echo &quot;Line 26&quot;                                                           │ │</text>
-    <text x="0" y="155" fill="#ffffff" textLength="720" lengthAdjust="spacingAndGlyphs">│ │ echo &quot;Line 27&quot;                                                           │ │</text>
-    <text x="0" y="172" fill="#ffffff" textLength="720" lengthAdjust="spacingAndGlyphs">│ │ echo &quot;Line 28&quot;                                                           │ │</text>
-    <text x="0" y="189" fill="#ffffff" textLength="720" lengthAdjust="spacingAndGlyphs">│ │ echo &quot;Line 29&quot;                                                           │ │</text>
-    <text x="0" y="206" fill="#ffffff" textLength="720" lengthAdjust="spacingAndGlyphs">│ │ echo &quot;Line 30&quot;                                                           │ │</text>
-    <text x="0" y="223" fill="#ffffff" textLength="720" lengthAdjust="spacingAndGlyphs">│ │ echo &quot;Line 31&quot;                                                           │ │</text>
-    <text x="0" y="240" fill="#ffffff" textLength="720" lengthAdjust="spacingAndGlyphs">│ │ echo &quot;Line 32&quot;                                                           │ │</text>
-    <text x="0" y="257" fill="#ffffff" textLength="720" lengthAdjust="spacingAndGlyphs">│ │ echo &quot;Line 33&quot;                                                           │ │</text>
-    <text x="0" y="274" fill="#ffffff" textLength="720" lengthAdjust="spacingAndGlyphs">│ │ echo &quot;Line 34&quot;                                                           │ │</text>
-    <text x="0" y="291" fill="#ffffff" textLength="720" lengthAdjust="spacingAndGlyphs">│ │ echo &quot;Line 35&quot;                                                           │ │</text>
-    <text x="0" y="308" fill="#ffffff" textLength="720" lengthAdjust="spacingAndGlyphs">│ │ echo &quot;Line 36&quot;                                                           │ │</text>
-    <text x="0" y="325" fill="#ffffff" textLength="720" lengthAdjust="spacingAndGlyphs">│ │ echo &quot;Line 37&quot;                                                           │ │</text>
-    <text x="0" y="342" fill="#ffffff" textLength="720" lengthAdjust="spacingAndGlyphs">│ │ echo &quot;Line 38&quot;                                                           │ │</text>
-    <text x="0" y="359" fill="#ffffff" textLength="720" lengthAdjust="spacingAndGlyphs">│ │ echo &quot;Line 39&quot;                                                           │ │</text>
-    <text x="0" y="376" fill="#ffffff" textLength="720" lengthAdjust="spacingAndGlyphs">│ │ echo &quot;Line 40&quot;                                                           │ │</text>
-    <text x="0" y="393" fill="#ffffff" textLength="720" lengthAdjust="spacingAndGlyphs">│ │ echo &quot;Line 41&quot;                                                           │ │</text>
-    <text x="0" y="410" fill="#ffffff" textLength="720" lengthAdjust="spacingAndGlyphs">│ │ echo &quot;Line 42&quot;                                                           │ │</text>
-    <text x="0" y="427" fill="#ffffff" textLength="720" lengthAdjust="spacingAndGlyphs">│ │ echo &quot;Line 43&quot;                                                           │ │</text>
-    <text x="0" y="444" fill="#ffffff" textLength="720" lengthAdjust="spacingAndGlyphs">│ │ echo &quot;Line 44&quot;                                                           │ │</text>
-    <text x="0" y="461" fill="#ffffff" textLength="720" lengthAdjust="spacingAndGlyphs">│ │ echo &quot;Line 45&quot;                                                           │ │</text>
-    <text x="0" y="478" fill="#ffffff" textLength="720" lengthAdjust="spacingAndGlyphs">│ │ echo &quot;Line 46&quot;                                                           │ │</text>
-    <text x="0" y="495" fill="#ffffff" textLength="720" lengthAdjust="spacingAndGlyphs">│ │ echo &quot;Line 47&quot;                                                           │ │</text>
-    <text x="0" y="512" fill="#ffffff" textLength="720" lengthAdjust="spacingAndGlyphs">│ │ echo &quot;Line 48&quot;                                                           │ │</text>
-    <text x="0" y="529" fill="#ffffff" textLength="720" lengthAdjust="spacingAndGlyphs">│ │ echo &quot;Line 49&quot;                                                           │ │</text>
+    <text x="0" y="53" fill="#ffffff" textLength="720" lengthAdjust="spacingAndGlyphs">│ │ ... 22 hidden (Ctrl+O) ...                                               │ │</text>
+    <text x="0" y="70" fill="#ffffff" textLength="720" lengthAdjust="spacingAndGlyphs">│ │ echo &quot;Line 23&quot;                                                           │ │</text>
+    <text x="0" y="87" fill="#ffffff" textLength="720" lengthAdjust="spacingAndGlyphs">│ │ echo &quot;Line 24&quot;                                                           │ │</text>
+    <text x="0" y="104" fill="#ffffff" textLength="720" lengthAdjust="spacingAndGlyphs">│ │ echo &quot;Line 25&quot;                                                           │ │</text>
+    <text x="0" y="121" fill="#ffffff" textLength="720" lengthAdjust="spacingAndGlyphs">│ │ echo &quot;Line 26&quot;                                                           │ │</text>
+    <text x="0" y="138" fill="#ffffff" textLength="720" lengthAdjust="spacingAndGlyphs">│ │ echo &quot;Line 27&quot;                                                           │ │</text>
+    <text x="0" y="155" fill="#ffffff" textLength="720" lengthAdjust="spacingAndGlyphs">│ │ echo &quot;Line 28&quot;                                                           │ │</text>
+    <text x="0" y="172" fill="#ffffff" textLength="720" lengthAdjust="spacingAndGlyphs">│ │ echo &quot;Line 29&quot;                                                           │ │</text>
+    <text x="0" y="189" fill="#ffffff" textLength="720" lengthAdjust="spacingAndGlyphs">│ │ echo &quot;Line 30&quot;                                                           │ │</text>
+    <text x="0" y="206" fill="#ffffff" textLength="720" lengthAdjust="spacingAndGlyphs">│ │ echo &quot;Line 31&quot;                                                           │ │</text>
+    <text x="0" y="223" fill="#ffffff" textLength="720" lengthAdjust="spacingAndGlyphs">│ │ echo &quot;Line 32&quot;                                                           │ │</text>
+    <text x="0" y="240" fill="#ffffff" textLength="720" lengthAdjust="spacingAndGlyphs">│ │ echo &quot;Line 33&quot;                                                           │ │</text>
+    <text x="0" y="257" fill="#ffffff" textLength="720" lengthAdjust="spacingAndGlyphs">│ │ echo &quot;Line 34&quot;                                                           │ │</text>
+    <text x="0" y="274" fill="#ffffff" textLength="720" lengthAdjust="spacingAndGlyphs">│ │ echo &quot;Line 35&quot;                                                           │ │</text>
+    <text x="0" y="291" fill="#ffffff" textLength="720" lengthAdjust="spacingAndGlyphs">│ │ echo &quot;Line 36&quot;                                                           │ │</text>
+    <text x="0" y="308" fill="#ffffff" textLength="720" lengthAdjust="spacingAndGlyphs">│ │ echo &quot;Line 37&quot;                                                           │ │</text>
+    <text x="0" y="325" fill="#ffffff" textLength="720" lengthAdjust="spacingAndGlyphs">│ │ echo &quot;Line 38&quot;                                                           │ │</text>
+    <text x="0" y="342" fill="#ffffff" textLength="720" lengthAdjust="spacingAndGlyphs">│ │ echo &quot;Line 39&quot;                                                           │ │</text>
+    <text x="0" y="359" fill="#ffffff" textLength="720" lengthAdjust="spacingAndGlyphs">│ │ echo &quot;Line 40&quot;                                                           │ │</text>
+    <text x="0" y="376" fill="#ffffff" textLength="720" lengthAdjust="spacingAndGlyphs">│ │ echo &quot;Line 41&quot;                                                           │ │</text>
+    <text x="0" y="393" fill="#ffffff" textLength="720" lengthAdjust="spacingAndGlyphs">│ │ echo &quot;Line 42&quot;                                                           │ │</text>
+    <text x="0" y="410" fill="#ffffff" textLength="720" lengthAdjust="spacingAndGlyphs">│ │ echo &quot;Line 43&quot;                                                           │ │</text>
+    <text x="0" y="427" fill="#ffffff" textLength="720" lengthAdjust="spacingAndGlyphs">│ │ echo &quot;Line 44&quot;                                                           │ │</text>
+    <text x="0" y="444" fill="#ffffff" textLength="720" lengthAdjust="spacingAndGlyphs">│ │ echo &quot;Line 45&quot;                                                           │ │</text>
+    <text x="0" y="461" fill="#ffffff" textLength="720" lengthAdjust="spacingAndGlyphs">│ │ echo &quot;Line 46&quot;                                                           │ │</text>
+    <text x="0" y="478" fill="#ffffff" textLength="720" lengthAdjust="spacingAndGlyphs">│ │ echo &quot;Line 47&quot;                                                           │ │</text>
+    <text x="0" y="495" fill="#ffffff" textLength="720" lengthAdjust="spacingAndGlyphs">│ │ echo &quot;Line 48&quot;                                                           │ │</text>
+    <text x="0" y="512" fill="#ffffff" textLength="720" lengthAdjust="spacingAndGlyphs">│ │ echo &quot;Line 49&quot;                                                           │ │</text>
+    <text x="0" y="529" fill="#ffffff" textLength="720" lengthAdjust="spacingAndGlyphs">│ │ echo &quot;Line 50&quot;                                                           │ │</text>
     <text x="0" y="546" fill="#ffffff" textLength="720" lengthAdjust="spacingAndGlyphs">│ ╰──────────────────────────────────────────────────────────────────────────╯ │</text>
     <text x="0" y="563" fill="#ffffff" textLength="720" lengthAdjust="spacingAndGlyphs">│ Allow execution of [echo]?                                                   │</text>
     <text x="0" y="580" fill="#ffffff" textLength="720" lengthAdjust="spacingAndGlyphs">│                                                                              │</text>

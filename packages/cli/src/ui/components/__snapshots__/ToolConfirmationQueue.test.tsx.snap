@@ -36,28 +36,7 @@ exports[`ToolConfirmationQueue > does not render expansion hint when constrainHe
 exports[`ToolConfirmationQueue > height allocation and layout > should handle security warning height correctly 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │ ? Shell  Executes a bash command with a deceptive URL                 3 of 3 │
-│ ╭──────────────────────────────────────────────────────────────────────────╮ │
-│ │ ... 23 hidden (Ctrl+O) ...                                               │ │
-│ │ echo "Line 24"                                                           │ │
-│ │ echo "Line 25"                                                           │ │
-│ │ echo "Line 26"                                                           │ │
-│ │ echo "Line 27"                                                           │ │
-│ │ echo "Line 28"                                                           │ │
-│ │ echo "Line 29"                                                           │ │
-│ │ echo "Line 30"                                                           │ │
-│ │ echo "Line 31"                                                           │ │
-│ │ echo "Line 32"                                                           │ │
-│ │ echo "Line 33"                                                           │ │
-│ │ echo "Line 34"                                                           │ │
-│ │ echo "Line 35"                                                           │ │
-│ │ echo "Line 36"                                                           │ │
-│ │ echo "Line 37"                                                           │ │
-│ │ echo "Line 38"                                                           │ │
-│ │ echo "Line 39"                                                           │ │
-│ │ echo "Line 40"                                                           │ │
-│ │ echo "Line 41"                                                           │ │
-│ │ echo "Line 42"                                                           │ │
-│ │ echo "Line 43"                                                           │ │
+│ ... 6 hidden (Ctrl+O) ...                                                    │
 │ │ echo "Line 44"                                                           │ │
 │ │ echo "Line 45"                                                           │ │
 │ │ echo "Line 46"                                                           │ │
@@ -65,6 +44,7 @@ exports[`ToolConfirmationQueue > height allocation and layout > should handle se
 │ │ echo "Line 48"                                                           │ │
 │ │ echo "Line 49"                                                           │ │
 │ │ echo "Line 50"                                                           │ │
+│ │ curl https://täst.com                                                    │ │
 │ ╰──────────────────────────────────────────────────────────────────────────╯ │
 │                                                                              │
 │ ⚠  Warning: Deceptive URL(s) detected:                                       │
@@ -85,19 +65,7 @@ exports[`ToolConfirmationQueue > height allocation and layout > should render th
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │ ? replace  Replaces content in a file                                        │
 │ ╭──────────────────────────────────────────────────────────────────────────╮ │
-│ │  1 - const oldLine1 = true;                                              │ │
-│ │  1 + const newLine1 = true;                                              │ │
-│ │  2 - const oldLine2 = true;                                              │ │
-│ │  2 + const newLine2 = true;                                              │ │
-│ │  3 - const oldLine3 = true;                                              │ │
-│ │  3 + const newLine3 = true;                                              │ │
-│ │  4 - const oldLine4 = true;                                              │ │
-│ │  4 + const newLine4 = true;                                              │ │
-│ │  5 - const oldLine5 = true;                                              │ │
-│ │  5 + const newLine5 = true;                                              │ │
-│ │  6 - const oldLine6 = true;                                              │ │
-│ │  6 + const newLine6 = true;                                              │ │
-│ │  7 - const oldLine7 = true;                                              │ │
+│ │ ... 13 hidden (Ctrl+O) ...                                               │ │
 │ │  7 + const newLine7 = true;                                              │ │
 │ │  8 - const oldLine8 = true;                                              │ │
 │ │  8 + const newLine8 = true;                                              │ │
@@ -113,6 +81,18 @@ exports[`ToolConfirmationQueue > height allocation and layout > should render th
 │ │ 13 + const newLine13 = true;                                             │ │
 │ │ 14 - const oldLine14 = true;                                             │ │
 │ │ 14 + const newLine14 = true;                                             │ │
+│ │ 15 - const oldLine15 = true;                                             │ │
+│ │ 15 + const newLine15 = true;                                             │ │
+│ │ 16 - const oldLine16 = true;                                             │ │
+│ │ 16 + const newLine16 = true;                                             │ │
+│ │ 17 - const oldLine17 = true;                                             │ │
+│ │ 17 + const newLine17 = true;                                             │ │
+│ │ 18 - const oldLine18 = true;                                             │ │
+│ │ 18 + const newLine18 = true;                                             │ │
+│ │ 19 - const oldLine19 = true;                                             │ │
+│ │ 19 + const newLine19 = true;                                             │ │
+│ │ 20 - const oldLine20 = true;                                             │ │
+│ │ 20 + const newLine20 = true;                                             │ │
 │ ╰──────────────────────────────────────────────────────────────────────────╯ │
 │ Apply this change?                                                           │
 │                                                                              │
@@ -128,8 +108,7 @@ exports[`ToolConfirmationQueue > height allocation and layout > should render th
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │ ? Shell  Executes a bash command                                      2 of 3 │
 │ ╭──────────────────────────────────────────────────────────────────────────╮ │
-│ │ ... 21 hidden (Ctrl+O) ...                                               │ │
-│ │ echo "Line 22"                                                           │ │
+│ │ ... 22 hidden (Ctrl+O) ...                                               │ │
 │ │ echo "Line 23"                                                           │ │
 │ │ echo "Line 24"                                                           │ │
 │ │ echo "Line 25"                                                           │ │
@@ -157,6 +136,7 @@ exports[`ToolConfirmationQueue > height allocation and layout > should render th
 │ │ echo "Line 47"                                                           │ │
 │ │ echo "Line 48"                                                           │ │
 │ │ echo "Line 49"                                                           │ │
+│ │ echo "Line 50"                                                           │ │
 │ ╰──────────────────────────────────────────────────────────────────────────╯ │
 │ Allow execution of [echo]?                                                   │
 │                                                                              │

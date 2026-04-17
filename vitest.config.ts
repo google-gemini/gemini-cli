@@ -17,6 +17,7 @@ export default defineConfig({
       'packages/a2a-server',
       'packages/test-utils',
     ],
+    include: ['**/*.test.{ts,tsx}'],
     // Global test settings
     coverage: {
       enabled: false,

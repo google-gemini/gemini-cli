@@ -63,7 +63,6 @@ import { spawnAsync } from '@google/gemini-cli-core';
 import {
   cleanupOldClipboardImages,
   splitDragAndDropPaths,
-  parsePastedPaths,
 } from './clipboardUtils.js';
 
 const mockPlatform = (platform: string) => {
@@ -448,20 +447,20 @@ describe('clipboardUtils', () => {
 
   describe('parsePastedPaths', () => {
     it('should return null for empty string', () => {
-      const result = parsePastedPaths('');
+      const result = clipboardUtils.parsePastedPaths('');
       expect(result).toBe(null);
     });
 
     it('should add @ prefix to single valid path', () => {
       vi.mocked(existsSync).mockReturnValue(true);
       vi.mocked(statSync).mockReturnValue(MOCK_FILE_STATS);
-      const result = parsePastedPaths('/path/to/file.txt');
+      const result = clipboardUtils.parsePastedPaths('/path/to/file.txt');
       expect(result).toBe('@/path/to/file.txt ');
     });
 
     it('should return null for single invalid path', () => {
       vi.mocked(existsSync).mockReturnValue(false);
-      const result = parsePastedPaths('/path/to/file.txt');
+      const result = clipboardUtils.parsePastedPaths('/path/to/file.txt');
       expect(result).toBe(null);
     });
 
@@ -472,7 +471,9 @@ describe('clipboardUtils', () => {
       );
       vi.mocked(statSync).mockReturnValue(MOCK_FILE_STATS);
 
-      const result = parsePastedPaths('/path/to/file1.txt /path/to/file2.txt');
+      const result = clipboardUtils.parsePastedPaths(
+        '/path/to/file1.txt /path/to/file2.txt',
+      );
       expect(result).toBe('@/path/to/file1.txt @/path/to/file2.txt ');
     });
 
@@ -482,13 +483,17 @@ describe('clipboardUtils', () => {
       );
       vi.mocked(statSync).mockReturnValue(MOCK_FILE_STATS);
 
-      const result = parsePastedPaths('/valid/file.txt /invalid/file.jpg');
+      const result = clipboardUtils.parsePastedPaths(
+        '/valid/file.txt /invalid/file.jpg',
+      );
       expect(result).toBe(null);
     });
 
     it('should return null if no paths are valid', () => {
       vi.mocked(existsSync).mockReturnValue(false);
-      const result = parsePastedPaths('/path/to/file1.txt /path/to/file2.txt');
+      const result = clipboardUtils.parsePastedPaths(
+        '/path/to/file1.txt /path/to/file2.txt',
+      );
       expect(result).toBe(null);
     });
 
@@ -504,7 +509,7 @@ describe('clipboardUtils', () => {
         );
         vi.mocked(statSync).mockReturnValue(MOCK_FILE_STATS);
 
-        const result = parsePastedPaths(
+        const result = clipboardUtils.parsePastedPaths(
           '/path/to/my\\ file.txt /other/path.txt',
         );
         expect(result).toBe('@/path/to/my\\ file.txt @/other/path.txt ');
@@ -519,7 +524,7 @@ describe('clipboardUtils', () => {
         });
         vi.mocked(statSync).mockReturnValue(MOCK_FILE_STATS);
 
-        parsePastedPaths('/my\\ file.txt /other.txt');
+        clipboardUtils.parsePastedPaths('/my\\ file.txt /other.txt');
         // First checks entire string, then individual unescaped segments
         expect(validatedPaths).toEqual([
           '/my\\ file.txt /other.txt',
@@ -532,7 +537,7 @@ describe('clipboardUtils', () => {
         vi.mocked(existsSync).mockReturnValue(true);
         vi.mocked(statSync).mockReturnValue(MOCK_FILE_STATS);
 
-        const result = parsePastedPaths('/path/to/my file.txt');
+        const result = clipboardUtils.parsePastedPaths('/path/to/my file.txt');
         expect(result).toBe('@/path/to/my\\ file.txt ');
       });
 
@@ -547,7 +552,7 @@ describe('clipboardUtils', () => {
         });
         vi.mocked(statSync).mockReturnValue(MOCK_FILE_STATS);
 
-        const result = parsePastedPaths(
+        const result = clipboardUtils.parsePastedPaths(
           "'/usr/test/my file with '\\''single quotes'\\''.txt'",
         );
         expect(result).toBe(
@@ -567,7 +572,7 @@ describe('clipboardUtils', () => {
         vi.mocked(existsSync).mockReturnValue(true);
         vi.mocked(statSync).mockReturnValue(MOCK_FILE_STATS);
 
-        const result = parsePastedPaths('C:\\Users\\file.txt');
+        const result = clipboardUtils.parsePastedPaths('C:\\Users\\file.txt');
         expect(result).toBe('@C:\\Users\\file.txt ');
       });
 
@@ -575,7 +580,9 @@ describe('clipboardUtils', () => {
         vi.mocked(existsSync).mockReturnValue(true);
         vi.mocked(statSync).mockReturnValue(MOCK_FILE_STATS);
 
-        const result = parsePastedPaths('C:\\My Documents\\file.txt');
+        const result = clipboardUtils.parsePastedPaths(
+          'C:\\My Documents\\file.txt',
+        );
         expect(result).toBe('@"C:\\My Documents\\file.txt" ');
       });
       it('should handle multiple Windows paths', () => {
@@ -585,7 +592,9 @@ describe('clipboardUtils', () => {
         );
         vi.mocked(statSync).mockReturnValue(MOCK_FILE_STATS);
 
-        const result = parsePastedPaths('C:\\file1.txt D:\\file2.txt');
+        const result = clipboardUtils.parsePastedPaths(
+          'C:\\file1.txt D:\\file2.txt',
+        );
         expect(result).toBe('@C:\\file1.txt @D:\\file2.txt ');
       });
 
@@ -593,7 +602,9 @@ describe('clipboardUtils', () => {
         vi.mocked(existsSync).mockReturnValue(true);
         vi.mocked(statSync).mockReturnValue(MOCK_FILE_STATS);
 
-        const result = parsePastedPaths('\\\\server\\share\\file.txt');
+        const result = clipboardUtils.parsePastedPaths(
+          '\\\\server\\share\\file.txt',
+        );
         expect(result).toBe('@\\\\server\\share\\file.txt ');
       });
     });
