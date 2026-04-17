@@ -79,6 +79,7 @@ function usePlanContent(planPath: string, config: Config): PlanContentState {
   useEffect(() => {
     let ignore = false;
     setState({ status: PlanStatus.Loading });
+    debugLogger.debug('usePlanContent loading plan:', planPath);
 
     const load = async () => {
       try {
@@ -125,6 +126,10 @@ function usePlanContent(planPath: string, config: Config): PlanContentState {
           setState({ status: PlanStatus.Error, error: 'Plan file is empty.' });
           return;
         }
+        debugLogger.debug(
+          'usePlanContent loaded successfully, length:',
+          content.length,
+        );
         setState({ status: PlanStatus.Loaded, content });
       } catch (err: unknown) {
         if (ignore) return;
