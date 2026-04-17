@@ -127,7 +127,7 @@ describe('useExtensionUpdates', () => {
       return null;
     }
 
-    await render(<TestComponent />);
+    await render(<TestComponent />, undefined, undefined, true);
 
     await waitFor(() => {
       expect(addItem).toHaveBeenCalledWith(
@@ -177,7 +177,7 @@ describe('useExtensionUpdates', () => {
       return null;
     }
 
-    await render(<TestComponent />);
+    await render(<TestComponent />, undefined, undefined, true);
 
     await waitFor(
       () => {
@@ -255,7 +255,7 @@ describe('useExtensionUpdates', () => {
       return null;
     }
 
-    await render(<TestComponent />);
+    await render(<TestComponent />, undefined, undefined, true);
 
     await waitFor(
       () => {
@@ -338,7 +338,7 @@ describe('useExtensionUpdates', () => {
       return null;
     }
 
-    await render(<TestComponent />);
+    await render(<TestComponent />, undefined, undefined, true);
 
     await waitFor(() => {
       expect(addItem).toHaveBeenCalledTimes(1);
