@@ -109,6 +109,7 @@ describe('useShellHistory', () => {
         MOCKED_HISTORY_FILE,
         'utf-8',
       );
+      expect(result.current.history).toEqual(['cmd2', 'cmd1']);
     });
 
     let command: string | null = null;
@@ -154,6 +155,12 @@ describe('useShellHistory', () => {
       expect(mockedFs.readFile).toHaveBeenCalled();
     });
 
+    vi.useFakeTimers();
+    // Wait for state updates to flush
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10);
+    });
+
     act(() => {
       result.current.addCommandToHistory('new_command');
     });
@@ -186,6 +193,7 @@ describe('useShellHistory', () => {
     // Wait for history to be loaded: ['cmd3', 'cmd2', 'cmd1']
     await waitFor(() => {
       expect(mockedFs.readFile).toHaveBeenCalled();
+      expect(result.current.history).toEqual(['cmd3', 'cmd2', 'cmd1']);
     });
 
     let command: string | null = null;
@@ -259,6 +267,12 @@ describe('useShellHistory', () => {
       expect(mockedFs.readFile).toHaveBeenCalled();
     });
 
+    vi.useFakeTimers();
+    // Wait for state updates to flush
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10);
+    });
+
     act(() => {
       result.current.addCommandToHistory('new_cmd');
     });
@@ -291,6 +305,12 @@ describe('useShellHistory', () => {
     // Initial state: ['cmd3', 'cmd2', 'cmd1']
     await waitFor(() => {
       expect(mockedFs.readFile).toHaveBeenCalled();
+    });
+
+    vi.useFakeTimers();
+    // Wait for state updates to flush
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10);
     });
 
     act(() => {
