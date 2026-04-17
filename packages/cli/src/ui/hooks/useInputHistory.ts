@@ -20,6 +20,7 @@ export interface UseInputHistoryReturn {
   handleSubmit: (value: string) => void;
   navigateUp: () => boolean;
   navigateDown: () => boolean;
+  checkpointCurrentInput: (text: string, offset: number) => void;
 }
 
 export function useInputHistory({
@@ -107,8 +108,32 @@ export function useInputHistory({
     [historyIndex, currentQuery, currentCursorOffset, userMessages, onChange],
   );
 
+  const checkpointCurrentInput = useCallback((text: string, offset: number) => {
+    if (!text.trim()) {
+      return;
+    }
+    historyCacheRef.current[-1] = { text, offset };
+  }, []);
+
   const navigateUp = useCallback(() => {
     if (!isActive) return false;
+
+    const cache = historyCacheRef.current;
+    const unsentDraft = cache[-1];
+
+    if (historyIndex === -1 && unsentDraft !== undefined) {
+      const trimmedSaved = unsentDraft.text.trim();
+      if (trimmedSaved) {
+        const shouldRestoreDraft =
+          !currentQuery.trim() || currentQuery === unsentDraft.text;
+        if (shouldRestoreDraft) {
+          delete cache[-1];
+          onChange(unsentDraft.text, unsentDraft.offset);
+          return true;
+        }
+      }
+    }
+
     if (userMessages.length === 0) return false;
 
     if (historyIndex < userMessages.length - 1) {
@@ -116,7 +141,14 @@ export function useInputHistory({
       return true;
     }
     return false;
-  }, [historyIndex, userMessages, isActive, navigateTo]);
+  }, [
+    historyIndex,
+    userMessages,
+    isActive,
+    navigateTo,
+    currentQuery,
+    onChange,
+  ]);
 
   const navigateDown = useCallback(() => {
     if (!isActive) return false;
@@ -130,5 +162,6 @@ export function useInputHistory({
     handleSubmit,
     navigateUp,
     navigateDown,
+    checkpointCurrentInput,
   };
 }
