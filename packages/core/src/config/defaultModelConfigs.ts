@@ -294,7 +294,7 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       family: 'gemini-3',
       isPreview: true,
       isVisible: true,
-      features: { thinking: false, multimodalToolUse: true },
+      features: { thinking: true, multimodalToolUse: true },
     },
     'gemini-2.5-pro': {
       tier: 'pro',

@@ -850,24 +850,28 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
     : undefined;
 
   // Reserve space for at least 3 items if more selectionItems available.
-  const reservedListHeight = Math.min(selectionItems.length * 2, 6);
+
   const questionHeightLimit =
     listHeight && !isAlternateBuffer
       ? question.unconstrainedHeight
         ? Math.max(1, listHeight - selectionItems.length * 2)
-        : Math.max(1, listHeight - Math.max(DIALOG_PADDING, reservedListHeight))
+        : Math.min(
+            30,
+            Math.max(1, listHeight - Math.min(selectionItems.length, 5) * 2),
+          )
       : undefined;
 
-  const maxItemsToShow =
-    listHeight && (!isAlternateBuffer || availableHeight !== undefined)
-      ? Math.min(
-          selectionItems.length,
-          Math.max(
-            1,
-            Math.floor((listHeight - (questionHeightLimit ?? 0)) / 2),
-          ),
-        )
-      : selectionItems.length;
+  let maxItemsToShow = selectionItems.length;
+  if (listHeight && (!isAlternateBuffer || availableHeight !== undefined)) {
+    if (selectionItems.length <= 5) {
+      maxItemsToShow = selectionItems.length;
+    } else {
+      maxItemsToShow = Math.min(
+        selectionItems.length,
+        Math.max(1, Math.floor((listHeight - (questionHeightLimit ?? 0)) / 2)),
+      );
+    }
+  }
 
   return (
     <Box flexDirection="column">

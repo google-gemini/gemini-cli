@@ -63,6 +63,7 @@ export const createMockConfig = (overrides: Partial<Config> = {}): Config =>
     getGeminiMdFileCount: vi.fn(() => 0),
     getDeferredCommand: vi.fn(() => undefined),
     getFileSystemService: vi.fn(() => ({})),
+    getSimulateUser: vi.fn(() => false),
     clientVersion: '1.0.0',
     getModel: vi.fn().mockReturnValue('gemini-pro'),
     getWorkingDir: vi.fn().mockReturnValue('/mock/cwd'),

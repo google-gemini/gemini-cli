@@ -9,7 +9,15 @@ import { render } from 'ink';
 import { basename } from 'node:path';
 import { AppContainer } from './ui/AppContainer.js';
 import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
+import { UserSimulator } from './services/UserSimulator.js';
 import { registerCleanup, setupTtyCheck } from './utils/cleanup.js';
+import { PassThrough } from 'node:stream';
+
+interface RenderMetrics {
+  renderTime: number;
+  output: string;
+  staticOutput?: string;
+}
 import {
   type StartupWarning,
   type Config,
@@ -134,6 +142,11 @@ export async function startInteractiveUI(
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
 
+  const simulateUser = config.getSimulateUser();
+  const simulatedStdin = new PassThrough({ encoding: 'utf8' });
+
+  let lastFrame: string | undefined;
+  const staticHistory: string[] = [];
   const instance = render(
     process.env['DEBUG'] ? (
       <React.StrictMode>
@@ -145,12 +158,20 @@ export async function startInteractiveUI(
     {
       stdout: inkStdout,
       stderr: inkStderr,
-      stdin: process.stdin,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-unsafe-assignment
+      stdin: (simulateUser ? simulatedStdin : process.stdin) as any,
       exitOnCtrlC: false,
       isScreenReaderEnabled: config.getScreenReader(),
-      onRender: ({ renderTime }: { renderTime: number }) => {
-        if (renderTime > SLOW_RENDER_MS) {
-          recordSlowRender(config, renderTime);
+      onRender: (metrics: RenderMetrics) => {
+        lastFrame = metrics.output;
+        if (metrics.staticOutput) {
+          staticHistory.push(metrics.staticOutput);
+          if (staticHistory.length > 50) {
+            staticHistory.shift();
+          }
+        }
+        if (metrics.renderTime > SLOW_RENDER_MS) {
+          recordSlowRender(config, metrics.renderTime);
         }
         profiler.reportFrameRendered();
       },
@@ -180,6 +201,21 @@ export async function startInteractiveUI(
         debugLogger.warn('Update check failed:', err);
       }
     });
+
+  if (simulateUser) {
+    const simulator = new UserSimulator(
+      config,
+      () => {
+        if (lastFrame === undefined) return undefined;
+        // Combine history with latest frame for the simulator
+        const historyText = staticHistory.join('\n');
+        return historyText ? `${historyText}\n${lastFrame}` : lastFrame;
+      },
+      simulatedStdin,
+    );
+    simulator.start();
+    registerCleanup(() => simulator.stop());
+  }
 
   registerCleanup(() => instance.unmount());
 

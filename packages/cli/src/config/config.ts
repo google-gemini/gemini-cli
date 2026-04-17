@@ -8,6 +8,7 @@ import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import process from 'node:process';
 import * as path from 'node:path';
+import * as os from 'node:os';
 import { execa } from 'execa';
 import { mcpCommand } from '../commands/mcp.js';
 import { extensionsCommand } from '../commands/extensions.js';
@@ -105,6 +106,8 @@ export interface CliArgs {
   rawOutput: boolean | undefined;
   acceptRawOutputRisk: boolean | undefined;
   isCommand: boolean | undefined;
+  simulateUser: boolean | undefined;
+  knowledgeSource: string | undefined;
 }
 
 /**
@@ -442,6 +445,24 @@ export async function parseArguments(
         .option('accept-raw-output-risk', {
           type: 'boolean',
           description: 'Suppress the security warning when using --raw-output.',
+        })
+        .option('simulate-user', {
+          type: 'boolean',
+          description:
+            'Run the user simulation agent in the background for evaluation purposes.',
+        })
+        .option('knowledge-source', {
+          type: 'string',
+          skipValidation: true,
+          description:
+            'A file path to load into the user simulator context and update with new knowledge. Defaults to ~/.agents/kb.md if passed without a value.',
+          coerce: (value: string): string => {
+            const trimmed = value.trim();
+            if (trimmed === '') {
+              return path.join(os.homedir(), '.agents', 'kb.md');
+            }
+            return trimmed;
+          },
         }),
     )
     .version(await getVersion()) // This will enable the --version flag based on package.json
@@ -935,6 +956,10 @@ export async function loadCliConfig(
     approvalMode,
     disableYoloMode:
       settings.security?.disableYoloMode || settings.admin?.secureModeEnabled,
+    simulateUser: !!argv.simulateUser || !!argv.knowledgeSource,
+    knowledgeSource: argv.knowledgeSource
+      ? path.resolve(cwd, resolvePath(argv.knowledgeSource))
+      : undefined,
     disableAlwaysAllow:
       settings.security?.disableAlwaysAllow ||
       settings.admin?.secureModeEnabled,

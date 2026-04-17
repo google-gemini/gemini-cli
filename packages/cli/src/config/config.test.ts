@@ -276,6 +276,22 @@ describe('parseArguments', () => {
     });
   });
 
+  describe('knowledgeSource', () => {
+    it('should parse --knowledge-source flag with a path', async () => {
+      process.argv = ['node', 'script.js', '--knowledge-source', 'mykb.md'];
+      const settings = createTestMergedSettings();
+      const argv = await parseArguments(settings);
+      expect(argv.knowledgeSource).toBe('mykb.md');
+    });
+
+    it('should default to ~/.agents/kb.md when --knowledge-source is provided without a path', async () => {
+      process.argv = ['node', 'script.js', '--knowledge-source'];
+      const settings = createTestMergedSettings();
+      const argv = await parseArguments(settings);
+      expect(argv.knowledgeSource).toBe(path.join(os.homedir(), '.agents', 'kb.md'));
+    });
+  });
+
   it.each([
     {
       description: 'long flags',
@@ -905,6 +921,25 @@ describe('loadCliConfig', () => {
       DEFAULT_FILE_FILTERING_OPTIONS.customIgnoreFilePaths,
     );
     expect(config.getApprovalMode()).toBe(ApprovalMode.DEFAULT);
+  });
+
+  it('should enable simulateUser when knowledgeSource is provided', async () => {
+    process.argv = ['node', 'script.js', '--knowledge-source', 'k.txt'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const settings = createTestMergedSettings();
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.getSimulateUser()).toBe(true);
+    expect(config.getKnowledgeSource()).toBe(
+      path.resolve(process.cwd(), 'k.txt'),
+    );
+  });
+
+  it('should enable simulateUser when simulateUser flag is provided', async () => {
+    process.argv = ['node', 'script.js', '--simulate-user'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const settings = createTestMergedSettings();
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.getSimulateUser()).toBe(true);
   });
 
   it('should be non-interactive when isCommand is set', async () => {
