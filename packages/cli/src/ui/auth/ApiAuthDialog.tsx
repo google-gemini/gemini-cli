@@ -52,7 +52,7 @@ export function ApiAuthDialog({
       height: 4,
     },
     inputFilter: (text) =>
-      text.replace(/[^a-zA-Z0-9_-]/g, '').replace(/[\r\n]/g, ''),
+      text.replace(/[^A-Za-z0-9\-._~]/g, '').replace(/[\r\n]/g, ''),
     singleLine: true,
   });
 
