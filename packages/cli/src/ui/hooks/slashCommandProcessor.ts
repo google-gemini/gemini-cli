@@ -63,6 +63,7 @@ import {
   LogoutChoice,
 } from '../components/LogoutConfirmationDialog.js';
 import { runExitCleanup } from '../../utils/cleanup.js';
+import { isRecord } from '../../utils/typeGuards.js';
 
 interface SlashCommandProcessorActions {
   openAuthDialog: () => void;
@@ -504,35 +505,41 @@ export const useSlashCommandProcessor = (
                       actions.openModelDialog();
                       return { type: 'handled' };
                     case 'agentConfig': {
-                      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-                      const props = result.props as Record<string, unknown>;
+                      const props = result.props;
+                      const name = isRecord(props) ? props['name'] : undefined;
+                      const displayName = isRecord(props)
+                        ? props['displayName']
+                        : undefined;
+                      const definition = isRecord(props)
+                        ? props['definition']
+                        : undefined;
+
                       if (
-                        !props ||
-                        // eslint-disable-next-line no-restricted-syntax
-                        typeof props['name'] !== 'string' ||
-                        // eslint-disable-next-line no-restricted-syntax
-                        typeof props['displayName'] !== 'string' ||
-                        !props['definition']
+                        typeof name !== 'string' ||
+                        typeof displayName !== 'string' ||
+                        !definition
                       ) {
                         throw new Error(
                           'Received invalid properties for agentConfig dialog action.',
                         );
                       }
-
                       actions.openAgentConfigDialog(
-                        props['name'],
-                        props['displayName'],
+                        name,
+                        displayName,
                         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-                        props['definition'] as AgentDefinition,
+                        definition as AgentDefinition,
                       );
                       return { type: 'handled' };
                     }
-                    case 'permissions':
+                    case 'permissions': {
+                      const props = result.props;
                       actions.openPermissionsDialog(
-                        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-                        result.props as { targetDirectory?: string },
+                        isRecord(props)
+                          ? (props as { targetDirectory?: string })
+                          : undefined,
                       );
                       return { type: 'handled' };
+                    }
                     case 'help':
                       return { type: 'handled' };
                     default: {

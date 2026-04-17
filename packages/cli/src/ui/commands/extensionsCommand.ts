@@ -209,8 +209,8 @@ async function restartAction(
 
   const s = extensionsToRestart.length > 1 ? 's' : '';
 
-  const reloadingMessage = {
-    type: MessageType.INFO,
+  const reloadingMessage: HistoryItemInfo = {
+    type: 'info',
     text: `Reloading ${extensionsToRestart.length} extension${s}...`,
     color: theme.text.primary,
   };
@@ -472,8 +472,7 @@ async function installAction(
   args: string,
   requestConsentOverride?: (consent: string) => Promise<boolean>,
 ) {
-  const extensionLoader =
-    context.services.agentContext?.config.getExtensionLoader();
+  const extensionLoader = context.services.config?.getExtensionLoader();
   if (!(extensionLoader instanceof ExtensionManager)) {
     debugLogger.error(
       `Cannot ${context.invocation?.name} extensions in this environment`,
