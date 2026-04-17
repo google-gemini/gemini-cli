@@ -19,6 +19,7 @@ import {
 import { theme } from '../semantic-colors.js';
 import { parseMarkdownToANSI } from './markdownParsingUtils.js';
 import { stripUnsafeCharacters } from './textUtils.js';
+import { processRtlText } from '../rtl/rtlUtils.js';
 
 interface TableRendererProps {
   headers: string[];
@@ -40,7 +41,8 @@ const parseMarkdownToStyledLine = (
   defaultColor?: string,
 ): StyledLine => {
   const ansi = parseMarkdownToANSI(text, defaultColor);
-  return toStyledCharacters(ansi);
+  const processed = processRtlText(ansi);
+  return toStyledCharacters(processed);
 };
 
 const calculateWidths = (styledLine: StyledLine) => {
