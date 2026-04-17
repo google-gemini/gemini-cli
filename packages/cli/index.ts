@@ -9,6 +9,7 @@
 import { spawn } from 'node:child_process';
 import os from 'node:os';
 import v8 from 'node:v8';
+import { buildRelaunchSpawnSpec } from './src/utils/relaunchSpawnSpec.js';
 
 // --- Global Entry Point ---
 
@@ -74,17 +75,14 @@ async function run() {
     // --- Lightweight Parent Process / Daemon ---
     // We avoid importing heavy dependencies here to save ~1.5s of startup time.
 
-    const nodeArgs: string[] = [...process.execArgv];
-    const scriptArgs = process.argv.slice(2);
-
     const memoryArgs = await getMemoryNodeArgs();
-    nodeArgs.push(...memoryArgs);
-
-    const script = process.argv[1];
-    nodeArgs.push(script);
-    nodeArgs.push(...scriptArgs);
-
-    const newEnv = { ...process.env, GEMINI_CLI_NO_RELAUNCH: 'true' };
+    const { args: relaunchArgs, env: newEnv } = buildRelaunchSpawnSpec({
+      additionalNodeArgs: memoryArgs,
+      additionalScriptArgs: [],
+      argv: process.argv,
+      env: process.env,
+      execArgv: process.execArgv,
+    });
     const RELAUNCH_EXIT_CODE = 199;
     let latestAdminSettings: unknown = undefined;
 
@@ -97,7 +95,7 @@ async function run() {
     const runner = () => {
       process.stdin.pause();
 
-      const child = spawn(process.execPath, nodeArgs, {
+      const child = spawn(process.execPath, relaunchArgs, {
         stdio: ['inherit', 'inherit', 'inherit', 'ipc'],
         env: newEnv,
       });

@@ -10,6 +10,7 @@ import {
   writeToStderr,
   type AdminControlsSettings,
 } from '@google/gemini-cli-core';
+import { buildRelaunchSpawnSpec } from './relaunchSpawnSpec.js';
 
 export async function relaunchOnExitCode(runner: () => Promise<number>) {
   while (true) {
@@ -43,19 +44,13 @@ export async function relaunchAppInChildProcess(
   let latestAdminSettings = remoteAdminSettings;
 
   const runner = () => {
-    // process.argv is [node, script, ...args]
-    // We want to construct [ ...nodeArgs, script, ...scriptArgs]
-    const script = process.argv[1];
-    const scriptArgs = process.argv.slice(2);
-
-    const nodeArgs = [
-      ...process.execArgv,
-      ...additionalNodeArgs,
-      script,
-      ...additionalScriptArgs,
-      ...scriptArgs,
-    ];
-    const newEnv = { ...process.env, GEMINI_CLI_NO_RELAUNCH: 'true' };
+    const { args: nodeArgs, env: newEnv } = buildRelaunchSpawnSpec({
+      additionalNodeArgs,
+      additionalScriptArgs,
+      argv: process.argv,
+      env: process.env,
+      execArgv: process.execArgv,
+    });
 
     // The parent process should not be reading from stdin while the child is running.
     process.stdin.pause();
