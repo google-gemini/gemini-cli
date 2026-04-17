@@ -133,14 +133,32 @@ async def _invoke_candidate(candidate: str, kwargs: dict[str, Any]) -> Any:
         allowed_keys = set(signature.parameters.keys())
         filtered_kwargs = {key: value for key, value in kwargs.items() if key in allowed_keys}
 
-    result = function(**filtered_kwargs)
-    if inspect.isawaitable(result):
-        result = await result
+    if inspect.iscoroutinefunction(function):
+        result = await function(**filtered_kwargs)
+    else:
+        result = await asyncio.to_thread(function, **filtered_kwargs)
+        if inspect.isawaitable(result):
+            result = await result
     return result
 
 
 async def _call_hats_function(tool_name: str, kwargs: dict[str, Any]) -> dict[str, Any]:
-    candidates = _load_function_candidates().get(tool_name, [])
+    try:
+        function_candidates = _load_function_candidates()
+    except ValueError as error:
+        return {
+            "tool": tool_name,
+            "timestamp": _format_utc_timestamp(),
+            "status": "error",
+            "input": _convert_to_json_serializable(kwargs),
+            "error": str(error),
+            "hint": (
+                'Set HATS_FUNCTION_MAP to a JSON object mapping tool names to '
+                'function paths, for example: {"port_scan":"package.module:function"}.'
+            ),
+        }
+
+    candidates = function_candidates.get(tool_name, [])
     if not candidates:
         return {
             "tool": tool_name,
@@ -234,10 +252,18 @@ async def hats_recon_chain(target: str, ports: str = "1-1000") -> dict[str, Any]
         services=discovered_services,
     )
 
+    result_items = [port_scan, service_detection, vulnerability_lookup]
+    chain_status = "ok"
+    if any(
+        isinstance(result, dict) and result.get("status") == "error"
+        for result in result_items
+    ):
+        chain_status = "error"
+
     return {
         "tool": "recon_chain",
         "timestamp": _format_utc_timestamp(),
-        "status": "ok",
+        "status": chain_status,
         "target": target,
         "results": {
             "port_scan": port_scan,
