@@ -42,6 +42,9 @@ describe('SuggestionsDisplay', () => {
         userInput=""
         mode="reverse"
       />,
+      undefined,
+      undefined,
+      true,
     );
     expect(lastFrame({ allowEmpty: true })).toBe('');
   });
