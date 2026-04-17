@@ -1407,7 +1407,11 @@ Logging in with Google... Restarting Gemini CLI to continue.
       }
 
       const isMcpOrConfigReady = isConfigInitialized && isMcpReady;
-      if ((isSlash && isConfigInitialized) || (isIdle && isMcpOrConfigReady)) {
+      if (
+        (isSlash && isConfigInitialized) ||
+        (isIdle && isMcpOrConfigReady) ||
+        streamingState === StreamingState.WaitingForConfirmation
+      ) {
         if (!isSlash) {
           const permissions = await checkPermissions(submittedValue, config);
           if (permissions.length > 0) {
