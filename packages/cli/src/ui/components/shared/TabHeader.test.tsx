@@ -22,6 +22,7 @@ describe('TabHeader', () => {
           tabs={[{ key: '0', header: 'Only Tab' }]}
           currentIndex={0}
         />,
+        { allowEmptyFrame: true },
       );
       expect(lastFrame({ allowEmpty: true })).toBe('');
       unmount();
