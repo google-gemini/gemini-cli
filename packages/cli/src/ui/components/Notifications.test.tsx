@@ -121,6 +121,7 @@ describe('Notifications', () => {
       {
         settings,
         width: 100,
+        allowEmptyFrame: true,
       },
     );
     expect(lastFrame({ allowEmpty: true })).toBe('');
@@ -287,6 +288,7 @@ describe('Notifications', () => {
         uiState,
         settings,
         width: 100,
+        allowEmptyFrame: true,
       },
     );
     expect(lastFrame({ allowEmpty: true })).toBe('');
@@ -344,6 +346,7 @@ describe('Notifications', () => {
       await renderWithProviders(<Notifications />, {
         settings,
         width: 100,
+        allowEmptyFrame: true,
       });
     });
 
@@ -362,6 +365,7 @@ describe('Notifications', () => {
       {
         settings,
         width: 100,
+        allowEmptyFrame: true,
       },
     );
 
