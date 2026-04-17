@@ -379,6 +379,8 @@ describe('plan_mode', () => {
 
   evalTest('USUALLY_PASSES', {
     name: 'should handle nested plan directories correctly',
+    suiteName: 'plan_mode',
+    suiteType: 'behavioral',
     approvalMode: ApprovalMode.PLAN,
     params: {
       settings,
