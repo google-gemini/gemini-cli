@@ -53,7 +53,7 @@ DEFAULT_FUNCTION_CANDIDATES: dict[str, list[str]] = {
 }
 
 
-def _utc_timestamp() -> str:
+def _format_utc_timestamp() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
@@ -95,18 +95,32 @@ def _import_function(function_path: str):
     return function
 
 
-def _coerce_to_json_compatible(value: Any) -> Any:
+def _convert_to_json_serializable(value: Any) -> Any:
     if isinstance(value, (str, int, float, bool)) or value is None:
         return value
     if isinstance(value, dict):
-        return {str(key): _coerce_to_json_compatible(item) for key, item in value.items()}
+        return {
+            str(key): _convert_to_json_serializable(item) for key, item in value.items()
+        }
     if isinstance(value, (list, tuple, set)):
-        return [_coerce_to_json_compatible(item) for item in value]
+        return [_convert_to_json_serializable(item) for item in value]
     if hasattr(value, "model_dump") and callable(value.model_dump):
-        return _coerce_to_json_compatible(value.model_dump())
+        return _convert_to_json_serializable(value.model_dump())
     if hasattr(value, "dict") and callable(value.dict):
-        return _coerce_to_json_compatible(value.dict())
+        return _convert_to_json_serializable(value.dict())
     return str(value)
+
+
+def _extract_discovered_services(service_detection_result: dict[str, Any]) -> list[str]:
+    findings = service_detection_result.get("findings")
+    if not isinstance(findings, dict):
+        return []
+
+    raw_services = findings.get("services")
+    if not isinstance(raw_services, list):
+        return []
+
+    return [str(item) for item in raw_services]
 
 
 async def _invoke_candidate(candidate: str, kwargs: dict[str, Any]) -> Any:
@@ -130,10 +144,13 @@ async def _call_hats_function(tool_name: str, kwargs: dict[str, Any]) -> dict[st
     if not candidates:
         return {
             "tool": tool_name,
-            "timestamp": _utc_timestamp(),
+            "timestamp": _format_utc_timestamp(),
             "status": "error",
             "error": f"No function mapping configured for '{tool_name}'.",
-            "hint": "Set HATS_FUNCTION_MAP to map tool names to Python functions.",
+            "hint": (
+                'Set HATS_FUNCTION_MAP to a JSON object mapping tool names to '
+                'function paths, for example: {"port_scan":"package.module:function"}.'
+            ),
         }
 
     errors: list[dict[str, str]] = []
@@ -142,21 +159,21 @@ async def _call_hats_function(tool_name: str, kwargs: dict[str, Any]) -> dict[st
             result = await _invoke_candidate(candidate, kwargs)
             return {
                 "tool": tool_name,
-                "timestamp": _utc_timestamp(),
+                "timestamp": _format_utc_timestamp(),
                 "status": "ok",
                 "handler": candidate,
-                "input": _coerce_to_json_compatible(kwargs),
-                "findings": _coerce_to_json_compatible(result),
+                "input": _convert_to_json_serializable(kwargs),
+                "findings": _convert_to_json_serializable(result),
             }
         except Exception as error:
             errors.append({"handler": candidate, "error": str(error)})
 
     return {
         "tool": tool_name,
-        "timestamp": _utc_timestamp(),
+        "timestamp": _format_utc_timestamp(),
         "status": "error",
-        "input": _coerce_to_json_compatible(kwargs),
-        "error": "All configured HATS handlers failed.",
+        "input": _convert_to_json_serializable(kwargs),
+        "error": f"All {len(candidates)} configured HATS handler(s) failed.",
         "attempts": errors,
     }
 
@@ -209,11 +226,8 @@ async def hats_recon_chain(target: str, ports: str = "1-1000") -> dict[str, Any]
     service_detection = await hats_service_detection(target=target, ports=ports)
 
     discovered_services: list[str] = []
-    findings = service_detection.get("findings") if isinstance(service_detection, dict) else None
-    if isinstance(findings, dict):
-        raw_services = findings.get("services")
-        if isinstance(raw_services, list):
-            discovered_services = [str(item) for item in raw_services]
+    if isinstance(service_detection, dict):
+        discovered_services = _extract_discovered_services(service_detection)
 
     vulnerability_lookup = await hats_vulnerability_lookup(
         target=target,
@@ -222,7 +236,7 @@ async def hats_recon_chain(target: str, ports: str = "1-1000") -> dict[str, Any]
 
     return {
         "tool": "recon_chain",
-        "timestamp": _utc_timestamp(),
+        "timestamp": _format_utc_timestamp(),
         "status": "ok",
         "target": target,
         "results": {
