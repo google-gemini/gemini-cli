@@ -1196,7 +1196,7 @@ export class Config implements McpContext, AgentLoopContext {
         },
       },
     };
-    this.topicUpdateNarration = params.topicUpdateNarration ?? false;
+    this.topicUpdateNarration = params.topicUpdateNarration ?? true;
     this.modelSteering = params.modelSteering ?? false;
     this.injectionService = new InjectionService(() =>
       this.isModelSteeringEnabled(),

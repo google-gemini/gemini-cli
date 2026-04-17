@@ -198,6 +198,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Minimum retention period (safety limit, defaults to "1d")
   - **Default:** `"1d"`
 
+- **`general.topicUpdateNarration`** (boolean):
+  - **Description:** Enable the Topic & Update communication model for reduced
+    chattiness and structured progress reporting.
+  - **Default:** `true`
+
 #### `output`
 
 - **`output.format`** (enum):
@@ -1735,8 +1740,7 @@ their corresponding top-level category object in your `settings.json` file.
   - **Requires restart:** Yes
 
 - **`experimental.topicUpdateNarration`** (boolean):
-  - **Description:** Enable the experimental Topic & Update communication model
-    for reduced chattiness and structured progress reporting.
+  - **Description:** Deprecated: Use general.topicUpdateNarration instead.
   - **Default:** `false`
 
 #### `skills`

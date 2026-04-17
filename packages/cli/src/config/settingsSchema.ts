@@ -418,6 +418,16 @@ const SETTINGS_SCHEMA = {
         },
         description: 'Settings for automatic session cleanup.',
       },
+      topicUpdateNarration: {
+        type: 'boolean',
+        label: 'Topic & Update Narration',
+        category: 'General',
+        requiresRestart: false,
+        default: true,
+        description:
+          'Enable the Topic & Update communication model for reduced chattiness and structured progress reporting.',
+        showInDialog: true,
+      },
     },
   },
   output: {
@@ -2228,9 +2238,8 @@ const SETTINGS_SCHEMA = {
         category: 'Experimental',
         requiresRestart: false,
         default: false,
-        description:
-          'Enable the experimental Topic & Update communication model for reduced chattiness and structured progress reporting.',
-        showInDialog: true,
+        description: 'Deprecated: Use general.topicUpdateNarration instead.',
+        showInDialog: false,
       },
     },
   },
