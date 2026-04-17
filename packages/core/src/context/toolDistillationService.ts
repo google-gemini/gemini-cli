@@ -28,9 +28,9 @@ import {
 } from './truncation.js';
 import { sanitizePromptString } from '../utils/sanitizePromptInput.js';
 
-// Skip structural map generation for outputs larger than this threshold (in characters)
-// as it consumes excessive tokens and may not be representative of the full content.
-const MAX_DISTILLATION_SIZE = 64_000;
+// ~16K tokens at 4 chars/token. Larger outputs overwhelm the utility
+// compressor model with latency and cost for diminishing returns.
+const MAX_DISTILLATION_CHARS = 64_000;
 
 export interface DistilledToolOutput {
   truncatedContent: PartListUnion;
@@ -143,12 +143,12 @@ export class ToolOutputDistillationService {
 
     if (
       originalContentLength > summarizationThresholdChars &&
-      originalContentLength <= MAX_DISTILLATION_SIZE
+      originalContentLength <= MAX_DISTILLATION_CHARS
     ) {
       const summary = await this.generateIntentSummary(
         toolName,
         stringifiedContent,
-        Math.floor(MAX_DISTILLATION_SIZE),
+        Math.floor(MAX_DISTILLATION_CHARS),
         abortSignal,
       );
 

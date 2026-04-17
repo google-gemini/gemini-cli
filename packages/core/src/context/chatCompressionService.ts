@@ -236,23 +236,18 @@ async function truncateHistoryToBudget(
   return truncatedHistory;
 }
 
-/** Start graduating messages when hot zone exceeds this count. */
+// graduateAt < evictAt: messages enter the cold forest early so clusters
+// have time to form before the hot zone forces an eviction.
 const UNION_FIND_GRADUATE_AT = 26;
-
-/** Evict oldest from hot zone when it exceeds this count. */
 const UNION_FIND_EVICT_AT = 30;
-
-/** Maximum number of clusters in the cold zone. */
 const UNION_FIND_MAX_COLD_CLUSTERS = 10;
-
-/** TF-IDF cosine similarity floor for merging. */
 const UNION_FIND_MERGE_THRESHOLD = 0.15;
-
-/** Top-k clusters to retrieve for render. */
 const UNION_FIND_RETRIEVE_K = 3;
-
-/** Minimum similarity to include a cluster in render. */
 const UNION_FIND_RETRIEVE_MIN_SIM = 0.05;
+
+// Cap tool-response previews fed to the embedder/summarizer. Full output
+// is preserved in the original Content objects for the hot zone.
+const TOOL_RESPONSE_PREVIEW_GRAPHEMES = 500;
 
 export class ChatCompressionService {
   async compress(
@@ -635,8 +630,9 @@ export class ChatCompressionService {
             );
             const graphemes = Array.from(responseStr);
             const preview =
-              graphemes.length > 500
-                ? graphemes.slice(0, 500).join('') + '...'
+              graphemes.length > TOOL_RESPONSE_PREVIEW_GRAPHEMES
+                ? graphemes.slice(0, TOOL_RESPONSE_PREVIEW_GRAPHEMES).join('') +
+                  '...'
                 : responseStr;
             return `[Tool response: ${p.functionResponse.name}] ${sanitizePromptString(preview)}`;
           }

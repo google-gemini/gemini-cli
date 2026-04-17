@@ -2350,8 +2350,9 @@ export class Config implements McpContext, AgentLoopContext {
     if (this.experimentalJitContext && this.memoryContextManager) {
       await this.memoryContextManager.refresh();
     } else {
-      const { refreshServerHierarchicalMemory } =
-        await import('../utils/memoryDiscovery.js');
+      const { refreshServerHierarchicalMemory } = await import(
+        '../utils/memoryDiscovery.js'
+      );
       await refreshServerHierarchicalMemory(this);
     }
     if (this._geminiClient?.isInitialized()) {
@@ -3024,7 +3025,7 @@ export class Config implements McpContext, AgentLoopContext {
     return remoteThreshold;
   }
 
-  async getCompressionStrategy(): Promise<string> {
+  async getCompressionStrategy(): Promise<'flat' | 'union-find'> {
     await this.ensureExperimentsLoaded();
     const remoteStrategy =
       this.experiments?.flags[ExperimentFlags.COMPRESSION_STRATEGY]
