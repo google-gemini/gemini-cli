@@ -166,6 +166,9 @@ describe('<AnsiOutputText />', () => {
           width={80}
           disableTruncation={true}
         />,
+        undefined,
+        undefined,
+        true,
       );
       expect(lastFrame({ allowEmpty: true }).trim()).toBe('');
       unmount();
@@ -178,6 +181,9 @@ describe('<AnsiOutputText />', () => {
           width={80}
           disableTruncation={true}
         />,
+        undefined,
+        undefined,
+        true,
       );
       expect(lastFrame({ allowEmpty: true }).trim()).toBe('');
       unmount();
