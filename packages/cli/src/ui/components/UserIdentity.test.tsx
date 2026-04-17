@@ -134,6 +134,7 @@ describe('<UserIdentity />', () => {
 
     const { lastFrame, unmount } = await renderWithProviders(
       <UserIdentity config={mockConfig} />,
+      { allowEmptyFrame: true },
     );
 
     expect(lastFrame({ allowEmpty: true })).toBe('');
