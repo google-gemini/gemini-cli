@@ -33,6 +33,7 @@ import {
   type AnyDeclarativeTool,
 } from '../tools/tools.js';
 import { getToolSuggestion } from '../utils/tool-utils.js';
+import { debugLogger } from '../utils/debugLogger.js';
 import { runInDevTraceSpan } from '../telemetry/trace.js';
 import { logToolCall } from '../telemetry/loggers.js';
 import { ToolCallEvent } from '../telemetry/types.js';
@@ -163,15 +164,21 @@ export class Scheduler {
     });
   };
 
-  private readonly handleToolConfirmationRequest = async (
+  private readonly handleToolConfirmationRequest = (
     request: ToolConfirmationRequest,
   ) => {
-    await this.messageBus.publish({
-      type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
-      correlationId: request.correlationId,
-      confirmed: false,
-      requiresUserConfirmation: true,
-    });
+    this.messageBus
+      .publish({
+        type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+        correlationId: request.correlationId,
+        confirmed: false,
+        requiresUserConfirmation: true,
+      })
+      .catch((error) => {
+        debugLogger.error(
+          `Failed to publish tool confirmation response: ${error}`,
+        );
+      });
   };
 
   private setupMessageBusListener(messageBus: MessageBus): void {

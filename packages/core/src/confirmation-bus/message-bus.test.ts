@@ -30,8 +30,10 @@ describe('MessageBus', () => {
       const errorHandler = vi.fn();
       messageBus.on('error', errorHandler);
 
-      // @ts-expect-error - Testing invalid message
-      await messageBus.publish({ invalid: 'message' });
+      await expect(
+        // @ts-expect-error - Testing invalid message
+        messageBus.publish({ invalid: 'message' }),
+      ).rejects.toThrow('Invalid message structure');
 
       expect(errorHandler).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -44,11 +46,13 @@ describe('MessageBus', () => {
       const errorHandler = vi.fn();
       messageBus.on('error', errorHandler);
 
-      // @ts-expect-error - Testing missing correlationId
-      await messageBus.publish({
-        type: MessageBusType.TOOL_CONFIRMATION_REQUEST,
-        toolCall: { name: 'test' },
-      });
+      await expect(
+        // @ts-expect-error - Testing missing correlationId
+        messageBus.publish({
+          type: MessageBusType.TOOL_CONFIRMATION_REQUEST,
+          toolCall: { name: 'test' },
+        }),
+      ).rejects.toThrow('Invalid message structure');
 
       expect(errorHandler).toHaveBeenCalled();
     });
@@ -251,8 +255,10 @@ describe('MessageBus', () => {
         correlationId: '123',
       };
 
-      // Should not throw
-      await expect(messageBus.publish(request)).resolves.not.toThrow();
+      // Should throw
+      await expect(messageBus.publish(request)).rejects.toThrow(
+        'Policy check failed',
+      );
 
       // Should emit error
       expect(errorHandler).toHaveBeenCalledWith(
@@ -280,7 +286,9 @@ describe('MessageBus', () => {
       const requestPromise = subagentBus.request<
         ToolConfirmationRequest,
         ToolConfirmationResponse
-      >(request, MessageBusType.TOOL_CONFIRMATION_RESPONSE, 2000);
+      >(request, MessageBusType.TOOL_CONFIRMATION_RESPONSE, {
+        timeoutMs: 2000,
+      });
 
       // Wait for request on root bus and respond
       await new Promise<void>((resolve) => {
@@ -323,7 +331,9 @@ describe('MessageBus', () => {
       const requestPromise = subagentBus2.request<
         ToolConfirmationRequest,
         ToolConfirmationResponse
-      >(request, MessageBusType.TOOL_CONFIRMATION_RESPONSE, 2000);
+      >(request, MessageBusType.TOOL_CONFIRMATION_RESPONSE, {
+        timeoutMs: 2000,
+      });
 
       await new Promise<void>((resolve) => {
         messageBus.subscribe<ToolConfirmationRequest>(
