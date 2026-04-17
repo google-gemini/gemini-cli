@@ -41,3 +41,19 @@ jobs:
       - name: 'Run Batch 1 Tests'
         run: 'npx vitest run --pool=threads packages/cli/src/test-utils packages/cli/src/utils'
         shell: 'bash'
+
+  test_batch_2:
+    name: 'Test (Linux) - Batch 2 (Core & Services & ACP)'
+    runs-on: 'gemini-cli-ubuntu-16-core'
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
+
+      - name: 'Setup and Build'
+        uses: './.github/actions/setup-gemini'
+        with:
+          mode: 'source'
+
+      - name: 'Run Batch 2 Tests'
+        run: 'npx vitest run --pool=threads packages/cli/src/core packages/cli/src/services packages/cli/src/acp'
+        shell: 'bash'
