@@ -34,6 +34,28 @@ describe('DenseToolMessage', () => {
     terminalWidth: 80,
   };
 
+  it('explicitly renders the filename in the header for FileDiff results', async () => {
+    const fileDiff: FileDiff = {
+      fileName: 'test-file.ts',
+      filePath: '/test-file.ts',
+      fileDiff:
+        '--- a/test-file.ts\n+++ b/test-file.ts\n@@ -1 +1 @@\n-old\n+new',
+      originalContent: 'old',
+      newContent: 'new',
+    };
+
+    const { lastFrame, waitUntilReady } = await renderWithProviders(
+      <DenseToolMessage
+        {...defaultProps}
+        name="Edit"
+        resultDisplay={fileDiff as unknown as ToolResultDisplay}
+      />,
+    );
+    await waitUntilReady();
+    const output = lastFrame();
+    expect(output).toContain('test-file.ts');
+  });
+
   it('renders correctly for a successful string result', async () => {
     const { lastFrame, waitUntilReady } = await renderWithProviders(
       <DenseToolMessage {...defaultProps} />,
