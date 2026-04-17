@@ -331,7 +331,7 @@ ${strippedScreen}
           this.stdinBuffer.write(char);
           // Small delay to ensure Ink processes each keypress event individually
           // while preventing UI state collisions during long simulated inputs.
-          await new Promise((resolve) => setTimeout(resolve, 5));
+          await new Promise((resolve) => setTimeout(resolve, 50));
         }
         this.lastScreenContent = normalizedScreen;
       } else {
