@@ -57,10 +57,12 @@ describe('<HookStatusDisplay />', () => {
 
   it('should return empty string if no active hooks', async () => {
     const props = { activeHooks: [] };
-    const { lastFrame, unmount, waitUntilReady } = await render(
+    const { lastFrame, unmount } = await render(
       <HookStatusDisplay {...props} />,
+      undefined,
+      undefined,
+      true,
     );
-    await waitUntilReady();
     expect(lastFrame({ allowEmpty: true })).toBe('');
     unmount();
   });
