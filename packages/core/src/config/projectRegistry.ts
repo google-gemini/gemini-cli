@@ -159,9 +159,18 @@ export class ProjectRegistry {
     if (!fs.existsSync(dir)) {
       await fs.promises.mkdir(dir, { recursive: true });
     }
-    // Ensure the registry file exists so proper-lockfile can lock it
+    // Ensure the registry file exists so proper-lockfile can lock it.
+    // If it doesn't exist, we try to create it. If someone else creates it
+    // between our check and our write, we just continue.
     if (!fs.existsSync(this.registryPath)) {
-      await this.save({ projects: {} });
+      try {
+        await this.save({ projects: {} });
+      } catch (e: unknown) {
+        if (!fs.existsSync(this.registryPath)) {
+          throw e; // File still doesn't exist and save failed, this is a real error.
+        }
+        // Someone else created it while we were trying to save. Continue to locking.
+      }
     }
 
     // Use proper-lockfile to prevent racy updates
@@ -327,10 +336,22 @@ export class ProjectRegistry {
       try {
         await this.ensureOwnershipMarkers(candidate, projectPath);
         return candidate;
-      } catch {
-        // Someone might have claimed it between our check and our write.
-        // Try next candidate.
-        continue;
+      } catch (error: unknown) {
+        // Only retry if it was a collision (someone else took the slug)
+        // or a race condition during marker creation.
+        const code = isNodeError(error) ? error.code : '';
+        const isCollision =
+          code === 'EEXIST' ||
+          (error instanceof Error &&
+            error.message.includes('already owned by'));
+
+        if (isCollision) {
+          debugLogger.debug(`Slug collision for ${candidate}, trying next...`);
+          continue;
+        }
+
+        // Fatal error (Permission denied, Disk full, etc.)
+        throw error;
       }
     }
   }
@@ -352,13 +373,28 @@ export class ProjectRegistry {
           continue;
         }
         // Collision!
-        throw new Error(`Slug ${slug} is already owned by ${owner}`);
+        const error = Object.assign(
+          new Error(`Slug ${slug} is already owned by ${owner}`),
+          { code: 'EEXIST' },
+        );
+        throw error;
       }
       // Use flag: 'wx' to ensure atomic creation
-      await fs.promises.writeFile(markerPath, normalizedProject, {
-        encoding: 'utf8',
-        flag: 'wx',
-      });
+      try {
+        await fs.promises.writeFile(markerPath, normalizedProject, {
+          encoding: 'utf8',
+          flag: 'wx',
+        });
+      } catch (e: unknown) {
+        if (isNodeError(e) && e.code === 'EEXIST') {
+          // Re-verify ownership in case we just lost a race
+          const owner = (await fs.promises.readFile(markerPath, 'utf8')).trim();
+          if (this.normalizePath(owner) === normalizedProject) {
+            continue;
+          }
+        }
+        throw e;
+      }
     }
   }
 
