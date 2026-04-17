@@ -60,7 +60,11 @@ describe('ToolGroupMessage Regression Tests', () => {
         toolCalls={toolCalls}
         borderBottom={true}
       />,
-      { config: baseMockConfig, settings: fullVerbositySettings },
+      {
+        config: baseMockConfig,
+        settings: fullVerbositySettings,
+        allowEmptyFrame: true,
+      },
     );
 
     expect(lastFrame({ allowEmpty: true })).toBe('');
