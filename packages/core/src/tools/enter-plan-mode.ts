@@ -125,16 +125,48 @@ export class EnterPlanModeInvocation extends BaseToolInvocation<
 
     this.config.setApprovalMode(ApprovalMode.PLAN);
 
-    // Ensure plans directory exists so that the agent can write the plan file.
+    // Ensure plans directories exist so that the agent can write plan files.
     // In sandboxed environments, the plans directory must exist on the host
     // before it can be bound/allowed in the sandbox.
-    const plansDir = this.config.storage.getPlansDir();
-    if (!fs.existsSync(plansDir)) {
-      try {
-        fs.mkdirSync(plansDir, { recursive: true });
-      } catch (e) {
-        // Log error but don't fail; write_file will try again later
-        debugLogger.error(`Failed to create plans directory: ${plansDir}`, e);
+    const dirsToCreate = new Set<string>();
+
+    // Always ensure the default plans directory exists
+    try {
+      dirsToCreate.add(this.config.storage.getPlansDir(undefined));
+    } catch {
+      // Ignore if default somehow throws (unlikely)
+    }
+
+    // Ensure extension-specific plan directories exist
+    for (const ext of this.config.getExtensions()) {
+      if (!ext.isActive) continue;
+
+      // Check for user-defined custom plan directory setting first.
+      // If not set, fallback to the default directory defined in the extension's manifest.
+      const customDir =
+        this.config.getExtensionSetting(ext.id, 'plan.directory') ??
+        ext.plan?.directory;
+
+      if (customDir) {
+        try {
+          dirsToCreate.add(this.config.storage.getPlansDir(customDir));
+        } catch (e) {
+          debugLogger.warn(
+            `Invalid custom plan directory '${customDir}' for extension '${ext.name}':`,
+            e,
+          );
+        }
+      }
+    }
+
+    for (const dir of dirsToCreate) {
+      if (!fs.existsSync(dir)) {
+        try {
+          fs.mkdirSync(dir, { recursive: true });
+        } catch (e) {
+          // Log error but don't fail; write_file will try again later
+          debugLogger.error(`Failed to create plans directory: ${dir}`, e);
+        }
       }
     }
 
