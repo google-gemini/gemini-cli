@@ -66,7 +66,10 @@ export async function scheduleAgentTools(
 
   const schedulerContext = {
     config,
-    promptId: config.promptId,
+    // Fork the promptId if this is a subagent or child call to isolate history
+    promptId: parentCallId
+      ? config.promptId + '-' + parentCallId.replace(/[^a-zA-Z0-9-_]/g, '')
+      : config.promptId,
     toolRegistry,
     promptRegistry: promptRegistry ?? config.getPromptRegistry(),
     resourceRegistry: resourceRegistry ?? config.getResourceRegistry(),
@@ -74,7 +77,6 @@ export async function scheduleAgentTools(
     geminiClient: config.geminiClient,
     sandboxManager: config.sandboxManager,
   };
-
   const scheduler = new Scheduler({
     context: schedulerContext,
     messageBus: toolRegistry.messageBus,
