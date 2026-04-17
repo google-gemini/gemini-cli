@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/* eslint-disable import/export */
+
 // Export config
 export * from './config/config.js';
 export * from './config/agent-loop-context.js';
@@ -68,7 +70,6 @@ export * from './core/apiKeyCredentialStorage.js';
 
 // Export utilities
 export * from './utils/fetch.js';
-export { homedir, tmpdir } from './utils/paths.js';
 export * from './utils/paths.js';
 export * from './utils/checks.js';
 export * from './utils/headless.js';
@@ -94,11 +95,6 @@ export * from './utils/approvalModeUtils.js';
 export * from './utils/fileDiffUtils.js';
 export * from './utils/retry.js';
 export * from './utils/shell-utils.js';
-export {
-  PolicyDecision,
-  ApprovalMode,
-  PRIORITY_YOLO_ALLOW_ALL,
-} from './policy/types.js';
 export * from './utils/tool-utils.js';
 export * from './utils/tool-visibility.js';
 export * from './utils/terminalSerializer.js';
@@ -122,7 +118,6 @@ export * from './utils/extensionLoader.js';
 export * from './utils/package.js';
 export * from './utils/version.js';
 export * from './utils/checkpointUtils.js';
-export * from './utils/secure-browser-launcher.js';
 export * from './utils/apiConversionUtils.js';
 export * from './utils/channel.js';
 export * from './utils/constants.js';
@@ -273,12 +268,6 @@ export { Storage } from './config/storage.js';
 
 // Export hooks system
 export * from './hooks/index.js';
-
-// Export hook types
-export * from './hooks/types.js';
-
-// Export agent types
-export * from './agents/types.js';
 
 // Export stdio utils
 export * from './utils/stdio.js';

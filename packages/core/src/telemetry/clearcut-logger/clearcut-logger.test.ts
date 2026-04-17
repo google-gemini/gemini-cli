@@ -824,9 +824,9 @@ describe('ClearcutLogger', () => {
       // Spy on flushToClearcut to prevent it from clearing the queue
       const flushSpy = vi
         .spyOn(
-          (logger as unknown as {
+          logger as unknown as {
             flushToClearcut: () => Promise<{ nextRequestWaitMs: number }>;
-          }),
+          },
           'flushToClearcut',
         )
         .mockResolvedValue({ nextRequestWaitMs: 0 });
@@ -1490,9 +1490,9 @@ describe('ClearcutLogger', () => {
       const { logger } = setup();
       const flushSpy = vi
         .spyOn(
-          (logger as unknown as {
+          logger as unknown as {
             flushToClearcut: () => Promise<{ nextRequestWaitMs: number }>;
-          }),
+          },
           'flushToClearcut',
         )
         .mockResolvedValue({ nextRequestWaitMs: 0 });
@@ -1505,9 +1505,9 @@ describe('ClearcutLogger', () => {
       const { logger } = setup();
       const flushSpy = vi
         .spyOn(
-          (logger as unknown as {
+          logger as unknown as {
             flushToClearcut: () => Promise<{ nextRequestWaitMs: number }>;
-          }),
+          },
           'flushToClearcut',
         )
         .mockResolvedValue({ nextRequestWaitMs: 0 });

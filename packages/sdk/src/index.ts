@@ -8,4 +8,12 @@ export * from './agent.js';
 export * from './session.js';
 export * from './tool.js';
 export * from './skills.js';
-export * from './types.js';
+export type {
+  SystemInstructions,
+  GeminiCliAgentOptions,
+  AgentFilesystem,
+  AgentShellOptions,
+  AgentShellResult,
+  AgentShell,
+  SessionContext,
+} from './types.js';

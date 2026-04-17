@@ -9,7 +9,6 @@ import * as fs from 'node:fs';
 import { Writable } from 'node:stream';
 import { ProxyAgent } from 'undici';
 
-import type { CommandContext } from '../../ui/commands/types.js';
 import {
   getGitRepoRoot,
   getLatestGitHubRelease,
@@ -21,6 +20,7 @@ import {
   CommandKind,
   type SlashCommand,
   type SlashCommandActionReturn,
+  type CommandContext,
 } from './types.js';
 import { getUrlOpenCommand } from '../../ui/utils/commandUtils.js';
 import { debugLogger } from '@google/gemini-cli-core';
