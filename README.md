@@ -362,14 +362,14 @@ Python MCP bridge for HATS workflows.
 Set up the Python runtime dependency before linking the extension:
 
 ```bash
-cd /home/runner/work/gemini-cyber-cli/gemini-cyber-cli/extensions/gemini-cyber-cli
+cd extensions/gemini-cyber-cli
 python3 -m pip install -r mcp/requirements.txt
 ```
 
 Then link the extension:
 
 ```bash
-gemini extensions link /home/runner/work/gemini-cyber-cli/gemini-cyber-cli/extensions/gemini-cyber-cli
+gemini extensions link ./extensions/gemini-cyber-cli
 ```
 
 ## 🤝 Contributing
