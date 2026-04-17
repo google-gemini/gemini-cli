@@ -1128,7 +1128,7 @@ export class ShellExecutionService {
                 const sniffBuffer = Buffer.concat(sniffChunks);
                 sniffedBytes = sniffBuffer.length;
 
-                if (isBinary(sniffBuffer)) {
+                if (isBinary(sniffBuffer, 512, true)) {
                   isStreamingRawContent = false;
                   binaryBytesReceived = sniffBuffer.length;
                   const event: ShellOutputEvent = { type: 'binary_detected' };
