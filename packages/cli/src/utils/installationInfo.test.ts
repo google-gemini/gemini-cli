@@ -45,10 +45,12 @@ const mockedExecSync = vi.mocked(childProcess.execSync);
 describe('getInstallationInfo', () => {
   const projectRoot = '/path/to/project';
   let originalArgv: string[];
+  let originalPlatform: NodeJS.Platform;
 
   beforeEach(() => {
     vi.resetAllMocks();
     originalArgv = [...process.argv];
+    originalPlatform = process.platform;
     // Mock process.cwd() for isGitRepository
     vi.spyOn(process, 'cwd').mockReturnValue(projectRoot);
     vi.spyOn(debugLogger, 'log').mockImplementation(() => {});
@@ -56,6 +58,8 @@ describe('getInstallationInfo', () => {
 
   afterEach(() => {
     process.argv = originalArgv;
+    Object.defineProperty(process, 'platform', { value: originalPlatform });
+    vi.unstubAllGlobals();
   });
 
   it('should detect running as a standalone binary', () => {
@@ -146,9 +150,7 @@ describe('getInstallationInfo', () => {
   });
 
   it('should detect Homebrew installation via execSync', () => {
-    Object.defineProperty(process, 'platform', {
-      value: 'darwin',
-    });
+    Object.defineProperty(process, 'platform', { value: 'darwin' });
     // Use a path that matches what brew would resolve to
     const cliPath = '/opt/homebrew/Cellar/gemini-cli/1.0.0/bin/gemini';
     process.argv[1] = cliPath;
@@ -182,10 +184,62 @@ describe('getInstallationInfo', () => {
   });
 
   it('should fall through if brew command fails', () => {
-    Object.defineProperty(process, 'platform', {
-      value: 'darwin',
+    Object.defineProperty(process, 'platform', { value: 'darwin' });
+    const cliPath = '/opt/homebrew/Cellar/node_modules/bin/gemini';
+    process.argv[1] = cliPath;
+    mockedRealPathSync.mockReturnValue(cliPath);
+    mockedExecSync.mockImplementation(() => {
+      throw new Error('Command failed');
     });
-    const cliPath = '/usr/local/bin/gemini';
+
+    const info = getInstallationInfo(projectRoot, true);
+
+    expect(mockedExecSync).toHaveBeenCalledWith(
+      expect.stringContaining('brew --prefix gemini-cli'),
+      expect.anything(),
+    );
+    // Should fall back to default global npm
+    expect(info.packageManager).toBe(PackageManager.NPM);
+    expect(info.isGlobal).toBe(true);
+  });
+
+  it('should detect Linuxbrew installation on linux', () => {
+    Object.defineProperty(process, 'platform', { value: 'linux' });
+    const cliPath =
+      '/home/linuxbrew/.linuxbrew/Cellar/gemini-cli/1.0.0/bin/gemini';
+    process.argv[1] = cliPath;
+
+    mockedExecSync.mockImplementation((cmd) => {
+      if (typeof cmd === 'string' && cmd.includes('brew --prefix gemini-cli')) {
+        return '/home/linuxbrew/.linuxbrew/opt/gemini-cli';
+      }
+      throw new Error(`Command failed: ${cmd}`);
+    });
+
+    mockedRealPathSync.mockImplementation((p) => {
+      if (p === cliPath) return cliPath;
+      if (p === '/home/linuxbrew/.linuxbrew/opt/gemini-cli') {
+        return '/home/linuxbrew/.linuxbrew/Cellar/gemini-cli/1.0.0';
+      }
+      return String(p);
+    });
+
+    const info = getInstallationInfo(projectRoot, true);
+
+    expect(mockedExecSync).toHaveBeenCalledWith(
+      expect.stringContaining('brew --prefix gemini-cli'),
+      expect.anything(),
+    );
+    expect(info.packageManager).toBe(PackageManager.HOMEBREW);
+    expect(info.isGlobal).toBe(true);
+    expect(info.updateMessage).toBe(
+      'Installed via Homebrew. Please update with "brew upgrade gemini-cli".',
+    );
+  });
+
+  it('should fall through if brew command fails on linux', () => {
+    Object.defineProperty(process, 'platform', { value: 'linux' });
+    const cliPath = '/home/linuxbrew/.linuxbrew/Cellar/bin/gemini';
     process.argv[1] = cliPath;
     mockedRealPathSync.mockReturnValue(cliPath);
     mockedExecSync.mockImplementation(() => {
@@ -353,9 +407,7 @@ describe('getInstallationInfo', () => {
   });
 
   it('should NOT detect Homebrew if gemini-cli is installed in brew but running from npm location', () => {
-    Object.defineProperty(process, 'platform', {
-      value: 'darwin',
-    });
+    Object.defineProperty(process, 'platform', { value: 'darwin' });
     // Path looks like standard global NPM
     const cliPath =
       '/usr/local/lib/node_modules/@google/gemini-cli/dist/index.js';
