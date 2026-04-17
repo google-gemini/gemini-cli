@@ -2981,6 +2981,11 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
         description: 'Protocol for OTLP exporters.',
         enum: ['grpc', 'http'],
       },
+      traces: {
+        type: 'boolean',
+        description:
+          'Whether detailed traces with large attributes are captured.',
+      },
       logPrompts: {
         type: 'boolean',
         description: 'Whether prompts are logged in telemetry payloads.',

@@ -198,12 +198,14 @@ export interface SummarizeToolOutputSettings {
 
 export interface PlanSettings {
   enabled?: boolean;
+  traces?: boolean;
   directory?: string;
   modelRouting?: boolean;
 }
 
 export interface TelemetrySettings {
   enabled?: boolean;
+  traces?: boolean;
   target?: TelemetryTarget;
   otlpEndpoint?: string;
   otlpProtocol?: 'grpc' | 'http';
@@ -219,6 +221,7 @@ export interface OutputSettings {
 
 export interface GemmaModelRouterSettings {
   enabled?: boolean;
+  traces?: boolean;
   classifier?: {
     host?: string;
     model?: string;
@@ -278,6 +281,7 @@ export interface AgentOverride {
   modelConfig?: ModelConfig;
   runConfig?: AgentRunConfig;
   enabled?: boolean;
+  traces?: boolean;
   tools?: string[];
   mcpServers?: Record<string, MCPServerConfig>;
 }
@@ -1054,6 +1058,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.accessibility = params.accessibility ?? {};
     this.telemetrySettings = {
       enabled: params.telemetry?.enabled ?? false,
+      traces: params.telemetry?.traces ?? false,
       target: params.telemetry?.target ?? DEFAULT_TELEMETRY_TARGET,
       otlpEndpoint: params.telemetry?.otlpEndpoint ?? DEFAULT_OTLP_ENDPOINT,
       otlpProtocol: params.telemetry?.otlpProtocol,
@@ -2714,6 +2719,10 @@ export class Config implements McpContext, AgentLoopContext {
 
   getTelemetryEnabled(): boolean {
     return this.telemetrySettings.enabled ?? false;
+  }
+
+  getTelemetryTracesEnabled(): boolean {
+    return this.telemetrySettings.traces ?? false;
   }
 
   getTelemetryLogPromptsEnabled(): boolean {

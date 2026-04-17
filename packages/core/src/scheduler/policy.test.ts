@@ -858,6 +858,7 @@ describe('Plan Mode Denial Consistency', () => {
       getEnableHooks: vi.fn().mockReturnValue(false),
       getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.PLAN), // Key: Plan Mode
       getTelemetryLogPromptsEnabled: vi.fn().mockReturnValue(false),
+      getTelemetryTracesEnabled: vi.fn().mockReturnValue(false),
       setApprovalMode: vi.fn(),
       getSessionId: vi.fn().mockReturnValue('test-session-id'),
       getUsageStatisticsEnabled: vi.fn().mockReturnValue(false),
