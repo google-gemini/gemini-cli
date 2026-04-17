@@ -1,0 +1,24 @@
+description = "Create a professional markdown pentest report using the latest tool evidence."
+prompt = """
+Create a professional penetration testing report in markdown.
+
+Use the latest 10 tool outputs in this session as the evidence base.
+If fewer than 10 are available, use all available outputs and explicitly say so.
+
+Required sections:
+1. Executive Summary
+2. Scope and Methodology
+3. Reconnaissance Findings
+4. Validated Vulnerabilities
+5. Risk Prioritization Matrix
+6. Remediation Recommendations
+7. Evidence Appendix
+
+For each finding include:
+- Asset
+- Evidence source/tool output reference
+- Severity
+- Confidence
+- Impact
+- Recommended fix
+"""
