@@ -11,14 +11,10 @@ import {
   isAlternateBufferEnabled,
 } from './useAlternateBuffer.js';
 import type { Config } from '@google/gemini-cli-core';
+import { ConfigContext } from '../contexts/ConfigContext.js';
+import React from 'react';
 
-vi.mock('../contexts/ConfigContext.js', () => ({
-  useConfig: vi.fn(),
-}));
-
-const mockUseConfig = vi.mocked(
-  await import('../contexts/ConfigContext.js').then((m) => m.useConfig),
-);
+// Removed vi.mock for ConfigContext
 
 describe('useAlternateBuffer', () => {
   beforeEach(() => {
@@ -26,22 +22,40 @@ describe('useAlternateBuffer', () => {
   });
 
   it('should return false when config.getUseAlternateBuffer returns false', async () => {
-    mockUseConfig.mockReturnValue({
+    const mockConfig = {
       getUseAlternateBuffer: () => false,
       getUseTerminalBuffer: () => false,
-    } as unknown as ReturnType<typeof mockUseConfig>);
+    } as unknown as Config;
 
-    const { result } = await renderHook(() => useAlternateBuffer());
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(
+        ConfigContext.Provider,
+        { value: mockConfig },
+        children,
+      );
+
+    const { result } = await renderHook(() => useAlternateBuffer(), {
+      wrapper,
+    });
     expect(result.current).toBe(false);
   });
 
   it('should return true when config.getUseAlternateBuffer returns true', async () => {
-    mockUseConfig.mockReturnValue({
+    const mockConfig = {
       getUseAlternateBuffer: () => true,
       getUseTerminalBuffer: () => false,
-    } as unknown as ReturnType<typeof mockUseConfig>);
+    } as unknown as Config;
 
-    const { result } = await renderHook(() => useAlternateBuffer());
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(
+        ConfigContext.Provider,
+        { value: mockConfig },
+        children,
+      );
+
+    const { result } = await renderHook(() => useAlternateBuffer(), {
+      wrapper,
+    });
     expect(result.current).toBe(true);
   });
 
@@ -49,11 +63,18 @@ describe('useAlternateBuffer', () => {
     const mockConfig = {
       getUseAlternateBuffer: () => true,
       getUseTerminalBuffer: () => false,
-    } as unknown as ReturnType<typeof mockUseConfig>;
+    } as unknown as Config;
 
-    mockUseConfig.mockReturnValue(mockConfig);
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(
+        ConfigContext.Provider,
+        { value: mockConfig },
+        children,
+      );
 
-    const { result, rerender } = await renderHook(() => useAlternateBuffer());
+    const { result, rerender } = await renderHook(() => useAlternateBuffer(), {
+      wrapper,
+    });
 
     // Value should remain true even after rerender
     expect(result.current).toBe(true);
