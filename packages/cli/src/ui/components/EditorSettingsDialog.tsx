@@ -22,7 +22,6 @@ import {
   type EditorType,
   isEditorAvailable,
   EDITOR_DISPLAY_NAMES,
-  coreEvents,
 } from '@google/gemini-cli-core';
 import { useKeypress } from '../hooks/useKeypress.js';
 
@@ -72,10 +71,6 @@ export function EditorSettingsDialog({
       )
     : 0;
   if (editorIndex === -1) {
-    coreEvents.emitFeedback(
-      'error',
-      `Editor is not supported: ${currentPreference}`,
-    );
     editorIndex = 0;
   }
 
@@ -132,8 +127,7 @@ export function EditorSettingsDialog({
   ) {
     mergedEditorName =
       EDITOR_DISPLAY_NAMES[
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        settings.merged.general.preferredEditor as EditorType
+        settings.merged.general.preferredEditor
       ];
   }
 
@@ -161,6 +155,7 @@ export function EditorSettingsDialog({
           onSelect={handleEditorSelect}
           isFocused={focusedSection === 'editor'}
           key={selectedScope}
+          maxItemsToShow={editorItems.length}
         />
 
         <Box marginTop={1} flexDirection="column">
