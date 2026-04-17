@@ -70,12 +70,10 @@ export function resolveGemmaConfig(fallbackPort: number): GemmaConfigStatus {
   const configuredBinaryPath = getUserConfiguredBinaryPath();
   try {
     const settings = loadSettings(process.cwd());
-    const gemmaSettings = settings.merged.experimental?.gemmaModelRouter;
+    const gemmaSettings = settings.forScope(SettingScope.User).settings.experimental?.gemmaModelRouter;
     settingsEnabled = gemmaSettings?.enabled === true;
     configuredPort = parsePortFromHost(
       gemmaSettings?.classifier?.host,
-      fallbackPort,
-    );
   } catch {
     // ignore — settings may fail to load outside a workspace
   }
