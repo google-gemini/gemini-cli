@@ -862,8 +862,15 @@ export function KeypressProvider({
 
     process.stdin.setEncoding('utf8'); // Make data events emit strings
 
+    debugLogger.log(
+      `[DEBUG] KeypressProvider simulateUser: ${config?.getSimulateUser()}`,
+    );
+
     let processor = nonKeyboardEventFilter(broadcast);
-    if (!terminalCapabilityManager.isKittyProtocolEnabled()) {
+    if (
+      !terminalCapabilityManager.isKittyProtocolEnabled() &&
+      !config?.getSimulateUser()
+    ) {
       processor = bufferFastReturn(processor);
     }
     processor = bufferBackslashEnter(processor);
