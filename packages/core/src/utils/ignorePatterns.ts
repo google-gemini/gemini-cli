@@ -47,6 +47,29 @@ export const BINARY_FILE_PATTERNS: string[] = [
   '**/*.odt',
   '**/*.ods',
   '**/*.odp',
+  // Game engine and large archive formats
+  '**/*.pak',
+  '**/*.rpa',
+  '**/*.unity3d',
+  '**/*.asset',
+  '**/*.bundle',
+  // Disk images and installers
+  '**/*.iso',
+  '**/*.dmg',
+  '**/*.msi',
+  '**/*.deb',
+  '**/*.rpm',
+  '**/*.apk',
+  // Additional archive formats
+  '**/*.xz',
+  '**/*.zst',
+  '**/*.lz4',
+  '**/*.cab',
+  // Electron / platform-specific
+  '**/*.asar',
+  // Python distribution
+  '**/*.whl',
+  '**/*.egg',
 ];
 
 /**
