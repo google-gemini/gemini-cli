@@ -24,6 +24,7 @@ import type {
 } from '@google/genai';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
+import type { Config } from '../config/config.js';
 import {
   SESSION_FILE_PREFIX,
   type TokensSummary,
@@ -620,22 +621,40 @@ export class ChatRecordingService {
    * @throws {Error} If shortId validation fails.
    */
   async deleteSession(sessionIdOrBasename: string): Promise<void> {
+    return ChatRecordingService.deleteSessionFiles(
+      this.context.config,
+      sessionIdOrBasename,
+    );
+  }
+
+  /**
+   * Static version of deleteSession that only requires Config.
+   * Useful for management operations outside of an active agent loop.
+   */
+  static async deleteSessionFiles(
+    config: Config,
+    sessionIdOrBasename: string,
+  ): Promise<void> {
     try {
-      const tempDir = this.context.config.storage.getProjectTempDir();
+      const tempDir = config.storage.getProjectTempDir();
       const chatsDir = path.join(tempDir, 'chats');
-      const shortId = this.deriveShortId(sessionIdOrBasename);
+      const shortId = ChatRecordingService.deriveShortId(sessionIdOrBasename);
 
       // Using stat instead of existsSync for async sanity
       if (!(await fs.promises.stat(chatsDir).catch(() => null))) {
         return; // Nothing to delete
       }
 
-      const matchingFiles = await this.getMatchingSessionFiles(
+      const matchingFiles = await ChatRecordingService.getMatchingSessionFiles(
         chatsDir,
         shortId,
       );
       for (const file of matchingFiles) {
-        await this.deleteSessionAndArtifacts(chatsDir, file, tempDir);
+        await ChatRecordingService.deleteSessionAndArtifacts(
+          chatsDir,
+          file,
+          tempDir,
+        );
       }
     } catch (error) {
       debugLogger.error('Error deleting session file.', error);
@@ -643,7 +662,7 @@ export class ChatRecordingService {
     }
   }
 
-  private deriveShortId(sessionIdOrBasename: string): string {
+  private static deriveShortId(sessionIdOrBasename: string): string {
     let shortId = sessionIdOrBasename;
     if (sessionIdOrBasename.startsWith(SESSION_FILE_PREFIX)) {
       const withoutExt = sessionIdOrBasename.replace(/\.jsonl?$/, '');
@@ -662,7 +681,7 @@ export class ChatRecordingService {
     return shortId;
   }
 
-  private async getMatchingSessionFiles(
+  private static async getMatchingSessionFiles(
     chatsDir: string,
     shortId: string,
   ): Promise<string[]> {
@@ -677,7 +696,7 @@ export class ChatRecordingService {
   /**
    * Deletes a single session file and its associated logs, tool-outputs, and directory.
    */
-  private async deleteSessionAndArtifacts(
+  private static async deleteSessionAndArtifacts(
     chatsDir: string,
     file: string,
     tempDir: string,
