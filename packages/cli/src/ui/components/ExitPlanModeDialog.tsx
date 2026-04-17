@@ -271,7 +271,11 @@ export const ExitPlanModeDialog: React.FC<ExitPlanModeDialogProps> = ({
         ]}
         onSubmit={(answers) => {
           const answer = answers['0'];
-          if (answer === ApprovalOption.Auto) {
+          if (
+            answer === ApprovalOption.Auto ||
+            answer.toLowerCase() === 'y' ||
+            answer.toLowerCase() === 'yes'
+          ) {
             onApprove(ApprovalMode.AUTO_EDIT);
           } else if (answer === ApprovalOption.Manual) {
             onApprove(ApprovalMode.DEFAULT);
