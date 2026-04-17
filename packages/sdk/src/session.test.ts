@@ -16,7 +16,18 @@ const mockClient = {
   updateSystemInstruction: vi.fn(),
 };
 
+// Mutable mock tool registry so AgentLoopContext property access works
+const mockToolRegistry = {
+  getTool: vi.fn().mockReturnValue(null),
+  registerTool: vi.fn(),
+  unregisterTool: vi.fn(),
+  clone: vi.fn(),
+};
+mockToolRegistry.clone.mockReturnValue(mockToolRegistry);
+
 // Mutable mock config so individual tests can spy on setUserMemory etc.
+// Must expose both getter methods (used by Config internals) AND plain properties
+// (accessed when Config is cast to AgentLoopContext in session.ts).
 const mockConfig = {
   initialize: vi.fn().mockResolvedValue(undefined),
   refreshAuth: vi.fn().mockResolvedValue(undefined),
@@ -24,11 +35,12 @@ const mockConfig = {
     getSkills: vi.fn().mockReturnValue([]),
     addSkills: vi.fn(),
   }),
-  getToolRegistry: vi.fn().mockReturnValue({
-    getTool: vi.fn().mockReturnValue(null),
-    registerTool: vi.fn(),
-    unregisterTool: vi.fn(),
-  }),
+  // Plain properties for AgentLoopContext cast
+  toolRegistry: mockToolRegistry,
+  messageBus: {},
+  geminiClient: mockClient,
+  // Getter methods retained for any internal Config usage
+  getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
   getMessageBus: vi.fn().mockReturnValue({}),
   getGeminiClient: vi.fn().mockReturnValue(mockClient),
   getSessionId: vi.fn().mockReturnValue('mock-session-id'),
@@ -181,8 +193,7 @@ describe('GeminiCliSession initialize()', () => {
   });
 });
 
-// TODO(#24999): Mock uses getGeminiClient() method but session.ts expects geminiClient property.
-describe.skip('GeminiCliSession sendStream()', () => {
+describe('GeminiCliSession sendStream()', () => {
   it('auto-initializes if not yet initialized', async () => {
     const session = new GeminiCliSession(
       baseOptions,
