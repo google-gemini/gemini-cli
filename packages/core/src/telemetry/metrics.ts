@@ -88,6 +88,7 @@ const GEN_AI_CLIENT_OPERATION_DURATION = 'gen_ai.client.operation.duration';
 const STARTUP_TIME = 'gemini_cli.startup.duration';
 const MEMORY_USAGE = 'gemini_cli.memory.usage';
 const CPU_USAGE = 'gemini_cli.cpu.usage';
+const EVENT_LOOP_DELAY = 'gemini_cli.event_loop.delay';
 const TOOL_QUEUE_DEPTH = 'gemini_cli.tool.queue.depth';
 const TOOL_EXECUTION_BREAKDOWN = 'gemini_cli.tool.execution.breakdown';
 const TOKEN_EFFICIENCY = 'gemini_cli.token.efficiency';
@@ -608,6 +609,17 @@ const PERFORMANCE_HISTOGRAM_DEFINITIONS = {
       component?: string;
     },
   },
+  [EVENT_LOOP_DELAY]: {
+    description: 'Event loop delay in milliseconds.',
+    unit: 'ms',
+    valueType: ValueType.DOUBLE,
+    assign: (h: Histogram) => (eventLoopDelayHistogram = h),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    attributes: {} as {
+      percentile: string;
+      component?: string;
+    },
+  },
   [TOOL_QUEUE_DEPTH]: {
     description: 'Number of tools in execution queue.',
     unit: 'count',
@@ -806,6 +818,7 @@ let genAiClientOperationDurationHistogram: Histogram | undefined;
 let startupTimeHistogram: Histogram | undefined;
 let memoryUsageGauge: Histogram | undefined; // Using Histogram until ObservableGauge is available
 let cpuUsageGauge: Histogram | undefined;
+let eventLoopDelayHistogram: Histogram | undefined;
 let toolQueueDepthGauge: Histogram | undefined;
 let toolExecutionBreakdownHistogram: Histogram | undefined;
 let tokenEfficiencyHistogram: Histogram | undefined;
@@ -1337,6 +1350,21 @@ export function recordCpuUsage(
   };
 
   cpuUsageGauge.record(percentage, metricAttributes);
+}
+
+export function recordEventLoopDelay(
+  config: Config,
+  delayMs: number,
+  attributes: MetricDefinitions[typeof EVENT_LOOP_DELAY]['attributes'],
+): void {
+  if (!eventLoopDelayHistogram || !isPerformanceMonitoringEnabled) return;
+
+  const metricAttributes: Attributes = {
+    ...baseMetricDefinition.getCommonAttributes(config),
+    ...attributes,
+  };
+
+  eventLoopDelayHistogram.record(delayMs, metricAttributes);
 }
 
 export function recordToolQueueDepth(config: Config, queueDepth: number): void {

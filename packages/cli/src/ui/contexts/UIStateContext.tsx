@@ -9,7 +9,6 @@ import type {
   HistoryItem,
   ThoughtSummary,
   ConfirmationRequest,
-  QuotaStats,
   LoopDetectionConfirmationRequest,
   HistoryItemWithoutId,
   StreamingState,
@@ -21,7 +20,6 @@ import type { CommandContext, SlashCommand } from '../commands/types.js';
 import type {
   IdeContext,
   ApprovalMode,
-  UserTierId,
   IdeInfo,
   AuthType,
   FallbackIntent,
@@ -85,16 +83,6 @@ import { type UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
 import { type RestartReason } from '../hooks/useIdeTrustListener.js';
 import type { TerminalBackgroundColor } from '../utils/terminalCapabilityManager.js';
 import type { BackgroundTask } from '../hooks/useExecutionLifecycle.js';
-
-export interface QuotaState {
-  userTier: UserTierId | undefined;
-  stats: QuotaStats | undefined;
-  proQuotaRequest: ProQuotaDialogRequest | null;
-  validationRequest: ValidationDialogRequest | null;
-  // G1 AI Credits overage flow
-  overageMenuRequest: OverageMenuDialogRequest | null;
-  emptyWalletRequest: EmptyWalletDialogRequest | null;
-}
 
 export interface AccountSuspensionInfo {
   message: string;
@@ -171,8 +159,6 @@ export interface UIState {
   queueErrorMessage: string | null;
   showApprovalModeIndicator: ApprovalMode;
   allowPlanMode: boolean;
-  // Quota-related state
-  quota: QuotaState;
   currentModel: string;
   contextFileNames: string[];
   errorCount: number;
