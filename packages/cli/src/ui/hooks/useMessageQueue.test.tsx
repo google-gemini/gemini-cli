@@ -35,7 +35,12 @@ describe('useMessageQueue', () => {
       hookResult = useMessageQueue(props);
       return null;
     }
-    const { rerender } = await render(<TestComponent {...initialProps} />);
+    const { rerender } = await render(
+      <TestComponent {...initialProps} />,
+      undefined,
+      undefined,
+      true,
+    );
     return {
       result: {
         get current() {
