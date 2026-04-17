@@ -2471,6 +2471,80 @@ describe('AppContainer State Management', () => {
     });
   });
 
+  describe('Mouse Mode (Ctrl+S) Guard', () => {
+    it('should NOT toggle mouse mode when NOT in alternate or terminal buffer mode', async () => {
+      vi.spyOn(mockConfig, 'getUseTerminalBuffer').mockReturnValue(false);
+      vi.spyOn(mockConfig, 'getUseAlternateBuffer').mockReturnValue(false);
+      const testSettings = createMockSettings({
+        ui: { useAlternateBuffer: false, terminalBuffer: false },
+      });
+
+      const getTree = (settings: LoadedSettings) => (
+        <SettingsContext.Provider value={settings}>
+          <KeypressProvider config={mockConfig}>
+            <OverflowProvider>
+              <AppContainer
+                config={mockConfig}
+                version="1.0.0"
+                initializationResult={mockInitResult}
+              />
+            </OverflowProvider>
+          </KeypressProvider>
+        </SettingsContext.Provider>
+      );
+
+      const { stdin, unmount, rerender } = await act(async () =>
+        render(getTree(testSettings)),
+      );
+      (enableMouseEvents as Mock).mockClear();
+      (disableMouseEvents as Mock).mockClear();
+
+      act(() => {
+        stdin.write('\x13'); // Ctrl+S
+      });
+      rerender(getTree(testSettings));
+
+      expect(enableMouseEvents).not.toHaveBeenCalled();
+      expect(disableMouseEvents).not.toHaveBeenCalled();
+      unmount();
+    });
+
+    it('should toggle mouse mode when in terminal buffer mode even if not in alternate buffer mode', async () => {
+      vi.spyOn(mockConfig, 'getUseTerminalBuffer').mockReturnValue(true);
+      vi.spyOn(mockConfig, 'getUseAlternateBuffer').mockReturnValue(false);
+      const testSettings = createMockSettings({
+        ui: { useAlternateBuffer: false, terminalBuffer: true },
+      });
+
+      const getTree = (settings: LoadedSettings) => (
+        <SettingsContext.Provider value={settings}>
+          <KeypressProvider config={mockConfig}>
+            <OverflowProvider>
+              <AppContainer
+                config={mockConfig}
+                version="1.0.0"
+                initializationResult={mockInitResult}
+              />
+            </OverflowProvider>
+          </KeypressProvider>
+        </SettingsContext.Provider>
+      );
+
+      const { stdin, unmount, rerender } = await act(async () =>
+        render(getTree(testSettings)),
+      );
+      (disableMouseEvents as Mock).mockClear();
+
+      act(() => {
+        stdin.write('\x13'); // Ctrl+S
+      });
+      rerender(getTree(testSettings));
+
+      expect(disableMouseEvents).toHaveBeenCalled();
+      unmount();
+    });
+  });
+
   describe('Copy Mode (F9)', () => {
     let rerender: () => void;
     let unmount: () => void;

@@ -118,6 +118,7 @@ import ansiEscapes from 'ansi-escapes';
 import { basename } from 'node:path';
 import { computeTerminalTitle } from '../utils/windowTitle.js';
 import { useTextBuffer } from './components/shared/text-buffer.js';
+import { isAlternateBufferEnabled } from './hooks/useAlternateBuffer.js';
 import { useLogger } from './hooks/useLogger.js';
 import { useGeminiStream } from './hooks/useGeminiStream.js';
 import { useAgentStream } from './hooks/useAgentStream.js';
@@ -238,10 +239,8 @@ export const AppContainer = (props: AppContainerProps) => {
   });
 
   useMemoryMonitor(historyManager);
-  const isAlternateBuffer = config.getUseAlternateBuffer();
-  const [mouseMode, setMouseMode] = useState(() =>
-    config.getUseAlternateBuffer(),
-  );
+  const isAlternateBuffer = isAlternateBufferEnabled(config);
+  const [mouseMode, setMouseMode] = useState(() => isAlternateBuffer);
 
   useEffect(() => {
     setOptions({
@@ -1806,10 +1805,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
       }
 
       if (keyMatchers[Command.TOGGLE_MOUSE_MODE](key)) {
-        setMouseMode((prev) => !prev);
-        if (mouseMode && !isAlternateBuffer) {
-          appEvents.emit(AppEvent.ScrollToBottom);
+        if (!isAlternateBuffer) {
+          return false;
         }
+        setMouseMode((prev) => !prev);
         return true;
       }
 
@@ -2050,10 +2049,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       dumpCurrentFrame,
       startRecording,
       stopRecording,
-      mouseMode,
     ],
   );
-
   useKeypress(handleGlobalKeypress, { isActive: true, priority: true });
 
   useKeypress(
