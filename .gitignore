@@ -59,6 +59,10 @@ gha-creds-*.json
 patch_output.log
 gemini-debug.log
 
+# Python bytecode/cache files
+__pycache__/
+*.pyc
+
 .genkit
 .gemini-clipboard/
 .eslintcache
