@@ -195,6 +195,7 @@ const PARSE_TIMEOUT_MICROS = 1000 * 1000; // 1 second
 // this avoids brittle quoting/escaping when spawning PowerShell and ensures the script is received byte-for-byte.
 const POWERSHELL_PARSER_SCRIPT = Buffer.from(
   `
+$OutputEncoding = [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $ErrorActionPreference = 'Stop'
 $commandText = $env:${POWERSHELL_COMMAND_ENV}
 if ([string]::IsNullOrEmpty($commandText)) {
@@ -645,7 +646,11 @@ export function getShellConfiguration(): ShellConfiguration {
       ) {
         return {
           executable: comSpec,
-          argsPrefix: ['-NoProfile', '-Command'],
+          argsPrefix: [
+            '-NoProfile',
+            '-Command',
+            '$OutputEncoding = [Console]::OutputEncoding = [System.Text.Encoding]::UTF8;',
+          ],
           shell: 'powershell',
         };
       }
@@ -654,7 +659,11 @@ export function getShellConfiguration(): ShellConfiguration {
     // Default to PowerShell for all other Windows configurations.
     return {
       executable: 'powershell.exe',
-      argsPrefix: ['-NoProfile', '-Command'],
+      argsPrefix: [
+        '-NoProfile',
+        '-Command',
+        '$OutputEncoding = [Console]::OutputEncoding = [System.Text.Encoding]::UTF8;',
+      ],
       shell: 'powershell',
     };
   }
