@@ -41,26 +41,30 @@ describe('useAgentStream', () => {
   });
 
   it('should initialize on mount', async () => {
-    await renderHookWithProviders(() =>
-      useAgentStream({
-        agent: mockLegacyAgentProtocol as unknown as LegacyAgentProtocol,
-        addItem: mockAddItem,
-        onCancelSubmit: mockOnCancelSubmit,
-        isShellFocused: false,
-      }),
+    await renderHookWithProviders(
+      () =>
+        useAgentStream({
+          agent: mockLegacyAgentProtocol as unknown as LegacyAgentProtocol,
+          addItem: mockAddItem,
+          onCancelSubmit: mockOnCancelSubmit,
+          isShellFocused: false,
+        }),
+      { allowEmptyFrame: true },
     );
 
     expect(mockLegacyAgentProtocol.subscribe).toHaveBeenCalled();
   });
 
   it('should call agent.send when submitQuery is called', async () => {
-    const { result } = await renderHookWithProviders(() =>
-      useAgentStream({
-        agent: mockLegacyAgentProtocol as unknown as LegacyAgentProtocol,
-        addItem: mockAddItem,
-        onCancelSubmit: mockOnCancelSubmit,
-        isShellFocused: false,
-      }),
+    const { result } = await renderHookWithProviders(
+      () =>
+        useAgentStream({
+          agent: mockLegacyAgentProtocol as unknown as LegacyAgentProtocol,
+          addItem: mockAddItem,
+          onCancelSubmit: mockOnCancelSubmit,
+          isShellFocused: false,
+        }),
+      { allowEmptyFrame: true },
     );
 
     await act(async () => {
@@ -77,13 +81,15 @@ describe('useAgentStream', () => {
   });
 
   it('should update streamingState based on agent_start and agent_end events', async () => {
-    const { result } = await renderHookWithProviders(() =>
-      useAgentStream({
-        agent: mockLegacyAgentProtocol as unknown as LegacyAgentProtocol,
-        addItem: mockAddItem,
-        onCancelSubmit: mockOnCancelSubmit,
-        isShellFocused: false,
-      }),
+    const { result } = await renderHookWithProviders(
+      () =>
+        useAgentStream({
+          agent: mockLegacyAgentProtocol as unknown as LegacyAgentProtocol,
+          addItem: mockAddItem,
+          onCancelSubmit: mockOnCancelSubmit,
+          isShellFocused: false,
+        }),
+      { allowEmptyFrame: true },
     );
 
     const eventHandler = vi.mocked(mockLegacyAgentProtocol.subscribe).mock
@@ -114,13 +120,15 @@ describe('useAgentStream', () => {
   });
 
   it('should accumulate text content and update pendingHistoryItems', async () => {
-    const { result } = await renderHookWithProviders(() =>
-      useAgentStream({
-        agent: mockLegacyAgentProtocol as unknown as LegacyAgentProtocol,
-        addItem: mockAddItem,
-        onCancelSubmit: mockOnCancelSubmit,
-        isShellFocused: false,
-      }),
+    const { result } = await renderHookWithProviders(
+      () =>
+        useAgentStream({
+          agent: mockLegacyAgentProtocol as unknown as LegacyAgentProtocol,
+          addItem: mockAddItem,
+          onCancelSubmit: mockOnCancelSubmit,
+          isShellFocused: false,
+        }),
+      { allowEmptyFrame: true },
     );
 
     const eventHandler = vi.mocked(mockLegacyAgentProtocol.subscribe).mock
@@ -158,13 +166,15 @@ describe('useAgentStream', () => {
   });
 
   it('should process thought events and update thought state', async () => {
-    const { result } = await renderHookWithProviders(() =>
-      useAgentStream({
-        agent: mockLegacyAgentProtocol as unknown as LegacyAgentProtocol,
-        addItem: mockAddItem,
-        onCancelSubmit: mockOnCancelSubmit,
-        isShellFocused: false,
-      }),
+    const { result } = await renderHookWithProviders(
+      () =>
+        useAgentStream({
+          agent: mockLegacyAgentProtocol as unknown as LegacyAgentProtocol,
+          addItem: mockAddItem,
+          onCancelSubmit: mockOnCancelSubmit,
+          isShellFocused: false,
+        }),
+      { allowEmptyFrame: true },
     );
 
     const eventHandler = vi.mocked(mockLegacyAgentProtocol.subscribe).mock
@@ -188,13 +198,15 @@ describe('useAgentStream', () => {
   });
 
   it('should call agent.abort when cancelOngoingRequest is called', async () => {
-    const { result } = await renderHookWithProviders(() =>
-      useAgentStream({
-        agent: mockLegacyAgentProtocol as unknown as LegacyAgentProtocol,
-        addItem: mockAddItem,
-        onCancelSubmit: mockOnCancelSubmit,
-        isShellFocused: false,
-      }),
+    const { result } = await renderHookWithProviders(
+      () =>
+        useAgentStream({
+          agent: mockLegacyAgentProtocol as unknown as LegacyAgentProtocol,
+          addItem: mockAddItem,
+          onCancelSubmit: mockOnCancelSubmit,
+          isShellFocused: false,
+        }),
+      { allowEmptyFrame: true },
     );
 
     await act(async () => {
