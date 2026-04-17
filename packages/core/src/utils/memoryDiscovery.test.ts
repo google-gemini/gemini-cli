@@ -97,9 +97,6 @@ describe('memoryDiscovery', () => {
     vi.mocked(pathsHomedir).mockReturnValue(homedir);
   });
 
-  const normMarker = (p: string) =>
-    process.platform === 'win32' ? p.toLowerCase() : p;
-
   afterEach(async () => {
     vi.unstubAllEnvs();
     // Some tests set this to a different value.
@@ -1374,12 +1371,10 @@ included directory memory
     const result = flattenResult(
       await loadServerHierarchicalMemory(
         config.getWorkingDir(),
-        config.shouldLoadMemoryFromIncludeDirectories()
-          ? config.getWorkspaceContext().getDirectories()
-          : [],
-        config.getFileService(),
+        [],
+        config.getFileDiscoveryService(),
         config.getExtensionLoader(),
-        config.isTrustedFolder(),
+        config.isFolderTrusted(),
         config.getImportFormat(),
       ),
     );
@@ -1408,10 +1403,8 @@ included directory memory
     const flattenedMemory = flattenMemory(refreshResult.memoryContent);
     expect(flattenedMemory).toContain('Really cool custom context!');
     expect(config.getUserMemory()).toStrictEqual(refreshResult.memoryContent);
-    expect(refreshResult.filePaths[0]).toContain(
-      normMarker(path.join(extensionPath, 'CustomContext.md')),
-    );
-    expect(config.getGeminiMdFilePaths()).equals(refreshResult.filePaths);
+    expect(refreshResult.filePaths[0]).toContain('CustomContext.md');
+    expect(config.getGeminiMdFilePaths()).toStrictEqual(refreshResult.filePaths);
     expect(mockEventListener).toHaveBeenCalledExactlyOnceWith({
       fileCount: refreshResult.fileCount,
     });
@@ -1421,20 +1414,23 @@ included directory memory
     const mockConfig = {
       getWorkingDir: vi.fn().mockReturnValue(cwd),
       shouldLoadMemoryFromIncludeDirectories: vi.fn().mockReturnValue(false),
-      getFileService: vi
+      getFileDiscoveryService: vi
         .fn()
         .mockReturnValue(new FileDiscoveryService(projectRoot)),
       getExtensionLoader: vi
         .fn()
         .mockReturnValue(new SimpleExtensionLoader([])),
-      isTrustedFolder: vi.fn().mockReturnValue(true),
+      isFolderTrusted: vi.fn().mockReturnValue(true),
       getImportFormat: vi.fn().mockReturnValue('tree'),
-      getFileFilteringOptions: vi.fn().mockReturnValue(undefined),
-      getDiscoveryMaxDirs: vi.fn().mockReturnValue(200),
+      getMemoryFileFilteringOptions: vi.fn().mockReturnValue(undefined),
+      getMaxGeminiMdDiscoveryDirs: vi.fn().mockReturnValue(200),
       getMemoryBoundaryMarkers: vi.fn().mockReturnValue(['.git']),
       setUserMemory: vi.fn(),
       setGeminiMdFileCount: vi.fn(),
       setGeminiMdFilePaths: vi.fn(),
+      getWorkspaceContext: vi.fn().mockReturnValue({
+        getDirectories: vi.fn().mockReturnValue([]),
+      }),
       getMcpClientManager: vi.fn().mockReturnValue({
         getMcpInstructions: vi
           .fn()

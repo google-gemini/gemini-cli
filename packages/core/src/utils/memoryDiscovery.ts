@@ -480,9 +480,11 @@ export async function getGlobalMemoryPaths(): Promise<string[]> {
     }
   });
 
-  return (await Promise.all(accessChecks)).filter(
+  const paths = (await Promise.all(accessChecks)).filter(
     (p): p is string => p !== null,
   );
+  const { paths: deduplicated } = await deduplicatePathsByFileIdentity(paths);
+  return deduplicated;
 }
 
 export async function getUserProjectMemoryPaths(
@@ -546,7 +548,10 @@ export async function getEnvironmentMemoryPaths(
   const pathArrays = await Promise.all(traversalPromises);
   pathArrays.flat().forEach((p) => allPaths.add(p));
 
-  return Array.from(allPaths).sort();
+  const { paths: deduplicated } = await deduplicatePathsByFileIdentity(
+    Array.from(allPaths).sort(),
+  );
+  return deduplicated;
 }
 
 export function categorizeAndConcatenate(
@@ -728,11 +733,22 @@ export async function loadServerHierarchicalMemory(
   const contentsMap = new Map(allContents.map((c) => [c.filePath, c]));
 
   // 3. CATEGORIZE: Back into Global, Project, Extension
+  // We need to deduplicate the individual lists too to ensure correct categorization
+  const { paths: globalDeduped } = await deduplicatePathsByFileIdentity(
+    discoveryResult.global,
+  );
+  const { paths: projectDeduped } = await deduplicatePathsByFileIdentity(
+    discoveryResult.project,
+  );
+  const { paths: extensionDeduped } = await deduplicatePathsByFileIdentity(
+    extensionPaths,
+  );
+
   const hierarchicalMemory = categorizeAndConcatenate(
     {
-      global: discoveryResult.global,
-      extension: extensionPaths,
-      project: discoveryResult.project,
+      global: globalDeduped,
+      extension: extensionDeduped,
+      project: projectDeduped,
     },
     contentsMap,
   );
@@ -756,22 +772,16 @@ export async function refreshServerHierarchicalMemory(config: Config) {
     config.shouldLoadMemoryFromIncludeDirectories()
       ? config.getWorkspaceContext().getDirectories()
       : [],
-    config.getFileService(),
+    config.getFileDiscoveryService(),
     config.getExtensionLoader(),
-    config.isTrustedFolder(),
-    config.getImportFormat(),
-    config.getFileFilteringOptions(),
-    config.getDiscoveryMaxDirs(),
-    config.getMemoryBoundaryMarkers(),
+    config.isFolderTrusted(),
+    'tree',
+    config.getMemoryFileFilteringOptions(),
+    config.getMaxGeminiMdDiscoveryDirs(),
   );
-  const mcpInstructions =
-    config.getMcpClientManager()?.getMcpInstructions() || '';
-  const finalMemory: HierarchicalMemory = {
-    ...result.memoryContent,
-    project: [result.memoryContent.project, mcpInstructions.trimStart()]
-      .filter(Boolean)
-      .join('\n\n'),
-  };
+
+  const finalMemory = flattenMemory(result.memoryContent);
+
   config.setUserMemory(finalMemory);
   config.setGeminiMdFileCount(result.fileCount);
   config.setGeminiMdFilePaths(result.filePaths);
