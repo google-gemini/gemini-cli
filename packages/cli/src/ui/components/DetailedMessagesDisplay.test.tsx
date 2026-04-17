@@ -42,6 +42,7 @@ describe('DetailedMessagesDisplay', () => {
       <DetailedMessagesDisplay maxHeight={10} width={80} hasFocus={false} />,
       {
         settings: createMockSettings({ ui: { errorVerbosity: 'full' } }),
+        allowEmptyFrame: true,
       },
     );
     expect(lastFrame({ allowEmpty: true })).toBe('');
