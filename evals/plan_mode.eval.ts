@@ -305,7 +305,7 @@ describe('plan_mode', () => {
       settings,
     },
     prompt:
-      'Enter plan mode and plan to create a new module called foo. The plan should be saved as foo-plan.md. Then, exit plan mode.',
+      'I agree with your strategy. Please enter plan mode and draft the plan to create a new module called foo. The plan should be saved as foo-plan.md. Then, exit plan mode.',
     assert: async (rig, result) => {
       const enterPlanCalled = await rig.waitForToolCall('enter_plan_mode');
       expect(
