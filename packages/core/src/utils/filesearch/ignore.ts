@@ -20,7 +20,13 @@ export function loadIgnoreRules(
 
   for (const filePath of ignoreFiles) {
     if (fs.existsSync(filePath)) {
-      ignorer.add(fs.readFileSync(filePath, 'utf8'));
+      try {
+        ignorer.add(fs.readFileSync(filePath, 'utf8'));
+      } catch {
+        // Skip paths that cannot be read as text files (e.g., directories).
+        // This can happen if customIgnoreFilePaths contains directory-like
+        // entries such as "node_modules/" that exist on disk.
+      }
     }
   }
 
