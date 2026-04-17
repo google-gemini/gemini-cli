@@ -3278,6 +3278,42 @@ describe('parseArguments with positional prompt', () => {
     debugErrorSpy.mockRestore();
   });
 
+  it('should throw an error when both a positional prompt and the --prompt-interactive flag are used', async () => {
+    process.argv = [
+      'node',
+      'script.js',
+      'positional',
+      'prompt',
+      '--prompt-interactive',
+      'interactive prompt',
+    ];
+
+    const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit called');
+    });
+
+    const mockConsoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+    const debugErrorSpy = vi
+      .spyOn(debugLogger, 'error')
+      .mockImplementation(() => {});
+
+    await expect(parseArguments(createTestMergedSettings())).rejects.toThrow(
+      'process.exit called',
+    );
+
+    expect(debugErrorSpy).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'Cannot use both a positional prompt and the --prompt-interactive (-i) flag together',
+      ),
+    );
+
+    mockExit.mockRestore();
+    mockConsoleError.mockRestore();
+    debugErrorSpy.mockRestore();
+  });
+
   it('should correctly parse a positional prompt to query field', async () => {
     process.argv = ['node', 'script.js', 'positional', 'prompt'];
     const argv = await parseArguments(createTestMergedSettings());
