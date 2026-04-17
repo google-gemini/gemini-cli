@@ -39,7 +39,7 @@ describe('useMcpStatus', () => {
       hookResult = useMcpStatus(config);
       return null;
     }
-    await render(<TestComponent config={config} />);
+    await render(<TestComponent config={config} />, undefined, undefined, true);
     return {
       result: {
         get current() {
