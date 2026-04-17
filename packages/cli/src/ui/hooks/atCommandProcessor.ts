@@ -238,15 +238,34 @@ async function resolveFilePaths(
       continue;
     }
 
+    // Convert absolute paths to relative for the ignore check. The `ignore`
+    // library throws RangeError on absolute or `..`-prefixed paths, which
+    // happens for clipboard images saved to a temp directory outside the project.
+    let ignoreCheckPath = pathName;
+    if (path.isAbsolute(pathName)) {
+      const targetDir = config.getWorkspaceContext().getDirectories()[0];
+      if (targetDir) {
+        ignoreCheckPath = path.relative(
+          resolveToRealPath(targetDir),
+          resolveToRealPath(pathName),
+        );
+      }
+    }
+    // On Windows, path.relative() between different drives (e.g., C: vs D:)
+    // returns an absolute path instead of a `..`-prefixed one, so check both.
+    const isOutsideProject =
+      ignoreCheckPath.startsWith('..') || path.isAbsolute(ignoreCheckPath);
     const gitIgnored =
+      !isOutsideProject &&
       respectFileIgnore.respectGitIgnore &&
-      fileDiscovery.shouldIgnoreFile(pathName, {
+      fileDiscovery.shouldIgnoreFile(ignoreCheckPath, {
         respectGitIgnore: true,
         respectGeminiIgnore: false,
       });
     const geminiIgnored =
+      !isOutsideProject &&
       respectFileIgnore.respectGeminiIgnore &&
-      fileDiscovery.shouldIgnoreFile(pathName, {
+      fileDiscovery.shouldIgnoreFile(ignoreCheckPath, {
         respectGitIgnore: false,
         respectGeminiIgnore: true,
       });
@@ -270,9 +289,15 @@ async function resolveFilePaths(
         const absolutePath = path.resolve(dir, pathName);
         const stats = await fs.stat(absolutePath);
 
-        const relativePath = path.isAbsolute(pathName)
+        const rawRelative = path.isAbsolute(pathName)
           ? path.relative(dir, absolutePath)
           : pathName;
+        // On Windows, path.relative() between different drives (e.g., C: vs D:)
+        // returns the source path unchanged (still absolute). Fall back to the
+        // absolute path so downstream tools handle cross-drive paths correctly.
+        const relativePath = path.isAbsolute(rawRelative)
+          ? absolutePath
+          : rawRelative;
 
         if (stats.isDirectory()) {
           const pathSpec = path.join(relativePath, '**');
@@ -320,7 +345,12 @@ async function resolveFilePaths(
                 const lines = globResult.llmContent.split('\n');
                 if (lines.length > 1 && lines[1]) {
                   const firstMatchAbsolute = lines[1].trim();
-                  const pathSpec = path.relative(dir, firstMatchAbsolute);
+                  const rawPathSpec = path.relative(dir, firstMatchAbsolute);
+                  // On Windows, path.relative() between different drives returns
+                  // the source path unchanged (absolute). Fall back to absolute.
+                  const pathSpec = path.isAbsolute(rawPathSpec)
+                    ? firstMatchAbsolute
+                    : rawPathSpec;
                   resolvedFiles.push({
                     part,
                     pathSpec,
