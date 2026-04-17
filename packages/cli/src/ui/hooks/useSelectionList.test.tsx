@@ -4,10 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { act } from 'react';
-
-vi.mock('./useKeypress.js');
 
 import { renderWithProviders } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
@@ -15,7 +13,7 @@ import {
   useSelectionList,
   type SelectionListItem,
 } from './useSelectionList.js';
-import { useKeypress } from './useKeypress.js';
+import * as useKeypressModule from './useKeypress.js';
 
 import type { KeypressHandler, Key } from '../contexts/KeypressContext.js';
 
@@ -23,7 +21,7 @@ type UseKeypressMockOptions = { isActive: boolean };
 
 let activeKeypressHandler: KeypressHandler | null = null;
 
-describe.skip('useSelectionList', () => {
+describe('useSelectionList', () => {
   const mockOnSelect = vi.fn();
   const mockOnHighlight = vi.fn();
 
@@ -36,7 +34,7 @@ describe.skip('useSelectionList', () => {
 
   beforeEach(() => {
     activeKeypressHandler = null;
-    vi.mocked(useKeypress).mockImplementation(
+    vi.spyOn(useKeypressModule, 'useKeypress').mockImplementation(
       (handler: KeypressHandler, options?: UseKeypressMockOptions) => {
         if (options?.isActive) {
           activeKeypressHandler = handler;
