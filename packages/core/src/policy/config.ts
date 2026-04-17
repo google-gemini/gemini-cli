@@ -9,6 +9,7 @@ import * as path from 'node:path';
 import * as crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { Storage } from '../config/storage.js';
+import { debugLogger } from '../utils/debugLogger.js';
 import {
   ApprovalMode,
   type PolicyEngineConfig,
@@ -28,7 +29,6 @@ import {
 } from '../confirmation-bus/types.js';
 import { type MessageBus } from '../confirmation-bus/message-bus.js';
 import { coreEvents } from '../utils/events.js';
-import { debugLogger } from '../utils/debugLogger.js';
 import { SHELL_TOOL_NAMES } from '../utils/shell-utils.js';
 import {
   SHELL_TOOL_NAME,
@@ -685,6 +685,7 @@ export function createPolicyUpdater(
 
       if (message.persist) {
         persistenceQueue = persistenceQueue.then(async () => {
+          let tmpFile: string | undefined;
           try {
             const policyFile =
               message.persistScope === 'workspace'
@@ -705,11 +706,27 @@ export function createPolicyUpdater(
                 existingData = parsed as { rule?: TomlRule[] };
               }
             } catch (error) {
-              if (!isNodeError(error) || error.code !== 'ENOENT') {
-                debugLogger.warn(
-                  `Failed to parse ${policyFile}, overwriting with new policy.`,
-                  error,
+              if (isNodeError(error) && error.code === 'ENOENT') {
+                // File doesn't exist yet, start fresh
+              } else if (!isNodeError(error)) {
+                // TOML parse error — back up corrupted file and recover
+                coreEvents.emitFeedback(
+                  'warning',
+                  `Syntax error found in policy file. Backing up corrupted file to ${policyFile}.bak and starting fresh.`,
                 );
+                if (
+                  !(
+                    await fs.lstat(policyFile).catch(() => null)
+                  )?.isSymbolicLink()
+                ) {
+                  await fs
+                    .copyFile(policyFile, `${policyFile}.bak`)
+                    .catch(() => {});
+                }
+                existingData = {};
+              } else {
+                // Real filesystem error (e.g. EACCES) — throw to prevent silent failure
+                throw error;
               }
             }
 
@@ -757,7 +774,7 @@ export function createPolicyUpdater(
             // Using a unique suffix avoids race conditions where concurrent processes
             // overwrite each other's temporary files, leading to ENOENT errors on rename.
             const tmpSuffix = crypto.randomBytes(8).toString('hex');
-            const tmpFile = `${policyFile}.${tmpSuffix}.tmp`;
+            tmpFile = `${policyFile}.${tmpSuffix}.tmp`;
 
             let handle: fs.FileHandle | undefined;
             try {
@@ -767,11 +784,37 @@ export function createPolicyUpdater(
             } finally {
               await handle?.close();
             }
-            await fs.rename(tmpFile, policyFile);
+            try {
+              await fs.rename(tmpFile, policyFile);
+            } catch (renameError) {
+              // Cross-device rename fails with EXDEV on some Linux mount configurations.
+              // Fall back to copy + unlink which works across filesystems.
+              if (
+                isNodeError(renameError) &&
+                (renameError.code === 'EXDEV' || renameError.code === 'EBUSY')
+              ) {
+                if (
+                  (
+                    await fs.lstat(policyFile).catch(() => null)
+                  )?.isSymbolicLink()
+                )
+                  throw renameError;
+                await fs.copyFile(tmpFile, policyFile);
+                await fs.unlink(tmpFile).catch(() => {});
+              } else {
+                throw renameError;
+              }
+            }
           } catch (error) {
+            // Clean up orphaned tmp file if it was created
+            if (tmpFile) {
+              await fs.unlink(tmpFile).catch(() => {});
+            }
+            const reason =
+              error instanceof Error ? error.message : String(error);
             coreEvents.emitFeedback(
               'error',
-              `Failed to persist policy for ${toolName}`,
+              `Failed to persist policy for ${toolName}: ${reason}`,
               error,
             );
           }
