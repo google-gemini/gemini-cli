@@ -16,6 +16,7 @@ import { type HistoryItem } from '../types.js';
 const renderToastDisplay = async (
   uiState: Partial<UIState> = {},
   inputState: Partial<InputState> = {},
+  allowEmptyFrame = false,
 ) =>
   renderWithProviders(<ToastDisplay />, {
     uiState: {
@@ -27,6 +28,7 @@ const renderToastDisplay = async (
       showEscapePrompt: false,
       ...inputState,
     },
+    allowEmptyFrame,
   });
 
 describe('ToastDisplay', () => {
@@ -155,7 +157,7 @@ describe('ToastDisplay', () => {
   });
 
   it('renders nothing by default', async () => {
-    const { lastFrame } = await renderToastDisplay();
+    const { lastFrame } = await renderToastDisplay({}, {}, true);
     expect(lastFrame({ allowEmpty: true })).toBe('');
   });
 
