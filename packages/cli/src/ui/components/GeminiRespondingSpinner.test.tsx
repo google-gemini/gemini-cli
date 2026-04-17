@@ -56,7 +56,12 @@ describe('GeminiRespondingSpinner', () => {
 
   it('renders nothing when not responding and no non-responding display', async () => {
     mockUseStreamingContext.mockReturnValue(StreamingState.Idle);
-    const { lastFrame, unmount } = await render(<GeminiRespondingSpinner />);
+    const { lastFrame, unmount } = await render(
+      <GeminiRespondingSpinner />,
+      undefined,
+      undefined,
+      true,
+    );
     expect(lastFrame({ allowEmpty: true })).toBe('');
     unmount();
   });
