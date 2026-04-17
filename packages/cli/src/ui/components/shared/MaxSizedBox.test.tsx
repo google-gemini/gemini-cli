@@ -195,15 +195,17 @@ describe('<MaxSizedBox />', () => {
   });
 
   it('renders an empty box for empty children', async () => {
-    const { lastFrame, waitUntilReady, unmount } = await render(
+    const { lastFrame, unmount } = await render(
       <OverflowProvider>
         <MaxSizedBox maxWidth={80} maxHeight={10}></MaxSizedBox>
       </OverflowProvider>,
+      undefined,
+      undefined,
+      true,
     );
     await act(async () => {
       vi.runAllTimers();
     });
-    await waitUntilReady();
     expect(lastFrame({ allowEmpty: true })?.trim()).equals('');
     unmount();
   });
