@@ -27,8 +27,8 @@ Running this command will open a dialog with your options:
 | Auto (Gemini 2.5) | Let the system choose the best Gemini 2.5 model for your task. | gemini-2.5-pro, gemini-2.5-flash             |
 | Manual            | Select a specific model.                                       | Any available model.                         |
 
-We recommend selecting one of the above **Auto** options. However, you can
-select **Manual** to select a specific model from those available.
+Gemini CLI recommends selecting one of the above **Auto** options. However, you
+can select **Manual** to select a specific model from those available.
 
 You can also use the `--model` flag to specify a particular Gemini model on
 startup. For more details, refer to the

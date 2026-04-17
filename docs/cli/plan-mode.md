@@ -35,9 +35,9 @@ To launch Gemini CLI in Plan Mode once:
 To start Plan Mode while using Gemini CLI:
 
 - **Keyboard shortcut:** Press `Shift+Tab` to cycle through approval modes
-  (`Default` -> `Auto-Edit` -> `Plan`). Plan Mode is automatically removed from
-  the rotation when Gemini CLI is actively processing or showing confirmation
-  dialogs.
+  (**Default** -> **Auto-Edit** -> **Plan**). Plan Mode is automatically removed
+  from the rotation when Gemini CLI is actively processing or showing
+  confirmation dialogs.
 
 - **Command:** Type `/plan [goal]` in the input box. The `[goal]` is optional;
   for example, `/plan implement authentication` will switch to Plan Mode and

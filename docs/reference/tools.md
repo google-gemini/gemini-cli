@@ -122,15 +122,15 @@ each tool.
 
 ### Task Tracking
 
-| Tool                     | Kind    | Description                                                                 |
-| :----------------------- | :------ | :-------------------------------------------------------------------------- |
-| `tracker_add_dependency` | `Think` | Adds a dependency between two existing tasks in the tracker.                |
-| `tracker_create_task`    | `Think` | Creates a new task in the internal tracker to monitor progress.             |
-| `tracker_get_task`       | `Think` | Retrieves the details and current status of a specific tracked task.        |
-| `tracker_list_tasks`     | `Think` | Lists all tasks currently being tracked.                                    |
-| `tracker_update_task`    | `Think` | Updates the status or details of an existing task.                          |
-| `tracker_visualize`      | `Think` | Generates a visual representation of the current task dependency graph.     |
-| `update_topic`           | `Think` | Updates the current topic and status to keep the user informed of progress. |
+| Tool                                                                     | Kind    | Description                                                                 |
+| :----------------------------------------------------------------------- | :------ | :-------------------------------------------------------------------------- |
+| [`tracker_add_dependency`](../cli/tutorials/automation.md#task-tracking) | `Think` | Adds a dependency between two existing tasks in the tracker.                |
+| [`tracker_create_task`](../cli/tutorials/automation.md#task-tracking)    | `Think` | Creates a new task in the internal tracker to monitor progress.             |
+| [`tracker_get_task`](../cli/tutorials/automation.md#task-tracking)       | `Think` | Retrieves the details and current status of a specific tracked task.        |
+| [`tracker_list_tasks`](../cli/tutorials/automation.md#task-tracking)     | `Think` | Lists all tasks currently being tracked.                                    |
+| [`tracker_update_task`](../cli/tutorials/automation.md#task-tracking)    | `Think` | Updates the status or details of an existing task.                          |
+| [`tracker_visualize`](../cli/tutorials/automation.md#task-tracking)      | `Think` | Generates a visual representation of the current task dependency graph.     |
+| [`update_topic`](../cli/tutorials/automation.md#status-reporting)        | `Think` | Updates the current topic and status to keep the user informed of progress. |
 
 ### Web
 

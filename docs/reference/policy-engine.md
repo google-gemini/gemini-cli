@@ -472,6 +472,36 @@ deny_message = "Deep codebase analysis is restricted for this session."
   tool, use the `subagent` field instead. See
   [TOML rule schema](#toml-rule-schema).
 
+## Context-Aware Security (Conseca)
+
+Context-Aware Security (Conseca) is an experimental feature that uses an LLM to
+dynamically evaluate tool calls based on the intent of your prompt. It provides
+an additional layer of protection by identifying potentially harmful actions
+that might otherwise match an "allow" rule.
+
+### How it works
+
+When Conseca is enabled, every tool call that would be automatically allowed is
+first sent to a security classifier. The classifier analyzes the tool call, its
+arguments, and the original user prompt to determine if the action is safe and
+aligned with the user's intent.
+
+If the classifier identifies a potential security risk, it can override an
+`allow` decision and force it to `ask_user` or `deny`.
+
+### Enable Conseca
+
+To enable Conseca, set the `security.enableConseca` setting to `true`.
+
+```bash
+gemini config set security.enableConseca true
+```
+
+<!-- prettier-ignore -->
+> [!NOTE]
+> Conseca is an experimental feature and may increase the latency of tool
+> execution, as it requires an additional model call for security validation.
+
 ## Default policies
 
 Gemini CLI ships with a set of default policies to provide a safe out-of-the-box
