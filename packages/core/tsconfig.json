@@ -5,8 +5,8 @@
     "lib": ["DOM", "DOM.Iterable", "ES2023"],
     "composite": true,
     "types": ["node", "vitest/globals"],
-    "baseUrl": ".",
     "paths": {
+      "src/*": ["./src/*"],
       "@google/gemini-cli-core": ["./index.ts"]
     }
   },

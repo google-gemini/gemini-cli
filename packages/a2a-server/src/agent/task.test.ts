@@ -12,6 +12,7 @@ import {
   type ToolCallRequestInfo,
   type GitService,
   type CompletedToolCall,
+  type ServerGeminiStreamEvent,
 } from '@google/gemini-cli-core';
 import { createMockConfig } from '../utils/testing_utils.js';
 import type { ExecutionEventBus, RequestContext } from '@a2a-js/sdk/server';
@@ -230,8 +231,8 @@ describe('Task', () => {
         mockEventBus,
       );
 
-      const event = {
-        type: 'content',
+      const event: ServerGeminiStreamEvent = {
+        type: GeminiEventType.Content,
         value: 'test',
         traceId: 'test-trace-id',
       };
@@ -267,7 +268,7 @@ describe('Task', () => {
       );
 
       const citationText = 'Source: example.com';
-      const citationEvent = {
+      const citationEvent: ServerGeminiStreamEvent = {
         type: GeminiEventType.Citation,
         value: citationText,
       };
@@ -310,7 +311,7 @@ describe('Task', () => {
         mockEventBus,
       );
 
-      const modelInfoEvent = {
+      const modelInfoEvent: ServerGeminiStreamEvent = {
         type: GeminiEventType.ModelInfo,
         value: 'new-model-name',
       };
@@ -342,7 +343,7 @@ describe('Task', () => {
     it.each([
       { eventType: GeminiEventType.Retry, eventName: 'Retry' },
       { eventType: GeminiEventType.InvalidStream, eventName: 'InvalidStream' },
-    ])(
+    ] as const)(
       'should handle $eventName event without triggering error handling',
       async ({ eventType }) => {
         const mockConfig = createMockConfig();
@@ -366,7 +367,7 @@ describe('Task', () => {
         const cancelPendingToolsSpy = vi.spyOn(task, 'cancelPendingTools');
         const setTaskStateSpy = vi.spyOn(task, 'setTaskStateAndPublishUpdate');
 
-        const event = {
+        const event: ServerGeminiStreamEvent = {
           type: eventType,
         };
 

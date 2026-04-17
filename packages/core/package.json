@@ -17,7 +17,7 @@
     "test": "vitest run",
     "test:ci": "vitest run",
     "posttest": "npm run build",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsgo --noEmit"
   },
   "files": [
     "dist",
@@ -108,9 +108,9 @@
     "@types/js-yaml": "^4.0.9",
     "@types/json-stable-stringify": "^1.1.0",
     "@types/picomatch": "^4.0.1",
+    "@typescript/native-preview": "^7.0.0-dev.20260412.1",
     "chrome-devtools-mcp": "^0.19.0",
     "msw": "^2.3.4",
-    "typescript": "^5.3.3",
     "vitest": "^3.1.1"
   },
   "engines": {

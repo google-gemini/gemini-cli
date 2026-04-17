@@ -19,7 +19,7 @@
     "format": "prettier --write .",
     "test": "vitest run",
     "test:ci": "vitest run --coverage",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsgo --noEmit"
   },
   "files": [
     "dist"
@@ -41,9 +41,9 @@
     "@types/fs-extra": "^11.0.4",
     "@types/supertest": "^6.0.3",
     "@types/tar": "^6.1.13",
+    "@typescript/native-preview": "^7.0.0-dev.20260412.1",
     "dotenv": "^16.4.5",
     "supertest": "^7.1.4",
-    "typescript": "^5.3.3",
     "vitest": "^3.1.1"
   },
   "engines": {
