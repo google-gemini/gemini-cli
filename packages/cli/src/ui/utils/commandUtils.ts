@@ -10,13 +10,16 @@ import type { SlashCommand } from '../commands/types.js';
 import fs from 'node:fs';
 import type { Writable } from 'node:stream';
 import type { Settings } from '../../config/settingsSchema.js';
-import { AT_COMMAND_PATH_REGEX_SOURCE } from '../hooks/atCommandProcessor.js';
+import {
+  AT_COMMAND_PATH_REGEX_SOURCE,
+  AT_COMMAND_NEGATIVE_LOOKBEHIND_PREFIX_SOURCE,
+} from '../hooks/atCommandProcessor.js';
 
 // Pre-compiled regex for detecting @<path> patterns consistent with parseAllAtCommands.
 // Uses the same AT_COMMAND_PATH_REGEX_SOURCE so that isAtCommand is true whenever
 // parseAllAtCommands would find at least one atPath part.
 const AT_COMMAND_DETECT_REGEX = new RegExp(
-  `(?<!\\\\)@${AT_COMMAND_PATH_REGEX_SOURCE}`,
+  `(?<!${AT_COMMAND_NEGATIVE_LOOKBEHIND_PREFIX_SOURCE})@${AT_COMMAND_PATH_REGEX_SOURCE}`,
 );
 
 /**

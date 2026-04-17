@@ -11,7 +11,10 @@ import {
 import { LRUCache } from 'mnemonist';
 import { cpLen, cpSlice } from './textUtils.js';
 import { LRU_BUFFER_PERF_CACHE_LIMIT } from '../constants.js';
-import { AT_COMMAND_PATH_REGEX_SOURCE } from '../hooks/atCommandProcessor.js';
+import {
+  AT_COMMAND_PATH_REGEX_SOURCE,
+  AT_COMMAND_NEGATIVE_LOOKBEHIND_PREFIX_SOURCE,
+} from '../hooks/atCommandProcessor.js';
 
 export type HighlightToken = {
   text: string;
@@ -25,7 +28,7 @@ export type HighlightToken = {
 // It matches any character except strict delimiters (ASCII whitespace, comma, etc.).
 // This supports URIs like `@file:///example.txt` and filenames with Unicode spaces (like NNBSP).
 const HIGHLIGHT_REGEX = new RegExp(
-  `(^/[a-zA-Z0-9_-]+|(?<!\\\\)@${AT_COMMAND_PATH_REGEX_SOURCE}|${PASTED_TEXT_PLACEHOLDER_REGEX.source})`,
+  `(^/[a-zA-Z0-9_-]+|(?<!${AT_COMMAND_NEGATIVE_LOOKBEHIND_PREFIX_SOURCE})@${AT_COMMAND_PATH_REGEX_SOURCE}|${PASTED_TEXT_PLACEHOLDER_REGEX.source})`,
   'g',
 );
 
