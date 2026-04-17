@@ -10,10 +10,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-
-
-
-
   test_suspect:
     name: 'Test (Linux) - Suspect Tests'
     runs-on: 'gemini-cli-ubuntu-16-core'
@@ -30,8 +26,18 @@ jobs:
         run: 'npx vitest run --pool=threads packages/cli/src/test-utils/render.test.tsx packages/cli/src/ui/App.test.tsx packages/cli/src/ui/components/SettingsDialog.test.tsx packages/cli/src/ui/components/messages/DiffRenderer.test.tsx packages/cli/src/ui/components/messages/ThinkingMessage.test.tsx packages/cli/src/ui/components/messages/ToolResultDisplay.test.tsx packages/cli/src/ui/components/messages/ToolResultDisplayOverflow.test.tsx packages/cli/src/ui/components/messages/UserMessage.test.tsx packages/cli/src/ui/components/shared/SearchableList.test.tsx packages/cli/src/ui/components/shared/TextInput.test.tsx packages/cli/src/ui/components/views/ExtensionRegistryView.test.tsx packages/cli/src/ui/components/Footer.test.tsx packages/cli/src/ui/components/HistoryItemDisplay.test.tsx packages/cli/src/ui/components/ConsoleSummaryDisplay.test.tsx packages/cli/src/ui/components/DebugProfiler.test.tsx packages/cli/src/ui/components/InputPrompt.test.tsx packages/cli/src/integration-tests/modelSteering.test.tsx packages/cli/src/ui/components/ThemeDialog.test.tsx packages/cli/src/ui/components/messages/ToolMessage.test.tsx packages/cli/src/ui/components/messages/ShellToolMessage.test.tsx packages/cli/src/ui/utils/MarkdownDisplay.test.tsx packages/cli/src/ui/hooks/useSelectionList.test.tsx'
         shell: 'bash'
 
+  test_batch_1:
+    name: 'Test (Linux) - Batch 1 (Utils & Test-Utils)'
+    runs-on: 'gemini-cli-ubuntu-16-core'
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
 
+      - name: 'Setup and Build'
+        uses: './.github/actions/setup-gemini'
+        with:
+          mode: 'source'
 
-
-
-
+      - name: 'Run Batch 1 Tests'
+        run: 'npx vitest run --pool=threads packages/cli/src/test-utils packages/cli/src/utils'
+        shell: 'bash'
