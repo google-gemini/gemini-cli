@@ -97,25 +97,6 @@ sessions. From there you can:
 Promoted skills become discoverable in the next session and follow the standard
 [skill discovery precedence](./skills.md#skill-discovery-tiers).
 
-## Auto Memory compared to the Memory Manager Agent
-
-Auto Memory and the [Memory Manager Agent](#memory-manager-agent-disambiguation)
-are two distinct experimental features. Earlier releases gated both behind a
-single flag. They are now controlled independently and you can enable either one
-on its own.
-
-| Feature                                                      | Setting                      | What it changes                                                                                                                |
-| ------------------------------------------------------------ | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| Auto Memory                                                  | `experimental.autoMemory`    | Background extraction of past sessions into the `/memory inbox`.                                                               |
-| [Memory Manager Agent](#memory-manager-agent-disambiguation) | `experimental.memoryManager` | Replaces the built-in `save_memory` tool with a sub-agent that supports adding, removing, deduplicating, and organizing facts. |
-
-### Memory Manager Agent disambiguation
-
-The Memory Manager Agent is unrelated to Auto Memory. It changes how single-fact
-memories are stored (the `save_memory` flow described in the
-[memory management tutorial](./tutorials/memory-management.md)). Enabling one
-flag does not enable the other.
-
 ## How to disable Auto Memory
 
 To turn off background extraction, set the flag back to `false` in your settings
