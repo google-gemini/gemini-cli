@@ -107,6 +107,13 @@ describe('chatCommand', () => {
     expect(chatCommand.subCommands).toHaveLength(6);
   });
 
+  it('should expose /chat-specific usage strings in checkpoint descriptions', () => {
+    expect(getSubCommand('save').description).toContain('/chat save <tag>');
+    expect(getSubCommand('resume').description).toContain('/chat resume <tag>');
+    expect(getSubCommand('delete').description).toContain('/chat delete <tag>');
+    expect(getSubCommand('share').description).toContain('/chat share <file>');
+  });
+
   describe('list subcommand', () => {
     let listCommand: SlashCommand;
 
@@ -162,7 +169,23 @@ describe('chatCommand', () => {
       expect(result).toEqual({
         type: 'message',
         messageType: 'error',
-        content: 'Missing tag. Usage: /resume save <tag>',
+        content: 'Missing tag. Usage: /chat save <tag>',
+      });
+    });
+
+    it('should use the invoked /chat alias in the missing-tag error', async () => {
+      mockContext.invocation = {
+        raw: '/chat save',
+        name: 'save',
+        args: '',
+      };
+
+      const result = await saveCommand?.action?.(mockContext, '  ');
+
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'error',
+        content: 'Missing tag. Usage: /chat save <tag>',
       });
     });
 
@@ -256,7 +279,23 @@ describe('chatCommand', () => {
       expect(result).toEqual({
         type: 'message',
         messageType: 'error',
-        content: 'Missing tag. Usage: /resume resume <tag>',
+        content: 'Missing tag. Usage: /chat resume <tag>',
+      });
+    });
+
+    it('should preserve the typed subcommand alias in the missing-tag error', async () => {
+      mockContext.invocation = {
+        raw: '/chat load',
+        name: 'resume',
+        args: '',
+      };
+
+      const result = await resumeCommand?.action?.(mockContext, '');
+
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'error',
+        content: 'Missing tag. Usage: /chat load <tag>',
       });
     });
 
@@ -390,7 +429,7 @@ describe('chatCommand', () => {
       expect(result).toEqual({
         type: 'message',
         messageType: 'error',
-        content: 'Missing tag. Usage: /resume delete <tag>',
+        content: 'Missing tag. Usage: /chat delete <tag>',
       });
     });
 
