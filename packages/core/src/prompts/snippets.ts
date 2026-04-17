@@ -227,6 +227,9 @@ Use the following guidelines to optimize your search and read patterns.
 - **Navigating:** read the minimum required to not require additional turns spent reading the file.
 </examples>
 
+## Shell Usage
+- **Non-Interactive Mandate:** You MUST ALWAYS use non-interactive flags (e.g., \`--yes\`, \`-y\`, \`--no-interactive\`) with any command that might prompt for user input or installation confirmation. This is especially CRITICAL for \`npm create\`, \`npm init\`, and \`npx\`. **Placement is key:** For \`npm create\` and \`npm init\`, you MUST place the non-interactive flag (\`--yes\`) BEFORE any \`--\` argument separator, AND you MUST include tool-specific non-interactive flags like \`--no-interactive\` AFTER the separator to avoid modern prompts (e.g., \`npm create vite@latest --yes -- --template react-ts --no-interactive\`). Failure to include BOTH flags correctly will cause the environment to hang indefinitely.
+
 ## Engineering Standards
 - **Contextual Precedence:** Instructions found in ${formattedFilenames} files are foundational mandates. They take absolute precedence over the general workflows and tool defaults described in this system prompt.
 - **Conventions & Style:** Rigorously adhere to existing workspace conventions, architectural patterns, and style (naming, formatting, typing, commenting). During the research phase, analyze surrounding files, tests, and configuration to ensure your changes are seamless, idiomatic, and consistent with the local context. Never compromise idiomatic quality or completeness (e.g., proper declarations, type safety, documentation) to minimize tool calls; all supporting changes required by local conventions are part of a surgical update.
@@ -786,7 +789,7 @@ function newApplicationSteps(options: PrimaryWorkflowsOptions): string {
      - **Mobile:** Compose Multiplatform or Flutter.
      - **Games:** HTML/CSS/JS (Three.js for 3D).
      - **CLIs:** Python or Go.
-3. **Implementation:** Autonomously implement each feature per the approved plan. When starting, scaffold the application using ${formatToolName(SHELL_TOOL_NAME)}. For interactive scaffolding tools (like create-react-app, create-vite, or npm create), you MUST use the corresponding non-interactive flag (e.g. '--yes', '-y', or specific template flags) to prevent the environment from hanging waiting for user input. For visual assets, utilize **platform-native primitives** (e.g., stylized shapes, gradients, icons). Never link to external services or assume local paths for assets that have not been created.
+3. **Implementation:** Autonomously implement each feature per the approved plan. When starting, scaffold the application using ${formatToolName(SHELL_TOOL_NAME)}. For interactive scaffolding tools (like create-react-app, create-vite, or npm create), you MUST use BOTH the non-interactive installation flag (\`--yes\` or \`-y\`) AND any tool-specific non-interactive flags (like \`--no-interactive\`). **Place \`--yes\` BEFORE the \`--\` separator** and any tool flags like \`--no-interactive\` AFTER it (e.g. \`npm create vite@latest --yes -- --template react-ts --no-interactive\`) to prevent the environment from hanging waiting for user input. For visual assets, utilize **platform-native primitives** (e.g., stylized shapes, gradients, icons). Never link to external services or assume local paths for assets that have not been created.
 4. **Verify:** Review work against the original request. Fix bugs and deviations. **Build the application and ensure there are no compile errors.**`.trim();
 }
 
@@ -796,15 +799,17 @@ function toolUsageInteractive(
 ): string {
   if (interactive) {
     const focusHint = interactiveShellEnabled
-      ? ' If you choose to execute an interactive command consider letting the user know they can press `tab` to focus into the shell to provide input.'
+      ? ' If you choose to execute an interactive command consider letting the user know they can press `ctrl + f` to focus into the shell to provide input.'
       : '';
     return `
 - **Background Processes:** To run a command in the background, set the \`${SHELL_PARAM_IS_BACKGROUND}\` parameter to true. If unsure, ask the user.
-- **Interactive Commands:** Always prefer non-interactive commands (e.g., using 'run once' or 'CI' flags for test runners to avoid persistent watch modes or 'git --no-pager') unless a persistent process is specifically required; however, some commands are only interactive and expect user input during their execution (e.g. ssh, vim).${focusHint}`;
+- **Interactive Commands:** Always prefer non-interactive commands (e.g., using 'run once' or 'CI' flags for test runners to avoid persistent watch modes or 'git --no-pager') unless a persistent process is specifically required; however, some commands are only interactive and expect user input during their execution (e.g. ssh, vim).${focusHint}
+- **Proactive Non-Interaction:** Always use non-interactive flags (e.g., \`--yes\` or \`-y\`) with tools that might prompt for confirmation, such as \`npm create\`, \`npm init\`, or \`npx\`. **CRITICAL:** Failure to use \`--yes\` with these tools will cause the environment to hang indefinitely. Do not rely on \`--help\` as even help commands can prompt for installation.`;
   }
   return `
 - **Background Processes:** To run a command in the background, set the \`${SHELL_PARAM_IS_BACKGROUND}\` parameter to true.
-- **Interactive Commands:** Always prefer non-interactive commands (e.g., using 'run once' or 'CI' flags for test runners to avoid persistent watch modes or 'git --no-pager') unless a persistent process is specifically required; however, some commands are only interactive and expect user input during their execution (e.g. ssh, vim).`;
+- **Interactive Commands:** Always prefer non-interactive commands (e.g., using 'run once' or 'CI' flags for test runners to avoid persistent watch modes or 'git --no-pager') unless a persistent process is specifically required; however, some commands are only interactive and expect user input during their execution (e.g. ssh, vim).
+- **Proactive Non-Interaction:** Always use non-interactive flags (e.g., \`--yes\` or \`-y\`) with tools that might prompt for confirmation, such as \`npm create\`, \`npm init\`, or \`npx\`. **CRITICAL:** Failure to use \`--yes\` with these tools will cause the environment to hang indefinitely. Do not rely on \`--help\` as even help commands can prompt for installation.`;
 }
 
 function toolUsageRememberingFacts(

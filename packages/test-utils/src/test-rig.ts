@@ -686,7 +686,7 @@ export class TestRig {
     return {
       ...cleanEnv,
       GEMINI_CLI_HOME: this.homeDir!,
-      GEMINI_PTY_INFO: 'child_process',
+      GEMINI_PTY_INFO: 'node-pty',
       ...extraEnv,
     };
   }
