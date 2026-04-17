@@ -2103,6 +2103,16 @@ const SETTINGS_SCHEMA = {
           'Use OSC 52 for copying. This may be more robust than the default system when using remote terminal sessions (if your terminal is configured to allow it).',
         showInDialog: true,
       },
+      hyperlinks: {
+        type: 'boolean',
+        label: 'Hyperlinks',
+        category: 'Experimental',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Render file paths and URLs as clickable hyperlinks in supported terminals (OSC 8).',
+        showInDialog: true,
+      },
       taskTracker: {
         type: 'boolean',
         label: 'Task Tracker',
