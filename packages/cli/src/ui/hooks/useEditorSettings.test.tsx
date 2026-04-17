@@ -78,13 +78,13 @@ describe('useEditorSettings', () => {
   });
 
   it('should initialize with dialog closed', async () => {
-    await render(<TestComponent />);
+    await render(<TestComponent />, undefined, undefined, true);
 
     expect(result.isEditorDialogOpen).toBe(false);
   });
 
   it('should open editor dialog when openEditorDialog is called', async () => {
-    await render(<TestComponent />);
+    await render(<TestComponent />, undefined, undefined, true);
 
     act(() => {
       result.openEditorDialog();
@@ -94,7 +94,7 @@ describe('useEditorSettings', () => {
   });
 
   it('should close editor dialog when exitEditorDialog is called', async () => {
-    await render(<TestComponent />);
+    await render(<TestComponent />, undefined, undefined, true);
     act(() => {
       result.openEditorDialog();
       result.exitEditorDialog();
@@ -103,7 +103,7 @@ describe('useEditorSettings', () => {
   });
 
   it('should handle editor selection successfully', async () => {
-    await render(<TestComponent />);
+    await render(<TestComponent />, undefined, undefined, true);
 
     const editorType: EditorType = 'vscode';
     const scope = SettingScope.User;
@@ -132,7 +132,7 @@ describe('useEditorSettings', () => {
   });
 
   it('should handle clearing editor preference (undefined editor)', async () => {
-    await render(<TestComponent />);
+    await render(<TestComponent />, undefined, undefined, true);
 
     const scope = SettingScope.Workspace;
 
@@ -160,7 +160,7 @@ describe('useEditorSettings', () => {
   });
 
   it('should handle different editor types', async () => {
-    await render(<TestComponent />);
+    await render(<TestComponent />, undefined, undefined, true);
 
     const editorTypes: EditorType[] = ['cursor', 'windsurf', 'vim'];
     const displayNames: Record<string, string> = {
@@ -192,7 +192,7 @@ describe('useEditorSettings', () => {
   });
 
   it('should handle different setting scopes', async () => {
-    await render(<TestComponent />);
+    await render(<TestComponent />, undefined, undefined, true);
 
     const editorType: EditorType = 'vscode';
     const scopes: LoadableSettingScope[] = [
@@ -222,7 +222,7 @@ describe('useEditorSettings', () => {
   });
 
   it('should not set preference for unavailable editors', async () => {
-    await render(<TestComponent />);
+    await render(<TestComponent />, undefined, undefined, true);
 
     mockHasValidEditorCommand.mockReturnValue(false);
 
@@ -240,7 +240,7 @@ describe('useEditorSettings', () => {
   });
 
   it('should not set preference for editors not allowed in sandbox', async () => {
-    await render(<TestComponent />);
+    await render(<TestComponent />, undefined, undefined, true);
 
     mockAllowEditorTypeInSandbox.mockReturnValue(false);
 
@@ -258,7 +258,7 @@ describe('useEditorSettings', () => {
   });
 
   it('should handle errors during editor selection', async () => {
-    await render(<TestComponent />);
+    await render(<TestComponent />, undefined, undefined, true);
 
     const errorMessage = 'Failed to save settings';
     (
