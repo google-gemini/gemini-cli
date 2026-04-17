@@ -369,7 +369,7 @@ python3 -m pip install -r mcp/requirements.txt
 Then link the extension:
 
 ```bash
-gemini extensions link ./extensions/gemini-cyber-cli
+gemini extensions link .
 ```
 
 ## 🤝 Contributing

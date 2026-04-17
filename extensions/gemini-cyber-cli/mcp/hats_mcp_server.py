@@ -137,8 +137,6 @@ async def _invoke_candidate(candidate: str, kwargs: dict[str, Any]) -> Any:
         result = await function(**filtered_kwargs)
     else:
         result = await asyncio.to_thread(function, **filtered_kwargs)
-        if inspect.isawaitable(result):
-            result = await result
     return result
 
 
