@@ -63,6 +63,9 @@ describe('SessionStatsContext', () => {
       <SessionStatsProvider sessionId="test-session-id">
         <TestHarness contextRef={contextRef} />
       </SessionStatsProvider>,
+      undefined,
+      undefined,
+      true,
     );
 
     const stats = contextRef.current?.stats;
@@ -82,6 +85,9 @@ describe('SessionStatsContext', () => {
       <SessionStatsProvider sessionId="test-session-id">
         <TestHarness contextRef={contextRef} />
       </SessionStatsProvider>,
+      undefined,
+      undefined,
+      true,
     );
 
     const newMetrics: SessionMetrics = {
@@ -165,6 +171,9 @@ describe('SessionStatsContext', () => {
       <SessionStatsProvider sessionId="test-session-id">
         <CountingTestHarness />
       </SessionStatsProvider>,
+      undefined,
+      undefined,
+      true,
     );
 
     expect(renderCount).toBe(1);
@@ -248,6 +257,9 @@ describe('SessionStatsContext', () => {
       <SessionStatsProvider sessionId="test-session-id">
         <TestHarness contextRef={contextRef} />
       </SessionStatsProvider>,
+      undefined,
+      undefined,
+      true,
     );
 
     const initialStartTime = contextRef.current?.stats.sessionStartTime;
@@ -276,6 +288,9 @@ describe('SessionStatsContext', () => {
       <ErrorBoundary onError={onError}>
         <TestHarness contextRef={{ current: undefined }} />
       </ErrorBoundary>,
+      undefined,
+      undefined,
+      true,
     );
 
     expect(onError).toHaveBeenCalledWith(
