@@ -625,6 +625,15 @@ export async function main() {
       return runAcpClient(config, settings, argv);
     }
 
+    if (config.getExperimentalVoice()) {
+      writeToStderr(
+        '[experimental] Voice mode is not yet implemented. ' +
+          'The --voice flag registers the architectural skeleton only.\n',
+      );
+      await runExitCleanup();
+      process.exit(ExitCodes.SUCCESS);
+    }
+
     let input = config.getQuestion();
     const useAlternateBuffer = shouldEnterAlternateScreen(
       isAlternateBufferEnabled(config),

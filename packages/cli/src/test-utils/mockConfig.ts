@@ -49,6 +49,7 @@ export const createMockConfig = (overrides: Partial<Config> = {}): Config =>
     getWorktreeSettings: vi.fn(() => undefined),
     getContentGeneratorConfig: vi.fn(() => ({ authType: 'google' })),
     getAcpMode: vi.fn(() => false),
+    getExperimentalVoice: vi.fn(() => false),
     isBrowserLaunchSuppressed: vi.fn(() => false),
     setRemoteAdminSettings: vi.fn(),
     isYoloModeDisabled: vi.fn(() => false),

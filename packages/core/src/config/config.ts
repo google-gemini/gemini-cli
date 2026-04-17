@@ -628,6 +628,7 @@ export interface ConfigParameters {
   disableLoopDetection?: boolean;
   maxSessionTurns?: number;
   acpMode?: boolean;
+  experimentalVoice?: boolean;
   listSessions?: boolean;
   deleteSession?: string;
   listExtensions?: boolean;
@@ -852,6 +853,7 @@ export class Config implements McpContext, AgentLoopContext {
     | Record<string, SummarizeToolOutputSettings>
     | undefined;
   private readonly acpMode: boolean = false;
+  private readonly experimentalVoice: boolean = false;
   private readonly loadMemoryFromIncludeDirectories: boolean = false;
   private readonly includeDirectoryTree: boolean = true;
   private readonly importFormat: 'tree' | 'flat';
@@ -1204,6 +1206,7 @@ export class Config implements McpContext, AgentLoopContext {
     ExecutionLifecycleService.setInjectionService(this.injectionService);
     this.maxSessionTurns = params.maxSessionTurns ?? -1;
     this.acpMode = params.acpMode ?? false;
+    this.experimentalVoice = params.experimentalVoice ?? false;
     this.listSessions = params.listSessions ?? false;
     this.deleteSession = params.deleteSession;
     this.listExtensions = params.listExtensions ?? false;
@@ -2874,10 +2877,8 @@ export class Config implements McpContext, AgentLoopContext {
     return this.acpMode;
   }
 
-  async waitForMcpInit(): Promise<void> {
-    if (this.mcpInitializationPromise) {
-      await this.mcpInitializationPromise;
-    }
+  getExperimentalVoice(): boolean {
+    return this.experimentalVoice;
   }
 
   getListExtensions(): boolean {

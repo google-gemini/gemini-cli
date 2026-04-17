@@ -1,0 +1,31 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(done)",
+      "Bash(xargs grep -l \"mode\")",
+      "Bash(xargs grep -l \"hook\\\\|middleware\\\\|plugin\")",
+      "Bash(xargs grep -l \"mode\\\\|Mode\")",
+      "Bash(xargs grep -l \"SecurityModel\\\\|sandbox\")",
+      "Bash(xargs -I {} bash -c 'echo \"\"=== {} ===\"\" && head -50 \"\"{}\"\"')",
+      "Bash(node --version)",
+      "Bash(npm install)",
+      "Bash(npm run build)",
+      "Bash(npm start)",
+      "Bash(node packages/cli/bundle/gemini.js --version)",
+      "Bash(node bundle/gemini.js --version)",
+      "Bash(node bundle/gemini.js --help)",
+      "Bash(npm run build --workspace=@google/gemini-cli-core)",
+      "Bash(npm run build --workspace=@google/gemini-cli)",
+      "Bash(node bundle/gemini.js --voice)",
+      "Bash(npm run bundle)",
+      "Bash(npm start -- --voice)",
+      "Bash(node bundle/gemini.js)",
+      "Bash(echo \"EXIT CODE: $?\")",
+      "Bash(npm run test --workspace=@google/gemini-cli-core)",
+      "Bash(npm run test --workspace=@google/gemini-cli)",
+      "Bash(npx vitest run packages/cli/src/gemini.test.tsx)",
+      "Bash(git checkout -- 'packages/cli/src/ui/components/__snapshots__/ConfigInitDisplay.test.tsx.snap')",
+      "Bash(git checkout -- package-lock.json)"
+    ]
+  }
+}
