@@ -16,6 +16,7 @@ import {
   type SkillDefinition,
   type AgentDefinition,
   type ApprovalMode,
+  type SessionMetrics,
   type Kind,
   type AnsiOutput,
   CoreToolCallStatus,
@@ -230,15 +231,18 @@ export type HistoryItemStats = HistoryItemQuotaBase & {
   type: 'stats';
   duration: string;
   quotas?: RetrieveUserQuotaResponse;
+  stats?: SessionMetrics;
   creditBalance?: number;
 };
 
 export type HistoryItemModelStats = HistoryItemQuotaBase & {
   type: 'model_stats';
+  stats?: SessionMetrics;
 };
 
 export type HistoryItemToolStats = HistoryItemBase & {
   type: 'tool_stats';
+  stats?: SessionMetrics;
 };
 
 export type HistoryItemModel = HistoryItemBase & {
