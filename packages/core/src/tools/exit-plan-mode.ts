@@ -63,20 +63,20 @@ export class ExitPlanModeTool extends BaseDeclarativeTool<
     if (!params.plan_filename || params.plan_filename.trim() === '') {
       return 'plan_filename is required.';
     }
-try {
-  resolveAndValidatePlanPath(
-    params.plan_filename,
-    this.config.getPlansDir(),
-  );
-} catch (e) {
-  if (e instanceof Error && e.message.startsWith('Security violation')) {
-    return `Access denied: plan path (${path.join(
-      this.config.getPlansDir(),
-      params.plan_filename,
-    )}) must be within the designated plans directory (${this.config.getPlansDir()}).`;
-  }
-  return e instanceof Error ? e.message : String(e);
-}
+    try {
+      resolveAndValidatePlanPath(
+        params.plan_filename,
+        this.config.getPlansDir(),
+      );
+    } catch (e) {
+      if (e instanceof Error && e.message.startsWith('Security violation')) {
+        return `Access denied: plan path (${path.join(
+          this.config.getPlansDir(),
+          params.plan_filename,
+        )}) must be within the designated plans directory (${this.config.getPlansDir()}).`;
+      }
+      return e instanceof Error ? e.message : String(e);
+    }
 
     return null;
   }
@@ -184,8 +184,10 @@ export class ExitPlanModeInvocation extends BaseToolInvocation<
    * Note: Validation is done in validateToolParamValues, so this assumes the path is valid.
    */
   private getResolvedPlanPath(): string {
-    const safeFilename = path.basename(this.params.plan_filename);
-    return path.join(this.config.getPlansDir(), safeFilename);
+    return resolveAndValidatePlanPath(
+      this.params.plan_filename,
+      this.config.getPlansDir(),
+    );
   }
 
   async execute({ abortSignal: _signal }: ExecuteOptions): Promise<ToolResult> {
