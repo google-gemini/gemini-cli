@@ -50,5 +50,7 @@ export interface CoreToolSet {
   enter_plan_mode: FunctionDeclaration;
   exit_plan_mode: () => FunctionDeclaration;
   activate_skill: (skillNames: string[]) => FunctionDeclaration;
+  read_mcp_resource: FunctionDeclaration;
+  list_mcp_resources: FunctionDeclaration;
   update_topic?: FunctionDeclaration;
 }
