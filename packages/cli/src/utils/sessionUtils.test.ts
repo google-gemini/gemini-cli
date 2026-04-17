@@ -11,6 +11,7 @@ import {
   formatRelativeTime,
   hasUserOrAssistantMessage,
   SessionError,
+  type SessionInfo,
   convertSessionToHistoryFormats,
 } from './sessionUtils.js';
 import {
@@ -803,6 +804,243 @@ describe('formatRelativeTime', () => {
   });
 });
 
+describe('SessionError.invalidSessionIdentifier', () => {
+  it('returns fallback message when no sessions are provided', () => {
+    const error = SessionError.invalidSessionIdentifier('bad-id');
+    expect(error.code).toBe('INVALID_SESSION_IDENTIFIER');
+    expect(error.message).toContain('"bad-id"');
+    expect(error.message).toContain('--list-sessions');
+  });
+
+  it('includes compact session list in message when sessions are provided', () => {
+    const sessions = [
+      {
+        id: 'uuid-1',
+        displayName: 'Fix auth bug',
+        lastUpdated: '2024-01-01T10:00:00.000Z',
+        startTime: '2024-01-01T09:00:00.000Z',
+        index: 1,
+      },
+      {
+        id: 'uuid-2',
+        displayName: 'Refactor database',
+        lastUpdated: '2024-01-02T10:00:00.000Z',
+        startTime: '2024-01-02T09:00:00.000Z',
+        index: 2,
+      },
+    ] as SessionInfo[];
+
+    const error = SessionError.invalidSessionIdentifier('99', sessions);
+    expect(error.code).toBe('INVALID_SESSION_IDENTIFIER');
+    expect(error.message).toContain('"99"');
+    expect(error.message).toContain('Fix auth bug');
+    expect(error.message).toContain('Refactor database');
+    expect(error.message).toContain('--resume 1');
+    expect(error.message).toContain('--resume 2');
+    expect(error.message).toContain('--resume latest');
+    // Should NOT include the generic --list-sessions redirect
+    expect(error.message).not.toContain(
+      'Use --list-sessions to see available sessions',
+    );
+  });
+
+  it('sorts sessions oldest-first regardless of input order', () => {
+    const sessions = [
+      {
+        id: 'uuid-newer',
+        displayName: 'Newer session',
+        lastUpdated: '2024-01-02T10:00:00.000Z',
+        startTime: '2024-01-02T09:00:00.000Z',
+        index: 2,
+      },
+      {
+        id: 'uuid-older',
+        displayName: 'Older session',
+        lastUpdated: '2024-01-01T10:00:00.000Z',
+        startTime: '2024-01-01T09:00:00.000Z',
+        index: 1,
+      },
+    ] as SessionInfo[];
+
+    const error = SessionError.invalidSessionIdentifier('bad', sessions);
+    const olderPos = error.message.indexOf('Older session');
+    const newerPos = error.message.indexOf('Newer session');
+    expect(olderPos).toBeLessThan(newerPos);
+    // Older session should be index 1, newer should be index 2
+    expect(error.message).toMatch(/1\. Older session/);
+    expect(error.message).toMatch(/2\. Newer session/);
+  });
+
+  it('truncates display names longer than 60 characters', () => {
+    const longName = 'A'.repeat(80);
+    const sessions = [
+      {
+        id: 'uuid-1',
+        displayName: longName,
+        lastUpdated: '2024-01-01T10:00:00.000Z',
+        startTime: '2024-01-01T09:00:00.000Z',
+        index: 1,
+      },
+    ] as SessionInfo[];
+
+    const error = SessionError.invalidSessionIdentifier('bad', sessions);
+    expect(error.message).toContain('A'.repeat(57) + '...');
+    expect(error.message).not.toContain(longName);
+  });
+
+  it('truncates display names with multi-byte Unicode characters without splitting them', () => {
+    // Each emoji is 2 UTF-16 code units but 1 grapheme cluster.
+    // Naive .slice() would split at a surrogate pair boundary; cpSlice must not.
+    const emoji = '😀';
+    const longName = emoji.repeat(80); // 80 grapheme clusters, 160 UTF-16 code units
+    const sessions = [
+      {
+        id: 'uuid-1',
+        displayName: longName,
+        lastUpdated: '2024-01-01T10:00:00.000Z',
+        startTime: '2024-01-01T09:00:00.000Z',
+        index: 1,
+      },
+    ] as SessionInfo[];
+
+    const error = SessionError.invalidSessionIdentifier('bad', sessions);
+    // Should end with exactly 57 emojis followed by '...'
+    expect(error.message).toContain(emoji.repeat(57) + '...');
+    // Must not contain the full un-truncated name
+    expect(error.message).not.toContain(longName);
+  });
+
+  it('appends "Run --list-sessions for the full list." when more than 10 sessions exist', () => {
+    const sessions = Array.from({ length: 11 }, (_, i) => ({
+      id: `uuid-${i}`,
+      displayName: `Session ${i + 1}`,
+      lastUpdated: `2024-01-${String(i + 1).padStart(2, '0')}T10:00:00.000Z`,
+      startTime: `2024-01-${String(i + 1).padStart(2, '0')}T09:00:00.000Z`,
+      index: i + 1,
+    })) as SessionInfo[];
+
+    const error = SessionError.invalidSessionIdentifier('bad', sessions);
+    expect(error.message).toContain('Run --list-sessions for the full list.');
+    // Most recent 10 sessions (2–11) shown; oldest (1) is hidden behind the note
+    expect(error.message).toContain('--resume 11');
+    expect(error.message).not.toContain('--resume 1,');
+  });
+
+  it('does not append overflow note when sessions are exactly 10', () => {
+    const sessions = Array.from({ length: 10 }, (_, i) => ({
+      id: `uuid-${i}`,
+      displayName: `Session ${i + 1}`,
+      lastUpdated: `2024-01-${String(i + 1).padStart(2, '0')}T10:00:00.000Z`,
+      startTime: `2024-01-${String(i + 1).padStart(2, '0')}T09:00:00.000Z`,
+      index: i + 1,
+    })) as SessionInfo[];
+
+    const error = SessionError.invalidSessionIdentifier('bad', sessions);
+    expect(error.message).not.toContain(
+      'Run --list-sessions for the full list.',
+    );
+  });
+});
+
+describe('SessionSelector.findSession error message', () => {
+  let tmpDir: string;
+  let config: Config;
+
+  beforeEach(async () => {
+    tmpDir = path.join(process.cwd(), '.tmp-test-find-session');
+    await fs.mkdir(tmpDir, { recursive: true });
+
+    config = {
+      storage: {
+        getProjectTempDir: () => tmpDir,
+      },
+      getSessionId: () => 'current-session-id',
+    } as Partial<Config> as Config;
+  });
+
+  afterEach(async () => {
+    try {
+      await fs.rm(tmpDir, { recursive: true, force: true });
+    } catch (_error) {
+      // Ignore cleanup errors
+    }
+  });
+
+  it('includes available sessions in error message for invalid numeric index', async () => {
+    const sessionId = randomUUID();
+    const chatsDir = path.join(tmpDir, 'chats');
+    await fs.mkdir(chatsDir, { recursive: true });
+
+    await fs.writeFile(
+      path.join(
+        chatsDir,
+        `${SESSION_FILE_PREFIX}2024-01-01T10-00-${sessionId.slice(0, 8)}.json`,
+      ),
+      JSON.stringify({
+        sessionId,
+        projectHash: 'test-hash',
+        startTime: '2024-01-01T10:00:00.000Z',
+        lastUpdated: '2024-01-01T10:30:00.000Z',
+        messages: [
+          {
+            type: 'user',
+            content: 'My only session',
+            id: 'msg1',
+            timestamp: '2024-01-01T10:00:00.000Z',
+          },
+        ],
+      }),
+    );
+
+    const sessionSelector = new SessionSelector(config);
+
+    const error = await sessionSelector
+      .resolveSession('99')
+      .catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(SessionError);
+    expect((error as SessionError).code).toBe('INVALID_SESSION_IDENTIFIER');
+    expect((error as SessionError).message).toContain('"99"');
+    expect((error as SessionError).message).toContain('My only session');
+    expect((error as SessionError).message).toContain('--resume 1');
+    expect((error as SessionError).message).toContain('--resume latest');
+  });
+
+  it('includes available sessions in error message for invalid string identifier', async () => {
+    const sessionId = randomUUID();
+    const chatsDir = path.join(tmpDir, 'chats');
+    await fs.mkdir(chatsDir, { recursive: true });
+
+    await fs.writeFile(
+      path.join(
+        chatsDir,
+        `${SESSION_FILE_PREFIX}2024-01-01T10-00-${sessionId.slice(0, 8)}.json`,
+      ),
+      JSON.stringify({
+        sessionId,
+        projectHash: 'test-hash',
+        startTime: '2024-01-01T10:00:00.000Z',
+        lastUpdated: '2024-01-01T10:30:00.000Z',
+        messages: [
+          {
+            type: 'user',
+            content: 'My only session',
+            id: 'msg1',
+            timestamp: '2024-01-01T10:00:00.000Z',
+          },
+        ],
+      }),
+    );
+
+    const sessionSelector = new SessionSelector(config);
+
+    const error = await sessionSelector
+      .resolveSession('not-a-valid-uuid')
+      .catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(SessionError);
+    expect((error as SessionError).message).toContain('"not-a-valid-uuid"');
+    expect((error as SessionError).message).toContain('My only session');
 describe('convertSessionToHistoryFormats', () => {
   it('should preserve tool call arguments', () => {
     const messages: MessageRecord[] = [
