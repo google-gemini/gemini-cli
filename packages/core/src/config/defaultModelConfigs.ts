@@ -100,6 +100,17 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
         },
       },
     },
+    'gemma4-31b': {
+      extends: 'base',
+      modelConfig: {
+        model: 'gemma-4-31b-it',
+        generateContentConfig: {
+          temperature: 1,
+          topP: 0.95,
+          topK: 64,
+        },
+      },
+    },
     // Bases for the internal model configs.
     'gemini-2.5-flash-base': {
       extends: 'base',
@@ -318,6 +329,13 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       isVisible: true,
       features: { thinking: false, multimodalToolUse: false },
     },
+    'gemma-4-31b-it': {
+      tier: 'pro',
+      family: 'gemma-4',
+      isPreview: false,
+      isVisible: true,
+      features: { thinking: false, multimodalToolUse: false },
+    },
     // Aliases
     auto: {
       tier: 'auto',
@@ -326,6 +344,12 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       features: { thinking: true, multimodalToolUse: false },
     },
     gemma4: {
+      tier: 'pro',
+      isPreview: false,
+      isVisible: true,
+      features: { thinking: false, multimodalToolUse: false },
+    },
+    'gemma4-31b': {
       tier: 'pro',
       isPreview: false,
       isVisible: true,
@@ -442,6 +466,9 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
     },
     gemma4: {
       default: 'gemma-4-26b-a4b-it',
+    },
+    'gemma4-31b': {
+      default: 'gemma-4-31b-it',
     },
   },
   classifierIdResolutions: {

@@ -105,6 +105,14 @@
       "topK": 64
     }
   },
+  "gemma4-31b": {
+    "model": "gemma-4-31b-it",
+    "generateContentConfig": {
+      "temperature": 1,
+      "topP": 0.95,
+      "topK": 64
+    }
+  },
   "gemini-2.5-flash-base": {
     "model": "gemini-2.5-flash",
     "generateContentConfig": {
