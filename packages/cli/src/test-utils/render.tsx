@@ -941,6 +941,7 @@ export async function renderHookWithProviders<Result, Props>(
     width?: number;
     mouseEventsEnabled?: boolean;
     config?: Config;
+    allowEmptyFrame?: boolean;
   } = {},
 ): Promise<{
   result: { current: Result };
