@@ -412,4 +412,84 @@ describe('handleFallback', () => {
       expect(policyConfig.activateFallbackMode).not.toHaveBeenCalled();
     });
   });
+
+  describe('5xx error handling', () => {
+    let policyConfig: Config;
+    let policyHandler: Mock<FallbackModelHandler>;
+
+    beforeEach(() => {
+      vi.clearAllMocks();
+      policyHandler = vi.fn().mockResolvedValue('retry_once');
+      policyConfig = createMockConfig();
+      vi.mocked(policyConfig.getFallbackModelHandler).mockReturnValue(
+        policyHandler,
+      );
+    });
+
+    it.each([
+      [AuthType.USE_GEMINI, 'gemini-api-key'],
+      [AuthType.USE_VERTEX_AI, 'vertex-ai'],
+      [AuthType.LOGIN_WITH_GOOGLE, 'oauth-personal'],
+      [AuthType.COMPUTE_ADC, 'compute-default-credentials'],
+      [AuthType.GATEWAY, 'gateway'],
+      [undefined, 'undefined (no auth)'],
+    ])(
+      'returns null without invoking fallback handler for 500 errors regardless of auth type (%s)',
+      async (authType, _label) => {
+        const serverError = new Error('Internal Server Error');
+        (serverError as NodeJS.ErrnoException & { status?: number }).status =
+          500;
+
+        const result = await handleFallback(
+          policyConfig,
+          MOCK_PRO_MODEL,
+          authType,
+          serverError,
+        );
+
+        expect(result).toBeNull();
+        expect(policyHandler).not.toHaveBeenCalled();
+      },
+    );
+
+    it('returns null for other 5xx errors (e.g. 502, 503)', async () => {
+      for (const status of [502, 503, 504]) {
+        const serverError = new Error(`Server Error ${status}`);
+        (serverError as NodeJS.ErrnoException & { status?: number }).status =
+          status;
+
+        const result = await handleFallback(
+          policyConfig,
+          MOCK_PRO_MODEL,
+          AuthType.LOGIN_WITH_GOOGLE,
+          serverError,
+        );
+
+        expect(result).toBeNull();
+      }
+    });
+
+    it('does not affect non-5xx errors (e.g. 429 quota) for API key auth', async () => {
+      const quotaError = new TerminalQuotaError('Quota exceeded', {
+        code: 429,
+        message: 'quota',
+        details: [],
+      });
+
+      vi.mocked(policyConfig.getModel).mockReturnValue(
+        DEFAULT_GEMINI_MODEL_AUTO,
+      );
+
+      const result = await handleFallback(
+        policyConfig,
+        MOCK_PRO_MODEL,
+        AuthType.USE_GEMINI,
+        quotaError,
+      );
+
+      // 429 quota errors should always reach the handler regardless of auth type
+      expect(policyHandler).toHaveBeenCalled();
+      expect(result).toBe(true);
+    });
+  });
 });
