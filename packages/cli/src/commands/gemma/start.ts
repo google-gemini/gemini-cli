@@ -25,27 +25,18 @@ import {
   resolveGemmaConfig,
 } from './platform.js';
 
-/**
- * Starts the LiteRT-LM server as a detached background process.
- * Returns true if the server was started (or is already running).
- *
- * This function is also used by `setup.ts` to start the server after installation.
- */
 export async function startServer(
   binaryPath: string,
   port: number,
 ): Promise<boolean> {
-  // Check if already running
   const alreadyRunning = await isServerRunning(port);
   if (alreadyRunning) {
     debugLogger.log(`LiteRT server already running on port ${port}`);
     return true;
   }
 
-  // Ensure log directory exists
   const logPath = getLogFilePath();
   fs.mkdirSync(getLiteRtBinDir(), { recursive: true });
-  // Ensure tmp dir exists for log and pid files
   const tmpDir = path.dirname(getPidFilePath());
   fs.mkdirSync(tmpDir, { recursive: true });
 
@@ -57,19 +48,16 @@ export async function startServer(
       stdio: ['ignore', logFd, logFd],
     });
 
-    // Write PID file
     const pidPath = getPidFilePath();
     if (child.pid) {
       fs.writeFileSync(pidPath, String(child.pid), 'utf-8');
     }
 
-    // Detach the child so it survives after the CLI exits.
     child.unref();
   } finally {
     fs.closeSync(logFd);
   }
 
-  // Wait briefly and verify the server is responding.
   await new Promise((resolve) => setTimeout(resolve, SERVER_START_WAIT_MS));
   return isServerRunning(port);
 }

@@ -30,11 +30,6 @@ export interface GemmaStatusResult {
   allPassing: boolean;
 }
 
-/**
- * Runs all diagnostic checks and returns a structured status result.
- * This is shared between the CLI `gemini gemma status` command and the
- * in-session `/gemma` slash command.
- */
 export async function checkGemmaStatus(
   port?: number,
 ): Promise<GemmaStatusResult> {
@@ -64,7 +59,6 @@ export async function checkGemmaStatus(
   };
 }
 
-/** Formats the status result into a human-readable string. */
 export function formatGemmaStatus(status: GemmaStatusResult): string {
   const check = (ok: boolean) => (ok ? chalk.green('✓') : chalk.red('✗'));
 
@@ -75,7 +69,6 @@ export function formatGemmaStatus(status: GemmaStatusResult): string {
     '',
   ];
 
-  // Binary
   if (status.binaryInstalled) {
     lines.push(`  Binary:    ${check(true)} Installed (${status.binaryPath})`);
   } else {
@@ -90,7 +83,6 @@ export function formatGemmaStatus(status: GemmaStatusResult): string {
     }
   }
 
-  // Model
   if (status.modelDownloaded) {
     lines.push(`  Model:     ${check(true)} ${GEMMA_MODEL_NAME} downloaded`);
   } else {
@@ -106,7 +98,6 @@ export function formatGemmaStatus(status: GemmaStatusResult): string {
     }
   }
 
-  // Server
   if (status.serverRunning) {
     const pidInfo = status.serverPid ? ` (PID ${status.serverPid})` : '';
     lines.push(
@@ -119,7 +110,6 @@ export function formatGemmaStatus(status: GemmaStatusResult): string {
     lines.push(chalk.dim(`             Run: gemini gemma start`));
   }
 
-  // Settings
   if (status.settingsEnabled) {
     lines.push(`  Settings:  ${check(true)} Enabled in settings.json`);
   } else {
@@ -169,7 +159,6 @@ export const statusCommand: CommandModule = {
     }
     const status = await checkGemmaStatus(port);
     const output = formatGemmaStatus(status);
-    // Use process.stdout directly for consistent output in non-interactive mode.
     process.stdout.write(output);
     await exitCli(status.allPassing ? 0 : 1);
   },

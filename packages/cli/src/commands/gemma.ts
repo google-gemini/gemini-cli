@@ -29,8 +29,5 @@ export const gemmaCommand: CommandModule = {
       .command(defer(logsCommand, 'gemma'))
       .demandCommand(1, 'You need at least one command before continuing.')
       .version(false),
-  handler: () => {
-    // yargs will automatically show help if no subcommand is provided
-    // thanks to demandCommand(1) in the builder.
-  },
+  handler: () => {},
 };

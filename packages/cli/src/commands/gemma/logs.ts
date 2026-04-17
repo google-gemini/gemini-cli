@@ -11,14 +11,9 @@ import { debugLogger } from '@google/gemini-cli-core';
 import { exitCli } from '../utils.js';
 import { getLogFilePath } from './constants.js';
 
-/**
- * Reads the last N lines from a file using Node.js APIs.
- * Used as a cross-platform fallback when `tail` is unavailable (Windows).
- */
 function readLastLines(filePath: string, count: number): string {
   const content = fs.readFileSync(filePath, 'utf-8');
   const lines = content.split('\n');
-  // If the file ends with a newline, the last element is empty — skip it.
   if (lines.length > 0 && lines[lines.length - 1] === '') {
     lines.pop();
   }
@@ -64,7 +59,6 @@ export const logsCommand: CommandModule = {
         await exitCli(0);
         return;
       }
-      // Show last N lines and exit.
       const tailArgs = ['-n', String(lines), logPath];
       const child = spawn('tail', tailArgs, { stdio: 'inherit' });
       child.on('close', async (code) => {
@@ -81,7 +75,6 @@ export const logsCommand: CommandModule = {
       return;
     }
 
-    // Follow mode — stream live output until user presses Ctrl+C.
     debugLogger.log(`Tailing ${logPath} (Ctrl+C to stop)\n`);
     const tailArgs = ['-f', '-n', '20', logPath];
     const child = spawn('tail', tailArgs, { stdio: 'inherit' });

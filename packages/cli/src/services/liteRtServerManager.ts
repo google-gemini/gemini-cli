@@ -13,19 +13,7 @@ import {
 } from '../commands/gemma/platform.js';
 import { DEFAULT_PORT } from '../commands/gemma/constants.js';
 
-/**
- * Manages the LiteRT-LM server lifecycle for auto-start during CLI startup.
- *
- * When the Gemma model router is enabled and `autoStartServer` is true,
- * this manager ensures the server is running before the CLI enters
- * interactive mode. The server is spawned as a detached daemon that
- * persists across CLI sessions — it is NOT stopped when the CLI exits.
- */
 export class LiteRtServerManager {
-  /**
-   * Ensures the LiteRT-LM server is running if the settings call for it.
-   * This is fire-and-forget: failures are logged but never block startup.
-   */
   static async ensureRunning(
     gemmaSettings: GemmaModelRouterSettings | undefined,
   ): Promise<void> {
@@ -57,8 +45,6 @@ export class LiteRtServerManager {
     );
 
     try {
-      // Dynamic import to avoid circular dependencies and to keep the start
-      // logic in one place.
       const { startServer } = await import('../commands/gemma/start.js');
       const binaryPath = gemmaSettings.binaryPath || getBinaryPath() || '';
       if (!binaryPath) {

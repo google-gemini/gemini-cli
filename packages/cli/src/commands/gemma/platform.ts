@@ -28,9 +28,6 @@ export interface GemmaConfigStatus {
   configuredPort: number;
 }
 
-/**
- * Resolves the Gemma configuration from the workspace settings.
- */
 export function resolveGemmaConfig(fallbackPort: number): GemmaConfigStatus {
   let settingsEnabled = false;
   let configuredPort = fallbackPort;
@@ -46,15 +43,11 @@ export function resolveGemmaConfig(fallbackPort: number): GemmaConfigStatus {
       }
     }
   } catch {
-    // Settings may fail to load in some contexts; treat as not enabled.
+    // ignore — settings may fail to load outside a workspace
   }
   return { settingsEnabled, configuredPort };
 }
 
-/**
- * Detects the current platform and resolves the corresponding LiteRT-LM binary name.
- * Returns null if the platform is unsupported.
- */
 export function detectPlatform(): PlatformInfo | null {
   const key = `${process.platform}-${process.arch}`;
   const binaryName = PLATFORM_BINARY_MAP[key];
@@ -64,29 +57,22 @@ export function detectPlatform(): PlatformInfo | null {
   return { key, binaryName };
 }
 
-/** Returns the full local path to the LiteRT-LM binary. */
 export function getBinaryPath(binaryName?: string): string | null {
   const name = binaryName ?? detectPlatform()?.binaryName;
   if (!name) return null;
   return path.join(getLiteRtBinDir(), name);
 }
 
-/** Returns the GitHub release download URL for the binary. */
 export function getBinaryDownloadUrl(binaryName: string): string {
   return `${LITERT_RELEASE_BASE_URL}/${LITERT_RELEASE_VERSION}/${binaryName}`;
 }
 
-/** Checks if the LiteRT-LM binary exists on disk. */
 export function isBinaryInstalled(): boolean {
   const binaryPath = getBinaryPath();
   if (!binaryPath) return false;
   return fs.existsSync(binaryPath);
 }
 
-/**
- * Checks if the Gemma model has been downloaded by running `lit list`
- * and looking for the model name in stdout.
- */
 export function isModelDownloaded(binaryPath: string): boolean {
   try {
     const output = execFileSync(binaryPath, ['list'], {
@@ -99,10 +85,6 @@ export function isModelDownloaded(binaryPath: string): boolean {
   }
 }
 
-/**
- * Checks if a LiteRT-LM server is running and responding on the given port.
- * Uses a simple HTTP request with a short timeout.
- */
 export async function isServerRunning(port: number): Promise<boolean> {
   try {
     const controller = new AbortController();
@@ -112,17 +94,12 @@ export async function isServerRunning(port: number): Promise<boolean> {
     );
     await fetch(`http://localhost:${port}/`, { signal: controller.signal });
     clearTimeout(timeout);
-    // Any response (even an error page) means the server is up.
     return true;
   } catch {
     return false;
   }
 }
 
-/**
- * Reads the PID from the PID file, if it exists.
- * Returns the PID number, or null if the file doesn't exist or is invalid.
- */
 export function readServerPid(): number | null {
   const pidPath = getPidFilePath();
   try {
@@ -134,12 +111,8 @@ export function readServerPid(): number | null {
   }
 }
 
-/**
- * Checks if a process with the given PID is still running.
- */
 export function isProcessRunning(pid: number): boolean {
   try {
-    // Sending signal 0 checks if the process exists without actually signaling it.
     process.kill(pid, 0);
     return true;
   } catch {

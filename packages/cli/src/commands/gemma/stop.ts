@@ -17,10 +17,6 @@ import {
   resolveGemmaConfig,
 } from './platform.js';
 
-/**
- * Stops the LiteRT-LM server by sending SIGTERM to the stored PID.
- * Returns true if the server was stopped successfully.
- */
 export async function stopServer(): Promise<boolean> {
   const pid = readServerPid();
   const pidPath = getPidFilePath();
@@ -30,11 +26,10 @@ export async function stopServer(): Promise<boolean> {
   }
 
   if (!isProcessRunning(pid)) {
-    // PID file exists but process is gone — clean up stale file.
     try {
       fs.unlinkSync(pidPath);
     } catch {
-      // Ignore cleanup errors.
+      // ignore
     }
     return false;
   }
@@ -45,24 +40,21 @@ export async function stopServer(): Promise<boolean> {
     return false;
   }
 
-  // Wait briefly for graceful shutdown.
   await new Promise((resolve) => setTimeout(resolve, 1000));
 
-  // If still running, escalate to SIGKILL.
   if (isProcessRunning(pid)) {
     try {
       process.kill(pid, 'SIGKILL');
     } catch {
-      // Process may have exited between the check and the kill.
+      // ignore
     }
     await new Promise((resolve) => setTimeout(resolve, 500));
   }
 
-  // Clean up PID file.
   try {
     fs.unlinkSync(pidPath);
   } catch {
-    // Ignore cleanup errors.
+    // ignore
   }
 
   return true;
@@ -101,7 +93,6 @@ export const stopCommand: CommandModule = {
       return;
     }
 
-    // No PID file or process not running — check if something else is on the port.
     const running = await isServerRunning(port);
     if (running) {
       debugLogger.log(

@@ -32,7 +32,6 @@ export const GemmaStatus: React.FC<GemmaStatusProps> = ({
     <Text bold>Gemma Local Model Routing</Text>
     <Box height={1} />
 
-    {/* Binary */}
     <Box>
       <StatusDot ok={binaryInstalled} />
       <Text>
@@ -46,7 +45,6 @@ export const GemmaStatus: React.FC<GemmaStatusProps> = ({
       </Text>
     </Box>
 
-    {/* Model */}
     <Box>
       <StatusDot ok={modelDownloaded} />
       <Text>
@@ -60,7 +58,6 @@ export const GemmaStatus: React.FC<GemmaStatusProps> = ({
       </Text>
     </Box>
 
-    {/* Server */}
     <Box>
       <StatusDot ok={serverRunning} />
       <Text>
@@ -81,7 +78,6 @@ export const GemmaStatus: React.FC<GemmaStatusProps> = ({
       </Text>
     </Box>
 
-    {/* Settings */}
     <Box>
       <StatusDot ok={settingsEnabled} />
       <Text>
@@ -95,7 +91,6 @@ export const GemmaStatus: React.FC<GemmaStatusProps> = ({
       </Text>
     </Box>
 
-    {/* Active For */}
     <Box marginTop={1}>
       <Text bold>Active for: </Text>
       {allPassing ? (
@@ -105,7 +100,6 @@ export const GemmaStatus: React.FC<GemmaStatusProps> = ({
       )}
     </Box>
 
-    {/* Summary */}
     <Box marginTop={1}>
       {allPassing ? (
         <Box flexDirection="column">

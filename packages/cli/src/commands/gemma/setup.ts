@@ -29,10 +29,6 @@ import readline from 'node:readline';
 const log = (msg: string) => debugLogger.log(msg);
 const logError = (msg: string) => debugLogger.error(msg);
 
-/**
- * Prompts the user for a yes/no confirmation.
- * Returns true if the user answers 'y' or 'yes'.
- */
 async function promptYesNo(question: string): Promise<boolean> {
   const rl = readline.createInterface({
     input: process.stdin,
@@ -49,14 +45,12 @@ async function promptYesNo(question: string): Promise<boolean> {
   });
 }
 
-/** Formats a byte count into a human-readable string (e.g. "12.3 MB"). */
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-/** Renders a single-line progress bar to stderr (overwriting in place). */
 function renderProgress(downloaded: number, total: number | null): void {
   const barWidth = 30;
   if (total && total > 0) {
@@ -72,14 +66,8 @@ function renderProgress(downloaded: number, total: number | null): void {
   }
 }
 
-/**
- * Downloads a file from a URL to a local path with a progress bar.
- * Uses a temporary `.downloading` suffix for safety against interrupted downloads.
- */
 async function downloadFile(url: string, destPath: string): Promise<void> {
   const tmpPath = destPath + '.downloading';
-
-  // Clean up any previous interrupted download.
   if (fs.existsSync(tmpPath)) {
     fs.unlinkSync(tmpPath);
   }
@@ -114,24 +102,17 @@ async function downloadFile(url: string, destPath: string): Promise<void> {
     }
   } finally {
     fileStream.end();
-    // Clear the progress line.
     process.stderr.write('\r' + ' '.repeat(80) + '\r');
   }
 
-  // Wait for the file to finish flushing.
   await new Promise<void>((resolve, reject) => {
     fileStream.on('finish', resolve);
     fileStream.on('error', reject);
   });
 
-  // Atomic rename after successful download.
   fs.renameSync(tmpPath, destPath);
 }
 
-/**
- * Spawns a child process and returns a promise that resolves with the exit code.
- * Inherits stdio so the user sees all output (progress, terms acceptance, etc.).
- */
 function spawnInherited(command: string, args: string[]): Promise<number> {
   return new Promise((resolve, reject) => {
     const child = nodeSpawn(command, args, {
@@ -158,7 +139,6 @@ async function handleSetup(argv: SetupArgs): Promise<number> {
   log(chalk.dim('─'.repeat(40)));
   log('');
 
-  // Step 1: Platform detection
   const platform = detectPlatform();
   if (!platform) {
     logError(
@@ -171,7 +151,6 @@ async function handleSetup(argv: SetupArgs): Promise<number> {
   }
   log(chalk.dim(`  Platform: ${platform.key} → ${platform.binaryName}`));
 
-  // Step 2: Consent
   if (!argv.consent) {
     log('');
     log('This will download and install the LiteRT-LM runtime and the');
@@ -188,7 +167,6 @@ async function handleSetup(argv: SetupArgs): Promise<number> {
     }
   }
 
-  // Step 3: Download binary
   const binaryPath = getBinaryPath(platform.binaryName)!;
   const alreadyInstalled = isBinaryInstalled();
 
@@ -217,7 +195,6 @@ async function handleSetup(argv: SetupArgs): Promise<number> {
       return 1;
     }
 
-    // Step 4: Make executable and handle macOS gatekeeper
     if (process.platform !== 'win32') {
       try {
         fs.chmodSync(binaryPath, 0o755);
@@ -238,15 +215,11 @@ async function handleSetup(argv: SetupArgs): Promise<number> {
         });
         log(chalk.green('  ✓ macOS quarantine attribute removed'));
       } catch {
-        // This is expected to fail if the attribute doesn't exist.
-        debugLogger.log(
-          'xattr quarantine removal not needed or failed (non-fatal)',
-        );
+        // Expected if the attribute doesn't exist.
       }
     }
   }
 
-  // Step 5: Pull the model
   if (!argv.skipModel) {
     const modelAlreadyDownloaded = isModelDownloaded(binaryPath);
     if (modelAlreadyDownloaded && !force) {
@@ -274,7 +247,6 @@ async function handleSetup(argv: SetupArgs): Promise<number> {
     }
   }
 
-  // Step 6: Configure settings
   log('');
   log('  Configuring settings...');
   try {
@@ -294,7 +266,6 @@ async function handleSetup(argv: SetupArgs): Promise<number> {
       },
     };
 
-    // Read existing experimental settings to avoid overwriting them.
     const existingExperimental =
       settings.forScope(SettingScope.User).settings.experimental ?? {};
     settings.setValue(SettingScope.User, 'experimental', {
@@ -314,7 +285,6 @@ async function handleSetup(argv: SetupArgs): Promise<number> {
     );
   }
 
-  // Step 7: Start server (if requested)
   if (argv.start) {
     log('');
     log('  Starting LiteRT server...');
@@ -330,7 +300,6 @@ async function handleSetup(argv: SetupArgs): Promise<number> {
     }
   }
 
-  // Step 8: Summary
   log('');
   log(chalk.dim('─'.repeat(40)));
   log(chalk.bold.green('  Setup complete! Local model routing is now active.'));
