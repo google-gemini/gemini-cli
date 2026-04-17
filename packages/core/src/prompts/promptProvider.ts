@@ -199,12 +199,12 @@ export class PromptProvider {
               context.config.storage.getPlansDir(),
               context.config.getProjectRoot(),
             ),
-            approvedPlanPath: context.config.getApprovedPlanPath()
-              ? makeRelative(
-                  context.config.getApprovedPlanPath()!,
-                  context.config.getProjectRoot(),
-                )
-              : undefined,
+            approvedPlanPath: (() => {
+              const approvedPath = context.config.getApprovedPlanPath();
+              return approvedPath
+                ? makeRelative(approvedPath, context.config.getProjectRoot())
+                : undefined;
+            })(),
           }),
           isPlanMode,
         ),
