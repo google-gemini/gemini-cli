@@ -29,6 +29,13 @@ vi.mock('../telemetry/loggers.js');
 vi.mock('../utils/environmentContext.js');
 vi.mock('../core/tokenLimits.js');
 
+function makeHistory(n: number): Content[] {
+  return Array.from({ length: n }, (_, i) => ({
+    role: (i % 2 === 0 ? 'user' : 'model'),
+    parts: [{ text: `message ${i}` }],
+  }));
+}
+
 describe('findCompressSplitPoint', () => {
   it('should throw an error for non-positive numbers', () => {
     expect(() => findCompressSplitPoint([], 0)).toThrow(
@@ -902,7 +909,9 @@ describe('ChatCompressionService', () => {
   describe('Compression strategy dispatch', () => {
     it('should route to flat compression when strategy is flat', async () => {
       vi.mocked(
-        mockConfig as unknown as { getCompressionStrategy: () => string },
+        mockConfig as unknown as {
+          getCompressionStrategy: () => 'flat' | 'union-find';
+        },
       ).getCompressionStrategy = vi.fn().mockReturnValue('flat');
 
       const history: Content[] = [
@@ -932,7 +941,9 @@ describe('ChatCompressionService', () => {
 
     it('should route to union-find compression when strategy is union-find', async () => {
       vi.mocked(
-        mockConfig as unknown as { getCompressionStrategy: () => string },
+        mockConfig as unknown as {
+          getCompressionStrategy: () => 'flat' | 'union-find';
+        },
       ).getCompressionStrategy = vi.fn().mockReturnValue('union-find');
 
       // Mock for cluster summarization
@@ -951,14 +962,7 @@ describe('ChatCompressionService', () => {
         mockLlmClient as unknown as BaseLlmClient,
       );
 
-      // Need enough messages to trigger graduation (> UNION_FIND_HOT_SIZE = 30)
-      const history: Content[] = [];
-      for (let i = 0; i < 35; i++) {
-        history.push({
-          role: i % 2 === 0 ? 'user' : 'model',
-          parts: [{ text: `message ${i}` }],
-        });
-      }
+      const history = makeHistory(35);
       vi.mocked(mockChat.getHistory).mockReturnValue(history);
       vi.mocked(mockChat.getLastPromptTokenCount).mockReturnValue(600000);
 
@@ -977,7 +981,9 @@ describe('ChatCompressionService', () => {
 
     it('should return valid ChatCompressionInfo for union-find path', async () => {
       vi.mocked(
-        mockConfig as unknown as { getCompressionStrategy: () => string },
+        mockConfig as unknown as {
+          getCompressionStrategy: () => 'flat' | 'union-find';
+        },
       ).getCompressionStrategy = vi.fn().mockReturnValue('union-find');
 
       const mockLlmClient = {
@@ -995,13 +1001,7 @@ describe('ChatCompressionService', () => {
         mockLlmClient as unknown as BaseLlmClient,
       );
 
-      const history: Content[] = [];
-      for (let i = 0; i < 35; i++) {
-        history.push({
-          role: i % 2 === 0 ? 'user' : 'model',
-          parts: [{ text: `msg ${i}` }],
-        });
-      }
+      const history = makeHistory(35);
       vi.mocked(mockChat.getHistory).mockReturnValue(history);
       vi.mocked(mockChat.getLastPromptTokenCount).mockReturnValue(600000);
 
@@ -1021,7 +1021,9 @@ describe('ChatCompressionService', () => {
 
     it('should return NOOP for union-find with empty history', async () => {
       vi.mocked(
-        mockConfig as unknown as { getCompressionStrategy: () => string },
+        mockConfig as unknown as {
+          getCompressionStrategy: () => 'flat' | 'union-find';
+        },
       ).getCompressionStrategy = vi.fn().mockReturnValue('union-find');
       vi.mocked(mockChat.getHistory).mockReturnValue([]);
 
