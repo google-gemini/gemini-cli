@@ -11,33 +11,54 @@ import { debugLogger } from '@google/gemini-cli-core';
 import { exitCli } from '../utils.js';
 import { DEFAULT_PORT, getPidFilePath } from './constants.js';
 import {
-  readServerPid,
+  getBinaryPath,
+  isExpectedLiteRtServerProcess,
   isProcessRunning,
   isServerRunning,
+  readServerPid,
+  readServerProcessInfo,
   resolveGemmaConfig,
 } from './platform.js';
 
-export async function stopServer(): Promise<boolean> {
-  const pid = readServerPid();
+export type StopServerResult =
+  | 'stopped'
+  | 'not-running'
+  | 'unexpected-process'
+  | 'failed';
+
+export async function stopServer(
+  expectedPort?: number,
+): Promise<StopServerResult> {
+  const processInfo = readServerProcessInfo();
   const pidPath = getPidFilePath();
 
-  if (pid === null) {
-    return false;
+  if (!processInfo) {
+    return 'not-running';
   }
 
+  const { pid } = processInfo;
   if (!isProcessRunning(pid)) {
     try {
       fs.unlinkSync(pidPath);
     } catch {
       // ignore
     }
-    return false;
+    return 'not-running';
+  }
+
+  const binaryPath = processInfo.binaryPath ?? getBinaryPath();
+  const port = processInfo.port ?? expectedPort;
+  if (!isExpectedLiteRtServerProcess(pid, { binaryPath, port })) {
+    debugLogger.warn(
+      `Refusing to stop PID ${pid} because it does not match the expected LiteRT server process.`,
+    );
+    return 'unexpected-process';
   }
 
   try {
     process.kill(pid, 'SIGTERM');
   } catch {
-    return false;
+    return 'failed';
   }
 
   await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -49,6 +70,9 @@ export async function stopServer(): Promise<boolean> {
       // ignore
     }
     await new Promise((resolve) => setTimeout(resolve, 500));
+    if (isProcessRunning(pid)) {
+      return 'failed';
+    }
   }
 
   try {
@@ -57,8 +81,9 @@ export async function stopServer(): Promise<boolean> {
     // ignore
   }
 
-  return true;
+  return 'stopped';
 }
+
 export const stopCommand: CommandModule = {
   command: 'stop',
   describe: 'Stop the LiteRT-LM server',
@@ -78,14 +103,27 @@ export const stopCommand: CommandModule = {
       port = configuredPort;
     }
 
-    const pid = readServerPid();
+    const processInfo = readServerProcessInfo();
+    const pid = processInfo?.pid ?? readServerPid();
 
     if (pid !== null && isProcessRunning(pid)) {
       debugLogger.log(`Stopping LiteRT server (PID ${pid})...`);
-      const stopped = await stopServer();
-      if (stopped) {
+      const result = await stopServer(port);
+      if (result === 'stopped') {
         debugLogger.log(chalk.green('LiteRT server stopped.'));
         await exitCli(0);
+      } else if (result === 'unexpected-process') {
+        debugLogger.error(
+          chalk.red(
+            `Refusing to stop PID ${pid} because it does not match the expected LiteRT server process.`,
+          ),
+        );
+        debugLogger.error(
+          chalk.dim(
+            'Remove the stale pid file after verifying the process, or stop the process manually.',
+          ),
+        );
+        await exitCli(1);
       } else {
         debugLogger.error(chalk.red('Failed to stop LiteRT server.'));
         await exitCli(1);

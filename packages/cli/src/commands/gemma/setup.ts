@@ -5,6 +5,7 @@
  */
 
 import type { CommandModule } from 'yargs';
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync, spawn as nodeSpawn } from 'node:child_process';
@@ -12,7 +13,11 @@ import chalk from 'chalk';
 import { debugLogger } from '@google/gemini-cli-core';
 import { loadSettings, SettingScope } from '../../config/settings.js';
 import { exitCli } from '../utils.js';
-import { DEFAULT_PORT, GEMMA_MODEL_NAME } from './constants.js';
+import {
+  DEFAULT_PORT,
+  GEMMA_MODEL_NAME,
+  PLATFORM_BINARY_SHA256,
+} from './constants.js';
 import {
   detectPlatform,
   getBinaryDownloadUrl,
@@ -110,6 +115,29 @@ async function downloadFile(url: string, destPath: string): Promise<void> {
   fs.renameSync(tmpPath, destPath);
 }
 
+export async function computeFileSha256(filePath: string): Promise<string> {
+  const hash = createHash('sha256');
+  const fileStream = fs.createReadStream(filePath);
+
+  return new Promise((resolve, reject) => {
+    fileStream.on('data', (chunk) => {
+      hash.update(chunk);
+    });
+    fileStream.on('error', reject);
+    fileStream.on('end', () => {
+      resolve(hash.digest('hex'));
+    });
+  });
+}
+
+export async function verifyFileSha256(
+  filePath: string,
+  expectedHash: string,
+): Promise<boolean> {
+  const actualHash = await computeFileSha256(filePath);
+  return actualHash === expectedHash;
+}
+
 function spawnInherited(command: string, args: string[]): Promise<number> {
   return new Promise((resolve, reject) => {
     const child = nodeSpawn(command, args, {
@@ -192,6 +220,51 @@ async function handleSetup(argv: SetupArgs): Promise<number> {
         ),
       );
       logError('  Check your internet connection and try again.');
+      return 1;
+    }
+
+    const expectedHash = PLATFORM_BINARY_SHA256[platform.binaryName];
+    if (!expectedHash) {
+      logError(
+        chalk.red(
+          `  ✗ No checksum is configured for ${platform.binaryName}. Refusing to install the binary.`,
+        ),
+      );
+      try {
+        fs.rmSync(binaryPath, { force: true });
+      } catch {
+        // ignore
+      }
+      return 1;
+    }
+
+    try {
+      const checksumVerified = await verifyFileSha256(binaryPath, expectedHash);
+      if (!checksumVerified) {
+        logError(
+          chalk.red(
+            '  ✗ Downloaded binary checksum did not match the expected release hash.',
+          ),
+        );
+        try {
+          fs.rmSync(binaryPath, { force: true });
+        } catch {
+          // ignore
+        }
+        return 1;
+      }
+      log(chalk.green('  ✓ Binary checksum verified'));
+    } catch (error) {
+      logError(
+        chalk.red(
+          `  ✗ Failed to verify binary checksum: ${error instanceof Error ? error.message : String(error)}`,
+        ),
+      );
+      try {
+        fs.rmSync(binaryPath, { force: true });
+      } catch {
+        // ignore
+      }
       return 1;
     }
 

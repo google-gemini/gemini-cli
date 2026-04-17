@@ -21,7 +21,9 @@ vi.mock('../../config/settings.js', () => ({
 
 import {
   getBinaryPath,
+  isExpectedLiteRtServerCommand,
   isBinaryInstalled,
+  readServerProcessInfo,
   resolveGemmaConfig,
 } from './platform.js';
 
@@ -109,5 +111,52 @@ describe('gemma platform helpers', () => {
 
     expect(isBinaryInstalled()).toBe(true);
     expect(fs.existsSync).toHaveBeenCalledWith('/custom/lit');
+  });
+
+  it('parses structured server process info from the pid file', () => {
+    vi.spyOn(fs, 'readFileSync').mockReturnValue(
+      JSON.stringify({
+        pid: 1234,
+        binaryPath: '/custom/lit',
+        port: 8123,
+      }),
+    );
+
+    expect(readServerProcessInfo()).toEqual({
+      pid: 1234,
+      binaryPath: '/custom/lit',
+      port: 8123,
+    });
+  });
+
+  it('parses legacy pid-only files for backward compatibility', () => {
+    vi.spyOn(fs, 'readFileSync').mockReturnValue('4321');
+
+    expect(readServerProcessInfo()).toEqual({
+      pid: 4321,
+    });
+  });
+
+  it('matches only the expected LiteRT serve command', () => {
+    expect(
+      isExpectedLiteRtServerCommand('/custom/lit serve --port=8123 --verbose', {
+        binaryPath: '/custom/lit',
+        port: 8123,
+      }),
+    ).toBe(true);
+
+    expect(
+      isExpectedLiteRtServerCommand('/custom/lit run --port=8123', {
+        binaryPath: '/custom/lit',
+        port: 8123,
+      }),
+    ).toBe(false);
+
+    expect(
+      isExpectedLiteRtServerCommand('/custom/lit serve --port=9000', {
+        binaryPath: '/custom/lit',
+        port: 8123,
+      }),
+    ).toBe(false);
   });
 });

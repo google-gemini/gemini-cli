@@ -29,6 +29,12 @@ export interface GemmaConfigStatus {
   configuredBinaryPath?: string;
 }
 
+export interface LiteRtServerProcessInfo {
+  pid: number;
+  binaryPath?: string;
+  port?: number;
+}
+
 function getUserConfiguredBinaryPath(
   workspaceDir = process.cwd(),
 ): string | undefined {
@@ -136,15 +142,160 @@ export async function isServerRunning(port: number): Promise<boolean> {
   }
 }
 
-export function readServerPid(): number | null {
+function isLiteRtServerProcessInfo(
+  value: unknown,
+): value is LiteRtServerProcessInfo {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  const isPositiveInteger = (candidate: unknown): candidate is number =>
+    typeof candidate === 'number' &&
+    Number.isInteger(candidate) &&
+    candidate > 0;
+  const isNonEmptyString = (candidate: unknown): candidate is string =>
+    typeof candidate === 'string' && candidate.length > 0;
+
+  const pid: unknown = Object.getOwnPropertyDescriptor(value, 'pid')?.value;
+  if (!isPositiveInteger(pid)) {
+    return false;
+  }
+
+  const binaryPath: unknown = Object.getOwnPropertyDescriptor(
+    value,
+    'binaryPath',
+  )?.value;
+  if (binaryPath !== undefined && !isNonEmptyString(binaryPath)) {
+    return false;
+  }
+
+  const port: unknown = Object.getOwnPropertyDescriptor(value, 'port')?.value;
+  if (port !== undefined && !isPositiveInteger(port)) {
+    return false;
+  }
+
+  return true;
+}
+
+export function readServerProcessInfo(): LiteRtServerProcessInfo | null {
   const pidPath = getPidFilePath();
   try {
     const content = fs.readFileSync(pidPath, 'utf-8').trim();
-    const pid = parseInt(content, 10);
-    return isNaN(pid) ? null : pid;
+    if (!content) {
+      return null;
+    }
+
+    if (/^\d+$/.test(content)) {
+      return { pid: parseInt(content, 10) };
+    }
+
+    const parsed = JSON.parse(content) as unknown;
+    return isLiteRtServerProcessInfo(parsed) ? parsed : null;
   } catch {
     return null;
   }
+}
+
+export function writeServerProcessInfo(
+  processInfo: LiteRtServerProcessInfo,
+): void {
+  fs.writeFileSync(getPidFilePath(), JSON.stringify(processInfo), 'utf-8');
+}
+
+export function readServerPid(): number | null {
+  return readServerProcessInfo()?.pid ?? null;
+}
+
+function normalizeProcessValue(value: string): string {
+  const normalized = value.replace(/\0/g, ' ').trim();
+  if (process.platform === 'win32') {
+    return normalized.replace(/\\/g, '/').replace(/\s+/g, ' ').toLowerCase();
+  }
+  return normalized.replace(/\s+/g, ' ');
+}
+
+function readProcessCommandLine(pid: number): string | null {
+  try {
+    if (process.platform === 'linux') {
+      const output = fs.readFileSync(`/proc/${pid}/cmdline`, 'utf-8');
+      return output.trim() ? output : null;
+    }
+
+    if (process.platform === 'win32') {
+      const output = execFileSync(
+        'powershell.exe',
+        [
+          '-NoProfile',
+          '-Command',
+          `(Get-CimInstance Win32_Process -Filter "ProcessId = ${pid}").CommandLine`,
+        ],
+        {
+          encoding: 'utf-8',
+          timeout: 5000,
+        },
+      );
+      return output.trim() || null;
+    }
+
+    const output = execFileSync('ps', ['-p', String(pid), '-o', 'command='], {
+      encoding: 'utf-8',
+      timeout: 5000,
+    });
+    return output.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+export function isExpectedLiteRtServerCommand(
+  commandLine: string,
+  options: {
+    binaryPath?: string | null;
+    port?: number;
+  },
+): boolean {
+  const normalizedCommandLine = normalizeProcessValue(commandLine);
+  if (!normalizedCommandLine) {
+    return false;
+  }
+
+  if (!/(^|\s|")serve(\s|$)/.test(normalizedCommandLine)) {
+    return false;
+  }
+
+  if (
+    options.port !== undefined &&
+    !normalizedCommandLine.includes(`--port=${options.port}`)
+  ) {
+    return false;
+  }
+
+  if (!options.binaryPath) {
+    return true;
+  }
+
+  const normalizedBinaryPath = normalizeProcessValue(options.binaryPath);
+  const normalizedBinaryName = normalizeProcessValue(
+    path.basename(options.binaryPath),
+  );
+  return (
+    normalizedCommandLine.includes(normalizedBinaryPath) ||
+    normalizedCommandLine.includes(normalizedBinaryName)
+  );
+}
+
+export function isExpectedLiteRtServerProcess(
+  pid: number,
+  options: {
+    binaryPath?: string | null;
+    port?: number;
+  },
+): boolean {
+  const commandLine = readProcessCommandLine(pid);
+  if (!commandLine) {
+    return false;
+  }
+  return isExpectedLiteRtServerCommand(commandLine, options);
 }
 
 export function isProcessRunning(pid: number): boolean {

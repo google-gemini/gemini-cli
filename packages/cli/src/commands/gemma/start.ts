@@ -23,6 +23,7 @@ import {
   isBinaryInstalled,
   isServerRunning,
   resolveGemmaConfig,
+  writeServerProcessInfo,
 } from './platform.js';
 
 export async function startServer(
@@ -48,9 +49,12 @@ export async function startServer(
       stdio: ['ignore', logFd, logFd],
     });
 
-    const pidPath = getPidFilePath();
     if (child.pid) {
-      fs.writeFileSync(pidPath, String(child.pid), 'utf-8');
+      writeServerProcessInfo({
+        pid: child.pid,
+        binaryPath,
+        port,
+      });
     }
 
     child.unref();
