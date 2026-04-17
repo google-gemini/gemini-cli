@@ -74,6 +74,7 @@ const renderStatusDisplay = async (
   uiState: UIState = createMockUIState(),
   settings = createMockSettings(),
   config = createMockConfig(),
+  allowEmptyFrame = false,
 ) => {
   const result = await render(
     <ConfigContext.Provider value={config as unknown as Config}>
@@ -83,6 +84,9 @@ const renderStatusDisplay = async (
         </UIStateContext.Provider>
       </SettingsContext.Provider>
     </ConfigContext.Provider>,
+    undefined,
+    undefined,
+    allowEmptyFrame,
   );
   return result;
 };
@@ -98,9 +102,13 @@ describe('StatusDisplay', () => {
   });
 
   it('renders nothing by default if context summary is hidden via props', async () => {
-    const { lastFrame, unmount } = await renderStatusDisplay({
-      hideContextSummary: true,
-    });
+    const { lastFrame, unmount } = await renderStatusDisplay(
+      { hideContextSummary: true },
+      undefined,
+      undefined,
+      undefined,
+      true,
+    );
     expect(lastFrame({ allowEmpty: true })).toBe('');
     unmount();
   });
@@ -154,6 +162,8 @@ describe('StatusDisplay', () => {
       { hideContextSummary: false },
       undefined,
       settings,
+      undefined,
+      true,
     );
     expect(lastFrame({ allowEmpty: true })).toBe('');
     unmount();
