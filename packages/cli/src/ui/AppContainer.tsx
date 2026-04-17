@@ -2098,6 +2098,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       folderName: basename(config.getTargetDir()),
       showThoughts: !!settings.merged.ui.showStatusInTitle,
       useDynamicTitle: settings.merged.ui.dynamicWindowTitle,
+      terminalTitleMaxLen: settings.merged.ui.terminalTitleMaxLen as number,
+      padWindowTitle: !!settings.merged.ui.padWindowTitle,
     });
 
     // Only update the title if it's different from the last value we set
@@ -2114,6 +2116,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
     shouldShowSilentWorkingTitle,
     settings.merged.ui.showStatusInTitle,
     settings.merged.ui.dynamicWindowTitle,
+    settings.merged.ui.terminalTitleMaxLen,
+    settings.merged.ui.padWindowTitle,
     settings.merged.ui.hideWindowTitle,
     config,
     stdout,

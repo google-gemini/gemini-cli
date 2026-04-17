@@ -549,6 +549,26 @@ const SETTINGS_SCHEMA = {
           'Update the terminal window title with current status icons (Ready: ◇, Action Required: ✋, Working: ✦)',
         showInDialog: true,
       },
+      terminalTitleMaxLen: {
+        type: 'number',
+        label: 'Terminal Title Max Length',
+        category: 'UI',
+        requiresRestart: false,
+        default: 80,
+        description: 'Maximum length of the terminal window title.',
+        showInDialog: true,
+        unit: 'chars',
+      },
+      padWindowTitle: {
+        type: 'boolean',
+        label: 'Pad Window Title',
+        category: 'UI',
+        requiresRestart: false,
+        default: true,
+        description:
+          'Pad the terminal window title with spaces to a fixed length to prevent taskbar jitter.',
+        showInDialog: true,
+      },
       showHomeDirectoryWarning: {
         type: 'boolean',
         label: 'Show Home Directory Warning',
