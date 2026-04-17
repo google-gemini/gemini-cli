@@ -68,17 +68,29 @@ export const SCROLLBACK_LIMIT = 300000;
 const BASH_SHOPT_OPTIONS = 'promptvars nullglob extglob nocaseglob dotglob';
 const BASH_SHOPT_GUARD = `shopt -u ${BASH_SHOPT_OPTIONS};`;
 
-function ensurePromptvarsDisabled(command: string, shell: ShellType): string {
-  if (shell !== 'bash') {
-    return command;
-  }
+// Forces UTF-8 output encoding in PowerShell so non-ASCII output is correctly
+// captured through Node.js pipes regardless of the system code page.
+const POWERSHELL_UTF8_GUARD =
+  '[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; $OutputEncoding = [System.Text.Encoding]::UTF8;';
 
+function applyShellPreamble(command: string, shell: ShellType): string {
   const trimmed = command.trimStart();
-  if (trimmed.startsWith(BASH_SHOPT_GUARD)) {
-    return command;
+
+  if (shell === 'bash') {
+    if (trimmed.startsWith(BASH_SHOPT_GUARD)) {
+      return command;
+    }
+    return `${BASH_SHOPT_GUARD} ${command}`;
   }
 
-  return `${BASH_SHOPT_GUARD} ${command}`;
+  if (shell === 'powershell') {
+    if (trimmed.startsWith(POWERSHELL_UTF8_GUARD)) {
+      return command;
+    }
+    return `${POWERSHELL_UTF8_GUARD} ${command}`;
+  }
+
+  return command;
 }
 
 /** A structured result from a shell command execution. */
@@ -394,6 +406,7 @@ export class ShellExecutionService {
     args: string[];
     env: NodeJS.ProcessEnv;
     cwd: string;
+    shell: ShellType;
     cleanup?: () => void;
   }> {
     const sandboxManager =
@@ -417,7 +430,7 @@ export class ShellExecutionService {
     const resolvedExecutable =
       (await resolveExecutable(executable)) ?? executable;
 
-    const guardedCommand = ensurePromptvarsDisabled(commandToExecute, shell);
+    const guardedCommand = applyShellPreamble(commandToExecute, shell);
     const spawnArgs = [...argsPrefix, guardedCommand];
 
     // 2. Prepare Environment
@@ -500,6 +513,7 @@ export class ShellExecutionService {
       args: sandboxedCommand.args,
       env: sandboxedCommand.env,
       cwd: sandboxedCommand.cwd ?? cwd,
+      shell,
       cleanup: sandboxedCommand.cleanup,
     };
   }
@@ -529,6 +543,7 @@ export class ShellExecutionService {
         args: finalArgs,
         env: finalEnv,
         cwd: finalCwd,
+        shell,
       } = prepared;
 
       const child = cpSpawn(finalExecutable, finalArgs, {
@@ -615,7 +630,9 @@ export class ShellExecutionService {
 
       const handleOutput = (data: Buffer, stream: 'stdout' | 'stderr') => {
         if (!stdoutDecoder || !stderrDecoder) {
-          const encoding = getCachedEncodingForBuffer(data);
+          // PowerShell preamble forces UTF-8 output; skip system encoding detection.
+          const encoding =
+            shell === 'powershell' ? 'utf-8' : getCachedEncodingForBuffer(data);
           try {
             stdoutDecoder = new TextDecoder(encoding);
             stderrDecoder = new TextDecoder(encoding);
