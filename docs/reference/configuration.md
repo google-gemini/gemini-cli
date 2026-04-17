@@ -134,9 +134,14 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `true`
 
 - **`general.enableNotifications`** (boolean):
-  - **Description:** Enable run-event notifications for action-required prompts
-    and session completion.
+  - **Description:** Enable terminal run-event notifications for action-required
+    prompts and session completion.
   - **Default:** `false`
+
+- **`general.notificationMethod`** (enum):
+  - **Description:** How to send terminal notifications.
+  - **Default:** `"auto"`
+  - **Values:** `"auto"`, `"osc9"`, `"osc777"`, `"bell"`
 
 - **`general.checkpointing.enabled`** (boolean):
   - **Description:** Enable session checkpointing for recovery
@@ -2160,6 +2165,21 @@ the `advanced.excludedEnvVars` setting in your `settings.json` file.
   - When set, overrides the default API version used by the SDK.
   - Example: `export GOOGLE_GENAI_API_VERSION="v1"` (Windows PowerShell:
     `$env:GOOGLE_GENAI_API_VERSION="v1"`)
+- **`GOOGLE_GEMINI_BASE_URL`**:
+  - Overrides the default base URL for Gemini API requests (when using
+    `gemini-api-key` authentication).
+  - Must be a valid URL. For security, it must use HTTPS unless pointing to
+    `localhost` (or `127.0.0.1` / `[::1]`).
+  - Example: `export GOOGLE_GEMINI_BASE_URL="https://my-proxy.com"` (Windows
+    PowerShell: `$env:GOOGLE_GEMINI_BASE_URL="https://my-proxy.com"`)
+- **`GOOGLE_VERTEX_BASE_URL`**:
+  - Overrides the default base URL for Vertex AI API requests (when using
+    `vertex-ai` authentication).
+  - Must be a valid URL. For security, it must use HTTPS unless pointing to
+    `localhost` (or `127.0.0.1` / `[::1]`).
+  - Example: `export GOOGLE_VERTEX_BASE_URL="https://my-vertex-proxy.com"`
+    (Windows PowerShell:
+    `$env:GOOGLE_VERTEX_BASE_URL="https://my-vertex-proxy.com"`)
 - **`OTLP_GOOGLE_CLOUD_PROJECT`**:
   - Your Google Cloud Project ID for Telemetry in Google Cloud
   - Example: `export OTLP_GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"` (Windows
