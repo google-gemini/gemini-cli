@@ -242,7 +242,7 @@ describe('PromptProvider', () => {
       const expectedRelativePath = makeRelative(
         mockConfig.storage.getPlansDir(),
         mockConfig.getProjectRoot(),
-      );
+      ).replaceAll('\\', '/');
       expect(prompt).toContain(
         `write .md plan files to \`${expectedRelativePath}/\``,
       );
