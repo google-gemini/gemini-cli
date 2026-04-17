@@ -39,6 +39,7 @@ export const createMockConfig = (overrides: Partial<Config> = {}): Config =>
       fireSessionStartEvent: vi.fn().mockResolvedValue(undefined),
     })),
     isMemoryManagerEnabled: vi.fn(() => false),
+    isAutoMemoryEnabled: vi.fn(() => false),
     getListExtensions: vi.fn(() => false),
     getExtensions: vi.fn(() => []),
     getListSessions: vi.fn(() => false),
