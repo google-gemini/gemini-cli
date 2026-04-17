@@ -88,7 +88,12 @@ describe('useConsoleMessages', () => {
       hookResult = useTestableConsoleMessages();
       return null;
     }
-    const { unmount } = await render(<TestComponent />);
+    const { unmount } = await render(
+      <TestComponent />,
+      undefined,
+      undefined,
+      true,
+    );
     unmounts.push(unmount);
     return {
       result: {
@@ -177,7 +182,12 @@ describe('useErrorCount', () => {
       hookResult = useErrorCount();
       return null;
     }
-    const { unmount } = await render(<TestComponent />);
+    const { unmount } = await render(
+      <TestComponent />,
+      undefined,
+      undefined,
+      true,
+    );
     unmounts.push(unmount);
     return {
       result: {
