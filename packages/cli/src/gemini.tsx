@@ -34,6 +34,7 @@ import {
   debugLogger,
   isHeadlessMode,
   Storage,
+  getProxyAgent,
 } from '@google/gemini-cli-core';
 
 import { loadCliConfig, parseArguments } from './config/config.js';
@@ -245,6 +246,7 @@ export async function startInteractiveUI(
 }
 
 export async function main() {
+  getProxyAgent(); // Initialize proxy agent from environment variables
   const cliStartupHandle = startupProfiler.start('cli_startup');
 
   // Listen for admin controls from parent process (IPC) in non-sandbox mode. In

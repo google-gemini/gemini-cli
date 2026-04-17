@@ -9,6 +9,7 @@ import { getClientMetadata } from './client_metadata.js';
 import type { ListExperimentsResponse, Flag } from './types.js';
 import * as fs from 'node:fs';
 import { debugLogger } from '../../utils/debugLogger.js';
+import { isNetworkError, getErrorMessage } from '../../utils/errors.js';
 
 export interface Experiments {
   flags: Record<string, Flag>;
@@ -55,9 +56,21 @@ export async function getExperiments(
       return { flags: {}, experimentIds: [] };
     }
 
-    const metadata = await getClientMetadata();
-    const response = await server.listExperiments(metadata);
-    return parseExperiments(response);
+    try {
+      const metadata = await getClientMetadata();
+      const response = await server.listExperiments(metadata);
+      return parseExperiments(response);
+    } catch (e) {
+      if (isNetworkError(e)) {
+        debugLogger.warn(
+          'Network error while fetching experiments. Experiments will be disabled for this session.',
+          getErrorMessage(e),
+        );
+      } else {
+        debugLogger.error('Failed to fetch experiments', e);
+      }
+      return { flags: {}, experimentIds: [] };
+    }
   })();
   return experimentsPromise;
 }

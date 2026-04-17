@@ -8,6 +8,7 @@ import type { HttpHeaders } from '@a2a-js/sdk/client';
 import { BaseA2AAuthProvider } from './base-provider.js';
 import type { GoogleCredentialsAuthConfig } from './types.js';
 import { GoogleAuth } from 'google-auth-library';
+import { getProxyAgent } from '../../utils/proxy.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 import { OAuthUtils, FIVE_MIN_BUFFER_MS } from '../../mcp/oauth-utils.js';
 
@@ -65,6 +66,9 @@ export class GoogleCredentialsAuthProvider extends BaseA2AAuthProvider {
 
     this.auth = new GoogleAuth({
       scopes,
+      clientOptions: {
+        agent: getProxyAgent(),
+      },
     });
   }
 

@@ -11,6 +11,7 @@ import type {
   OAuthTokens,
 } from '@modelcontextprotocol/sdk/shared/auth.js';
 import { GoogleAuth } from 'google-auth-library';
+import { getProxyAgent } from '../utils/proxy.js';
 import { OAuthUtils, FIVE_MIN_BUFFER_MS } from './oauth-utils.js';
 import type { MCPServerConfig } from '../config/config.js';
 import type { McpAuthProvider } from './auth-provider.js';
@@ -62,7 +63,11 @@ export class ServiceAccountImpersonationProvider implements McpAuthProvider {
     }
     this.targetServiceAccount = config.targetServiceAccount;
 
-    this.auth = new GoogleAuth();
+    this.auth = new GoogleAuth({
+      clientOptions: {
+        agent: getProxyAgent(),
+      },
+    });
   }
 
   clientInformation(): OAuthClientInformation | undefined {

@@ -9,6 +9,7 @@ import { URL } from 'node:url';
 import { Agent, ProxyAgent, setGlobalDispatcher } from 'undici';
 import ipaddr from 'ipaddr.js';
 import { lookup } from 'node:dns/promises';
+import { shouldProxy } from './proxy.js';
 
 export class FetchError extends Error {
   constructor(
@@ -216,6 +217,9 @@ export function setGlobalProxy(proxy: string) {
       uri: proxy,
       headersTimeout: defaultTimeout,
       bodyTimeout: defaultTimeout,
+      // undici ProxyAgent supports skipProxy to avoid proxying for specific hosts.
+      // We use our shouldProxy utility which handles NO_PROXY and loopback.
+      skipProxy: (url) => !shouldProxy(url),
     }),
   );
 }

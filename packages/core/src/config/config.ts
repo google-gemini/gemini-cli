@@ -166,6 +166,7 @@ import { AcknowledgedAgentsService } from '../agents/acknowledgedAgents.js';
 import { setGlobalProxy, updateGlobalFetchTimeouts } from '../utils/fetch.js';
 import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { isNetworkError, getErrorMessage } from '../utils/errors.js';
 import { SkillManager, type SkillDefinition } from '../skills/skillManager.js';
 import { startupProfiler } from '../telemetry/startupProfiler.js';
 import type { AgentDefinition } from '../agents/types.js';
@@ -2202,7 +2203,14 @@ export class Config implements McpContext, AgentLoopContext {
       this.setHasAccessToPreviewModel(hasAccess);
       return quota;
     } catch (e) {
-      debugLogger.debug('Failed to retrieve user quota', e);
+      if (isNetworkError(e)) {
+        debugLogger.warn(
+          'Network error while retrieving user quota. Some features may be limited.',
+          getErrorMessage(e),
+        );
+      } else {
+        debugLogger.debug('Failed to retrieve user quota', e);
+      }
       return undefined;
     }
   }
