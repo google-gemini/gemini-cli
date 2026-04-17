@@ -1407,13 +1407,12 @@ Logging in with Google... Restarting Gemini CLI to continue.
       }
 
       const isMcpOrConfigReady = isConfigInitialized && isMcpReady;
-      const isTimedOutIdle = Date.now() - lastOutputTimeRef.current >= 1000;
       debugLogger.log(
-        `[AppContainer] handleFinalSubmit: streamingState=\${streamingState}, isIdle=\${isIdle}, isTimedOutIdle=\${isTimedOutIdle}, isSlash=\${isSlash}`,
+        `[AppContainer] handleFinalSubmit: streamingState=\${streamingState}, isIdle=\${isIdle}, isSlash=\${isSlash}`,
       );
       if (
         (isSlash && isConfigInitialized) ||
-        ((isIdle || isTimedOutIdle) && isMcpOrConfigReady) ||
+        (isIdle && isMcpOrConfigReady) ||
         streamingState === StreamingState.WaitingForConfirmation
       ) {
         debugLogger.log(

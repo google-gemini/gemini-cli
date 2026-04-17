@@ -24,7 +24,7 @@ import { useKeypress, type Key } from '../hooks/useKeypress.js';
 import { Command } from '../key/keyMatchers.js';
 import { TextInput } from './shared/TextInput.js';
 import { formatCommand } from '../key/keybindingUtils.js';
-import { KeypressPriority } from '../contexts/KeypressContext.js';
+
 import {
   useTextBuffer,
   expandPastePlaceholders,
@@ -350,10 +350,7 @@ const TextQuestionView: React.FC<TextQuestionViewProps> = ({
     [buffer, textValue, keyMatchers],
   );
 
-  useKeypress(handleExtraKeys, {
-    isActive: true,
-    priority: KeypressPriority.Critical,
-  });
+  useKeypress(handleExtraKeys, { isActive: true, priority: true });
 
   const handleSubmit = useCallback(
     (val: string) => {
@@ -731,10 +728,7 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
     ],
   );
 
-  useKeypress(handleExtraKeys, {
-    isActive: true,
-    priority: KeypressPriority.Critical,
-  });
+  useKeypress(handleExtraKeys, { isActive: true, priority: true });
 
   const selectionItems = useMemo((): Array<SelectionListItem<OptionItem>> => {
     const list: Array<SelectionListItem<OptionItem>> = questionOptions.map(
