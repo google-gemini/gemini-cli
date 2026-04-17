@@ -9,6 +9,8 @@ import { render } from '../../test-utils/render.js';
 import { ShowMoreLines } from './ShowMoreLines.js';
 import { useOverflowState } from '../contexts/OverflowContext.js';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
+import { StreamingContext } from '../contexts/StreamingContext.js';
+import { StreamingState } from '../types.js';
 
 import type React from 'react';
 
@@ -42,7 +44,9 @@ describe('ShowMoreLines layout and padding', () => {
     const TestComponent = () => (
       <Box flexDirection="column">
         <Text>Top</Text>
-        <ShowMoreLines constrainHeight={true} isOverflowing={true} />
+        <StreamingContext.Provider value={StreamingState.Idle}>
+          <ShowMoreLines constrainHeight={true} isOverflowing={true} />
+        </StreamingContext.Provider>
         <Text>Bottom</Text>
       </Box>
     );
@@ -74,7 +78,9 @@ describe('ShowMoreLines layout and padding', () => {
     const TestComponent = () => (
       <Box flexDirection="column">
         <Text>Top</Text>
-        <ShowMoreLines constrainHeight={true} isOverflowing={true} />
+        <StreamingContext.Provider value={StreamingState.Idle}>
+          <ShowMoreLines constrainHeight={true} isOverflowing={true} />
+        </StreamingContext.Provider>
         <Text>Bottom</Text>
       </Box>
     );
