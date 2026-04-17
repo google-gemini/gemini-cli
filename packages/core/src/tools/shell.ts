@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import crypto from 'node:crypto';
-import { debugLogger } from '../index.js';
+import { debugLogger } from '../utils/debugLogger.js';
 import { type SandboxPermissions } from '../services/sandboxManager.js';
 import { ToolErrorType } from './tool-error.js';
 import {
@@ -34,7 +34,10 @@ import {
   type ShellOutputEvent,
 } from '../services/shellExecutionService.js';
 import { formatBytes } from '../utils/formatters.js';
-import type { AnsiOutput } from '../utils/terminalSerializer.js';
+import {
+  serializeAnsiOutputToText,
+  type AnsiOutput,
+} from '../utils/terminalSerializer.js';
 import {
   getCommandRoots,
   initializeShellParsers,
@@ -464,6 +467,14 @@ export class ShellToolInvocation extends BaseToolInvocation<
 
     const onAbort = () => combinedController.abort();
 
+    const outputFileName = `gemini_shell_output_${crypto.randomBytes(6).toString('hex')}.log`;
+    const projectTempDir = this.context.config.storage.getProjectTempDir();
+    fs.mkdirSync(projectTempDir, { recursive: true });
+    const outputFilePath = path.join(projectTempDir, outputFileName);
+    const outputStream = fs.createWriteStream(outputFilePath);
+
+    let fullOutputReturned = false;
+
     try {
       // pgrep is not available on Windows, so we can't get background PIDs
       const commandToExecute = this.wrapCommandForPgrep(
@@ -490,6 +501,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
       let cumulativeOutput: string | AnsiOutput = '';
       let lastUpdateTime = Date.now();
       let isBinaryStream = false;
+      let totalBytesWritten = 0;
 
       const resetTimeout = () => {
         if (timeoutMs <= 0) {
@@ -515,31 +527,65 @@ export class ShellToolInvocation extends BaseToolInvocation<
           cwd,
           (event: ShellOutputEvent) => {
             resetTimeout(); // Reset timeout on any event
-            if (!updateOutput) {
-              return;
-            }
-
-            let shouldUpdate = false;
 
             switch (event.type) {
+              case 'raw_data':
+                // We do not write raw data to the file to avoid spurious escape codes.
+                // We rely on 'file_data' for the clean output stream.
+                break;
+              case 'file_data':
+                totalBytesWritten += Buffer.byteLength(event.chunk);
+                outputStream.write(event.chunk);
+                break;
               case 'data':
                 if (isBinaryStream) break;
-                cumulativeOutput = event.chunk;
-                shouldUpdate = true;
+                if (typeof event.chunk === 'string') {
+                  if (typeof cumulativeOutput === 'string') {
+                    // Accumulate string chunks, capped at 16MB (same as ShellExecutionService)
+                    const MAX_BUFFER = 16 * 1024 * 1024;
+                    if (
+                      cumulativeOutput.length + event.chunk.length >
+                      MAX_BUFFER
+                    ) {
+                      cumulativeOutput = (cumulativeOutput + event.chunk).slice(
+                        -MAX_BUFFER,
+                      );
+                    } else {
+                      cumulativeOutput += event.chunk;
+                    }
+                  } else {
+                    // In case of mode switch (unlikely)
+                    cumulativeOutput = event.chunk;
+                  }
+                } else {
+                  // Snapshots (AnsiOutput) always replace
+                  cumulativeOutput = event.chunk;
+                }
+                if (updateOutput && !this.params.is_background) {
+                  updateOutput(cumulativeOutput);
+                  lastUpdateTime = Date.now();
+                }
                 break;
               case 'binary_detected':
                 isBinaryStream = true;
                 cumulativeOutput =
                   '[Binary output detected. Halting stream...]';
-                shouldUpdate = true;
+                if (updateOutput && !this.params.is_background) {
+                  updateOutput(cumulativeOutput);
+                }
                 break;
               case 'binary_progress':
                 isBinaryStream = true;
                 cumulativeOutput = `[Receiving binary output... ${formatBytes(
                   event.bytesReceived,
                 )} received]`;
-                if (Date.now() - lastUpdateTime > OUTPUT_UPDATE_INTERVAL_MS) {
-                  shouldUpdate = true;
+                if (
+                  updateOutput &&
+                  !this.params.is_background &&
+                  Date.now() - lastUpdateTime > OUTPUT_UPDATE_INTERVAL_MS
+                ) {
+                  updateOutput(cumulativeOutput);
+                  lastUpdateTime = Date.now();
                 }
                 break;
               case 'exit':
@@ -547,11 +593,6 @@ export class ShellToolInvocation extends BaseToolInvocation<
               default: {
                 throw new Error('An unhandled ShellOutputEvent was found.');
               }
-            }
-
-            if (shouldUpdate && !this.params.is_background) {
-              updateOutput(cumulativeOutput);
-              lastUpdateTime = Date.now();
             }
           },
           combinedController.signal,
@@ -615,9 +656,14 @@ export class ShellToolInvocation extends BaseToolInvocation<
           await new Promise((resolve) => setTimeout(resolve, delay));
 
           if (!completed) {
+            const initialOutputText =
+              typeof cumulativeOutput === 'string'
+                ? cumulativeOutput
+                : serializeAnsiOutputToText(cumulativeOutput);
+
             // Return early with initial output if still running
             return {
-              llmContent: `Command is running in background. PID: ${pid}. Initial output:\n${cumulativeOutput}`,
+              llmContent: `Command is running in background. PID: ${pid}. Initial output:\n${initialOutputText}`,
               returnDisplay: `Background process started with PID ${pid}.`,
             };
           }
@@ -625,6 +671,15 @@ export class ShellToolInvocation extends BaseToolInvocation<
       }
 
       const result = await resultPromise;
+      await new Promise<void>((resolve, reject) => {
+        outputStream.on('error', reject);
+        outputStream.end(resolve);
+      });
+
+      // Ensure the stream is fully closed before we proceed
+      if (!outputStream.closed) {
+        await new Promise<void>((resolve) => outputStream.on('close', resolve));
+      }
 
       const backgroundPIDs: number[] = [];
       if (os.platform() !== 'win32') {
@@ -918,27 +973,59 @@ export class ShellToolInvocation extends BaseToolInvocation<
           this.context.geminiClient,
           signal,
         );
-        return {
+        const threshold = this.context.config.getTruncateToolOutputThreshold();
+        const fullOutputFilePath =
+          threshold > 0 && totalBytesWritten >= threshold
+            ? outputFilePath
+            : undefined;
+
+        const toolResult: ToolResult = {
           llmContent: summary,
           returnDisplay,
+          fullOutputFilePath,
           ...executionError,
         };
+        if (toolResult.fullOutputFilePath) {
+          fullOutputReturned = true;
+        }
+        return toolResult;
       }
 
-      return {
+      const threshold = this.context.config.getTruncateToolOutputThreshold();
+      const fullOutputFilePath =
+        threshold > 0 && totalBytesWritten >= threshold
+          ? outputFilePath
+          : undefined;
+
+      const toolResult: ToolResult = {
         llmContent,
         returnDisplay,
         data,
+        fullOutputFilePath,
         ...executionError,
       };
+      if (toolResult.fullOutputFilePath) {
+        fullOutputReturned = true;
+      }
+      return toolResult;
     } finally {
       if (timeoutTimer) clearTimeout(timeoutTimer);
+      if (!outputStream.closed) {
+        outputStream.destroy();
+      }
       signal.removeEventListener('abort', onAbort);
       timeoutController.signal.removeEventListener('abort', onAbort);
       try {
         await fsPromises.unlink(tempFilePath);
       } catch {
         // Ignore errors during unlink
+      }
+      if (!fullOutputReturned) {
+        try {
+          await fsPromises.unlink(outputFilePath);
+        } catch {
+          // Ignore errors during unlink
+        }
       }
     }
   }
