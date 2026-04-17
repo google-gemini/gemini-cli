@@ -4,13 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import fs from 'node:fs';
 import { debugLogger } from '@google/gemini-cli-core';
 import type { GemmaModelRouterSettings } from '@google/gemini-cli-core';
-import {
-  getBinaryPath,
-  isBinaryInstalled,
-  isServerRunning,
-} from '../commands/gemma/platform.js';
+import { getBinaryPath, isServerRunning } from '../commands/gemma/platform.js';
 import { DEFAULT_PORT } from '../commands/gemma/constants.js';
 
 export class LiteRtServerManager {
@@ -19,7 +16,8 @@ export class LiteRtServerManager {
   ): Promise<void> {
     if (!gemmaSettings?.enabled) return;
     if (gemmaSettings.autoStartServer === false) return;
-    if (!isBinaryInstalled()) {
+    const binaryPath = getBinaryPath();
+    if (!binaryPath || !fs.existsSync(binaryPath)) {
       debugLogger.log(
         '[LiteRtServerManager] Binary not installed, skipping auto-start. Run "gemini gemma setup".',
       );
@@ -46,11 +44,6 @@ export class LiteRtServerManager {
 
     try {
       const { startServer } = await import('../commands/gemma/start.js');
-      const binaryPath = gemmaSettings.binaryPath || getBinaryPath() || '';
-      if (!binaryPath) {
-        debugLogger.warn('[LiteRtServerManager] Could not resolve binary path');
-        return;
-      }
       const started = await startServer(binaryPath, port);
       if (started) {
         debugLogger.log(`[LiteRtServerManager] Server started on port ${port}`);

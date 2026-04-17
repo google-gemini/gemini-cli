@@ -81,7 +81,8 @@ export const startCommand: CommandModule = {
       port = configuredPort;
     }
 
-    if (!isBinaryInstalled()) {
+    const binaryPath = getBinaryPath();
+    if (!binaryPath || !isBinaryInstalled(binaryPath)) {
       debugLogger.error(
         chalk.red(
           'LiteRT-LM binary not found. Run "gemini gemma setup" first.',
@@ -100,7 +101,6 @@ export const startCommand: CommandModule = {
       return;
     }
 
-    const binaryPath = getBinaryPath()!;
     debugLogger.log(`Starting LiteRT server on port ${port}...`);
 
     const started = await startServer(binaryPath, port);

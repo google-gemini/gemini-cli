@@ -6,16 +6,13 @@
 
 import type { CommandModule } from 'yargs';
 import fs from 'node:fs';
-import { execSync, spawn as nodeSpawn } from 'node:child_process';
+import path from 'node:path';
+import { execFileSync, spawn as nodeSpawn } from 'node:child_process';
 import chalk from 'chalk';
 import { debugLogger } from '@google/gemini-cli-core';
 import { loadSettings, SettingScope } from '../../config/settings.js';
 import { exitCli } from '../utils.js';
-import {
-  DEFAULT_PORT,
-  GEMMA_MODEL_NAME,
-  getLiteRtBinDir,
-} from './constants.js';
+import { DEFAULT_PORT, GEMMA_MODEL_NAME } from './constants.js';
 import {
   detectPlatform,
   getBinaryDownloadUrl,
@@ -133,6 +130,9 @@ interface SetupArgs {
 
 async function handleSetup(argv: SetupArgs): Promise<number> {
   const { port, force } = argv;
+  let settingsUpdated = false;
+  let serverStarted = false;
+  let autoStartServer = true;
 
   log('');
   log(chalk.bold('Gemma Local Model Routing Setup'));
@@ -181,7 +181,7 @@ async function handleSetup(argv: SetupArgs): Promise<number> {
     debugLogger.log(`Downloading from: ${downloadUrl}`);
 
     try {
-      const binDir = getLiteRtBinDir();
+      const binDir = path.dirname(binaryPath);
       fs.mkdirSync(binDir, { recursive: true });
       await downloadFile(downloadUrl, binaryPath);
       log(chalk.green('  ✓ Binary downloaded successfully'));
@@ -210,7 +210,7 @@ async function handleSetup(argv: SetupArgs): Promise<number> {
 
     if (process.platform === 'darwin') {
       try {
-        execSync(`xattr -d com.apple.quarantine "${binaryPath}"`, {
+        execFileSync('xattr', ['-d', 'com.apple.quarantine', binaryPath], {
           stdio: 'ignore',
         });
         log(chalk.green('  ✓ macOS quarantine attribute removed'));
@@ -254,15 +254,16 @@ async function handleSetup(argv: SetupArgs): Promise<number> {
     const existingGemma =
       settings.forScope(SettingScope.User).settings.experimental
         ?.gemmaModelRouter ?? {};
+    autoStartServer = existingGemma.autoStartServer ?? true;
 
     const newGemmaSettings = {
       ...existingGemma,
       enabled: true,
-      autoStartServer: existingGemma.autoStartServer ?? true,
+      autoStartServer,
       classifier: {
+        ...existingGemma.classifier,
         host: `http://localhost:${port}`,
         model: GEMMA_MODEL_NAME,
-        ...existingGemma.classifier,
       },
     };
 
@@ -274,6 +275,7 @@ async function handleSetup(argv: SetupArgs): Promise<number> {
     });
 
     log(chalk.green('  ✓ Settings updated in ~/.gemini/settings.json'));
+    settingsUpdated = true;
   } catch (error) {
     logError(
       chalk.red(
@@ -288,8 +290,8 @@ async function handleSetup(argv: SetupArgs): Promise<number> {
   if (argv.start) {
     log('');
     log('  Starting LiteRT server...');
-    const started = await startServer(binaryPath, port);
-    if (started) {
+    serverStarted = await startServer(binaryPath, port);
+    if (serverStarted) {
       log(chalk.green(`  ✓ Server started on port ${port}`));
     } else {
       log(
@@ -300,9 +302,23 @@ async function handleSetup(argv: SetupArgs): Promise<number> {
     }
   }
 
+  const routingActive = settingsUpdated && serverStarted;
+  const setupSucceeded = settingsUpdated && (!argv.start || serverStarted);
   log('');
   log(chalk.dim('─'.repeat(40)));
-  log(chalk.bold.green('  Setup complete! Local model routing is now active.'));
+  if (routingActive) {
+    log(chalk.bold.green('  Setup complete! Local model routing is active.'));
+  } else if (settingsUpdated) {
+    log(
+      chalk.bold.green('  Setup complete! Local model routing is configured.'),
+    );
+  } else {
+    log(
+      chalk.bold.yellow(
+        '  Setup incomplete. Manual settings changes are still required.',
+      ),
+    );
+  }
   log('');
   log('  How it works: Every request is classified by the local Gemma model.');
   log(
@@ -317,15 +333,27 @@ async function handleSetup(argv: SetupArgs): Promise<number> {
   );
   log('  This happens automatically — just use the CLI as usual.');
   log('');
-  if (!argv.start) {
+  if (!settingsUpdated) {
     log(
       chalk.yellow(
-        '  Note: Run "gemini gemma start" to start the server, or restart',
+        '  Fix the settings update above, then rerun "gemini gemma status".',
       ),
     );
+    log('');
+  } else if (!argv.start) {
+    log(chalk.yellow('  Note: Run "gemini gemma start" to start the server.'));
+    if (autoStartServer) {
+      log(
+        chalk.yellow(
+          '  Or restart the CLI to auto-start it on the next launch.',
+        ),
+      );
+    }
+    log('');
+  } else if (!serverStarted) {
     log(
       chalk.yellow(
-        '  the CLI to auto-start it (if autoStartServer is enabled).',
+        '  Review the server logs and rerun "gemini gemma start" after fixing the issue.',
       ),
     );
     log('');
@@ -337,7 +365,7 @@ async function handleSetup(argv: SetupArgs): Promise<number> {
   log(chalk.dim('    /gemma               Check status inside a session'));
   log('');
 
-  return 0;
+  return setupSucceeded ? 0 : 1;
 }
 
 export const setupCommand: CommandModule = {

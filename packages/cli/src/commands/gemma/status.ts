@@ -37,7 +37,7 @@ export async function checkGemmaStatus(
 
   const effectivePort = port ?? configuredPort;
   const binaryPath = getBinaryPath();
-  const binaryInstalled = isBinaryInstalled();
+  const binaryInstalled = isBinaryInstalled(binaryPath);
   const modelDownloaded =
     binaryInstalled && binaryPath ? isModelDownloaded(binaryPath) : false;
   const serverRunning = await isServerRunning(effectivePort);

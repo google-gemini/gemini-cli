@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { loadSettings } from '../../config/settings.js';
+import { loadSettings, SettingScope } from '../../config/settings.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -26,26 +26,60 @@ export interface PlatformInfo {
 export interface GemmaConfigStatus {
   settingsEnabled: boolean;
   configuredPort: number;
+  configuredBinaryPath?: string;
+}
+
+function getUserConfiguredBinaryPath(
+  workspaceDir = process.cwd(),
+): string | undefined {
+  try {
+    const userGemmaSettings = loadSettings(workspaceDir).forScope(
+      SettingScope.User,
+    ).settings.experimental?.gemmaModelRouter;
+    return userGemmaSettings?.binaryPath?.trim() || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function parsePortFromHost(
+  host: string | undefined,
+  fallbackPort: number,
+): number {
+  if (!host) {
+    return fallbackPort;
+  }
+
+  try {
+    const url = new URL(host);
+    const port = Number(url.port);
+    return Number.isFinite(port) && port > 0 ? port : fallbackPort;
+  } catch {
+    const match = host.match(/:(\d+)/);
+    if (!match) {
+      return fallbackPort;
+    }
+    const port = parseInt(match[1], 10);
+    return Number.isFinite(port) && port > 0 ? port : fallbackPort;
+  }
 }
 
 export function resolveGemmaConfig(fallbackPort: number): GemmaConfigStatus {
   let settingsEnabled = false;
   let configuredPort = fallbackPort;
+  const configuredBinaryPath = getUserConfiguredBinaryPath();
   try {
     const settings = loadSettings(process.cwd());
     const gemmaSettings = settings.merged.experimental?.gemmaModelRouter;
     settingsEnabled = gemmaSettings?.enabled === true;
-    const hostStr = gemmaSettings?.classifier?.host;
-    if (hostStr) {
-      const match = hostStr.match(/:(\d+)/);
-      if (match) {
-        configuredPort = parseInt(match[1], 10);
-      }
-    }
+    configuredPort = parsePortFromHost(
+      gemmaSettings?.classifier?.host,
+      fallbackPort,
+    );
   } catch {
     // ignore — settings may fail to load outside a workspace
   }
-  return { settingsEnabled, configuredPort };
+  return { settingsEnabled, configuredPort, configuredBinaryPath };
 }
 
 export function detectPlatform(): PlatformInfo | null {
@@ -58,6 +92,11 @@ export function detectPlatform(): PlatformInfo | null {
 }
 
 export function getBinaryPath(binaryName?: string): string | null {
+  const configuredBinaryPath = getUserConfiguredBinaryPath();
+  if (configuredBinaryPath) {
+    return configuredBinaryPath;
+  }
+
   const name = binaryName ?? detectPlatform()?.binaryName;
   if (!name) return null;
   return path.join(getLiteRtBinDir(), name);
@@ -67,8 +106,7 @@ export function getBinaryDownloadUrl(binaryName: string): string {
   return `${LITERT_RELEASE_BASE_URL}/${LITERT_RELEASE_VERSION}/${binaryName}`;
 }
 
-export function isBinaryInstalled(): boolean {
-  const binaryPath = getBinaryPath();
+export function isBinaryInstalled(binaryPath = getBinaryPath()): boolean {
   if (!binaryPath) return false;
   return fs.existsSync(binaryPath);
 }
