@@ -2947,6 +2947,13 @@
           "default": false,
           "type": "boolean"
         },
+        "stressTestProfile": {
+          "title": "Use the stress test profile to aggressively trigger context management.",
+          "description": "Significantly lowers token limits to force early garbage collection and distillation for testing purposes.",
+          "markdownDescription": "Significantly lowers token limits to force early garbage collection and distillation for testing purposes.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "generalistProfile": {
           "title": "Use the generalist profile to manage agent contexts.",
           "description": "Suitable for general coding and software development tasks.",

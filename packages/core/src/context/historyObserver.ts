@@ -39,23 +39,14 @@ export class HistoryObserver {
     }
 
     this.unsubscribeHistory = this.chatHistory.subscribe(
-      (_event: HistoryEvent) => {
-        // Rebuild the pristine Context Graph graph from the full source history on every change.
-        // Wait, toGraph still returns an Episode[].
-        // We actually need to map the Episode[] to a flat ConcreteNode[] here to form the 'nodes'.
-        const pristineEpisodes = this.graphMapper.toGraph(
-          this.chatHistory.get(),
-          this.tokenCalculator,
-        );
+      (event: HistoryEvent) => {
+        let nodes: ConcreteNode[] = [];
 
-        const nodes: ConcreteNode[] = [];
-        for (const ep of pristineEpisodes) {
-          if (ep.concreteNodes) {
-            for (const child of ep.concreteNodes) {
-              nodes.push(child);
-            }
-          }
+        if (event.type === 'CLEAR') {
+          this.seenNodeIds.clear();
         }
+
+        nodes = this.graphMapper.applyEvent(event, this.tokenCalculator);
 
         const newNodes = new Set<string>();
         for (const node of nodes) {
@@ -67,7 +58,7 @@ export class HistoryObserver {
 
         this.tracer.logEvent(
           'HistoryObserver',
-          'Rebuilt pristine graph from chat history update',
+          `Rebuilt pristine graph from ${event.type} event`,
           { nodesSize: nodes.length, newNodesCount: newNodes.size },
         );
 

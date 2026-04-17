@@ -29,12 +29,14 @@ const MAX_CHARS_FOR_FULL_HEURISTIC = 100_000;
 // standard multimodal responses are typically depth 1.
 const MAX_RECURSION_DEPTH = 3;
 
+const DEFAULT_CHARS_PER_TOKEN = 4;
+
 /**
  * Heuristic estimation of tokens for a text string.
  */
-function estimateTextTokens(text: string): number {
+function estimateTextTokens(text: string, charsPerToken: number): number {
   if (text.length > MAX_CHARS_FOR_FULL_HEURISTIC) {
-    return text.length / 4;
+    return text.length / charsPerToken;
   }
 
   let tokens = 0;
@@ -73,25 +75,33 @@ function estimateMediaTokens(part: Part): number | undefined {
  * Heuristic estimation for tool responses, avoiding massive string copies
  * and accounting for nested Gemini 3 multimodal parts.
  */
-function estimateFunctionResponseTokens(part: Part, depth: number): number {
+function estimateFunctionResponseTokens(
+  part: Part,
+  depth: number,
+  charsPerToken: number,
+): number {
   const fr = part.functionResponse;
   if (!fr) return 0;
 
-  let totalTokens = (fr.name?.length ?? 0) / 4;
+  let totalTokens = (fr.name?.length ?? 0) / charsPerToken;
   const response = fr.response as unknown;
 
   if (typeof response === 'string') {
-    totalTokens += response.length / 4;
+    totalTokens += response.length / charsPerToken;
   } else if (response !== undefined && response !== null) {
     // For objects, stringify only the payload, not the whole Part object.
-    totalTokens += JSON.stringify(response).length / 4;
+    totalTokens += JSON.stringify(response).length / charsPerToken;
   }
 
   // Gemini 3: Handle nested multimodal parts recursively.
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const nestedParts = (fr as unknown as { parts?: Part[] }).parts;
   if (nestedParts && nestedParts.length > 0) {
-    totalTokens += estimateTokenCountSync(nestedParts, depth + 1);
+    totalTokens += estimateTokenCountSync(
+      nestedParts,
+      depth + 1,
+      charsPerToken,
+    );
   }
 
   return totalTokens;
@@ -100,11 +110,12 @@ function estimateFunctionResponseTokens(part: Part, depth: number): number {
 /**
  * Estimates token count for parts synchronously using a heuristic.
  * - Text: character-based heuristic (ASCII vs CJK) for small strings, length/4 for massive ones.
- * - Non-text (Tools, etc): JSON string length / 4.
+ * - Non-text (Tools, etc): JSON string length / charsPerToken.
  */
 export function estimateTokenCountSync(
   parts: Part[],
   depth: number = 0,
+  charsPerToken: number = DEFAULT_CHARS_PER_TOKEN,
 ): number {
   if (depth > MAX_RECURSION_DEPTH) {
     return 0;
@@ -113,9 +124,9 @@ export function estimateTokenCountSync(
   let totalTokens = 0;
   for (const part of parts) {
     if (typeof part.text === 'string') {
-      totalTokens += estimateTextTokens(part.text);
+      totalTokens += estimateTextTokens(part.text, charsPerToken);
     } else if (part.functionResponse) {
-      totalTokens += estimateFunctionResponseTokens(part, depth);
+      totalTokens += estimateFunctionResponseTokens(part, depth, charsPerToken);
     } else {
       const mediaEstimate = estimateMediaTokens(part);
       if (mediaEstimate !== undefined) {
@@ -123,7 +134,7 @@ export function estimateTokenCountSync(
       } else {
         // Fallback for other non-text parts (e.g., functionCall).
         // Note: JSON.stringify(part) here is safe as these parts are typically small.
-        totalTokens += JSON.stringify(part).length / 4;
+        totalTokens += JSON.stringify(part).length / charsPerToken;
       }
     }
   }
@@ -162,9 +173,9 @@ export async function calculateRequestTokenCount(
     } catch (error) {
       // Fallback to local estimation if the API call fails
       debugLogger.debug('countTokens API failed:', error);
-      return estimateTokenCountSync(parts);
+      return estimateTokenCountSync(parts, 0, DEFAULT_CHARS_PER_TOKEN);
     }
   }
 
-  return estimateTokenCountSync(parts);
+  return estimateTokenCountSync(parts, 0, DEFAULT_CHARS_PER_TOKEN);
 }

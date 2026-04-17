@@ -95,7 +95,7 @@ describe('ContextWorkingBufferImpl', () => {
     buffer = buffer.applyProcessorResult('Summarizer', [p1, p2], [summaryNode]);
 
     // p1 and p2 are removed, p3 remains, s1 is added
-    expect(buffer.nodes.map((n) => n.id)).toEqual(['p3', 's1']);
+    expect(buffer.nodes.map((n) => n.id)).toEqual(['s1', 'p3']);
 
     // Provenance lookup: The summary node should resolve to both p1 and p2!
     const roots = buffer.getPristineNodes('s1');
