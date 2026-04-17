@@ -18,13 +18,14 @@ import {
   MessageBusType,
   type SerializableConfirmationDetails,
 } from '../confirmation-bus/types.js';
+import type { PolicySuggestion } from '../policy/suggestion-generator.js';
 import {
   ToolConfirmationOutcome,
   type AnyDeclarativeTool,
   type AnyToolInvocation,
   type PolicyUpdateOptions,
 } from '../tools/tools.js';
-import { buildFilePathArgsPattern } from '../policy/utils.js';
+import { buildFilePathArgsPattern, isSafeRegExp } from '../policy/utils.js';
 import { makeRelative } from '../utils/paths.js';
 import { DiscoveredMCPTool, formatMcpToolName } from '../tools/mcp-tool.js';
 import { EDIT_TOOL_NAMES } from '../tools/tool-names.js';
@@ -118,6 +119,7 @@ export async function updatePolicy(
   context: AgentLoopContext,
   messageBus: MessageBus,
   toolInvocation?: AnyToolInvocation,
+  policySuggestion?: PolicySuggestion | null,
 ): Promise<void> {
   // Mode Transitions (AUTO_EDIT)
   if (isAutoEditTransition(tool, outcome)) {
@@ -165,6 +167,7 @@ export async function updatePolicy(
       confirmationDetails,
       messageBus,
       persistScope,
+      policySuggestion,
       modes,
     );
     return;
@@ -177,6 +180,7 @@ export async function updatePolicy(
     confirmationDetails,
     messageBus,
     persistScope,
+    policySuggestion,
     toolInvocation,
     context.config,
     modes,
@@ -210,6 +214,7 @@ async function handleStandardPolicyUpdate(
   confirmationDetails: SerializableConfirmationDetails | undefined,
   messageBus: MessageBus,
   persistScope?: 'workspace' | 'user',
+  policySuggestion?: PolicySuggestion | null,
   toolInvocation?: AnyToolInvocation,
   config?: Config,
   modes?: ApprovalMode[],
@@ -221,7 +226,15 @@ async function handleStandardPolicyUpdate(
     const options: PolicyUpdateOptions =
       toolInvocation?.getPolicyUpdateOptions?.(outcome) || {};
 
-    if (!options.commandPrefix && confirmationDetails?.type === 'exec') {
+    // Use LLM suggestion if available, otherwise fall back to heuristic
+    if (policySuggestion?.commandPrefix) {
+      options.commandPrefix = policySuggestion.commandPrefix;
+    } else if (
+      policySuggestion?.argsPattern &&
+      isSafeRegExp(policySuggestion.argsPattern)
+    ) {
+      options.argsPattern = policySuggestion.argsPattern;
+    } else if (!options.commandPrefix && confirmationDetails?.type === 'exec') {
       options.commandPrefix = confirmationDetails.rootCommands;
     } else if (!options.argsPattern && confirmationDetails?.type === 'edit') {
       const filePath = config
@@ -254,6 +267,7 @@ async function handleMcpPolicyUpdate(
   >,
   messageBus: MessageBus,
   persistScope?: 'workspace' | 'user',
+  policySuggestion?: PolicySuggestion | null,
   modes?: ApprovalMode[],
 ): Promise<void> {
   const isMcpAlways =
@@ -272,6 +286,8 @@ async function handleMcpPolicyUpdate(
   // If "Always allow all tools from this server", use the wildcard pattern
   if (outcome === ToolConfirmationOutcome.ProceedAlwaysServer) {
     toolName = formatMcpToolName(confirmationDetails.serverName, '*');
+  } else if (policySuggestion?.toolName) {
+    toolName = policySuggestion.toolName;
   }
 
   await messageBus.publish({

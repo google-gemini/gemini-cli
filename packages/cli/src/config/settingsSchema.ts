@@ -1914,6 +1914,16 @@ const SETTINGS_SCHEMA = {
           'Enable the context-aware security checker. This feature uses an LLM to dynamically generate and enforce security policies for tool use based on your prompt, providing an additional layer of protection against unintended actions.',
         showInDialog: true,
       },
+      enableSmartPolicyScoping: {
+        type: 'boolean',
+        label: 'Smart Policy Scoping',
+        category: 'Security',
+        requiresRestart: false,
+        default: false,
+        description:
+          'To suggest better-scoped policy rules, allow Gemini to analyze tool approvals. Displays a suggested scope description on approval options.',
+        showInDialog: true,
+      },
     },
   },
 

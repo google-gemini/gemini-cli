@@ -10,6 +10,7 @@ import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { SchedulerStateManager } from './state-manager.js';
 import { resolveConfirmation } from './confirmation.js';
 import { checkPolicy, updatePolicy, getPolicyDenialError } from './policy.js';
+import type { PolicySuggestion } from '../policy/suggestion-generator.js';
 import { evaluateBeforeToolHook } from './hook-utils.js';
 import { ToolExecutor } from './tool-executor.js';
 import { ToolModificationHandler } from './tool-modifier.js';
@@ -646,6 +647,7 @@ export class Scheduler {
     // User Confirmation Loop
     let outcome = ToolConfirmationOutcome.ProceedOnce;
     let lastDetails: SerializableConfirmationDetails | undefined;
+    let policySuggestion: PolicySuggestion | null | undefined;
 
     if (decision === PolicyDecision.ASK_USER) {
       const result = await resolveConfirmation(toolCall, signal, {
@@ -661,6 +663,7 @@ export class Scheduler {
       });
       outcome = result.outcome;
       lastDetails = result.lastDetails;
+      policySuggestion = result.policySuggestion;
     }
 
     this.state.setOutcome(callId, outcome);
@@ -674,6 +677,7 @@ export class Scheduler {
         this.context,
         this.messageBus,
         toolCall.invocation,
+        policySuggestion,
       );
     }
 

@@ -18,6 +18,8 @@ import {
   ApprovalMode,
   hasRedirection,
   debugLogger,
+  MessageBusType,
+  type PolicySuggestionMessage,
 } from '@google/gemini-cli-core';
 import { useToolActions } from '../../contexts/ToolActionsContext.js';
 import {
@@ -49,6 +51,7 @@ import { isShellTool } from './ToolShared.js';
 
 export interface ToolConfirmationMessageProps {
   callId: string;
+  correlationId?: string;
   confirmationDetails: SerializableConfirmationDetails;
   config: Config;
   getPreferredEditor: () => EditorType | undefined;
@@ -62,6 +65,7 @@ export const ToolConfirmationMessage: React.FC<
   ToolConfirmationMessageProps
 > = ({
   callId,
+  correlationId,
   confirmationDetails,
   config,
   getPreferredEditor,
@@ -72,6 +76,27 @@ export const ToolConfirmationMessage: React.FC<
 }) => {
   const keyMatchers = useKeyMatchers();
   const { confirm, isDiffingEnabled } = useToolActions();
+  const smartScoping = config.enableSmartPolicyScoping && !!correlationId;
+  const [policySuggestion, setPolicySuggestion] = useState<
+    PolicySuggestionMessage['suggestion'] | null
+  >(null);
+
+  // Subscribe to LLM-generated policy suggestions for this confirmation
+  useEffect(() => {
+    if (!correlationId) return;
+
+    const messageBus = config.getMessageBus();
+    const handler = (msg: PolicySuggestionMessage) => {
+      if (msg.correlationId === correlationId && msg.suggestion?.description) {
+        setPolicySuggestion(msg.suggestion);
+      }
+    };
+    messageBus.on(MessageBusType.POLICY_SUGGESTION, handler);
+    return () => {
+      messageBus.off(MessageBusType.POLICY_SUGGESTION, handler);
+    };
+  }, [config, correlationId]);
+
   const [mcpDetailsExpansionState, setMcpDetailsExpansionState] = useState<{
     callId: string;
     expanded: boolean;
@@ -738,6 +763,22 @@ export const ToolConfirmationMessage: React.FC<
           ),
         ).join(', ');
 
+        // When smart scoping is active, show the LLM-suggested scope in
+        // brackets with the description in parentheses. Otherwise fall back
+        // to the heuristic root command names.
+        let scopeDisplay = commandNames;
+        let scopeDescription = '';
+        if (smartScoping && policySuggestion) {
+          if (policySuggestion.commandPrefix) {
+            scopeDisplay = Array.isArray(policySuggestion.commandPrefix)
+              ? policySuggestion.commandPrefix.join(', ')
+              : policySuggestion.commandPrefix;
+          } else if (policySuggestion.argsPattern) {
+            scopeDisplay = policySuggestion.argsPattern;
+          }
+          scopeDescription = policySuggestion.description;
+        }
+
         const allowQuestion = (
           <Text>
             Allow execution of{' '}
@@ -745,8 +786,11 @@ export const ToolConfirmationMessage: React.FC<
               color={isShell ? theme.status.warning : undefined}
               bold={isShell}
             >
-              [{sanitizeForDisplay(commandNames)}]
+              [{sanitizeForDisplay(scopeDisplay)}]
             </Text>
+            {scopeDescription ? (
+              <Text color={theme.text.secondary}> ({scopeDescription})</Text>
+            ) : null}
             {'?'}
           </Text>
         );
@@ -834,7 +878,15 @@ export const ToolConfirmationMessage: React.FC<
         );
       } else if (confirmationDetails.type === 'mcp') {
         const mcpProps = confirmationDetails;
-        question = `Allow execution of MCP tool "${sanitizeForDisplay(mcpProps.toolName)}" from server "${sanitizeForDisplay(mcpProps.serverName)}"?`;
+        const mcpToolDisplay =
+          smartScoping && policySuggestion?.toolName
+            ? policySuggestion.toolName
+            : mcpProps.toolName;
+        const mcpDescription =
+          smartScoping && policySuggestion?.description
+            ? ` (${policySuggestion.description})`
+            : '';
+        question = `Allow execution of MCP tool "${sanitizeForDisplay(mcpToolDisplay)}" from server "${sanitizeForDisplay(mcpProps.serverName)}"${mcpDescription}?`;
 
         bodyContent = (
           <Box flexDirection="column">
@@ -906,6 +958,8 @@ export const ToolConfirmationMessage: React.FC<
       activeTheme,
       config,
       toolName,
+      smartScoping,
+      policySuggestion,
     ]);
 
   const bodyOverflowDirection: 'top' | 'bottom' =

@@ -119,6 +119,7 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
         <Box flexDirection="column">
           <ToolConfirmationMessage
             callId={tool.callId}
+            correlationId={tool.correlationId}
             confirmationDetails={tool.confirmationDetails}
             config={config}
             getPreferredEditor={getPreferredEditor}
