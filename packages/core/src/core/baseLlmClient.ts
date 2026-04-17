@@ -337,6 +337,7 @@ export class BaseLlmClient {
         authType:
           this.authType ?? this.config.getContentGeneratorConfig()?.authType,
         retryFetchErrors: this.config.getRetryFetchErrors(),
+        logErrorDetails: this.config.getDebugMode(),
         onRetry: (attempt, error, delayMs) => {
           const actualMaxAttempts =
             availabilityMaxAttempts ?? maxAttempts ?? DEFAULT_MAX_ATTEMPTS;

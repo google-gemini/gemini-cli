@@ -120,6 +120,7 @@ describe('BaseLlmClient', () => {
       setActiveModel: vi.fn(),
       getUserTier: vi.fn().mockReturnValue(undefined),
       getRetryFetchErrors: vi.fn().mockReturnValue(true),
+      getDebugMode: vi.fn().mockReturnValue(false),
       getMaxAttempts: vi.fn().mockReturnValue(3),
       getModel: vi.fn().mockReturnValue('test-model'),
       getActiveModel: vi.fn().mockReturnValue('test-model'),

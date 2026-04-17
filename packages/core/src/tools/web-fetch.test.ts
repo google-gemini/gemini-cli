@@ -283,6 +283,7 @@ describe('WebFetchTool', () => {
       get geminiClient() {
         return mockGetGeminiClient();
       },
+      getDebugMode: vi.fn().mockReturnValue(false),
       getRetryFetchErrors: vi.fn().mockReturnValue(false),
       getMaxAttempts: vi.fn().mockReturnValue(3),
       getDirectWebFetch: vi.fn().mockReturnValue(false),

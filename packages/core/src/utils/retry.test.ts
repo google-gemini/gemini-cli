@@ -200,6 +200,49 @@ describe('retryWithBackoff', () => {
     expect(mockFn).toHaveBeenCalledTimes(2);
   });
 
+  it('logs only the retry summary by default for 429 errors', async () => {
+    const mockFn = vi.fn(async () => {
+      throw new ApiError({ message: 'Too Many Requests', status: 429 });
+    });
+
+    const promise = retryWithBackoff(mockFn, {
+      maxAttempts: 2,
+      initialDelayMs: 10,
+    });
+
+    await Promise.all([
+      expect(promise).rejects.toThrow('Too Many Requests'),
+      vi.runAllTimersAsync(),
+    ]);
+
+    expect(debugLogger.warn).toHaveBeenCalledWith(
+      'Attempt 1 failed with status 429. Retrying with backoff...',
+    );
+  });
+
+  it('logs retry error details when logErrorDetails is enabled', async () => {
+    const error = new ApiError({ message: 'Too Many Requests', status: 429 });
+    const mockFn = vi.fn(async () => {
+      throw error;
+    });
+
+    const promise = retryWithBackoff(mockFn, {
+      maxAttempts: 2,
+      initialDelayMs: 10,
+      logErrorDetails: true,
+    });
+
+    await Promise.all([
+      expect(promise).rejects.toThrow('Too Many Requests'),
+      vi.runAllTimersAsync(),
+    ]);
+
+    expect(debugLogger.warn).toHaveBeenCalledWith(
+      'Attempt 1 failed with status 429. Retrying with backoff...',
+      error,
+    );
+  });
+
   it('should use default shouldRetry if not provided, not retrying on ApiError 400', async () => {
     const mockFn = vi.fn(async () => {
       throw new ApiError({ message: 'Bad Request', status: 400 });

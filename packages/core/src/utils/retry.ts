@@ -23,6 +23,7 @@ export interface RetryOptions {
   maxAttempts: number;
   initialDelayMs: number;
   maxDelayMs: number;
+  logErrorDetails: boolean;
   shouldRetryOnError: (error: Error, retryFetchErrors?: boolean) => boolean;
   shouldRetryOnContent?: (content: GenerateContentResponse) => boolean;
   onPersistent429?: (
@@ -43,6 +44,7 @@ const DEFAULT_RETRY_OPTIONS: RetryOptions = {
   maxAttempts: DEFAULT_MAX_ATTEMPTS,
   initialDelayMs: 5000,
   maxDelayMs: 30000, // 30 seconds
+  logErrorDetails: false,
   shouldRetryOnError: isRetryableError,
 };
 
@@ -240,6 +242,7 @@ export async function retryWithBackoff<T>(
     signal,
     getAvailabilityContext,
     onRetry,
+    logErrorDetails,
   } = {
     ...DEFAULT_RETRY_OPTIONS,
     shouldRetryOnError: isRetryableError,
@@ -386,7 +389,7 @@ export async function retryWithBackoff<T>(
           continue;
         } else {
           const errorStatus = getErrorStatus(error);
-          logRetryAttempt(attempt, error, errorStatus);
+          logRetryAttempt(attempt, error, errorStatus, logErrorDetails);
 
           // Exponential backoff with jitter for non-quota errors
           const jitter = currentDelay * 0.3 * (Math.random() * 2 - 1);
@@ -410,7 +413,7 @@ export async function retryWithBackoff<T>(
       }
 
       const errorStatus = getErrorStatus(error);
-      logRetryAttempt(attempt, error, errorStatus);
+      logRetryAttempt(attempt, error, errorStatus, logErrorDetails);
 
       // Exponential backoff with jitter for non-quota errors
       const jitter = currentDelay * 0.3 * (Math.random() * 2 - 1);
@@ -436,32 +439,39 @@ function logRetryAttempt(
   attempt: number,
   error: unknown,
   errorStatus?: number,
+  logErrorDetails: boolean = false,
 ): void {
   let message = `Attempt ${attempt} failed. Retrying with backoff...`;
   if (errorStatus) {
     message = `Attempt ${attempt} failed with status ${errorStatus}. Retrying with backoff...`;
   }
 
+  const logWarning = (warningMessage: string) => {
+    if (logErrorDetails) {
+      debugLogger.warn(warningMessage, error);
+    } else {
+      debugLogger.warn(warningMessage);
+    }
+  };
+
   if (errorStatus === 429) {
-    debugLogger.warn(message, error);
+    logWarning(message);
   } else if (errorStatus && errorStatus >= 500 && errorStatus < 600) {
-    debugLogger.warn(message, error);
+    logWarning(message);
   } else if (error instanceof Error) {
     // Fallback for errors that might not have a status but have a message
     if (error.message.includes('429')) {
-      debugLogger.warn(
+      logWarning(
         `Attempt ${attempt} failed with 429 error (no Retry-After header). Retrying with backoff...`,
-        error,
       );
     } else if (error.message.match(/5\d{2}/)) {
-      debugLogger.warn(
+      logWarning(
         `Attempt ${attempt} failed with 5xx error. Retrying with backoff...`,
-        error,
       );
     } else {
-      debugLogger.warn(message, error); // Default to warn for other errors
+      logWarning(message); // Default to warn for other errors
     }
   } else {
-    debugLogger.warn(message, error); // Default to warn if error type is unknown
+    logWarning(message); // Default to warn if error type is unknown
   }
 }
