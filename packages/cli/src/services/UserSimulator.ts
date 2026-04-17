@@ -315,7 +315,19 @@ ${strippedScreen}
           }
         }
 
-        for (const char of keys) {
+        const keysToSend =
+          process.env['SIMULATOR_SKIP_RETURN'] === 'true' && keys === 'y\r'
+            ? 'y'
+            : keys;
+        if (keysToSend !== keys) {
+          debugLogger.log(
+            `[SIMULATOR] HACK: Skipping \\r for testing. Sending: ${JSON.stringify(keysToSend)}`,
+          );
+        }
+        for (const char of keysToSend) {
+          debugLogger.log(
+            `[SIMULATOR] Writing character to stdin: ${JSON.stringify(char)}`,
+          );
           this.stdinBuffer.write(char);
           // Small delay to ensure Ink processes each keypress event individually
           // while preventing UI state collisions during long simulated inputs.
