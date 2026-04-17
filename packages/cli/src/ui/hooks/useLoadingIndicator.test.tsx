@@ -73,6 +73,9 @@ describe('useLoadingIndicator', () => {
         showWit={initialShowWit}
         errorVerbosity={initialErrorVerbosity}
       />,
+      undefined,
+      undefined,
+      true,
     );
     return {
       result: {
@@ -96,7 +99,6 @@ describe('useLoadingIndicator', () => {
             {...newProps}
           />,
         );
-        await waitUntilReady();
       },
       waitUntilReady,
     };
