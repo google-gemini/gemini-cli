@@ -153,6 +153,9 @@ describe('SettingsContext', () => {
       <ErrorBoundary onError={onError}>
         <TestHarness />
       </ErrorBoundary>,
+      undefined,
+      undefined,
+      true,
     );
 
     expect(onError).toHaveBeenCalledWith(
