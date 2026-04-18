@@ -76,6 +76,8 @@ import { promptForSetting } from './extensions/extensionSettings.js';
 import type { EventEmitter } from 'node:stream';
 import { runExitCleanup } from '../utils/cleanup.js';
 
+const CYBER_BINARY_NAME = 'gemini-cyber';
+
 export interface CliArgs {
   query: string | undefined;
   model: string | undefined;
@@ -515,9 +517,10 @@ async function createHatsMcpServerConfig(
   cwd: string,
 ): Promise<MCPServerConfig | undefined> {
   const currentBin = process.argv[1] ?? '';
+  const currentBinName = path.basename(currentBin);
   const shouldEnableHatsMcp =
     process.env['GEMINI_CYBER_ENABLE_HATS_MCP'] === '1' ||
-    currentBin.includes('gemini-cyber');
+    currentBinName === CYBER_BINARY_NAME;
   if (!shouldEnableHatsMcp) {
     return undefined;
   }

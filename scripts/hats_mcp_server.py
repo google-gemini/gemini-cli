@@ -64,7 +64,7 @@ def _run_hats(args: list[str]) -> dict[str, Any]:
         "stdout": stdout,
         "stderr": stderr,
         "parsed_json": parsed_json,
-        "ok": proc.returncode == 0,
+        "success": proc.returncode == 0,
     }
 
 
@@ -110,4 +110,3 @@ def hats_chain_scan(target: str) -> dict[str, Any]:
 
 if __name__ == "__main__":
     mcp.run()
-
