@@ -106,14 +106,77 @@ function main() {
     markdown += '#### 3. Manual Fix\n';
     markdown +=
       'See the [Fixing Guide](https://github.com/google-gemini/gemini-cli/blob/main/evals/README.md#fixing-evaluations) for detailed troubleshooting steps.\n';
-    markdown += '</details>\n';
+    markdown += '</details>\n\n';
+
+    markdown += getUsageSummaryMarkdown();
 
     process.stdout.write(markdown);
   } else if (passes.length > 0) {
     // Success State
-    process.stdout.write(
-      `✅ **${passes.length}** tests passed successfully on **${targetModel}**.\n`,
-    );
+    let markdown = `✅ **${passes.length}** tests passed successfully on **${targetModel}**.\n\n`;
+    markdown += getUsageSummaryMarkdown();
+    process.stdout.write(markdown);
+  }
+}
+
+/**
+ * Generates a Markdown summary of usage metrics if available.
+ */
+function getUsageSummaryMarkdown() {
+  const usageLogPath =
+    process.env['GEMINI_EVAL_USAGE_LOG'] ||
+    path.resolve(process.cwd(), 'evals/logs/usage-metrics.jsonl');
+  // In the PR workflow, the metrics might be gathered in multiple passes or we might
+  // need to fall back to the nightly report structure. Since the PR evaluation runs
+  // in a loop that might wipe the temp file, we rely on the fact that `run_eval_regression`
+  // copies the metrics to `evals/logs/usage-metrics.jsonl` if we implement that, or
+  // we just skip it if it's missing.
+  if (!fs.existsSync(usageLogPath)) {
+    return '';
+  }
+
+  try {
+    const lines = fs
+      .readFileSync(usageLogPath, 'utf-8')
+      .trim()
+      .split('\n')
+      .filter(Boolean);
+    if (lines.length === 0) return '';
+    const entries = lines
+      .map((line) => {
+        try {
+          return JSON.parse(line);
+        } catch {
+          return null;
+        }
+      })
+      .filter(Boolean);
+
+    let totalTurns = 0;
+    let totalInput = 0;
+    let totalOutput = 0;
+    let totalCached = 0;
+    let grandTotal = 0;
+
+    for (const entry of entries) {
+      totalTurns += entry.turns || 0;
+      totalInput += entry.input || 0;
+      totalOutput += entry.output || 0;
+      totalCached += entry.cached || 0;
+      grandTotal += entry.total || 0;
+    }
+
+    let markdown = '#### 📊 Usage Summary\n';
+    markdown += `| Metric | Total |\n`;
+    markdown += `| :--- | :--- |\n`;
+    markdown += `| **Turns** | ${totalTurns} |\n`;
+    markdown += `| **Input Tokens** | ${totalInput.toLocaleString()} |\n`;
+    markdown += `| **Output Tokens** | ${totalOutput.toLocaleString()} |\n`;
+    markdown += `| **Cached Tokens** | ${totalCached.toLocaleString()} |\n`;
+    markdown += `| **Total Tokens** | ${grandTotal.toLocaleString()} |\n`;
+    return markdown;
+  } catch {
+    return '';
   }
 }
 

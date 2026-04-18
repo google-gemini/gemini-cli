@@ -14,6 +14,7 @@ import {
   prepareWorkspace,
   type BaseEvalCase,
   EVAL_MODEL,
+  logUsageMetrics,
 } from './test-helper.js';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -59,6 +60,7 @@ export function appEvalTest(policy: EvalPolicy, evalCase: AppEvalCase) {
 
       const { logDir, sanitizedName } = await prepareLogDir(evalCase.name);
       const logFile = path.join(logDir, `${sanitizedName}.log`);
+      let isSuccess = false;
 
       try {
         await rig.initialize();
@@ -89,7 +91,16 @@ export function appEvalTest(policy: EvalPolicy, evalCase: AppEvalCase) {
         // Run assertion. Interaction-heavy tests can do their own waiting/steering here.
         const output = rig.getStaticOutput();
         await evalCase.assert(rig, output);
+        isSuccess = true;
+      } catch (e) {
+        isSuccess = false;
+        throw e;
       } finally {
+        const metrics = rig.getUsageMetrics();
+        if (metrics.turns > 0) {
+          logUsageMetrics(evalCase.name, metrics, isSuccess);
+        }
+
         const output = rig.getStaticOutput();
         if (output) {
           await fs.promises.writeFile(logFile, output);

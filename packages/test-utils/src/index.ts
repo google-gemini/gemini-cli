@@ -13,3 +13,4 @@ export * from './mock-utils.js';
 export * from './test-mcp-server.js';
 export * from './test-rig.js';
 export * from './env-setup.js';
+export * from './usage-metrics-utils.js';

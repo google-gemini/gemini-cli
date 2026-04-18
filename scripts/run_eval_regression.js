@@ -15,6 +15,9 @@
 
 import { execSync } from 'node:child_process';
 import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
+import { randomUUID } from 'node:crypto';
 
 /**
  * Main execution logic.
@@ -25,6 +28,14 @@ async function main() {
 
   let combinedReport = '';
   let hasRegression = false;
+
+  const usageLogPath = path.join(
+    os.tmpdir(),
+    `gemini-usage-regression-${randomUUID()}.jsonl`,
+  );
+  if (fs.existsSync(usageLogPath)) {
+    fs.unlinkSync(usageLogPath);
+  }
 
   console.log(
     `🚀 Starting evaluation orchestration for models: ${models.join(', ')}`,
@@ -50,16 +61,30 @@ async function main() {
       }
 
       // 2. Run Frugal Regression Check
-      console.log(`🧪 Running regression check for ${model}...`);
+      console.log(`\n🚀 Executing regression tests for ${model}...`);
+      const tmpUsageLog = path.join(
+        os.tmpdir(),
+        `gemini-usage-tmp-${model}-${randomUUID()}.jsonl`,
+      );
+      const env = { ...process.env, GEMINI_EVAL_USAGE_LOG: tmpUsageLog };
+
       execSync(`node scripts/run_regression_check.js "${model}" "${output}"`, {
         stdio: 'inherit',
+        env,
       });
+
+      if (fs.existsSync(tmpUsageLog)) {
+        fs.appendFileSync(usageLogPath, fs.readFileSync(tmpUsageLog));
+        fs.unlinkSync(tmpUsageLog);
+      }
 
       // 3. Generate Report
       console.log(`📊 Generating report for ${model}...`);
+      const reportEnv = { ...process.env, GEMINI_EVAL_USAGE_LOG: usageLogPath };
       const report = execSync(`node scripts/compare_evals.js "${model}"`, {
         encoding: 'utf-8',
         stdio: ['inherit', 'pipe', 'inherit'],
+        env: reportEnv,
       }).trim();
 
       if (report) {
@@ -96,6 +121,10 @@ async function main() {
     );
   } else {
     console.log('\n✅ All evaluations passed successfully (or were cleared).');
+  }
+
+  if (fs.existsSync(usageLogPath)) {
+    fs.unlinkSync(usageLogPath);
   }
 
   process.exit(0);
