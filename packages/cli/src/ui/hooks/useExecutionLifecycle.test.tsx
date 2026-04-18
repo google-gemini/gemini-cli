@@ -190,7 +190,12 @@ describe('useExecutionLifecycle', () => {
       );
       return null;
     }
-    const { rerender } = await render(<TestComponent />);
+    const { rerender } = await render(
+      <TestComponent />,
+      undefined,
+      undefined,
+      true,
+    );
     return {
       result: {
         get current() {
