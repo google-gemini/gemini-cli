@@ -1405,9 +1405,7 @@ describe('AppContainer State Management', () => {
       );
 
       expect(titleWrites).toHaveLength(1);
-      expect(titleWrites[0][0]).toBe(
-        `\x1b]0;${'✦  Working… (workspace)'.padEnd(80, ' ')}\x07`,
-      );
+      expect(titleWrites[0][0]).toBe(`\x1b]0;${'✦  Working… (workspace)'}\x07`);
       unmount();
     });
 
@@ -1440,9 +1438,7 @@ describe('AppContainer State Management', () => {
       );
 
       expect(titleWrites).toHaveLength(1);
-      expect(titleWrites[0][0]).toBe(
-        `\x1b]0;${'Gemini CLI (workspace)'.padEnd(80, ' ')}\x07`,
-      );
+      expect(titleWrites[0][0]).toBe(`\x1b]0;${'Gemini CLI (workspace)'}\x07`);
       unmount();
     });
 
@@ -1502,7 +1498,7 @@ describe('AppContainer State Management', () => {
 
       expect(titleWrites).toHaveLength(1);
       expect(titleWrites[0][0]).toBe(
-        `\x1b]0;${`✦  ${thoughtSubject} (workspace)`.padEnd(80, ' ')}\x07`,
+        `\x1b]0;${`✦  ${thoughtSubject} (workspace)`}\x07`,
       );
       unmount();
     });
@@ -1532,9 +1528,7 @@ describe('AppContainer State Management', () => {
       );
 
       expect(titleWrites).toHaveLength(1);
-      expect(titleWrites[0][0]).toBe(
-        `\x1b]0;${'◇  Ready (workspace)'.padEnd(80, ' ')}\x07`,
-      );
+      expect(titleWrites[0][0]).toBe(`\x1b]0;${'◇  Ready (workspace)'}\x07`);
       unmount();
     });
 
@@ -1569,7 +1563,7 @@ describe('AppContainer State Management', () => {
 
       expect(titleWrites).toHaveLength(1);
       expect(titleWrites[0][0]).toBe(
-        `\x1b]0;${'✋  Action Required (workspace)'.padEnd(80, ' ')}\x07`,
+        `\x1b]0;${'✋  Action Required (workspace)'}\x07`,
       );
       unmount();
     });
@@ -1844,7 +1838,7 @@ describe('AppContainer State Management', () => {
       });
     });
 
-    it('should pad title to exactly 80 characters', async () => {
+    it('should not pad title with trailing spaces', async () => {
       // Arrange: Set up mock settings with showStatusInTitle enabled
       const mockSettingsWithTitleEnabled = createMockSettings({
         ui: {
@@ -1868,16 +1862,23 @@ describe('AppContainer State Management', () => {
         }),
       );
 
-      // Assert: Check that title is padded to exactly 80 characters
+      // Assert: Check that title has no trailing spaces and is <= 80 characters
       const titleWrites = mocks.mockStdout.write.mock.calls.filter((call) =>
         call[0].includes('\x1b]0;'),
       );
 
       expect(titleWrites).toHaveLength(1);
       const calledWith = titleWrites[0][0];
-      const expectedTitle = `✦  ${shortTitle} (workspace)`.padEnd(80, ' ');
+      const expectedTitle = `✦  ${shortTitle} (workspace)`;
       const expectedEscapeSequence = `\x1b]0;${expectedTitle}\x07`;
       expect(calledWith).toBe(expectedEscapeSequence);
+
+      // Title should not have trailing spaces
+      const emittedTitle = calledWith
+        .replace('\x1b]0;', '')
+        .replace('\x07', '');
+      expect(emittedTitle).toBe(emittedTitle.trimEnd());
+      expect(emittedTitle.length).toBeLessThanOrEqual(80);
       unmount();
     });
 
@@ -1911,7 +1912,7 @@ describe('AppContainer State Management', () => {
       );
 
       expect(titleWrites).toHaveLength(1);
-      const expectedEscapeSequence = `\x1b]0;${`✦  ${title} (workspace)`.padEnd(80, ' ')}\x07`;
+      const expectedEscapeSequence = `\x1b]0;${`✦  ${title} (workspace)`}\x07`;
       expect(titleWrites[0][0]).toBe(expectedEscapeSequence);
       unmount();
     });
@@ -1948,7 +1949,7 @@ describe('AppContainer State Management', () => {
 
       expect(titleWrites).toHaveLength(1);
       expect(titleWrites[0][0]).toBe(
-        `\x1b]0;${'✦  Working… (Custom Gemini Title)'.padEnd(80, ' ')}\x07`,
+        `\x1b]0;${'✦  Working… (Custom Gemini Title)'}\x07`,
       );
       unmount();
     });

@@ -39,7 +39,7 @@ describe('computeTerminalTitle', () => {
         showThoughts: true,
         useDynamicTitle: false,
       } as TerminalTitleOptions,
-      expected: 'Gemini CLI (my-project)'.padEnd(80, ' '),
+      expected: 'Gemini CLI (my-project)',
       exact: true,
     },
     {
@@ -82,7 +82,7 @@ describe('computeTerminalTitle', () => {
         showThoughts: true,
         useDynamicTitle: true,
       } as TerminalTitleOptions,
-      expected: '✦  Working… (my-project)'.padEnd(80, ' '),
+      expected: '✦  Working… (my-project)',
       exact: true,
     },
     {
@@ -116,7 +116,7 @@ describe('computeTerminalTitle', () => {
     } else {
       expect(title).toContain(expected);
     }
-    expect(title.length).toBe(80);
+    expect(title.length).toBeLessThanOrEqual(80);
   });
 
   it('should return active state title with thought subject and NO suffix when thoughts are very long', () => {
@@ -133,7 +133,7 @@ describe('computeTerminalTitle', () => {
 
     expect(title).not.toContain('(my-project)');
     expect(title).toContain('✦  AAAAAAAAAAAAAAAA');
-    expect(title.length).toBe(80);
+    expect(title.length).toBeLessThanOrEqual(80);
   });
 
   it('should truncate long thought subjects when thoughts are enabled', () => {
@@ -148,9 +148,9 @@ describe('computeTerminalTitle', () => {
       useDynamicTitle: true,
     });
 
-    expect(title.length).toBe(80);
+    expect(title.length).toBeLessThanOrEqual(80);
     expect(title).toContain('…');
-    expect(title.trimEnd().length).toBe(80);
+    expect(title.trimEnd().length).toBe(title.length);
   });
 
   it('should strip control characters from the title', () => {
@@ -168,7 +168,7 @@ describe('computeTerminalTitle', () => {
     expect(title).not.toContain('\x00');
     expect(title).not.toContain('\x07');
     expect(title).not.toContain('\x1B');
-    expect(title.length).toBe(80);
+    expect(title.length).toBeLessThanOrEqual(80);
   });
 
   it('should prioritize CLI_TITLE environment variable over folder name when thoughts are disabled', () => {
@@ -185,7 +185,7 @@ describe('computeTerminalTitle', () => {
 
     expect(title).toContain('◇  Ready (EnvOverride)');
     expect(title).not.toContain('my-project');
-    expect(title.length).toBe(80);
+    expect(title.length).toBeLessThanOrEqual(80);
   });
 
   it.each([
@@ -216,7 +216,7 @@ describe('computeTerminalTitle', () => {
         useDynamicTitle: true,
       });
 
-      expect(title.length).toBe(80);
+      expect(title.length).toBeLessThanOrEqual(80);
       expect(title).toContain(expected);
       expect(title).toContain('…)');
     },
@@ -233,8 +233,28 @@ describe('computeTerminalTitle', () => {
       useDynamicTitle: false,
     });
 
-    expect(title.length).toBe(80);
+    expect(title.length).toBeLessThanOrEqual(80);
     expect(title).toContain('Gemini CLI (CCCCC');
     expect(title).toContain('…)');
+  });
+
+  it('should safely truncate strings containing emojis and surrogate pairs without splitting them', () => {
+    // 💥 is a surrogate pair (UTF-16 length 2). 50 of them = 100 UTF-16 code units.
+    const emojiThought = '💥'.repeat(100);
+    const title = computeTerminalTitle({
+      streamingState: StreamingState.Responding,
+      thoughtSubject: emojiThought,
+      isConfirming: false,
+      isSilentWorking: false,
+      folderName: 'my-project',
+      showThoughts: true,
+      useDynamicTitle: true,
+    });
+
+    // Array.from slices by code points, so we measure by code points.
+    expect(Array.from(title).length).toBeLessThanOrEqual(80);
+    expect(title).toContain('…');
+    // Ensure we actually retained emojis and didn't mangle them
+    expect(title).toContain('💥');
   });
 });
