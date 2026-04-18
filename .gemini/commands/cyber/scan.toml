@@ -1,0 +1,10 @@
+description = "Authorized recon chain using HATS MCP tools."
+prompt = """
+Run an authorized recon chain for target: {{args}}
+
+1) Call hats_chain_scan when available.
+2) If unavailable, call hats_nmap_scan -> hats_service_detection -> hats_vuln_lookup.
+3) Return JSON findings (ports, services, vulnerabilities, severity, remediation priorities).
+4) Refuse any out-of-scope or destructive activity.
+"""
+

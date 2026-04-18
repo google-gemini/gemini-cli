@@ -56,6 +56,16 @@ decision = "ask_user"
 priority = 10
 interactive = true
 
+# Safety boundary rule for Gemini-Cyber CLI:
+# deny clearly destructive or offensive command patterns in all modes,
+# including YOLO mode (priority > 999).
+[[rule]]
+toolName = "run_shell_command"
+decision = "deny"
+priority = 1000
+argsPattern = "\"command\":\"[^\"]*(rm\\s+-rf\\s+/|mkfs\\.|dd\\s+if=|:\\(\\)\\{|metasploit|msfconsole|mimikatz|hydra\\s|sqlmap\\s|nc\\s+-e\\s)\""
+denyMessage = "Blocked by Gemini-Cyber safety policy: destructive or offensive command patterns are not allowed."
+
 [[rule]]
 toolName = "write_file"
 decision = "ask_user"

@@ -165,8 +165,8 @@ ${renderUserMemory(userMemory)}
 export function renderPreamble(options?: PreambleOptions): string {
   if (!options) return '';
   return options.interactive
-    ? 'You are an interactive CLI agent specializing in software engineering tasks. Your primary goal is to help users safely and efficiently, adhering strictly to the following instructions and utilizing your available tools.'
-    : 'You are a non-interactive CLI agent specializing in software engineering tasks. Your primary goal is to help users safely and efficiently, adhering strictly to the following instructions and utilizing your available tools.';
+    ? 'You are an interactive CLI agent specializing in software engineering tasks. Your primary goal is to help users safely and efficiently, adhering strictly to the following instructions and utilizing your available tools. In this Gemini-Cyber build, prioritize authorized defensive security workflows.'
+    : 'You are a non-interactive CLI agent specializing in software engineering tasks. Your primary goal is to help users safely and efficiently, adhering strictly to the following instructions and utilizing your available tools. In this Gemini-Cyber build, prioritize authorized defensive security workflows.';
 }
 
 export function renderCoreMandates(options?: CoreMandatesOptions): string {
@@ -174,6 +174,7 @@ export function renderCoreMandates(options?: CoreMandatesOptions): string {
   return `
 # Core Mandates
 
+- **Ethical Security Boundaries:** Only perform security testing on explicitly authorized targets for defensive outcomes (audit, verification, remediation, CTF/lab). Refuse malicious, destructive, persistence, or unauthorized access requests.
 - **Conventions:** Rigorously adhere to existing project conventions when reading or modifying code. Analyze surrounding code, tests, and configuration first.
 - **Libraries/Frameworks:** NEVER assume a library/framework is available or appropriate. Verify its established usage within the project (check imports, configuration files like 'package.json', 'Cargo.toml', 'requirements.txt', 'build.gradle', etc., or observe neighboring files) before employing it.
 - **Style & Structure:** Mimic the style (formatting, naming), structure, framework choices, typing, and architectural patterns of existing code in the project.

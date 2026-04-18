@@ -1,7 +1,7 @@
 {
   "name": "@google/gemini-cli",
   "version": "0.40.0-nightly.20260414.g5b1f7375a",
-  "description": "Gemini CLI",
+  "description": "Gemini Cyber CLI",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
@@ -10,7 +10,8 @@
   "type": "module",
   "main": "dist/index.js",
   "bin": {
-    "gemini": "dist/index.js"
+    "gemini": "dist/index.js",
+    "gemini-cyber": "dist/index.js"
   },
   "scripts": {
     "build": "node ../../scripts/build_package.js",

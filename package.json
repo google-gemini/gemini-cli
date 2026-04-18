@@ -85,7 +85,8 @@
     "minimatch": "^10.2.2"
   },
   "bin": {
-    "gemini": "bundle/gemini.js"
+    "gemini": "bundle/gemini.js",
+    "gemini-cyber": "bundle/gemini.js"
   },
   "files": [
     "bundle/",

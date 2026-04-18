@@ -1,0 +1,16 @@
+description = "Generate a markdown pentest report from recent tool outputs."
+prompt = """
+Generate a professional markdown pentest report using the last 10 tool outputs.
+
+Context: {{args}}
+
+Sections:
+1. Executive Summary
+2. Scope & Authorization
+3. Methodology
+4. Findings Table
+5. Detailed Findings
+6. Remediation Plan
+7. Appendix (evidence summary)
+"""
+
