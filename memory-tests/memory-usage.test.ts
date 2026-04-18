@@ -489,8 +489,12 @@ async function generateSharedLargeChatData(tempDir: string) {
 
   // Wait for streams to finish
   await Promise.all([
-    new Promise((res) => activeResponsesStream.on('finish', res)),
-    new Promise((res) => resumeResponsesStream.on('finish', res)),
+    new Promise((res) =>
+      activeResponsesStream.on('finish', () => res(undefined)),
+    ),
+    new Promise((res) =>
+      resumeResponsesStream.on('finish', () => res(undefined)),
+    ),
   ]);
 
   return {

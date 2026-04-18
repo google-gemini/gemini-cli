@@ -865,6 +865,336 @@ describe('SandboxManager Integration', () => {
     });
   });
 
+  describe('Governance Files', () => {
+    it('blocks write access to governance files in the workspace', async () => {
+      const tempWorkspace = createTempDir('workspace-');
+      const gitDir = path.join(tempWorkspace, '.git');
+      fs.mkdirSync(gitDir);
+      const testFile = path.join(gitDir, 'config');
+
+      const osManager = createSandboxManager(
+        { enabled: true },
+        { workspace: tempWorkspace },
+      );
+
+      const { command, args } = Platform.touch(testFile);
+      const sandboxed = await osManager.prepareCommand({
+        command,
+        args,
+        cwd: tempWorkspace,
+        env: process.env,
+      });
+
+      const result = await runCommand(sandboxed);
+      assertResult(result, sandboxed, 'failure');
+      expect(fs.existsSync(testFile)).toBe(false);
+    });
+
+    it('allows write access to governance files when explicitly requested via additionalPermissions', async () => {
+      const tempWorkspace = createTempDir('workspace-');
+      const gitDir = path.join(tempWorkspace, '.git');
+      fs.mkdirSync(gitDir);
+      const testFile = path.join(gitDir, 'config');
+
+      const osManager = createSandboxManager(
+        { enabled: true },
+        { workspace: tempWorkspace },
+      );
+
+      const { command, args } = Platform.touch(testFile);
+      const sandboxed = await osManager.prepareCommand({
+        command,
+        args,
+        cwd: tempWorkspace,
+        env: process.env,
+        policy: {
+          additionalPermissions: { fileSystem: { write: [gitDir] } },
+        },
+      });
+
+      const result = await runCommand(sandboxed);
+      assertResult(result, sandboxed, 'success');
+      expect(fs.existsSync(testFile)).toBe(true);
+    });
+  });
+
+  describe('Git Worktree Support', () => {
+    it('allows access to git common directory in a worktree', async () => {
+      const mainRepo = createTempDir('main-repo-');
+      const worktreeDir = createTempDir('worktree-');
+
+      const mainGitDir = path.join(mainRepo, '.git');
+      fs.mkdirSync(mainGitDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(mainGitDir, 'config'),
+        '[core]\n\trepositoryformatversion = 0\n',
+      );
+
+      const worktreeGitDir = path.join(
+        mainGitDir,
+        'worktrees',
+        'test-worktree',
+      );
+      fs.mkdirSync(worktreeGitDir, { recursive: true });
+
+      // Create the .git file in the worktree directory pointing to the worktree git dir
+      fs.writeFileSync(
+        path.join(worktreeDir, '.git'),
+        `gitdir: ${worktreeGitDir}\n`,
+      );
+
+      // Create the backlink from worktree git dir to the worktree's .git file
+      const backlinkPath = path.join(worktreeGitDir, 'gitdir');
+      fs.writeFileSync(backlinkPath, path.join(worktreeDir, '.git'));
+
+      // Create a file in the worktree git dir that we want to access
+      const secretFile = path.join(worktreeGitDir, 'secret.txt');
+      fs.writeFileSync(secretFile, 'git-secret');
+
+      const osManager = createSandboxManager(
+        { enabled: true },
+        { workspace: worktreeDir },
+      );
+
+      const { command, args } = Platform.cat(secretFile);
+      const sandboxed = await osManager.prepareCommand({
+        command,
+        args,
+        cwd: worktreeDir,
+        env: process.env,
+      });
+
+      const result = await runCommand(sandboxed);
+      assertResult(result, sandboxed, 'success');
+      expect(result.stdout.trim()).toBe('git-secret');
+    });
+
+    it('blocks write access to git common directory in a worktree', async () => {
+      const mainRepo = createTempDir('main-repo-');
+      const worktreeDir = createTempDir('worktree-');
+
+      const mainGitDir = path.join(mainRepo, '.git');
+      fs.mkdirSync(mainGitDir, { recursive: true });
+
+      const worktreeGitDir = path.join(
+        mainGitDir,
+        'worktrees',
+        'test-worktree',
+      );
+      fs.mkdirSync(worktreeGitDir, { recursive: true });
+
+      fs.writeFileSync(
+        path.join(worktreeDir, '.git'),
+        `gitdir: ${worktreeGitDir}\n`,
+      );
+      fs.writeFileSync(
+        path.join(worktreeGitDir, 'gitdir'),
+        path.join(worktreeDir, '.git'),
+      );
+
+      const targetFile = path.join(worktreeGitDir, 'secret.txt');
+
+      const osManager = createSandboxManager(
+        { enabled: true },
+        // Use YOLO mode to ensure the workspace is fully writable, but git worktrees should still be read-only
+        { workspace: worktreeDir, modeConfig: { yolo: true } },
+      );
+
+      const { command, args } = Platform.touch(targetFile);
+      const sandboxed = await osManager.prepareCommand({
+        command,
+        args,
+        cwd: worktreeDir,
+        env: process.env,
+      });
+
+      const result = await runCommand(sandboxed);
+      assertResult(result, sandboxed, 'failure');
+      expect(fs.existsSync(targetFile)).toBe(false);
+    });
+
+    it('blocks write access to git common directory in a worktree when not explicitly requested via additionalPermissions', async () => {
+      const mainRepo = createTempDir('main-repo-');
+      const worktreeDir = createTempDir('worktree-');
+
+      const mainGitDir = path.join(mainRepo, '.git');
+      fs.mkdirSync(mainGitDir, { recursive: true });
+
+      const worktreeGitDir = path.join(
+        mainGitDir,
+        'worktrees',
+        'test-worktree',
+      );
+      fs.mkdirSync(worktreeGitDir, { recursive: true });
+
+      fs.writeFileSync(
+        path.join(worktreeDir, '.git'),
+        `gitdir: ${worktreeGitDir}\n`,
+      );
+      fs.writeFileSync(
+        path.join(worktreeGitDir, 'gitdir'),
+        path.join(worktreeDir, '.git'),
+      );
+
+      const targetFile = path.join(worktreeGitDir, 'secret.txt');
+
+      const osManager = createSandboxManager(
+        { enabled: true },
+        { workspace: worktreeDir },
+      );
+
+      const { command, args } = Platform.touch(targetFile);
+      const sandboxed = await osManager.prepareCommand({
+        command,
+        args,
+        cwd: worktreeDir,
+        env: process.env,
+      });
+
+      const result = await runCommand(sandboxed);
+      assertResult(result, sandboxed, 'failure');
+      expect(fs.existsSync(targetFile)).toBe(false);
+    });
+
+    it('allows write access to git common directory in a worktree when explicitly requested via additionalPermissions', async () => {
+      const mainRepo = createTempDir('main-repo-');
+      const worktreeDir = createTempDir('worktree-');
+
+      const mainGitDir = path.join(mainRepo, '.git');
+      fs.mkdirSync(mainGitDir, { recursive: true });
+
+      const worktreeGitDir = path.join(
+        mainGitDir,
+        'worktrees',
+        'test-worktree',
+      );
+      fs.mkdirSync(worktreeGitDir, { recursive: true });
+
+      fs.writeFileSync(
+        path.join(worktreeDir, '.git'),
+        `gitdir: ${worktreeGitDir}\n`,
+      );
+      fs.writeFileSync(
+        path.join(worktreeGitDir, 'gitdir'),
+        path.join(worktreeDir, '.git'),
+      );
+
+      const targetFile = path.join(worktreeGitDir, 'secret.txt');
+
+      const osManager = createSandboxManager(
+        { enabled: true },
+        { workspace: worktreeDir },
+      );
+
+      const { command, args } = Platform.touch(targetFile);
+      const sandboxed = await osManager.prepareCommand({
+        command,
+        args,
+        cwd: worktreeDir,
+        env: process.env,
+        policy: {
+          additionalPermissions: { fileSystem: { write: [worktreeGitDir] } },
+        },
+      });
+
+      const result = await runCommand(sandboxed);
+      assertResult(result, sandboxed, 'success');
+      expect(fs.existsSync(targetFile)).toBe(true);
+    });
+
+    it('allows write access to external git directory in a non-worktree environment when explicitly requested via additionalPermissions', async () => {
+      const externalGitDir = createTempDir('external-git-');
+      const workspaceDir = createTempDir('workspace-');
+
+      fs.mkdirSync(externalGitDir, { recursive: true });
+
+      fs.writeFileSync(
+        path.join(workspaceDir, '.git'),
+        `gitdir: ${externalGitDir}\n`,
+      );
+
+      const targetFile = path.join(externalGitDir, 'secret.txt');
+
+      const osManager = createSandboxManager(
+        { enabled: true },
+        { workspace: workspaceDir },
+      );
+
+      const { command, args } = Platform.touch(targetFile);
+      const sandboxed = await osManager.prepareCommand({
+        command,
+        args,
+        cwd: workspaceDir,
+        env: process.env,
+        policy: {
+          additionalPermissions: { fileSystem: { write: [externalGitDir] } },
+        },
+      });
+
+      const result = await runCommand(sandboxed);
+      assertResult(result, sandboxed, 'success');
+      expect(fs.existsSync(targetFile)).toBe(true);
+    });
+  });
+
+  describe('Git and Governance Write Access', () => {
+    it('allows write access to .gitignore when workspace is writable', async () => {
+      const testFile = path.join(workspace, '.gitignore');
+      fs.writeFileSync(testFile, 'initial');
+
+      const editManager = createSandboxManager(
+        { enabled: true },
+        { workspace, modeConfig: { readonly: false, allowOverrides: true } },
+      );
+
+      const { command, args } = Platform.touch(testFile);
+      const sandboxed = await editManager.prepareCommand({
+        command,
+        args,
+        cwd: workspace,
+        env: process.env,
+      });
+
+      const result = await runCommand(sandboxed);
+      assertResult(result, sandboxed, 'success');
+      expect(fs.existsSync(testFile)).toBe(true);
+    });
+
+    it('automatically allows write access to .git when running git command and workspace is writable', async () => {
+      const gitDir = path.join(workspace, '.git');
+      if (!fs.existsSync(gitDir)) fs.mkdirSync(gitDir);
+      const lockFile = path.join(gitDir, 'index.lock');
+
+      const editManager = createSandboxManager(
+        { enabled: true },
+        { workspace, modeConfig: { readonly: false, allowOverrides: true } },
+      );
+
+      // We use a command that looks like git to trigger the special handling.
+      // LinuxSandboxManager identifies the command root from the shell wrapper.
+      const { command: nodePath, args: nodeArgs } = Platform.touch(lockFile);
+
+      const commandString = Platform.isWindows
+        ? `git --version > NUL && "${nodePath.replace(/\\/g, '/')}" ${nodeArgs
+            .map((a) => `'${a.replace(/\\/g, '/')}'`)
+            .join(' ')}`
+        : `git --version > /dev/null; "${nodePath}" ${nodeArgs
+            .map((a) => (a.includes(' ') || a.includes('(') ? `'${a}'` : a))
+            .join(' ')}`;
+
+      const sandboxed = await editManager.prepareCommand({
+        command: 'sh',
+        args: ['-c', commandString],
+        cwd: workspace,
+        env: process.env,
+      });
+
+      const result = await runCommand(sandboxed);
+      assertResult(result, sandboxed, 'success');
+      expect(fs.existsSync(lockFile)).toBe(true);
+    });
+  });
+
   describe('Network Security', () => {
     describe('Network Access', () => {
       let server: http.Server;
