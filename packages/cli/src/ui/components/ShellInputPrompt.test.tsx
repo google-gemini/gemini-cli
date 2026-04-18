@@ -50,14 +50,20 @@ describe('ShellInputPrompt', () => {
   it('renders nothing', async () => {
     const { lastFrame, unmount } = await render(
       <ShellInputPrompt activeShellPtyId={1} focus={true} />,
+      undefined,
+      undefined,
+      true,
     );
     expect(lastFrame({ allowEmpty: true })).toBe('');
     unmount();
   });
 
   it('sends tab to pty', async () => {
-    const { waitUntilReady, unmount } = await render(
+    const { unmount } = await render(
       <ShellInputPrompt activeShellPtyId={1} focus={true} />,
+      undefined,
+      undefined,
+      true,
     );
 
     const handler = mockUseKeypress.mock.calls[0][0];
@@ -72,7 +78,6 @@ describe('ShellInputPrompt', () => {
         sequence: '\t',
       });
     });
-    await waitUntilReady();
 
     expect(mockWriteToPty).toHaveBeenCalledWith(1, '\t');
     unmount();
@@ -82,8 +87,11 @@ describe('ShellInputPrompt', () => {
     ['a', 'a'],
     ['b', 'b'],
   ])('handles keypress input: %s', async (name, sequence) => {
-    const { waitUntilReady, unmount } = await render(
+    const { unmount } = await render(
       <ShellInputPrompt activeShellPtyId={1} focus={true} />,
+      undefined,
+      undefined,
+      true,
     );
 
     // Get the registered handler
@@ -100,7 +108,6 @@ describe('ShellInputPrompt', () => {
         sequence,
       });
     });
-    await waitUntilReady();
 
     expect(mockWriteToPty).toHaveBeenCalledWith(1, sequence);
     unmount();
@@ -110,8 +117,11 @@ describe('ShellInputPrompt', () => {
     ['up', -1],
     ['down', 1],
   ])('handles scroll %s (Command.SCROLL_%s)', async (key, direction) => {
-    const { waitUntilReady, unmount } = await render(
+    const { unmount } = await render(
       <ShellInputPrompt activeShellPtyId={1} focus={true} />,
+      undefined,
+      undefined,
+      true,
     );
 
     const handler = mockUseKeypress.mock.calls[0][0];
@@ -119,7 +129,6 @@ describe('ShellInputPrompt', () => {
     await act(async () => {
       handler({ name: key, shift: true, alt: false, ctrl: false, cmd: false });
     });
-    await waitUntilReady();
 
     expect(mockScrollPty).toHaveBeenCalledWith(1, direction);
     unmount();
@@ -131,8 +140,11 @@ describe('ShellInputPrompt', () => {
   ])(
     'handles page scroll %s (Command.PAGE_%s) with default size',
     async (key, expectedScroll) => {
-      const { waitUntilReady, unmount } = await render(
+      const { unmount } = await render(
         <ShellInputPrompt activeShellPtyId={1} focus={true} />,
+        undefined,
+        undefined,
+        true,
       );
 
       const handler = mockUseKeypress.mock.calls[0][0];
@@ -146,7 +158,6 @@ describe('ShellInputPrompt', () => {
           cmd: false,
         });
       });
-      await waitUntilReady();
 
       expect(mockScrollPty).toHaveBeenCalledWith(1, expectedScroll);
       unmount();
@@ -154,12 +165,15 @@ describe('ShellInputPrompt', () => {
   );
 
   it('respects scrollPageSize prop', async () => {
-    const { waitUntilReady, unmount } = await render(
+    const { unmount } = await render(
       <ShellInputPrompt
         activeShellPtyId={1}
         focus={true}
         scrollPageSize={10}
       />,
+      undefined,
+      undefined,
+      true,
     );
 
     const handler = mockUseKeypress.mock.calls[0][0];
@@ -174,7 +188,6 @@ describe('ShellInputPrompt', () => {
         cmd: false,
       });
     });
-    await waitUntilReady();
     expect(mockScrollPty).toHaveBeenCalledWith(1, 10);
 
     // PageUp
@@ -187,14 +200,16 @@ describe('ShellInputPrompt', () => {
         cmd: false,
       });
     });
-    await waitUntilReady();
     expect(mockScrollPty).toHaveBeenCalledWith(1, -10);
     unmount();
   });
 
   it('does not handle input when not focused', async () => {
-    const { waitUntilReady, unmount } = await render(
+    const { unmount } = await render(
       <ShellInputPrompt activeShellPtyId={1} focus={false} />,
+      undefined,
+      undefined,
+      true,
     );
 
     const handler = mockUseKeypress.mock.calls[0][0];
@@ -209,15 +224,17 @@ describe('ShellInputPrompt', () => {
         sequence: 'a',
       });
     });
-    await waitUntilReady();
 
     expect(mockWriteToPty).not.toHaveBeenCalled();
     unmount();
   });
 
   it('does not handle input when no active shell', async () => {
-    const { waitUntilReady, unmount } = await render(
+    const { unmount } = await render(
       <ShellInputPrompt activeShellPtyId={null} focus={true} />,
+      undefined,
+      undefined,
+      true,
     );
 
     const handler = mockUseKeypress.mock.calls[0][0];
@@ -232,15 +249,17 @@ describe('ShellInputPrompt', () => {
         sequence: 'a',
       });
     });
-    await waitUntilReady();
 
     expect(mockWriteToPty).not.toHaveBeenCalled();
     unmount();
   });
 
   it('ignores Command.UNFOCUS_SHELL (Shift+Tab) to allow focus navigation', async () => {
-    const { waitUntilReady, unmount } = await render(
+    const { unmount } = await render(
       <ShellInputPrompt activeShellPtyId={1} focus={true} />,
+      undefined,
+      undefined,
+      true,
     );
 
     const handler = mockUseKeypress.mock.calls[0][0];
@@ -255,7 +274,6 @@ describe('ShellInputPrompt', () => {
         cmd: false,
       });
     });
-    await waitUntilReady();
 
     expect(result).toBe(false);
     expect(mockWriteToPty).not.toHaveBeenCalled();
