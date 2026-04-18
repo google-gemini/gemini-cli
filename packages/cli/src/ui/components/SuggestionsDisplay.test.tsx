@@ -160,4 +160,67 @@ describe('SuggestionsDisplay', () => {
     expect(frame).toContain('-- auto --');
     expect(frame).toContain('-- checkpoints --');
   });
+
+  it('renders mention shortcut hints for filesystem @ suggestions', async () => {
+    const mentionSuggestions = [
+      {
+        label: 'src/index.ts',
+        value: 'src/index.ts',
+        mentionTargetKind: 'file' as const,
+        mentionTargetPath: '/mock/project/src/index.ts',
+      },
+    ];
+
+    const { lastFrame } = await render(
+      <SuggestionsDisplay
+        suggestions={mentionSuggestions}
+        activeIndex={0}
+        isLoading={false}
+        width={100}
+        scrollOffset={0}
+        userInput="@src"
+        mode="reverse"
+        mentionShortcuts={{
+          openTarget: 'Ctrl+X',
+          openLocation: 'Ctrl+Shift+X',
+        }}
+      />,
+    );
+
+    const frame = lastFrame();
+    expect(frame).toContain('Ctrl+X');
+    expect(frame).toContain('Ctrl+Shift+X');
+    expect(frame).toContain('open target');
+    expect(frame).toContain('open folder');
+  });
+
+  it('does not render mention shortcut hints for non-filesystem suggestions', async () => {
+    const agentSuggestions = [
+      {
+        label: 'review-agent',
+        value: 'review-agent',
+        commandKind: CommandKind.AGENT,
+      },
+    ];
+
+    const { lastFrame } = await render(
+      <SuggestionsDisplay
+        suggestions={agentSuggestions}
+        activeIndex={0}
+        isLoading={false}
+        width={100}
+        scrollOffset={0}
+        userInput="@rev"
+        mode="reverse"
+        mentionShortcuts={{
+          openTarget: 'Ctrl+X',
+          openLocation: 'Ctrl+Shift+X',
+        }}
+      />,
+    );
+
+    const frame = lastFrame();
+    expect(frame).not.toContain('open target');
+    expect(frame).not.toContain('open folder');
+  });
 });

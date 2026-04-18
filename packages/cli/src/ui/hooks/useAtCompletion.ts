@@ -16,6 +16,7 @@ import {
 } from '@google/gemini-cli-core';
 import {
   MAX_SUGGESTIONS_TO_SHOW,
+  type MentionTargetKind,
   type Suggestion,
 } from '../components/SuggestionsDisplay.js';
 import { CommandKind } from '../commands/types.js';
@@ -113,6 +114,16 @@ export interface UseAtCompletionProps {
 interface ResourceSuggestionCandidate {
   searchKey: string;
   suggestion: Suggestion;
+}
+
+function getMentionTargetKind(suggestionPath: string): MentionTargetKind {
+  return /[\\/]$/.test(suggestionPath) ? 'directory' : 'file';
+}
+
+function getDisplayPathWithoutTrailingSeparator(
+  suggestionPath: string,
+): string {
+  return suggestionPath.replace(/[\\/]+$/, '');
 }
 
 function buildResourceCandidates(
@@ -392,10 +403,21 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
 
         const mergedResults = allResults.flat();
 
-        const fileSuggestions = mergedResults.map((p) => ({
-          label: p,
-          value: escapePath(p),
-        }));
+        const fileSuggestions = mergedResults.map((p) => {
+          const mentionTargetKind = getMentionTargetKind(p);
+          const normalizedDisplayPath =
+            getDisplayPathWithoutTrailingSeparator(p);
+          const mentionTargetPath = path.isAbsolute(normalizedDisplayPath)
+            ? normalizedDisplayPath
+            : path.join(cwdRealpath, normalizedDisplayPath);
+
+          return {
+            label: p,
+            value: escapePath(p),
+            mentionTargetKind,
+            mentionTargetPath,
+          } satisfies Suggestion;
+        });
 
         const resourceCandidates = buildResourceCandidates(config);
         const resourceSuggestions = (

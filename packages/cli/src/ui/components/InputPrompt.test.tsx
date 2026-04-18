@@ -69,6 +69,7 @@ import {
   AppEvent,
   TransientMessageType,
 } from '../../utils/events.js';
+import { openDirectory, openFileInEditor } from '../utils/editorUtils.js';
 import '../../test-utils/customMatchers.js';
 
 vi.mock('../hooks/useShellHistory.js');
@@ -78,6 +79,10 @@ vi.mock('../hooks/useReverseSearchCompletion.js');
 vi.mock('clipboardy');
 vi.mock('../utils/clipboardUtils.js');
 vi.mock('../hooks/useKittyKeyboardProtocol.js');
+vi.mock('../utils/editorUtils.js', () => ({
+  openFileInEditor: vi.fn(),
+  openDirectory: vi.fn(),
+}));
 vi.mock('../utils/terminalUtils.js', () => ({
   isLowColorDepth: vi.fn(() => false),
 }));
@@ -5096,6 +5101,185 @@ describe('InputPrompt', () => {
         unmount();
       },
     );
+  });
+
+  describe('@ mention open shortcuts', () => {
+    it('opens the prompt editor on Ctrl+X when @ completion is not active', async () => {
+      const { stdin, unmount } = await renderWithProviders(
+        <TestInputPrompt {...props} />,
+        {
+          uiActions,
+        },
+      );
+
+      await act(async () => {
+        stdin.write('\x18');
+      });
+
+      await waitFor(() => {
+        expect(props.buffer.openInExternalEditor).toHaveBeenCalled();
+      });
+      expect(vi.mocked(openFileInEditor)).not.toHaveBeenCalled();
+      expect(vi.mocked(openDirectory)).not.toHaveBeenCalled();
+      unmount();
+    });
+
+    it('opens the selected file mention on Ctrl+X, defaulting to the first suggestion', async () => {
+      mockedUseCommandCompletion.mockReturnValue({
+        ...mockCommandCompletion,
+        showSuggestions: true,
+        suggestions: [
+          {
+            label: 'src/index.ts',
+            value: 'src/index.ts',
+            mentionTargetKind: 'file',
+            mentionTargetPath: '/mock/project/src/index.ts',
+          },
+        ],
+        activeSuggestionIndex: -1,
+        completionMode: CompletionMode.AT,
+      });
+
+      const { stdin, unmount } = await renderWithProviders(
+        <TestInputPrompt {...props} />,
+        {
+          uiActions,
+        },
+      );
+
+      await act(async () => {
+        stdin.write('\x18');
+      });
+
+      await waitFor(() => {
+        expect(vi.mocked(openFileInEditor)).toHaveBeenCalled();
+      });
+
+      expect(vi.mocked(openFileInEditor).mock.calls[0]?.[0]).toBe(
+        '/mock/project/src/index.ts',
+      );
+      expect(props.buffer.openInExternalEditor).not.toHaveBeenCalled();
+      expect(vi.mocked(openDirectory)).not.toHaveBeenCalled();
+      unmount();
+    });
+
+    it('opens the containing folder on Ctrl+Shift+X for file mentions', async () => {
+      mockedUseCommandCompletion.mockReturnValue({
+        ...mockCommandCompletion,
+        showSuggestions: true,
+        suggestions: [
+          {
+            label: 'src/index.ts',
+            value: 'src/index.ts',
+            mentionTargetKind: 'file',
+            mentionTargetPath: '/mock/project/src/index.ts',
+          },
+        ],
+        activeSuggestionIndex: 0,
+        completionMode: CompletionMode.AT,
+      });
+
+      const { stdin, unmount } = await renderWithProviders(
+        <TestInputPrompt {...props} />,
+        {
+          uiActions,
+        },
+      );
+
+      await act(async () => {
+        stdin.write('\x1b[88;6u');
+      });
+
+      await waitFor(() => {
+        expect(vi.mocked(openDirectory)).toHaveBeenCalledWith(
+          '/mock/project/src',
+        );
+      });
+
+      expect(vi.mocked(openFileInEditor)).not.toHaveBeenCalled();
+      expect(props.buffer.openInExternalEditor).not.toHaveBeenCalled();
+      unmount();
+    });
+
+    it('opens the selected folder on Ctrl+X for folder mentions', async () => {
+      mockedUseCommandCompletion.mockReturnValue({
+        ...mockCommandCompletion,
+        showSuggestions: true,
+        suggestions: [
+          {
+            label: 'src/',
+            value: 'src/',
+            mentionTargetKind: 'directory',
+            mentionTargetPath: '/mock/project/src',
+          },
+        ],
+        activeSuggestionIndex: 0,
+        completionMode: CompletionMode.AT,
+      });
+
+      const { stdin, unmount } = await renderWithProviders(
+        <TestInputPrompt {...props} />,
+        {
+          uiActions,
+        },
+      );
+
+      await act(async () => {
+        stdin.write('\x18');
+      });
+
+      await waitFor(() => {
+        expect(vi.mocked(openDirectory)).toHaveBeenCalledWith(
+          '/mock/project/src',
+        );
+      });
+
+      expect(vi.mocked(openFileInEditor)).not.toHaveBeenCalled();
+      expect(props.buffer.openInExternalEditor).not.toHaveBeenCalled();
+      unmount();
+    });
+
+    it('shows a hint instead of opening the prompt editor for non-filesystem @ suggestions', async () => {
+      const emitSpy = vi.spyOn(appEvents, 'emit');
+      mockedUseCommandCompletion.mockReturnValue({
+        ...mockCommandCompletion,
+        showSuggestions: true,
+        suggestions: [
+          {
+            label: 'review-agent',
+            value: 'review-agent',
+            commandKind: CommandKind.AGENT,
+          },
+        ],
+        activeSuggestionIndex: 0,
+        completionMode: CompletionMode.AT,
+      });
+
+      const { stdin, unmount } = await renderWithProviders(
+        <TestInputPrompt {...props} />,
+        {
+          uiActions,
+        },
+      );
+
+      await act(async () => {
+        stdin.write('\x18');
+      });
+
+      await waitFor(() => {
+        expect(emitSpy).toHaveBeenCalledWith(AppEvent.TransientMessage, {
+          message:
+            'Only file and folder mentions can be opened from the suggestion list.',
+          type: TransientMessageType.Hint,
+        });
+      });
+
+      expect(vi.mocked(openFileInEditor)).not.toHaveBeenCalled();
+      expect(vi.mocked(openDirectory)).not.toHaveBeenCalled();
+      expect(props.buffer.openInExternalEditor).not.toHaveBeenCalled();
+      emitSpy.mockRestore();
+      unmount();
+    });
   });
 });
 

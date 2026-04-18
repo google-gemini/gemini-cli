@@ -6,6 +6,7 @@
 
 import { spawn, spawnSync } from 'node:child_process';
 import type { ReadStream } from 'node:tty';
+import open from 'open';
 import {
   coreEvents,
   CoreEvent,
@@ -147,5 +148,23 @@ export async function openFileInEditor(
       setRawMode?.(true);
     }
     coreEvents.emit(CoreEvent.ExternalEditorClosed);
+  }
+}
+
+/**
+ * Opens a directory in the platform default file browser.
+ *
+ * @param directoryPath Path to the directory to open
+ */
+export async function openDirectory(directoryPath: string): Promise<void> {
+  try {
+    await open(directoryPath, { wait: false });
+  } catch (error) {
+    coreEvents.emitFeedback(
+      'error',
+      '[editorUtils] open directory error',
+      error,
+    );
+    throw error;
   }
 }

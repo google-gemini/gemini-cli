@@ -10,6 +10,7 @@ import { renderWithProviders } from '../../test-utils/render.js';
 import { createMockSettings } from '../../test-utils/settings.js';
 import { waitFor } from '../../test-utils/async.js';
 import { ExitPlanModeDialog } from './ExitPlanModeDialog.js';
+import { openFileInEditor } from '../utils/editorUtils.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { Command } from '../key/keyMatchers.js';
 import {
@@ -612,6 +613,32 @@ Implement a comprehensive authentication system with multiple providers.
             'I have edited the plan or annotated it with feedback. Review the edited plan, update if necessary, and present it again for approval.',
           );
         });
+        expect(vi.mocked(openFileInEditor)).toHaveBeenCalled();
+      });
+
+      it('automatically submits feedback when Ctrl+X is used to edit the plan', async () => {
+        const { stdin, lastFrame } = await act(async () =>
+          renderDialog({ useAlternateBuffer }),
+        );
+
+        await act(async () => {
+          vi.runAllTimers();
+        });
+
+        await waitFor(() => {
+          expect(lastFrame()).toContain('Add user authentication');
+        });
+
+        await act(async () => {
+          writeKey(stdin, '\x18');
+        });
+
+        await waitFor(() => {
+          expect(onFeedback).toHaveBeenCalledWith(
+            'I have edited the plan or annotated it with feedback. Review the edited plan, update if necessary, and present it again for approval.',
+          );
+        });
+        expect(vi.mocked(openFileInEditor)).toHaveBeenCalled();
       });
     },
   );
