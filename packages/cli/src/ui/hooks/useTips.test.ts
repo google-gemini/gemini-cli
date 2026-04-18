@@ -17,7 +17,9 @@ describe('useTips()', () => {
   });
 
   it('should return false and call set(1) if state is undefined', async () => {
-    const { result } = await renderHookWithProviders(() => useTips());
+    const { result } = await renderHookWithProviders(() => useTips(), {
+      allowEmptyFrame: true,
+    });
 
     expect(result.current.showTips).toBe(true);
 
@@ -28,7 +30,9 @@ describe('useTips()', () => {
   it('should return false and call set(6) if state is 5', async () => {
     persistentStateMock.setData({ tipsShown: 5 });
 
-    const { result } = await renderHookWithProviders(() => useTips());
+    const { result } = await renderHookWithProviders(() => useTips(), {
+      allowEmptyFrame: true,
+    });
 
     expect(result.current.showTips).toBe(true);
 
@@ -38,7 +42,9 @@ describe('useTips()', () => {
   it('should return true if state is 10', async () => {
     persistentStateMock.setData({ tipsShown: 10 });
 
-    const { result } = await renderHookWithProviders(() => useTips());
+    const { result } = await renderHookWithProviders(() => useTips(), {
+      allowEmptyFrame: true,
+    });
 
     expect(result.current.showTips).toBe(false);
     expect(persistentStateMock.set).not.toHaveBeenCalled();
