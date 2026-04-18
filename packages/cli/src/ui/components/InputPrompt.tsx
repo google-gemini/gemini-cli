@@ -1106,16 +1106,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                   const command =
                     completion.getCommandFromSuggestion(suggestion);
 
-                  // Only auto-execute if the command has no completion function
-                  // (i.e., it doesn't require an argument to be selected)
-                  if (
-                    command &&
-                    isAutoExecutableCommand(command) &&
-                    !command.completion
-                  ) {
-                    const completedText =
-                      completion.getCompletedText(suggestion);
+                  const completedText = completion.getCompletedText(suggestion);
 
+                  // If the user hits Enter on a suggestion, we should submit it
+                  // IF it has an action and doesn't require further arguments (no completion function).
+                  // This is separate from autoExecute, which handles automatic execution while typing.
+                  if (command && command.action && !command.completion) {
                     if (completedText) {
                       setExpandedSuggestionIndex(-1);
                       handleSubmit(completedText.trim());
