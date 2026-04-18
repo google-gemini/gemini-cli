@@ -14,6 +14,7 @@ const dirname = fileURLToPath(new URL('.', import.meta.url));
 export default defineConfig({
   resolve: {
     alias: {
+      '@google/gemini-cli-core/src': path.resolve(dirname, '../core/src'),
       '@google/gemini-cli-core': path.resolve(dirname, '../core/dist/index.js'),
       '@google/gemini-cli-test-utils': path.resolve(
         dirname,
