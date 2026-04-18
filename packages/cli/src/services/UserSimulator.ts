@@ -143,7 +143,7 @@ Look carefully at the screen and determine the CLI's current state:
 STATE 1: The agent is busy (e.g., streaming a response, showing a spinner, running a tool, or displaying a timer like "7s"). It is actively working and NOT waiting for text input.
 - In this case, your action MUST be exactly: <WAIT>
 
-STATE 2: The agent is waiting for you to authorize a tool, confirm an action, or answer a specific multi-choice question (e.g., "Action Required", "Allow execution", numbered options). This includes when the agent states it is exiting Plan Mode or transitioning to implementation, as it requires plan approval.
+STATE 2: The agent is waiting for you to authorize a tool, confirm an action, or answer a specific multi-choice question (e.g., "Action Required", "Allow execution", numbered options). This includes when the agent states it is exiting Plan Mode, transitioning to implementation, or mentions it will present a plan for review, as it requires plan approval.
 - In this case, your action MUST be the exact raw characters to select the option and submit it (e.g., 1\\r, 2\\r, y\\r, n\\r, or just \\r if the default option is acceptable). Do NOT output <DONE> or "Thank you". You must unblock the agent and allow it to run the tool. If you intend to approve or proceed, ALWAYS output "y\\r" or the number of the "Auto" option. DO NOT use free-form text like "please proceed" or "yes".
 
 STATE 3: The agent has finished its current thought process AND is idle, waiting for a NEW general text prompt (usually indicated by a "> Type your message" prompt).
@@ -157,8 +157,9 @@ STATE 4: Any other situation where the agent is waiting for text input or needs 
 
 CRITICAL RULES:
 - RULE 1: If there is ANY active spinner (e.g., ⠋, ⠙, ⠹, ⠸, ⠼, ⠴, ⠧) or an elapsed time indicator (e.g., "0s", "7s") anywhere on the screen, the agent is STILL WORKING. Your action MUST be <WAIT>. Do NOT issue commands, even if a text prompt is visible below it.
-- RULE 2: If there is an "Action Required" or confirmation prompt on the screen (or if the agent states it is exiting Plan Mode), YOU MUST HANDLE IT (State 2). This takes precedence over everything else.
-- RULE 3: You MUST output a strictly formatted JSON object with no markdown wrappers or extra text.
+- RULE 2: If there is an "Action Required" or confirmation prompt on the screen, or if the agent states it is exiting Plan Mode, or if the agent's thought bubble contains phrases like "present a plan", "exit plan mode", or "strategy" indicating it is ready for plan approval, YOU MUST HANDLE IT (State 2). This takes precedence over everything else.
+- RULE 3: DO NOT formulate rules in "new_rule" that advise waiting when the agent indicates it is ready to present a plan, exit plan mode, or has finished a thought process expressing intent to act.
+- RULE 4: You MUST output a strictly formatted JSON object with no markdown wrappers or extra text.
 
 JSON FORMAT:
 {
