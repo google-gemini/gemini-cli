@@ -18,12 +18,34 @@
 // limitations under the License.
 
 import { execSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, '..');
+
+function getWorkspaces() {
+  const packagesDir = join(root, 'packages');
+  const entries = readdirSync(packagesDir, { withFileTypes: true });
+  const workspaces = [];
+  for (const entry of entries) {
+    if (entry.isDirectory()) {
+      const pkgPath = join(packagesDir, entry.name, 'package.json');
+      if (existsSync(pkgPath)) {
+        try {
+          const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
+          if (pkg.name) {
+            workspaces.push(pkg.name);
+          }
+        } catch {
+          // skip
+        }
+      }
+    }
+  }
+  return workspaces;
+}
 
 // npm install if node_modules was removed (e.g. via npm run clean or scripts/clean.js)
 if (!existsSync(join(root, 'node_modules'))) {
@@ -46,12 +68,9 @@ if (process.env.CI) {
 
   // Build the rest in parallel
   console.log('Building other workspaces in parallel...');
-  const workspaceInfo = JSON.parse(
-    execSync('npm query .workspace --json', { cwd: root, encoding: 'utf-8' }),
+  const parallelWorkspaces = getWorkspaces().filter(
+    (name) => name !== '@google/gemini-cli-core',
   );
-  const parallelWorkspaces = workspaceInfo
-    .map((w) => w.name)
-    .filter((name) => name !== '@google/gemini-cli-core');
 
   execSync(
     `npx npm-run-all --parallel ${parallelWorkspaces.map((w) => `"build -w ${w}"`).join(' ')}`,

@@ -66,6 +66,7 @@ vi.mock('./tool-modifier.js');
 
 import { Scheduler } from './scheduler.js';
 import type { Config } from '../config/config.js';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { PolicyEngine } from '../policy/policy-engine.js';
 import type { ToolRegistry } from '../tools/tool-registry.js';
@@ -1415,6 +1416,114 @@ describe('Scheduler (Orchestrator)', () => {
       s.dispose();
 
       expect(capturedSignal?.aborted).toBe(true);
+    });
+  });
+
+  describe('Tool Hallucination Repair', () => {
+    it('should repair kebab-case to snake_case via normalization', async () => {
+      mockToolRegistry.getTool.mockImplementation((name) => {
+        if (name === 'read_file') return mockTool;
+        return undefined;
+      });
+      mockToolRegistry.getAllToolNames.mockReturnValue(['read_file']);
+
+      const schedulerInstance = new Scheduler({
+        context: mockConfig as unknown as AgentLoopContext,
+        getPreferredEditor,
+        schedulerId: ROOT_SCHEDULER_ID,
+      });
+
+      const requests: ToolCallRequestInfo[] = [
+        {
+          callId: 'call-1',
+          name: 'read-file',
+          args: {},
+          isClientInitiated: false,
+          prompt_id: 'p1',
+        },
+      ];
+
+      await schedulerInstance.schedule(requests, signal);
+
+      expect(mockStateManager.enqueue).toHaveBeenCalledWith([
+        expect.objectContaining({
+          request: expect.objectContaining({
+            name: 'read_file',
+            originalRequestName: 'read-file',
+          }),
+        }),
+      ]);
+    });
+
+    it('should repair hallucinated name via fuzzy matching (distance <= 2)', async () => {
+      mockToolRegistry.getTool.mockImplementation((name) => {
+        if (name === 'read_file') return mockTool;
+        return undefined;
+      });
+      mockToolRegistry.getAllToolNames.mockReturnValue([
+        'read_file',
+        'write_file',
+      ]);
+
+      const schedulerInstance = new Scheduler({
+        context: mockConfig as unknown as AgentLoopContext,
+        getPreferredEditor,
+        schedulerId: ROOT_SCHEDULER_ID,
+      });
+
+      const requests: ToolCallRequestInfo[] = [
+        {
+          callId: 'call-1',
+          name: 'rd_file', // Distance 2 from read_file
+          args: {},
+          isClientInitiated: false,
+          prompt_id: 'p1',
+        },
+      ];
+
+      await schedulerInstance.schedule(requests, signal);
+
+      expect(mockStateManager.enqueue).toHaveBeenCalledWith([
+        expect.objectContaining({
+          request: expect.objectContaining({
+            name: 'read_file',
+            originalRequestName: 'rd_file',
+          }),
+        }),
+      ]);
+    });
+
+    it('should NOT repair if match is ambiguous', async () => {
+      mockToolRegistry.getTool.mockReturnValue(undefined);
+      mockToolRegistry.getAllToolNames.mockReturnValue(['tool_1', 'tool_2']);
+
+      const schedulerInstance = new Scheduler({
+        context: mockConfig as unknown as AgentLoopContext,
+        getPreferredEditor,
+        schedulerId: ROOT_SCHEDULER_ID,
+      });
+
+      const requests: ToolCallRequestInfo[] = [
+        {
+          callId: 'call-1',
+          name: 'tool', // Distance 2 from both tool_1 and tool_2
+          args: {},
+          isClientInitiated: false,
+          prompt_id: 'p1',
+        },
+      ];
+
+      await schedulerInstance.schedule(requests, signal);
+
+      // Should remain errored (tool not found)
+      expect(mockStateManager.enqueue).toHaveBeenCalledWith([
+        expect.objectContaining({
+          status: CoreToolCallStatus.Error,
+          request: expect.objectContaining({
+            name: 'tool',
+          }),
+        }),
+      ]);
     });
   });
 });
