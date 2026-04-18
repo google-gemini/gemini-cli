@@ -1,0 +1,13 @@
+{
+  "name": "gemini-cyber-builtin",
+  "version": "1.0.0",
+  "contextFileName": "GEMINI.md",
+  "mcpServers": {
+    "hats": {
+      "command": "python3",
+      "args": ["${extensionPath}${/}hats_mcp_server.py"],
+      "cwd": "${extensionPath}",
+      "trust": false
+    }
+  }
+}

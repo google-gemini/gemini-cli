@@ -1,4 +1,4 @@
-# Gemini CLI
+# Gemini-Cyber-CLI
 
 [![Gemini CLI CI](https://github.com/google-gemini/gemini-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/google-gemini/gemini-cli/actions/workflows/ci.yml)
 [![Gemini CLI E2E (Chained)](https://github.com/google-gemini/gemini-cli/actions/workflows/chained_e2e.yml/badge.svg)](https://github.com/google-gemini/gemini-cli/actions/workflows/chained_e2e.yml)
@@ -8,24 +8,26 @@
 
 ![Gemini CLI Screenshot](/docs/assets/gemini-screenshot.png)
 
-Gemini CLI is an open-source AI agent that brings the power of Gemini directly
-into your terminal. It provides lightweight access to Gemini, giving you the
-most direct path from your prompt to our model.
+Gemini-Cyber-CLI is a standalone Gemini CLI fork focused on **authorized
+ethical hacking workflows** in terminal-first environments (including Kali
+Linux). It combines Gemini agent capabilities with structured security tooling
+through MCP, including HATS-based workflows.
 
-Learn all about Gemini CLI in our [documentation](https://geminicli.com/docs/).
+This fork is defensive-security oriented: reconnaissance, vulnerability triage,
+report writing, and remediation guidance.
 
-## 🚀 Why Gemini CLI?
+## 🚀 Why Gemini-Cyber-CLI?
 
-- **🎯 Free tier**: 60 requests/min and 1,000 requests/day with personal Google
-  account.
-- **🧠 Powerful Gemini 3 models**: Access to improved reasoning and 1M token
-  context window.
-- **🔧 Built-in tools**: Google Search grounding, file operations, shell
-  commands, web fetching.
-- **🔌 Extensible**: MCP (Model Context Protocol) support for custom
-  integrations.
-- **💻 Terminal-first**: Designed for developers who live in the command line.
-- **🛡️ Open source**: Apache 2.0 licensed.
+- **🛡️ Defensive by default**: strict ethical-use scope and refusal behavior for
+  unauthorized/offensive requests.
+- **🧠 Cyber-focused agent context**: optimized for recon, vuln verification,
+  and reporting.
+- **🔌 HATS MCP bridge**: structured JSON findings from Python HATS workflows,
+  instead of unstructured shell output.
+- **⚡ Faster default posture**: lightweight default model path and cyber
+  workflow presets.
+- **🎨 Hacker-style terminal UX**: green ANSI-forward defaults for security
+  operations.
 
 ## 📦 Installation
 
@@ -47,6 +49,46 @@ npx @google/gemini-cli
 ```bash
 npm install -g @google/gemini-cli
 ```
+
+Then run:
+
+```bash
+gemini-cyber
+```
+
+## 🧩 HATS MCP Integration (Python Bridge)
+
+Gemini-Cyber-CLI can automatically load a built-in HATS MCP server bridge so
+the model receives structured security findings.
+
+### Prerequisites
+
+- Python 3.x
+- HATS framework available (see https://github.com/JSNrepo/HATS)
+- MCP server dependencies for Python bridge:
+
+```bash
+pip install fastmcp
+# or
+pip install mcp
+```
+
+### Optional environment setup
+
+```bash
+# Enable HATS MCP bridge even when not launched as gemini-cyber
+export GEMINI_CYBER_ENABLE_HATS_MCP=1
+
+# Optional: override HATS executable path
+export HATS_BIN=/path/to/hats
+```
+
+## 🧭 Cyber Workflow Commands
+
+- `/scan <target>`: authorized recon chain prompt (HATS Nmap -> service
+  detection -> vulnerability lookup)
+- `/report [context]`: generate a professional markdown pentest report from
+  recent tool outputs
 
 #### Install globally with Homebrew (macOS/Linux)
 
@@ -161,10 +203,10 @@ for details)
 - **No API key management** - just sign in with your Google account
 - **Automatic updates** to latest models
 
-#### Start Gemini CLI, then choose _Sign in with Google_ and follow the browser authentication flow when prompted
+#### Start Gemini-Cyber-CLI, then choose _Sign in with Google_ and follow the browser authentication flow when prompted
 
 ```bash
-gemini
+gemini-cyber
 ```
 
 #### If you are using a paid Code Assist License from your organization, remember to set the Google Cloud Project
@@ -172,7 +214,7 @@ gemini
 ```bash
 # Set your Google Cloud Project
 export GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"
-gemini
+gemini-cyber
 ```
 
 ### Option 2: Gemini API Key
@@ -188,7 +230,7 @@ gemini
 ```bash
 # Get your key from https://aistudio.google.com/apikey
 export GEMINI_API_KEY="YOUR_API_KEY"
-gemini
+gemini-cyber
 ```
 
 ### Option 3: Vertex AI
@@ -205,7 +247,7 @@ gemini
 # Get your key from Google Cloud Console
 export GOOGLE_API_KEY="YOUR_API_KEY"
 export GOOGLE_GENAI_USE_VERTEXAI=true
-gemini
+gemini-cyber
 ```
 
 For Google Workspace accounts and other authentication methods, see the
@@ -218,19 +260,19 @@ For Google Workspace accounts and other authentication methods, see the
 #### Start in current directory
 
 ```bash
-gemini
+gemini-cyber
 ```
 
 #### Include multiple directories
 
 ```bash
-gemini --include-directories ../lib,../docs
+gemini-cyber --include-directories ../lib,../docs
 ```
 
 #### Use specific model
 
 ```bash
-gemini -m gemini-2.5-flash
+gemini-cyber -m gemini-2.5-flash
 ```
 
 #### Non-interactive mode for scripts
@@ -238,21 +280,21 @@ gemini -m gemini-2.5-flash
 Get a simple text response:
 
 ```bash
-gemini -p "Explain the architecture of this codebase"
+gemini-cyber -p "Explain the architecture of this codebase"
 ```
 
 For more advanced scripting, including how to parse JSON and handle errors, use
 the `--output-format json` flag to get structured output:
 
 ```bash
-gemini -p "Explain the architecture of this codebase" --output-format json
+gemini-cyber -p "Explain the architecture of this codebase" --output-format json
 ```
 
 For real-time event streaming (useful for monitoring long-running operations),
 use `--output-format stream-json` to get newline-delimited JSON events:
 
 ```bash
-gemini -p "Run tests and deploy" --output-format stream-json
+gemini-cyber -p "Run tests and deploy" --output-format stream-json
 ```
 
 ### Quick Examples
@@ -261,7 +303,7 @@ gemini -p "Run tests and deploy" --output-format stream-json
 
 ```bash
 cd new-project/
-gemini
+gemini-cyber
 > Write me a Discord bot that answers questions using a FAQ.md file I will provide
 ```
 
@@ -270,7 +312,7 @@ gemini
 ```bash
 git clone https://github.com/google-gemini/gemini-cli
 cd gemini-cli
-gemini
+gemini-cyber
 > Give me a summary of all of the changes that went in yesterday
 ```
 
