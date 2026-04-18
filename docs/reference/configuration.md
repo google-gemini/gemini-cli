@@ -1729,6 +1729,12 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
+- **`experimental.autoMemory`** (boolean):
+  - **Description:** Automatically extract reusable skills from past sessions in
+    the background. Review results with /memory inbox.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
 - **`experimental.generalistProfile`** (boolean):
   - **Description:** Suitable for general coding and software development tasks.
   - **Default:** `false`

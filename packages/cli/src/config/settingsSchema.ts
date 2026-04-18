@@ -2213,6 +2213,16 @@ const SETTINGS_SCHEMA = {
           'Replace the built-in save_memory tool with a memory manager subagent that supports adding, removing, de-duplicating, and organizing memories.',
         showInDialog: true,
       },
+      autoMemory: {
+        type: 'boolean',
+        label: 'Auto Memory',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Automatically extract reusable skills from past sessions in the background. Review results with /memory inbox.',
+        showInDialog: true,
+      },
       generalistProfile: {
         type: 'boolean',
         label: 'Use the generalist profile to manage agent contexts.',
