@@ -27,8 +27,10 @@ function buildZodSchemaFromJsonSchema(def: any): z.ZodTypeAny {
     if (def.enum) return z.enum(def.enum as [string, ...string[]]);
     return z.string();
   }
-  if (def.type === 'number') return z.number();
-  if (def.type === 'boolean') return z.boolean();
+  if (def.type === 'number')
+    return z.preprocess(coerceNumberString, z.number());
+  if (def.type === 'boolean')
+    return z.preprocess(coerceBooleanString, z.boolean());
 
   if (def.type === 'array') {
     if (def.items) {
@@ -123,6 +125,27 @@ function buildObjectShapeFromProperties(
   return shape;
 }
 
+// Env vars like "${GEMINI_AUTO_THEME:-true}" resolve to the string "true"
+// but Zod expects an actual boolean. Same deal with numbers.
+function coerceBooleanString(val: unknown): unknown {
+  if (typeof val === 'string') {
+    const trimmed = val.trim().toLowerCase();
+    if (trimmed === 'true') return true;
+    if (trimmed === 'false') return false;
+  }
+  return val;
+}
+
+function coerceNumberString(val: unknown): unknown {
+  if (typeof val === 'string') {
+    const trimmed = val.trim();
+    if (trimmed !== '' && !isNaN(Number(trimmed))) {
+      return Number(trimmed);
+    }
+  }
+  return val;
+}
+
 /**
  * Builds a Zod schema for primitive types (string, number, boolean)
  */
@@ -133,9 +156,9 @@ function buildPrimitiveSchema(
     case 'string':
       return z.string();
     case 'number':
-      return z.number();
+      return z.preprocess(coerceNumberString, z.number());
     case 'boolean':
-      return z.boolean();
+      return z.preprocess(coerceBooleanString, z.boolean());
     default:
       return z.unknown();
   }
