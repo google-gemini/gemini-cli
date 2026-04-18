@@ -47,7 +47,6 @@ import { MouseProvider } from './contexts/MouseContext.js';
 import { ScrollProvider } from './contexts/ScrollProvider.js';
 import {
   type StartupWarning,
-  type EditorType,
   type Config,
   type IdeInfo,
   type IdeContext,
@@ -631,8 +630,7 @@ export const AppContainer = (props: AppContainerProps) => {
   const staticAreaMaxItemHeight = Math.max(terminalHeight * 4, 100);
 
   const getPreferredEditor = useCallback(
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    () => settings.merged.general.preferredEditor as EditorType,
+    () => settings.merged.general.preferredEditor,
     [settings.merged.general.preferredEditor],
   );
 
