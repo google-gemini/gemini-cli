@@ -144,7 +144,7 @@ STATE 1: The agent is busy (e.g., streaming a response, showing a spinner, runni
 - In this case, your action MUST be exactly: <WAIT>
 
 STATE 2: The agent is waiting for you to authorize a tool, confirm an action, or answer a specific multi-choice question (e.g., "Action Required", "Allow execution", numbered options).
-- In this case, your action MUST be the exact raw characters to select the option and submit it (e.g., 1\\r, 2\\r, y\\r, n\\r, or just \\r if the default option is acceptable). Do NOT output <DONE> or "Thank you". You must unblock the agent and allow it to run the tool.
+- In this case, your action MUST be the exact raw characters to select the option and submit it (e.g., 1\\r, 2\\r, y\\r, n\\r, or just \\r if the default option is acceptable). Do NOT output <DONE> or "Thank you". You must unblock the agent and allow it to run the tool. If you intend to approve or proceed, ALWAYS output "y\\r" or the number of the "Auto" option. DO NOT use free-form text like "please proceed" or "yes".
 
 STATE 3: The agent has finished its current thought process AND is idle, waiting for a NEW general text prompt (usually indicated by a "> Type your message" prompt).
 - First, verify that the ACTUAL task is fully complete based on your original goal. Do not stop at intermediate steps like planning or syntax checking.
