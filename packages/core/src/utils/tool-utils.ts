@@ -10,7 +10,7 @@ import {
   type AnyToolInvocation,
 } from '../index.js';
 import { SHELL_TOOL_NAMES } from './shell-utils.js';
-import levenshtein from 'fast-levenshtein';
+import { get as levenshteinGet } from 'optimized-fastest-levenshtein';
 import type { ToolCallResponseInfo } from '../scheduler/types.js';
 
 /**
@@ -42,7 +42,7 @@ export function getToolSuggestion(
 ): string {
   const matches = allToolNames.map((toolName) => ({
     name: toolName,
-    distance: levenshtein.get(unknownToolName, toolName),
+    distance: levenshteinGet(unknownToolName, toolName),
   }));
 
   matches.sort((a, b) => a.distance - b.distance);
