@@ -543,7 +543,9 @@ export async function downloadFile(
               new Error('Redirect response missing Location header'),
             );
           }
-          downloadFile(res.headers.location, dest, options, redirectCount + 1)
+          res.resume(); // Drain response body to free the socket
+          const redirectUrl = new URL(res.headers.location, url).toString();
+          downloadFile(redirectUrl, dest, options, redirectCount + 1)
             .then(resolve)
             .catch(reject);
           return;
