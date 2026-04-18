@@ -5,125 +5,48 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { EventEmitter } from 'node:events';
+import { Readable } from 'node:stream';
 import {
   captureHeapSnapshot,
   MEMORY_SNAPSHOT_AUTO_THRESHOLD_BYTES,
 } from './memorySnapshot.js';
 
-type StreamWrites = string[];
-
-interface FakeSession {
-  connect: ReturnType<typeof vi.fn>;
-  disconnect: ReturnType<typeof vi.fn>;
-  on: ReturnType<typeof vi.fn>;
-  removeListener: ReturnType<typeof vi.fn>;
-  post: ReturnType<typeof vi.fn>;
-}
-
-const { sessionInstances, createdStreams, mkdirMock, postFailure } = vi.hoisted(
-  () => ({
-    sessionInstances: [] as FakeSession[],
-    createdStreams: [] as Array<
-      EventEmitter & {
-        write: ReturnType<typeof vi.fn>;
-        end: ReturnType<typeof vi.fn>;
-        writes: StreamWrites;
-        path: string;
-      }
-    >,
+const { mkdirMock, pipelineMock, getHeapSnapshotMock, createWriteStreamMock } =
+  vi.hoisted(() => ({
     mkdirMock: vi.fn(async () => undefined),
-    postFailure: { error: null as Error | null },
-  }),
-);
+    pipelineMock: vi.fn(async () => undefined),
+    getHeapSnapshotMock: vi.fn(),
+    createWriteStreamMock: vi.fn(),
+  }));
 
 vi.mock('node:fs/promises', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs/promises')>();
-  return {
-    ...actual,
-    mkdir: mkdirMock,
-  };
+  return { ...actual, mkdir: mkdirMock };
 });
 
 vi.mock('node:fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs')>();
-  return {
-    ...actual,
-    createWriteStream: vi.fn((filePath: string) => {
-      const writes: StreamWrites = [];
-      const emitter = new EventEmitter() as EventEmitter & {
-        write: ReturnType<typeof vi.fn>;
-        end: ReturnType<typeof vi.fn>;
-        writes: StreamWrites;
-        path: string;
-      };
-      emitter.writes = writes;
-      emitter.path = filePath;
-      emitter.write = vi.fn((chunk: string) => {
-        writes.push(chunk);
-        return true;
-      });
-      emitter.end = vi.fn(() => {
-        // Defer 'finish' so awaiters see it after the current microtask.
-        queueMicrotask(() => emitter.emit('finish'));
-      });
-      createdStreams.push(emitter);
-      return emitter;
-    }),
-  };
+  return { ...actual, createWriteStream: createWriteStreamMock };
 });
 
-vi.mock('node:inspector/promises', () => {
-  class Session {
-    private listeners = new Map<string, Set<(msg: unknown) => void>>();
-    connect: ReturnType<typeof vi.fn>;
-    disconnect: ReturnType<typeof vi.fn>;
-    on: ReturnType<typeof vi.fn>;
-    removeListener: ReturnType<typeof vi.fn>;
-    post: ReturnType<typeof vi.fn>;
+vi.mock('node:v8', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:v8')>();
+  return { ...actual, getHeapSnapshot: getHeapSnapshotMock };
+});
 
-    constructor() {
-      this.connect = vi.fn();
-      this.disconnect = vi.fn();
-      this.on = vi.fn((event: string, listener: (msg: unknown) => void) => {
-        if (!this.listeners.has(event)) {
-          this.listeners.set(event, new Set());
-        }
-        this.listeners.get(event)!.add(listener);
-        return this;
-      });
-      this.removeListener = vi.fn(
-        (event: string, listener: (msg: unknown) => void) => {
-          this.listeners.get(event)?.delete(listener);
-          return this;
-        },
-      );
-      this.post = vi.fn(async (method: string) => {
-        if (postFailure.error) {
-          throw postFailure.error;
-        }
-        if (method === 'HeapProfiler.takeHeapSnapshot') {
-          const handlers = this.listeners.get(
-            'HeapProfiler.addHeapSnapshotChunk',
-          );
-          handlers?.forEach((fn) => {
-            fn({ params: { chunk: 'chunk-a' } });
-            fn({ params: { chunk: 'chunk-b' } });
-          });
-        }
-      });
-      sessionInstances.push(this as unknown as FakeSession);
-    }
-  }
-  return { Session };
+vi.mock('node:stream/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:stream/promises')>();
+  return { ...actual, pipeline: pipelineMock };
 });
 
 describe('captureHeapSnapshot', () => {
   beforeEach(() => {
-    sessionInstances.length = 0;
-    createdStreams.length = 0;
     mkdirMock.mockClear();
-    postFailure.error = null;
+    pipelineMock.mockClear();
+    getHeapSnapshotMock.mockClear().mockReturnValue(Readable.from([]));
+    createWriteStreamMock
+      .mockClear()
+      .mockReturnValue({ write: vi.fn(), end: vi.fn() });
   });
 
   afterEach(() => {
@@ -134,7 +57,7 @@ describe('captureHeapSnapshot', () => {
     expect(MEMORY_SNAPSHOT_AUTO_THRESHOLD_BYTES).toBe(2 * 1024 * 1024 * 1024);
   });
 
-  it('connects the inspector, streams chunks to disk, removes the listener, and disconnects', async () => {
+  it('creates the target directory and pipelines the V8 snapshot to disk', async () => {
     const target = '/tmp/gemini-test/snapshot.heapsnapshot';
 
     await captureHeapSnapshot(target);
@@ -142,38 +65,20 @@ describe('captureHeapSnapshot', () => {
     expect(mkdirMock).toHaveBeenCalledWith('/tmp/gemini-test', {
       recursive: true,
     });
-
-    expect(sessionInstances).toHaveLength(1);
-    const session = sessionInstances[0];
-    expect(session.connect).toHaveBeenCalledTimes(1);
-    expect(session.on).toHaveBeenCalledWith(
-      'HeapProfiler.addHeapSnapshotChunk',
-      expect.any(Function),
+    expect(getHeapSnapshotMock).toHaveBeenCalledTimes(1);
+    expect(createWriteStreamMock).toHaveBeenCalledWith(target);
+    expect(pipelineMock).toHaveBeenCalledTimes(1);
+    expect(pipelineMock).toHaveBeenCalledWith(
+      getHeapSnapshotMock.mock.results[0].value,
+      createWriteStreamMock.mock.results[0].value,
     );
-    expect(session.post).toHaveBeenCalledWith('HeapProfiler.takeHeapSnapshot', {
-      reportProgress: false,
-    });
-    expect(session.removeListener).toHaveBeenCalledWith(
-      'HeapProfiler.addHeapSnapshotChunk',
-      expect.any(Function),
-    );
-    expect(session.disconnect).toHaveBeenCalledTimes(1);
-
-    expect(createdStreams).toHaveLength(1);
-    const stream = createdStreams[0];
-    expect(stream.path).toBe(target);
-    expect(stream.writes).toEqual(['chunk-a', 'chunk-b']);
-    expect(stream.end).toHaveBeenCalledTimes(1);
   });
 
-  it('disconnects the inspector even when HeapProfiler.takeHeapSnapshot fails', async () => {
-    postFailure.error = new Error('heap profiler disabled');
+  it('propagates pipeline failures to the caller', async () => {
+    pipelineMock.mockRejectedValueOnce(new Error('write failed'));
 
     await expect(
       captureHeapSnapshot('/tmp/gemini-test/fail.heapsnapshot'),
-    ).rejects.toThrow('heap profiler disabled');
-
-    expect(sessionInstances).toHaveLength(1);
-    expect(sessionInstances[0].disconnect).toHaveBeenCalledTimes(1);
+    ).rejects.toThrow('write failed');
   });
 });

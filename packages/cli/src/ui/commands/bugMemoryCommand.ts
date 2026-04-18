@@ -45,7 +45,7 @@ export const bugMemoryCommand: SlashCommand = {
     context.ui.addItem(
       {
         type: MessageType.INFO,
-        text: `Capturing V8 heap snapshot (current RSS: ${formatBytes(rss)}).\nThis can take 20+ seconds on large processes — please do not exit the CLI.\nDestination: ${filePath}`,
+        text: `Capturing V8 heap snapshot (current RSS: ${formatBytes(rss)}).\nThis can take 20+ seconds and the CLI may be temporarily unresponsive — please do not exit.\nDestination: ${filePath}`,
       },
       Date.now(),
     );

@@ -145,7 +145,7 @@ export const bugCommand: SlashCommand = {
       context.ui.addItem(
         {
           type: MessageType.INFO,
-          text: `High memory usage detected (${formatBytes(rss)}). Capturing V8 heap snapshot to ${snapshotPath}.\nThis can take 20+ seconds; the CLI will remain responsive.`,
+          text: `High memory usage detected (${formatBytes(rss)}). Capturing V8 heap snapshot to ${snapshotPath}.\nThis can take 20+ seconds and the CLI may be temporarily unresponsive; please do not exit.`,
         },
         Date.now(),
       );
