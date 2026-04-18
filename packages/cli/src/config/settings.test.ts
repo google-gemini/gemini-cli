@@ -339,6 +339,69 @@ describe('Settings Loading and Merging', () => {
       });
     });
 
+    it('should preserve legacy auto memory behavior when only memoryManager is explicitly enabled', () => {
+      (mockFsExistsSync as Mock).mockImplementation((p: fs.PathLike) => {
+        const normP = path.normalize(p.toString());
+        return (
+          normP === path.normalize(USER_SETTINGS_PATH) ||
+          normP === path.normalize(MOCK_WORKSPACE_SETTINGS_PATH)
+        );
+      });
+
+      const userSettingsContent = {
+        experimental: {
+          memoryManager: true,
+        },
+      };
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          const normP = path.normalize(p.toString());
+          if (normP === path.normalize(USER_SETTINGS_PATH)) {
+            return JSON.stringify(userSettingsContent);
+          }
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      expect(settings.merged.experimental?.memoryManager).toBe(true);
+      expect(settings.merged.experimental?.autoMemory).toBe(true);
+    });
+
+    it('should let explicit autoMemory false override legacy memoryManager compatibility', () => {
+      (mockFsExistsSync as Mock).mockImplementation((p: fs.PathLike) => {
+        const normP = path.normalize(p.toString());
+        return (
+          normP === path.normalize(USER_SETTINGS_PATH) ||
+          normP === path.normalize(MOCK_WORKSPACE_SETTINGS_PATH)
+        );
+      });
+
+      const userSettingsContent = {
+        experimental: {
+          memoryManager: true,
+          autoMemory: false,
+        },
+      };
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          const normP = path.normalize(p.toString());
+          if (normP === path.normalize(USER_SETTINGS_PATH)) {
+            return JSON.stringify(userSettingsContent);
+          }
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      expect(settings.merged.experimental?.memoryManager).toBe(true);
+      expect(settings.merged.experimental?.autoMemory).toBe(false);
+    });
+
     it('should merge all settings files with the correct precedence', () => {
       // Mock schema to test defaults application
       const mockSchema = {
