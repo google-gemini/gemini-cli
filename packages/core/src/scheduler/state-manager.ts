@@ -32,7 +32,6 @@ import {
   type SerializableConfirmationDetails,
 } from '../confirmation-bus/types.js';
 import { isToolCallResponseInfo } from '../utils/tool-utils.js';
-import { getDiffStatFromPatch } from '../tools/diffOptions.js';
 
 /**
  * Handler for terminal tool calls.
@@ -455,28 +454,12 @@ export class SchedulerStateManager {
     this.validateHasToolAndInvocation(call, CoreToolCallStatus.Cancelled);
     const startTime = 'startTime' in call ? call.startTime : undefined;
 
-    // TODO: Refactor this tool-specific logic into the confirmation details payload.
-    // See: https://github.com/google-gemini/gemini-cli/issues/16716
+    // Use the tool-provided cancelResult if available
     let resultDisplay: ToolResultDisplay | undefined = undefined;
     if (this.isWaitingToolCall(call)) {
       const details = call.confirmationDetails;
-      if (
-        details.type === 'edit' &&
-        'fileDiff' in details &&
-        'fileName' in details &&
-        'filePath' in details &&
-        'originalContent' in details &&
-        'newContent' in details
-      ) {
-        resultDisplay = {
-          fileDiff: details.fileDiff,
-          fileName: details.fileName,
-          filePath: details.filePath,
-          originalContent: details.originalContent,
-          newContent: details.newContent,
-          // Derive stats from the patch if they aren't already present
-          diffStat: details.diffStat ?? getDiffStatFromPatch(details.fileDiff),
-        };
+      if ('cancelResult' in details && details.cancelResult) {
+        resultDisplay = details.cancelResult;
       }
     }
 

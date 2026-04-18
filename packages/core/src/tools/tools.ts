@@ -986,6 +986,7 @@ export interface ToolEditConfirmationDetails {
   isModifying?: boolean;
   diffStat?: DiffStat;
   ideConfirmation?: Promise<DiffUpdateResult>;
+  cancelResult?: ToolResultDisplay;
 }
 
 export interface ToolEditConfirmationPayload {
