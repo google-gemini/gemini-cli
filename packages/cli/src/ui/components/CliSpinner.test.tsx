@@ -27,6 +27,7 @@ describe('<CliSpinner />', () => {
     const settings = createMockSettings({ ui: { showSpinner: false } });
     const { lastFrame, unmount } = await renderWithProviders(<CliSpinner />, {
       settings,
+      allowEmptyFrame: true,
     });
     expect(lastFrame({ allowEmpty: true })).toBe('');
     unmount();
