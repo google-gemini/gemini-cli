@@ -314,6 +314,120 @@ describe('relaunchAppInChildProcess', () => {
       // Should default to exit code 1
       expect(processExitSpy).toHaveBeenCalledWith(1);
     });
+
+    it('should forward termination signals to the child and clean up listeners on close', async () => {
+      process.argv = ['/usr/bin/node', '/app/cli.js'];
+
+      const FORWARDED: NodeJS.Signals[] = [
+        'SIGTERM',
+        'SIGHUP',
+        'SIGINT',
+        'SIGQUIT',
+        'SIGUSR1',
+        'SIGUSR2',
+      ];
+      const baseline = Object.fromEntries(
+        FORWARDED.map((s) => [s, process.listenerCount(s)]),
+      ) as Record<NodeJS.Signals, number>;
+
+      const mockChild = createMockChildProcess(0, false);
+      const listenerCountsAfterSpawn: Record<string, number> = {};
+
+      mockedSpawn.mockImplementation(() => {
+        // Defer so the caller has wired up its listeners first.
+        setImmediate(() => {
+          for (const sig of FORWARDED) {
+            listenerCountsAfterSpawn[sig] = process.listenerCount(sig);
+          }
+          // Trigger SIGTERM forwarder.
+          process.emit('SIGTERM');
+          // Then close the child so the promise resolves.
+          setImmediate(() => mockChild.emit('close', 0));
+        });
+        return mockChild;
+      });
+
+      await expect(relaunchAppInChildProcess([], [])).rejects.toThrow(
+        'PROCESS_EXIT_CALLED',
+      );
+
+      // Each forwarded signal gained exactly one listener while the child was alive.
+      for (const sig of FORWARDED) {
+        expect(listenerCountsAfterSpawn[sig]).toBe(baseline[sig] + 1);
+      }
+      // SIGTERM was forwarded to the child.
+      expect(mockChild.kill).toHaveBeenCalledWith('SIGTERM');
+      // After child close, listener counts returned to baseline.
+      for (const sig of FORWARDED) {
+        expect(process.listenerCount(sig)).toBe(baseline[sig]);
+      }
+    });
+
+    it('should not leak signal listeners when child.send throws synchronously', async () => {
+      process.argv = ['/usr/bin/node', '/app/cli.js'];
+
+      const FORWARDED: NodeJS.Signals[] = [
+        'SIGTERM',
+        'SIGHUP',
+        'SIGINT',
+        'SIGQUIT',
+        'SIGUSR1',
+        'SIGUSR2',
+      ];
+      const baseline = Object.fromEntries(
+        FORWARDED.map((s) => [s, process.listenerCount(s)]),
+      ) as Record<NodeJS.Signals, number>;
+
+      const mockChild = createMockChildProcess(0, false);
+      (mockChild.send as unknown as MockInstance).mockImplementation(() => {
+        throw new Error('IPC send failed');
+      });
+      mockedSpawn.mockImplementation(() => mockChild);
+
+      await expect(
+        relaunchAppInChildProcess([], [], {
+          isReadonly: false,
+        } as unknown as Parameters<typeof relaunchAppInChildProcess>[2]),
+      ).rejects.toThrow('PROCESS_EXIT_CALLED');
+
+      // Listeners are attached AFTER child.send(); a synchronous throw from
+      // child.send must not leave forwarders registered on the parent.
+      for (const sig of FORWARDED) {
+        expect(process.listenerCount(sig)).toBe(baseline[sig]);
+      }
+    });
+
+    it('should clean up signal listeners on child process error', async () => {
+      process.argv = ['/usr/bin/node', '/app/cli.js'];
+
+      const FORWARDED: NodeJS.Signals[] = [
+        'SIGTERM',
+        'SIGHUP',
+        'SIGINT',
+        'SIGQUIT',
+        'SIGUSR1',
+        'SIGUSR2',
+      ];
+      const baseline = Object.fromEntries(
+        FORWARDED.map((s) => [s, process.listenerCount(s)]),
+      ) as Record<NodeJS.Signals, number>;
+
+      const mockChild = createMockChildProcess(0, false);
+      mockedSpawn.mockImplementation(() => {
+        setImmediate(() => {
+          mockChild.emit('error', new Error('spawn failed'));
+        });
+        return mockChild;
+      });
+
+      await expect(relaunchAppInChildProcess([], [])).rejects.toThrow(
+        'PROCESS_EXIT_CALLED',
+      );
+
+      for (const sig of FORWARDED) {
+        expect(process.listenerCount(sig)).toBe(baseline[sig]);
+      }
+    });
   });
 });
 
