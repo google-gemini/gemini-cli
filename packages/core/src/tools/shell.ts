@@ -488,7 +488,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
         };
       }
       let cumulativeOutput: string | AnsiOutput = '';
-      let lastUpdateTime = Date.now();
+      let lastUpdateTime = 0;
       let isBinaryStream = false;
 
       const resetTimeout = () => {
@@ -524,8 +524,19 @@ export class ShellToolInvocation extends BaseToolInvocation<
             switch (event.type) {
               case 'data':
                 if (isBinaryStream) break;
-                cumulativeOutput = event.chunk;
-                shouldUpdate = true;
+                if (typeof event.chunk === 'string') {
+                  if (typeof cumulativeOutput === 'string') {
+                    cumulativeOutput += event.chunk;
+                  } else {
+                    cumulativeOutput = event.chunk;
+                  }
+                } else {
+                  // AnsiOutput (PTY) is always the full state
+                  cumulativeOutput = event.chunk;
+                }
+                if (Date.now() - lastUpdateTime > OUTPUT_UPDATE_INTERVAL_MS) {
+                  shouldUpdate = true;
+                }
                 break;
               case 'binary_detected':
                 isBinaryStream = true;
