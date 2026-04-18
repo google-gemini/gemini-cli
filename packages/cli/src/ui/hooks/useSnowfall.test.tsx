@@ -53,6 +53,7 @@ describe('useSnowfall', () => {
       () => useSnowfall(mockArt),
       {
         uiState: { history: [], historyRemountKey: 0 } as Partial<UIState>,
+        allowEmptyFrame: true,
       },
     );
 
@@ -67,6 +68,7 @@ describe('useSnowfall', () => {
       () => useSnowfall(mockArt),
       {
         uiState: { history: [], historyRemountKey: 0 } as Partial<UIState>,
+        allowEmptyFrame: true,
       },
     );
 
@@ -88,6 +90,7 @@ describe('useSnowfall', () => {
       () => useSnowfall(mockArt),
       {
         uiState: { history: [], historyRemountKey: 0 } as Partial<UIState>,
+        allowEmptyFrame: true,
       },
     );
 
@@ -103,6 +106,7 @@ describe('useSnowfall', () => {
       () => useSnowfall(mockArt),
       {
         uiState: { history: [], historyRemountKey: 0 } as Partial<UIState>,
+        allowEmptyFrame: true,
       },
     );
 
@@ -118,6 +122,7 @@ describe('useSnowfall', () => {
           history: [{ type: 'user', text: 'hello' }],
           historyRemountKey: 0,
         } as Partial<UIState>,
+        allowEmptyFrame: true,
       },
     );
 
