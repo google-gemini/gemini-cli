@@ -20,6 +20,9 @@ describe('<Checklist />', () => {
   it('renders nothing when list is empty', async () => {
     const { lastFrame } = await render(
       <Checklist title="Test List" items={[]} isExpanded={true} />,
+      undefined,
+      undefined,
+      true,
     );
     expect(lastFrame({ allowEmpty: true })).toBe('');
   });
@@ -31,6 +34,9 @@ describe('<Checklist />', () => {
     ];
     const { lastFrame } = await render(
       <Checklist title="Test List" items={inactiveItems} isExpanded={false} />,
+      undefined,
+      undefined,
+      true,
     );
     expect(lastFrame({ allowEmpty: true })).toBe('');
   });
