@@ -668,6 +668,35 @@ export function getShellConfiguration(): ShellConfiguration {
  */
 export const isWindows = () => os.platform() === 'win32';
 
+export function isWsl(): boolean {
+  if (os.platform() !== 'linux') {
+    return false;
+  }
+  // WSL sets WSLENV or WSL_DISTRO_NAME in the environment
+  if (process.env['WSL_DISTRO_NAME'] || process.env['WSLENV']) {
+    return true;
+  }
+  // Fallback: check /proc/version for 'microsoft' or 'WSL'
+  try {
+    const procVersion = fs.readFileSync('/proc/version', 'utf8');
+    return /microsoft|wsl/i.test(procVersion);
+  } catch {
+    return false;
+  }
+}
+export function isWslCrossOsPath(dirPath: string): boolean {
+  if (!isWsl()) {
+    return false;
+  }
+  return /^\/mnt\/[a-zA-Z](\/|$)/.test(dirPath);
+}
+export function isWslCrossOsCommand(command: string): boolean {
+  if (!isWsl()) {
+    return false;
+  }
+  return /\b\w+\.exe\b/i.test(command);
+}
+
 /**
  * Escapes a string so that it can be safely used as a single argument
  * in a shell command, preventing command injection.
