@@ -35,6 +35,9 @@ describe('useTimer', () => {
     }
     const { rerender, unmount } = await render(
       <TestComponent isActive={initialIsActive} resetKey={initialResetKey} />,
+      undefined,
+      undefined,
+      true,
     );
     return {
       result: {
