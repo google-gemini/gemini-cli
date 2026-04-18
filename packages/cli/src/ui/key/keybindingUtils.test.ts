@@ -6,7 +6,12 @@
 
 import { describe, it, expect } from 'vitest';
 import { formatKeyBinding, formatCommand } from './keybindingUtils.js';
-import { Command, KeyBinding } from './keyBindings.js';
+import {
+  Command,
+  KeyBinding,
+  setActiveKeyBindingConfig,
+  defaultKeyBindingConfig,
+} from './keyBindings.js';
 
 describe('keybindingUtils', () => {
   describe('formatKeyBinding', () => {
@@ -137,6 +142,29 @@ describe('keybindingUtils', () => {
           'default',
         ),
       ).toBe('');
+    });
+
+    it('falls back to activeKeyBindingConfig when no config is provided', () => {
+      try {
+        // Initially it should be default (Ctrl+G)
+        expect(
+          formatCommand(Command.OPEN_EXTERNAL_EDITOR, undefined, 'default'),
+        ).toBe('Ctrl+G');
+
+        // Set a custom active config
+        const customConfig = new Map([
+          [Command.OPEN_EXTERNAL_EDITOR, [new KeyBinding('ctrl+x')]],
+        ]);
+        setActiveKeyBindingConfig(customConfig);
+
+        // Now it should be Ctrl+X
+        expect(
+          formatCommand(Command.OPEN_EXTERNAL_EDITOR, undefined, 'default'),
+        ).toBe('Ctrl+X');
+      } finally {
+        // Reset to default for other tests
+        setActiveKeyBindingConfig(defaultKeyBindingConfig);
+      }
     });
   });
 });
