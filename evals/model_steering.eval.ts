@@ -86,4 +86,79 @@ describe('Model Steering Behavioral Evals', () => {
       expect(fs.existsSync(hwPy), 'hw.py should exist').toBe(true);
     },
   });
+
+  appEvalTest('USUALLY_PASSES', {
+    name: 'Skip Step: Model omits a planned step when instructed via hint',
+    configOverrides: {
+      modelSteering: true,
+    },
+    files: {
+      'src/math.ts':
+        'export function multiply(a: number, b: number): number {\n  return a * b;\n}\n',
+    },
+    prompt:
+      'Refactor the multiply function in src/math.ts to use arrow function syntax, then create a file called done.txt to confirm completion.',
+    setup: async (rig) => {
+      // Pause on the first write_file so we can inject a hint before done.txt is created
+      rig.setBreakpoint(['write_file']);
+    },
+    assert: async (rig) => {
+      // Wait for the model to write the refactored src/math.ts
+      await rig.waitForPendingConfirmation('write_file', 30000);
+
+      // Instruct the model to skip the done.txt step
+      await rig.addUserHint(
+        'Skip creating done.txt — the refactor is all I need.',
+      );
+
+      await rig.resolveAwaitedTool();
+      await rig.waitForIdle(60000);
+
+      const testDir = rig.getTestDir();
+      const mathTs = path.join(testDir, 'src/math.ts');
+      const doneTxt = path.join(testDir, 'done.txt');
+
+      // The refactor should have happened
+      expect(fs.existsSync(mathTs), 'src/math.ts should exist').toBe(true);
+      expect(fs.readFileSync(mathTs, 'utf8')).toMatch(/=>/);
+
+      // The skipped step should not have happened
+      expect(fs.existsSync(doneTxt), 'done.txt should not exist').toBe(false);
+    },
+  });
+
+  appEvalTest('USUALLY_PASSES', {
+    name: 'Path Correction: Model searches correct directory after hint',
+    configOverrides: {
+      modelSteering: true,
+    },
+    files: {
+      'src/common/utils/helpers.ts':
+        'export const DATABASE_URL = "postgres://localhost:5432/mydb";\n',
+      'src/index.ts': '// Entry point — no constants here\n',
+    },
+    prompt: 'Find the DATABASE_URL constant and tell me its value.',
+    setup: async (rig) => {
+      rig.setBreakpoint(['read_file', 'glob', 'grep', 'list_directory']);
+    },
+    assert: async (rig) => {
+      // Wait for the model to start searching
+      await rig.waitForPendingConfirmation(
+        /read_file|glob|grep|list_directory/i,
+        30000,
+      );
+
+      // Correct the search path
+      await rig.addUserHint(
+        'The constants are in src/common/utils/, not the root src/ directory.',
+      );
+
+      await rig.resolveAwaitedTool();
+      await rig.waitForIdle(60000);
+
+      // The model should have found and reported the value
+      const output = rig.getStaticOutput();
+      expect(output).toMatch(/postgres/i);
+    },
+  });
 });
