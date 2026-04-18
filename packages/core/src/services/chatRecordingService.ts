@@ -47,6 +47,14 @@ const ENOSPC_WARNING_MESSAGE =
   'The conversation will continue but will not be saved to disk. ' +
   'Free up disk space and restart to enable recording.';
 
+/**
+ * Warning message shown when recording is disabled due to conversation exceeding
+ * the maximum serializable size.
+ */
+const RANGE_WARNING_MESSAGE =
+  'Chat recording disabled: Conversation exceeded maximum serializable size. ' +
+  'The conversation will continue but will not be saved to disk.';
+
 function hasProperty<T extends string>(
   obj: unknown,
   prop: T,
@@ -397,6 +405,10 @@ export class ChatRecordingService {
       if (isNodeError(error) && error.code === 'ENOSPC') {
         this.conversationFile = null;
         debugLogger.warn(ENOSPC_WARNING_MESSAGE);
+      } else if (error instanceof RangeError || error instanceof TypeError) {
+        this.conversationFile = null;
+        const message = error instanceof RangeError ? RANGE_WARNING_MESSAGE : 'Chat recording disabled: Conversation data could not be serialized.';
+        debugLogger.warn(message, error);
       } else {
         throw error;
       }

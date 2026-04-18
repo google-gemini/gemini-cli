@@ -956,6 +956,55 @@ describe('ChatRecordingService', () => {
     });
   });
 
+  describe('RangeError (conversation too large) graceful degradation - issue #24902', () => {
+    it('should disable recording and not throw when RangeError occurs during appendRecord', async () => {
+      await chatRecordingService.initialize();
+
+      vi.mocked(fs.appendFileSync).mockImplementation(() => {
+        throw new RangeError('Invalid string length');
+      });
+
+      expect(() =>
+        chatRecordingService.recordMessage({
+          type: 'user',
+          content: 'Hello',
+          model: 'gemini-pro',
+        }),
+      ).not.toThrow();
+
+      expect(chatRecordingService.getConversationFilePath()).toBeNull();
+    });
+
+    it('should skip recording operations after RangeError disables recording', async () => {
+      await chatRecordingService.initialize();
+
+      vi.mocked(fs.appendFileSync)
+        .mockImplementationOnce(() => {
+          throw new RangeError('Invalid string length');
+        })
+        .mockImplementation(() => {});
+
+      chatRecordingService.recordMessage({
+        type: 'user',
+        content: 'Hello',
+        model: 'gemini-pro',
+      });
+
+      // Recording should be disabled after RangeError
+      expect(chatRecordingService.getConversationFilePath()).toBeNull();
+
+      // Subsequent records should silently no-op
+      const appendSpy = vi.mocked(fs.appendFileSync);
+      const callsBefore = appendSpy.mock.calls.length;
+      chatRecordingService.recordMessage({
+        type: 'user',
+        content: 'Second message',
+        model: 'gemini-pro',
+      });
+      expect(appendSpy.mock.calls.length).toBe(callsBefore);
+    });
+  });
+
   describe('updateMessagesFromHistory', () => {
     beforeEach(async () => {
       await chatRecordingService.initialize();
