@@ -65,8 +65,49 @@ export async function relaunchAppInChildProcess(
       env: newEnv,
     });
 
+    // Forward termination signals so the whole process tree exits cleanly
+    // rather than orphaning the child under PID 1 / the user's systemd
+    // manager. Programmatic signals (e.g. `kill -INT <parent_pid>`,
+    // systemd/container runtimes, supervising ACP clients) target only the
+    // parent and would otherwise leave the child orphaned. Terminal-generated
+    // signals (Ctrl+C, Ctrl+\) are already delivered to the whole foreground
+    // process group by the terminal; the resulting double-delivery is
+    // harmless for typical signal handlers and strictly preferable to
+    // orphaning. Waiting for the child to exit via the installed listeners
+    // also keeps the terminal state clean by preventing the shell prompt
+    // from returning mid-cleanup.
+    const FORWARDED_SIGNALS: NodeJS.Signals[] = [
+      'SIGTERM',
+      'SIGHUP',
+      'SIGINT',
+      'SIGQUIT',
+      'SIGUSR1',
+      'SIGUSR2',
+    ];
+    const forwarders = new Map<NodeJS.Signals, () => void>();
+    const removeForwarders = () => {
+      for (const [sig, handler] of forwarders) {
+        process.off(sig, handler);
+      }
+      forwarders.clear();
+    };
+
     if (latestAdminSettings) {
       child.send({ type: 'admin-settings', settings: latestAdminSettings });
+    }
+
+    // Attach listeners only after any synchronous IPC setup that could throw,
+    // so a thrown child.send() doesn't leak listeners on the parent process.
+    for (const sig of FORWARDED_SIGNALS) {
+      const handler = () => {
+        try {
+          child.kill(sig);
+        } catch {
+          // Child may already be gone; ignore.
+        }
+      };
+      forwarders.set(sig, handler);
+      process.on(sig, handler);
     }
 
     child.on('message', (msg: { type?: string; settings?: unknown }) => {
@@ -76,8 +117,12 @@ export async function relaunchAppInChildProcess(
     });
 
     return new Promise<number>((resolve, reject) => {
-      child.on('error', reject);
+      child.on('error', (err) => {
+        removeForwarders();
+        reject(err);
+      });
       child.on('close', (code) => {
+        removeForwarders();
         // Resume stdin before the parent process exits.
         process.stdin.resume();
         resolve(code ?? 1);
