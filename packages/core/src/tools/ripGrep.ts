@@ -9,7 +9,8 @@ import fs from 'node:fs';
 import fsPromises from 'node:fs/promises';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
-import { downloadRipGrep } from '@joshua.litt/get-ripgrep';
+import os from 'node:os';
+import { fileURLToPath } from 'node:url';
 import {
   BaseDeclarativeTool,
   BaseToolInvocation,
@@ -27,7 +28,6 @@ import {
 import { getErrorMessage, isNodeError } from '../utils/errors.js';
 import type { Config } from '../config/config.js';
 import { fileExists } from '../utils/fileUtils.js';
-import { Storage } from '../config/storage.js';
 import { GREP_TOOL_NAME } from './tool-names.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import {
@@ -44,20 +44,7 @@ import { RIP_GREP_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
 import { type GrepMatch, formatGrepResults } from './grep-utils.js';
 
-function getRgCandidateFilenames(): readonly string[] {
-  return process.platform === 'win32' ? ['rg.exe', 'rg'] : ['rg'];
-}
-
-async function resolveExistingRgPath(): Promise<string | null> {
-  const binDir = Storage.getGlobalBinDir();
-  for (const fileName of getRgCandidateFilenames()) {
-    const candidatePath = path.join(binDir, fileName);
-    if (await fileExists(candidatePath)) {
-      return candidatePath;
-    }
-  }
-  return null;
-}
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Cache the promise itself to handle concurrent requests efficiently
 let validationPromise: Promise<boolean> | null = null;
@@ -118,67 +105,51 @@ async function isValidRipgrepBinary(
   return validationPromise;
 }
 
-let ripgrepAcquisitionPromise: Promise<string | null> | null = null;
+export async function getRipgrepPath(): Promise<string | null> {
+  const platform = os.platform();
+  const arch = os.arch();
 
-/**
- * Ensures a ripgrep binary is available.
- *
- * NOTE:
- * - The Gemini CLI currently prefers a managed ripgrep binary downloaded
- * into its global bin directory.
- * - Even if ripgrep is available on the system PATH, it is intentionally
- * not used at this time.
- *
- * Preference for system-installed ripgrep is blocked on:
- * - checksum verification of external binaries
- * - internalization of the get-ripgrep dependency
- *
- * See:
- * - feat(core): Prefer rg in system path (#11847)
- * - Move get-ripgrep to third_party (#12099)
- */
-async function ensureRipgrepAvailable(): Promise<string | null> {
-  const existingPath = await resolveExistingRgPath();
-  if (existingPath && (await isValidRipgrepBinary(existingPath))) {
-    return existingPath;
-  }
+  // Map to the correct bundled binary
+  const binName = `rg-${platform}-${arch}${platform === 'win32' ? '.exe' : ''}`;
 
-  if (!ripgrepAcquisitionPromise) {
-    ripgrepAcquisitionPromise = (async () => {
-      try {
-        await downloadRipGrep(Storage.getGlobalBinDir());
-        const newPath = await resolveExistingRgPath();
-        if (newPath && (await isValidRipgrepBinary(newPath))) {
-          return newPath;
-        }
-        return null;
-      } catch (e) {
+  const candidatePaths = [
+    // 1. SEA runtime layout: everything is flattened into the root dir
+    path.resolve(__dirname, 'vendor/ripgrep', binName),
+    // 2. Dev/Dist layout: packages/core/dist/tools/ripGrep.js -> packages/core/vendor/ripgrep
+    path.resolve(__dirname, '../../vendor/ripgrep', binName),
+  ];
+
+  for (const candidate of candidatePaths) {
+    if (await fileExists(candidate)) {
+      // Validate the binary before trusting it
+      if (await isValidRipgrepBinary(candidate)) {
+        return candidate;
+      } else {
         debugLogger.warn(
-          `[grep_search] Failed to acquire valid ripgrep: ${getErrorMessage(e)}`,
+          `[grep_search] Found binary at ${candidate} but it failed EFTYPE/version validation.`,
         );
-        return null;
-      } finally {
-        ripgrepAcquisitionPromise = null;
       }
-    })();
+    }
   }
-  return ripgrepAcquisitionPromise;
+
+  return null;
 }
 
 /**
- * Checks if `rg` exists, if not then attempt to download it.
+ * Checks if a valid `rg` exists in the bundled vendor directory.
  */
 export async function canUseRipgrep(): Promise<boolean> {
-  return (await ensureRipgrepAvailable()) !== null;
+  const binPath = await getRipgrepPath();
+  return binPath !== null;
 }
 
 /**
- * Ensures `rg` is downloaded and valid. Throws an error if unavailable or incompatible.
+ * Ensures `rg` is available and valid, or throws.
  */
 export async function ensureRgPath(): Promise<string> {
-  const downloadedPath = await ensureRipgrepAvailable();
-  if (downloadedPath) {
-    return downloadedPath;
+  const binPath = await getRipgrepPath();
+  if (binPath !== null) {
+    return binPath;
   }
 
   throw new Error(
