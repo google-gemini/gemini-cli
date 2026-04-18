@@ -44,6 +44,7 @@ import {
   normalizeCommand,
 } from '../utils/shell-utils.js';
 import { SHELL_TOOL_NAME } from './tool-names.js';
+import { ApprovalMode } from '../policy/types.js';
 import { PARAM_ADDITIONAL_PERMISSIONS } from './definitions/base-declarations.js';
 import { ApprovalMode } from '../policy/types.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
@@ -447,6 +448,52 @@ export class ShellToolInvocation extends BaseToolInvocation<
         llmContent: 'Command was cancelled by user before it could start.',
         returnDisplay: 'Command cancelled by user.',
       };
+    }
+
+    const isYoloMode =
+      this.context.config.getApprovalMode() === ApprovalMode.YOLO;
+    const delayMs = this.context.config.getYoloShellDelayMs();
+
+    if (isYoloMode && delayMs > 0 && !this.params.is_background) {
+      try {
+        await new Promise<void>((resolve, reject) => {
+          const endTime = Date.now() + delayMs;
+          let timeout: NodeJS.Timeout;
+
+          const onAbort = () => {
+            clearTimeout(timeout);
+            reject(new Error('Command cancelled by user during YOLO delay.'));
+          };
+          signal.addEventListener('abort', onAbort, { once: true });
+
+          const tick = () => {
+            const remainingMs = Math.max(0, endTime - Date.now());
+
+            if (updateOutput) {
+              updateOutput(
+                `[YOLO] Executing in ${Math.ceil(
+                  remainingMs / 1000,
+                )}s... (Press Ctrl+C to cancel)\n`,
+              );
+            }
+
+            if (remainingMs <= 0) {
+              signal.removeEventListener('abort', onAbort);
+              resolve();
+            } else {
+              timeout = setTimeout(tick, Math.min(remainingMs, 1000));
+            }
+          };
+
+          tick();
+        });
+      } catch {
+        return {
+          llmContent:
+            'Command was cancelled by user during the YOLO mode delay.',
+          returnDisplay: 'Command cancelled by user.',
+        };
+      }
     }
 
     const isWindows = os.platform() === 'win32';

@@ -1507,6 +1507,11 @@ their corresponding top-level category object in your `settings.json` file.
 
 #### `security`
 
+- **`security.yoloShellDelayMs`** (number):
+  - **Description:** The delay in milliseconds before automatically executing a
+    shell command in YOLO mode. Set to 0 to disable the delay.
+  - **Default:** `0`
+
 - **`security.toolSandboxing`** (boolean):
   - **Description:** Tool-level sandboxing. Isolates individual tools instead of
     the entire CLI process.

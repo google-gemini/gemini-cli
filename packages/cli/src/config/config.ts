@@ -902,6 +902,7 @@ export async function loadCliConfig(
     embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
     sandbox: sandboxConfig,
     toolSandboxing: settings.security?.toolSandboxing ?? false,
+    yoloShellDelayMs: settings.security?.yoloShellDelayMs,
     targetDir: cwd,
     includeDirectoryTree,
     includeDirectories,

@@ -584,6 +584,7 @@ export interface ConfigParameters {
   clientVersion?: string;
   embeddingModel?: string;
   sandbox?: SandboxConfig;
+  yoloShellDelayMs?: number;
   toolSandboxing?: boolean;
   targetDir: string;
   debugMode: boolean;
@@ -905,6 +906,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly shellToolInactivityTimeout: number;
   readonly fakeResponses?: string;
   readonly recordResponses?: string;
+  private readonly yoloShellDelayMs: number;
   private readonly disableYoloMode: boolean;
   private readonly disableAlwaysAllow: boolean;
   private readonly rawOutput: boolean;
@@ -1340,6 +1342,7 @@ export class Config implements McpContext, AgentLoopContext {
       params.maxAttempts ?? DEFAULT_MAX_ATTEMPTS,
       DEFAULT_MAX_ATTEMPTS,
     );
+    this.yoloShellDelayMs = params.yoloShellDelayMs ?? 0;
     this.disableYoloMode = params.disableYoloMode ?? false;
     this.rawOutput = params.rawOutput ?? false;
     this.acceptRawOutputRisk = params.acceptRawOutputRisk ?? false;
@@ -2685,6 +2688,10 @@ export class Config implements McpContext, AgentLoopContext {
 
   isYoloModeDisabled(): boolean {
     return this.disableYoloMode || !this.isTrustedFolder();
+  }
+
+  getYoloShellDelayMs(): number {
+    return this.yoloShellDelayMs;
   }
 
   getDisableAlwaysAllow(): boolean {
