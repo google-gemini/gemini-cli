@@ -479,7 +479,7 @@ const SETTINGS_SCHEMA = {
         label: 'Theme',
         category: 'UI',
         requiresRestart: false,
-        default: undefined as string | undefined,
+        default: 'ANSI',
         description:
           'The color theme for the UI. See the CLI themes guide for available options.',
         showInDialog: false,
@@ -489,7 +489,7 @@ const SETTINGS_SCHEMA = {
         label: 'Auto Theme Switching',
         category: 'UI',
         requiresRestart: false,
-        default: true,
+        default: false,
         description:
           'Automatically switch between default light and dark themes based on terminal background color.',
         showInDialog: true,

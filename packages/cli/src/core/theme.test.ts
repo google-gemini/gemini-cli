@@ -45,8 +45,8 @@ describe('theme', () => {
     expect(themeManager.findThemeByName).toHaveBeenCalledWith('test-theme');
   });
 
-  it('should return null if theme is undefined', () => {
-    mockSettings.merged.ui.theme = undefined;
+  it('should return null if theme is empty', () => {
+    mockSettings.merged.ui.theme = '';
     const result = validateTheme(mockSettings);
     expect(result).toBeNull();
     expect(themeManager.findThemeByName).not.toHaveBeenCalled();
