@@ -3080,6 +3080,17 @@ export class Config implements McpContext, AgentLoopContext {
     return remoteThreshold;
   }
 
+  async getCompressionStrategy(): Promise<'flat' | 'union-find'> {
+    await this.ensureExperimentsLoaded();
+    const remoteStrategy =
+      this.experiments?.flags[ExperimentFlags.COMPRESSION_STRATEGY]
+        ?.stringValue;
+    if (remoteStrategy === 'union-find' || remoteStrategy === 'flat') {
+      return remoteStrategy;
+    }
+    return 'flat';
+  }
+
   async getUserCaching(): Promise<boolean | undefined> {
     await this.ensureExperimentsLoaded();
 
