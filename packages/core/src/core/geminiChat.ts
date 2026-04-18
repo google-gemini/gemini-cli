@@ -569,7 +569,10 @@ export class GeminiChat {
         abortSignal,
       };
 
-      let contentsToUse: Content[] = supportsModernFeatures(modelToUse)
+      let contentsToUse: Content[] = supportsModernFeatures(
+        modelToUse,
+        this.context.config,
+      )
         ? [...contentsForPreviewModel]
         : [...requestContents];
 
@@ -613,7 +616,10 @@ export class GeminiChat {
           );
           lastModelToUse = modelToUse;
           // Re-evaluate contentsToUse based on the new model's feature support
-          contentsToUse = supportsModernFeatures(modelToUse)
+          contentsToUse = supportsModernFeatures(
+            modelToUse,
+            this.context.config,
+          )
             ? [...contentsForPreviewModel]
             : [...requestContents];
         }
@@ -1072,9 +1078,13 @@ export class GeminiChat {
     }
 
     const thoughtPart = content.parts[0];
-    if (thoughtPart.text) {
+    const rawText =
+      typeof thoughtPart.thought === 'string'
+        ? thoughtPart.thought
+        : (thoughtPart.text ?? '');
+
+    if (rawText) {
       // Extract subject and description using the same logic as turn.ts
-      const rawText = thoughtPart.text;
       const subjectStringMatches = rawText.match(/\*\*(.*?)\*\*/s);
       const subject = subjectStringMatches
         ? subjectStringMatches[1].trim()

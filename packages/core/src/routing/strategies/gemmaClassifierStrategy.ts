@@ -178,6 +178,39 @@ ${formattedHistory}
       return null;
     }
 
+    const model = context.requestedModel ?? config.getModel();
+
+    // Check if classification is redundant (i.e., both tiers resolve to the same model)
+    const proModel = resolveClassifierModel(
+      model,
+      'pro',
+      false, // useGemini3_1
+      false, // useGemini3_1FlashLite
+      false, // useCustomToolModel
+      true, // hasAccessToPreview
+      config,
+    );
+    const flashModel = resolveClassifierModel(
+      model,
+      'flash',
+      false, // useGemini3_1
+      false, // useGemini3_1FlashLite
+      false, // useCustomToolModel
+      true, // hasAccessToPreview
+      config,
+    );
+
+    if (proModel === flashModel) {
+      return {
+        model: proModel,
+        metadata: {
+          source: this.name,
+          latencyMs: 0,
+          reasoning: `Skipped classification because both tiers resolve to the same model: ${proModel}`,
+        },
+      };
+    }
+
     // Only the gemma3-1b-gpu-custom model has been tested and verified.
     if (gemmaRouterSettings.classifier?.model !== 'gemma3-1b-gpu-custom') {
       throw new Error('Only gemma3-1b-gpu-custom has been tested');
@@ -210,8 +243,13 @@ ${formattedHistory}
       const reasoning = routerResponse.reasoning;
       const latencyMs = Date.now() - startTime;
       const selectedModel = resolveClassifierModel(
-        context.requestedModel ?? config.getModel(),
+        model,
         routerResponse.model_choice,
+        false, // useGemini3_1
+        false, // useGemini3_1FlashLite
+        false, // useCustomToolModel
+        true, // hasAccessToPreview
+        config,
       );
 
       return {

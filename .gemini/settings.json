@@ -6,5 +6,8 @@
   },
   "general": {
     "devtools": true
+  },
+  "model": {
+    "gemma4Variant": "gemma-4-31b-it"
   }
 }
