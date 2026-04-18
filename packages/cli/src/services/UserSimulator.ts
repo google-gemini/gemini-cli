@@ -31,6 +31,7 @@ export class UserSimulator {
   private knowledgeBase = '';
   private editableKnowledgeFile: string | null = null;
   private actionHistory: string[] = [];
+  private staticTicks = 0;
 
   constructor(
     private readonly config: Config,
@@ -105,7 +106,20 @@ export class UserSimulator {
         .replace(/\[?\s*\b\d+(\.\d+)?s\b\s*\]?/g, '')
         .trim();
 
-      if (normalizedScreen === this.lastScreenContent) return;
+      if (normalizedScreen === this.lastScreenContent) {
+        this.staticTicks++;
+        const lastAction = this.actionHistory[this.actionHistory.length - 1];
+        if (lastAction === '<WAIT>' && this.staticTicks >= 5) {
+          debugLogger.log(
+            `[SIMULATOR] Forcing re-evaluation of static screen after ${this.staticTicks} ticks of waiting`,
+          );
+          this.staticTicks = 0;
+        } else {
+          return;
+        }
+      } else {
+        this.staticTicks = 0;
+      }
 
       debugLogger.log(
         `[SIMULATOR] Screen Content Seen:\n---\n${strippedScreen}\n---`,
