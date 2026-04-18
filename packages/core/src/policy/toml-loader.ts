@@ -151,28 +151,51 @@ export interface PolicyFile {
 }
 
 /**
- * Reads policy files from a directory or a single file.
+ * Reads policy files from a directory or a single file, following symlinks.
+ * Supports recursion and prevents circular symlink traversal.
  *
  * @param policyPath Path to a directory or a .toml file.
+ * @param visitedPaths Set of real paths already visited to prevent circularity.
  * @returns Array of PolicyFile objects.
  */
 export async function readPolicyFiles(
   policyPath: string,
+  visitedPaths: Set<string> = new Set(),
 ): Promise<PolicyFile[]> {
-  let filesToLoad: string[] = [];
-  let baseDir = '';
+  const results: PolicyFile[] = [];
 
   try {
+    const realPath = await fs.realpath(policyPath);
+    if (visitedPaths.has(realPath)) {
+      return [];
+    }
+    visitedPaths.add(realPath);
+
     const stats = await fs.stat(policyPath);
     if (stats.isDirectory()) {
-      baseDir = policyPath;
       const dirEntries = await fs.readdir(policyPath, { withFileTypes: true });
-      filesToLoad = dirEntries
-        .filter((entry) => entry.isFile() && entry.name.endsWith('.toml'))
-        .map((entry) => entry.name);
+      for (const entry of dirEntries) {
+        const entryPath = path.join(policyPath, entry.name);
+        try {
+          const entryStats = await fs.stat(entryPath);
+
+          if (entryStats.isDirectory()) {
+            // Recursive call
+            results.push(...(await readPolicyFiles(entryPath, visitedPaths)));
+          } else if (entryStats.isFile() && entry.name.endsWith('.toml')) {
+            const content = await fs.readFile(entryPath, 'utf-8');
+            results.push({ path: entryPath, content });
+          }
+        } catch (e) {
+          if (isNodeError(e) && e.code === 'ENOENT') {
+            continue;
+          }
+          throw e;
+        }
+      }
     } else if (stats.isFile() && policyPath.endsWith('.toml')) {
-      baseDir = path.dirname(policyPath);
-      filesToLoad = [path.basename(policyPath)];
+      const content = await fs.readFile(policyPath, 'utf-8');
+      results.push({ path: policyPath, content });
     }
   } catch (e) {
     if (isNodeError(e) && e.code === 'ENOENT') {
@@ -181,12 +204,6 @@ export async function readPolicyFiles(
     throw e;
   }
 
-  const results: PolicyFile[] = [];
-  for (const file of filesToLoad) {
-    const filePath = path.join(baseDir, file);
-    const content = await fs.readFile(filePath, 'utf-8');
-    results.push({ path: filePath, content });
-  }
   return results;
 }
 

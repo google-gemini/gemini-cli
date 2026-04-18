@@ -47,12 +47,20 @@ describe('Workspace-Level Policies', () => {
     const mockRoot = nodePath.resolve('/mock/');
     const mockStat = vi.fn(async (path: string) => {
       if (typeof path === 'string' && path.startsWith(mockRoot)) {
+        const isFile = path.endsWith('.toml');
         return {
-          isDirectory: () => true,
-          isFile: () => false,
+          isDirectory: () => !isFile,
+          isFile: () => isFile,
         } as unknown as Awaited<ReturnType<typeof actualFs.stat>>;
       }
       return actualFs.stat(path);
+    });
+
+    const mockRealpath = vi.fn(async (path: string) => {
+      if (typeof path === 'string' && path.startsWith(mockRoot)) {
+        return path;
+      }
+      return actualFs.realpath(path);
     });
 
     // Mock readdir to return a policy file for each tier
@@ -125,10 +133,12 @@ priority = 10
         readdir: mockReaddir,
         readFile: mockReadFile,
         stat: mockStat,
+        realpath: mockRealpath,
       },
       readdir: mockReaddir,
       readFile: mockReadFile,
       stat: mockStat,
+      realpath: mockRealpath,
     }));
 
     const { createPolicyEngineConfig } = await import('./config.js');
@@ -172,12 +182,20 @@ priority = 10
     const mockRoot = nodePath.resolve('/mock/');
     const mockStat = vi.fn(async (path: string) => {
       if (typeof path === 'string' && path.startsWith(mockRoot)) {
+        const isFile = path.endsWith('.toml');
         return {
-          isDirectory: () => true,
-          isFile: () => false,
+          isDirectory: () => !isFile,
+          isFile: () => isFile,
         } as unknown as Awaited<ReturnType<typeof actualFs.stat>>;
       }
       return actualFs.stat(path);
+    });
+
+    const mockRealpath = vi.fn(async (path: string) => {
+      if (typeof path === 'string' && path.startsWith(mockRoot)) {
+        return path;
+      }
+      return actualFs.realpath(path);
     });
 
     const mockReaddir = vi.fn(async (path: string) => {
@@ -206,10 +224,12 @@ priority=10`,
         readdir: mockReaddir,
         readFile: mockReadFile,
         stat: mockStat,
+        realpath: mockRealpath,
       },
       readdir: mockReaddir,
       readFile: mockReadFile,
       stat: mockStat,
+      realpath: mockRealpath,
     }));
 
     const { createPolicyEngineConfig } = await import('./config.js');
@@ -238,12 +258,20 @@ priority=10`,
     const mockRoot = nodePath.resolve('/mock/');
     const mockStat = vi.fn(async (path: string) => {
       if (typeof path === 'string' && path.startsWith(mockRoot)) {
+        const isFile = path.endsWith('.toml');
         return {
-          isDirectory: () => true,
-          isFile: () => false,
+          isDirectory: () => !isFile,
+          isFile: () => isFile,
         } as unknown as Awaited<ReturnType<typeof actualFs.stat>>;
       }
       return actualFs.stat(path);
+    });
+
+    const mockRealpath = vi.fn(async (path: string) => {
+      if (typeof path === 'string' && path.startsWith(mockRoot)) {
+        return path;
+      }
+      return actualFs.realpath(path);
     });
 
     const mockReaddir = vi.fn(async (path: string) => {
@@ -272,10 +300,12 @@ priority=500`,
         readdir: mockReaddir,
         readFile: mockReadFile,
         stat: mockStat,
+        realpath: mockRealpath,
       },
       readdir: mockReaddir,
       readFile: mockReadFile,
       stat: mockStat,
+      realpath: mockRealpath,
     }));
 
     const { createPolicyEngineConfig } = await import('./config.js');
