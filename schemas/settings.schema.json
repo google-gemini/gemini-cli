@@ -2954,6 +2954,13 @@
           "default": false,
           "type": "boolean"
         },
+        "autoMemory": {
+          "title": "Auto Memory",
+          "description": "Automatically extract reusable skills from past sessions in the background. Review results with /memory inbox.",
+          "markdownDescription": "Automatically extract reusable skills from past sessions in the background. Review results with /memory inbox.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "generalistProfile": {
           "title": "Use the generalist profile to manage agent contexts.",
           "description": "Suitable for general coding and software development tasks.",

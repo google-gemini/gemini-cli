@@ -149,12 +149,12 @@ async function readSkillBodies(skillsDir: string): Promise<string[]> {
 
 /**
  * Shared configOverrides for all skill extraction component evals.
- * - experimentalMemoryManager: enables the memory extraction pipeline.
+ * - experimentalAutoMemory: enables the Auto Memory skill extraction pipeline.
  * - approvalMode: YOLO auto-approves tool calls (write_file, read_file) so the
  *   background agent can execute without interactive confirmation.
  */
 const EXTRACTION_CONFIG_OVERRIDES = {
-  experimentalMemoryManager: true,
+  experimentalAutoMemory: true,
   approvalMode: ApprovalMode.YOLO,
 };
 

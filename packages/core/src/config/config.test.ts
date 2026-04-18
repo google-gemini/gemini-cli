@@ -3443,6 +3443,50 @@ describe('Config JIT Initialization', () => {
     });
   });
 
+  describe('isAutoMemoryEnabled', () => {
+    it('should default to false', () => {
+      const params: ConfigParameters = {
+        sessionId: 'test-session',
+        targetDir: '/tmp/test',
+        debugMode: false,
+        model: 'test-model',
+        cwd: '/tmp/test',
+      };
+
+      config = new Config(params);
+      expect(config.isAutoMemoryEnabled()).toBe(false);
+    });
+
+    it('should return true when experimentalAutoMemory is true', () => {
+      const params: ConfigParameters = {
+        sessionId: 'test-session',
+        targetDir: '/tmp/test',
+        debugMode: false,
+        model: 'test-model',
+        cwd: '/tmp/test',
+        experimentalAutoMemory: true,
+      };
+
+      config = new Config(params);
+      expect(config.isAutoMemoryEnabled()).toBe(true);
+    });
+
+    it('should be independent of experimentalMemoryManager', () => {
+      const params: ConfigParameters = {
+        sessionId: 'test-session',
+        targetDir: '/tmp/test',
+        debugMode: false,
+        model: 'test-model',
+        cwd: '/tmp/test',
+        experimentalMemoryManager: true,
+      };
+
+      config = new Config(params);
+      expect(config.isMemoryManagerEnabled()).toBe(true);
+      expect(config.isAutoMemoryEnabled()).toBe(false);
+    });
+  });
+
   describe('reloadSkills', () => {
     it('should refresh disabledSkills and re-register ActivateSkillTool when skills exist', async () => {
       const mockOnReload = vi.fn().mockResolvedValue({

@@ -124,3 +124,5 @@ immediately. Force a reload with:
 - Explore the [Command reference](../../reference/commands.md) for more
   `/memory` options.
 - Read the technical spec for [Project context](../../cli/gemini-md.md).
+- Try the experimental [Auto Memory](../auto-memory.md) feature to extract
+  reusable skills from your past sessions automatically.
