@@ -1470,6 +1470,13 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                 partWidth += charWidth;
                 splitIndex = i + 1;
               }
+              // Guard against infinite loop: if no codepoint fit (e.g. a single wide
+              // character exceeds inputWidth), advance by one codepoint so the loop
+              // always terminates. The oversized character is emitted on its own line.
+              if (splitIndex === 0) {
+                splitIndex = 1;
+                part = cpSlice(wordToProcess, 0, 1);
+              }
               additionalLines.push(part);
               wordToProcess = cpSlice(wordToProcess, splitIndex);
             }
