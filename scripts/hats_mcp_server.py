@@ -27,7 +27,7 @@ def _import_fastmcp():
             return FastMCP
         except Exception as exc:  # pragma: no cover - startup failure path
             raise RuntimeError(
-                "FastMCP is required. Install with: pip install fastmcp"
+                "FastMCP is required. Install with one of: `pip install fastmcp` or `pip install mcp`."
             ) from exc
 
 
@@ -55,7 +55,7 @@ def _run_hats(args: list[str]) -> dict[str, Any]:
     if stdout:
         try:
             parsed_json = json.loads(stdout)
-        except Exception:
+        except json.JSONDecodeError:
             parsed_json = None
 
     return {
