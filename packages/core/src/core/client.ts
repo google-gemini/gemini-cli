@@ -1013,6 +1013,11 @@ export class GeminiClient {
       }
     } catch (error) {
       if (signal?.aborted || isAbortError(error)) {
+        if (hooksEnabled) {
+          await this.config
+            .getHookSystem()
+            ?.fireUserCancelEvent('user_request');
+        }
         yield { type: GeminiEventType.UserCancelled };
         return turn;
       }

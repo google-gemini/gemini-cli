@@ -232,6 +232,13 @@ export class HookSystem {
     return this.hookEventHandler.fireSessionEndEvent(reason);
   }
 
+  async fireUserCancelEvent(
+    reason: string,
+    taskId?: string,
+  ): Promise<AggregatedHookResult | undefined> {
+    return this.hookEventHandler.fireUserCancelEvent(reason, taskId);
+  }
+
   async firePreCompressEvent(
     trigger: PreCompressTrigger,
   ): Promise<AggregatedHookResult | undefined> {
