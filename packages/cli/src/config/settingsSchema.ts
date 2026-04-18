@@ -418,6 +418,16 @@ const SETTINGS_SCHEMA = {
         },
         description: 'Settings for automatic session cleanup.',
       },
+      topicUpdateNarration: {
+        type: 'boolean',
+        label: 'Topic & Update Narration',
+        category: 'General',
+        requiresRestart: false,
+        default: true,
+        description:
+          'Enable the Topic & Update communication model for reduced chattiness and structured progress reporting.',
+        showInDialog: true,
+      },
     },
   },
   output: {
@@ -2203,6 +2213,16 @@ const SETTINGS_SCHEMA = {
           'Replace the built-in save_memory tool with a memory manager subagent that supports adding, removing, de-duplicating, and organizing memories.',
         showInDialog: true,
       },
+      autoMemory: {
+        type: 'boolean',
+        label: 'Auto Memory',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Automatically extract reusable skills from past sessions in the background. Review results with /memory inbox.',
+        showInDialog: true,
+      },
       generalistProfile: {
         type: 'boolean',
         label: 'Use the generalist profile to manage agent contexts.',
@@ -2228,9 +2248,8 @@ const SETTINGS_SCHEMA = {
         category: 'Experimental',
         requiresRestart: false,
         default: false,
-        description:
-          'Enable the experimental Topic & Update communication model for reduced chattiness and structured progress reporting.',
-        showInDialog: true,
+        description: 'Deprecated: Use general.topicUpdateNarration instead.',
+        showInDialog: false,
       },
     },
   },
