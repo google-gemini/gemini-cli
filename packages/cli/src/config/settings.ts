@@ -32,6 +32,7 @@ import {
   type MergeStrategy,
   type SettingsSchema,
   type SettingDefinition,
+  type SettingsType,
   getSettingsSchema,
 } from './settingsSchema.js';
 
@@ -242,6 +243,74 @@ export function getDefaultsFromSchema(
     }
   }
   return defaults as Settings;
+}
+
+function parseBooleanString(value: string): boolean | undefined {
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'true') {
+    return true;
+  }
+  if (normalized === 'false') {
+    return false;
+  }
+  return undefined;
+}
+
+function isObjectRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+type SchemaNode = {
+  type: SettingsType;
+  properties?: SettingsSchema;
+  items?: SchemaNode;
+  additionalProperties?: SchemaNode;
+};
+
+function coerceSettingsValueFromSchema(
+  value: unknown,
+  schemaNode?: SchemaNode,
+): unknown {
+  if (!schemaNode) {
+    return value;
+  }
+
+  if (schemaNode.type === 'boolean' && typeof value === 'string') {
+    return parseBooleanString(value) ?? value;
+  }
+
+  if (schemaNode.type === 'array' && Array.isArray(value)) {
+    return value.map((entry) =>
+      coerceSettingsValueFromSchema(entry, schemaNode.items),
+    );
+  }
+
+  if (schemaNode.type === 'object' && isObjectRecord(value)) {
+    const result: Record<string, unknown> = { ...value };
+
+    for (const [key, currentValue] of Object.entries(result)) {
+      const childSchema = schemaNode.properties?.[key];
+      const fallbackSchema = schemaNode.additionalProperties;
+      result[key] = coerceSettingsValueFromSchema(
+        currentValue,
+        childSchema ?? fallbackSchema,
+      );
+    }
+
+    return result;
+  }
+
+  return value;
+}
+
+function coerceBooleanSettingsFromSchema(settings: Settings): Settings {
+  const rootSchema: SchemaNode = {
+    type: 'object',
+    properties: getSettingsSchema(),
+  };
+
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+  return coerceSettingsValueFromSchema(settings, rootSchema) as Settings;
 }
 
 export function mergeSettings(
@@ -686,8 +755,16 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         const settingsObject = rawSettings as Record<string, unknown>;
 
+        // Resolve env vars and coerce schema-typed booleans before validating.
+        const resolvedForValidation = resolveEnvVarsInObject(
+          settingsObject as Settings,
+        );
+        const normalizedForValidation = coerceBooleanSettingsFromSchema(
+          resolvedForValidation,
+        );
+
         // Validate settings structure with Zod
-        const validationResult = validateSettings(settingsObject);
+        const validationResult = validateSettings(normalizedForValidation);
         if (!validationResult.success && validationResult.error) {
           const errorMessage = formatValidationError(
             validationResult.error,
@@ -732,10 +809,18 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
   const workspaceOriginalSettings = structuredClone(workspaceResult.settings);
 
   // Environment variables for runtime use
-  systemSettings = resolveEnvVarsInObject(systemResult.settings);
-  systemDefaultSettings = resolveEnvVarsInObject(systemDefaultsResult.settings);
-  userSettings = resolveEnvVarsInObject(userResult.settings);
-  workspaceSettings = resolveEnvVarsInObject(workspaceResult.settings);
+  systemSettings = coerceBooleanSettingsFromSchema(
+    resolveEnvVarsInObject(systemResult.settings),
+  );
+  systemDefaultSettings = coerceBooleanSettingsFromSchema(
+    resolveEnvVarsInObject(systemDefaultsResult.settings),
+  );
+  userSettings = coerceBooleanSettingsFromSchema(
+    resolveEnvVarsInObject(userResult.settings),
+  );
+  workspaceSettings = coerceBooleanSettingsFromSchema(
+    resolveEnvVarsInObject(workspaceResult.settings),
+  );
 
   // Support legacy theme names
   if (userSettings.ui?.theme === 'VS') {

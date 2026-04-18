@@ -1494,6 +1494,70 @@ describe('Settings Loading and Merging', () => {
       delete process.env['TEST_PORT'];
     });
 
+    it('should coerce env-resolved boolean setting values from strings', () => {
+      process.env['GEMINI_AUTO_THEME'] = 'TRUE';
+      const userSettingsContent = {
+        ui: {
+          autoThemeSwitching: '${GEMINI_AUTO_THEME:-false}',
+        },
+      };
+
+      (mockFsExistsSync as Mock).mockImplementation(
+        (p: fs.PathLike) =>
+          normalizePath(p) === normalizePath(USER_SETTINGS_PATH),
+      );
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (normalizePath(p) === normalizePath(USER_SETTINGS_PATH)) {
+            return JSON.stringify(userSettingsContent);
+          }
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      expect(settings.user.settings.ui?.autoThemeSwitching).toBe(true);
+      expect(settings.merged.ui?.autoThemeSwitching).toBe(true);
+      expect(
+        settings.errors.some((error) =>
+          error.message.includes('ui.autoThemeSwitching'),
+        ),
+      ).toBe(false);
+
+      delete process.env['GEMINI_AUTO_THEME'];
+    });
+
+    it('should not coerce env-resolved values in string-only map settings', () => {
+      const userSettingsContent: TestSettings = {
+        mcpServers: {
+          demo: {
+            command: 'node',
+            args: ['server.js'],
+            env: {
+              FEATURE_FLAG: '${FEATURE_FLAG:-false}',
+            },
+          } satisfies MCPServerConfig,
+        },
+      };
+
+      (mockFsExistsSync as Mock).mockImplementation(
+        (p: fs.PathLike) =>
+          normalizePath(p) === normalizePath(USER_SETTINGS_PATH),
+      );
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (normalizePath(p) === normalizePath(USER_SETTINGS_PATH)) {
+            return JSON.stringify(userSettingsContent);
+          }
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      const mcpServer = settings.user.settings.mcpServers?.['demo'];
+      expect(mcpServer?.env?.['FEATURE_FLAG']).toBe('false');
+    });
+
     describe('when GEMINI_CLI_SYSTEM_SETTINGS_PATH is set', () => {
       const MOCK_ENV_SYSTEM_SETTINGS_PATH = path.resolve(
         '/mock/env/system/settings.json',
