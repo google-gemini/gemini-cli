@@ -19,8 +19,13 @@ import {
   mergeSettings,
   type LoadedSettings,
 } from '../../config/settings.js';
-import { createTransport, debugLogger } from '@google/gemini-cli-core';
+import {
+  createTransport,
+  debugLogger,
+  MCP_DEFAULT_TIMEOUT_MSEC,
+} from '@google/gemini-cli-core';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { ExtensionStorage } from '../../config/extensions/storage.js';
 import { ExtensionManager } from '../../config/extension-manager.js';
 import { McpServerEnablementManager } from '../../config/mcp/index.js';
@@ -45,6 +50,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   return {
     ...original,
     createTransport: vi.fn(),
+    MCP_DEFAULT_TIMEOUT_MSEC: 10 * 60 * 1000,
 
     MCPServerStatus: {
       CONNECTED: 'CONNECTED',
@@ -213,6 +219,54 @@ describe('mcp list command', () => {
     expect(debugLogger.log).toHaveBeenCalledWith(
       expect.stringContaining(
         'test-server: /test/server  (stdio) - Disconnected',
+      ),
+    );
+  });
+
+  it('should use the shared default MCP timeout when testing connections', async () => {
+    const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
+    mockedLoadSettings.mockReturnValue({
+      merged: {
+        ...defaultMergedSettings,
+        mcpServers: {
+          'http-server': { httpUrl: 'https://example.com/http' },
+        },
+      },
+      isTrusted: true,
+    });
+
+    mockClient.connect.mockResolvedValue(undefined);
+    mockClient.ping.mockResolvedValue(undefined);
+
+    await listMcpServers();
+
+    expect(mockClient.connect).toHaveBeenCalledWith(mockTransport, {
+      timeout: MCP_DEFAULT_TIMEOUT_MSEC,
+    });
+  });
+
+  it('should treat ping MethodNotFound as connected', async () => {
+    const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
+    mockedLoadSettings.mockReturnValue({
+      merged: {
+        ...defaultMergedSettings,
+        mcpServers: {
+          'cloud-run': { httpUrl: 'https://run.googleapis.com/mcp' },
+        },
+      },
+      isTrusted: true,
+    });
+
+    mockClient.connect.mockResolvedValue(undefined);
+    mockClient.ping.mockRejectedValue(
+      new McpError(ErrorCode.MethodNotFound, 'Method not supported'),
+    );
+
+    await listMcpServers();
+
+    expect(debugLogger.log).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'cloud-run: https://run.googleapis.com/mcp (http) - Connected',
       ),
     );
   });
