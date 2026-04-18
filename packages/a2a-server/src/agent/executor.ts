@@ -237,13 +237,6 @@ export class CoderAgentExecutor implements AgentExecutor {
       );
       task.cancelPendingTools('Task canceled by user request.');
 
-      if (task.config.getEnableHooks()) {
-        await task.config
-          .getHookSystem()
-          ?.getEventHandler()
-          .fireUserCancelEvent('user_request', taskId);
-      }
-
       const stateChange: StateChange = {
         kind: CoderAgentEvent.StateChangeEvent,
       };
@@ -254,6 +247,13 @@ export class CoderAgentExecutor implements AgentExecutor {
         undefined,
         true,
       );
+
+      if (task.config.getEnableHooks()) {
+        await task.config
+          .getHookSystem()
+          ?.fireUserCancelEvent('user_request', taskId);
+      }
+
       logger.info(
         `[CoderAgentExecutor] Task ${taskId} cancellation processed. Saving state.`,
       );
