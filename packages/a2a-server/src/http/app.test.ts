@@ -107,11 +107,15 @@ vi.mock('@google/gemini-cli-core', async () => {
   };
 });
 
+const TEST_BEARER_TOKEN = 'test-bearer-token';
+const AUTH_HEADER = `Bearer ${TEST_BEARER_TOKEN}`;
+
 describe('E2E Tests', () => {
   let app: express.Express;
   let server: Server;
 
   beforeAll(async () => {
+    process.env['CODER_AGENT_BEARER_TOKEN'] = TEST_BEARER_TOKEN;
     app = await createApp();
     server = app.listen(0); // Listen on a random available port
   });
@@ -123,6 +127,7 @@ describe('E2E Tests', () => {
   afterAll(
     () =>
       new Promise<void>((resolve) => {
+        delete process.env['CODER_AGENT_BEARER_TOKEN'];
         server.close(() => {
           resolve();
         });
@@ -873,7 +878,10 @@ describe('E2E Tests', () => {
         .mockReturnValue(mockCommands);
 
       const agent = request.agent(app);
-      const res = await agent.get('/listCommands').expect(200);
+      const res = await agent
+        .get('/listCommands')
+        .set('Authorization', AUTH_HEADER)
+        .expect(200);
 
       expect(res.body).toEqual({
         commands: [
@@ -920,7 +928,10 @@ describe('E2E Tests', () => {
         .mockReturnValue([cyclicCommand]);
 
       const agent = request.agent(app);
-      const res = await agent.get('/listCommands').expect(200);
+      const res = await agent
+        .get('/listCommands')
+        .set('Authorization', AUTH_HEADER)
+        .expect(200);
 
       expect(res.body.commands[0].name).toBe('cyclic-command');
       expect(res.body.commands[0].subCommands).toEqual([]);
@@ -962,6 +973,7 @@ describe('E2E Tests', () => {
         .post('/executeCommand')
         .send({ command: 'extensions list', args: [] })
         .set('Content-Type', 'application/json')
+        .set('Authorization', AUTH_HEADER)
         .expect(200);
 
       expect(res.body).toEqual({
@@ -979,6 +991,7 @@ describe('E2E Tests', () => {
         .post('/executeCommand')
         .send({ command: 'invalid command' })
         .set('Content-Type', 'application/json')
+        .set('Authorization', AUTH_HEADER)
         .expect(404);
 
       expect(res.body.error).toBe('Command not found: invalid command');
@@ -991,6 +1004,7 @@ describe('E2E Tests', () => {
         .post('/executeCommand')
         .send({ args: [] })
         .set('Content-Type', 'application/json')
+        .set('Authorization', AUTH_HEADER)
         .expect(400);
       expect(getExtensionsSpy).not.toHaveBeenCalled();
     });
@@ -1001,6 +1015,7 @@ describe('E2E Tests', () => {
         .post('/executeCommand')
         .send({ command: 'extensions.list', args: 'not-an-array' })
         .set('Content-Type', 'application/json')
+        .set('Authorization', AUTH_HEADER)
         .expect(400);
 
       expect(res.body.error).toBe('"args" field must be an array.');
@@ -1020,6 +1035,7 @@ describe('E2E Tests', () => {
       delete process.env['CODER_AGENT_WORKSPACE_PATH'];
       const response = await request(app)
         .post('/executeCommand')
+        .set('Authorization', AUTH_HEADER)
         .send({ command: 'test-command', args: [] });
 
       expect(response.status).toBe(200);
@@ -1040,6 +1056,7 @@ describe('E2E Tests', () => {
       delete process.env['CODER_AGENT_WORKSPACE_PATH'];
       const response = await request(app)
         .post('/executeCommand')
+        .set('Authorization', AUTH_HEADER)
         .send({ command: 'workspace-command', args: [] });
 
       expect(response.status).toBe(400);
@@ -1062,6 +1079,7 @@ describe('E2E Tests', () => {
       process.env['CODER_AGENT_WORKSPACE_PATH'] = '/tmp/test-workspace';
       const response = await request(app)
         .post('/executeCommand')
+        .set('Authorization', AUTH_HEADER)
         .send({ command: 'workspace-command', args: [] });
 
       expect(response.status).toBe(200);
@@ -1086,6 +1104,7 @@ describe('E2E Tests', () => {
         .post('/executeCommand')
         .send({ command: 'context-check-command', args: [] })
         .set('Content-Type', 'application/json')
+        .set('Authorization', AUTH_HEADER)
         .expect(200);
 
       expect(res.body.data).toBe('success');
@@ -1127,6 +1146,7 @@ describe('E2E Tests', () => {
           .send({ command: 'stream-test', args: [] })
           .set('Content-Type', 'application/json')
           .set('Accept', 'text/event-stream')
+          .set('Authorization', AUTH_HEADER)
           .on('response', (res) => {
             let data = '';
             res.on('data', (chunk: Buffer) => {
@@ -1175,6 +1195,7 @@ describe('E2E Tests', () => {
           .post('/executeCommand')
           .send({ command: 'non-stream-test', args: [] })
           .set('Content-Type', 'application/json')
+          .set('Authorization', AUTH_HEADER)
           .expect(200);
 
         expect(res.body).toEqual({ name: 'non-stream-test', data: 'done' });

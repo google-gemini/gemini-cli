@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import express, { type Request } from 'express';
+import express from 'express';
 
 import type { AgentCard, Message } from '@a2a-js/sdk';
 import {
@@ -13,15 +13,19 @@ import {
   InMemoryTaskStore,
   DefaultExecutionEventBus,
   type AgentExecutionEvent,
-  UnauthenticatedUser,
 } from '@a2a-js/sdk/server';
-import { A2AExpressApp, type UserBuilder } from '@a2a-js/sdk/server/express'; // Import server components
+import { A2AExpressApp } from '@a2a-js/sdk/server/express'; // Import server components
 import { v4 as uuidv4 } from 'uuid';
 import { logger } from '../utils/logger.js';
 import type { AgentSettings } from '../types.js';
 import { GCSTaskStore, NoOpTaskStore } from '../persistence/gcs.js';
 import { CoderAgentExecutor } from '../agent/executor.js';
 import { requestStorage } from './requestStorage.js';
+import {
+  buildAgentUserBuilder,
+  loadAgentServerCredentials,
+  requireAgentAuth,
+} from './auth.js';
 import { loadConfig, loadEnvironment, setTargetDir } from '../config/config.js';
 import { loadSettings } from '../config/settings.js';
 import { loadExtensions } from '../config/extension.js';
@@ -90,35 +94,6 @@ const coderAgentCard: AgentCard = {
 export function updateCoderAgentCardUrl(port: number) {
   coderAgentCard.url = `http://localhost:${port}/`;
 }
-
-const customUserBuilder: UserBuilder = async (req: Request) => {
-  const auth = req.headers['authorization'];
-  if (auth) {
-    const scheme = auth.split(' ')[0];
-    logger.info(
-      `[customUserBuilder] Received Authorization header with scheme: ${scheme}`,
-    );
-  }
-  if (!auth) return new UnauthenticatedUser();
-
-  // 1. Bearer Auth
-  if (auth.startsWith('Bearer ')) {
-    const token = auth.substring(7);
-    if (token === 'valid-token') {
-      return { userName: 'bearer-user', isAuthenticated: true };
-    }
-  }
-
-  // 2. Basic Auth
-  if (auth.startsWith('Basic ')) {
-    const credentials = Buffer.from(auth.substring(6), 'base64').toString();
-    if (credentials === 'admin:password') {
-      return { userName: 'basic-user', isAuthenticated: true };
-    }
-  }
-
-  return new UnauthenticatedUser();
-};
 
 async function handleExecuteCommand(
   req: express.Request,
@@ -232,6 +207,9 @@ export async function createApp() {
 
     const context = { config, git, agentExecutor };
 
+    const credentials = loadAgentServerCredentials();
+    const authMiddleware = requireAgentAuth(credentials);
+
     const requestHandler = new DefaultRequestHandler(
       coderAgentCard,
       taskStoreForHandler,
@@ -243,11 +221,14 @@ export async function createApp() {
       requestStorage.run({ req }, next);
     });
 
-    const appBuilder = new A2AExpressApp(requestHandler, customUserBuilder);
+    const appBuilder = new A2AExpressApp(
+      requestHandler,
+      buildAgentUserBuilder(credentials),
+    );
     expressApp = appBuilder.setupRoutes(expressApp, '');
     expressApp.use(express.json());
 
-    expressApp.post('/tasks', async (req, res) => {
+    expressApp.post('/tasks', authMiddleware, async (req, res) => {
       try {
         const taskId = uuidv4();
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
@@ -273,11 +254,11 @@ export async function createApp() {
       }
     });
 
-    expressApp.post('/executeCommand', (req, res) => {
+    expressApp.post('/executeCommand', authMiddleware, (req, res) => {
       void handleExecuteCommand(req, res, context);
     });
 
-    expressApp.get('/listCommands', (req, res) => {
+    expressApp.get('/listCommands', authMiddleware, (req, res) => {
       try {
         const transformCommand = (
           command: Command,
@@ -319,13 +300,14 @@ export async function createApp() {
       }
     });
 
-    expressApp.get('/tasks/metadata', async (req, res) => {
+    expressApp.get('/tasks/metadata', authMiddleware, async (req, res) => {
       // This endpoint is only meaningful if the task store is in-memory.
       if (!(taskStoreForExecutor instanceof InMemoryTaskStore)) {
         res.status(501).send({
           error:
             'Listing all task metadata is only supported when using InMemoryTaskStore.',
         });
+        return;
       }
       try {
         const wrappers = agentExecutor.getAllTasks();
@@ -347,7 +329,7 @@ export async function createApp() {
       }
     });
 
-    expressApp.get('/tasks/:taskId/metadata', async (req, res) => {
+    expressApp.get('/tasks/:taskId/metadata', authMiddleware, async (req, res) => {
       const taskId = req.params.taskId;
       let wrapper = agentExecutor.getTask(taskId);
       if (!wrapper) {
