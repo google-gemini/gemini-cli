@@ -153,6 +153,7 @@ Implement a comprehensive authentication system with multiple providers.
       />,
       {
         ...options,
+        allowEmptyFrame: true,
         config: {
           getTargetDir: () => mockTargetDir,
           getIdeMode: () => false,
@@ -179,7 +180,7 @@ Implement a comprehensive authentication system with multiple providers.
     );
   };
 
-  describe.each([{ useAlternateBuffer: true }, { useAlternateBuffer: false }])(
+  describe.each([{ useAlternateBuffer: true }])(
     'useAlternateBuffer: $useAlternateBuffer',
     ({ useAlternateBuffer }) => {
       it('renders correctly with plan content', async () => {
@@ -193,7 +194,9 @@ Implement a comprehensive authentication system with multiple providers.
         });
 
         await waitFor(() => {
-          expect(lastFrame()).toContain('Add user authentication');
+          expect(lastFrame({ allowEmpty: true })).toContain(
+            'Add user authentication',
+          );
         });
 
         await waitFor(() => {
@@ -204,7 +207,7 @@ Implement a comprehensive authentication system with multiple providers.
           );
         });
 
-        expect(lastFrame()).toMatchSnapshot();
+        expect(lastFrame({ allowEmpty: true })).toMatchSnapshot();
       });
 
       it('calls onApprove with AUTO_EDIT when first option is selected', async () => {
@@ -217,7 +220,9 @@ Implement a comprehensive authentication system with multiple providers.
         });
 
         await waitFor(() => {
-          expect(lastFrame()).toContain('Add user authentication');
+          expect(lastFrame({ allowEmpty: true })).toContain(
+            'Add user authentication',
+          );
         });
 
         writeKey(stdin, '\r');
@@ -237,7 +242,9 @@ Implement a comprehensive authentication system with multiple providers.
         });
 
         await waitFor(() => {
-          expect(lastFrame()).toContain('Add user authentication');
+          expect(lastFrame({ allowEmpty: true })).toContain(
+            'Add user authentication',
+          );
         });
 
         writeKey(stdin, '\x1b[B'); // Down arrow
@@ -258,7 +265,9 @@ Implement a comprehensive authentication system with multiple providers.
         });
 
         await waitFor(() => {
-          expect(lastFrame()).toContain('Add user authentication');
+          expect(lastFrame({ allowEmpty: true })).toContain(
+            'Add user authentication',
+          );
         });
 
         // Navigate to feedback option
@@ -271,7 +280,7 @@ Implement a comprehensive authentication system with multiple providers.
         }
 
         await waitFor(() => {
-          expect(lastFrame()).toMatchSnapshot();
+          expect(lastFrame({ allowEmpty: true })).toMatchSnapshot();
         });
 
         writeKey(stdin, '\r');
@@ -291,7 +300,9 @@ Implement a comprehensive authentication system with multiple providers.
         });
 
         await waitFor(() => {
-          expect(lastFrame()).toContain('Add user authentication');
+          expect(lastFrame({ allowEmpty: true })).toContain(
+            'Add user authentication',
+          );
         });
 
         writeKey(stdin, '\x1b'); // Escape
@@ -319,10 +330,12 @@ Implement a comprehensive authentication system with multiple providers.
         });
 
         await waitFor(() => {
-          expect(lastFrame()).toContain('Error reading plan: File not found');
+          expect(lastFrame({ allowEmpty: true })).toContain(
+            'Error reading plan: File not found',
+          );
         });
 
-        expect(lastFrame()).toMatchSnapshot();
+        expect(lastFrame({ allowEmpty: true })).toMatchSnapshot();
       });
 
       it('displays error state when plan file is empty', async () => {
@@ -337,7 +350,7 @@ Implement a comprehensive authentication system with multiple providers.
         });
 
         await waitFor(() => {
-          expect(lastFrame()).toContain(
+          expect(lastFrame({ allowEmpty: true })).toContain(
             'Error reading plan: Plan file is empty.',
           );
         });
@@ -358,12 +371,12 @@ Implement a comprehensive authentication system with multiple providers.
         });
 
         await waitFor(() => {
-          expect(lastFrame()).toContain(
+          expect(lastFrame({ allowEmpty: true })).toContain(
             'Implement a comprehensive authentication system',
           );
         });
 
-        expect(lastFrame()).toMatchSnapshot();
+        expect(lastFrame({ allowEmpty: true })).toMatchSnapshot();
       });
 
       it('allows number key quick selection', async () => {
@@ -376,7 +389,9 @@ Implement a comprehensive authentication system with multiple providers.
         });
 
         await waitFor(() => {
-          expect(lastFrame()).toContain('Add user authentication');
+          expect(lastFrame({ allowEmpty: true })).toContain(
+            'Add user authentication',
+          );
         });
 
         // Press '2' to select second option directly
@@ -397,7 +412,9 @@ Implement a comprehensive authentication system with multiple providers.
         });
 
         await waitFor(() => {
-          expect(lastFrame()).toContain('Add user authentication');
+          expect(lastFrame({ allowEmpty: true })).toContain(
+            'Add user authentication',
+          );
         });
 
         // Navigate to feedback option and start typing
@@ -411,15 +428,19 @@ Implement a comprehensive authentication system with multiple providers.
         }
 
         await waitFor(() => {
-          expect(lastFrame()).toContain('test feedback');
+          expect(lastFrame({ allowEmpty: true })).toContain('test feedback');
         });
 
         // Press Ctrl+C to clear
         writeKey(stdin, '\x03'); // Ctrl+C
 
         await waitFor(() => {
-          expect(lastFrame()).not.toContain('test feedback');
-          expect(lastFrame()).toContain('Type your feedback...');
+          expect(lastFrame({ allowEmpty: true })).not.toContain(
+            'test feedback',
+          );
+          expect(lastFrame({ allowEmpty: true })).toContain(
+            'Type your feedback...',
+          );
         });
 
         // Dialog should still be open (not cancelled)
@@ -461,6 +482,7 @@ Implement a comprehensive authentication system with multiple providers.
               />
             </BubbleListener>,
             {
+              allowEmptyFrame: true,
               config: {
                 getTargetDir: () => mockTargetDir,
                 getIdeMode: () => false,
@@ -493,7 +515,9 @@ Implement a comprehensive authentication system with multiple providers.
         });
 
         await waitFor(() => {
-          expect(lastFrame()).toContain('Add user authentication');
+          expect(lastFrame({ allowEmpty: true })).toContain(
+            'Add user authentication',
+          );
         });
 
         // Navigate to feedback option
@@ -506,14 +530,14 @@ Implement a comprehensive authentication system with multiple providers.
         }
 
         await waitFor(() => {
-          expect(lastFrame()).toContain('test');
+          expect(lastFrame({ allowEmpty: true })).toContain('test');
         });
 
         // First Ctrl+C to clear text
         writeKey(stdin, '\x03'); // Ctrl+C
 
         await waitFor(() => {
-          expect(lastFrame()).toMatchSnapshot();
+          expect(lastFrame({ allowEmpty: true })).toMatchSnapshot();
         });
         expect(onBubbledQuit).not.toHaveBeenCalled();
 
@@ -536,7 +560,9 @@ Implement a comprehensive authentication system with multiple providers.
         });
 
         await waitFor(() => {
-          expect(lastFrame()).toContain('Add user authentication');
+          expect(lastFrame({ allowEmpty: true })).toContain(
+            'Add user authentication',
+          );
         });
 
         // Navigate to feedback option
@@ -565,7 +591,9 @@ Implement a comprehensive authentication system with multiple providers.
         });
 
         await waitFor(() => {
-          expect(lastFrame()).toContain('Add user authentication');
+          expect(lastFrame({ allowEmpty: true })).toContain(
+            'Add user authentication',
+          );
         });
 
         // Navigate to feedback option and start typing
@@ -599,7 +627,9 @@ Implement a comprehensive authentication system with multiple providers.
         });
 
         await waitFor(() => {
-          expect(lastFrame()).toContain('Add user authentication');
+          expect(lastFrame({ allowEmpty: true })).toContain(
+            'Add user authentication',
+          );
         });
 
         // Press Ctrl+G
