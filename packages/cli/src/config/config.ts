@@ -990,7 +990,12 @@ export async function loadCliConfig(
     disabledSkills: settings.skills?.disabled,
     experimentalJitContext: settings.experimental?.jitContext,
     experimentalMemoryManager: settings.experimental?.memoryManager,
-    experimentalAutoMemory: settings.experimental?.autoMemory,
+    // Backward compatibility: before the flag split, enabling the memory
+    // manager also unlocked inbox/startup behavior. Preserve that behavior
+    // unless the user explicitly sets autoMemory.
+    experimentalAutoMemory:
+      settings.experimental?.autoMemory ??
+      settings.experimental?.memoryManager,
     contextManagement,
     modelSteering: settings.experimental?.modelSteering,
     topicUpdateNarration:
