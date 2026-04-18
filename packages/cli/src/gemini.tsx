@@ -163,11 +163,12 @@ export function getNodeMemoryArgs(isDebugMode: boolean): string[] {
 
 export function setupUnhandledRejectionHandler() {
   let unhandledRejectionOccurred = false;
-  process.on('unhandledRejection', (reason, _promise) => {
-    // AbortError is expected when the user cancels a request (e.g. pressing ESC).
+  const handleError = (reason: any) => {
+    // AbortError is expected when the user cancels a request (e.g. pressing ESC)
+    // or when the client performs internal recovery.
     // It may surface as an unhandled rejection due to async timing in the
     // streaming pipeline, but it is not a bug.
-    if (reason instanceof Error && reason.name === 'AbortError') {
+    if (reason?.name === 'AbortError') {
       debugLogger.log(`Suppressed unhandled AbortError: ${reason.message}`);
       return;
     }
@@ -188,6 +189,14 @@ ${reason.stack}`
       unhandledRejectionOccurred = true;
       appEvents.emit(AppEvent.OpenDebugConsole);
     }
+  };
+
+  process.on('unhandledRejection', (reason, _promise) => {
+    handleError(reason);
+  });
+
+  process.on('uncaughtException', (error) => {
+    handleError(error);
   });
 }
 
@@ -490,7 +499,7 @@ export async function main() {
           );
           if (promptIndex > -1 && finalArgs.length > promptIndex + 1) {
             // If there's a prompt argument, prepend stdin to it
-            finalArgs[promptIndex + 1] =
+            finalArgs[promptIndex + 1] = 
               `${stdinData}\n\n${finalArgs[promptIndex + 1]}`;
           } else {
             // If there's no prompt argument, add stdin as the prompt
