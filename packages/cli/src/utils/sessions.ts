@@ -9,6 +9,7 @@ import {
   generateSummary,
   writeToStderr,
   writeToStdout,
+  OutputFormat,
   type Config,
 } from '@google/gemini-cli-core';
 import {
@@ -18,11 +19,18 @@ import {
 } from './sessionUtils.js';
 
 export async function listSessions(config: Config): Promise<void> {
-  // Generate summary for most recent session if needed
-  await generateSummary(config);
+  // Only generate summaries for interactive display to keep JSON output clean
+  if (config.getOutputFormat() !== OutputFormat.JSON) {
+    await generateSummary(config);
+  }
 
   const sessionSelector = new SessionSelector(config.storage);
   const sessions = await sessionSelector.listSessions();
+
+  if (config.getOutputFormat() === OutputFormat.JSON) {
+    writeToStdout(JSON.stringify(sessions, null, 2) + '\n');
+    return;
+  }
 
   if (sessions.length === 0) {
     writeToStdout('No previous sessions found for this project.');
@@ -33,22 +41,20 @@ export async function listSessions(config: Config): Promise<void> {
     `\nAvailable sessions for this project (${sessions.length}):\n`,
   );
 
-  sessions
-    .sort(
-      (a, b) =>
-        new Date(a.startTime).getTime() - new Date(b.startTime).getTime(),
-    )
-    .forEach((session, index) => {
-      const current = session.isCurrentSession ? ', current' : '';
-      const time = formatRelativeTime(session.lastUpdated);
-      const title =
-        session.displayName.length > 100
-          ? session.displayName.slice(0, 97) + '...'
-          : session.displayName;
-      writeToStdout(
-        `  ${index + 1}. ${title} (${time}${current}) [${session.id}]\n`,
-      );
-    });
+  sessions.forEach((session, index) => {
+    const current = session.isCurrentSession ? ', current' : '';
+    const time = formatRelativeTime(session.lastUpdated);
+
+    const titleChars = Array.from(session.displayName);
+    const title =
+      titleChars.length > 100
+        ? titleChars.slice(0, 97).join('') + '...'
+        : session.displayName;
+
+    writeToStdout(
+      `  ${index + 1}. ${title} (${time}${current}) [${session.id}]\n`,
+    );
+  });
 }
 
 export async function deleteSession(
@@ -63,17 +69,10 @@ export async function deleteSession(
     return;
   }
 
-  // Sort sessions by start time to match list-sessions ordering
-  const sortedSessions = sessions.sort(
-    (a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime(),
-  );
-
   let sessionToDelete: SessionInfo;
 
   // Try to find by UUID first
-  const sessionByUuid = sortedSessions.find(
-    (session) => session.id === sessionIndex,
-  );
+  const sessionByUuid = sessions.find((session) => session.id === sessionIndex);
   if (sessionByUuid) {
     sessionToDelete = sessionByUuid;
   } else {
@@ -85,7 +84,7 @@ export async function deleteSession(
       );
       return;
     }
-    sessionToDelete = sortedSessions[index - 1];
+    sessionToDelete = sessions[index - 1];
   }
 
   // Prevent deleting the current session
