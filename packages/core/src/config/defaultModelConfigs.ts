@@ -89,6 +89,19 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
         model: 'gemini-2.5-flash-lite',
       },
     },
+    'gemma-4-31b-it': {
+      extends: 'chat-base-3',
+      modelConfig: {
+        model: 'gemma-4-31b-it',
+      },
+    },
+    'gemma-4-26b-a4b-it': {
+      extends: 'chat-base-3',
+      modelConfig: {
+        model: 'gemma-4-26b-a4b-it',
+      },
+    },
+
     // Bases for the internal model configs.
     'gemini-2.5-flash-base': {
       extends: 'base',
@@ -317,6 +330,21 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       isVisible: true,
       features: { thinking: false, multimodalToolUse: false },
     },
+    'gemma-4-31b-it': {
+      tier: 'custom',
+      family: 'gemma-4',
+      isPreview: false,
+      isVisible: true,
+      features: { thinking: true, multimodalToolUse: false },
+    },
+    'gemma-4-26b-a4b-it': {
+      tier: 'custom',
+      family: 'gemma-4',
+      isPreview: false,
+      isVisible: true,
+      features: { thinking: true, multimodalToolUse: false },
+    },
+
     // Aliases
     auto: {
       tier: 'auto',
@@ -362,6 +390,13 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
     },
   },
   modelIdResolutions: {
+    'gemma-4-31b-it': {
+      default: 'gemma-4-31b-it',
+    },
+    'gemma-4-26b-a4b-it': {
+      default: 'gemma-4-26b-a4b-it',
+    },
+
     'gemini-3.1-pro-preview': {
       default: 'gemini-3.1-pro-preview',
       contexts: [

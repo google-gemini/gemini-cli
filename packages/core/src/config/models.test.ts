@@ -32,6 +32,8 @@ import {
   PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
   isPreviewModel,
   isProModel,
+  GEMMA_4_31B_IT_MODEL,
+  GEMMA_4_26B_A4B_IT_MODEL,
 } from './models.js';
 import type { Config } from './config.js';
 import { ModelConfigService } from '../services/modelConfigService.js';
@@ -356,6 +358,8 @@ describe('getDisplayString', () => {
 
   it('should return the model name as is for other models', () => {
     expect(getDisplayString('custom-model')).toBe('custom-model');
+    expect(getDisplayString(GEMMA_4_31B_IT_MODEL)).toBe('Gemma 4 31B');
+    expect(getDisplayString(GEMMA_4_26B_A4B_IT_MODEL)).toBe('Gemma 4 26B');
     expect(getDisplayString(DEFAULT_GEMINI_FLASH_LITE_MODEL)).toBe(
       DEFAULT_GEMINI_FLASH_LITE_MODEL,
     );
@@ -571,6 +575,8 @@ describe('isActiveModel', () => {
     expect(isActiveModel(DEFAULT_GEMINI_MODEL)).toBe(true);
     expect(isActiveModel(PREVIEW_GEMINI_MODEL)).toBe(true);
     expect(isActiveModel(DEFAULT_GEMINI_FLASH_MODEL)).toBe(true);
+    expect(isActiveModel(GEMMA_4_31B_IT_MODEL)).toBe(true);
+    expect(isActiveModel(GEMMA_4_26B_A4B_IT_MODEL)).toBe(true);
   });
 
   it('should return false for Gemini 3.1 models when Gemini 3.1 is not launched', () => {
