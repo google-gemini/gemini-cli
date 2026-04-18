@@ -31,6 +31,14 @@ export async function relaunchOnExitCode(runner: () => Promise<number>) {
   }
 }
 
+// Signals we relay from parent to child so it doesn't get orphaned
+// when a process manager sends SIGTERM, or someone does kill <pid>.
+const FORWARDED_SIGNALS: readonly NodeJS.Signals[] = [
+  'SIGTERM',
+  'SIGHUP',
+  'SIGINT',
+];
+
 export async function relaunchAppInChildProcess(
   additionalNodeArgs: string[],
   additionalScriptArgs: string[],
@@ -43,8 +51,6 @@ export async function relaunchAppInChildProcess(
   let latestAdminSettings = remoteAdminSettings;
 
   const runner = () => {
-    // process.argv is [node, script, ...args]
-    // We want to construct [ ...nodeArgs, script, ...scriptArgs]
     const script = process.argv[1];
     const scriptArgs = process.argv.slice(2);
 
@@ -57,7 +63,6 @@ export async function relaunchAppInChildProcess(
     ];
     const newEnv = { ...process.env, GEMINI_CLI_NO_RELAUNCH: 'true' };
 
-    // The parent process should not be reading from stdin while the child is running.
     process.stdin.pause();
 
     const child = spawn(process.execPath, nodeArgs, {
@@ -65,9 +70,22 @@ export async function relaunchAppInChildProcess(
       env: newEnv,
     });
 
-    if (latestAdminSettings) {
-      child.send({ type: 'admin-settings', settings: latestAdminSettings });
+    // Forward signals so the child dies when we do.
+    const forwarders = new Map<NodeJS.Signals, NodeJS.SignalsListener>();
+    for (const sig of FORWARDED_SIGNALS) {
+      const handler: NodeJS.SignalsListener = () => {
+        child.kill(sig);
+      };
+      forwarders.set(sig, handler);
+      process.on(sig, handler);
     }
+
+    const removeForwarders = () => {
+      for (const [sig, handler] of forwarders) {
+        process.removeListener(sig, handler);
+      }
+      forwarders.clear();
+    };
 
     child.on('message', (msg: { type?: string; settings?: unknown }) => {
       if (msg.type === 'admin-settings-update' && msg.settings) {
@@ -75,10 +93,22 @@ export async function relaunchAppInChildProcess(
       }
     });
 
+    try {
+      if (latestAdminSettings) {
+        child.send({ type: 'admin-settings', settings: latestAdminSettings });
+      }
+    } catch {
+      // send() can throw if IPC channel is already dead — that's fine,
+      // we still want to wait for the child to exit below.
+    }
+
     return new Promise<number>((resolve, reject) => {
-      child.on('error', reject);
+      child.on('error', (err) => {
+        removeForwarders();
+        reject(err);
+      });
       child.on('close', (code) => {
-        // Resume stdin before the parent process exits.
+        removeForwarders();
         process.stdin.resume();
         resolve(code ?? 1);
       });
