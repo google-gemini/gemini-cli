@@ -22,6 +22,9 @@ describe('QuotaDisplay', () => {
   it('should not render when remaining is undefined', async () => {
     const { lastFrame, unmount } = await render(
       <QuotaDisplay remaining={undefined} limit={100} />,
+      undefined,
+      undefined,
+      true,
     );
     expect(lastFrame({ allowEmpty: true })).toBe('');
     unmount();
@@ -30,6 +33,9 @@ describe('QuotaDisplay', () => {
   it('should not render when limit is undefined', async () => {
     const { lastFrame, unmount } = await render(
       <QuotaDisplay remaining={100} limit={undefined} />,
+      undefined,
+      undefined,
+      true,
     );
     expect(lastFrame({ allowEmpty: true })).toBe('');
     unmount();
@@ -38,6 +44,9 @@ describe('QuotaDisplay', () => {
   it('should not render when limit is 0', async () => {
     const { lastFrame, unmount } = await render(
       <QuotaDisplay remaining={100} limit={0} />,
+      undefined,
+      undefined,
+      true,
     );
     expect(lastFrame({ allowEmpty: true })).toBe('');
     unmount();
@@ -46,6 +55,9 @@ describe('QuotaDisplay', () => {
   it('should not render when usage < 80%', async () => {
     const { lastFrame, unmount } = await render(
       <QuotaDisplay remaining={85} limit={100} />,
+      undefined,
+      undefined,
+      true,
     );
     expect(lastFrame({ allowEmpty: true })).toBe('');
     unmount();
