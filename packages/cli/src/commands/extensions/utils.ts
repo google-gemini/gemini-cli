@@ -87,6 +87,7 @@ export async function configureSpecificSetting(
   scope: ExtensionSettingScope,
   logger: ConfigLogger = defaultLogger,
   requestSetting: RequestSettingCallback = defaultRequestSetting,
+  value?: string,
 ) {
   const { extension } = await getExtensionAndManager(
     extensionManager,
@@ -110,7 +111,7 @@ export async function configureSpecificSetting(
     extensionConfig,
     extension.id,
     settingKey,
-    requestSetting,
+    value !== undefined ? async () => value : requestSetting,
     scope,
     process.cwd(),
   );
