@@ -34,6 +34,8 @@ import {
   deriveItemsFromLegacySettings,
 } from '../../config/footerItems.js';
 import { isDevelopment } from '../../utils/installationInfo.js';
+import { Command } from '../key/keyMatchers.js';
+import { formatCommand } from '../key/keybindingUtils.js';
 
 interface CwdIndicatorProps {
   targetDir: string;
@@ -320,12 +322,21 @@ export const Footer: React.FC = () => {
         break;
       }
       case 'model-name': {
-        const str = getDisplayString(model);
+        const isFavorite = settings.merged.model.favorites?.includes(model);
+        const str = `${getDisplayString(model)}${isFavorite ? ' ★' : ''}`;
+        const cycleHint = formatCommand(Command.CYCLE_MODELS_FORWARD);
         addCol(
           id,
           header,
-          () => <Text color={itemColor}>{str}</Text>,
-          str.length,
+          () => (
+            <Text color={itemColor}>
+              {str}{' '}
+              <Text color={theme.ui.comment} dimColor>
+                ({cycleHint})
+              </Text>
+            </Text>
+          ),
+          str.length + cycleHint.length + 3,
         );
         break;
       }

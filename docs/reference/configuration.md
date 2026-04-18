@@ -469,6 +469,10 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Skip the next speaker check.
   - **Default:** `true`
 
+- **`model.favorites`** (array):
+  - **Description:** A list of favorite models to cycle through.
+  - **Default:** `[]`
+
 #### `modelConfigs`
 
 - **`modelConfigs.aliases`** (object):
