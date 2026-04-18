@@ -9,13 +9,24 @@ import AjvPkg, { type AnySchema, type Ajv } from 'ajv';
 
 import Ajv2020Pkg from 'ajv/dist/2020.js';
 import * as addFormats from 'ajv-formats';
+import { z } from 'zod';
 import { debugLogger } from './debugLogger.js';
 
-// Ajv's ESM/CJS interop: use 'any' for compatibility as recommended by Ajv docs
-// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-unsafe-assignment
-const AjvClass = (AjvPkg as any).default || AjvPkg;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-unsafe-assignment
-const Ajv2020Class = (Ajv2020Pkg as any).default || Ajv2020Pkg;
+// zod schema for esm/cjs module interop resolution
+const EsmModuleSchema = z.object({ default: z.unknown() }).passthrough();
+
+// zod schema for extracting $schema identifier
+const SchemaWithIdSchema = z.object({ $schema: z.string() }).passthrough();
+
+function resolveEsmDefault(mod: unknown): unknown {
+  const result = EsmModuleSchema.safeParse(mod);
+  return result.success ? result.data.default : mod;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const AjvClass: any = resolveEsmDefault(AjvPkg);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const Ajv2020Class: any = resolveEsmDefault(Ajv2020Pkg);
 
 const ajvOptions = {
   // See: https://ajv.js.org/options.html#strict-mode-options
@@ -36,13 +47,18 @@ const ajvDefault: Ajv = new AjvClass(ajvOptions);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
 const ajv2020: Ajv = new Ajv2020Class(ajvOptions);
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-unsafe-assignment
-const addFormatsFunc = (addFormats as any).default || addFormats;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const addFormatsFunc: any = resolveEsmDefault(addFormats);
 addFormatsFunc(ajvDefault);
 addFormatsFunc(ajv2020);
 
 // Canonical draft-2020-12 meta-schema URI (used by rmcp MCP servers)
 const DRAFT_2020_12_SCHEMA = 'https://json-schema.org/draft/2020-12/schema';
+
+function getSchemaId(schema: unknown): string {
+  const result = SchemaWithIdSchema.safeParse(schema);
+  return result.success ? result.data.$schema : '<no $schema>';
+}
 
 /**
  * Returns the appropriate validator based on schema's $schema field.
@@ -91,10 +107,9 @@ export class SchemaValidator {
       // Skip validation rather than blocking tool usage.
       // This matches LenientJsonSchemaValidator behavior in mcp-client.ts.
       debugLogger.warn(
-        `Failed to compile schema (${
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          (schema as Record<string, unknown>)?.['$schema'] ?? '<no $schema>'
-        }): ${error instanceof Error ? error.message : String(error)}. ` +
+        `Failed to compile schema (${getSchemaId(
+          schema,
+        )}): ${error instanceof Error ? error.message : String(error)}. ` +
           'Skipping parameter validation.',
       );
       return null;
@@ -123,10 +138,9 @@ export class SchemaValidator {
       // Schema validation failed (unsupported version, etc.)
       // Skip validation rather than blocking tool usage.
       debugLogger.warn(
-        `Failed to validate schema (${
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          (schema as Record<string, unknown>)?.['$schema'] ?? '<no $schema>'
-        }): ${error instanceof Error ? error.message : String(error)}. ` +
+        `Failed to validate schema (${getSchemaId(
+          schema,
+        )}): ${error instanceof Error ? error.message : String(error)}. ` +
           'Skipping schema validation.',
       );
       return null;

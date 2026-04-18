@@ -211,4 +211,25 @@ describe('SchemaValidator', () => {
       ).not.toBeNull();
     });
   });
+
+  describe('schema validation error handling', () => {
+    it('gracefully handles schema with invalid $ref', () => {
+      const schema = {
+        type: 'object',
+        properties: {
+          name: { $ref: '#/definitions/nonexistent' },
+        },
+      };
+      // should skip validation rather than throw
+      expect(SchemaValidator.validate(schema, { name: 'test' })).toBeNull();
+    });
+
+    it('validates schema without $schema field', () => {
+      const result = SchemaValidator.validateSchema({
+        type: 'object',
+        properties: { name: { type: 'string' } },
+      });
+      expect(result).toBeNull();
+    });
+  });
 });
