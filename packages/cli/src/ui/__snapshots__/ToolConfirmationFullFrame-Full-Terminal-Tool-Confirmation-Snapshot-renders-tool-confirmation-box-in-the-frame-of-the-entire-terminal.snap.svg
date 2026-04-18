@@ -1,45 +1,56 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="920" height="666" viewBox="0 0 920 666">
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="938" viewBox="0 0 920 938">
   <style>
     text { font-family: Consolas, "Courier New", monospace; font-size: 14px; dominant-baseline: text-before-edge; white-space: pre; }
   </style>
-  <rect width="920" height="666" fill="#000000" />
+  <rect width="920" height="938" fill="#000000" />
   <g transform="translate(10, 10)">
-    <text x="0" y="2" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs"> &gt; Can you edit InputPrompt.tsx for me?                                                             </text>
-    <text x="0" y="19" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄</text>
-    <text x="0" y="53" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">╭─────────────────────────────────────────────────────────────────────────────────────────────────╮ </text>
-    <text x="0" y="70" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│ ? Edit packages/.../InputPrompt.tsx:   return kittyProtocolSupporte... =&gt;   return kittyProto…  │ </text>
-    <text x="0" y="87" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│ ╭─────────────────────────────────────────────────────────────────────────────────────────────╮ │ </text>
-    <text x="0" y="104" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│ │ ... first 42 lines hidden (Ctrl+O to show) ...                                              │ │ </text>
-    <text x="0" y="121" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│ │ 43   const line43 = true;                                                                   │ │ </text>
-    <text x="0" y="138" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│ │ 44   const line44 = true;                                                                   │ │ </text>
-    <text x="0" y="155" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│ │ 45   const line45 = true;                                                                   │ │ </text>
-    <text x="0" y="172" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│ │ 46   const line46 = true;                                                                   │ │ </text>
-    <text x="0" y="189" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│ │ 47   const line47 = true;                                                                   │ │▄</text>
-    <text x="0" y="206" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│ │ 48   const line48 = true;                                                                   │ │█</text>
-    <text x="0" y="223" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│ │ 49   const line49 = true;                                                                   │ │█</text>
-    <text x="0" y="240" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│ │ 50   const line50 = true;                                                                   │ │█</text>
-    <text x="0" y="257" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│ │ 51   const line51 = true;                                                                   │ │█</text>
-    <text x="0" y="274" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│ │ 52   const line52 = true;                                                                   │ │█</text>
-    <text x="0" y="291" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│ │ 53   const line53 = true;                                                                   │ │█</text>
-    <text x="0" y="308" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│ │ 54   const line54 = true;                                                                   │ │█</text>
-    <text x="0" y="325" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│ │ 55   const line55 = true;                                                                   │ │█</text>
-    <text x="0" y="342" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│ │ 56   const line56 = true;                                                                   │ │█</text>
-    <text x="0" y="359" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│ │ 57   const line57 = true;                                                                   │ │█</text>
-    <text x="0" y="376" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│ │ 58   const line58 = true;                                                                   │ │█</text>
-    <text x="0" y="393" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│ │ 59   const line59 = true;                                                                   │ │█</text>
-    <text x="0" y="410" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│ │ 60   const line60 = true;                                                                   │ │█</text>
-    <text x="0" y="427" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│ │ 61 -  return kittyProtocolSupporte...;                                                      │ │█</text>
-    <text x="0" y="444" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│ │ 61 +  return kittyProtocolSupporte...;                                                      │ │█</text>
-    <text x="0" y="461" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│ │ 62    buffer: TextBuffer;                                                                   │ │█</text>
-    <text x="0" y="478" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│ │ 63    onSubmit: (value: string) =&gt; void;                                                    │ │█</text>
-    <text x="0" y="495" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│ ╰─────────────────────────────────────────────────────────────────────────────────────────────╯ │█</text>
-    <text x="0" y="512" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│ Apply this change?                                                                              │█</text>
-    <text x="0" y="529" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│                                                                                                 │█</text>
-    <text x="0" y="546" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│ ● 1. Allow once                                                                                 │█</text>
-    <text x="0" y="563" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│   2. Allow for this session                                                                     │█</text>
-    <text x="0" y="580" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│   3. Allow for this file in all future sessions ~/.gemini/policies/auto-saved.toml              │█</text>
-    <text x="0" y="597" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│   4. Modify with external editor                                                                │█</text>
-    <text x="0" y="614" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│   5. No, suggest changes (esc)                                                                  │█</text>
-    <text x="0" y="631" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">╰─────────────────────────────────────────────────────────────────────────────────────────────────╯█</text>
+    <text x="0" y="19" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs"> ▝▜▄      ▗█▀▀▜▙▝█▛▀▀▌▜██▖▟██▘▜█▘▜██▖▝█▛▝█▛                                                         </text>
+    <text x="0" y="36" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">   ▝▜▄    █▌     █▙▟  ▐█▝█▛▐█ ▐█ ▐█▝█▖█▌ █▌                                                         </text>
+    <text x="0" y="53" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">  ▗▟▀     ▜▙ ▝█▛ █▌▝ ▖▐█   ▐█ ▐█ ▐█ ▝██▌ █▌                                                         </text>
+    <text x="0" y="70" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs"> ▝▀        ▀▀▀▀▘▝▀▀▀▀▘▀▀▘  ▀▀▘▀▀▘▀▀▘ ▝▀▀▝▀▀                                                         </text>
+    <text x="0" y="104" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs"> Gemini CLI v1.2.3                                                                                  </text>
+    <text x="0" y="172" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">Tips for getting started:                                                                           </text>
+    <text x="0" y="189" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">1. Create GEMINI.md files to customize your interactions                                            </text>
+    <text x="0" y="206" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">2. /help for more information                                                                       </text>
+    <text x="0" y="223" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">3. Ask coding questions, edit code or run commands                                                  </text>
+    <text x="0" y="240" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">4. Be specific for the best results                                                                 </text>
+    <text x="0" y="257" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀</text>
+    <text x="0" y="274" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs"> &gt; Can you edit InputPrompt.tsx for me?                                                             </text>
+    <text x="0" y="291" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄</text>
+    <text x="0" y="325" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">╭─────────────────────────────────────────────────────────────────────────────────────────────────╮ </text>
+    <text x="0" y="342" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│ ? Edit packages/.../InputPrompt.tsx:   return kittyProtocolSupporte... =&gt;   return kittyProto…  │ </text>
+    <text x="0" y="359" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│ ╭─────────────────────────────────────────────────────────────────────────────────────────────╮ │ </text>
+    <text x="0" y="376" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│ │ ... first 42 lines hidden (Ctrl+O to show) ...                                              │ │ </text>
+    <text x="0" y="393" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│ │ 43   const line43 = true;                                                                   │ │ </text>
+    <text x="0" y="410" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│ │ 44   const line44 = true;                                                                   │ │ </text>
+    <text x="0" y="427" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│ │ 45   const line45 = true;                                                                   │ │ </text>
+    <text x="0" y="444" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│ │ 46   const line46 = true;                                                                   │ │ </text>
+    <text x="0" y="461" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│ │ 47   const line47 = true;                                                                   │ │ </text>
+    <text x="0" y="478" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│ │ 48   const line48 = true;                                                                   │ │ </text>
+    <text x="0" y="495" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│ │ 49   const line49 = true;                                                                   │ │ </text>
+    <text x="0" y="512" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│ │ 50   const line50 = true;                                                                   │ │ </text>
+    <text x="0" y="529" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│ │ 51   const line51 = true;                                                                   │ │ </text>
+    <text x="0" y="546" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│ │ 52   const line52 = true;                                                                   │ │ </text>
+    <text x="0" y="563" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│ │ 53   const line53 = true;                                                                   │ │ </text>
+    <text x="0" y="580" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│ │ 54   const line54 = true;                                                                   │ │ </text>
+    <text x="0" y="597" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│ │ 55   const line55 = true;                                                                   │ │ </text>
+    <text x="0" y="614" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│ │ 56   const line56 = true;                                                                   │ │ </text>
+    <text x="0" y="631" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│ │ 57   const line57 = true;                                                                   │ │ </text>
+    <text x="0" y="648" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│ │ 58   const line58 = true;                                                                   │ │ </text>
+    <text x="0" y="665" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│ │ 59   const line59 = true;                                                                   │ │ </text>
+    <text x="0" y="682" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│ │ 60   const line60 = true;                                                                   │ │ </text>
+    <text x="0" y="699" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│ │ 61 -  return kittyProtocolSupporte...;                                                      │ │ </text>
+    <text x="0" y="716" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│ │ 61 +  return kittyProtocolSupporte...;                                                      │ │ </text>
+    <text x="0" y="733" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│ │ 62    buffer: TextBuffer;                                                                   │ │ </text>
+    <text x="0" y="750" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│ │ 63    onSubmit: (value: string) =&gt; void;                                                    │ │ </text>
+    <text x="0" y="767" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│ ╰─────────────────────────────────────────────────────────────────────────────────────────────╯ │ </text>
+    <text x="0" y="784" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│ Apply this change?                                                                              │ </text>
+    <text x="0" y="801" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│                                                                                                 │ </text>
+    <text x="0" y="818" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│ ● 1. Allow once                                                                                 │ </text>
+    <text x="0" y="835" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│   2. Allow for this session                                                                     │ </text>
+    <text x="0" y="852" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│   3. Allow for this file in all future sessions ~/.gemini/policies/auto-saved.toml              │ </text>
+    <text x="0" y="869" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│   4. Modify with external editor                                                                │ </text>
+    <text x="0" y="886" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">│   5. No, suggest changes (esc)                                                                  │ </text>
+    <text x="0" y="903" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">╰─────────────────────────────────────────────────────────────────────────────────────────────────╯ </text>
   </g>
 </svg>

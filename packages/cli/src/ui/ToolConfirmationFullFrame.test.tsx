@@ -44,6 +44,9 @@ vi.mock('./hooks/useSettingsCommand.js');
 vi.mock('./hooks/useModelCommand.js');
 vi.mock('./hooks/slashCommandProcessor.js');
 vi.mock('./hooks/useConsoleMessages.js');
+vi.mock('./hooks/useBanner.js', () => ({
+  useBanner: vi.fn(() => ({ bannerText: '' })),
+}));
 vi.mock('./hooks/useTerminalSize.js', () => ({
   useTerminalSize: vi.fn(() => ({ columns: 100, rows: 30 })),
 }));
