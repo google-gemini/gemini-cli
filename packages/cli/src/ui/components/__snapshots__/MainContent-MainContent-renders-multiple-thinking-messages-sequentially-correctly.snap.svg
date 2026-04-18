@@ -6,16 +6,14 @@
   <g transform="translate(10, 10)">
     <text x="0" y="2" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">ScrollableList                                                                                      </text>
     <text x="0" y="19" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">AppHeader(full)                                                                                     </text>
-    <rect x="0" y="34" width="900" height="17" fill="#141414" />
-    <text x="0" y="36" fill="#000000" textLength="900" lengthAdjust="spacingAndGlyphs">▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀</text>
+    <text x="0" y="36" fill="#141414" textLength="900" lengthAdjust="spacingAndGlyphs">▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄</text>
     <rect x="0" y="51" width="9" height="17" fill="#141414" />
     <rect x="9" y="51" width="18" height="17" fill="#141414" />
     <text x="9" y="53" fill="#d7afff" textLength="18" lengthAdjust="spacingAndGlyphs">&gt; </text>
     <rect x="27" y="51" width="135" height="17" fill="#141414" />
     <text x="27" y="53" fill="#ffffff" textLength="135" lengthAdjust="spacingAndGlyphs">Plan a solution</text>
     <rect x="162" y="51" width="738" height="17" fill="#141414" />
-    <rect x="0" y="68" width="900" height="17" fill="#141414" />
-    <text x="0" y="70" fill="#000000" textLength="900" lengthAdjust="spacingAndGlyphs">▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄</text>
+    <text x="0" y="70" fill="#141414" textLength="900" lengthAdjust="spacingAndGlyphs">▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀</text>
     <text x="0" y="87" fill="#ffffff" textLength="117" lengthAdjust="spacingAndGlyphs" font-style="italic"> Thinking... </text>
     <text x="9" y="104" fill="#afafaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="9" y="121" fill="#afafaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>

@@ -14,7 +14,8 @@ import {
   resolveColor,
   getSafeLowColorBackground,
 } from '../../themes/color-utils.js';
-import { isLowColorDepth, isITerm2 } from '../../utils/terminalUtils.js';
+import { isLowColorDepth } from '../../utils/terminalUtils.js';
+import { supportsTrueColor } from '@google/gemini-cli-core';
 
 export interface HalfLinePaddedBoxProps {
   /**
@@ -79,9 +80,9 @@ const HalfLinePaddedBoxInternal: React.FC<HalfLinePaddedBoxProps> = ({
     return <>{children}</>;
   }
 
-  const isITerm = isITerm2();
+  const noTrueColor = !supportsTrueColor();
 
-  if (isITerm) {
+  if (noTrueColor) {
     return (
       <Box
         width={terminalWidth}
@@ -89,20 +90,18 @@ const HalfLinePaddedBoxInternal: React.FC<HalfLinePaddedBoxProps> = ({
         alignItems="stretch"
         minHeight={1}
         flexShrink={0}
+        backgroundColor={backgroundColor}
       >
         <Box width={terminalWidth} flexDirection="row">
-          <Text color={backgroundColor}>{'▄'.repeat(terminalWidth)}</Text>
+          <Text backgroundColor={backgroundColor}>
+            {' '.repeat(terminalWidth)}
+          </Text>
         </Box>
-        <Box
-          width={terminalWidth}
-          flexDirection="column"
-          alignItems="stretch"
-          backgroundColor={backgroundColor}
-        >
-          {children}
-        </Box>
+        {children}
         <Box width={terminalWidth} flexDirection="row">
-          <Text color={backgroundColor}>{'▀'.repeat(terminalWidth)}</Text>
+          <Text backgroundColor={backgroundColor}>
+            {' '.repeat(terminalWidth)}
+          </Text>
         </Box>
       </Box>
     );
@@ -115,18 +114,20 @@ const HalfLinePaddedBoxInternal: React.FC<HalfLinePaddedBoxProps> = ({
       alignItems="stretch"
       minHeight={1}
       flexShrink={0}
-      backgroundColor={backgroundColor}
     >
       <Box width={terminalWidth} flexDirection="row">
-        <Text backgroundColor={backgroundColor} color={terminalBg}>
-          {'▀'.repeat(terminalWidth)}
-        </Text>
+        <Text color={backgroundColor}>{'▄'.repeat(terminalWidth)}</Text>
       </Box>
-      {children}
+      <Box
+        width={terminalWidth}
+        flexDirection="column"
+        alignItems="stretch"
+        backgroundColor={backgroundColor}
+      >
+        {children}
+      </Box>
       <Box width={terminalWidth} flexDirection="row">
-        <Text color={terminalBg} backgroundColor={backgroundColor}>
-          {'▄'.repeat(terminalWidth)}
-        </Text>
+        <Text color={backgroundColor}>{'▀'.repeat(terminalWidth)}</Text>
       </Box>
     </Box>
   );
