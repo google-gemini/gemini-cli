@@ -18,13 +18,23 @@ describe('useModelCommand', () => {
   }
 
   it('should initialize with the model dialog closed', async () => {
-    const { unmount } = await render(<TestComponent />);
+    const { unmount } = await render(
+      <TestComponent />,
+      undefined,
+      undefined,
+      true,
+    );
     expect(result.isModelDialogOpen).toBe(false);
     unmount();
   });
 
   it('should open the model dialog when openModelDialog is called', async () => {
-    const { unmount } = await render(<TestComponent />);
+    const { unmount } = await render(
+      <TestComponent />,
+      undefined,
+      undefined,
+      true,
+    );
 
     act(() => {
       result.openModelDialog();
@@ -35,7 +45,12 @@ describe('useModelCommand', () => {
   });
 
   it('should close the model dialog when closeModelDialog is called', async () => {
-    const { unmount } = await render(<TestComponent />);
+    const { unmount } = await render(
+      <TestComponent />,
+      undefined,
+      undefined,
+      true,
+    );
 
     // Open it first
     act(() => {
