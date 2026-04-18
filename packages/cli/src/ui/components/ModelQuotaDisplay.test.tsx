@@ -50,7 +50,7 @@ describe('<ModelQuotaDisplay />', () => {
   it('renders nothing when no buckets are provided', async () => {
     const { lastFrame } = await renderWithProviders(
       <ModelQuotaDisplay buckets={[]} availableWidth={100} />,
-      { width: 100 },
+      { width: 100, allowEmptyFrame: true },
     );
     const output = lastFrame({ allowEmpty: true });
     expect(output).toBe('');
