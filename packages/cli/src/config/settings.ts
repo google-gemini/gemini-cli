@@ -244,6 +244,28 @@ export function getDefaultsFromSchema(
   return defaults as Settings;
 }
 
+function hasOwnNestedProperty(
+  obj: Settings | undefined,
+  path: string[],
+): boolean {
+  let current: unknown = obj;
+
+  for (const key of path) {
+    if (typeof current !== 'object' || current === null) {
+      return false;
+    }
+
+    const record = current as Record<string, unknown>;
+    if (!Object.hasOwn(record, key)) {
+      return false;
+    }
+
+    current = record[key];
+  }
+
+  return true;
+}
+
 export function mergeSettings(
   system: Settings,
   systemDefaults: Settings,
@@ -262,7 +284,7 @@ export function mergeSettings(
   // 4. Workspace Settings
   // 5. System Settings (as overrides)
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-  return customDeepMerge(
+  const merged = customDeepMerge(
     getMergeStrategyForPath,
     schemaDefaults,
     systemDefaults,
@@ -270,6 +292,22 @@ export function mergeSettings(
     safeWorkspace,
     system,
   ) as MergedSettings;
+
+  const hasExplicitAutoMemory =
+    hasOwnNestedProperty(system, ['experimental', 'autoMemory']) ||
+    hasOwnNestedProperty(systemDefaults, ['experimental', 'autoMemory']) ||
+    hasOwnNestedProperty(user, ['experimental', 'autoMemory']) ||
+    hasOwnNestedProperty(safeWorkspace, ['experimental', 'autoMemory']);
+
+  if (
+    !hasExplicitAutoMemory &&
+    merged.experimental?.memoryManager &&
+    merged.experimental
+  ) {
+    merged.experimental.autoMemory = true;
+  }
+
+  return merged;
 }
 
 /**
