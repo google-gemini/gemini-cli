@@ -32,7 +32,7 @@ import {
   type MergeStrategy,
   type SettingsSchema,
   type SettingDefinition,
-  type SettingsType,
+  SETTINGS_SCHEMA_DEFINITIONS,
   getSettingsSchema,
 } from './settingsSchema.js';
 
@@ -261,36 +261,89 @@ function isObjectRecord(value: unknown): value is Record<string, unknown> {
 }
 
 type SchemaNode = {
-  type: SettingsType;
-  properties?: SettingsSchema;
-  items?: SchemaNode;
-  additionalProperties?: SchemaNode;
+  type?: string | string[];
+  properties?: Record<string, unknown>;
+  items?: unknown;
+  additionalProperties?: unknown;
+  ref?: string;
 };
+
+function toSchemaNode(value: unknown): SchemaNode | undefined {
+  if (!isObjectRecord(value)) {
+    return undefined;
+  }
+
+   
+  return value as SchemaNode;
+}
+
+function resolveSchemaNode(
+  schemaNode?: SchemaNode,
+  resolvingRefs: Set<string> = new Set(),
+): SchemaNode | undefined {
+  if (!schemaNode?.ref) {
+    return schemaNode;
+  }
+
+  const ref = schemaNode.ref;
+  if (resolvingRefs.has(ref)) {
+    // Break potential cycles in malformed ref graphs.
+    const { ref: _ignoredRef, ...withoutRef } = schemaNode;
+    return withoutRef;
+  }
+
+  const referenced = toSchemaNode(SETTINGS_SCHEMA_DEFINITIONS[ref]);
+  if (!referenced) {
+    const { ref: _ignoredRef, ...withoutRef } = schemaNode;
+    return withoutRef;
+  }
+
+  const nextResolvingRefs = new Set(resolvingRefs);
+  nextResolvingRefs.add(ref);
+  const resolvedReferenced = resolveSchemaNode(referenced, nextResolvingRefs);
+  if (!resolvedReferenced) {
+    const { ref: _ignoredRef, ...withoutRef } = schemaNode;
+    return withoutRef;
+  }
+
+  const { ref: _ignoredRef, ...inlineWithoutRef } = schemaNode;
+  return {
+    ...resolvedReferenced,
+    ...inlineWithoutRef,
+  };
+}
 
 function coerceSettingsValueFromSchema(
   value: unknown,
   schemaNode?: SchemaNode,
 ): unknown {
-  if (!schemaNode) {
+  const resolvedSchemaNode = resolveSchemaNode(schemaNode);
+  if (!resolvedSchemaNode) {
     return value;
   }
 
-  if (schemaNode.type === 'boolean' && typeof value === 'string') {
+  if (resolvedSchemaNode.type === 'boolean' && typeof value === 'string') {
     return parseBooleanString(value) ?? value;
   }
 
-  if (schemaNode.type === 'array' && Array.isArray(value)) {
+  if (resolvedSchemaNode.type === 'array' && Array.isArray(value)) {
+    const itemSchema = toSchemaNode(resolvedSchemaNode.items);
     return value.map((entry) =>
-      coerceSettingsValueFromSchema(entry, schemaNode.items),
+      coerceSettingsValueFromSchema(entry, itemSchema),
     );
   }
 
-  if (schemaNode.type === 'object' && isObjectRecord(value)) {
+  if (resolvedSchemaNode.type === 'object' && isObjectRecord(value)) {
+    const schemaProperties = isObjectRecord(resolvedSchemaNode.properties)
+      ? resolvedSchemaNode.properties
+      : undefined;
+    const fallbackSchema = toSchemaNode(
+      resolvedSchemaNode.additionalProperties,
+    );
     const result: Record<string, unknown> = { ...value };
 
     for (const [key, currentValue] of Object.entries(result)) {
-      const childSchema = schemaNode.properties?.[key];
-      const fallbackSchema = schemaNode.additionalProperties;
+      const childSchema = toSchemaNode(schemaProperties?.[key]);
       result[key] = coerceSettingsValueFromSchema(
         currentValue,
         childSchema ?? fallbackSchema,
@@ -306,7 +359,7 @@ function coerceSettingsValueFromSchema(
 function coerceBooleanSettingsFromSchema(settings: Settings): Settings {
   const rootSchema: SchemaNode = {
     type: 'object',
-    properties: getSettingsSchema(),
+    properties: getSettingsSchema() as Record<string, unknown>,
   };
 
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion

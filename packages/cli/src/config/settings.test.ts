@@ -1527,6 +1527,39 @@ describe('Settings Loading and Merging', () => {
       delete process.env['GEMINI_AUTO_THEME'];
     });
 
+    it('should coerce env-resolved booleans in ref-based settings', () => {
+      process.env['MCP_TRUSTED'] = 'FALSE';
+      const userSettingsContent = {
+        mcpServers: {
+          demo: {
+            command: 'node',
+            args: ['server.js'],
+            trust: '${MCP_TRUSTED:-true}',
+          },
+        },
+      };
+
+      (mockFsExistsSync as Mock).mockImplementation(
+        (p: fs.PathLike) =>
+          normalizePath(p) === normalizePath(USER_SETTINGS_PATH),
+      );
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (normalizePath(p) === normalizePath(USER_SETTINGS_PATH)) {
+            return JSON.stringify(userSettingsContent);
+          }
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      const mcpServer = settings.user.settings.mcpServers?.['demo'];
+      expect(mcpServer?.trust).toBe(false);
+      expect(settings.merged.mcpServers?.['demo']?.trust).toBe(false);
+
+      delete process.env['MCP_TRUSTED'];
+    });
+
     it('should not coerce env-resolved values in string-only map settings', () => {
       const userSettingsContent: TestSettings = {
         mcpServers: {
