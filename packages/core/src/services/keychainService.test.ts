@@ -216,6 +216,19 @@ describe('KeychainService', () => {
 
       expect(mockKeytar.setPassword).toHaveBeenCalledTimes(1);
     });
+
+    it('should clean up test credential when getPassword throws during functional test', async () => {
+      // setPassword succeeds (credential is stored in keychain)
+      // getPassword throws (simulating a keychain error mid-test)
+      mockKeytar.getPassword?.mockRejectedValue(new Error('keychain locked'));
+
+      await service.isAvailable();
+
+      // Bug: deletePassword is never called because getPassword threw,
+      //      leaving the test credential in the OS keychain forever
+      // Fix: deletePassword should be called in a catch/finally block
+      expect(mockKeytar.deletePassword).toHaveBeenCalled();
+    });
   });
 
   describe('macOS Keychain Probing', () => {
