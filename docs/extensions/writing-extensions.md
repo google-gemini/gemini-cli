@@ -159,6 +159,13 @@ When a user installs this extension, Gemini CLI will prompt them to enter the
 `sensitive` is true) and injected into the MCP server's process as the
 `MY_SERVICE_API_KEY` environment variable.
 
+> **Important (Environment Variable Sanitization):** For security reasons,
+> sensitive environment variables are filtered out and not passed to extensions
+> or MCP servers by default. Extensions will _only_ have access to environment
+> variables that are explicitly declared in the `settings` array using the
+> `envVar` property, plus a few standard safe variables. Do not expect host
+> environment variables to be available otherwise.
+
 ## Step 4: Link your extension
 
 Link your extension to your Gemini CLI installation for local development.
