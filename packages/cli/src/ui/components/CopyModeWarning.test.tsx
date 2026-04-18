@@ -22,6 +22,7 @@ describe('CopyModeWarning', () => {
     } as unknown as ReturnType<typeof useInputState>);
     const { lastFrame, unmount } = await renderWithProviders(
       <CopyModeWarning />,
+      { allowEmptyFrame: true },
     );
     expect(lastFrame({ allowEmpty: true })).toBe('');
     unmount();
