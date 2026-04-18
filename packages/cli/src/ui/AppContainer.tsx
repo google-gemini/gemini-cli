@@ -487,8 +487,8 @@ export const AppContainer = (props: AppContainerProps) => {
       setConfigInitialized(true);
       startupProfiler.flush(config);
 
-      // Fire-and-forget memory service (skill extraction from past sessions)
-      if (config.isMemoryManagerEnabled()) {
+      // Fire-and-forget Auto Memory service (skill extraction from past sessions)
+      if (config.isAutoMemoryEnabled()) {
         startMemoryService(config).catch((e) => {
           debugLogger.error('Failed to start memory service:', e);
         });
@@ -980,6 +980,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       openAgentConfigDialog,
       openPermissionsDialog,
       quit: (messages: HistoryItem[]) => {
+        closeThemeDialog();
         setQuittingMessages(messages);
         setTimeout(async () => {
           await runExitCleanup();
@@ -1008,6 +1009,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     [
       setAuthState,
       openThemeDialog,
+      closeThemeDialog,
       openEditorDialog,
       openSettingsDialog,
       openSessionBrowser,
