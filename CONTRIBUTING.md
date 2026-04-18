@@ -372,8 +372,8 @@ npm run lint
 2.  In VS Code, use the "Attach" launch configuration (found in
     `.vscode/launch.json`).
 
-Alternatively, you can use the "Launch Program" configuration in VS Code if you
-prefer to launch the currently open file directly, but 'F5' is generally
+Alternatively, you can use the "CLI: Run Current File" configuration in VS Code
+if you prefer to launch the currently open file directly, but 'F5' is generally
 recommended.
 
 To hit a breakpoint inside the sandbox container run:
