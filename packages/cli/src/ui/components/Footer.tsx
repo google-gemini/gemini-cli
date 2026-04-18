@@ -185,6 +185,8 @@ export const Footer: React.FC = () => {
   const authType = config.getContentGeneratorConfig()?.authType;
   const [email, setEmail] = useState<string | undefined>();
 
+  const HOSTNAME = os.hostname();
+
   useEffect(() => {
     if (authType) {
       const userAccountManager = new UserAccountManager();
@@ -388,12 +390,11 @@ export const Footer: React.FC = () => {
         break;
       }
       case 'hostname': {
-        const hostname = os.hostname();
         addCol(
           id,
           header,
-          () => <Text color={itemColor}>{hostname}</Text>,
-          hostname.length,
+          () => <Text color={itemColor}>{HOSTNAME}</Text>,
+          HOSTNAME.length,
         );
         break;
       }
