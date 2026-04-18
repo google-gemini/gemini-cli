@@ -59,7 +59,8 @@ def _run_hats(args: list[str]) -> dict[str, Any]:
             parsed_json = None
 
     return {
-        "command": " ".join(shlex.quote(part) for part in command),
+        # Display/logging convenience only; execution uses argv list directly.
+        "command_display": " ".join(shlex.quote(part) for part in command),
         "return_code": proc.returncode,
         "stdout": stdout,
         "stderr": stderr,

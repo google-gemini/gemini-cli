@@ -7,7 +7,7 @@
       "command": "python3",
       "args": ["${extensionPath}${/}hats_mcp_server.py"],
       "cwd": "${extensionPath}",
-      "trust": true
+      "trust": false
     }
   }
 }

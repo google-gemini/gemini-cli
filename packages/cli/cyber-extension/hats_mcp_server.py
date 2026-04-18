@@ -18,7 +18,7 @@ def find_server_file(start: Path) -> Path:
 def main() -> None:
     server_file = find_server_file(Path(__file__).resolve().parent)
     # Intentionally replace this wrapper process so MCP stdio uses the main server process directly.
-    os.execv(sys.executable, [sys.executable, str(server_file), *sys.argv[1:]])
+    os.execv(sys.executable, [sys.executable, str(server_file)])
 
 
 if __name__ == "__main__":
