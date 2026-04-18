@@ -70,6 +70,7 @@ interface HandleAtCommandParams {
   messageId: number;
   signal: AbortSignal;
   escapePastedAtSymbols?: boolean;
+  depth?: number;
 }
 
 interface HandleAtCommandResult {
@@ -504,6 +505,9 @@ async function readLocalFiles(
   config: Config,
   signal: AbortSignal,
   userMessageTimestamp: number,
+  depth: number,
+  addItem: UseHistoryManagerReturn['addItem'],
+  onDebugMessage: (message: string) => void,
 ): Promise<{
   parts: PartUnion[];
   display?: IndividualToolCallDisplay;
@@ -580,7 +584,25 @@ async function readLocalFiles(
             parts.push({
               text: `\nContent from @${displayPath}:\n`,
             });
-            parts.push({ text: fileActualContent });
+            
+            if (depth < 2 && typeof fileActualContent === 'string' && fileActualContent.includes('@')) {
+              const nestedResult = await handleAtCommand({
+                query: fileActualContent,
+                config,
+                addItem: () => 0, // Mock addItem to prevent history pollution.
+                onDebugMessage: () => {}, 
+                messageId: userMessageTimestamp,
+                signal,
+                depth: depth + 1,
+              });
+              if (nestedResult.processedQuery) {
+                parts.push(...nestedResult.processedQuery);
+              } else {
+                parts.push({ text: fileActualContent });
+              }
+            } else {
+              parts.push({ text: fileActualContent });
+            }
           } else {
             parts.push({ text: part });
           }
@@ -667,7 +689,12 @@ export async function handleAtCommand({
   messageId: userMessageTimestamp,
   signal,
   escapePastedAtSymbols = false,
+  depth = 0,
 }: HandleAtCommandParams): Promise<HandleAtCommandResult> {
+  if (depth > 2) {
+    return { processedQuery: [{ text: query }] };
+  }
+
   const commandParts = parseAllAtCommands(query, escapePastedAtSymbols);
 
   const { agentParts, resourceParts, fileParts } = categorizeAtCommands(
@@ -710,7 +737,7 @@ export async function handleAtCommand({
 
   const [mcpResult, fileResult] = await Promise.all([
     readMcpResources(resourceParts, config, signal),
-    readLocalFiles(resolvedFiles, config, signal, userMessageTimestamp),
+    readLocalFiles(resolvedFiles, config, signal, userMessageTimestamp, depth, addItem, onDebugMessage),
   ]);
 
   const hasContent = mcpResult.parts.length > 0 || fileResult.parts.length > 0;

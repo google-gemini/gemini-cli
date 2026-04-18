@@ -199,8 +199,8 @@ ${finalExclusionPatternsForDescription
           const fullPath = path.join(dir, normalizedP);
           let exists = false;
           try {
-            await fsPromises.access(fullPath);
-            exists = true;
+            const st = await fsPromises.stat(fullPath);
+            exists = st.isFile();
           } catch {
             exists = false;
           }

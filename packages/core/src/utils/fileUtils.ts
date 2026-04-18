@@ -8,7 +8,6 @@ import fs from 'node:fs';
 import fsPromises from 'node:fs/promises';
 import path from 'node:path';
 import type { PartUnion } from '@google/genai';
-import { isBinaryFile as isBinaryFileCheck } from 'isbinaryfile';
 import mime from 'mime/lite';
 import type { FileSystemService } from '../services/fileSystemService.js';
 import { ToolErrorType } from '../tools/tool-error.js';
@@ -346,11 +345,74 @@ export async function isEmpty(filePath: string): Promise<boolean> {
 
 /**
  * Heuristic: determine if a file is likely binary.
- * Delegates to the `isbinaryfile` package for UTF-8-aware detection.
  */
 export async function isBinaryFile(filePath: string): Promise<boolean> {
   try {
-    return await isBinaryFileCheck(filePath);
+    let fh;
+    try {
+      fh = await fs.promises.open(filePath, 'r');
+      const stats = await fh.stat();
+      if (stats.isDirectory()) return false;
+      const fileSize = stats.size;
+      if (fileSize === 0) return false; // empty is not binary
+
+      // Sample up to 4KB from the head
+      const sampleSize = Math.min(4096, fileSize);
+      const buf = Buffer.alloc(sampleSize);
+      const { bytesRead } = await fh.read(buf, 0, sampleSize, 0);
+      if (bytesRead === 0) return false;
+
+      // BOM → text (avoid false positives for UTF‑16/32 with nulls)
+      const bom = detectBOM(buf.subarray(0, Math.min(4, bytesRead)));
+      if (bom) return false;
+
+      let nonPrintableCount = 0;
+      let i = 0;
+      while (i < bytesRead) {
+        const byte = buf[i];
+        if (byte === 0) return true; // null byte → strong binary signal
+        if (byte < 9 || (byte > 13 && byte < 32)) {
+          nonPrintableCount++;
+          i++;
+        } else if (byte >= 0x80) {
+          // Determine expected UTF-8 sequence length from the lead byte
+          let seqLen = 0;
+          if (byte >= 0xf0 && byte <= 0xf7) seqLen = 4;
+          else if (byte >= 0xe0 && byte <= 0xef) seqLen = 3;
+          else if (byte >= 0xc2 && byte <= 0xdf) seqLen = 2;
+          // 0x80–0xBF are continuation bytes without a leading byte → invalid
+          // 0xC0–0xC1 are overlong encodings → invalid
+          // 0xF8–0xFF are invalid UTF-8
+
+          if (seqLen > 0 && i + seqLen <= bytesRead) {
+            // Verify continuation bytes (0x80–0xBF)
+            let valid = true;
+            for (let j = 1; j < seqLen; j++) {
+              if ((buf[i + j] & 0xc0) !== 0x80) {
+                valid = false;
+                break;
+              }
+            }
+            if (valid) {
+              i += seqLen; // skip valid multi-byte sequence
+            } else {
+              nonPrintableCount++;
+              i++;
+            }
+          } else {
+            // lone continuation byte, partial sequence, or invalid lead byte
+            nonPrintableCount++;
+            i++;
+          }
+        } else {
+          i++;
+        }
+      }
+      // If >30% non-printable characters, consider it binary
+      return nonPrintableCount / bytesRead > 0.3;
+    } finally {
+      if (fh) await fh.close();
+    }
   } catch (error) {
     debugLogger.warn(
       `Failed to check if file is binary: ${filePath}`,
