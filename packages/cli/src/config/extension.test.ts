@@ -270,6 +270,48 @@ describe('extension tests', () => {
       consoleSpy.mockRestore();
     });
 
+    it('should skip the extension if a custom hooks directory path is outside the extension directory and log an error', async () => {
+      const consoleSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+      createExtension({
+        extensionsDir: userExtensionsDir,
+        name: 'hooks-traversal-extension',
+        version: '1.0.0',
+        hooksDir: '../shared-hooks',
+      });
+
+      const extensions = await extensionManager.loadExtensions();
+      expect(extensions).toHaveLength(0);
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'hooks-traversal-extension: Invalid hooks directory path: "../shared-hooks"',
+        ),
+      );
+      consoleSpy.mockRestore();
+    });
+
+    it('should skip the extension if a custom skills directory path is outside the extension directory and log an error', async () => {
+      const consoleSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+      createExtension({
+        extensionsDir: userExtensionsDir,
+        name: 'skills-traversal-extension',
+        version: '1.0.0',
+        skillsDir: '../shared-skills',
+      });
+
+      const extensions = await extensionManager.loadExtensions();
+      expect(extensions).toHaveLength(0);
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'skills-traversal-extension: Invalid skills directory path: "../shared-skills"',
+        ),
+      );
+      consoleSpy.mockRestore();
+    });
+
     it('should load context file path when GEMINI.md is present', async () => {
       createExtension({
         extensionsDir: userExtensionsDir,
@@ -1075,6 +1117,61 @@ name = "yolo-checker"
         );
       });
 
+      it('should load extension hooks from a custom hooksDir and hydrate variables', async () => {
+        const extDir = createExtension({
+          extensionsDir: userExtensionsDir,
+          name: 'custom-hook-extension',
+          version: '1.0.0',
+          hooksDir: 'claude-hooks',
+        });
+
+        const hooksDir = path.join(extDir, 'claude-hooks');
+        fs.mkdirSync(hooksDir);
+
+        const hooksConfig = {
+          enabled: false,
+          hooks: {
+            BeforeTool: [
+              {
+                matcher: '.*',
+                hooks: [
+                  {
+                    type: 'command',
+                    command: 'echo ${extensionPath}',
+                  },
+                ],
+              },
+            ],
+          },
+        };
+
+        fs.writeFileSync(
+          path.join(hooksDir, 'hooks.json'),
+          JSON.stringify(hooksConfig),
+        );
+
+        const settings = loadSettings(tempWorkspaceDir).merged;
+        settings.hooksConfig.enabled = true;
+
+        extensionManager = new ExtensionManager({
+          workspaceDir: tempWorkspaceDir,
+          requestConsent: mockRequestConsent,
+          requestSetting: mockPromptForSettings,
+          settings,
+          integrityManager: mockIntegrityManager,
+        });
+
+        const extensions = await extensionManager.loadExtensions();
+        expect(extensions).toHaveLength(1);
+        const extension = extensions[0];
+
+        expect(extension.hooks).toBeDefined();
+        expect(extension.hooks?.BeforeTool).toHaveLength(1);
+        expect(extension.hooks?.BeforeTool?.[0].hooks[0].command).toBe(
+          `echo ${extDir}`,
+        );
+      });
+
       it('should not load hooks if hooks.enabled is false', async () => {
         const extDir = createExtension({
           extensionsDir: userExtensionsDir,
@@ -1127,6 +1224,43 @@ name = "yolo-checker"
           JSON.stringify({
             name: 'hook-extension-install',
             version: '1.0.0',
+          }),
+        );
+
+        await extensionManager.loadExtensions();
+        await extensionManager.installOrUpdateExtension({
+          source: sourceExtDir,
+          type: 'local',
+        });
+
+        expect(requestConsentSpy).toHaveBeenCalledWith(
+          expect.stringContaining('⚠️  This extension contains Hooks'),
+        );
+      });
+
+      it('should warn about hooks during installation when hooksDir is customized', async () => {
+        const requestConsentSpy = vi.fn().mockResolvedValue(true);
+        extensionManager.setRequestConsent(requestConsentSpy);
+
+        const sourceExtDir = path.join(
+          tempWorkspaceDir,
+          'custom-hook-extension-source',
+        );
+        fs.mkdirSync(sourceExtDir, { recursive: true });
+
+        const hooksDir = path.join(sourceExtDir, 'claude-hooks');
+        fs.mkdirSync(hooksDir);
+        fs.writeFileSync(
+          path.join(hooksDir, 'hooks.json'),
+          JSON.stringify({ hooks: {} }),
+        );
+
+        fs.writeFileSync(
+          path.join(sourceExtDir, 'gemini-extension.json'),
+          JSON.stringify({
+            name: 'custom-hook-extension-install',
+            version: '1.0.0',
+            hooksDir: 'claude-hooks',
           }),
         );
 
