@@ -2330,9 +2330,9 @@ for that specific session.
   - Enables debug mode for this session, providing more verbose output. Open the
     debug console with F12 to see the additional logging.
 - **`--delete-session <identifier>`**:
-  - Delete a specific chat session by its index number or full session UUID.
+  - Delete a specific chat session by its index number or full session ID.
   - Use `--list-sessions` first to see available sessions, their indices, and
-    UUIDs.
+    IDs.
   - Example: `gemini --delete-session 3` or
     `gemini --delete-session a1b2c3d4-e5f6-7890-abcd-ef1234567890`
 - **`--extensions <extension_name ...>`** (**`-e <extension_name ...>`**):
@@ -2383,9 +2383,13 @@ for that specific session.
   - Path to a file to record model responses for testing.
 - **`--resume [session_id]`** (**`-r [session_id]`**):
   - Resume a previous chat session. Use "latest" for the most recent session,
-    provide a session index number, or provide a full session UUID.
+    provide a session index number, or provide a session ID/name.
+  - If the provided non-numeric value does not match an existing session ID or
+    saved session name, Gemini starts a new session and stores that value as the
+    session name. Names may contain letters, numbers, `_`, and `-`.
   - If no session_id is provided, defaults to "latest".
   - Example: `gemini --resume 5` or `gemini --resume latest` or
+    `gemini --resume release-notes` or
     `gemini --resume a1b2c3d4-e5f6-7890-abcd-ef1234567890` or `gemini --resume`
   - See [Session Management](../cli/session-management.md) for more details.
 - **`--sandbox`** (**`-s`**):

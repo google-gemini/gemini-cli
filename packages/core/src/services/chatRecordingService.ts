@@ -223,6 +223,7 @@ export async function loadConversationRecord(
 
     return {
       sessionId: metadata.sessionId,
+      sessionName: metadata.sessionName,
       projectHash: metadata.projectHash,
       startTime: metadata.startTime || new Date().toISOString(),
       lastUpdated: metadata.lastUpdated || new Date().toISOString(),
@@ -286,6 +287,7 @@ export class ChatRecordingService {
             // Migrate the entire legacy record to the new file
             const initialMetadata = {
               sessionId: this.sessionId,
+              sessionName: this.cachedConversation.sessionName,
               projectHash: this.projectHash,
               startTime: this.cachedConversation.startTime,
               lastUpdated: this.cachedConversation.lastUpdated,
@@ -360,6 +362,7 @@ export class ChatRecordingService {
 
         const initialMetadata = {
           sessionId: this.sessionId,
+          sessionName: this.context.config.getSessionName(),
           projectHash: this.projectHash,
           startTime: new Date().toISOString(),
           lastUpdated: new Date().toISOString(),

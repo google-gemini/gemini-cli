@@ -22,8 +22,9 @@ export const SessionSummaryDisplay: React.FC<SessionSummaryDisplayProps> = ({
   const { shell } = getShellConfiguration();
 
   const worktreeSettings = config.getWorktreeSettings();
+  const resumeIdentifier = config.getSessionName() ?? stats.sessionId;
 
-  const escapedSessionId = escapeShellArg(stats.sessionId, shell);
+  const escapedSessionId = escapeShellArg(resumeIdentifier, shell);
   let footer = `To resume this session: gemini --resume ${escapedSessionId}`;
 
   if (worktreeSettings) {

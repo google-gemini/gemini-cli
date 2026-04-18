@@ -16,6 +16,7 @@ import {
 } from 'vitest';
 import {
   main,
+  resolveSessionId,
   setupUnhandledRejectionHandler,
   validateDnsResolutionOrder,
   startInteractiveUI,
@@ -47,6 +48,7 @@ import {
   debugLogger,
   coreEvents,
   AuthType,
+  Storage,
 } from '@google/gemini-cli-core';
 import { act } from 'react';
 import { type InitializationResult } from './core/initializer.js';
@@ -875,9 +877,72 @@ describe('gemini.tsx main function kitty protocol', () => {
     emitFeedbackSpy.mockRestore();
   });
 
-  it('should start normally with a warning when no sessions found for resume', async () => {
+  it('should create a new session with a warning when resuming latest and no sessions exist', async () => {
     const { SessionSelector, SessionError } = await import(
       './utils/sessionUtils.js'
+    );
+    vi.spyOn(Storage.prototype, 'initialize').mockResolvedValue(undefined);
+    vi.mocked(SessionSelector).mockImplementation(
+      () =>
+        ({
+          resolveSession: vi
+            .fn()
+            .mockRejectedValue(SessionError.noSessionsFound()),
+        }) as unknown as InstanceType<typeof SessionSelector>,
+    );
+
+    const emitFeedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
+    const result = await resolveSessionId('latest');
+
+    expect(result.sessionId).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+    );
+    expect(result.sessionName).toBeUndefined();
+    expect(result.resumedSessionData).toBeUndefined();
+    expect(emitFeedbackSpy).toHaveBeenCalledWith(
+      'warning',
+      'No previous sessions found for this project.',
+    );
+    emitFeedbackSpy.mockRestore();
+  });
+
+  it('should create a named session when a custom session ID does not exist', async () => {
+    const { SessionSelector, SessionError } = await import(
+      './utils/sessionUtils.js'
+    );
+    vi.spyOn(Storage.prototype, 'initialize').mockResolvedValue(undefined);
+    vi.spyOn(Storage.prototype, 'getProjectTempDir').mockReturnValue(
+      '/tmp/project-id',
+    );
+    vi.mocked(SessionSelector).mockImplementation(
+      () =>
+        ({
+          resolveSession: vi
+            .fn()
+            .mockRejectedValue(
+              SessionError.invalidSessionIdentifier(
+                'release-notes',
+                '/tmp/project-id/chats',
+              ),
+            ),
+        }) as unknown as InstanceType<typeof SessionSelector>,
+    );
+
+    const result = await resolveSessionId('release-notes');
+
+    expect(result.sessionName).toBe('release-notes');
+    expect(result.sessionId).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+    );
+  });
+
+  it('should reject invalid custom session IDs instead of creating them', async () => {
+    const { SessionSelector, SessionError } = await import(
+      './utils/sessionUtils.js'
+    );
+    vi.spyOn(Storage.prototype, 'initialize').mockResolvedValue(undefined);
+    vi.spyOn(Storage.prototype, 'getProjectTempDir').mockReturnValue(
+      '/tmp/project-id',
     );
     vi.mocked(SessionSelector).mockImplementation(
       () =>
@@ -895,38 +960,17 @@ describe('gemini.tsx main function kitty protocol', () => {
       });
     const emitFeedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
 
-    vi.mocked(loadSettings).mockReturnValue(
-      createMockSettings({
-        merged: { advanced: {}, security: { auth: {} }, ui: { theme: 'test' } },
-        workspace: { settings: {} },
-        setValue: vi.fn(),
-        forScope: () => ({ settings: {}, originalSettings: {}, path: '' }),
-      }),
-    );
+    try {
+      await resolveSessionId('feature/foo');
+      expect.fail('Should have thrown MockProcessExitError');
+    } catch (e) {
+      expect(e).toBeInstanceOf(MockProcessExitError);
+      expect((e as MockProcessExitError).code).toBe(42);
+    }
 
-    vi.mocked(parseArguments).mockResolvedValue({
-      enabled: true,
-      allowedPaths: [],
-      networkAccess: false,
-      promptInteractive: false,
-      resume: 'latest',
-    } as unknown as CliArgs);
-    vi.mocked(loadCliConfig).mockResolvedValue(
-      createMockConfig({
-        isInteractive: () => true,
-        getQuestion: () => '',
-        getSandbox: () => undefined,
-      }),
-    );
-
-    await main();
-
-    // Should NOT have crashed
-    expect(processExitSpy).not.toHaveBeenCalled();
-    // Should NOT have emitted a feedback error
-    expect(emitFeedbackSpy).not.toHaveBeenCalledWith(
+    expect(emitFeedbackSpy).toHaveBeenCalledWith(
       'error',
-      expect.stringContaining('Error resuming session'),
+      expect.stringContaining('Invalid session identifier "feature/foo"'),
     );
     processExitSpy.mockRestore();
     emitFeedbackSpy.mockRestore();

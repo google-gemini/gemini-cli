@@ -78,6 +78,8 @@ export type MessageRecord = BaseMessageRecord & ConversationRecordExtra;
  */
 export interface ConversationRecord {
   sessionId: string;
+  /** Optional user-provided resume name (for --resume <name>) */
+  sessionName?: string;
   projectHash: string;
   startTime: string;
   lastUpdated: string;
@@ -116,6 +118,7 @@ export interface MetadataUpdateRecord {
 
 export interface PartialMetadataRecord {
   sessionId: string;
+  sessionName?: string;
   projectHash: string;
   startTime?: string;
   lastUpdated?: string;

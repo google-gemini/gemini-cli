@@ -383,7 +383,7 @@ export async function parseArguments(
           // one, and not being passed at all.
           skipValidation: true,
           description:
-            'Resume a previous session. Use "latest" for most recent or index number (e.g. --resume 5)',
+            'Resume a previous session. Use "latest", an index number (e.g. --resume 5), or a custom session name',
           coerce: (value: string): string => {
             // When --resume passed with a value (`gemini --resume 123`): value = "123" (string)
             // When --resume passed without a value (`gemini --resume`): value = "" (string)
@@ -511,6 +511,7 @@ export function isDebugMode(argv: CliArgs): boolean {
 
 export interface LoadCliConfigOptions {
   cwd?: string;
+  sessionName?: string;
   projectHooks?: { [K in HookEventName]?: HookDefinition[] } & {
     disabled?: string[];
   };
@@ -523,7 +524,7 @@ export async function loadCliConfig(
   argv: CliArgs,
   options: LoadCliConfigOptions = {},
 ): Promise<Config> {
-  const { cwd = process.cwd(), projectHooks } = options;
+  const { cwd = process.cwd(), projectHooks, sessionName } = options;
   const debugMode = isDebugMode(argv);
 
   const worktreeSettings =
@@ -898,6 +899,7 @@ export async function loadCliConfig(
     acpMode: isAcpMode,
     clientName,
     sessionId,
+    sessionName,
     clientVersion: await getVersion(),
     embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
     sandbox: sandboxConfig,

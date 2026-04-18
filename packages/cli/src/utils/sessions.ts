@@ -45,8 +45,11 @@ export async function listSessions(config: Config): Promise<void> {
         session.displayName.length > 100
           ? session.displayName.slice(0, 97) + '...'
           : session.displayName;
+      const identifier = session.sessionName
+        ? `${session.sessionName} | ${session.id}`
+        : session.id;
       writeToStdout(
-        `  ${index + 1}. ${title} (${time}${current}) [${session.id}]\n`,
+        `  ${index + 1}. ${title} (${time}${current}) [${identifier}]\n`,
       );
     });
 }

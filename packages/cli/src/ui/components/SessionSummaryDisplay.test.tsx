@@ -66,6 +66,7 @@ const renderWithMockedStats = async (
 
   vi.mocked(useConfig).mockReturnValue({
     getWorktreeSettings: () => worktreeSettings,
+    getSessionName: () => undefined,
   } as never);
 
   const result = await renderWithProviders(
