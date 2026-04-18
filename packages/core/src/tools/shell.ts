@@ -41,6 +41,7 @@ import {
   stripShellWrapper,
   parseCommandDetails,
   hasRedirection,
+  hasEnvPrefix,
   normalizeCommand,
 } from '../utils/shell-utils.js';
 import { SHELL_TOOL_NAME } from './tool-names.js';
@@ -237,11 +238,12 @@ export class ShellToolInvocation extends BaseToolInvocation<
       const command = stripShellWrapper(this.params.command);
       const rootCommands = [...new Set(getCommandRoots(command))];
       const allowRedirection = hasRedirection(command) ? true : undefined;
+      const allowEnv = hasEnvPrefix(command) ? true : undefined;
 
       if (rootCommands.length > 0) {
-        return { commandPrefix: rootCommands, allowRedirection };
+        return { commandPrefix: rootCommands, allowRedirection, allowEnv };
       }
-      return { commandPrefix: this.params.command, allowRedirection };
+      return { commandPrefix: this.params.command, allowRedirection, allowEnv };
     }
     return undefined;
   }
