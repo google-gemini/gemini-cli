@@ -76,6 +76,8 @@ export const handleSlashCommand = async (
         session: {
           stats: sessionStats,
           sessionShellAllowlist: new Set(),
+          activeCheckpointTag: undefined,
+          setActiveCheckpointTag: () => {},
         },
         invocation: {
           raw: trimmed,
