@@ -585,4 +585,83 @@ describe('GeminiChat Network Retries', () => {
       }),
     );
   });
+
+  it('should retry on ERR_STREAM_PREMATURE_CLOSE during stream iteration with large content', async () => {
+    // This simulates issue where the stream closes unexpectedly during long generation
+    const prematureCloseError = new Error('Stream closed prematurely');
+    (prematureCloseError as NodeJS.ErrnoException).code =
+      'ERR_STREAM_PREMATURE_CLOSE';
+
+    // Setup a large history to simulate a heavy session
+    const largeContent = 'A'.repeat(1024 * 10); // 10KB string
+    chat.setHistory([
+      { role: 'user', parts: [{ text: 'Tell me a very long story.' }] },
+      { role: 'model', parts: [{ text: largeContent }] },
+      { role: 'user', parts: [{ text: 'Keep going.' }] },
+    ]);
+
+    vi.mocked(mockContentGenerator.generateContentStream)
+      // First attempt: yield many chunks then fail
+      .mockImplementationOnce(async () =>
+        (async function* () {
+          for (let i = 0; i < 20; i++) {
+            yield {
+              candidates: [{ content: { parts: [{ text: `Chunk ${i} ` }] } }],
+            } as unknown as GenerateContentResponse;
+          }
+          throw prematureCloseError;
+        })(),
+      )
+      // Second attempt: succeed
+      .mockImplementationOnce(async () =>
+        (async function* () {
+          yield {
+            candidates: [
+              {
+                content: {
+                  parts: [{ text: 'Success after premature close retry' }],
+                },
+                finishReason: 'STOP',
+              },
+            ],
+          } as unknown as GenerateContentResponse;
+        })(),
+      );
+
+    const stream = await chat.sendMessageStream(
+      { model: 'test-model' },
+      'Final push',
+      'prompt-id-premature-close-retry',
+      new AbortController().signal,
+      LlmRole.MAIN,
+    );
+
+    const events: StreamEvent[] = [];
+    for await (const event of stream) {
+      events.push(event);
+    }
+
+    // Verify chunk, retry, and success sequence
+    expect(events.some((e) => e.type === StreamEventType.CHUNK)).toBe(true);
+    expect(events.some((e) => e.type === StreamEventType.RETRY)).toBe(true);
+
+    const successChunk = events.find(
+      (e) =>
+        e.type === StreamEventType.CHUNK &&
+        e.value.candidates?.[0]?.content?.parts?.[0]?.text ===
+          'Success after premature close retry',
+    );
+    expect(successChunk).toBeDefined();
+
+    // Verify it was retried
+    expect(mockContentGenerator.generateContentStream).toHaveBeenCalledTimes(2);
+
+    // Verify correct error type in telemetry
+    expect(mockLogNetworkRetryAttempt).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        error_type: 'ERR_STREAM_PREMATURE_CLOSE',
+      }),
+    );
+  });
 });
