@@ -136,6 +136,10 @@ vi.mock('./nonInteractiveCli.js', () => ({
   runNonInteractive: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock('./acp/acpClient.js', () => ({
+  runAcpClient: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock('./utils/cleanup.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./utils/cleanup.js')>();
   return {
@@ -293,6 +297,39 @@ describe('gemini.tsx main function cleanup', () => {
     expect(mockHookSystem.fireSessionEndEvent).toHaveBeenCalledWith(
       SessionEndReason.Exit,
     );
+  });
+
+  it('should keep the global console patch active in ACP mode', async () => {
+    const { loadCliConfig, parseArguments } = await import(
+      './config/config.js'
+    );
+    const { loadSettings } = await import('./config/settings.js');
+    const { registerCleanup } = await import('./utils/cleanup.js');
+    const { runAcpClient } = await import('./acp/acpClient.js');
+
+    vi.mocked(loadSettings).mockReturnValue({
+      merged: { advanced: {}, security: { auth: {} }, ui: {} },
+      workspace: { settings: {} },
+      setValue: vi.fn(),
+      forScope: () => ({ settings: {}, originalSettings: {}, path: '' }),
+      errors: [],
+    } as unknown as ReturnType<typeof loadSettings>);
+
+    vi.mocked(parseArguments).mockResolvedValue({
+      promptInteractive: false,
+      acp: true,
+    } as unknown as Awaited<ReturnType<typeof parseArguments>>);
+
+    vi.mocked(loadCliConfig).mockResolvedValue(
+      buildMockConfig({
+        getAcpMode: vi.fn(() => true),
+      }),
+    );
+
+    await main();
+
+    expect(runAcpClient).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(registerCleanup)).toHaveBeenCalledTimes(3);
   });
 
   function buildMockConfig(overrides: Partial<Config> = {}): Config {
