@@ -292,6 +292,7 @@ Would you like to attempt to install via "git clone" instead?`,
 
       try {
         newExtensionConfig = await this.loadExtensionConfig(localSourcePath);
+        const extensionId = getExtensionId(newExtensionConfig, installMetadata);
 
         const newExtensionName = newExtensionConfig.name;
         const previousName = previousExtensionConfig?.name ?? newExtensionName;
@@ -309,6 +310,14 @@ Would you like to attempt to install via "git clone" instead?`,
             `Extension "${previousName}" was not already installed, cannot update it.`,
           );
         } else if (!isUpdate && previous) {
+          if (extensionId === previous.id) {
+            debugLogger.log(
+              chalk.blue(
+                `Extension "${newExtensionName}" is already installed. Skipping re-installation.`,
+              ),
+            );
+            return previous;
+          }
           throw new Error(
             `Extension "${newExtensionName}" is already installed. Please uninstall it first.`,
           );
@@ -348,7 +357,6 @@ Would you like to attempt to install via "git clone" instead?`,
           previousSkills,
           isMigrating,
         );
-        const extensionId = getExtensionId(newExtensionConfig, installMetadata);
         const destinationPath = new ExtensionStorage(
           newExtensionName,
         ).getExtensionDir();

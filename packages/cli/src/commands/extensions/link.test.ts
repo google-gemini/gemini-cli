@@ -13,7 +13,11 @@ import {
   afterEach,
   type Mock,
 } from 'vitest';
-import { coreEvents, getErrorMessage } from '@google/gemini-cli-core';
+import {
+  coreEvents,
+  getErrorMessage,
+  type GeminiCLIExtension,
+} from '@google/gemini-cli-core';
 import { type Argv } from 'yargs';
 import { handleLink, linkCommand } from './link.js';
 import { ExtensionManager } from '../../config/extension-manager.js';
@@ -106,6 +110,36 @@ describe('extensions link command', () => {
         'Link failed message',
       );
       expect(mockProcessExit).toHaveBeenCalledWith(1);
+      mockProcessExit.mockRestore();
+    });
+
+    it('should reuse existing extension without reinstalling', async () => {
+      const mockProcessExit = vi
+        .spyOn(process, 'exit')
+        .mockImplementation((() => {}) as (
+          code?: string | number | null | undefined,
+        ) => never);
+
+      // ExtensionManager.installOrUpdateExtension will now resolve even if already installed
+      vi.mocked(
+        mockExtensionManager.prototype.installOrUpdateExtension,
+      ).mockImplementation(async () => {
+        coreEvents.emitConsoleLog(
+          'log',
+          'Extension "my-linked-extension" is already installed. Skipping re-installation.',
+        );
+        return {
+          name: 'my-linked-extension',
+        } as GeminiCLIExtension;
+      });
+
+      await handleLink({ path: '/local/path/to/extension' });
+
+      expect(coreEvents.emitConsoleLog).toHaveBeenCalledWith(
+        'log',
+        'Extension "my-linked-extension" is already installed. Skipping re-installation.',
+      );
+      expect(mockProcessExit).not.toHaveBeenCalled();
       mockProcessExit.mockRestore();
     });
   });
