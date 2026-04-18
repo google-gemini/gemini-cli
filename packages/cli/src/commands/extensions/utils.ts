@@ -47,8 +47,7 @@ const defaultRequestConfirmation: RequestConfirmationCallback = async (
     message,
     initial: false,
   });
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-  return response.confirm;
+  return typeof response.confirm === 'boolean' ? response.confirm : false;
 };
 
 export async function getExtensionManager() {

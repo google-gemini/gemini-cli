@@ -9,7 +9,7 @@ import picomatch from 'picomatch';
 import { loadIgnoreRules, type Ignore } from './ignore.js';
 import { ResultCache } from './result-cache.js';
 import { crawl } from './crawler.js';
-import { AsyncFzf, type FzfResultItem } from 'fzf';
+import { AsyncFzf } from 'fzf';
 import { unescapePath } from '../paths.js';
 import type { FileDiscoveryService } from '../../services/fileDiscoveryService.js';
 
@@ -169,7 +169,7 @@ class RecursiveFileSearch implements FileSearch {
 
     pattern = unescapePath(pattern) || '*';
 
-    let filteredCandidates;
+    let filteredCandidates: string[];
     const { files: candidates, isExactMatch } =
       await this.resultCache.get(pattern);
 
@@ -181,17 +181,27 @@ class RecursiveFileSearch implements FileSearch {
       if (pattern.includes('*') || !this.fzf) {
         filteredCandidates = await filter(candidates, pattern, options.signal);
       } else {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-        filteredCandidates = await this.fzf
-          .find(pattern)
-          .then((results: Array<FzfResultItem<string>>) =>
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-            results.map((entry: FzfResultItem<string>) => entry.item),
-          )
-          .catch(() => {
+        try {
+          const fzfResult: unknown = await this.fzf.find(pattern);
+          if (Array.isArray(fzfResult)) {
+            filteredCandidates = fzfResult.map((entry: unknown) => {
+              if (
+                typeof entry === 'object' &&
+                entry !== null &&
+                'item' in entry
+              ) {
+                return String((entry as { item: unknown }).item);
+              }
+              return String(entry);
+            });
+          } else {
             shouldCache = false;
-            return [];
-          });
+            filteredCandidates = [];
+          }
+        } catch {
+          shouldCache = false;
+          filteredCandidates = [];
+        }
       }
 
       if (shouldCache) {
