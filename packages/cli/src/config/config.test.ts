@@ -280,6 +280,34 @@ describe('parseArguments', () => {
 
   it.each([
     {
+      description: 'should parse --workspace flag correctly',
+      argv: ['node', 'script.js', '--workspace', '/path/to/workspace'],
+      expected: { workspace: '/path/to/workspace' },
+    },
+
+    {
+      description: 'should parse workspace flag with space separation',
+      argv: [
+        'node',
+        'script.js',
+        '--workspace',
+        '/path with spaces/to/workspace',
+      ],
+      expected: { workspace: '/path with spaces/to/workspace' },
+    },
+    {
+      description: 'should not set workspace if flag is not provided',
+      argv: ['node', 'script.js', 'some', 'query'],
+      expected: { workspace: undefined },
+    },
+  ])('$description', async ({ argv, expected }) => {
+    process.argv = argv;
+    const parsedArgs = await parseArguments(createTestMergedSettings());
+    expect(parsedArgs.workspace).toBe(expected.workspace);
+  });
+
+  it.each([
+    {
       description: 'long flags',
       argv: [
         'node',

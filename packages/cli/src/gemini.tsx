@@ -1,8 +1,10 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+import yargs from 'yargs/yargs';
+import { hideBin } from 'yargs/helpers';
 
 import {
   type StartupWarning,
@@ -91,6 +93,7 @@ import { setupTerminalAndTheme } from './utils/terminalTheme.js';
 import { runDeferredCommand } from './deferred.js';
 import { cleanupBackgroundLogs } from './utils/logCleanup.js';
 import { SlashCommandConflictHandler } from './services/SlashCommandConflictHandler.js';
+import { bootstrapWorkspace } from './utils/resolveWorkspace.js';
 
 export function validateDnsResolutionOrder(
   order: string | undefined,
@@ -268,6 +271,42 @@ export async function main() {
   const slashCommandConflictHandler = new SlashCommandConflictHandler();
   slashCommandConflictHandler.start();
   registerCleanup(() => slashCommandConflictHandler.stop());
+
+  const bootstrapArgs = yargs(hideBin(process.argv))
+    .options({
+      workspace: { type: 'string' },
+    })
+    .help(false)
+    .version(false)
+    .parseSync();
+
+  const workspace = [bootstrapArgs.workspace].flat().pop();
+  if (typeof workspace === 'string') {
+    try {
+      const resolvedPath = bootstrapWorkspace(workspace);
+
+      const wsIndex = process.argv.findIndex(
+        (arg) => arg.startsWith('--workspace=') || arg === '--workspace',
+      );
+      if (wsIndex !== -1) {
+        if (process.argv[wsIndex].includes('=')) {
+          process.argv[wsIndex] = `--workspace=${resolvedPath}`;
+        } else if (wsIndex + 1 < process.argv.length) {
+          process.argv[wsIndex + 1] = resolvedPath;
+        }
+      }
+
+      process.chdir(resolvedPath);
+      debugLogger.log(`Changed working directory to: ${resolvedPath}`);
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      writeToStderr(
+        `Error processing workspace path "${workspace}": ${errorMessage}\n`,
+      );
+      await runExitCleanup();
+      process.exit(ExitCodes.FATAL_INPUT_ERROR);
+    }
+  }
 
   const loadSettingsHandle = startupProfiler.start('load_settings');
   const settings = loadSettings();
