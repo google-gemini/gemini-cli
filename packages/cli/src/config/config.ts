@@ -587,7 +587,9 @@ export async function loadCliConfig(
       const trimmedPath = p.trim();
       if (!trimmedPath) return false;
       try {
-        return resolveToRealPath(trimmedPath) !== realCwd;
+        // Safely check if paths differ, ignoring OS case insensitivity
+        const realIdePath = resolveToRealPath(trimmedPath);
+        return path.relative(realCwd, realIdePath) !== '';
       } catch (e) {
         debugLogger.debug(
           `[IDE] Skipping inaccessible workspace folder: ${trimmedPath} (${e instanceof Error ? e.message : String(e)})`,
