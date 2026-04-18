@@ -12,6 +12,9 @@ describe('QueuedMessageDisplay', () => {
   it('renders nothing when message queue is empty', async () => {
     const { lastFrame, unmount } = await render(
       <QueuedMessageDisplay messageQueue={[]} />,
+      undefined,
+      undefined,
+      true,
     );
 
     expect(lastFrame({ allowEmpty: true })).toBe('');
