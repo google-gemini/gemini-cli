@@ -1,7 +1,7 @@
 name: 'Evals: PR Evaluation & Regression'
 
 on:
-  pull_request_target:
+  pull_request:
     types: ['opened', 'synchronize', 'reopened', 'ready_for_review']
     paths:
       - 'packages/core/src/prompts/**'
@@ -153,9 +153,10 @@ jobs:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           MODEL_LIST: '${{ env.MODEL_LIST }}'
+          GITHUB_BASE_REF: '${{ github.base_ref }}'
         run: |
-          # Run the regression check loop. The script saves the report to a file.
-          node scripts/run_eval_regression.js
+          # Run the related regression check loop.
+          node scripts/run_eval_regression.js --related
 
           # Use the generated report file if it exists
           if [[ -f eval_regression_report.md ]]; then

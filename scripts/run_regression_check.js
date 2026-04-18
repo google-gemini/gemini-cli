@@ -183,33 +183,45 @@ async function verifyBaseline(testName, results, files, model) {
     let baselinePasses = 0;
     let baselineTotal = 0;
 
-    while (baselinePasses === 0 && baselineTotal < 3) {
-      baselineTotal++;
-      console.log(`  Baseline Attempt ${baselineTotal}...`);
-      const baselineRun = runTests(files, escapeRegex(testName), model);
-      if (findAssertion(baselineRun, testName)?.status === 'passed') {
-        baselinePasses++;
-        console.log(`  ✅ Baseline Attempt ${baselineTotal} passed.`);
+    // Determine the primary file for this test
+    const testFile = results[testName].file
+      ? path.relative(process.cwd(), results[testName].file)
+      : null;
+
+    if (testFile && !fs.existsSync(testFile)) {
+      console.log(
+        `  ℹ️ Test file **${testFile}** does not exist on 'main'. Marking as NEW CONFIRMED REGRESSION.`,
+      );
+      results[testName].status = 'regression';
+    } else {
+      while (baselinePasses === 0 && baselineTotal < 3) {
+        baselineTotal++;
+        console.log(`  Baseline Attempt ${baselineTotal}...`);
+        const baselineRun = runTests(files, escapeRegex(testName), model);
+        if (findAssertion(baselineRun, testName)?.status === 'passed') {
+          baselinePasses++;
+          console.log(`  ✅ Baseline Attempt ${baselineTotal} passed.`);
+        } else {
+          console.log(`  ❌ Baseline Attempt ${baselineTotal} failed.`);
+        }
+      }
+
+      if (baselinePasses === 0) {
+        console.log(
+          `  ℹ️ Test also fails on 'main'. Marking as PRE-EXISTING (Cleared).`,
+        );
+        results[testName].status = 'pre-existing';
+        results[testName].passed = results[testName].total; // Clear for report
       } else {
-        console.log(`  ❌ Baseline Attempt ${baselineTotal} failed.`);
+        console.log(
+          `  ❌ Test passes on 'main' but fails in PR. Marking as CONFIRMED REGRESSION.`,
+        );
+        results[testName].status = 'regression';
       }
     }
 
     execSync('git checkout -', { stdio: 'inherit' });
     if (hasStash) execSync('git stash pop', { stdio: 'inherit' });
-
-    if (baselinePasses === 0) {
-      console.log(
-        `  ℹ️ Test also fails on 'main'. Marking as PRE-EXISTING (Cleared).`,
-      );
-      results[testName].status = 'pre-existing';
-      results[testName].passed = results[testName].total; // Clear for report
-    } else {
-      console.log(
-        `  ❌ Test passes on 'main' but fails in PR. Marking as CONFIRMED REGRESSION.`,
-      );
-      results[testName].status = 'regression';
-    }
   } catch (error) {
     console.error(`  ❌ Failed to verify baseline: ${error.message}`);
 
@@ -233,12 +245,17 @@ async function processResults(firstPass, pattern, model, files) {
   let totalProcessed = 0;
 
   for (const fileResult of firstPass.testResults) {
+    console.log(`\nDebug: Processing file ${fileResult.name}`);
     for (const assertion of fileResult.assertionResults) {
       if (assertion.status !== 'passed' && assertion.status !== 'failed') {
+        console.log(
+          `  - Skipping test: ${assertion.title} (status: ${assertion.status})`,
+        );
         continue;
       }
 
       const name = assertion.title;
+      console.log(`  - Test: ${name} (status: ${assertion.status})`);
       results[name] = {
         passed: assertion.status === 'passed' ? 1 : 0,
         total: 1,

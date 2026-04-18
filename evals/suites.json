@@ -1,0 +1,173 @@
+{
+  "allowedOverlaps": [],
+  "grep": {
+    "description": "Grep search functionality",
+    "patterns": [
+      "packages/core/src/tools/grep.ts",
+      "packages/core/src/tools/ripGrep.ts",
+      "packages/core/src/tools/grep-utils.ts",
+      "evals/grep_search_functionality.eval.ts"
+    ],
+    "evals": ["evals/grep_search_functionality.eval.ts"]
+  },
+  "memory": {
+    "description": "Memory tool and fact persistence",
+    "patterns": [
+      "packages/core/src/tools/memoryTool.ts",
+      "packages/core/src/persistence/storage.ts",
+      "evals/save_memory.eval.ts",
+      "evals/hierarchical_memory.eval.ts"
+    ],
+    "evals": ["evals/save_memory.eval.ts", "evals/hierarchical_memory.eval.ts"]
+  },
+  "read_file": {
+    "description": "File reading and content extraction",
+    "patterns": [
+      "packages/core/src/tools/read-file.ts",
+      "packages/core/src/tools/read-many-files.ts",
+      "evals/frugalReads.eval.ts"
+    ],
+    "evals": ["evals/frugalReads.eval.ts"]
+  },
+  "glob": {
+    "description": "File discovery and globbing",
+    "patterns": [
+      "packages/core/src/tools/glob.ts",
+      "evals/frugalSearch.eval.ts"
+    ],
+    "evals": ["evals/frugalSearch.eval.ts"]
+  },
+  "tracker": {
+    "description": "Task and progress tracking",
+    "patterns": [
+      "packages/core/src/tools/trackerTools.ts",
+      "evals/tracker.eval.ts"
+    ],
+    "evals": ["evals/tracker.eval.ts"]
+  },
+  "ask_user": {
+    "description": "Interactive user confirmation and input",
+    "patterns": [
+      "packages/core/src/tools/ask-user.ts",
+      "evals/ask_user.eval.ts"
+    ],
+    "evals": ["evals/ask_user.eval.ts"]
+  },
+  "plan_mode": {
+    "description": "Plan Mode orchestration",
+    "patterns": [
+      "packages/core/src/tools/enter-plan-mode.ts",
+      "packages/core/src/tools/exit-plan-mode.ts",
+      "packages/core/src/agents/planAgent.ts",
+      "evals/plan_mode.eval.ts"
+    ],
+    "evals": ["evals/plan_mode.eval.ts"]
+  },
+  "git": {
+    "description": "Git repository operations",
+    "patterns": [
+      "packages/core/src/utils/git.ts",
+      "packages/core/src/tools/shell.ts",
+      "evals/gitRepo.eval.ts",
+      "evals/unsafe-cloning.eval.ts"
+    ],
+    "evals": ["evals/gitRepo.eval.ts", "evals/unsafe-cloning.eval.ts"]
+  },
+  "agents": {
+    "description": "Agent delegation and help",
+    "patterns": [
+      "packages/core/src/agents/**",
+      "packages/core/src/routing/**",
+      "evals/subagents.eval.ts",
+      "evals/generalist_agent.eval.ts",
+      "evals/generalist_delegation.eval.ts",
+      "evals/cli_help_delegation.eval.ts"
+    ],
+    "evals": [
+      "evals/subagents.eval.ts",
+      "evals/generalist_agent.eval.ts",
+      "evals/generalist_delegation.eval.ts",
+      "evals/cli_help_delegation.eval.ts"
+    ]
+  },
+  "background": {
+    "description": "Background process management",
+    "patterns": [
+      "packages/core/src/tools/shellBackgroundTools.ts",
+      "evals/background_processes.eval.ts"
+    ],
+    "evals": ["evals/background_processes.eval.ts"]
+  },
+  "core_steering": {
+    "description": "System prompts and core model steering",
+    "patterns": [
+      "packages/core/src/prompts/**",
+      "evals/answer-vs-act.eval.ts",
+      "evals/model_steering.eval.ts",
+      "evals/redundant_casts.eval.ts",
+      "evals/failing_steering.eval.ts"
+    ],
+    "evals": [
+      "ALL_ALWAYS_PASSING",
+      "evals/answer-vs-act.eval.ts",
+      "evals/model_steering.eval.ts",
+      "evals/redundant_casts.eval.ts",
+      "evals/failing_steering.eval.ts"
+    ]
+  },
+  "edit_fidelity": {
+    "description": "Code edit accuracy and location checks",
+    "patterns": [
+      "packages/core/src/tools/edit.ts",
+      "packages/core/src/tools/write-file.ts",
+      "evals/edit-locations-eval.eval.ts",
+      "evals/validation_fidelity.eval.ts",
+      "evals/validation_fidelity_pre_existing_errors.eval.ts"
+    ],
+    "evals": [
+      "evals/edit-locations-eval.eval.ts",
+      "evals/validation_fidelity.eval.ts",
+      "evals/validation_fidelity_pre_existing_errors.eval.ts"
+    ]
+  },
+  "reliability": {
+    "description": "Core safety and sandbox reliability",
+    "patterns": [
+      "packages/core/src/safety/**",
+      "packages/core/src/fallback/**",
+      "evals/concurrency-safety.eval.ts",
+      "evals/sandbox_recovery.eval.ts",
+      "evals/interactive-hang.eval.ts",
+      "evals/tool_output_masking.eval.ts"
+    ],
+    "evals": [
+      "evals/concurrency-safety.eval.ts",
+      "evals/sandbox_recovery.eval.ts",
+      "evals/interactive-hang.eval.ts",
+      "evals/tool_output_masking.eval.ts"
+    ]
+  },
+  "orchestration": {
+    "description": "Agent task lifecycle and topic management",
+    "patterns": [
+      "packages/core/src/tools/update-topic.ts",
+      "packages/core/src/tools/complete-task.ts",
+      "evals/update_topic.eval.ts"
+    ],
+    "evals": ["evals/update_topic.eval.ts"]
+  },
+  "general_tools": {
+    "description": "General tool usage and efficiency",
+    "patterns": [
+      "packages/core/src/tools/tools.ts",
+      "packages/core/src/tools/tool-registry.ts",
+      "packages/core/src/tools/shell.ts",
+      "evals/automated-tool-use.eval.ts",
+      "evals/shell-efficiency.eval.ts"
+    ],
+    "evals": [
+      "evals/automated-tool-use.eval.ts",
+      "evals/shell-efficiency.eval.ts"
+    ]
+  }
+}

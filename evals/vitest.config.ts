@@ -21,6 +21,7 @@ export default defineConfig({
       json: 'evals/logs/report.json',
     },
     include: ['**/*.eval.ts'],
+    exclude: ['**/node_modules/**', '**/dist/**', '**/nulllinter/**'],
     environment: 'node',
     globals: true,
     alias: {
