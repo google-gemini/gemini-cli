@@ -169,6 +169,7 @@ they appear in the UI.
 | Model Steering                                       | `experimental.modelSteering`     | Enable model steering (user hints) to guide the model during tool execution.                                                                              | `false` |
 | Direct Web Fetch                                     | `experimental.directWebFetch`    | Enable web fetch behavior that bypasses LLM summarization.                                                                                                | `false` |
 | Memory Manager Agent                                 | `experimental.memoryManager`     | Replace the built-in save_memory tool with a memory manager subagent that supports adding, removing, de-duplicating, and organizing memories.             | `false` |
+| Auto Memory                                          | `experimental.autoMemory`        | Automatically extract reusable skills from past sessions in the background. Review results with /memory inbox.                                            | `false` |
 | Use the generalist profile to manage agent contexts. | `experimental.generalistProfile` | Suitable for general coding and software development tasks.                                                                                               | `false` |
 | Enable Context Management                            | `experimental.contextManagement` | Enable logic for context management.                                                                                                                      | `false` |
 
