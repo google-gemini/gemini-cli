@@ -18,6 +18,7 @@ import {
 } from '@google/gemini-cli-core';
 import { ConsoleSummaryDisplay } from './ConsoleSummaryDisplay.js';
 import process from 'node:process';
+import os from 'node:os';
 import { MemoryUsageDisplay } from './MemoryUsageDisplay.js';
 import { ContextUsageDisplay } from './ContextUsageDisplay.js';
 import { QuotaDisplay } from './QuotaDisplay.js';
@@ -383,6 +384,16 @@ export const Footer: React.FC = () => {
             </Text>
           ),
           8,
+        );
+        break;
+      }
+      case 'hostname': {
+        const hostname = os.hostname();
+        addCol(
+          id,
+          header,
+          () => <Text color={itemColor}>{hostname}</Text>,
+          hostname.length,
         );
         break;
       }
