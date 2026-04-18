@@ -164,6 +164,76 @@ npm run test:all_evals
 This command sets the `RUN_EVALS` environment variable to `1`, which enables the
 `USUALLY_PASSES` tests.
 
+## Community Contribution Workflow
+
+Use this checklist when preparing a quality-related eval contribution. The goal
+is to make it easy for reviewers to validate the behavior change and avoid flaky
+merges.
+
+1. Confirm the behavior gap and collect evidence by linking the relevant issue,
+   nightly report, or failing test output, and explain why the behavior change
+   matters.
+2. Reproduce with a focused run by executing only the target eval(s) first, then
+   run the full eval target once.
+3. Apply the smallest fix that addresses the gap, preferring prompt/tool
+   guidance updates and minimizing test-only changes.
+4. Validate stability before opening a PR by running multiple local attempts and
+   including pass-rate notes in the PR.
+5. Keep new evals in incubation: new evals must start as `USUALLY_PASSES` until
+   they satisfy promotion criteria.
+6. Include a reviewer-ready PR summary with the problem statement, fix approach,
+   exact commands run, and residual risks.
+
+## Quality PR Evidence Template
+
+When opening a quality-focused PR related to behavioral evals, include a concise
+evidence section in your PR description so reviewers can validate quickly and
+consistently.
+
+```md
+## Eval Evidence
+
+- Related issue: #<issue-number>
+- Target behavior gap: <one sentence>
+- Commands run:
+  - <command 1>
+  - <command 2>
+- Local rerun results: <for example, 3/3 passes>
+- Nightly evidence (if available): <workflow/run link>
+- Policy impact: <USUALLY_PASSES or ALWAYS_PASSES, and why>
+- Residual risk: <one sentence>
+```
+
+Keep this section factual and brief. Link to logs/runs instead of pasting long
+output blocks.
+
+## Quick Eval Gap Triage (Contributor Starter)
+
+If you are looking for a high-impact eval contribution, use this lightweight
+triage flow before writing code.
+
+1. Pick one behavior area (for example: tool selection, approvals, context
+   continuity, instruction following, or sub-agent delegation).
+2. Check current coverage quickly:
+
+- `rg "describe\\(|evalTest\\(" evals/*.eval.ts`
+- `rg "<keyword-for-behavior>" evals/*.eval.ts`
+
+3. Review recent nightly trends for candidate flaky tests and note any repeated
+   regressions for the same behavior area.
+4. Open or link one issue that states:
+
+- expected behavior,
+- current observed gap,
+- why it matters for users,
+- and the first eval(s) you plan to add or stabilize.
+
+5. Start with one narrow eval change and keep it in `USUALLY_PASSES` incubation
+   until promotion criteria are met.
+
+This keeps contribution scope small, reviewable, and aligned with the deflaking
+process.
+
 ## Ensuring Eval is Stable Prior to Check-in
 
 The
