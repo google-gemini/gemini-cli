@@ -32,6 +32,7 @@ import {
   type MergeStrategy,
   type SettingsSchema,
   type SettingDefinition,
+  SETTINGS_SCHEMA_DEFINITIONS,
   getSettingsSchema,
 } from './settingsSchema.js';
 
@@ -242,6 +243,127 @@ export function getDefaultsFromSchema(
     }
   }
   return defaults as Settings;
+}
+
+function parseBooleanString(value: string): boolean | undefined {
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'true') {
+    return true;
+  }
+  if (normalized === 'false') {
+    return false;
+  }
+  return undefined;
+}
+
+function isObjectRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+type SchemaNode = {
+  type?: string | string[];
+  properties?: Record<string, unknown>;
+  items?: unknown;
+  additionalProperties?: unknown;
+  ref?: string;
+};
+
+function toSchemaNode(value: unknown): SchemaNode | undefined {
+  if (!isObjectRecord(value)) {
+    return undefined;
+  }
+
+   
+  return value as SchemaNode;
+}
+
+function resolveSchemaNode(
+  schemaNode?: SchemaNode,
+  resolvingRefs: Set<string> = new Set(),
+): SchemaNode | undefined {
+  if (!schemaNode?.ref) {
+    return schemaNode;
+  }
+
+  const ref = schemaNode.ref;
+  if (resolvingRefs.has(ref)) {
+    // Break potential cycles in malformed ref graphs.
+    const { ref: _ignoredRef, ...withoutRef } = schemaNode;
+    return withoutRef;
+  }
+
+  const referenced = toSchemaNode(SETTINGS_SCHEMA_DEFINITIONS[ref]);
+  if (!referenced) {
+    const { ref: _ignoredRef, ...withoutRef } = schemaNode;
+    return withoutRef;
+  }
+
+  const nextResolvingRefs = new Set(resolvingRefs);
+  nextResolvingRefs.add(ref);
+  const resolvedReferenced = resolveSchemaNode(referenced, nextResolvingRefs);
+  if (!resolvedReferenced) {
+    const { ref: _ignoredRef, ...withoutRef } = schemaNode;
+    return withoutRef;
+  }
+
+  const { ref: _ignoredRef, ...inlineWithoutRef } = schemaNode;
+  return {
+    ...resolvedReferenced,
+    ...inlineWithoutRef,
+  };
+}
+
+function coerceSettingsValueFromSchema(
+  value: unknown,
+  schemaNode?: SchemaNode,
+): unknown {
+  const resolvedSchemaNode = resolveSchemaNode(schemaNode);
+  if (!resolvedSchemaNode) {
+    return value;
+  }
+
+  if (resolvedSchemaNode.type === 'boolean' && typeof value === 'string') {
+    return parseBooleanString(value) ?? value;
+  }
+
+  if (resolvedSchemaNode.type === 'array' && Array.isArray(value)) {
+    const itemSchema = toSchemaNode(resolvedSchemaNode.items);
+    return value.map((entry) =>
+      coerceSettingsValueFromSchema(entry, itemSchema),
+    );
+  }
+
+  if (resolvedSchemaNode.type === 'object' && isObjectRecord(value)) {
+    const schemaProperties = isObjectRecord(resolvedSchemaNode.properties)
+      ? resolvedSchemaNode.properties
+      : undefined;
+    const fallbackSchema = toSchemaNode(
+      resolvedSchemaNode.additionalProperties,
+    );
+    const result: Record<string, unknown> = { ...value };
+
+    for (const [key, currentValue] of Object.entries(result)) {
+      const childSchema = toSchemaNode(schemaProperties?.[key]);
+      result[key] = coerceSettingsValueFromSchema(
+        currentValue,
+        childSchema ?? fallbackSchema,
+      );
+    }
+
+    return result;
+  }
+
+  return value;
+}
+
+function coerceBooleanSettingsFromSchema(settings: Settings): Settings {
+  const rootSchema: SchemaNode = {
+    type: 'object',
+    properties: getSettingsSchema() as Record<string, unknown>,
+  };
+
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+  return coerceSettingsValueFromSchema(settings, rootSchema) as Settings;
 }
 
 export function mergeSettings(
@@ -686,8 +808,16 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         const settingsObject = rawSettings as Record<string, unknown>;
 
+        // Resolve env vars and coerce schema-typed booleans before validating.
+        const resolvedForValidation = resolveEnvVarsInObject(
+          settingsObject as Settings,
+        );
+        const normalizedForValidation = coerceBooleanSettingsFromSchema(
+          resolvedForValidation,
+        );
+
         // Validate settings structure with Zod
-        const validationResult = validateSettings(settingsObject);
+        const validationResult = validateSettings(normalizedForValidation);
         if (!validationResult.success && validationResult.error) {
           const errorMessage = formatValidationError(
             validationResult.error,
@@ -732,10 +862,18 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
   const workspaceOriginalSettings = structuredClone(workspaceResult.settings);
 
   // Environment variables for runtime use
-  systemSettings = resolveEnvVarsInObject(systemResult.settings);
-  systemDefaultSettings = resolveEnvVarsInObject(systemDefaultsResult.settings);
-  userSettings = resolveEnvVarsInObject(userResult.settings);
-  workspaceSettings = resolveEnvVarsInObject(workspaceResult.settings);
+  systemSettings = coerceBooleanSettingsFromSchema(
+    resolveEnvVarsInObject(systemResult.settings),
+  );
+  systemDefaultSettings = coerceBooleanSettingsFromSchema(
+    resolveEnvVarsInObject(systemDefaultsResult.settings),
+  );
+  userSettings = coerceBooleanSettingsFromSchema(
+    resolveEnvVarsInObject(userResult.settings),
+  );
+  workspaceSettings = coerceBooleanSettingsFromSchema(
+    resolveEnvVarsInObject(workspaceResult.settings),
+  );
 
   // Support legacy theme names
   if (userSettings.ui?.theme === 'VS') {
