@@ -590,6 +590,7 @@ const mockUIActions: UIActions = {
   setActiveBackgroundTaskPid: vi.fn(),
   setIsBackgroundTaskListOpen: vi.fn(),
   setAuthContext: vi.fn(),
+  dismissLoginRestart: vi.fn(),
   onHintInput: vi.fn(),
   onHintBackspace: vi.fn(),
   onHintClear: vi.fn(),
