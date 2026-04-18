@@ -107,6 +107,8 @@ export interface CommandContext {
 export interface QuitActionReturn {
   type: 'quit';
   messages: HistoryItem[];
+  /** When true, the current session's history and temporary files will be deleted on exit. */
+  deleteSession?: boolean;
 }
 
 /**
