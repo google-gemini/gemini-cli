@@ -180,6 +180,34 @@ describe('settings-validation', () => {
       expect(result.success).toBe(false);
     });
 
+    it('should coerce "true" and "false" strings to boolean', () => {
+      const stringBoolSettings = {
+        general: {
+          vimMode: 'true',
+          enableAutoUpdate: 'false',
+        },
+      };
+
+      const result = validateSettings(stringBoolSettings);
+      expect(result.success).toBe(true);
+      if (result.success && result.data) {
+        const data = result.data as any;
+        expect(data.general.vimMode).toBe(true);
+        expect(data.general.enableAutoUpdate).toBe(false);
+      }
+    });
+
+    it('should still reject other string values for boolean fields', () => {
+      const invalidSettings = {
+        general: {
+          vimMode: '1',
+        },
+      };
+
+      const result = validateSettings(invalidSettings);
+      expect(result.success).toBe(false);
+    });
+
     it('should validate number fields correctly', () => {
       const validSettings = {
         model: {
