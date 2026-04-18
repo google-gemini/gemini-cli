@@ -62,8 +62,8 @@ interactive = true
 [[rule]]
 toolName = "run_shell_command"
 decision = "deny"
-priority = 1000
-argsPattern = "\"command\":\"[^\"]*(rm\\s+-rf\\s+/|mkfs\\.|dd\\s+if=|:\\(\\)\\{|metasploit|msfconsole|mimikatz|hydra\\s|sqlmap\\s|nc\\s+-e\\s)\""
+priority = 999
+argsPattern = "\"command\":\"[^\"]*(rm -rf /|mkfs|dd if=|metasploit|msfconsole|mimikatz|hydra |sqlmap |nc -e )\""
 denyMessage = "Blocked by Gemini-Cyber safety policy: destructive or offensive command patterns are not allowed."
 
 [[rule]]

@@ -511,8 +511,18 @@ export function isDebugMode(argv: CliArgs): boolean {
   );
 }
 
-function createHatsMcpServerConfig(cwd: string): MCPServerConfig | undefined {
-  const projectRoot = getProjectRootForWorktree(cwd) ?? cwd;
+async function createHatsMcpServerConfig(
+  cwd: string,
+): Promise<MCPServerConfig | undefined> {
+  const currentBin = process.argv[1] ?? '';
+  const shouldEnableHatsMcp =
+    process.env['GEMINI_CYBER_ENABLE_HATS_MCP'] === '1' ||
+    currentBin.includes('gemini-cyber');
+  if (!shouldEnableHatsMcp) {
+    return undefined;
+  }
+
+  const projectRoot = (await getProjectRootForWorktree(cwd)) ?? cwd;
   const scriptPath =
     process.env['GEMINI_CYBER_HATS_MCP_SERVER_PATH'] ||
     path.resolve(projectRoot, 'scripts/hats_mcp_server.py');
@@ -532,6 +542,7 @@ function createHatsMcpServerConfig(cwd: string): MCPServerConfig | undefined {
     [scriptPath],
     Object.keys(env).length > 0 ? env : undefined,
     projectRoot,
+    undefined,
     undefined,
     undefined,
     undefined,
@@ -874,7 +885,7 @@ export async function loadCliConfig(
   let mcpServers = mcpEnabled ? settings.mcpServers : {};
 
   if (mcpEnabled && !mcpServers?.['hats']) {
-    const hatsServerConfig = createHatsMcpServerConfig(cwd);
+    const hatsServerConfig = await createHatsMcpServerConfig(cwd);
     if (hatsServerConfig) {
       mcpServers = { ...mcpServers, hats: hatsServerConfig };
     }
