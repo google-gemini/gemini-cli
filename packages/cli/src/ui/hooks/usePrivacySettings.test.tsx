@@ -39,7 +39,7 @@ describe('usePrivacySettings', () => {
       hookResult = usePrivacySettings(mockConfig);
       return null;
     }
-    await render(<TestComponent />);
+    await render(<TestComponent />, undefined, undefined, true);
     return {
       result: {
         get current() {
