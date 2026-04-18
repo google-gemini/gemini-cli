@@ -19,6 +19,23 @@ platforms, they execute with `bash -c`.
 - `is_background` (boolean, optional): Whether to move the process to the
   background immediately after starting.
 
+### Policy engine shorthands
+
+The [policy engine](../reference/policy-engine.md) provides two convenience
+fields for writing rules that target shell commands:
+
+- `commandPrefix`: Matches if the `command` argument starts with a given string.
+- `commandRegex`: Matches if the `command` argument matches a given regular
+  expression.
+
+These are syntactic sugar for combining `toolName = "run_shell_command"` with an
+`argsPattern` in a policy TOML file. They are **not** arguments of
+`run_shell_command` itself.
+
+For details on writing shell-specific policy rules, see
+[Special syntax for `run_shell_command`](../reference/policy-engine.md#special-syntax-for-run_shell_command)
+in the policy engine reference.
+
 ### Return values
 
 The tool returns a JSON object containing:
