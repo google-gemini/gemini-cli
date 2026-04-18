@@ -43,7 +43,12 @@ describe('QuittingDisplay', () => {
     mockUseUIState.mockReturnValue({
       quittingMessages: null,
     } as unknown as UIState);
-    const { lastFrame, unmount } = await render(<QuittingDisplay />);
+    const { lastFrame, unmount } = await render(
+      <QuittingDisplay />,
+      undefined,
+      undefined,
+      true,
+    );
     expect(lastFrame({ allowEmpty: true })).toBe('');
     unmount();
   });
