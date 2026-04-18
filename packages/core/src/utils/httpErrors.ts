@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/**
+ * Represents an HTTP error with an optional status code.
+ */
 export interface HttpError extends Error {
   status?: number;
 }
@@ -36,6 +39,9 @@ export function getErrorStatus(error: unknown): number | undefined {
   return undefined;
 }
 
+/**
+ * Error thrown when the requested model is not found (HTTP 404).
+ */
 export class ModelNotFoundError extends Error {
   code: number;
   constructor(message: string, code?: number) {

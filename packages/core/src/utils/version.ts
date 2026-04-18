@@ -13,6 +13,13 @@ const __dirname = path.dirname(__filename);
 
 let versionPromise: Promise<string> | undefined;
 
+/**
+ * Resolves the current CLI version string.
+ * Reads the version from `package.json` in the package directory, falling back
+ * to the `CLI_VERSION` environment variable, then `'unknown'`.
+ * The result is cached after the first call.
+ * @returns A promise that resolves to the version string.
+ */
 export function getVersion(): Promise<string> {
   if (versionPromise) {
     return versionPromise;
