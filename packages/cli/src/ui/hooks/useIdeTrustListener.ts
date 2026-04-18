@@ -33,6 +33,7 @@ export function useIdeTrustListener() {
     IDEConnectionStatus.Disconnected,
   );
   const previousTrust = useRef<boolean | undefined>(undefined);
+  const hasEverBeenConnected = useRef(false);
   const [restartReason, setRestartReason] = useState<RestartReason>('NONE');
   const [needsRestart, setNeedsRestart] = useState(false);
 
@@ -77,16 +78,19 @@ export function useIdeTrustListener() {
 
   useEffect(() => {
     const currentTrust = isWorkspaceTrusted(settings.merged).isTrusted;
-    // Trigger a restart if the overall trust status for the CLI has changed,
-    // but not on the initial trust value.
+    // Avoid restart loop when local and IDE trust differ on startup.
     if (
+      hasEverBeenConnected.current &&
       previousTrust.current !== undefined &&
       previousTrust.current !== currentTrust
     ) {
       setNeedsRestart(true);
     }
     previousTrust.current = currentTrust;
-  }, [isIdeTrusted, settings.merged]);
+    if (connectionStatus === IDEConnectionStatus.Connected) {
+      hasEverBeenConnected.current = true;
+    }
+  }, [isIdeTrusted, settings.merged, connectionStatus]);
 
   return { isIdeTrusted, needsRestart, restartReason };
 }
