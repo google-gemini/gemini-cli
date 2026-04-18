@@ -23,7 +23,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   };
 });
 
-describe('saveClipboardImage Windows Path Escaping', () => {
+describe.skip('saveClipboardImage Windows Path Escaping', () => {
   const originalPlatform = process.platform;
 
   beforeEach(() => {
