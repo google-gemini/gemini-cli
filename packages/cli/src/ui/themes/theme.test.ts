@@ -208,4 +208,43 @@ describe('pickDefaultThemeName', () => {
       pickDefaultThemeName(undefined, mockThemes, 'Dark Theme', 'Light Theme'),
     ).toBe('Dark Theme');
   });
+
+  it('should return preferred light theme if available and background is light', () => {
+    expect(
+      pickDefaultThemeName(
+        '#eeeeee',
+        mockThemes,
+        'Dark Theme',
+        'Light Theme',
+        'Blue Theme', // preferred dark
+        'Light Theme', // preferred light
+      ),
+    ).toBe('Light Theme');
+  });
+
+  it('should return preferred dark theme if available and background is dark', () => {
+    expect(
+      pickDefaultThemeName(
+        '#111111',
+        mockThemes,
+        'Dark Theme',
+        'Light Theme',
+        'Blue Theme', // preferred dark
+        undefined,
+      ),
+    ).toBe('Blue Theme');
+  });
+
+  it('should fall back to default if preferred theme is not available', () => {
+    expect(
+      pickDefaultThemeName(
+        '#111111',
+        mockThemes,
+        'Dark Theme',
+        'Light Theme',
+        'Missing Theme', // preferred dark (not in mockThemes)
+        undefined,
+      ),
+    ).toBe('Dark Theme');
+  });
 });
