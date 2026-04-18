@@ -36,7 +36,7 @@ describe('useMemoryMonitor', () => {
     memoryUsageSpy.mockReturnValue({
       rss: MEMORY_WARNING_THRESHOLD / 2,
     } as NodeJS.MemoryUsage);
-    await render(<TestComponent />);
+    await render(<TestComponent />, undefined, undefined, true);
     vi.advanceTimersByTime(10000);
     expect(addItem).not.toHaveBeenCalled();
   });
@@ -45,7 +45,7 @@ describe('useMemoryMonitor', () => {
     memoryUsageSpy.mockReturnValue({
       rss: MEMORY_WARNING_THRESHOLD * 1.5,
     } as NodeJS.MemoryUsage);
-    await render(<TestComponent />);
+    await render(<TestComponent />, undefined, undefined, true);
     vi.advanceTimersByTime(MEMORY_CHECK_INTERVAL);
     expect(addItem).toHaveBeenCalledTimes(1);
     expect(addItem).toHaveBeenCalledWith(
@@ -61,7 +61,12 @@ describe('useMemoryMonitor', () => {
     memoryUsageSpy.mockReturnValue({
       rss: MEMORY_WARNING_THRESHOLD * 1.5,
     } as NodeJS.MemoryUsage);
-    const { rerender } = await render(<TestComponent />);
+    const { rerender } = await render(
+      <TestComponent />,
+      undefined,
+      undefined,
+      true,
+    );
     vi.advanceTimersByTime(MEMORY_CHECK_INTERVAL);
     expect(addItem).toHaveBeenCalledTimes(1);
 
