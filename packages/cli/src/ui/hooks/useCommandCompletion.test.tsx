@@ -217,6 +217,7 @@ describe('useCommandCompletion', () => {
         shellModeActive={shellModeActive}
         active={active}
       />,
+      { allowEmptyFrame: true },
     );
     return {
       result: {
@@ -833,7 +834,7 @@ describe('useCommandCompletion', () => {
         hookResult = { ...completion, textBuffer };
         return null;
       }
-      await renderWithProviders(<TestComponent />);
+      await renderWithProviders(<TestComponent />, { allowEmptyFrame: true });
 
       // Should not trigger prompt completion for comments
       await waitFor(() => {
@@ -868,7 +869,7 @@ describe('useCommandCompletion', () => {
         hookResult = { ...completion, textBuffer };
         return null;
       }
-      await renderWithProviders(<TestComponent />);
+      await renderWithProviders(<TestComponent />, { allowEmptyFrame: true });
 
       // Should not trigger prompt completion for comments
       await waitFor(() => {
@@ -903,7 +904,7 @@ describe('useCommandCompletion', () => {
         hookResult = { ...completion, textBuffer };
         return null;
       }
-      await renderWithProviders(<TestComponent />);
+      await renderWithProviders(<TestComponent />, { allowEmptyFrame: true });
 
       // This test verifies that comments are filtered out while regular text is not
       await waitFor(() => {
