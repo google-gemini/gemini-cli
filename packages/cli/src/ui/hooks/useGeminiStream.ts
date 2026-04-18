@@ -34,6 +34,7 @@ import {
   CoreEvent,
   CoreToolCallStatus,
   buildUserSteeringHintPrompt,
+  generateSteeringAckMessage,
   GeminiCliOperation,
   getPlanModeExitMessage,
   isBackgroundExecutionData,
@@ -1256,8 +1257,9 @@ export const useGeminiStream = (
           userMessageTimestamp,
         );
       }
+      setThought(null);
     },
-    [addItem],
+    [addItem, setThought],
   );
 
   const handleChatCompressionEvent = useCallback(
@@ -1720,6 +1722,7 @@ export const useGeminiStream = (
             } finally {
               if (activeQueryIdRef.current === queryId) {
                 setIsResponding(false);
+                setThought(null);
               }
             }
           });
@@ -2001,6 +2004,28 @@ export const useGeminiStream = (
           responsesToSend.unshift({
             text: buildUserSteeringHintPrompt(hintText),
           });
+          const ackTimestamp = Date.now();
+          const signal = abortControllerRef.current?.signal;
+          void generateSteeringAckMessage(config.getBaseLlmClient(), hintText, {
+            signal,
+          })
+            .then((ackText) => {
+              if (signal?.aborted) return;
+              addItem(
+                {
+                  type: MessageType.INFO,
+                  icon: '· ',
+                  color: theme.text.secondary,
+                  marginBottom: 1,
+                  text: ackText,
+                } as HistoryItemInfo,
+                ackTimestamp,
+              );
+            })
+            .catch((err) => {
+              if (err?.name === 'AbortError') return;
+              // Silently ignore — steering ack is non-critical UI feedback.
+            });
         }
       }
 
@@ -2041,6 +2066,7 @@ export const useGeminiStream = (
       maybeAddSuppressedToolErrorNote,
       maybeAddLowVerbosityFailureNote,
       setIsResponding,
+      config,
     ],
   );
 
