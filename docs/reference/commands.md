@@ -111,6 +111,11 @@ Slash commands provide meta-level control over the CLI itself.
 
 - **Description:** Manage custom slash commands loaded from `.toml` files.
 - **Sub-commands:**
+  - **`list`**:
+    - **Description:** List available custom command `.toml` files from all
+      sources (user-level `~/.gemini/commands/`, project-level
+      `<project>/.gemini/commands/`, and active extensions).
+    - **Usage:** `/commands list`
   - **`reload`**:
     - **Description:** Reload custom command definitions from all sources
       (user-level `~/.gemini/commands/`, project-level
