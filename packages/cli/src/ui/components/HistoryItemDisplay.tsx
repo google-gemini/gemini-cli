@@ -217,6 +217,7 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
         <SkillsList
           skills={itemForDisplay.skills}
           showDescriptions={itemForDisplay.showDescriptions}
+          showVerbose={itemForDisplay.showVerbose}
         />
       )}
       {itemForDisplay.type === 'agents_list' && (

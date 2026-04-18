@@ -7,19 +7,21 @@
 import type React from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../../semantic-colors.js';
-import { type SkillDefinition } from '../../types.js';
+import { type SkillListItem } from '../../types.js';
 import { SKILLS_DOCS_URL } from '../../constants.js';
 
 interface SkillsListProps {
-  skills: readonly SkillDefinition[];
+  skills: readonly SkillListItem[];
   showDescriptions: boolean;
+  showVerbose?: boolean;
 }
 
 export const SkillsList: React.FC<SkillsListProps> = ({
   skills,
   showDescriptions,
+  showVerbose = false,
 }) => {
-  const sortSkills = (a: SkillDefinition, b: SkillDefinition) => {
+  const sortSkills = (a: SkillListItem, b: SkillListItem) => {
     if (a.isBuiltin === b.isBuiltin) {
       return a.name.localeCompare(b.name);
     }
@@ -30,7 +32,7 @@ export const SkillsList: React.FC<SkillsListProps> = ({
 
   const disabledSkills = skills.filter((s) => s.disabled).sort(sortSkills);
 
-  const renderSkill = (skill: SkillDefinition) => (
+  const renderSkill = (skill: SkillListItem) => (
     <Box key={skill.name} flexDirection="row">
       <Text color={theme.text.primary}>{'  '}- </Text>
       <Box flexDirection="column">
@@ -52,6 +54,20 @@ export const SkillsList: React.FC<SkillsListProps> = ({
             >
               {skill.description}
             </Text>
+          </Box>
+        )}
+        {showVerbose && (
+          <Box marginLeft={2} flexDirection="column">
+            <Text color={theme.text.secondary}>Location: {skill.location}</Text>
+            <Text color={theme.text.secondary}>
+              Load: {skill.loadMetadata?.duration_ms ?? 'n/a'}ms
+            </Text>
+            {skill.loadDiscoveryReport && (
+              <Text color={theme.text.secondary}>
+                Discovery: total {skill.loadDiscoveryReport.total_duration_ms}ms,
+                glob {skill.loadDiscoveryReport.glob_duration_ms}ms
+              </Text>
+            )}
           </Box>
         )}
       </Box>

@@ -77,19 +77,34 @@ describe('skills list command', () => {
           name: 'skill1',
           description: 'desc1',
           disabled: false,
-          location: '/path/to/skill1',
+          location: '/skills/skill1/SKILL.md',
+          loadMetadata: {
+            duration_ms: 12,
+          },
         },
         {
           name: 'skill2',
           description: 'desc2',
           disabled: true,
           location: '/path/to/skill2',
+          loadMetadata: {
+            duration_ms: 2,
+          },
         },
       ];
       const mockConfig = {
         initialize: vi.fn().mockResolvedValue(undefined),
         getSkillManager: vi.fn().mockReturnValue({
           getAllSkills: vi.fn().mockReturnValue(skills),
+          getLatestDiscoveryReport: vi.fn().mockReturnValue([
+            {
+              source_dir: '/skills',
+              total_duration_ms: 45,
+              glob_duration_ms: 30,
+              skill_count: 1,
+              invalid_count: 0,
+            },
+          ]),
         }),
       };
       mockLoadCliConfig.mockResolvedValue(mockConfig as unknown as Config);
@@ -110,6 +125,46 @@ describe('skills list command', () => {
       );
       expect(stdoutWriteSpy).toHaveBeenCalledWith(
         expect.stringContaining(chalk.red('[Disabled]')),
+      );
+    });
+
+    it('should include timing details in verbose mode', async () => {
+      const skills = [
+        {
+          name: 'skill1',
+          description: 'desc1',
+          disabled: false,
+          location: '/skills/skill1/SKILL.md',
+          loadMetadata: {
+            duration_ms: 12,
+          },
+        },
+      ];
+      const mockConfig = {
+        initialize: vi.fn().mockResolvedValue(undefined),
+        getSkillManager: vi.fn().mockReturnValue({
+          getAllSkills: vi.fn().mockReturnValue(skills),
+          getLatestDiscoveryReport: vi.fn().mockReturnValue([
+            {
+              source_dir: '/skills',
+              total_duration_ms: 45,
+              glob_duration_ms: 30,
+              skill_count: 1,
+              invalid_count: 0,
+            },
+          ]),
+        }),
+      };
+      mockLoadCliConfig.mockResolvedValue(mockConfig as unknown as Config);
+
+      await handleList({ verbose: true });
+
+      expect(stdoutWriteSpy).toHaveBeenCalledWith('  Load Time:   12ms\n');
+      expect(stdoutWriteSpy).toHaveBeenCalledWith(
+        '  Location:    /skills/skill1/SKILL.md\n',
+      );
+      expect(stdoutWriteSpy).toHaveBeenCalledWith(
+        '  Discovery:   total 45ms, glob 30ms\n',
       );
     });
 
@@ -172,7 +227,7 @@ describe('skills list command', () => {
     const command = listCommand;
 
     it('should have correct command and describe', () => {
-      expect(command.command).toBe('list [--all]');
+      expect(command.command).toBe('list [--all] [--verbose]');
       expect(command.describe).toBe('Lists discovered agent skills.');
     });
   });

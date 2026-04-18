@@ -56,13 +56,13 @@ describe('skillsCommand', () => {
       {
         name: 'skill1',
         description: 'desc1',
-        location: '/loc1',
+        location: '/skills/skill1/SKILL.md',
         body: 'body1',
       },
       {
         name: 'skill2',
         description: 'desc2',
-        location: '/loc2',
+        location: '/skills/skill2/SKILL.md',
         body: 'body2',
       },
     ];
@@ -73,6 +73,8 @@ describe('skillsCommand', () => {
             getAllSkills: vi.fn().mockReturnValue(skills),
             getSkills: vi.fn().mockReturnValue(skills),
             isAdminEnabled: vi.fn().mockReturnValue(true),
+            getSlowestSkillLoadTime: vi.fn().mockReturnValue(null),
+            getLatestDiscoveryReport: vi.fn().mockReturnValue([]),
             getSkill: vi
               .fn()
               .mockImplementation(
@@ -109,15 +111,17 @@ describe('skillsCommand', () => {
             name: 'skill1',
             description: 'desc1',
             disabled: undefined,
-            location: '/loc1',
+            location: '/skills/skill1/SKILL.md',
             body: 'body1',
+            loadMetadata: undefined,
           },
           {
             name: 'skill2',
             description: 'desc2',
             disabled: undefined,
-            location: '/loc2',
+            location: '/skills/skill2/SKILL.md',
             body: 'body2',
+            loadMetadata: undefined,
           },
         ],
         showDescriptions: true,
@@ -137,15 +141,17 @@ describe('skillsCommand', () => {
             name: 'skill1',
             description: 'desc1',
             disabled: undefined,
-            location: '/loc1',
+            location: '/skills/skill1/SKILL.md',
             body: 'body1',
+            loadMetadata: undefined,
           },
           {
             name: 'skill2',
             description: 'desc2',
             disabled: undefined,
-            location: '/loc2',
+            location: '/skills/skill2/SKILL.md',
             body: 'body2',
+            loadMetadata: undefined,
           },
         ],
         showDescriptions: true,
@@ -160,6 +166,37 @@ describe('skillsCommand', () => {
     expect(context.ui.addItem).toHaveBeenCalledWith(
       expect.objectContaining({
         showDescriptions: false,
+      }),
+    );
+  });
+
+  it('should enable verbose skill listing when requested', async () => {
+    const listCmd = skillsCommand.subCommands!.find((s) => s.name === 'list')!;
+    const skillManager =
+      context.services.agentContext!.config.getSkillManager() as unknown as {
+        getLatestDiscoveryReport: ReturnType<typeof vi.fn>;
+      };
+    skillManager.getLatestDiscoveryReport.mockReturnValue([
+      {
+        source_dir: '/skills',
+        total_duration_ms: 45,
+        glob_duration_ms: 30,
+      },
+    ]);
+    await listCmd.action!(context, 'verbose');
+
+    expect(context.ui.addItem).toHaveBeenCalledWith(
+      expect.objectContaining({
+        showVerbose: true,
+        skills: expect.arrayContaining([
+          expect.objectContaining({
+            loadDiscoveryReport: {
+              source_dir: '/skills',
+              total_duration_ms: 45,
+              glob_duration_ms: 30,
+            },
+          }),
+        ]),
       }),
     );
   });
@@ -606,6 +643,29 @@ describe('skillsCommand', () => {
         expect.objectContaining({
           type: MessageType.INFO,
           text: 'Agent skills reloaded successfully. 1 newly available skill and 1 skill no longer available.',
+        }),
+      );
+    });
+
+    it('should add verbose inspection guidance when a slow skill is detected', async () => {
+      const reloadCmd = skillsCommand.subCommands!.find(
+        (s) => s.name === 'reload',
+      )!;
+      const skillManager =
+        context.services.agentContext!.config.getSkillManager() as unknown as {
+          getSlowestSkillLoadTime: ReturnType<typeof vi.fn>;
+        };
+      skillManager.getSlowestSkillLoadTime.mockReturnValue(250);
+      context.services.agentContext!.config.reloadSkills = vi
+        .fn()
+        .mockResolvedValue(undefined);
+
+      await reloadCmd.action!(context, '');
+
+      expect(context.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: 'Agent skills reloaded successfully. Run "/skills list verbose" to inspect skill load timings.',
         }),
       );
     });
