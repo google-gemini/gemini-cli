@@ -92,11 +92,19 @@
           "type": "boolean"
         },
         "enableNotifications": {
-          "title": "Enable Notifications",
-          "description": "Enable run-event notifications for action-required prompts and session completion.",
-          "markdownDescription": "Enable run-event notifications for action-required prompts and session completion.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `false`",
+          "title": "Enable Terminal Notifications",
+          "description": "Enable terminal run-event notifications for action-required prompts and session completion.",
+          "markdownDescription": "Enable terminal run-event notifications for action-required prompts and session completion.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
           "type": "boolean"
+        },
+        "notificationMethod": {
+          "title": "Terminal Notification Method",
+          "description": "How to send terminal notifications.",
+          "markdownDescription": "How to send terminal notifications.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `auto`",
+          "default": "auto",
+          "type": "string",
+          "enum": ["auto", "osc9", "osc777", "bell"]
         },
         "checkpointing": {
           "title": "Checkpointing",
@@ -201,6 +209,13 @@
             }
           },
           "additionalProperties": false
+        },
+        "topicUpdateNarration": {
+          "title": "Topic & Update Narration",
+          "description": "Enable the Topic & Update communication model for reduced chattiness and structured progress reporting.",
+          "markdownDescription": "Enable the Topic & Update communication model for reduced chattiness and structured progress reporting.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
         }
       },
       "additionalProperties": false
@@ -2939,6 +2954,13 @@
           "default": false,
           "type": "boolean"
         },
+        "autoMemory": {
+          "title": "Auto Memory",
+          "description": "Automatically extract reusable skills from past sessions in the background. Review results with /memory inbox.",
+          "markdownDescription": "Automatically extract reusable skills from past sessions in the background. Review results with /memory inbox.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "generalistProfile": {
           "title": "Use the generalist profile to manage agent contexts.",
           "description": "Suitable for general coding and software development tasks.",
@@ -2955,8 +2977,8 @@
         },
         "topicUpdateNarration": {
           "title": "Topic & Update Narration",
-          "description": "Enable the experimental Topic & Update communication model for reduced chattiness and structured progress reporting.",
-          "markdownDescription": "Enable the experimental Topic & Update communication model for reduced chattiness and structured progress reporting.\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `false`",
+          "description": "Deprecated: Use general.topicUpdateNarration instead.",
+          "markdownDescription": "Deprecated: Use general.topicUpdateNarration instead.\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         }

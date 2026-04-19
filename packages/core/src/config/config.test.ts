@@ -349,6 +349,27 @@ describe('Server Config (config.ts)', () => {
         }),
       );
     });
+
+    it('should ignore properties that are explicitly undefined and preserve existing values', () => {
+      const config = new Config(baseParams);
+
+      config.setShellExecutionConfig({
+        terminalWidth: 80,
+        showColor: true,
+      });
+
+      expect(config.getShellExecutionConfig().terminalWidth).toBe(80);
+      expect(config.getShellExecutionConfig().showColor).toBe(true);
+
+      // Provide undefined for terminalWidth, which should be ignored
+      config.setShellExecutionConfig({
+        terminalWidth: undefined,
+        showColor: false,
+      });
+
+      expect(config.getShellExecutionConfig().terminalWidth).toBe(80); // Should still be 80, not undefined
+      expect(config.getShellExecutionConfig().showColor).toBe(false); // Should be updated
+    });
   });
 
   beforeEach(() => {
@@ -1773,6 +1794,95 @@ describe('Server Config (config.ts)', () => {
 
     expect(config1.topicState.getTopic()).toBe('Topic 1');
     expect(config2.topicState.getTopic()).toBe('Topic 2');
+  });
+
+  it('updates storage session-scoped directories when the sessionId changes', async () => {
+    const config = new Config({
+      ...baseParams,
+      sessionId: 'session-one',
+      plan: true,
+    });
+
+    await config.initialize();
+    const tempDir = config.storage.getProjectTempDir();
+    const oldPlansDir = path.join(tempDir, 'session-one', 'plans');
+    const oldTrackerService = config.getTrackerService();
+
+    config.setSessionId('session-two');
+
+    expect(config.getSessionId()).toBe('session-two');
+    expect(config.storage.getProjectTempPlansDir()).toBe(
+      path.join(tempDir, 'session-two', 'plans'),
+    );
+    expect(config.storage.getProjectTempTrackerDir()).toBe(
+      path.join(tempDir, 'session-two', 'tracker'),
+    );
+    expect(config.getTrackerService()).not.toBe(oldTrackerService);
+    expect(config.getTrackerService().trackerDir).toBe(
+      path.join(tempDir, 'session-two', 'tracker'),
+    );
+    expect(config.getWorkspaceContext().getDirectories()).not.toContain(
+      oldPlansDir,
+    );
+  });
+
+  it('does not throw when changing sessions before the previous plans dir exists', async () => {
+    const config = new Config({
+      ...baseParams,
+      sessionId: 'session-one',
+      plan: true,
+    });
+
+    await config.initialize();
+    const missingPlansDir = config.storage.getProjectTempPlansDir();
+    const realpathMock = vi.mocked(fs.realpathSync);
+    const originalImplementation = realpathMock.getMockImplementation();
+
+    try {
+      realpathMock.mockImplementation((input) => {
+        const normalizedInput =
+          typeof input === 'string' || Buffer.isBuffer(input)
+            ? input
+            : input.toString();
+
+        if (normalizedInput === missingPlansDir) {
+          const error = new Error(
+            `ENOENT: no such file or directory, ${normalizedInput}`,
+          );
+          Object.assign(error, { code: 'ENOENT' });
+          throw error;
+        }
+        if (originalImplementation) {
+          return originalImplementation(input);
+        }
+        return normalizedInput;
+      });
+
+      expect(() => config.setSessionId('session-two')).not.toThrow();
+    } finally {
+      realpathMock.mockImplementation((input) => {
+        if (originalImplementation) {
+          return originalImplementation(input);
+        }
+        return typeof input === 'string' || Buffer.isBuffer(input)
+          ? input
+          : input.toString();
+      });
+    }
+  });
+
+  it('clears the approved plan when starting a new session', () => {
+    const config = new Config({
+      ...baseParams,
+      sessionId: 'session-one',
+    });
+
+    config.setApprovedPlanPath('/tmp/session-one/plans/approved.md');
+
+    expect(() => config.resetNewSessionState('session-two')).not.toThrow();
+
+    expect(config.getSessionId()).toBe('session-two');
+    expect(config.getApprovedPlanPath()).toBeUndefined();
   });
 });
 
@@ -3330,6 +3440,50 @@ describe('Config JIT Initialization', () => {
 
       config = new Config(params);
       expect(config.isMemoryManagerEnabled()).toBe(true);
+    });
+  });
+
+  describe('isAutoMemoryEnabled', () => {
+    it('should default to false', () => {
+      const params: ConfigParameters = {
+        sessionId: 'test-session',
+        targetDir: '/tmp/test',
+        debugMode: false,
+        model: 'test-model',
+        cwd: '/tmp/test',
+      };
+
+      config = new Config(params);
+      expect(config.isAutoMemoryEnabled()).toBe(false);
+    });
+
+    it('should return true when experimentalAutoMemory is true', () => {
+      const params: ConfigParameters = {
+        sessionId: 'test-session',
+        targetDir: '/tmp/test',
+        debugMode: false,
+        model: 'test-model',
+        cwd: '/tmp/test',
+        experimentalAutoMemory: true,
+      };
+
+      config = new Config(params);
+      expect(config.isAutoMemoryEnabled()).toBe(true);
+    });
+
+    it('should be independent of experimentalMemoryManager', () => {
+      const params: ConfigParameters = {
+        sessionId: 'test-session',
+        targetDir: '/tmp/test',
+        debugMode: false,
+        model: 'test-model',
+        cwd: '/tmp/test',
+        experimentalMemoryManager: true,
+      };
+
+      config = new Config(params);
+      expect(config.isMemoryManagerEnabled()).toBe(true);
+      expect(config.isAutoMemoryEnabled()).toBe(false);
     });
   });
 
