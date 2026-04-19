@@ -18,6 +18,7 @@ import {
 } from '@google/gemini-cli-core';
 import { ConsoleSummaryDisplay } from './ConsoleSummaryDisplay.js';
 import process from 'node:process';
+import { hostname } from 'node:os';
 import { MemoryUsageDisplay } from './MemoryUsageDisplay.js';
 import { ContextUsageDisplay } from './ContextUsageDisplay.js';
 import { QuotaDisplay } from './QuotaDisplay.js';
@@ -317,6 +318,19 @@ export const Footer: React.FC = () => {
           () => <SandboxIndicator isTrustedFolder={isTrustedFolder} />,
           str.length,
         );
+        break;
+      }
+      case 'hostname': {
+        const hostnameStr = hostname();
+
+        if (hostnameStr) {
+          addCol(
+            id,
+            header,
+            () => <Text color={itemColor}>{hostnameStr}</Text>,
+            hostnameStr.length,
+          );
+        }
         break;
       }
       case 'model-name': {
