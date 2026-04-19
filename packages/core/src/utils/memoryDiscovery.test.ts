@@ -15,6 +15,7 @@ import {
   getEnvironmentMemoryPaths,
   loadJitSubdirectoryMemory,
   refreshServerHierarchicalMemory,
+  readGeminiMdFiles,
 } from './memoryDiscovery.js';
 import {
   setGeminiMdFilename,
@@ -680,6 +681,39 @@ included directory memory
       .length;
     expect(parentOccurrences).toBe(1);
     expect(childOccurrences).toBe(1);
+  });
+
+  describe('EISDIR handling for GEMINI.md as a directory', () => {
+    it('readGeminiMdFiles returns null content (without throwing) when path is a directory', async () => {
+      const dirAsFilePath = await createEmptyDir(
+        path.join(cwd, DEFAULT_CONTEXT_FILENAME),
+      );
+
+      const results = await readGeminiMdFiles([dirAsFilePath]);
+
+      expect(results).toHaveLength(1);
+      expect(results[0].filePath).toBe(dirAsFilePath);
+      expect(results[0].content).toBeNull();
+    });
+
+    it('loadServerHierarchicalMemory ignores a GEMINI.md directory and returns empty memory', async () => {
+      // Create a directory named GEMINI.md where a regular file would be expected.
+      await createEmptyDir(path.join(cwd, DEFAULT_CONTEXT_FILENAME));
+
+      const result = flattenResult(
+        await loadServerHierarchicalMemory(
+          cwd,
+          [],
+          new FileDiscoveryService(projectRoot),
+          new SimpleExtensionLoader([]),
+          DEFAULT_FOLDER_TRUST,
+        ),
+      );
+
+      // EISDIR is silently skipped, so memory is empty (no readable file
+      // contents) and no exception propagates.
+      expect(result.memoryContent).toBe('');
+    });
   });
 
   describe('getGlobalMemoryPaths', () => {
