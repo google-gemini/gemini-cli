@@ -149,7 +149,8 @@
     "node-fetch-native": "^1.6.7",
     "proper-lockfile": "^4.1.2",
     "punycode": "^2.3.1",
-    "simple-git": "^3.28.0"
+    "simple-git": "^3.28.0",
+    "https-proxy-agent": "^7.0.0"
   },
   "optionalDependencies": {
     "@github/keytar": "^7.10.6",
