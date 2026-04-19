@@ -320,6 +320,13 @@ export interface CustomTheme {
     success?: string;
     warning?: string;
   };
+  logLevels?: {
+    log?: string;
+    info?: string;
+    warn?: string;
+    error?: string;
+    debug?: string;
+  };
 
   // Legacy properties (all optional)
   Background?: string;

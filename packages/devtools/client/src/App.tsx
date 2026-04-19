@@ -9,6 +9,81 @@ import { useDevToolsData, type ConsoleLog, type NetworkLog } from './hooks';
 
 type ThemeMode = 'light' | 'dark' | null; // null means follow system
 
+export type ConsoleLevelFilter =
+  | 'all'
+  | 'log'
+  | 'info'
+  | 'warn'
+  | 'error'
+  | 'debug';
+
+const CONSOLE_LEVEL_BUTTONS: ReadonlyArray<{
+  key: ConsoleLevelFilter;
+  label: string;
+  activeColor: string;
+}> = [
+  { key: 'all', label: 'All', activeColor: 'var(--console-level-all-color)' },
+  { key: 'log', label: 'Log', activeColor: '#8ab4f8' },
+  { key: 'info', label: 'Info', activeColor: '#81c995' },
+  { key: 'warn', label: 'Warn', activeColor: '#fdd663' },
+  { key: 'error', label: 'Error', activeColor: '#f28b82' },
+  { key: 'debug', label: 'Debug', activeColor: '#c792ea' },
+];
+
+export function normalizeConsoleSearchText(searchText: string): string {
+  return searchText.trim().toLowerCase();
+}
+
+export function filterConsoleLogs(
+  logs: ConsoleLog[],
+  levelFilter: ConsoleLevelFilter,
+  searchText: string,
+): ConsoleLog[] {
+  const normalizedSearchText = normalizeConsoleSearchText(searchText);
+
+  return logs.filter((log) => {
+    if (levelFilter !== 'all' && log.type !== levelFilter) {
+      return false;
+    }
+
+    if (normalizedSearchText) {
+      const content = (log.content || '').toLowerCase();
+      if (!content.includes(normalizedSearchText)) {
+        return false;
+      }
+    }
+
+    return true;
+  });
+}
+
+export function getConsoleLevelCounts(
+  logs: ConsoleLog[],
+): Record<ConsoleLevelFilter, number> {
+  const counts: Record<ConsoleLevelFilter, number> = {
+    all: logs.length,
+    log: 0,
+    info: 0,
+    warn: 0,
+    error: 0,
+    debug: 0,
+  };
+
+  for (const log of logs) {
+    switch (log.type) {
+      case 'log':
+      case 'info':
+      case 'warn':
+      case 'error':
+      case 'debug':
+        counts[log.type] += 1;
+        break;
+    }
+  }
+
+  return counts;
+}
+
 interface ThemeColors {
   bg: string;
   bgSecondary: string;
@@ -777,23 +852,28 @@ function ConsoleLogEntry({ log, t }: { log: ConsoleLog; t: ThemeColors }) {
 
 function ConsoleView({ logs, t }: { logs: ConsoleLog[]; t: ThemeColors }) {
   const bottomRef = useRef<HTMLDivElement>(null);
+  const [levelFilter, setLevelFilter] = useState<ConsoleLevelFilter>('all');
+  const [searchText, setSearchText] = useState('');
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [logs.length]);
+
+  const filteredLogs = useMemo(
+    () => filterConsoleLogs(logs, levelFilter, searchText),
+    [logs, levelFilter, searchText],
+  );
+
+  const levelCounts = useMemo(() => getConsoleLevelCounts(logs), [logs]);
 
   if (logs.length === 0) {
     return (
       <div
         style={{
           padding: '20px',
-
           color: t.textSecondary,
-
           fontSize: '11px',
-
           textAlign: 'center',
-
           flex: 1,
         }}
       >
@@ -805,23 +885,134 @@ function ConsoleView({ logs, t }: { logs: ConsoleLog[]; t: ThemeColors }) {
   return (
     <div
       style={{
+        display: 'flex',
+        flexDirection: 'column',
         flex: 1,
-
-        overflowY: 'auto',
-
-        fontFamily:
-          'SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace',
-
-        background: t.consoleBg,
-
-        fontSize: '12px',
+        height: '100%',
       }}
     >
-      {logs.map((log) => (
-        <ConsoleLogEntry key={log.id} log={log} t={t} />
-      ))}
+      <div
+        style={{
+          padding: '8px 12px',
+          background: t.bgSecondary,
+          borderBottom: `1px solid ${t.border}`,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          flexWrap: 'wrap',
+        }}
+      >
+        <div style={{ display: 'flex', gap: '4px' }}>
+          {CONSOLE_LEVEL_BUTTONS.map(({ key, label, activeColor }) => {
+            const isActive = levelFilter === key;
+            const buttonColor = key === 'all' ? t.textSecondary : activeColor;
 
-      <div ref={bottomRef} />
+            return (
+              <button
+                key={key}
+                onClick={() => setLevelFilter(key)}
+                style={{
+                  padding: '4px 10px',
+                  fontSize: '11px',
+                  border: 'none',
+                  borderRadius: '3px',
+                  cursor: 'pointer',
+                  background: isActive ? buttonColor : t.bg,
+                  color: isActive ? '#000' : t.text,
+                  opacity: isActive ? 1 : 0.7,
+                  transition: 'all 0.15s',
+                  fontWeight: isActive ? '600' : '400',
+                }}
+                title={`${label} (${levelCounts[key]})`}
+              >
+                {label} ({levelCounts[key]})
+              </button>
+            );
+          })}
+        </div>
+
+        <div style={{ width: '1px', height: '20px', background: t.border }} />
+
+        <input
+          type="text"
+          placeholder="Filter logs..."
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
+          style={{
+            flex: 1,
+            minWidth: '150px',
+            maxWidth: '300px',
+            padding: '4px 10px',
+            background: t.bg,
+            color: t.text,
+            border: `1px solid ${t.border}`,
+            borderRadius: '4px',
+            fontSize: '12px',
+            outline: 'none',
+          }}
+        />
+
+        {(levelFilter !== 'all' || searchText) && (
+          <button
+            onClick={() => {
+              setLevelFilter('all');
+              setSearchText('');
+            }}
+            style={{
+              padding: '4px 10px',
+              fontSize: '11px',
+              border: `1px solid ${t.border}`,
+              borderRadius: '3px',
+              cursor: 'pointer',
+              background: t.bg,
+              color: t.textSecondary,
+            }}
+            title="Clear filters"
+          >
+            ✕ Clear
+          </button>
+        )}
+
+        <span
+          style={{
+            fontSize: '11px',
+            color: t.textSecondary,
+            marginLeft: 'auto',
+          }}
+        >
+          Showing {filteredLogs.length} of {logs.length}
+        </span>
+      </div>
+
+      <div
+        style={{
+          flex: 1,
+          overflowY: 'auto',
+          fontFamily:
+            'SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace',
+          background: t.consoleBg,
+          fontSize: '12px',
+        }}
+      >
+        {filteredLogs.length === 0 ? (
+          <div
+            style={{
+              padding: '40px 20px',
+              color: t.textSecondary,
+              fontSize: '12px',
+              textAlign: 'center',
+            }}
+          >
+            No logs match the current filter
+          </div>
+        ) : (
+          filteredLogs.map((log) => (
+            <ConsoleLogEntry key={log.id} log={log} t={t} />
+          ))
+        )}
+
+        <div ref={bottomRef} />
+      </div>
     </div>
   );
 }

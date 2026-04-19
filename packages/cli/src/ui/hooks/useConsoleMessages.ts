@@ -12,6 +12,10 @@ import {
   type ConsoleLogPayload,
 } from '@google/gemini-cli-core';
 
+function nextMessageId(): string {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+}
+
 export interface UseErrorCountReturn {
   errorCount: number;
   clearErrorCount: () => void;
@@ -79,7 +83,7 @@ function processQueue() {
         count: prev.count + 1,
       };
     } else {
-      newMessages.push({ ...queuedMessage, count: 1 });
+      newMessages.push(structuredClone(queuedMessage));
     }
   }
 
@@ -132,6 +136,7 @@ const handleConsoleLog = (payload: ConsoleLogPayload) => {
   }
 
   handleNewMessage({
+    id: nextMessageId(),
     type: payload.type,
     content,
     count: 1,
@@ -154,7 +159,7 @@ const handleOutput = (payload: {
       `... [Truncated ${content.length - MAX_OUTPUT_CHUNK_LENGTH} characters]`;
   }
 
-  handleNewMessage({ type: 'log', content, count: 1 });
+  handleNewMessage({ id: nextMessageId(), type: 'log', content, count: 1 });
 };
 
 /**

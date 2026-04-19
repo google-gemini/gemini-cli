@@ -1929,6 +1929,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
         return true;
       } else if (
         keyMatchers[Command.SHOW_IDE_CONTEXT_DETAIL](key) &&
+        !showErrorDetails &&
         config.getIdeMode() &&
         ideContextState
       ) {

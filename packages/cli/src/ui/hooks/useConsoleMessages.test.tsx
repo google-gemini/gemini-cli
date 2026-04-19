@@ -113,9 +113,13 @@ describe('useConsoleMessages', () => {
       vi.runAllTimers();
     });
 
-    expect(result.current.consoleMessages).toEqual([
-      { type: 'log', content: 'Test message', count: 1 },
-    ]);
+    expect(result.current.consoleMessages).toHaveLength(1);
+    expect(result.current.consoleMessages[0]).toMatchObject({
+      type: 'log',
+      content: 'Test message',
+      count: 1,
+    });
+    expect(result.current.consoleMessages[0]?.id).toEqual(expect.any(String));
   });
 
   it('should batch and count identical consecutive messages', async () => {
@@ -128,9 +132,13 @@ describe('useConsoleMessages', () => {
       vi.runAllTimers();
     });
 
-    expect(result.current.consoleMessages).toEqual([
-      { type: 'log', content: 'Test message', count: 3 },
-    ]);
+    expect(result.current.consoleMessages).toHaveLength(1);
+    expect(result.current.consoleMessages[0]).toMatchObject({
+      type: 'log',
+      content: 'Test message',
+      count: 3,
+    });
+    expect(result.current.consoleMessages[0]?.id).toEqual(expect.any(String));
   });
 
   it('should not batch different messages', async () => {
@@ -142,10 +150,19 @@ describe('useConsoleMessages', () => {
       vi.runAllTimers();
     });
 
-    expect(result.current.consoleMessages).toEqual([
-      { type: 'log', content: 'First message', count: 1 },
-      { type: 'error', content: 'Second message', count: 1 },
-    ]);
+    expect(result.current.consoleMessages).toHaveLength(2);
+    expect(result.current.consoleMessages[0]).toMatchObject({
+      type: 'log',
+      content: 'First message',
+      count: 1,
+    });
+    expect(result.current.consoleMessages[1]).toMatchObject({
+      type: 'error',
+      content: 'Second message',
+      count: 1,
+    });
+    expect(result.current.consoleMessages[0]?.id).toEqual(expect.any(String));
+    expect(result.current.consoleMessages[1]?.id).toEqual(expect.any(String));
   });
 });
 

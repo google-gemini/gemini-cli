@@ -190,6 +190,16 @@ exports[`ThemeDialog Snapshots > should render correctly in theme selection mode
 │                                              │         cess       and positive status          │ │
 │                                              │  #FFFFA status.wa Color for warnings and        │ │
 │                                              │  F      rning     cautionary status             │ │
+│                                              │  #FFFFFF   logLevels.                           │ │
+│                                              │            log                                  │ │
+│                                              │  #87AFFF   logLevels.                           │ │
+│                                              │            info                                 │ │
+│                                              │  #FFFFAF   logLevels.                           │ │
+│                                              │            warn                                 │ │
+│                                              │  #FF87AF   logLevels.                           │ │
+│                                              │            error                                │ │
+│                                              │  #20B2AA   logLevels.                           │ │
+│                                              │            debug                                │ │
 │                                              │  #4796E4   ui.gradien                           │ │
 │                                              │  #847ACE   t                                    │ │
 │                                              │  #C3677F                                        │ │
