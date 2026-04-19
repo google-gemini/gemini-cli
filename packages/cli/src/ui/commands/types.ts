@@ -110,6 +110,20 @@ export interface QuitActionReturn {
 }
 
 /**
+ * The return type for a command action that quits the current process and
+ * relaunches it, optionally resuming a specific session.
+ */
+export interface RestartActionReturn {
+  type: 'restart';
+  messages: HistoryItem[];
+  /**
+   * If provided, the relaunched CLI is started with `--resume <sessionId>` so
+   * the conversation continues where it left off.
+   */
+  resumeSessionId?: string;
+}
+
+/**
  * The return type for a command action that needs to open a dialog.
  */
 export interface OpenDialogActionReturn {
@@ -169,6 +183,7 @@ export interface LogoutActionReturn {
 export type SlashCommandActionReturn =
   | CommandActionReturn<HistoryItemWithoutId[]>
   | QuitActionReturn
+  | RestartActionReturn
   | OpenDialogActionReturn
   | ConfirmShellCommandsActionReturn
   | ConfirmActionReturn

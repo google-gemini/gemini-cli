@@ -979,6 +979,27 @@ Logging in with Google... Restarting Gemini CLI to continue.
           process.exit(0);
         }, 100);
       },
+      restart: (messages: HistoryItem[], resumeSessionId?: string) => {
+        closeThemeDialog();
+        setQuittingMessages(messages);
+        // Tell the parent process (see packages/cli/index.ts) to append
+        // `--resume <sessionId>` to the next spawn so the new process picks
+        // up where this one left off.
+        if (resumeSessionId && typeof process.send === 'function') {
+          try {
+            process.send({
+              type: 'restart-with-resume',
+              sessionId: resumeSessionId,
+            });
+          } catch {
+            // The IPC channel is best-effort. If it is closed the relaunch
+            // still happens, just without --resume injection.
+          }
+        }
+        setTimeout(async () => {
+          await relaunchApp();
+        }, 100);
+      },
       setDebugMessage,
       toggleCorgiMode: () => setCorgiMode((prev) => !prev),
       toggleDebugProfiler,
