@@ -106,13 +106,15 @@ export class UserSimulator {
         .replace(/\[?\s*\b\d+(\.\d+)?s\b\s*\]?/g, '')
         .trim();
 
+      let reminderMessage = '';
       if (normalizedScreen === this.lastScreenContent) {
         this.staticTicks++;
         const lastAction = this.actionHistory[this.actionHistory.length - 1];
-        if (lastAction === '<WAIT>' && this.staticTicks >= 5) {
+        if (lastAction === '<WAIT>' && this.staticTicks >= 15) {
           debugLogger.log(
             `[SIMULATOR] Forcing re-evaluation of static screen after ${this.staticTicks} ticks of waiting`,
           );
+          reminderMessage = `\n[IMPORTANT] The screen has been static for ${this.staticTicks} ticks while you were in <WAIT> state. The agent might be stuck waiting for a tool call or confirmation that is not visible on the screen. If you suspect this is the case, you may attempt to unblock it by sending 'y\\r' or a similar confirmation command, instead of continuing to wait.\n`;
           this.staticTicks = 0;
         } else {
           return;
@@ -181,7 +183,7 @@ JSON FORMAT:
   "used_knowledge": <true if you used the User Knowledge Base below to answer this prompt, false otherwise>,
   "new_rule": "<If used_knowledge is false and action is not <WAIT> or <DONE>, formulate a single, clear, reusable one-line rule combining the question and your answer without using option numbers (e.g. 1, 2) that might change. For example: 'If asked to allow pip execution, always allow it.' or 'Automatically accept edits for snake game implementation.'>"
 }
-${goalInstruction}${knowledgeInstruction}${historyInstruction}
+${goalInstruction}${knowledgeInstruction}${historyInstruction}${reminderMessage}
 
 Here is the current terminal screen output:
 
