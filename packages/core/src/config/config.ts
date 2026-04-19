@@ -21,6 +21,7 @@ import {
   AuthType,
   createContentGenerator,
   createContentGeneratorConfig,
+  getAuthTypeFromEnv,
   type ContentGenerator,
   type ContentGeneratorConfig,
 } from '../core/contentGenerator.js';
@@ -1517,6 +1518,10 @@ export class Config implements McpContext, AgentLoopContext {
     baseUrl?: string,
     customHeaders?: Record<string, string>,
   ) {
+    const envAuthType = getAuthTypeFromEnv();
+    const effectiveAuthMethod =
+      envAuthType === AuthType.OPENAI ? envAuthType : authMethod;
+
     // Reset availability service when switching auth
     this.modelAvailabilityService.reset();
 
@@ -1524,7 +1529,7 @@ export class Config implements McpContext, AgentLoopContext {
     // thoughtSignature from Genai to Vertex will fail, we need to strip them
     if (
       this.contentGeneratorConfig?.authType === AuthType.USE_GEMINI &&
-      authMethod !== AuthType.USE_GEMINI
+      effectiveAuthMethod !== AuthType.USE_GEMINI
     ) {
       // Restore the conversation history to the new client
       this._geminiClient.stripThoughtsFromHistory();
@@ -1541,7 +1546,7 @@ export class Config implements McpContext, AgentLoopContext {
 
     const newContentGeneratorConfig = await createContentGeneratorConfig(
       this,
-      authMethod,
+      effectiveAuthMethod,
       apiKey,
       baseUrl,
       customHeaders,

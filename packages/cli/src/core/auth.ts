@@ -5,12 +5,13 @@
  */
 
 import {
-  type AuthType,
+  AuthType,
   type Config,
   getErrorMessage,
   ValidationRequiredError,
   isAccountSuspendedError,
   ProjectIdRequiredError,
+  getAuthTypeFromEnv,
 } from '@google/gemini-cli-core';
 
 import type { AccountSuspensionInfo } from '../ui/contexts/UIStateContext.js';
@@ -30,12 +31,17 @@ export async function performInitialAuth(
   config: Config,
   authType: AuthType | undefined,
 ): Promise<InitialAuthResult> {
-  if (!authType) {
+  const envAuthType = getAuthTypeFromEnv();
+  // If OpenAI is explicitly configured in env, prioritize it over settings
+  const effectiveAuthType =
+    envAuthType === AuthType.OPENAI ? envAuthType : authType || envAuthType;
+
+  if (!effectiveAuthType) {
     return { authError: null, accountSuspensionInfo: null };
   }
 
   try {
-    await config.refreshAuth(authType);
+    await config.refreshAuth(effectiveAuthType);
     // The console.log is intentionally left out here.
     // We can add a dedicated startup message later if needed.
   } catch (e) {

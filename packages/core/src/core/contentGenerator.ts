@@ -28,6 +28,8 @@ import { determineSurface } from '../utils/surface.js';
 import { RecordingContentGenerator } from './recordingContentGenerator.js';
 import { getVersion, resolveModel } from '../../index.js';
 import type { LlmRole } from '../telemetry/llmRole.js';
+import { OpenAiContentGenerator } from './openAiContentGenerator.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 /**
  * Interface abstracting the core functionalities for generating content and counting tokens.
@@ -63,6 +65,7 @@ export enum AuthType {
   LEGACY_CLOUD_SHELL = 'cloud-shell',
   COMPUTE_ADC = 'compute-default-credentials',
   GATEWAY = 'gateway',
+  OPENAI = 'openai',
 }
 
 /**
@@ -72,6 +75,7 @@ export enum AuthType {
  * 1. GOOGLE_GENAI_USE_GCA=true -> LOGIN_WITH_GOOGLE
  * 2. GOOGLE_GENAI_USE_VERTEXAI=true -> USE_VERTEX_AI
  * 3. GEMINI_API_KEY -> USE_GEMINI
+ * 4. OPENAI_API_KEY -> OPENAI
  */
 export function getAuthTypeFromEnv(): AuthType | undefined {
   if (process.env['GOOGLE_GENAI_USE_GCA'] === 'true') {
@@ -82,6 +86,9 @@ export function getAuthTypeFromEnv(): AuthType | undefined {
   }
   if (process.env['GEMINI_API_KEY']) {
     return AuthType.USE_GEMINI;
+  }
+  if (process.env['OPENAI_API_KEY'] || process.env['OPENAI_API_BASE_URL']) {
+    return AuthType.OPENAI;
   }
   if (
     process.env['CLOUD_SHELL'] === 'true' ||
@@ -128,6 +135,7 @@ export async function createContentGeneratorConfig(
     process.env['GEMINI_API_KEY'] ||
     (await loadApiKey()) ||
     undefined;
+  const openAiApiKey = process.env['OPENAI_API_KEY'] || undefined;
   const googleApiKey = process.env['GOOGLE_API_KEY'] || undefined;
   const googleCloudProject =
     process.env['GOOGLE_CLOUD_PROJECT'] ||
@@ -147,6 +155,13 @@ export async function createContentGeneratorConfig(
     authType === AuthType.LOGIN_WITH_GOOGLE ||
     authType === AuthType.COMPUTE_ADC
   ) {
+    return contentGeneratorConfig;
+  }
+
+  if (authType === AuthType.OPENAI) {
+    contentGeneratorConfig.apiKey = apiKey || openAiApiKey;
+    contentGeneratorConfig.baseUrl =
+      baseUrl || process.env['OPENAI_API_BASE_URL'];
     return contentGeneratorConfig;
   }
 
@@ -182,6 +197,9 @@ export async function createContentGenerator(
   gcConfig: Config,
   sessionId?: string,
 ): Promise<ContentGenerator> {
+  if (gcConfig.getDebugMode()) {
+    debugLogger.log(`[ContentGenerator] Creating generator with authType: ${config.authType}`);
+  }
   const generator = await (async () => {
     if (gcConfig.fakeResponses) {
       const fakeGenerator = await FakeContentGenerator.fromFile(
@@ -255,6 +273,22 @@ export async function createContentGenerator(
     ) {
       baseHeaders['Authorization'] = `Bearer ${config.apiKey}`;
     }
+
+    if (config.authType === AuthType.OPENAI) {
+      let headers: Record<string, string> = { ...baseHeaders };
+      if (config.customHeaders) {
+        headers = { ...headers, ...config.customHeaders };
+      }
+      return new LoggingContentGenerator(
+        new OpenAiContentGenerator({
+          apiKey: config.apiKey,
+          baseUrl: config.baseUrl,
+          headers,
+        }),
+        gcConfig,
+      );
+    }
+
     if (
       config.authType === AuthType.LOGIN_WITH_GOOGLE ||
       config.authType === AuthType.COMPUTE_ADC
