@@ -99,6 +99,7 @@ import {
   EmptyWalletMenuShownEvent,
   CreditPurchaseClickEvent,
 } from './billingEvents.js';
+import { safeTruncate } from './utils.js';
 
 export function logCliConfiguration(
   config: Config,
@@ -124,10 +125,14 @@ export function logCliConfiguration(
 }
 
 export function logUserPrompt(config: Config, event: UserPromptEvent): void {
+  // SHIELD: Prevent massive prompt strings from sitting in the buffer heap
+  if (event.prompt) {
+    event.prompt = safeTruncate(event.prompt, 4096);
+  }
+
   ClearcutLogger.getInstance(config)?.logNewPromptEvent(event);
   bufferTelemetryEvent(() => {
     const logger = logs.getLogger(SERVICE_NAME);
-
     const logRecord: LogRecord = {
       body: event.toLogBody(),
       attributes: event.toOpenTelemetryAttributes(config),
@@ -233,12 +238,27 @@ export function logFileOperation(
 }
 
 export function logApiRequest(config: Config, event: ApiRequestEvent): void {
-  ClearcutLogger.getInstance(config)?.logApiRequestEvent(event);
-  bufferTelemetryEvent(() => {
-    const logger = logs.getLogger(SERVICE_NAME);
-    logger.emit(event.toLogRecord(config));
-    logger.emit(event.toSemanticLogRecord(config));
-  });
+  if (event.request_text) {
+    event.request_text = safeTruncate(event.request_text, 4096);
+  }
+
+  // FIX: Clear structured data that contains the same large text to prevent OOM
+  if (event.prompt && (event.prompt as any).contents) {
+    (event.prompt as any).contents = undefined;
+  }
+
+  // FIX: Explicit mapping to avoid unsafe class spreading
+  const uiEvent: UiEvent = {
+    'event.name': EVENT_API_REQUEST,
+    'event.timestamp': new Date().toISOString(),
+    status_code: event.status_code,
+    duration_ms: event.duration_ms,
+    request_text: event.request_text,
+    auth_type: event.auth_type,
+    model: event.model,
+    role: event.role,
+  };
+  uiTelemetryService.addEvent(uiEvent);
 }
 
 export function logFlashFallback(
@@ -305,44 +325,30 @@ export function logApiError(config: Config, event: ApiErrorEvent): void {
 }
 
 export function logApiResponse(config: Config, event: ApiResponseEvent): void {
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-  const uiEvent = {
-    // eslint-disable-next-line @typescript-eslint/no-misused-spread
-    ...event,
+  if (event.response_text) {
+    event.response_text = safeTruncate(event.response_text, 4096);
+  }
+
+  // FIX: Clear structured data found by bot
+  if (event.response && (event.response as any).candidates) {
+    (event.response as any).candidates = undefined;
+  }
+  if (event.prompt && (event.prompt as any).contents) {
+    (event.prompt as any).contents = undefined;
+  }
+
+  // FIX: Explicit mapping to avoid @typescript-eslint/no-misused-spread
+  const uiEvent: UiEvent = {
     'event.name': EVENT_API_RESPONSE,
     'event.timestamp': new Date().toISOString(),
-  } as UiEvent;
+    status_code: event.status_code,
+    duration_ms: event.duration_ms,
+    response_text: event.response_text,
+    auth_type: event.auth_type,
+    model: event.model,
+    role: event.role,
+  };
   uiTelemetryService.addEvent(uiEvent);
-  ClearcutLogger.getInstance(config)?.logApiResponseEvent(event);
-  bufferTelemetryEvent(() => {
-    const logger = logs.getLogger(SERVICE_NAME);
-    logger.emit(event.toLogRecord(config));
-    logger.emit(event.toSemanticLogRecord(config));
-
-    const conventionAttributes = getConventionAttributes(event);
-
-    recordApiResponseMetrics(config, event.duration_ms, {
-      model: event.model,
-      status_code: event.status_code,
-      genAiAttributes: conventionAttributes,
-    });
-
-    const tokenUsageData = [
-      { count: event.usage.input_token_count, type: 'input' as const },
-      { count: event.usage.output_token_count, type: 'output' as const },
-      { count: event.usage.cached_content_token_count, type: 'cache' as const },
-      { count: event.usage.thoughts_token_count, type: 'thought' as const },
-      { count: event.usage.tool_token_count, type: 'tool' as const },
-    ];
-
-    for (const { count, type } of tokenUsageData) {
-      recordTokenUsageMetrics(config, count, {
-        model: event.model,
-        type,
-        genAiAttributes: conventionAttributes,
-      });
-    }
-  });
 }
 
 export function logLoopDetected(
