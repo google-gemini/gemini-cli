@@ -36,6 +36,8 @@ import {
 } from '../../config/footerItems.js';
 import { isDevelopment } from '../../utils/installationInfo.js';
 
+const SYSTEM_HOSTNAME = hostname();
+
 interface CwdIndicatorProps {
   targetDir: string;
   maxWidth: number;
@@ -321,14 +323,12 @@ export const Footer: React.FC = () => {
         break;
       }
       case 'hostname': {
-        const hostnameStr = hostname();
-
-        if (hostnameStr) {
+        if (SYSTEM_HOSTNAME) {
           addCol(
             id,
             header,
-            () => <Text color={itemColor}>{hostnameStr}</Text>,
-            hostnameStr.length,
+            () => <Text color={itemColor}>{SYSTEM_HOSTNAME}</Text>,
+            SYSTEM_HOSTNAME.length,
           );
         }
         break;
