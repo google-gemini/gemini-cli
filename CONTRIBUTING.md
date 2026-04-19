@@ -297,6 +297,49 @@ For more detailed information on the integration testing framework, please see
 the
 [Integration Tests documentation](https://geminicli.com/docs/integration-tests).
 
+### Test Output Noise Guidelines
+
+The project maintains a **zero-noise** goal for `npm run test` and
+`npm run preflight` output. Unexpected `console.warn` / `console.error` calls
+degrade signal-to-noise ratio and can mask real failures in nightly eval runs.
+See [issue #23328](https://github.com/google-gemini/gemini-cli/issues/23328).
+
+- **Zero unexpected output.** Every line written to stderr/stdout during a test
+  run must be intentional. Unintentional output should be suppressed at the
+  source with `vi.spyOn(console, 'warn').mockImplementation(() => {})`.
+- **Whitelist, don't silence globally.** Some warnings are legitimately
+  expected (see below). Use the allowlist in `scripts/test-noise-whitelist.mjs`
+  rather than blanket-suppressing all console output.
+- **Allowed noise patterns** (do not treat these as failures):
+  - React `act()` warnings in async ink/React component tests.
+  - `UnhandledPromiseRejection` lines produced by tests that use
+    `expect.assertions()` to assert on rejection paths.
+  - `ECONNREFUSED` / network errors in tests that explicitly test
+    offline/unavailable-API code paths.
+- **Adding a new expected pattern.** If your code intentionally produces a
+  warning, add an entry to `scripts/test-noise-whitelist.mjs` in the same PR:
+
+  ```ts
+  // In your test file
+  const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  // ... run code under test ...
+  expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('expected msg'));
+  warnSpy.mockRestore();
+  ```
+
+- **Audit script.** PR [#23474](https://github.com/google-gemini/gemini-cli/pull/23474)
+  introduced `scripts/audit-test-noise.mjs`. Run it locally to catch noise
+  regressions before opening a PR:
+
+  ```bash
+  node scripts/audit-test-noise.mjs
+  ```
+
+- **CI enforcement.** The audit script is integrated into `npm run lint:ci` via
+  preflight. A noisy test suite will fail the check; fix it before merging.
+- **Do not use `--silent` as a workaround.** Hiding output breaks the audit
+  script and obscures real failures. Fix the root cause instead.
+
 ### Linting and preflight checks
 
 To ensure code quality and formatting consistency, run the preflight check:
