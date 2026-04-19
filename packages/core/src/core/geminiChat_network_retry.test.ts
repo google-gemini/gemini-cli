@@ -519,4 +519,70 @@ describe('GeminiChat Network Retries', () => {
       }),
     );
   });
+
+  it('should retry on OpenSSL 3.x SSL error during stream iteration (ERR_SSL_SSL/TLS_ALERT_BAD_RECORD_MAC)', async () => {
+    // OpenSSL 3.x produces a different error code format than OpenSSL 1.x
+    const sslError = new Error(
+      'request to https://cloudcode-pa.googleapis.com/v1internal:streamGenerateContent failed',
+    ) as NodeJS.ErrnoException & { type?: string };
+    sslError.type = 'system';
+    sslError.errno =
+      'ERR_SSL_SSL/TLS_ALERT_BAD_RECORD_MAC' as unknown as number;
+    sslError.code = 'ERR_SSL_SSL/TLS_ALERT_BAD_RECORD_MAC';
+
+    vi.mocked(mockContentGenerator.generateContentStream)
+      .mockImplementationOnce(async () =>
+        (async function* () {
+          yield {
+            candidates: [
+              { content: { parts: [{ text: 'Partial response...' }] } },
+            ],
+          } as unknown as GenerateContentResponse;
+          throw sslError;
+        })(),
+      )
+      .mockImplementationOnce(async () =>
+        (async function* () {
+          yield {
+            candidates: [
+              {
+                content: { parts: [{ text: 'Complete response after retry' }] },
+                finishReason: 'STOP',
+              },
+            ],
+          } as unknown as GenerateContentResponse;
+        })(),
+      );
+
+    const stream = await chat.sendMessageStream(
+      { model: 'test-model' },
+      'test message',
+      'prompt-id-ssl3-mid-stream',
+      new AbortController().signal,
+      LlmRole.MAIN,
+    );
+
+    const events: StreamEvent[] = [];
+    for await (const event of stream) {
+      events.push(event);
+    }
+
+    const retryEvent = events.find((e) => e.type === StreamEventType.RETRY);
+    expect(retryEvent).toBeDefined();
+
+    const successChunk = events.find(
+      (e) =>
+        e.type === StreamEventType.CHUNK &&
+        e.value.candidates?.[0]?.content?.parts?.[0]?.text ===
+          'Complete response after retry',
+    );
+    expect(successChunk).toBeDefined();
+
+    expect(mockLogNetworkRetryAttempt).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        error_type: 'ERR_SSL_SSL/TLS_ALERT_BAD_RECORD_MAC',
+      }),
+    );
+  });
 });
