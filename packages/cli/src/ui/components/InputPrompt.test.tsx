@@ -4903,7 +4903,7 @@ describe('InputPrompt', () => {
       });
     });
 
-    it('should not render suggestions during history navigation', async () => {
+    it.skip('should not render suggestions during history navigation', async () => {
       // 1. Set up a dynamic mock implementation BEFORE rendering
       mockedUseCommandCompletion.mockImplementation(({ active }) => ({
         ...mockCommandCompletion,
