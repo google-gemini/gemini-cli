@@ -714,6 +714,64 @@ included directory memory
       // contents) and no exception propagates.
       expect(result.memoryContent).toBe('');
     });
+
+    it('falls back to a real GEMINI.md file at a higher level when a directory shadows the same name lower in the tree', async () => {
+      // Lower in the tree (cwd): a directory named GEMINI.md (invalid).
+      await createEmptyDir(path.join(cwd, DEFAULT_CONTEXT_FILENAME));
+      // Higher in the tree (projectRoot): a real GEMINI.md file (valid).
+      const projectContextFile = await createTestFile(
+        path.join(projectRoot, DEFAULT_CONTEXT_FILENAME),
+        'Project root memory content',
+      );
+
+      const result = flattenResult(
+        await loadServerHierarchicalMemory(
+          cwd,
+          [],
+          new FileDiscoveryService(projectRoot),
+          new SimpleExtensionLoader([]),
+          DEFAULT_FOLDER_TRUST,
+        ),
+      );
+
+      // The directory at cwd is silently skipped; the actual file at
+      // projectRoot is still discovered and loaded normally.
+      expect(result.memoryContent).toContain('Project root memory content');
+      expect(result.filePaths).toContain(projectContextFile);
+    });
+
+    it('silently skips a GEMINI.md symlink that points to a directory', async () => {
+      // Create a real directory elsewhere and symlink GEMINI.md to it.
+      const realDir = await createEmptyDir(path.join(cwd, '.geminimd-target'));
+      const symlinkPath = path.join(cwd, DEFAULT_CONTEXT_FILENAME);
+      try {
+        await fsPromises.symlink(realDir, symlinkPath, 'dir');
+      } catch (err) {
+        // Symlink creation may be unsupported on some Windows setups (no
+        // SeCreateSymbolicLinkPrivilege). Skip the test there rather than fail.
+        if (
+          err instanceof Error &&
+          (err as NodeJS.ErrnoException).code === 'EPERM'
+        ) {
+          return;
+        }
+        throw err;
+      }
+
+      const result = flattenResult(
+        await loadServerHierarchicalMemory(
+          cwd,
+          [],
+          new FileDiscoveryService(projectRoot),
+          new SimpleExtensionLoader([]),
+          DEFAULT_FOLDER_TRUST,
+        ),
+      );
+
+      // A symlink resolving to a directory triggers EISDIR on read in the
+      // same way a plain directory does and must be skipped silently.
+      expect(result.memoryContent).toBe('');
+    });
   });
 
   describe('getGlobalMemoryPaths', () => {
