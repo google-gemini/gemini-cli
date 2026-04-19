@@ -66,6 +66,23 @@ const env = {
   DEV: 'true',
 };
 
+// Filter out CI_* env vars to prevent is-in-ci from detecting CI environment,
+// which would cause ink to switch to non-interactive mode in dev mode.
+// The bundled build handles this via esbuild alias; dev mode needs this runtime fix.
+// See issue #1563 and PR #22452.
+const ciVars = Object.keys(env).filter((key) => key.startsWith('CI_'));
+if (ciVars.length > 0) {
+  for (const key of ciVars) {
+    delete env[key];
+  }
+  console.warn(
+    `[gemini] Removed CI-related env vars to ensure interactive mode: ${ciVars.join(', ')}`
+  );
+  console.warn(
+    `[gemini] These variables are still available in processes spawned by shell tools.`
+  );
+}
+
 if (isInDebugMode) {
   // If this is not set, the debugger will pause on the outer process rather
   // than the relaunched process making it harder to debug.
