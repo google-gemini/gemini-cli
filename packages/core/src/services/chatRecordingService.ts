@@ -693,6 +693,7 @@ export class ChatRecordingService {
         const { bytesRead } = await fd.read(buffer, 0, CHUNK_SIZE, 0);
         if (bytesRead === 0) {
           await fd.close();
+          fd = undefined;
           await fs.promises.unlink(filePath);
           return;
         }
