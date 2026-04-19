@@ -73,7 +73,6 @@ import {
   getDisplayString,
   resolveModel,
   isGemini2Model,
-  PREVIEW_GEMINI_FLASH_MODEL,
 } from '../config/models.js';
 import { partToString } from '../utils/partUtils.js';
 import { coreEvents, CoreEvent } from '../utils/events.js';
@@ -681,26 +680,13 @@ export class GeminiClient {
       );
     }
 
-    let modelToUse: string;
-
-    // Determine Model (Stickiness vs. Routing)
-    if (this.currentSequenceModel) {
-      modelToUse = this.currentSequenceModel;
-    } else {
-      modelToUse = PREVIEW_GEMINI_FLASH_MODEL;
-    }
+    const modelToUse = 'gemma-4-26b-a4b-it';
 
     // availability logic
     const modelConfigKey: ModelConfigKey = {
       model: modelToUse,
       isChatModel: true,
     };
-    const { model: finalModel } = applyModelSelection(
-      this.config,
-      modelConfigKey,
-      { consumeAttempt: false },
-    );
-    modelToUse = finalModel;
 
     if (!signal.aborted && !this.currentSequenceModel) {
       yield { type: GeminiEventType.ModelInfo, value: modelToUse };
