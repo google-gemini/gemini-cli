@@ -19,6 +19,7 @@ import {
 import {
   setGeminiMdFilename,
   DEFAULT_CONTEXT_FILENAME,
+  DEFAULT_CONTEXT_FILENAMES,
 } from '../tools/memoryTool.js';
 import { flattenMemory, type HierarchicalMemory } from '../config/memory.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
@@ -103,7 +104,7 @@ describe('memoryDiscovery', () => {
   afterEach(async () => {
     vi.unstubAllEnvs();
     // Some tests set this to a different value.
-    setGeminiMdFilename(DEFAULT_CONTEXT_FILENAME);
+    setGeminiMdFilename(DEFAULT_CONTEXT_FILENAMES);
     // Clean up the temporary directory to prevent resource leaks.
     // Use maxRetries option for robust cleanup without race conditions
     await fsPromises.rm(testRootDir, {

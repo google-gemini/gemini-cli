@@ -91,18 +91,36 @@ More content here.
 For more details, see the [Memory Import Processor](../reference/memport.md)
 documentation.
 
+## Default context file names
+
+By default, Gemini CLI discovers both `GEMINI.md` and `AGENTS.md` files as
+context sources. This means if your codebase uses the
+[AGENTS.md](https://agents.md) standard, those instructions will be
+automatically loaded alongside any `GEMINI.md` files.
+
 ## Customize the context file name
 
-While `GEMINI.md` is the default filename, you can configure this in your
-`settings.json` file. To specify a different name or a list of names, use the
-`context.fileName` property.
+You can configure which context filenames are discovered in your `settings.json`
+file. To specify a different name or a list of names, use the `context.fileName`
+property. This overrides the defaults, so you can use it to remove `AGENTS.md`
+from discovery if it causes problems.
 
 **Example `settings.json`:**
 
 ```json
 {
   "context": {
-    "fileName": ["AGENTS.md", "CONTEXT.md", "GEMINI.md"]
+    "fileName": ["GEMINI.md"]
+  }
+}
+```
+
+To add additional custom context files alongside the defaults:
+
+```json
+{
+  "context": {
+    "fileName": ["GEMINI.md", "AGENTS.md", "CONTEXT.md"]
   }
 }
 ```
