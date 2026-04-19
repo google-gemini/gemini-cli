@@ -29,7 +29,12 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
 });
 
 describe('Policy Engine Integration Tests', () => {
-  beforeEach(() => vi.stubEnv('GEMINI_SYSTEM_MD', ''));
+  beforeEach(() => {
+    vi.stubEnv('GEMINI_SYSTEM_MD', '');
+    // Silence debugLogger output (routes through console.debug/console.log)
+    vi.spyOn(console, 'debug').mockImplementation(() => {});
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+  });
 
   afterEach(() => vi.unstubAllEnvs());
 
