@@ -61,6 +61,19 @@ const terminalNotificationsMocks = vi.hoisted(() => ({
   })),
 }));
 
+// Hoisted mock for generateSummary so it survives vi.clearAllMocks()
+const mockGenerateSummary = vi.hoisted(() =>
+  vi.fn(() => Promise.resolve(undefined)),
+);
+
+// Hoisted no-op debugLogger to silence console output from debugLogger calls
+const mockDebugLogger = vi.hoisted(() => ({
+  log: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  debug: vi.fn(),
+}));
+
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
     await importOriginal<typeof import('@google/gemini-cli-core')>();
@@ -93,6 +106,10 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
       start: vi.fn(),
       end: vi.fn(),
     },
+    // Silence "[SessionSummary] Error finding previous session" noise
+    generateSummary: mockGenerateSummary,
+    // Silence all debugLogger output (debug, log, warn, error) during tests
+    debugLogger: mockDebugLogger,
   };
 });
 import ansiEscapes from 'ansi-escapes';
@@ -213,6 +230,15 @@ vi.mock('../utils/events.js');
 vi.mock('../utils/handleAutoUpdate.js');
 vi.mock('./utils/ConsolePatcher.js');
 vi.mock('../utils/cleanup.js');
+// Silence "Failed to read or parse keybindings" noise from real fs reads
+vi.mock('./utils/terminalSetup.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('./utils/terminalSetup.js')>();
+  return {
+    ...actual,
+    useTerminalSetupPrompt: vi.fn(),
+  };
+});
 
 import { useHistory } from './hooks/useHistoryManager.js';
 import { useThemeCommand } from './hooks/useThemeCommand.js';
@@ -349,6 +375,25 @@ describe('AppContainer State Management', () => {
   beforeEach(() => {
     persistentStateMock.reset();
     vi.clearAllMocks();
+
+    // Suppress console noise from unmocked code paths (e.g. debugLogger
+    // calls that slip through, React act() warnings, etc.).
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'debug').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    // Suppress the well-known React "act(...)" environment warning that fires
+    // on every render in a non-browser test environment, while still letting
+    // unexpected errors through.
+    // eslint-disable-next-line no-console
+    const originalError = console.error;
+    vi.spyOn(console, 'error').mockImplementation((...args: unknown[]) => {
+      const msg = String(args[0] ?? '');
+      if (msg.includes('not configured to support act')) return;
+      originalError.call(console, ...args);
+    });
+
+    // Re-set after clearAllMocks so generateSummary().catch() doesn't blow up
+    mockGenerateSummary.mockImplementation(() => Promise.resolve(undefined));
 
     mockIdeClient.getInstance.mockReturnValue(new Promise(() => {}));
 
