@@ -1,0 +1,246 @@
+[2026-04-19 01:02:49] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-19 01:02:49] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-19 01:02:49] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-19 01:02:49] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-19 01:02:49] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-19 01:02:49] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-19 01:02:49] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-19 01:02:49] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-19 01:02:49] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-19 01:02:49] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-19 01:02:49] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-19 01:02:49] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-19 01:02:49] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-19 01:02:49] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-19 01:02:49] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-19 01:02:49] [32mINFO[0m [hats.security:313] Starting secure execution of nmap
+[2026-04-19 01:02:49] [32mINFO[0m [hats.core:235] Executing: nmap example.com -sV -sC
+[2026-04-19 01:04:04] [32mINFO[0m [hats.core:274] Tool nmap completed in 75.22s
+[2026-04-19 01:04:04] [32mINFO[0m [hats.security:322] Secure execution of nmap completed in 75.22s
+[2026-04-19 01:18:14] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-19 01:18:14] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-19 01:18:14] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-19 01:18:14] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-19 01:18:14] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-19 01:18:14] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-19 01:18:14] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-19 01:18:14] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-19 01:18:14] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-19 01:18:14] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-19 01:18:14] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-19 01:18:14] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-19 01:18:14] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-19 01:18:14] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-19 01:18:14] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-19 01:18:14] [32mINFO[0m [hats.security:313] Starting secure execution of whatweb
+[2026-04-19 01:18:14] [32mINFO[0m [hats.core:235] Executing: whatweb https://example.com
+[2026-04-19 01:18:19] [32mINFO[0m [hats.core:274] Tool whatweb completed in 5.06s
+[2026-04-19 01:18:19] [32mINFO[0m [hats.security:322] Secure execution of whatweb completed in 5.06s
+[2026-04-19 01:18:30] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-19 01:18:30] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-19 01:18:30] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-19 01:18:30] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-19 01:18:30] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-19 01:18:30] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-19 01:18:30] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-19 01:18:30] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-19 01:18:30] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-19 01:18:30] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-19 01:18:30] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-19 01:18:30] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-19 01:18:30] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-19 01:18:30] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-19 01:18:30] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-19 01:18:30] [32mINFO[0m [hats.security:313] Starting secure execution of gobuster
+[2026-04-19 01:18:30] [32mINFO[0m [hats.core:235] Executing: gobuster https://example.com
+[2026-04-19 01:18:30] [32mINFO[0m [hats.core:274] Tool gobuster completed in 0.02s
+[2026-04-19 01:18:30] [32mINFO[0m [hats.security:322] Secure execution of gobuster completed in 0.02s
+[2026-04-19 01:18:54] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-19 01:18:54] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-19 01:18:54] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-19 01:18:54] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-19 01:18:54] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-19 01:18:54] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-19 01:18:54] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-19 01:18:54] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-19 01:18:54] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-19 01:18:54] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-19 01:18:54] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-19 01:18:54] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-19 01:18:54] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-19 01:18:54] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-19 01:18:54] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-19 01:18:54] [32mINFO[0m [hats.security:313] Starting secure execution of gobuster
+[2026-04-19 01:18:54] [32mINFO[0m [hats.core:235] Executing: gobuster dir -u https://example.com -w /usr/share/wordlists/dirb/common.txt
+[2026-04-19 01:18:58] [32mINFO[0m [hats.core:274] Tool gobuster completed in 3.50s
+[2026-04-19 01:18:58] [32mINFO[0m [hats.security:322] Secure execution of gobuster completed in 3.50s
+[2026-04-19 01:19:11] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-19 01:19:11] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-19 01:19:11] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-19 01:19:11] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-19 01:19:11] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-19 01:19:11] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-19 01:19:11] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-19 01:19:11] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-19 01:19:11] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-19 01:19:11] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-19 01:19:11] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-19 01:19:11] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-19 01:19:11] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-19 01:19:11] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-19 01:19:11] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-19 01:19:11] [32mINFO[0m [hats.security:313] Starting secure execution of ffuf
+[2026-04-19 01:19:11] [32mINFO[0m [hats.core:235] Executing: ffuf https://example.com/FUZZ
+[2026-04-19 01:19:11] [32mINFO[0m [hats.core:274] Tool ffuf completed in 0.02s
+[2026-04-19 01:19:11] [32mINFO[0m [hats.security:322] Secure execution of ffuf completed in 0.02s
+[2026-04-19 01:19:27] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-19 01:19:27] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-19 01:19:27] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-19 01:19:27] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-19 01:19:27] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-19 01:19:27] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-19 01:19:27] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-19 01:19:27] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-19 01:19:27] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-19 01:19:27] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-19 01:19:27] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-19 01:19:27] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-19 01:19:27] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-19 01:19:27] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-19 01:19:27] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-19 01:19:27] [32mINFO[0m [hats.security:313] Starting secure execution of ffuf
+[2026-04-19 01:19:27] [32mINFO[0m [hats.core:235] Executing: ffuf -u https://example.com/FUZZ -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt
+[2026-04-19 01:19:27] [32mINFO[0m [hats.core:274] Tool ffuf completed in 0.01s
+[2026-04-19 01:19:27] [32mINFO[0m [hats.security:322] Secure execution of ffuf completed in 0.01s
+[2026-04-19 01:20:32] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-19 01:20:32] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-19 01:20:32] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-19 01:20:32] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-19 01:20:32] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-19 01:20:32] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-19 01:20:32] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-19 01:20:32] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-19 01:20:32] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-19 01:20:32] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-19 01:20:32] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-19 01:20:32] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-19 01:20:32] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-19 01:20:32] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-19 01:20:32] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-19 01:20:32] [32mINFO[0m [hats.security:313] Starting secure execution of ffuf
+[2026-04-19 01:20:32] [32mINFO[0m [hats.core:235] Executing: ffuf -u https://example.com/FUZZ -w /usr/share/wordlists/rockyou.txt
+[2026-04-19 01:25:32] [31mERROR[0m [hats.core:279] Tool ffuf execution failed after 300.00s: Tool ffuf execution timed out
+[2026-04-19 01:25:32] [32mINFO[0m [hats.security:322] Secure execution of ffuf completed in 300.00s
+[2026-04-19 01:25:48] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-19 01:25:48] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-19 01:25:48] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-19 01:25:48] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-19 01:25:48] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-19 01:25:48] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-19 01:25:48] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-19 01:25:48] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-19 01:25:48] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-19 01:25:48] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-19 01:25:48] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-19 01:25:48] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-19 01:25:48] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-19 01:25:48] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-19 01:25:48] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-19 01:25:48] [32mINFO[0m [hats.security:313] Starting secure execution of nikto
+[2026-04-19 01:25:48] [32mINFO[0m [hats.core:235] Executing: nikto https://example.com
+[2026-04-19 01:25:48] [32mINFO[0m [hats.core:274] Tool nikto completed in 0.76s
+[2026-04-19 01:25:48] [32mINFO[0m [hats.security:322] Secure execution of nikto completed in 0.76s
+[2026-04-19 01:26:01] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-19 01:26:01] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-19 01:26:01] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-19 01:26:01] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-19 01:26:01] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-19 01:26:01] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-19 01:26:01] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-19 01:26:01] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-19 01:26:01] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-19 01:26:01] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-19 01:26:01] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-19 01:26:01] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-19 01:26:01] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-19 01:26:01] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-19 01:26:01] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-19 01:26:01] [32mINFO[0m [hats.security:313] Starting secure execution of nikto
+[2026-04-19 01:26:01] [32mINFO[0m [hats.core:235] Executing: nikto -host https://example.com
+[2026-04-19 01:26:09] [32mINFO[0m [hats.core:274] Tool nikto completed in 7.24s
+[2026-04-19 01:26:09] [32mINFO[0m [hats.security:322] Secure execution of nikto completed in 7.24s
+[2026-04-19 01:26:40] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-19 01:26:40] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-19 01:26:40] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-19 01:26:40] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-19 01:26:40] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-19 01:26:40] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-19 01:26:40] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-19 01:26:40] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-19 01:26:40] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-19 01:26:40] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-19 01:26:40] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-19 01:26:40] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-19 01:26:40] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-19 01:26:40] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-19 01:26:40] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-19 01:26:40] [32mINFO[0m [hats.security:313] Starting secure execution of nuclei
+[2026-04-19 01:26:40] [31mERROR[0m [hats.core:279] Tool nuclei execution failed after 0.00s: Tool 'nuclei' is not available or not safe to execute
+[2026-04-19 01:26:40] [32mINFO[0m [hats.security:322] Secure execution of nuclei completed in 0.00s
+[2026-04-19 01:27:20] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-19 01:27:20] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-19 01:27:20] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-19 01:27:20] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-19 01:27:20] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-19 01:27:20] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-19 01:27:20] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-19 01:27:20] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-19 01:27:20] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-19 01:27:20] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-19 01:27:20] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-19 01:27:20] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-19 01:27:20] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-19 01:27:20] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-19 01:27:20] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-19 01:27:20] [32mINFO[0m [hats.security:313] Starting secure execution of nuclei
+[2026-04-19 01:27:20] [32mINFO[0m [hats.core:235] Executing: nuclei -u https://example.com -s critical,high
+[2026-04-19 01:28:52] [32mINFO[0m [hats.core:274] Tool nuclei completed in 92.76s
+[2026-04-19 01:28:52] [32mINFO[0m [hats.security:322] Secure execution of nuclei completed in 92.76s
+[2026-04-19 01:29:20] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-19 01:29:20] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-19 01:29:20] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-19 01:29:20] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-19 01:29:20] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-19 01:29:20] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-19 01:29:20] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-19 01:29:20] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-19 01:29:20] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-19 01:29:20] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-19 01:29:20] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-19 01:29:20] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-19 01:29:20] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-19 01:29:20] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-19 01:29:20] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-19 01:29:20] [32mINFO[0m [hats.security:313] Starting secure execution of dnsrecon
+[2026-04-19 01:29:20] [32mINFO[0m [hats.core:235] Executing: dnsrecon example.com
+[2026-04-19 01:29:21] [32mINFO[0m [hats.core:274] Tool dnsrecon completed in 0.91s
+[2026-04-19 01:29:21] [32mINFO[0m [hats.security:322] Secure execution of dnsrecon completed in 0.91s
+[2026-04-19 01:29:49] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-19 01:29:49] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-19 01:29:49] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-19 01:29:49] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-19 01:29:49] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-19 01:29:49] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-19 01:29:49] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-19 01:29:49] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-19 01:29:49] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-19 01:29:49] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-19 01:29:49] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-19 01:29:49] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-19 01:29:49] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-19 01:29:49] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-19 01:29:49] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-19 01:29:49] [32mINFO[0m [hats.security:313] Starting secure execution of dnsrecon
+[2026-04-19 01:29:49] [32mINFO[0m [hats.core:235] Executing: dnsrecon -d example.com
+[2026-04-19 01:29:52] [32mINFO[0m [hats.core:274] Tool dnsrecon completed in 3.37s
+[2026-04-19 01:29:52] [32mINFO[0m [hats.security:322] Secure execution of dnsrecon completed in 3.37s

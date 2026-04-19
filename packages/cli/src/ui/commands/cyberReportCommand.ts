@@ -6,21 +6,21 @@
 
 import { CommandKind, type SlashCommand } from './types.js';
 
-const reportPrompt = `Create a professional markdown pentest report from the most recent tool outputs.
+const reportPrompt = `Create a professional markdown pentest report based on HATS framework findings and agentic hacking workflows.
 
 Constraints:
 - Use only authorized assessment context.
-- Do not include exploit payloads or harmful operational details.
-- Prioritize HATS MCP structured findings when present.
+- Prioritize structured JSON data from HATS MCP tools.
+- Include summaries of any automated HATS scripts executed during the workflow.
 
-Report format:
-1) Executive Summary
-2) Scope and Authorization Assumptions
-3) Methodology (Recon -> Verification -> Reporting)
-4) Findings Table (severity, evidence, impact, remediation)
-5) Detailed Findings
-6) Remediation Plan (prioritized)
-7) Appendix: Last 10 tool outputs summarized`;
+Report structure:
+1) Executive Summary (Overall Risk Posture)
+2) Scope and Authorization
+3) HATS Reconnaissance Summary (Nmap, Services, Vulns)
+4) Agentic Workflow Analysis (Automation and Scripting results)
+5) Findings Table (Severity, Vulnerability, Evidence, Impact, Remediation)
+6) Detailed Remediation Roadmap
+7) Appendix: Raw HATS Tool/Script Outputs Summary`;
 
 export const cyberReportCommand: SlashCommand = {
   name: 'report',

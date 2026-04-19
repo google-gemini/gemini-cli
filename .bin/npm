@@ -1,0 +1,2 @@
+#!/bin/sh
+/usr/bin/node /usr/share/nodejs/corepack/dist/npm.js "$@"

@@ -1,0 +1,10 @@
+description = "Web application security scan: tech detection, directory brute-force, vulnerability scanning."
+prompt = """
+Run a web application security assessment on: {{args}}
+
+1) Run hats_whatweb to identify technology stack.
+2) Run hats_gobuster for directory/file enumeration.
+3) Run hats_nikto for server vulnerability scanning.
+4) Run hats_nuclei with severity=critical,high for CVE detection.
+5) Summarize findings by severity with remediation recommendations.
+"""

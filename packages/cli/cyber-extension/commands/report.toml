@@ -1,7 +1,0 @@
-description = "Generate a pentest report from recent outputs."
-prompt = """
-Generate a professional markdown pentest report from the last 10 tool outputs.
-Context: {{args}}
-Include severity, impact, evidence, and remediation.
-"""
-

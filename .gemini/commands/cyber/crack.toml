@@ -1,0 +1,10 @@
+description = "Hash identification and cracking workflow using hashid, john, and hashcat."
+prompt = """
+Identify and crack the following hash(es): {{args}}
+
+1) Run hats_hashid to identify the hash type.
+2) Choose the appropriate cracking tool (john or hashcat).
+3) Try wordlist attack first with rockyou.txt.
+4) If wordlist fails, suggest rule-based or mask attack.
+5) Report cracked credentials in a table.
+"""

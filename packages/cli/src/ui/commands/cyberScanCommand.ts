@@ -6,18 +6,19 @@
 
 import { CommandKind, type SlashCommand } from './types.js';
 
-const scanPrompt = `Run an authorized reconnaissance workflow for the provided target only.
+const scanPrompt = `Perform an authorized agentic reconnaissance workflow using the HATS framework.
 
 Rules:
 - Operate strictly within authorized scope and legal boundaries.
 - Refuse any destructive, persistence, or unauthorized activity.
-- Prefer HATS MCP tools and return structured findings.
+- Prioritize HATS MCP tools for structured JSON findings.
+- If repetitive tasks are identified, automate them by writing a Python script using the \`hats-framework\` module.
 
 Workflow:
-1) Use hats_chain_scan when available.
-2) If hats_chain_scan is unavailable, run hats_nmap_scan, then hats_service_detection, then hats_vuln_lookup.
-3) Summarize findings as JSON with: target, open_ports, services, vulnerabilities, risk_level, recommended_next_steps.
-4) Include confidence and explicitly mark assumptions.`;
+1) Use hats_chain_scan for initial target profiling.
+2) Enumerate services and vulnerabilities using hats_service_detection and hats_vuln_lookup.
+3) Summarize findings as JSON with: target, open_ports, services, vulnerabilities, risk_level, and recommended_next_steps.
+4) Provide clear remediation guidance for every discovered risk.`;
 
 export const cyberScanCommand: SlashCommand = {
   name: 'scan',

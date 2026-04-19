@@ -7,6 +7,7 @@
 import { AyuDark } from './builtin/dark/ayu-dark.js';
 import { AyuLight } from './builtin/light/ayu-light.js';
 import { AtomOneDark } from './builtin/dark/atom-one-dark.js';
+import { Cyber } from './builtin/dark/cyber-dark.js';
 import { Dracula } from './builtin/dark/dracula-dark.js';
 import { GitHubDark } from './builtin/dark/github-dark.js';
 import { GitHubLight } from './builtin/light/github-light.js';
@@ -50,7 +51,7 @@ export interface ThemeDisplay {
   isCustom?: boolean;
 }
 
-export const DEFAULT_THEME: Theme = DefaultDark;
+export const DEFAULT_THEME: Theme = Cyber;
 
 class ThemeManager {
   private readonly availableThemes: Theme[];
@@ -76,6 +77,7 @@ class ThemeManager {
       AyuDark,
       AyuLight,
       AtomOneDark,
+      Cyber,
       Dracula,
       DefaultLight,
       DefaultDark,

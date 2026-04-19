@@ -66,7 +66,8 @@ export const LogoutConfirmationDialog: React.FC<
             You are now signed out
           </Text>
           <Text color={theme.text.secondary}>
-            Sign in again to continue using Gemini CLI, or exit the application.
+            Sign in again to continue using Gemini-Cyber-CLI, or exit the
+            application.
           </Text>
         </Box>
 
