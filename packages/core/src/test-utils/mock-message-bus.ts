@@ -22,7 +22,7 @@ export class MockMessageBus {
   /**
    * Mock publish method that captures messages and simulates responses
    */
-  publish = vi.fn(async (message: Message) => {
+  publish = vi.fn(async (message: Message): Promise<void> => {
     this.publishedMessages.push(message);
 
     // Handle tool confirmation requests
