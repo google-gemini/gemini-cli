@@ -316,6 +316,10 @@ ${strippedScreen}
         }
 
         for (const char of keys) {
+          if (char === '\r') {
+            // Wait a bit to ensure the previous character is rendered before submitting
+            await new Promise((resolve) => setTimeout(resolve, 50));
+          }
           this.stdinBuffer.write(char);
           // Small delay to ensure Ink processes each keypress event individually
           // while preventing UI state collisions during long simulated inputs.
