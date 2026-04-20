@@ -24,7 +24,8 @@ export async function validateNonInteractiveAuth(
   settings: LoadedSettings,
 ) {
   try {
-    const effectiveAuthType = configuredAuthType || getAuthTypeFromEnv();
+    const model = nonInteractiveConfig.getModel();
+    const effectiveAuthType = configuredAuthType || getAuthTypeFromEnv(model);
 
     const enforcedType = settings.merged.security.auth.enforcedType;
     if (enforcedType && effectiveAuthType !== enforcedType) {

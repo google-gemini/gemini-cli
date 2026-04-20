@@ -1521,16 +1521,9 @@ export class Config implements McpContext, AgentLoopContext {
     const envAuthType = getAuthTypeFromEnv(this.model);
     let effectiveAuthMethod = authMethod;
 
-    // If a model is specifically identified as requiring OpenAI (e.g., Gemma),
-    // or if no specific auth method was provided but OpenAI env vars are present.
+    // If using OpenAI, we MUST use it regardless of other settings
     if (envAuthType === AuthType.OPENAI) {
-      if (
-        this.model.startsWith('google/gemma') ||
-        this.model === 'gemma' ||
-        authMethod === AuthType.LOGIN_WITH_GOOGLE // Default fallback often ends up here
-      ) {
-        effectiveAuthMethod = AuthType.OPENAI;
-      }
+      effectiveAuthMethod = AuthType.OPENAI;
     }
 
     // Reset availability service when switching auth
@@ -1569,6 +1562,15 @@ export class Config implements McpContext, AgentLoopContext {
     );
     // Only assign to instance properties after successful initialization
     this.contentGeneratorConfig = newContentGeneratorConfig;
+
+    // If using OpenAI, register a runtime override so that the 'classifier' model
+    // (used for complexity scoring) points to the actual custom model being used.
+    if (effectiveAuthMethod === AuthType.OPENAI) {
+      this.modelConfigService.registerRuntimeModelOverride({
+        match: { model: 'classifier' },
+        modelConfig: { model: this.model },
+      });
+    }
 
     const codeAssistServer = getCodeAssistServer(this);
     const quotaPromise = codeAssistServer?.projectId

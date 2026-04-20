@@ -79,6 +79,11 @@ export enum AuthType {
  * 5. OPENAI_API_KEY -> OPENAI
  */
 export function getAuthTypeFromEnv(model?: string): AuthType | undefined {
+  // HIGHEST PRIORITY: If a custom model is requested, FORCE OpenAI auth.
+  if (model?.startsWith('google/gemma') || model === 'gemma') {
+    return AuthType.OPENAI;
+  }
+
   if (process.env['GOOGLE_GENAI_USE_GCA'] === 'true') {
     return AuthType.LOGIN_WITH_GOOGLE;
   }
