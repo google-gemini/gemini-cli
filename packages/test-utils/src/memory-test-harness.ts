@@ -54,6 +54,12 @@ export interface MemoryTestHarnessOptions {
   baselinesPath: string;
   /** Default tolerance percentage (0-100). Default: 10 */
   defaultTolerancePercent?: number;
+  /** Number of GC cycles to run before each snapshot. Default: 3 */
+  gcCycles?: number;
+  /** Delay in ms between GC cycles. Default: 100 */
+  gcDelayMs?: number;
+  /** Number of samples to take for median calculation. Default: 3 */
+  sampleCount?: number;
 }
 
 /**
@@ -168,10 +174,9 @@ export class MemoryTestHarness {
     let withinTolerance = true;
 
     if (baseline) {
+      const measuredMB = afterSnap.heapUsed / (1024 * 1024);
       deltaPercent =
-        ((afterSnap.heapUsed - baseline.heapUsedBytes) /
-          baseline.heapUsedBytes) *
-        100;
+        ((measuredMB - baseline.heapUsedMB) / baseline.heapUsedMB) * 100;
       withinTolerance = deltaPercent <= tolerance;
     }
 
@@ -272,16 +277,16 @@ export class MemoryTestHarness {
       return; // Don't fail if no baseline exists yet
     }
 
+    const measuredMB = result.finalHeapUsed / (1024 * 1024);
     const deltaPercent =
-      ((result.finalHeapUsed - result.baseline.heapUsedBytes) /
-        result.baseline.heapUsedBytes) *
+      ((measuredMB - result.baseline.heapUsedMB) / result.baseline.heapUsedMB) *
       100;
 
     if (deltaPercent > tolerance) {
       throw new Error(
         `Memory regression detected for "${result.scenarioName}"!\n` +
           `  Measured:  ${formatMB(result.finalHeapUsed)} heap used\n` +
-          `  Baseline:  ${formatMB(result.baseline.heapUsedBytes)} heap used\n` +
+          `  Baseline:  ${result.baseline.heapUsedMB.toFixed(1)} MB heap used\n` +
           `  Delta:     ${deltaPercent.toFixed(1)}% (tolerance: ${tolerance}%)\n` +
           `  Peak heap: ${formatMB(result.peakHeapUsed)}\n` +
           `  Peak RSS:  ${formatMB(result.peakRss)}\n` +
@@ -294,12 +299,14 @@ export class MemoryTestHarness {
    * Update the baseline for a scenario with the current measured values.
    */
   updateScenarioBaseline(result: MemoryTestResult): void {
+    const lastSnapshot = result.snapshots[result.snapshots.length - 1];
     updateBaseline(this.baselinesPath, result.scenarioName, {
-      heapUsedBytes: result.finalHeapUsed,
-      heapTotalBytes:
-        result.snapshots[result.snapshots.length - 1]?.heapTotal ?? 0,
-      rssBytes: result.finalRss,
-      externalBytes: result.finalExternal,
+      heapUsedMB: Number((result.finalHeapUsed / (1024 * 1024)).toFixed(1)),
+      heapTotalMB: Number(
+        ((lastSnapshot?.heapTotal ?? 0) / (1024 * 1024)).toFixed(1),
+      ),
+      rssMB: Number((result.finalRss / (1024 * 1024)).toFixed(1)),
+      externalMB: Number((result.finalExternal / (1024 * 1024)).toFixed(1)),
     });
     // Reload baselines after update
     this.baselines = loadBaselines(this.baselinesPath);
@@ -322,7 +329,7 @@ export class MemoryTestHarness {
     for (const result of resultsToReport) {
       const measured = formatMB(result.finalHeapUsed);
       const baseline = result.baseline
-        ? formatMB(result.baseline.heapUsedBytes)
+        ? `${result.baseline.heapUsedMB.toFixed(1)} MB`
         : 'N/A';
       const delta = result.baseline
         ? `${result.deltaPercent >= 0 ? '+' : ''}${result.deltaPercent.toFixed(1)}%`
