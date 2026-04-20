@@ -33,8 +33,10 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     homedir: () => '/mock/home/user',
     isHeadlessMode: vi.fn(() => false),
     coreEvents: {
+      ...actual.coreEvents,
       emitFeedback: vi.fn(),
     },
+    FatalConfigError: actual.FatalConfigError,
   };
 });
 

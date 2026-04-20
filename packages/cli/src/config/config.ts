@@ -544,7 +544,7 @@ export async function loadCliConfig(
       ? false
       : (settings.security?.folderTrust?.enabled ?? false);
   const trustedFolder =
-    isWorkspaceTrusted(settings, cwd, undefined, {
+    isWorkspaceTrusted(settings, cwd, {
       prompt: argv.prompt,
       query: argv.query,
     })?.isTrusted ?? false;

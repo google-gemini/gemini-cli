@@ -20,6 +20,7 @@ import { ProjectRegistry } from './projectRegistry.js';
 import { StorageMigration } from './storageMigration.js';
 
 export const OAUTH_FILE = 'oauth_creds.json';
+export const TRUSTED_FOLDERS_FILENAME = 'trustedFolders.json';
 const TMP_DIR_NAME = 'tmp';
 const BIN_DIR_NAME = 'bin';
 const AGENTS_DIR_NAME = '.agents';
@@ -84,6 +85,13 @@ export class Storage {
 
   static getGoogleAccountsPath(): string {
     return path.join(Storage.getGlobalGeminiDir(), GOOGLE_ACCOUNTS_FILENAME);
+  }
+
+  static getTrustedFoldersPath(): string {
+    if (process.env['GEMINI_CLI_TRUSTED_FOLDERS_PATH']) {
+      return process.env['GEMINI_CLI_TRUSTED_FOLDERS_PATH'];
+    }
+    return path.join(Storage.getGlobalGeminiDir(), TRUSTED_FOLDERS_FILENAME);
   }
 
   static getUserCommandsDir(): string {
