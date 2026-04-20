@@ -978,6 +978,51 @@ describe('Scheduler (Orchestrator)', () => {
       );
     });
 
+    it('should include feedback in cancel reason when payload carries feedback', async () => {
+      vi.mocked(checkPolicy).mockResolvedValue({
+        decision: PolicyDecision.ASK_USER,
+        rule: undefined,
+      });
+
+      const resolution = {
+        outcome: ToolConfirmationOutcome.Cancel,
+        lastDetails: undefined,
+        payload: { feedback: "don't overwrite, append instead" },
+      };
+      vi.mocked(resolveConfirmation).mockResolvedValue(resolution);
+
+      await scheduler.schedule(req1, signal);
+
+      expect(mockStateManager.updateStatus).toHaveBeenCalledWith(
+        'call-1',
+        CoreToolCallStatus.Cancelled,
+        "User denied execution. Feedback: don't overwrite, append instead",
+      );
+      expect(mockExecutor.execute).not.toHaveBeenCalled();
+    });
+
+    it('should fall back to plain reason when feedback is empty string', async () => {
+      vi.mocked(checkPolicy).mockResolvedValue({
+        decision: PolicyDecision.ASK_USER,
+        rule: undefined,
+      });
+
+      const resolution = {
+        outcome: ToolConfirmationOutcome.Cancel,
+        lastDetails: undefined,
+        payload: { feedback: '' },
+      };
+      vi.mocked(resolveConfirmation).mockResolvedValue(resolution);
+
+      await scheduler.schedule(req1, signal);
+
+      expect(mockStateManager.updateStatus).toHaveBeenCalledWith(
+        'call-1',
+        CoreToolCallStatus.Cancelled,
+        'User denied execution.',
+      );
+    });
+
     it('should preserve confirmation details (e.g. diff) in cancelled state', async () => {
       vi.mocked(checkPolicy).mockResolvedValue({
         decision: PolicyDecision.ASK_USER,
