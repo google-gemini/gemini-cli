@@ -15,8 +15,7 @@ export const MemoryUsageDisplay: React.FC<{
   color?: string;
   isActive?: boolean;
 }> = ({ color = theme.text.primary, isActive = true }) => {
-  const [rssUsage, setRssUsage] = useState<string>('');
-  const [heapUsage, setHeapUsage] = useState<string>('');
+  const [memoryUsage, setMemoryUsage] = useState<string>('');
   const [memoryUsageColor, setMemoryUsageColor] = useState<string>(color);
 
   useEffect(() => {
@@ -25,12 +24,10 @@ export const MemoryUsageDisplay: React.FC<{
     }
 
     const updateMemory = () => {
-      const usage = process.memoryUsage();
-      const rss = usage.rss;
-      setRssUsage(formatBytes(rss));
-      setHeapUsage(formatBytes(usage.heapUsed));
+      const usage = process.memoryUsage().rss;
+      setMemoryUsage(formatBytes(usage));
       setMemoryUsageColor(
-        rss >= 2 * 1024 * 1024 * 1024 ? theme.status.error : color,
+        usage >= 2 * 1024 * 1024 * 1024 ? theme.status.error : color,
       );
     };
 
@@ -41,9 +38,7 @@ export const MemoryUsageDisplay: React.FC<{
 
   return (
     <Box>
-      <Text color={memoryUsageColor}>
-        {rssUsage} (Heap: {heapUsage})
-      </Text>
+      <Text color={memoryUsageColor}>{memoryUsage}</Text>
     </Box>
   );
 };
