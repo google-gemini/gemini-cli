@@ -641,7 +641,10 @@ export class ShellToolInvocation extends BaseToolInvocation<
 
         if (tempFileExists) {
           const pgrepContent = await fsPromises.readFile(tempFilePath, 'utf8');
-          const pgrepLines = pgrepContent.split('\n').filter(Boolean);
+          const pgrepLines = pgrepContent
+            .split('\n')
+            .map((line) => line.trim())
+            .filter(Boolean);
           for (const line of pgrepLines) {
             if (!/^\d+$/.test(line)) {
               if (
