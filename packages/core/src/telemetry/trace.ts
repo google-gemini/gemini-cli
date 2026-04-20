@@ -48,7 +48,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
-function isHasToJSON(value: unknown): value is { toJSON: () => unknown } {
+function hasToJSON(value: unknown): value is { toJSON: () => unknown } {
   if (!isRecord(value)) return false;
   if (!('toJSON' in value)) return false;
   const toJSONFn = value['toJSON'];
@@ -67,16 +67,17 @@ export function truncateForTelemetry(
   maxStringLength = 10000,
   maxArrayLength = 100,
   maxDepth = 4,
+  maxObjectKeys = 100,
   maxGlobalStringLength = 50000,
 ): AttributeValue | undefined {
   const truncateObj = (v: unknown, depth: number): unknown => {
     if (typeof v === 'string') {
-      const graphemes = Array.from(v);
-      if (graphemes.length > maxStringLength) {
-        return (
-          graphemes.slice(0, maxStringLength).join('') +
-          `...[TRUNCATED: original length ${graphemes.length}]`
-        );
+      if (v.length > maxStringLength) {
+        let truncatedStr = v.slice(0, maxStringLength);
+        if (truncatedStr.length > 0 && /[\uD800-\uDBFF]$/.test(truncatedStr)) {
+          truncatedStr = truncatedStr.slice(0, -1);
+        }
+        return truncatedStr + `...[TRUNCATED: original length ${v.length}]`;
       }
       return v;
     }
@@ -88,7 +89,7 @@ export function truncateForTelemetry(
     ) {
       return v;
     }
-    if (isHasToJSON(v)) {
+    if (hasToJSON(v)) {
       try {
         return truncateObj(v.toJSON(), depth);
       } catch {
@@ -112,21 +113,21 @@ export function truncateForTelemetry(
 
       const newObj: Record<string, unknown> = {};
       let numKeys = 0;
-      const MAX_KEYS = 100;
       const recordV = isRecord(v) ? v : {};
       for (const key in recordV) {
         if (!Object.prototype.hasOwnProperty.call(recordV, key)) continue;
-        if (numKeys >= MAX_KEYS) {
-          newObj['__truncated'] = `[TRUNCATED: Object with >${MAX_KEYS} keys]`;
+        if (numKeys >= maxObjectKeys) {
+          newObj['__truncated'] =
+            `[TRUNCATED: Object with >${maxObjectKeys} keys]`;
           break;
         }
+        const truncatedKey =
+          key.length > 100 ? key.slice(0, 100) + '...[TRUNCATED_KEY]' : key;
         try {
           const val = recordV[key];
-          const truncatedKey =
-            key.length > 100 ? key.slice(0, 100) + '...[TRUNCATED_KEY]' : key;
           newObj[truncatedKey] = truncateObj(val, depth + 1);
         } catch {
-          newObj[key] = '[ERROR: Failed to read property]';
+          newObj[truncatedKey] = '[ERROR: Failed to read property]';
         }
         numKeys++;
       }
@@ -151,10 +152,7 @@ export function truncateForTelemetry(
   const stringified = safeJsonStringify(truncated);
 
   if (stringified.length > maxGlobalStringLength) {
-    const graphemes = Array.from(stringified);
-    if (graphemes.length > maxGlobalStringLength) {
-      return `"[TRUNCATED: Payload exceeded global limit of ${maxGlobalStringLength} characters. Original length: ${graphemes.length}]"`;
-    }
+    return `"[TRUNCATED: Payload exceeded global limit of ${maxGlobalStringLength} characters. Original length: ${stringified.length}]"`;
   }
 
   return stringified as AttributeValue;

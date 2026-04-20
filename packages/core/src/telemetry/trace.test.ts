@@ -52,13 +52,13 @@ describe('truncateForTelemetry', () => {
   });
 
   it('should correctly truncate strings with multi-byte unicode characters (emojis)', () => {
-    // 5 emojis, each is a single grapheme cluster
+    // 5 emojis, each is a surrogate pair (2 code units)
     const emojis = '👋🌍🚀🔥🎉';
 
-    // Truncating to 2 graphemes
+    // Truncating to 2 code units
     const result = truncateForTelemetry(emojis, 2);
 
-    expect(result).toBe('👋🌍...[TRUNCATED: original length 5]');
+    expect(result).toBe('👋...[TRUNCATED: original length 10]');
   });
 
   it('should stringify and structurally truncate objects if exceeding limits', () => {
@@ -130,7 +130,7 @@ describe('truncateForTelemetry', () => {
       b: 'y'.repeat(100),
     };
     // Capping global string length to 50
-    const result = truncateForTelemetry(obj, 100, 100, 4, 50) as string;
+    const result = truncateForTelemetry(obj, 100, 100, 4, 100, 50) as string;
 
     // It should replace the entire object with a valid JSON string indicating truncation
     expect(result).toBe(
