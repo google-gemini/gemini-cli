@@ -16,6 +16,7 @@ import {
 import clipboardy from 'clipboardy';
 import { Box, Text, useStdout, type DOMElement } from 'ink';
 import { SuggestionsDisplay, MAX_WIDTH } from './SuggestionsDisplay.js';
+import { GeminiSpinner } from './GeminiSpinner.js';
 import { theme } from '../semantic-colors.js';
 import { useInputHistory } from '../hooks/useInputHistory.js';
 import { escapeAtSymbols } from '../hooks/atCommandProcessor.js';
@@ -1762,20 +1763,18 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   return (
     <>
       {suggestionsPosition === 'above' && suggestionsNode}
-      {useLineFallback ? (
-        <Box
-          borderStyle="round"
-          borderTop={true}
-          borderBottom={false}
-          borderLeft={false}
-          borderRight={false}
-          borderColor={borderColor}
-          width={terminalWidth}
-          flexDirection="row"
-          alignItems="flex-start"
-          height={0}
-        />
-      ) : null}
+      <Box
+        borderStyle="round"
+        borderTop={true}
+        borderBottom={false}
+        borderLeft={false}
+        borderRight={false}
+        borderColor={borderColor}
+        width={terminalWidth}
+        flexDirection="row"
+        alignItems="flex-start"
+        height={0}
+      />
       <HalfLinePaddedBox
         backgroundBaseColor={theme.background.input}
         backgroundOpacity={1}
@@ -1786,17 +1785,23 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           flexDirection="row"
           paddingX={1}
           borderColor={borderColor}
-          borderStyle={useLineFallback ? 'round' : undefined}
+          borderStyle="round"
           borderTop={false}
           borderBottom={false}
-          borderLeft={!useBackgroundColor}
-          borderRight={!useBackgroundColor}
+          borderLeft={true}
+          borderRight={true}
         >
           <Text
-            color={statusColor ?? theme.text.accent}
+            color={
+              streamingState === StreamingState.Responding
+                ? theme.text.secondary
+                : (statusColor ?? theme.text.accent)
+            }
             aria-label={statusText || undefined}
           >
-            {shellModeActive ? (
+            {streamingState === StreamingState.Responding ? (
+              <GeminiSpinner spinnerType="dots" />
+            ) : shellModeActive ? (
               reverseSearchActive ? (
                 <Text
                   color={theme.text.link}
@@ -1812,7 +1817,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             ) : showYoloStyling ? (
               '*'
             ) : (
-              '>'
+              '❯'
             )}{' '}
           </Text>
           <Box flexGrow={1} flexDirection="column" ref={innerBoxRef}>
@@ -1878,22 +1883,30 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
               </Box>
             )}
           </Box>
+          {statusText &&
+            !reverseSearchActive &&
+            !commandSearchActive &&
+            streamingState === StreamingState.Idle && (
+              <Box flexShrink={0} paddingLeft={1}>
+                <Text dimColor color={statusColor}>
+                  {statusText}
+                </Text>
+              </Box>
+            )}
         </Box>
       </HalfLinePaddedBox>
-      {useLineFallback ? (
-        <Box
-          borderStyle="round"
-          borderTop={false}
-          borderBottom={true}
-          borderLeft={false}
-          borderRight={false}
-          borderColor={borderColor}
-          width={terminalWidth}
-          flexDirection="row"
-          alignItems="flex-start"
-          height={0}
-        />
-      ) : null}
+      <Box
+        borderStyle="round"
+        borderTop={false}
+        borderBottom={true}
+        borderLeft={false}
+        borderRight={false}
+        borderColor={borderColor}
+        width={terminalWidth}
+        flexDirection="row"
+        alignItems="flex-start"
+        height={0}
+      />
       {suggestionsPosition === 'below' && suggestionsNode}
     </>
   );
