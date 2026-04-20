@@ -183,6 +183,10 @@
             "label": "Project context (GEMINI.md)",
             "slug": "docs/cli/gemini-md"
           },
+          {
+            "label": "Gemma 4 Routing",
+            "slug": "docs/cli/gemma4-routing"
+          },
           { "label": "Settings", "slug": "docs/cli/settings" },
           {
             "label": "System prompt override",

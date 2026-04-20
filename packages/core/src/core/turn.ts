@@ -308,7 +308,11 @@ export class Turn {
         const parts = resp.candidates?.[0]?.content?.parts ?? [];
         for (const part of parts) {
           if (part.thought) {
-            const thought = parseThought(part.text ?? '');
+            const rawThought =
+              typeof part.thought === 'string'
+                ? part.thought
+                : (part.text ?? '');
+            const thought = parseThought(rawThought);
             yield {
               type: GeminiEventType.Thought,
               value: thought,

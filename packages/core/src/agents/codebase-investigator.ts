@@ -53,7 +53,7 @@ export const CodebaseInvestigatorAgent = (
 ): LocalAgentDefinition<typeof CodebaseInvestigationReportSchema> => {
   // Use Preview Flash model if the main model supports modern features.
   // If the main model is not a modern model, use the default pro model.
-  const model = supportsModernFeatures(config.getModel())
+  const model = supportsModernFeatures(config.getModel(), config)
     ? PREVIEW_GEMINI_FLASH_MODEL
     : DEFAULT_GEMINI_MODEL;
 
@@ -97,7 +97,7 @@ export const CodebaseInvestigatorAgent = (
       generateContentConfig: {
         temperature: 0.1,
         topP: 0.95,
-        thinkingConfig: supportsModernFeatures(model)
+        thinkingConfig: supportsModernFeatures(model, config)
           ? {
               includeThoughts: true,
               thinkingLevel: ThinkingLevel.HIGH,

@@ -1072,6 +1072,23 @@ const SETTINGS_SCHEMA = {
         description: 'Skip the next speaker check.',
         showInDialog: true,
       },
+      gemma4Variant: {
+        type: 'enum',
+        label: 'Gemma 4 Variant',
+        category: 'Model',
+        requiresRestart: true,
+        default: undefined as
+          | 'gemma-4-26b-a4b-it'
+          | 'gemma-4-31b-it'
+          | undefined,
+        description:
+          'Select which Gemma 4 model variant to use when routing Gemini Pro and Flash requests.',
+        showInDialog: true,
+        options: [
+          { value: 'gemma-4-26b-a4b-it', label: 'Gemma 4 26B A4B IT' },
+          { value: 'gemma-4-31b-it', label: 'Gemma 4 31B IT' },
+        ],
+      },
     },
   },
 
