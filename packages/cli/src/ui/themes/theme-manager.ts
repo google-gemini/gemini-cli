@@ -7,6 +7,8 @@
 import { AyuDark } from './builtin/dark/ayu-dark.js';
 import { AyuLight } from './builtin/light/ayu-light.js';
 import { AtomOneDark } from './builtin/dark/atom-one-dark.js';
+import { ColorblindDark } from './builtin/dark/colorblind-dark.js';
+import { ColorblindLight } from './builtin/light/colorblind-light.js';
 import { Dracula } from './builtin/dark/dracula-dark.js';
 import { GitHubDark } from './builtin/dark/github-dark.js';
 import { GitHubLight } from './builtin/light/github-light.js';
@@ -74,6 +76,8 @@ class ThemeManager {
       AyuDark,
       AyuLight,
       AtomOneDark,
+      ColorblindDark,
+      ColorblindLight,
       Dracula,
       DefaultLight,
       DefaultDark,
