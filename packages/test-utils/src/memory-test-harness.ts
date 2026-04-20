@@ -199,6 +199,60 @@ export class MemoryTestHarness {
   }
 
   /**
+   * Assert that a scenario result is within the baseline tolerance.
+   * Throws an assertion error with details if it exceeds the threshold.
+   */
+  assertWithinBaseline(
+    result: MemoryTestResult,
+    tolerancePercent?: number,
+  ): void {
+    const tolerance = tolerancePercent ?? this.defaultTolerancePercent;
+
+    if (!result.baseline) {
+      console.warn(
+        `⚠ No baseline found for "${result.scenarioName}". ` +
+          `Run with UPDATE_MEMORY_BASELINES=true to create one. ` +
+          `Measured: ${formatMB(result.finalHeapUsed)} heap used.`,
+      );
+      return; // Don't fail if no baseline exists yet
+    }
+
+    const measuredMB = result.finalHeapUsed / (1024 * 1024);
+    const deltaPercent =
+      ((measuredMB - result.baseline.heapUsedMB) / result.baseline.heapUsedMB) *
+      100;
+
+    if (deltaPercent > tolerance) {
+      throw new Error(
+        `Memory regression detected for "${result.scenarioName}"!\n` +
+          `  Measured:  ${formatMB(result.finalHeapUsed)} heap used\n` +
+          `  Baseline:  ${result.baseline.heapUsedMB.toFixed(1)} MB heap used\n` +
+          `  Delta:     ${deltaPercent.toFixed(1)}% (tolerance: ${tolerance}%)\n` +
+          `  Peak heap: ${formatMB(result.peakHeapUsed)}\n` +
+          `  Peak RSS:  ${formatMB(result.peakRss)}\n` +
+          `  Peak External:  ${formatMB(result.peakExternal)}`,
+      );
+    }
+  }
+
+  /**
+   * Update the baseline for a scenario with the current measured values.
+   */
+  updateScenarioBaseline(result: MemoryTestResult): void {
+    const lastSnapshot = result.snapshots[result.snapshots.length - 1];
+    updateBaseline(this.baselinesPath, result.scenarioName, {
+      heapUsedMB: Number((result.finalHeapUsed / (1024 * 1024)).toFixed(1)),
+      heapTotalMB: Number(
+        ((lastSnapshot?.heapTotal ?? 0) / (1024 * 1024)).toFixed(1),
+      ),
+      rssMB: Number((result.finalRss / (1024 * 1024)).toFixed(1)),
+      externalMB: Number((result.finalExternal / (1024 * 1024)).toFixed(1)),
+    });
+    // Reload baselines after update
+    this.baselines = loadBaselines(this.baselinesPath);
+  }
+
+  /**
    * Analyze snapshots to detect sustained leaks.
    * A leak is flagged if growth is observed in both phases.
    */
@@ -256,60 +310,6 @@ export class MemoryTestHarness {
           `  Delta:    ${formatMB(delta)} (tolerance: ${formatMB(tolerance)})`,
       );
     }
-  }
-
-  /**
-   * Assert that a scenario result is within the baseline tolerance.
-   * Throws an assertion error with details if it exceeds the threshold.
-   */
-  assertWithinBaseline(
-    result: MemoryTestResult,
-    tolerancePercent?: number,
-  ): void {
-    const tolerance = tolerancePercent ?? this.defaultTolerancePercent;
-
-    if (!result.baseline) {
-      console.warn(
-        `⚠ No baseline found for "${result.scenarioName}". ` +
-          `Run with UPDATE_MEMORY_BASELINES=true to create one. ` +
-          `Measured: ${formatMB(result.finalHeapUsed)} heap used.`,
-      );
-      return; // Don't fail if no baseline exists yet
-    }
-
-    const measuredMB = result.finalHeapUsed / (1024 * 1024);
-    const deltaPercent =
-      ((measuredMB - result.baseline.heapUsedMB) / result.baseline.heapUsedMB) *
-      100;
-
-    if (deltaPercent > tolerance) {
-      throw new Error(
-        `Memory regression detected for "${result.scenarioName}"!\n` +
-          `  Measured:  ${formatMB(result.finalHeapUsed)} heap used\n` +
-          `  Baseline:  ${result.baseline.heapUsedMB.toFixed(1)} MB heap used\n` +
-          `  Delta:     ${deltaPercent.toFixed(1)}% (tolerance: ${tolerance}%)\n` +
-          `  Peak heap: ${formatMB(result.peakHeapUsed)}\n` +
-          `  Peak RSS:  ${formatMB(result.peakRss)}\n` +
-          `  Peak External:  ${formatMB(result.peakExternal)}`,
-      );
-    }
-  }
-
-  /**
-   * Update the baseline for a scenario with the current measured values.
-   */
-  updateScenarioBaseline(result: MemoryTestResult): void {
-    const lastSnapshot = result.snapshots[result.snapshots.length - 1];
-    updateBaseline(this.baselinesPath, result.scenarioName, {
-      heapUsedMB: Number((result.finalHeapUsed / (1024 * 1024)).toFixed(1)),
-      heapTotalMB: Number(
-        ((lastSnapshot?.heapTotal ?? 0) / (1024 * 1024)).toFixed(1),
-      ),
-      rssMB: Number((result.finalRss / (1024 * 1024)).toFixed(1)),
-      externalMB: Number((result.finalExternal / (1024 * 1024)).toFixed(1)),
-    });
-    // Reload baselines after update
-    this.baselines = loadBaselines(this.baselinesPath);
   }
 
   /**
