@@ -1584,7 +1584,7 @@ export class TestRig {
                   (dp.attributes?.['component'] as string) || 'unknown';
                 const seconds = dp.startTime?.[0] || 0;
                 const nanos = dp.startTime?.[1] || 0;
-                const timeKey = `${sessionId}-${component}-${seconds}`;
+                const timeKey = `${sessionId}-${component}-${seconds}-${nanos}`;
 
                 if (!snapshots[timeKey]) {
                   snapshots[timeKey] = {
