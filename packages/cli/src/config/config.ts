@@ -80,6 +80,7 @@ export interface CliArgs {
   model: string | undefined;
   sandbox: boolean | string | undefined;
   debug: boolean | undefined;
+  disableStreaming?: boolean;
   prompt: string | undefined;
   promptInteractive: string | undefined;
   worktree?: string;
@@ -420,6 +421,10 @@ export async function parseArguments(
         .option('screen-reader', {
           type: 'boolean',
           description: 'Enable screen reader mode for accessibility.',
+        })
+        .option('disable-streaming', {
+          type: 'boolean',
+          description: 'Disable streaming responses from the model',
         })
         .option('output-format', {
           alias: 'o',
@@ -918,6 +923,7 @@ export async function loadCliConfig(
   return new Config({
     acpMode: isAcpMode,
     clientName,
+    disableStreaming: argv.disableStreaming,
     sessionId,
     clientVersion: await getVersion(),
     embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
