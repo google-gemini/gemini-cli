@@ -154,7 +154,7 @@ based on the task description.
 Plan Mode's default tool restrictions are managed by the [policy engine] and
 defined in the built-in [`plan.toml`] file. The built-in policy (Tier 1)
 enforces the read-only state, but you can customize these rules by creating your
-own policies in your `~/.gemini/policies/` directory (Tier 2).
+own policies in your `~/.gemini/policies/` directory (Tier 4).
 
 #### Example: Automatically approve read-only MCP tools
 

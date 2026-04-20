@@ -791,8 +791,12 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Restrict the set of built-in tools with an allowlist. Match
     semantics mirror tools.allowed; see the built-in tools documentation for
     available names.
-  - **Default:** `undefined`
+  - **Default:** `undefined` (all built-in tools are enabled)
   - **Requires restart:** Yes
+  - **Warning:** Setting this to _any_ value disables all built-in tools that
+    are not in the list. For example, `["read_file", "run_shell_command(git)"]`
+    disables every other built-in tool (write, edit, search, etc.). Leave
+    `undefined` to keep all built-in tools enabled.
 
 - **`tools.allowed`** (array):
   - **Description:** Tool names that bypass the confirmation dialog. Useful for
@@ -1518,9 +1522,10 @@ for that specific session.
   - Specifies the Gemini model to use for this session.
   - Example: `npm start -- --model gemini-3-pro-preview`
 - **`--prompt <your_prompt>`** (**`-p <your_prompt>`**):
-  - **Deprecated:** Use positional arguments instead.
-  - Used to pass a prompt directly to the command. This invokes Gemini CLI in a
-    non-interactive mode.
+  - Runs Gemini CLI in non-interactive (headless) mode with the given prompt.
+    The response is printed to stdout and the process exits.
+  - When stdin is piped, the stdin content is prepended to the prompt.
+  - Example: `gemini -p "Explain this codebase"`
 - **`--prompt-interactive <your_prompt>`** (**`-i <your_prompt>`**):
   - Starts an interactive session with the provided prompt as the initial input.
   - The prompt is processed within the interactive session, not before it.

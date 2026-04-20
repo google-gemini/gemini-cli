@@ -19,15 +19,19 @@ Headless mode runs Gemini CLI once and exits. It's perfect for:
 
 ## How to use headless mode
 
-Run Gemini CLI in headless mode by providing a prompt as a positional argument.
-This bypasses the interactive chat interface and prints the response to standard
-output (stdout).
+Run Gemini CLI in headless mode using the `-p` (`--prompt`) flag. This bypasses
+the interactive chat interface, processes a single prompt, and prints the
+response to standard output (stdout).
 
 Run a single command:
 
 ```bash
-gemini "Write a poem about TypeScript"
+gemini -p "Write a poem about TypeScript"
 ```
+
+Note: Positional arguments (for example, `gemini "hello"`) default to
+interactive mode when run in a TTY. Headless mode is also activated
+automatically in non-TTY environments (piped input/output) and CI environments.
 
 ## How to pipe input to Gemini CLI
 
