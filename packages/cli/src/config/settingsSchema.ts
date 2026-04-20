@@ -256,13 +256,28 @@ const SETTINGS_SCHEMA = {
       },
       enableNotifications: {
         type: 'boolean',
-        label: 'Enable Notifications',
+        label: 'Enable Terminal Notifications',
         category: 'General',
         requiresRestart: false,
         default: false,
         description:
-          'Enable run-event notifications for action-required prompts and session completion.',
+          'Enable terminal run-event notifications for action-required prompts and session completion.',
         showInDialog: true,
+      },
+      notificationMethod: {
+        type: 'enum',
+        label: 'Terminal Notification Method',
+        category: 'General',
+        requiresRestart: false,
+        default: 'auto',
+        description: 'How to send terminal notifications.',
+        showInDialog: true,
+        options: [
+          { value: 'auto', label: 'Auto' },
+          { value: 'osc9', label: 'OSC 9' },
+          { value: 'osc777', label: 'OSC 777' },
+          { value: 'bell', label: 'Bell' },
+        ],
       },
       checkpointing: {
         type: 'object',
@@ -402,6 +417,16 @@ const SETTINGS_SCHEMA = {
           },
         },
         description: 'Settings for automatic session cleanup.',
+      },
+      topicUpdateNarration: {
+        type: 'boolean',
+        label: 'Topic & Update Narration',
+        category: 'General',
+        requiresRestart: false,
+        default: true,
+        description:
+          'Enable the Topic & Update communication model for reduced chattiness and structured progress reporting.',
+        showInDialog: true,
       },
     },
   },
@@ -2188,6 +2213,16 @@ const SETTINGS_SCHEMA = {
           'Replace the built-in save_memory tool with a memory manager subagent that supports adding, removing, de-duplicating, and organizing memories.',
         showInDialog: true,
       },
+      autoMemory: {
+        type: 'boolean',
+        label: 'Auto Memory',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Automatically extract reusable skills from past sessions in the background. Review results with /memory inbox.',
+        showInDialog: true,
+      },
       generalistProfile: {
         type: 'boolean',
         label: 'Use the generalist profile to manage agent contexts.',
@@ -2213,9 +2248,8 @@ const SETTINGS_SCHEMA = {
         category: 'Experimental',
         requiresRestart: false,
         default: false,
-        description:
-          'Enable the experimental Topic & Update communication model for reduced chattiness and structured progress reporting.',
-        showInDialog: true,
+        description: 'Deprecated: Use general.topicUpdateNarration instead.',
+        showInDialog: false,
       },
     },
   },
