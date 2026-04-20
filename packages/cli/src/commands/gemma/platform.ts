@@ -15,6 +15,7 @@ import {
   getLiteRtBinDir,
   GEMMA_MODEL_NAME,
   HEALTH_CHECK_TIMEOUT_MS,
+  LITERT_API_VERSION,
   getPidFilePath,
 } from './constants.js';
 
@@ -136,9 +137,12 @@ export async function isServerRunning(port: number): Promise<boolean> {
       () => controller.abort(),
       HEALTH_CHECK_TIMEOUT_MS,
     );
-    await fetch(`http://localhost:${port}/`, { signal: controller.signal });
+    const response = await fetch(
+      `http://localhost:${port}/${LITERT_API_VERSION}/models/${GEMMA_MODEL_NAME}`,
+      { signal: controller.signal },
+    );
     clearTimeout(timeout);
-    return true;
+    return response.ok;
   } catch {
     return false;
   }

@@ -13,6 +13,7 @@ export const LITERT_RELEASE_BASE_URL =
 export const GEMMA_MODEL_NAME = 'gemma3-1b-gpu-custom';
 export const DEFAULT_PORT = 9379;
 export const HEALTH_CHECK_TIMEOUT_MS = 5000;
+export const LITERT_API_VERSION = 'v1beta';
 export const SERVER_START_WAIT_MS = 3000;
 
 export const PLATFORM_BINARY_MAP: Record<string, string> = {
