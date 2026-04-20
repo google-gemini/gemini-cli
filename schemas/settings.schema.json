@@ -2509,6 +2509,12 @@
               "markdownDescription": "Enable shell output efficiency optimizations for better performance.\n\n- Category: `Tools`\n- Requires restart: `no`\n- Default: `true`",
               "default": true,
               "type": "boolean"
+            },
+            "rcFile": {
+              "title": "Shell Tool RC File",
+              "description": "The path to a bash file (e.g., .bashrc) to source before executing shell commands.",
+              "markdownDescription": "The path to a bash file (e.g., .bashrc) to source before executing shell commands.\n\n- Category: `Tools`\n- Requires restart: `no`",
+              "type": "string"
             }
           },
           "additionalProperties": false

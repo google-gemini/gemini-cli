@@ -1452,6 +1452,11 @@ their corresponding top-level category object in your `settings.json` file.
     performance.
   - **Default:** `true`
 
+- **`tools.shell.rcFile`** (string):
+  - **Description:** The path to a bash file (e.g., .bashrc) to source before
+    executing shell commands.
+  - **Default:** `undefined`
+
 - **`tools.core`** (array):
   - **Description:** Restrict the set of built-in tools with an allowlist. Match
     semantics mirror tools.allowed; see the built-in tools documentation for

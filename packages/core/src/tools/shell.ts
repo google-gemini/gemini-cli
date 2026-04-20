@@ -466,6 +466,8 @@ export class ShellToolInvocation extends BaseToolInvocation<
     const rcFilePath = this.context.config.getShellToolRcFile();
     if (rcFilePath) {
       strippedCommandWithRc = `source ${rcFilePath} && ${strippedCommand}`;
+    } else if (!isWindows) {
+      strippedCommandWithRc = `export PAGER=cat GIT_PAGER=cat; more() { cat "$@"; }; less() { cat "$@"; }; ${strippedCommand}`;
     }
 
     try {
