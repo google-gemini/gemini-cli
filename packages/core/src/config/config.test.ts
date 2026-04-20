@@ -710,6 +710,59 @@ describe('Server Config (config.ts)', () => {
       );
     });
 
+    describe('getProModelNoAccessSync', () => {
+      it('should return experiment value for AuthType.LOGIN_WITH_GOOGLE', async () => {
+        vi.mocked(getExperiments).mockResolvedValue({
+          experimentIds: [],
+          flags: {
+            [ExperimentFlags.PRO_MODEL_NO_ACCESS]: {
+              boolValue: true,
+            },
+          },
+        });
+        const config = new Config(baseParams);
+        vi.mocked(createContentGeneratorConfig).mockResolvedValue({
+          authType: AuthType.LOGIN_WITH_GOOGLE,
+        });
+        await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
+        expect(config.getProModelNoAccessSync()).toBe(true);
+      });
+
+      it('should return experiment value for AuthType.COMPUTE_ADC', async () => {
+        vi.mocked(getExperiments).mockResolvedValue({
+          experimentIds: [],
+          flags: {
+            [ExperimentFlags.PRO_MODEL_NO_ACCESS]: {
+              boolValue: true,
+            },
+          },
+        });
+        const config = new Config(baseParams);
+        vi.mocked(createContentGeneratorConfig).mockResolvedValue({
+          authType: AuthType.COMPUTE_ADC,
+        });
+        await config.refreshAuth(AuthType.COMPUTE_ADC);
+        expect(config.getProModelNoAccessSync()).toBe(true);
+      });
+
+      it('should return false for other auth types even if experiment is true', async () => {
+        vi.mocked(getExperiments).mockResolvedValue({
+          experimentIds: [],
+          flags: {
+            [ExperimentFlags.PRO_MODEL_NO_ACCESS]: {
+              boolValue: true,
+            },
+          },
+        });
+        const config = new Config(baseParams);
+        vi.mocked(createContentGeneratorConfig).mockResolvedValue({
+          authType: AuthType.USE_GEMINI,
+        });
+        await config.refreshAuth(AuthType.USE_GEMINI);
+        expect(config.getProModelNoAccessSync()).toBe(false);
+      });
+    });
+
     describe('getRequestTimeoutMs', () => {
       it('should return undefined if the flag is not set', () => {
         const config = new Config(baseParams);
@@ -3448,6 +3501,50 @@ describe('Config JIT Initialization', () => {
 
       config = new Config(params);
       expect(config.isMemoryManagerEnabled()).toBe(true);
+    });
+  });
+
+  describe('isAutoMemoryEnabled', () => {
+    it('should default to false', () => {
+      const params: ConfigParameters = {
+        sessionId: 'test-session',
+        targetDir: '/tmp/test',
+        debugMode: false,
+        model: 'test-model',
+        cwd: '/tmp/test',
+      };
+
+      config = new Config(params);
+      expect(config.isAutoMemoryEnabled()).toBe(false);
+    });
+
+    it('should return true when experimentalAutoMemory is true', () => {
+      const params: ConfigParameters = {
+        sessionId: 'test-session',
+        targetDir: '/tmp/test',
+        debugMode: false,
+        model: 'test-model',
+        cwd: '/tmp/test',
+        experimentalAutoMemory: true,
+      };
+
+      config = new Config(params);
+      expect(config.isAutoMemoryEnabled()).toBe(true);
+    });
+
+    it('should be independent of experimentalMemoryManager', () => {
+      const params: ConfigParameters = {
+        sessionId: 'test-session',
+        targetDir: '/tmp/test',
+        debugMode: false,
+        model: 'test-model',
+        cwd: '/tmp/test',
+        experimentalMemoryManager: true,
+      };
+
+      config = new Config(params);
+      expect(config.isMemoryManagerEnabled()).toBe(true);
+      expect(config.isAutoMemoryEnabled()).toBe(false);
     });
   });
 
