@@ -1993,13 +1993,15 @@ describe('getRipgrepPath', () => {
       vi.mocked(fileExists).mockImplementation(
         async (checkPath) =>
           checkPath.includes(path.normalize('core/vendor/ripgrep')) &&
-          !checkPath.includes('tools'),
+          !checkPath.includes(path.join(path.sep, 'tools', path.sep)),
       );
 
       const resolvedPath = await getRipgrepPath();
       expect(resolvedPath).not.toBeNull();
       expect(resolvedPath).toContain(path.normalize('core/vendor/ripgrep'));
-      expect(resolvedPath).not.toContain('tools');
+      expect(resolvedPath).not.toContain(
+        path.join(path.sep, 'tools', path.sep),
+      );
     });
 
     it('should return null if binary is missing from both paths', async () => {

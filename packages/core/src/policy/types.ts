@@ -335,6 +335,7 @@ export interface PolicySettings {
     allowed?: string[];
   };
   tools?: {
+    core?: string[];
     exclude?: string[];
     allowed?: string[];
   };

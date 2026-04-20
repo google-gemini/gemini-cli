@@ -75,6 +75,7 @@ export const ADMIN_POLICY_TIER = 5;
 export const MCP_EXCLUDED_PRIORITY = USER_POLICY_TIER + 0.9;
 export const EXCLUDE_TOOLS_FLAG_PRIORITY = USER_POLICY_TIER + 0.4;
 export const ALLOWED_TOOLS_FLAG_PRIORITY = USER_POLICY_TIER + 0.3;
+export const CORE_TOOLS_FLAG_PRIORITY = USER_POLICY_TIER + 0.25;
 export const TRUSTED_MCP_SERVER_PRIORITY = USER_POLICY_TIER + 0.2;
 export const ALLOWED_MCP_SERVER_PRIORITY = USER_POLICY_TIER + 0.1;
 
@@ -434,10 +435,12 @@ export async function createPolicyEngineConfig(
     }
   }
 
-  // Tools that are explicitly allowed in the settings.
-  // Priority: ALLOWED_TOOLS_FLAG_PRIORITY (user tier - explicit temporary allows)
-  if (settings.tools?.allowed) {
-    for (const tool of settings.tools.allowed) {
+  const mapToolsToRules = (
+    tools: string[],
+    priority: number,
+    source: string,
+  ) => {
+    for (const tool of tools) {
       // Check for legacy format: toolName(args)
       const match = tool.match(/^([a-zA-Z0-9_-]+)\((.*)\)$/);
       if (match) {
@@ -455,9 +458,9 @@ export async function createPolicyEngineConfig(
               rules.push({
                 toolName,
                 decision: PolicyDecision.ALLOW,
-                priority: ALLOWED_TOOLS_FLAG_PRIORITY,
+                priority,
                 argsPattern: new RegExp(pattern),
-                source: 'Settings (Tools Allowed)',
+                source,
               });
             }
           }
@@ -467,8 +470,8 @@ export async function createPolicyEngineConfig(
           rules.push({
             toolName,
             decision: PolicyDecision.ALLOW,
-            priority: ALLOWED_TOOLS_FLAG_PRIORITY,
-            source: 'Settings (Tools Allowed)',
+            priority,
+            source,
           });
         }
       } else {
@@ -479,11 +482,40 @@ export async function createPolicyEngineConfig(
         rules.push({
           toolName,
           decision: PolicyDecision.ALLOW,
-          priority: ALLOWED_TOOLS_FLAG_PRIORITY,
-          source: 'Settings (Tools Allowed)',
+          priority,
+          source,
         });
       }
     }
+  };
+
+  // Tools that are explicitly allowed in the settings.
+  // Priority: ALLOWED_TOOLS_FLAG_PRIORITY (user tier - explicit temporary allows)
+  if (settings.tools?.allowed) {
+    mapToolsToRules(
+      settings.tools.allowed,
+      ALLOWED_TOOLS_FLAG_PRIORITY,
+      'Settings (Tools Allowed)',
+    );
+  }
+
+  // Core tools that are restricted in the settings.
+  // Priority: CORE_TOOLS_FLAG_PRIORITY (user tier - core tool allowlist)
+  if (settings.tools?.core) {
+    mapToolsToRules(
+      settings.tools.core,
+      CORE_TOOLS_FLAG_PRIORITY,
+      'Settings (Core Tools)',
+    );
+
+    // If core tools are restricted, we should add a default DENY rule for everything else
+    // at a slightly lower priority than the explicit allows.
+    rules.push({
+      toolName: '*',
+      decision: PolicyDecision.DENY,
+      priority: CORE_TOOLS_FLAG_PRIORITY - 0.01,
+      source: 'Settings (Core Tools Allowlist Enforcement)',
+    });
   }
 
   // MCP servers that are trusted in the settings.
