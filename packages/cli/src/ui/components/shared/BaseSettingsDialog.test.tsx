@@ -87,12 +87,17 @@ describe('BaseSettingsDialog', () => {
   let mockOnScopeChange: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
+    vi.useFakeTimers();
     vi.clearAllMocks();
     mockOnItemToggle = vi.fn();
     mockOnEditCommit = vi.fn();
     mockOnItemClear = vi.fn();
     mockOnClose = vi.fn();
     mockOnScopeChange = vi.fn();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   const renderDialog = async (props: Partial<BaseSettingsDialogProps> = {}) => {
@@ -110,6 +115,7 @@ describe('BaseSettingsDialog', () => {
 
     const result = await renderWithProviders(
       <BaseSettingsDialog {...defaultProps} />,
+      { width: 100, height: 40 },
     );
     await result.waitUntilReady();
     return result;
