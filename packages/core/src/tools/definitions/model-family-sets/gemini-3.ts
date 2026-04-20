@@ -100,8 +100,7 @@ export const GEMINI_3_SET: CoreToolSet = {
           type: 'string',
         },
         [READ_FILE_PARAM_START_LINE]: {
-          description:
-            'Optional: The 1-based line number to start reading from.',
+          description: 'Optional 1-based starting line number.',
           type: 'number',
         },
         [READ_FILE_PARAM_END_LINE]: {
@@ -184,7 +183,7 @@ export const GEMINI_3_SET: CoreToolSet = {
   grep_search_ripgrep: {
     name: GREP_TOOL_NAME,
     description:
-      'Searches for a regular expression pattern within file contents. This tool is FAST and optimized, powered by ripgrep. PREFERRED over standard `run_shell_command("grep ...")` due to better performance and automatic output limiting (defaults to 100 matches, but can be increased via `total_max_matches`).',
+      "Fast ripgrep-powered search. Always prefer this over run_shell_command('grep').",
     parametersJsonSchema: {
       type: 'object',
       properties: {
@@ -343,8 +342,8 @@ export const GEMINI_3_SET: CoreToolSet = {
 
   replace: {
     name: EDIT_TOOL_NAME,
-    description: `Replaces text within a file. By default, the tool expects to find and replace exactly ONE occurrence of \`old_string\`. If you want to replace multiple occurrences of the exact same string, set \`allow_multiple\` to true. This tool requires providing significant context around the change to ensure precise targeting.
-The user has the ability to modify the \`new_string\` content. If modified, this will be stated in the response.`,
+    description:
+      'Replaces exact old_string with new_string. Fails if not exactly one match, unless allow_multiple is true.',
     parametersJsonSchema: {
       type: 'object',
       properties: {
