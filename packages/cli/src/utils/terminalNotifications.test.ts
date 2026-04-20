@@ -11,6 +11,7 @@ import {
   MAX_NOTIFICATION_SUBTITLE_CHARS,
   MAX_NOTIFICATION_TITLE_CHARS,
   notifyViaTerminal,
+  TerminalNotificationMethod,
 } from './terminalNotifications.js';
 
 const writeToStdout = vi.hoisted(() => vi.fn());
@@ -24,38 +25,19 @@ vi.mock('@google/gemini-cli-core', () => ({
 }));
 
 describe('terminal notifications', () => {
-  const originalPlatform = process.platform;
-
   beforeEach(() => {
     vi.resetAllMocks();
     vi.unstubAllEnvs();
-    Object.defineProperty(process, 'platform', {
-      value: 'darwin',
-      configurable: true,
-    });
+    vi.stubEnv('TMUX', '');
+    vi.stubEnv('STY', '');
+    vi.stubEnv('WT_SESSION', '');
+    vi.stubEnv('TERM_PROGRAM', '');
+    vi.stubEnv('TERM', '');
+    vi.stubEnv('ALACRITTY_WINDOW_ID', '');
   });
 
   afterEach(() => {
     vi.unstubAllEnvs();
-    Object.defineProperty(process, 'platform', {
-      value: originalPlatform,
-      configurable: true,
-    });
-  });
-
-  it('emits notification on non-macOS platforms', async () => {
-    Object.defineProperty(process, 'platform', {
-      value: 'linux',
-      configurable: true,
-    });
-
-    const shown = await notifyViaTerminal(true, {
-      title: 't',
-      body: 'b',
-    });
-
-    expect(shown).toBe(true);
-    expect(writeToStdout).toHaveBeenCalled();
   });
 
   it('returns false without writing when disabled', async () => {
@@ -68,8 +50,7 @@ describe('terminal notifications', () => {
     expect(writeToStdout).not.toHaveBeenCalled();
   });
 
-  it('emits OSC 9 notification when supported terminal is detected', async () => {
-    vi.stubEnv('WT_SESSION', '');
+  it('emits OSC 9 notification when iTerm2 is detected', async () => {
     vi.stubEnv('TERM_PROGRAM', 'iTerm.app');
 
     const shown = await notifyViaTerminal(true, {
@@ -85,10 +66,7 @@ describe('terminal notifications', () => {
     expect(emitted.endsWith('\x07')).toBe(true);
   });
 
-  it('emits BEL fallback when OSC 9 is not supported', async () => {
-    vi.stubEnv('TERM_PROGRAM', '');
-    vi.stubEnv('TERM', '');
-
+  it('emits OSC 777 for unknown terminals', async () => {
     const shown = await notifyViaTerminal(true, {
       title: 'Title',
       subtitle: 'Subtitle',
@@ -96,12 +74,49 @@ describe('terminal notifications', () => {
     });
 
     expect(shown).toBe(true);
+    expect(writeToStdout).toHaveBeenCalledTimes(1);
+    const emitted = String(writeToStdout.mock.calls[0][0]);
+    expect(emitted.startsWith('\x1b]777;notify;')).toBe(true);
+  });
+
+  it('uses BEL when Windows Terminal is detected', async () => {
+    vi.stubEnv('WT_SESSION', '1');
+
+    const shown = await notifyViaTerminal(true, {
+      title: 'Title',
+      body: 'Body',
+    });
+
+    expect(shown).toBe(true);
     expect(writeToStdout).toHaveBeenCalledWith('\x07');
   });
 
-  it('uses BEL fallback when WT_SESSION is set', async () => {
-    vi.stubEnv('WT_SESSION', '1');
-    vi.stubEnv('TERM_PROGRAM', 'WezTerm');
+  it('uses BEL when Alacritty is detected', async () => {
+    vi.stubEnv('ALACRITTY_WINDOW_ID', '1');
+
+    const shown = await notifyViaTerminal(true, {
+      title: 'Title',
+      body: 'Body',
+    });
+
+    expect(shown).toBe(true);
+    expect(writeToStdout).toHaveBeenCalledWith('\x07');
+  });
+
+  it('uses BEL when Apple Terminal is detected', async () => {
+    vi.stubEnv('TERM_PROGRAM', 'Apple_Terminal');
+
+    const shown = await notifyViaTerminal(true, {
+      title: 'Title',
+      body: 'Body',
+    });
+
+    expect(shown).toBe(true);
+    expect(writeToStdout).toHaveBeenCalledWith('\x07');
+  });
+
+  it('uses BEL when VSCode Terminal is detected', async () => {
+    vi.stubEnv('TERM_PROGRAM', 'vscode');
 
     const shown = await notifyViaTerminal(true, {
       title: 'Title',
@@ -127,7 +142,6 @@ describe('terminal notifications', () => {
   });
 
   it('strips terminal control sequences and newlines from payload text', async () => {
-    vi.stubEnv('WT_SESSION', '');
     vi.stubEnv('TERM_PROGRAM', 'iTerm.app');
 
     const shown = await notifyViaTerminal(true, {
@@ -161,5 +175,125 @@ describe('terminal notifications', () => {
     expect(content.body.length).toBeLessThanOrEqual(
       MAX_NOTIFICATION_BODY_CHARS,
     );
+  });
+
+  it('emits OSC 9 notification when method is explicitly set to osc9', async () => {
+    // Explicitly set terminal to something that would normally use BEL
+    vi.stubEnv('WT_SESSION', '1');
+
+    const shown = await notifyViaTerminal(
+      true,
+      {
+        title: 'Explicit OSC 9',
+        body: 'Body',
+      },
+      TerminalNotificationMethod.Osc9,
+    );
+
+    expect(shown).toBe(true);
+    expect(writeToStdout).toHaveBeenCalledTimes(1);
+    const emitted = String(writeToStdout.mock.calls[0][0]);
+    expect(emitted.startsWith('\x1b]9;')).toBe(true);
+    expect(emitted.endsWith('\x07')).toBe(true);
+    expect(emitted).toContain('Explicit OSC 9');
+  });
+
+  it('emits OSC 777 notification when method is explicitly set to osc777', async () => {
+    // Explicitly set terminal to something that would normally use BEL
+    vi.stubEnv('WT_SESSION', '1');
+    const shown = await notifyViaTerminal(
+      true,
+      {
+        title: 'Explicit OSC 777',
+        body: 'Body',
+      },
+      TerminalNotificationMethod.Osc777,
+    );
+
+    expect(shown).toBe(true);
+    expect(writeToStdout).toHaveBeenCalledTimes(1);
+    const emitted = String(writeToStdout.mock.calls[0][0]);
+    expect(emitted.startsWith('\x1b]777;notify;')).toBe(true);
+    expect(emitted.endsWith('\x07')).toBe(true);
+    expect(emitted).toContain('Explicit OSC 777');
+  });
+
+  it('emits BEL notification when method is explicitly set to bell', async () => {
+    // Explicitly set terminal to something that supports OSC 9
+    vi.stubEnv('TERM_PROGRAM', 'iTerm.app');
+
+    const shown = await notifyViaTerminal(
+      true,
+      {
+        title: 'Explicit BEL',
+        body: 'Body',
+      },
+      TerminalNotificationMethod.Bell,
+    );
+
+    expect(shown).toBe(true);
+    expect(writeToStdout).toHaveBeenCalledTimes(1);
+    expect(writeToStdout).toHaveBeenCalledWith('\x07');
+  });
+
+  it('replaces semicolons with colons in OSC 777 to avoid breaking the sequence', async () => {
+    const shown = await notifyViaTerminal(
+      true,
+      {
+        title: 'Title; with; semicolons',
+        subtitle: 'Sub;title',
+        body: 'Body; with; semicolons',
+      },
+      TerminalNotificationMethod.Osc777,
+    );
+
+    expect(shown).toBe(true);
+    const emitted = String(writeToStdout.mock.calls[0][0]);
+
+    // Format: \x1b]777;notify;title;body\x07
+    expect(emitted).toContain('Title: with: semicolons');
+    expect(emitted).toContain('Sub:title');
+    expect(emitted).toContain('Body: with: semicolons');
+    expect(emitted).not.toContain('Title; with; semicolons');
+    expect(emitted).not.toContain('Body; with; semicolons');
+
+    // Extract everything after '\x1b]777;notify;' and before '\x07'
+    const payload = emitted.slice('\x1b]777;notify;'.length, -1);
+
+    // There should be exactly one semicolon separating title and body
+    const semicolonsCount = (payload.match(/;/g) || []).length;
+    expect(semicolonsCount).toBe(1);
+  });
+
+  it('wraps OSC sequence in tmux passthrough when TMUX env var is set', async () => {
+    vi.stubEnv('TMUX', '1');
+    vi.stubEnv('TERM_PROGRAM', 'iTerm.app');
+
+    const shown = await notifyViaTerminal(true, {
+      title: 'Title',
+      body: 'Body',
+    });
+
+    expect(shown).toBe(true);
+    expect(writeToStdout).toHaveBeenCalledTimes(1);
+    const emitted = String(writeToStdout.mock.calls[0][0]);
+    expect(emitted.startsWith('\x1bPtmux;\x1b\x1b]9;')).toBe(true);
+    expect(emitted.endsWith('\x1b\\')).toBe(true);
+  });
+
+  it('wraps OSC sequence in GNU screen passthrough when STY env var is set', async () => {
+    vi.stubEnv('STY', '1');
+    vi.stubEnv('TERM_PROGRAM', 'iTerm.app');
+
+    const shown = await notifyViaTerminal(true, {
+      title: 'Title',
+      body: 'Body',
+    });
+
+    expect(shown).toBe(true);
+    expect(writeToStdout).toHaveBeenCalledTimes(1);
+    const emitted = String(writeToStdout.mock.calls[0][0]);
+    expect(emitted.startsWith('\x1bP\x1b]9;')).toBe(true);
+    expect(emitted.endsWith('\x1b\\')).toBe(true);
   });
 });

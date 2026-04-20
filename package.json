@@ -62,7 +62,7 @@
     "lint:ci": "npm run lint:all",
     "lint:all": "node scripts/lint.js",
     "format": "prettier --experimental-cli --write .",
-    "typecheck": "npm run typecheck --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present && tsc -b evals/tsconfig.json integration-tests/tsconfig.json memory-tests/tsconfig.json",
     "preflight": "npm run clean && npm ci && npm run format && npm run build && npm run lint:ci && npm run typecheck && npm run test:ci",
     "prepare": "husky && npm run bundle",
     "prepare:package": "node scripts/prepare-package.js",
@@ -94,6 +94,7 @@
   ],
   "devDependencies": {
     "@agentclientprotocol/sdk": "^0.16.1",
+    "read-package-up": "^11.0.0",
     "@octokit/rest": "^22.0.0",
     "@types/marked": "^5.0.2",
     "@types/mime-types": "^3.0.1",
@@ -137,6 +138,7 @@
     "strip-ansi": "^7.1.2",
     "ts-prune": "^0.10.3",
     "tsx": "^4.20.3",
+    "typescript": "^5.8.3",
     "typescript-eslint": "^8.30.1",
     "vitest": "^3.2.4",
     "yargs": "^17.7.2"

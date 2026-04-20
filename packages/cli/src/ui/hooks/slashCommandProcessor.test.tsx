@@ -859,11 +859,81 @@ describe('useSlashCommandProcessor', () => {
   });
 
   describe('Lifecycle', () => {
+    it('removes the IDE status listener on unmount after async initialization', async () => {
+      let resolveIdeClient:
+        | ((client: {
+            addStatusChangeListener: (listener: () => void) => void;
+            removeStatusChangeListener: (listener: () => void) => void;
+          }) => void)
+        | undefined;
+      const addStatusChangeListener = vi.fn();
+      const removeStatusChangeListener = vi.fn();
+
+      mockIdeClientGetInstance.mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            resolveIdeClient = resolve;
+          }),
+      );
+
+      const result = await setupProcessorHook();
+
+      await act(async () => {
+        resolveIdeClient?.({
+          addStatusChangeListener,
+          removeStatusChangeListener,
+        });
+      });
+
+      result.unmount();
+      unmountHook = undefined;
+
+      expect(addStatusChangeListener).toHaveBeenCalledTimes(1);
+      expect(removeStatusChangeListener).toHaveBeenCalledTimes(1);
+      expect(removeStatusChangeListener).toHaveBeenCalledWith(
+        addStatusChangeListener.mock.calls[0]?.[0],
+      );
+    });
+
+    it('does not register an IDE status listener if unmounted before async initialization resolves', async () => {
+      let resolveIdeClient:
+        | ((client: {
+            addStatusChangeListener: (listener: () => void) => void;
+            removeStatusChangeListener: (listener: () => void) => void;
+          }) => void)
+        | undefined;
+      const addStatusChangeListener = vi.fn();
+      const removeStatusChangeListener = vi.fn();
+
+      mockIdeClientGetInstance.mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            resolveIdeClient = resolve;
+          }),
+      );
+
+      const result = await setupProcessorHook();
+
+      result.unmount();
+      unmountHook = undefined;
+
+      await act(async () => {
+        resolveIdeClient?.({
+          addStatusChangeListener,
+          removeStatusChangeListener,
+        });
+      });
+
+      expect(addStatusChangeListener).not.toHaveBeenCalled();
+      expect(removeStatusChangeListener).not.toHaveBeenCalled();
+    });
+
     it('should abort command loading when the hook unmounts', async () => {
       const abortSpy = vi.spyOn(AbortController.prototype, 'abort');
       const { unmount } = await setupProcessorHook();
 
       unmount();
+      unmountHook = undefined;
 
       expect(abortSpy).toHaveBeenCalledTimes(1);
     });
