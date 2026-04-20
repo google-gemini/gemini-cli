@@ -324,30 +324,50 @@ async function handleSetup(argv: SetupArgs): Promise<number> {
   log('  Configuring settings...');
   try {
     const settings = loadSettings(process.cwd());
-    const existingGemma =
+
+    // User scope: security-sensitive settings that must not be overridable
+    // by workspace configs (prevents arbitrary binary execution).
+    const existingUserGemma =
       settings.forScope(SettingScope.User).settings.experimental
         ?.gemmaModelRouter ?? {};
-    autoStartServer = existingGemma.autoStartServer ?? true;
-
-    const newGemmaSettings = {
-      ...existingGemma,
-      enabled: true,
-      autoStartServer,
-      classifier: {
-        ...existingGemma.classifier,
-        host: `http://localhost:${port}`,
-        model: GEMMA_MODEL_NAME,
-      },
-    };
-
-    const existingExperimental =
+    autoStartServer = existingUserGemma.autoStartServer ?? true;
+    const existingUserExperimental =
       settings.forScope(SettingScope.User).settings.experimental ?? {};
     settings.setValue(SettingScope.User, 'experimental', {
-      ...existingExperimental,
-      gemmaModelRouter: newGemmaSettings,
+      ...existingUserExperimental,
+      gemmaModelRouter: {
+        autoStartServer,
+        ...(existingUserGemma.binaryPath !== undefined
+          ? { binaryPath: existingUserGemma.binaryPath }
+          : {}),
+      },
     });
 
-    log(chalk.green('  ✓ Settings updated in ~/.gemini/settings.json'));
+    // Workspace scope: project-isolated settings so the local model only
+    // runs for this specific project, saving resources globally.
+    const existingWorkspaceGemma =
+      settings.forScope(SettingScope.Workspace).settings.experimental
+        ?.gemmaModelRouter ?? {};
+    const existingWorkspaceExperimental =
+      settings.forScope(SettingScope.Workspace).settings.experimental ?? {};
+    settings.setValue(SettingScope.Workspace, 'experimental', {
+      ...existingWorkspaceExperimental,
+      gemmaModelRouter: {
+        ...existingWorkspaceGemma,
+        enabled: true,
+        classifier: {
+          ...existingWorkspaceGemma.classifier,
+          host: `http://localhost:${port}`,
+          model: GEMMA_MODEL_NAME,
+        },
+      },
+    });
+
+    log(chalk.green('  ✓ Settings updated'));
+    log(chalk.dim('    User (~/.gemini/settings.json): autoStartServer'));
+    log(
+      chalk.dim('    Workspace (.gemini/settings.json): enabled, classifier'),
+    );
     settingsUpdated = true;
   } catch (error) {
     logError(

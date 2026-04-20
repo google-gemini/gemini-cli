@@ -613,12 +613,21 @@ export async function main() {
     initAppHandle?.end();
 
     import('./services/liteRtServerManager.js')
-      .then(({ LiteRtServerManager }) =>
-        LiteRtServerManager.ensureRunning(
+      .then(({ LiteRtServerManager }) => {
+        const mergedGemma = settings.merged.experimental?.gemmaModelRouter;
+        if (!mergedGemma) return;
+        // Security: binaryPath and autoStartServer must come from user-scoped
+        // settings only to prevent workspace configs from triggering arbitrary
+        // binary execution.
+        const userGemma =
           settings.forScope(SettingScope.User).settings.experimental
-            ?.gemmaModelRouter,
-        ),
-      )
+            ?.gemmaModelRouter;
+        return LiteRtServerManager.ensureRunning({
+          ...mergedGemma,
+          binaryPath: userGemma?.binaryPath,
+          autoStartServer: userGemma?.autoStartServer,
+        });
+      })
       .catch((e) => debugLogger.warn('LiteRT auto-start import failed:', e));
 
     if (
