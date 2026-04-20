@@ -161,7 +161,8 @@ STATE 4: Any other situation where the agent is waiting for text input or needs 
 CRITICAL RULES:
 - RULE 1: If there is ANY active spinner (e.g., ⠋, ⠙, ⠹, ⠸, ⠼, ⠴, ⠧) or an elapsed time indicator (e.g., "0s", "7s") anywhere on the screen, the agent is STILL WORKING. Your action MUST be <WAIT>. Do NOT issue commands, even if a text prompt is visible below it.
 - RULE 2: If there is an "Action Required" or confirmation prompt on the screen, YOU MUST HANDLE IT (State 2). This takes precedence over everything else.
-- RULE 3: You MUST output a strictly formatted JSON object with no markdown wrappers or extra text.
+- RULE 3: If prompted to allow execution of a command with options like 'Allow once' and 'Allow for this session', you MUST choose the option for 'Allow for this session' (typically by sending '2\\r').
+- RULE 4: You MUST output a strictly formatted JSON object with no markdown wrappers or extra text.
 
 JSON FORMAT:
 {
