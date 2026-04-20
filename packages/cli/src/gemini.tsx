@@ -619,9 +619,8 @@ export async function main() {
         // Security: binaryPath and autoStartServer must come from user-scoped
         // settings only to prevent workspace configs from triggering arbitrary
         // binary execution.
-        const userGemma =
-          settings.forScope(SettingScope.User).settings.experimental
-            ?.gemmaModelRouter;
+        const userGemma = settings.forScope(SettingScope.User).settings
+          .experimental?.gemmaModelRouter;
         return LiteRtServerManager.ensureRunning({
           ...mergedGemma,
           binaryPath: userGemma?.binaryPath,
