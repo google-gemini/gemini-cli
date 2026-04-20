@@ -177,10 +177,24 @@ export const logsCommand: CommandModule<object, LogsArgs> = {
       const exitCode = await runTail(logPath, requestedLines, follow);
       await exitCli(exitCode);
     } catch (error) {
-      debugLogger.error(
-        `Failed to read log output: ${error instanceof Error ? error.message : String(error)}`,
-      );
-      await exitCli(1);
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        if (!follow) {
+          process.stdout.write(
+            await readLastLines(logPath, requestedLines),
+          );
+          await exitCli(0);
+        } else {
+          debugLogger.error(
+            '"tail" command not found. Use --lines N to view recent logs without tail.',
+          );
+          await exitCli(1);
+        }
+      } else {
+        debugLogger.error(
+          `Failed to read log output: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        await exitCli(1);
+      }
     }
   },
 };

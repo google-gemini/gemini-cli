@@ -38,6 +38,9 @@ export async function stopServer(
 
   const { pid } = processInfo;
   if (!isProcessRunning(pid)) {
+    debugLogger.log(
+      `Stale PID file found (PID ${pid} is not running), removing ${pidPath}`,
+    );
     try {
       fs.unlinkSync(pidPath);
     } catch {
