@@ -69,15 +69,16 @@ export enum AuthType {
 }
 
 /**
- * Detects the best authentication type based on environment variables.
+ * Detects the best authentication type based on environment variables and the requested model.
  *
  * Checks in order:
  * 1. GOOGLE_GENAI_USE_GCA=true -> LOGIN_WITH_GOOGLE
  * 2. GOOGLE_GENAI_USE_VERTEXAI=true -> USE_VERTEX_AI
  * 3. GEMINI_API_KEY -> USE_GEMINI
- * 4. OPENAI_API_KEY -> OPENAI
+ * 4. Model name starts with 'google/gemma' or is a known custom model AND OpenAI env vars present -> OPENAI
+ * 5. OPENAI_API_KEY -> OPENAI
  */
-export function getAuthTypeFromEnv(): AuthType | undefined {
+export function getAuthTypeFromEnv(model?: string): AuthType | undefined {
   if (process.env['GOOGLE_GENAI_USE_GCA'] === 'true') {
     return AuthType.LOGIN_WITH_GOOGLE;
   }
@@ -87,9 +88,15 @@ export function getAuthTypeFromEnv(): AuthType | undefined {
   if (process.env['GEMINI_API_KEY']) {
     return AuthType.USE_GEMINI;
   }
-  if (process.env['OPENAI_API_KEY'] || process.env['OPENAI_API_BASE_URL']) {
+
+  const isOpenAiEnv =
+    !!process.env['OPENAI_API_KEY'] || !!process.env['OPENAI_API_BASE_URL'];
+  const isCustomModel = model?.startsWith('google/gemma') || model === 'gemma';
+
+  if (isOpenAiEnv && (isCustomModel || !process.env['GEMINI_API_KEY'])) {
     return AuthType.OPENAI;
   }
+
   if (
     process.env['CLOUD_SHELL'] === 'true' ||
     process.env['GEMINI_CLI_USE_COMPUTE_ADC'] === 'true'

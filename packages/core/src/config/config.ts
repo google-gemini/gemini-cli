@@ -1518,9 +1518,20 @@ export class Config implements McpContext, AgentLoopContext {
     baseUrl?: string,
     customHeaders?: Record<string, string>,
   ) {
-    const envAuthType = getAuthTypeFromEnv();
-    const effectiveAuthMethod =
-      envAuthType === AuthType.OPENAI ? envAuthType : authMethod;
+    const envAuthType = getAuthTypeFromEnv(this.model);
+    let effectiveAuthMethod = authMethod;
+
+    // If a model is specifically identified as requiring OpenAI (e.g., Gemma),
+    // or if no specific auth method was provided but OpenAI env vars are present.
+    if (envAuthType === AuthType.OPENAI) {
+      if (
+        this.model.startsWith('google/gemma') ||
+        this.model === 'gemma' ||
+        authMethod === AuthType.LOGIN_WITH_GOOGLE // Default fallback often ends up here
+      ) {
+        effectiveAuthMethod = AuthType.OPENAI;
+      }
+    }
 
     // Reset availability service when switching auth
     this.modelAvailabilityService.reset();

@@ -63,7 +63,7 @@ export class OpenAiContentGenerator implements ContentGenerator {
     const body = {
       model,
       messages,
-      temperature: config?.temperature ?? 1,
+      temperature: config?.temperature ?? 0.7,
       top_p: config?.topP ?? 1,
       max_tokens: config?.maxOutputTokens,
       stop: config?.stopSequences,
@@ -140,9 +140,9 @@ export class OpenAiContentGenerator implements ContentGenerator {
     systemInstruction?: any,
   ): OpenAiMessage[] {
     const messages: OpenAiMessage[] = [];
+    let systemText = '';
 
     if (systemInstruction) {
-      let systemText = '';
       if (typeof systemInstruction === 'string') {
         systemText = systemInstruction;
       } else if (systemInstruction.parts) {
@@ -150,11 +150,9 @@ export class OpenAiContentGenerator implements ContentGenerator {
       } else if (Array.isArray(systemInstruction)) {
         systemText = (systemInstruction as any[]).map((p: any) => p.text).join('\n');
       }
-      if (systemText) {
-        messages.push({ role: 'system', content: systemText });
-      }
     }
 
+    let isFirstUserMessage = true;
     for (const content of contents) {
       const role = content.role === 'model' ? 'assistant' : 'user';
       const parts: OpenAiContentPart[] = (content.parts || []).map((part: any) => {
@@ -172,11 +170,30 @@ export class OpenAiContentGenerator implements ContentGenerator {
         return { type: 'text', text: '[Unsupported Part]' };
       });
 
+      // If it's the first user message, prepend the system instruction
+      if (role === 'user' && isFirstUserMessage && systemText) {
+        const firstTextPart = parts.find(p => p.type === 'text');
+        if (firstTextPart) {
+          firstTextPart.text = `System Instruction:\n${systemText}\n\nUser Question:\n${firstTextPart.text}`;
+        } else {
+          parts.unshift({
+            type: 'text',
+            text: `System Instruction:\n${systemText}`,
+          });
+        }
+        isFirstUserMessage = false;
+      }
+
       if (parts.length === 1 && parts[0].type === 'text') {
         messages.push({ role, content: parts[0].text || '' });
       } else {
         messages.push({ role, content: parts });
       }
+    }
+
+    // Fallback if no user messages
+    if (messages.length === 0 && systemText) {
+      messages.push({ role: 'user', content: `System Instruction:\n${systemText}` });
     }
 
     return messages;
