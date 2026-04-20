@@ -95,13 +95,23 @@ describe('readLastLines', () => {
 });
 
 describe('logsCommand', () => {
+  const originalPlatform = process.platform;
+
   beforeEach(() => {
     vi.clearAllMocks();
+    Object.defineProperty(process, 'platform', {
+      value: 'linux',
+      configurable: true,
+    });
     vi.mocked(getLogFilePath).mockReturnValue('/tmp/gemma.log');
     vi.spyOn(fs.promises, 'access').mockResolvedValue(undefined);
   });
 
   afterEach(() => {
+    Object.defineProperty(process, 'platform', {
+      value: originalPlatform,
+      configurable: true,
+    });
     vi.restoreAllMocks();
   });
 

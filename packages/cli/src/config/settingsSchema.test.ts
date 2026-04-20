@@ -480,7 +480,7 @@ describe('SettingsSchema', () => {
       expect(autoStartServer).toBeDefined();
       expect(autoStartServer.type).toBe('boolean');
       expect(autoStartServer.category).toBe('Experimental');
-      expect(autoStartServer.default).toBe(true);
+      expect(autoStartServer.default).toBe(false);
       expect(autoStartServer.requiresRestart).toBe(true);
       expect(autoStartServer.showInDialog).toBe(true);
       expect(autoStartServer.description).toBe(

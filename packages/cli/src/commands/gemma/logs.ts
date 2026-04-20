@@ -86,8 +86,6 @@ export async function readLastLines(
   }
 }
 
-const isWindows = process.platform === 'win32';
-
 interface LogsArgs {
   lines?: number;
   follow?: boolean;
@@ -156,7 +154,7 @@ export const logsCommand: CommandModule<object, LogsArgs> = {
     const follow = argv.follow ?? lines === undefined;
     const requestedLines = lines ?? 20;
 
-    if (follow && isWindows) {
+    if (follow && process.platform === 'win32') {
       debugLogger.log(
         'Live log following is not supported on Windows. Use --lines N to view recent logs.',
       );
@@ -164,7 +162,7 @@ export const logsCommand: CommandModule<object, LogsArgs> = {
       return;
     }
 
-    if (isWindows) {
+    if (process.platform === 'win32') {
       process.stdout.write(await readLastLines(logPath, requestedLines));
       await exitCli(0);
       return;

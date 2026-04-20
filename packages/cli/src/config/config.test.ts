@@ -3068,7 +3068,7 @@ describe('loadCliConfig gemmaModelRouter', () => {
     const config = await loadCliConfig(settings, 'test-session', argv);
     expect(config.getGemmaModelRouterEnabled()).toBe(true);
     const gemmaSettings = config.getGemmaModelRouterSettings();
-    expect(gemmaSettings.autoStartServer).toBe(true);
+    expect(gemmaSettings.autoStartServer).toBe(false);
     expect(gemmaSettings.binaryPath).toBe('');
     expect(gemmaSettings.classifier?.host).toBe('http://localhost:9379');
     expect(gemmaSettings.classifier?.model).toBe('gemma3-1b-gpu-custom');
