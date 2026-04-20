@@ -42,7 +42,7 @@ const mockFileKeychain: MockKeychain = {
   findCredentials: vi.fn(),
 };
 
-vi.mock('keytar', () => ({ default: mockKeytar }));
+vi.mock('@github/keytar', () => ({ default: mockKeytar }));
 
 vi.mock('./fileKeychain.js', () => ({
   FileKeychain: vi.fn(() => mockFileKeychain),
@@ -53,7 +53,7 @@ vi.mock('../utils/events.js', () => ({
 }));
 
 vi.mock('../utils/debugLogger.js', () => ({
-  debugLogger: { log: vi.fn() },
+  debugLogger: { debug: vi.fn() },
 }));
 
 vi.mock('node:os', async (importOriginal) => {
@@ -153,14 +153,14 @@ describe('KeychainService', () => {
 
       // Because it falls back to FileKeychain, it is always available.
       expect(available).toBe(true);
-      expect(debugLogger.log).toHaveBeenCalledWith(
+      expect(debugLogger.debug).toHaveBeenCalledWith(
         expect.stringContaining('encountered an error'),
         'locked',
       );
       expect(coreEvents.emitTelemetryKeychainAvailability).toHaveBeenCalledWith(
         expect.objectContaining({ available: false }),
       );
-      expect(debugLogger.log).toHaveBeenCalledWith(
+      expect(debugLogger.debug).toHaveBeenCalledWith(
         expect.stringContaining('Using FileKeychain fallback'),
       );
       expect(FileKeychain).toHaveBeenCalled();
@@ -173,7 +173,7 @@ describe('KeychainService', () => {
       const available = await service.isAvailable();
 
       expect(available).toBe(true);
-      expect(debugLogger.log).toHaveBeenCalledWith(
+      expect(debugLogger.debug).toHaveBeenCalledWith(
         expect.stringContaining('failed structural validation'),
         expect.objectContaining({ getPassword: expect.any(Array) }),
       );
@@ -191,7 +191,7 @@ describe('KeychainService', () => {
       const available = await service.isAvailable();
 
       expect(available).toBe(true);
-      expect(debugLogger.log).toHaveBeenCalledWith(
+      expect(debugLogger.debug).toHaveBeenCalledWith(
         expect.stringContaining('functional verification failed'),
       );
       expect(FileKeychain).toHaveBeenCalled();
@@ -243,7 +243,7 @@ describe('KeychainService', () => {
       );
       expect(mockKeytar.setPassword).not.toHaveBeenCalled();
       expect(FileKeychain).toHaveBeenCalled();
-      expect(debugLogger.log).toHaveBeenCalledWith(
+      expect(debugLogger.debug).toHaveBeenCalledWith(
         expect.stringContaining('MacOS default keychain not found'),
       );
     });

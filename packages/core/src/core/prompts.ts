@@ -24,11 +24,13 @@ export function getCoreSystemPrompt(
   config: Config,
   userMemory?: string | HierarchicalMemory,
   interactiveOverride?: boolean,
+  topicUpdateNarrationOverride?: boolean,
 ): string {
   return new PromptProvider().getCoreSystemPrompt(
     config,
     userMemory,
     interactiveOverride,
+    topicUpdateNarrationOverride,
   );
 }
 
