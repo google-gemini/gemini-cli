@@ -182,6 +182,9 @@ export enum CompressionStatus {
 
   /** The compression was skipped due to previous failure, but content was truncated to budget */
   CONTENT_TRUNCATED,
+
+  /** The compression was cancelled by the user */
+  CANCELLED,
 }
 
 export interface ChatCompressionInfo {

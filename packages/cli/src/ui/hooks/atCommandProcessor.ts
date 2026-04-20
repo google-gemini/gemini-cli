@@ -154,8 +154,10 @@ export async function checkPermissions(
   const permissionsRequired: string[] = [];
 
   for (const part of fileParts) {
-    const pathName = part.content.substring(1);
-    if (!pathName) continue;
+    const rawPath = part.content.substring(1);
+    if (!rawPath) continue;
+
+    const { cleanPath: pathName } = parseLineSpecifier(rawPath);
 
     const resolvedPathName = resolveToRealPath(
       path.resolve(config.getTargetDir(), pathName),
@@ -170,11 +172,54 @@ export async function checkPermissions(
   return permissionsRequired;
 }
 
+interface LineSpecifier {
+  startLine: number;
+  endLine?: number;
+}
+
+/**
+ * Parses a line specifier suffix from a file path.
+ * Supports formats like:
+ *   file.txt:10       -> line 10
+ *   file.txt:10:20    -> lines 10-20
+ *   file.txt:10-20    -> lines 10-20 (range)
+ *
+ * Returns the clean file path and an optional LineSpecifier.
+ */
+export function parseLineSpecifier(filePath: string): {
+  cleanPath: string;
+  lineSpec?: LineSpecifier;
+} {
+  // Match :startLine or :startLine:endLine or :startLine-endLine at the end of the path.
+  // Only match if the colon is not part of a Windows drive letter (e.g., C:\).
+  const lineSpecRegex = /:(\d+)(?:[:–-](\d+))?$/;
+  const match = lineSpecRegex.exec(filePath);
+
+  if (!match) {
+    return { cleanPath: filePath };
+  }
+
+  // Avoid matching Windows drive letters like C: or D:
+  const beforeColon = filePath.substring(0, match.index);
+  if (beforeColon.length === 1 && /^[a-zA-Z]$/.test(beforeColon)) {
+    return { cleanPath: filePath };
+  }
+
+  const startLine = parseInt(match[1], 10);
+  const endLine = match[2] ? parseInt(match[2], 10) : undefined;
+
+  return {
+    cleanPath: beforeColon,
+    lineSpec: { startLine, endLine },
+  };
+}
+
 interface ResolvedFile {
   part: AtCommandPart;
   pathSpec: string;
   displayLabel: string;
   absolutePath?: string;
+  lineSpec?: LineSpecifier;
 }
 
 interface IgnoredFile {
@@ -201,11 +246,14 @@ async function resolveFilePaths(
 
   for (const part of fileParts) {
     const originalAtPath = part.content;
-    const pathName = originalAtPath.substring(1);
+    const rawPathName = originalAtPath.substring(1);
 
-    if (!pathName) {
+    if (!rawPathName) {
       continue;
     }
+
+    // Strip :line or :line:col suffix before resolving the file path.
+    const { cleanPath: pathName, lineSpec } = parseLineSpecifier(rawPathName);
 
     const gitIgnored =
       respectFileIgnore.respectGitIgnore &&
@@ -250,6 +298,7 @@ async function resolveFilePaths(
             pathSpec,
             displayLabel: path.isAbsolute(pathName) ? relativePath : pathName,
             absolutePath,
+            lineSpec,
           });
           onDebugMessage(
             `Path ${pathName} resolved to directory, using glob: ${pathSpec}`,
@@ -260,6 +309,7 @@ async function resolveFilePaths(
             pathSpec: relativePath,
             displayLabel: path.isAbsolute(pathName) ? relativePath : pathName,
             absolutePath,
+            lineSpec,
           });
           onDebugMessage(
             `Path ${pathName} resolved to file: ${absolutePath}, using relative path: ${relativePath}`,
@@ -296,6 +346,7 @@ async function resolveFilePaths(
                     displayLabel: path.isAbsolute(pathName)
                       ? pathSpec
                       : pathName,
+                    lineSpec,
                   });
                   onDebugMessage(
                     `Glob search for ${pathName} found ${firstMatchAbsolute}, using relative path: ${pathSpec}`,
@@ -348,7 +399,14 @@ function constructInitialQuery(
 ): string {
   const replacementMap = new Map<AtCommandPart, string>();
   for (const rf of resolvedFiles) {
-    replacementMap.set(rf.part, rf.pathSpec);
+    let spec = rf.pathSpec;
+    if (rf.lineSpec) {
+      spec += `:${rf.lineSpec.startLine}`;
+      if (rf.lineSpec.endLine !== undefined) {
+        spec += `:${rf.lineSpec.endLine}`;
+      }
+    }
+    replacementMap.set(rf.part, spec);
   }
 
   let result = '';
@@ -546,10 +604,29 @@ async function readLocalFiles(
 
             displayPath = displayPath || filePathSpecInContent;
 
-            parts.push({
-              text: `\nContent from @${displayPath}:\n`,
-            });
-            parts.push({ text: fileActualContent });
+            // If a line specifier was provided, filter the content to the requested lines.
+            let contentToInclude = fileActualContent;
+            if (resolvedFile?.lineSpec) {
+              const allLines = fileActualContent.split('\n');
+              const { startLine, endLine } = resolvedFile.lineSpec;
+              // Lines are 1-based, array is 0-based.
+              const startIdx = Math.max(0, startLine - 1);
+              const endIdx = endLine !== undefined ? endLine : startLine;
+              contentToInclude = allLines.slice(startIdx, endIdx).join('\n');
+              const lineLabel =
+                endLine !== undefined
+                  ? `lines ${startLine}-${endLine}`
+                  : `line ${startLine}`;
+              displayPath = `${displayPath}:${startLine}${endLine !== undefined ? `:${endLine}` : ''}`;
+              parts.push({
+                text: `\nContent from @${displayPath} (${lineLabel}):\n`,
+              });
+            } else {
+              parts.push({
+                text: `\nContent from @${displayPath}:\n`,
+              });
+            }
+            parts.push({ text: contentToInclude });
           } else {
             parts.push({ text: part });
           }

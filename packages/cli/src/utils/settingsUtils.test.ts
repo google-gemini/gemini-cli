@@ -734,6 +734,83 @@ describe('SettingsUtils', () => {
         );
         expect(result).toBe('false');
       });
+
+      it('should display object values as formatted JSON instead of [object Object]', () => {
+        const settings = makeMockSettings({
+          mcpServers: { myServer: { command: 'node', args: ['server.js'] } },
+        });
+        const mergedSettings = makeMockSettings({
+          mcpServers: { myServer: { command: 'node', args: ['server.js'] } },
+        });
+
+        const result = getDisplayValue('mcpServers', settings, mergedSettings);
+        expect(result).toContain('myServer');
+        expect(result).toContain('node');
+        expect(result).not.toContain('[object Object]');
+        expect(result.endsWith('*')).toBe(true);
+      });
+
+      it('should display empty object as {}', () => {
+        const settings = makeMockSettings({ mcpServers: {} });
+        const mergedSettings = makeMockSettings({ mcpServers: {} });
+
+        const result = getDisplayValue('mcpServers', settings, mergedSettings);
+        expect(result).toBe('{}*');
+      });
+
+      it('should display default object values as formatted JSON', () => {
+        const result = getDisplayValue(
+          'mcpServers',
+          makeMockSettings({}),
+          makeMockSettings({}),
+        );
+        // Default is {}, displayed without * since not in scope
+        expect(result).toBe('{}');
+      });
+
+      it('should display array values as comma-separated list', () => {
+        vi.mocked(getSettingsSchema).mockReturnValue({
+          tags: {
+            type: 'array',
+            label: 'Tags',
+            category: 'Basic',
+            requiresRestart: false,
+            default: [],
+            description: 'Tags for the project.',
+            showInDialog: true,
+          },
+        } as unknown as SettingsSchemaType);
+
+        const settings = makeMockSettings({
+          tags: ['alpha', 'beta', 'gamma'],
+        });
+        const mergedSettings = makeMockSettings({
+          tags: ['alpha', 'beta', 'gamma'],
+        });
+
+        const result = getDisplayValue('tags', settings, mergedSettings);
+        expect(result).toBe('alpha, beta, gamma*');
+      });
+
+      it('should display empty array as []', () => {
+        vi.mocked(getSettingsSchema).mockReturnValue({
+          tags: {
+            type: 'array',
+            label: 'Tags',
+            category: 'Basic',
+            requiresRestart: false,
+            default: [],
+            description: 'Tags for the project.',
+            showInDialog: true,
+          },
+        } as unknown as SettingsSchemaType);
+
+        const settings = makeMockSettings({ tags: [] });
+        const mergedSettings = makeMockSettings({ tags: [] });
+
+        const result = getDisplayValue('tags', settings, mergedSettings);
+        expect(result).toBe('[]*');
+      });
     });
 
     describe('getDisplayValue with units', () => {

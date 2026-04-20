@@ -587,7 +587,7 @@ export class GeminiClient {
     // Check for context window overflow
     const modelForLimitCheck = this._getActiveModelForCurrentTurn();
 
-    const compressed = await this.tryCompressChat(prompt_id, false);
+    const compressed = await this.tryCompressChat(prompt_id, false, signal);
 
     if (compressed.compressionStatus === CompressionStatus.COMPRESSED) {
       yield { type: GeminiEventType.ChatCompressed, value: compressed };
@@ -715,30 +715,46 @@ export class GeminiClient {
 
     let loopDetectedAbort = false;
     let loopRecoverResult: { detail?: string } | undefined;
-    for await (const event of resultStream) {
-      const loopResult = this.loopDetector.addAndCheck(event);
-      if (loopResult.count > 1) {
-        yield { type: GeminiEventType.LoopDetected };
-        loopDetectedAbort = true;
-        break;
-      } else if (loopResult.count === 1) {
-        if (boundedTurns <= 1) {
-          yield { type: GeminiEventType.MaxSessionTurns };
+    try {
+      for await (const event of resultStream) {
+        const loopResult = this.loopDetector.addAndCheck(event);
+        if (loopResult.count > 1) {
+          yield { type: GeminiEventType.LoopDetected };
           loopDetectedAbort = true;
           break;
+        } else if (loopResult.count === 1) {
+          if (boundedTurns <= 1) {
+            yield { type: GeminiEventType.MaxSessionTurns };
+            loopDetectedAbort = true;
+            break;
+          }
+          loopRecoverResult = loopResult;
+          break;
         }
-        loopRecoverResult = loopResult;
-        break;
-      }
-      yield event;
+        yield event;
 
-      this.updateTelemetryTokenCount();
+        this.updateTelemetryTokenCount();
 
-      if (event.type === GeminiEventType.InvalidStream) {
-        isInvalidStream = true;
+        if (event.type === GeminiEventType.InvalidStream) {
+          isInvalidStream = true;
+        }
+        if (event.type === GeminiEventType.Error) {
+          isError = true;
+        }
       }
-      if (event.type === GeminiEventType.Error) {
-        isError = true;
+    } catch (error) {
+      // When loop detection breaks out of the for-await loop, the async
+      // generator cleanup (iterator.return()) may propagate an AbortError
+      // from the aborted internal signal. Swallow it when the abort was
+      // triggered by loop detection; re-throw everything else.
+      if ((loopDetectedAbort || loopRecoverResult) && isAbortError(error)) {
+        // Expected AbortError from loop-detection-triggered abort — ignore.
+      } else if (signal.aborted && isAbortError(error)) {
+        // User-initiated cancellation during loop detection — handled by
+        // the outer sendMessageStream catch block.
+        throw error;
+      } else {
+        throw error;
       }
     }
 
@@ -1115,6 +1131,7 @@ export class GeminiClient {
   async tryCompressChat(
     prompt_id: string,
     force: boolean = false,
+    abortSignal?: AbortSignal,
   ): Promise<ChatCompressionInfo> {
     // If the model is 'auto', we will use a placeholder model to check.
     // Compression occurs before we choose a model, so calling `count_tokens`
@@ -1128,6 +1145,7 @@ export class GeminiClient {
       model,
       this.config,
       this.hasFailedCompressionAttempt,
+      abortSignal,
     );
 
     if (

@@ -28,5 +28,7 @@ exports[`<ToolsList /> > renders correctly without descriptions 1`] = `
   - Test Tool One (test-tool-one)
   - Test Tool Two (test-tool-two)
   - Test Tool Three (test-tool-three)
+
+Run /tools desc to include tool descriptions.
 "
 `;

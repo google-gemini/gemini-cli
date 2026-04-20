@@ -9,6 +9,37 @@ import type {
   ComputedSessionStats,
   ModelMetrics,
 } from '../contexts/SessionContext.js';
+import type { ToolCallStats } from '@google/gemini-cli-core';
+
+export interface PerModelPerfStats {
+  name: string;
+  requests: number;
+  avgLatencyMs: number;
+  errorRate: number;
+  totalTokens: number;
+}
+
+export interface TopToolStats {
+  name: string;
+  stats: ToolCallStats;
+  avgDurationMs: number;
+}
+
+export interface MemoryStats {
+  rss: number;
+  heapUsed: number;
+  heapTotal: number;
+}
+
+export interface PerfStats extends ComputedSessionStats {
+  idleTimeMs: number;
+  perModelStats: PerModelPerfStats[];
+  topToolsByDuration: TopToolStats[];
+  memory: MemoryStats;
+  tokensPerRequest: number;
+  totalOutputTokens: number;
+  totalRequests: number;
+}
 
 export function calculateErrorRate(metrics: ModelMetrics): number {
   if (metrics.api.totalRequests === 0) {
@@ -92,3 +123,64 @@ export const computeSessionStats = (
     totalLinesRemoved: files.totalLinesRemoved,
   };
 };
+
+export function computePerfStats(
+  metrics: SessionMetrics,
+  wallTimeMs: number,
+): PerfStats {
+  const base = computeSessionStats(metrics);
+  const idleTimeMs = Math.max(0, wallTimeMs - base.agentActiveTime);
+
+  const perModelStats: PerModelPerfStats[] = Object.entries(metrics.models).map(
+    ([name, m]) => ({
+      name,
+      requests: m.api.totalRequests,
+      avgLatencyMs: calculateAverageLatency(m),
+      errorRate: calculateErrorRate(m),
+      totalTokens: m.tokens.total,
+    }),
+  );
+
+  const topToolsByDuration: TopToolStats[] = Object.entries(
+    metrics.tools.byName,
+  )
+    .filter(([, stats]) => stats.count > 0)
+    .sort(([, a], [, b]) => b.durationMs - a.durationMs)
+    .slice(0, 5)
+    .map(([name, stats]) => ({
+      name,
+      stats,
+      avgDurationMs: stats.count > 0 ? stats.durationMs / stats.count : 0,
+    }));
+
+  const mem = process.memoryUsage();
+  const memory: MemoryStats = {
+    rss: mem.rss,
+    heapUsed: mem.heapUsed,
+    heapTotal: mem.heapTotal,
+  };
+
+  const totalRequests = Object.values(metrics.models).reduce(
+    (acc, m) => acc + m.api.totalRequests,
+    0,
+  );
+  const totalOutputTokens = Object.values(metrics.models).reduce(
+    (acc, m) => acc + m.tokens.candidates,
+    0,
+  );
+  const tokensPerRequest =
+    totalRequests > 0
+      ? (base.totalInputTokens + totalOutputTokens) / totalRequests
+      : 0;
+
+  return {
+    ...base,
+    idleTimeMs,
+    perModelStats,
+    topToolsByDuration,
+    memory,
+    tokensPerRequest,
+    totalOutputTokens,
+    totalRequests,
+  };
+}

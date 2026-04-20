@@ -344,7 +344,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   const handleSubmitAndClear = useCallback(
     (submittedValue: string) => {
-      let processedValue = submittedValue;
+      let processedValue = submittedValue ?? '';
       if (buffer.pastedContent) {
         processedValue = expandPastePlaceholders(
           processedValue,
@@ -394,7 +394,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   const handleSubmit = useCallback(
     (submittedValue: string) => {
-      const trimmedMessage = submittedValue.trim();
+      const trimmedMessage = (submittedValue ?? '').trim();
       const isSlash = isSlashCommand(trimmedMessage);
 
       const isShell = shellModeActive;
@@ -1102,7 +1102,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             buffer.move('home');
             return true;
           }
-          const prevCommand = shellHistory.getPreviousCommand();
+          const prevCommand = shellHistory.getPreviousCommand(buffer.text);
           if (prevCommand !== null) buffer.setText(prevCommand);
           return true;
         }

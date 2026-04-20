@@ -421,8 +421,6 @@ export async function loadCliConfig(
   const { cwd = process.cwd(), projectHooks } = options;
   const debugMode = isDebugMode(argv);
 
-  const loadedSettings = loadSettings(cwd);
-
   if (argv.sandbox) {
     process.env['GEMINI_SANDBOX'] = 'true';
   }
@@ -454,8 +452,6 @@ export async function loadCliConfig(
     setServerGeminiMdFilename(getCurrentGeminiMdFilename());
   }
 
-  const fileService = new FileDiscoveryService(cwd);
-
   const memoryFileFiltering = {
     ...DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
     ...settings.context?.fileFiltering,
@@ -465,6 +461,12 @@ export async function loadCliConfig(
     ...DEFAULT_FILE_FILTERING_OPTIONS,
     ...settings.context?.fileFiltering,
   };
+
+  const fileService = new FileDiscoveryService(cwd, {
+    respectGitIgnore: fileFiltering.respectGitIgnore,
+    respectGeminiIgnore: fileFiltering.respectGeminiIgnore,
+    customIgnoreFilePaths: fileFiltering.customIgnoreFilePaths,
+  });
 
   const includeDirectories = (settings.context?.includeDirectories || [])
     .map(resolvePath)
@@ -818,7 +820,12 @@ export async function loadCliConfig(
     hooks: settings.hooks || {},
     disabledHooks: settings.hooksConfig?.disabled || [],
     projectHooks: projectHooks || {},
-    onModelChange: (model: string) => saveModelChange(loadedSettings, model),
+    onModelChange: (model: string) => {
+      // Re-load settings fresh to avoid writing back a stale snapshot
+      // that could overwrite concurrent changes to the config file.
+      const freshSettings = loadSettings(cwd);
+      saveModelChange(freshSettings, model);
+    },
     onReload: async () => {
       const refreshedSettings = loadSettings(cwd);
       return {

@@ -283,8 +283,16 @@ export const useShellCommandProcessor = (
       let commandToExecute = rawQuery;
       let pwdFilePath: string | undefined;
 
-      // On non-windows, wrap the command to capture the final working directory.
-      if (!isWindows) {
+      // Wrap the command to capture the final working directory so we can
+      // warn the user about stateless cd commands.
+      if (isWindows) {
+        const pwdFileName = `shell_pwd_${crypto.randomBytes(6).toString('hex')}.tmp`;
+        pwdFilePath = path.join(os.tmpdir(), pwdFileName);
+        const psPath = pwdFilePath.replace(/'/g, "''");
+        const command = rawQuery.trim();
+        // Run user command, capture exit code, then write the final directory
+        commandToExecute = `${command}; $__code = $LASTEXITCODE; (Get-Location).Path | Out-File -FilePath '${psPath}' -Encoding utf8; exit $__code`;
+      } else {
         let command = rawQuery.trim();
         const pwdFileName = `shell_pwd_${crypto.randomBytes(6).toString('hex')}.tmp`;
         pwdFilePath = path.join(os.tmpdir(), pwdFileName);
@@ -471,7 +479,11 @@ export const useShellCommandProcessor = (
           }
 
           if (pwdFilePath && fs.existsSync(pwdFilePath)) {
-            const finalPwd = fs.readFileSync(pwdFilePath, 'utf8').trim();
+            // Strip UTF-8 BOM (0xFEFF) that PowerShell's Out-File may prepend
+            const finalPwd = fs
+              .readFileSync(pwdFilePath, 'utf8')
+              .replace(/^\uFEFF/, '')
+              .trim();
             if (finalPwd && finalPwd !== targetDir) {
               const warning = `WARNING: shell mode is stateless; the directory change to '${finalPwd}' will not persist.`;
               finalOutput = `${warning}\n\n${finalOutput}`;

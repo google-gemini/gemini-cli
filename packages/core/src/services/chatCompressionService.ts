@@ -367,11 +367,22 @@ export class ChatCompressionService {
       ],
       systemInstruction: { text: getCompressionPrompt(config) },
       promptId,
-      // TODO(joshualitt): wire up a sensible abort signal,
       abortSignal: abortSignal ?? new AbortController().signal,
       role: LlmRole.UTILITY_COMPRESSOR,
     });
     const summary = getResponseText(summaryResponse) ?? '';
+
+    // Check if compression was cancelled between the two LLM calls.
+    if (abortSignal?.aborted) {
+      return {
+        newHistory: null,
+        info: {
+          originalTokenCount,
+          newTokenCount: originalTokenCount,
+          compressionStatus: CompressionStatus.CANCELLED,
+        },
+      };
+    }
 
     // Phase 3: The "Probe" Verification (Self-Correction)
     // We perform a second lightweight turn to ensure no critical information was lost.

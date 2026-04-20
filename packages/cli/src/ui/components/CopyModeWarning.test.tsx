@@ -35,7 +35,7 @@ describe('CopyModeWarning', () => {
     const { lastFrame, waitUntilReady, unmount } = render(<CopyModeWarning />);
     await waitUntilReady();
     expect(lastFrame()).toContain('In Copy Mode');
-    expect(lastFrame()).toContain('Press any key to exit');
+    expect(lastFrame()).toContain('any other key to exit');
     unmount();
   });
 });

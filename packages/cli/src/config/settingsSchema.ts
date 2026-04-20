@@ -789,6 +789,16 @@ const SETTINGS_SCHEMA = {
               'Render output in plain-text to be more screen reader accessible',
             showInDialog: true,
           },
+          speechMode: {
+            type: 'boolean',
+            label: 'Speech-Friendly Output',
+            category: 'UI',
+            requiresRestart: false,
+            default: false,
+            description:
+              'Format responses for screen readers and text-to-speech: strips markdown, converts symbols to words, linearizes tables, and numbers bullet points.',
+            showInDialog: true,
+          },
         },
       },
     },

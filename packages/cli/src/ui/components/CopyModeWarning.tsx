@@ -19,7 +19,8 @@ export const CopyModeWarning: React.FC = () => {
   return (
     <Box>
       <Text color={theme.status.warning}>
-        In Copy Mode. Press any key to exit.
+        In Copy Mode. Scroll: Shift+Up/Down, PgUp/PgDn, Ctrl+Home/End. Press any
+        other key to exit.
       </Text>
     </Box>
   );

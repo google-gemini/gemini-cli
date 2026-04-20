@@ -6,7 +6,7 @@
 
 import type { Mock } from 'vitest';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { handleAtCommand } from './atCommandProcessor.js';
+import { handleAtCommand, parseLineSpecifier } from './atCommandProcessor.js';
 import type { Config, DiscoveredMCPResource } from '@google/gemini-cli-core';
 import {
   FileDiscoveryService,
@@ -1471,5 +1471,64 @@ describe('handleAtCommand', () => {
     expect(result.processedQuery).toContainEqual(
       expect.objectContaining({ text: expectedNudge }),
     );
+  });
+});
+
+describe('parseLineSpecifier', () => {
+  it('should return the path unchanged when no line specifier is present', () => {
+    const result = parseLineSpecifier('src/main.ts');
+    expect(result).toEqual({ cleanPath: 'src/main.ts' });
+  });
+
+  it('should parse a single line number', () => {
+    const result = parseLineSpecifier('src/main.ts:42');
+    expect(result).toEqual({
+      cleanPath: 'src/main.ts',
+      lineSpec: { startLine: 42, endLine: undefined },
+    });
+  });
+
+  it('should parse a line range with colon separator', () => {
+    const result = parseLineSpecifier('src/main.ts:10:20');
+    expect(result).toEqual({
+      cleanPath: 'src/main.ts',
+      lineSpec: { startLine: 10, endLine: 20 },
+    });
+  });
+
+  it('should parse a line range with dash separator', () => {
+    const result = parseLineSpecifier('src/main.ts:10-20');
+    expect(result).toEqual({
+      cleanPath: 'src/main.ts',
+      lineSpec: { startLine: 10, endLine: 20 },
+    });
+  });
+
+  it('should not treat Windows drive letters as line specifiers', () => {
+    const result = parseLineSpecifier('C:\\Users\\file.txt');
+    expect(result).toEqual({ cleanPath: 'C:\\Users\\file.txt' });
+  });
+
+  it('should handle paths without extensions', () => {
+    const result = parseLineSpecifier('Makefile:5');
+    expect(result).toEqual({
+      cleanPath: 'Makefile',
+      lineSpec: { startLine: 5, endLine: undefined },
+    });
+  });
+
+  it('should not match non-numeric suffixes', () => {
+    const result = parseLineSpecifier('src/main.ts:abc');
+    expect(result).toEqual({ cleanPath: 'src/main.ts:abc' });
+  });
+
+  it('should handle deeply nested paths with line numbers', () => {
+    const result = parseLineSpecifier(
+      'packages/cli/src/ui/hooks/atCommandProcessor.ts:100',
+    );
+    expect(result).toEqual({
+      cleanPath: 'packages/cli/src/ui/hooks/atCommandProcessor.ts',
+      lineSpec: { startLine: 100, endLine: undefined },
+    });
   });
 });

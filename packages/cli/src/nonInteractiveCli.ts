@@ -30,6 +30,7 @@ import {
   ToolErrorType,
   Scheduler,
   ROOT_SCHEDULER_ID,
+  isAbortError,
 } from '@google/gemini-cli-core';
 
 import type { Content, Part } from '@google/genai';
@@ -518,7 +519,21 @@ export async function runNonInteractive({
         }
       }
     } catch (error) {
-      errorToHandle = error;
+      // AbortError can be thrown during loop detection when the internal
+      // abort controller is triggered to stop a looping turn. This is an
+      // expected control-flow signal, not a fatal error. Handle it
+      // gracefully so the CLI exits cleanly instead of crashing.
+      if (isAbortError(error) && !abortController.signal.aborted) {
+        // Internal abort from loop detection — not a user cancellation.
+        // The warning was already emitted via the LoopDetected event.
+        if (config.getOutputFormat() === OutputFormat.TEXT) {
+          process.stderr.write(
+            'Loop detected: the operation was stopped to prevent repeated actions. Exiting gracefully.\n',
+          );
+        }
+      } else {
+        errorToHandle = error;
+      }
     } finally {
       // Cleanup stdin cancellation before other cleanup
       cleanupStdinCancellation();

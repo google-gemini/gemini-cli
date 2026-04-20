@@ -6,7 +6,10 @@
 
 import { describe, it, expect, beforeAll, vi } from 'vitest';
 import chalk from 'chalk';
-import { parseMarkdownToANSI } from './markdownParsingUtils.js';
+import {
+  parseMarkdownToANSI,
+  stripTrailingUrlPunctuation,
+} from './markdownParsingUtils.js';
 
 // Mock the theme to use explicit colors instead of empty strings from the default theme.
 // This ensures that ansiColorize actually applies ANSI codes that we can verify.
@@ -221,6 +224,125 @@ describe('parsingUtils', () => {
           `${primary('Bold with ')}${accent('code')}${primary(' inside')}`,
         ),
       );
+    });
+
+    it('should strip trailing period from bare URL', () => {
+      const input = 'Visit https://example.com.';
+      const output = parseMarkdownToANSI(input);
+      expect(output).toBe(
+        `${primary('Visit ')}${link('https://example.com')}${primary('.')}`,
+      );
+    });
+
+    it('should strip trailing comma from bare URL', () => {
+      const input = 'See https://example.com, and more';
+      const output = parseMarkdownToANSI(input);
+      expect(output).toBe(
+        `${primary('See ')}${link('https://example.com')}${primary(', and more')}`,
+      );
+    });
+
+    it('should strip trailing exclamation from bare URL', () => {
+      const input = 'Check https://example.com!';
+      const output = parseMarkdownToANSI(input);
+      expect(output).toBe(
+        `${primary('Check ')}${link('https://example.com')}${primary('!')}`,
+      );
+    });
+
+    it('should strip trailing closing paren from bare URL without opening paren', () => {
+      const input = '(see https://example.com)';
+      const output = parseMarkdownToANSI(input);
+      expect(output).toBe(
+        `${primary('(see ')}${link('https://example.com')}${primary(')')}`,
+      );
+    });
+
+    it('should preserve balanced parentheses in URLs like Wikipedia', () => {
+      const input = 'See https://en.wikipedia.org/wiki/Foo_(bar) for details';
+      const output = parseMarkdownToANSI(input);
+      expect(output).toBe(
+        `${primary('See ')}${link('https://en.wikipedia.org/wiki/Foo_(bar)')}${primary(' for details')}`,
+      );
+    });
+
+    it('should handle Wikipedia URL with trailing period', () => {
+      const input = 'See https://en.wikipedia.org/wiki/Foo_(bar).';
+      const output = parseMarkdownToANSI(input);
+      expect(output).toBe(
+        `${primary('See ')}${link('https://en.wikipedia.org/wiki/Foo_(bar)')}${primary('.')}`,
+      );
+    });
+
+    it('should strip trailing semicolon from bare URL', () => {
+      const input = 'URL: https://example.com/path;';
+      const output = parseMarkdownToANSI(input);
+      expect(output).toBe(
+        `${primary('URL: ')}${link('https://example.com/path')}${primary(';')}`,
+      );
+    });
+
+    it('should not strip characters that are part of the URL path', () => {
+      const input = 'Visit https://example.com/path?q=1&b=2#hash now';
+      const output = parseMarkdownToANSI(input);
+      expect(output).toBe(
+        `${primary('Visit ')}${link('https://example.com/path?q=1&b=2#hash')}${primary(' now')}`,
+      );
+    });
+  });
+
+  describe('stripTrailingUrlPunctuation', () => {
+    it('should strip trailing period', () => {
+      expect(stripTrailingUrlPunctuation('https://example.com.')).toEqual([
+        'https://example.com',
+        '.',
+      ]);
+    });
+
+    it('should strip trailing comma', () => {
+      expect(stripTrailingUrlPunctuation('https://example.com,')).toEqual([
+        'https://example.com',
+        ',',
+      ]);
+    });
+
+    it('should strip multiple trailing punctuation chars', () => {
+      expect(stripTrailingUrlPunctuation('https://example.com.).')).toEqual([
+        'https://example.com',
+        '.).',
+      ]);
+    });
+
+    it('should preserve balanced parentheses', () => {
+      expect(
+        stripTrailingUrlPunctuation('https://en.wikipedia.org/wiki/Foo_(bar)'),
+      ).toEqual(['https://en.wikipedia.org/wiki/Foo_(bar)', '']);
+    });
+
+    it('should strip trailing period after balanced parens', () => {
+      expect(
+        stripTrailingUrlPunctuation('https://en.wikipedia.org/wiki/Foo_(bar).'),
+      ).toEqual(['https://en.wikipedia.org/wiki/Foo_(bar)', '.']);
+    });
+
+    it('should strip unbalanced closing paren', () => {
+      expect(stripTrailingUrlPunctuation('https://example.com)')).toEqual([
+        'https://example.com',
+        ')',
+      ]);
+    });
+
+    it('should return URL unchanged if no trailing punctuation', () => {
+      expect(stripTrailingUrlPunctuation('https://example.com/path')).toEqual([
+        'https://example.com/path',
+        '',
+      ]);
+    });
+
+    it('should handle URL with query params and trailing period', () => {
+      expect(
+        stripTrailingUrlPunctuation('https://example.com/path?q=1.'),
+      ).toEqual(['https://example.com/path?q=1', '.']);
     });
   });
 });

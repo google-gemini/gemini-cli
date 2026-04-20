@@ -954,6 +954,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     pendingHistoryItems: pendingSlashCommandHistoryItems,
     commandContext,
     confirmationRequest: commandConfirmationRequest,
+    cancelActiveCommand,
   } = useSlashCommandProcessor(
     config,
     settings,
@@ -1268,7 +1269,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
         }
       }
 
-      const isSlash = isSlashCommand(submittedValue.trim());
+      const trimmedValue = (submittedValue ?? '').trim();
+      const isSlash = isSlashCommand(trimmedValue);
       const isIdle = streamingState === StreamingState.Idle;
       const isAgentRunning =
         streamingState === StreamingState.Responding ||
@@ -1469,6 +1471,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
   const [showErrorDetails, setShowErrorDetails] = useState<boolean>(false);
   const [showFullTodos, setShowFullTodos] = useState<boolean>(false);
   const [renderMarkdown, setRenderMarkdown] = useState<boolean>(true);
+  const speechMode = settings.merged.ui?.accessibility?.speechMode ?? false;
 
   const handleExitRepeat = useCallback(
     (count: number) => {
@@ -1668,6 +1671,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
         // If the user presses Ctrl+C, we want to cancel any ongoing requests.
         // This should happen regardless of the count.
         cancelOngoingRequest?.();
+        cancelActiveCommand?.();
 
         handleCtrlCPress();
         return true;
@@ -1829,6 +1833,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       handleCtrlDPress,
       handleSlashCommand,
       cancelOngoingRequest,
+      cancelActiveCommand,
       activePtyId,
       handleSuspend,
       embeddedShellFocused,
@@ -1854,7 +1859,19 @@ Logging in with Google... Restarting Gemini CLI to continue.
   useKeypress(handleGlobalKeypress, { isActive: true, priority: true });
 
   useKeypress(
-    () => {
+    (key: Key) => {
+      // Allow scroll keys to pass through so the user can scroll while in
+      // copy mode (see https://github.com/google/gemini-cli/issues/19926).
+      if (
+        keyMatchers[Command.SCROLL_UP](key) ||
+        keyMatchers[Command.SCROLL_DOWN](key) ||
+        keyMatchers[Command.PAGE_UP](key) ||
+        keyMatchers[Command.PAGE_DOWN](key) ||
+        keyMatchers[Command.SCROLL_HOME](key) ||
+        keyMatchers[Command.SCROLL_END](key)
+      ) {
+        return false;
+      }
       setCopyModeEnabled(false);
       enableMouseEvents();
       return true;
@@ -2201,6 +2218,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       filteredConsoleMessages,
       ideContextState,
       renderMarkdown,
+      speechMode,
       ctrlCPressedOnce: ctrlCPressCount >= 1,
       ctrlDPressedOnce: ctrlDPressCount >= 1,
       showEscapePrompt,
@@ -2329,6 +2347,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       filteredConsoleMessages,
       ideContextState,
       renderMarkdown,
+      speechMode,
       ctrlCPressCount,
       ctrlDPressCount,
       showEscapePrompt,

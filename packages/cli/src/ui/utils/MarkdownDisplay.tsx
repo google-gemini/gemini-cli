@@ -12,6 +12,7 @@ import { TableRenderer } from './TableRenderer.js';
 import { RenderInline } from './InlineMarkdownRenderer.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
+import { formatForSpeech } from './speechFormatter.js';
 
 interface MarkdownDisplayProps {
   text: string;
@@ -19,6 +20,7 @@ interface MarkdownDisplayProps {
   availableTerminalHeight?: number;
   terminalWidth: number;
   renderMarkdown?: boolean;
+  speechMode?: boolean;
 }
 
 // Constants for Markdown parsing and rendering
@@ -34,12 +36,25 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
   availableTerminalHeight,
   terminalWidth,
   renderMarkdown = true,
+  speechMode = false,
 }) => {
   const settings = useSettings();
   const isAlternateBuffer = useAlternateBuffer();
   const responseColor = theme.text.response ?? theme.text.primary;
 
   if (!text) return <></>;
+
+  // Speech-friendly mode — convert markdown to plain, screen-reader-friendly text
+  if (speechMode) {
+    const speechText = formatForSpeech(text);
+    return (
+      <Box flexDirection="column">
+        <Text wrap="wrap" color={responseColor}>
+          {speechText}
+        </Text>
+      </Box>
+    );
+  }
 
   // Raw markdown mode - display syntax-highlighted markdown without rendering
   if (!renderMarkdown) {

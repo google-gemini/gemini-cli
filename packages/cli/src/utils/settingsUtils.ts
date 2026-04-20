@@ -282,11 +282,17 @@ export function getDisplayValue(
     value = getDefaultValue(key);
   }
 
-  let valueString = String(value);
+  let valueString: string;
 
   if (definition?.type === 'enum' && definition.options) {
     const option = definition.options?.find((option) => option.value === value);
     valueString = option?.label ?? `${value}`;
+  } else if (Array.isArray(value)) {
+    valueString = value.length === 0 ? '[]' : value.join(', ');
+  } else if (value !== null && typeof value === 'object') {
+    valueString = JSON.stringify(value, null, 2);
+  } else {
+    valueString = String(value);
   }
 
   if (definition?.unit === '%' && typeof value === 'number') {

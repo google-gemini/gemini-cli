@@ -216,6 +216,18 @@ export type HistoryItemToolStats = HistoryItemBase & {
   type: 'tool_stats';
 };
 
+export type HistoryItemPerfStats = HistoryItemBase & {
+  type: 'perf_stats';
+};
+
+export type HistoryItemProgressTree = HistoryItemBase & {
+  type: 'progress_tree';
+};
+
+export type HistoryItemVisualizeDeps = HistoryItemBase & {
+  type: 'visualize_deps';
+};
+
 export type HistoryItemModel = HistoryItemBase & {
   type: 'model';
   model: string;
@@ -274,6 +286,10 @@ export interface ToolDefinition {
   name: string;
   displayName: string;
   description?: string;
+  kind?: string;
+  isReadOnly?: boolean;
+  source?: 'builtin' | 'extension' | 'mcp' | 'discovered';
+  serverName?: string;
 }
 
 export type HistoryItemToolsList = HistoryItemBase & {
@@ -368,6 +384,9 @@ export type HistoryItemWithoutId =
   | HistoryItemStats
   | HistoryItemModelStats
   | HistoryItemToolStats
+  | HistoryItemPerfStats
+  | HistoryItemProgressTree
+  | HistoryItemVisualizeDeps
   | HistoryItemModel
   | HistoryItemQuit
   | HistoryItemCompression
@@ -393,6 +412,9 @@ export enum MessageType {
   STATS = 'stats',
   MODEL_STATS = 'model_stats',
   TOOL_STATS = 'tool_stats',
+  PERF_STATS = 'perf_stats',
+  PROGRESS_TREE = 'progress_tree',
+  VISUALIZE_DEPS = 'visualize_deps',
   QUIT = 'quit',
   GEMINI = 'gemini',
   COMPRESSION = 'compression',
@@ -443,6 +465,21 @@ export type Message =
     }
   | {
       type: MessageType.TOOL_STATS;
+      timestamp: Date;
+      content?: string;
+    }
+  | {
+      type: MessageType.PERF_STATS;
+      timestamp: Date;
+      content?: string;
+    }
+  | {
+      type: MessageType.PROGRESS_TREE;
+      timestamp: Date;
+      content?: string;
+    }
+  | {
+      type: MessageType.VISUALIZE_DEPS;
       timestamp: Date;
       content?: string;
     }

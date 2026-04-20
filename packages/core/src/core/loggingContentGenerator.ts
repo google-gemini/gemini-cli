@@ -37,7 +37,11 @@ import { toContents } from '../code_assist/converter.js';
 import { isStructuredError } from '../utils/quotaErrorDetection.js';
 import { runInDevTraceSpan, type SpanMetadata } from '../telemetry/trace.js';
 import { debugLogger } from '../utils/debugLogger.js';
-import { isAbortError, getErrorType } from '../utils/errors.js';
+import {
+  isAbortError,
+  getErrorType,
+  decodeErrorMessage,
+} from '../utils/errors.js';
 import {
   GeminiCliOperation,
   GEN_AI_PROMPT_NAME,
@@ -277,7 +281,8 @@ export class LoggingContentGenerator implements ContentGenerator {
 
   private _fixGaxiosErrorData(error: unknown): void {
     // Fix for raw ASCII buffer strings appearing in dev with the latest
-    // Gaxios updates.
+    // Gaxios updates. The response.data can be a comma-separated string of
+    // byte codes (from Uint8Array/Buffer toString) instead of actual text.
     if (
       typeof error === 'object' &&
       error !== null &&
@@ -292,11 +297,20 @@ export class LoggingContentGenerator implements ContentGenerator {
         try {
           const charCodes = data.split(',').map(Number);
           if (charCodes.every((code) => !isNaN(code))) {
-            response.data = String.fromCharCode(...charCodes);
+            response.data = new TextDecoder().decode(new Uint8Array(charCodes));
           }
         } catch (_e) {
           // If parsing fails, just leave it alone
         }
+      }
+    }
+
+    // Also fix the error message itself if it contains raw byte codes,
+    // since getErrorMessage() reads error.message for display.
+    if (error instanceof Error) {
+      const decoded = decodeErrorMessage(error.message);
+      if (decoded !== error.message) {
+        error.message = decoded;
       }
     }
   }

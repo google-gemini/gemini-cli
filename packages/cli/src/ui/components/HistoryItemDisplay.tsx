@@ -22,6 +22,9 @@ import { AboutBox } from './AboutBox.js';
 import { StatsDisplay } from './StatsDisplay.js';
 import { ModelStatsDisplay } from './ModelStatsDisplay.js';
 import { ToolStatsDisplay } from './ToolStatsDisplay.js';
+import { PerfStatsDisplay } from './PerfStatsDisplay.js';
+import { ProgressTreeDisplay } from './ProgressTreeDisplay.js';
+import { VisualizeDepsDisplay } from './VisualizeDepsDisplay.js';
 import { SessionSummaryDisplay } from './SessionSummaryDisplay.js';
 import { Help } from './Help.js';
 import type { SlashCommand } from '../commands/types.js';
@@ -185,6 +188,9 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
         />
       )}
       {itemForDisplay.type === 'tool_stats' && <ToolStatsDisplay />}
+      {itemForDisplay.type === 'perf_stats' && <PerfStatsDisplay />}
+      {itemForDisplay.type === 'progress_tree' && <ProgressTreeDisplay />}
+      {itemForDisplay.type === 'visualize_deps' && <VisualizeDepsDisplay />}
       {itemForDisplay.type === 'model' && (
         <ModelMessage model={itemForDisplay.model} />
       )}

@@ -1750,13 +1750,30 @@ function textBufferReducerLogic(
         newCursorCol = cpLen(lines[newCursorRow] ?? '');
       }
 
+      // Clean up pastedContent: only keep entries whose placeholder IDs
+      // still appear in the new text. This prevents stale entries from
+      // accumulating and causing incorrect placeholder counter suffixes.
+      let newPastedContent: Record<string, string>;
+      if (action.payload === '') {
+        newPastedContent = {};
+      } else {
+        const fullText = action.payload;
+        newPastedContent = {};
+        for (const [id, content] of Object.entries(nextState.pastedContent)) {
+          if (fullText.includes(id)) {
+            newPastedContent[id] = content;
+          }
+        }
+      }
+
       return {
         ...nextState,
         lines,
         cursorRow: newCursorRow,
         cursorCol: newCursorCol,
         preferredCol: null,
-        pastedContent: action.payload === '' ? {} : nextState.pastedContent,
+        pastedContent: newPastedContent,
+        expandedPaste: null,
       };
     }
 

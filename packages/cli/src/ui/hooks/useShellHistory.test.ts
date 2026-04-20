@@ -221,11 +221,87 @@ describe('useShellHistory', () => {
     });
     expect(command).toBe('cmd3');
 
-    // Should return to the "new command" line (represented as empty string)
+    // Should return to the "new command" line (empty string when no draft)
     act(() => {
       command = result.current.getNextCommand();
     });
     expect(command).toBe('');
+
+    unmount();
+  });
+
+  it('should preserve in-flight draft when navigating history', async () => {
+    mockedFs.readFile.mockResolvedValue('cmd1\ncmd2\ncmd3');
+    const { result, unmount } = renderHook(() =>
+      useShellHistory(MOCKED_PROJECT_ROOT),
+    );
+
+    await waitFor(() => {
+      expect(mockedFs.readFile).toHaveBeenCalled();
+    });
+
+    let command: string | null = null;
+
+    // Navigate up, passing current draft text
+    act(() => {
+      command = result.current.getPreviousCommand('my draft');
+    });
+    expect(command).toBe('cmd3');
+
+    // Navigate back down — should restore the draft
+    act(() => {
+      command = result.current.getNextCommand();
+    });
+    expect(command).toBe('my draft');
+
+    unmount();
+  });
+
+  it('should restore draft only once after navigating back', async () => {
+    mockedFs.readFile.mockResolvedValue('cmd1\ncmd2');
+    const { result, unmount } = renderHook(() =>
+      useShellHistory(MOCKED_PROJECT_ROOT),
+    );
+
+    await waitFor(() => {
+      expect(mockedFs.readFile).toHaveBeenCalled();
+    });
+
+    let command: string | null = null;
+
+    // Navigate up with a draft
+    act(() => {
+      command = result.current.getPreviousCommand('in progress');
+    });
+    expect(command).toBe('cmd2');
+
+    // Navigate back down — restores draft
+    act(() => {
+      command = result.current.getNextCommand();
+    });
+    expect(command).toBe('in progress');
+
+    // Navigate up again with new draft
+    act(() => {
+      command = result.current.getPreviousCommand('new draft');
+    });
+    expect(command).toBe('cmd2');
+
+    act(() => {
+      command = result.current.getPreviousCommand();
+    });
+    expect(command).toBe('cmd1');
+
+    // Navigate all the way back
+    act(() => {
+      command = result.current.getNextCommand();
+    });
+    expect(command).toBe('cmd2');
+
+    act(() => {
+      command = result.current.getNextCommand();
+    });
+    expect(command).toBe('new draft');
 
     unmount();
   });

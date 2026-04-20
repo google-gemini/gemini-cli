@@ -161,6 +161,7 @@ export interface UIState {
   filteredConsoleMessages: ConsoleMessageItem[];
   ideContextState: IdeContext | undefined;
   renderMarkdown: boolean;
+  speechMode: boolean;
   ctrlCPressedOnce: boolean;
   ctrlDPressedOnce: boolean;
   showEscapePrompt: boolean;

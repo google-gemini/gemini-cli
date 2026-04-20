@@ -171,6 +171,7 @@ export interface AccessibilitySettings {
   /** @deprecated Use ui.loadingPhrases instead. */
   enableLoadingPhrases?: boolean;
   screenReader?: boolean;
+  speechMode?: boolean;
 }
 
 export interface SessionRetentionSettings {
@@ -455,7 +456,9 @@ export class LoadedSettings {
         key,
         structuredClone(valueToSet),
       );
-      saveSettings(settingsFile);
+      // Pass the changed key so saveSettings can re-read from disk and apply
+      // only this change, avoiding overwriting concurrent modifications.
+      saveSettings(settingsFile, [key]);
     }
 
     this._merged = this.computeMergedSettings();
@@ -1028,7 +1031,10 @@ export function migrateDeprecatedSettings(
   return anyModified;
 }
 
-export function saveSettings(settingsFile: SettingsFile): void {
+export function saveSettings(
+  settingsFile: SettingsFile,
+  changedKeys?: string[],
+): void {
   try {
     // Ensure the directory exists
     const dirPath = path.dirname(settingsFile.path);
@@ -1036,13 +1042,28 @@ export function saveSettings(settingsFile: SettingsFile): void {
       fs.mkdirSync(dirPath, { recursive: true });
     }
 
-    const settingsToSave = settingsFile.originalSettings;
+    let settingsToSave: Record<string, unknown>;
+
+    if (changedKeys && changedKeys.length > 0) {
+      // Read fresh settings from disk to avoid overwriting concurrent changes.
+      // Only apply the specific keys that were modified, leaving other keys
+      // (potentially written by another process) untouched.
+      settingsToSave = readCurrentSettingsFromDisk(settingsFile.path);
+      for (const key of changedKeys) {
+        const value = getNestedProperty(
+          settingsFile.originalSettings as Record<string, unknown>,
+          key,
+        );
+        setNestedProperty(settingsToSave, key, structuredClone(value));
+      }
+    } else {
+      // Fallback: write the full originalSettings (legacy behavior for
+      // callers that don't track changed keys, e.g. migration).
+      settingsToSave = settingsFile.originalSettings as Record<string, unknown>;
+    }
 
     // Use the format-preserving update function
-    updateSettingsFilePreservingFormat(
-      settingsFile.path,
-      settingsToSave as Record<string, unknown>,
-    );
+    updateSettingsFilePreservingFormat(settingsFile.path, settingsToSave);
   } catch (error) {
     coreEvents.emitFeedback(
       'error',
@@ -1050,6 +1071,55 @@ export function saveSettings(settingsFile: SettingsFile): void {
       error,
     );
   }
+}
+
+/**
+ * Reads the current settings from disk, returning an empty object if
+ * the file does not exist or cannot be parsed.
+ */
+function readCurrentSettingsFromDisk(
+  filePath: string,
+): Record<string, unknown> {
+  try {
+    if (fs.existsSync(filePath)) {
+      const content = fs.readFileSync(filePath, 'utf-8');
+      const parsed: unknown = JSON.parse(stripJsonComments(content));
+      if (
+        typeof parsed === 'object' &&
+        parsed !== null &&
+        !Array.isArray(parsed)
+      ) {
+        // parsed is verified to be a non-null, non-array object above
+        const record: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(parsed)) {
+          record[k] = v;
+        }
+        return record;
+      }
+    }
+  } catch {
+    // If we can't read or parse the file, start fresh
+  }
+  return {};
+}
+
+/**
+ * Retrieves a nested property from an object using a dot-separated path.
+ */
+function getNestedProperty(
+  obj: Record<string, unknown>,
+  keyPath: string,
+): unknown {
+  const keys = keyPath.split('.');
+  let current: unknown = obj;
+  for (const key of keys) {
+    if (typeof current !== 'object' || current === null) {
+      return undefined;
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- verified object above
+    current = (current as Record<string, unknown>)[key];
+  }
+  return current;
 }
 
 export function saveModelChange(

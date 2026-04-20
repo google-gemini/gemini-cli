@@ -50,6 +50,8 @@ export function CompressionMessage({
         return 'Chat history compression failed: the model returned an empty summary.';
       case CompressionStatus.NOOP:
         return 'Nothing to compress.';
+      case CompressionStatus.CANCELLED:
+        return 'Chat history compression was cancelled.';
       default:
         return '';
     }

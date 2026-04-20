@@ -35,23 +35,100 @@ export function isAbortError(error: unknown): boolean {
 
 export function getErrorMessage(error: unknown): string {
   const friendlyError = toFriendlyError(error);
+  let message: string;
   if (friendlyError instanceof Error) {
-    return friendlyError.message;
-  }
-  if (
+    message = friendlyError.message;
+  } else if (
     typeof friendlyError === 'object' &&
     friendlyError !== null &&
     'message' in friendlyError &&
     typeof (friendlyError as { message: unknown }).message === 'string'
   ) {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    return (friendlyError as { message: string }).message;
+    message = (friendlyError as { message: string }).message;
+  } else {
+    try {
+      message = String(friendlyError);
+    } catch {
+      return 'Failed to get error details';
+    }
+  }
+  return decodeErrorMessage(message);
+}
+
+/**
+ * Attempts to decode an error message that may contain raw byte codes
+ * (comma-separated numeric values from a Uint8Array/Buffer toString) or
+ * a raw JSON error body, returning a human-readable error message.
+ */
+export function decodeErrorMessage(message: string): string {
+  // Step 1: If the message looks like comma-separated byte codes
+  // (e.g., "123,34,101,114,114,111,114,34"), decode it first.
+  const decoded = tryDecodeByteCodeString(message);
+  if (decoded !== null) {
+    message = decoded;
+  }
+
+  // Step 2: Try to extract a human-readable message from JSON error bodies.
+  // API errors often arrive as JSON like:
+  //   {"error":{"message":"The actual error text","code":400,...}}
+  // or prefixed with status info like:
+  //   got status: RESOURCE_EXHAUSTED. {"error":{...}}
+  return tryExtractJsonErrorMessage(message) ?? message;
+}
+
+/**
+ * Tries to decode a string of comma-separated byte codes into text.
+ * Returns null if the string does not appear to be byte codes.
+ */
+function tryDecodeByteCodeString(value: string): string | null {
+  // Must contain at least one comma and only digits, commas, and whitespace
+  if (!value.includes(',') || !/^[\d,\s]+$/.test(value)) {
+    return null;
   }
   try {
-    return String(friendlyError);
+    const bytes = value.split(',').map(Number);
+    if (bytes.some((b) => isNaN(b) || b < 0 || b > 255)) {
+      return null;
+    }
+    return new TextDecoder().decode(new Uint8Array(bytes));
   } catch {
-    return 'Failed to get error details';
+    return null;
   }
+}
+
+/**
+ * Tries to extract a human-readable error message from a JSON error string.
+ * Handles formats like:
+ *   {"error":{"message":"...","code":400,"status":"..."}}
+ *   got status: RESOURCE_EXHAUSTED. {"error":{...}}
+ * Returns null if the message is not a recognized JSON error format.
+ */
+function tryExtractJsonErrorMessage(message: string): string | null {
+  const jsonStart = message.indexOf('{');
+  if (jsonStart === -1) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(message.substring(jsonStart)) as unknown;
+    if (
+      typeof parsed === 'object' &&
+      parsed !== null &&
+      'error' in parsed &&
+      typeof (parsed as { error: unknown }).error === 'object' &&
+      (parsed as { error: unknown }).error !== null
+    ) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      const errorObj = (parsed as { error: { message?: string } }).error;
+      if (typeof errorObj.message === 'string') {
+        return errorObj.message;
+      }
+    }
+  } catch {
+    // Not valid JSON, return null
+  }
+  return null;
 }
 
 export function getErrorType(error: unknown): string {

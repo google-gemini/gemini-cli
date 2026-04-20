@@ -14,7 +14,7 @@ const MAX_HISTORY_LENGTH = 100;
 export interface UseShellHistoryReturn {
   history: string[];
   addCommandToHistory: (command: string) => void;
-  getPreviousCommand: () => string | null;
+  getPreviousCommand: (currentText?: string) => string | null;
   getNextCommand: () => string | null;
   resetHistoryPosition: () => void;
 }
@@ -77,6 +77,9 @@ export function useShellHistory(
   const [history, setHistory] = useState<string[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [historyFilePath, setHistoryFilePath] = useState<string | null>(null);
+  // Stores the in-flight draft text so it can be restored when the user
+  // navigates back to the current (un-submitted) command line position.
+  const [draft, setDraft] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadHistory() {
@@ -102,18 +105,26 @@ export function useShellHistory(
       // eslint-disable-next-line @typescript-eslint/no-floating-promises
       writeHistoryFile(historyFilePath, [...newHistory].reverse());
       setHistoryIndex(-1);
+      setDraft(null);
     },
     [history, historyFilePath],
   );
 
-  const getPreviousCommand = useCallback(() => {
-    if (history.length === 0) {
-      return null;
-    }
-    const newIndex = Math.min(historyIndex + 1, history.length - 1);
-    setHistoryIndex(newIndex);
-    return history[newIndex] ?? null;
-  }, [history, historyIndex]);
+  const getPreviousCommand = useCallback(
+    (currentText?: string) => {
+      if (history.length === 0) {
+        return null;
+      }
+      // Save the in-flight edit as draft when first entering history navigation
+      if (historyIndex === -1 && currentText !== undefined) {
+        setDraft(currentText);
+      }
+      const newIndex = Math.min(historyIndex + 1, history.length - 1);
+      setHistoryIndex(newIndex);
+      return history[newIndex] ?? null;
+    },
+    [history, historyIndex],
+  );
 
   const getNextCommand = useCallback(() => {
     if (historyIndex < 0) {
@@ -122,13 +133,17 @@ export function useShellHistory(
     const newIndex = historyIndex - 1;
     setHistoryIndex(newIndex);
     if (newIndex < 0) {
-      return '';
+      // Restore the saved draft instead of returning an empty string
+      const restored = draft ?? '';
+      setDraft(null);
+      return restored;
     }
     return history[newIndex] ?? null;
-  }, [history, historyIndex]);
+  }, [history, historyIndex, draft]);
 
   const resetHistoryPosition = useCallback(() => {
     setHistoryIndex(-1);
+    setDraft(null);
   }, []);
 
   return {

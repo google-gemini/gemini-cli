@@ -157,12 +157,27 @@ const isSSH = (): boolean =>
       process.env['SSH_CLIENT'],
   );
 
-const isWSL = (): boolean =>
-  Boolean(
+const isWSL = (): boolean => {
+  // Check standard WSL environment variables first (fast path)
+  if (
     process.env['WSL_DISTRO_NAME'] ||
-      process.env['WSLENV'] ||
-      process.env['WSL_INTEROP'],
-  );
+    process.env['WSLENV'] ||
+    process.env['WSL_INTEROP']
+  ) {
+    return true;
+  }
+  // Fallback: check /proc/version for 'microsoft' or 'WSL' (works on WSL2
+  // even when env vars are not set, e.g. in cron jobs or detached processes)
+  if (process.platform === 'linux') {
+    try {
+      const procVersion = fs.readFileSync('/proc/version', 'utf-8');
+      return /microsoft|wsl/i.test(procVersion);
+    } catch {
+      // /proc/version not readable — not WSL
+    }
+  }
+  return false;
+};
 
 const isWindowsTerminal = (): boolean =>
   process.platform === 'win32' && Boolean(process.env['WT_SESSION']);

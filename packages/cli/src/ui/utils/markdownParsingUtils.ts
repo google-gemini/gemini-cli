@@ -21,6 +21,61 @@ const INLINE_CODE_MARKER_LENGTH = 1; // For "`"
 const UNDERLINE_TAG_START_LENGTH = 3; // For "<u>"
 const UNDERLINE_TAG_END_LENGTH = 4; // For "</u>"
 
+// Characters that are typically trailing punctuation and not part of a URL
+const TRAILING_PUNCTUATION = /[.,;:!?)}\]]+$/;
+
+/**
+ * Strips trailing punctuation from a URL, handling balanced parentheses
+ * for URLs like Wikipedia links (e.g., https://en.wikipedia.org/wiki/Foo_(bar)).
+ *
+ * @returns A tuple of [cleanUrl, trailingPunctuation]
+ */
+export function stripTrailingUrlPunctuation(rawUrl: string): [string, string] {
+  const match = rawUrl.match(TRAILING_PUNCTUATION);
+  if (!match) {
+    return [rawUrl, ''];
+  }
+
+  let url = rawUrl.slice(0, -match[0].length);
+  let trailing = match[0];
+
+  // Handle balanced parentheses: if the URL contains an opening paren
+  // but we stripped the closing one, restore closing parens to balance them.
+  const openParens = (url.match(/\(/g) || []).length;
+  const closeParens = (url.match(/\)/g) || []).length;
+  const deficit = openParens - closeParens;
+
+  if (deficit > 0) {
+    // Restore closing parens from the trailing punctuation to balance
+    let restored = 0;
+    for (let i = 0; i < trailing.length && restored < deficit; i++) {
+      if (trailing[i] === ')') {
+        restored++;
+      }
+    }
+    if (restored > 0) {
+      // Move the balanced closing parens back to the URL
+      let parensToRestore = restored;
+      let splitIndex = 0;
+      for (let i = 0; i < trailing.length && parensToRestore > 0; i++) {
+        if (trailing[i] === ')') {
+          parensToRestore--;
+        }
+        splitIndex = i + 1;
+      }
+      url = rawUrl.slice(0, rawUrl.length - match[0].length + splitIndex);
+      trailing = rawUrl.slice(rawUrl.length - match[0].length + splitIndex);
+    }
+  }
+
+  // If nothing remains after stripping, return the original URL
+  if (url.length === 0) {
+    return [rawUrl, ''];
+  }
+
+  return [url, trailing];
+}
+
 /**
  * Helper to apply color to a string using ANSI escape codes,
  * consistent with how Ink's colorize works.
@@ -197,7 +252,11 @@ export const parseMarkdownToANSI = (
           ),
         );
       } else if (fullMatch.match(/^https?:\/\//)) {
-        styledPart = ansiColorize(fullMatch, theme.text.link);
+        const [cleanUrl, trailingPunc] = stripTrailingUrlPunctuation(fullMatch);
+        styledPart = ansiColorize(cleanUrl, theme.text.link);
+        if (trailingPunc) {
+          styledPart += ansiColorize(trailingPunc, baseColor);
+        }
       }
     } catch (e) {
       debugLogger.warn('Error parsing inline markdown part:', fullMatch, e);

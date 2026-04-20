@@ -9,6 +9,7 @@ import {
   useMemo,
   useEffect,
   useState,
+  useRef,
   createElement,
 } from 'react';
 import { type PartListUnion } from '@google/genai';
@@ -144,6 +145,10 @@ export const useSlashCommandProcessor = (
     null,
   );
 
+  // AbortController for the currently running slash command.
+  // When the user presses Ctrl+C during a command, this is aborted.
+  const activeCommandAbortControllerRef = useRef<AbortController | null>(null);
+
   const pendingHistoryItems = useMemo(() => {
     const items: HistoryItemWithoutId[] = [];
     if (pendingItem != null) {
@@ -184,6 +189,18 @@ export const useSlashCommandProcessor = (
       } else if (message.type === MessageType.TOOL_STATS) {
         historyItemContent = {
           type: 'tool_stats',
+        };
+      } else if (message.type === MessageType.PERF_STATS) {
+        historyItemContent = {
+          type: 'perf_stats',
+        };
+      } else if (message.type === MessageType.PROGRESS_TREE) {
+        historyItemContent = {
+          type: 'progress_tree',
+        };
+      } else if (message.type === MessageType.VISUALIZE_DEPS) {
+        historyItemContent = {
+          type: 'visualize_deps',
         };
       } else if (message.type === MessageType.QUIT) {
         historyItemContent = {
@@ -411,7 +428,46 @@ export const useSlashCommandProcessor = (
 
       try {
         if (commandToExecute) {
+          // Validate argument count before executing the command.
+          if (
+            commandToExecute.minArgs != null ||
+            commandToExecute.maxArgs != null
+          ) {
+            const argCount = args.trim().split(/\s+/).filter(Boolean).length;
+            const { minArgs, maxArgs, argsUsage } = commandToExecute;
+            const usageHint = argsUsage ? ` Usage: ${argsUsage}` : '';
+
+            if (minArgs != null && argCount < minArgs) {
+              const noun = minArgs === 1 ? 'argument' : 'arguments';
+              addItem(
+                {
+                  type: MessageType.ERROR,
+                  text: `/${resolvedCommandPath.join(' ')} requires at least ${minArgs} ${noun}, but received ${argCount}.${usageHint}`,
+                },
+                Date.now(),
+              );
+              return { type: 'handled' };
+            }
+
+            if (maxArgs != null && argCount > maxArgs) {
+              const noun = maxArgs === 1 ? 'argument' : 'arguments';
+              addItem(
+                {
+                  type: MessageType.ERROR,
+                  text: `/${resolvedCommandPath.join(' ')} accepts at most ${maxArgs} ${noun}, but received ${argCount}.${usageHint}`,
+                },
+                Date.now(),
+              );
+              return { type: 'handled' };
+            }
+          }
+
           if (commandToExecute.action) {
+            // Create an AbortController for this command execution so the
+            // user can cancel long-running commands (e.g. /compress) with Ctrl+C.
+            const commandAbortController = new AbortController();
+            activeCommandAbortControllerRef.current = commandAbortController;
+
             const fullCommandContext: CommandContext = {
               ...commandContext,
               invocation: {
@@ -420,6 +476,7 @@ export const useSlashCommandProcessor = (
                 args,
               },
               overwriteConfirmed,
+              abortSignal: commandAbortController.signal,
             };
 
             // If a one-time list is provided for a "Proceed" action, temporarily
@@ -703,6 +760,7 @@ export const useSlashCommandProcessor = (
         );
         return { type: 'handled' };
       } finally {
+        activeCommandAbortControllerRef.current = null;
         if (config && resolvedCommandPath[0] && !hasError) {
           const event = makeSlashCommandEvent({
             command: resolvedCommandPath[0],
@@ -729,11 +787,16 @@ export const useSlashCommandProcessor = (
     ],
   );
 
+  const cancelActiveCommand = useCallback(() => {
+    activeCommandAbortControllerRef.current?.abort();
+  }, []);
+
   return {
     handleSlashCommand,
     slashCommands: commands,
     pendingHistoryItems,
     commandContext,
     confirmationRequest,
+    cancelActiveCommand,
   };
 };

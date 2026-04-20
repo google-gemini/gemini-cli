@@ -28,7 +28,7 @@ export const GeminiMessageContent: React.FC<GeminiMessageContentProps> = ({
   availableTerminalHeight,
   terminalWidth,
 }) => {
-  const { renderMarkdown } = useUIState();
+  const { renderMarkdown, speechMode } = useUIState();
   const originalPrefix = '✦ ';
   const prefixWidth = originalPrefix.length;
 
@@ -44,6 +44,7 @@ export const GeminiMessageContent: React.FC<GeminiMessageContentProps> = ({
         }
         terminalWidth={Math.max(terminalWidth - prefixWidth, 0)}
         renderMarkdown={renderMarkdown}
+        speechMode={speechMode}
       />
     </Box>
   );
