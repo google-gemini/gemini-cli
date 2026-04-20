@@ -4,9 +4,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { createContext, useCallback, useContext, useState } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+} from 'react';
 import { SettingScope } from '../../config/settings.js';
 import { useSettingsStore } from './SettingsContext.js';
+import {
+  setCursorBlock,
+  setCursorBar,
+  resetCursorShape,
+} from '../utils/vimCursorShape.js';
 
 export type VimMode = 'NORMAL' | 'INSERT';
 
@@ -26,17 +37,44 @@ export const VimModeProvider = ({
 }) => {
   const { settings, setSetting } = useSettingsStore();
   const vimEnabled = settings.merged.general.vimMode;
-  const [vimMode, setVimMode] = useState<VimMode>('INSERT');
+  const [vimMode, setVimModeState] = useState<VimMode>('INSERT');
+
+  // Wrap setVimMode to also update terminal cursor shape
+  const setVimMode = useCallback(
+    (mode: VimMode) => {
+      setVimModeState(mode);
+      if (vimEnabled) {
+        if (mode === 'NORMAL') {
+          setCursorBlock();
+        } else {
+          setCursorBar();
+        }
+      }
+    },
+    [vimEnabled],
+  );
 
   const toggleVimEnabled = useCallback(async () => {
     const newValue = !vimEnabled;
     // When enabling vim mode, start in INSERT mode
     if (newValue) {
-      setVimMode('INSERT');
+      setVimModeState('INSERT');
+      setCursorBar();
+    } else {
+      // When disabling vim mode, reset cursor to terminal default
+      resetCursorShape();
     }
     setSetting(SettingScope.User, 'general.vimMode', newValue);
     return newValue;
   }, [vimEnabled, setSetting]);
+
+  // Reset cursor shape when the provider unmounts (app exit)
+  useEffect(
+    () => () => {
+      resetCursorShape();
+    },
+    [],
+  );
 
   const value = {
     vimEnabled,
