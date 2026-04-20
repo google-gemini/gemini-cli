@@ -21,6 +21,8 @@ describe('ToolConfirmationMessage Redirection', () => {
   const mockConfig = {
     isTrustedFolder: () => true,
     getIdeMode: () => false,
+    getDisableAlwaysAllow: () => false,
+    getApprovalMode: () => 'default',
   } as unknown as Config;
 
   it('should display redirection warning and tip for redirected commands', async () => {
@@ -32,7 +34,7 @@ describe('ToolConfirmationMessage Redirection', () => {
       rootCommands: ['echo'],
     };
 
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <ToolConfirmationMessage
         callId="test-call-id"
         confirmationDetails={confirmationDetails}
@@ -40,9 +42,9 @@ describe('ToolConfirmationMessage Redirection', () => {
         getPreferredEditor={vi.fn()}
         availableTerminalHeight={30}
         terminalWidth={100}
+        toolName="shell"
       />,
     );
-    await waitUntilReady();
 
     const output = lastFrame();
     expect(output).toMatchSnapshot();

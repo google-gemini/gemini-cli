@@ -36,24 +36,25 @@ describe('clearCommand', () => {
 
     mockContext = createMockCommandContext({
       services: {
-        config: {
-          getGeminiClient: () =>
-            ({
-              resetChat: mockResetChat,
-              getChat: () => ({
-                getChatRecordingService: mockGetChatRecordingService,
-              }),
-            }) as unknown as GeminiClient,
-          setSessionId: vi.fn(),
-          getEnableHooks: vi.fn().mockReturnValue(false),
-          getMessageBus: vi.fn().mockReturnValue(undefined),
-          getHookSystem: vi.fn().mockReturnValue({
-            fireSessionEndEvent: vi.fn().mockResolvedValue(undefined),
-            fireSessionStartEvent: vi.fn().mockResolvedValue(undefined),
-          }),
-          userHintService: {
-            clear: mockHintClear,
+        agentContext: {
+          config: {
+            getEnableHooks: vi.fn().mockReturnValue(false),
+            resetNewSessionState: vi.fn(),
+            getMessageBus: vi.fn().mockReturnValue(undefined),
+            getHookSystem: vi.fn().mockReturnValue({
+              fireSessionEndEvent: vi.fn().mockResolvedValue(undefined),
+              fireSessionStartEvent: vi.fn().mockResolvedValue(undefined),
+            }),
+            injectionService: {
+              clear: mockHintClear,
+            },
           },
+          geminiClient: {
+            resetChat: mockResetChat,
+            getChat: () => ({
+              getChatRecordingService: mockGetChatRecordingService,
+            }),
+          } as unknown as GeminiClient,
         },
       },
     });
@@ -73,6 +74,9 @@ describe('clearCommand', () => {
 
     expect(mockResetChat).toHaveBeenCalledTimes(1);
     expect(mockHintClear).toHaveBeenCalledTimes(1);
+    expect(
+      mockContext.services.agentContext?.config.resetNewSessionState,
+    ).toHaveBeenCalledTimes(1);
     expect(uiTelemetryService.clear).toHaveBeenCalled();
     expect(uiTelemetryService.clear).toHaveBeenCalledTimes(1);
     expect(mockContext.ui.clear).toHaveBeenCalledTimes(1);
@@ -98,7 +102,7 @@ describe('clearCommand', () => {
 
     const nullConfigContext = createMockCommandContext({
       services: {
-        config: null,
+        agentContext: null,
       },
     });
 

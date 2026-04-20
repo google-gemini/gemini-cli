@@ -121,6 +121,56 @@ describe('HookTranslator', () => {
         },
       ]);
     });
+
+    it('should apply model override when hook returns only model field', () => {
+      const baseRequest: GenerateContentParameters = {
+        model: 'gemini-2.5-flash-lite',
+        contents: [
+          {
+            role: 'user',
+            parts: [{ text: 'Hello' }],
+          },
+        ],
+      } as unknown as GenerateContentParameters;
+
+      // Simulate a hook that only overrides the model — no messages field
+      const hookRequest = {
+        model: 'gemini-2.5-flash',
+      } as unknown as LLMRequest;
+
+      const sdkRequest = translator.fromHookLLMRequest(
+        hookRequest,
+        baseRequest,
+      );
+
+      // Model should be overridden
+      expect(sdkRequest.model).toBe('gemini-2.5-flash');
+      // Original conversation contents should be preserved
+      expect(sdkRequest.contents).toEqual(baseRequest.contents);
+    });
+
+    it('should preserve base request contents when hook messages is undefined', () => {
+      const baseRequest: GenerateContentParameters = {
+        model: 'gemini-1.5-flash',
+        contents: [
+          { role: 'user', parts: [{ text: 'original message' }] },
+          { role: 'model', parts: [{ text: 'original reply' }] },
+        ],
+      } as unknown as GenerateContentParameters;
+
+      const hookRequest = {
+        model: 'gemini-1.5-pro',
+        // messages intentionally omitted
+      } as unknown as LLMRequest;
+
+      const sdkRequest = translator.fromHookLLMRequest(
+        hookRequest,
+        baseRequest,
+      );
+
+      expect(sdkRequest.model).toBe('gemini-1.5-pro');
+      expect(sdkRequest.contents).toEqual(baseRequest.contents);
+    });
   });
 
   describe('LLM Response Translation', () => {

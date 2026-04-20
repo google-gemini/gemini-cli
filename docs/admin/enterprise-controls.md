@@ -72,7 +72,7 @@ organization.
 **Supported Fields:**
 
 - `url`: (Required) The full URL of the MCP server endpoint.
-- `type`: (Required) The connection type (e.g., `sse` or `http`).
+- `type`: (Required) The connection type (for example, `sse` or `http`).
 - `trust`: (Optional) If set to `true`, the server is trusted and tool execution
   will not require user approval.
 - `includeTools`: (Optional) An explicit list of tool names to allow. If
@@ -105,6 +105,67 @@ organization.
   but is missing from the local configuration, it will not be initialized. This
   ensures users maintain final control over which permitted servers are actually
   active in their environment.
+
+#### Required MCP Servers (preview)
+
+**Default**: empty
+
+Allows administrators to define MCP servers that are **always injected** into
+the user's environment. Unlike the allowlist (which filters user-configured
+servers), required servers are automatically added regardless of the user's
+local configuration.
+
+**Required Servers Format:**
+
+```json
+{
+  "requiredMcpServers": {
+    "corp-compliance-tool": {
+      "url": "https://mcp.corp/compliance",
+      "type": "http",
+      "trust": true,
+      "description": "Corporate compliance tool"
+    },
+    "internal-registry": {
+      "url": "https://registry.corp/mcp",
+      "type": "sse",
+      "authProviderType": "google_credentials",
+      "oauth": {
+        "scopes": ["https://www.googleapis.com/auth/scope"]
+      }
+    }
+  }
+}
+```
+
+**Supported Fields:**
+
+- `url`: (Required) The full URL of the MCP server endpoint.
+- `type`: (Required) The connection type (`sse` or `http`).
+- `trust`: (Optional) If set to `true`, tool execution will not require user
+  approval. Defaults to `true` for required servers.
+- `description`: (Optional) Human-readable description of the server.
+- `authProviderType`: (Optional) Authentication provider (`dynamic_discovery`,
+  `google_credentials`, or `service_account_impersonation`).
+- `oauth`: (Optional) OAuth configuration including `scopes`, `clientId`, and
+  `clientSecret`.
+- `targetAudience`: (Optional) OAuth target audience for service-to-service
+  auth.
+- `targetServiceAccount`: (Optional) Service account email to impersonate.
+- `headers`: (Optional) Additional HTTP headers to send with requests.
+- `includeTools` / `excludeTools`: (Optional) Tool filtering lists.
+- `timeout`: (Optional) Timeout in milliseconds for MCP requests.
+
+**Client Enforcement Logic:**
+
+- Required servers are injected **after** allowlist filtering, so they are
+  always available even if the allowlist is active.
+- If a required server has the **same name** as a locally configured server, the
+  admin configuration **completely overrides** the local one.
+- Required servers only support remote transports (`sse`, `http`). Local
+  execution fields (`command`, `args`, `env`, `cwd`) are not supported.
+- Required servers can coexist with allowlisted servers — both features work
+  independently.
 
 ### Unmanaged Capabilities
 

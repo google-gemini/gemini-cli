@@ -7,9 +7,9 @@ create files, and control what Gemini CLI can see.
 ## Prerequisites
 
 - Gemini CLI installed and authenticated.
-- A project directory to work with (e.g., a git repository).
+- A project directory to work with (for example, a git repository).
 
-## How to give the agent context (Reading files)
+## Providing context by reading files
 
 Gemini CLI will generally try to read relevant files, sometimes prompting you
 for access (depending on your settings). To ensure that Gemini CLI uses a file,
@@ -58,11 +58,13 @@ You know there's a `UserProfile` component, but you don't know where it lives.
 ```
 
 Gemini uses the `glob` or `list_directory` tools to search your project
-structure. It will return the specific path (e.g.,
+structure. It will return the specific path (for example,
 `src/components/UserProfile.tsx`), which you can then use with `@` in your next
 turn.
 
-> **Tip:** You can also ask for lists of files, like "Show me all the TypeScript
+<!-- prettier-ignore -->
+> [!TIP]
+> You can also ask for lists of files, like "Show me all the TypeScript
 > configuration files in the root directory."
 
 ## How to modify code
@@ -111,8 +113,8 @@ or, better yet, run your project's tests.
 `Run the tests for the UserProfile component.`
 ```
 
-Gemini CLI uses the `run_shell_command` tool to execute your test runner (e.g.,
-`npm test` or `jest`). This ensures the changes didn't break existing
+Gemini CLI uses the `run_shell_command` tool to execute your test runner (for
+example, `npm test` or `jest`). This ensures the changes didn't break existing
 functionality.
 
 ## Advanced: Controlling what Gemini sees

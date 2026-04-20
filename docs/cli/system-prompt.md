@@ -14,7 +14,9 @@ core instructions will apply unless you include them yourself.
 This feature is intended for advanced users who need to enforce strict,
 project-specific behavior or create a customized persona.
 
-> Tip: You can export the current default system prompt to a file first, review
+<!-- prettier-ignore -->
+> [!TIP]
+> You can export the current default system prompt to a file first, review
 > it, and then selectively modify or replace it (see
 > [“Export the default prompt”](#export-the-default-prompt-recommended)).
 
@@ -22,7 +24,7 @@ project-specific behavior or create a customized persona.
 
 You can set the environment variable temporarily in your shell, or persist it
 via a `.gemini/.env` file. See
-[Persisting Environment Variables](../get-started/authentication.md#persisting-environment-variables).
+[Persisting Environment Variables](../get-started/authentication.mdx#persisting-environment-variables).
 
 - Use the project default path (`.gemini/system.md`):
   - `GEMINI_SYSTEM_MD=true` or `GEMINI_SYSTEM_MD=1`
@@ -33,7 +35,7 @@ via a `.gemini/.env` file. See
   - `GEMINI_SYSTEM_MD=/absolute/path/to/my-system.md`
   - Relative paths are supported and resolved from the current working
     directory.
-  - Tilde expansion is supported (e.g., `~/my-system.md`).
+  - Tilde expansion is supported (for example, `~/my-system.md`).
 
 - Disable the override (use built‑in prompt):
   - `GEMINI_SYSTEM_MD=false` or `GEMINI_SYSTEM_MD=0` or unset the variable.
@@ -68,7 +70,7 @@ dynamically include built-in content:
 - `${AvailableTools}`: Injects a bulleted list of all currently enabled tool
   names.
 - Tool Name Variables: Injects the actual name of a tool using the pattern:
-  `${toolName}_ToolName` (e.g., `${write_file_ToolName}`,
+  `${toolName}_ToolName` (for example, `${write_file_ToolName}`,
   `${run_shell_command_ToolName}`).
 
   This pattern is generated dynamically for all available tools.
