@@ -73,7 +73,7 @@ describe('createPolicyUpdater', () => {
     // Wait for async operations (microtasks)
     await new Promise((resolve) => setTimeout(resolve, 0));
 
-    expect(fs.mkdir).toHaveBeenCalledWith(userPoliciesDir, {
+    expect(fs.mkdir).toHaveBeenCalledWith(path.dirname(policyFile), {
       recursive: true,
     });
 
@@ -240,5 +240,150 @@ describe('createPolicyUpdater', () => {
     } catch {
       expect(writtenContent).toContain(`toolName = 'search"tool"'`);
     }
+  });
+
+  it('should not persist duplicate rules', async () => {
+    createPolicyUpdater(policyEngine, messageBus, mockStorage);
+
+    const userPoliciesDir = '/mock/user/.gemini/policies';
+    const policyFile = path.join(userPoliciesDir, AUTO_SAVED_POLICY_FILENAME);
+    vi.spyOn(mockStorage, 'getAutoSavedPolicyPath').mockReturnValue(policyFile);
+    (fs.mkdir as unknown as Mock).mockResolvedValue(undefined);
+
+    // Simulate an existing file that already has the same rule
+    const existingContent =
+      '[[rule]]\ntoolName = "test_tool"\ndecision = "allow"\npriority = 100\n';
+    (fs.readFile as unknown as Mock).mockResolvedValue(existingContent);
+
+    const mockFileHandle = {
+      writeFile: vi.fn().mockResolvedValue(undefined),
+      close: vi.fn().mockResolvedValue(undefined),
+    };
+    (fs.open as unknown as Mock).mockResolvedValue(mockFileHandle);
+    (fs.rename as unknown as Mock).mockResolvedValue(undefined);
+
+    await messageBus.publish({
+      type: MessageBusType.UPDATE_POLICY,
+      toolName: 'test_tool',
+      persist: true,
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // The written content should still have only one rule (no duplicate)
+    const writeCall = mockFileHandle.writeFile.mock.calls[0];
+    const writtenContent = writeCall[0] as string;
+    const ruleCount = (writtenContent.match(/\[\[rule\]\]/g) || []).length;
+    expect(ruleCount).toBe(1);
+  });
+
+  it('should fall back to direct write when rename fails with EPERM', async () => {
+    createPolicyUpdater(policyEngine, messageBus, mockStorage);
+
+    const userPoliciesDir = '/mock/user/.gemini/policies';
+    const policyFile = path.join(userPoliciesDir, AUTO_SAVED_POLICY_FILENAME);
+    vi.spyOn(mockStorage, 'getAutoSavedPolicyPath').mockReturnValue(policyFile);
+    (fs.mkdir as unknown as Mock).mockResolvedValue(undefined);
+    (fs.readFile as unknown as Mock).mockRejectedValue(
+      Object.assign(new Error('File not found'), { code: 'ENOENT' }),
+    );
+
+    const mockFileHandle = {
+      writeFile: vi.fn().mockResolvedValue(undefined),
+      close: vi.fn().mockResolvedValue(undefined),
+    };
+    (fs.open as unknown as Mock).mockResolvedValue(mockFileHandle);
+
+    // Simulate Windows EPERM error on rename
+    const epermError = Object.assign(
+      new Error('EPERM: operation not permitted'),
+      {
+        code: 'EPERM',
+      },
+    );
+    (fs.rename as unknown as Mock).mockRejectedValue(epermError);
+    (fs.writeFile as unknown as Mock).mockResolvedValue(undefined);
+    (fs.unlink as unknown as Mock).mockResolvedValue(undefined);
+
+    await messageBus.publish({
+      type: MessageBusType.UPDATE_POLICY,
+      toolName: 'test_tool',
+      persist: true,
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // Should have fallen back to direct writeFile
+    expect(fs.writeFile).toHaveBeenCalledWith(
+      policyFile,
+      expect.stringContaining('toolName = "test_tool"'),
+      'utf-8',
+    );
+  });
+
+  it('should clean up temp file on failure', async () => {
+    createPolicyUpdater(policyEngine, messageBus, mockStorage);
+
+    const userPoliciesDir = '/mock/user/.gemini/policies';
+    const policyFile = path.join(userPoliciesDir, AUTO_SAVED_POLICY_FILENAME);
+    vi.spyOn(mockStorage, 'getAutoSavedPolicyPath').mockReturnValue(policyFile);
+    (fs.mkdir as unknown as Mock).mockResolvedValue(undefined);
+    (fs.readFile as unknown as Mock).mockRejectedValue(
+      Object.assign(new Error('File not found'), { code: 'ENOENT' }),
+    );
+
+    const mockFileHandle = {
+      writeFile: vi.fn().mockResolvedValue(undefined),
+      close: vi.fn().mockResolvedValue(undefined),
+    };
+    (fs.open as unknown as Mock).mockResolvedValue(mockFileHandle);
+
+    // Simulate an unexpected error on rename (not EPERM/EACCES/EXDEV)
+    const eioError = Object.assign(new Error('I/O error'), { code: 'EIO' });
+    (fs.rename as unknown as Mock).mockRejectedValue(eioError);
+    (fs.unlink as unknown as Mock).mockResolvedValue(undefined);
+
+    await messageBus.publish({
+      type: MessageBusType.UPDATE_POLICY,
+      toolName: 'test_tool',
+      persist: true,
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // Temp file should be cleaned up
+    expect(fs.unlink).toHaveBeenCalledWith(expect.stringMatching(/\.tmp$/));
+  });
+
+  it('should include error details in feedback message', async () => {
+    createPolicyUpdater(policyEngine, messageBus, mockStorage);
+
+    const userPoliciesDir = '/mock/user/.gemini/policies';
+    const policyFile = path.join(userPoliciesDir, AUTO_SAVED_POLICY_FILENAME);
+    vi.spyOn(mockStorage, 'getAutoSavedPolicyPath').mockReturnValue(policyFile);
+
+    // Simulate mkdir failure (permission denied on parent directory)
+    const mkdirError = Object.assign(new Error('EACCES: permission denied'), {
+      code: 'EACCES',
+    });
+    (fs.mkdir as unknown as Mock).mockRejectedValue(mkdirError);
+
+    // Spy on coreEvents to check the feedback message
+    const { coreEvents } = await import('../utils/events.js');
+    const feedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
+
+    await messageBus.publish({
+      type: MessageBusType.UPDATE_POLICY,
+      toolName: 'test_tool',
+      persist: true,
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // Should include the directory path and the error message
+    expect(feedbackSpy).toHaveBeenCalledWith(
+      'error',
+      expect.stringContaining('could not create policy directory'),
+    );
   });
 });

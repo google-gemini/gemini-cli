@@ -529,9 +529,25 @@ export function createPolicyUpdater(
 
       if (message.persist) {
         persistenceQueue = persistenceQueue.then(async () => {
+          let tmpFile: string | undefined;
           try {
             const policyFile = storage.getAutoSavedPolicyPath();
-            await fs.mkdir(path.dirname(policyFile), { recursive: true });
+            const policyDir = path.dirname(policyFile);
+
+            // Ensure the policy directory exists (handles first-run case
+            // where ~/.gemini/policies has never been created).
+            try {
+              await fs.mkdir(policyDir, { recursive: true });
+            } catch (mkdirError) {
+              const errMsg = isNodeError(mkdirError)
+                ? mkdirError.message
+                : String(mkdirError);
+              coreEvents.emitFeedback(
+                'error',
+                `Failed to persist policy for ${toolName}: could not create policy directory ${policyDir}: ${errMsg}`,
+              );
+              return;
+            }
 
             // Read existing file
             let existingData: { rule?: TomlRule[] } = {};
@@ -584,19 +600,42 @@ export function createPolicyUpdater(
               newRule.argsPattern = message.argsPattern;
             }
 
-            // Add to rules
-            existingData.rule.push(newRule);
+            // Check for duplicate rules to avoid appending the same rule repeatedly
+            const isDuplicate = existingData.rule.some(
+              (existing) =>
+                existing.toolName === newRule.toolName &&
+                existing.decision === newRule.decision &&
+                existing.mcpName === newRule.mcpName &&
+                existing.commandPrefix === newRule.commandPrefix &&
+                existing.argsPattern === newRule.argsPattern,
+            );
+
+            if (!isDuplicate) {
+              existingData.rule.push(newRule);
+            }
 
             // Serialize back to TOML
             // @iarna/toml stringify might not produce beautiful output but it handles escaping correctly
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            const newContent = toml.stringify(existingData as toml.JsonMap);
+            let newContent: string;
+            try {
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+              newContent = toml.stringify(existingData as toml.JsonMap);
+            } catch (serializeError) {
+              const errMsg = isNodeError(serializeError)
+                ? serializeError.message
+                : String(serializeError);
+              coreEvents.emitFeedback(
+                'error',
+                `Failed to persist policy for ${toolName}: could not serialize policy to TOML: ${errMsg}`,
+              );
+              return;
+            }
 
             // Atomic write: write to a unique tmp file then rename to the target file.
             // Using a unique suffix avoids race conditions where concurrent processes
             // overwrite each other's temporary files, leading to ENOENT errors on rename.
             const tmpSuffix = crypto.randomBytes(8).toString('hex');
-            const tmpFile = `${policyFile}.${tmpSuffix}.tmp`;
+            tmpFile = `${policyFile}.${tmpSuffix}.tmp`;
 
             let handle: fs.FileHandle | undefined;
             try {
@@ -606,13 +645,45 @@ export function createPolicyUpdater(
             } finally {
               await handle?.close();
             }
-            await fs.rename(tmpFile, policyFile);
+
+            try {
+              await fs.rename(tmpFile, policyFile);
+            } catch (renameError) {
+              // On Windows, rename can fail with EPERM/EACCES if the target
+              // file is locked by another process. Fall back to a direct write.
+              if (
+                isNodeError(renameError) &&
+                (renameError.code === 'EPERM' ||
+                  renameError.code === 'EACCES' ||
+                  renameError.code === 'EXDEV')
+              ) {
+                debugLogger.warn(
+                  `Atomic rename failed (${renameError.code}), falling back to direct write for ${policyFile}.`,
+                );
+                await fs.writeFile(policyFile, newContent, 'utf-8');
+              } else {
+                throw renameError;
+              }
+            }
+            // Clear tmpFile on success so finally block does not attempt cleanup.
+            tmpFile = undefined;
           } catch (error) {
+            const errMsg =
+              error instanceof Error ? error.message : String(error);
             coreEvents.emitFeedback(
               'error',
-              `Failed to persist policy for ${toolName}`,
+              `Failed to persist policy for ${toolName}: ${errMsg}`,
               error,
             );
+          } finally {
+            // Clean up the temp file if it was created but not renamed.
+            if (tmpFile) {
+              try {
+                await fs.unlink(tmpFile);
+              } catch {
+                // Best-effort cleanup; ignore errors (file may not exist).
+              }
+            }
           }
         });
       }
