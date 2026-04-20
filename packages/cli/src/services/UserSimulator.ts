@@ -104,7 +104,7 @@ export class UserSimulator {
         .replace(/[\u2800-\u28FF]/g, '')
         .replace(/[|/-\\]/g, '')
         .replace(/\b\d+(\.\d+)?s\b/g, '')
-        .replace(/\b\d+m\s+\d+s\b/g, '')
+        .replace(/\b\d+m(\s+\d+s)?\b/g, '')
         .replace(/\(\s*\)/g, '')
         .trim();
 
