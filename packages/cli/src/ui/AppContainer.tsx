@@ -1408,9 +1408,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
         return;
       }
 
-      // Pass new messages as additional instructions to the running task
+      // Queue new messages while agent is running; auto-drain when idle
       if (isAgentRunning && !isSlash) {
-        handleHintSubmit(submittedValue);
+        addMessage(submittedValue);
         addInput(submittedValue);
         return;
       }

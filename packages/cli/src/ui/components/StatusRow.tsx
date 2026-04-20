@@ -21,7 +21,6 @@ import { INTERACTIVE_SHELL_WAITING_PHRASE } from '../hooks/usePhraseCycler.js';
 import { LoadingIndicator } from './LoadingIndicator.js';
 import { StatusDisplay } from './StatusDisplay.js';
 import { ContextUsageDisplay } from './ContextUsageDisplay.js';
-import { HorizontalLine } from './shared/HorizontalLine.js';
 import { ApprovalModeIndicator } from './ApprovalModeIndicator.js';
 import { ShellModeIndicator } from './ShellModeIndicator.js';
 import { RawMarkdownIndicator } from './RawMarkdownIndicator.js';
@@ -370,14 +369,7 @@ export const StatusRow: React.FC<StatusRowProps> = ({
         </Box>
       )}
 
-      {/* Internal Separator */}
-      {showRow1 &&
-        showRow2 &&
-        (showUiDetails || (showRow1Minimal && showRow2Minimal)) && (
-          <Box width="100%">
-            <HorizontalLine dim />
-          </Box>
-        )}
+      {/* Internal Separator — removed for compact UI */}
 
       {/* Row 2: Modes & Context */}
       {showRow2 && (
