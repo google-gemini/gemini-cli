@@ -28,6 +28,7 @@ import {
   dismissInboxSkill,
   applyInboxPatch,
   dismissInboxPatch,
+  isGeminiMdPatchTarget,
   isProjectSkillPatchTarget,
 } from '@google/gemini-cli-core';
 
@@ -35,7 +36,12 @@ type Phase = 'list' | 'skill-preview' | 'skill-action' | 'patch-preview';
 
 type InboxItem =
   | { type: 'skill'; skill: InboxSkill }
-  | { type: 'patch'; patch: InboxPatch; targetsProjectSkills: boolean }
+  | {
+      type: 'patch';
+      patch: InboxPatch;
+      targetsProjectSkills: boolean;
+      targetsGeminiMd: boolean;
+    }
   | { type: 'header'; label: string };
 
 interface DestinationChoice {
@@ -115,6 +121,18 @@ async function patchTargetsProjectSkills(
     ),
   );
   return entryTargetsProjectSkills.some(Boolean);
+}
+
+async function patchTargetsGeminiMd(
+  patch: InboxPatch,
+  config: Config,
+): Promise<boolean> {
+  const entryTargetsGeminiMd = await Promise.all(
+    patch.entries.map((entry) =>
+      isGeminiMdPatchTarget(entry.targetPath, config),
+    ),
+  );
+  return entryTargetsGeminiMd.some(Boolean);
 }
 
 /**
@@ -208,20 +226,16 @@ export const SkillInboxDialog: React.FC<SkillInboxDialogProps> = ({
         ]);
         const patchItems = await Promise.all(
           patches.map(async (patch): Promise<InboxItem> => {
-            let targetsProjectSkills = false;
-            try {
-              targetsProjectSkills = await patchTargetsProjectSkills(
-                patch,
-                config,
-              );
-            } catch {
-              targetsProjectSkills = false;
-            }
+            const [targetsProjectSkills, targetsGeminiMd] = await Promise.all([
+              patchTargetsProjectSkills(patch, config).catch(() => false),
+              patchTargetsGeminiMd(patch, config).catch(() => false),
+            ]);
 
             return {
               type: 'patch',
               patch,
               targetsProjectSkills,
+              targetsGeminiMd,
             };
           }),
         );
@@ -257,13 +271,22 @@ export const SkillInboxDialog: React.FC<SkillInboxDialogProps> = ({
 
   const listItems: Array<SelectionListItem<InboxItem>> = useMemo(() => {
     const skills = items.filter((i) => i.type === 'skill');
-    const patches = items.filter((i) => i.type === 'patch');
+    const skillPatches = items.filter(
+      (i) => i.type === 'patch' && !i.targetsGeminiMd,
+    );
+    const geminiMdPatches = items.filter(
+      (i) => i.type === 'patch' && i.targetsGeminiMd,
+    );
     const result: Array<SelectionListItem<InboxItem>> = [];
 
-    // Only show section headers when both types are present
-    const showHeaders = skills.length > 0 && patches.length > 0;
+    // Show section headers whenever more than one category is present so
+    // GEMINI.md patches stay visually distinct from skill artifacts.
+    const categoryCount = [skills, skillPatches, geminiMdPatches].filter(
+      (group) => group.length > 0,
+    ).length;
+    const showHeaders = categoryCount > 1;
 
-    if (showHeaders) {
+    if (showHeaders && skills.length > 0) {
       const header: InboxItem = { type: 'header', label: 'New Skills' };
       result.push({
         key: 'header:new-skills',
@@ -276,7 +299,7 @@ export const SkillInboxDialog: React.FC<SkillInboxDialogProps> = ({
       result.push({ key: getItemKey(item), value: item });
     }
 
-    if (showHeaders) {
+    if (showHeaders && skillPatches.length > 0) {
       const header: InboxItem = { type: 'header', label: 'Skill Updates' };
       result.push({
         key: 'header:skill-updates',
@@ -285,7 +308,23 @@ export const SkillInboxDialog: React.FC<SkillInboxDialogProps> = ({
         hideNumber: true,
       });
     }
-    for (const item of patches) {
+    for (const item of skillPatches) {
+      result.push({ key: getItemKey(item), value: item });
+    }
+
+    if (showHeaders && geminiMdPatches.length > 0) {
+      const header: InboxItem = {
+        type: 'header',
+        label: 'Project Memory Updates',
+      };
+      result.push({
+        key: 'header:project-memory-updates',
+        value: header,
+        disabled: true,
+        hideNumber: true,
+      });
+    }
+    for (const item of geminiMdPatches) {
       result.push({ key: getItemKey(item), value: item });
     }
 

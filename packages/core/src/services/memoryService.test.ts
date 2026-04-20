@@ -518,6 +518,10 @@ describe('memoryService', () => {
         getMessageBus: vi.fn(),
         getGeminiClient: vi.fn(),
         getSkillManager: vi.fn().mockReturnValue({ getSkills: () => [] }),
+        getGeminiMdFilePaths: vi.fn().mockReturnValue([]),
+        getExtensionLoader: vi
+          .fn()
+          .mockReturnValue({ getExtensions: () => [] }),
         modelConfigService: {
           registerRuntimeModelConfig: vi.fn(),
         },
@@ -902,6 +906,8 @@ describe('memoryService', () => {
         storage: {
           getProjectSkillsDir: () => projectSkillsDir,
         },
+        getGeminiMdFilePaths: () => [] as string[],
+        getExtensionLoader: () => ({ getExtensions: () => [] }),
       } as unknown as Config;
     });
 
@@ -1162,6 +1168,117 @@ describe('memoryService', () => {
       await expect(fs.access(patchPath)).rejects.toThrow();
       expect(await fs.readFile(outsideFile, 'utf-8')).not.toContain('line2.5');
     });
+
+    it('keeps patches that target a loaded GEMINI.md file', async () => {
+      const { validatePatches } = await import('./memoryService.js');
+
+      await fs.mkdir(skillsDir, { recursive: true });
+      const repoDir = path.join(tmpDir, 'repo-with-gemini-md');
+      await fs.mkdir(repoDir, { recursive: true });
+      const geminiMdFile = path.join(repoDir, 'GEMINI.md');
+      await fs.writeFile(geminiMdFile, 'rule one\nrule two\nrule three\n');
+
+      const allowingConfig = Object.assign({}, validateConfig, {
+        getGeminiMdFilePaths: () => [geminiMdFile],
+      }) as unknown as Config;
+
+      const patchPath = path.join(skillsDir, 'gemini-md-update.patch');
+      await fs.writeFile(
+        patchPath,
+        [
+          `--- ${geminiMdFile}`,
+          `+++ ${geminiMdFile}`,
+          '@@ -1,3 +1,4 @@',
+          ' rule one',
+          ' rule two',
+          '+rule two-and-a-half',
+          ' rule three',
+          '',
+        ].join('\n'),
+      );
+
+      const result = await validatePatches(skillsDir, allowingConfig);
+
+      expect(result).toEqual(['gemini-md-update.patch']);
+      await expect(fs.access(patchPath)).resolves.toBeUndefined();
+    });
+
+    it('rejects /dev/null patches that try to create a new GEMINI.md', async () => {
+      const { validatePatches } = await import('./memoryService.js');
+
+      await fs.mkdir(skillsDir, { recursive: true });
+      const newGeminiMdPath = path.join(tmpDir, 'NEW_GEMINI.md');
+      // The path is not in the allow-list because it isn't a loaded file.
+      const allowingConfig = Object.assign({}, validateConfig, {
+        getGeminiMdFilePaths: () => [] as string[],
+      }) as unknown as Config;
+
+      const patchPath = path.join(skillsDir, 'create-gemini-md.patch');
+      await fs.writeFile(
+        patchPath,
+        [
+          '--- /dev/null',
+          `+++ ${newGeminiMdPath}`,
+          '@@ -0,0 +1 @@',
+          '+brand new rule',
+          '',
+        ].join('\n'),
+      );
+
+      const result = await validatePatches(skillsDir, allowingConfig);
+
+      expect(result).toEqual([]);
+      await expect(fs.access(patchPath)).rejects.toThrow();
+      await expect(fs.access(newGeminiMdPath)).rejects.toThrow();
+    });
+
+    it('rejects patches that target an extension-supplied GEMINI.md', async () => {
+      const { validatePatches } = await import('./memoryService.js');
+
+      await fs.mkdir(skillsDir, { recursive: true });
+      const extensionDir = path.join(tmpDir, 'extension');
+      await fs.mkdir(extensionDir, { recursive: true });
+      const extensionContextFile = path.join(extensionDir, 'GEMINI.md');
+      await fs.writeFile(
+        extensionContextFile,
+        'extension rule one\nextension rule two\n',
+      );
+
+      // Note: the file appears in getGeminiMdFilePaths (it's loaded into
+      // memory at runtime), but it's also reported by the extension loader,
+      // so the allow-list must subtract it.
+      const blockingConfig = Object.assign({}, validateConfig, {
+        getGeminiMdFilePaths: () => [extensionContextFile],
+        getExtensionLoader: () => ({
+          getExtensions: () => [
+            { isActive: true, contextFiles: [extensionContextFile] },
+          ],
+        }),
+      }) as unknown as Config;
+
+      const patchPath = path.join(skillsDir, 'patch-extension.patch');
+      await fs.writeFile(
+        patchPath,
+        [
+          `--- ${extensionContextFile}`,
+          `+++ ${extensionContextFile}`,
+          '@@ -1,2 +1,3 @@',
+          ' extension rule one',
+          ' extension rule two',
+          '+sneaky added rule',
+          '',
+        ].join('\n'),
+      );
+
+      const result = await validatePatches(skillsDir, blockingConfig);
+
+      expect(result).toEqual([]);
+      await expect(fs.access(patchPath)).rejects.toThrow();
+      // Confirm the extension file was NOT modified.
+      expect(await fs.readFile(extensionContextFile, 'utf-8')).toBe(
+        'extension rule one\nextension rule two\n',
+      );
+    });
   });
 
   describe('startMemoryService feedback for patch-only runs', () => {
@@ -1231,6 +1348,10 @@ describe('memoryService', () => {
         getMessageBus: vi.fn(),
         getGeminiClient: vi.fn(),
         getSkillManager: vi.fn().mockReturnValue({ getSkills: () => [] }),
+        getGeminiMdFilePaths: vi.fn().mockReturnValue([]),
+        getExtensionLoader: vi
+          .fn()
+          .mockReturnValue({ getExtensions: () => [] }),
         modelConfigService: {
           registerRuntimeModelConfig: vi.fn(),
         },
@@ -1312,6 +1433,10 @@ describe('memoryService', () => {
         getMessageBus: vi.fn(),
         getGeminiClient: vi.fn(),
         getSkillManager: vi.fn().mockReturnValue({ getSkills: () => [] }),
+        getGeminiMdFilePaths: vi.fn().mockReturnValue([]),
+        getExtensionLoader: vi
+          .fn()
+          .mockReturnValue({ getExtensions: () => [] }),
         modelConfigService: {
           registerRuntimeModelConfig: vi.fn(),
         },

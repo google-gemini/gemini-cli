@@ -31,7 +31,9 @@ import { Storage } from '../config/storage.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
 import {
   applyParsedSkillPatches,
+  getAllowedGeminiMdPatchTargets,
   hasParsedPatchHunks,
+  isGeminiMdPatchTarget,
 } from './memoryPatchUtils.js';
 
 const LOCK_FILENAME = '.extraction.lock';
@@ -469,6 +471,106 @@ async function buildExistingSkillsSummary(
 }
 
 /**
+ * Builds a markdown summary of the GEMINI.md (and equivalently named) memory
+ * files the extraction agent is allowed to patch, grouped by scope so the
+ * agent can pick the most-specific target. Returns an empty string when no
+ * eligible files are loaded.
+ *
+ * Scopes:
+ * - **Global**: files under the user's `~/.gemini/` directory.
+ * - **Workspace root**: files at a workspace root directory.
+ * - **Workspace subdir**: files inside a workspace root.
+ * - **Workspace ancestor**: files above a workspace root (typically discovered
+ *   via the upward traversal stopping at a `.git` boundary).
+ */
+function buildGeminiMdContext(config: Config): string {
+  const allowedPaths = getAllowedGeminiMdPatchTargets(config);
+  if (allowedPaths.length === 0) {
+    return '';
+  }
+
+  const userGeminiDir = path.resolve(Storage.getGlobalGeminiDir());
+  const workspaceRoots = (() => {
+    try {
+      return config
+        .getWorkspaceContext()
+        .getDirectories()
+        .map((d) => path.resolve(d));
+    } catch {
+      return [] as string[];
+    }
+  })();
+
+  const buckets = {
+    global: [] as string[],
+    workspaceRoot: [] as string[],
+    workspaceSubdir: [] as string[],
+    workspaceAncestor: [] as string[],
+  };
+
+  for (const target of allowedPaths) {
+    const targetDir = path.dirname(target);
+    if (
+      targetDir === userGeminiDir ||
+      targetDir.startsWith(userGeminiDir + path.sep)
+    ) {
+      buckets.global.push(target);
+      continue;
+    }
+
+    const matchedRoot = workspaceRoots.find((root) => targetDir === root);
+    if (matchedRoot) {
+      buckets.workspaceRoot.push(target);
+      continue;
+    }
+
+    const containingRoot = workspaceRoots.find((root) =>
+      targetDir.startsWith(root + path.sep),
+    );
+    if (containingRoot) {
+      buckets.workspaceSubdir.push(target);
+      continue;
+    }
+
+    const ancestorRoot = workspaceRoots.find(
+      (root) => root === targetDir || root.startsWith(targetDir + path.sep),
+    );
+    if (ancestorRoot) {
+      buckets.workspaceAncestor.push(target);
+      continue;
+    }
+
+    // Path does not fit any known scope (e.g. an extra include-directory
+    // outside the workspace). Treat as ancestor-equivalent for prompt clarity.
+    buckets.workspaceAncestor.push(target);
+  }
+
+  const sections: string[] = [];
+  if (buckets.global.length > 0) {
+    sections.push(
+      `### Global (~/.gemini)\nUser-wide preferences. Patch only when the rule applies to every project.\n${buckets.global.map((p) => `- ${p}`).join('\n')}`,
+    );
+  }
+  if (buckets.workspaceRoot.length > 0) {
+    sections.push(
+      `### Workspace root\nProject-wide conventions. The most common patch target.\n${buckets.workspaceRoot.map((p) => `- ${p}`).join('\n')}`,
+    );
+  }
+  if (buckets.workspaceSubdir.length > 0) {
+    sections.push(
+      `### Workspace subdirectory\nScoped rules — prefer these when the convention only applies inside this directory.\n${buckets.workspaceSubdir.map((p) => `- ${p}`).join('\n')}`,
+    );
+  }
+  if (buckets.workspaceAncestor.length > 0) {
+    sections.push(
+      `### Workspace ancestor\nLikely owned by a parent project. Patch only when the rule clearly belongs to that broader scope.\n${buckets.workspaceAncestor.map((p) => `- ${p}`).join('\n')}`,
+    );
+  }
+
+  return sections.join('\n\n');
+}
+
+/**
  * Builds an AgentLoopContext from a Config for background agent execution.
  */
 function buildAgentLoopContext(config: Config): AgentLoopContext {
@@ -684,11 +786,21 @@ export async function startMemoryService(config: Config): Promise<void> {
       );
     }
 
+    // Build the GEMINI.md targeting context (loaded user/project memory files,
+    // grouped by scope). Extension-supplied context files are excluded so the
+    // agent cannot propose patches that would be overwritten on extension
+    // upgrades.
+    const geminiMdContext = buildGeminiMdContext(config);
+    if (geminiMdContext) {
+      debugLogger.log(`[MemoryService] GEMINI.md context:\n${geminiMdContext}`);
+    }
+
     // Build agent definition and context
     const agentDefinition = SkillExtractionAgent(
       skillsDir,
       sessionIndex,
       existingSkillsSummary,
+      geminiMdContext,
     );
 
     const context = buildAgentLoopContext(config);
@@ -728,6 +840,8 @@ export async function startMemoryService(config: Config): Promise<void> {
     // Validate any .patch files the agent generated
     const validPatches = await validatePatches(skillsDir, config);
     const patchesCreatedThisRun: string[] = [];
+    const skillPatchesThisRun: string[] = [];
+    const geminiMdPatchesThisRun: string[] = [];
     for (const patchFile of validPatches) {
       const patchPath = path.join(skillsDir, patchFile);
       let currentContent: string;
@@ -736,13 +850,39 @@ export async function startMemoryService(config: Config): Promise<void> {
       } catch {
         continue;
       }
-      if (patchContentsBefore.get(patchFile) !== currentContent) {
-        patchesCreatedThisRun.push(patchFile);
+      if (patchContentsBefore.get(patchFile) === currentContent) {
+        continue;
+      }
+      patchesCreatedThisRun.push(patchFile);
+
+      // Classify by inspecting the parsed targets — a single patch file may
+      // contain hunks for multiple files, so we check all of them.
+      let targetsGeminiMd = false;
+      try {
+        const parsed = Diff.parsePatch(currentContent);
+        for (const entry of parsed) {
+          const targetPath = entry.newFileName ?? entry.oldFileName ?? '';
+          if (!targetPath || targetPath === '/dev/null') continue;
+          if (await isGeminiMdPatchTarget(targetPath, config)) {
+            targetsGeminiMd = true;
+            break;
+          }
+        }
+      } catch {
+        // Parsing already passed validatePatches, so this is unexpected, but
+        // fall back to treating the patch as a skill patch if classification
+        // fails.
+      }
+
+      if (targetsGeminiMd) {
+        geminiMdPatchesThisRun.push(patchFile);
+      } else {
+        skillPatchesThisRun.push(patchFile);
       }
     }
     if (validPatches.length > 0) {
       debugLogger.log(
-        `[MemoryService] ${validPatches.length} valid patch(es) currently in inbox; ${patchesCreatedThisRun.length} created or updated this run`,
+        `[MemoryService] ${validPatches.length} valid patch(es) currently in inbox; ${patchesCreatedThisRun.length} created or updated this run (${skillPatchesThisRun.length} skill, ${geminiMdPatchesThisRun.length} GEMINI.md)`,
       );
     }
 
@@ -764,9 +904,14 @@ export async function startMemoryService(config: Config): Promise<void> {
           `created ${skillsCreated.length} skill(s): ${skillsCreated.join(', ')}`,
         );
       }
-      if (patchesCreatedThisRun.length > 0) {
+      if (skillPatchesThisRun.length > 0) {
         completionParts.push(
-          `prepared ${patchesCreatedThisRun.length} patch(es): ${patchesCreatedThisRun.join(', ')}`,
+          `prepared ${skillPatchesThisRun.length} skill patch(es): ${skillPatchesThisRun.join(', ')}`,
+        );
+      }
+      if (geminiMdPatchesThisRun.length > 0) {
+        completionParts.push(
+          `prepared ${geminiMdPatchesThisRun.length} GEMINI.md patch(es): ${geminiMdPatchesThisRun.join(', ')}`,
         );
       }
       debugLogger.log(
@@ -778,9 +923,14 @@ export async function startMemoryService(config: Config): Promise<void> {
           `${skillsCreated.length} new skill${skillsCreated.length > 1 ? 's' : ''} extracted from past sessions: ${skillsCreated.join(', ')}`,
         );
       }
-      if (patchesCreatedThisRun.length > 0) {
+      if (skillPatchesThisRun.length > 0) {
         feedbackParts.push(
-          `${patchesCreatedThisRun.length} skill update${patchesCreatedThisRun.length > 1 ? 's' : ''} extracted from past sessions`,
+          `${skillPatchesThisRun.length} skill update${skillPatchesThisRun.length > 1 ? 's' : ''} extracted from past sessions`,
+        );
+      }
+      if (geminiMdPatchesThisRun.length > 0) {
+        feedbackParts.push(
+          `${geminiMdPatchesThisRun.length} project memory update${geminiMdPatchesThisRun.length > 1 ? 's' : ''} extracted from past sessions`,
         );
       }
       coreEvents.emitFeedback(

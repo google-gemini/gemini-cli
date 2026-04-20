@@ -87,4 +87,52 @@ describe('SkillExtractionAgent', () => {
       'If recurrence or future reuse is unclear, create no skill and explain why.',
     );
   });
+
+  it('should always include the GEMINI.md patching section with strict gating', () => {
+    const prompt = agent.promptConfig.systemPrompt;
+
+    expect(prompt).toContain('UPDATING GEMINI.md (PATCHES)');
+    expect(prompt).toContain('NEVER create a new GEMINI.md file');
+    expect(prompt).toContain(
+      'NEVER duplicate, restate, elaborate on, strengthen, rephrase, or expand',
+    );
+    expect(prompt).toContain(
+      'NEVER patch a file that is not in the supplied targeting context',
+    );
+    expect(prompt).toContain('pick the most-specific scope that fits the rule');
+  });
+
+  it('should describe a combined volume cap across skills and patches', () => {
+    const prompt = agent.promptConfig.systemPrompt;
+
+    expect(prompt).toContain(
+      'Aim for 0-2 artifacts per run TOTAL — counting new skills, skill patches,',
+    );
+    expect(prompt).toContain(
+      'Prefer fewer, higher-quality artifacts. 0-2 TOTAL per run',
+    );
+  });
+
+  it('should embed the GEMINI.md targeting context in the query when provided', () => {
+    const geminiMdContext =
+      '### Workspace root\n- /repo/GEMINI.md\n\n### Workspace subdirectory\n- /repo/packages/cli/GEMINI.md';
+    const agentWithContext = SkillExtractionAgent(
+      skillsDir,
+      sessionIndex,
+      existingSkillsSummary,
+      geminiMdContext,
+    );
+
+    const query = agentWithContext.promptConfig.query ?? '';
+    expect(query).toContain('# GEMINI.md Targeting Context');
+    expect(query).toContain('/repo/GEMINI.md');
+    expect(query).toContain('/repo/packages/cli/GEMINI.md');
+    expect(query).toContain('Pick the most-specific scope that');
+  });
+
+  it('should omit the GEMINI.md targeting header when no context is provided', () => {
+    const query = agent.promptConfig.query ?? '';
+
+    expect(query).not.toContain('# GEMINI.md Targeting Context');
+  });
 });
