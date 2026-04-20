@@ -88,24 +88,32 @@ export const generalistProfile: ContextProfile = {
             }),
           ),
           createBlobDegradationProcessor('BlobDegradation', env), // No options
+          // Automatically distill extremely large blocks (e.g. huge source files pasted by the user)
+          createNodeDistillationProcessor(
+            'ImmediateNodeDistillation',
+            env,
+            resolveProcessorOptions(config, 'ImmediateNodeDistillation', {
+              nodeThresholdTokens: 15000,
+            }),
+          ),
         ],
       },
       {
         name: 'Normalization',
         triggers: ['retained_exceeded'],
         processors: [
-          createNodeTruncationProcessor(
-            'NodeTruncation',
-            env,
-            resolveProcessorOptions(config, 'NodeTruncation', {
-              maxTokensPerNode: 3000,
-            }),
-          ),
           createNodeDistillationProcessor(
             'NodeDistillation',
             env,
             resolveProcessorOptions(config, 'NodeDistillation', {
-              nodeThresholdTokens: 5000,
+              nodeThresholdTokens: 3000,
+            }),
+          ),
+          createNodeTruncationProcessor(
+            'NodeTruncation',
+            env,
+            resolveProcessorOptions(config, 'NodeTruncation', {
+              maxTokensPerNode: 2000,
             }),
           ),
         ],

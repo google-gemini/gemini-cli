@@ -129,7 +129,10 @@ export function createToolMaskingProcessor(
           1024
         ).toFixed(2);
         const totalLines = content.split('\n').length;
-        return `<tool_output_masked>\n[Tool ${nodeType} string (${fileSizeMB}MB, ${totalLines} lines) masked to preserve context window. Full string saved to: ${filePath}]\n</tool_output_masked>`;
+
+        // Ensure consistent path separators for LLM tokenization and deterministic tests across OSes
+        const normalizedPath = filePath.split(path.sep).join('/');
+        return `<tool_output_masked>\n[Tool ${nodeType} string (${fileSizeMB}MB, ${totalLines} lines) masked to preserve context window. Full string saved to: ${normalizedPath}]\n</tool_output_masked>`;
       };
 
       const returnedNodes: ConcreteNode[] = [];
