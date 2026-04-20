@@ -1390,6 +1390,7 @@ describe('ShellExecutionService child_process fallback', () => {
         cp.stdout?.emit('data', Buffer.from(chunk2));
         cp.stdout?.emit('data', Buffer.from(chunk3));
         cp.emit('exit', 0, null);
+        cp.emit('close', 0, null);
       });
 
       const truncationMessage =
@@ -1577,6 +1578,7 @@ describe('ShellExecutionService child_process fallback', () => {
         cp.stdout?.emit('data', binaryChunk1);
         cp.stdout?.emit('data', binaryChunk2);
         cp.emit('exit', 0, null);
+        cp.emit('close', 0, null);
       });
 
       expect(onOutputEventMock).toHaveBeenCalledTimes(4);
@@ -1641,6 +1643,7 @@ describe('ShellExecutionService child_process fallback', () => {
       mockPlatform.mockReturnValue('win32');
       await simulateExecution('dir "foo bar"', (cp) => {
         cp.emit('exit', 0, null);
+        cp.emit('close', 0, null);
       });
 
       expect(mockCpSpawn).toHaveBeenCalledWith(
@@ -1658,6 +1661,7 @@ describe('ShellExecutionService child_process fallback', () => {
       mockPlatform.mockReturnValue('linux');
       await simulateExecution('ls "foo bar"', (cp) => {
         cp.emit('exit', 0, null);
+        cp.emit('close', 0, null);
       });
 
       expect(mockCpSpawn).toHaveBeenCalledWith(
@@ -1772,6 +1776,7 @@ describe('ShellExecutionService execution method selection', () => {
 
     // Simulate exit to allow promise to resolve
     mockChildProcess.emit('exit', 0, null);
+    mockChildProcess.emit('close', 0, null);
     const result = await handle.result;
 
     expect(mockGetPty).not.toHaveBeenCalled();
@@ -1795,6 +1800,7 @@ describe('ShellExecutionService execution method selection', () => {
 
     // Simulate exit to allow promise to resolve
     mockChildProcess.emit('exit', 0, null);
+    mockChildProcess.emit('close', 0, null);
     const result = await handle.result;
 
     expect(mockGetPty).toHaveBeenCalled();
