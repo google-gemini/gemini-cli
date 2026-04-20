@@ -1494,7 +1494,55 @@ export const useGeminiStream = (
                 error.userHandled
               ) {
                 // Error was handled by validation dialog, don't display again
-              } else if (!isNodeError(error) || error.name !== 'AbortError') {
+              } else if (isNodeError(error) && error.name === 'AbortError') {
+                // AbortError can originate from loop detection aborting the
+                // internal signal. When loop detection was active, flush
+                // pending history and show the confirmation dialog so the
+                // user can choose to disable detection or stop.
+                if (loopDetectedRef.current) {
+                  loopDetectedRef.current = false;
+                  if (pendingHistoryItemRef.current) {
+                    addItem(
+                      pendingHistoryItemRef.current,
+                      userMessageTimestamp,
+                    );
+                    setPendingHistoryItem(null);
+                  }
+                  setLoopDetectionConfirmationRequest({
+                    onComplete: (result: {
+                      userSelection: 'disable' | 'keep';
+                    }) => {
+                      setLoopDetectionConfirmationRequest(null);
+
+                      if (result.userSelection === 'disable') {
+                        config
+                          .getGeminiClient()
+                          .getLoopDetectionService()
+                          .disableForSession();
+                        addItem({
+                          type: 'info',
+                          text: `Loop detection has been disabled for this session. Retrying request...`,
+                        });
+
+                        if (lastQueryRef.current && lastPromptIdRef.current) {
+                          // eslint-disable-next-line @typescript-eslint/no-floating-promises
+                          submitQuery(
+                            lastQueryRef.current,
+                            { isContinuation: true },
+                            lastPromptIdRef.current,
+                          );
+                        }
+                      } else {
+                        addItem({
+                          type: 'info',
+                          text: `A potential loop was detected. This can happen due to repetitive tool calls or other model behavior. The request has been halted.`,
+                        });
+                      }
+                    },
+                  });
+                }
+                // Otherwise, this is a regular user-initiated abort — silently ignore.
+              } else {
                 maybeAddSuppressedToolErrorNote(userMessageTimestamp);
                 addItem(
                   {

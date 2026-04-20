@@ -151,27 +151,38 @@ async function detectTerminal(): Promise<SupportedTerminal | null> {
   }
 
   // Check parent process name
-  if (os.platform() !== 'win32') {
-    try {
+  try {
+    let parentName: string;
+    if (os.platform() === 'win32') {
+      // On Windows, use WMIC to query the parent process name
+      const ppid = process.ppid;
+      const { stdout } = await execAsync(
+        `wmic process where ProcessId=${ppid} get Name /FORMAT:VALUE`,
+      );
+      parentName = stdout
+        .trim()
+        .replace(/^Name=/i, '')
+        .trim();
+    } else {
       const { stdout } = await execAsync('ps -o comm= -p $PPID');
-      const parentName = stdout.trim();
-
-      // Check forks before VS Code to avoid false positives
-      if (parentName.includes('windsurf') || parentName.includes('Windsurf'))
-        return 'windsurf';
-      if (
-        parentName.includes('antigravity') ||
-        parentName.includes('Antigravity')
-      )
-        return 'antigravity';
-      if (parentName.includes('cursor') || parentName.includes('Cursor'))
-        return 'cursor';
-      if (parentName.includes('code') || parentName.includes('Code'))
-        return 'vscode';
-    } catch (error) {
-      // Continue detection even if process check fails
-      debugLogger.debug('Parent process detection failed:', error);
+      parentName = stdout.trim();
     }
+
+    // Check forks before VS Code to avoid false positives
+    if (parentName.includes('windsurf') || parentName.includes('Windsurf'))
+      return 'windsurf';
+    if (
+      parentName.includes('antigravity') ||
+      parentName.includes('Antigravity')
+    )
+      return 'antigravity';
+    if (parentName.includes('cursor') || parentName.includes('Cursor'))
+      return 'cursor';
+    if (parentName.includes('code') || parentName.includes('Code'))
+      return 'vscode';
+  } catch (error) {
+    // Continue detection even if process check fails
+    debugLogger.debug('Parent process detection failed:', error);
   }
 
   return null;
