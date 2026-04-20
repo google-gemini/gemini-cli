@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { renderWithProviders } from '../../../test-utils/render.js';
+import { renderWithProviders as originalRenderWithProviders } from '../../../test-utils/render.js';
 import { createMockSettings } from '../../../test-utils/settings.js';
 import { waitFor } from '../../../test-utils/async.js';
 import { DenseToolMessage } from './DenseToolMessage.js';
@@ -23,6 +23,11 @@ import type {
   ToolResultDisplay,
 } from '../../types.js';
 
+const renderWithProviders = async (
+  component: React.ReactElement,
+  options?: Parameters<typeof originalRenderWithProviders>[1],
+) => originalRenderWithProviders(component, { height: 40, ...options });
+
 describe('DenseToolMessage', () => {
   const defaultProps = {
     callId: 'call-1',
@@ -33,6 +38,14 @@ describe('DenseToolMessage', () => {
     confirmationDetails: undefined,
     terminalWidth: 80,
   };
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
 
   it('explicitly renders the filename in the header for FileDiff results', async () => {
     const fileDiff: FileDiff = {
