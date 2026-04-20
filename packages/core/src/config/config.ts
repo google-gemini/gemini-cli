@@ -3167,7 +3167,10 @@ export class Config implements McpContext, AgentLoopContext {
    * Note: This method should only be called after startup, once experiments have been loaded.
    */
   getProModelNoAccessSync(): boolean {
-    if (this.contentGeneratorConfig?.authType !== AuthType.LOGIN_WITH_GOOGLE) {
+    if (
+      this.contentGeneratorConfig?.authType !== AuthType.LOGIN_WITH_GOOGLE &&
+      this.contentGeneratorConfig?.authType !== AuthType.COMPUTE_ADC
+    ) {
       return false;
     }
     return (
