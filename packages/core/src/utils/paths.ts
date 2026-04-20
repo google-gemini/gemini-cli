@@ -424,6 +424,16 @@ function robustRealpath(p: string, visited = new Set<string>()): string {
       e &&
       typeof e === 'object' &&
       'code' in e &&
+      (e.code === 'ENAMETOOLONG' || e.code === 'ENOTDIR')
+    ) {
+      // Path is too long or contains a non-directory component; it cannot be a
+      // real filesystem path, so return it as-is.
+      return p;
+    }
+    if (
+      e &&
+      typeof e === 'object' &&
+      'code' in e &&
       (e.code === 'ENOENT' || e.code === 'EISDIR')
     ) {
       try {
@@ -441,7 +451,10 @@ function robustRealpath(p: string, visited = new Set<string>()): string {
             lstatError &&
             typeof lstatError === 'object' &&
             'code' in lstatError &&
-            (lstatError.code === 'ENOENT' || lstatError.code === 'EISDIR')
+            (lstatError.code === 'ENOENT' ||
+              lstatError.code === 'EISDIR' ||
+              lstatError.code === 'ENAMETOOLONG' ||
+              lstatError.code === 'ENOTDIR')
           )
         ) {
           throw lstatError;
