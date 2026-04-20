@@ -1110,14 +1110,28 @@ function detectPowerShellSubstitution(command: string): boolean {
     if (char === '$' && command[i + 1] === '(') {
       return true;
     }
-    if (char === '@' && command[i + 1] === '(') {
+    if (char === '@' && command[i + 1] === '(' && !inDoubleQuote) {
       return true;
     }
     if (char === '(' && !inDoubleQuote) {
       const prev = i > 0 ? command[i - 1] : '';
-      if (prev !== '$' && prev !== '@') {
-        return true;
+      if (prev === '$' || prev === '@' || prev === '.' || prev === ':') {
+        i++;
+        continue;
       }
+      if (/\w/.test(prev)) {
+        i++;
+        continue;
+      }
+      const beforeParen = command.slice(0, i).trimEnd();
+      const contextMatch = beforeParen.match(
+        /\b(if|elseif|else|foreach|for|while|do|switch|catch|trap|until|function|filter)(\s+\w+)?\s*$/i,
+      );
+      if (contextMatch) {
+        i++;
+        continue;
+      }
+      return true;
     }
     i++;
   }
