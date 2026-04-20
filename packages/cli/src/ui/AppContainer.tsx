@@ -1408,6 +1408,13 @@ Logging in with Google... Restarting Gemini CLI to continue.
         return;
       }
 
+      // Pass new messages as additional instructions to the running task
+      if (isAgentRunning && !isSlash) {
+        handleHintSubmit(submittedValue);
+        addInput(submittedValue);
+        return;
+      }
+
       const isMcpOrConfigReady = isConfigInitialized && isMcpReady;
       if ((isSlash && isConfigInitialized) || (isIdle && isMcpOrConfigReady)) {
         if (!isSlash) {

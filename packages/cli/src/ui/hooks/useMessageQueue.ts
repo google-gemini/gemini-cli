@@ -72,11 +72,12 @@ export function useMessageQueue({
       isMcpReady &&
       messageQueue.length > 0
     ) {
-      // Combine all messages with double newlines for clarity
-      const combinedMessage = messageQueue.join('\n\n');
-      // Clear the queue and submit
-      setMessageQueue([]);
-      submitQuery(combinedMessage);
+      // Process one message at a time to preserve sequential intent
+      const [next, ...rest] = messageQueue;
+      if (next) {
+        setMessageQueue(rest);
+        submitQuery(next);
+      }
     }
   }, [
     isConfigInitialized,
