@@ -214,6 +214,27 @@ export interface TelemetryMetric {
   };
   dataPoints: MetricDataPoint[];
 }
+export interface MetricDataPoint {
+  attributes?: Record<string, unknown>;
+  value?: {
+    sum?: number;
+    min?: number;
+    max?: number;
+    count?: number;
+  };
+  startTime?: [number, number];
+  endTime?: string;
+}
+
+export interface TelemetryMetric {
+  descriptor: {
+    name: string;
+    type?: string;
+    description?: string;
+    unit?: string;
+  };
+  dataPoints: MetricDataPoint[];
+}
 
 export interface ParsedLog {
   attributes?: {
@@ -1475,7 +1496,7 @@ export class TestRig {
   readMetric(metricName: string): TelemetryMetric | null {
     const logs = this._readAndParseTelemetryLog();
     for (const logData of logs) {
-      if (logData.scopeMetrics) {
+      if (logData && logData.scopeMetrics) {
         for (const scopeMetric of logData.scopeMetrics) {
           for (const metric of scopeMetric.metrics) {
             if (metric.descriptor.name === `gemini_cli.${metricName}`) {
@@ -1486,6 +1507,152 @@ export class TestRig {
       }
     }
     return null;
+  }
+
+  readMemoryMetrics(): {
+    heapUsed: number;
+    heapTotal: number;
+    rss: number;
+    external: number;
+  } {
+    // For simplicity, we just look for the last values in the logs
+    const metrics = {
+      heapUsed: 0,
+      heapTotal: 0,
+      rss: 0,
+      external: 0,
+    };
+
+    // We want to return the memory snapshot that has the peak RSS usage.
+    // Group data points by their session, component and start time (seconds) to represent a single snapshot.
+    const snapshots: Record<string, typeof metrics> = {};
+
+    const logs = this._readAndParseTelemetryLog();
+    for (const logData of logs) {
+      if (logData && logData.scopeMetrics) {
+        for (const scopeMetric of logData.scopeMetrics) {
+          for (const metric of scopeMetric.metrics) {
+            if (metric.descriptor.name === 'gemini_cli.memory.usage') {
+              for (const dp of metric.dataPoints) {
+                // Group by session, component and seconds portion of start time to identify a single snapshot interval.
+                // Different metrics in the same snapshot might have slightly different nanosecond timestamps.
+                const sessionId =
+                  (dp.attributes?.['session.id'] as string) || 'unknown';
+                const component =
+                  (dp.attributes?.['component'] as string) || 'unknown';
+                const seconds = dp.startTime?.[0] || 0;
+                const timeKey = `${sessionId}-${component}-${seconds}`;
+
+                if (!snapshots[timeKey]) {
+                  snapshots[timeKey] = {
+                    rss: 0,
+                    heapUsed: 0,
+                    heapTotal: 0,
+                    external: 0,
+                  };
+                }
+
+                const type = dp.attributes?.['memory_type'];
+                const value = dp.value?.max ?? dp.value?.sum ?? 0;
+
+                if (type === 'heap_used') snapshots[timeKey].heapUsed = value;
+                else if (type === 'heap_total')
+                  snapshots[timeKey].heapTotal = value;
+                else if (type === 'rss') snapshots[timeKey].rss = value;
+                else if (type === 'external')
+                  snapshots[timeKey].external = value;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Find the snapshot with the highest RSS
+    for (const snapshot of Object.values(snapshots)) {
+      if (snapshot.rss > metrics.rss) {
+        metrics.rss = snapshot.rss;
+        metrics.heapUsed = snapshot.heapUsed;
+        metrics.heapTotal = snapshot.heapTotal;
+        metrics.external = snapshot.external;
+      }
+    }
+
+    // Fallback: if we didn't find any RSS but found heap, use the max heap
+    if (metrics.rss === 0) {
+      for (const snapshot of Object.values(snapshots)) {
+        if (snapshot.heapUsed > metrics.heapUsed) {
+          metrics.rss = snapshot.rss;
+          metrics.heapUsed = snapshot.heapUsed;
+          metrics.heapTotal = snapshot.heapTotal;
+          metrics.external = snapshot.external;
+        }
+      }
+    }
+
+    return metrics;
+  }
+
+  readCpuMetrics(): {
+    userUs: number;
+    systemUs: number;
+    totalUs: number;
+  } {
+    const metrics = {
+      userUs: 0,
+      systemUs: 0,
+      totalUs: 0,
+    };
+
+    const logs = this._readAndParseTelemetryLog();
+    for (const logData of logs) {
+      if (logData && logData.scopeMetrics) {
+        for (const scopeMetric of logData.scopeMetrics) {
+          for (const metric of scopeMetric.metrics) {
+            if (metric.descriptor.name === 'gemini_cli.cpu.usage') {
+              for (const dp of metric.dataPoints) {
+                const value = dp.value?.sum ?? 0;
+                // Currently cpu usage is recorded as a single total sum in core/metrics.ts
+                metrics.totalUs = value;
+              }
+            }
+          }
+        }
+      }
+    }
+    return metrics;
+  }
+
+  readEventLoopMetrics(): {
+    p50: number;
+    p95: number;
+    max: number;
+  } {
+    const metrics = {
+      p50: 0,
+      p95: 0,
+      max: 0,
+    };
+
+    const logs = this._readAndParseTelemetryLog();
+    for (const logData of logs) {
+      if (logData && logData.scopeMetrics) {
+        for (const scopeMetric of logData.scopeMetrics) {
+          for (const metric of scopeMetric.metrics) {
+            if (metric.descriptor.name === 'gemini_cli.event_loop.delay') {
+              for (const dp of metric.dataPoints) {
+                const percentile = dp.attributes?.['percentile'];
+                const value = dp.value?.sum ?? 0;
+                if (percentile === 'p50') metrics.p50 = value;
+                else if (percentile === 'p95') metrics.p95 = value;
+                else if (percentile === 'max') metrics.max = value;
+              }
+            }
+          }
+        }
+      }
+    }
+    return metrics;
   }
 
   async runInteractive(options?: {

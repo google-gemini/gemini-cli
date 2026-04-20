@@ -4,10 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import v8 from 'node:v8';
-import { setTimeout as sleep } from 'node:timers/promises';
 import { loadBaselines, updateBaseline } from './memory-baselines.js';
 import type { MemoryBaseline, MemoryBaselineFile } from './memory-baselines.js';
+import type { TestRig } from './test-rig.js';
 
 /** Configuration for asciichart plot function. */
 interface PlotConfig {
@@ -28,9 +27,6 @@ export interface MemorySnapshot {
   heapTotal: number;
   rss: number;
   external: number;
-  arrayBuffers: number;
-  heapSizeLimit: number;
-  heapSpaces: any[];
 }
 
 /**
@@ -58,22 +54,13 @@ export interface MemoryTestHarnessOptions {
   baselinesPath: string;
   /** Default tolerance percentage (0-100). Default: 10 */
   defaultTolerancePercent?: number;
-  /** Number of GC cycles to run before each snapshot. Default: 3 */
-  gcCycles?: number;
-  /** Delay in ms between GC cycles. Default: 100 */
-  gcDelayMs?: number;
-  /** Number of samples to take for median calculation. Default: 3 */
-  sampleCount?: number;
-  /** Pause in ms between samples. Default: 50 */
-  samplePauseMs?: number;
 }
 
 /**
  * MemoryTestHarness provides infrastructure for running memory usage tests.
  *
  * It handles:
- * - Forcing V8 garbage collection to reduce noise
- * - Taking V8 heap snapshots for accurate memory measurement
+ * - Extracting memory metrics from CLI process telemetry
  * - Comparing against baselines with configurable tolerance
  * - Generating ASCII chart reports of memory trends
  */
@@ -81,88 +68,44 @@ export class MemoryTestHarness {
   private baselines: MemoryBaselineFile;
   private readonly baselinesPath: string;
   private readonly defaultTolerancePercent: number;
-  private readonly gcCycles: number;
-  private readonly gcDelayMs: number;
-  private readonly sampleCount: number;
-  private readonly samplePauseMs: number;
   private allResults: MemoryTestResult[] = [];
 
   constructor(options: MemoryTestHarnessOptions) {
     this.baselinesPath = options.baselinesPath;
     this.defaultTolerancePercent = options.defaultTolerancePercent ?? 10;
-    this.gcCycles = options.gcCycles ?? 3;
-    this.gcDelayMs = options.gcDelayMs ?? 100;
-    this.sampleCount = options.sampleCount ?? 3;
-    this.samplePauseMs = options.samplePauseMs ?? 50;
     this.baselines = loadBaselines(this.baselinesPath);
   }
 
   /**
-   * Force garbage collection multiple times and take a V8 heap snapshot.
-   * Forces GC multiple times with delays to allow weak references and
-   * FinalizationRegistry callbacks to run, reducing measurement noise.
+   * Extract memory snapshot from TestRig telemetry.
    */
-  async takeSnapshot(label: string = 'snapshot'): Promise<MemorySnapshot> {
-    await this.forceGC();
-
-    const memUsage = process.memoryUsage();
-    const heapStats = v8.getHeapStatistics();
-
-    return {
-      timestamp: Date.now(),
-      label,
-      heapUsed: memUsage.heapUsed,
-      heapTotal: memUsage.heapTotal,
-      rss: memUsage.rss,
-      external: memUsage.external,
-      arrayBuffers: memUsage.arrayBuffers,
-      heapSizeLimit: heapStats.heap_size_limit,
-      heapSpaces: v8.getHeapSpaceStatistics(),
-    };
-  }
-
-  /**
-   * Take multiple snapshot samples and return the median to reduce noise.
-   */
-  async takeMedianSnapshot(
-    label: string = 'median',
-    count?: number,
+  async takeSnapshot(
+    rig: TestRig,
+    label: string = 'snapshot',
   ): Promise<MemorySnapshot> {
-    const samples: MemorySnapshot[] = [];
-    const numSamples = count ?? this.sampleCount;
-
-    for (let i = 0; i < numSamples; i++) {
-      samples.push(await this.takeSnapshot(`${label}_sample_${i}`));
-      if (i < numSamples - 1) {
-        await sleep(this.samplePauseMs);
-      }
-    }
-
-    // Sort by heapUsed and take the median
-    samples.sort((a, b) => a.heapUsed - b.heapUsed);
-    const medianIdx = Math.floor(samples.length / 2);
-    const median = samples[medianIdx]!;
+    const metrics = rig.readMemoryMetrics();
 
     return {
-      ...median,
-      label,
       timestamp: Date.now(),
+      label,
+      heapUsed: metrics.heapUsed,
+      heapTotal: metrics.heapTotal,
+      rss: metrics.rss,
+      external: metrics.external,
     };
   }
 
   /**
    * Run a memory test scenario.
    *
-   * Takes before/after snapshots around the scenario function, collects
-   * intermediate snapshots if the scenario provides them, and compares
-   * the result against the stored baseline.
-   *
+   * @param rig - The TestRig instance running the CLI
    * @param name - Scenario name (must match baseline key)
    * @param fn - Async function that executes the scenario. Receives a
    *   `recordSnapshot` callback for recording intermediate snapshots.
    * @param tolerancePercent - Override default tolerance for this scenario
    */
   async runScenario(
+    rig: TestRig,
     name: string,
     fn: (
       recordSnapshot: (label: string) => Promise<MemorySnapshot>,
@@ -172,27 +115,33 @@ export class MemoryTestHarness {
     const tolerance = tolerancePercent ?? this.defaultTolerancePercent;
     const snapshots: MemorySnapshot[] = [];
 
+    // Record initial snapshot
+    const beforeSnap = await this.takeSnapshot(rig, 'before');
+    snapshots.push(beforeSnap);
+
     // Record a callback for intermediate snapshots
     const recordSnapshot = async (label: string): Promise<MemorySnapshot> => {
-      const snap = await this.takeMedianSnapshot(label);
+      // Small delay to allow telemetry to flush if needed
+      await rig.waitForTelemetryReady();
+      const snap = await this.takeSnapshot(rig, label);
       snapshots.push(snap);
       return snap;
     };
 
-    // Before snapshot
-    const beforeSnap = await this.takeMedianSnapshot('before');
-    snapshots.push(beforeSnap);
-
     // Run the scenario
     await fn(recordSnapshot);
 
-    // After snapshot (median of multiple samples)
-    const afterSnap = await this.takeMedianSnapshot('after');
+    // Final wait for telemetry to ensure everything is flushed
+    await rig.waitForTelemetryReady();
+
+    // After snapshot
+    const afterSnap = await this.takeSnapshot(rig, 'after');
     snapshots.push(afterSnap);
 
     // Calculate peak values
     const peakHeapUsed = Math.max(...snapshots.map((s) => s.heapUsed));
     const peakRss = Math.max(...snapshots.map((s) => s.rss));
+    const peakExternal = Math.max(...snapshots.map((s) => s.external));
 
     // Get baseline
     const baseline = this.baselines.scenarios[name];
@@ -208,8 +157,6 @@ export class MemoryTestHarness {
         100;
       withinTolerance = deltaPercent <= tolerance;
     }
-
-    const peakExternal = Math.max(...snapshots.map((s) => s.external));
 
     const result: MemoryTestResult = {
       scenarioName: name,
@@ -279,105 +226,6 @@ export class MemoryTestHarness {
     });
     // Reload baselines after update
     this.baselines = loadBaselines(this.baselinesPath);
-  }
-
-  /**
-   * Analyze snapshots to detect sustained leaks across 3 snapshots.
-   * A leak is flagged if growth is observed in both phases for any heap space.
-   */
-  analyzeSnapshots(
-    snapshots: MemorySnapshot[],
-    thresholdBytes: number = 1024 * 1024, // 1 MB
-  ): { leaked: boolean; message: string } {
-    if (snapshots.length < 3) {
-      return { leaked: false, message: 'Not enough snapshots to analyze' };
-    }
-
-    const snap1 = snapshots[snapshots.length - 3];
-    const snap2 = snapshots[snapshots.length - 2];
-    const snap3 = snapshots[snapshots.length - 1];
-
-    if (!snap1 || !snap2 || !snap3) {
-      return { leaked: false, message: 'Missing snapshots' };
-    }
-
-    const spaceNames = new Set<string>();
-    snap1.heapSpaces.forEach((s: any) => spaceNames.add(s.space_name));
-    snap2.heapSpaces.forEach((s: any) => spaceNames.add(s.space_name));
-    snap3.heapSpaces.forEach((s: any) => spaceNames.add(s.space_name));
-
-    let hasSustainedGrowth = false;
-    const growthDetails: string[] = [];
-
-    for (const name of spaceNames) {
-      const size1 =
-        snap1.heapSpaces.find((s: any) => s.space_name === name)
-          ?.space_used_size ?? 0;
-      const size2 =
-        snap2.heapSpaces.find((s: any) => s.space_name === name)
-          ?.space_used_size ?? 0;
-      const size3 =
-        snap3.heapSpaces.find((s: any) => s.space_name === name)
-          ?.space_used_size ?? 0;
-
-      const growth1 = size2 - size1;
-      const growth2 = size3 - size2;
-
-      if (growth1 > thresholdBytes && growth2 > thresholdBytes) {
-        hasSustainedGrowth = true;
-        growthDetails.push(
-          `${name}: sustained growth (${formatMB(growth1)} -> ${formatMB(growth2)})`,
-        );
-      }
-    }
-
-    let message = '';
-    if (hasSustainedGrowth) {
-      message =
-        `Memory bloat detected in heap spaces:\n  ` +
-        growthDetails.join('\n  ');
-    } else {
-      message = `No sustained growth detected in any heap space above threshold.`;
-    }
-
-    return { leaked: hasSustainedGrowth, message };
-  }
-
-  /**
-   * Assert that memory returns to a baseline level after a peak.
-   * Useful for verifying that large tool outputs are not retained.
-   */
-  assertMemoryReturnsToBaseline(
-    snapshots: MemorySnapshot[],
-    tolerancePercent: number = 10,
-  ): void {
-    if (snapshots.length < 3) {
-      throw new Error('Need at least 3 snapshots to check return to baseline');
-    }
-
-    const baseline = snapshots[0]; // Assume first is baseline
-    const peak = snapshots.reduce(
-      (max, s) => (s.heapUsed > max.heapUsed ? s : max),
-      snapshots[0],
-    );
-    const final = snapshots[snapshots.length - 1];
-
-    if (!baseline || !peak || !final) {
-      throw new Error('Missing snapshots for return to baseline check');
-    }
-
-    const tolerance = baseline.heapUsed * (tolerancePercent / 100);
-    const delta = final.heapUsed - baseline.heapUsed;
-
-    if (delta > tolerance) {
-      throw new Error(
-        `Memory did not return to baseline!\n` +
-          `  Baseline: ${formatMB(baseline.heapUsed)}\n` +
-          `  Peak:     ${formatMB(peak.heapUsed)}\n` +
-          `  Final:    ${formatMB(final.heapUsed)}\n` +
-          `  Delta:    ${formatMB(delta)} (tolerance: ${formatMB(tolerance)})`,
-      );
-    }
   }
 
   /**
@@ -460,26 +308,6 @@ export class MemoryTestHarness {
     const report = lines.join('\n');
     console.log(report);
     return report;
-  }
-
-  /**
-   * Force V8 garbage collection.
-   * Runs multiple GC cycles with delays to allow weak references
-   * and FinalizationRegistry callbacks to run.
-   */
-  private async forceGC(): Promise<void> {
-    if (typeof globalThis.gc !== 'function') {
-      throw new Error(
-        'global.gc() not available. Run with --expose-gc for accurate measurements.',
-      );
-    }
-
-    for (let i = 0; i < this.gcCycles; i++) {
-      globalThis.gc();
-      if (i < this.gcCycles - 1) {
-        await sleep(this.gcDelayMs);
-      }
-    }
   }
 }
 
