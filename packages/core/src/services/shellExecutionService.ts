@@ -465,6 +465,9 @@ export class ShellExecutionService {
         'GIT_CONFIG_COUNT',
         newKey,
         newValue,
+        'DEBIAN_FRONTEND',
+        'APT_LISTCHANGES_FRONTEND',
+        'APT_LISTBUGS_FRONTEND',
       );
 
       Object.assign(baseEnv, {
