@@ -471,9 +471,31 @@ describe('SettingsSchema', () => {
       expect(enabled.category).toBe('Experimental');
       expect(enabled.default).toBe(false);
       expect(enabled.requiresRestart).toBe(true);
-      expect(enabled.showInDialog).toBe(false);
+      expect(enabled.showInDialog).toBe(true);
       expect(enabled.description).toBe(
         'Enable the Gemma Model Router (experimental). Requires a local endpoint serving Gemma via the Gemini API using LiteRT-LM shim.',
+      );
+
+      const autoStartServer = gemmaModelRouter.properties.autoStartServer;
+      expect(autoStartServer).toBeDefined();
+      expect(autoStartServer.type).toBe('boolean');
+      expect(autoStartServer.category).toBe('Experimental');
+      expect(autoStartServer.default).toBe(false);
+      expect(autoStartServer.requiresRestart).toBe(true);
+      expect(autoStartServer.showInDialog).toBe(true);
+      expect(autoStartServer.description).toBe(
+        'Automatically start the LiteRT-LM server when Gemini CLI starts and the Gemma router is enabled.',
+      );
+
+      const binaryPath = gemmaModelRouter.properties.binaryPath;
+      expect(binaryPath).toBeDefined();
+      expect(binaryPath.type).toBe('string');
+      expect(binaryPath.category).toBe('Experimental');
+      expect(binaryPath.default).toBe('');
+      expect(binaryPath.requiresRestart).toBe(true);
+      expect(binaryPath.showInDialog).toBe(false);
+      expect(binaryPath.description).toBe(
+        'Custom path to the LiteRT-LM binary. Leave empty to use the default location (~/.gemini/bin/litert/).',
       );
 
       const classifier = gemmaModelRouter.properties.classifier;
