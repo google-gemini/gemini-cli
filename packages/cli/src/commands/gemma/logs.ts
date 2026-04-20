@@ -177,11 +177,13 @@ export const logsCommand: CommandModule<object, LogsArgs> = {
       const exitCode = await runTail(logPath, requestedLines, follow);
       await exitCli(exitCode);
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      if (
+        error instanceof Error &&
+        'code' in error &&
+        error.code === 'ENOENT'
+      ) {
         if (!follow) {
-          process.stdout.write(
-            await readLastLines(logPath, requestedLines),
-          );
+          process.stdout.write(await readLastLines(logPath, requestedLines));
           await exitCli(0);
         } else {
           debugLogger.error(
