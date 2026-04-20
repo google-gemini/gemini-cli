@@ -256,7 +256,7 @@ function isSafeToCallWithExec(args: string[]): boolean {
  * @param subcommands - A list of subcommands to look for.
  * @returns An object containing the index of the subcommand and its name.
  */
-function findGitSubcommand(
+export function findGitSubcommand(
   args: string[],
   subcommands: string[],
 ): { idx: number; subcommand: string | null } {
@@ -318,7 +318,7 @@ function findGitSubcommand(
  * @param args - The git command arguments.
  * @returns true if config overrides are present.
  */
-function gitHasConfigOverrideGlobalOption(args: string[]): boolean {
+export function gitHasConfigOverrideGlobalOption(args: string[]): boolean {
   return args.some(
     (arg) =>
       arg === '-c' ||
@@ -336,7 +336,7 @@ function gitHasConfigOverrideGlobalOption(args: string[]): boolean {
  * @param args - Arguments passed to the git subcommand.
  * @returns true if the arguments only represent read-only operations.
  */
-function gitSubcommandArgsAreReadOnly(args: string[]): boolean {
+export function gitSubcommandArgsAreReadOnly(args: string[]): boolean {
   const unsafeFlags = new Set([
     '--output',
     '--ext-diff',
@@ -360,7 +360,7 @@ function gitSubcommandArgsAreReadOnly(args: string[]): boolean {
  * @param args - Arguments passed to `git branch`.
  * @returns true if it's purely a listing/read-only branch command.
  */
-function gitBranchIsReadOnly(args: string[]): boolean {
+export function gitBranchIsReadOnly(args: string[]): boolean {
   if (args.length === 0) return true;
 
   let sawReadOnlyFlag = false;
@@ -436,7 +436,98 @@ export function isDangerousCommand(args: string[]): boolean {
   }
 
   if (cmd === 'sudo') {
-    return isDangerousCommand(args.slice(1));
+    let nextCmdIdx = 1;
+    while (nextCmdIdx < args.length) {
+      const arg = args[nextCmdIdx];
+      if (arg === '--') {
+        nextCmdIdx++;
+        break;
+      }
+      if (!arg.startsWith('-')) {
+        // It could be variable assignment like VAR=value before the command
+        if (/^[a-zA-Z_][a-zA-Z0-9_]*=/.test(arg)) {
+          nextCmdIdx++;
+          continue;
+        }
+        break;
+      }
+
+      // Check for options that consume the next argument
+      if (
+        /^-[acCDghopRrTtUu]$/.test(arg) ||
+        [
+          '--auth-type',
+          '--login-class',
+          '--close-from',
+          '--chdir',
+          '--group',
+          '--host',
+          '--prompt',
+          '--chroot',
+          '--role',
+          '--type',
+          '--command-timeout',
+          '--timeout',
+          '--user',
+          '--other-user',
+          '--option',
+        ].includes(arg)
+      ) {
+        nextCmdIdx += 2;
+      } else {
+        nextCmdIdx += 1;
+      }
+    }
+    return isDangerousCommand(args.slice(nextCmdIdx));
+  }
+
+  if (['env', 'xargs'].includes(cmd)) {
+    let nextCmdIdx = 1;
+    while (nextCmdIdx < args.length) {
+      const arg = args[nextCmdIdx];
+      if (arg === '--') {
+        nextCmdIdx++;
+        break;
+      }
+      if (!arg.startsWith('-')) {
+        // It could be variable assignment like VAR=value before the command (for env)
+        if (cmd === 'env' && /^[a-zA-Z_][a-zA-Z0-9_]*=/.test(arg)) {
+          nextCmdIdx++;
+          continue;
+        }
+        break;
+      }
+
+      // Check for options that consume the next argument
+      if (cmd === 'env') {
+        if (
+          /^-[uS]$/.test(arg) ||
+          ['--unset', '--split-string'].includes(arg)
+        ) {
+          nextCmdIdx += 2;
+        } else {
+          nextCmdIdx += 1;
+        }
+      } else if (cmd === 'xargs') {
+        if (
+          /^-[aEeIiLlnPs]$/.test(arg) ||
+          [
+            '--arg-file',
+            '--max-args',
+            '--max-procs',
+            '--max-chars',
+            '--process-slot-var',
+          ].includes(arg)
+        ) {
+          nextCmdIdx += 2;
+        } else {
+          nextCmdIdx += 1;
+        }
+      } else {
+        nextCmdIdx += 1;
+      }
+    }
+    return isDangerousCommand(args.slice(nextCmdIdx));
   }
 
   if (cmd === 'find') {

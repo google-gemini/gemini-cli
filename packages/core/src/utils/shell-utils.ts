@@ -321,7 +321,26 @@ export function normalizeCommand(commandName: string): string {
   // Split by both separators and get the last non-empty part
   const parts = commandName.split(/[\\/]/).filter(Boolean);
   const base = parts.length > 0 ? parts[parts.length - 1] : '';
-  return base.toLowerCase().replace(/\.exe$/, '');
+  let result = base.toLowerCase();
+  const extensions = ['.exe', '.cmd', '.bat', '.com', '.ps1'];
+
+  while (true) {
+    const prev = result;
+
+    while (result.endsWith('.')) {
+      result = result.slice(0, -1);
+    }
+
+    for (const ext of extensions) {
+      if (result.endsWith(ext)) {
+        result = result.slice(0, -ext.length);
+        break;
+      }
+    }
+
+    if (result === prev) break;
+  }
+  return result;
 }
 
 function extractNameFromNode(node: Node): string | null {

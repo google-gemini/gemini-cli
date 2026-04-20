@@ -10,7 +10,14 @@ import {
   splitCommands,
   stripShellWrapper,
   normalizeCommand,
+  hasRedirection,
 } from '../../utils/shell-utils.js';
+import {
+  findGitSubcommand,
+  gitHasConfigOverrideGlobalOption,
+  gitSubcommandArgsAreReadOnly,
+  gitBranchIsReadOnly,
+} from '../utils/commandSafety.js';
 
 /**
  * Determines if a command is strictly approved for execution on Windows.
@@ -34,6 +41,10 @@ export async function isStrictlyApproved(
   const fullCmd = [command, ...args].join(' ');
   const stripped = stripShellWrapper(fullCmd);
 
+  if (hasRedirection(stripped)) {
+    return false;
+  }
+
   const pipelineCommands = splitCommands(stripped);
 
   // Fallback for simple commands or parsing failures
@@ -49,10 +60,7 @@ export async function isStrictlyApproved(
     const parsedArgs = shellParse(trimmed).map(extractStringFromParseEntry);
     if (parsedArgs.length === 0) return true;
 
-    let root = parsedArgs[0].toLowerCase();
-    if (root.endsWith('.exe')) {
-      root = root.slice(0, -4);
-    }
+    const root = normalizeCommand(parsedArgs[0]);
     // The segment is approved if the root tool is in the allowlist OR if the whole segment is safe.
     return (
       tools.some((t) => t.toLowerCase() === root) ||
@@ -66,10 +74,7 @@ export async function isStrictlyApproved(
  */
 export function isKnownSafeCommand(args: string[]): boolean {
   if (!args || args.length === 0) return false;
-  let cmd = args[0].toLowerCase();
-  if (cmd.endsWith('.exe')) {
-    cmd = cmd.slice(0, -4);
-  }
+  const cmd = normalizeCommand(args[0]);
 
   // Native Windows/PowerShell safe commands
   const safeCommands = new Set([
@@ -106,10 +111,35 @@ export function isKnownSafeCommand(args: string[]): boolean {
 
   // We allow git on Windows if it's read-only, using the same logic as POSIX
   if (cmd === 'git') {
-    // For simplicity in this branch, we'll allow standard git read operations
-    // In a full implementation, we'd port the sub-command validation too.
-    const sub = args[1]?.toLowerCase();
-    return ['status', 'log', 'diff', 'show', 'branch'].includes(sub);
+    if (gitHasConfigOverrideGlobalOption(args)) {
+      return false;
+    }
+
+    const { idx, subcommand } = findGitSubcommand(args, [
+      'status',
+      'log',
+      'diff',
+      'show',
+      'branch',
+    ]);
+    if (!subcommand) {
+      return false;
+    }
+
+    const subcommandArgs = args.slice(idx + 1);
+
+    if (['status', 'log', 'diff', 'show'].includes(subcommand)) {
+      return gitSubcommandArgsAreReadOnly(subcommandArgs);
+    }
+
+    if (subcommand === 'branch') {
+      return (
+        gitSubcommandArgsAreReadOnly(subcommandArgs) &&
+        gitBranchIsReadOnly(subcommandArgs)
+      );
+    }
+
+    return false;
   }
 
   return false;
@@ -123,6 +153,7 @@ export function isDangerousCommand(args: string[]): boolean {
   const cmd = normalizeCommand(args[0]);
 
   const dangerous = new Set([
+    'rm',
     'del',
     'erase',
     'rd',
@@ -144,5 +175,89 @@ export function isDangerousCommand(args: string[]): boolean {
     'new-item',
   ]);
 
-  return dangerous.has(cmd);
+  if (dangerous.has(cmd)) {
+    return true;
+  }
+
+  if (cmd === 'git') {
+    if (gitHasConfigOverrideGlobalOption(args)) {
+      return true;
+    }
+
+    const { idx, subcommand } = findGitSubcommand(args, [
+      'status',
+      'log',
+      'diff',
+      'show',
+      'branch',
+    ]);
+    if (!subcommand) {
+      // It's a git command we don't recognize as explicitly safe.
+      return false;
+    }
+
+    const subcommandArgs = args.slice(idx + 1);
+
+    if (['status', 'log', 'diff', 'show'].includes(subcommand)) {
+      return !gitSubcommandArgsAreReadOnly(subcommandArgs);
+    }
+
+    if (subcommand === 'branch') {
+      return !(
+        gitSubcommandArgsAreReadOnly(subcommandArgs) &&
+        gitBranchIsReadOnly(subcommandArgs)
+      );
+    }
+
+    return false;
+  }
+
+  if (['env', 'xargs'].includes(cmd)) {
+    let nextCmdIdx = 1;
+    while (nextCmdIdx < args.length) {
+      const arg = args[nextCmdIdx];
+      if (arg === '--') {
+        nextCmdIdx++;
+        break;
+      }
+      if (!arg.startsWith('-')) {
+        if (cmd === 'env' && /^[a-zA-Z_][a-zA-Z0-9_]*=/.test(arg)) {
+          nextCmdIdx++;
+          continue;
+        }
+        break;
+      }
+
+      if (cmd === 'env') {
+        if (
+          /^-[uS]$/.test(arg) ||
+          ['--unset', '--split-string'].includes(arg)
+        ) {
+          nextCmdIdx += 2;
+        } else {
+          nextCmdIdx += 1;
+        }
+      } else if (cmd === 'xargs') {
+        if (
+          /^-[aEeIiLlnPs]$/.test(arg) ||
+          [
+            '--arg-file',
+            '--max-args',
+            '--max-procs',
+            '--max-chars',
+            '--process-slot-var',
+          ].includes(arg)
+        ) {
+          nextCmdIdx += 2;
+        } else {
+          nextCmdIdx += 1;
+        }
+      } else {
+        nextCmdIdx += 1;
+      }
+    }
+    return isDangerousCommand(args.slice(nextCmdIdx));
+  }
+
+  return false;
 }

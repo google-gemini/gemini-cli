@@ -19,12 +19,10 @@ vi.mock('../../utils/shell-utils.js', () => ({
     return '';
   },
   normalizeCommand: (cmd: string) => {
-    // Simple mock normalization: /bin/rm -> rm
-    if (cmd.startsWith('/')) {
-      const parts = cmd.split('/');
-      return parts[parts.length - 1];
-    }
-    return cmd;
+    if (!cmd) return '';
+    const parts = cmd.split(/[\\/]/).filter(Boolean);
+    const base = parts.length > 0 ? parts[parts.length - 1] : '';
+    return base.toLowerCase().replace(/\.exe$/, '');
   },
 }));
 
@@ -74,12 +72,67 @@ describe('POSIX commandSafety', () => {
 
     it('should identify sudo as dangerous if command is dangerous', () => {
       expect(isDangerousCommand(['sudo', 'rm', 'file'])).toBe(true);
+      expect(isDangerousCommand(['sudo', '-u', 'root', 'rm', 'file'])).toBe(
+        true,
+      );
+      expect(isDangerousCommand(['sudo', '--user', 'root', 'rm', 'file'])).toBe(
+        true,
+      );
+      expect(isDangerousCommand(['sudo', '-t', 'type', 'rm', 'file'])).toBe(
+        true,
+      );
+      expect(isDangerousCommand(['sudo', '-o', 'opt=val', 'rm', 'file'])).toBe(
+        true,
+      );
+      expect(
+        isDangerousCommand(['sudo', '--option', 'opt=val', 'rm', 'file']),
+      ).toBe(true);
+      expect(isDangerousCommand(['sudo', '--askpass', 'rm', 'file'])).toBe(
+        true,
+      );
+      expect(isDangerousCommand(['sudo', '-D', '/tmp', 'rm', '-rf', '/'])).toBe(
+        true,
+      );
+      expect(
+        isDangerousCommand(['sudo', '--chroot', '/tmp', 'rm', '-rf', '/']),
+      ).toBe(true);
+      expect(isDangerousCommand(['sudo', '-r', 'role', 'rm', 'file'])).toBe(
+        true,
+      );
+      expect(isDangerousCommand(['sudo', '-t', 'type', 'rm', 'file'])).toBe(
+        true,
+      );
+      expect(isDangerousCommand(['sudo', '--askpass', 'rm', 'file'])).toBe(
+        true,
+      );
+      expect(isDangerousCommand(['sudo', './rm=dangerous'])).toBe(false);
+      expect(isDangerousCommand(['sudo', './rm'])).toBe(true);
     });
 
     it('should identify find -exec as dangerous', () => {
       expect(isDangerousCommand(['find', '.', '-exec', 'rm', '{}', '+'])).toBe(
         true,
       );
+    });
+
+    it('should identify dangerous commands wrapped in env', () => {
+      expect(isDangerousCommand(['env', 'rm', '-rf', '/'])).toBe(true);
+      expect(isDangerousCommand(['env', '-i', 'rm', '-rf', '/'])).toBe(true);
+      expect(isDangerousCommand(['env', '-u', 'USER', 'rm', '-rf', '/'])).toBe(
+        true,
+      );
+      expect(isDangerousCommand(['env', 'VAR=val', 'rm', '-rf', '/'])).toBe(
+        true,
+      );
+      expect(isDangerousCommand(['env', '--', 'rm', '-rf', '/'])).toBe(true);
+    });
+
+    it('should identify dangerous commands wrapped in xargs', () => {
+      expect(isDangerousCommand(['xargs', 'rm', '-rf', '/'])).toBe(true);
+      expect(isDangerousCommand(['xargs', '-I', '{}', 'rm', '{}'])).toBe(true);
+      expect(isDangerousCommand(['xargs', '-n', '1', 'rm'])).toBe(true);
+      expect(isDangerousCommand(['xargs', '-0', 'rm'])).toBe(true);
+      expect(isDangerousCommand(['xargs', '--', 'rm'])).toBe(true);
     });
 
     it('should identify dangerous rg flags', () => {
