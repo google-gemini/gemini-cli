@@ -38,6 +38,22 @@ export function isAppleTerminal(): boolean {
 }
 
 /**
+ * Detects if the current terminal is Windows Terminal (modern terminal on
+ * Windows that fully supports ANSI/VT sequences, 256 colors, and true color).
+ */
+export function isWindowsTerminal(): boolean {
+  return os.platform() === 'win32' && Boolean(process.env['WT_SESSION']);
+}
+
+/**
+ * Detects if the current terminal is the legacy Windows console host (conhost).
+ * ConHost has limited VT sequence support compared to Windows Terminal.
+ */
+export function isLegacyConHost(): boolean {
+  return os.platform() === 'win32' && !isWindowsTerminal();
+}
+
+/**
  * Detects if the current terminal supports 256 colors (8-bit).
  */
 export function supports256Colors(): boolean {
@@ -49,6 +65,11 @@ export function supports256Colors(): boolean {
   // Check TERM environment variable
   const term = process.env['TERM'] || '';
   if (term.includes('256color')) {
+    return true;
+  }
+
+  // Windows Terminal always supports 256 colors
+  if (isWindowsTerminal()) {
     return true;
   }
 
@@ -69,6 +90,11 @@ export function supportsTrueColor(): boolean {
 
   // Check if stdout supports 24-bit color depth
   if (process.stdout.getColorDepth && process.stdout.getColorDepth() >= 24) {
+    return true;
+  }
+
+  // Windows Terminal supports true color natively
+  if (isWindowsTerminal()) {
     return true;
   }
 
@@ -100,6 +126,15 @@ export function getCompatibilityWarnings(options?: {
       message:
         'Warning: Windows 10 detected. Some UI features like smooth scrolling may be degraded. Windows 11 is recommended for the best experience.',
       priority: WarningPriority.High,
+    });
+  }
+
+  if (isLegacyConHost()) {
+    warnings.push({
+      id: 'windows-legacy-conhost',
+      message:
+        'Warning: Legacy console host (conhost) detected. For the best experience on Windows, use Windows Terminal (https://aka.ms/terminal).',
+      priority: WarningPriority.Low,
     });
   }
 

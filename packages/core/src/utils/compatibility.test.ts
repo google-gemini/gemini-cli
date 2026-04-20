@@ -286,13 +286,15 @@ describe('compatibility', () => {
       vi.stubEnv('TERMINAL_EMULATOR', 'JetBrains-JediTerm');
       vi.stubEnv('COLORTERM', '');
       vi.stubEnv('TERM_PROGRAM', 'xterm');
+      vi.stubEnv('WT_SESSION', '');
       process.stdout.getColorDepth = vi.fn().mockReturnValue(8);
 
       const warnings = getCompatibilityWarnings({ isAlternateBuffer: true });
-      expect(warnings).toHaveLength(3);
+      expect(warnings).toHaveLength(4);
       expect(warnings[0].message).toContain('Windows 10 detected');
-      expect(warnings[1].message).toContain('JetBrains');
-      expect(warnings[2].message).toContain(
+      expect(warnings[1].message).toContain('Legacy console host');
+      expect(warnings[2].message).toContain('JetBrains');
+      expect(warnings[3].message).toContain(
         'True color (24-bit) support not detected',
       );
     });
