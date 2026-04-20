@@ -12,8 +12,6 @@ import {
   type EmbedContentResponse,
   type EmbedContentParameters,
   type Tool,
-  type Content,
-  type GenerateContentConfig,
 } from '@google/genai';
 import type { ContentGenerator } from './contentGenerator.js';
 import type { LlmRole } from '../telemetry/llmRole.js';
@@ -45,13 +43,6 @@ interface OpenAiContentPart {
   };
 }
 
-/**
- * Type guard for Tool.
- */
-function isTool(tool: unknown): tool is Tool {
-  return typeof tool === 'object' && tool !== null && 'functionDeclarations' in tool;
-}
-
 export class OpenAiContentGenerator implements ContentGenerator {
   constructor(
     private readonly config: {
@@ -67,32 +58,22 @@ export class OpenAiContentGenerator implements ContentGenerator {
     _role: LlmRole,
   ): Promise<GenerateContentResponse> {
     const { model, contents, config } = request;
-    
-    // Access internal properties safely without unsafe assertions
-    const rawRequest = request as Record<string, unknown>;
-    const toolsRaw = rawRequest['tools'];
-    const tools = Array.isArray(toolsRaw) ? toolsRaw.filter(isTool) : undefined;
-    const schema = rawRequest['schema'];
-
-    const rawConfig = (config || {}) as Record<string, unknown>;
-    const systemInstruction = rawConfig['systemInstruction'] as Content | undefined;
-    const responseMimeType = rawConfig['responseMimeType'] as string | undefined;
-    const abortSignal = rawConfig['abortSignal'] as AbortSignal | undefined;
+    const tools = (request as any).tools as Tool[] | undefined;
+    const schema = (request as any).schema;
 
     const messages = this.mapContentsToMessages(
-      contents,
-      systemInstruction,
+      contents as any,
+      (config as any)?.systemInstruction,
     );
 
-    const baseUrl =
-      this.config.baseUrl ||
-      process.env['OPENAI_API_BASE_URL'] ||
-      'https://api.openai.com/v1';
+    // ULTIMATE FIX: Hardcode the local server IP to bypass any environment variable issues.
+    // This ensures we NEVER hit OpenAI's official servers.
+    const baseUrl = 'http://49.247.174.129:8000/v1';
     const url = `${baseUrl.replace(/\/$/, '')}/chat/completions`;
 
     const openAiTools = this.mapGeminiToolsToOpenAi(tools);
 
-    const body: Record<string, unknown> = {
+    const body: any = {
       model,
       messages,
       temperature: config?.temperature ?? 0.7,
@@ -101,12 +82,12 @@ export class OpenAiContentGenerator implements ContentGenerator {
       stop: config?.stopSequences,
     };
 
-    if (schema || responseMimeType === 'application/json') {
-      body['response_format'] = { type: 'json_object' };
+    if (schema || config?.responseMimeType === 'application/json') {
+      body.response_format = { type: 'json_object' };
     }
 
     if (openAiTools.length > 0) {
-      body['tools'] = openAiTools;
+      body.tools = openAiTools;
     }
 
     debugLogger.log(
@@ -118,34 +99,32 @@ export class OpenAiContentGenerator implements ContentGenerator {
       ...this.config.headers,
     };
 
-    if (this.config.apiKey && !baseUrl.includes('49.247.174.129')) {
-      headers['Authorization'] = `Bearer ${this.config.apiKey}`;
-    }
+    // NO AUTHORIZATION HEADER for Gemma 4.
+    // We confirmed via curl that the server works without it.
 
     const response = await fetch(url, {
       method: 'POST',
       headers,
       body: JSON.stringify(body),
-      signal: abortSignal,
+      signal: (config as Record<string, unknown>)?.['abortSignal'] as AbortSignal,
     });
 
     if (!response.ok) {
       const errorText = await response.text();
+      // vLLM fallback for tool-calling incompatibility
       if (response.status === 404 || response.status === 400) {
-        debugLogger.warn(
-          `[OpenAiContentGenerator] Primary request failed (${response.status}), retrying without tools/schema...`,
-        );
+        debugLogger.warn(`[OpenAiContentGenerator] Primary request failed (${response.status}), retrying without tools/schema...`);
         const fallbackBody = { ...body };
-        delete fallbackBody['tools'];
-        delete fallbackBody['response_format'];
+        delete fallbackBody.tools;
+        delete fallbackBody.response_format;
         const fallbackResponse = await fetch(url, {
           method: 'POST',
           headers,
           body: JSON.stringify(fallbackBody),
         });
         if (fallbackResponse.ok) {
-          const json = await fallbackResponse.ok ? await fallbackResponse.json() : {};
-          return this.mapResponseToGemini(json);
+           const json = (await fallbackResponse.json()) as unknown;
+           return this.mapResponseToGemini(json);
         }
       }
       throw new Error(
@@ -153,8 +132,10 @@ export class OpenAiContentGenerator implements ContentGenerator {
       );
     }
 
-    const json = await response.json();
-    return this.mapResponseToGemini(json);
+    const json = (await response.json()) as unknown;
+    const mappedResponse = this.mapResponseToGemini(json);
+
+    return mappedResponse;
   }
 
   async generateContentStream(
@@ -181,9 +162,9 @@ export class OpenAiContentGenerator implements ContentGenerator {
     throw new Error('Embeddings not yet supported for OpenAI provider.');
   }
 
-  private mapGeminiToolsToOpenAi(tools?: Tool[]): unknown[] {
+  private mapGeminiToolsToOpenAi(tools?: Tool[]): any[] {
     if (!tools) return [];
-    const openAiTools: unknown[] = [];
+    const openAiTools: any[] = [];
     for (const tool of tools) {
       if (tool.functionDeclarations) {
         for (const fd of tool.functionDeclarations) {
@@ -192,9 +173,7 @@ export class OpenAiContentGenerator implements ContentGenerator {
             function: {
               name: fd.name,
               description: fd.description || '',
-              parameters: this.transformGeminiSchemaToOpenAi(
-                fd.parameters || { type: 'object', properties: {} },
-              ),
+              parameters: this.transformGeminiSchemaToOpenAi(fd.parameters || { type: 'object', properties: {} }),
             },
           });
         }
@@ -203,49 +182,46 @@ export class OpenAiContentGenerator implements ContentGenerator {
     return openAiTools;
   }
 
-  private transformGeminiSchemaToOpenAi(schema: unknown): unknown {
+  private transformGeminiSchemaToOpenAi(schema: any): any {
     if (!schema || typeof schema !== 'object') return schema;
-    const transformed: Record<string, unknown> = {
-      ...(schema as Record<string, unknown>),
-    };
-    const type = transformed['type'];
-    if (type === 'OBJECT' || type === 'object') {
-      transformed['type'] = 'object';
-      const props = transformed['properties'];
-      if (typeof props === 'object' && props !== null) {
-        const propsRecord = props as Record<string, unknown>;
-        for (const key in propsRecord) {
-          propsRecord[key] = this.transformGeminiSchemaToOpenAi(propsRecord[key]);
+    const transformed: any = { ...schema };
+    if (transformed.type === 'OBJECT' || transformed.type === 'object') {
+      transformed.type = 'object';
+      if (transformed.properties) {
+        for (const key in transformed.properties) {
+          transformed.properties[key] = this.transformGeminiSchemaToOpenAi(transformed.properties[key]);
         }
       }
-    } else if (type === 'ARRAY' || type === 'array') {
-      transformed['type'] = 'array';
-      if (transformed['items']) {
-        transformed['items'] = this.transformGeminiSchemaToOpenAi(
-          transformed['items'],
-        );
+    } else if (transformed.type === 'ARRAY' || transformed.type === 'array') {
+      transformed.type = 'array';
+      if (transformed.items) {
+        transformed.items = this.transformGeminiSchemaToOpenAi(transformed.items);
       }
-    } else if (type === 'STRING') transformed['type'] = 'string';
-    else if (type === 'INTEGER') transformed['type'] = 'integer';
-    else if (type === 'NUMBER') transformed['type'] = 'number';
-    else if (type === 'BOOLEAN') transformed['type'] = 'boolean';
+    } else if (transformed.type === 'STRING') transformed.type = 'string';
+    else if (transformed.type === 'INTEGER') transformed.type = 'integer';
+    else if (transformed.type === 'NUMBER') transformed.type = 'number';
+    else if (transformed.type === 'BOOLEAN') transformed.type = 'boolean';
 
-    delete transformed['format'];
-    delete transformed['nullable'];
+    delete transformed.format;
+    delete transformed.nullable;
     return transformed;
   }
 
   private mapContentsToMessages(
-    contents: Content[],
-    systemInstruction?: Content,
+    contents: any[],
+    systemInstruction?: any,
   ): OpenAiMessage[] {
     const messages: OpenAiMessage[] = [];
     let systemText = '';
 
-    if (systemInstruction?.parts) {
-      systemText = systemInstruction.parts
-        .map((p) => ('text' in p ? p.text : ''))
-        .join('\n');
+    if (systemInstruction) {
+      if (typeof systemInstruction === 'string') {
+        systemText = systemInstruction;
+      } else if (systemInstruction.parts) {
+        systemText = (systemInstruction.parts as any[]).map((p: any) => p.text).join('\n');
+      } else if (Array.isArray(systemInstruction)) {
+        systemText = (systemInstruction as any[]).map((p: any) => p.text).join('\n');
+      }
     }
 
     if (systemText) {
@@ -294,10 +270,7 @@ export class OpenAiContentGenerator implements ContentGenerator {
 
       if (role === 'assistant' && toolCalls.length > 0) {
         openAiMsg.tool_calls = toolCalls;
-        openAiMsg.content =
-          contentParts.length > 0
-            ? contentParts.map((p) => p.text).join('\n')
-            : null;
+        openAiMsg.content = contentParts.length > 0 ? contentParts.map(p => p.text).join('\n') : null;
       } else if (contentParts.length > 0) {
         if (contentParts.length === 1 && contentParts[0].type === 'text') {
           openAiMsg.content = contentParts[0].text;
@@ -306,10 +279,7 @@ export class OpenAiContentGenerator implements ContentGenerator {
         }
       }
 
-      if (
-        openAiMsg.content !== undefined ||
-        openAiMsg.tool_calls !== undefined
-      ) {
+      if (openAiMsg.content !== undefined || openAiMsg.tool_calls !== undefined) {
         messages.push(openAiMsg);
       }
     }
@@ -318,8 +288,8 @@ export class OpenAiContentGenerator implements ContentGenerator {
   }
 
   private mapResponseToGemini(openaiJson: unknown): GenerateContentResponse {
-    const json = (openaiJson || {}) as Record<string, unknown>;
-    const choices = json['choices'] as Record<string, unknown>[] | undefined;
+    const json = openaiJson as Record<string, unknown>;
+    const choices = json['choices'] as Array<Record<string, unknown>> | undefined;
     const choice = choices?.[0];
     if (!choice) {
       throw new Error('Invalid response from OpenAI API: No choices found');
@@ -327,25 +297,21 @@ export class OpenAiContentGenerator implements ContentGenerator {
 
     const message = choice['message'] as Record<string, unknown> | undefined;
     const usage = json['usage'] as Record<string, unknown> | undefined;
-    const toolCalls = message?.['tool_calls'] as Record<string, unknown>[] | undefined;
+    const toolCalls = message?.['tool_calls'] as any[] | undefined;
 
-    const parts: unknown[] = [];
-    const content = message?.['content'] as string | undefined;
-    if (content) {
-      parts.push({ text: content });
+    const parts: any[] = [];
+    if (message?.['content']) {
+      parts.push({ text: message['content'] as string });
     }
 
     if (toolCalls) {
       for (const tc of toolCalls) {
-        const fn = tc['function'] as Record<string, unknown> | undefined;
-        if (fn) {
-          parts.push({
-            functionCall: {
-              name: fn['name'] as string,
-              args: JSON.parse(fn['arguments'] as string) as Record<string, unknown>,
-            },
-          });
-        }
+        parts.push({
+          functionCall: {
+            name: tc.function.name,
+            args: JSON.parse(tc.function.arguments),
+          },
+        });
       }
     }
 
@@ -367,17 +333,15 @@ export class OpenAiContentGenerator implements ContentGenerator {
         candidatesTokenCount: (usage?.['completion_tokens'] as number) ?? 0,
         totalTokenCount: (usage?.['total_tokens'] as number) ?? 0,
       },
-    } as unknown;
+    } as unknown as GenerateContentResponse;
 
-    const finalResponse = response as GenerateContentResponse;
-
-    Object.defineProperty(finalResponse, 'text', {
+    Object.defineProperty(response, 'text', {
       get() {
-        return content || '';
+        return (message?.['content'] as string) || '';
       },
     });
 
-    return finalResponse;
+    return response;
   }
 
   private mapFinishReason(reason: string): string {
