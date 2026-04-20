@@ -11,7 +11,6 @@ import {
   type CountTokensParameters,
   type EmbedContentResponse,
   type EmbedContentParameters,
-  type Content,
 } from '@google/genai';
 import type { ContentGenerator } from './contentGenerator.js';
 import type { LlmRole } from '../telemetry/llmRole.js';
@@ -47,8 +46,8 @@ export class OpenAiContentGenerator implements ContentGenerator {
   ): Promise<GenerateContentResponse> {
     const { model, contents, config } = request;
     const messages = this.mapContentsToMessages(
-      contents,
-      config?.systemInstruction,
+      contents as any,
+      (config as any)?.systemInstruction,
     );
 
     const baseUrl = this.config.baseUrl || 'https://api.openai.com/v1';
@@ -86,7 +85,7 @@ export class OpenAiContentGenerator implements ContentGenerator {
       method: 'POST',
       headers,
       body: JSON.stringify(body),
-      signal: (config as Record<string, unknown>)?.abortSignal as AbortSignal,
+      signal: (config as Record<string, unknown>)?.['abortSignal'] as AbortSignal,
     });
 
     if (!response.ok) {
@@ -97,7 +96,19 @@ export class OpenAiContentGenerator implements ContentGenerator {
     }
 
     const json = (await response.json()) as unknown;
-    return this.mapResponseToGemini(json);
+    const mappedResponse = this.mapResponseToGemini(json);
+
+    debugLogger.log(
+      `[OpenAiContentGenerator] Received response for model ${model}`,
+    );
+    debugLogger.log(
+      `[OpenAiContentGenerator] Response text: ${mappedResponse.text}`,
+    );
+    debugLogger.log(
+      `[OpenAiContentGenerator] Usage: ${JSON.stringify(mappedResponse.usageMetadata)}`,
+    );
+
+    return mappedResponse;
   }
 
   async generateContentStream(
@@ -125,8 +136,8 @@ export class OpenAiContentGenerator implements ContentGenerator {
   }
 
   private mapContentsToMessages(
-    contents: Content[],
-    systemInstruction?: GenerateContentParameters['config']['systemInstruction'],
+    contents: any[],
+    systemInstruction?: any,
   ): OpenAiMessage[] {
     const messages: OpenAiMessage[] = [];
 
@@ -134,10 +145,10 @@ export class OpenAiContentGenerator implements ContentGenerator {
       let systemText = '';
       if (typeof systemInstruction === 'string') {
         systemText = systemInstruction;
-      } else if ('parts' in systemInstruction) {
-        systemText = systemInstruction.parts.map((p) => p.text).join('\n');
+      } else if (systemInstruction.parts) {
+        systemText = (systemInstruction.parts as any[]).map((p: any) => p.text).join('\n');
       } else if (Array.isArray(systemInstruction)) {
-        systemText = systemInstruction.map((p) => p.text).join('\n');
+        systemText = (systemInstruction as any[]).map((p: any) => p.text).join('\n');
       }
       if (systemText) {
         messages.push({ role: 'system', content: systemText });
@@ -146,7 +157,7 @@ export class OpenAiContentGenerator implements ContentGenerator {
 
     for (const content of contents) {
       const role = content.role === 'model' ? 'assistant' : 'user';
-      const parts: OpenAiContentPart[] = (content.parts || []).map((part) => {
+      const parts: OpenAiContentPart[] = (content.parts || []).map((part: any) => {
         if ('text' in part && part.text) {
           return { type: 'text', text: part.text };
         }

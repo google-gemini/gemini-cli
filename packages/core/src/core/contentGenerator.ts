@@ -198,7 +198,13 @@ export async function createContentGenerator(
   sessionId?: string,
 ): Promise<ContentGenerator> {
   if (gcConfig.getDebugMode()) {
-    debugLogger.log(`[ContentGenerator] Creating generator with authType: ${config.authType}`);
+    const details =
+      config.authType === AuthType.OPENAI
+        ? ` (Base URL: ${config.baseUrl || 'https://api.openai.com/v1'})`
+        : '';
+    debugLogger.log(
+      `[ContentGenerator] Creating generator with authType: ${config.authType}${details}`,
+    );
   }
   const generator = await (async () => {
     if (gcConfig.fakeResponses) {
