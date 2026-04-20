@@ -82,11 +82,12 @@ export class MemoryTestHarness {
   async takeSnapshot(
     rig: TestRig,
     label: string = 'snapshot',
+    strategy: 'peak' | 'last' = 'last',
   ): Promise<MemorySnapshot> {
-    const metrics = rig.readMemoryMetrics();
+    const metrics = rig.readMemoryMetrics(strategy);
 
     return {
-      timestamp: Date.now(),
+      timestamp: metrics.timestamp,
       label,
       heapUsed: metrics.heapUsed,
       heapTotal: metrics.heapTotal,
@@ -138,10 +139,26 @@ export class MemoryTestHarness {
     const afterSnap = await this.takeSnapshot(rig, 'after');
     snapshots.push(afterSnap);
 
-    // Calculate peak values
-    const peakHeapUsed = Math.max(...snapshots.map((s) => s.heapUsed));
-    const peakRss = Math.max(...snapshots.map((s) => s.rss));
-    const peakExternal = Math.max(...snapshots.map((s) => s.external));
+    // Calculate peak values from ALL snapshots seen during the scenario
+    const allSnapshots = rig.readAllMemorySnapshots();
+    const scenarioSnapshots = allSnapshots.filter(
+      (s) =>
+        s.timestamp >= beforeSnap.timestamp &&
+        s.timestamp <= afterSnap.timestamp,
+    );
+
+    const peakHeapUsed = Math.max(
+      ...scenarioSnapshots.map((s) => s.heapUsed),
+      ...snapshots.map((s) => s.heapUsed),
+    );
+    const peakRss = Math.max(
+      ...scenarioSnapshots.map((s) => s.rss),
+      ...snapshots.map((s) => s.rss),
+    );
+    const peakExternal = Math.max(
+      ...scenarioSnapshots.map((s) => s.external),
+      ...snapshots.map((s) => s.external),
+    );
 
     // Get baseline
     const baseline = this.baselines.scenarios[name];
@@ -174,6 +191,66 @@ export class MemoryTestHarness {
 
     this.allResults.push(result);
     return result;
+  }
+
+  /**
+   * Analyze snapshots to detect sustained leaks.
+   * A leak is flagged if growth is observed in both phases.
+   */
+  analyzeSnapshots(
+    snapshots: MemorySnapshot[],
+    thresholdBytes: number = 1024 * 1024, // 1 MB
+  ): { leaked: boolean; message: string } {
+    if (snapshots.length < 3) {
+      return { leaked: false, message: 'Not enough snapshots to analyze' };
+    }
+
+    const snap1 = snapshots[snapshots.length - 3]!;
+    const snap2 = snapshots[snapshots.length - 2]!;
+    const snap3 = snapshots[snapshots.length - 1]!;
+
+    const growth1 = snap2.heapUsed - snap1.heapUsed;
+    const growth2 = snap3.heapUsed - snap2.heapUsed;
+
+    const leaked = growth1 > thresholdBytes && growth2 > thresholdBytes;
+    let message = leaked
+      ? `Memory bloat detected: sustained growth (${formatMB(growth1)} -> ${formatMB(growth2)})`
+      : `No sustained growth detected above threshold.`;
+
+    return { leaked, message };
+  }
+
+  /**
+   * Assert that memory returns to a baseline level after a peak.
+   * Useful for verifying that large tool outputs or history are not retained.
+   */
+  assertMemoryReturnsToBaseline(
+    snapshots: MemorySnapshot[],
+    tolerancePercent: number = 15,
+  ): void {
+    if (snapshots.length < 3) {
+      return; // Need at least before, peak, after
+    }
+
+    // Find the first non-zero snapshot as baseline
+    const baseline = snapshots.find((s) => s.heapUsed > 0);
+    if (!baseline) {
+      return; // No memory reported yet
+    }
+
+    const final = snapshots[snapshots.length - 1]!;
+
+    const tolerance = baseline.heapUsed * (tolerancePercent / 100);
+    const delta = final.heapUsed - baseline.heapUsed;
+
+    if (delta > tolerance) {
+      throw new Error(
+        `Memory did not return to baseline!\n` +
+          `  Baseline: ${formatMB(baseline.heapUsed)} (${baseline.label})\n` +
+          `  Final:    ${formatMB(final.heapUsed)} (${final.label})\n` +
+          `  Delta:    ${formatMB(delta)} (tolerance: ${formatMB(tolerance)})`,
+      );
+    }
   }
 
   /**

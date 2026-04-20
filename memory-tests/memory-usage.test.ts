@@ -153,6 +153,9 @@ describe('Memory Usage Tests', () => {
       );
     } else {
       harness.assertWithinBaseline(result);
+      harness.assertMemoryReturnsToBaseline(result.snapshots, 20);
+      const { leaked, message } = harness.analyzeSnapshots(result.snapshots);
+      if (leaked) console.warn(`⚠ ${message}`);
     }
   });
 
@@ -199,6 +202,7 @@ describe('Memory Usage Tests', () => {
       );
     } else {
       harness.assertWithinBaseline(result);
+      harness.assertMemoryReturnsToBaseline(result.snapshots, 20);
     }
   });
 
