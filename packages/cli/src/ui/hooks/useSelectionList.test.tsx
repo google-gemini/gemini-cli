@@ -7,7 +7,7 @@
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { act } from 'react';
 
-import { renderWithProviders } from '../../test-utils/render.js';
+import { renderWithProviders as originalRenderWithProviders } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
 import {
   useSelectionList,
@@ -16,6 +16,11 @@ import {
 import * as useKeypressModule from './useKeypress.js';
 
 import type { KeypressHandler, Key } from '../contexts/KeypressContext.js';
+
+const renderWithProviders = async (
+  component: React.ReactElement,
+  options?: Parameters<typeof originalRenderWithProviders>[1],
+) => originalRenderWithProviders(component, { height: 40, ...options });
 
 type UseKeypressMockOptions = { isActive: boolean };
 
