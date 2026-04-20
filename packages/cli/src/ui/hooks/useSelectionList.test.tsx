@@ -38,6 +38,7 @@ describe('useSelectionList', () => {
   ];
 
   beforeEach(() => {
+    vi.useFakeTimers();
     activeKeypressHandler = null;
     vi.spyOn(useKeypressModule, 'useKeypress').mockImplementation(
       (handler: KeypressHandler, options?: UseKeypressMockOptions) => {
@@ -50,6 +51,10 @@ describe('useSelectionList', () => {
     );
     mockOnSelect.mockClear();
     mockOnHighlight.mockClear();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   const pressKey = (
@@ -530,14 +535,6 @@ describe('useSelectionList', () => {
   });
 
   describe('Numeric Quick Selection (showNumbers=true)', () => {
-    beforeEach(() => {
-      vi.useFakeTimers();
-    });
-
-    afterEach(() => {
-      vi.useRealTimers();
-    });
-
     const shortList = items;
     const longList: Array<SelectionListItem<string>> = Array.from(
       { length: 15 },
