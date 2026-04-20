@@ -2545,29 +2545,29 @@ image separately and reference that image in your sandbox configuration.
 
 ## Usage statistics
 
-To help us improve Gemini CLI, we collect anonymized usage statistics. This data
-helps us understand how the CLI is used, identify common issues, and prioritize
-new features.
+To improve Gemini CLI, Gemini CLI collects anonymized usage statistics. This
+data helps identify common issues and prioritize new features.
 
-**What we collect:**
+**Collected data:**
 
-- **Tool calls:** We log the names of the tools that are called, whether they
-  succeed or fail, and how long they take to execute. We do not collect the
-  arguments passed to the tools or any data returned by them.
-- **API requests:** We log the Gemini model used for each request, the duration
-  of the request, and whether it was successful. We do not collect the content
-  of the prompts or responses.
-- **Session information:** We collect information about the configuration of the
-  CLI, such as the enabled tools and the approval mode.
+- **Tool calls:** Gemini CLI logs the names of the tools that are called,
+  whether they succeed or fail, and how long they take to execute. Gemini CLI
+  does not collect the arguments passed to the tools or any data returned by
+  them.
+- **API requests:** Gemini CLI logs the Gemini model used for each request, the
+  duration of the request, and whether it was successful. Gemini CLI does not
+  collect the content of the prompts or responses.
+- **Session information:** Gemini CLI collects information about the
+  configuration of the CLI, such as the enabled tools and the approval mode.
 
-**What we DON'T collect:**
+**Data NOT collected:**
 
-- **Personally identifiable information (PII):** We do not collect any personal
-  information, such as your name, email address, or API keys.
-- **Prompt and response content:** We do not log the content of your prompts or
-  the responses from the Gemini model.
-- **File content:** We do not log the content of any files that are read or
-  written by the CLI.
+- **Personally identifiable information (PII):** Gemini CLI does not collect
+  personal information, such as your name, email address, or API keys.
+- **Prompt and response content:** Gemini CLI does not log the content of your
+  prompts or the responses from the Gemini model.
+- **File content:** Gemini CLI does not log the content of any files that are
+  read or written by the CLI.
 
 **How to opt out:**
 

@@ -5,6 +5,9 @@ and parameters.
 
 ## CLI commands
 
+Gemini CLI provides a range of commands for starting sessions, updating the
+application, and managing extensions and MCP servers.
+
 | Command                            | Description                        | Example                                                      |
 | ---------------------------------- | ---------------------------------- | ------------------------------------------------------------ |
 | `gemini`                           | Start interactive REPL             | `gemini`                                                     |
@@ -17,9 +20,13 @@ and parameters.
 | `gemini -r "<session-id>" "query"` | Resume session by ID               | `gemini -r "abc123" "Finish this PR"`                        |
 | `gemini update`                    | Update to latest version           | `gemini update`                                              |
 | `gemini extensions`                | Manage extensions                  | See [Extensions Management](#extensions-management)          |
+| `gemini hooks`                     | Manage hooks                       | See [Hooks Management](#hooks-management)                    |
 | `gemini mcp`                       | Configure MCP servers              | See [MCP Server Management](#mcp-server-management)          |
+| `gemini skills`                    | Manage agent skills                | See [Skills Management](#skills-management)                  |
 
 ### Positional arguments
+
+Use positional arguments to provide a prompt directly from the command line.
 
 | Argument | Type              | Description                                                                                                |
 | -------- | ----------------- | ---------------------------------------------------------------------------------------------------------- |
@@ -41,6 +48,8 @@ These commands are available within the interactive REPL.
 | `/quit`              | Exit the interactive session                    |
 
 ## CLI Options
+
+Configure the behavior of Gemini CLI using these command-line options.
 
 | Option                           | Alias | Type    | Default   | Description                                                                                                                                                            |
 | -------------------------------- | ----- | ------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -85,6 +94,8 @@ These are convenient shortcuts that map to specific models:
 
 ## Extensions management
 
+Manage your Gemini CLI extensions with these commands.
+
 | Command                                            | Description                                  | Example                                                                        |
 | -------------------------------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------ |
 | `gemini extensions install <source>`               | Install extension from Git URL or local path | `gemini extensions install https://github.com/user/my-extension`               |
@@ -99,10 +110,23 @@ These are convenient shortcuts that map to specific models:
 | `gemini extensions link <path>`                    | Link local extension for development         | `gemini extensions link /path/to/extension`                                    |
 | `gemini extensions new <path>`                     | Create new extension from template           | `gemini extensions new ./my-extension`                                         |
 | `gemini extensions validate <path>`                | Validate extension structure                 | `gemini extensions validate ./my-extension`                                    |
+| `gemini extensions configure <name>`               | Configure an extension                       | `gemini extensions configure my-extension`                                     |
 
 See [Extensions Documentation](../extensions/index.md) for more details.
 
+## Hooks management
+
+Manage your Gemini CLI hooks with these commands.
+
+| Command                | Description          | Example                |
+| ---------------------- | -------------------- | ---------------------- |
+| `gemini hooks migrate` | Migrate legacy hooks | `gemini hooks migrate` |
+
+See [Hooks Documentation](../hooks/index.md) for more details.
+
 ## MCP server management
+
+Manage your Model Context Protocol (MCP) servers with these commands.
 
 | Command                                                       | Description                     | Example                                                                                              |
 | ------------------------------------------------------------- | ------------------------------- | ---------------------------------------------------------------------------------------------------- |
@@ -113,10 +137,14 @@ See [Extensions Documentation](../extensions/index.md) for more details.
 | `gemini mcp add <name> <command> --include-tools tool1,tool2` | Add with specific tools         | `gemini mcp add github npx -y @modelcontextprotocol/server-github --include-tools list_repos,get_pr` |
 | `gemini mcp remove <name>`                                    | Remove an MCP server            | `gemini mcp remove github`                                                                           |
 | `gemini mcp list`                                             | List all configured MCP servers | `gemini mcp list`                                                                                    |
+| `gemini mcp enable <name>`                                    | Enable an MCP server            | `gemini mcp enable github`                                                                           |
+| `gemini mcp disable <name>`                                   | Disable an MCP server           | `gemini mcp disable github`                                                                          |
 
 See [MCP Server Integration](../tools/mcp-server.md) for more details.
 
 ## Skills management
+
+Manage your agent skills with these commands.
 
 | Command                          | Description                           | Example                                           |
 | -------------------------------- | ------------------------------------- | ------------------------------------------------- |
