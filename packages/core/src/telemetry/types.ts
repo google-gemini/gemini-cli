@@ -388,7 +388,7 @@ export class ToolCallEvent implements BaseTelemetryEvent {
 
 export const EVENT_API_REQUEST = 'gemini_cli.api_request';
 
-function shouldLogPrompts(config: Config): boolean {
+function shouldIncludePayloads(config: Config): boolean {
   return (
     config.getTelemetryTracesEnabled() && config.getTelemetryLogPromptsEnabled()
   );
@@ -450,7 +450,7 @@ export class ApiRequestEvent implements BaseTelemetryEvent {
       attributes['server.port'] = this.prompt.server.port;
     }
 
-    if (shouldLogPrompts(config) && this.prompt.contents) {
+    if (shouldIncludePayloads(config) && this.prompt.contents) {
       attributes['gen_ai.input.messages'] = JSON.stringify(
         toInputMessages(this.prompt.contents),
       );
@@ -547,7 +547,7 @@ export class ApiErrorEvent implements BaseTelemetryEvent {
       attributes['server.port'] = this.prompt.server.port;
     }
 
-    if (shouldLogPrompts(config) && this.prompt.contents) {
+    if (shouldIncludePayloads(config) && this.prompt.contents) {
       attributes['gen_ai.input.messages'] = JSON.stringify(
         toInputMessages(this.prompt.contents),
       );
@@ -714,7 +714,7 @@ export class ApiResponseEvent implements BaseTelemetryEvent {
       'event.timestamp': this['event.timestamp'],
       'gen_ai.response.id': this.response.response_id,
       'gen_ai.response.finish_reasons': this.finish_reasons,
-      ...(shouldLogPrompts(config)
+      ...(shouldIncludePayloads(config)
         ? {
             'gen_ai.output.messages': JSON.stringify(
               toOutputMessages(this.response.candidates),
@@ -730,7 +730,7 @@ export class ApiResponseEvent implements BaseTelemetryEvent {
       attributes['server.port'] = this.prompt.server.port;
     }
 
-    if (shouldLogPrompts(config) && this.prompt.contents) {
+    if (shouldIncludePayloads(config) && this.prompt.contents) {
       attributes['gen_ai.input.messages'] = JSON.stringify(
         toInputMessages(this.prompt.contents),
       );
