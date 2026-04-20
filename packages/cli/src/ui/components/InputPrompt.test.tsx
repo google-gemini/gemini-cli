@@ -4,7 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { renderWithProviders, cleanup } from '../../test-utils/render.js';
+import {
+  renderWithProviders as originalRenderWithProviders,
+  cleanup,
+} from '../../test-utils/render.js';
 import { createMockSettings } from '../../test-utils/settings.js';
 import { makeFakeConfig } from '@google/gemini-cli-core';
 import { waitFor } from '../../test-utils/async.js';
@@ -70,6 +73,11 @@ import {
   TransientMessageType,
 } from '../../utils/events.js';
 import '../../test-utils/customMatchers.js';
+
+const renderWithProviders = async (
+  component: React.ReactElement,
+  options?: Parameters<typeof originalRenderWithProviders>[1],
+) => originalRenderWithProviders(component, { height: 40, ...options });
 
 vi.mock('../hooks/useShellHistory.js');
 vi.mock('../hooks/useCommandCompletion.js');
