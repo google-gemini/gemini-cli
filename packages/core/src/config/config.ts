@@ -639,6 +639,7 @@ export interface ConfigParameters {
   bugCommand?: BugCommandSettings;
   model: string;
   disableLoopDetection?: boolean;
+  disableStreaming?: boolean;
   maxSessionTurns?: number;
   acpMode?: boolean;
   listSessions?: boolean;
@@ -986,6 +987,7 @@ export class Config implements McpContext, AgentLoopContext {
   private approvedPlanPath: string | undefined;
   private readonly simulateUser: boolean;
   private readonly knowledgeSource?: string;
+  private readonly disableStreaming: boolean;
 
   constructor(params: ConfigParameters) {
     this._sessionId = params.sessionId;
@@ -1316,6 +1318,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.enableConseca = params.enableConseca ?? false;
     this.simulateUser = params.simulateUser ?? false;
     this.knowledgeSource = params.knowledgeSource;
+    this.disableStreaming = params.disableStreaming ?? false;
 
     // Initialize Safety Infrastructure
     const contextBuilder = new ContextBuilder(this);
@@ -3031,6 +3034,10 @@ export class Config implements McpContext, AgentLoopContext {
 
   getSimulateUser(): boolean {
     return this.simulateUser;
+  }
+
+  getDisableStreaming(): boolean {
+    return this.disableStreaming;
   }
 
   getKnowledgeSource(): string | undefined {

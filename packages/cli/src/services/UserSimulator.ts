@@ -57,7 +57,7 @@ export class UserSimulator {
     }
     this.interactionsFile = `interactions_${Date.now()}.txt`;
     this.isRunning = true;
-    this.timer = setInterval(() => this.tick(), 3000);
+    this.timer = setInterval(() => this.tick(), 1000);
   }
 
   stop() {

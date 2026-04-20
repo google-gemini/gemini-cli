@@ -850,6 +850,23 @@ export class GeminiChat {
 
       const finalContents = stripToolCallIdPrefixes(contentsToUse);
 
+      if (this.context.config.getDisableStreaming()) {
+        const response = await this.context.config
+          .getContentGenerator()
+          .generateContent(
+            {
+              model: modelToUse,
+              contents: finalContents,
+              config,
+            },
+            prompt_id,
+            role,
+          );
+        return (async function* () {
+          yield response;
+        })();
+      }
+
       return this.context.config.getContentGenerator().generateContentStream(
         {
           model: modelToUse,
