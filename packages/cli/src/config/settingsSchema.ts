@@ -2176,7 +2176,7 @@ const SETTINGS_SCHEMA = {
             label: 'Auto-start LiteRT Server',
             category: 'Experimental',
             requiresRestart: true,
-            default: true,
+            default: false,
             description:
               'Automatically start the LiteRT-LM server when Gemini CLI starts and the Gemma router is enabled.',
             showInDialog: true,
