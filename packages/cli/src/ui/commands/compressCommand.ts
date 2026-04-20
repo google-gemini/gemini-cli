@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { CompressionStatus, isAbortError } from '@google/gemini-cli-core';
 import type { HistoryItemCompression } from '../types.js';
 import { MessageType } from '../types.js';
 import type { SlashCommand } from './types.js';
@@ -43,7 +44,7 @@ export const compressCommand: SlashCommand = {
       const promptId = `compress-${Date.now()}`;
       const compressed = await context.services.config
         ?.getGeminiClient()
-        ?.tryCompressChat(promptId, true);
+        ?.tryCompressChat(promptId, true, context.abortSignal);
       if (compressed) {
         ui.addItem(
           {
@@ -67,6 +68,21 @@ export const compressCommand: SlashCommand = {
         );
       }
     } catch (e) {
+      if (isAbortError(e) || context.abortSignal?.aborted) {
+        ui.addItem(
+          {
+            type: MessageType.COMPRESSION,
+            compression: {
+              isPending: false,
+              originalTokenCount: null,
+              newTokenCount: null,
+              compressionStatus: CompressionStatus.CANCELLED,
+            },
+          } as HistoryItemCompression,
+          Date.now(),
+        );
+        return;
+      }
       ui.addItem(
         {
           type: MessageType.ERROR,

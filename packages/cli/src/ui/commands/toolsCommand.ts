@@ -10,10 +10,12 @@ import {
   CommandKind,
 } from './types.js';
 import { MessageType, type HistoryItemToolsList } from '../types.js';
+import { DiscoveredMCPTool, DiscoveredTool } from '@google/gemini-cli-core';
 
 export const toolsCommand: SlashCommand = {
   name: 'tools',
-  description: 'List available Gemini CLI tools. Usage: /tools [desc]',
+  description:
+    'List available Gemini CLI tools. Use /tools desc to include descriptions.',
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
   action: async (context: CommandContext, args?: string): Promise<void> => {
@@ -35,16 +37,32 @@ export const toolsCommand: SlashCommand = {
     }
 
     const tools = toolRegistry.getAllTools();
-    // Filter out MCP tools by checking for the absence of a serverName property
-    const geminiTools = tools.filter((tool) => !('serverName' in tool));
 
     const toolsListItem: HistoryItemToolsList = {
       type: MessageType.TOOLS_LIST,
-      tools: geminiTools.map((tool) => ({
-        name: tool.name,
-        displayName: tool.displayName,
-        description: tool.description,
-      })),
+      tools: tools.map((tool) => {
+        let source: 'builtin' | 'extension' | 'mcp' | 'discovered' = 'builtin';
+        let serverName: string | undefined;
+
+        if (tool instanceof DiscoveredMCPTool) {
+          source = 'mcp';
+          serverName = tool.serverName;
+        } else if (tool instanceof DiscoveredTool) {
+          source = 'discovered';
+        } else if (tool.extensionName) {
+          source = 'extension';
+        }
+
+        return {
+          name: tool.name,
+          displayName: tool.displayName,
+          description: tool.description,
+          kind: tool.kind,
+          isReadOnly: tool.isReadOnly,
+          source,
+          serverName,
+        };
+      }),
       showDescriptions: useShowDescriptions,
     };
 

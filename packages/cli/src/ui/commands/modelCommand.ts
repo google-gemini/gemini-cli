@@ -21,15 +21,11 @@ const setModelCommand: SlashCommand = {
     'Set the model to use. Usage: /model set <model-name> [--persist]',
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
+  minArgs: 1,
+  maxArgs: 2,
+  argsUsage: '/model set <model-name> [--persist]',
   action: async (context: CommandContext, args: string) => {
     const parts = args.trim().split(/\s+/).filter(Boolean);
-    if (parts.length === 0) {
-      context.ui.addItem({
-        type: MessageType.ERROR,
-        text: 'Usage: /model set <model-name> [--persist]',
-      });
-      return;
-    }
 
     const modelName = parts[0];
     const persist = parts.includes('--persist');

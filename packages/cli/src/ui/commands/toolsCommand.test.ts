@@ -17,12 +17,16 @@ const mockTools = [
     name: 'file-reader',
     displayName: 'File Reader',
     description: 'Reads files from the local system.',
+    kind: 'read',
+    isReadOnly: true,
     schema: {},
   },
   {
     name: 'code-editor',
     displayName: 'Code Editor',
     description: 'Edits code files.',
+    kind: 'edit',
+    isReadOnly: false,
     schema: {},
   },
 ] as unknown as Array<ToolBuilder<object, ToolResult>>;
@@ -85,7 +89,13 @@ describe('toolsCommand', () => {
     expect(message.showDescriptions).toBe(false);
     expect(message.tools).toHaveLength(2);
     expect(message.tools[0].displayName).toBe('File Reader');
+    expect(message.tools[0].source).toBe('builtin');
+    expect(message.tools[0].kind).toBe('read');
+    expect(message.tools[0].isReadOnly).toBe(true);
     expect(message.tools[1].displayName).toBe('Code Editor');
+    expect(message.tools[1].source).toBe('builtin');
+    expect(message.tools[1].kind).toBe('edit');
+    expect(message.tools[1].isReadOnly).toBe(false);
   });
 
   it('should list tools with descriptions when "desc" arg is passed', async () => {

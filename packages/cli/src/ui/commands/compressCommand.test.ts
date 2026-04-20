@@ -77,6 +77,7 @@ describe('compressCommand', () => {
     expect(mockTryCompressChat).toHaveBeenCalledWith(
       expect.stringMatching(/^compress-\d+$/),
       true,
+      undefined,
     );
 
     expect(context.ui.addItem).toHaveBeenCalledWith(

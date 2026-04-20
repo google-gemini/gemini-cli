@@ -8,6 +8,7 @@ import type {
   HistoryItemStats,
   HistoryItemModelStats,
   HistoryItemToolStats,
+  HistoryItemPerfStats,
 } from '../types.js';
 import { MessageType } from '../types.js';
 import { formatDuration } from '../utils/formatters.js';
@@ -129,6 +130,17 @@ export const statsCommand: SlashCommand = {
         context.ui.addItem({
           type: MessageType.TOOL_STATS,
         } as HistoryItemToolStats);
+      },
+    },
+    {
+      name: 'perf',
+      description: 'Show detailed performance breakdown',
+      kind: CommandKind.BUILT_IN,
+      autoExecute: true,
+      action: (context: CommandContext) => {
+        context.ui.addItem({
+          type: MessageType.PERF_STATS,
+        } as HistoryItemPerfStats);
       },
     },
   ],

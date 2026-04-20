@@ -101,6 +101,8 @@ export interface CommandContext {
   };
   // Flag to indicate if an overwrite has been confirmed
   overwriteConfirmed?: boolean;
+  /** Signal that is aborted when the user cancels the command (e.g. Ctrl+C). */
+  abortSignal?: AbortSignal;
 }
 
 /** The return type for a command action that results in the app quitting. */
@@ -233,6 +235,24 @@ export interface SlashCommand {
    * Defaults to true. Set to false for fast completions to avoid flicker.
    */
   showCompletionLoading?: boolean;
+
+  /**
+   * Minimum number of arguments required by this command.
+   * When set, the processor will validate the arg count before calling the action.
+   */
+  minArgs?: number;
+
+  /**
+   * Maximum number of arguments allowed by this command.
+   * When set, the processor will validate the arg count before calling the action.
+   */
+  maxArgs?: number;
+
+  /**
+   * Usage hint shown when arg validation fails.
+   * For example: '/model set <model-name> [--persist]'
+   */
+  argsUsage?: string;
 
   subCommands?: SlashCommand[];
 }

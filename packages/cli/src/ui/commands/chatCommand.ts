@@ -93,6 +93,9 @@ const saveCommand: SlashCommand = {
     'Save the current conversation as a checkpoint. Usage: /resume save <tag>',
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
+  minArgs: 1,
+  maxArgs: 1,
+  argsUsage: '/resume save <tag>',
   action: async (context, args): Promise<SlashCommandActionReturn | void> => {
     const tag = args.trim();
     if (!tag) {
@@ -162,6 +165,9 @@ const resumeCheckpointCommand: SlashCommand = {
     'Resume a conversation from a checkpoint. Usage: /resume resume <tag>',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
+  minArgs: 1,
+  maxArgs: 1,
+  argsUsage: '/resume resume <tag>',
   action: async (context, args) => {
     const tag = args.trim();
     if (!tag) {
@@ -240,6 +246,9 @@ const deleteCommand: SlashCommand = {
   description: 'Delete a conversation checkpoint. Usage: /resume delete <tag>',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
+  minArgs: 1,
+  maxArgs: 1,
+  argsUsage: '/resume delete <tag>',
   action: async (context, args): Promise<MessageActionReturn> => {
     const tag = args.trim();
     if (!tag) {

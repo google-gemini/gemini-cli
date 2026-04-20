@@ -44,6 +44,8 @@ export const memoryCommand: SlashCommand = {
       description: 'Add content to the memory',
       kind: CommandKind.BUILT_IN,
       autoExecute: false,
+      minArgs: 1,
+      argsUsage: '/memory add <content>',
       action: (context, args): SlashCommandActionReturn | void => {
         const result = addMemory(args);
 
