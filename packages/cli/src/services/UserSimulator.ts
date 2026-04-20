@@ -101,8 +101,11 @@ export class UserSimulator {
         .replace(/\n([ \t]*\n)+/g, '\n\n');
 
       const normalizedScreen = strippedScreen
-        .replace(/[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]/g, '')
-        .replace(/\[?\s*\b\d+(\.\d+)?s\b\s*\]?/g, '')
+        .replace(/[\u2800-\u28FF]/g, '')
+        .replace(/[|/-\\]/g, '')
+        .replace(/\b\d+(\.\d+)?s\b/g, '')
+        .replace(/\b\d+m\s+\d+s\b/g, '')
+        .replace(/\(\s*\)/g, '')
         .trim();
 
       if (normalizedScreen === this.lastScreenContent) return;
