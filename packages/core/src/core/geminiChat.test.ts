@@ -622,14 +622,10 @@ describe('GeminiChat', () => {
         LlmRole.MAIN,
       );
 
-      // 4. Assert: The stream processing should throw an InvalidStreamError.
-      await expect(
-        (async () => {
-          for await (const _ of stream) {
-            // This loop consumes the stream to trigger the internal logic.
-          }
-        })(),
-      ).rejects.toThrow(InvalidStreamError);
+      // 4. Assert: Thought-only responses are valid — should NOT throw.
+      for await (const _ of stream) {
+        // consume stream
+      }
     });
 
     it('should succeed when there is a tool call without finish reason', async () => {
@@ -714,9 +710,10 @@ describe('GeminiChat', () => {
       ).rejects.toThrow(InvalidStreamError);
     });
 
-    it('should throw InvalidStreamError when no tool call and empty response text', async () => {
+    it('should NOT throw InvalidStreamError when response has only thought content', async () => {
       // Setup: Stream with finish reason but empty response (only thoughts)
-      const streamWithEmptyResponse = (async function* () {
+      // Thinking models may produce only thoughts — this is valid.
+      const streamWithThoughtOnly = (async function* () {
         yield {
           candidates: [
             {
@@ -731,7 +728,7 @@ describe('GeminiChat', () => {
       })();
 
       vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
-        streamWithEmptyResponse,
+        streamWithThoughtOnly,
       );
 
       const stream = await chat.sendMessageStream(
@@ -742,13 +739,10 @@ describe('GeminiChat', () => {
         LlmRole.MAIN,
       );
 
-      await expect(
-        (async () => {
-          for await (const _ of stream) {
-            // consume stream
-          }
-        })(),
-      ).rejects.toThrow(InvalidStreamError);
+      // Thought-only responses are valid — should NOT throw.
+      for await (const _ of stream) {
+        // consume stream
+      }
     });
 
     it('should succeed when there is finish reason and response text', async () => {
@@ -1064,8 +1058,8 @@ describe('GeminiChat', () => {
   });
 
   describe('sendMessageStream with retries', () => {
-    it('should not retry on invalid content if model does not start with gemini-2', async () => {
-      // Mock the stream to fail.
+    it('should retry on invalid content regardless of model name', async () => {
+      // InvalidStreamError retry now applies to all models, not just gemini-2.x.
       vi.mocked(mockContentGenerator.generateContentStream).mockImplementation(
         async () =>
           (async function* () {
@@ -1091,11 +1085,11 @@ describe('GeminiChat', () => {
         })(),
       ).rejects.toThrow(InvalidStreamError);
 
-      // Should be called only 1 time (no retry)
+      // Should be called 2 times (1 initial + 1 retry)
       expect(mockContentGenerator.generateContentStream).toHaveBeenCalledTimes(
-        1,
+        2,
       );
-      expect(mockLogContentRetry).not.toHaveBeenCalled();
+      expect(mockLogContentRetry).toHaveBeenCalled();
     });
 
     it('should yield a RETRY event when an invalid stream is encountered', async () => {

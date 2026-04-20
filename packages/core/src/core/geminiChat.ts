@@ -25,11 +25,7 @@ import {
 } from '../utils/retry.js';
 import type { ValidationRequiredError } from '../utils/googleQuotaErrors.js';
 import type { Config } from '../config/config.js';
-import {
-  resolveModel,
-  isGemini2Model,
-  supportsModernFeatures,
-} from '../config/models.js';
+import { resolveModel, supportsModernFeatures } from '../config/models.js';
 import { hasCycleInSchema } from '../tools/tools.js';
 import type { StructuredError } from './turn.js';
 import type { CompletedToolCall } from './coreToolScheduler.js';
@@ -415,10 +411,7 @@ export class GeminiChat {
             lastError = error;
             const isContentError = error instanceof InvalidStreamError;
 
-            if (
-              (isContentError && isGemini2Model(model)) ||
-              (isRetryable && !signal.aborted)
-            ) {
+            if (isContentError || (isRetryable && !signal.aborted)) {
               // Check if we have more attempts left.
               if (attempt < maxAttempts - 1) {
                 const delayMs = INVALID_CONTENT_RETRY_OPTIONS.initialDelayMs;
@@ -446,10 +439,7 @@ export class GeminiChat {
         }
 
         if (lastError) {
-          if (
-            lastError instanceof InvalidStreamError &&
-            isGemini2Model(model)
-          ) {
+          if (lastError instanceof InvalidStreamError) {
             logContentRetryFailure(
               this.config,
               new ContentRetryFailureEvent(maxAttempts, lastError.type, model),
@@ -914,6 +904,7 @@ export class GeminiChat {
     const modelResponseParts: Part[] = [];
 
     let hasToolCall = false;
+    let hasThought = false;
     let finishReason: FinishReason | undefined;
 
     for await (const chunk of streamResponse) {
@@ -929,6 +920,7 @@ export class GeminiChat {
         const content = chunk.candidates?.[0]?.content;
         if (content?.parts) {
           if (content.parts.some((part) => part.thought)) {
+            hasThought = true;
             // Record thoughts
             this.recordThoughtFromContent(content);
           }
@@ -1012,13 +1004,15 @@ export class GeminiChat {
     // Stream validation logic: A stream is considered successful if:
     // 1. There's a tool call OR
     // 2. There's inline data (image generation models like nano-banana-pro) OR
-    // 3. A not MALFORMED_FUNCTION_CALL finish reason and a non-empty response text
+    // 3. There's thought content (thinking models may produce only thoughts) OR
+    // 4. A not MALFORMED_FUNCTION_CALL finish reason and a non-empty response text
     //
-    // We throw an error only when there's no tool call AND no inline data AND:
+    // We throw an error only when there's no tool call AND no inline data
+    // AND no thought content AND:
     // - No finish reason, OR
     // - MALFORMED_FUNCTION_CALL finish reason OR
-    // - Empty response text (e.g., only thoughts with no actual content)
-    if (!hasToolCall && !hasInlineData) {
+    // - Empty response text
+    if (!hasToolCall && !hasInlineData && !hasThought) {
       if (!finishReason) {
         throw new InvalidStreamError(
           'Model stream ended without a finish reason.',
