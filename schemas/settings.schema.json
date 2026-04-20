@@ -2920,6 +2920,20 @@
               "default": false,
               "type": "boolean"
             },
+            "autoStartServer": {
+              "title": "Auto-start LiteRT Server",
+              "description": "Automatically start the LiteRT-LM server when Gemini CLI starts and the Gemma router is enabled.",
+              "markdownDescription": "Automatically start the LiteRT-LM server when Gemini CLI starts and the Gemma router is enabled.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+              "default": false,
+              "type": "boolean"
+            },
+            "binaryPath": {
+              "title": "LiteRT Binary Path",
+              "description": "Custom path to the LiteRT-LM binary. Leave empty to use the default location (~/.gemini/bin/litert/).",
+              "markdownDescription": "Custom path to the LiteRT-LM binary. Leave empty to use the default location (~/.gemini/bin/litert/).\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: ``",
+              "default": "",
+              "type": "string"
+            },
             "classifier": {
               "title": "Classifier",
               "description": "Classifier configuration.",
