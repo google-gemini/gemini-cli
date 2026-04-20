@@ -138,11 +138,13 @@ export async function isServerRunning(port: number): Promise<boolean> {
       HEALTH_CHECK_TIMEOUT_MS,
     );
     const response = await fetch(
-      `http://localhost:${port}/${LITERT_API_VERSION}/models/${GEMMA_MODEL_NAME}`,
-      { signal: controller.signal },
+      `http://localhost:${port}/${LITERT_API_VERSION}/models/${GEMMA_MODEL_NAME}:generateContent`,
+      { method: 'POST', signal: controller.signal },
     );
     clearTimeout(timeout);
-    return response.ok;
+    // A 400 (bad request) confirms the route exists — the server recognises
+    // the model endpoint.  Only a 404 means "wrong server / wrong model".
+    return response.status !== 404;
   } catch {
     return false;
   }
