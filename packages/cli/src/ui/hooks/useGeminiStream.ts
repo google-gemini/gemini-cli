@@ -39,7 +39,8 @@ import {
   isBackgroundExecutionData,
   Kind,
   ACTIVATE_SKILL_TOOL_NAME,
-  shouldHideToolCall,
+  isRenderedInHistory,
+  buildToolVisibilityContext,
   UPDATE_TOPIC_TOOL_NAME,
   UPDATE_TOPIC_DISPLAY_NAME,
 } from '@google/gemini-cli-core';
@@ -247,15 +248,8 @@ export const useGeminiStream = (
   const previousApprovalModeRef = useRef<ApprovalMode>(
     config.getApprovalMode(),
   );
-  const [isResponding, setIsRespondingState] = useState<boolean>(false);
-  const isRespondingRef = useRef<boolean>(false);
-  const setIsResponding = useCallback(
-    (value: boolean) => {
-      setIsRespondingState(value);
-      isRespondingRef.current = value;
-    },
-    [setIsRespondingState],
-  );
+  const [isResponding, isRespondingRef, setIsResponding] =
+    useStateAndRef<boolean>(false);
   const [thought, thoughtRef, setThought] =
     useStateAndRef<ThoughtSummary | null>(null);
   const [pendingHistoryItem, pendingHistoryItemRef, setPendingHistoryItem] =
@@ -269,24 +263,26 @@ export const useGeminiStream = (
     useStateAndRef<boolean>(true);
   const processedMemoryToolsRef = useRef<Set<string>>(new Set());
   const { startNewPrompt, getPromptCount } = useSessionStats();
-  const storage = config.storage;
-  const logger = useLogger(storage);
+  const logger = useLogger(config);
   const gitService = useMemo(() => {
     if (!config.getProjectRoot()) {
       return;
     }
-    return new GitService(config.getProjectRoot(), storage);
-  }, [config, storage]);
+    return new GitService(config.getProjectRoot(), config.storage);
+  }, [config]);
 
   useEffect(() => {
     const handleRetryAttempt = (payload: RetryAttemptPayload) => {
+      if (turnCancelledRef.current || !isRespondingRef.current) {
+        return;
+      }
       setRetryStatus(payload);
     };
     coreEvents.on(CoreEvent.RetryAttempt, handleRetryAttempt);
     return () => {
       coreEvents.off(CoreEvent.RetryAttempt, handleRetryAttempt);
     };
-  }, []);
+  }, [isRespondingRef]);
 
   const [
     toolCalls,
@@ -652,29 +648,8 @@ export const useGeminiStream = (
       toolCalls.every((tc) => pushedToolCallIds.has(tc.request.callId));
 
     const isToolVisible = (tc: TrackedToolCall) => {
-      const displayName = tc.tool?.displayName ?? tc.request.name;
-
-      let hasResultDisplay = false;
-      if (
-        tc.status === CoreToolCallStatus.Success ||
-        tc.status === CoreToolCallStatus.Error ||
-        tc.status === CoreToolCallStatus.Cancelled
-      ) {
-        hasResultDisplay = !!tc.response?.resultDisplay;
-      } else if (tc.status === CoreToolCallStatus.Executing) {
-        hasResultDisplay = !!tc.liveOutput;
-      }
-
       // AskUser tools and Plan Mode write/edit are handled by this logic
-      if (
-        shouldHideToolCall({
-          displayName,
-          status: tc.status,
-          approvalMode: tc.approvalMode,
-          hasResultDisplay,
-          parentCallId: tc.request.parentCallId,
-        })
-      ) {
+      if (!isRenderedInHistory(buildToolVisibilityContext(tc))) {
         return false;
       }
 
@@ -839,6 +814,7 @@ export const useGeminiStream = (
       return;
     }
     turnCancelledRef.current = true;
+    setRetryStatus(null);
 
     // A full cancellation means no tools have produced a final result yet.
     // This determines if we show a generic "Request cancelled" message.
@@ -1583,6 +1559,7 @@ export const useGeminiStream = (
           operation: options?.isContinuation
             ? GeminiCliOperation.SystemPrompt
             : GeminiCliOperation.UserPrompt,
+          sessionId: config.getSessionId(),
         },
         async ({ metadata: spanMetadata }) => {
           spanMetadata.input = query;
@@ -1765,6 +1742,7 @@ export const useGeminiStream = (
       setThought,
       maybeAddSuppressedToolErrorNote,
       maybeAddLowVerbosityFailureNote,
+      isRespondingRef,
       settings.merged.billing?.overageStrategy,
       setIsResponding,
     ],
@@ -2107,7 +2085,7 @@ export const useGeminiStream = (
         }
 
         if (checkpointsToWrite.size > 0) {
-          const checkpointDir = storage.getProjectTempCheckpointsDir();
+          const checkpointDir = config.storage.getProjectTempCheckpointsDir();
           try {
             await fs.mkdir(checkpointDir, { recursive: true });
             for (const [fileName, content] of checkpointsToWrite) {
@@ -2124,15 +2102,7 @@ export const useGeminiStream = (
     };
     // eslint-disable-next-line @typescript-eslint/no-floating-promises
     saveRestorableToolCalls();
-  }, [
-    toolCalls,
-    config,
-    onDebugMessage,
-    gitService,
-    history,
-    geminiClient,
-    storage,
-  ]);
+  }, [toolCalls, config, onDebugMessage, gitService, history, geminiClient]);
 
   const lastOutputTime = Math.max(
     lastToolOutputTime,

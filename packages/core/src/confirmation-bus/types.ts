@@ -5,6 +5,7 @@
  */
 
 import { type FunctionCall } from '@google/genai';
+import { type ApprovalMode } from '../policy/types.js';
 import type {
   ToolConfirmationOutcome,
   ToolConfirmationPayload,
@@ -150,6 +151,7 @@ export interface UpdatePolicy {
   commandPrefix?: string | string[];
   mcpName?: string;
   allowRedirection?: boolean;
+  modes?: ApprovalMode[];
 }
 
 export interface ToolPolicyRejection {

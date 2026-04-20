@@ -78,6 +78,7 @@ describe('PromptProvider', () => {
       getActiveModel: vi.fn().mockReturnValue(PREVIEW_GEMINI_MODEL),
       getAgentRegistry: vi.fn().mockReturnValue({
         getAllDefinitions: vi.fn().mockReturnValue([]),
+        getDefinition: vi.fn().mockReturnValue(undefined),
       }),
       getApprovedPlanPath: vi.fn().mockReturnValue(undefined),
       getApprovalMode: vi.fn(),
@@ -273,6 +274,56 @@ describe('PromptProvider', () => {
       const prompt = provider.getCompressionPrompt(mockConfig);
 
       expect(prompt).not.toContain('### APPROVED PLAN PRESERVATION');
+    });
+  });
+
+  describe('topicUpdateNarrationOverride', () => {
+    let provider: PromptProvider;
+
+    beforeEach(() => {
+      provider = new PromptProvider();
+      mockConfig.topicState.reset();
+      (mockConfig.getToolRegistry as ReturnType<typeof vi.fn>).mockReturnValue({
+        getAllToolNames: vi.fn().mockReturnValue([UPDATE_TOPIC_TOOL_NAME]),
+      });
+      (mockConfig.getAgentRegistry as ReturnType<typeof vi.fn>).mockReturnValue(
+        {
+          getAllDefinitions: vi.fn().mockReturnValue([]),
+          getDefinition: vi.fn().mockReturnValue(undefined),
+        },
+      );
+    });
+
+    it('should disable topic update narration when override is false, even if config is true', () => {
+      vi.mocked(mockConfig.isTopicUpdateNarrationEnabled).mockReturnValue(true);
+
+      const prompt = provider.getCoreSystemPrompt(
+        mockConfig as unknown as Config,
+        /*userMemory=*/ undefined,
+        /*interactiveOverride=*/ undefined,
+        /*topicUpdateNarrationOverride=*/ false,
+      );
+
+      expect(prompt).not.toContain(
+        `As you work, the user follows along by reading topic updates that you publish with ${UPDATE_TOPIC_TOOL_NAME}.`,
+      );
+    });
+
+    it('should enable topic update narration when override is true, even if config is false', () => {
+      vi.mocked(mockConfig.isTopicUpdateNarrationEnabled).mockReturnValue(
+        false,
+      );
+
+      const prompt = provider.getCoreSystemPrompt(
+        mockConfig as unknown as Config,
+        /*userMemory=*/ undefined,
+        /*interactiveOverride=*/ undefined,
+        /*topicUpdateNarrationOverride=*/ true,
+      );
+
+      expect(prompt).toContain(
+        `As you work, the user follows along by reading topic updates that you publish with ${UPDATE_TOPIC_TOOL_NAME}.`,
+      );
     });
   });
 

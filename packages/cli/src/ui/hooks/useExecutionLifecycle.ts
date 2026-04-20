@@ -409,6 +409,7 @@ export const useExecutionLifecycle = (
           const activeTheme = themeManager.getActiveTheme();
           const shellExecutionConfig = {
             ...config.getShellExecutionConfig(),
+            sessionId: config.getSessionId(),
             terminalWidth,
             terminalHeight,
             defaultFg: activeTheme.colors.Foreground,
@@ -554,6 +555,7 @@ export const useExecutionLifecycle = (
                 italic: false,
                 underline: false,
                 inverse: false,
+                isUninitialized: false,
               },
             ]);
             return [...newLines, [], ...output];

@@ -63,6 +63,17 @@ describe('<LoadingIndicator />', () => {
     expect(lastFrame({ allowEmpty: true })?.trim()).toBe('');
   });
 
+  it('should not show cancel and timer when idle even if a phrase exists', async () => {
+    const { lastFrame, waitUntilReady } = await renderWithContext(
+      <LoadingIndicator currentLoadingPhrase="Retrying..." elapsedTime={5} />,
+      StreamingState.Idle,
+    );
+    await waitUntilReady();
+    const output = lastFrame();
+    expect(output).toContain('Retrying...');
+    expect(output).not.toContain('(esc to cancel');
+  });
+
   it('should render spinner, phrase, and time when streamingState is Responding', async () => {
     const { lastFrame, waitUntilReady } = await renderWithContext(
       <LoadingIndicator {...defaultProps} />,

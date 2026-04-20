@@ -30,6 +30,7 @@ import * as path from 'node:path';
 import * as fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { injectAutomationOverlay } from './automationOverlay.js';
+import { logBrowserAgentConnection } from '../../telemetry/loggers.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -114,6 +115,12 @@ export class BrowserManager {
   private static instances = new Map<string, BrowserManager>();
 
   /**
+   * Maximum number of parallel browser instances allowed in isolated mode.
+   * Prevents unbounded resource consumption from concurrent browser_agent calls.
+   */
+  static readonly MAX_PARALLEL_INSTANCES = 5;
+
+  /**
    * Returns the cache key for a given config.
    * Uses `sessionMode:profilePath` so different profiles get separate instances.
    */
@@ -127,14 +134,64 @@ export class BrowserManager {
   /**
    * Returns an existing BrowserManager for the current config's session mode
    * and profile, or creates a new one.
+   *
+   * Concurrency rules:
+   * - **persistent / existing mode**: Only one instance is allowed at a time.
+   *   If the instance is already in-use, an error is thrown instructing the
+   *   caller to run browser tasks sequentially.
+   * - **isolated mode**: Parallel instances are allowed up to
+   *   MAX_PARALLEL_INSTANCES. Each isolated instance gets its own temp profile.
    */
   static getInstance(config: Config): BrowserManager {
     const key = BrowserManager.getInstanceKey(config);
+    const sessionMode =
+      config.getBrowserAgentConfig().customConfig.sessionMode ?? 'persistent';
     let instance = BrowserManager.instances.get(key);
     if (!instance) {
       instance = new BrowserManager(config);
       BrowserManager.instances.set(key, instance);
       debugLogger.log(`Created new BrowserManager singleton (key: ${key})`);
+    } else if (instance.inUse) {
+      // Persistent and existing modes share a browser profile directory.
+      // Chrome prevents multiple instances from using the same profile, so
+      // concurrent usage would cause "profile locked" errors.
+      if (sessionMode === 'persistent' || sessionMode === 'existing') {
+        throw new Error(
+          `Cannot launch a concurrent browser agent in "${sessionMode}" session mode. ` +
+            `The browser instance is already in use by another task. ` +
+            `Please run browser tasks sequentially, or switch to "isolated" session mode for concurrent browser usage.`,
+        );
+      }
+
+      // Isolated mode: allow parallel instances up to the limit.
+      let inUseCount = 1; // primary is already in-use
+      let suffix = 1;
+      let parallelKey = `${key}:${suffix}`;
+      let parallel = BrowserManager.instances.get(parallelKey);
+      while (parallel?.inUse) {
+        inUseCount++;
+        if (inUseCount >= BrowserManager.MAX_PARALLEL_INSTANCES) {
+          throw new Error(
+            `Maximum number of parallel browser instances (${BrowserManager.MAX_PARALLEL_INSTANCES}) reached. ` +
+              `Please wait for an existing browser task to complete before starting a new one.`,
+          );
+        }
+        suffix++;
+        parallelKey = `${key}:${suffix}`;
+        parallel = BrowserManager.instances.get(parallelKey);
+      }
+      if (!parallel) {
+        parallel = new BrowserManager(config);
+        BrowserManager.instances.set(parallelKey, parallel);
+        debugLogger.log(
+          `Created parallel BrowserManager (key: ${parallelKey})`,
+        );
+      } else {
+        debugLogger.log(
+          `Reusing released parallel BrowserManager (key: ${parallelKey})`,
+        );
+      }
+      instance = parallel;
     } else {
       debugLogger.log(
         `Reusing existing BrowserManager singleton (key: ${key})`,
@@ -178,6 +235,36 @@ export class BrowserManager {
   private disconnected = false;
   private isClosing = false;
   private connectionPromise: Promise<void> | undefined;
+
+  /**
+   * Whether this instance is currently acquired by an active invocation.
+   * Used by getInstance() to avoid handing the same browser to concurrent
+   * browser_agent calls.
+   */
+  private inUse = false;
+
+  /**
+   * Marks this instance as in-use. Call this when starting a browser agent
+   * invocation so concurrent calls get a separate instance.
+   */
+  acquire(): void {
+    this.inUse = true;
+  }
+
+  /**
+   * Marks this instance as available for reuse. Call this in the finally
+   * block of a browser agent invocation.
+   */
+  release(): void {
+    this.inUse = false;
+  }
+
+  /**
+   * Returns whether this instance is currently acquired by an active invocation.
+   */
+  isAcquired(): boolean {
+    return this.inUse;
+  }
 
   /** State for action rate limiting */
   private actionCounter = 0;
@@ -486,7 +573,11 @@ export class BrowserManager {
 
     // Build args for chrome-devtools-mcp
     const browserConfig = this.config.getBrowserAgentConfig();
-    let sessionMode = browserConfig.customConfig.sessionMode ?? 'persistent';
+    const rawSessionMode = browserConfig.customConfig.sessionMode;
+    let sessionMode: 'persistent' | 'isolated' | 'existing' =
+      rawSessionMode === 'isolated' || rawSessionMode === 'existing'
+        ? rawSessionMode
+        : 'persistent';
 
     // Detect sandbox environment.
     // SANDBOX env var is set to 'sandbox-exec' (seatbelt) or the container
@@ -558,7 +649,9 @@ export class BrowserManager {
     // Add optional settings from config.
     // Force headless in seatbelt sandbox since Chrome profile/display access
     // may be restricted, and the user is running in a sandboxed environment.
-    if (browserConfig.customConfig.headless || isSeatbeltSandbox) {
+    const effectiveHeadless =
+      !!browserConfig.customConfig.headless || isSeatbeltSandbox;
+    if (effectiveHeadless) {
       mcpArgs.push('--headless');
     }
     if (browserConfig.customConfig.profilePath) {
@@ -652,6 +745,7 @@ export class BrowserManager {
       sessionMode === 'existing' ? 15_000 : MCP_TIMEOUT_MS;
 
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    const connectStartMs = Date.now();
     try {
       await Promise.race([
         (async () => {
@@ -660,6 +754,13 @@ export class BrowserManager {
           await this.discoverTools();
           // clear the action counter for each connection
           this.actionCounter = 0;
+
+          logBrowserAgentConnection(this.config, Date.now() - connectStartMs, {
+            session_mode: sessionMode,
+            headless: effectiveHeadless,
+            success: true,
+            tool_count: this.discoveredTools.length,
+          });
         })(),
         new Promise<never>((_, reject) => {
           timeoutId = setTimeout(
@@ -676,11 +777,19 @@ export class BrowserManager {
     } catch (error) {
       await this.close();
 
+      const rawErrorMessage =
+        error instanceof Error ? error.message : String(error);
+      const errorType = BrowserManager.classifyConnectionError(rawErrorMessage);
+
+      logBrowserAgentConnection(this.config, Date.now() - connectStartMs, {
+        session_mode: sessionMode,
+        headless: effectiveHeadless,
+        success: false,
+        error_type: errorType,
+      });
+
       // Provide error-specific, session-mode-aware remediation
-      throw this.createConnectionError(
-        error instanceof Error ? error.message : String(error),
-        sessionMode,
-      );
+      throw this.createConnectionError(rawErrorMessage, sessionMode);
     } finally {
       if (timeoutId !== undefined) {
         clearTimeout(timeoutId);
@@ -689,14 +798,33 @@ export class BrowserManager {
   }
 
   /**
+   * Classifies a connection error message into a known error type.
+   * Shared between connectMcp error recording and createConnectionError
+   * to ensure consistent error categorization across the browser agent.
+   */
+  private static classifyConnectionError(
+    message: string,
+  ): 'profile_locked' | 'timeout' | 'connection_refused' | 'unknown' {
+    const lowerMessage = message.toLowerCase();
+    if (lowerMessage.includes('already running')) {
+      return 'profile_locked';
+    } else if (lowerMessage.includes('timed out')) {
+      return 'timeout';
+    } else if (lowerMessage.includes('connection refused')) {
+      return 'connection_refused';
+    }
+    return 'unknown';
+  }
+
+  /**
    * Creates an Error with context-specific remediation based on the actual
    * error message and the current sessionMode.
    */
   private createConnectionError(message: string, sessionMode: string): Error {
-    const lowerMessage = message.toLowerCase();
+    const errorType = BrowserManager.classifyConnectionError(message);
 
     // "already running for the current profile" — persistent mode profile lock
-    if (lowerMessage.includes('already running')) {
+    if (errorType === 'profile_locked') {
       if (sessionMode === 'persistent' || sessionMode === 'isolated') {
         return new Error(
           `Could not connect to Chrome: ${message}\n\n` +
@@ -716,7 +844,7 @@ export class BrowserManager {
     }
 
     // Timeout errors
-    if (lowerMessage.includes('timed out')) {
+    if (errorType === 'timeout') {
       if (sessionMode === 'existing') {
         return new Error(
           `Timed out connecting to Chrome: ${message}\n\n` +

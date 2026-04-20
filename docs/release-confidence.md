@@ -1,7 +1,7 @@
 # Release confidence strategy
 
 This document outlines the strategy for gaining confidence in every release of
-the Gemini CLI. It serves as a checklist and quality gate for release manager to
+Gemini CLI. It serves as a checklist and quality gate for release manager to
 ensure we are shipping a high-quality product.
 
 ## The goal
@@ -21,12 +21,6 @@ All workflows in `.github/workflows/ci.yml` must pass on the `main` branch (for
 nightly) or the release branch (for preview/stable).
 
 - **Platforms:** Tests must pass on **Linux and macOS**.
-
-<!-- prettier-ignore -->
-> [!NOTE]
-> Windows tests currently run with `continue-on-error: true`. While a
-> failure here doesn't block the release technically, it should be
-> investigated.
 
 - **Checks:**
   - **Linting:** No linting errors (ESLint, Prettier, etc.).

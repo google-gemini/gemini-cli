@@ -92,11 +92,19 @@
           "type": "boolean"
         },
         "enableNotifications": {
-          "title": "Enable Notifications",
-          "description": "Enable run-event notifications for action-required prompts and session completion.",
-          "markdownDescription": "Enable run-event notifications for action-required prompts and session completion.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `false`",
+          "title": "Enable Terminal Notifications",
+          "description": "Enable terminal run-event notifications for action-required prompts and session completion.",
+          "markdownDescription": "Enable terminal run-event notifications for action-required prompts and session completion.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
           "type": "boolean"
+        },
+        "notificationMethod": {
+          "title": "Terminal Notification Method",
+          "description": "How to send terminal notifications.",
+          "markdownDescription": "How to send terminal notifications.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `auto`",
+          "default": "auto",
+          "type": "string",
+          "enum": ["auto", "osc9", "osc777", "bell"]
         },
         "checkpointing": {
           "title": "Checkpointing",
@@ -201,6 +209,13 @@
             }
           },
           "additionalProperties": false
+        },
+        "topicUpdateNarration": {
+          "title": "Topic & Update Narration",
+          "description": "Enable the Topic & Update communication model for reduced chattiness and structured progress reporting.",
+          "markdownDescription": "Enable the Topic & Update communication model for reduced chattiness and structured progress reporting.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
         }
       },
       "additionalProperties": false
@@ -230,6 +245,13 @@
       "default": {},
       "type": "object",
       "properties": {
+        "debugRainbow": {
+          "title": "Debug Rainbow",
+          "description": "Enable debug rainbow rendering. Only useful for debugging rendering bugs and performance issues.",
+          "markdownDescription": "Enable debug rainbow rendering. Only useful for debugging rendering bugs and performance issues.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "theme": {
           "title": "Theme",
           "description": "The color theme for the UI. See the CLI themes guide for available options.",
@@ -327,8 +349,8 @@
         "compactToolOutput": {
           "title": "Compact Tool Output",
           "description": "Display tool outputs (like directory listings and file reads) in a compact, structured format.",
-          "markdownDescription": "Display tool outputs (like directory listings and file reads) in a compact, structured format.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
-          "default": false,
+          "markdownDescription": "Display tool outputs (like directory listings and file reads) in a compact, structured format.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
           "type": "boolean"
         },
         "hideBanner": {
@@ -452,6 +474,20 @@
           "title": "Use Alternate Screen Buffer",
           "description": "Use an alternate screen buffer for the UI, preserving shell history.",
           "markdownDescription": "Use an alternate screen buffer for the UI, preserving shell history.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "renderProcess": {
+          "title": "Render Process",
+          "description": "Enable Ink render process for the UI.",
+          "markdownDescription": "Enable Ink render process for the UI.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
+        "terminalBuffer": {
+          "title": "Terminal Buffer",
+          "description": "Use the new terminal buffer architecture for rendering.",
+          "markdownDescription": "Use the new terminal buffer architecture for rendering.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },
@@ -2426,8 +2462,8 @@
             "showColor": {
               "title": "Show Color",
               "description": "Show color in shell output.",
-              "markdownDescription": "Show color in shell output.\n\n- Category: `Tools`\n- Requires restart: `no`\n- Default: `false`",
-              "default": false,
+              "markdownDescription": "Show color in shell output.\n\n- Category: `Tools`\n- Requires restart: `no`\n- Default: `true`",
+              "default": true,
               "type": "boolean"
             },
             "inactivityTimeout": {
@@ -2560,8 +2596,8 @@
       "properties": {
         "toolSandboxing": {
           "title": "Tool Sandboxing",
-          "description": "Experimental tool-level sandboxing (implementation in progress).",
-          "markdownDescription": "Experimental tool-level sandboxing (implementation in progress).\n\n- Category: `Security`\n- Requires restart: `no`\n- Default: `false`",
+          "description": "Tool-level sandboxing. Isolates individual tools instead of the entire CLI process.",
+          "markdownDescription": "Tool-level sandboxing. Isolates individual tools instead of the entire CLI process.\n\n- Category: `Security`\n- Requires restart: `yes`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },
@@ -2711,8 +2747,8 @@
       "properties": {
         "autoConfigureMemory": {
           "title": "Auto Configure Max Old Space Size",
-          "description": "Automatically configure Node.js memory limits",
-          "markdownDescription": "Automatically configure Node.js memory limits\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `true`",
+          "description": "Automatically configure Node.js memory limits. Note: Because memory is allocated during the initial process boot, this setting is only read from the global user settings file and ignores workspace-level overrides.",
+          "markdownDescription": "Automatically configure Node.js memory limits. Note: Because memory is allocated during the initial process boot, this setting is only read from the global user settings file and ignores workspace-level overrides.\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `true`",
           "default": true,
           "type": "boolean"
         },
@@ -2759,6 +2795,13 @@
               "title": "Agent Session Non-interactive Enabled",
               "description": "Enable non-interactive agent sessions.",
               "markdownDescription": "Enable non-interactive agent sessions.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+              "default": false,
+              "type": "boolean"
+            },
+            "agentSessionInteractiveEnabled": {
+              "title": "Interactive Agent Session Enabled",
+              "description": "Enable the agent session implementation for the interactive CLI.",
+              "markdownDescription": "Enable the agent session implementation for the interactive CLI.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
               "default": false,
               "type": "boolean"
             }
@@ -2911,6 +2954,13 @@
           "default": false,
           "type": "boolean"
         },
+        "autoMemory": {
+          "title": "Auto Memory",
+          "description": "Automatically extract reusable skills from past sessions in the background. Review results with /memory inbox.",
+          "markdownDescription": "Automatically extract reusable skills from past sessions in the background. Review results with /memory inbox.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "generalistProfile": {
           "title": "Use the generalist profile to manage agent contexts.",
           "description": "Suitable for general coding and software development tasks.",
@@ -2927,8 +2977,8 @@
         },
         "topicUpdateNarration": {
           "title": "Topic & Update Narration",
-          "description": "Enable the experimental Topic & Update communication model for reduced chattiness and structured progress reporting.",
-          "markdownDescription": "Enable the experimental Topic & Update communication model for reduced chattiness and structured progress reporting.\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `false`",
+          "description": "Deprecated: Use general.topicUpdateNarration instead.",
+          "markdownDescription": "Deprecated: Use general.topicUpdateNarration instead.\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         }

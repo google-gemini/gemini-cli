@@ -110,6 +110,13 @@ export interface HookEndPayload extends HookPayload {
 }
 
 /**
+ * Payload for the 'hook-system-message' event.
+ */
+export interface HookSystemMessagePayload extends HookPayload {
+  message: string;
+}
+
+/**
  * Payload for the 'retry-attempt' event.
  */
 export interface RetryAttemptPayload {
@@ -183,6 +190,7 @@ export enum CoreEvent {
   SettingsChanged = 'settings-changed',
   HookStart = 'hook-start',
   HookEnd = 'hook-end',
+  HookSystemMessage = 'hook-system-message',
   AgentsRefreshed = 'agents-refreshed',
   AdminSettingsChanged = 'admin-settings-changed',
   RetryAttempt = 'retry-attempt',
@@ -217,6 +225,7 @@ export interface CoreEvents extends ExtensionEvents {
   [CoreEvent.SettingsChanged]: never[];
   [CoreEvent.HookStart]: [HookStartPayload];
   [CoreEvent.HookEnd]: [HookEndPayload];
+  [CoreEvent.HookSystemMessage]: [HookSystemMessagePayload];
   [CoreEvent.AgentsRefreshed]: never[];
   [CoreEvent.AdminSettingsChanged]: never[];
   [CoreEvent.RetryAttempt]: [RetryAttemptPayload];
@@ -337,6 +346,13 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
    */
   emitHookEnd(payload: HookEndPayload): void {
     this.emit(CoreEvent.HookEnd, payload);
+  }
+
+  /**
+   * Notifies subscribers that a hook has provided a system message.
+   */
+  emitHookSystemMessage(payload: HookSystemMessagePayload): void {
+    this.emit(CoreEvent.HookSystemMessage, payload);
   }
 
   /**

@@ -22,7 +22,11 @@ import {
   getSecureSanitizationConfig,
 } from '../../services/environmentSanitization.js';
 import { buildSeatbeltProfile } from './seatbeltArgsBuilder.js';
-import { initializeShellParsers } from '../../utils/shell-utils.js';
+import {
+  initializeShellParsers,
+  getCommandRoots,
+  stripShellWrapper,
+} from '../../utils/shell-utils.js';
 import {
   isKnownSafeCommand,
   isDangerousCommand,
@@ -32,10 +36,16 @@ import {
   getCommandName as getFullCommandName,
   isStrictlyApproved,
 } from '../utils/commandUtils.js';
-import { parsePosixSandboxDenials } from '../utils/sandboxDenialUtils.js';
+import {
+  parsePosixSandboxDenials,
+  createSandboxDenialCache,
+  type SandboxDenialCache,
+} from '../utils/sandboxDenialUtils.js';
 import { handleReadWriteCommands } from '../utils/sandboxReadWriteUtils.js';
 
 export class MacOsSandboxManager implements SandboxManager {
+  private readonly denialCache: SandboxDenialCache = createSandboxDenialCache();
+
   constructor(private readonly options: GlobalSandboxOptions) {}
 
   isKnownSafeCommand(args: string[]): boolean {
@@ -52,11 +62,15 @@ export class MacOsSandboxManager implements SandboxManager {
   }
 
   parseDenials(result: ShellExecutionResult): ParsedSandboxDenial | undefined {
-    return parsePosixSandboxDenials(result);
+    return parsePosixSandboxDenials(result, this.denialCache);
   }
 
   getWorkspace(): string {
     return this.options.workspace;
+  }
+
+  getOptions(): GlobalSandboxOptions {
+    return this.options;
   }
 
   async prepareCommand(req: SandboxRequest): Promise<SandboxedCommand> {
@@ -96,12 +110,8 @@ export class MacOsSandboxManager implements SandboxManager {
 
     const isYolo = this.options.modeConfig?.yolo ?? false;
     const workspaceWrite = !isReadonlyMode || isApproved || isYolo;
-
     const defaultNetwork =
       this.options.modeConfig?.network || req.policy?.networkAccess || isYolo;
-
-    const { allowed: allowedPaths, forbidden: forbiddenPaths } =
-      await resolveSandboxPaths(this.options, req);
 
     // Fetch persistent approvals for this command
     const commandName = await getFullCommandName(currentReq);
@@ -127,23 +137,42 @@ export class MacOsSandboxManager implements SandboxManager {
         false,
     };
 
+    // If the workspace is writable and we're running a git command,
+    // automatically allow write access to the .git directory.
+    const fullCmd = [command, ...args].join(' ');
+    const stripped = stripShellWrapper(fullCmd);
+    const roots = getCommandRoots(stripped).filter(
+      (r) => r !== 'shopt' && r !== 'set',
+    );
+    const isGitCommand = roots.includes('git');
+
+    if (workspaceWrite && isGitCommand) {
+      const gitDir = path.join(this.options.workspace, '.git');
+      if (!mergedAdditional.fileSystem!.write!.includes(gitDir)) {
+        mergedAdditional.fileSystem!.write!.push(gitDir);
+      }
+    }
+
     const { command: finalCommand, args: finalArgs } = handleReadWriteCommands(
       req,
       mergedAdditional,
       this.options.workspace,
-      req.policy?.allowedPaths,
+      [
+        ...(req.policy?.allowedPaths || []),
+        ...(this.options.includeDirectories || []),
+      ],
+    );
+
+    const resolvedPaths = await resolveSandboxPaths(
+      this.options,
+      req,
+      mergedAdditional,
     );
 
     const sandboxArgs = buildSeatbeltProfile({
-      workspace: this.options.workspace,
-      allowedPaths: [
-        ...allowedPaths,
-        ...(this.options.includeDirectories || []),
-      ],
-      forbiddenPaths,
+      resolvedPaths,
       networkAccess: mergedAdditional.network,
       workspaceWrite,
-      additionalPermissions: mergedAdditional,
     });
 
     const tempFile = this.writeProfileToTempFile(sandboxArgs);

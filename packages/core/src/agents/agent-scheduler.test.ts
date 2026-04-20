@@ -15,6 +15,7 @@ import type { MessageBus } from '../confirmation-bus/message-bus.js';
 vi.mock('../scheduler/scheduler.js', () => ({
   Scheduler: vi.fn().mockImplementation(() => ({
     schedule: vi.fn().mockResolvedValue([{ status: 'success' }]),
+    dispose: vi.fn(),
   })),
 }));
 
@@ -123,6 +124,57 @@ describe('agent-scheduler', () => {
     const schedulerConfig = vi.mocked(Scheduler).mock.calls[0][0].context;
     expect(schedulerConfig.toolRegistry).toBe(agentRegistry);
     expect(schedulerConfig.toolRegistry).not.toBe(mainRegistry);
+  });
+
+  it('should dispose the scheduler after schedule completes', async () => {
+    const mockConfig = {
+      getPromptRegistry: vi.fn(),
+      getResourceRegistry: vi.fn(),
+      messageBus: mockMessageBus,
+      toolRegistry: mockToolRegistry,
+    } as unknown as Mocked<Config>;
+
+    const options = {
+      schedulerId: 'subagent-1',
+      toolRegistry: mockToolRegistry as unknown as ToolRegistry,
+      signal: new AbortController().signal,
+    };
+
+    await scheduleAgentTools(mockConfig as unknown as Config, [], options);
+
+    const schedulerInstance = vi.mocked(Scheduler).mock.results[0].value;
+    expect(schedulerInstance.dispose).toHaveBeenCalledOnce();
+  });
+
+  it('should dispose the scheduler even when schedule throws', async () => {
+    const scheduleError = new Error('schedule failed');
+    vi.mocked(Scheduler).mockImplementationOnce(
+      () =>
+        ({
+          schedule: vi.fn().mockRejectedValue(scheduleError),
+          dispose: vi.fn(),
+        }) as unknown as Scheduler,
+    );
+
+    const mockConfig = {
+      getPromptRegistry: vi.fn(),
+      getResourceRegistry: vi.fn(),
+      messageBus: mockMessageBus,
+      toolRegistry: mockToolRegistry,
+    } as unknown as Mocked<Config>;
+
+    const options = {
+      schedulerId: 'subagent-1',
+      toolRegistry: mockToolRegistry as unknown as ToolRegistry,
+      signal: new AbortController().signal,
+    };
+
+    await expect(
+      scheduleAgentTools(mockConfig as unknown as Config, [], options),
+    ).rejects.toThrow('schedule failed');
+
+    const schedulerInstance = vi.mocked(Scheduler).mock.results[0].value;
+    expect(schedulerInstance.dispose).toHaveBeenCalledOnce();
   });
 
   it('should create an AgentLoopContext that has a defined .config property', async () => {
