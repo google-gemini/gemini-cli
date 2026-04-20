@@ -483,7 +483,7 @@ EOF`;
         false,
         expect.any(Object),
       );
-      expect(mockShellExecutionService.mock.calls[0][0]).toMatch(/\nEOF\n\);/);
+      expect(mockShellExecutionService.mock.calls[0][0]).toMatch(/\nEOF\n\)\n/);
     });
 
     it('should format error messages correctly', async () => {

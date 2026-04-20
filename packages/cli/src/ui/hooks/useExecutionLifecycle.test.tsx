@@ -256,7 +256,7 @@ describe('useExecutionLifecycle', () => {
     });
     const tmpFile = path.join('/tmp/gemini-shell-abcdef', 'pwd.tmp');
     const escapedTmpFile = escapeShellArg(tmpFile, 'bash');
-    const wrappedCommand = `{\nls -l\n}; __code=$?; pwd > ${escapedTmpFile}; exit $__code`;
+    const wrappedCommand = `{\nls -l\n}\n__code=$?; pwd > ${escapedTmpFile}; exit $__code`;
     expect(mockShellExecutionService).toHaveBeenCalledWith(
       wrappedCommand,
       '/test/dir',
@@ -367,7 +367,7 @@ describe('useExecutionLifecycle', () => {
 
       const tmpFile = path.join('/tmp/gemini-shell-abcdef', 'pwd.tmp');
       const escapedTmpFile = escapeShellArg(tmpFile, 'bash');
-      const wrappedCommand = `{\nstream\n}; __code=$?; pwd > ${escapedTmpFile}; exit $__code`;
+      const wrappedCommand = `{\nstream\n}\n__code=$?; pwd > ${escapedTmpFile}; exit $__code`;
       expect(mockShellExecutionService).toHaveBeenCalledWith(
         wrappedCommand,
         '/test/dir',

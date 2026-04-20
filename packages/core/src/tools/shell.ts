@@ -112,7 +112,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
       trimmed += ' ';
     }
     const escapedTempFilePath = escapeShellArg(tempFilePath, 'bash');
-    return `(\n${trimmed}\n); __code=$?; pgrep -g 0 >${escapedTempFilePath} 2>&1; exit $__code;`;
+    return `(\n${trimmed}\n)\n__code=$?; pgrep -g 0 >${escapedTempFilePath} 2>&1; exit $__code;`;
   }
 
   private getContextualDetails(): string {

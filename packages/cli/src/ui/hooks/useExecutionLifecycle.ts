@@ -403,7 +403,7 @@ export const useExecutionLifecycle = (
             );
             pwdFilePath = path.join(tmpDir, 'pwd.tmp');
             const escapedPwdFilePath = escapeShellArg(pwdFilePath, 'bash');
-            commandToExecute = `{\n${command}\n}; __code=$?; pwd > ${escapedPwdFilePath}; exit $__code`;
+            commandToExecute = `{\n${command}\n}\n__code=$?; pwd > ${escapedPwdFilePath}; exit $__code`;
           }
 
           onDebugMessage(`Executing in ${targetDir}: ${commandToExecute}`);
