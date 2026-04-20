@@ -56,9 +56,15 @@ import { toolsCommand } from '../ui/commands/toolsCommand.js';
 import { skillsCommand } from '../ui/commands/skillsCommand.js';
 import { settingsCommand } from '../ui/commands/settingsCommand.js';
 import { shellsCommand } from '../ui/commands/shellsCommand.js';
+import { speechCommand } from '../ui/commands/speechCommand.js';
 import { vimCommand } from '../ui/commands/vimCommand.js';
 import { setupGithubCommand } from '../ui/commands/setupGithubCommand.js';
+import { progressCommand } from '../ui/commands/progressCommand.js';
+import { sandboxCommand } from '../ui/commands/sandboxCommand.js';
 import { terminalSetupCommand } from '../ui/commands/terminalSetupCommand.js';
+import { undoCommand } from '../ui/commands/undoCommand.js';
+import { visualizeCommand } from '../ui/commands/visualizeCommand.js';
+import { voiceCommand } from '../ui/commands/voiceCommand.js';
 
 /**
  * Loads the core, hard-coded slash commands that are an integral part
@@ -185,6 +191,8 @@ export class BuiltinCommandLoader implements ICommandLoader {
       ...(this.config?.isPlanEnabled() ? [planCommand] : []),
       policiesCommand,
       privacyCommand,
+      progressCommand,
+      sandboxCommand,
       ...(isDevelopment ? [profileCommand] : []),
       quitCommand,
       restoreCommand(this.config),
@@ -195,6 +203,7 @@ export class BuiltinCommandLoader implements ICommandLoader {
       statsCommand,
       themeCommand,
       toolsCommand,
+      undoCommand,
       ...(this.config?.isSkillsSupportEnabled()
         ? this.config?.getSkillManager()?.isAdminEnabled() === false
           ? [
@@ -220,9 +229,12 @@ export class BuiltinCommandLoader implements ICommandLoader {
         : []),
       settingsCommand,
       shellsCommand,
+      speechCommand,
       vimCommand,
       setupGithubCommand,
       terminalSetupCommand,
+      visualizeCommand,
+      voiceCommand,
     ];
     handle?.end();
     return allDefinitions.filter((cmd): cmd is SlashCommand => cmd !== null);
