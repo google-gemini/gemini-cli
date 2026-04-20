@@ -81,6 +81,8 @@ const mockConfigPlain = {
   isTrustedFolder: () => true,
   getExtensionRegistryURI: () => undefined,
   getContentGeneratorConfig: () => ({ authType: undefined }),
+  getSandboxEnabled: () => false,
+  getSessionId: () => 'test-session-id',
 };
 
 const mockConfig = mockConfigPlain as unknown as Config;
@@ -265,21 +267,16 @@ describe('<Footer />', () => {
       width: 120,
       uiState: {
         sessionStats: mockSessionStats,
-        quota: {
-          userTier: undefined,
-          stats: {
-            remaining: 15,
-            limit: 100,
-            resetTime: undefined,
-          },
-          proQuotaRequest: null,
-          validationRequest: null,
-          overageMenuRequest: null,
-          emptyWalletRequest: null,
+      },
+      quotaState: {
+        stats: {
+          remaining: 15,
+          limit: 100,
+          resetTime: undefined,
         },
       },
     });
-    expect(lastFrame()).toContain('85%');
+    expect(lastFrame()).toContain('85% used');
     expect(normalizeFrame(lastFrame())).toMatchSnapshot();
     unmount();
   });
@@ -290,21 +287,16 @@ describe('<Footer />', () => {
       width: 120,
       uiState: {
         sessionStats: mockSessionStats,
-        quota: {
-          userTier: undefined,
-          stats: {
-            remaining: 85,
-            limit: 100,
-            resetTime: undefined,
-          },
-          proQuotaRequest: null,
-          validationRequest: null,
-          overageMenuRequest: null,
-          emptyWalletRequest: null,
+      },
+      quotaState: {
+        stats: {
+          remaining: 85,
+          limit: 100,
+          resetTime: undefined,
         },
       },
     });
-    expect(normalizeFrame(lastFrame())).not.toContain('used');
+    expect(normalizeFrame(lastFrame())).toContain('15% used');
     expect(normalizeFrame(lastFrame())).toMatchSnapshot();
     unmount();
   });
@@ -315,17 +307,12 @@ describe('<Footer />', () => {
       width: 120,
       uiState: {
         sessionStats: mockSessionStats,
-        quota: {
-          userTier: undefined,
-          stats: {
-            remaining: 0,
-            limit: 100,
-            resetTime: undefined,
-          },
-          proQuotaRequest: null,
-          validationRequest: null,
-          overageMenuRequest: null,
-          emptyWalletRequest: null,
+      },
+      quotaState: {
+        stats: {
+          remaining: 0,
+          limit: 100,
+          resetTime: undefined,
         },
       },
     });
@@ -364,7 +351,7 @@ describe('<Footer />', () => {
       unmount();
     });
 
-    it('should display custom sandbox info when SANDBOX env is set', async () => {
+    it('should display "current process" for custom sandbox when SANDBOX env is set', async () => {
       vi.stubEnv('SANDBOX', 'gemini-cli-test-sandbox');
       const { lastFrame, unmount } = await renderWithProviders(<Footer />, {
         config: mockConfig,
@@ -374,12 +361,12 @@ describe('<Footer />', () => {
           sessionStats: mockSessionStats,
         },
       });
-      expect(lastFrame()).toContain('test');
+      expect(lastFrame()).toContain('current process');
       vi.unstubAllEnvs();
       unmount();
     });
 
-    it('should display macOS Seatbelt info when SANDBOX is sandbox-exec', async () => {
+    it('should display "current process" for macOS Seatbelt when SANDBOX is sandbox-exec', async () => {
       vi.stubEnv('SANDBOX', 'sandbox-exec');
       vi.stubEnv('SEATBELT_PROFILE', 'test-profile');
       const { lastFrame, unmount } = await renderWithProviders(<Footer />, {
@@ -387,7 +374,7 @@ describe('<Footer />', () => {
         width: 120,
         uiState: { isTrustedFolder: true, sessionStats: mockSessionStats },
       });
-      expect(lastFrame()).toMatch(/macOS Seatbelt.*\(test-profile\)/s);
+      expect(lastFrame()).toContain('current process');
       vi.unstubAllEnvs();
       unmount();
     });
@@ -401,6 +388,24 @@ describe('<Footer />', () => {
         uiState: { isTrustedFolder: true, sessionStats: mockSessionStats },
       });
       expect(lastFrame()).toContain('no sandbox');
+      vi.unstubAllEnvs();
+      unmount();
+    });
+
+    it('should display "all tools" when tool sandboxing is enabled and agent is local', async () => {
+      vi.stubEnv('SANDBOX', '');
+      const { lastFrame, unmount } = await renderWithProviders(<Footer />, {
+        config: Object.assign(
+          Object.create(Object.getPrototypeOf(mockConfig)),
+          mockConfig,
+          {
+            getSandboxEnabled: () => true,
+          },
+        ),
+        width: 120,
+        uiState: { isTrustedFolder: true, sessionStats: mockSessionStats },
+      });
+      expect(lastFrame()).toContain('all tools');
       vi.unstubAllEnvs();
       unmount();
     });

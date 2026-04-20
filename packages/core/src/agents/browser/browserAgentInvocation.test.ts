@@ -26,6 +26,7 @@ vi.mock('../../utils/debugLogger.js', () => ({
 
 vi.mock('./browserAgentFactory.js', () => ({
   createBrowserAgentDefinition: vi.fn(),
+  cleanupBrowserAgent: vi.fn(),
 }));
 
 vi.mock('./inputBlocker.js', () => ({
@@ -36,16 +37,24 @@ vi.mock('./automationOverlay.js', () => ({
   removeAutomationOverlay: vi.fn(),
 }));
 
+vi.mock('../../telemetry/metrics.js', () => ({
+  recordBrowserAgentTaskOutcome: vi.fn(),
+}));
+
 vi.mock('../local-executor.js', () => ({
   LocalAgentExecutor: {
     create: vi.fn(),
   },
 }));
 
-import { createBrowserAgentDefinition } from './browserAgentFactory.js';
+import {
+  createBrowserAgentDefinition,
+  cleanupBrowserAgent,
+} from './browserAgentFactory.js';
 import { removeInputBlocker } from './inputBlocker.js';
 import { removeAutomationOverlay } from './automationOverlay.js';
 import { LocalAgentExecutor } from '../local-executor.js';
+import { recordBrowserAgentTaskOutcome } from '../../telemetry/metrics.js';
 import type { ToolLiveOutput } from '../../tools/tools.js';
 
 describe('BrowserAgentInvocation', () => {
@@ -183,7 +192,12 @@ describe('BrowserAgentInvocation', () => {
           promptConfig: { query: '', systemPrompt: '' },
           toolConfig: { tools: ['analyze_screenshot', 'click'] },
         },
-        browserManager: {} as never,
+        browserManager: {
+          release: vi.fn(),
+          callTool: vi.fn().mockResolvedValue({ content: [] }),
+        } as never,
+        visionEnabled: true,
+        sessionMode: 'persistent',
       });
 
       mockExecutor = {
@@ -209,7 +223,10 @@ describe('BrowserAgentInvocation', () => {
       const controller = new AbortController();
       const updateOutput: (output: ToolLiveOutput) => void = vi.fn();
 
-      const result = await invocation.execute(controller.signal, updateOutput);
+      const result = await invocation.execute({
+        abortSignal: controller.signal,
+        updateOutput,
+      });
 
       expect(Array.isArray(result.llmContent)).toBe(true);
       expect((result.llmContent as Array<{ text: string }>)[0].text).toContain(
@@ -228,7 +245,7 @@ describe('BrowserAgentInvocation', () => {
       const controller = new AbortController();
       // Should not throw even with no updateOutput
       await expect(
-        invocation.execute(controller.signal),
+        invocation.execute({ abortSignal: controller.signal }),
       ).resolves.toBeDefined();
     });
 
@@ -242,7 +259,9 @@ describe('BrowserAgentInvocation', () => {
       );
 
       const controller = new AbortController();
-      const result = await invocation.execute(controller.signal);
+      const result = await invocation.execute({
+        abortSignal: controller.signal,
+      });
 
       expect(result.error).toBeDefined();
       expect(removeInputBlocker).toHaveBeenCalled();
@@ -284,7 +303,10 @@ describe('BrowserAgentInvocation', () => {
         mockMessageBus,
       );
 
-      await invocation.execute(new AbortController().signal, updateOutput);
+      await invocation.execute({
+        abortSignal: new AbortController().signal,
+        updateOutput,
+      });
 
       const firstCall = updateOutput.mock.calls[0]?.[0] as SubagentProgress;
       expect(firstCall.isSubagentProgress).toBe(true);
@@ -301,7 +323,10 @@ describe('BrowserAgentInvocation', () => {
         mockMessageBus,
       );
 
-      await invocation.execute(new AbortController().signal, updateOutput);
+      await invocation.execute({
+        abortSignal: new AbortController().signal,
+        updateOutput,
+      });
 
       const lastCall = updateOutput.mock.calls[
         updateOutput.mock.calls.length - 1
@@ -320,10 +345,10 @@ describe('BrowserAgentInvocation', () => {
         mockMessageBus,
       );
 
-      const executePromise = invocation.execute(
-        new AbortController().signal,
+      const executePromise = invocation.execute({
+        abortSignal: new AbortController().signal,
         updateOutput,
-      );
+      });
 
       // Allow createBrowserAgentDefinition to resolve and onActivity to be registered
       await Promise.resolve();
@@ -363,10 +388,10 @@ describe('BrowserAgentInvocation', () => {
         mockMessageBus,
       );
 
-      const executePromise = invocation.execute(
-        new AbortController().signal,
+      const executePromise = invocation.execute({
+        abortSignal: new AbortController().signal,
         updateOutput,
-      );
+      });
 
       // Allow createBrowserAgentDefinition to resolve and onActivity to be registered
       await Promise.resolve();
@@ -410,10 +435,10 @@ describe('BrowserAgentInvocation', () => {
         mockMessageBus,
       );
 
-      const executePromise = invocation.execute(
-        new AbortController().signal,
+      const executePromise = invocation.execute({
+        abortSignal: new AbortController().signal,
         updateOutput,
-      );
+      });
 
       await Promise.resolve();
       await Promise.resolve();
@@ -461,10 +486,10 @@ describe('BrowserAgentInvocation', () => {
         mockMessageBus,
       );
 
-      const executePromise = invocation.execute(
-        new AbortController().signal,
+      const executePromise = invocation.execute({
+        abortSignal: new AbortController().signal,
         updateOutput,
-      );
+      });
 
       await Promise.resolve();
       await Promise.resolve();
@@ -505,10 +530,10 @@ describe('BrowserAgentInvocation', () => {
         mockMessageBus,
       );
 
-      const executePromise = invocation.execute(
-        new AbortController().signal,
+      const executePromise = invocation.execute({
+        abortSignal: new AbortController().signal,
         updateOutput,
-      );
+      });
 
       await Promise.resolve();
       await Promise.resolve();
@@ -550,10 +575,10 @@ describe('BrowserAgentInvocation', () => {
         mockMessageBus,
       );
 
-      const executePromise = invocation.execute(
-        new AbortController().signal,
+      const executePromise = invocation.execute({
+        abortSignal: new AbortController().signal,
         updateOutput,
-      );
+      });
 
       await Promise.resolve();
       await Promise.resolve();
@@ -590,10 +615,10 @@ describe('BrowserAgentInvocation', () => {
         mockMessageBus,
       );
 
-      const executePromise = invocation.execute(
-        new AbortController().signal,
+      const executePromise = invocation.execute({
+        abortSignal: new AbortController().signal,
         updateOutput,
-      );
+      });
 
       await Promise.resolve();
       await Promise.resolve();
@@ -633,10 +658,10 @@ describe('BrowserAgentInvocation', () => {
         mockMessageBus,
       );
 
-      const executePromise = invocation.execute(
-        new AbortController().signal,
+      const executePromise = invocation.execute({
+        abortSignal: new AbortController().signal,
         updateOutput,
-      );
+      });
 
       await Promise.resolve();
       await Promise.resolve();
@@ -669,17 +694,86 @@ describe('BrowserAgentInvocation', () => {
         .map((c) => c[0] as SubagentProgress)
         .filter((p) => p.isSubagentProgress);
 
-      const allItems = progressCalls.flatMap((p) => p.recentActivity);
-      const toolA = allItems.find(
+      const finalActivity =
+        progressCalls[progressCalls.length - 1].recentActivity;
+      const toolA = finalActivity.find(
         (a) => a.type === 'tool_call' && a.content === 'tool_a',
       );
-      const toolB = allItems.find(
+      const toolB = finalActivity.find(
         (a) => a.type === 'tool_call' && a.content === 'tool_b',
       );
 
       // Both should be error since no callId was specified
       expect(toolA?.status).toBe('error');
       expect(toolB?.status).toBe('error');
+    });
+
+    it('should record successful task outcome metrics', async () => {
+      const invocation = new BrowserAgentInvocation(
+        mockConfig,
+        mockParams,
+        mockMessageBus,
+      );
+      await invocation.execute({
+        abortSignal: new AbortController().signal,
+        updateOutput: vi.fn(),
+      });
+
+      expect(recordBrowserAgentTaskOutcome).toHaveBeenCalledWith(
+        mockConfig,
+        expect.objectContaining({
+          success: true,
+          session_mode: 'persistent',
+          vision_enabled: true,
+          headless: false,
+          duration_ms: expect.any(Number),
+        }),
+      );
+    });
+
+    it('should record failed task outcome metrics', async () => {
+      vi.mocked(LocalAgentExecutor.create).mockResolvedValue({
+        run: vi.fn().mockResolvedValue({
+          result: JSON.stringify({ success: false, foo: 'bar' }),
+        }),
+      } as never);
+
+      const updateOutput = vi.fn();
+      const invocation = new BrowserAgentInvocation(
+        mockConfig,
+        mockParams,
+        mockMessageBus,
+      );
+
+      await invocation.execute({
+        abortSignal: new AbortController().signal,
+        updateOutput,
+      });
+
+      expect(recordBrowserAgentTaskOutcome).toHaveBeenCalledWith(
+        mockConfig,
+        expect.objectContaining({
+          success: false,
+          session_mode: 'persistent',
+          vision_enabled: true,
+          headless: false,
+          duration_ms: expect.any(Number),
+        }),
+      );
+    });
+
+    it('should not call cleanupBrowserAgent (cleanup is handled by BrowserManager.resetAll)', async () => {
+      const invocation = new BrowserAgentInvocation(
+        mockConfig,
+        mockParams,
+        mockMessageBus,
+      );
+      await invocation.execute({
+        abortSignal: new AbortController().signal,
+        updateOutput: vi.fn(),
+      });
+
+      expect(cleanupBrowserAgent).not.toHaveBeenCalled();
     });
   });
 
@@ -695,6 +789,7 @@ describe('BrowserAgentInvocation', () => {
           }
           return { isError: false };
         }),
+        release: vi.fn(),
       };
 
       vi.mocked(createBrowserAgentDefinition).mockResolvedValue({
@@ -711,6 +806,8 @@ describe('BrowserAgentInvocation', () => {
           toolConfig: { tools: [] },
         },
         browserManager: mockBrowserManager as never,
+        visionEnabled: true,
+        sessionMode: 'persistent',
       });
 
       const mockExecutor = {
@@ -730,7 +827,7 @@ describe('BrowserAgentInvocation', () => {
         mockMessageBus,
       );
 
-      await invocation.execute(new AbortController().signal);
+      await invocation.execute({ abortSignal: new AbortController().signal });
 
       // Verify list_pages was called
       expect(mockBrowserManager.callTool).toHaveBeenCalledWith(

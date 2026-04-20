@@ -26,6 +26,7 @@ import {
   ENTER_PLAN_MODE_TOOL_NAME,
   GLOB_TOOL_NAME,
   GREP_TOOL_NAME,
+  AGENT_TOOL_NAME,
 } from '../tools/tool-names.js';
 import { resolveModel, supportsModernFeatures } from '../config/models.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
@@ -43,6 +44,7 @@ export class PromptProvider {
     context: AgentLoopContext,
     userMemory?: string | HierarchicalMemory,
     interactiveOverride?: boolean,
+    topicUpdateNarrationOverride?: boolean,
   ): string {
     const systemMdResolution = resolvePathFromEnv(
       process.env['GEMINI_SYSTEM_MD'],
@@ -56,6 +58,10 @@ export class PromptProvider {
     const isYoloMode = approvalMode === ApprovalMode.YOLO;
     const skills = context.config.getSkillManager().getSkills();
     const toolNames = context.toolRegistry.getAllToolNames();
+    const isTopicUpdateNarrationEnabled =
+      topicUpdateNarrationOverride ??
+      context.config.isTopicUpdateNarrationEnabled();
+
     const enabledToolNames = new Set(toolNames);
 
     const approvedPlanPath = context.config.getApprovedPlanPath();
@@ -138,16 +144,19 @@ export class PromptProvider {
           hasSkills: skills.length > 0,
           hasHierarchicalMemory,
           contextFilenames,
-          topicUpdateNarration: context.config.isTopicUpdateNarrationEnabled(),
+          topicUpdateNarration: isTopicUpdateNarrationEnabled,
         })),
-        subAgents: this.withSection('agentContexts', () =>
-          context.config
-            .getAgentRegistry()
-            .getAllDefinitions()
-            .map((d) => ({
-              name: d.name,
-              description: d.description,
-            })),
+        subAgents: this.withSection(
+          'agentContexts',
+          () =>
+            context.config
+              .getAgentRegistry()
+              .getAllDefinitions()
+              .map((d) => ({
+                name: d.name,
+                description: d.description,
+              })),
+          enabledToolNames.has(AGENT_TOOL_NAME),
         ),
         agentSkills: this.withSection(
           'agentSkills',
@@ -163,24 +172,26 @@ export class PromptProvider {
         hookContext: isSectionEnabled('hookContext') || undefined,
         primaryWorkflows: this.withSection(
           'primaryWorkflows',
-          () => ({
-            interactive: interactiveMode,
-            enableCodebaseInvestigator: enabledToolNames.has(
-              CodebaseInvestigatorAgent.name,
-            ),
-            enableWriteTodosTool: enabledToolNames.has(WRITE_TODOS_TOOL_NAME),
-            enableEnterPlanModeTool: enabledToolNames.has(
-              ENTER_PLAN_MODE_TOOL_NAME,
-            ),
-            enableGrep: enabledToolNames.has(GREP_TOOL_NAME),
-            enableGlob: enabledToolNames.has(GLOB_TOOL_NAME),
-            approvedPlan: approvedPlanPath
-              ? { path: approvedPlanPath }
-              : undefined,
-            taskTracker: trackerDir,
-            topicUpdateNarration:
-              context.config.isTopicUpdateNarrationEnabled(),
-          }),
+          () => {
+            const agentRegistry = context.config.getAgentRegistry();
+            return {
+              interactive: interactiveMode,
+              enableCodebaseInvestigator:
+                agentRegistry.getDefinition(CodebaseInvestigatorAgent.name) !==
+                undefined,
+              enableWriteTodosTool: enabledToolNames.has(WRITE_TODOS_TOOL_NAME),
+              enableEnterPlanModeTool: enabledToolNames.has(
+                ENTER_PLAN_MODE_TOOL_NAME,
+              ),
+              enableGrep: enabledToolNames.has(GREP_TOOL_NAME),
+              enableGlob: enabledToolNames.has(GLOB_TOOL_NAME),
+              approvedPlan: approvedPlanPath
+                ? { path: approvedPlanPath }
+                : undefined,
+              taskTracker: trackerDir,
+              topicUpdateNarration: isTopicUpdateNarrationEnabled,
+            };
+          },
           !isPlanMode,
         ),
         planningWorkflow: this.withSection(
@@ -200,8 +211,7 @@ export class PromptProvider {
             enableShellEfficiency:
               context.config.getEnableShellOutputEfficiency(),
             interactiveShellEnabled: context.config.isInteractiveShellEnabled(),
-            topicUpdateNarration:
-              context.config.isTopicUpdateNarrationEnabled(),
+            topicUpdateNarration: isTopicUpdateNarrationEnabled,
             memoryManagerEnabled: context.config.isMemoryManagerEnabled(),
           }),
         ),
@@ -244,7 +254,7 @@ export class PromptProvider {
     let sanitizedPrompt = finalPrompt.replace(/\n{3,}/g, '\n\n');
 
     // Context Reinjection (Active Topic)
-    if (context.config.isTopicUpdateNarrationEnabled()) {
+    if (isTopicUpdateNarrationEnabled) {
       const activeTopic = context.config.topicState.getTopic();
       if (activeTopic) {
         const sanitizedTopic = activeTopic
