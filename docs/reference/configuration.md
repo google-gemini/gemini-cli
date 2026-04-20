@@ -1714,7 +1714,7 @@ their corresponding top-level category object in your `settings.json` file.
 - **`experimental.gemmaModelRouter.autoStartServer`** (boolean):
   - **Description:** Automatically start the LiteRT-LM server when Gemini CLI
     starts and the Gemma router is enabled.
-  - **Default:** `true`
+  - **Default:** `false`
   - **Requires restart:** Yes
 
 - **`experimental.gemmaModelRouter.binaryPath`** (string):

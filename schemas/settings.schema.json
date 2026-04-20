@@ -2924,7 +2924,7 @@
               "title": "Auto-start LiteRT Server",
               "description": "Automatically start the LiteRT-LM server when Gemini CLI starts and the Gemma router is enabled.",
               "markdownDescription": "Automatically start the LiteRT-LM server when Gemini CLI starts and the Gemma router is enabled.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `true`",
-              "default": true,
+              "default": false,
               "type": "boolean"
             },
             "binaryPath": {
