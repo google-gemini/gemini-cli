@@ -1615,68 +1615,6 @@ export class TestRig {
     return Object.values(snapshots).sort((a, b) => a.timestamp - b.timestamp);
   }
 
-  readCpuMetrics(): {
-    userUs: number;
-    systemUs: number;
-    totalUs: number;
-  } {
-    const metrics = {
-      userUs: 0,
-      systemUs: 0,
-      totalUs: 0,
-    };
-
-    const logs = this._readAndParseTelemetryLog();
-    for (const logData of logs) {
-      if (logData && logData.scopeMetrics) {
-        for (const scopeMetric of logData.scopeMetrics) {
-          for (const metric of scopeMetric.metrics) {
-            if (metric.descriptor.name === 'gemini_cli.cpu.usage') {
-              for (const dp of metric.dataPoints) {
-                const value = dp.value?.sum ?? 0;
-                // Currently cpu usage is recorded as a single total sum in core/metrics.ts
-                metrics.totalUs = value;
-              }
-            }
-          }
-        }
-      }
-    }
-    return metrics;
-  }
-
-  readEventLoopMetrics(): {
-    p50: number;
-    p95: number;
-    max: number;
-  } {
-    const metrics = {
-      p50: 0,
-      p95: 0,
-      max: 0,
-    };
-
-    const logs = this._readAndParseTelemetryLog();
-    for (const logData of logs) {
-      if (logData && logData.scopeMetrics) {
-        for (const scopeMetric of logData.scopeMetrics) {
-          for (const metric of scopeMetric.metrics) {
-            if (metric.descriptor.name === 'gemini_cli.event_loop.delay') {
-              for (const dp of metric.dataPoints) {
-                const percentile = dp.attributes?.['percentile'];
-                const value = dp.value?.sum ?? 0;
-                if (percentile === 'p50') metrics.p50 = value;
-                else if (percentile === 'p95') metrics.p95 = value;
-                else if (percentile === 'max') metrics.max = value;
-              }
-            }
-          }
-        }
-      }
-    }
-    return metrics;
-  }
-
   async runInteractive(options?: {
     args?: string | string[];
     approvalMode?: 'default' | 'auto_edit' | 'yolo' | 'plan';
