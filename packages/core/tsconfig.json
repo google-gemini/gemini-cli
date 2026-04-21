@@ -1,6 +1,7 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
+    "ignoreDeprecations": "6.0",
     "outDir": "dist",
     "declarationDir": "dist",
     "lib": ["DOM", "DOM.Iterable", "ES2023"],
