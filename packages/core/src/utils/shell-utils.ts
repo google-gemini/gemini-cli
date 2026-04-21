@@ -74,6 +74,8 @@ export interface ShellConfiguration {
   argsPrefix: string[];
   /** An identifier for the shell type. */
   shell: ShellType;
+  /** The default pager to use for this environment. */
+  defaultPager: string;
 }
 
 export async function resolveExecutable(
@@ -103,6 +105,81 @@ export async function resolveExecutable(
     }
   }
   return undefined;
+}
+
+/**
+ * Maps common Unix commands to their Windows equivalents if running on Windows.
+ * This is a best-effort mapping to improve model reliability.
+ *
+ * @param command The command string to potentially map.
+ * @param shell The type of shell being used (powershell or cmd).
+ * @returns The (potentially) mapped command string.
+ */
+export function getEnvironmentAwareCommand(
+  command: string,
+  shell: ShellType = 'powershell',
+): string {
+  if (!isWindows()) {
+    return command;
+  }
+
+  const trimmed = command.trim();
+  if (shell === 'powershell') {
+    // PowerShell has aliases for many Unix commands, but flags often differ.
+    let result = trimmed
+      // rm -rf -> rm -Recurse -Force
+      .replace(/\brm\s+-rf(\s|$)/g, 'rm -Recurse -Force$1')
+      .replace(/\brm\s+-r(\s|$)/g, 'rm -Recurse$1')
+      .replace(/\brm\s+-f(\s|$)/g, 'rm -Force$1')
+      // mkdir -p -> mkdir (PS mkdir function handles multiple levels)
+      .replace(/\bmkdir\s+-p(\s|$)/g, 'mkdir$1')
+      // cp -r -> cp -Recurse
+      .replace(/\bcp\s+-[ra](\s|$)/g, 'cp -Recurse$1')
+      // touch -> New-Item
+      .replace(/\btouch\s+(\S+)/g, 'New-Item -ItemType File -Force $1')
+      // which -> Get-Command
+      .replace(/\bwhich\s+(\S+)/g, 'Get-Command $1')
+      // /dev/null -> $null
+      .replace(/\/dev\/null\b/g, '$null')
+      // && and || (PowerShell 7+ only, so emulate for PS 5.1 compatibility)
+      // We do a simple replacement for common chained patterns.
+      .replace(/\s+&&\s+/g, '; if ($?) { ')
+      .replace(/\s+\|\|\s+/g, '; if (-not $?) { ')
+      // General replacements for cat and ls if they are used in pipes/chains
+      .replace(/^ls(\s|$)/, 'ls$1')
+      .replace(/^cat(\s|$)/, 'cat$1')
+      .replace(/(\||&&|;)\s*ls(\s|$)/g, '$1 ls$2')
+      .replace(/(\||&&|;)\s*cat(\s|$)/g, '$1 cat$2');
+
+    // Add closing braces for any opened blocks
+    const openedBlocks = (result.match(/\{ /g) || []).length;
+    if (openedBlocks > 0) {
+      result += ' }'.repeat(openedBlocks);
+    }
+    return result;
+  }
+
+  if (shell === 'cmd') {
+    return (
+      trimmed
+        // ls -> dir
+        .replace(/^ls(\s|$)/, 'dir$1')
+        .replace(/(\||&&|;)\s*ls(\s|$)/g, '$1 dir$2')
+        // cat -> type
+        .replace(/^cat(\s|$)/, 'type$1')
+        .replace(/(\||&&|;)\s*cat(\s|$)/g, '$1 type$2')
+        // mkdir -p -> mkdir
+        .replace(/\bmkdir\s+-p(\s|$)/g, 'mkdir$1')
+        // touch -> type nul >
+        .replace(/\btouch\s+(\S+)/g, 'type nul > $1')
+        // which -> where
+        .replace(/\bwhich\s+(\S+)/g, 'where $1')
+        // /dev/null -> nul
+        .replace(/\/dev\/null\b/g, 'nul')
+    );
+  }
+
+  return trimmed;
 }
 
 let bashLanguage: Language | null = null;
@@ -647,6 +724,7 @@ export function getShellConfiguration(): ShellConfiguration {
           executable: comSpec,
           argsPrefix: ['-NoProfile', '-Command'],
           shell: 'powershell',
+          defaultPager: '',
         };
       }
     }
@@ -656,11 +734,17 @@ export function getShellConfiguration(): ShellConfiguration {
       executable: 'powershell.exe',
       argsPrefix: ['-NoProfile', '-Command'],
       shell: 'powershell',
+      defaultPager: '',
     };
   }
 
   // Unix-like systems (Linux, macOS)
-  return { executable: 'bash', argsPrefix: ['-c'], shell: 'bash' };
+  return {
+    executable: 'bash',
+    argsPrefix: ['-c'],
+    shell: 'bash',
+    defaultPager: 'cat',
+  };
 }
 
 /**
