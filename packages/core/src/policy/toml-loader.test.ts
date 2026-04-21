@@ -1057,6 +1057,25 @@ priority = 100
           cliHelpResult.decision,
           'cli_help should be ALLOWED in Plan Mode',
         ).toBe(PolicyDecision.ALLOW);
+
+        // 7. Verify MCP resource tools are ALLOWED
+        const listMcpResult = await engine.check(
+          { name: 'list_mcp_resources' },
+          undefined,
+        );
+        expect(
+          listMcpResult.decision,
+          'list_mcp_resources should be ALLOWED in Plan Mode',
+        ).toBe(PolicyDecision.ALLOW);
+
+        const readMcpResult = await engine.check(
+          { name: 'read_mcp_resource', args: { uri: 'test://resource' } },
+          undefined,
+        );
+        expect(
+          readMcpResult.decision,
+          'read_mcp_resource should be ALLOWED in Plan Mode',
+        ).toBe(PolicyDecision.ALLOW);
       } finally {
         await fs.rm(tempPolicyDir, { recursive: true, force: true });
       }

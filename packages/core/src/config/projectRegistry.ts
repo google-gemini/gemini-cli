@@ -10,6 +10,7 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import { lock } from 'proper-lockfile';
 import { debugLogger } from '../utils/debugLogger.js';
+import { isNodeError } from '../utils/errors.js';
 
 export interface RegistryData {
   projects: Record<string, string>;
@@ -54,18 +55,27 @@ export class ProjectRegistry {
   }
 
   private async loadData(): Promise<RegistryData> {
-    if (!fs.existsSync(this.registryPath)) {
-      return { projects: {} };
-    }
-
     try {
       const content = await fs.promises.readFile(this.registryPath, 'utf8');
       // eslint-disable-next-line @typescript-eslint/no-unsafe-return
       return JSON.parse(content);
-    } catch (e) {
-      debugLogger.debug('Failed to load registry: ', e);
-      // If the registry is corrupted, we'll start fresh to avoid blocking the CLI
-      return { projects: {} };
+    } catch (error: unknown) {
+      if (isNodeError(error) && error.code === 'ENOENT') {
+        return { projects: {} }; // Normal first run
+      }
+      if (error instanceof SyntaxError) {
+        debugLogger.warn(
+          'Failed to load registry (JSON corrupted), resetting to empty: ',
+          error,
+        );
+        // Ownership markers on disk will allow self-healing when short IDs are requested.
+        return { projects: {} };
+      }
+
+      // If it's a real filesystem error (e.g. EACCES permission denied), DO NOT swallow it.
+      // Swallowing read errors and overwriting the file would permanently destroy user data.
+      debugLogger.error('Critical failure reading project registry:', error);
+      throw error;
     }
   }
 
@@ -82,18 +92,54 @@ export class ProjectRegistry {
     if (!fs.existsSync(dir)) {
       await fs.promises.mkdir(dir, { recursive: true });
     }
+    // Use a randomized tmp path to avoid ENOENT crashes when save() is called concurrently
+    const tmpPath = this.registryPath + '.' + randomUUID() + '.tmp';
+    let savedSuccessfully = false;
 
     try {
+      // Unconditionally ensure the directory exists; recursive ignores EEXIST.
+      await fs.promises.mkdir(dir, { recursive: true });
+
       const content = JSON.stringify(data, null, 2);
-      // Use a randomized tmp path to avoid ENOENT crashes when save() is called concurrently
-      const tmpPath = this.registryPath + '.' + randomUUID() + '.tmp';
       await fs.promises.writeFile(tmpPath, content, 'utf8');
-      await fs.promises.rename(tmpPath, this.registryPath);
+
+      // Exponential backoff for OS-level file locks (EBUSY/EPERM) during rename
+      const maxRetries = 5;
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+          await fs.promises.rename(tmpPath, this.registryPath);
+          savedSuccessfully = true;
+          break; // Success, exit the retry loop
+        } catch (error: unknown) {
+          const code = isNodeError(error) ? error.code : '';
+          const isRetryable = code === 'EBUSY' || code === 'EPERM';
+
+          if (!isRetryable || attempt === maxRetries - 1) {
+            throw error; // Throw immediately on fatal error or final attempt
+          }
+
+          const delayMs = Math.pow(2, attempt) * 50;
+          debugLogger.debug(
+            `Rename failed with ${code}, retrying in ${delayMs}ms (attempt ${attempt + 1}/${maxRetries})...`,
+          );
+          await new Promise((resolve) => setTimeout(resolve, delayMs));
+        }
+      }
     } catch (error) {
       debugLogger.error(
         `Failed to save project registry to ${this.registryPath}:`,
         error,
       );
+      throw error;
+    } finally {
+      // Clean up the temporary file if it was left behind (e.g. if writeFile or rename failed)
+      if (!savedSuccessfully) {
+        try {
+          await fs.promises.unlink(tmpPath);
+        } catch {
+          // Ignore errors during cleanup
+        }
+      }
     }
   }
 
@@ -113,9 +159,18 @@ export class ProjectRegistry {
     if (!fs.existsSync(dir)) {
       await fs.promises.mkdir(dir, { recursive: true });
     }
-    // Ensure the registry file exists so proper-lockfile can lock it
+    // Ensure the registry file exists so proper-lockfile can lock it.
+    // If it doesn't exist, we try to create it. If someone else creates it
+    // between our check and our write, we just continue.
     if (!fs.existsSync(this.registryPath)) {
-      await this.save({ projects: {} });
+      try {
+        await this.save({ projects: {} });
+      } catch (e: unknown) {
+        if (!fs.existsSync(this.registryPath)) {
+          throw e; // File still doesn't exist and save failed, this is a real error.
+        }
+        // Someone else created it while we were trying to save. Continue to locking.
+      }
     }
 
     // Use proper-lockfile to prevent racy updates
@@ -157,7 +212,13 @@ export class ProjectRegistry {
       await this.save(currentData);
       return shortId;
     } finally {
-      await release();
+      try {
+        await release();
+      } catch (e) {
+        // Prevent proper-lockfile errors (e.g. if the lock dir was externally deleted)
+        // from masking the original error thrown inside the try block.
+        debugLogger.error('Failed to release project registry lock:', e);
+      }
     }
   }
 
@@ -171,20 +232,19 @@ export class ProjectRegistry {
 
     for (const baseDir of this.baseDirs) {
       const markerPath = path.join(baseDir, slug, PROJECT_ROOT_FILE);
-      if (fs.existsSync(markerPath)) {
-        try {
-          const owner = (await fs.promises.readFile(markerPath, 'utf8')).trim();
-          if (this.normalizePath(owner) !== this.normalizePath(projectPath)) {
-            return false;
-          }
-        } catch (e) {
-          debugLogger.debug(
-            `Failed to read ownership marker ${markerPath}:`,
-            e,
-          );
-          // If we can't read it, assume it's not ours or corrupted.
+      try {
+        const owner = (await fs.promises.readFile(markerPath, 'utf8')).trim();
+        if (this.normalizePath(owner) !== this.normalizePath(projectPath)) {
           return false;
         }
+      } catch (e: unknown) {
+        if (isNodeError(e) && e.code === 'ENOENT') {
+          // Marker doesn't exist, this is fine, we just won't fail verification
+          continue;
+        }
+        debugLogger.debug(`Failed to read ownership marker ${markerPath}:`, e);
+        // If we can't read it for other reasons (perms, corrupted), assume not ours.
+        return false;
       }
     }
     return true;
@@ -276,10 +336,22 @@ export class ProjectRegistry {
       try {
         await this.ensureOwnershipMarkers(candidate, projectPath);
         return candidate;
-      } catch {
-        // Someone might have claimed it between our check and our write.
-        // Try next candidate.
-        continue;
+      } catch (error: unknown) {
+        // Only retry if it was a collision (someone else took the slug)
+        // or a race condition during marker creation.
+        const code = isNodeError(error) ? error.code : '';
+        const isCollision =
+          code === 'EEXIST' ||
+          (error instanceof Error &&
+            error.message.includes('already owned by'));
+
+        if (isCollision) {
+          debugLogger.debug(`Slug collision for ${candidate}, trying next...`);
+          continue;
+        }
+
+        // Fatal error (Permission denied, Disk full, etc.)
+        throw error;
       }
     }
   }
@@ -301,13 +373,28 @@ export class ProjectRegistry {
           continue;
         }
         // Collision!
-        throw new Error(`Slug ${slug} is already owned by ${owner}`);
+        const error = Object.assign(
+          new Error(`Slug ${slug} is already owned by ${owner}`),
+          { code: 'EEXIST' },
+        );
+        throw error;
       }
       // Use flag: 'wx' to ensure atomic creation
-      await fs.promises.writeFile(markerPath, normalizedProject, {
-        encoding: 'utf8',
-        flag: 'wx',
-      });
+      try {
+        await fs.promises.writeFile(markerPath, normalizedProject, {
+          encoding: 'utf8',
+          flag: 'wx',
+        });
+      } catch (e: unknown) {
+        if (isNodeError(e) && e.code === 'EEXIST') {
+          // Re-verify ownership in case we just lost a race
+          const owner = (await fs.promises.readFile(markerPath, 'utf8')).trim();
+          if (this.normalizePath(owner) === normalizedProject) {
+            continue;
+          }
+        }
+        throw e;
+      }
     }
   }
 
