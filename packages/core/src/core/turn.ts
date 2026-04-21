@@ -29,6 +29,7 @@ import { parseThought, type ThoughtSummary } from '../utils/thoughtUtils.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
 import { getCitations } from '../utils/generateContentResponseUtilities.js';
 import { LlmRole } from '../telemetry/types.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 import {
   type ToolCallRequestInfo,
@@ -301,11 +302,15 @@ export class Turn {
         const resp = streamEvent.value;
         if (!resp) continue; // Skip if there's no response body
 
+        debugLogger.log(`[Turn] RECEIVED RESP FROM CHAT: ${JSON.stringify(resp, null, 2)}`);
+
         this.debugResponses.push(resp);
 
         const traceId = resp.responseId;
 
         const parts = resp.candidates?.[0]?.content?.parts ?? [];
+        debugLogger.log(`[Turn] Candidate Parts (${parts.length}): ${JSON.stringify(parts)}`);
+
         for (const part of parts) {
           if (part.thought) {
             const thought = parseThought(part.text ?? '');

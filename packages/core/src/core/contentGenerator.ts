@@ -96,9 +96,8 @@ export function getAuthTypeFromEnv(model?: string): AuthType | undefined {
 
   const isOpenAiEnv =
     !!process.env['OPENAI_API_KEY'] || !!process.env['OPENAI_API_BASE_URL'];
-  const isCustomModel = model?.startsWith('google/gemma') || model === 'gemma';
 
-  if (isOpenAiEnv && (isCustomModel || !process.env['GEMINI_API_KEY'])) {
+  if (isOpenAiEnv && !process.env['GEMINI_API_KEY']) {
     return AuthType.OPENAI;
   }
 

@@ -31,10 +31,8 @@ export async function performInitialAuth(
   config: Config,
   authType: AuthType | undefined,
 ): Promise<InitialAuthResult> {
-  const model = config.getModel();
-  const envAuthType = getAuthTypeFromEnv(model);
-  // If OpenAI is explicitly configured in env OR required by the model (e.g. Gemma),
-  // prioritize it over settings.
+  const envAuthType = getAuthTypeFromEnv();
+  // If OpenAI is explicitly configured in env, prioritize it over settings
   const effectiveAuthType =
     envAuthType === AuthType.OPENAI ? envAuthType : authType || envAuthType;
 

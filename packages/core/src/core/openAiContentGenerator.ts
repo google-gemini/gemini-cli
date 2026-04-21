@@ -66,12 +66,13 @@ export class OpenAiContentGenerator implements ContentGenerator {
       (config as any)?.systemInstruction,
     );
 
-    // ULTIMATE FIX: Hardcode the local server IP to bypass any environment variable issues.
-    // This ensures we NEVER hit OpenAI's official servers.
+    // Hardcode the local server IP to bypass any environment variable issues.
     const baseUrl = 'http://49.247.174.129:8000/v1';
     const url = `${baseUrl.replace(/\/$/, '')}/chat/completions`;
 
     const openAiTools = this.mapGeminiToolsToOpenAi(tools);
+
+    debugLogger.log(`[OpenAiContentGenerator] FINAL MESSAGES SENT TO API: ${JSON.stringify(messages, null, 2)}`);
 
     const body: any = {
       model,
@@ -90,17 +91,14 @@ export class OpenAiContentGenerator implements ContentGenerator {
       body.tools = openAiTools;
     }
 
-    debugLogger.log(
-      `[OpenAiContentGenerator] FORCE-ROUTING to ${url} for model ${model}`,
-    );
-
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       ...this.config.headers,
     };
 
-    // NO AUTHORIZATION HEADER for Gemma 4.
-    // We confirmed via curl that the server works without it.
+    if (this.config.apiKey) {
+      headers['Authorization'] = `Bearer ${this.config.apiKey}`;
+    }
 
     const response = await fetch(url, {
       method: 'POST',
@@ -111,22 +109,6 @@ export class OpenAiContentGenerator implements ContentGenerator {
 
     if (!response.ok) {
       const errorText = await response.text();
-      // vLLM fallback for tool-calling incompatibility
-      if (response.status === 404 || response.status === 400) {
-        debugLogger.warn(`[OpenAiContentGenerator] Primary request failed (${response.status}), retrying without tools/schema...`);
-        const fallbackBody = { ...body };
-        delete fallbackBody.tools;
-        delete fallbackBody.response_format;
-        const fallbackResponse = await fetch(url, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify(fallbackBody),
-        });
-        if (fallbackResponse.ok) {
-           const json = (await fallbackResponse.json()) as unknown;
-           return this.mapResponseToGemini(json);
-        }
-      }
       throw new Error(
         `OpenAI API request failed with status ${response.status}: ${errorText}`,
       );
@@ -173,7 +155,9 @@ export class OpenAiContentGenerator implements ContentGenerator {
             function: {
               name: fd.name,
               description: fd.description || '',
-              parameters: this.transformGeminiSchemaToOpenAi(fd.parameters || { type: 'object', properties: {} }),
+              parameters: this.transformGeminiSchemaToOpenAi(
+                fd.parameters || { type: 'object', properties: {} },
+              ),
             },
           });
         }
@@ -185,23 +169,31 @@ export class OpenAiContentGenerator implements ContentGenerator {
   private transformGeminiSchemaToOpenAi(schema: any): any {
     if (!schema || typeof schema !== 'object') return schema;
     const transformed: any = { ...schema };
-    if (transformed.type === 'OBJECT' || transformed.type === 'object') {
-      transformed.type = 'object';
+    
+    // Convert type to lowercase for OpenAI compatibility
+    if (typeof transformed.type === 'string') {
+      transformed.type = transformed.type.toLowerCase();
+    }
+
+    if (transformed.type === 'object') {
       if (transformed.properties) {
         for (const key in transformed.properties) {
-          transformed.properties[key] = this.transformGeminiSchemaToOpenAi(transformed.properties[key]);
+          transformed.properties[key] = this.transformGeminiSchemaToOpenAi(
+            transformed.properties[key],
+          );
         }
       }
-    } else if (transformed.type === 'ARRAY' || transformed.type === 'array') {
-      transformed.type = 'array';
+    } else if (transformed.type === 'array') {
       if (transformed.items) {
-        transformed.items = this.transformGeminiSchemaToOpenAi(transformed.items);
+        transformed.items = this.transformGeminiSchemaToOpenAi(
+          transformed.items,
+        );
       }
-    } else if (transformed.type === 'STRING') transformed.type = 'string';
-    else if (transformed.type === 'INTEGER') transformed.type = 'integer';
-    else if (transformed.type === 'NUMBER') transformed.type = 'number';
-    else if (transformed.type === 'BOOLEAN') transformed.type = 'boolean';
+    }
 
+    // OpenAI uses "required" array at the same level as "properties"
+    // Gemini sometimes uses "required" inside properties or different structures
+    
     delete transformed.format;
     delete transformed.nullable;
     return transformed;
@@ -213,28 +205,23 @@ export class OpenAiContentGenerator implements ContentGenerator {
   ): OpenAiMessage[] {
     const messages: OpenAiMessage[] = [];
     let systemText = '';
-
     if (systemInstruction) {
       if (typeof systemInstruction === 'string') {
         systemText = systemInstruction;
       } else if (systemInstruction.parts) {
-        systemText = (systemInstruction.parts as any[]).map((p: any) => p.text).join('\n');
+        systemText = (systemInstruction.parts as any[])
+          .map((p: any) => p.text)
+          .join('\n');
       } else if (Array.isArray(systemInstruction)) {
-        systemText = (systemInstruction as any[]).map((p: any) => p.text).join('\n');
+        systemText = (systemInstruction as any[])
+          .map((p: any) => p.text)
+          .join('\n');
       }
-    }
-
-    if (systemText) {
-      messages.push({
-        role: 'system',
-        content: systemText,
-      });
     }
 
     for (const content of contents) {
       const role = content.role === 'model' ? 'assistant' : 'user';
       const parts = content.parts || [];
-      const openAiMsg: OpenAiMessage = { role };
       const contentParts: OpenAiContentPart[] = [];
       const toolCalls: OpenAiToolCall[] = [];
 
@@ -250,7 +237,9 @@ export class OpenAiContentGenerator implements ContentGenerator {
           });
         } else if ('functionCall' in part && part.functionCall) {
           toolCalls.push({
-            id: `call_${part.functionCall.name}_${Math.random().toString(36).substring(2, 5)}`,
+            id:
+              part.functionCall.id ||
+              `call_${part.functionCall.name}_${Math.random().toString(36).substring(2, 5)}`,
             type: 'function',
             function: {
               name: part.functionCall.name,
@@ -259,28 +248,30 @@ export class OpenAiContentGenerator implements ContentGenerator {
           });
         } else if ('functionResponse' in part && part.functionResponse) {
           messages.push({
-            role: 'tool',
-            tool_call_id: part.functionResponse.name,
-            name: part.functionResponse.name,
-            content: JSON.stringify(part.functionResponse.response),
+            role: 'user',
+            content: `<|tool_response|>${JSON.stringify(part.functionResponse.response)}<|tool_response|>`,
           });
-          continue;
         }
       }
 
       if (role === 'assistant' && toolCalls.length > 0) {
-        openAiMsg.tool_calls = toolCalls;
-        openAiMsg.content = contentParts.length > 0 ? contentParts.map(p => p.text).join('\n') : null;
+        messages.push({
+          role: 'assistant',
+          tool_calls: toolCalls,
+          content: contentParts.length > 0 ? contentParts.map(p => p.text).join('\n') : null,
+        });
       } else if (contentParts.length > 0) {
-        if (contentParts.length === 1 && contentParts[0].type === 'text') {
-          openAiMsg.content = contentParts[0].text;
-        } else {
-          openAiMsg.content = contentParts;
-        }
+        const contentStr = contentParts.map(p => p.text).join('\n');
+        messages.push({ role, content: contentStr });
       }
+    }
 
-      if (openAiMsg.content !== undefined || openAiMsg.tool_calls !== undefined) {
-        messages.push(openAiMsg);
+    if (systemText && messages.length > 0) {
+      const firstUserMsg = messages.find(m => m.role === 'user');
+      if (firstUserMsg && typeof firstUserMsg.content === 'string') {
+        // Add a nudge for Gemma to use correct tool parameter names
+        const nudge = "\n\nIMPORTANT: When calling tools, ensure you use the exact parameter names defined in the tool's schema (e.g., use 'file_path' instead of 'path' for read_file).";
+        firstUserMsg.content = `System Instruction:\n${systemText}${nudge}\n\nUser Question:\n${firstUserMsg.content}`;
       }
     }
 
@@ -297,22 +288,78 @@ export class OpenAiContentGenerator implements ContentGenerator {
 
     const message = choice['message'] as Record<string, unknown> | undefined;
     const usage = json['usage'] as Record<string, unknown> | undefined;
-    const toolCalls = message?.['tool_calls'] as any[] | undefined;
-
+    
+    let rawText = message?.['content'] as string || '';
+    let filteredText = rawText;
+    
     const parts: any[] = [];
-    if (message?.['content']) {
-      parts.push({ text: message['content'] as string });
+    const functionCalls: any[] = [];
+
+    // Parse Gemma-style tool calls: <|tool_call|>call:name{args}<tool_call|>
+    const toolCallPatterns = [
+      /<\|tool_call>([\s\S]*?)<tool_call\|?>/g,
+      /call:([a-zA-Z0-9_]+)(\{[\s\S]*?\})/g
+    ];
+
+    for (const pattern of toolCallPatterns) {
+      let match;
+      while ((match = pattern.exec(rawText)) !== null) {
+        const fullMatch = match[0];
+        const innerContent = pattern.source.includes('<|tool_call>') ? match[1].trim() : match[0];
+        
+        const parts_match = innerContent.match(/call:([^\{]+)(\{[\s\S]*\})/);
+        if (parts_match) {
+          try {
+            const name = parts_match[1].trim();
+            let rawArgs = parts_match[2];
+            
+            // SUPER ROBUST PSEUDO-JSON PARSING
+            // 1. Quote keys: {key: -> {"key":
+            rawArgs = rawArgs.replace(/([{,]\s*)([a-zA-Z0-9_]+)(\s*:)/g, '$1"$2"$3');
+            // 2. Quote string values that are not already quoted: :value -> :"value"
+            // We target values that don't start with ", {, [, t (true), f (false), n (null) or a number
+            rawArgs = rawArgs.replace(/:\s*([^"{\[tf\n\-0-9\s][^,}\n]*)/g, (match, p1) => {
+              const trimmed = p1.trim();
+              if (trimmed === 'true' || trimmed === 'false' || trimmed === 'null' || !isNaN(Number(trimmed))) {
+                return `: ${trimmed}`;
+              }
+              return `: "${trimmed}"`;
+            });
+            // 3. Clean up trailing commas before } or ]
+            rawArgs = rawArgs.replace(/,\s*([}\]])/g, '$1');
+
+            const args = JSON.parse(rawArgs);
+            const callId = `call_${name}_${Math.random().toString(36).substring(2, 5)}`;
+          
+            const fnCall = { name, args, id: callId };
+            parts.push({ functionCall: fnCall });
+            functionCalls.push(fnCall);
+            
+            filteredText = filteredText.replace(fullMatch, '').trim();
+          } catch (e) {
+            debugLogger.error(`[OpenAiContentGenerator] Failed to parse tool call: ${e}. Raw match: ${fullMatch}`);
+          }
+        }
+      }
     }
 
-    if (toolCalls) {
-      for (const tc of toolCalls) {
-        parts.push({
-          functionCall: {
-            name: tc.function.name,
-            args: JSON.parse(tc.function.arguments),
-          },
-        });
+    const openAiToolCalls = message?.['tool_calls'] as any[] | undefined;
+    if (openAiToolCalls) {
+      for (const tc of openAiToolCalls) {
+        const fnCall = {
+          name: tc.function.name,
+          args: JSON.parse(tc.function.arguments),
+          id: tc.id,
+        };
+        parts.push({ functionCall: fnCall });
+        functionCalls.push(fnCall);
       }
+    }
+
+    if (filteredText) {
+      parts.unshift({ text: filteredText });
+    } else if (parts.length === 0 && rawText) {
+      parts.push({ text: rawText });
     }
 
     const response = {
@@ -320,11 +367,9 @@ export class OpenAiContentGenerator implements ContentGenerator {
         {
           content: {
             role: 'model',
-            parts: parts.length > 0 ? parts : [{ text: '' }],
+            parts: parts,
           },
-          finishReason: this.mapFinishReason(
-            (choice['finish_reason'] as string) || 'stop',
-          ),
+          finishReason: this.mapFinishReason((choice['finish_reason'] as string) || 'stop'),
           index: (choice['index'] as number) ?? 0,
         },
       ],
@@ -333,21 +378,23 @@ export class OpenAiContentGenerator implements ContentGenerator {
         candidatesTokenCount: (usage?.['completion_tokens'] as number) ?? 0,
         totalTokenCount: (usage?.['total_tokens'] as number) ?? 0,
       },
-    } as unknown as GenerateContentResponse;
+    } as any;
+
+    if (functionCalls.length > 0) {
+      response.functionCalls = functionCalls;
+    }
 
     Object.defineProperty(response, 'text', {
-      get() {
-        return (message?.['content'] as string) || '';
-      },
+      get() { return filteredText || (parts.find(p => p.text)?.text ?? ''); },
+      configurable: true
     });
 
-    return response;
+    return response as GenerateContentResponse;
   }
 
   private mapFinishReason(reason: string): string {
     switch (reason) {
       case 'stop':
-        return 'STOP';
       case 'tool_calls':
         return 'STOP';
       case 'length':

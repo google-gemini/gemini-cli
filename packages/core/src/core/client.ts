@@ -46,6 +46,7 @@ import { LoopDetectionService } from '../services/loopDetectionService.js';
 import { ChatCompressionService } from '../context/chatCompressionService.js';
 import { AgentHistoryProvider } from '../context/agentHistoryProvider.js';
 import { ideContextStore } from '../ide/ideContext.js';
+import { debugLogger } from '../utils/debugLogger.js';
 import {
   logContentRetryFailure,
   logNextSpeakerCheck,
@@ -63,7 +64,6 @@ import { uiTelemetryService } from '../telemetry/uiTelemetry.js';
 import type { IdeContext, File } from '../ide/types.js';
 import { handleFallback } from '../fallback/handler.js';
 import type { RoutingContext } from '../routing/routingStrategy.js';
-import { debugLogger } from '../utils/debugLogger.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
 import { ToolOutputMaskingService } from '../context/toolOutputMaskingService.js';
 import { calculateRequestTokenCount } from '../utils/tokenCalculation.js';
@@ -598,10 +598,14 @@ export class GeminiClient {
     isInvalidStreamRetry: boolean,
     displayContent?: PartListUnion,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
+    debugLogger.log(`[GeminiClient] === TURN START (Prompt ID: ${prompt_id}, Bounded: ${boundedTurns}) ===`);
+    
     // Re-initialize turn (it was empty before if in loop, or new instance)
     let turn = new Turn(this.getChat(), prompt_id);
 
     this.sessionTurnCount++;
+    debugLogger.log(`[GeminiClient] Session Turn Count: ${this.sessionTurnCount}`);
+
     if (
       this.config.getMaxSessionTurns() > 0 &&
       this.sessionTurnCount > this.config.getMaxSessionTurns()
@@ -660,6 +664,8 @@ export class GeminiClient {
     // in the conversation history . The IDE context is not discarded; it will
     // be included in the next regular message sent to the model.
     const history = this.getHistory();
+    debugLogger.log(`[GeminiClient] CURRENT HISTORY LENGTH: ${history.length}`);
+    debugLogger.log(`[GeminiClient] RAW HISTORY DATA (JSON): ${JSON.stringify(history, null, 2)}`);
     const lastMessage =
       history.length > 0 ? history[history.length - 1] : undefined;
     const hasPendingToolCall =
@@ -889,6 +895,13 @@ export class GeminiClient {
     displayContent?: PartListUnion,
     stopHookActive: boolean = false,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
+    debugLogger.log(`[GeminiClient] >>> sendMessageStream START (Turns remaining: ${turns})`);
+    if (typeof request !== 'string' && 'parts' in request) {
+      debugLogger.log(`[GeminiClient] REQUEST PARTS: ${JSON.stringify(request.parts, null, 2)}`);
+    } else {
+      debugLogger.log(`[GeminiClient] REQUEST: ${JSON.stringify(request, null, 2)}`);
+    }
+
     if (!isInvalidStreamRetry) {
       this.config.resetTurn();
     }

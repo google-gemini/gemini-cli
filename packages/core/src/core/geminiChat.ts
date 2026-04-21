@@ -47,6 +47,7 @@ import {
 import { handleFallback } from '../fallback/handler.js';
 import { isFunctionResponse } from '../utils/messageInspectors.js';
 import { partListUnionToString } from './geminiRequest.js';
+import { debugLogger } from '../utils/debugLogger.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
 import { estimateTokenCountSync } from '../utils/tokenCalculation.js';
 import {
@@ -656,6 +657,16 @@ export class GeminiChat {
       lastConfig = config;
       lastContentsToUse = contentsToUse;
 
+      debugLogger.log(
+        `[GeminiChat] Calling generateContentStream for model ${modelToUse}`,
+      );
+      debugLogger.log(
+        `[GeminiChat] FULL REQUEST CONTENTS (JSON): ${JSON.stringify(contentsToUse, null, 2)}`,
+      );
+      debugLogger.log(
+        `[GeminiChat] FULL REQUEST CONFIG (JSON): ${JSON.stringify(config, null, 2)}`,
+      );
+
       return this.context.config.getContentGenerator().generateContentStream(
         {
           model: modelToUse,
@@ -886,6 +897,9 @@ export class GeminiChat {
     let finishReason: FinishReason | undefined;
 
     for await (const chunk of streamResponse) {
+      debugLogger.log(
+        `[GeminiChat] RECEIVED CHUNK: ${JSON.stringify(chunk, null, 2)}`,
+      );
       const candidateWithReason = chunk?.candidates?.find(
         (candidate) => candidate.finishReason,
       );
@@ -1013,6 +1027,9 @@ export class GeminiChat {
       }
     }
 
+    debugLogger.log(
+      `[GeminiChat] PUSHING TO HISTORY: ${JSON.stringify({ role: 'model', parts: consolidatedParts }, null, 2)}`,
+    );
     this.history.push({ role: 'model', parts: consolidatedParts });
   }
 

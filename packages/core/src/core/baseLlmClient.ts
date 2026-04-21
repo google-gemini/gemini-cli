@@ -274,18 +274,11 @@ export class BaseLlmClient {
       additionalProperties,
     } = options;
 
-    let {
+    const {
       model,
       config: generateContentConfig,
       maxAttempts: availabilityMaxAttempts,
     } = applyModelSelection(this.config, modelConfigKey);
-
-    // If using OpenAI, we MUST use the current primary model for all utility calls
-    // because the external OpenAI-compatible endpoint likely doesn't have 
-    // Gemini-specific models like 'classifier' or 'summarizer'.
-    if (this.config.getContentGeneratorConfig()?.authType === 'openai') {
-      model = this.config.getModel();
-    }
 
     let currentModel = model;
     let currentGenerateContentConfig = generateContentConfig;
