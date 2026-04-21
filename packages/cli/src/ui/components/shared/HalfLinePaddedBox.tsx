@@ -72,25 +72,8 @@ const HalfLinePaddedBoxInternal: React.FC<HalfLinePaddedBoxProps> = ({
 
   if (noTrueColor) {
     return (
-      <Box
-        width={terminalWidth}
-        flexDirection="column"
-        alignItems="stretch"
-        minHeight={1}
-        flexShrink={0}
-        backgroundColor={backgroundColor}
-      >
-        <Box width={terminalWidth} flexDirection="row">
-          <Text backgroundColor={backgroundColor}>
-            {' '.repeat(terminalWidth)}
-          </Text>
-        </Box>
+      <Box width={terminalWidth} backgroundColor={backgroundColor} paddingY={1}>
         {children}
-        <Box width={terminalWidth} flexDirection="row">
-          <Text backgroundColor={backgroundColor}>
-            {' '.repeat(terminalWidth)}
-          </Text>
-        </Box>
       </Box>
     );
   }
