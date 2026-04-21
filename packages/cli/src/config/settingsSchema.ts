@@ -3118,6 +3118,7 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
           secondary: { type: 'string' },
           link: { type: 'string' },
           accent: { type: 'string' },
+          response: { type: 'string' },
         },
       },
       background: {
@@ -3149,6 +3150,8 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
         properties: {
           comment: { type: 'string' },
           symbol: { type: 'string' },
+          active: { type: 'string' },
+          focus: { type: 'string' },
           gradient: {
             type: 'array',
             items: { type: 'string' },
