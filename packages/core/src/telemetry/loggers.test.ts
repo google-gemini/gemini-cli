@@ -216,6 +216,7 @@ describe('loggers', () => {
       getTelemetryEnabled: () => true,
       getUsageStatisticsEnabled: () => true,
       getTelemetryLogPromptsEnabled: () => true,
+      getTelemetryTracesEnabled: () => false,
       getFileFilteringRespectGitIgnore: () => true,
       getFileFilteringAllowBuildArtifacts: () => false,
       getDebugMode: () => true,
@@ -313,6 +314,7 @@ describe('loggers', () => {
       getSessionId: () => 'test-session-id',
       getTelemetryEnabled: () => true,
       getTelemetryLogPromptsEnabled: () => true,
+      getTelemetryTracesEnabled: () => false,
       getUsageStatisticsEnabled: () => true,
       isInteractive: () => false,
       getExperiments: () => undefined,
@@ -352,6 +354,7 @@ describe('loggers', () => {
         getSessionId: () => 'test-session-id',
         getTelemetryEnabled: () => true,
         getTelemetryLogPromptsEnabled: () => false,
+        getTelemetryTracesEnabled: () => false,
         getTargetDir: () => 'target-dir',
         getUsageStatisticsEnabled: () => true,
         isInteractive: () => false,
@@ -392,6 +395,7 @@ describe('loggers', () => {
       getUsageStatisticsEnabled: () => true,
       getTelemetryEnabled: () => true,
       getTelemetryLogPromptsEnabled: () => true,
+      getTelemetryTracesEnabled: () => true,
       isInteractive: () => false,
       getExperiments: () => undefined,
       getExperimentsAsync: async () => undefined,
@@ -493,10 +497,10 @@ describe('loggers', () => {
           'gen_ai.output.messages':
             '[{"finish_reason":"stop","role":"system","parts":[{"type":"text","content":"candidate 1"}]}]',
           'gen_ai.response.finish_reasons': ['stop'],
+          'gen_ai.operation.name': 'generate_content',
           'gen_ai.response.model': 'test-model',
           'gen_ai.usage.input_tokens': 17,
           'gen_ai.usage.output_tokens': 50,
-          'gen_ai.operation.name': 'generate_content',
           'gen_ai.output.type': 'text',
           'gen_ai.request.choice.count': 1,
           'gen_ai.request.seed': 678,
@@ -564,6 +568,57 @@ describe('loggers', () => {
       });
     });
 
+    it('should not log input and output messages when traces are disabled', () => {
+      const mockConfigNoTraces = {
+        getSessionId: () => 'test-session-id',
+        getTargetDir: () => 'target-dir',
+        getUsageStatisticsEnabled: () => true,
+        getTelemetryEnabled: () => true,
+        getTelemetryLogPromptsEnabled: () => true,
+        getTelemetryTracesEnabled: () => false, // Disabled
+        isInteractive: () => false,
+        getExperiments: () => undefined,
+        getExperimentsAsync: async () => undefined,
+        getContentGeneratorConfig: () => undefined,
+      } as unknown as Config;
+
+      const event = new ApiResponseEvent(
+        'test-model',
+        100,
+        { prompt_id: 'prompt-id-1', contents: [] },
+        { candidates: [] },
+        AuthType.LOGIN_WITH_GOOGLE,
+        undefined,
+        'test-response',
+      );
+
+      logApiResponse(mockConfigNoTraces, event);
+
+      expect(mockLogger.emit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          body: 'GenAI operation details from test-model. Status: 200. Duration: 100ms.',
+          attributes: expect.objectContaining({
+            'event.name': 'gen_ai.client.inference.operation.details',
+            'gen_ai.operation.name': 'generate_content',
+          }),
+        }),
+      );
+
+      const emitCalls = mockLogger.emit.mock.calls;
+      const detailsCall = emitCalls.find(
+        (call) =>
+          call[0].attributes &&
+          call[0].attributes['event.name'] ===
+            'gen_ai.client.inference.operation.details',
+      );
+      expect(
+        detailsCall![0].attributes['gen_ai.input.messages'],
+      ).toBeUndefined();
+      expect(
+        detailsCall![0].attributes['gen_ai.output.messages'],
+      ).toBeUndefined();
+    });
+
     it('should log an API response with a role', () => {
       const event = new ApiResponseEvent(
         'test-model',
@@ -596,6 +651,7 @@ describe('loggers', () => {
       getUsageStatisticsEnabled: () => true,
       getTelemetryEnabled: () => true,
       getTelemetryLogPromptsEnabled: () => true,
+      getTelemetryTracesEnabled: () => true,
       isInteractive: () => false,
       getExperiments: () => undefined,
       getExperimentsAsync: async () => undefined,
@@ -674,8 +730,6 @@ describe('loggers', () => {
           'gen_ai.request.temperature': 1,
           'gen_ai.request.top_p': 2,
           'gen_ai.request.top_k': 3,
-          'gen_ai.input.messages':
-            '[{"role":"user","parts":[{"type":"text","content":"Hello"}]}]',
           'gen_ai.operation.name': 'generate_content',
           'gen_ai.output.type': 'text',
           'gen_ai.request.choice.count': 1,
@@ -683,6 +737,8 @@ describe('loggers', () => {
           'gen_ai.request.frequency_penalty': 10,
           'gen_ai.request.presence_penalty': 6,
           'gen_ai.request.max_tokens': 8000,
+          'gen_ai.input.messages':
+            '[{"role":"user","parts":[{"type":"text","content":"Hello"}]}]',
           'server.address': 'foo.com',
           'server.port': 8080,
           'gen_ai.request.stop_sequences': ['stop', 'please stop'],
@@ -724,6 +780,52 @@ describe('loggers', () => {
       });
     });
 
+    it('should not log input messages when traces are disabled', () => {
+      const mockConfigNoTraces = {
+        getSessionId: () => 'test-session-id',
+        getTargetDir: () => 'target-dir',
+        getUsageStatisticsEnabled: () => true,
+        getTelemetryEnabled: () => true,
+        getTelemetryLogPromptsEnabled: () => true,
+        getTelemetryTracesEnabled: () => false, // Disabled
+        isInteractive: () => false,
+        getExperiments: () => undefined,
+        getExperimentsAsync: async () => undefined,
+        getContentGeneratorConfig: () => undefined,
+      } as unknown as Config;
+
+      const event = new ApiErrorEvent(
+        'test-model',
+        'error',
+        100,
+        { prompt_id: 'prompt-id-1', contents: [] },
+        AuthType.LOGIN_WITH_GOOGLE,
+        'ApiError',
+        500,
+      );
+
+      logApiError(mockConfigNoTraces, event);
+
+      expect(mockLogger.emit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          attributes: expect.objectContaining({
+            'event.name': 'gen_ai.client.inference.operation.details',
+          }),
+        }),
+      );
+
+      const emitCalls = mockLogger.emit.mock.calls;
+      const detailsCall = emitCalls.find(
+        (call) =>
+          call[0].attributes &&
+          call[0].attributes['event.name'] ===
+            'gen_ai.client.inference.operation.details',
+      );
+      expect(
+        detailsCall![0].attributes['gen_ai.input.messages'],
+      ).toBeUndefined();
+    });
+
     it('should log an API error with a role', () => {
       const event = new ApiErrorEvent(
         'test-model',
@@ -756,6 +858,7 @@ describe('loggers', () => {
       getUsageStatisticsEnabled: () => true,
       getTelemetryEnabled: () => true,
       getTelemetryLogPromptsEnabled: () => true,
+      getTelemetryTracesEnabled: () => false,
       isInteractive: () => false,
       getExperiments: () => undefined,
       getExperimentsAsync: async () => undefined,
@@ -833,7 +936,8 @@ describe('loggers', () => {
         getTargetDir: () => 'target-dir',
         getUsageStatisticsEnabled: () => true,
         getTelemetryEnabled: () => true,
-        getTelemetryLogPromptsEnabled: () => true, // Enabled
+        getTelemetryLogPromptsEnabled: () => true,
+        getTelemetryTracesEnabled: () => true, // Enabled
         isInteractive: () => false,
         getExperiments: () => undefined,
         getExperimentsAsync: async () => undefined,
@@ -922,7 +1026,8 @@ describe('loggers', () => {
         getTargetDir: () => 'target-dir',
         getUsageStatisticsEnabled: () => true,
         getTelemetryEnabled: () => true,
-        getTelemetryLogPromptsEnabled: () => false, // Disabled
+        getTelemetryLogPromptsEnabled: () => false,
+        getTelemetryTracesEnabled: () => false, // Disabled
         isInteractive: () => false,
         getExperiments: () => undefined,
         getExperimentsAsync: async () => undefined,
@@ -978,6 +1083,7 @@ describe('loggers', () => {
         getSessionId: () => 'test-session-id',
         getTelemetryEnabled: () => true,
         getTelemetryLogPromptsEnabled: () => true,
+        getTelemetryTracesEnabled: () => false,
         isInteractive: () => false,
         getExperiments: () => undefined,
         getExperimentsAsync: async () => undefined,
@@ -1140,6 +1246,7 @@ describe('loggers', () => {
       getCoreTools: () => ['ls', 'read-file'],
       getApprovalMode: () => 'default',
       getTelemetryLogPromptsEnabled: () => true,
+      getTelemetryTracesEnabled: () => false,
       getFileFilteringRespectGitIgnore: () => true,
       getFileFilteringAllowBuildArtifacts: () => false,
       getDebugMode: () => true,
@@ -1170,6 +1277,7 @@ describe('loggers', () => {
       getUsageStatisticsEnabled: () => true,
       getTelemetryEnabled: () => true,
       getTelemetryLogPromptsEnabled: () => true,
+      getTelemetryTracesEnabled: () => false,
       isInteractive: () => false,
       getExperiments: () => undefined,
       getExperimentsAsync: async () => undefined,
@@ -1829,6 +1937,7 @@ describe('loggers', () => {
       getUsageStatisticsEnabled: () => true,
       getTelemetryEnabled: () => true,
       getTelemetryLogPromptsEnabled: () => true,
+      getTelemetryTracesEnabled: () => false,
       isInteractive: () => false,
       getExperiments: () => undefined,
       getExperimentsAsync: async () => undefined,
@@ -2423,6 +2532,7 @@ describe('loggers', () => {
       getExperiments: () => undefined,
       getExperimentsAsync: async () => undefined,
       getTelemetryLogPromptsEnabled: () => false,
+      getTelemetryTracesEnabled: () => false,
       getContentGeneratorConfig: () => undefined,
     } as unknown as Config;
 

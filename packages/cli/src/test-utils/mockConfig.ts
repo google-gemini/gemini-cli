@@ -89,6 +89,7 @@ export const createMockConfig = (overrides: Partial<Config> = {}): Config =>
     getAccessibility: vi.fn().mockReturnValue({}),
     getTelemetryEnabled: vi.fn().mockReturnValue(false),
     getTelemetryLogPromptsEnabled: vi.fn().mockReturnValue(false),
+    getTelemetryTracesEnabled: vi.fn().mockReturnValue(false),
     getTelemetryOtlpEndpoint: vi.fn().mockReturnValue(''),
     getTelemetryOtlpProtocol: vi.fn().mockReturnValue('grpc'),
     getTelemetryTarget: vi.fn().mockReturnValue(''),
