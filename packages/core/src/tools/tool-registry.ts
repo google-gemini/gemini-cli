@@ -178,6 +178,7 @@ export class DiscoveredTool extends BaseDeclarativeTool<
     description: string,
     override readonly parameterSchema: Record<string, unknown>,
     messageBus: MessageBus,
+    canUpdateOutput = false,
   ) {
     const discoveryCmd = config.getToolDiscoveryCommand()!;
     const callCommand = config.getToolCallCommand()!;
@@ -207,7 +208,7 @@ Signal: Signal number or \`(none)\` if no signal was received.
       parameterSchema,
       messageBus,
       false, // isOutputMarkdown
-      false, // canUpdateOutput
+      canUpdateOutput,
     );
     this.originalName = originalName;
   }
@@ -226,6 +227,10 @@ Signal: Signal number or \`(none)\` if no signal was received.
       messageBus,
     );
   }
+}
+
+interface DiscoveredToolDeclaration extends FunctionDeclaration {
+  canUpdateOutput?: boolean;
 }
 
 export class ToolRegistry {
@@ -503,6 +508,8 @@ export class ToolRegistry {
             !Array.isArray(func.parametersJsonSchema)
               ? func.parametersJsonSchema
               : {};
+          const canUpdateOutput = !!(func as DiscoveredToolDeclaration)
+            .canUpdateOutput;
           this.registerTool(
             new DiscoveredTool(
               this.config,
@@ -512,6 +519,7 @@ export class ToolRegistry {
               // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
               parameters as Record<string, unknown>,
               this.messageBus,
+              canUpdateOutput,
             ),
           );
         }

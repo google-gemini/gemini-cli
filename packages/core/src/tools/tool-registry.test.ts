@@ -616,6 +616,31 @@ describe('ToolRegistry', () => {
       expect(result.llmContent).toContain('Exit Code: 1');
     });
 
+    it('should correctly parse canUpdateOutput during discovery', async () => {
+      const discoveryCommand = 'my-discovery-command';
+      mockConfigGetToolDiscoveryCommand.mockReturnValue(discoveryCommand);
+
+      const toolWithStreaming: any = {
+        name: 'streaming-tool',
+        description: 'A tool that supports streaming',
+        parametersJsonSchema: { type: 'object', properties: {} },
+        canUpdateOutput: true,
+      };
+
+      const mockSpawn = vi.mocked(spawn);
+      mockSpawn.mockReturnValueOnce(
+        createDiscoveryProcess([toolWithStreaming]) as any,
+      );
+
+      await toolRegistry.discoverAllTools();
+      const discoveredTool = toolRegistry.getTool(
+        DISCOVERED_TOOL_PREFIX + 'streaming-tool',
+      );
+
+      expect(discoveredTool).toBeDefined();
+      expect(discoveredTool?.canUpdateOutput).toBe(true);
+    });
+
     it('should pass MessageBus to DiscoveredTool and its invocations', async () => {
       const discoveryCommand = 'my-discovery-command';
       mockConfigGetToolDiscoveryCommand.mockReturnValue(discoveryCommand);
