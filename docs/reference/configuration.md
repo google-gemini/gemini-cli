@@ -436,6 +436,20 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `"ask"`
   - **Values:** `"ask"`, `"always"`, `"never"`
 
+- **`billing.vertexAi.requestType`** (enum):
+  - **Description:** Sets the X-Vertex-AI-LLM-Request-Type header for Vertex AI
+    requests.
+  - **Default:** `undefined`
+  - **Values:** `"dedicated"`, `"shared"`
+  - **Requires restart:** Yes
+
+- **`billing.vertexAi.sharedRequestType`** (enum):
+  - **Description:** Sets the X-Vertex-AI-LLM-Shared-Request-Type header for
+    Vertex AI requests.
+  - **Default:** `undefined`
+  - **Values:** `"priority"`, `"flex"`
+  - **Requires restart:** Yes
+
 #### `model`
 
 - **`model.name`** (string):
