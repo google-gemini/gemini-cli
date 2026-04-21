@@ -642,7 +642,7 @@ describe('ToolRegistry', () => {
       expect(discoveredTool?.canUpdateOutput).toBe(true);
     });
 
-    it('should call updateOutput during execution for stdout and stderr', async () => {
+    it('should relay live tool output to the UI during execution', async () => {
       vi.spyOn(config, 'getToolDiscoveryCommand').mockReturnValue('discovery');
       vi.spyOn(config, 'getToolCallCommand').mockReturnValue('call');
 
