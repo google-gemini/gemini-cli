@@ -8,7 +8,16 @@ import { expect, describe, it, beforeEach, afterEach } from 'vitest';
 import { TestRig } from './test-helper.js';
 import { join } from 'node:path';
 
-describe('Interactive Mode', () => {
+// Skip on macOS: every interactive test in this file is chronically flaky
+// because the captured pty buffer contains the CLI's startup escape
+// sequences (`q4;?m...true color warning`) instead of the streamed output,
+// causing `expectText(...)` to time out. Reproducible across unrelated
+// runs on `main` (24740161950, 24739323404) and on consecutive merge-queue
+// gates for #25753 (24743605639, 24747624513) — different tests in the
+// same describe fail on different runs. Not specific to any model.
+const skipOnDarwin = process.platform === 'darwin';
+
+describe.skipIf(skipOnDarwin)('Interactive Mode', () => {
   let rig: TestRig;
 
   beforeEach(() => {
