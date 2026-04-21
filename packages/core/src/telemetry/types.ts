@@ -806,6 +806,7 @@ export enum LoopType {
   LLM_DETECTED_LOOP = 'llm_detected_loop',
   // Aliases for tests/internal use
   TOOL_CALL_LOOP = CONSECUTIVE_IDENTICAL_TOOL_CALLS,
+  IDENTICAL_TOOL_CALL_LOOP = CONSECUTIVE_IDENTICAL_TOOL_CALLS,
   CONTENT_CHANTING_LOOP = CHANTING_IDENTICAL_SENTENCES,
 }
 export class LoopDetectedEvent implements BaseTelemetryEvent {
