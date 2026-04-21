@@ -224,6 +224,7 @@ export interface ParsedLog {
 export class InteractiveRun {
   ptyProcess: pty.IPty;
   public output = '';
+  private _isDead = false;
 
   constructor(ptyProcess: pty.IPty) {
     this.ptyProcess = ptyProcess;
@@ -232,6 +233,9 @@ export class InteractiveRun {
       if (env['KEEP_OUTPUT'] === 'true' || env['VERBOSE'] === 'true') {
         process.stdout.write(data);
       }
+    });
+    ptyProcess.onExit(() => {
+      this._isDead = true;
     });
   }
 
@@ -295,7 +299,23 @@ export class InteractiveRun {
   }
 
   async kill() {
-    this.ptyProcess.kill();
+    if (this._isDead) return;
+    return new Promise<void>((resolve) => {
+      const timer = setTimeout(() => {
+        try {
+          process.kill(this.ptyProcess.pid, 'SIGKILL');
+        } catch (e) {
+          // Ignore if already dead
+        }
+        resolve(); // Resolve anyway to avoid hanging tests!
+      }, 5000); // Wait 5 seconds
+
+      this.ptyProcess.onExit(() => {
+        clearTimeout(timer);
+        resolve();
+      });
+      this.ptyProcess.kill();
+    });
   }
 
   expectExit(): Promise<number> {
