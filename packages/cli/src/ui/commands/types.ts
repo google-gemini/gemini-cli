@@ -9,6 +9,7 @@ import type {
   HistoryItemWithoutId,
   HistoryItem,
   ConfirmationRequest,
+  BtwActionReturn,
 } from '../types.js';
 import type {
   GitService,
@@ -173,7 +174,8 @@ export type SlashCommandActionReturn =
   | ConfirmShellCommandsActionReturn
   | ConfirmActionReturn
   | OpenCustomDialogActionReturn
-  | LogoutActionReturn;
+  | LogoutActionReturn
+  | BtwActionReturn;
 
 export enum CommandKind {
   BUILT_IN = 'built-in',

@@ -3025,6 +3025,13 @@
           "markdownDescription": "Deprecated: Use general.topicUpdateNarration instead.\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
           "type": "boolean"
+        },
+        "btw": {
+          "title": "Enable /btw Side Inquiries",
+          "description": "Enable the experimental /btw side inquiry command for ephemeral, non-persisted chat turns.",
+          "markdownDescription": "Enable the experimental /btw side inquiry command for ephemeral, non-persisted chat turns.\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
         }
       },
       "additionalProperties": false

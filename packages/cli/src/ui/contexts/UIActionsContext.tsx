@@ -84,6 +84,7 @@ export interface UIActions {
   dismissBackgroundTask: (pid: number) => Promise<void>;
   setActiveBackgroundTaskPid: (pid: number) => void;
   setIsBackgroundTaskListOpen: (isOpen: boolean) => void;
+  dismissBtw: () => void;
   setAuthContext: (context: { requiresRestart?: boolean }) => void;
   onHintInput: (char: string) => void;
   onHintBackspace: () => void;

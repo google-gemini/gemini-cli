@@ -102,6 +102,7 @@ const FLICKER_FRAME_COUNT = 'gemini_cli.ui.flicker.count';
 const SLOW_RENDER_LATENCY = 'gemini_cli.ui.slow_render.latency';
 const EXIT_FAIL_COUNT = 'gemini_cli.exit.fail.count';
 const PLAN_EXECUTION_COUNT = 'gemini_cli.plan.execution.count';
+const BTW_USAGE_COUNT = 'gemini_cli.btw.usage.count';
 
 const baseMetricDefinition = {
   getCommonAttributes,
@@ -269,6 +270,12 @@ const COUNTER_DEFINITIONS = {
     attributes: {} as {
       approval_mode: string;
     },
+  },
+  [BTW_USAGE_COUNT]: {
+    description: 'Counts the usage of the /btw side inquiry command.',
+    valueType: ValueType.INT,
+    assign: (c: Counter) => (btwUsageCounter = c),
+    attributes: {} as Record<string, never>,
   },
   [EVENT_HOOK_CALL_COUNT]: {
     description: 'Counts hook calls, tagged by hook event name and success.',
@@ -789,6 +796,7 @@ let agentRecoveryAttemptDurationHistogram: Histogram | undefined;
 let flickerFrameCounter: Counter | undefined;
 let exitFailCounter: Counter | undefined;
 let planExecutionCounter: Counter | undefined;
+let btwUsageCounter: Counter | undefined;
 let slowRenderHistogram: Histogram | undefined;
 let hookCallCounter: Counter | undefined;
 let hookCallLatencyHistogram: Histogram | undefined;
@@ -1045,6 +1053,14 @@ export function recordPlanExecution(
     ...baseMetricDefinition.getCommonAttributes(config),
     ...attributes,
   });
+}
+
+/**
+ * Records a metric for when the /btw side inquiry command is used
+ */
+export function recordBtwUsageMetrics(config: Config): void {
+  if (!btwUsageCounter || !isMetricsInitialized) return;
+  btwUsageCounter.add(1, baseMetricDefinition.getCommonAttributes(config));
 }
 
 /**

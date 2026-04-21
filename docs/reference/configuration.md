@@ -1781,6 +1781,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Deprecated: Use general.topicUpdateNarration instead.
   - **Default:** `false`
 
+- **`experimental.btw`** (boolean):
+  - **Description:** Enable the experimental /btw side inquiry command for
+    ephemeral, non-persisted chat turns.
+  - **Default:** `false`
+
 #### `skills`
 
 - **`skills.enabled`** (boolean):

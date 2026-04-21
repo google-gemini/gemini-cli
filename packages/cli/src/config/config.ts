@@ -995,6 +995,7 @@ export async function loadCliConfig(
     experimentalMemoryManager: settings.experimental?.memoryManager,
     experimentalAutoMemory: settings.experimental?.autoMemory,
     contextManagement,
+    experimentalBtw: settings.experimental?.btw,
     modelSteering: settings.experimental?.modelSteering,
     topicUpdateNarration:
       settings.general?.topicUpdateNarration ??

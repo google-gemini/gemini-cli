@@ -135,6 +135,8 @@ export {
   recordGenAiClientTokenUsage,
   recordGenAiClientOperationDuration,
   getConventionAttributes,
+  // Btw Metrics
+  recordBtwUsageMetrics,
   // Performance monitoring functions
   recordStartupPerformance,
   recordMemoryUsage,

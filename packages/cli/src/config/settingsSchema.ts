@@ -2322,6 +2322,16 @@ const SETTINGS_SCHEMA = {
         description: 'Deprecated: Use general.topicUpdateNarration instead.',
         showInDialog: false,
       },
+      btw: {
+        type: 'boolean',
+        label: 'Enable /btw Side Inquiries',
+        category: 'Experimental',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Enable the experimental /btw side inquiry command for ephemeral, non-persisted chat turns.',
+        showInDialog: true,
+      },
     },
   },
   extensions: {

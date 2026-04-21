@@ -12,6 +12,7 @@ import { AppHeader } from './AppHeader.js';
 
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 import { useConfig } from '../contexts/ConfigContext.js';
+import { BtwDisplay } from './BtwDisplay.js';
 import {
   SCROLL_TO_ITEM_END,
   type VirtualizedListRef,
@@ -45,10 +46,10 @@ export const MainContent = () => {
   const scrollableListRef = useRef<VirtualizedListRef<unknown>>(null);
 
   useEffect(() => {
-    if (showConfirmationQueue) {
+    if (showConfirmationQueue || uiState.btwState.isActive) {
       scrollableListRef.current?.scrollToEnd();
     }
-  }, [showConfirmationQueue, confirmingToolCallId]);
+  }, [showConfirmationQueue, confirmingToolCallId, uiState.btwState.isActive]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -202,18 +203,66 @@ export const MainContent = () => {
     ],
   );
 
-  const virtualizedData = useMemo(
-    () => [
-      { type: 'header' as const },
-      ...augmentedHistory.map((data, index) => ({
-        type: 'history' as const,
-        item: data.item,
-        element: historyItems[index],
-      })),
-      { type: 'pending' as const },
+  const btwDisplayNode = useMemo(
+    () =>
+      uiState.btwState.isActive ? (
+        <BtwDisplay
+          key="btw-display"
+          query={uiState.btwState.query}
+          response={uiState.btwState.response}
+          isStreaming={uiState.btwState.isStreaming}
+          error={uiState.btwState.error}
+          terminalWidth={uiState.terminalWidth}
+        />
+      ) : null,
+    [
+      uiState.btwState.isActive,
+      uiState.btwState.query,
+      uiState.btwState.response,
+      uiState.btwState.isStreaming,
+      uiState.btwState.error,
+      uiState.terminalWidth,
     ],
-    [augmentedHistory, historyItems],
   );
+
+  const virtualizedData = useMemo(() => {
+    const data: Array<
+      | { type: 'header' }
+      | { type: 'pending' }
+      | { type: 'btw' }
+      | {
+          type: 'history';
+          item: (typeof augmentedHistory)[0]['item'];
+          isExpandable: boolean;
+          isFirstThinking: boolean;
+          isFirstAfterThinking: boolean;
+          suppressNarration: boolean;
+        }
+    > = [
+      { type: 'header' as const },
+      ...augmentedHistory.map(
+        ({
+          item,
+          isExpandable,
+          isFirstThinking,
+          isFirstAfterThinking,
+          suppressNarration,
+        }) => ({
+          type: 'history' as const,
+          item,
+          isExpandable,
+          isFirstThinking,
+          isFirstAfterThinking,
+          suppressNarration,
+        }),
+      ),
+      { type: 'pending' as const },
+    ];
+    if (uiState.btwState.isActive) {
+      data.push({ type: 'btw' as const });
+    }
+    return data;
+  }, [augmentedHistory, uiState.btwState.isActive]);
 
   const renderItem = useCallback(
     ({ item }: { item: (typeof virtualizedData)[number] }) => {
@@ -226,12 +275,41 @@ export const MainContent = () => {
           />
         );
       } else if (item.type === 'history') {
-        return item.element;
+        return (
+          <MemoizedHistoryItemDisplay
+            terminalWidth={mainAreaWidth}
+            availableTerminalHeight={
+              uiState.constrainHeight || !item.isExpandable
+                ? staticAreaMaxItemHeight
+                : undefined
+            }
+            availableTerminalHeightGemini={MAX_GEMINI_MESSAGE_LINES}
+            key={item.item.id}
+            item={item.item}
+            isPending={false}
+            commands={uiState.slashCommands}
+            isExpandable={item.isExpandable}
+            isFirstThinking={item.isFirstThinking}
+            isFirstAfterThinking={item.isFirstAfterThinking}
+            suppressNarration={item.suppressNarration}
+          />
+        );
+      } else if (item.type === 'btw') {
+        return <>{btwDisplayNode}</>;
       } else {
         return pendingItems;
       }
     },
-    [showHeaderDetails, version, pendingItems],
+    [
+      showHeaderDetails,
+      version,
+      mainAreaWidth,
+      uiState.slashCommands,
+      pendingItems,
+      uiState.constrainHeight,
+      staticAreaMaxItemHeight,
+      btwDisplayNode,
+    ],
   );
 
   const estimatedItemHeight = useCallback(() => 100, []);
@@ -240,6 +318,7 @@ export const MainContent = () => {
     (item: (typeof virtualizedData)[number], _index: number) => {
       if (item.type === 'header') return 'header';
       if (item.type === 'history') return item.item.id.toString();
+      if (item.type === 'btw') return 'btw';
       return 'pending';
     },
     [],
@@ -318,6 +397,10 @@ export const MainContent = () => {
         {(item) => item}
       </Static>
       {pendingItems}
+      {/* In alternate buffer mode, the btwDisplayNode is rendered within the ScrollableList
+          (via virtualizedData) to ensure proper scrolling. In standard mode, it is rendered
+          here at the bottom of the layout. */}
+      {btwDisplayNode}
     </>
   );
 };

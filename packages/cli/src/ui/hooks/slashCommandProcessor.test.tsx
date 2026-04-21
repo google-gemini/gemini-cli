@@ -644,6 +644,31 @@ describe('useSlashCommandProcessor', () => {
 
       expect(mockSetQuittingMessages).toHaveBeenCalledWith(['bye']);
     });
+
+    it('should handle a "btw" action', async () => {
+      const btwAction = vi
+        .fn()
+        .mockResolvedValue({ type: 'btw', query: 'some query' });
+      const command = createTestCommand({
+        name: 'side_question',
+        action: btwAction,
+      });
+      const result = await setupProcessorHook({
+        builtinCommands: [command],
+      });
+
+      await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
+
+      let processedResult;
+      await act(async () => {
+        processedResult = await result.current.handleSlashCommand(
+          '/side_question some args',
+        );
+      });
+
+      expect(processedResult).toEqual({ type: 'btw', query: 'some query' });
+    });
+
     it('should handle "submit_prompt" action returned from a file-based command', async () => {
       const fileCommand = createTestCommand(
         {

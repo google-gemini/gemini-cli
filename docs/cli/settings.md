@@ -174,6 +174,7 @@ they appear in the UI.
 | Auto Memory                                          | `experimental.autoMemory`                       | Automatically extract reusable skills from past sessions in the background. Review results with /memory inbox.                                            | `false` |
 | Use the generalist profile to manage agent contexts. | `experimental.generalistProfile`                | Suitable for general coding and software development tasks.                                                                                               | `false` |
 | Enable Context Management                            | `experimental.contextManagement`                | Enable logic for context management.                                                                                                                      | `false` |
+| Enable /btw Side Inquiries                           | `experimental.btw`                              | Enable the experimental /btw side inquiry command for ephemeral, non-persisted chat turns.                                                                | `false` |
 
 ### Skills
 

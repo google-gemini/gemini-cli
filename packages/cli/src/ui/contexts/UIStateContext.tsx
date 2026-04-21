@@ -204,6 +204,13 @@ export interface UIState {
   showIsExpandableHint: boolean;
   hintMode: boolean;
   hintBuffer: string;
+  btwState: {
+    isActive: boolean;
+    query: string;
+    response: string;
+    isStreaming: boolean;
+    error: string | null;
+  };
   transientMessage: {
     text: string;
     type: TransientMessageType;

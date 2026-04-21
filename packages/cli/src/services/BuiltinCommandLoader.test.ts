@@ -165,6 +165,7 @@ describe('BuiltinCommandLoader', () => {
       getExtensionsEnabled: vi.fn().mockReturnValue(true),
       isSkillsSupportEnabled: vi.fn().mockReturnValue(true),
       isAgentsEnabled: vi.fn().mockReturnValue(false),
+      isBtwEnabled: vi.fn().mockReturnValue(false),
       getMcpEnabled: vi.fn().mockReturnValue(true),
       getSkillManager: vi.fn().mockReturnValue({
         getAllSkills: vi.fn().mockReturnValue([]),
@@ -301,6 +302,22 @@ describe('BuiltinCommandLoader', () => {
     expect(planCmd).toBeUndefined();
   });
 
+  it('should include btw command when btw is enabled', async () => {
+    mockConfig.isBtwEnabled = vi.fn().mockReturnValue(true);
+    const loader = new BuiltinCommandLoader(mockConfig);
+    const commands = await loader.loadCommands(new AbortController().signal);
+    const btwCmd = commands.find((c) => c.name === 'btw');
+    expect(btwCmd).toBeDefined();
+  });
+
+  it('should exclude btw command when btw is disabled', async () => {
+    mockConfig.isBtwEnabled = vi.fn().mockReturnValue(false);
+    const loader = new BuiltinCommandLoader(mockConfig);
+    const commands = await loader.loadCommands(new AbortController().signal);
+    const btwCmd = commands.find((c) => c.name === 'btw');
+    expect(btwCmd).toBeUndefined();
+  });
+
   it('should exclude agents command when agents are disabled', async () => {
     mockConfig.isAgentsEnabled = vi.fn().mockReturnValue(false);
     const loader = new BuiltinCommandLoader(mockConfig);
@@ -391,6 +408,7 @@ describe('BuiltinCommandLoader profile', () => {
       getExtensionsEnabled: vi.fn().mockReturnValue(true),
       isSkillsSupportEnabled: vi.fn().mockReturnValue(true),
       isAgentsEnabled: vi.fn().mockReturnValue(false),
+      isBtwEnabled: vi.fn().mockReturnValue(false),
       getMcpEnabled: vi.fn().mockReturnValue(true),
       getSkillManager: vi.fn().mockReturnValue({
         getAllSkills: vi.fn().mockReturnValue([]),

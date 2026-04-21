@@ -712,6 +712,7 @@ export interface ConfigParameters {
   experimentalAgentHistoryTruncationThreshold?: number;
   experimentalAgentHistoryRetainedMessages?: number;
   experimentalAgentHistorySummarization?: boolean;
+  experimentalBtw?: boolean;
   memoryBoundaryMarkers?: string[];
   topicUpdateNarration?: boolean;
 
@@ -953,6 +954,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly experimentalMemoryManager: boolean;
   private readonly experimentalAutoMemory: boolean;
   private readonly experimentalContextManagementConfig?: string;
+  private readonly experimentalBtw: boolean;
   private readonly memoryBoundaryMarkers: readonly string[];
   private readonly topicUpdateNarration: boolean;
   private readonly disableLLMCorrection: boolean;
@@ -1170,6 +1172,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.experimentalJitContext = params.experimentalJitContext ?? false;
     this.experimentalMemoryManager = params.experimentalMemoryManager ?? false;
     this.experimentalAutoMemory = params.experimentalAutoMemory ?? false;
+    this.experimentalBtw = params.experimentalBtw ?? false;
     this.experimentalContextManagementConfig =
       params.experimentalContextManagementConfig;
     this.memoryBoundaryMarkers = params.memoryBoundaryMarkers ?? ['.git'];
@@ -2949,6 +2952,10 @@ export class Config implements McpContext, AgentLoopContext {
 
   isPlanEnabled(): boolean {
     return this.planEnabled;
+  }
+
+  isBtwEnabled(): boolean {
+    return this.experimentalBtw;
   }
 
   isTrackerEnabled(): boolean {

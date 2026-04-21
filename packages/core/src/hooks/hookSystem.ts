@@ -260,10 +260,13 @@ export class HookSystem {
 
   async fireBeforeModelEvent(
     llmRequest: GenerateContentParameters,
+    isBtw?: boolean,
   ): Promise<BeforeModelHookResult> {
     try {
-      const result =
-        await this.hookEventHandler.fireBeforeModelEvent(llmRequest);
+      const result = await this.hookEventHandler.fireBeforeModelEvent(
+        llmRequest,
+        isBtw,
+      );
       const hookOutput = result.finalOutput;
 
       if (hookOutput?.shouldStopExecution()) {
@@ -310,11 +313,13 @@ export class HookSystem {
   async fireAfterModelEvent(
     originalRequest: GenerateContentParameters,
     chunk: GenerateContentResponse,
+    isBtw?: boolean,
   ): Promise<AfterModelHookResult> {
     try {
       const result = await this.hookEventHandler.fireAfterModelEvent(
         originalRequest,
         chunk,
+        isBtw,
       );
       const hookOutput = result.finalOutput;
 

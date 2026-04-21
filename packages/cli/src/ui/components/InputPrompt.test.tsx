@@ -5097,6 +5097,150 @@ describe('InputPrompt', () => {
       },
     );
   });
+
+  describe('Btw dismiss behavior', () => {
+    it('dismisses Btw on ESC key press', async () => {
+      const dismissBtw = vi.fn();
+      const { stdin, unmount } = await renderWithProviders(
+        <TestInputPrompt {...props} />,
+        {
+          uiState: {
+            btwState: {
+              isActive: true,
+              query: '',
+              response: '',
+              isStreaming: false,
+              error: null,
+            },
+          },
+          uiActions: { dismissBtw },
+        },
+      );
+
+      await act(async () => {
+        stdin.write('\x1B'); // ESC
+      });
+
+      await waitFor(() => {
+        expect(dismissBtw).toHaveBeenCalled();
+      });
+      unmount();
+    });
+
+    it('dismisses Btw on Enter key press', async () => {
+      const dismissBtw = vi.fn();
+      const { stdin, unmount } = await renderWithProviders(
+        <TestInputPrompt {...props} />,
+        {
+          uiState: {
+            btwState: {
+              isActive: true,
+              query: '',
+              response: '',
+              isStreaming: false,
+              error: null,
+            },
+          },
+          uiActions: { dismissBtw },
+        },
+      );
+
+      await act(async () => {
+        stdin.write('\r'); // Enter
+      });
+
+      await waitFor(() => {
+        expect(dismissBtw).toHaveBeenCalled();
+      });
+      unmount();
+    });
+
+    it('dismisses Btw on Space key press when buffer is empty', async () => {
+      const dismissBtw = vi.fn();
+      const { stdin, unmount } = await renderWithProviders(
+        <TestInputPrompt {...props} />,
+        {
+          uiState: {
+            btwState: {
+              isActive: true,
+              query: '',
+              response: '',
+              isStreaming: false,
+              error: null,
+            },
+          },
+          uiActions: { dismissBtw },
+        },
+      );
+
+      await act(async () => {
+        stdin.write(' '); // Space
+      });
+
+      await waitFor(() => {
+        expect(dismissBtw).toHaveBeenCalled();
+      });
+      unmount();
+    });
+
+    it('dismisses Btw and accepts input on typing when not streaming', async () => {
+      const dismissBtw = vi.fn();
+      const { stdin, stdout, unmount } = await renderWithProviders(
+        <TestInputPrompt {...props} />,
+        {
+          uiState: {
+            btwState: {
+              isActive: true,
+              query: '',
+              response: '',
+              isStreaming: false,
+              error: null,
+            },
+          },
+          uiActions: { dismissBtw },
+        },
+      );
+
+      await act(async () => {
+        stdin.write('a');
+      });
+
+      await waitFor(() => {
+        expect(dismissBtw).toHaveBeenCalled();
+        expect(clean(stdout.lastFrameRaw())).toContain('a');
+      });
+      unmount();
+    });
+
+    it('blocks typing when Btw is streaming', async () => {
+      const dismissBtw = vi.fn();
+      const { stdin, stdout, unmount } = await renderWithProviders(
+        <TestInputPrompt {...props} />,
+        {
+          uiState: {
+            btwState: {
+              isActive: true,
+              query: '',
+              response: '',
+              isStreaming: true,
+              error: null,
+            },
+          },
+          uiActions: { dismissBtw },
+        },
+      );
+
+      await act(async () => {
+        stdin.write('Z');
+      });
+
+      await waitFor(() => {
+        expect(dismissBtw).not.toHaveBeenCalled();
+        expect(clean(stdout.lastFrameRaw())).not.toContain('Z');
+      });
+      unmount();
+    });
+  });
 });
 
 function clean(str: string | undefined): string {

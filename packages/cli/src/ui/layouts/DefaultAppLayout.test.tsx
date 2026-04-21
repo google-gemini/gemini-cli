@@ -38,6 +38,13 @@ const mockUIState = {
   availableTerminalHeight: 20,
   activePtyId: null,
   isBackgroundTaskVisible: true,
+  btwState: {
+    isActive: false,
+    query: '',
+    response: '',
+    isStreaming: false,
+    error: null,
+  },
 } as unknown as UIState;
 
 vi.mock('../contexts/UIStateContext.js', () => ({

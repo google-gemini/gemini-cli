@@ -673,6 +673,7 @@ export interface PreCompressOutput {
  */
 export interface BeforeModelInput extends HookInput {
   llm_request: LLMRequest;
+  isBtw?: boolean;
 }
 
 /**
@@ -692,6 +693,7 @@ export interface BeforeModelOutput extends HookOutput {
 export interface AfterModelInput extends HookInput {
   llm_request: LLMRequest;
   llm_response: LLMResponse;
+  isBtw?: boolean;
 }
 
 /**

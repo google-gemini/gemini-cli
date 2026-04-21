@@ -13,6 +13,7 @@ import {
   useLayoutEffect,
   useContext,
 } from 'react';
+import { type PartListUnion } from '@google/genai';
 import {
   type DOMElement,
   ResizeObserver,
@@ -92,6 +93,7 @@ import {
   ApiKeyUpdatedEvent,
   LegacyAgentProtocol,
   type InjectionSource,
+  partListUnionToString,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import process from 'node:process';
@@ -163,6 +165,7 @@ import { isWorkspaceTrusted } from '../config/trustedFolders.js';
 import { useSettings } from './contexts/SettingsContext.js';
 import { terminalCapabilityManager } from './utils/terminalCapabilityManager.js';
 import { useInputHistoryStore } from './hooks/useInputHistoryStore.js';
+import { useBtw } from './hooks/useBtw.js';
 import { useBanner } from './hooks/useBanner.js';
 import { useTerminalSetupPrompt } from './utils/terminalSetup.js';
 import { useHookDisplayState } from './hooks/useHookDisplayState.js';
@@ -236,6 +239,7 @@ export const AppContainer = (props: AppContainerProps) => {
   const historyManager = useHistory({
     chatRecordingService: config.getGeminiClient()?.getChatRecordingService(),
   });
+  const btw = useBtw(config.getGeminiClient());
 
   useMemoryMonitor(historyManager);
   const isAlternateBuffer = config.getUseAlternateBuffer();
@@ -1042,6 +1046,21 @@ Logging in with Google... Restarting Gemini CLI to continue.
     setCustomDialog,
   );
 
+  const handleSlashCommandWrapper = useCallback(
+    async (cmd: PartListUnion) => {
+      const submittedValue = partListUnionToString(cmd);
+      const result = await handleSlashCommand(submittedValue);
+      if (result && result.type === 'btw') {
+        void btw.submitBtw(result.query);
+        return {
+          type: 'handled' as const,
+        };
+      }
+      return result;
+    },
+    [handleSlashCommand, btw],
+  );
+
   const [authConsentRequest, setAuthConsentRequest] =
     useState<ConfirmationRequest | null>(null);
   const [permissionConfirmationRequest, setPermissionConfirmationRequest] =
@@ -1391,7 +1410,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
           slashCommands ?? [],
         );
         if (commandToExecute?.isSafeConcurrent) {
-          void handleSlashCommand(submittedValue);
+          void handleSlashCommandWrapper(submittedValue);
           addInput(submittedValue);
           return;
         }
@@ -1443,7 +1462,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       addMessage,
       addInput,
       submitQuery,
-      handleSlashCommand,
+      handleSlashCommandWrapper,
       slashCommands,
       isMcpReady,
       streamingState,
@@ -2539,6 +2558,13 @@ Logging in with Google... Restarting Gemini CLI to continue.
       hintMode:
         config.isModelSteeringEnabled() && isToolExecuting(pendingHistoryItems),
       hintBuffer: '',
+      btwState: {
+        isActive: btw.isActive,
+        query: btw.query,
+        response: btw.response,
+        isStreaming: btw.isStreaming,
+        error: btw.error,
+      },
     }),
     [
       isThemeDialogOpen,
@@ -2650,6 +2676,11 @@ Logging in with Google... Restarting Gemini CLI to continue.
       adminSettingsChanged,
       newAgents,
       showIsExpandableHint,
+      btw.isActive,
+      btw.query,
+      btw.response,
+      btw.isStreaming,
+      btw.error,
     ],
   );
 
@@ -2709,6 +2740,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       dismissBackgroundTask,
       setActiveBackgroundTaskPid,
       setIsBackgroundTaskListOpen,
+      dismissBtw: btw.dismissBtw,
       setAuthContext,
       onHintInput: () => {},
       onHintBackspace: () => {},
@@ -2803,6 +2835,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       setIsBackgroundTaskListOpen,
       setAuthContext,
       setAccountSuspensionInfo,
+      btw.dismissBtw,
       newAgents,
       config,
       historyManager,

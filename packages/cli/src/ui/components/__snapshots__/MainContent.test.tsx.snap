@@ -92,6 +92,23 @@ exports[`MainContent > MainContent Tool Output Height Logic > 'Normal mode - Unc
 "
 `;
 
+exports[`MainContent > renders BtwDisplay within ScrollableList in alternate buffer mode when btw is active 1`] = `
+"ScrollableList
+AppHeader(full)
+▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+ > Hello                                                                                            
+▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+✦ Hi there
+╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ BY THE WAY                                                  Press Esc, Enter or Space to dismiss │
+│                                                                                                  │
+│ Q: test query                                                                                    │
+│                                                                                                  │
+│ test response                                                                                    │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
+`;
+
 exports[`MainContent > renders a ToolConfirmationQueue without an extra line when preceded by hidden tools 1`] = `
 "AppHeader(full)
 ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀

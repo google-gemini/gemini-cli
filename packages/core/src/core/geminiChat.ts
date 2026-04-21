@@ -489,12 +489,71 @@ export class GeminiChat {
     return streamWithRetries.call(this);
   }
 
+  /**
+   * Sends a side inquiry (BTW) that reuses current context but doesn't affect history.
+   */
+  sendBtwStream(
+    modelConfigKey: ModelConfigKey,
+    message: PartListUnion,
+    prompt_id: string,
+    signal: AbortSignal,
+    role: LlmRole,
+  ): AsyncGenerator<StreamEvent> {
+    const requestContents = [
+      ...this.getHistory(true),
+      createUserContent(message),
+    ];
+
+    const streamWithRetries = async function* (
+      this: GeminiChat,
+    ): AsyncGenerator<StreamEvent, void, void> {
+      try {
+        const stream = await this.makeApiCallAndProcessStream(
+          modelConfigKey,
+          requestContents,
+          prompt_id,
+          signal,
+          role,
+          [],
+          true, // isBtw flag
+        );
+        for await (const chunk of stream) {
+          yield { type: StreamEventType.CHUNK, value: chunk };
+        }
+      } catch (error) {
+        if (error instanceof AgentExecutionStoppedError) {
+          yield {
+            type: StreamEventType.AGENT_EXECUTION_STOPPED,
+            reason: error.reason,
+          };
+        } else if (error instanceof AgentExecutionBlockedError) {
+          yield {
+            type: StreamEventType.AGENT_EXECUTION_BLOCKED,
+            reason: error.reason,
+          };
+          if (error.syntheticResponse) {
+            yield {
+              type: StreamEventType.CHUNK,
+              value: error.syntheticResponse,
+            };
+          }
+        } else {
+          throw error;
+        }
+      }
+    };
+
+    return streamWithRetries.call(this);
+  }
+
   private async makeApiCallAndProcessStream(
     modelConfigKey: ModelConfigKey,
     requestContents: readonly Content[],
     prompt_id: string,
     abortSignal: AbortSignal,
     role: LlmRole,
+    toolsOverride?: Tool[],
+    isBtw?: boolean,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
     const contentsForPreviewModel =
       this.ensureActiveLoopHasThoughtSignatures(requestContents);
@@ -565,7 +624,7 @@ export class GeminiChat {
         // TODO(12622): Ensure we don't overrwrite these when they are
         // passed via config.
         systemInstruction: this.systemInstruction,
-        tools: this.tools,
+        tools: toolsOverride !== undefined ? toolsOverride : this.tools,
         abortSignal,
       };
 
@@ -575,11 +634,14 @@ export class GeminiChat {
 
       const hookSystem = this.context.config.getHookSystem();
       if (hookSystem) {
-        const beforeModelResult = await hookSystem.fireBeforeModelEvent({
-          model: modelToUse,
-          config,
-          contents: contentsToUse,
-        });
+        const beforeModelResult = await hookSystem.fireBeforeModelEvent(
+          {
+            model: modelToUse,
+            config,
+            contents: contentsToUse,
+          },
+          isBtw,
+        );
 
         if (beforeModelResult.stopped) {
           throw new AgentExecutionStoppedError(
@@ -647,7 +709,7 @@ export class GeminiChat {
         }
       }
 
-      if (this.onModelChanged) {
+      if (this.onModelChanged && !isBtw) {
         this.tools = await this.onModelChanged(modelToUse);
       }
 
@@ -719,6 +781,7 @@ export class GeminiChat {
       lastModelToUse,
       streamResponse,
       originalRequest,
+      isBtw,
     );
   }
 
@@ -878,6 +941,7 @@ export class GeminiChat {
     model: string,
     streamResponse: AsyncGenerator<GenerateContentResponse>,
     originalRequest: GenerateContentParameters,
+    isBtw?: boolean,
   ): AsyncGenerator<GenerateContentResponse> {
     const modelResponseParts: Part[] = [];
 
@@ -900,7 +964,9 @@ export class GeminiChat {
           if (content.parts.some((part) => part.thought)) {
             // Record thoughts
             hasThoughts = true;
-            this.recordThoughtFromContent(content);
+            if (!isBtw) {
+              this.recordThoughtFromContent(content);
+            }
           }
           if (content.parts.some((part) => part.functionCall)) {
             hasToolCall = true;
@@ -913,7 +979,7 @@ export class GeminiChat {
       }
 
       // Record token usage if this chunk has usageMetadata
-      if (chunk.usageMetadata) {
+      if (chunk.usageMetadata && !isBtw) {
         this.chatRecordingService.recordMessageTokens(chunk.usageMetadata);
         if (chunk.usageMetadata.promptTokenCount !== undefined) {
           this.lastPromptTokenCount = chunk.usageMetadata.promptTokenCount;
@@ -925,6 +991,7 @@ export class GeminiChat {
         const hookResult = await hookSystem.fireAfterModelEvent(
           originalRequest,
           chunk,
+          isBtw,
         );
 
         if (hookResult.stopped) {
@@ -970,7 +1037,7 @@ export class GeminiChat {
     // Record model response text from the collected parts.
     // Also flush when there are thoughts or a tool call (even with no text)
     // so that BeforeTool hooks always see the latest transcript state.
-    if (responseText || hasThoughts || hasToolCall) {
+    if (!isBtw && (responseText || hasThoughts || hasToolCall)) {
       this.chatRecordingService.recordMessage({
         model,
         type: 'gemini',
@@ -1013,7 +1080,9 @@ export class GeminiChat {
       }
     }
 
-    this.history.push({ role: 'model', parts: consolidatedParts });
+    if (!isBtw) {
+      this.history.push({ role: 'model', parts: consolidatedParts });
+    }
   }
 
   getLastPromptTokenCount(): number {
