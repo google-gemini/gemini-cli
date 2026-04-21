@@ -73,8 +73,6 @@ import {
 import { parseSlashCommand } from '../../utils/commands.js';
 import * as path from 'node:path';
 import { SCREEN_READER_USER_PREFIX } from '../textConstants.js';
-import { getSafeLowColorBackground } from '../themes/color-utils.js';
-import { isLowColorDepth } from '../utils/terminalUtils.js';
 import { useShellFocusState } from '../contexts/ShellFocusContext.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { useInputState } from '../contexts/InputContext.js';
@@ -242,7 +240,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     toggleCleanUiDetailsVisible,
   } = useUIActions();
   const {
-    terminalWidth,
     activePtyId,
     history,
     backgroundTasks,
@@ -1645,21 +1642,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   );
 
   const useBackgroundColor = config.getUseBackgroundColor();
-  const isLowColor = isLowColorDepth();
-  const terminalBg = theme.background.primary || 'black';
-
-  // We should fallback to lines if the background color is disabled OR if it is
-  // enabled but we are in a low color depth terminal where we don't have a safe
-  // background color to use.
-  const useLineFallback = useMemo(() => {
-    if (!useBackgroundColor) {
-      return true;
-    }
-    if (isLowColor) {
-      return !getSafeLowColorBackground(terminalBg);
-    }
-    return false;
-  }, [useBackgroundColor, isLowColor, terminalBg]);
 
   const prevCursorRef = useRef(buffer.visualCursor);
   const prevTextRef = useRef(buffer.text);
@@ -1698,8 +1680,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     }
   }, [buffer.visualCursor, buffer.text, focus]);
 
-  const listBackgroundColor =
-    useLineFallback || !useBackgroundColor ? undefined : theme.background.input;
+  const listBackgroundColor = !useBackgroundColor
+    ? undefined
+    : theme.background.input;
 
   useEffect(() => {
     if (onSuggestionsVisibilityChange) {
@@ -1762,20 +1745,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   return (
     <>
       {suggestionsPosition === 'above' && suggestionsNode}
-      {useLineFallback ? (
-        <Box
-          borderStyle="round"
-          borderTop={true}
-          borderBottom={false}
-          borderLeft={false}
-          borderRight={false}
-          borderColor={borderColor}
-          width={terminalWidth}
-          flexDirection="row"
-          alignItems="flex-start"
-          height={0}
-        />
-      ) : null}
       <HalfLinePaddedBox
         backgroundBaseColor={theme.background.input}
         backgroundOpacity={1}
@@ -1786,7 +1755,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           flexDirection="row"
           paddingX={1}
           borderColor={borderColor}
-          borderStyle={useLineFallback ? 'round' : undefined}
           borderTop={false}
           borderBottom={false}
           borderLeft={!useBackgroundColor}
@@ -1880,20 +1848,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           </Box>
         </Box>
       </HalfLinePaddedBox>
-      {useLineFallback ? (
-        <Box
-          borderStyle="round"
-          borderTop={false}
-          borderBottom={true}
-          borderLeft={false}
-          borderRight={false}
-          borderColor={borderColor}
-          width={terminalWidth}
-          flexDirection="row"
-          alignItems="flex-start"
-          height={0}
-        />
-      ) : null}
       {suggestionsPosition === 'below' && suggestionsNode}
     </>
   );
