@@ -59,7 +59,7 @@ export class SimulationHarness {
       sessionId: 'sim-session',
     });
     this.env = new ContextEnvironmentImpl(
-      mockLlmClient,
+      () => mockLlmClient,
       'sim-prompt',
       'sim-session',
       mockTempDir,

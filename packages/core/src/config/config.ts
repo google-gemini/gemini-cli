@@ -1663,11 +1663,6 @@ export class Config implements McpContext, AgentLoopContext {
     return this.baseLlmClient;
   }
 
-  async ensureExperimentsAndGetBaseLlmClient(): Promise<BaseLlmClient> {
-    await this.ensureExperimentsLoaded();
-    return this.getBaseLlmClient();
-  }
-
   getLocalLiteRtLmClient(): LocalLiteRtLmClient {
     if (!this.localLiteRtLmClient) {
       this.localLiteRtLmClient = new LocalLiteRtLmClient(this);

@@ -145,8 +145,8 @@ export function createMockEnvironment(
   });
   const eventBus = new ContextEventBus();
 
-  const env = new ContextEnvironmentImpl(
-    llmClient,
+  let env = new ContextEnvironmentImpl(
+    () => llmClient as BaseLlmClient,
     'mock-session',
     'mock-prompt-id',
     '/tmp/.gemini/trace',
@@ -157,7 +157,20 @@ export function createMockEnvironment(
   );
 
   if (overrides) {
-    Object.assign(env, overrides);
+    if (overrides.llmClient) {
+      env = new ContextEnvironmentImpl(
+        () => overrides.llmClient!,
+        env.sessionId,
+        env.promptId,
+        env.traceDir,
+        env.projectTempDir,
+        env.tracer,
+        env.charsPerToken,
+        env.eventBus,
+      );
+    }
+    const { llmClient: _llmClient, ...restOverrides } = overrides;
+    Object.assign(env, restOverrides);
   }
   return env;
 }
@@ -247,7 +260,7 @@ export function setupContextComponentTest(
   });
   const eventBus = new ContextEventBus();
   const env = new ContextEnvironmentImpl(
-    config.getBaseLlmClient(),
+    () => config.getBaseLlmClient(),
     'test prompt-id',
     'test-session',
     '/tmp',

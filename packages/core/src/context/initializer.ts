@@ -88,9 +88,8 @@ export async function initializeContextManager(
 
   const eventBus = new ContextEventBus();
 
-  const baseLlmClient = await config.ensureExperimentsAndGetBaseLlmClient();
   const env = new ContextEnvironmentImpl(
-    baseLlmClient,
+    () => config.getBaseLlmClient(),
     config.getSessionId(),
     lastPromptId,
     logDir,
