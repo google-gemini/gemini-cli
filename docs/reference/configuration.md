@@ -436,6 +436,20 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `"ask"`
   - **Values:** `"ask"`, `"always"`, `"never"`
 
+- **`billing.vertexAi.requestType`** (enum):
+  - **Description:** Sets the X-Vertex-AI-LLM-Request-Type header for Vertex AI
+    requests.
+  - **Default:** `undefined`
+  - **Values:** `"dedicated"`, `"shared"`
+  - **Requires restart:** Yes
+
+- **`billing.vertexAi.sharedRequestType`** (enum):
+  - **Description:** Sets the X-Vertex-AI-LLM-Shared-Request-Type header for
+    Vertex AI requests.
+  - **Default:** `undefined`
+  - **Values:** `"priority"`, `"flex"`
+  - **Requires restart:** Yes
+
 #### `model`
 
 - **`model.name`** (string):
@@ -1709,6 +1723,18 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Enable the Gemma Model Router (experimental). Requires a
     local endpoint serving Gemma via the Gemini API using LiteRT-LM shim.
   - **Default:** `false`
+  - **Requires restart:** Yes
+
+- **`experimental.gemmaModelRouter.autoStartServer`** (boolean):
+  - **Description:** Automatically start the LiteRT-LM server when Gemini CLI
+    starts and the Gemma router is enabled.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
+- **`experimental.gemmaModelRouter.binaryPath`** (string):
+  - **Description:** Custom path to the LiteRT-LM binary. Leave empty to use the
+    default location (~/.gemini/bin/litert/).
+  - **Default:** `""`
   - **Requires restart:** Yes
 
 - **`experimental.gemmaModelRouter.classifier.host`** (string):

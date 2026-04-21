@@ -710,6 +710,59 @@ describe('Server Config (config.ts)', () => {
       );
     });
 
+    describe('getProModelNoAccessSync', () => {
+      it('should return experiment value for AuthType.LOGIN_WITH_GOOGLE', async () => {
+        vi.mocked(getExperiments).mockResolvedValue({
+          experimentIds: [],
+          flags: {
+            [ExperimentFlags.PRO_MODEL_NO_ACCESS]: {
+              boolValue: true,
+            },
+          },
+        });
+        const config = new Config(baseParams);
+        vi.mocked(createContentGeneratorConfig).mockResolvedValue({
+          authType: AuthType.LOGIN_WITH_GOOGLE,
+        });
+        await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
+        expect(config.getProModelNoAccessSync()).toBe(true);
+      });
+
+      it('should return experiment value for AuthType.COMPUTE_ADC', async () => {
+        vi.mocked(getExperiments).mockResolvedValue({
+          experimentIds: [],
+          flags: {
+            [ExperimentFlags.PRO_MODEL_NO_ACCESS]: {
+              boolValue: true,
+            },
+          },
+        });
+        const config = new Config(baseParams);
+        vi.mocked(createContentGeneratorConfig).mockResolvedValue({
+          authType: AuthType.COMPUTE_ADC,
+        });
+        await config.refreshAuth(AuthType.COMPUTE_ADC);
+        expect(config.getProModelNoAccessSync()).toBe(true);
+      });
+
+      it('should return false for other auth types even if experiment is true', async () => {
+        vi.mocked(getExperiments).mockResolvedValue({
+          experimentIds: [],
+          flags: {
+            [ExperimentFlags.PRO_MODEL_NO_ACCESS]: {
+              boolValue: true,
+            },
+          },
+        });
+        const config = new Config(baseParams);
+        vi.mocked(createContentGeneratorConfig).mockResolvedValue({
+          authType: AuthType.USE_GEMINI,
+        });
+        await config.refreshAuth(AuthType.USE_GEMINI);
+        expect(config.getProModelNoAccessSync()).toBe(false);
+      });
+    });
+
     describe('getRequestTimeoutMs', () => {
       it('should return undefined if the flag is not set', () => {
         const config = new Config(baseParams);
@@ -783,10 +836,35 @@ describe('Server Config (config.ts)', () => {
         undefined,
         undefined,
         undefined,
+        undefined,
       );
       // Verify that contentGeneratorConfig is updated
       expect(config.getContentGeneratorConfig()).toEqual(mockContentConfig);
       expect(GeminiClient).toHaveBeenCalledWith(config);
+    });
+
+    it('should pass Vertex AI routing settings when refreshing auth', async () => {
+      const vertexAiRouting = {
+        requestType: 'shared' as const,
+        sharedRequestType: 'priority' as const,
+      };
+      const config = new Config({
+        ...baseParams,
+        vertexAiRouting,
+      });
+
+      vi.mocked(createContentGeneratorConfig).mockResolvedValue({});
+
+      await config.refreshAuth(AuthType.USE_VERTEX_AI);
+
+      expect(createContentGeneratorConfig).toHaveBeenCalledWith(
+        config,
+        AuthType.USE_VERTEX_AI,
+        undefined,
+        undefined,
+        undefined,
+        vertexAiRouting,
+      );
     });
 
     it('should reset model availability status', async () => {
@@ -1922,6 +2000,8 @@ describe('GemmaModelRouterSettings', () => {
     const config = new Config(baseParams);
     const settings = config.getGemmaModelRouterSettings();
     expect(settings.enabled).toBe(false);
+    expect(settings.autoStartServer).toBe(true);
+    expect(settings.binaryPath).toBe('');
     expect(settings.classifier?.host).toBe('http://localhost:9379');
     expect(settings.classifier?.model).toBe('gemma3-1b-gpu-custom');
   });
@@ -1931,6 +2011,8 @@ describe('GemmaModelRouterSettings', () => {
       ...baseParams,
       gemmaModelRouter: {
         enabled: true,
+        autoStartServer: false,
+        binaryPath: '/custom/lit',
         classifier: {
           host: 'http://custom:1234',
           model: 'custom-gemma',
@@ -1940,6 +2022,8 @@ describe('GemmaModelRouterSettings', () => {
     const config = new Config(params);
     const settings = config.getGemmaModelRouterSettings();
     expect(settings.enabled).toBe(true);
+    expect(settings.autoStartServer).toBe(false);
+    expect(settings.binaryPath).toBe('/custom/lit');
     expect(settings.classifier?.host).toBe('http://custom:1234');
     expect(settings.classifier?.model).toBe('custom-gemma');
   });
@@ -1954,6 +2038,8 @@ describe('GemmaModelRouterSettings', () => {
     const config = new Config(params);
     const settings = config.getGemmaModelRouterSettings();
     expect(settings.enabled).toBe(true);
+    expect(settings.autoStartServer).toBe(true);
+    expect(settings.binaryPath).toBe('');
     expect(settings.classifier?.host).toBe('http://localhost:9379');
     expect(settings.classifier?.model).toBe('gemma3-1b-gpu-custom');
   });
