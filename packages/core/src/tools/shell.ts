@@ -41,7 +41,12 @@ import {
   stripShellWrapper,
   parseCommandDetails,
   hasRedirection,
+ fix/wsl2-9p-deadlock-cross-os
+  isWslCrossOsPath,
+  isWslCrossOsCommand,
+
   normalizeCommand,
+ main
 } from '../utils/shell-utils.js';
 import { SHELL_TOOL_NAME } from './tool-names.js';
 import { PARAM_ADDITIONAL_PERMISSIONS } from './definitions/base-declarations.js';
@@ -446,6 +451,38 @@ export class ShellToolInvocation extends BaseToolInvocation<
       return {
         llmContent: 'Command was cancelled by user before it could start.',
         returnDisplay: 'Command cancelled by user.',
+      };
+    }
+
+    const effectiveCwd = this.params.dir_path
+      ? path.resolve(this.config.getTargetDir(), this.params.dir_path)
+      : this.config.getTargetDir();
+
+    if (isWslCrossOsPath(effectiveCwd)) {
+      const wslWarning =
+        `[WSL2 Warning] The working directory "${effectiveCwd}" is on a Windows host ` +
+        `filesystem mount (9P protocol). Heavy file I/O here can cause terminal freezes, ` +
+        `forkpty(3) failures, or OOM crashes.\n` +
+        `Recommendation: Copy your project to a native Linux path (e.g. ~/projects/) ` +
+        `and run Gemini CLI from there to avoid 9P bridge bottlenecks.`;
+      if (updateOutput) updateOutput(wslWarning);
+      return {
+        llmContent: wslWarning,
+        returnDisplay: wslWarning,
+      };
+    }
+
+    if (isWslCrossOsCommand(strippedCommand)) {
+      const crossOsWarning =
+        `[WSL2 Warning] The command "${strippedCommand}" appears to invoke a Windows ` +
+        `host executable (.exe) from within WSL2. Cross-OS process spawning via the 9P ` +
+        `bridge can cause deadlocks and terminal hangs.\n` +
+        `Recommendation: Run Windows executables directly from PowerShell or CMD instead ` +
+        `of from within WSL2.`;
+      if (updateOutput) updateOutput(crossOsWarning);
+      return {
+        llmContent: crossOsWarning,
+        returnDisplay: crossOsWarning,
       };
     }
 
