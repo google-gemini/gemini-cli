@@ -171,9 +171,9 @@ export function getEnvironmentAwareCommand(
         // mkdir -p -> mkdir
         .replace(/\bmkdir\s+-p(\s|$)/g, 'mkdir$1')
         // touch -> type nul >
-        .replace(/\btouch\s+(\S+)/g, 'type nul > $1')
+        .replace(/\btouch\s+((?:"[^"]*"|'[^']*'|\S)+)/g, 'type nul > $1')
         // which -> where
-        .replace(/\bwhich\s+(\S+)/g, 'where $1')
+        .replace(/\bwhich\s+((?:"[^"]*"|'[^']*'|\S)+)/g, 'where $1')
         // /dev/null -> nul
         .replace(/\/dev\/null\b/g, 'nul')
     );
