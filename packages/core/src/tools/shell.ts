@@ -463,10 +463,8 @@ export class ShellToolInvocation extends BaseToolInvocation<
 
     const onAbort = () => combinedController.abort();
     try {
-      if (!isWindows) {
-        tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gemini-shell-'));
-        tempFilePath = path.join(tempDir, 'pgrep.tmp');
-      }
+      tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gemini-shell-'));
+      tempFilePath = path.join(tempDir, 'pgrep.tmp');
 
       // pgrep is not available on Windows, so we can't get background PIDs
       const commandToExecute = this.wrapCommandForPgrep(
