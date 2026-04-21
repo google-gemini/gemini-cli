@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { renderWithProviders } from '../../../test-utils/render.js';
+import { renderWithProviders as originalRenderWithProviders } from '../../../test-utils/render.js';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { ToolGroupMessage } from './ToolGroupMessage.js';
 import {
@@ -21,6 +21,12 @@ import {
   READ_FILE_DISPLAY_NAME,
   GLOB_DISPLAY_NAME,
 } from '@google/gemini-cli-core';
+
+const renderWithProviders = async (
+  component: React.ReactElement,
+  options?: Parameters<typeof originalRenderWithProviders>[1],
+) => originalRenderWithProviders(component, { height: 40, ...options });
+
 import type {
   HistoryItem,
   HistoryItemWithoutId,
