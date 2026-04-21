@@ -20,6 +20,8 @@ import {
   ShellExecutionService,
   ExecutionLifecycleService,
   CoreToolCallStatus,
+  moveToolOutputToFile,
+  debugLogger,
 } from '@google/gemini-cli-core';
 import { type PartListUnion } from '@google/genai';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
@@ -39,16 +41,15 @@ export { type BackgroundTask };
 
 export const OUTPUT_UPDATE_INTERVAL_MS = 1000;
 const RESTORE_VISIBILITY_DELAY_MS = 300;
-const MAX_OUTPUT_LENGTH = 10000;
-
 function addShellCommandToGeminiHistory(
   geminiClient: GeminiClient,
   rawQuery: string,
   resultText: string,
+  maxOutputLength: number,
 ) {
   const modelContent =
-    resultText.length > MAX_OUTPUT_LENGTH
-      ? resultText.substring(0, MAX_OUTPUT_LENGTH) + '\n... (truncated)'
+    maxOutputLength > 0 && resultText.length > maxOutputLength
+      ? resultText.substring(0, maxOutputLength) + '\n... (truncated)'
       : resultText;
 
   // Escape backticks to prevent prompt injection breakouts
@@ -424,6 +425,9 @@ export const useExecutionLifecycle = (
                 let shouldUpdate = false;
 
                 switch (event.type) {
+                  case 'raw_data':
+                  case 'file_data':
+                    break;
                   case 'data':
                     if (isBinaryStream) break;
                     if (typeof event.chunk === 'string') {
@@ -533,6 +537,24 @@ export const useExecutionLifecycle = (
           } else {
             mainContent =
               result.output.trim() || '(Command produced no output)';
+            if (result.fullOutputFilePath) {
+              const { outputFile: savedPath } = await moveToolOutputToFile(
+                result.fullOutputFilePath,
+                SHELL_COMMAND_NAME,
+                callId,
+                config.storage.getProjectTempDir(),
+                config.getSessionId(),
+              );
+              const warning = `[Full command output saved to: ${savedPath}]`;
+              mainContent = mainContent.includes(
+                '[GEMINI_CLI_WARNING: Output truncated.',
+              )
+                ? mainContent.replace(
+                    /\[GEMINI_CLI_WARNING: Output truncated\..*?\]/,
+                    warning,
+                  )
+                : `${mainContent}\n\n${warning}`;
+            }
           }
 
           let finalOutput: string | AnsiOutput =
@@ -617,7 +639,12 @@ export const useExecutionLifecycle = (
             );
           }
 
-          addShellCommandToGeminiHistory(geminiClient, rawQuery, mainContent);
+          addShellCommandToGeminiHistory(
+            geminiClient,
+            rawQuery,
+            mainContent,
+            config.getTruncateToolOutputThreshold(),
+          );
         } catch (err) {
           setPendingHistoryItem(null);
           const errorMessage = err instanceof Error ? err.message : String(err);
@@ -630,8 +657,13 @@ export const useExecutionLifecycle = (
           );
         } finally {
           abortSignal.removeEventListener('abort', abortHandler);
-          if (pwdFilePath && fs.existsSync(pwdFilePath)) {
-            fs.unlinkSync(pwdFilePath);
+          if (pwdFilePath) {
+            fs.promises.unlink(pwdFilePath).catch((err) => {
+              debugLogger.warn(
+                `Failed to cleanup pwd file: ${pwdFilePath}`,
+                err,
+              );
+            });
           }
 
           dispatch({ type: 'SET_ACTIVE_PTY', pid: null });

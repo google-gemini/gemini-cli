@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import fsPromises from 'node:fs/promises';
+import { debugLogger } from '../utils/debugLogger.js';
 import {
   ToolErrorType,
   ToolOutputTruncatedEvent,
@@ -24,6 +26,7 @@ import { executeToolWithHooks } from '../core/coreToolHookTriggers.js';
 import {
   saveTruncatedToolOutput,
   formatTruncatedToolOutput,
+  moveToolOutputToFile,
 } from '../utils/fileUtils.js';
 import { convertToFunctionResponse } from '../utils/generateContentResponseUtilities.js';
 import {
@@ -138,6 +141,16 @@ export class ToolExecutor {
           }
 
           if (signal.aborted) {
+            if (toolResult.fullOutputFilePath) {
+              await fsPromises
+                .unlink(toolResult.fullOutputFilePath)
+                .catch((error) => {
+                  debugLogger.warn(
+                    `Failed to delete temporary tool output file on abort: ${toolResult.fullOutputFilePath}`,
+                    error,
+                  );
+                });
+            }
             completedToolCall = await this.createCancelledResult(
               call,
               'User cancelled tool execution.',
@@ -149,6 +162,16 @@ export class ToolExecutor {
               toolResult,
             );
           } else {
+            if (toolResult.fullOutputFilePath) {
+              await fsPromises
+                .unlink(toolResult.fullOutputFilePath)
+                .catch((error) => {
+                  debugLogger.warn(
+                    `Failed to delete temporary tool output file on error: ${toolResult.fullOutputFilePath}`,
+                    error,
+                  );
+                });
+            }
             const displayText =
               typeof toolResult.returnDisplay === 'string'
                 ? toolResult.returnDisplay
@@ -197,33 +220,80 @@ export class ToolExecutor {
   private async truncateOutputIfNeeded(
     call: ToolCall,
     content: PartListUnion,
+    fullOutputFilePath?: string,
   ): Promise<{ truncatedContent: PartListUnion; outputFile?: string }> {
+    const toolName = call.request.name;
+    const callId = call.request.callId;
+
     if (this.config.isContextManagementEnabled()) {
       const distiller = new ToolOutputDistillationService(
         this.config,
         this.context.geminiClient,
         this.context.promptId,
       );
-      return distiller.distill(call.request.name, call.request.callId, content);
+      const result = await distiller.distill(
+        call.request.name,
+        call.request.callId,
+        content,
+      );
+
+      let finalOutputFile = result.outputFile;
+      if (fullOutputFilePath) {
+        const { outputFile: movedPath } = await moveToolOutputToFile(
+          fullOutputFilePath,
+          toolName,
+          callId,
+          this.config.storage.getProjectTempDir(),
+          this.config.getSessionId(),
+        );
+        finalOutputFile = movedPath;
+        if (result.outputFile) {
+          try {
+            await fsPromises.unlink(result.outputFile);
+          } catch (error) {
+            debugLogger.warn(
+              `Failed to delete distiller's temporary tool output file: ${result.outputFile}`,
+              error,
+            );
+          }
+        }
+      }
+      return {
+        truncatedContent: result.truncatedContent,
+        outputFile: finalOutputFile,
+      };
     }
 
-    const toolName = call.request.name;
-    const callId = call.request.callId;
     let outputFile: string | undefined;
+
+    if (fullOutputFilePath) {
+      const { outputFile: movedPath } = await moveToolOutputToFile(
+        fullOutputFilePath,
+        toolName,
+        callId,
+        this.config.storage.getProjectTempDir(),
+        this.config.getSessionId(),
+      );
+      outputFile = movedPath;
+    }
 
     if (typeof content === 'string' && toolName === SHELL_TOOL_NAME) {
       const threshold = this.config.getTruncateToolOutputThreshold();
 
       if (threshold > 0 && content.length > threshold) {
         const originalContentLength = content.length;
-        const { outputFile: savedPath } = await saveTruncatedToolOutput(
-          content,
-          toolName,
-          callId,
-          this.config.storage.getProjectTempDir(),
-          this.context.promptId,
-        );
-        outputFile = savedPath;
+
+        if (!outputFile) {
+          const { outputFile: writtenPath } = await saveTruncatedToolOutput(
+            content,
+            toolName,
+            callId,
+            this.config.storage.getProjectTempDir(),
+            this.context.promptId,
+          );
+          outputFile = writtenPath;
+        }
+
         const truncatedContent = formatTruncatedToolOutput(
           content,
           outputFile,
@@ -255,14 +325,16 @@ export class ToolExecutor {
 
         if (threshold > 0 && textContent.length > threshold) {
           const originalContentLength = textContent.length;
-          const { outputFile: savedPath } = await saveTruncatedToolOutput(
-            textContent,
-            toolName,
-            callId,
-            this.config.storage.getProjectTempDir(),
-            this.context.promptId,
-          );
-          outputFile = savedPath;
+          if (!outputFile) {
+            const { outputFile: savedPath } = await saveTruncatedToolOutput(
+              textContent,
+              toolName,
+              callId,
+              this.config.storage.getProjectTempDir(),
+              this.context.promptId,
+            );
+            outputFile = savedPath;
+          }
           const truncatedText = formatTruncatedToolOutput(
             textContent,
             outputFile,
@@ -314,7 +386,11 @@ export class ToolExecutor {
       // Attempt to truncate and save output if we have content, even in cancellation case
       // This is to handle cases where the tool may have produced output before cancellation
       const { truncatedContent: output, outputFile: truncatedOutputFile } =
-        await this.truncateOutputIfNeeded(call, toolResult?.llmContent);
+        await this.truncateOutputIfNeeded(
+          call,
+          toolResult.llmContent,
+          toolResult.fullOutputFilePath,
+        );
 
       outputFile = truncatedOutputFile;
       responseParts = convertToFunctionResponse(
@@ -323,6 +399,7 @@ export class ToolExecutor {
         output,
         this.config.getActiveModel(),
         this.config,
+        outputFile,
       );
 
       // Inject the cancellation error into the response object
@@ -332,6 +409,16 @@ export class ToolExecutor {
         respObj['error'] = errorMessage;
       }
     } else {
+      if (toolResult?.fullOutputFilePath) {
+        try {
+          await fsPromises.unlink(toolResult.fullOutputFilePath);
+        } catch (error) {
+          debugLogger.warn(
+            `Failed to delete temporary tool output file: ${toolResult.fullOutputFilePath}`,
+            error,
+          );
+        }
+      }
       responseParts = [
         {
           functionResponse: {
@@ -369,8 +456,11 @@ export class ToolExecutor {
     toolResult: ToolResult,
   ): Promise<SuccessfulToolCall> {
     const { truncatedContent: content, outputFile } =
-      await this.truncateOutputIfNeeded(call, toolResult.llmContent);
-
+      await this.truncateOutputIfNeeded(
+        call,
+        toolResult.llmContent,
+        toolResult.fullOutputFilePath,
+      );
     const toolName = call.request.originalRequestName || call.request.name;
     const callId = call.request.callId;
 
@@ -380,6 +470,7 @@ export class ToolExecutor {
       content,
       this.config.getActiveModel(),
       this.config,
+      outputFile,
     );
 
     const successResponse: ToolCallResponseInfo = {
