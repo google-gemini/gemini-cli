@@ -836,10 +836,35 @@ describe('Server Config (config.ts)', () => {
         undefined,
         undefined,
         undefined,
+        undefined,
       );
       // Verify that contentGeneratorConfig is updated
       expect(config.getContentGeneratorConfig()).toEqual(mockContentConfig);
       expect(GeminiClient).toHaveBeenCalledWith(config);
+    });
+
+    it('should pass Vertex AI routing settings when refreshing auth', async () => {
+      const vertexAiRouting = {
+        requestType: 'shared' as const,
+        sharedRequestType: 'priority' as const,
+      };
+      const config = new Config({
+        ...baseParams,
+        vertexAiRouting,
+      });
+
+      vi.mocked(createContentGeneratorConfig).mockResolvedValue({});
+
+      await config.refreshAuth(AuthType.USE_VERTEX_AI);
+
+      expect(createContentGeneratorConfig).toHaveBeenCalledWith(
+        config,
+        AuthType.USE_VERTEX_AI,
+        undefined,
+        undefined,
+        undefined,
+        vertexAiRouting,
+      );
     });
 
     it('should reset model availability status', async () => {
@@ -1975,6 +2000,8 @@ describe('GemmaModelRouterSettings', () => {
     const config = new Config(baseParams);
     const settings = config.getGemmaModelRouterSettings();
     expect(settings.enabled).toBe(false);
+    expect(settings.autoStartServer).toBe(true);
+    expect(settings.binaryPath).toBe('');
     expect(settings.classifier?.host).toBe('http://localhost:9379');
     expect(settings.classifier?.model).toBe('gemma3-1b-gpu-custom');
   });
@@ -1984,6 +2011,8 @@ describe('GemmaModelRouterSettings', () => {
       ...baseParams,
       gemmaModelRouter: {
         enabled: true,
+        autoStartServer: false,
+        binaryPath: '/custom/lit',
         classifier: {
           host: 'http://custom:1234',
           model: 'custom-gemma',
@@ -1993,6 +2022,8 @@ describe('GemmaModelRouterSettings', () => {
     const config = new Config(params);
     const settings = config.getGemmaModelRouterSettings();
     expect(settings.enabled).toBe(true);
+    expect(settings.autoStartServer).toBe(false);
+    expect(settings.binaryPath).toBe('/custom/lit');
     expect(settings.classifier?.host).toBe('http://custom:1234');
     expect(settings.classifier?.model).toBe('custom-gemma');
   });
@@ -2007,6 +2038,8 @@ describe('GemmaModelRouterSettings', () => {
     const config = new Config(params);
     const settings = config.getGemmaModelRouterSettings();
     expect(settings.enabled).toBe(true);
+    expect(settings.autoStartServer).toBe(true);
+    expect(settings.binaryPath).toBe('');
     expect(settings.classifier?.host).toBe('http://localhost:9379');
     expect(settings.classifier?.model).toBe('gemma3-1b-gpu-custom');
   });
