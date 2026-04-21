@@ -74,6 +74,22 @@ jobs:
         run: 'npx vitest run --pool=threads packages/cli/src/ui/App.test.tsx packages/cli/src/ui/AppContainer.test.tsx packages/cli/src/ui/IdeIntegrationNudge.test.tsx packages/cli/src/ui/ToolConfirmationFullFrame.test.tsx packages/cli/src/ui/auth packages/cli/src/ui/commands packages/cli/src/ui/contexts packages/cli/src/ui/hooks packages/cli/src/ui/key packages/cli/src/ui/layouts packages/cli/src/ui/noninteractive packages/cli/src/ui/privacy packages/cli/src/ui/state packages/cli/src/ui/themes packages/cli/src/ui/utils'
         shell: 'bash'
 
+  test_ui_components_top:
+    name: 'Test (Linux) - UI Components Top'
+    runs-on: 'gemini-cli-ubuntu-16-core'
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
+
+      - name: 'Setup and Build'
+        uses: './.github/actions/setup-gemini'
+        with:
+          mode: 'source'
+
+      - name: 'Run UI Components Top Tests'
+        run: 'npx vitest run --pool=threads packages/cli/src/ui/components/*.test.tsx'
+        shell: 'bash'
+
   test_batch_1:
     name: 'Test (Linux) - Batch 1 (Utils & Test-Utils)'
     runs-on: 'gemini-cli-ubuntu-16-core'
