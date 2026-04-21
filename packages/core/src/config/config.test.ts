@@ -815,9 +815,10 @@ describe('Server Config (config.ts)', () => {
 
       await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
       await config.getExperimentsAsync();
-      await new Promise((r) => setTimeout(r, 0));
 
-      expect(config.getModel()).toBe(PREVIEW_GEMINI_FLASH_MODEL);
+      await vi.waitFor(() => {
+        expect(config.getModel()).toBe(PREVIEW_GEMINI_FLASH_MODEL);
+      });
     });
 
     it('should NOT switch to flash model if user has Pro access and model is auto', async () => {
