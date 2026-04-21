@@ -1562,7 +1562,6 @@ export class Config implements McpContext, AgentLoopContext {
         return undefined;
       });
 
-    // Run experiments and quota promises concurrently
     const [experiments] = await Promise.all([
       this.experimentsPromise,
       quotaPromise.catch((e) => {
