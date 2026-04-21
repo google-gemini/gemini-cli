@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useEffect, useReducer, useRef } from 'react';
+import { useCallback, useEffect, useReducer, useRef } from 'react';
 import { setTimeout as setTimeoutPromise } from 'node:timers/promises';
 import * as path from 'node:path';
 import {
@@ -224,15 +224,28 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
     setIsLoadingSuggestions(state.isLoading);
   }, [state.isLoading, setIsLoadingSuggestions]);
 
-  const resetFileSearchState = () => {
+  const disposeFileSearchers = useCallback(async () => {
+    const searchers = [...fileSearchMap.current.values()];
     fileSearchMap.current.clear();
     initEpoch.current += 1;
+
+    const closePromises: Array<Promise<void>> = [];
+    for (const searcher of searchers) {
+      if (searcher.close) {
+        closePromises.push(searcher.close());
+      }
+    }
+    await Promise.all(closePromises);
+  }, []);
+
+  const resetFileSearchState = useCallback(() => {
+    void disposeFileSearchers();
     dispatch({ type: 'RESET' });
-  };
+  }, [disposeFileSearchers]);
 
   useEffect(() => {
     resetFileSearchState();
-  }, [cwd, config]);
+  }, [cwd, config, resetFileSearchState]);
 
   useEffect(() => {
     const workspaceContext = config?.getWorkspaceContext?.();
@@ -242,7 +255,18 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
       workspaceContext.onDirectoriesChanged(resetFileSearchState);
 
     return unsubscribe;
-  }, [config]);
+  }, [config, resetFileSearchState]);
+
+  useEffect(
+    () => () => {
+      void disposeFileSearchers();
+      searchAbortController.current?.abort();
+      if (slowSearchTimer.current) {
+        clearTimeout(slowSearchTimer.current);
+      }
+    },
+    [disposeFileSearchers],
+  );
 
   // Reacts to user input (`pattern`) ONLY.
   useEffect(() => {
@@ -295,6 +319,8 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
             ),
             cache: true,
             cacheTtl: 30,
+            enableFileWatcher:
+              config?.getFileFilteringOptions()?.enableFileWatcher ?? false,
             enableRecursiveFileSearch:
               config?.getEnableRecursiveFileSearch() ?? true,
             enableFuzzySearch:
