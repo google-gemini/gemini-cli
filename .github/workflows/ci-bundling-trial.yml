@@ -40,6 +40,9 @@ jobs:
     needs: build
     runs-on: 'gemini-cli-ubuntu-16-core'
     steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
+
       - name: 'Download Workspace'
         uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806'
         with:
@@ -61,6 +64,9 @@ jobs:
     needs: build
     runs-on: 'gemini-cli-ubuntu-16-core'
     steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
+
       - name: 'Download Workspace'
         uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806'
         with:
@@ -82,6 +88,9 @@ jobs:
     needs: build
     runs-on: 'gemini-cli-ubuntu-16-core'
     steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
+
       - name: 'Download Workspace'
         uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806'
         with:
@@ -103,6 +112,9 @@ jobs:
     needs: build
     runs-on: 'gemini-cli-ubuntu-16-core'
     steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
+
       - name: 'Download Workspace'
         uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806'
         with:
@@ -124,6 +136,9 @@ jobs:
     needs: build
     runs-on: 'gemini-cli-ubuntu-16-core'
     steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
+
       - name: 'Download Workspace'
         uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806'
         with:
@@ -145,6 +160,9 @@ jobs:
     needs: build
     runs-on: 'gemini-cli-ubuntu-16-core'
     steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
+
       - name: 'Download Workspace'
         uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806'
         with:
@@ -166,6 +184,9 @@ jobs:
     needs: build
     runs-on: 'gemini-cli-ubuntu-16-core'
     steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
+
       - name: 'Download Workspace'
         uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806'
         with:
@@ -187,6 +208,9 @@ jobs:
     needs: build
     runs-on: 'gemini-cli-ubuntu-16-core'
     steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
+
       - name: 'Download Workspace'
         uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806'
         with:
