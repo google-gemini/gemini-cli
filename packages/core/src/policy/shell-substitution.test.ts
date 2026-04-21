@@ -4,10 +4,25 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { expect, describe, it, beforeAll } from 'vitest';
+import { expect, describe, it, beforeAll, vi } from 'vitest';
 import { PolicyEngine } from './policy-engine.js';
 import { PolicyDecision } from './types.js';
 import { initializeShellParsers } from '../utils/shell-utils.js';
+
+// Mock shell-utils to ensure consistent behavior across platforms (especially Windows CI)
+// We want to test PolicyEngine logic with Bash syntax rules.
+vi.mock('../utils/shell-utils.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../utils/shell-utils.js')>();
+  return {
+    ...actual,
+    getShellConfiguration: () => ({
+      executable: 'bash',
+      argsPrefix: ['-c'],
+      shell: 'bash',
+    }),
+  };
+});
 
 describe('PolicyEngine Command Substitution Validation', () => {
   beforeAll(async () => {
