@@ -105,6 +105,31 @@ describe('LoopDetectionService', () => {
       expect(loggers.logLoopDetected).toHaveBeenCalledTimes(1);
     });
 
+    it('should detect a loop for consecutive calls to a thinking tool even with different arguments', () => {
+      const toolName = 'sequentialthinking';
+      for (let i = 0; i < 15 - 1; i++) {
+        const event = createToolCallRequestEvent(toolName, {
+          thoughtNumber: i,
+        });
+        expect(service.addAndCheck(event).count).toBe(0);
+      }
+      const finalEvent = createToolCallRequestEvent(toolName, {
+        thoughtNumber: 14,
+      });
+      expect(service.addAndCheck(finalEvent).count).toBe(1);
+      expect(loggers.logLoopDetected).toHaveBeenCalledTimes(1);
+    });
+
+    it('should detect a loop for consecutive calls to a non-thinking tool with different arguments at a higher threshold', () => {
+      const toolName = 'otherTool';
+      for (let i = 0; i < 50 - 1; i++) {
+        const event = createToolCallRequestEvent(toolName, { arg: i });
+        expect(service.addAndCheck(event).count).toBe(0);
+      }
+      const finalEvent = createToolCallRequestEvent(toolName, { arg: 49 });
+      expect(service.addAndCheck(finalEvent).count).toBe(1);
+    });
+
     it('should not detect a loop for different tool calls', () => {
       const event1 = createToolCallRequestEvent('testTool', {
         param: 'value1',
