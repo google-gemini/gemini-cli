@@ -538,5 +538,52 @@ describe('a2aUtils', () => {
       expect(output).toContain('Artifact (Data):');
       expect(output).not.toContain('Answer from history');
     });
+
+    it('should return message log as activity items', () => {
+      const reassembler = new A2AResultReassembler();
+
+      reassembler.update({
+        kind: 'status-update',
+        taskId: 't1',
+        contextId: 'ctx1',
+        status: {
+          state: 'working',
+          message: {
+            kind: 'message',
+            role: 'agent',
+            parts: [{ kind: 'text', text: 'Message 1' }],
+          } as Message,
+        },
+      } as unknown as SendMessageResult);
+
+      reassembler.update({
+        kind: 'status-update',
+        taskId: 't1',
+        contextId: 'ctx1',
+        status: {
+          state: 'working',
+          message: {
+            kind: 'message',
+            role: 'agent',
+            parts: [{ kind: 'text', text: 'Message 2' }],
+          } as Message,
+        },
+      } as unknown as SendMessageResult);
+
+      const items = reassembler.toActivityItems();
+      expect(items).toHaveLength(2);
+      expect(items[0]).toEqual({
+        id: 'msg-0',
+        type: 'thought',
+        content: 'Message 1',
+        status: 'completed',
+      });
+      expect(items[1]).toEqual({
+        id: 'msg-1',
+        type: 'thought',
+        content: 'Message 2',
+        status: 'completed',
+      });
+    });
   });
 });
