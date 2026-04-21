@@ -1748,7 +1748,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   return (
     <>
       {suggestionsPosition === 'above' && suggestionsNode}
-      {useLineFallback ? (
+      {useLineFallback || !useBackgroundColor ? (
         <Box
           borderStyle="round"
           borderTop={true}
@@ -1767,17 +1767,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         backgroundOpacity={1}
         useBackgroundColor={useBackgroundColor}
       >
-        <Box
-          flexGrow={1}
-          flexDirection="row"
-          paddingX={1}
-          borderColor={borderColor}
-          borderStyle={useLineFallback ? 'round' : undefined}
-          borderTop={false}
-          borderBottom={false}
-          borderLeft={!useBackgroundColor || useLineFallback}
-          borderRight={!useBackgroundColor || useLineFallback}
-        >
+        <Box flexGrow={1} flexDirection="row" paddingX={1}>
           <Text
             color={statusColor ?? theme.text.accent}
             aria-label={statusText || undefined}
@@ -1866,7 +1856,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           </Box>
         </Box>
       </HalfLinePaddedBox>
-      {useLineFallback ? (
+      {useLineFallback || !useBackgroundColor ? (
         <Box
           borderStyle="round"
           borderTop={false}
