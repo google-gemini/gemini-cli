@@ -8,7 +8,6 @@ import fsPromises from 'node:fs/promises';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import crypto from 'node:crypto';
 import { debugLogger } from '../index.js';
 import { type SandboxPermissions } from '../services/sandboxManager.js';
 import { ToolErrorType } from './tool-error.js';
@@ -42,6 +41,7 @@ import {
   parseCommandDetails,
   hasRedirection,
   normalizeCommand,
+  escapeShellArg,
 } from '../utils/shell-utils.js';
 import { SHELL_TOOL_NAME } from './tool-names.js';
 import { PARAM_ADDITIONAL_PERMISSIONS } from './definitions/base-declarations.js';
@@ -111,7 +111,8 @@ export class ShellToolInvocation extends BaseToolInvocation<
     if (trimmed.endsWith('\\')) {
       trimmed += ' ';
     }
-    return `(\n${trimmed}\n); __code=$?; pgrep -g 0 >${tempFilePath} 2>&1; exit $__code;`;
+    const escapedTempFilePath = escapeShellArg(tempFilePath, 'bash');
+    return `(\n${trimmed}\n)\n__code=$?; pgrep -g 0 >${escapedTempFilePath} 2>&1; exit $__code;`;
   }
 
   private getContextualDetails(): string {
@@ -450,10 +451,8 @@ export class ShellToolInvocation extends BaseToolInvocation<
     }
 
     const isWindows = os.platform() === 'win32';
-    const tempFileName = `shell_pgrep_${crypto
-      .randomBytes(6)
-      .toString('hex')}.tmp`;
-    const tempFilePath = path.join(os.tmpdir(), tempFileName);
+    let tempFilePath = '';
+    let tempDir = '';
 
     const timeoutMs = this.context.config.getShellToolInactivityTimeout();
     const timeoutController = new AbortController();
@@ -463,8 +462,10 @@ export class ShellToolInvocation extends BaseToolInvocation<
     const combinedController = new AbortController();
 
     const onAbort = () => combinedController.abort();
-
     try {
+      tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gemini-shell-'));
+      tempFilePath = path.join(tempDir, 'pgrep.tmp');
+
       // pgrep is not available on Windows, so we can't get background PIDs
       const commandToExecute = this.wrapCommandForPgrep(
         strippedCommand,
@@ -638,7 +639,10 @@ export class ShellToolInvocation extends BaseToolInvocation<
 
         if (tempFileExists) {
           const pgrepContent = await fsPromises.readFile(tempFilePath, 'utf8');
-          const pgrepLines = pgrepContent.split(os.EOL).filter(Boolean);
+          const pgrepLines = pgrepContent
+            .split('\n')
+            .map((line) => line.trim())
+            .filter(Boolean);
           for (const line of pgrepLines) {
             if (!/^\d+$/.test(line)) {
               if (
@@ -935,10 +939,19 @@ export class ShellToolInvocation extends BaseToolInvocation<
       if (timeoutTimer) clearTimeout(timeoutTimer);
       signal.removeEventListener('abort', onAbort);
       timeoutController.signal.removeEventListener('abort', onAbort);
-      try {
-        await fsPromises.unlink(tempFilePath);
-      } catch {
-        // Ignore errors during unlink
+      if (tempFilePath) {
+        try {
+          await fsPromises.unlink(tempFilePath);
+        } catch {
+          // Ignore errors during unlink
+        }
+      }
+      if (tempDir) {
+        try {
+          await fsPromises.rm(tempDir, { recursive: true, force: true });
+        } catch {
+          // Ignore errors during rm
+        }
       }
     }
   }

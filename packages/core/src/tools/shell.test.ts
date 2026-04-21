@@ -96,6 +96,7 @@ describe('ShellTool', () => {
   let mockShellOutputCallback: (event: ShellOutputEvent) => void;
   let resolveExecutionPromise: (result: ShellExecutionResult) => void;
   let tempRootDir: string;
+  let extractedTmpFile: string;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -197,16 +198,28 @@ describe('ShellTool', () => {
     process.env['ComSpec'] =
       'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe';
 
+    extractedTmpFile = '';
+
     // Capture the output callback to simulate streaming events from the service
-    mockShellExecutionService.mockImplementation((_cmd, _cwd, callback) => {
-      mockShellOutputCallback = callback;
-      return {
-        pid: 12345,
-        result: new Promise((resolve) => {
-          resolveExecutionPromise = resolve;
-        }),
-      };
-    });
+    mockShellExecutionService.mockImplementation(
+      (
+        cmd: string,
+        _cwd: string,
+        callback: (event: ShellOutputEvent) => void,
+      ) => {
+        mockShellOutputCallback = callback;
+        const match = cmd.match(/pgrep -g 0 >([^ ]+)/);
+        if (match) {
+          extractedTmpFile = match[1].replace(/['"]/g, ''); // remove any quotes if present
+        }
+        return {
+          pid: 12345,
+          result: new Promise((resolve) => {
+            resolveExecutionPromise = resolve;
+          }),
+        };
+      },
+    );
 
     mockShellBackground.mockImplementation(() => {
       resolveExecutionPromise({
@@ -293,17 +306,16 @@ describe('ShellTool', () => {
     it('should wrap command on linux and parse pgrep output', async () => {
       const invocation = shellTool.build({ command: 'my-command &' });
       const promise = invocation.execute({ abortSignal: mockAbortSignal });
-      resolveShellExecution({ pid: 54321 });
 
       // Simulate pgrep output file creation by the shell command
-      const tmpFile = path.join(os.tmpdir(), 'shell_pgrep_abcdef.tmp');
-      fs.writeFileSync(tmpFile, `54321${os.EOL}54322${os.EOL}`);
+      fs.writeFileSync(extractedTmpFile, `54321${os.EOL}54322${os.EOL}`);
+
+      resolveShellExecution({ pid: 54321 });
 
       const result = await promise;
 
-      const wrappedCommand = `(\n${'my-command &'}\n); __code=$?; pgrep -g 0 >${tmpFile} 2>&1; exit $__code;`;
       expect(mockShellExecutionService).toHaveBeenCalledWith(
-        wrappedCommand,
+        expect.stringMatching(/pgrep -g 0 >.*gemini-shell-.*[/\\]pgrep\.tmp/),
         tempRootDir,
         expect.any(Function),
         expect.any(AbortSignal),
@@ -316,7 +328,7 @@ describe('ShellTool', () => {
       );
       expect(result.llmContent).toContain('Background PIDs: 54322');
       // The file should be deleted by the tool
-      expect(fs.existsSync(tmpFile)).toBe(false);
+      expect(fs.existsSync(extractedTmpFile)).toBe(false);
     });
 
     it('should add a space when command ends with a backslash to prevent escaping newline', async () => {
@@ -325,10 +337,8 @@ describe('ShellTool', () => {
       resolveShellExecution();
       await promise;
 
-      const tmpFile = path.join(os.tmpdir(), 'shell_pgrep_abcdef.tmp');
-      const wrappedCommand = `(\nls\\ \n); __code=$?; pgrep -g 0 >${tmpFile} 2>&1; exit $__code;`;
       expect(mockShellExecutionService).toHaveBeenCalledWith(
-        wrappedCommand,
+        expect.stringMatching(/pgrep -g 0 >.*gemini-shell-.*[/\\]pgrep\.tmp/),
         tempRootDir,
         expect.any(Function),
         expect.any(AbortSignal),
@@ -343,10 +353,8 @@ describe('ShellTool', () => {
       resolveShellExecution();
       await promise;
 
-      const tmpFile = path.join(os.tmpdir(), 'shell_pgrep_abcdef.tmp');
-      const wrappedCommand = `(\nls # comment\n); __code=$?; pgrep -g 0 >${tmpFile} 2>&1; exit $__code;`;
       expect(mockShellExecutionService).toHaveBeenCalledWith(
-        wrappedCommand,
+        expect.stringMatching(/pgrep -g 0 >.*gemini-shell-.*[/\\]pgrep\.tmp/),
         tempRootDir,
         expect.any(Function),
         expect.any(AbortSignal),
@@ -365,10 +373,8 @@ describe('ShellTool', () => {
       resolveShellExecution();
       await promise;
 
-      const tmpFile = path.join(os.tmpdir(), 'shell_pgrep_abcdef.tmp');
-      const wrappedCommand = `(\n${'ls'}\n); __code=$?; pgrep -g 0 >${tmpFile} 2>&1; exit $__code;`;
       expect(mockShellExecutionService).toHaveBeenCalledWith(
-        wrappedCommand,
+        expect.stringMatching(/pgrep -g 0 >.*gemini-shell-.*[/\\]pgrep\.tmp/),
         subdir,
         expect.any(Function),
         expect.any(AbortSignal),
@@ -390,10 +396,8 @@ describe('ShellTool', () => {
       resolveShellExecution();
       await promise;
 
-      const tmpFile = path.join(os.tmpdir(), 'shell_pgrep_abcdef.tmp');
-      const wrappedCommand = `(\n${'ls'}\n); __code=$?; pgrep -g 0 >${tmpFile} 2>&1; exit $__code;`;
       expect(mockShellExecutionService).toHaveBeenCalledWith(
-        wrappedCommand,
+        expect.stringMatching(/pgrep -g 0 >.*gemini-shell-.*[/\\]pgrep\.tmp/),
         path.join(tempRootDir, 'subdir'),
         expect.any(Function),
         expect.any(AbortSignal),
@@ -461,6 +465,26 @@ describe('ShellTool', () => {
       },
       20000,
     );
+
+    it('should correctly wrap heredoc commands', async () => {
+      const command = `cat << 'EOF'
+hello world
+EOF`;
+      const invocation = shellTool.build({ command });
+      const promise = invocation.execute({ abortSignal: mockAbortSignal });
+      resolveShellExecution();
+      await promise;
+
+      expect(mockShellExecutionService).toHaveBeenCalledWith(
+        expect.stringMatching(/pgrep -g 0 >.*gemini-shell-.*[/\\]pgrep\.tmp/),
+        tempRootDir,
+        expect.any(Function),
+        expect.any(AbortSignal),
+        false,
+        expect.any(Object),
+      );
+      expect(mockShellExecutionService.mock.calls[0][0]).toMatch(/\nEOF\n\)\n/);
+    });
 
     it('should format error messages correctly', async () => {
       const error = new Error('wrapped command failed');
@@ -562,10 +586,13 @@ describe('ShellTool', () => {
 
     it('should clean up the temp file on synchronous execution error', async () => {
       const error = new Error('sync spawn error');
-      mockShellExecutionService.mockImplementation(() => {
-        // Create the temp file before throwing to simulate it being left behind
-        const tmpFile = path.join(os.tmpdir(), 'shell_pgrep_abcdef.tmp');
-        fs.writeFileSync(tmpFile, '');
+      mockShellExecutionService.mockImplementation((cmd: string) => {
+        const match = cmd.match(/pgrep -g 0 >([^ ]+)/);
+        if (match) {
+          extractedTmpFile = match[1].replace(/['"]/g, ''); // remove any quotes if present
+          // Create the temp file before throwing to simulate it being left behind
+          fs.writeFileSync(extractedTmpFile, '');
+        }
         throw error;
       });
 
@@ -574,8 +601,7 @@ describe('ShellTool', () => {
         invocation.execute({ abortSignal: mockAbortSignal }),
       ).rejects.toThrow(error);
 
-      const tmpFile = path.join(os.tmpdir(), 'shell_pgrep_abcdef.tmp');
-      expect(fs.existsSync(tmpFile)).toBe(false);
+      expect(fs.existsSync(extractedTmpFile)).toBe(false);
     });
 
     it('should not log "missing pgrep output" when process is backgrounded', async () => {
