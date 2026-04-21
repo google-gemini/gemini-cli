@@ -44,11 +44,12 @@ runs:
       shell: 'bash'
 
     - name: 'Build Core (Required for all tests)'
+      if: "${{ inputs.skip-npm-ci != 'true' }}"
       run: 'npm run build --workspace @google/gemini-cli-core'
       shell: 'bash'
-
+ 
     - name: 'Build from source'
-      if: "${{ inputs.mode == 'source' }}"
+      if: "${{ inputs.mode == 'source' && inputs.skip-npm-ci != 'true' }}"
       run: 'npm run build'
       shell: 'bash'
 
