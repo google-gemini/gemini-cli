@@ -1,14 +1,12 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
-    "ignoreDeprecations": "6.0",
     "outDir": "dist",
     "declarationDir": "dist",
     "lib": ["DOM", "DOM.Iterable", "ES2023"],
     "composite": true,
     "tsBuildInfoFile": "../../.cache/core.tsbuildinfo",
     "types": ["node", "vitest/globals"],
-    "baseUrl": ".",
     "paths": {
       "@google/gemini-cli-core": ["./index.ts"]
     }
