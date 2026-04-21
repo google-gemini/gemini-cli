@@ -11,9 +11,10 @@ import {
   getSecretFileFindArgs,
   type ResolvedSandboxPaths,
 } from '../../services/sandboxManager.js';
-import { resolveGitWorktreePaths, isErrnoException } from '../utils/fsUtils.js';
+import { isErrnoException } from '../utils/fsUtils.js';
 import { spawnAsync } from '../../utils/shell-utils.js';
 import { debugLogger } from '../../utils/debugLogger.js';
+import { toPathKey } from '../../utils/paths.js';
 
 /**
  * Options for building bubblewrap (bwrap) arguments.
@@ -23,7 +24,7 @@ export interface BwrapArgsOptions {
   workspaceWrite: boolean;
   networkAccess: boolean;
   maskFilePath: string;
-  isWriteCommand: boolean;
+  isReadOnlyCommand: boolean;
 }
 
 /**
@@ -37,7 +38,7 @@ export async function buildBwrapArgs(
     workspaceWrite,
     networkAccess,
     maskFilePath,
-    isWriteCommand,
+    isReadOnlyCommand,
   } = options;
   const { workspace } = resolvedPaths;
 
@@ -63,53 +64,101 @@ export async function buildBwrapArgs(
     '/tmp',
   );
 
-  const bindFlag = workspaceWrite ? '--bind-try' : '--ro-bind-try';
+  type MountType =
+    | '--bind'
+    | '--ro-bind'
+    | '--bind-try'
+    | '--ro-bind-try'
+    | '--symlink';
 
-  bwrapArgs.push(bindFlag, workspace.original, workspace.original);
+  type Mount =
+    | {
+        type: MountType;
+        src: string;
+        dest: string;
+      }
+    | { type: '--tmpfs-ro'; dest: string };
+
+  const mounts: Mount[] = [];
+
+  const bindFlag: MountType = workspaceWrite ? '--bind-try' : '--ro-bind-try';
+  mounts.push({
+    type: bindFlag,
+    src: workspace.original,
+    dest: workspace.original,
+  });
   if (workspace.resolved !== workspace.original) {
-    bwrapArgs.push(bindFlag, workspace.resolved, workspace.resolved);
-  }
-
-  const { worktreeGitDir, mainGitDir } = resolveGitWorktreePaths(
-    workspace.resolved,
-  );
-  if (worktreeGitDir) {
-    bwrapArgs.push(bindFlag, worktreeGitDir, worktreeGitDir);
-  }
-  if (mainGitDir) {
-    bwrapArgs.push(bindFlag, mainGitDir, mainGitDir);
+    mounts.push({
+      type: bindFlag,
+      src: workspace.resolved,
+      dest: workspace.resolved,
+    });
   }
 
   for (const includeDir of resolvedPaths.globalIncludes) {
-    bwrapArgs.push('--ro-bind-try', includeDir, includeDir);
+    mounts.push({ type: '--ro-bind-try', src: includeDir, dest: includeDir });
   }
 
   for (const allowedPath of resolvedPaths.policyAllowed) {
     if (fs.existsSync(allowedPath)) {
-      bwrapArgs.push('--bind-try', allowedPath, allowedPath);
+      mounts.push({ type: '--bind-try', src: allowedPath, dest: allowedPath });
     } else {
-      // If the path doesn't exist, we still want to allow access to its parent
-      // to enable creating it. Since allowedPath is already resolved by resolveSandboxPaths,
-      // its parent is also correctly resolved.
       const parent = dirname(allowedPath);
-      bwrapArgs.push(isWriteCommand ? '--bind-try' : bindFlag, parent, parent);
+      mounts.push({
+        type: isReadOnlyCommand ? '--ro-bind-try' : '--bind-try',
+        src: parent,
+        dest: parent,
+      });
     }
   }
 
   for (const p of resolvedPaths.policyRead) {
-    bwrapArgs.push('--ro-bind-try', p, p);
+    mounts.push({ type: '--ro-bind-try', src: p, dest: p });
   }
 
+  // Collect explicit additional write permissions.
   for (const p of resolvedPaths.policyWrite) {
-    bwrapArgs.push('--bind-try', p, p);
+    mounts.push({ type: '--bind-try', src: p, dest: p });
   }
+
+  const policyWriteKeys = new Set(resolvedPaths.policyWrite.map(toPathKey));
 
   for (const file of GOVERNANCE_FILES) {
     const filePath = join(workspace.original, file.path);
     const realPath = join(workspace.resolved, file.path);
-    bwrapArgs.push('--ro-bind', filePath, filePath);
-    if (realPath !== filePath) {
-      bwrapArgs.push('--ro-bind', realPath, realPath);
+
+    const isExplicitlyWritable =
+      policyWriteKeys.has(toPathKey(filePath)) ||
+      policyWriteKeys.has(toPathKey(realPath));
+
+    // If the workspace is writable, we allow editing .gitignore and .geminiignore by default.
+    // .git remains protected unless explicitly requested (e.g. for git commands).
+    const isImplicitlyWritable = workspaceWrite && file.path !== '.git';
+
+    if (!isExplicitlyWritable && !isImplicitlyWritable) {
+      mounts.push({ type: '--ro-bind', src: filePath, dest: filePath });
+      if (realPath !== filePath) {
+        mounts.push({ type: '--ro-bind', src: realPath, dest: realPath });
+      }
+    }
+  }
+
+  // Grant read-only access to git worktrees/submodules.
+  if (resolvedPaths.gitWorktree) {
+    const { worktreeGitDir, mainGitDir } = resolvedPaths.gitWorktree;
+    if (worktreeGitDir && !policyWriteKeys.has(toPathKey(worktreeGitDir))) {
+      mounts.push({
+        type: '--ro-bind-try',
+        src: worktreeGitDir,
+        dest: worktreeGitDir,
+      });
+    }
+    if (mainGitDir && !policyWriteKeys.has(toPathKey(mainGitDir))) {
+      mounts.push({
+        type: '--ro-bind-try',
+        src: mainGitDir,
+        dest: mainGitDir,
+      });
     }
   }
 
@@ -118,37 +167,23 @@ export async function buildBwrapArgs(
     try {
       const stat = fs.statSync(p);
       if (stat.isDirectory()) {
-        bwrapArgs.push('--tmpfs', p, '--remount-ro', p);
+        mounts.push({ type: '--tmpfs-ro', dest: p });
       } else {
-        bwrapArgs.push('--ro-bind', '/dev/null', p);
+        mounts.push({ type: '--ro-bind', src: '/dev/null', dest: p });
       }
     } catch (e: unknown) {
       if (isErrnoException(e) && e.code === 'ENOENT') {
-        bwrapArgs.push('--symlink', '/dev/null', p);
+        mounts.push({ type: '--symlink', src: '/dev/null', dest: p });
       } else {
         debugLogger.warn(
           `Failed to secure forbidden path ${p}: ${e instanceof Error ? e.message : String(e)}`,
         );
-        bwrapArgs.push('--ro-bind', '/dev/null', p);
+        mounts.push({ type: '--ro-bind', src: '/dev/null', dest: p });
       }
     }
   }
 
   // Mask secret files (.env, .env.*)
-  const secretArgs = await getSecretFilesArgs(resolvedPaths, maskFilePath);
-  bwrapArgs.push(...secretArgs);
-
-  return bwrapArgs;
-}
-
-/**
- * Generates bubblewrap arguments to mask secret files.
- */
-async function getSecretFilesArgs(
-  resolvedPaths: ResolvedSandboxPaths,
-  maskPath: string,
-): Promise<string[]> {
-  const args: string[] = [];
   const searchDirs = new Set([
     resolvedPaths.workspace.original,
     resolvedPaths.workspace.resolved,
@@ -159,9 +194,6 @@ async function getSecretFilesArgs(
 
   for (const dir of searchDirs) {
     try {
-      // Use the native 'find' command for performance and to catch nested secrets.
-      // We limit depth to 3 to keep it fast while covering common nested structures.
-      // We use -prune to skip heavy directories efficiently while matching dotfiles.
       const findResult = await spawnAsync('find', [
         dir,
         '-maxdepth',
@@ -198,7 +230,7 @@ async function getSecretFilesArgs(
       const files = findResult.stdout.toString().split('\0');
       for (const file of files) {
         if (file.trim()) {
-          args.push('--bind', maskPath, file.trim());
+          mounts.push({ type: '--bind', src: maskFilePath, dest: file.trim() });
         }
       }
     } catch (e) {
@@ -208,5 +240,19 @@ async function getSecretFilesArgs(
       );
     }
   }
-  return args;
+
+  // Sort mounts by destination path length to ensure parents are bound before children.
+  // This prevents hierarchical masking where a parent mount would hide a child mount.
+  mounts.sort((a, b) => a.dest.length - b.dest.length);
+
+  // Emit final bwrap arguments
+  for (const m of mounts) {
+    if (m.type === '--tmpfs-ro') {
+      bwrapArgs.push('--tmpfs', m.dest, '--remount-ro', m.dest);
+    } else {
+      bwrapArgs.push(m.type, m.src, m.dest);
+    }
+  }
+
+  return bwrapArgs;
 }

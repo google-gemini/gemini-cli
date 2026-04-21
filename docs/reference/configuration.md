@@ -71,7 +71,7 @@ Additionally, each extension can have its own `.env` file in its directory,
 which will be loaded automatically.
 
 **Note for Enterprise Users:** For guidance on deploying and managing Gemini CLI
-in a corporate environment, please see the
+in a corporate environment, see the
 [Enterprise Configuration](../cli/enterprise.md) documentation.
 
 ### The `.gemini` directory in your project
@@ -79,7 +79,7 @@ in a corporate environment, please see the
 In addition to a project settings file, a project's `.gemini` directory can
 contain other project-specific files related to Gemini CLI's operation, such as:
 
-- [Custom sandbox profiles](#sandboxing) (e.g.,
+- [Custom sandbox profiles](#sandboxing) (for example,
   `.gemini/sandbox-macos-custom.sb`, `.gemini/sandbox.Dockerfile`).
 
 ### Available settings in `settings.json`
@@ -134,9 +134,14 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `true`
 
 - **`general.enableNotifications`** (boolean):
-  - **Description:** Enable run-event notifications for action-required prompts
-    and session completion.
+  - **Description:** Enable terminal run-event notifications for action-required
+    prompts and session completion.
   - **Default:** `false`
+
+- **`general.notificationMethod`** (enum):
+  - **Description:** How to send terminal notifications.
+  - **Default:** `"auto"`
+  - **Values:** `"auto"`, `"osc9"`, `"osc777"`, `"bell"`
 
 - **`general.checkpointing.enabled`** (boolean):
   - **Description:** Enable session checkpointing for recovery
@@ -193,6 +198,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Minimum retention period (safety limit, defaults to "1d")
   - **Default:** `"1d"`
 
+- **`general.topicUpdateNarration`** (boolean):
+  - **Description:** Enable the Topic & Update communication model for reduced
+    chattiness and structured progress reporting.
+  - **Default:** `true`
+
 #### `output`
 
 - **`output.format`** (enum):
@@ -201,6 +211,12 @@ their corresponding top-level category object in your `settings.json` file.
   - **Values:** `"text"`, `"json"`
 
 #### `ui`
+
+- **`ui.debugRainbow`** (boolean):
+  - **Description:** Enable debug rainbow rendering. Only useful for debugging
+    rendering bugs and performance issues.
+  - **Default:** `false`
+  - **Requires restart:** Yes
 
 - **`ui.theme`** (string):
   - **Description:** The color theme for the UI. See the CLI themes guide for
@@ -1695,6 +1711,18 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
+- **`experimental.gemmaModelRouter.autoStartServer`** (boolean):
+  - **Description:** Automatically start the LiteRT-LM server when Gemini CLI
+    starts and the Gemma router is enabled.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
+- **`experimental.gemmaModelRouter.binaryPath`** (string):
+  - **Description:** Custom path to the LiteRT-LM binary. Leave empty to use the
+    default location (~/.gemini/bin/litert/).
+  - **Default:** `""`
+  - **Requires restart:** Yes
+
 - **`experimental.gemmaModelRouter.classifier.host`** (string):
   - **Description:** The host of the classifier.
   - **Default:** `"http://localhost:9379"`
@@ -1713,6 +1741,12 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
+- **`experimental.autoMemory`** (boolean):
+  - **Description:** Automatically extract reusable skills from past sessions in
+    the background. Review results with /memory inbox.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
 - **`experimental.generalistProfile`** (boolean):
   - **Description:** Suitable for general coding and software development tasks.
   - **Default:** `false`
@@ -1724,8 +1758,7 @@ their corresponding top-level category object in your `settings.json` file.
   - **Requires restart:** Yes
 
 - **`experimental.topicUpdateNarration`** (boolean):
-  - **Description:** Enable the experimental Topic & Update communication model
-    for reduced chattiness and structured progress reporting.
+  - **Description:** Deprecated: Use general.topicUpdateNarration instead.
   - **Default:** `false`
 
 #### `skills`
@@ -1912,15 +1945,15 @@ Configures connections to one or more Model-Context Protocol (MCP) servers for
 discovering and using custom tools. Gemini CLI attempts to connect to each
 configured MCP server to discover available tools. Every discovered tool is
 prepended with the `mcp_` prefix and its server alias to form a fully qualified
-name (FQN) (e.g., `mcp_serverAlias_actualToolName`) to avoid conflicts. Note
-that the system might strip certain schema properties from MCP tool definitions
-for compatibility. At least one of `command`, `url`, or `httpUrl` must be
-provided. If multiple are specified, the order of precedence is `httpUrl`, then
-`url`, then `command`.
+name (FQN) (for example, `mcp_serverAlias_actualToolName`) to avoid conflicts.
+Note that the system might strip certain schema properties from MCP tool
+definitions for compatibility. At least one of `command`, `url`, or `httpUrl`
+must be provided. If multiple are specified, the order of precedence is
+`httpUrl`, then `url`, then `command`.
 
 <!-- prettier-ignore -->
 > [!WARNING]
-> Avoid using underscores (`_`) in your server aliases (e.g., use
+> Avoid using underscores (`_`) in your server aliases (for example, use
 > `my-server` instead of `my_server`). The underlying policy engine parses Fully
 > Qualified Names (`mcp_server_tool`) using the first underscore after the
 > `mcp_` prefix. An underscore in your server alias will cause the parser to
@@ -2064,7 +2097,7 @@ within your user's home folder.
 Environment variables are a common way to configure applications, especially for
 sensitive information like API keys or for settings that might change between
 environments. For authentication setup, see the
-[Authentication documentation](../get-started/authentication.md) which covers
+[Authentication documentation](../get-started/authentication.mdx) which covers
 all available authentication methods.
 
 The CLI automatically loads environment variables from an `.env` file. The
@@ -2085,9 +2118,9 @@ the `advanced.excludedEnvVars` setting in your `settings.json` file.
 - **`GEMINI_API_KEY`**:
   - Your API key for the Gemini API.
   - One of several available
-    [authentication methods](../get-started/authentication.md).
-  - Set this in your shell profile (e.g., `~/.bashrc`, `~/.zshrc`) or an `.env`
-    file.
+    [authentication methods](../get-started/authentication.mdx).
+  - Set this in your shell profile (for example, `~/.bashrc`, `~/.zshrc`) or an
+    `.env` file.
 - **`GEMINI_MODEL`**:
   - Specifies the default Gemini model to use.
   - Overrides the hardcoded default
@@ -2142,6 +2175,21 @@ the `advanced.excludedEnvVars` setting in your `settings.json` file.
   - When set, overrides the default API version used by the SDK.
   - Example: `export GOOGLE_GENAI_API_VERSION="v1"` (Windows PowerShell:
     `$env:GOOGLE_GENAI_API_VERSION="v1"`)
+- **`GOOGLE_GEMINI_BASE_URL`**:
+  - Overrides the default base URL for Gemini API requests (when using
+    `gemini-api-key` authentication).
+  - Must be a valid URL. For security, it must use HTTPS unless pointing to
+    `localhost` (or `127.0.0.1` / `[::1]`).
+  - Example: `export GOOGLE_GEMINI_BASE_URL="https://my-proxy.com"` (Windows
+    PowerShell: `$env:GOOGLE_GEMINI_BASE_URL="https://my-proxy.com"`)
+- **`GOOGLE_VERTEX_BASE_URL`**:
+  - Overrides the default base URL for Vertex AI API requests (when using
+    `vertex-ai` authentication).
+  - Must be a valid URL. For security, it must use HTTPS unless pointing to
+    `localhost` (or `127.0.0.1` / `[::1]`).
+  - Example: `export GOOGLE_VERTEX_BASE_URL="https://my-vertex-proxy.com"`
+    (Windows PowerShell:
+    `$env:GOOGLE_VERTEX_BASE_URL="https://my-vertex-proxy.com"`)
 - **`OTLP_GOOGLE_CLOUD_PROJECT`**:
   - Your Google Cloud Project ID for Telemetry in Google Cloud
   - Example: `export OTLP_GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"` (Windows
@@ -2171,7 +2219,7 @@ the `advanced.excludedEnvVars` setting in your `settings.json` file.
     Any other value is treated as disabling it.
   - Overrides the `telemetry.useCollector` setting.
 - **`GOOGLE_CLOUD_LOCATION`**:
-  - Your Google Cloud Project Location (e.g., us-central1).
+  - Your Google Cloud Project Location (for example, us-central1).
   - Required for using Vertex AI in non-express mode.
   - Example: `export GOOGLE_CLOUD_LOCATION="YOUR_PROJECT_LOCATION"` (Windows
     PowerShell: `$env:GOOGLE_CLOUD_LOCATION="YOUR_PROJECT_LOCATION"`).
@@ -2202,7 +2250,7 @@ the `advanced.excludedEnvVars` setting in your `settings.json` file.
   - `strict-proxied`: Same as `strict-open` but routes network through proxy.
   - `<profile_name>`: Uses a custom profile. To define a custom profile, create
     a file named `sandbox-macos-<profile_name>.sb` in your project's `.gemini/`
-    directory (e.g., `my-project/.gemini/sandbox-macos-custom.sb`).
+    directory (for example, `my-project/.gemini/sandbox-macos-custom.sb`).
 - **`DEBUG` or `DEBUG_MODE`** (often used by underlying libraries or the CLI
   itself):
   - Set to `true` or `1` to enable verbose debug logging, which can be helpful
@@ -2241,7 +2289,7 @@ from the system or loaded from `.env` files.
 
 **Allowlist (Never Redacted):**
 
-- Common system variables (e.g., `PATH`, `HOME`, `USER`, `SHELL`, `TERM`,
+- Common system variables (for example, `PATH`, `HOME`, `USER`, `SHELL`, `TERM`,
   `LANG`).
 - Variables starting with `GEMINI_CLI_`.
 - GitHub Action specific variables.
@@ -2367,7 +2415,7 @@ for that specific session.
 While not strictly configuration for the CLI's _behavior_, context files
 (defaulting to `GEMINI.md` but configurable via the `context.fileName` setting)
 are crucial for configuring the _instructional context_ (also referred to as
-"memory") provided to the Gemini model. This powerful feature allows you to give
+"memory") provided to the Gemini model. This powerful feature lets you give
 project-specific instructions, coding style guides, or any relevant background
 information to the AI, making its responses more tailored and accurate to your
 needs. The CLI includes UI elements, such as an indicator in the footer showing
@@ -2378,7 +2426,7 @@ context.
   that you want the Gemini model to be aware of during your interactions. The
   system is designed to manage this instructional context hierarchically.
 
-### Example context file content (e.g., `GEMINI.md`)
+### Example context file content (for example, `GEMINI.md`)
 
 Here's a conceptual example of what a context file at the root of a TypeScript
 project might contain:
@@ -2388,7 +2436,7 @@ project might contain:
 
 ## General Instructions:
 
-- When generating new TypeScript code, please follow the existing coding style.
+- When generating new TypeScript code, follow the existing coding style.
 - Ensure all new functions and classes have JSDoc comments.
 - Prefer functional programming paradigms where appropriate.
 - All code should be compatible with TypeScript 5.0 and Node.js 20+.
@@ -2396,7 +2444,7 @@ project might contain:
 ## Coding Style:
 
 - Use 2 spaces for indentation.
-- Interface names should be prefixed with `I` (e.g., `IUserService`).
+- Interface names should be prefixed with `I` (for example, `IUserService`).
 - Private class members should be prefixed with an underscore (`_`).
 - Always use strict equality (`===` and `!==`).
 
@@ -2410,7 +2458,7 @@ project might contain:
 ## Regarding Dependencies:
 
 - Avoid introducing new external dependencies unless absolutely necessary.
-- If a new dependency is required, please state the reason.
+- If a new dependency is required, state the reason.
 ```
 
 This example demonstrates how you can provide general project context, specific
@@ -2420,13 +2468,13 @@ you. Project-specific context files are highly encouraged to establish
 conventions and context.
 
 - **Hierarchical loading and precedence:** The CLI implements a sophisticated
-  hierarchical memory system by loading context files (e.g., `GEMINI.md`) from
-  several locations. Content from files lower in this list (more specific)
+  hierarchical memory system by loading context files (for example, `GEMINI.md`)
+  from several locations. Content from files lower in this list (more specific)
   typically overrides or supplements content from files higher up (more
   general). The exact concatenation order and final context can be inspected
   using the `/memory show` command. The typical loading order is:
   1.  **Global context file:**
-      - Location: `~/.gemini/<configured-context-filename>` (e.g.,
+      - Location: `~/.gemini/<configured-context-filename>` (for example,
         `~/.gemini/GEMINI.md` in your user home directory).
       - Scope: Provides default instructions for all your projects.
   2.  **Project root and ancestors context files:**
@@ -2463,12 +2511,12 @@ conventions and context.
 
 By understanding and utilizing these configuration layers and the hierarchical
 nature of context files, you can effectively manage the AI's memory and tailor
-the Gemini CLI's responses to your specific needs and projects.
+Gemini CLI's responses to your specific needs and projects.
 
 ## Sandboxing
 
-The Gemini CLI can execute potentially unsafe operations (like shell commands
-and file modifications) within a sandboxed environment to protect your system.
+Gemini CLI can execute potentially unsafe operations (like shell commands and
+file modifications) within a sandboxed environment to protect your system.
 
 Sandboxing is disabled by default, but you can enable it in a few ways:
 
@@ -2503,11 +2551,15 @@ sandbox image:
 BUILD_SANDBOX=1 gemini -s
 ```
 
+Building a custom sandbox with `BUILD_SANDBOX` is only supported when running
+Gemini CLI from source. If you installed the CLI with npm, build the Docker
+image separately and reference that image in your sandbox configuration.
+
 ## Usage statistics
 
-To help us improve the Gemini CLI, we collect anonymized usage statistics. This
-data helps us understand how the CLI is used, identify common issues, and
-prioritize new features.
+To help us improve Gemini CLI, we collect anonymized usage statistics. This data
+helps us understand how the CLI is used, identify common issues, and prioritize
+new features.
 
 **What we collect:**
 
