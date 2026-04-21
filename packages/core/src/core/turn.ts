@@ -206,6 +206,12 @@ export type ServerGeminiFinishedEvent = {
 
 export type ServerGeminiLoopDetectedEvent = {
   type: GeminiEventType.LoopDetected;
+  value?: {
+    count: number;
+    type?: LoopType;
+    detail?: string;
+    confirmedByModel?: string;
+  };
 };
 
 export type ServerGeminiCitationEvent = {

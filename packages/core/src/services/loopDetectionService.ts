@@ -32,6 +32,25 @@ const CONTENT_CHUNK_SIZE = 50;
 const MAX_HISTORY_LENGTH = 5000;
 
 /**
+ * Hard cap for consecutive calls to the same tool name, even if arguments differ.
+ * This prevents infinite loops in tools like 'sequentialthinking' where
+ * arguments (like thoughtNumber) change each time.
+ */
+const CONSECUTIVE_SAME_TOOL_NAME_THRESHOLD = 50;
+
+/**
+ * Lower threshold for 'thinking' tools that are known to be prone to loops.
+ */
+const THINKING_TOOL_LOOP_THRESHOLD = 15;
+
+const THINKING_TOOL_NAMES = new Set([
+  'sequentialthinking',
+  'sequential_thinking',
+  'thought',
+  'reasoning',
+]);
+
+/**
  * The number of recent conversation turns to include in the history when asking the LLM to check for a loop.
  */
 const LLM_LOOP_CHECK_HISTORY_COUNT = 20;
@@ -137,7 +156,9 @@ export class LoopDetectionService {
 
   // Tool call tracking
   private lastToolCallKey: string | null = null;
+  private lastToolName: string | null = null;
   private toolCallRepetitionCount: number = 0;
+  private sameToolNameConsecutiveCount: number = 0;
 
   // Content streaming tracking
   private streamContentHistory = '';
@@ -319,9 +340,32 @@ export class LoopDetectionService {
       this.lastToolCallKey = key;
       this.toolCallRepetitionCount = 1;
     }
+
+    // Also track consecutive calls to the same tool name, even if arguments differ.
+    // This catches "thinking" loops where arguments (like thoughtNumber) change.
+    if (this.lastToolName === toolCall.name) {
+      this.sameToolNameConsecutiveCount++;
+    } else {
+      this.lastToolName = toolCall.name;
+      this.sameToolNameConsecutiveCount = 1;
+    }
+
     if (this.toolCallRepetitionCount >= TOOL_CALL_LOOP_THRESHOLD) {
+      this.lastLoopDetail = `Consecutive identical tool call: ${toolCall.name}`;
+      this.lastLoopType = LoopType.IDENTICAL_TOOL_CALL_LOOP;
       return true;
     }
+
+    const threshold = THINKING_TOOL_NAMES.has(toolCall.name)
+      ? THINKING_TOOL_LOOP_THRESHOLD
+      : CONSECUTIVE_SAME_TOOL_NAME_THRESHOLD;
+
+    if (this.sameToolNameConsecutiveCount >= threshold) {
+      this.lastLoopDetail = `Consecutive calls to the same tool name: ${toolCall.name} (args may vary)`;
+      this.lastLoopType = LoopType.IDENTICAL_TOOL_CALL_LOOP; // Still a tool loop
+      return true;
+    }
+
     return false;
   }
 
@@ -740,7 +784,9 @@ export class LoopDetectionService {
 
   private resetToolCallCount(): void {
     this.lastToolCallKey = null;
+    this.lastToolName = null;
     this.toolCallRepetitionCount = 0;
+    this.sameToolNameConsecutiveCount = 0;
   }
 
   private resetContentTracking(resetHistory = true): void {
