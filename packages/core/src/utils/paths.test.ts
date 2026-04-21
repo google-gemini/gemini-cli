@@ -601,6 +601,22 @@ describe('resolveToRealPath', () => {
       /Infinite recursion detected/,
     );
   });
+
+  it('should return path as-is if fs.realpathSync and fs.lstatSync fail with ENAMETOOLONG', () => {
+    vi.spyOn(fs, 'realpathSync').mockImplementation(() => {
+      const err = new Error('File name too long') as NodeJS.ErrnoException;
+      err.code = 'ENAMETOOLONG';
+      throw err;
+    });
+    vi.spyOn(fs, 'lstatSync').mockImplementation(() => {
+      const err = new Error('File name too long') as NodeJS.ErrnoException;
+      err.code = 'ENAMETOOLONG';
+      throw err;
+    });
+
+    const longPath = path.resolve('a'.repeat(5000));
+    expect(resolveToRealPath(longPath)).toBe(longPath);
+  });
 });
 
 describe('makeRelative', () => {
