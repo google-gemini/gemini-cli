@@ -23,30 +23,85 @@ export const PlanErrorMessages = {
 } as const;
 
 /**
+ * Resolves a plan file path and strictly validates it against the plans directory boundary.
+ * Useful for tools that need to write or read plans.
+ * @param planPath The untrusted file path provided by the model.
+ * @param plansDir The authorized project plans directory.
+ * @returns The safely resolved path string.
+ * @throws Error if the path is empty, malicious, or escapes boundaries.
+ */
+export function resolveAndValidatePlanPath(
+  planPath: string,
+  plansDir: string,
+  projectRoot: string,
+): string {
+  const trimmedPath = planPath.trim();
+  if (!trimmedPath) {
+    throw new Error('Plan file path must be non-empty.');
+  }
+
+  // 1. Handle case where agent provided an absolute path
+  if (path.isAbsolute(trimmedPath)) {
+    if (
+      isSubpath(resolveToRealPath(plansDir), resolveToRealPath(trimmedPath))
+    ) {
+      return trimmedPath;
+    }
+  }
+
+  // 2. Handle case where agent provided a path relative to the project root
+  const resolvedFromProjectRoot = path.resolve(projectRoot, trimmedPath);
+  if (
+    isSubpath(
+      resolveToRealPath(plansDir),
+      resolveToRealPath(resolvedFromProjectRoot),
+    )
+  ) {
+    return resolvedFromProjectRoot;
+  }
+
+  // 3. Handle default case where agent provided a path relative to the plans directory
+  const resolvedPath = path.resolve(plansDir, trimmedPath);
+  const realPath = resolveToRealPath(resolvedPath);
+  const realPlansDir = resolveToRealPath(plansDir);
+
+  if (!isSubpath(realPlansDir, realPath)) {
+    throw new Error(
+      PlanErrorMessages.PATH_ACCESS_DENIED(trimmedPath, plansDir),
+    );
+  }
+
+  return resolvedPath;
+}
+
+/**
  * Validates a plan file path for safety (traversal) and existence.
  * @param planPath The untrusted path to the plan file.
  * @param plansDir The authorized project plans directory.
- * @param targetDir The current working directory (project root).
+ * @param projectRoot The root directory of the project.
  * @returns An error message if validation fails, or null if successful.
  */
 export async function validatePlanPath(
   planPath: string,
   plansDir: string,
+  projectRoot: string,
 ): Promise<string | null> {
-  const safeFilename = path.basename(planPath);
-  const resolvedPath = path.join(plansDir, safeFilename);
-  const realPath = resolveToRealPath(resolvedPath);
-  const realPlansDir = resolveToRealPath(plansDir);
-
-  if (!isSubpath(realPlansDir, realPath)) {
-    return PlanErrorMessages.PATH_ACCESS_DENIED(planPath, realPlansDir);
+  try {
+    const resolvedPath = resolveAndValidatePlanPath(
+      planPath,
+      plansDir,
+      projectRoot,
+    );
+    if (!(await fileExists(resolvedPath))) {
+      return PlanErrorMessages.FILE_NOT_FOUND(planPath);
+    }
+    return null;
+  } catch {
+    return PlanErrorMessages.PATH_ACCESS_DENIED(
+      planPath,
+      resolveToRealPath(plansDir),
+    );
   }
-
-  if (!(await fileExists(resolvedPath))) {
-    return PlanErrorMessages.FILE_NOT_FOUND(planPath);
-  }
-
-  return null;
 }
 
 /**

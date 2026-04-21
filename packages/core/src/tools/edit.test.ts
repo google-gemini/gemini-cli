@@ -107,6 +107,7 @@ describe('EditTool', () => {
       getGeminiClient: vi.fn().mockReturnValue(geminiClient),
       getBaseLlmClient: vi.fn().mockReturnValue(baseLlmClient),
       getTargetDir: () => rootDir,
+      getProjectRoot: () => rootDir,
       getApprovalMode: vi.fn(),
       setApprovalMode: vi.fn(),
       getWorkspaceContext: () => createMockWorkspaceContext(rootDir),
@@ -1336,8 +1337,8 @@ function doIt() {
       vi.mocked(mockConfig.isPlanMode).mockReturnValue(true);
       vi.mocked(mockConfig.storage.getPlansDir).mockReturnValue(plansDir);
 
-      const filePath = path.join(rootDir, 'test-file.txt');
-      const planFilePath = path.join(plansDir, 'test-file.txt');
+      const filePath = 'test-file.txt';
+      const planFilePath = path.join(plansDir, filePath);
       const initialContent = 'some initial content';
       fs.writeFileSync(planFilePath, initialContent, 'utf8');
 
