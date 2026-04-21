@@ -15,7 +15,6 @@ import {
 import type { GeminiCLIExtension } from '../config/config.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { coreEvents } from '../utils/events.js';
-import { isSubpath, resolveToRealPath } from '../utils/paths.js';
 
 export { type SkillDefinition };
 
@@ -24,6 +23,7 @@ export class SkillManager {
   private activeSkillNames: Set<string> = new Set();
   private adminSkillsEnabled = true;
   private latestDiscoveryReport: SkillDiscoveryReport[] = [];
+  private discoveryReportBySkillLocation = new Map<string, SkillDiscoveryReport>();
 
   /**
    * Clears all discovered skills.
@@ -31,6 +31,7 @@ export class SkillManager {
   clearSkills(): void {
     this.skills = [];
     this.latestDiscoveryReport = [];
+    this.discoveryReportBySkillLocation.clear();
   }
 
   /**
@@ -65,7 +66,10 @@ export class SkillManager {
     for (const extension of extensions) {
       if (extension.isActive && extension.skills) {
         if (extension.skillsDiscoveryReport) {
-          this.latestDiscoveryReport.push(extension.skillsDiscoveryReport);
+          this.trackDiscoveryReport(
+            extension.skillsDiscoveryReport,
+            extension.skills,
+          );
         }
         this.addSkillsWithPrecedence(extension.skills);
       }
@@ -223,14 +227,18 @@ export class SkillManager {
   getDiscoveryReportForSkill(
     location: string,
   ): SkillDiscoveryReport | undefined {
-    const resolvedLocation = resolveToRealPath(location);
+    const directReport = this.discoveryReportBySkillLocation.get(location);
+    if (directReport) {
+      return directReport;
+    }
 
     return this.latestDiscoveryReport
       .filter((report) => {
-        const resolvedSourceDir = resolveToRealPath(report.source_dir);
+        const resolvedLocation = path.resolve(location);
+        const resolvedSourceDir = path.resolve(report.source_dir);
         return (
           resolvedLocation === resolvedSourceDir ||
-          isSubpath(resolvedSourceDir, resolvedLocation)
+          this.isSubpath(resolvedSourceDir, resolvedLocation)
         );
       })
       .sort((a, b) => b.source_dir.length - a.source_dir.length)[0];
@@ -252,7 +260,25 @@ export class SkillManager {
 
   private async loadAndTrackSkills(dir: string): Promise<SkillDefinition[]> {
     const { skills, report } = await loadSkillsFromDirWithReport(dir);
-    this.latestDiscoveryReport.push(report);
+    this.trackDiscoveryReport(report, skills);
     return skills;
+  }
+
+  private trackDiscoveryReport(
+    report: SkillDiscoveryReport,
+    skills: readonly SkillDefinition[],
+  ): void {
+    this.latestDiscoveryReport.push(report);
+    for (const skill of skills) {
+      this.discoveryReportBySkillLocation.set(skill.location, report);
+    }
+  }
+
+  private isSubpath(parentPath: string, childPath: string): boolean {
+    const relative = path.relative(parentPath, childPath);
+    return (
+      relative === '' ||
+      (!relative.startsWith('..') && !path.isAbsolute(relative))
+    );
   }
 }

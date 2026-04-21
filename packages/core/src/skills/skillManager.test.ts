@@ -14,6 +14,7 @@ import { type GeminiCLIExtension } from '../config/config.js';
 import { loadSkillsFromDir, type SkillDefinition } from './skillLoader.js';
 import { coreEvents } from '../utils/events.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import * as paths from '../utils/paths.js';
 
 vi.mock('./skillLoader.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./skillLoader.js')>();
@@ -430,6 +431,34 @@ description: project-desc
     expect(
       service.getDiscoveryReportForSkill('/skills/foobar/SKILL.md'),
     ).toBeUndefined();
+  });
+
+  it('should reuse the cached discovery report for an exact skill location', () => {
+    const service = new SkillManager();
+    const realpathSpy = vi.spyOn(paths, 'resolveToRealPath');
+    const report = {
+      source_dir: '/skills',
+      total_duration_ms: 10,
+      glob_duration_ms: 2,
+      skill_count: 1,
+      invalid_count: 0,
+      skill_metrics: [],
+    };
+
+    // @ts-expect-error accessing private method for testing
+    service.trackDiscoveryReport(report, [
+      {
+        name: 'skill-a',
+        description: 'desc',
+        location: '/skills/skill-a/SKILL.md',
+        body: 'body',
+      },
+    ]);
+
+    expect(
+      service.getDiscoveryReportForSkill('/skills/skill-a/SKILL.md'),
+    ).toEqual(report);
+    expect(realpathSpy).not.toHaveBeenCalled();
   });
 
   describe('Conflict Detection', () => {
