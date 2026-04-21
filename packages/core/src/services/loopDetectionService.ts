@@ -362,7 +362,7 @@ export class LoopDetectionService {
 
     if (this.sameToolNameConsecutiveCount >= threshold) {
       this.lastLoopDetail = `Consecutive calls to the same tool name: ${toolCall.name} (args may vary)`;
-      this.lastLoopType = LoopType.IDENTICAL_TOOL_CALL_LOOP; // Still a tool loop
+      this.lastLoopType = LoopType.CONSECUTIVE_SAME_NAME_TOOL_CALLS; // Still a tool loop
       return true;
     }
 
