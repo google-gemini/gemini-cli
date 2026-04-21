@@ -7,6 +7,8 @@
 // Force recompile
 
 import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import {
   describe,
   it,
@@ -171,6 +173,8 @@ let capturedQuotaState: QuotaState;
 let capturedUIActions: UIActions;
 let capturedOverflowActions: OverflowActions;
 
+const capturedStatePath = path.join(os.tmpdir(), 'capturedState.json');
+
 // Helper component will read the context values provided by AppContainer
 // so we can assert against them in our tests.
 function TestContextConsumer() {
@@ -186,13 +190,7 @@ function TestContextConsumer() {
   capturedUIActions = uiActions;
   capturedOverflowActions = overflowActions!;
 
-  const scratchDir =
-    '/usr/local/google/home/mattkorwel/.gemini/jetski/brain/a9380e4a-30b9-4d69-a1d7-40fbe95ff566/scratch';
-  fs.mkdirSync(scratchDir, { recursive: true });
-  fs.writeFileSync(
-    `${scratchDir}/capturedState.json`,
-    JSON.stringify({ uiState, quotaState }),
-  );
+  fs.writeFileSync(capturedStatePath, JSON.stringify({ uiState, quotaState }));
 
   return (
     <Box>
@@ -202,19 +200,13 @@ function TestContextConsumer() {
 }
 
 const getCapturedUIStateFromFrame = (_frame: string): UIState => {
-  const content = fs.readFileSync(
-    '/usr/local/google/home/mattkorwel/.gemini/jetski/brain/a9380e4a-30b9-4d69-a1d7-40fbe95ff566/scratch/capturedState.json',
-    'utf-8',
-  );
+  const content = fs.readFileSync(capturedStatePath, 'utf-8');
   const data = JSON.parse(content);
   return data.uiState;
 };
 
 const getCapturedQuotaStateFromFrame = (_frame: string): QuotaState => {
-  const content = fs.readFileSync(
-    '/usr/local/google/home/mattkorwel/.gemini/jetski/brain/a9380e4a-30b9-4d69-a1d7-40fbe95ff566/scratch/capturedState.json',
-    'utf-8',
-  );
+  const content = fs.readFileSync(capturedStatePath, 'utf-8');
   const data = JSON.parse(content);
   return data.quotaState;
 };
