@@ -1928,6 +1928,15 @@ export class Config implements McpContext, AgentLoopContext {
       this.lastEmittedQuotaRemaining = undefined;
       this.lastEmittedQuotaLimit = undefined;
       this.emitQuotaChangedEvent();
+
+      // HYBRID AUTH TRIGGER: When changing model via /model, refresh auth
+      // so that hybrid mode (OpenAI + Google) is correctly initialized.
+      const newAuthType = getAuthTypeFromEnv(newModel);
+      if (newAuthType) {
+        this.refreshAuth(newAuthType).catch((err) => {
+          debugLogger.log(`[Config] Auth refresh failed on model switch: ${err.message}`);
+        });
+      }
     }
     if (this.onModelChange && !isTemporary) {
       this.onModelChange(newModel);
