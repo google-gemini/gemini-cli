@@ -836,10 +836,35 @@ describe('Server Config (config.ts)', () => {
         undefined,
         undefined,
         undefined,
+        undefined,
       );
       // Verify that contentGeneratorConfig is updated
       expect(config.getContentGeneratorConfig()).toEqual(mockContentConfig);
       expect(GeminiClient).toHaveBeenCalledWith(config);
+    });
+
+    it('should pass Vertex AI routing settings when refreshing auth', async () => {
+      const vertexAiRouting = {
+        requestType: 'shared' as const,
+        sharedRequestType: 'priority' as const,
+      };
+      const config = new Config({
+        ...baseParams,
+        vertexAiRouting,
+      });
+
+      vi.mocked(createContentGeneratorConfig).mockResolvedValue({});
+
+      await config.refreshAuth(AuthType.USE_VERTEX_AI);
+
+      expect(createContentGeneratorConfig).toHaveBeenCalledWith(
+        config,
+        AuthType.USE_VERTEX_AI,
+        undefined,
+        undefined,
+        undefined,
+        vertexAiRouting,
+      );
     });
 
     it('should reset model availability status', async () => {
