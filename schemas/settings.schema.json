@@ -2393,6 +2393,13 @@
               "default": true,
               "type": "boolean"
             },
+            "enableFileWatcher": {
+              "title": "Enable File Watcher",
+              "description": "Enable file watcher updates for @ file suggestions (experimental).",
+              "markdownDescription": "Enable file watcher updates for @ file suggestions (experimental).\n\n- Category: `Context`\n- Requires restart: `yes`\n- Default: `false`",
+              "default": false,
+              "type": "boolean"
+            },
             "enableRecursiveFileSearch": {
               "title": "Enable Recursive File Search",
               "description": "Enable recursive file search functionality when completing @ references in the prompt.",
@@ -3619,6 +3626,10 @@
           "type": "string",
           "description": "Protocol for OTLP exporters.",
           "enum": ["grpc", "http"]
+        },
+        "traces": {
+          "type": "boolean",
+          "description": "Whether detailed traces with large attributes are captured."
         },
         "logPrompts": {
           "type": "boolean",
