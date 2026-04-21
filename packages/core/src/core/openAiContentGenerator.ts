@@ -170,7 +170,6 @@ export class OpenAiContentGenerator implements ContentGenerator {
     if (!schema || typeof schema !== 'object') return schema;
     const transformed: any = { ...schema };
     
-    // Convert type to lowercase for OpenAI compatibility
     if (typeof transformed.type === 'string') {
       transformed.type = transformed.type.toLowerCase();
     }
@@ -191,9 +190,6 @@ export class OpenAiContentGenerator implements ContentGenerator {
       }
     }
 
-    // OpenAI uses "required" array at the same level as "properties"
-    // Gemini sometimes uses "required" inside properties or different structures
-    
     delete transformed.format;
     delete transformed.nullable;
     return transformed;
@@ -269,8 +265,7 @@ export class OpenAiContentGenerator implements ContentGenerator {
     if (systemText && messages.length > 0) {
       const firstUserMsg = messages.find(m => m.role === 'user');
       if (firstUserMsg && typeof firstUserMsg.content === 'string') {
-        // Add a nudge for Gemma to use correct tool parameter names
-        const nudge = "\n\nIMPORTANT: When calling tools, ensure you use the exact parameter names defined in the tool's schema (e.g., use 'file_path' instead of 'path' for read_file).";
+        const nudge = "\n\nIMPORTANT: \n1. Use 'google_web_search' for any external information. \n2. NEVER use 'run_shell_command' for searching or finding files. \n3. Use tools IMMEDIATELY without asking for permission. \n4. When calling tools, ensure you use the EXACT parameter names (e.g., 'query' for search, 'file_path' for read_file).";
         firstUserMsg.content = `System Instruction:\n${systemText}${nudge}\n\nUser Question:\n${firstUserMsg.content}`;
       }
     }
@@ -295,7 +290,6 @@ export class OpenAiContentGenerator implements ContentGenerator {
     const parts: any[] = [];
     const functionCalls: any[] = [];
 
-    // Parse Gemma-style tool calls: <|tool_call|>call:name{args}<tool_call|>
     const toolCallPatterns = [
       /<\|tool_call>([\s\S]*?)<tool_call\|?>/g,
       /call:([a-zA-Z0-9_]+)(\{[\s\S]*?\})/g
@@ -313,19 +307,26 @@ export class OpenAiContentGenerator implements ContentGenerator {
             const name = parts_match[1].trim();
             let rawArgs = parts_match[2];
             
-            // SUPER ROBUST PSEUDO-JSON PARSING
-            // 1. Quote keys: {key: -> {"key":
+            // SUPER ROBUST PSEUDO-JSON PARSING V3
+            // 1. Quote ALL unquoted keys (even if they start the object)
+            // Regex: Finds an identifier followed by a colon that isn't already preceded by a quote
             rawArgs = rawArgs.replace(/([{,]\s*)([a-zA-Z0-9_]+)(\s*:)/g, '$1"$2"$3');
-            // 2. Quote string values that are not already quoted: :value -> :"value"
-            // We target values that don't start with ", {, [, t (true), f (false), n (null) or a number
+            // If the very first key is missing its opening brace context in some outputs
+            if (rawArgs.startsWith('{') && !rawArgs.startsWith('{"') && !rawArgs.startsWith('{"')) {
+               rawArgs = rawArgs.replace(/^{([a-zA-Z0-9_]+):/, '{"$1":');
+            }
+            
+            // 2. Quote string values ONLY if not already quoted
             rawArgs = rawArgs.replace(/:\s*([^"{\[tf\n\-0-9\s][^,}\n]*)/g, (match, p1) => {
               const trimmed = p1.trim();
               if (trimmed === 'true' || trimmed === 'false' || trimmed === 'null' || !isNaN(Number(trimmed))) {
                 return `: ${trimmed}`;
               }
+              if (trimmed.startsWith('"')) return `: ${trimmed}`;
               return `: "${trimmed}"`;
             });
-            // 3. Clean up trailing commas before } or ]
+
+            // 3. Clean up
             rawArgs = rawArgs.replace(/,\s*([}\]])/g, '$1');
 
             const args = JSON.parse(rawArgs);

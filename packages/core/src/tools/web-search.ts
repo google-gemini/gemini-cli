@@ -98,6 +98,10 @@ class WebSearchToolInvocation extends BaseToolInvocation<
         LlmRole.UTILITY_TOOL,
       );
 
+      if (process.env['DEBUG']) {
+        console.log(`[WebSearchTool] Raw Response: ${JSON.stringify(response, null, 2)}`);
+      }
+
       const responseText = getResponseText(response);
       const groundingMetadata = response.candidates?.[0]?.groundingMetadata;
       const sources = groundingMetadata?.groundingChunks as

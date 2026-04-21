@@ -60,6 +60,9 @@ export function resolvePolicyChain(
     hasAccessToPreview,
     config,
   );
+  if (process.env['DEBUG']) {
+    console.log(`[applyModelSelection] Resolved Model: "${resolvedModel}"`);
+  }
   const isAutoPreferred = preferredModel
     ? isAutoModel(preferredModel, config)
     : false;
@@ -268,15 +271,27 @@ export function applyModelSelection(
   modelConfigKey: ModelConfigKey,
   options: { consumeAttempt?: boolean } = {},
 ): { model: string; config: GenerateContentConfig; maxAttempts?: number } {
+  if (process.env['DEBUG']) {
+    console.log(`[applyModelSelection] Start - Key: ${JSON.stringify(modelConfigKey)}`);
+  }
   const resolved = config.modelConfigService.getResolvedConfig(modelConfigKey);
   const model = resolved.model;
+  if (process.env['DEBUG']) {
+    console.log(`[applyModelSelection] Initial Model: ${model}`);
+  }
   const selection = selectModelForAvailability(config, model);
 
   if (!selection) {
+    if (process.env['DEBUG']) {
+      console.log(`[applyModelSelection] No selection policy, returning: ${model}`);
+    }
     return { model, config: resolved.generateContentConfig };
   }
 
   const finalModel = selection.selectedModel ?? model;
+  if (process.env['DEBUG']) {
+    console.log(`[applyModelSelection] Selection result - Final Model: ${finalModel}`);
+  }
   let generateContentConfig = resolved.generateContentConfig;
 
   if (finalModel !== model) {

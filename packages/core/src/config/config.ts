@@ -25,6 +25,12 @@ import {
   type ContentGenerator,
   type ContentGeneratorConfig,
 } from '../core/contentGenerator.js';
+export {
+  AuthType,
+  createContentGenerator,
+  createContentGeneratorConfig,
+  getAuthTypeFromEnv,
+};
 import type { OverageStrategy } from '../billing/billing.js';
 import { PromptRegistry } from '../prompts/prompt-registry.js';
 import { ResourceRegistry } from '../resources/resource-registry.js';
@@ -754,6 +760,8 @@ export class Config implements McpContext, AgentLoopContext {
   readonly topicState = new TopicState();
   private contentGeneratorConfig!: ContentGeneratorConfig;
   private contentGenerator!: ContentGenerator;
+  private utilityGeneratorConfig?: ContentGeneratorConfig;
+  private utilityGenerator?: ContentGenerator;
   readonly modelConfigService: ModelConfigService;
   private readonly embeddingModel: string;
   private readonly sandbox: SandboxConfig | undefined;
@@ -1512,6 +1520,39 @@ export class Config implements McpContext, AgentLoopContext {
     return this.contentGenerator;
   }
 
+  getUtilityGenerator(): ContentGenerator {
+    const primaryIsOpenAi = this.contentGeneratorConfig?.authType === AuthType.OPENAI;
+    const utility = this.utilityGenerator ?? this.contentGenerator;
+
+    // HYBRID PROTECTION: If we're using Gemma (OpenAI) as primary, 
+    // we must ensure the utility generator doesn't use the Gemma model name.
+    if (primaryIsOpenAi && utility) {
+      // Create a lightweight wrapper that overrides the model in any request
+      const originalGenerate = utility.generateContent.bind(utility);
+      const originalGenerateStream = utility.generateContentStream.bind(utility);
+
+      return new Proxy(utility, {
+        get(target, prop, receiver) {
+          if (prop === 'generateContent') {
+            return async (request: any, promptId: string, role: any) => {
+              const maskedRequest = { ...request, model: 'gemini-3-flash-preview' };
+              return originalGenerate(maskedRequest, promptId, role);
+            };
+          }
+          if (prop === 'generateContentStream') {
+            return async (request: any, promptId: string, role: any) => {
+              const maskedRequest = { ...request, model: 'gemini-3-flash-preview' };
+              return originalGenerateStream(maskedRequest, promptId, role);
+            };
+          }
+          return Reflect.get(target, prop, receiver);
+        }
+      });
+    }
+
+    return utility;
+  }
+
   async refreshAuth(
     authMethod: AuthType,
     apiKey?: string,
@@ -1567,8 +1608,35 @@ export class Config implements McpContext, AgentLoopContext {
       this,
       this.getSessionId(),
     );
-    // Only assign to instance properties after successful initialization
     this.contentGeneratorConfig = newContentGeneratorConfig;
+
+    // --- HYBRID AUTH START ---
+    debugLogger.log(`[Config] Checking Hybrid Auth. Primary AuthType: ${this.contentGeneratorConfig.authType}`);
+    // If the primary generator is OpenAI, try to create a utility generator for Google-auth tasks
+    if (this.contentGeneratorConfig.authType === AuthType.OPENAI) {
+      try {
+        debugLogger.log('[Config] Attempting to find secondary Google Auth for hybrid mode...');
+        // Force model to undefined to probe for non-OpenAI auth
+        const googleAuthType = getAuthTypeFromEnv(undefined); 
+        debugLogger.log(`[Config] Resolved potential Google AuthType: ${googleAuthType}`);
+
+        if (googleAuthType && googleAuthType !== AuthType.OPENAI) {
+          // If we found a Google auth type, create a separate config and generator for it
+          this.utilityGeneratorConfig = await createContentGeneratorConfig(this, googleAuthType);
+          this.utilityGenerator = await createContentGenerator(this.utilityGeneratorConfig, this, this.getSessionId());
+          debugLogger.log(`[Config] Hybrid mode ENABLED. Utility generator initialized with ${googleAuthType}`);
+        } else {
+          debugLogger.log('[Config] Hybrid mode SKIPPED: Still resolving to OpenAI or no auth found.');
+        }
+      } catch (e) {
+        debugLogger.warn('[Config] Failed to initialize utility generator for hybrid mode', e);
+      }
+    } else {
+      // Otherwise, the primary generator is already Google-auth capable
+      this.utilityGenerator = this.contentGenerator;
+      this.utilityGeneratorConfig = this.contentGeneratorConfig;
+    }
+    // --- HYBRID AUTH END ---
 
     const codeAssistServer = getCodeAssistServer(this);
     const quotaPromise = codeAssistServer?.projectId

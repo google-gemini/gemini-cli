@@ -79,19 +79,35 @@ export enum AuthType {
  * 5. OPENAI_API_KEY -> OPENAI
  */
 export function getAuthTypeFromEnv(model?: string): AuthType | undefined {
+  debugLogger.log(`[getAuthTypeFromEnv] Resolving auth for model: ${model}`);
+  debugLogger.log(`[getAuthTypeFromEnv] Env GEMINI_API_KEY: ${process.env['GEMINI_API_KEY'] ? 'PRESENT' : 'MISSING'}`);
+  debugLogger.log(`[getAuthTypeFromEnv] Env OPENAI_API_KEY: ${process.env['OPENAI_API_KEY'] ? 'PRESENT' : 'MISSING'}`);
+  debugLogger.log(`[getAuthTypeFromEnv] Env GOOGLE_GENAI_USE_GCA: ${process.env['GOOGLE_GENAI_USE_GCA']}`);
+
   // HIGHEST PRIORITY: If a custom model is requested, FORCE OpenAI auth.
   if (model?.startsWith('google/gemma') || model === 'gemma') {
+    debugLogger.log(`[getAuthTypeFromEnv] FORCING AuthType.OPENAI due to gemma prefix`);
     return AuthType.OPENAI;
   }
 
   if (process.env['GOOGLE_GENAI_USE_GCA'] === 'true') {
+    debugLogger.log(`[getAuthTypeFromEnv] Found GOOGLE_GENAI_USE_GCA, returning LOGIN_WITH_GOOGLE`);
     return AuthType.LOGIN_WITH_GOOGLE;
   }
   if (process.env['GOOGLE_GENAI_USE_VERTEXAI'] === 'true') {
+    debugLogger.log(`[getAuthTypeFromEnv] Found GOOGLE_GENAI_USE_VERTEXAI, returning USE_VERTEX_AI`);
     return AuthType.USE_VERTEX_AI;
   }
   if (process.env['GEMINI_API_KEY']) {
+    debugLogger.log(`[getAuthTypeFromEnv] Found GEMINI_API_KEY, returning USE_GEMINI`);
     return AuthType.USE_GEMINI;
+  }
+
+  // FALLBACK: If we are in hybrid discovery (no model) and NO OpenAI keys are forced, 
+  // assume we can try Google Login if available.
+  if (!model && !process.env['OPENAI_API_KEY'] && !process.env['OPENAI_API_BASE_URL']) {
+     debugLogger.log(`[getAuthTypeFromEnv] Hybrid fallback: assuming Google Auth might be available via OAuth/ADC`);
+     return AuthType.LOGIN_WITH_GOOGLE;
   }
 
   const isOpenAiEnv =
@@ -360,6 +376,10 @@ export async function createContentGenerator(
 
       if (baseUrl) {
         httpOptions.baseUrl = baseUrl;
+      }
+
+      if (process.env['DEBUG']) {
+        console.log(`[ContentGenerator] Creating GoogleGenAI with AuthType: ${config.authType}, BaseURL: ${httpOptions.baseUrl}, Headers: ${JSON.stringify(httpOptions.headers)}`);
       }
 
       const googleGenAI = new GoogleGenAI({

@@ -24,7 +24,7 @@ import {
   type ServerGeminiStreamEvent,
   type ChatCompressionInfo,
 } from './turn.js';
-import type { Config } from '../config/config.js';
+import { AuthType, type Config } from '../config/config.js';
 import { type AgentLoopContext } from '../config/agent-loop-context.js';
 import { getCoreSystemPrompt } from './prompts.js';
 import { checkNextSpeaker } from '../utils/nextSpeakerChecker.js';
@@ -1057,6 +1057,18 @@ export class GeminiClient {
     abortSignal: AbortSignal,
     role: LlmRole,
   ): Promise<GenerateContentResponse> {
+    // HYBRID MODEL MASKING: 
+    // If this is a utility task and we are in a Gemma (OpenAI) session, 
+    // steer the config resolution toward a Google-native model.
+    const isPrimaryOpenAi = this.config.getContentGeneratorConfig()?.authType === AuthType.OPENAI;
+    const isUtilityTask = !modelConfigKey.isChatModel || 
+                          ['web-search', 'web-fetch', 'classifier'].includes(modelConfigKey.model || '');
+    
+    if (isPrimaryOpenAi && isUtilityTask) {
+      modelConfigKey = { ...modelConfigKey, model: 'gemini-3-flash-preview' };
+      debugLogger.log(`[GeminiClient] Steering utility task to Google-native model: ${modelConfigKey.model}`);
+    }
+
     const desiredModelConfig =
       this.config.modelConfigService.getResolvedConfig(modelConfigKey);
     let {
@@ -1101,19 +1113,37 @@ export class GeminiClient {
           currentAttemptGenerateContentConfig = generateContentConfig;
         }
 
+        // HYBRID PROMPT SANITIZATION:
+        // Use a minimal system prompt for utility tasks to prevent Google models
+        // from getting confused by the primary (Gemma) session's heavy instructions.
+        const effectiveSystemInstruction = (isPrimaryOpenAi && isUtilityTask)
+          ? { role: 'system', parts: [{ text: 'You are a helpful assistant specialized in using tools like web search. Provide concise and accurate data based on tool results.' }] }
+          : systemInstruction;
+
         const requestConfig: GenerateContentConfig = {
           ...currentAttemptGenerateContentConfig,
           abortSignal,
-          systemInstruction,
+          systemInstruction: effectiveSystemInstruction,
         };
 
-        return this.getContentGeneratorOrFail().generateContent(
+        const generator = (isPrimaryOpenAi && isUtilityTask) 
+          ? this.config.getUtilityGenerator() 
+          : this.getContentGeneratorOrFail();
+
+        if (process.env['DEBUG']) {
+          console.log(`[GeminiClient] FINAL GENERATOR CALL:
+            - Generator Type: ${generator.constructor.name}
+            - Request Model: ${currentAttemptModel}
+          `);
+        }
+
+        return generator.generateContent(
           {
             model: currentAttemptModel,
             config: requestConfig,
             contents,
           },
-          this.lastPromptId,
+          this.lastPromptId ?? 'default',
           role,
         );
       };

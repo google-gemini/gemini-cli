@@ -667,7 +667,18 @@ export class GeminiChat {
         `[GeminiChat] FULL REQUEST CONFIG (JSON): ${JSON.stringify(config, null, 2)}`,
       );
 
-      return this.context.config.getContentGenerator().generateContentStream(
+      // HYBRID ROUTING: Determine which generator to use based on the model.
+      const isInternalModel = 
+        modelToUse.startsWith('gemini-') || 
+        ['web-search', 'web-fetch', 'classifier', 'summarizer-default'].includes(modelToUse);
+      
+      const generator = isInternalModel 
+        ? this.context.config.getUtilityGenerator() 
+        : this.context.config.getContentGenerator();
+
+      debugLogger.log(`[GeminiChat] Routing request to ${isInternalModel ? 'Utility' : 'Primary'} generator for model: ${modelToUse}`);
+
+      return generator.generateContentStream(
         {
           model: modelToUse,
           contents: contentsToUse,
