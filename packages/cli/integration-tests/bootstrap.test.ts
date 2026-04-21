@@ -27,10 +27,10 @@ describe('Gemini CLI TTY Bootstrap', () => {
 
     // The ready marker we expect to see
     const readyMarker = 'Type your message or @path/to/file';
-    const welcomeMessage = 'Welcome to Gemini CLI!';
+    const tipsMessage = 'tips for getting started:';
 
     // Verify the initial render completes and displays the markers
-    await run.expectText(welcomeMessage, 30000);
+    await run.expectText(tipsMessage, 30000);
     await run.expectText(readyMarker, 30000);
 
     // If we reached here, the smoke test passed
