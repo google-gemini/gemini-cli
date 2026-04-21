@@ -154,7 +154,7 @@ export async function startInteractiveUI(
       isScreenReaderEnabled: config.getScreenReader(),
       onRender: ({ renderTime }: { renderTime: number }) => {
         if (renderTime > SLOW_RENDER_MS) {
-          recordSlowRender(config, renderTime);
+          recordSlowRender(config, Math.round(renderTime));
         }
         profiler.reportFrameRendered();
       },
