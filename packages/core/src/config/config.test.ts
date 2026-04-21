@@ -814,6 +814,8 @@ describe('Server Config (config.ts)', () => {
       });
 
       await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
+      await config.getExperimentsAsync();
+      await new Promise((r) => setTimeout(r, 0));
 
       expect(config.getModel()).toBe(PREVIEW_GEMINI_FLASH_MODEL);
     });

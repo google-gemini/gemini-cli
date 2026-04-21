@@ -1555,6 +1555,31 @@ export class Config implements McpContext, AgentLoopContext {
     this.experimentsPromise = getExperiments(codeAssistServer)
       .then((experiments) => {
         this.setExperiments(experiments);
+
+        const requestTimeoutMs = this.getRequestTimeoutMs();
+        if (requestTimeoutMs !== undefined) {
+          updateGlobalFetchTimeouts(requestTimeoutMs);
+        }
+
+        const adminControlsEnabled =
+          experiments?.flags[ExperimentFlags.ENABLE_ADMIN_CONTROLS]
+            ?.boolValue ?? false;
+        fetchAdminControls(
+          codeAssistServer,
+          this.getRemoteAdminSettings(),
+          adminControlsEnabled,
+          (newSettings: AdminControlsSettings) => {
+            this.setRemoteAdminSettings(newSettings);
+            coreEvents.emitAdminSettingsChanged();
+          },
+        )
+          .then((adminControls) => {
+            this.setRemoteAdminSettings(adminControls);
+          })
+          .catch((e) => {
+            debugLogger.error('Failed to fetch admin controls', e);
+          });
+
         return experiments;
       })
       .catch((e) => {
@@ -1562,53 +1587,35 @@ export class Config implements McpContext, AgentLoopContext {
         return undefined;
       });
 
-    // Fetch experiments and update timeouts before continuing initialization
-    const experiments = await this.experimentsPromise;
-
-    const requestTimeoutMs = this.getRequestTimeoutMs();
-    if (requestTimeoutMs !== undefined) {
-      updateGlobalFetchTimeouts(requestTimeoutMs);
-    }
-
-    // Initialize BaseLlmClient now that the ContentGenerator and experiments are available
+    // Initialize BaseLlmClient now that the ContentGenerator is available
     this.baseLlmClient = new BaseLlmClient(this.contentGenerator, this);
 
-    await quotaPromise;
+    quotaPromise
+      .then(async () => {
+        const authType = this.contentGeneratorConfig?.authType;
+        if (
+          authType === AuthType.USE_GEMINI ||
+          authType === AuthType.USE_VERTEX_AI
+        ) {
+          this.setHasAccessToPreviewModel(true);
+        }
 
-    const authType = this.contentGeneratorConfig.authType;
-    if (
-      authType === AuthType.USE_GEMINI ||
-      authType === AuthType.USE_VERTEX_AI
-    ) {
-      this.setHasAccessToPreviewModel(true);
-    }
+        // Only reset when we have explicit "no access" (hasAccessToPreviewModel === false).
+        // When null (quota not fetched) or true, we preserve the saved model.
+        if (
+          isPreviewModel(this.model, this) &&
+          this.hasAccessToPreviewModel === false
+        ) {
+          this.setModel(DEFAULT_GEMINI_MODEL_AUTO);
+        }
 
-    // Only reset when we have explicit "no access" (hasAccessToPreviewModel === false).
-    // When null (quota not fetched) or true, we preserve the saved model.
-    if (
-      isPreviewModel(this.model, this) &&
-      this.hasAccessToPreviewModel === false
-    ) {
-      this.setModel(DEFAULT_GEMINI_MODEL_AUTO);
-    }
-
-    const adminControlsEnabled =
-      experiments?.flags[ExperimentFlags.ENABLE_ADMIN_CONTROLS]?.boolValue ??
-      false;
-    const adminControls = await fetchAdminControls(
-      codeAssistServer,
-      this.getRemoteAdminSettings(),
-      adminControlsEnabled,
-      (newSettings: AdminControlsSettings) => {
-        this.setRemoteAdminSettings(newSettings);
-        coreEvents.emitAdminSettingsChanged();
-      },
-    );
-    this.setRemoteAdminSettings(adminControls);
-
-    if ((await this.getProModelNoAccess()) && isAutoModel(this.model)) {
-      this.setModel(PREVIEW_GEMINI_FLASH_MODEL);
-    }
+        if ((await this.getProModelNoAccess()) && isAutoModel(this.model)) {
+          this.setModel(PREVIEW_GEMINI_FLASH_MODEL);
+        }
+      })
+      .catch((e) => {
+        debugLogger.error('Failed to fetch user quota', e);
+      });
   }
 
   async getExperimentsAsync(): Promise<Experiments | undefined> {
