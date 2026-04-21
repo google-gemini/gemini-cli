@@ -302,11 +302,6 @@ export class InteractiveRun {
     if (this._isDead) return;
     return new Promise<void>((resolve) => {
       const timer = setTimeout(() => {
-        try {
-          process.kill(this.ptyProcess.pid, 'SIGKILL');
-        } catch (e) {
-          // Ignore if already dead
-        }
         resolve(); // Resolve anyway to avoid hanging tests!
       }, 5000); // Wait 5 seconds
 
@@ -314,6 +309,9 @@ export class InteractiveRun {
         clearTimeout(timer);
         resolve();
       });
+
+      // Send double Ctrl+C to force exit
+      this.ptyProcess.write('\x03\x03');
       this.ptyProcess.kill();
     });
   }
