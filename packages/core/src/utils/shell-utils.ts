@@ -138,7 +138,7 @@ export function getEnvironmentAwareCommand(
       // touch -> New-Item
       .replace(/\btouch\s+((?:"[^"]*"|'[^']*'|\S)+)/g, 'New-Item -ItemType File -Force $1')
       // which -> Get-Command
-      .replace(/\bwhich\s+(\S+)/g, 'Get-Command $1')
+      .replace(/\bwhich\s+((?:"[^"]*"|'[^']*'|\S)+)/g, 'Get-Command $1')
       // /dev/null -> $null
       .replace(/\/dev\/null\b/g, '$null')
       // && and || (PowerShell 7+ only, so emulate for PS 5.1 compatibility)
