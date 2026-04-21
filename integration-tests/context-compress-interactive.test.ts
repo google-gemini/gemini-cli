@@ -8,14 +8,16 @@ import { expect, describe, it, beforeEach, afterEach } from 'vitest';
 import { TestRig } from './test-helper.js';
 import { join } from 'node:path';
 
-// Skip on macOS: the interactive pty captures the CLI's startup escape
-// sequences (`q4;?m...true color warning`) instead of the streamed model
-// output, causing `expectText('THE_END.')` to time out. Reproducible on
-// vanilla `main` runs (e.g. 24740161950, 24739323404) and the merge-queue
-// gate for #25753 (24743605639); not specific to any model.
+// Skip on macOS: every interactive test in this file is chronically flaky
+// because the captured pty buffer contains the CLI's startup escape
+// sequences (`q4;?m...true color warning`) instead of the streamed output,
+// causing `expectText(...)` to time out. Reproducible across unrelated
+// runs on `main` (24740161950, 24739323404) and on consecutive merge-queue
+// gates for #25753 (24743605639, 24747624513) — different tests in the
+// same describe fail on different runs. Not specific to any model.
 const skipOnDarwin = process.platform === 'darwin';
 
-describe('Interactive Mode', () => {
+describe.skipIf(skipOnDarwin)('Interactive Mode', () => {
   let rig: TestRig;
 
   beforeEach(() => {
@@ -26,40 +28,37 @@ describe('Interactive Mode', () => {
     await rig.cleanup();
   });
 
-  it.skipIf(skipOnDarwin)(
-    'should trigger chat compression with /compress command',
-    async () => {
-      await rig.setup('interactive-compress-success', {
-        fakeResponsesPath: join(
-          import.meta.dirname,
-          'context-compress-interactive.compress.responses',
-        ),
-      });
+  it('should trigger chat compression with /compress command', async () => {
+    await rig.setup('interactive-compress-success', {
+      fakeResponsesPath: join(
+        import.meta.dirname,
+        'context-compress-interactive.compress.responses',
+      ),
+    });
 
-      const run = await rig.runInteractive();
+    const run = await rig.runInteractive();
 
-      await run.sendKeys(
-        'Write a 200 word story about a robot. The story MUST end with the text THE_END followed by a period.',
-      );
-      await run.type('\r');
+    await run.sendKeys(
+      'Write a 200 word story about a robot. The story MUST end with the text THE_END followed by a period.',
+    );
+    await run.type('\r');
 
-      // Wait for the specific end marker.
-      await run.expectText('THE_END.', 30000);
+    // Wait for the specific end marker.
+    await run.expectText('THE_END.', 30000);
 
-      await run.type('/compress');
-      await run.type('\r');
+    await run.type('/compress');
+    await run.type('\r');
 
-      const foundEvent = await rig.waitForTelemetryEvent(
-        'chat_compression',
-        25000,
-      );
-      expect(foundEvent, 'chat_compression telemetry event was not found').toBe(
-        true,
-      );
+    const foundEvent = await rig.waitForTelemetryEvent(
+      'chat_compression',
+      25000,
+    );
+    expect(foundEvent, 'chat_compression telemetry event was not found').toBe(
+      true,
+    );
 
-      await run.expectText('Chat history compressed', 5000);
-    },
-  );
+    await run.expectText('Chat history compressed', 5000);
+  });
 
   // TODO: Context compression is broken and doesn't include the system
   // instructions or tool counts, so it thinks compression is beneficial when
