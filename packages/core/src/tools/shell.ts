@@ -10,10 +10,7 @@ import path from 'node:path';
 import os from 'node:os';
 import crypto from 'node:crypto';
 import { debugLogger } from '../index.js';
-import {
-  type SandboxPermissions,
-  getPathIdentity,
-} from '../services/sandboxManager.js';
+import { type SandboxPermissions } from '../services/sandboxManager.js';
 import { ToolErrorType } from './tool-error.js';
 import {
   BaseDeclarativeTool,
@@ -48,11 +45,12 @@ import {
 } from '../utils/shell-utils.js';
 import { SHELL_TOOL_NAME } from './tool-names.js';
 import { PARAM_ADDITIONAL_PERMISSIONS } from './definitions/base-declarations.js';
+import { ApprovalMode } from '../policy/types.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { getShellDefinition } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
-import { isSubpath, resolveToRealPath } from '../utils/paths.js';
+import { toPathKey, isSubpath, resolveToRealPath } from '../utils/paths.js';
 import {
   getProactiveToolSuggestions,
   isNetworkReliantCommand,
@@ -252,6 +250,10 @@ export class ShellToolInvocation extends BaseToolInvocation<
     abortSignal: AbortSignal,
     forcedDecision?: ForcedToolDecision,
   ): Promise<ToolCallConfirmationDetails | false> {
+    if (this.context.config.getApprovalMode() === ApprovalMode.YOLO) {
+      return super.shouldConfirmExecute(abortSignal, forcedDecision);
+    }
+
     if (this.params[PARAM_ADDITIONAL_PERMISSIONS]) {
       return this.getConfirmationDetails(abortSignal);
     }
@@ -307,15 +309,13 @@ export class ShellToolInvocation extends BaseToolInvocation<
               approvedPaths?: string[],
             ): boolean => {
               if (!approvedPaths || approvedPaths.length === 0) return false;
-              const requestedRealIdentity = getPathIdentity(
+              const requestedRealIdentity = toPathKey(
                 resolveToRealPath(requestedPath),
               );
 
               // Identity check is fast, subpath check is slower
               return approvedPaths.some((p) => {
-                const approvedRealIdentity = getPathIdentity(
-                  resolveToRealPath(p),
-                );
+                const approvedRealIdentity = toPathKey(resolveToRealPath(p));
                 return (
                   requestedRealIdentity === approvedRealIdentity ||
                   isSubpath(approvedRealIdentity, requestedRealIdentity)
