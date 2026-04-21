@@ -153,6 +153,8 @@ export const StatusNode: React.FC<{
   );
 };
 
+import { useInputState } from '../contexts/InputContext.js';
+
 export const StatusRow: React.FC<StatusRowProps> = ({
   showUiDetails,
   isNarrow,
@@ -162,6 +164,7 @@ export const StatusRow: React.FC<StatusRowProps> = ({
   hasPendingActionRequired,
 }) => {
   const uiState = useUIState();
+  const inputState = useInputState();
   const settings = useSettings();
   const {
     isInteractiveShellWaiting,
@@ -225,7 +228,7 @@ export const StatusRow: React.FC<StatusRowProps> = ({
       settings.merged.ui.showShortcutsHint &&
       !hideUiDetailsForSuggestions &&
       !hasPendingActionRequired &&
-      uiState.buffer.text.length === 0
+      inputState.buffer.text.length === 0
     ) {
       return showUiDetails ? '? for shortcuts' : 'press tab twice for more';
     }
@@ -328,7 +331,7 @@ export const StatusRow: React.FC<StatusRowProps> = ({
             ) : isInteractiveShellWaiting ? (
               <Box width="100%" marginLeft={LAYOUT.INDICATOR_LEFT_MARGIN}>
                 <Text color={theme.status.warning}>
-                  ! Shell awaiting input (Tab to focus)
+                  {INTERACTIVE_SHELL_WAITING_PHRASE}
                 </Text>
               </Box>
             ) : (
@@ -391,13 +394,14 @@ export const StatusRow: React.FC<StatusRowProps> = ({
           >
             {showUiDetails ? (
               <>
-                {!hideUiDetailsForSuggestions && !uiState.shellModeActive && (
-                  <ApprovalModeIndicator
-                    approvalMode={uiState.showApprovalModeIndicator}
-                    allowPlanMode={uiState.allowPlanMode}
-                  />
-                )}
-                {uiState.shellModeActive && (
+                {!hideUiDetailsForSuggestions &&
+                  !inputState.shellModeActive && (
+                    <ApprovalModeIndicator
+                      approvalMode={uiState.showApprovalModeIndicator}
+                      allowPlanMode={uiState.allowPlanMode}
+                    />
+                  )}
+                {inputState.shellModeActive && (
                   <Box marginLeft={LAYOUT.INDICATOR_LEFT_MARGIN}>
                     <ShellModeIndicator />
                   </Box>

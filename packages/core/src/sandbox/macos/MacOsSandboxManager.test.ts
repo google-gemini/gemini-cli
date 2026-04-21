@@ -5,7 +5,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { MacOsSandboxManager } from './MacOsSandboxManager.js';
-import type { ExecutionPolicy } from '../../services/sandboxManager.js';
+import { type ExecutionPolicy } from '../../services/sandboxManager.js';
 import * as seatbeltArgsBuilder from './seatbeltArgsBuilder.js';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -64,20 +64,12 @@ describe('MacOsSandboxManager', () => {
         policy: mockPolicy,
       });
 
-      expect(seatbeltArgsBuilder.buildSeatbeltProfile).toHaveBeenCalledWith({
-        workspace: mockWorkspace,
-        allowedPaths: mockAllowedPaths,
-        forbiddenPaths: [],
-        networkAccess: mockNetworkAccess,
-        workspaceWrite: false,
-        additionalPermissions: {
-          fileSystem: {
-            read: [],
-            write: [],
-          },
-          network: true,
-        },
-      });
+      expect(seatbeltArgsBuilder.buildSeatbeltProfile).toHaveBeenCalledWith(
+        expect.objectContaining({
+          networkAccess: true,
+          workspaceWrite: false,
+        }),
+      );
 
       expect(result.program).toBe('/usr/bin/sandbox-exec');
       expect(result.args[0]).toBe('-f');
@@ -155,11 +147,10 @@ describe('MacOsSandboxManager', () => {
 
       expect(seatbeltArgsBuilder.buildSeatbeltProfile).toHaveBeenCalledWith(
         expect.objectContaining({
-          additionalPermissions: expect.objectContaining({
-            fileSystem: expect.objectContaining({
-              read: expect.not.arrayContaining(['/']),
-              write: expect.not.arrayContaining(['/']),
-            }),
+          workspaceWrite: true,
+          resolvedPaths: expect.objectContaining({
+            policyRead: expect.not.arrayContaining(['/']),
+            policyWrite: expect.not.arrayContaining(['/']),
           }),
         }),
       );
@@ -200,24 +191,6 @@ describe('MacOsSandboxManager', () => {
       });
     });
 
-    describe('governance files', () => {
-      it('should ensure governance files exist', async () => {
-        await manager.prepareCommand({
-          command: 'echo',
-          args: [],
-          cwd: mockWorkspace,
-          env: {},
-          policy: mockPolicy,
-        });
-
-        // The seatbelt builder internally handles governance files, so we simply verify
-        // it is invoked correctly with the right workspace.
-        expect(seatbeltArgsBuilder.buildSeatbeltProfile).toHaveBeenCalledWith(
-          expect.objectContaining({ workspace: mockWorkspace }),
-        );
-      });
-    });
-
     describe('allowedPaths', () => {
       it('should parameterize allowed paths and normalize them', async () => {
         await manager.prepareCommand({
@@ -233,7 +206,12 @@ describe('MacOsSandboxManager', () => {
 
         expect(seatbeltArgsBuilder.buildSeatbeltProfile).toHaveBeenCalledWith(
           expect.objectContaining({
-            allowedPaths: ['/tmp/allowed1', '/tmp/allowed2'],
+            resolvedPaths: expect.objectContaining({
+              policyAllowed: expect.arrayContaining([
+                '/tmp/allowed1',
+                '/tmp/allowed2',
+              ]),
+            }),
           }),
         );
       });
@@ -255,7 +233,9 @@ describe('MacOsSandboxManager', () => {
 
         expect(seatbeltArgsBuilder.buildSeatbeltProfile).toHaveBeenCalledWith(
           expect.objectContaining({
-            forbiddenPaths: ['/tmp/forbidden1'],
+            resolvedPaths: expect.objectContaining({
+              forbidden: expect.arrayContaining(['/tmp/forbidden1']),
+            }),
           }),
         );
       });
@@ -275,7 +255,9 @@ describe('MacOsSandboxManager', () => {
 
         expect(seatbeltArgsBuilder.buildSeatbeltProfile).toHaveBeenCalledWith(
           expect.objectContaining({
-            forbiddenPaths: ['/tmp/does-not-exist'],
+            resolvedPaths: expect.objectContaining({
+              forbidden: expect.arrayContaining(['/tmp/does-not-exist']),
+            }),
           }),
         );
       });
@@ -298,8 +280,10 @@ describe('MacOsSandboxManager', () => {
 
         expect(seatbeltArgsBuilder.buildSeatbeltProfile).toHaveBeenCalledWith(
           expect.objectContaining({
-            allowedPaths: [],
-            forbiddenPaths: ['/tmp/conflict'],
+            resolvedPaths: expect.objectContaining({
+              policyAllowed: [],
+              forbidden: expect.arrayContaining(['/tmp/conflict']),
+            }),
           }),
         );
       });

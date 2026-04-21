@@ -352,6 +352,7 @@ describe('<ToolMessage />', () => {
           underline: false,
           dim: false,
           inverse: false,
+          isUninitialized: false,
         },
       ],
     ];
@@ -443,8 +444,8 @@ describe('<ToolMessage />', () => {
             constrainHeight: true,
           },
           width: 80,
-          config: makeFakeConfig({ useAlternateBuffer: false }),
-          settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
+          config: makeFakeConfig({ useAlternateBuffer: true }),
+          settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
         },
       );
       const output = lastFrame();

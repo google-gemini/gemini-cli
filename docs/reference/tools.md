@@ -92,6 +92,28 @@ each tool.
 | [`ask_user`](../tools/ask-user.md) | `Communicate` | Requests clarification or missing information via an interactive dialog.               |
 | [`write_todos`](../tools/todos.md) | `Other`       | Maintains an internal list of subtasks. The model uses this to track its own progress. |
 
+### Task Tracker (Experimental)
+
+<!-- prettier-ignore -->
+> [!NOTE]
+> This is an experimental feature currently under active development. Enable via `experimental.taskTracker`.
+
+| Tool                                            | Kind    | Description                                                                 |
+| :---------------------------------------------- | :------ | :-------------------------------------------------------------------------- |
+| [`tracker_create_task`](../tools/tracker.md)    | `Other` | Creates a new task in the experimental tracker.                             |
+| [`tracker_update_task`](../tools/tracker.md)    | `Other` | Updates an existing task's status, description, or dependencies.            |
+| [`tracker_get_task`](../tools/tracker.md)       | `Other` | Retrieves the full details of a specific task.                              |
+| [`tracker_list_tasks`](../tools/tracker.md)     | `Other` | Lists tasks in the tracker, optionally filtered by status, type, or parent. |
+| [`tracker_add_dependency`](../tools/tracker.md) | `Other` | Adds a dependency between two tasks, ensuring topological execution.        |
+| [`tracker_visualize`](../tools/tracker.md)      | `Other` | Renders an ASCII tree visualization of the current task graph.              |
+
+### MCP
+
+| Tool                                              | Kind     | Description                                                            |
+| :------------------------------------------------ | :------- | :--------------------------------------------------------------------- |
+| [`list_mcp_resources`](../tools/mcp-resources.md) | `Search` | Lists all available resources exposed by connected MCP servers.        |
+| [`read_mcp_resource`](../tools/mcp-resources.md)  | `Read`   | Reads the content of a specific Model Context Protocol (MCP) resource. |
+
 ### Memory
 
 | Tool                                             | Kind    | Description                                                                          |
@@ -113,12 +135,24 @@ each tool.
 | :-------------- | :------ | :----------------------------------------------------------------------------------------------------------------- |
 | `complete_task` | `Other` | Finalizes a subagent's mission and returns the result to the parent agent. This tool is not available to the user. |
 
+### Task Tracking
+
+| Tool                     | Kind    | Description                                                                 |
+| :----------------------- | :------ | :-------------------------------------------------------------------------- |
+| `tracker_add_dependency` | `Think` | Adds a dependency between two existing tasks in the tracker.                |
+| `tracker_create_task`    | `Think` | Creates a new task in the internal tracker to monitor progress.             |
+| `tracker_get_task`       | `Think` | Retrieves the details and current status of a specific tracked task.        |
+| `tracker_list_tasks`     | `Think` | Lists all tasks currently being tracked.                                    |
+| `tracker_update_task`    | `Think` | Updates the status or details of an existing task.                          |
+| `tracker_visualize`      | `Think` | Generates a visual representation of the current task dependency graph.     |
+| `update_topic`           | `Think` | Updates the current topic and status to keep the user informed of progress. |
+
 ### Web
 
-| Tool                                          | Kind     | Description                                                                                                                                                                                                                                                              |
-| :-------------------------------------------- | :------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`google_web_search`](../tools/web-search.md) | `Search` | Performs a Google Search to find up-to-date information.                                                                                                                                                                                                                 |
-| [`web_fetch`](../tools/web-fetch.md)          | `Fetch`  | Retrieves and processes content from specific URLs. **Warning:** This tool can access local and private network addresses (e.g., localhost), which may pose a security risk if used with untrusted prompts. In Plan Mode, this tool requires explicit user confirmation. |
+| Tool                                          | Kind     | Description                                                                                                                                                                                                                                                                     |
+| :-------------------------------------------- | :------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [`google_web_search`](../tools/web-search.md) | `Search` | Performs a Google Search to find up-to-date information.                                                                                                                                                                                                                        |
+| [`web_fetch`](../tools/web-fetch.md)          | `Fetch`  | Retrieves and processes content from specific URLs. **Warning:** This tool can access local and private network addresses (for example, localhost), which may pose a security risk if used with untrusted prompts. In Plan Mode, this tool requires explicit user confirmation. |
 
 ## Under the hood
 

@@ -8,9 +8,8 @@ import fsPromises from 'node:fs/promises';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import crypto from 'node:crypto';
 import { debugLogger } from '../index.js';
-import type { SandboxPermissions } from '../services/sandboxManager.js';
+import { type SandboxPermissions } from '../services/sandboxManager.js';
 import { ToolErrorType } from './tool-error.js';
 import {
   BaseDeclarativeTool,
@@ -23,7 +22,6 @@ import {
   type ToolCallConfirmationDetails,
   type ToolExecuteConfirmationDetails,
   type PolicyUpdateOptions,
-  type ToolLiveOutput,
   type ExecuteOptions,
   type ForcedToolDecision,
 } from './tools.js';
@@ -42,14 +40,17 @@ import {
   stripShellWrapper,
   parseCommandDetails,
   hasRedirection,
+  normalizeCommand,
+  escapeShellArg,
 } from '../utils/shell-utils.js';
 import { SHELL_TOOL_NAME } from './tool-names.js';
 import { PARAM_ADDITIONAL_PERMISSIONS } from './definitions/base-declarations.js';
+import { ApprovalMode } from '../policy/types.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { getShellDefinition } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
-import { isSubpath } from '../utils/paths.js';
+import { toPathKey, isSubpath, resolveToRealPath } from '../utils/paths.js';
 import {
   getProactiveToolSuggestions,
   isNetworkReliantCommand,
@@ -59,6 +60,7 @@ export const OUTPUT_UPDATE_INTERVAL_MS = 1000;
 
 // Delay so user does not see the output of the process before the process is moved to the background.
 const BACKGROUND_DELAY_MS = 200;
+const SHOW_NL_DESCRIPTION_THRESHOLD = 150;
 
 export interface ShellToolParams {
   command: string;
@@ -109,7 +111,8 @@ export class ShellToolInvocation extends BaseToolInvocation<
     if (trimmed.endsWith('\\')) {
       trimmed += ' ';
     }
-    return `(\n${trimmed}\n); __code=$?; pgrep -g 0 >${tempFilePath} 2>&1; exit $__code;`;
+    const escapedTempFilePath = escapeShellArg(tempFilePath, 'bash');
+    return `(\n${trimmed}\n)\n__code=$?; pgrep -g 0 >${escapedTempFilePath} 2>&1; exit $__code;`;
   }
 
   private getContextualDetails(): string {
@@ -132,7 +135,12 @@ export class ShellToolInvocation extends BaseToolInvocation<
   }
 
   getDescription(): string {
-    return `${this.params.command} ${this.getContextualDetails()}`;
+    const descStr = this.params.description?.trim();
+    const commandStr = this.params.command;
+    return Array.from(commandStr).length <= SHOW_NL_DESCRIPTION_THRESHOLD ||
+      !descStr
+      ? commandStr
+      : descStr;
   }
 
   private simplifyPaths(paths: Set<string>): string[] {
@@ -243,81 +251,109 @@ export class ShellToolInvocation extends BaseToolInvocation<
     abortSignal: AbortSignal,
     forcedDecision?: ForcedToolDecision,
   ): Promise<ToolCallConfirmationDetails | false> {
+    if (this.context.config.getApprovalMode() === ApprovalMode.YOLO) {
+      return super.shouldConfirmExecute(abortSignal, forcedDecision);
+    }
+
     if (this.params[PARAM_ADDITIONAL_PERMISSIONS]) {
       return this.getConfirmationDetails(abortSignal);
     }
 
-    // Proactively suggest expansion for known network-heavy Node.js ecosystem tools
-    // (npm install, etc.) to avoid hangs when network is restricted by default.
-    // We do this even if the command is "allowed" by policy because the DEFAULT
-    // permissions are usually insufficient for these commands.
-    const command = stripShellWrapper(this.params.command);
-    const rootCommands = getCommandRoots(command);
-    const rootCommand = rootCommands[0];
+    if (this.context.config.getSandboxEnabled()) {
+      const command = stripShellWrapper(this.params.command);
+      const rootCommands = getCommandRoots(command);
+      const rawRootCommand = rootCommands[0];
 
-    if (rootCommand) {
-      const proactive = await getProactiveToolSuggestions(rootCommand);
-      if (proactive) {
-        const approved =
-          this.context.config.sandboxPolicyManager.getCommandPermissions(
-            rootCommand,
-          );
-        const missingNetwork = !!proactive.network && !approved?.network;
-
-        // Detect commands or sub-commands that definitely need network
-        const parsed = parseCommandDetails(command);
-        const subCommand = parsed?.details[0]?.args?.[0];
-        const needsNetwork = isNetworkReliantCommand(rootCommand, subCommand);
-
-        if (needsNetwork) {
-          // Add write permission to the current directory if we are in readonly mode
+      if (rawRootCommand) {
+        const rootCommand = normalizeCommand(rawRootCommand);
+        const proactive = await getProactiveToolSuggestions(rootCommand);
+        if (proactive) {
           const mode = this.context.config.getApprovalMode();
-          const isReadonlyMode =
-            this.context.config.sandboxPolicyManager.getModeConfig(mode)
-              ?.readonly ?? false;
+          const modeConfig =
+            this.context.config.sandboxPolicyManager.getModeConfig(mode);
+          const approved =
+            this.context.config.sandboxPolicyManager.getCommandPermissions(
+              rootCommand,
+            );
 
-          if (isReadonlyMode) {
-            const cwd =
-              this.params.dir_path || this.context.config.getTargetDir();
-            proactive.fileSystem = proactive.fileSystem || {
-              read: [],
-              write: [],
-            };
-            proactive.fileSystem.write = proactive.fileSystem.write || [];
-            if (!proactive.fileSystem.write.includes(cwd)) {
-              proactive.fileSystem.write.push(cwd);
-              proactive.fileSystem.read = proactive.fileSystem.read || [];
-              if (!proactive.fileSystem.read.includes(cwd)) {
-                proactive.fileSystem.read.push(cwd);
+          const hasNetwork = modeConfig.network || approved.network;
+          const missingNetwork = !!proactive.network && !hasNetwork;
+
+          // Detect commands or sub-commands that definitely need network
+          const parsed = parseCommandDetails(command);
+          const subCommand = parsed?.details[0]?.args?.[0];
+          const needsNetwork = isNetworkReliantCommand(rootCommand, subCommand);
+
+          if (needsNetwork) {
+            // Add write permission to the current directory if we are in readonly mode
+            const isReadonlyMode = modeConfig.readonly ?? false;
+
+            if (isReadonlyMode) {
+              const cwd =
+                this.params.dir_path || this.context.config.getTargetDir();
+              proactive.fileSystem = proactive.fileSystem || {
+                read: [],
+                write: [],
+              };
+              proactive.fileSystem.write = proactive.fileSystem.write || [];
+              if (!proactive.fileSystem.write.includes(cwd)) {
+                proactive.fileSystem.write.push(cwd);
+                proactive.fileSystem.read = proactive.fileSystem.read || [];
+                if (!proactive.fileSystem.read.includes(cwd)) {
+                  proactive.fileSystem.read.push(cwd);
+                }
               }
             }
-          }
 
-          const missingRead = (proactive.fileSystem?.read || []).filter(
-            (p) => !approved?.fileSystem?.read?.includes(p),
-          );
-          const missingWrite = (proactive.fileSystem?.write || []).filter(
-            (p) => !approved?.fileSystem?.write?.includes(p),
-          );
+            const isApproved = (
+              requestedPath: string,
+              approvedPaths?: string[],
+            ): boolean => {
+              if (!approvedPaths || approvedPaths.length === 0) return false;
+              const requestedRealIdentity = toPathKey(
+                resolveToRealPath(requestedPath),
+              );
 
-          const needsExpansion =
-            missingRead.length > 0 || missingWrite.length > 0 || missingNetwork;
+              // Identity check is fast, subpath check is slower
+              return approvedPaths.some((p) => {
+                const approvedRealIdentity = toPathKey(resolveToRealPath(p));
+                return (
+                  requestedRealIdentity === approvedRealIdentity ||
+                  isSubpath(approvedRealIdentity, requestedRealIdentity)
+                );
+              });
+            };
 
-          if (needsExpansion) {
-            const details = await this.getConfirmationDetails(
-              abortSignal,
-              proactive,
+            const missingRead = (proactive.fileSystem?.read || []).filter(
+              (p) => !isApproved(p, approved.fileSystem?.read),
             );
-            if (details && details.type === 'sandbox_expansion') {
-              const originalOnConfirm = details.onConfirm;
-              details.onConfirm = async (outcome: ToolConfirmationOutcome) => {
-                await originalOnConfirm(outcome);
-                if (outcome !== ToolConfirmationOutcome.Cancel) {
-                  this.proactivePermissionsConfirmed = proactive;
-                }
-              };
+            const missingWrite = (proactive.fileSystem?.write || []).filter(
+              (p) => !isApproved(p, approved.fileSystem?.write),
+            );
+
+            const needsExpansion =
+              missingRead.length > 0 ||
+              missingWrite.length > 0 ||
+              missingNetwork;
+
+            if (needsExpansion) {
+              const details = await this.getConfirmationDetails(
+                abortSignal,
+                proactive,
+              );
+              if (details && details.type === 'sandbox_expansion') {
+                const originalOnConfirm = details.onConfirm;
+                details.onConfirm = async (
+                  outcome: ToolConfirmationOutcome,
+                ) => {
+                  await originalOnConfirm(outcome);
+                  if (outcome !== ToolConfirmationOutcome.Cancel) {
+                    this.proactivePermissionsConfirmed = proactive;
+                  }
+                };
+              }
+              return details;
             }
-            return details;
           }
         }
       }
@@ -398,12 +434,13 @@ export class ShellToolInvocation extends BaseToolInvocation<
     return confirmationDetails;
   }
 
-  async execute(
-    signal: AbortSignal,
-    updateOutput?: (output: ToolLiveOutput) => void,
-    options?: ExecuteOptions,
-  ): Promise<ToolResult> {
-    const { shellExecutionConfig, setExecutionIdCallback } = options ?? {};
+  async execute(options: ExecuteOptions): Promise<ToolResult> {
+    const {
+      abortSignal: signal,
+      updateOutput,
+      shellExecutionConfig,
+      setExecutionIdCallback,
+    } = options;
     const strippedCommand = stripShellWrapper(this.params.command);
 
     if (signal.aborted) {
@@ -414,10 +451,8 @@ export class ShellToolInvocation extends BaseToolInvocation<
     }
 
     const isWindows = os.platform() === 'win32';
-    const tempFileName = `shell_pgrep_${crypto
-      .randomBytes(6)
-      .toString('hex')}.tmp`;
-    const tempFilePath = path.join(os.tmpdir(), tempFileName);
+    let tempFilePath = '';
+    let tempDir = '';
 
     const timeoutMs = this.context.config.getShellToolInactivityTimeout();
     const timeoutController = new AbortController();
@@ -427,8 +462,10 @@ export class ShellToolInvocation extends BaseToolInvocation<
     const combinedController = new AbortController();
 
     const onAbort = () => combinedController.abort();
-
     try {
+      tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gemini-shell-'));
+      tempFilePath = path.join(tempDir, 'pgrep.tmp');
+
       // pgrep is not available on Windows, so we can't get background PIDs
       const commandToExecute = this.wrapCommandForPgrep(
         strippedCommand,
@@ -602,7 +639,10 @@ export class ShellToolInvocation extends BaseToolInvocation<
 
         if (tempFileExists) {
           const pgrepContent = await fsPromises.readFile(tempFilePath, 'utf8');
-          const pgrepLines = pgrepContent.split(os.EOL).filter(Boolean);
+          const pgrepLines = pgrepContent
+            .split('\n')
+            .map((line) => line.trim())
+            .filter(Boolean);
           for (const line of pgrepLines) {
             if (!/^\d+$/.test(line)) {
               if (
@@ -742,20 +782,22 @@ export class ShellToolInvocation extends BaseToolInvocation<
           );
 
           // Proactive permission suggestions for Node ecosystem tools
-          const proactive =
-            await getProactiveToolSuggestions(rootCommandDisplay);
-          if (proactive) {
-            if (proactive.network) {
-              sandboxDenial.network = true;
-            }
-            if (proactive.fileSystem?.read) {
-              for (const p of proactive.fileSystem.read) {
-                readPaths.add(p);
+          if (this.context.config.getSandboxEnabled()) {
+            const proactive =
+              await getProactiveToolSuggestions(rootCommandDisplay);
+            if (proactive) {
+              if (proactive.network) {
+                sandboxDenial.network = true;
               }
-            }
-            if (proactive.fileSystem?.write) {
-              for (const p of proactive.fileSystem.write) {
-                writePaths.add(p);
+              if (proactive.fileSystem?.read) {
+                for (const p of proactive.fileSystem.read) {
+                  readPaths.add(p);
+                }
+              }
+              if (proactive.fileSystem?.write) {
+                for (const p of proactive.fileSystem.write) {
+                  writePaths.add(p);
+                }
               }
             }
           }
@@ -897,10 +939,19 @@ export class ShellToolInvocation extends BaseToolInvocation<
       if (timeoutTimer) clearTimeout(timeoutTimer);
       signal.removeEventListener('abort', onAbort);
       timeoutController.signal.removeEventListener('abort', onAbort);
-      try {
-        await fsPromises.unlink(tempFilePath);
-      } catch {
-        // Ignore errors during unlink
+      if (tempFilePath) {
+        try {
+          await fsPromises.unlink(tempFilePath);
+        } catch {
+          // Ignore errors during unlink
+        }
+      }
+      if (tempDir) {
+        try {
+          await fsPromises.rm(tempDir, { recursive: true, force: true });
+        } catch {
+          // Ignore errors during rm
+        }
       }
     }
   }

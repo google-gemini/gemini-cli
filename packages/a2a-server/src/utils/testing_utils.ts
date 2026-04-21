@@ -98,6 +98,7 @@ export function createMockConfig(
       getMcpServers: vi.fn().mockReturnValue({}),
     }),
     getTelemetryLogPromptsEnabled: vi.fn().mockReturnValue(false),
+    getTelemetryTracesEnabled: vi.fn().mockReturnValue(false),
     getGitService: vi.fn(),
     validatePathAccess: vi.fn().mockReturnValue(undefined),
     getShellExecutionConfig: vi.fn().mockReturnValue({
