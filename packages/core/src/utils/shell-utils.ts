@@ -136,7 +136,7 @@ export function getEnvironmentAwareCommand(
       // cp -r -> cp -Recurse
       .replace(/\bcp\s+-[ra](\s|$)/g, 'cp -Recurse$1')
       // touch -> New-Item
-      .replace(/\btouch\s+(\S+)/g, 'New-Item -ItemType File -Force $1')
+      .replace(/\btouch\s+((?:"[^"]*"|'[^']*'|\S)+)/g, 'New-Item -ItemType File -Force $1')
       // which -> Get-Command
       .replace(/\bwhich\s+(\S+)/g, 'Get-Command $1')
       // /dev/null -> $null
