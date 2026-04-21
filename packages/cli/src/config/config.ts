@@ -13,6 +13,7 @@ import { mcpCommand } from '../commands/mcp.js';
 import { extensionsCommand } from '../commands/extensions.js';
 import { skillsCommand } from '../commands/skills.js';
 import { hooksCommand } from '../commands/hooks.js';
+import { gemmaCommand } from '../commands/gemma.js';
 import {
   setGeminiMdFilename as setServerGeminiMdFilename,
   getCurrentGeminiMdFilename,
@@ -181,6 +182,7 @@ export async function parseArguments(
         extensionsCommand,
         skillsCommand,
         hooksCommand,
+        gemmaCommand,
       ];
 
       const subcommands = commandModules.flatMap((mod) => {
@@ -260,6 +262,7 @@ export async function parseArguments(
   yargsInstance.command(extensionsCommand);
   yargsInstance.command(skillsCommand);
   yargsInstance.command(hooksCommand);
+  yargsInstance.command(gemmaCommand);
 
   yargsInstance
     .command('$0 [query..]', 'Launch Gemini CLI', (yargsInstance) =>
@@ -990,10 +993,13 @@ export async function loadCliConfig(
     disabledSkills: settings.skills?.disabled,
     experimentalJitContext: settings.experimental?.jitContext,
     experimentalMemoryManager: settings.experimental?.memoryManager,
+    experimentalAutoMemory: settings.experimental?.autoMemory,
     contextManagement,
     experimentalBtw: settings.experimental?.btw,
     modelSteering: settings.experimental?.modelSteering,
-    topicUpdateNarration: settings.experimental?.topicUpdateNarration,
+    topicUpdateNarration:
+      settings.general?.topicUpdateNarration ??
+      settings.experimental?.topicUpdateNarration,
     noBrowser: !!process.env['NO_BROWSER'],
     summarizeToolOutput: settings.model?.summarizeToolOutput,
     ideMode,
@@ -1027,6 +1033,7 @@ export async function loadCliConfig(
     recordResponses: argv.recordResponses,
     retryFetchErrors: settings.general?.retryFetchErrors,
     billing: settings.billing,
+    vertexAiRouting: settings.billing?.vertexAi,
     maxAttempts: settings.general?.maxAttempts,
     ptyInfo: ptyInfo?.name,
     disableLLMCorrection: settings.tools?.disableLLMCorrection,
