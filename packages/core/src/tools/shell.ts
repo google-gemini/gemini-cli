@@ -50,7 +50,12 @@ import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { getShellDefinition } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
-import { toPathKey, isSubpath, resolveToRealPath } from '../utils/paths.js';
+import {
+  homedir,
+  toPathKey,
+  isSubpath,
+  resolveToRealPath,
+} from '../utils/paths.js';
 import {
   getProactiveToolSuggestions,
   isNetworkReliantCommand,
@@ -463,11 +468,20 @@ export class ShellToolInvocation extends BaseToolInvocation<
 
     const onAbort = () => combinedController.abort();
     let strippedCommandWithRc = strippedCommand;
-    const rcFilePath = this.context.config.getShellToolRcFile();
-    if (rcFilePath) {
-      strippedCommandWithRc = `source ${rcFilePath} && ${strippedCommand}`;
-    } else if (!isWindows) {
-      strippedCommandWithRc = `export PAGER=cat GIT_PAGER=cat; more() { cat "$@"; }; less() { cat "$@"; }; ${strippedCommand}`;
+    if (!isWindows) {
+      strippedCommandWithRc = `export PAGER=cat GIT_PAGER=cat; ${strippedCommand}`;
+      const rcFilePath = this.context.config.getShellToolRcFile();
+      if (rcFilePath && this.context.config.isTrustedFolder()) {
+        let resolvedRcFilePath = rcFilePath;
+        if (rcFilePath === '~' || rcFilePath.startsWith('~/')) {
+          resolvedRcFilePath = homedir() + rcFilePath.substring(1);
+        }
+        const escapedRcFilePath = resolvedRcFilePath.replace(
+          /'/g,
+          () => "'\\''",
+        );
+        strippedCommandWithRc = `source '${escapedRcFilePath}'; ${strippedCommandWithRc}`;
+      }
     }
 
     try {

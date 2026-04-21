@@ -165,6 +165,7 @@ describe('ShellTool', () => {
         addSessionApproval: vi.fn(),
       },
       getShellToolRcFile: vi.fn().mockReturnValue(undefined),
+      isTrustedFolder: vi.fn().mockReturnValue(true),
     } as unknown as Config;
 
     const bus = createMockMessageBus();
@@ -487,9 +488,10 @@ EOF`;
       expect(mockShellExecutionService.mock.calls[0][0]).toMatch(/\nEOF\n\)\n/);
     });
 
-    it('should source rcfile when shellToolRcFile setting is present', async () => {
+    it('should source rcfile when shellToolRcFile setting is present and folder is trusted', async () => {
       const rcFilePath = '~/.geminirc';
       (mockConfig.getShellToolRcFile as Mock).mockReturnValue(rcFilePath);
+      (mockConfig.isTrustedFolder as Mock).mockReturnValue(true);
 
       const invocation = shellTool.build({ command: 'my-command' });
       const promise = invocation.execute({ abortSignal: mockAbortSignal });
@@ -497,7 +499,51 @@ EOF`;
       await promise;
 
       expect(mockShellExecutionService).toHaveBeenCalledWith(
-        expect.stringContaining(`source ${rcFilePath} && my-command`),
+        expect.stringContaining(
+          `source '${rcFilePath.replace('~', '/home/user')}'; export PAGER=cat`,
+        ),
+        expect.any(String),
+        expect.any(Function),
+        expect.any(AbortSignal),
+        false,
+        expect.any(Object),
+      );
+    });
+
+    it('should NOT source rcfile when shellToolRcFile setting is present but folder is untrusted', async () => {
+      const rcFilePath = '~/.geminirc';
+      (mockConfig.getShellToolRcFile as Mock).mockReturnValue(rcFilePath);
+      (mockConfig.isTrustedFolder as Mock).mockReturnValue(false);
+
+      const invocation = shellTool.build({ command: 'my-command' });
+      const promise = invocation.execute({ abortSignal: mockAbortSignal });
+      resolveShellExecution();
+      await promise;
+
+      expect(mockShellExecutionService).not.toHaveBeenCalledWith(
+        expect.stringContaining(`source '${rcFilePath}'`),
+        expect.any(String),
+        expect.any(Function),
+        expect.any(AbortSignal),
+        false,
+        expect.any(Object),
+      );
+    });
+
+    it('should properly escape quotes in rcFilePath', async () => {
+      const rcFilePath = "/path/with/'quotes'/rc";
+      (mockConfig.getShellToolRcFile as Mock).mockReturnValue(rcFilePath);
+      (mockConfig.isTrustedFolder as Mock).mockReturnValue(true);
+
+      const invocation = shellTool.build({ command: 'my-command' });
+      const promise = invocation.execute({ abortSignal: mockAbortSignal });
+      resolveShellExecution();
+      await promise;
+
+      expect(mockShellExecutionService).toHaveBeenCalledWith(
+        expect.stringContaining(
+          `source '/path/with/'\\''quotes'\\''/rc'; export PAGER=cat`,
+        ),
         expect.any(String),
         expect.any(Function),
         expect.any(AbortSignal),
