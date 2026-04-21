@@ -240,6 +240,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     toggleCleanUiDetailsVisible,
   } = useUIActions();
   const {
+    terminalWidth,
     activePtyId,
     history,
     backgroundTasks,
@@ -1684,6 +1685,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     ? undefined
     : theme.background.input;
 
+  const useLineFallback = !!process.env['NO_COLOR'];
+
   useEffect(() => {
     if (onSuggestionsVisibilityChange) {
       onSuggestionsVisibilityChange(shouldShowSuggestions);
@@ -1745,6 +1748,20 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   return (
     <>
       {suggestionsPosition === 'above' && suggestionsNode}
+      {useLineFallback ? (
+        <Box
+          borderStyle="round"
+          borderTop={true}
+          borderBottom={false}
+          borderLeft={false}
+          borderRight={false}
+          borderColor={borderColor}
+          width={terminalWidth}
+          flexDirection="row"
+          alignItems="flex-start"
+          height={0}
+        />
+      ) : null}
       <HalfLinePaddedBox
         backgroundBaseColor={theme.background.input}
         backgroundOpacity={1}
@@ -1755,10 +1772,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           flexDirection="row"
           paddingX={1}
           borderColor={borderColor}
+          borderStyle={useLineFallback ? 'round' : undefined}
           borderTop={false}
           borderBottom={false}
-          borderLeft={!useBackgroundColor}
-          borderRight={!useBackgroundColor}
+          borderLeft={!useBackgroundColor || useLineFallback}
+          borderRight={!useBackgroundColor || useLineFallback}
         >
           <Text
             color={statusColor ?? theme.text.accent}
@@ -1848,6 +1866,20 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           </Box>
         </Box>
       </HalfLinePaddedBox>
+      {useLineFallback ? (
+        <Box
+          borderStyle="round"
+          borderTop={false}
+          borderBottom={true}
+          borderLeft={false}
+          borderRight={false}
+          borderColor={borderColor}
+          width={terminalWidth}
+          flexDirection="row"
+          alignItems="flex-start"
+          height={0}
+        />
+      ) : null}
       {suggestionsPosition === 'below' && suggestionsNode}
     </>
   );
