@@ -50,6 +50,7 @@ class DiscoveredToolInvocation extends BaseToolInvocation<
     prefixedToolName: string,
     params: ToolParams,
     messageBus: MessageBus,
+    private readonly canUpdateOutput: boolean,
   ) {
     super(params, messageBus, prefixedToolName);
   }
@@ -99,11 +100,19 @@ class DiscoveredToolInvocation extends BaseToolInvocation<
 
       await new Promise<void>((resolve) => {
         const onStdout = (data: Buffer) => {
-          stdout += data?.toString();
+          const chunk = data?.toString();
+          stdout += chunk;
+          if (_updateOutput) {
+            _updateOutput(chunk);
+          }
         };
 
         const onStderr = (data: Buffer) => {
-          stderr += data?.toString();
+          const chunk = data?.toString();
+          stderr += chunk;
+          if (_updateOutput) {
+            _updateOutput(chunk);
+          }
         };
 
         const onError = (err: Error) => {
@@ -139,8 +148,12 @@ class DiscoveredToolInvocation extends BaseToolInvocation<
       cleanupFunc?.();
     }
 
-    // if there is any error, non-zero exit code, signal, or stderr, return error details instead of stdout
-    if (error || code !== 0 || signal || stderr) {
+    // If there is a process error, signal, or non-zero exit code, return error details.
+    // We allow code 1 as successful ONLY if the tool supports streaming updates (canUpdateOutput),
+    // because many tools use it for non-fatal status (e.g. progress).
+    // For non-streaming tools, we maintain the original strict contract (code 0 only).
+    const failureThreshold = this.canUpdateOutput ? 1 : 0;
+    if (error || (code !== null && code > failureThreshold) || signal) {
       const llmContent = [
         `Stdout: ${stdout || '(empty)'}`,
         `Stderr: ${stderr || '(empty)'}`,
@@ -225,6 +238,7 @@ Signal: Signal number or \`(none)\` if no signal was received.
       _toolName ?? this.name,
       params,
       messageBus,
+      this.canUpdateOutput,
     );
   }
 }
