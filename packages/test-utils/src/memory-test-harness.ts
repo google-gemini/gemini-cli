@@ -264,9 +264,9 @@ export class MemoryTestHarness {
       return { leaked: false, message: 'Not enough snapshots to analyze' };
     }
 
-    const snap1 = snapshots[snapshots.length - 3]!;
-    const snap2 = snapshots[snapshots.length - 2]!;
-    const snap3 = snapshots[snapshots.length - 1]!;
+    const snap1 = snapshots[snapshots.length - 3];
+    const snap2 = snapshots[snapshots.length - 2];
+    const snap3 = snapshots[snapshots.length - 1];
 
     const growth1 = snap2.heapUsed - snap1.heapUsed;
     const growth2 = snap3.heapUsed - snap2.heapUsed;
@@ -285,10 +285,10 @@ export class MemoryTestHarness {
    */
   assertMemoryReturnsToBaseline(
     snapshots: MemorySnapshot[],
-    tolerancePercent: number = 15,
+    tolerancePercent: number = 10,
   ): void {
     if (snapshots.length < 3) {
-      return; // Need at least before, peak, after
+      throw new Error('Need at least 3 snapshots to check return to baseline');
     }
 
     // Find the first non-zero snapshot as baseline
