@@ -86,6 +86,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
     }
 
     const manualModels = [
+      'google/gemma-4-31B-it',
       DEFAULT_GEMINI_MODEL,
       DEFAULT_GEMINI_FLASH_MODEL,
       DEFAULT_GEMINI_FLASH_LITE_MODEL,
@@ -223,6 +224,11 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
 
     // --- LEGACY PATH ---
     const list = [
+      {
+        value: 'google/gemma-4-31B-it',
+        title: 'Gemma 4-31B-it (Hybrid)',
+        key: 'google/gemma-4-31B-it',
+      },
       {
         value: DEFAULT_GEMINI_MODEL,
         title: getDisplayString(DEFAULT_GEMINI_MODEL),
