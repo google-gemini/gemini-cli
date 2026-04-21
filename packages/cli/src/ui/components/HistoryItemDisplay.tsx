@@ -156,6 +156,8 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
           selectedAuthType={itemForDisplay.selectedAuthType}
           userEmail={itemForDisplay.userEmail}
           tier={itemForDisplay.tier}
+          creditBalance={itemForDisplay.creditBalance}
+          quotaBuckets={itemForDisplay.quotas?.buckets}
         />
       )}
       {itemForDisplay.type === 'model_stats' && (

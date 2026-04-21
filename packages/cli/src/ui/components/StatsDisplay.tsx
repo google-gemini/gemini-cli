@@ -25,6 +25,7 @@ import { computeSessionStats } from '../utils/computeStats.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 import type { QuotaStats } from '../types.js';
 import { LlmRole } from '@google/gemini-cli-core';
+import { ModelQuotaDisplay } from './ModelQuotaDisplay.js';
 
 // A more flexible and powerful StatRow component
 interface StatRowProps {
@@ -141,9 +142,7 @@ const ModelUsageTable: React.FC<ModelUsageTableProps> = ({ models }) => {
       <Text bold color={theme.text.primary}>
         Model Usage
       </Text>
-      <Text color={theme.text.secondary}>
-        Use /model to view model quota information
-      </Text>
+      <Text color={theme.text.secondary}>Session token usage by model</Text>
       <Box height={1} />
 
       {/* Header */}
@@ -237,6 +236,11 @@ interface StatsDisplayProps {
   currentModel?: string;
   quotaStats?: QuotaStats;
   creditBalance?: number;
+  quotaBuckets?: Array<{
+    modelId?: string;
+    remainingFraction?: number;
+    resetTime?: string;
+  }>;
 }
 
 export const StatsDisplay: React.FC<StatsDisplayProps> = ({
@@ -247,6 +251,7 @@ export const StatsDisplay: React.FC<StatsDisplayProps> = ({
   userEmail,
   tier,
   creditBalance,
+  quotaBuckets,
 }) => {
   const { stats } = useSessionStats();
   const { metrics } = stats;
@@ -394,6 +399,8 @@ export const StatsDisplay: React.FC<StatsDisplayProps> = ({
       </Section>
 
       {Object.keys(models).length > 0 && <ModelUsageTable models={models} />}
+
+      <ModelQuotaDisplay buckets={quotaBuckets} title="Daily Quota" />
 
       {renderFooter()}
     </Box>

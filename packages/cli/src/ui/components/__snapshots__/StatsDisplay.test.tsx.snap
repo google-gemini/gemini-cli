@@ -119,7 +119,7 @@ exports[`<StatsDisplay /> > Conditional Rendering Tests > hides Efficiency secti
 │                                                                                                  │
 │                                                                                                  │
 │  Model Usage                                                                                     │
-│  Use /model to view model quota information                                                      │
+│  Session token usage by model                                                                    │
 │                                                                                                  │
 │  Model                           Reqs  Input Tokens   Cache Reads Output Tokens                  │
 │  ──────────────────────────────────────────────────────────────────────────────────────────────  │
@@ -206,7 +206,7 @@ exports[`<StatsDisplay /> > renders a table with two models correctly 1`] = `
 │                                                                                                  │
 │                                                                                                  │
 │  Model Usage                                                                                     │
-│  Use /model to view model quota information                                                      │
+│  Session token usage by model                                                                    │
 │                                                                                                  │
 │  Model                           Reqs  Input Tokens   Cache Reads Output Tokens                  │
 │  ──────────────────────────────────────────────────────────────────────────────────────────────  │
@@ -235,7 +235,7 @@ exports[`<StatsDisplay /> > renders all sections when all data is present 1`] = 
 │                                                                                                  │
 │                                                                                                  │
 │  Model Usage                                                                                     │
-│  Use /model to view model quota information                                                      │
+│  Session token usage by model                                                                    │
 │                                                                                                  │
 │  Model                           Reqs  Input Tokens   Cache Reads Output Tokens                  │
 │  ──────────────────────────────────────────────────────────────────────────────────────────────  │
@@ -282,7 +282,7 @@ exports[`<StatsDisplay /> > renders role breakdown correctly under models 1`] = 
 │                                                                                                  │
 │                                                                                                  │
 │  Model Usage                                                                                     │
-│  Use /model to view model quota information                                                      │
+│  Session token usage by model                                                                    │
 │                                                                                                  │
 │  Model                           Reqs  Input Tokens   Cache Reads Output Tokens                  │
 │  ──────────────────────────────────────────────────────────────────────────────────────────────  │
