@@ -1,0 +1,17 @@
+{
+  "name": "optimizer1000",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "tsx index.ts"
+  },
+  "dependencies": {
+    "commander": "^12.0.0",
+    "csv-writer": "^1.6.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.20.3",
+    "typescript": "^5.4.5",
+    "@types/node": "^20.12.7"
+  }
+}
