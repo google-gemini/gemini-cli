@@ -2169,6 +2169,26 @@ const SETTINGS_SCHEMA = {
             default: false,
             description:
               'Enable the Gemma Model Router (experimental). Requires a local endpoint serving Gemma via the Gemini API using LiteRT-LM shim.',
+            showInDialog: true,
+          },
+          autoStartServer: {
+            type: 'boolean',
+            label: 'Auto-start LiteRT Server',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: false,
+            description:
+              'Automatically start the LiteRT-LM server when Gemini CLI starts and the Gemma router is enabled.',
+            showInDialog: true,
+          },
+          binaryPath: {
+            type: 'string',
+            label: 'LiteRT Binary Path',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: '',
+            description:
+              'Custom path to the LiteRT-LM binary. Leave empty to use the default location (~/.gemini/bin/litert/).',
             showInDialog: false,
           },
           classifier: {
@@ -2211,6 +2231,16 @@ const SETTINGS_SCHEMA = {
         default: false,
         description:
           'Replace the built-in save_memory tool with a memory manager subagent that supports adding, removing, de-duplicating, and organizing memories.',
+        showInDialog: true,
+      },
+      autoMemory: {
+        type: 'boolean',
+        label: 'Auto Memory',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Automatically extract reusable skills from past sessions in the background. Review results with /memory inbox.',
         showInDialog: true,
       },
       generalistProfile: {

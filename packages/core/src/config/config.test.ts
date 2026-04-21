@@ -710,6 +710,59 @@ describe('Server Config (config.ts)', () => {
       );
     });
 
+    describe('getProModelNoAccessSync', () => {
+      it('should return experiment value for AuthType.LOGIN_WITH_GOOGLE', async () => {
+        vi.mocked(getExperiments).mockResolvedValue({
+          experimentIds: [],
+          flags: {
+            [ExperimentFlags.PRO_MODEL_NO_ACCESS]: {
+              boolValue: true,
+            },
+          },
+        });
+        const config = new Config(baseParams);
+        vi.mocked(createContentGeneratorConfig).mockResolvedValue({
+          authType: AuthType.LOGIN_WITH_GOOGLE,
+        });
+        await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
+        expect(config.getProModelNoAccessSync()).toBe(true);
+      });
+
+      it('should return experiment value for AuthType.COMPUTE_ADC', async () => {
+        vi.mocked(getExperiments).mockResolvedValue({
+          experimentIds: [],
+          flags: {
+            [ExperimentFlags.PRO_MODEL_NO_ACCESS]: {
+              boolValue: true,
+            },
+          },
+        });
+        const config = new Config(baseParams);
+        vi.mocked(createContentGeneratorConfig).mockResolvedValue({
+          authType: AuthType.COMPUTE_ADC,
+        });
+        await config.refreshAuth(AuthType.COMPUTE_ADC);
+        expect(config.getProModelNoAccessSync()).toBe(true);
+      });
+
+      it('should return false for other auth types even if experiment is true', async () => {
+        vi.mocked(getExperiments).mockResolvedValue({
+          experimentIds: [],
+          flags: {
+            [ExperimentFlags.PRO_MODEL_NO_ACCESS]: {
+              boolValue: true,
+            },
+          },
+        });
+        const config = new Config(baseParams);
+        vi.mocked(createContentGeneratorConfig).mockResolvedValue({
+          authType: AuthType.USE_GEMINI,
+        });
+        await config.refreshAuth(AuthType.USE_GEMINI);
+        expect(config.getProModelNoAccessSync()).toBe(false);
+      });
+    });
+
     describe('getRequestTimeoutMs', () => {
       it('should return undefined if the flag is not set', () => {
         const config = new Config(baseParams);
@@ -1922,6 +1975,8 @@ describe('GemmaModelRouterSettings', () => {
     const config = new Config(baseParams);
     const settings = config.getGemmaModelRouterSettings();
     expect(settings.enabled).toBe(false);
+    expect(settings.autoStartServer).toBe(true);
+    expect(settings.binaryPath).toBe('');
     expect(settings.classifier?.host).toBe('http://localhost:9379');
     expect(settings.classifier?.model).toBe('gemma3-1b-gpu-custom');
   });
@@ -1931,6 +1986,8 @@ describe('GemmaModelRouterSettings', () => {
       ...baseParams,
       gemmaModelRouter: {
         enabled: true,
+        autoStartServer: false,
+        binaryPath: '/custom/lit',
         classifier: {
           host: 'http://custom:1234',
           model: 'custom-gemma',
@@ -1940,6 +1997,8 @@ describe('GemmaModelRouterSettings', () => {
     const config = new Config(params);
     const settings = config.getGemmaModelRouterSettings();
     expect(settings.enabled).toBe(true);
+    expect(settings.autoStartServer).toBe(false);
+    expect(settings.binaryPath).toBe('/custom/lit');
     expect(settings.classifier?.host).toBe('http://custom:1234');
     expect(settings.classifier?.model).toBe('custom-gemma');
   });
@@ -1954,6 +2013,8 @@ describe('GemmaModelRouterSettings', () => {
     const config = new Config(params);
     const settings = config.getGemmaModelRouterSettings();
     expect(settings.enabled).toBe(true);
+    expect(settings.autoStartServer).toBe(true);
+    expect(settings.binaryPath).toBe('');
     expect(settings.classifier?.host).toBe('http://localhost:9379');
     expect(settings.classifier?.model).toBe('gemma3-1b-gpu-custom');
   });
@@ -3440,6 +3501,50 @@ describe('Config JIT Initialization', () => {
 
       config = new Config(params);
       expect(config.isMemoryManagerEnabled()).toBe(true);
+    });
+  });
+
+  describe('isAutoMemoryEnabled', () => {
+    it('should default to false', () => {
+      const params: ConfigParameters = {
+        sessionId: 'test-session',
+        targetDir: '/tmp/test',
+        debugMode: false,
+        model: 'test-model',
+        cwd: '/tmp/test',
+      };
+
+      config = new Config(params);
+      expect(config.isAutoMemoryEnabled()).toBe(false);
+    });
+
+    it('should return true when experimentalAutoMemory is true', () => {
+      const params: ConfigParameters = {
+        sessionId: 'test-session',
+        targetDir: '/tmp/test',
+        debugMode: false,
+        model: 'test-model',
+        cwd: '/tmp/test',
+        experimentalAutoMemory: true,
+      };
+
+      config = new Config(params);
+      expect(config.isAutoMemoryEnabled()).toBe(true);
+    });
+
+    it('should be independent of experimentalMemoryManager', () => {
+      const params: ConfigParameters = {
+        sessionId: 'test-session',
+        targetDir: '/tmp/test',
+        debugMode: false,
+        model: 'test-model',
+        cwd: '/tmp/test',
+        experimentalMemoryManager: true,
+      };
+
+      config = new Config(params);
+      expect(config.isMemoryManagerEnabled()).toBe(true);
+      expect(config.isAutoMemoryEnabled()).toBe(false);
     });
   });
 

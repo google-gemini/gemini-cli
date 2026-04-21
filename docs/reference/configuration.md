@@ -1711,6 +1711,18 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
+- **`experimental.gemmaModelRouter.autoStartServer`** (boolean):
+  - **Description:** Automatically start the LiteRT-LM server when Gemini CLI
+    starts and the Gemma router is enabled.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
+- **`experimental.gemmaModelRouter.binaryPath`** (string):
+  - **Description:** Custom path to the LiteRT-LM binary. Leave empty to use the
+    default location (~/.gemini/bin/litert/).
+  - **Default:** `""`
+  - **Requires restart:** Yes
+
 - **`experimental.gemmaModelRouter.classifier.host`** (string):
   - **Description:** The host of the classifier.
   - **Default:** `"http://localhost:9379"`
@@ -1726,6 +1738,12 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Replace the built-in save_memory tool with a memory manager
     subagent that supports adding, removing, de-duplicating, and organizing
     memories.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
+- **`experimental.autoMemory`** (boolean):
+  - **Description:** Automatically extract reusable skills from past sessions in
+    the background. Review results with /memory inbox.
   - **Default:** `false`
   - **Requires restart:** Yes
 
