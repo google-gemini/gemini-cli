@@ -16,6 +16,10 @@ inputs:
   dist-artifact:
     description: 'The name of the dist artifact to download if mode is "dist"'
     required: false
+  skip-npm-ci:
+    description: 'Whether to skip npm ci step'
+    required: false
+    default: 'false'
 
 runs:
   using: 'composite'
@@ -27,6 +31,7 @@ runs:
         cache: 'npm'
 
     - name: 'Install dependencies'
+      if: "${{ inputs.skip-npm-ci != 'true' }}"
       run: 'npm ci'
       shell: 'bash'
 
