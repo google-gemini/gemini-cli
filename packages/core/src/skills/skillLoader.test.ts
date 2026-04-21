@@ -343,4 +343,28 @@ description: A long description: with a colon
     expect(skills[0].name).toBe('my-skill');
     expect(skills[0].description).toBe('A long description: with a colon');
   });
+
+  it('should not treat "Note:" as a new key in multi-line description in simple parser', async () => {
+    const skillDir = path.join(testRootDir, 'simple-parser-note');
+    await fs.mkdir(skillDir, { recursive: true });
+    const skillFile = path.join(skillDir, 'SKILL.md');
+    // Forces YAML failure, triggers simple parser
+    await fs.writeFile(
+      skillFile,
+      `---
+name: note-skill
+description: This is a description
+  Note: This should be part of the description
+---
+`,
+    );
+
+    const skills = await loadSkillsFromDir(testRootDir);
+
+    expect(skills).toHaveLength(1);
+    expect(skills[0].name).toBe('note-skill');
+    expect(skills[0].description).toBe(
+      'This is a description Note: This should be part of the description',
+    );
+  });
 });

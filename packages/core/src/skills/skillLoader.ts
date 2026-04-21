@@ -92,8 +92,11 @@ function parseSimpleFrontmatter(
       while (i + 1 < lines.length) {
         const nextLine = lines[i + 1];
         // If next line is indented, it's a continuation of the description,
-        // UNLESS it looks like another key (e.g. "name:")
-        if (nextLine.match(/^[ \t]+\S/) && !nextLine.match(/^\s*\w+\s*:/)) {
+        // UNLESS it looks like another known key (e.g. "name:")
+        if (
+          nextLine.match(/^[ \t]+\S/) &&
+          !nextLine.match(/^\s*(name|description)\s*:/i)
+        ) {
           descLines.push(nextLine.trim());
           i++;
         } else {
