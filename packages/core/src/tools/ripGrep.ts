@@ -30,7 +30,7 @@ import {
   COMMON_DIRECTORY_EXCLUDES,
 } from '../utils/ignorePatterns.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
-import { execStreaming } from '../utils/shell-utils.js';
+import { execStreaming, resolveExecutable } from '../utils/shell-utils.js';
 import {
   DEFAULT_TOTAL_MAX_MATCHES,
   DEFAULT_SEARCH_TIMEOUT_MS,
@@ -61,7 +61,8 @@ export async function getRipgrepPath(): Promise<string | null> {
     }
   }
 
-  return null;
+  // 3. System PATH fallback
+  return (await resolveExecutable('rg')) ?? null;
 }
 
 /**
