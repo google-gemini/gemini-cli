@@ -93,7 +93,6 @@ import {
   ApiKeyUpdatedEvent,
   LegacyAgentProtocol,
   type InjectionSource,
-  startMemoryService,
   partListUnionToString,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
