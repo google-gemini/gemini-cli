@@ -19,6 +19,7 @@ export const noteCommand: SlashCommand = {
       description: 'View the current workspace notes',
       kind: CommandKind.BUILT_IN,
       autoExecute: true,
+      takesArgs: false,
       action: async () => {
         const workspaceRoot = process.cwd();
         const notesFile = path.join(workspaceRoot, 'notes.md');
