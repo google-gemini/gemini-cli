@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import type { HierarchicalMemory } from '../config/memory.js';
-import { GEMINI_DIR } from '../utils/paths.js';
+import { GEMINI_DIR, makeRelative } from '../utils/paths.js';
 import { ApprovalMode } from '../policy/types.js';
 import * as snippets from './snippets.js';
 import * as legacySnippets from './snippets.legacy.js';
@@ -44,6 +44,7 @@ export class PromptProvider {
     context: AgentLoopContext,
     userMemory?: string | HierarchicalMemory,
     interactiveOverride?: boolean,
+    topicUpdateNarrationOverride?: boolean,
   ): string {
     const systemMdResolution = resolvePathFromEnv(
       process.env['GEMINI_SYSTEM_MD'],
@@ -57,6 +58,10 @@ export class PromptProvider {
     const isYoloMode = approvalMode === ApprovalMode.YOLO;
     const skills = context.config.getSkillManager().getSkills();
     const toolNames = context.toolRegistry.getAllToolNames();
+    const isTopicUpdateNarrationEnabled =
+      topicUpdateNarrationOverride ??
+      context.config.isTopicUpdateNarrationEnabled();
+
     const enabledToolNames = new Set(toolNames);
 
     const approvedPlanPath = context.config.getApprovedPlanPath();
@@ -139,7 +144,7 @@ export class PromptProvider {
           hasSkills: skills.length > 0,
           hasHierarchicalMemory,
           contextFilenames,
-          topicUpdateNarration: context.config.isTopicUpdateNarrationEnabled(),
+          topicUpdateNarration: isTopicUpdateNarrationEnabled,
         })),
         subAgents: this.withSection(
           'agentContexts',
@@ -184,8 +189,7 @@ export class PromptProvider {
                 ? { path: approvedPlanPath }
                 : undefined,
               taskTracker: trackerDir,
-              topicUpdateNarration:
-                context.config.isTopicUpdateNarrationEnabled(),
+              topicUpdateNarration: isTopicUpdateNarrationEnabled,
             };
           },
           !isPlanMode,
@@ -195,8 +199,19 @@ export class PromptProvider {
           () => ({
             interactive: interactiveMode,
             planModeToolsList,
-            plansDir: context.config.storage.getPlansDir(),
-            approvedPlanPath: context.config.getApprovedPlanPath(),
+            plansDir: makeRelative(
+              context.config.storage.getPlansDir(),
+              context.config.getProjectRoot(),
+            ).replaceAll('\\', '/'),
+            approvedPlanPath: (() => {
+              const approvedPath = context.config.getApprovedPlanPath();
+              return approvedPath
+                ? makeRelative(
+                    approvedPath,
+                    context.config.getProjectRoot(),
+                  ).replaceAll('\\', '/')
+                : undefined;
+            })(),
           }),
           isPlanMode,
         ),
@@ -207,8 +222,7 @@ export class PromptProvider {
             enableShellEfficiency:
               context.config.getEnableShellOutputEfficiency(),
             interactiveShellEnabled: context.config.isInteractiveShellEnabled(),
-            topicUpdateNarration:
-              context.config.isTopicUpdateNarrationEnabled(),
+            topicUpdateNarration: isTopicUpdateNarrationEnabled,
             memoryManagerEnabled: context.config.isMemoryManagerEnabled(),
           }),
         ),
@@ -251,7 +265,7 @@ export class PromptProvider {
     let sanitizedPrompt = finalPrompt.replace(/\n{3,}/g, '\n\n');
 
     // Context Reinjection (Active Topic)
-    if (context.config.isTopicUpdateNarrationEnabled()) {
+    if (isTopicUpdateNarrationEnabled) {
       const activeTopic = context.config.topicState.getTopic();
       if (activeTopic) {
         const sanitizedTopic = activeTopic

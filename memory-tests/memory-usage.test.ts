@@ -16,15 +16,21 @@ import {
   mkdirSync,
   rmSync,
 } from 'node:fs';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createHash } from 'node:crypto';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const BASELINES_PATH = join(__dirname, 'baselines.json');
 const UPDATE_BASELINES = process.env['UPDATE_MEMORY_BASELINES'] === 'true';
+function getProjectHash(projectRoot: string): string {
+  return createHash('sha256').update(projectRoot).digest('hex');
+}
 const TOLERANCE_PERCENT = 10;
 
 // Fake API key for tests using fake responses
-const TEST_ENV = { GEMINI_API_KEY: 'fake-memory-test-key' };
+const TEST_ENV = {
+  GEMINI_API_KEY: 'fake-memory-test-key',
+  GEMINI_MEMORY_MONITOR_INTERVAL: '100',
+};
 
 describe('Memory Usage Tests', () => {
   let harness: MemoryTestHarness;
@@ -56,6 +62,7 @@ describe('Memory Usage Tests', () => {
     });
 
     const result = await harness.runScenario(
+      rig,
       'idle-session-startup',
       async (recordSnapshot) => {
         await rig.run({
@@ -85,6 +92,7 @@ describe('Memory Usage Tests', () => {
     });
 
     const result = await harness.runScenario(
+      rig,
       'simple-prompt-response',
       async (recordSnapshot) => {
         await rig.run({
@@ -122,6 +130,7 @@ describe('Memory Usage Tests', () => {
     ];
 
     const result = await harness.runScenario(
+      rig,
       'multi-turn-conversation',
       async (recordSnapshot) => {
         // Run through all turns as a piped sequence
@@ -144,6 +153,9 @@ describe('Memory Usage Tests', () => {
       );
     } else {
       harness.assertWithinBaseline(result);
+      harness.assertMemoryReturnsToBaseline(result.snapshots, 20);
+      const { leaked, message } = harness.analyzeSnapshots(result.snapshots);
+      if (leaked) console.warn(`⚠ ${message}`);
     }
   });
 
@@ -168,6 +180,7 @@ describe('Memory Usage Tests', () => {
     );
 
     const result = await harness.runScenario(
+      rig,
       'multi-function-call-repo-search',
       async (recordSnapshot) => {
         await rig.run({
@@ -189,6 +202,7 @@ describe('Memory Usage Tests', () => {
       );
     } else {
       harness.assertWithinBaseline(result);
+      harness.assertMemoryReturnsToBaseline(result.snapshots, 20);
     }
   });
 
@@ -228,6 +242,7 @@ describe('Memory Usage Tests', () => {
       });
 
       const result = await harness.runScenario(
+        rig,
         'large-chat',
         async (recordSnapshot) => {
           await rig.run({
@@ -257,19 +272,21 @@ describe('Memory Usage Tests', () => {
       });
 
       const result = await harness.runScenario(
+        rig,
         'resume-large-chat',
         async (recordSnapshot) => {
           // Ensure the history file is linked
           const targetChatsDir = join(
-            rig.testDir!,
+            rig.homeDir!,
+            '.gemini',
             'tmp',
-            'test-project-hash',
+            getProjectHash(rig.testDir!),
             'chats',
           );
           mkdirSync(targetChatsDir, { recursive: true });
           const targetHistoryPath = join(
             targetChatsDir,
-            'large-chat-session.json',
+            'session-large-chat.json',
           );
           if (existsSync(targetHistoryPath)) rmSync(targetHistoryPath);
           copyFileSync(sharedHistoryPath, targetHistoryPath);
@@ -302,19 +319,21 @@ describe('Memory Usage Tests', () => {
       });
 
       const result = await harness.runScenario(
+        rig,
         'resume-large-chat-with-messages',
         async (recordSnapshot) => {
           // Ensure the history file is linked
           const targetChatsDir = join(
-            rig.testDir!,
+            rig.homeDir!,
+            '.gemini',
             'tmp',
-            'test-project-hash',
+            getProjectHash(rig.testDir!),
             'chats',
           );
           mkdirSync(targetChatsDir, { recursive: true });
           const targetHistoryPath = join(
             targetChatsDir,
-            'large-chat-session.json',
+            'session-large-chat.json',
           );
           if (existsSync(targetHistoryPath)) rmSync(targetHistoryPath);
           copyFileSync(sharedHistoryPath, targetHistoryPath);
@@ -457,6 +476,9 @@ async function generateSharedLargeChatData(tempDir: string) {
   // Generate responses for resumed chat
   const resumeResponsesStream = createWriteStream(resumeResponsesPath);
   for (let i = 0; i < 5; i++) {
+    // Doubling up on non-streaming responses to satisfy classifier and complexity checks
+    resumeResponsesStream.write(JSON.stringify(complexityResponse) + '\n');
+    resumeResponsesStream.write(JSON.stringify(summaryResponse) + '\n');
     resumeResponsesStream.write(JSON.stringify(complexityResponse) + '\n');
     resumeResponsesStream.write(
       JSON.stringify({
@@ -489,8 +511,12 @@ async function generateSharedLargeChatData(tempDir: string) {
 
   // Wait for streams to finish
   await Promise.all([
-    new Promise((res) => activeResponsesStream.on('finish', res)),
-    new Promise((res) => resumeResponsesStream.on('finish', res)),
+    new Promise((res) =>
+      activeResponsesStream.on('finish', () => res(undefined)),
+    ),
+    new Promise((res) =>
+      resumeResponsesStream.on('finish', () => res(undefined)),
+    ),
   ]);
 
   return {
