@@ -15,6 +15,7 @@ import {
 import type { GeminiCLIExtension } from '../config/config.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { coreEvents } from '../utils/events.js';
+import { isSubpath, resolveToRealPath } from '../utils/paths.js';
 
 export { type SkillDefinition };
 
@@ -217,6 +218,22 @@ export class SkillManager {
 
   getLatestDiscoveryReport(): SkillDiscoveryReport[] {
     return this.latestDiscoveryReport;
+  }
+
+  getDiscoveryReportForSkill(
+    location: string,
+  ): SkillDiscoveryReport | undefined {
+    const resolvedLocation = resolveToRealPath(location);
+
+    return this.latestDiscoveryReport
+      .filter((report) => {
+        const resolvedSourceDir = resolveToRealPath(report.source_dir);
+        return (
+          resolvedLocation === resolvedSourceDir ||
+          isSubpath(resolvedSourceDir, resolvedLocation)
+        );
+      })
+      .sort((a, b) => b.source_dir.length - a.source_dir.length)[0];
   }
 
   getSlowestSkillLoadTime(thresholdMs = 100): number | null {

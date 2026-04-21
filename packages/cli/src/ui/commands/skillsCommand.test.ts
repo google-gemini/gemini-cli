@@ -74,7 +74,7 @@ describe('skillsCommand', () => {
             getSkills: vi.fn().mockReturnValue(skills),
             isAdminEnabled: vi.fn().mockReturnValue(true),
             getSlowestSkillLoadTime: vi.fn().mockReturnValue(null),
-            getLatestDiscoveryReport: vi.fn().mockReturnValue([]),
+            getDiscoveryReportForSkill: vi.fn().mockReturnValue(undefined),
             getSkill: vi
               .fn()
               .mockImplementation(
@@ -174,15 +174,13 @@ describe('skillsCommand', () => {
     const listCmd = skillsCommand.subCommands!.find((s) => s.name === 'list')!;
     const skillManager =
       context.services.agentContext!.config.getSkillManager() as unknown as {
-        getLatestDiscoveryReport: ReturnType<typeof vi.fn>;
+        getDiscoveryReportForSkill: ReturnType<typeof vi.fn>;
       };
-    skillManager.getLatestDiscoveryReport.mockReturnValue([
-      {
-        source_dir: '/skills',
-        total_duration_ms: 45,
-        glob_duration_ms: 30,
-      },
-    ]);
+    skillManager.getDiscoveryReportForSkill.mockReturnValue({
+      source_dir: '/skills',
+      total_duration_ms: 45,
+      glob_duration_ms: 30,
+    });
     await listCmd.action!(context, 'verbose');
 
     expect(context.ui.addItem).toHaveBeenCalledWith(

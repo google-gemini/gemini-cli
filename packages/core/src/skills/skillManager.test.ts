@@ -381,6 +381,57 @@ description: project-desc
     );
   });
 
+  it('should prefer the longest matching discovery report for a skill location', () => {
+    const service = new SkillManager();
+
+    // @ts-expect-error accessing private property for testing
+    service.latestDiscoveryReport = [
+      {
+        source_dir: '/skills',
+        total_duration_ms: 10,
+        glob_duration_ms: 2,
+        skill_count: 1,
+        invalid_count: 0,
+        skill_metrics: [],
+      },
+      {
+        source_dir: '/skills/network',
+        total_duration_ms: 25,
+        glob_duration_ms: 5,
+        skill_count: 1,
+        invalid_count: 0,
+        skill_metrics: [],
+      },
+    ];
+
+    expect(
+      service.getDiscoveryReportForSkill('/skills/network/tool/SKILL.md'),
+    ).toEqual(
+      // @ts-expect-error accessing private property for testing
+      service.latestDiscoveryReport[1],
+    );
+  });
+
+  it('should not match sibling paths that only share a string prefix', () => {
+    const service = new SkillManager();
+
+    // @ts-expect-error accessing private property for testing
+    service.latestDiscoveryReport = [
+      {
+        source_dir: '/skills/foo',
+        total_duration_ms: 10,
+        glob_duration_ms: 2,
+        skill_count: 1,
+        invalid_count: 0,
+        skill_metrics: [],
+      },
+    ];
+
+    expect(
+      service.getDiscoveryReportForSkill('/skills/foobar/SKILL.md'),
+    ).toBeUndefined();
+  });
+
   describe('Conflict Detection', () => {
     it('should emit UI warning when a non-built-in skill is overridden', async () => {
       const emitFeedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');

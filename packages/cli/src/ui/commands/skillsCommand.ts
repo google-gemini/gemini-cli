@@ -28,8 +28,6 @@ import {
   requestConsentInteractive,
   skillsConsentString,
 } from '../../config/extensions/consent.js';
-import { getDiscoveryReportForSkill } from '../../utils/skillDiscovery.js';
-
 async function listAction(
   context: CommandContext,
   args: string,
@@ -63,10 +61,9 @@ async function listAction(
   const skills = showAll
     ? skillManager.getAllSkills()
     : skillManager.getAllSkills().filter((s) => !s.isBuiltin);
-  const reports = skillManager.getLatestDiscoveryReport();
   const skillsWithReports: SkillListItem[] = skills.map((skill) => ({
     ...skill,
-    loadDiscoveryReport: getDiscoveryReportForSkill(skill.location, reports),
+    loadDiscoveryReport: skillManager.getDiscoveryReportForSkill(skill.location),
   }));
 
   const skillsListItem: HistoryItemSkillsList = {

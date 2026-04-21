@@ -9,10 +9,6 @@ import { loadSettings } from '../../config/settings.js';
 import { loadCliConfig, type CliArgs } from '../../config/config.js';
 import { exitCli } from '../utils.js';
 import chalk from 'chalk';
-import {
-  getDiscoveryReportForSkill,
-  type SkillDiscoveryTiming,
-} from '../../utils/skillDiscovery.js';
 
 export async function handleList(args: { all?: boolean; verbose?: boolean }) {
   const workspaceDir = process.cwd();
@@ -35,7 +31,6 @@ export async function handleList(args: { all?: boolean; verbose?: boolean }) {
   const skills = args.all
     ? skillManager.getAllSkills()
     : skillManager.getAllSkills().filter((s) => !s.isBuiltin);
-  const reports: SkillDiscoveryTiming[] = skillManager.getLatestDiscoveryReport();
 
   // Sort skills: non-built-in first, then alphabetically by name
   skills.sort((a, b) => {
@@ -53,7 +48,7 @@ export async function handleList(args: { all?: boolean; verbose?: boolean }) {
   process.stdout.write(chalk.bold('Discovered Agent Skills:') + '\n\n');
 
   for (const skill of skills) {
-    const report = getDiscoveryReportForSkill(skill.location, reports);
+    const report = skillManager.getDiscoveryReportForSkill(skill.location);
     const status = skill.disabled
       ? chalk.red('[Disabled]')
       : chalk.green('[Enabled]');

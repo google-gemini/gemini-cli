@@ -62,6 +62,7 @@ describe('skills list command', () => {
         initialize: vi.fn().mockResolvedValue(undefined),
         getSkillManager: vi.fn().mockReturnValue({
           getAllSkills: vi.fn().mockReturnValue([]),
+          getDiscoveryReportForSkill: vi.fn(),
         }),
       };
       mockLoadCliConfig.mockResolvedValue(mockConfig as unknown as Config);
@@ -96,15 +97,13 @@ describe('skills list command', () => {
         initialize: vi.fn().mockResolvedValue(undefined),
         getSkillManager: vi.fn().mockReturnValue({
           getAllSkills: vi.fn().mockReturnValue(skills),
-          getLatestDiscoveryReport: vi.fn().mockReturnValue([
-            {
-              source_dir: '/skills',
-              total_duration_ms: 45,
-              glob_duration_ms: 30,
-              skill_count: 1,
-              invalid_count: 0,
-            },
-          ]),
+          getDiscoveryReportForSkill: vi.fn().mockReturnValue({
+            source_dir: '/skills',
+            total_duration_ms: 45,
+            glob_duration_ms: 30,
+            skill_count: 1,
+            invalid_count: 0,
+          }),
         }),
       };
       mockLoadCliConfig.mockResolvedValue(mockConfig as unknown as Config);
@@ -144,15 +143,13 @@ describe('skills list command', () => {
         initialize: vi.fn().mockResolvedValue(undefined),
         getSkillManager: vi.fn().mockReturnValue({
           getAllSkills: vi.fn().mockReturnValue(skills),
-          getLatestDiscoveryReport: vi.fn().mockReturnValue([
-            {
-              source_dir: '/skills',
-              total_duration_ms: 45,
-              glob_duration_ms: 30,
-              skill_count: 1,
-              invalid_count: 0,
-            },
-          ]),
+          getDiscoveryReportForSkill: vi.fn().mockReturnValue({
+            source_dir: '/skills',
+            total_duration_ms: 45,
+            glob_duration_ms: 30,
+            skill_count: 1,
+            invalid_count: 0,
+          }),
         }),
       };
       mockLoadCliConfig.mockResolvedValue(mockConfig as unknown as Config);
@@ -188,6 +185,7 @@ describe('skills list command', () => {
         initialize: vi.fn().mockResolvedValue(undefined),
         getSkillManager: vi.fn().mockReturnValue({
           getAllSkills: vi.fn().mockReturnValue(skills),
+          getDiscoveryReportForSkill: vi.fn(),
         }),
       };
       mockLoadCliConfig.mockResolvedValue(mockConfig as unknown as Config);
