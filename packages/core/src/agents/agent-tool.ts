@@ -11,7 +11,7 @@ import {
   type ToolResult,
   BaseToolInvocation,
   type ToolCallConfirmationDetails,
-  type ToolLiveOutput,
+  type ExecuteOptions,
 } from '../tools/tools.js';
 import { type AgentLoopContext } from '../config/agent-loop-context.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
@@ -185,10 +185,8 @@ class DelegateInvocation extends BaseToolInvocation<
     return invocation.shouldConfirmExecute(abortSignal);
   }
 
-  async execute(
-    signal: AbortSignal,
-    updateOutput?: (output: ToolLiveOutput) => void,
-  ): Promise<ToolResult> {
+  async execute(options: ExecuteOptions): Promise<ToolResult> {
+    const { abortSignal: signal, updateOutput } = options;
     const hintedParams = this.withUserHints(this.mappedInputs);
     const invocation = this.buildChildInvocation(hintedParams);
 
@@ -196,6 +194,7 @@ class DelegateInvocation extends BaseToolInvocation<
       {
         operation: GeminiCliOperation.AgentCall,
         logPrompts: this.context.config.getTelemetryLogPromptsEnabled(),
+        tracesEnabled: this.context.config.getTelemetryTracesEnabled(),
         sessionId: this.context.config.getSessionId(),
         attributes: {
           [GEN_AI_AGENT_NAME]: this.definition.name,
@@ -204,7 +203,10 @@ class DelegateInvocation extends BaseToolInvocation<
       },
       async ({ metadata }) => {
         metadata.input = this.params;
-        const result = await invocation.execute(signal, updateOutput);
+        const result = await invocation.execute({
+          abortSignal: signal,
+          updateOutput,
+        });
         metadata.output = result;
         return result;
       },

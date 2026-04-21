@@ -24,7 +24,7 @@ project-specific behavior or create a customized persona.
 
 You can set the environment variable temporarily in your shell, or persist it
 via a `.gemini/.env` file. See
-[Persisting Environment Variables](../get-started/authentication.md#persisting-environment-variables).
+[Persisting Environment Variables](../get-started/authentication.mdx#persisting-environment-variables).
 
 - Use the project default path (`.gemini/system.md`):
   - `GEMINI_SYSTEM_MD=true` or `GEMINI_SYSTEM_MD=1`
@@ -51,7 +51,7 @@ error with: `missing system prompt file '<path>'`.
   - Create `.gemini/system.md`, then add to `.gemini/.env`:
     - `GEMINI_SYSTEM_MD=1`
 - Use a custom file under your home directory:
-  - `GEMINI_SYSTEM_MD=~/prompts/SYSTEM.md gemini`
+  - `GEMINI_SYSTEM_MD=~/prompts/system.md gemini`
 
 ## UI indicator
 
@@ -102,17 +102,17 @@ safety and workflow rules.
 
 This creates the file and writes the current built‑in system prompt to it.
 
-## Best practices: SYSTEM.md vs GEMINI.md
+## Best practices: system.md vs GEMINI.md
 
-- SYSTEM.md (firmware):
+- system.md (firmware):
   - Non‑negotiable operational rules: safety, tool‑use protocols, approvals, and
     mechanics that keep the CLI reliable.
   - Stable across tasks and projects (or per project when needed).
 - GEMINI.md (strategy):
   - Persona, goals, methodologies, and project/domain context.
-  - Evolves per task; relies on SYSTEM.md for safe execution.
+  - Evolves per task; relies on system.md for safe execution.
 
-Keep SYSTEM.md minimal but complete for safety and tool operation. Keep
+Keep system.md minimal but complete for safety and tool operation. Keep
 GEMINI.md focused on high‑level guidance and project specifics.
 
 ## Troubleshooting
