@@ -1,0 +1,30 @@
+label,count
+"status/need-triage",609
+"area/agent",339
+"area/core",271
+"status/possible-duplicate",207
+"🔒 maintainer only",188
+"area/platform",130
+"type/bug",109
+"workstream-rollup",91
+"area/security",71
+"type/feature",66
+"help wanted",61
+"area/extensions",28
+"priority/p2",28
+"area/enterprise",27
+"area/documentation",21
+"area/unknown",19
+"priority/p1",18
+"priority/p3",14
+"area/non-interactive",11
+"status/needs-info",6
+"type/task",6
+"NO_LABEL",5
+"priority/p0",3
+"status/need-retesting",1
+"aiq/eval_infra",1
+"kind/enhancement",1
+"aiq/agent",1
+"kind/bug",1
+"ACP",1

@@ -1,0 +1,23 @@
+label,count
+"area/core",215
+"help wanted",204
+"priority/p2",94
+"🔒 maintainer only",88
+"status/need-issue",86
+"area/agent",67
+"priority/p1",55
+"priority/p3",31
+"NO_LABEL",27
+"area/extensions",27
+"area/platform",19
+"area/security",13
+"area/documentation",12
+"area/non-interactive",9
+"area/enterprise",7
+"dependencies",4
+"javascript",4
+"area/unknown",2
+"priority/p0",2
+"kind/bug",2
+"type/bug",1
+"Stale",1
