@@ -140,6 +140,10 @@ describe('SettingsSchema', () => {
       ).toBeDefined();
       expect(
         getSettingsSchema().context.properties.fileFiltering.properties
+          ?.enableFileWatcher,
+      ).toBeDefined();
+      expect(
+        getSettingsSchema().context.properties.fileFiltering.properties
           ?.customIgnoreFilePaths,
       ).toBeDefined();
       expect(

@@ -1471,6 +1471,17 @@ const SETTINGS_SCHEMA = {
             description: 'Respect .geminiignore files when searching.',
             showInDialog: true,
           },
+          enableFileWatcher: {
+            type: 'boolean',
+            label: 'Enable File Watcher',
+            category: 'Context',
+            requiresRestart: true,
+            default: false,
+            description: oneLine`
+              Enable file watcher updates for @ file suggestions (experimental).
+            `,
+            showInDialog: false,
+          },
           enableRecursiveFileSearch: {
             type: 'boolean',
             label: 'Enable Recursive File Search',
