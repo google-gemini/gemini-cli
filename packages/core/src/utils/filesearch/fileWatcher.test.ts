@@ -6,7 +6,7 @@
 
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanupTmpDir, createTmpDir } from '@google/gemini-cli-test-utils';
 import { FileWatcher, type FileWatcherEvent } from './fileWatcher.js';
 
@@ -33,6 +33,7 @@ describe('FileWatcher', () => {
   afterEach(async () => {
     await Promise.all(tmpDirs.map((dir) => cleanupTmpDir(dir)));
     tmpDirs.length = 0;
+    vi.restoreAllMocks();
   });
 
   it('should emit relative add and unlink events for files', async () => {

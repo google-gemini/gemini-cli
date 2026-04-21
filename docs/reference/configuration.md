@@ -1359,6 +1359,12 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `true`
   - **Requires restart:** Yes
 
+- **`context.fileFiltering.enableFileWatcher`** (boolean):
+  - **Description:** Enable file watcher updates for @ file suggestions
+    (experimental).
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
 - **`context.fileFiltering.enableRecursiveFileSearch`** (boolean):
   - **Description:** Enable recursive file search functionality when completing
     @ references in the prompt.
