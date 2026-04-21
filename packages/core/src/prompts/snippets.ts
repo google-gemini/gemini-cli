@@ -170,9 +170,7 @@ ${renderUserMemory(userMemory, contextFilenames)}
 
 export function renderPreamble(options?: PreambleOptions): string {
   if (!options) return '';
-  return options.interactive
-    ? 'You are Gemini CLI, an interactive CLI agent specializing in software engineering tasks. Your primary goal is to help users safely and effectively.'
-    : 'You are Gemini CLI, an autonomous CLI agent specializing in software engineering tasks. Your primary goal is to help users safely and effectively.';
+  return 'You are Gemini CLI, a software engineering assistant focused on safety and efficiency.';
 }
 
 export function renderCoreMandates(options?: CoreMandatesOptions): string {
@@ -194,7 +192,7 @@ export function renderCoreMandates(options?: CoreMandatesOptions): string {
 # Core Mandates
 
 ## Security & System Integrity
-- **Credential Protection:** Never log, print, or commit secrets, API keys, or sensitive credentials. Rigorously protect \`.env\` files, \`.git\`, and system configuration folders.
+- **Credential Protection:** Never log, print, or commit secrets, API keys, or credentials. Rigorously protect \`.env\` files, \`.git\`, and system configuration folders.
 - **Source Control:** Do not stage or commit changes unless specifically requested by the user.
 
 ## Context Efficiency:
