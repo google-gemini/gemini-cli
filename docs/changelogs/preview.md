@@ -1,6 +1,6 @@
-# Preview release: v0.39.0-preview.0
+# Preview release: v0.39.0-preview.1
 
-Released: April 14, 2026
+Released: April 21, 2026
 
 Our preview release includes the latest, new, and experimental features. This
 release may not be as stable as our [latest weekly release](latest.md).
@@ -31,6 +31,10 @@ npm install -g @google/gemini-cli@preview
 
 ## What's Changed
 
+- fix(patch): cherry-pick a4e98c0 to release/v0.39.0-preview.0-pr-25138 to patch
+  version v0.39.0-preview.0 and create version 0.39.0-preview.1 by
+  @gemini-cli-robot in
+  [#25766](https://github.com/google-gemini/gemini-cli/pull/25766)
 - refactor(plan): simplify policy priorities and consolidate read-only rules by
   @ruomengz in [#24849](https://github.com/google-gemini/gemini-cli/pull/24849)
 - feat(test-utils): add memory usage integration test harness by @sripasg in
@@ -254,4 +258,4 @@ npm install -g @google/gemini-cli@preview
   [#25336](https://github.com/google-gemini/gemini-cli/pull/25336)
 
 **Full Changelog**:
-https://github.com/google-gemini/gemini-cli/compare/v0.38.0-preview.0...v0.39.0-preview.0
+https://github.com/google-gemini/gemini-cli/compare/v0.38.0-preview.0...v0.39.0-preview.1
