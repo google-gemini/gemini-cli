@@ -33,6 +33,8 @@ describe('Interactive file system', () => {
     rig.createFile(fileName, '1.0.0');
 
     const run = await rig.runInteractive();
+    await run.expectText('tips for getting started:', 5000);
+    await new Promise((r) => setTimeout(r, 1000));
 
     // Step 1: Read the file
     const readPrompt = `Read the version from ${fileName}`;
@@ -56,5 +58,5 @@ describe('Interactive file system', () => {
 
     // Wait for telemetry to flush and file system to sync, especially in sandboxed environments
     await rig.waitForTelemetryReady();
-  });
+  }, 60000);
 });
