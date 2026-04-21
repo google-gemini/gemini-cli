@@ -250,6 +250,7 @@ describe('InputPrompt', () => {
   };
 
   beforeEach(() => {
+    vi.useFakeTimers();
     vi.resetAllMocks();
     coreEvents.removeAllListeners();
     vi.spyOn(
@@ -1588,7 +1589,9 @@ describe('InputPrompt', () => {
     });
 
     // We need to wait a bit to ensure handleAutocomplete was NOT called
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(100);
+    });
 
     expect(mockCommandCompletion.handleAutocomplete).not.toHaveBeenCalled();
     unmount();
@@ -2691,7 +2694,6 @@ describe('InputPrompt', () => {
 
   describe('paste auto-submission protection', () => {
     beforeEach(() => {
-      vi.useFakeTimers();
       mockedUseKittyKeyboardProtocol.mockReturnValue({
         enabled: false,
         checking: false,
@@ -2699,7 +2701,6 @@ describe('InputPrompt', () => {
     });
 
     afterEach(() => {
-      vi.useRealTimers();
       vi.restoreAllMocks();
     });
 
@@ -2873,9 +2874,6 @@ describe('InputPrompt', () => {
   });
 
   describe('enhanced input UX - keyboard shortcuts', () => {
-    beforeEach(() => vi.useFakeTimers());
-    afterEach(() => vi.useRealTimers());
-
     it('should clear buffer on Ctrl-C', async () => {
       const onEscapePromptChange = vi.fn();
       props.onEscapePromptChange = onEscapePromptChange;
@@ -3242,7 +3240,9 @@ describe('InputPrompt', () => {
         stdin.write('\x1b[Z'); // Shift+Tab
       });
 
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(100);
+      });
 
       expect(mockHandleAutocomplete).not.toHaveBeenCalled();
       unmount();
@@ -3651,7 +3651,9 @@ describe('InputPrompt', () => {
         stdin.write('\x1b[Z'); // Shift+Tab
       });
 
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(100);
+      });
 
       expect(mockAccept).not.toHaveBeenCalled();
       unmount();
