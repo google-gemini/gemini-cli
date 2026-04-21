@@ -43,12 +43,12 @@ exports[`System Lifecycle Golden Tests > Scenario 1: Organic Growth with Huge To
       "turnIndex": 1,
     },
     {
-      "tokensAfterBackground": 440,
+      "tokensAfterBackground": 436,
       "tokensBeforeBackground": 20148,
       "turnIndex": 2,
     },
     {
-      "tokensAfterBackground": 62,
+      "tokensAfterBackground": 61,
       "tokensBeforeBackground": 3017,
       "turnIndex": 3,
     },
