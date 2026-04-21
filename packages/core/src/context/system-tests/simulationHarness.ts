@@ -35,7 +35,7 @@ export class SimulationHarness {
   static async create(
     config: ContextProfile,
     mockLlmClient: BaseLlmClient,
-    mockTempDir = 'mock/sim/dir',
+    mockTempDir = '/tmp/sim',
   ): Promise<SimulationHarness> {
     const harness = new SimulationHarness();
     await harness.init(config, mockLlmClient, mockTempDir);
