@@ -35,6 +35,12 @@ jobs:
           name: 'workspace-artifact'
           path: '.'
 
+      - name: 'Upload Node Modules'
+        uses: 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02'
+        with:
+          name: 'node-modules-artifact'
+          path: 'node_modules'
+
   test_ui_messages:
     name: 'Test (Linux) - UI Messages'
     needs: build
@@ -48,6 +54,12 @@ jobs:
         with:
           name: 'workspace-artifact'
           path: '.'
+
+      - name: 'Download Node Modules'
+        uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806'
+        with:
+          name: 'node-modules-artifact'
+          path: 'node_modules'
 
       - name: 'Setup Gemini'
         uses: './.github/actions/setup-gemini'
@@ -73,6 +85,12 @@ jobs:
           name: 'workspace-artifact'
           path: '.'
 
+      - name: 'Download Node Modules'
+        uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806'
+        with:
+          name: 'node-modules-artifact'
+          path: 'node_modules'
+
       - name: 'Setup Gemini'
         uses: './.github/actions/setup-gemini'
         with:
@@ -96,6 +114,12 @@ jobs:
         with:
           name: 'workspace-artifact'
           path: '.'
+
+      - name: 'Download Node Modules'
+        uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806'
+        with:
+          name: 'node-modules-artifact'
+          path: 'node_modules'
 
       - name: 'Setup Gemini'
         uses: './.github/actions/setup-gemini'
@@ -121,6 +145,12 @@ jobs:
           name: 'workspace-artifact'
           path: '.'
 
+      - name: 'Download Node Modules'
+        uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806'
+        with:
+          name: 'node-modules-artifact'
+          path: 'node_modules'
+
       - name: 'Setup Gemini'
         uses: './.github/actions/setup-gemini'
         with:
@@ -144,6 +174,12 @@ jobs:
         with:
           name: 'workspace-artifact'
           path: '.'
+
+      - name: 'Download Node Modules'
+        uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806'
+        with:
+          name: 'node-modules-artifact'
+          path: 'node_modules'
 
       - name: 'Setup Gemini'
         uses: './.github/actions/setup-gemini'
@@ -169,6 +205,12 @@ jobs:
           name: 'workspace-artifact'
           path: '.'
 
+      - name: 'Download Node Modules'
+        uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806'
+        with:
+          name: 'node-modules-artifact'
+          path: 'node_modules'
+
       - name: 'Setup Gemini'
         uses: './.github/actions/setup-gemini'
         with:
@@ -193,6 +235,12 @@ jobs:
           name: 'workspace-artifact'
           path: '.'
 
+      - name: 'Download Node Modules'
+        uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806'
+        with:
+          name: 'node-modules-artifact'
+          path: 'node_modules'
+
       - name: 'Setup Gemini'
         uses: './.github/actions/setup-gemini'
         with:
@@ -216,6 +264,12 @@ jobs:
         with:
           name: 'workspace-artifact'
           path: '.'
+
+      - name: 'Download Node Modules'
+        uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806'
+        with:
+          name: 'node-modules-artifact'
+          path: 'node_modules'
 
       - name: 'Setup Gemini'
         uses: './.github/actions/setup-gemini'
