@@ -1537,5 +1537,57 @@ describe('ShellTool', () => {
       });
       expect(result.returnDisplay).not.toContain('Blocked');
     });
+
+    it('should allow PowerShell keyword with flag e.g. switch -regex ($x)', async () => {
+      mockPlatform.mockReturnValue('win32');
+      mockShellExecutionService.mockImplementation((_cmd, _cwd, _callback) => ({
+        pid: 12345,
+        result: Promise.resolve({
+          output: 'result',
+          rawOutput: Buffer.from('result'),
+          exitCode: 0,
+          signal: null,
+          error: null,
+          aborted: false,
+          pid: 12345,
+          executionMethod: 'child_process',
+          backgrounded: false,
+        }),
+      }));
+      const tool = new ShellTool(mockConfig, createMockMessageBus());
+      const invocation = tool.build({
+        command: 'switch -regex ($x) { "a" { 1 } }',
+      });
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+      expect(result.returnDisplay).not.toContain('Blocked');
+    });
+
+    it('should allow PowerShell nested parentheses e.g. if ((condition))', async () => {
+      mockPlatform.mockReturnValue('win32');
+      mockShellExecutionService.mockImplementation((_cmd, _cwd, _callback) => ({
+        pid: 12345,
+        result: Promise.resolve({
+          output: 'result',
+          rawOutput: Buffer.from('result'),
+          exitCode: 0,
+          signal: null,
+          error: null,
+          aborted: false,
+          pid: 12345,
+          executionMethod: 'child_process',
+          backgrounded: false,
+        }),
+      }));
+      const tool = new ShellTool(mockConfig, createMockMessageBus());
+      const invocation = tool.build({
+        command: 'if ((condition)) { Write-Host ok }',
+      });
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+      expect(result.returnDisplay).not.toContain('Blocked');
+    });
   });
 });

@@ -1083,12 +1083,16 @@ function detectBashSubstitution(command: string): boolean {
   return false;
 }
 
+const POWERSHELL_KEYWORD_RE =
+  /\b(if|elseif|else|foreach|for|while|do|switch|try|catch|finally|until|trap|function|filter)(\s+[-\w]+)*\s*$/i;
+
 function detectPowerShellSubstitution(command: string): boolean {
   let inSingleQuote = false;
   let inDoubleQuote = false;
   let i = 0;
   while (i < command.length) {
     const char = command[i];
+
     if (char === "'" && !inDoubleQuote) {
       inSingleQuote = !inSingleQuote;
       i++;
@@ -1099,40 +1103,35 @@ function detectPowerShellSubstitution(command: string): boolean {
       i++;
       continue;
     }
+
     if (inSingleQuote) {
       i++;
       continue;
     }
-    if (char === '`' && !inSingleQuote && i + 1 < command.length) {
+    if (char === '`' && i + 1 < command.length) {
       i += 2;
       continue;
     }
     if (char === '$' && command[i + 1] === '(') {
       return true;
     }
-    if (char === '@' && command[i + 1] === '(' && !inDoubleQuote) {
+    if (!inDoubleQuote && char === '@' && command[i + 1] === '(') {
       return true;
     }
-    if (char === '(' && !inDoubleQuote) {
-      const prev = i > 0 ? command[i - 1] : '';
-      if (prev === '$' || prev === '@' || prev === '.' || prev === ':') {
+    if (!inDoubleQuote && char === '(') {
+      const before = command.slice(0, i).trimEnd();
+      const prevChar = before[before.length - 1];
+      if (prevChar === '(') {
         i++;
         continue;
       }
-      if (/\w/.test(prev)) {
-        i++;
-        continue;
-      }
-      const beforeParen = command.slice(0, i).trimEnd();
-      const contextMatch = beforeParen.match(
-        /\b(if|elseif|else|foreach|for|while|do|switch|catch|trap|until|function|filter)(\s+\w+)?\s*$/i,
-      );
-      if (contextMatch) {
+      if (POWERSHELL_KEYWORD_RE.test(before)) {
         i++;
         continue;
       }
       return true;
     }
+
     i++;
   }
   return false;

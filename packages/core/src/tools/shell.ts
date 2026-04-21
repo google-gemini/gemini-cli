@@ -448,6 +448,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
         llmContent:
           'Command injection detected: command substitution syntax ' +
           '($(), backticks, <() or >()) found in command arguments. ' +
+          'On PowerShell, @() array subexpressions and $() subexpressions are also blocked. ' +
           'This is a security risk and the command was blocked.',
         returnDisplay:
           'Blocked: command substitution detected in shell command.',
