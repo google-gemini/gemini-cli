@@ -861,6 +861,47 @@ describe('<Footer />', () => {
       expect(output).toContain('/model');
       unmount();
     });
+
+    it('renders hostname item when enabled and remote', async () => {
+      vi.stubEnv('SSH_TTY', '/dev/pts/1');
+      const { lastFrame, unmount } = await renderWithProviders(<Footer />, {
+        config: mockConfig,
+        width: 120,
+        uiState: { sessionStats: mockSessionStats },
+        settings: createMockSettings({
+          ui: {
+            footer: {
+              items: ['hostname'],
+            },
+          },
+        }),
+      });
+
+      expect(lastFrame()).toContain('host');
+      unmount();
+    });
+
+    it('does NOT render hostname item when enabled but NOT remote', async () => {
+      // Ensure no remote env vars are set
+      vi.stubEnv('SSH_TTY', '');
+      vi.stubEnv('CLOUD_SHELL', '');
+
+      const { lastFrame, unmount } = await renderWithProviders(<Footer />, {
+        config: mockConfig,
+        width: 120,
+        uiState: { sessionStats: mockSessionStats },
+        settings: createMockSettings({
+          ui: {
+            footer: {
+              items: ['hostname'],
+            },
+          },
+        }),
+      });
+
+      expect(lastFrame({ allowEmpty: true })).not.toContain('host');
+      unmount();
+    });
   });
 
   describe('fallback mode display', () => {
