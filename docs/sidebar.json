@@ -96,6 +96,11 @@
             ]
           },
           { "label": "Agent Skills", "slug": "docs/cli/skills" },
+          {
+            "label": "Auto Memory",
+            "badge": "🔬",
+            "slug": "docs/cli/auto-memory"
+          },
           { "label": "Checkpointing", "slug": "docs/cli/checkpointing" },
           { "label": "Headless mode", "slug": "docs/cli/headless" },
           {
@@ -122,7 +127,14 @@
               }
             ]
           },
-          { "label": "MCP servers", "slug": "docs/tools/mcp-server" },
+          {
+            "label": "MCP servers",
+            "collapsed": true,
+            "items": [
+              { "label": "Overview", "slug": "docs/tools/mcp-server" },
+              { "label": "Resource tools", "slug": "docs/tools/mcp-resources" }
+            ]
+          },
           { "label": "Model routing", "slug": "docs/cli/model-routing" },
           { "label": "Model selection", "slug": "docs/cli/model" },
           {
