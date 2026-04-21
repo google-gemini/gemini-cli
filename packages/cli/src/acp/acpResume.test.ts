@@ -100,6 +100,7 @@ describe('GeminiAgent Session Resume', () => {
         unsubscribe: vi.fn(),
       },
       getApprovalMode: vi.fn().mockReturnValue('default'),
+      isAutoMemoryEnabled: vi.fn().mockReturnValue(false),
       isPlanEnabled: vi.fn().mockReturnValue(true),
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getHasAccessToPreviewModel: vi.fn().mockReturnValue(false),
