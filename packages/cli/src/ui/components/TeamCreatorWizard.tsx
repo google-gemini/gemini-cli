@@ -10,7 +10,6 @@ import { Box, Text, useStdin } from 'ink';
 import {
   type ScaffoldTeamAgent,
   scaffoldTeam,
-  type EditorType,
 } from '@google/gemini-cli-core';
 import { theme } from '../semantic-colors.js';
 import { TextInput } from './shared/TextInput.js';
@@ -18,13 +17,12 @@ import { useTextBuffer } from './shared/text-buffer.js';
 import { BaseSelectionList } from './shared/BaseSelectionList.js';
 import { DialogFooter } from './shared/DialogFooter.js';
 import { useConfig } from '../contexts/ConfigContext.js';
-import { useUIActions } from '../contexts/UIActionsContext.js';
-import { useKeypress, type Key } from '../hooks/useKeypress.js';
+import { useKeypress } from '../hooks/useKeypress.js';
 import { Command } from '../key/keyMatchers.js';
 import { useKeyMatchers } from '../hooks/useKeyMatchers.js';
 import { type SelectionListItem } from '../hooks/useSelectionList.js';
-import { useSettingsStore } from '../contexts/SettingsContext.js';
 import { formatCommand } from '../key/keybindingUtils.js';
+import { ProviderTag, PROVIDER_COLORS } from './shared/ProviderTag.js';
 
 interface TeamCreatorWizardProps {
   onComplete: () => void;
@@ -37,14 +35,6 @@ type WizardStep =
   | 'objective'
   | 'confirmation'
   | 'success';
-
-const PROVIDER_COLORS: Record<string, string> = {
-  'claude-code': '#C15F3C', // Claude Orange (Exact)
-  codex: '#FFFFFF', // Codex White
-  gemini: '#A855F7', // Gemini Purple
-  antigravity: '#93C5FD', // Antigravity Light Blue
-  gemma: '#60A5FA', // Gemma Blue
-};
 
 const EXTERNAL_TEMPLATES: RosterListItem[] = [
   {
@@ -79,7 +69,7 @@ const EXTERNAL_TEMPLATES: RosterListItem[] = [
 
 interface RosterListItem {
   name: string;
-  kind: 'local' | 'external' | 'meta';
+  kind: 'local' | 'external';
   provider?: string;
   description?: string;
   sourcePath?: string;
@@ -87,31 +77,11 @@ interface RosterListItem {
   logoColor?: string;
 }
 
-function ProviderTag({ provider }: { provider: string }) {
-  const label =
-    provider === 'claude-code'
-      ? 'Claude Code'
-      : provider === 'codex'
-        ? 'Codex'
-        : provider === 'antigravity'
-          ? 'Antigravity'
-          : provider === 'gemma'
-            ? 'Gemma'
-            : 'Gemini CLI';
-  const color = PROVIDER_COLORS[provider] || theme.ui.comment;
-  return (
-    <Text color={color} bold>
-      [{label}]
-    </Text>
-  );
-}
-
 export function TeamCreatorWizard({
   onComplete,
   onCancel,
 }: TeamCreatorWizardProps): React.JSX.Element {
   const config = useConfig();
-  const { handleTeamSelect } = useUIActions();
   const keyMatchers = useKeyMatchers();
   const [step, setStep] = useState<WizardStep>('identity');
   const [teamName, setTeamName] = useState('');
@@ -122,7 +92,7 @@ export function TeamCreatorWizard({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [createdPath, setCreatedPath] = useState<string | null>(null);
-  const [rosterMode, setRosterMode] = useState<'list' | 'action'>('list');
+  const [rosterMode] = useState<'list' | 'action'>('list');
 
   const localAgents = useMemo(
     () =>
@@ -152,270 +122,136 @@ export function TeamCreatorWizard({
         name: a.name,
         kind: 'local' as const,
         description: a.description,
-        sourcePath: a.metadata?.filePath,
-        logo: !a.metadata?.filePath ? logo : undefined, // Only for built-ins
-        logoColor: !a.metadata?.filePath ? logoColor : undefined,
+        sourcePath: (a as any).sourcePath,
+        logo,
+        logoColor,
       };
     });
-    const external: RosterListItem[] = EXTERNAL_TEMPLATES.map((a) => ({
-      name: a.name,
-      kind: 'external' as const,
-      provider: a.provider,
-      description: a.description,
-      logo: a.logo,
-      logoColor: a.logoColor,
-    }));
+
+    const external: RosterListItem[] = EXTERNAL_TEMPLATES;
+
     return [...local, ...external];
   }, [localAgents]);
 
-  const { settings } = useSettingsStore();
-  const { stdin, setRawMode } = useStdin();
-  const getPreferredEditor = useCallback(
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    () => settings.merged.general.preferredEditor as EditorType,
-    [settings.merged.general.preferredEditor],
-  );
+  const teamProviders = useMemo(() => {
+    const providers = new Set<string>();
+    for (const name of selectedAgents) {
+      const agent = allAvailableAgents.find((a) => a.name === name);
+      if (agent?.provider) {
+        providers.add(agent.provider);
+      } else {
+        providers.add('gemini');
+      }
+    }
+    return Array.from(providers).sort();
+  }, [selectedAgents, allAvailableAgents]);
 
   const handleNext = useCallback(() => {
     if (step === 'identity') {
-      if (!teamName.trim()) {
-        setError('Slug is required');
+      if (!teamName || !displayName) {
+        setError('Team ID and Display Name are required.');
         return;
       }
-      if (!displayName.trim()) {
-        setError('Display Name is required');
-        return;
-      }
-      setError(null);
       setStep('roster');
     } else if (step === 'roster') {
       setStep('objective');
     } else if (step === 'objective') {
-      if (!instructions.trim()) {
-        setError('Objective/Instructions are required');
+      if (!instructions) {
+        setError('Team mission instructions are required.');
         return;
       }
-      setError(null);
       setStep('confirmation');
+    } else if (step === 'confirmation') {
+      void handleSubmit();
     }
   }, [step, teamName, displayName, instructions]);
 
-  const handleBack = useCallback(() => {
-    if (step === 'roster') {
-      setStep('identity');
-      setRosterMode('list'); // Reset roster mode when going back
-    } else if (step === 'objective') {
-      setStep('roster');
-    } else if (step === 'confirmation') {
-      setStep('objective');
-    } else if (step === 'identity') {
-      onCancel();
-    } else if (step === 'success') {
-      onComplete();
-    }
-  }, [step, onCancel, onComplete]);
-
-  const handleToggleAgent = (name: string) => {
-    const next = new Set(selectedAgents);
-    if (next.has(name)) next.delete(name);
-    else next.add(name);
-    setSelectedAgents(next);
-  };
-
-  const handleCreate = useCallback(async () => {
+  const handleSubmit = async () => {
     setIsSubmitting(true);
     setError(null);
     try {
-      const agentsToScaffold: ScaffoldTeamAgent[] = allAvailableAgents
-        .filter((a) => selectedAgents.has(a.name) && a.kind !== 'meta')
-        .map((a) => ({
-          name: a.name,
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          kind: a.kind as 'local' | 'external',
-          provider: a.provider,
-          description: a.description,
-          sourcePath: a.sourcePath,
-        }));
+      const agents: ScaffoldTeamAgent[] = Array.from(selectedAgents).map(
+        (name) => {
+          const agent = allAvailableAgents.find((a) => a.name === name)!;
+          return {
+            name,
+            kind: agent.kind,
+            provider: agent.provider,
+            description: agent.description,
+            sourcePath: agent.sourcePath,
+          };
+        },
+      );
+
       const path = await scaffoldTeam({
         name: teamName,
         displayName,
         description,
         instructions,
-        agents: agentsToScaffold,
+        agents,
         targetDir: config.storage.getProjectTeamsDir(),
       });
+
       setCreatedPath(path);
-      await config.getTeamRegistry().reload();
       setStep('success');
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+    } catch (e: any) {
+      setError(e.message || 'Failed to create team.');
+    } finally {
       setIsSubmitting(false);
     }
-  }, [
-    allAvailableAgents,
-    selectedAgents,
-    teamName,
-    displayName,
-    description,
-    instructions,
-    config,
-  ]);
+  };
 
-  // Identity Step Buffers
+  const handleBack = useCallback(() => {
+    if (step === 'roster') setStep('identity');
+    else if (step === 'objective') setStep('roster');
+    else if (step === 'confirmation') setStep('objective');
+  }, [step]);
+
   const nameBuffer = useTextBuffer({
     initialText: teamName,
-    viewport: { width: 40, height: 1 },
+    viewport: { width: 100, height: 100 },
     onChange: setTeamName,
-    singleLine: true,
   });
   const displayNameBuffer = useTextBuffer({
     initialText: displayName,
-    viewport: { width: 40, height: 1 },
+    viewport: { width: 100, height: 100 },
     onChange: setDisplayName,
-    singleLine: true,
   });
-  const descBuffer = useTextBuffer({
+  const descriptionBuffer = useTextBuffer({
     initialText: description,
-    viewport: { width: 80, height: 1 },
+    viewport: { width: 100, height: 100 },
     onChange: setDescription,
-    singleLine: true,
   });
-
-  // Objective Step Buffer
   const instructionsBuffer = useTextBuffer({
     initialText: instructions,
-    viewport: { width: 80, height: 5 },
+    viewport: { width: 100, height: 100 },
     onChange: setInstructions,
-    stdin,
-    setRawMode,
-    getPreferredEditor,
   });
 
-  const [activeIdentityField, setActiveIdentityField] = useState<0 | 1 | 2>(0);
-
-  const handleIdentityKeyPress = useCallback(
-    (key: Key) => {
-      const isNext =
-        keyMatchers[Command.DIALOG_NAVIGATION_DOWN](key) ||
-        (key.name === 'tab' && !key.shift);
-      const isPrev =
-        keyMatchers[Command.DIALOG_NAVIGATION_UP](key) ||
-        (key.name === 'tab' && key.shift);
-
-      if (isNext) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        setActiveIdentityField(((activeIdentityField + 1) % 3) as 0 | 1 | 2);
-        return true;
-      }
-      if (isPrev) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        setActiveIdentityField(((activeIdentityField + 2) % 3) as 0 | 1 | 2);
-        return true;
-      }
+  const { stdin } = useStdin();
+  useKeypress(
+    (key) => {
       if (keyMatchers[Command.ESCAPE](key)) {
         onCancel();
         return true;
       }
-      return false;
-    },
-    [activeIdentityField, keyMatchers, onCancel],
-  );
-
-  // Handle Tab for "Back" and any key for success exit
-  const handleGlobalKeys = useCallback(
-    (key: Key) => {
-      if (step === 'success') {
-        if (key.sequence?.toLowerCase() === 'y') {
-          void handleTeamSelect(teamName);
-        }
-        onComplete();
-        return true;
-      }
-      if (key.name === 'tab') {
-        if (step === 'roster') {
-          setRosterMode((prev) => (prev === 'list' ? 'action' : 'list'));
-          return true;
-        }
+      if (key.name === 'b' && !stdin.isPaused()) {
         handleBack();
         return true;
       }
       return false;
     },
-    [step, handleBack, onComplete, handleTeamSelect, teamName],
+    { isActive: step !== 'identity' && step !== 'success' },
   );
 
-  useKeypress(handleGlobalKeys, { isActive: true, priority: true });
-
-  useKeypress(handleIdentityKeyPress, {
-    isActive: step === 'identity',
-    priority: true,
-  });
-
-  const handleRosterKeyPress = useCallback(
-    (key: Key) => {
-      if (key.sequence?.toLowerCase() === 'b') {
-        handleBack();
-        return true;
-      }
-      if (rosterMode === 'action') {
-        if (keyMatchers[Command.RETURN](key)) {
-          handleNext();
-          return true;
-        }
-      }
-      if (keyMatchers[Command.ESCAPE](key)) {
-        onCancel();
-        return true;
-      }
-      return false;
-    },
-    [handleNext, handleBack, onCancel, rosterMode, keyMatchers],
-  );
-
-  useKeypress(handleRosterKeyPress, {
-    isActive: step === 'roster',
-    priority: true,
-  });
-
-  const handleObjectiveKeyPress = useCallback(
-    (key: Key) => {
-      if (keyMatchers[Command.OPEN_EXTERNAL_EDITOR](key)) {
-        void instructionsBuffer.openInExternalEditor();
-        return true;
-      }
-      if (keyMatchers[Command.ESCAPE](key)) {
-        onCancel();
-        return true;
-      }
-      return false;
-    },
-    [instructionsBuffer, keyMatchers, onCancel],
-  );
-
-  useKeypress(handleObjectiveKeyPress, {
-    isActive: step === 'objective',
-    priority: true,
-  });
-
-  const handleConfirmationKeyPress = useCallback(
-    (key: Key) => {
-      if (keyMatchers[Command.RETURN](key)) {
-        void handleCreate();
-        return true;
-      }
-      if (keyMatchers[Command.ESCAPE](key)) {
-        onCancel();
-        return true;
-      }
-      return false;
-    },
-    [handleCreate, keyMatchers, onCancel],
-  );
-
-  useKeypress(handleConfirmationKeyPress, {
-    isActive: step === 'confirmation' && !isSubmitting,
-    priority: true,
-  });
+  const handleToggleAgent = useCallback((name: string) => {
+    setSelectedAgents((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  }, []);
 
   if (step === 'identity') {
     return (
@@ -430,38 +266,41 @@ export function TeamCreatorWizard({
           Step 1: Team Identity
         </Text>
         <Box marginTop={1} flexDirection="column">
-          <Text color={theme.text.secondary}>
-            Slug Name (e.g., coding-team):
-          </Text>
-          <TextInput
-            buffer={nameBuffer}
-            focus={activeIdentityField === 0}
-            onSubmit={() => setActiveIdentityField(1)}
-          />
+          <Text color={theme.text.secondary}>Unique Team ID (slug):</Text>
+          <Box borderStyle="single" borderColor={theme.ui.comment} paddingX={1}>
+            <TextInput buffer={nameBuffer} placeholder="e.g. frontend-team" />
+          </Box>
 
-          <Box marginTop={1} flexDirection="column">
-            <Text color={theme.text.secondary}>
-              Display Name (e.g., The Coding Team):
-            </Text>
+          <Box marginTop={1}>
+            <Text color={theme.text.secondary}>Display Name:</Text>
+          </Box>
+          <Box borderStyle="single" borderColor={theme.ui.comment} paddingX={1}>
             <TextInput
               buffer={displayNameBuffer}
-              focus={activeIdentityField === 1}
-              onSubmit={() => setActiveIdentityField(2)}
+              placeholder="e.g. Frontend Experts"
             />
           </Box>
 
-          <Box marginTop={1} flexDirection="column">
-            <Text color={theme.text.secondary}>Short Description:</Text>
+          <Box marginTop={1}>
+            <Text color={theme.text.secondary}>Description (Optional):</Text>
+          </Box>
+          <Box borderStyle="single" borderColor={theme.ui.comment} paddingX={1}>
             <TextInput
-              buffer={descBuffer}
-              focus={activeIdentityField === 2}
+              buffer={descriptionBuffer}
+              placeholder="Briefly describe the team's purpose"
               onSubmit={handleNext}
             />
           </Box>
         </Box>
+
+        {error && (
+          <Box marginTop={1}>
+            <Text color={theme.status.error}>Error: {error}</Text>
+          </Box>
+        )}
+
         <DialogFooter
           primaryAction="Enter to continue"
-          navigationActions="Tab or ↑/↓ to switch fields"
           cancelAction="Esc to cancel"
         />
       </Box>
@@ -469,11 +308,13 @@ export function TeamCreatorWizard({
   }
 
   if (step === 'roster') {
-    const rosterItems: Array<SelectionListItem<RosterListItem>> =
-      allAvailableAgents.map((a) => ({
+    const items: SelectionListItem<RosterListItem>[] = allAvailableAgents.map(
+      (a) => ({
         key: a.name,
+        label: a.name,
         value: a,
-      }));
+      }),
+    );
 
     return (
       <Box
@@ -483,101 +324,65 @@ export function TeamCreatorWizard({
         padding={1}
         width="100%"
       >
-        <Box flexDirection="row" justifyContent="space-between">
-          <Text bold color={theme.text.primary}>
-            Step 2: Team Roster
-          </Text>
-          <Box>
-            <Text color={theme.text.secondary}>
-              Selected: {selectedAgents.size}
-            </Text>
-          </Box>
-        </Box>
-
-        <Box marginTop={1} flexDirection="column">
+        <Text bold color={theme.text.primary}>
+          Step 2: Team Roster
+        </Text>
+        <Box marginBottom={1}>
           <Text color={theme.text.secondary}>
-            {rosterMode === 'list'
-              ? 'Select agents to include in your team:'
-              : 'Switch back to the list if you need to select more agents:'}
+            Select the agents that will participate in this team.
           </Text>
         </Box>
 
-        <Box marginTop={1} marginBottom={1} flexDirection="column">
+        <Box height={12} width="100%">
           <BaseSelectionList<RosterListItem>
-            items={rosterItems}
-            onSelect={(item) => handleToggleAgent(item.name)}
-            maxItemsToShow={5}
-            showScrollArrows={true}
-            isFocused={rosterMode === 'list'}
+            items={items}
+            onSelect={(value) => handleToggleAgent(value.name)}
             renderItem={(item, context) => {
               const value = item.value;
-              const isChecked = selectedAgents.has(value.name);
               return (
-                <Box flexDirection="column" paddingLeft={1}>
-                  <Box flexDirection="row">
-                    <Text
-                      color={
-                        isChecked ? theme.status.success : theme.text.secondary
-                      }
-                    >
-                      [{isChecked ? 'x' : ' '}]
-                    </Text>
-                    <Text
-                      color={
-                        context.isSelected && rosterMode === 'list'
-                          ? theme.text.accent
-                          : theme.text.primary
-                      }
-                    >
-                      {' '}
-                      {value.logo && (
-                        <Text color={value.logoColor || theme.text.accent}>
-                          {value.logo}{' '}
-                        </Text>
-                      )}
-                      {value.name}
-                    </Text>
-                    {(() => {
-                      const p = value.provider || 'gemini';
-                      const label =
-                        p === 'claude-code'
-                          ? 'Claude Code'
-                          : p === 'codex'
-                            ? 'Codex'
-                            : p === 'antigravity'
-                              ? 'Antigravity'
-                              : p === 'gemma'
-                                ? 'Gemma'
-                                : 'Gemini CLI';
-                      const color = PROVIDER_COLORS[p] || theme.ui.comment;
-                      return (
-                        <Text color={color} bold>
-                          {' '}
-                          [{label}]
-                        </Text>
-                      );
-                    })()}
+                <Box flexDirection="column" width="100%">
+                  <Box flexDirection="row" width="100%">
+                    <Box width={2} flexShrink={0}>
+                      <Text color={theme.text.accent}>
+                        {selectedAgents.has(value.name) ? '☑' : '☐'}
+                      </Text>
+                    </Box>
+                    <Box flexDirection="row" flexShrink={0}>
+                      <Text
+                        color={
+                          context.isSelected && rosterMode === 'list'
+                            ? theme.text.accent
+                            : theme.text.primary
+                        }
+                      >
+                        {' '}
+                        {value.logo && (
+                          <Text color={value.logoColor || theme.text.accent}>
+                            {value.logo}{' '}
+                          </Text>
+                        )}
+                        {value.name}
+                      </Text>
+                      <Box marginLeft={1}>
+                        <ProviderTag provider={value.provider || 'gemini'} />
+                      </Box>
+                    </Box>
+                    {value.description && (
+                      <Text color={theme.text.secondary} italic wrap="truncate">
+                        {'    '}
+                        {value.description}
+                      </Text>
+                    )}
                   </Box>
-                  {value.description && (
-                    <Text color={theme.text.secondary} italic wrap="truncate">
-                      {'    '}
-                      {value.description}
-                    </Text>
-                  )}
                 </Box>
               );
             }}
+            isFocused={rosterMode === 'list'}
           />
         </Box>
 
         <Box
-          paddingX={1}
-          paddingY={0}
-          borderStyle="round"
-          borderColor={
-            rosterMode === 'action' ? theme.text.accent : theme.border.default
-          }
-          justifyContent="center"
+          marginTop={1}
         >
           <Text
             bold
@@ -585,16 +390,14 @@ export function TeamCreatorWizard({
               rosterMode === 'action' ? theme.text.accent : theme.text.primary
             }
           >
-            {rosterMode === 'action' ? '> ' : '  '}[ Done - Continue to
-            Objective ]
+            {rosterMode === 'action' ? '> ' : '  '}
+            [ Done - Continue to Objective ]
           </Text>
         </Box>
 
         <DialogFooter
           primaryAction={
-            rosterMode === 'list'
-              ? 'Enter to toggle agent'
-              : 'Enter to continue'
+            rosterMode === 'list' ? 'Enter to toggle agent' : 'Enter to continue'
           }
           navigationActions={
             rosterMode === 'list' ? 'Tab to continue' : 'Tab to select agents'
@@ -624,6 +427,14 @@ export function TeamCreatorWizard({
           {selectedAgents.size > 0 && (
             <Box marginTop={1} flexDirection="column">
               <Box flexDirection="row" flexWrap="wrap">
+                <Text color={theme.text.secondary}>Providers: </Text>
+                {teamProviders.map((p, i) => (
+                  <Box key={p} marginLeft={i === 0 ? 0 : 1}>
+                    <ProviderTag provider={p} />
+                  </Box>
+                ))}
+              </Box>
+              <Box marginTop={1} flexDirection="row" flexWrap="wrap">
                 <Text color={theme.ui.comment}>Referencing agents: </Text>
                 {Array.from(selectedAgents).map((name, i) => {
                   const agent = allAvailableAgents.find((a) => a.name === name);
@@ -634,7 +445,9 @@ export function TeamCreatorWizard({
                           {agent.logo}{' '}
                         </Text>
                       )}
-                      <Text color={theme.ui.comment}>@{name} </Text>
+                      <Text color={theme.ui.comment}>
+                        @{name}{' '}
+                      </Text>
                       <ProviderTag provider={agent?.provider || 'gemini'} />
                       {i < selectedAgents.size - 1 && (
                         <Text color={theme.ui.comment}>, </Text>
@@ -680,7 +493,7 @@ export function TeamCreatorWizard({
         width="100%"
       >
         <Text bold color={theme.text.primary}>
-          Step 4: Confirm Team Creation
+          Step 4: Confirm Team Configuration
         </Text>
         <Box marginTop={1} flexDirection="column">
           <Text color={theme.text.secondary}>
@@ -707,7 +520,9 @@ export function TeamCreatorWizard({
                     {agent.logo}{' '}
                   </Text>
                 )}
-                <Text color={theme.text.primary}>{name} </Text>
+                <Text color={theme.text.primary}>
+                  {name}{' '}
+                </Text>
                 <ProviderTag provider={agent?.provider || 'gemini'} />
               </Box>
             );
@@ -719,23 +534,23 @@ export function TeamCreatorWizard({
           )}
         </Box>
 
+        {isSubmitting && (
+          <Box marginTop={1}>
+            <Text color={theme.text.accent}>Creating team...</Text>
+          </Box>
+        )}
+
         {error && (
           <Box marginTop={1}>
             <Text color={theme.status.error}>Error: {error}</Text>
           </Box>
         )}
 
-        <Box marginTop={1}>
-          {isSubmitting ? (
-            <Text color={theme.text.accent}>Creating team...</Text>
-          ) : (
-            <DialogFooter
-              primaryAction="Enter to create team"
-              navigationActions="Tab to go back"
-              cancelAction="Esc to cancel"
-            />
-          )}
-        </Box>
+        <DialogFooter
+          primaryAction="Enter to create team"
+          cancelAction="Esc to cancel"
+          extraParts={['[B]ack to Objective']}
+        />
       </Box>
     );
   }
@@ -750,28 +565,21 @@ export function TeamCreatorWizard({
         width="100%"
       >
         <Text bold color={theme.status.success}>
-          Team Created Successfully!
+          Success! Team Created
         </Text>
         <Box marginTop={1} flexDirection="column">
           <Text color={theme.text.primary}>
-            Your new team &quot;{displayName}&quot; is now ready to use.
+            Team {displayName} has been saved to:
           </Text>
-          {createdPath && (
-            <Box marginTop={1}>
-              <Text color={theme.text.secondary}>Created at: </Text>
-              <Text color={theme.text.primary}>{createdPath}</Text>
-            </Box>
-          )}
+          <Text color={theme.text.accent}>{createdPath}</Text>
+          <Box marginTop={1}>
+            <Text color={theme.text.secondary}>
+              You can now select this team from the main team selection menu.
+            </Text>
+          </Box>
         </Box>
         <Box marginTop={1}>
-          <Text color={theme.text.accent}>
-            Would you like to switch to this team now? (y/N)
-          </Text>
-        </Box>
-        <Box marginTop={1}>
-          <Text color={theme.text.secondary}>
-            Press any other key to finish...
-          </Text>
+          <Text color={theme.text.primary}>[Enter] Finish</Text>
         </Box>
       </Box>
     );

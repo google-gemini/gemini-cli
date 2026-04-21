@@ -10,44 +10,21 @@ import { Box, Text } from 'ink';
 import {
   type TeamDefinition,
   type AgentDefinition,
+  installRegistryTeam,
 } from '@google/gemini-cli-core';
 import { theme } from '../semantic-colors.js';
 import { DescriptiveRadioButtonSelect } from './shared/DescriptiveRadioButtonSelect.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { useUIActions } from '../contexts/UIActionsContext.js';
+import { TeamRegistryView } from './views/TeamRegistryView.js';
+import { useConfig } from '../contexts/ConfigContext.js';
+import { ProviderTag } from './shared/ProviderTag.js';
 
 interface TeamSelectionDialogProps {
   teams: TeamDefinition[];
   onSelect: (teamName: string | undefined) => void;
+  onRefreshTeams?: () => void | Promise<void>;
 }
-
-const PROVIDER_COLORS: Record<string, string> = {
-  'claude-code': '#C15F3C', // Claude Orange (Exact)
-  codex: '#FFFFFF', // Codex White
-  gemini: '#A855F7', // Gemini Purple
-  antigravity: '#93C5FD', // Antigravity Light Blue
-  gemma: '#60A5FA', // Gemma Blue
-};
-
-const ProviderTag: React.FC<{ provider: string }> = ({ provider }) => {
-  const label =
-    provider === 'claude-code'
-      ? 'Claude Code'
-      : provider === 'codex'
-        ? 'Codex'
-        : provider === 'antigravity'
-          ? 'Antigravity'
-          : provider === 'gemma'
-            ? 'Gemma'
-            : 'Gemini CLI';
-  const color = PROVIDER_COLORS[provider] || theme.text.secondary;
-
-  return (
-    <Text color={color} bold>
-      [{label}]
-    </Text>
-  );
-};
 
 const MultiModelBadge: React.FC = () => (
   <Box marginLeft={1}>
@@ -87,8 +64,10 @@ function getProviderTags(agents: AgentDefinition[]): React.ReactNode {
 export function TeamSelectionDialog({
   teams: discoveredTeams,
   onSelect,
+  onRefreshTeams,
 }: TeamSelectionDialogProps): React.JSX.Element {
   const uiActions = useUIActions();
+  const config = useConfig();
   const [view, setView] = useState<'select' | 'marketplace'>('select');
 
   useKeypress(
@@ -160,7 +139,7 @@ export function TeamSelectionDialog({
 
     list.push({
       value: 'marketplace',
-      title: 'Browse Team Marketplace',
+      title: 'Browse Agent Teams',
       description: 'Discover and install teams from the community',
       key: 'marketplace',
       titleSuffix: undefined,
@@ -193,39 +172,36 @@ export function TeamSelectionDialog({
     [onSelect, uiActions],
   );
 
+  const handleInstallTeam = useCallback(
+    async (registryTeam: any) => {
+      try {
+        const targetDir = config.storage.getProjectTeamsDir();
+        await installRegistryTeam(registryTeam, targetDir);
+        await onRefreshTeams?.();
+        // After installation, we go back to selection screen
+        setView('select');
+      } catch (error) {
+        // Errors are currently handled by the UI feedback system via coreEvents if they bubble up
+      }
+    },
+    [config, onRefreshTeams],
+  );
+
   if (view === 'marketplace') {
     return (
       <Box
         borderStyle="round"
         borderColor={theme.border.default}
         flexDirection="column"
-        padding={1}
+        padding={0}
         width="100%"
+        height="100%"
       >
-        <Text bold color={theme.text.primary}>
-          Agent Team Marketplace
-        </Text>
-        <Box marginTop={1} flexDirection="column">
-          <Text color={theme.text.secondary}>
-            Explore and download community-contributed agent teams.
-          </Text>
-          <Box
-            marginTop={1}
-            padding={1}
-            borderStyle="single"
-            borderColor={theme.ui.comment}
-          >
-            <Text color={theme.ui.comment}>
-              The community marketplace is currently under development. Soon you
-              will be able to browse hundreds of specialized teams.
-            </Text>
-          </Box>
-          <Box marginTop={1}>
-            <Text color={theme.text.accent}>
-              Press any key to go back to selection...
-            </Text>
-          </Box>
-        </Box>
+        <TeamRegistryView
+          installedTeams={discoveredTeams}
+          onInstall={handleInstallTeam}
+          onClose={() => setView('select')}
+        />
       </Box>
     );
   }

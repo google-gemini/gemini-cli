@@ -1431,6 +1431,11 @@ Logging in with Google... Restarting Gemini CLI to continue.
     },
     [config, refreshStatic],
   );
+
+  const handleRefreshTeams = useCallback(async () => {
+    await config.getTeamRegistry().reload();
+    setForceRerenderKey((prev) => prev + 1);
+  }, [config]);
   /**
    * Determines if the input prompt should be active and accept user input.
    * Input is disabled during:
@@ -2631,6 +2636,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
         setNewAgents(null);
       },
       handleTeamSelect,
+      handleRefreshTeams,
       setIsTeamCreatorActive,
       getPreferredEditor,
       clearAccountSuspension: () => {
@@ -2694,6 +2700,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       historyManager,
       getPreferredEditor,
       handleTeamSelect,
+      handleRefreshTeams,
       setIsTeamCreatorActive,
     ],
   );

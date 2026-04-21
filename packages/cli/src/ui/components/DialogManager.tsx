@@ -67,6 +67,7 @@ export const DialogManager = ({
       <TeamSelectionDialog
         teams={config.getTeamRegistry().getAllTeams()}
         onSelect={uiActions.handleTeamSelect}
+        onRefreshTeams={uiActions.handleRefreshTeams}
       />
     );
   }

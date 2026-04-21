@@ -12,6 +12,7 @@ import type { ExtensionManager } from '../extension-manager.js';
 import {
   fetchReleaseFromGithub,
   type GeminiCLIExtension,
+  type GithubReleaseData,
 } from '@google/gemini-cli-core';
 import type { ExtensionConfig } from '../extension.js';
 
@@ -150,7 +151,10 @@ describe('github.ts (CLI specific)', () => {
     });
 
     it('should return UPDATE_AVAILABLE if github release tag differs', async () => {
-      vi.mocked(fetchReleaseFromGithub).mockResolvedValue({ tag_name: 'v2.0.0' } as any);
+      vi.mocked(fetchReleaseFromGithub).mockResolvedValue({
+        tag_name: 'v2.0.0',
+        assets: [],
+      } as unknown as GithubReleaseData);
 
       const ext = {
         installMetadata: { 

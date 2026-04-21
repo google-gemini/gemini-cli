@@ -69,7 +69,10 @@ export class TeamRegistryClient {
         }
       } catch (error) {
         TeamRegistryClient.fetchPromise = null;
-        throw error;
+        if (error instanceof Error) {
+          throw error;
+        }
+        throw new Error(String(error));
       }
     })();
 

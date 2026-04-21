@@ -25,6 +25,7 @@ import { HorizontalLine } from './shared/HorizontalLine.js';
 import { ApprovalModeIndicator } from './ApprovalModeIndicator.js';
 import { ShellModeIndicator } from './ShellModeIndicator.js';
 import { RawMarkdownIndicator } from './RawMarkdownIndicator.js';
+import { ProviderTag } from './shared/ProviderTag.js';
 import { useComposerStatus } from '../hooks/useComposerStatus.js';
 
 /**
@@ -146,14 +147,6 @@ export const StatusNode: React.FC<{
   );
 };
 
-const PROVIDER_COLORS: Record<string, string> = {
-  'claude-code': '#C15F3C', // Claude Orange (Exact)
-  codex: '#FFFFFF', // Codex White
-  gemini: '#A855F7', // Gemini Purple
-  antigravity: '#93C5FD', // Antigravity Light Blue
-  gemma: '#60A5FA', // Gemma Blue
-};
-
 /**
  * Renders an indicator for the currently active agent team.
  */
@@ -180,29 +173,14 @@ const ActiveTeamIndicator: React.FC = () => {
   return (
     <Box marginLeft={LAYOUT.INDICATOR_LEFT_MARGIN} flexDirection="row">
       <Text color={theme.text.accent}>[ Team: {activeTeam.displayName} (</Text>
-      {sortedProviders.map((p, i) => {
-        const label =
-          p === 'claude-code'
-            ? 'Claude Code'
-            : p === 'codex'
-              ? 'Codex'
-              : p === 'antigravity'
-                ? 'Antigravity'
-                : p === 'gemma'
-                  ? 'Gemma'
-                  : 'Gemini CLI';
-        const color = PROVIDER_COLORS[p] || theme.text.secondary;
-        return (
-          <React.Fragment key={p}>
-            <Text color={color} bold>
-              {label}
-            </Text>
-            {i < sortedProviders.length - 1 && (
-              <Text color={theme.text.accent}>, </Text>
-            )}
-          </React.Fragment>
-        );
-      })}
+      {sortedProviders.map((p, i) => (
+        <React.Fragment key={p}>
+          <ProviderTag provider={p} />
+          {i < sortedProviders.length - 1 && (
+            <Text color={theme.text.accent}>, </Text>
+          )}
+        </React.Fragment>
+      ))}
       <Text color={theme.text.accent}>) ]</Text>
     </Box>
   );
