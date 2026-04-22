@@ -11,7 +11,7 @@ import { lock } from 'proper-lockfile';
 import stripJsonComments from 'strip-json-comments';
 import { Storage } from '../config/storage.js';
 import { normalizePath, isSubpath } from './paths.js';
-import { FatalConfigError } from './errors.js';
+import { FatalConfigError, getErrorMessage } from './errors.js';
 import { coreEvents } from './events.js';
 import { ideContextStore } from '../ide/ideContext.js';
 
@@ -44,7 +44,7 @@ export function isTrustLevel(value: unknown): value is TrustLevel {
  * IDE context, and local configuration file.
  */
 export function checkPathTrust(options: TrustOptions): TrustResult {
-  if (process.env['GEMINI_TRUST_WORKSPACE'] === 'true') {
+  if (process.env['GEMINI_CLI_TRUST_WORKSPACE'] === 'true') {
     return { isTrusted: true, source: 'env' };
   }
 
@@ -207,6 +207,7 @@ export class LoadedTrustedFolders {
     // lockfile requires the file to exist
     if (!fs.existsSync(this.user.path)) {
       await fs.promises.writeFile(this.user.path, JSON.stringify({}, null, 2), {
+        // Restrict file access to read/write for the owner only
         mode: 0o600,
       });
     }
@@ -310,7 +311,7 @@ export function loadTrustedFolders(): LoadedTrustedFolders {
     }
   } catch (error) {
     errors.push({
-      message: error instanceof Error ? error.message : String(error),
+      message: getErrorMessage(error),
       path: userPath,
     });
   }
@@ -337,6 +338,7 @@ export function saveTrustedFolders(
   try {
     fs.writeFileSync(tempPath, content, {
       encoding: 'utf-8',
+      // Restrict file access to read/write for the owner only
       mode: 0o600,
     });
     fs.renameSync(tempPath, trustedFoldersFile.path);

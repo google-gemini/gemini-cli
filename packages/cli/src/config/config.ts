@@ -23,6 +23,7 @@ import {
   FileDiscoveryService,
   resolveTelemetrySettings,
   FatalConfigError,
+  getErrorMessage,
   getPty,
   debugLogger,
   loadServerHierarchicalMemory,
@@ -59,6 +60,7 @@ import {
 
 import { loadSandboxConfig } from './sandboxConfig.js';
 import { resolvePath } from '../utils/resolvePath.js';
+import { isRecord } from '../utils/settingsUtils.js';
 import { RESUME_LATEST } from '../utils/sessionUtils.js';
 
 import { isWorkspaceTrusted } from './trustedFolders.js';
@@ -462,12 +464,16 @@ export async function parseArguments(
   yargsInstance.wrap(yargsInstance.terminalWidth());
   let result;
   try {
-    result = (await yargsInstance.parse()) as Record<string, unknown>;
+    const parsed = await yargsInstance.parse();
+    if (!isRecord(parsed)) {
+      throw new Error('Failed to parse arguments');
+    }
+    result = parsed;
     if (result['skip-trust']) {
-      process.env['GEMINI_TRUST_WORKSPACE'] = 'true';
+      process.env['GEMINI_CLI_TRUST_WORKSPACE'] = 'true';
     }
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
+    const msg = getErrorMessage(e);
     debugLogger.error(msg);
     yargsInstance.showHelp();
     await runExitCleanup();
@@ -481,10 +487,13 @@ export async function parseArguments(
   }
 
   // Normalize query args: handle both quoted "@path file" and unquoted @path file
-  const queryArg = (result as { query?: string | string[] | undefined }).query;
-  const q: string | undefined = Array.isArray(queryArg)
-    ? queryArg.join(' ')
-    : queryArg;
+  const queryArg = result['query'];
+  let q: string | undefined;
+  if (Array.isArray(queryArg)) {
+    q = queryArg.join(' ');
+  } else if (typeof queryArg === 'string') {
+    q = queryArg;
+  }
 
   // -p/--prompt forces non-interactive mode; positional args default to interactive in TTY
   if (q && !result['prompt']) {
@@ -598,7 +607,7 @@ export async function loadCliConfig(
         return resolveToRealPath(trimmedPath) !== realCwd;
       } catch (e) {
         debugLogger.debug(
-          `[IDE] Skipping inaccessible workspace folder: ${trimmedPath} (${e instanceof Error ? e.message : String(e)})`,
+          `[IDE] Skipping inaccessible workspace folder: ${trimmedPath} (${getErrorMessage(e)})`,
         );
         return false;
       }
@@ -1103,7 +1112,7 @@ async function resolveWorktreeSettings(
     worktreeBaseSha = stdout.trim();
   } catch (e: unknown) {
     debugLogger.debug(
-      `Failed to resolve worktree base SHA at ${worktreePath}: ${e instanceof Error ? e.message : String(e)}`,
+      `Failed to resolve worktree base SHA at ${worktreePath}: ${getErrorMessage(e)}`,
     );
   }
 

@@ -111,8 +111,8 @@ To proceed in these environments, you can bypass the trust check using one of
 the following methods:
 
 - **Command-line flag:** Run the CLI with the `--skip-trust` flag.
-- **Environment variable:** Set the `GEMINI_TRUST_WORKSPACE=true` environment
-  variable.
+- **Environment variable:** Set the `GEMINI_CLI_TRUST_WORKSPACE=true`
+  environment variable.
 
 These methods will trust the current workspace for the duration of the session
 without prompting.

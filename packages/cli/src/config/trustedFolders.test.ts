@@ -58,7 +58,7 @@ describe('Trusted Folders', () => {
     // Reset the internal state
     resetTrustedFoldersForTesting();
     vi.clearAllMocks();
-    delete process.env['GEMINI_TRUST_WORKSPACE'];
+    delete process.env['GEMINI_CLI_TRUST_WORKSPACE'];
   });
 
   afterEach(() => {
@@ -433,15 +433,15 @@ describe('Trusted Folders', () => {
       });
     });
 
-    it('should return true when GEMINI_TRUST_WORKSPACE is true', async () => {
-      process.env['GEMINI_TRUST_WORKSPACE'] = 'true';
+    it('should return true when GEMINI_CLI_TRUST_WORKSPACE is true', async () => {
+      process.env['GEMINI_CLI_TRUST_WORKSPACE'] = 'true';
       try {
         expect(isWorkspaceTrusted(mockSettings)).toEqual({
           isTrusted: true,
           source: 'env',
         });
       } finally {
-        delete process.env['GEMINI_TRUST_WORKSPACE'];
+        delete process.env['GEMINI_CLI_TRUST_WORKSPACE'];
       }
     });
 

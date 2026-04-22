@@ -2114,7 +2114,7 @@ the `advanced.excludedEnvVars` setting in your `settings.json` file.
   - Overrides the hardcoded default
   - Example: `export GEMINI_MODEL="gemini-3-flash-preview"` (Windows PowerShell:
     `$env:GEMINI_MODEL="gemini-3-flash-preview"`)
-- **`GEMINI_TRUST_WORKSPACE`**:
+- **`GEMINI_CLI_TRUST_WORKSPACE`**:
   - If set to `"true"`, trusts the current workspace for the duration of the
     session, bypassing the folder trust check.
   - Useful for headless environments (for example, CI/CD pipelines).
