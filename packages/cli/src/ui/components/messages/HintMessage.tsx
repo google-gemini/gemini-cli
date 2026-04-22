@@ -44,7 +44,7 @@ export const HintMessage: React.FC<HintMessageProps> = ({ text }) => {
         </Box>
         <Box flexGrow={1}>
           <Text wrap="wrap" italic color={theme.text.accent}>
-            {`Steering Hint: ${text}`}
+            {text}
           </Text>
         </Box>
       </Box>

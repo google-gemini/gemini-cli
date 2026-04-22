@@ -153,15 +153,35 @@ export const ToolStatusIndicator: React.FC<ToolStatusIndicatorProps> = ({
       ? theme.ui.active
       : theme.status.warning;
 
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  useEffect(() => {
+    if (status !== ToolCallStatus.Executing) {
+      setElapsedSeconds(0);
+      return;
+    }
+    setElapsedSeconds(0);
+    const interval = setInterval(() => {
+      setElapsedSeconds((s) => s + 1);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [status]);
+
   return (
     <Box minWidth={STATUS_INDICATOR_WIDTH}>
       {status === ToolCallStatus.Pending && (
         <Text color={theme.status.success}>{TOOL_STATUS.PENDING}</Text>
       )}
       {status === ToolCallStatus.Executing && (
-        <Text color={statusColor}>
-          <CliSpinner type="toggle" />
-        </Text>
+        <Box flexDirection="row" gap={1}>
+          <Text color={statusColor}>
+            <CliSpinner type="toggle" />
+          </Text>
+          {elapsedSeconds >= 3 && (
+            <Text color={theme.text.secondary} dimColor>
+              {elapsedSeconds}s
+            </Text>
+          )}
+        </Box>
       )}
       {status === ToolCallStatus.Success && (
         <Text color={theme.status.success} aria-label={'Success:'}>

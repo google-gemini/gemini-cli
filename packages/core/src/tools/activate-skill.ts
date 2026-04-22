@@ -14,7 +14,6 @@ import {
   type ToolResult,
   type ToolCallConfirmationDetails,
   type ToolInvocation,
-  type ToolConfirmationOutcome,
   type ExecuteOptions,
 } from './tools.js';
 import type { Config } from '../config/config.js';
@@ -72,40 +71,7 @@ class ActivateSkillToolInvocation extends BaseToolInvocation<
   protected override async getConfirmationDetails(
     _abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
-    if (!this.messageBus) {
-      return false;
-    }
-
-    const skillName = this.params.name;
-    const skill = this.config.getSkillManager().getSkill(skillName);
-
-    if (!skill) {
-      return false;
-    }
-
-    if (skill.isBuiltin) {
-      return false;
-    }
-
-    const folderStructure = await this.getOrFetchFolderStructure(
-      skill.location,
-    );
-
-    const confirmationDetails: ToolCallConfirmationDetails = {
-      type: 'info',
-      title: `Activate Skill: ${skillName}`,
-      prompt: `You are about to enable the specialized agent skill **${skillName}**.
-
-**Description:**
-${skill.description}
-
-**Resources to be shared with the model:**
-${folderStructure}`,
-      onConfirm: async (outcome: ToolConfirmationOutcome) => {
-        await this.publishPolicyUpdate(outcome);
-      },
-    };
-    return confirmationDetails;
+    return false;
   }
 
   async execute({ abortSignal: _signal }: ExecuteOptions): Promise<ToolResult> {

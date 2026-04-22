@@ -16,6 +16,7 @@ import {
 import clipboardy from 'clipboardy';
 import { Box, Text, useStdout, type DOMElement } from 'ink';
 import { SuggestionsDisplay, MAX_WIDTH } from './SuggestionsDisplay.js';
+import { GeminiSpinner } from './GeminiSpinner.js';
 import { theme } from '../semantic-colors.js';
 import { useInputHistory } from '../hooks/useInputHistory.js';
 import { escapeAtSymbols } from '../hooks/atCommandProcessor.js';
@@ -23,7 +24,7 @@ import {
   ScrollableList,
   type ScrollableListRef,
 } from './shared/ScrollableList.js';
-import { HalfLinePaddedBox } from './shared/HalfLinePaddedBox.js';
+import { HorizontalLine } from './shared/HorizontalLine.js';
 import {
   type TextBuffer,
   logicalPosToOffset,
@@ -242,7 +243,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     toggleCleanUiDetailsVisible,
   } = useUIActions();
   const {
-    terminalWidth,
     activePtyId,
     history,
     backgroundTasks,
@@ -1754,146 +1754,110 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     </Box>
   ) : null;
 
-  const borderColor =
-    isShellFocused && !isEmbeddedShellFocused
-      ? (statusColor ?? theme.ui.focus)
-      : theme.border.default;
-
   return (
     <>
       {suggestionsPosition === 'above' && suggestionsNode}
-      {useLineFallback ? (
-        <Box
-          borderStyle="round"
-          borderTop={true}
-          borderBottom={false}
-          borderLeft={false}
-          borderRight={false}
-          borderColor={borderColor}
-          width={terminalWidth}
-          flexDirection="row"
-          alignItems="flex-start"
-          height={0}
-        />
-      ) : null}
-      <HalfLinePaddedBox
-        backgroundBaseColor={theme.background.input}
-        backgroundOpacity={1}
-        useBackgroundColor={useBackgroundColor}
-      >
-        <Box
-          flexGrow={1}
-          flexDirection="row"
-          paddingX={1}
-          borderColor={borderColor}
-          borderStyle={useLineFallback ? 'round' : undefined}
-          borderTop={false}
-          borderBottom={false}
-          borderLeft={!useBackgroundColor}
-          borderRight={!useBackgroundColor}
+      <HorizontalLine />
+      <Box flexGrow={1} flexDirection="row" paddingX={1}>
+        <Text
+          color={
+            streamingState === StreamingState.Responding
+              ? theme.text.secondary
+              : (statusColor ?? theme.text.accent)
+          }
+          aria-label={statusText || undefined}
         >
-          <Text
-            color={statusColor ?? theme.text.accent}
-            aria-label={statusText || undefined}
-          >
-            {shellModeActive ? (
-              reverseSearchActive ? (
-                <Text
-                  color={theme.text.link}
-                  aria-label={SCREEN_READER_USER_PREFIX}
-                >
-                  (r:){' '}
-                </Text>
-              ) : (
-                '!'
-              )
-            ) : commandSearchActive ? (
-              <Text color={theme.text.accent}>(r:) </Text>
-            ) : showYoloStyling ? (
-              '*'
-            ) : (
-              '>'
-            )}{' '}
-          </Text>
-          <Box flexGrow={1} flexDirection="column" ref={innerBoxRef}>
-            {buffer.text.length === 0 && placeholder ? (
-              showCursor ? (
-                <Text
-                  terminalCursorFocus={showCursor}
-                  terminalCursorPosition={0}
-                >
-                  {chalk.inverse(placeholder.slice(0, 1))}
-                  <Text color={theme.text.secondary}>
-                    {placeholder.slice(1)}
-                  </Text>
-                </Text>
-              ) : (
-                <Text color={theme.text.secondary}>{placeholder}</Text>
-              )
-            ) : (
-              <Box
-                flexDirection="column"
-                height={Math.min(buffer.viewportHeight, scrollableData.length)}
-                width="100%"
+          {streamingState === StreamingState.Responding ? (
+            <GeminiSpinner spinnerType="dots" />
+          ) : shellModeActive ? (
+            reverseSearchActive ? (
+              <Text
+                color={theme.text.link}
+                aria-label={SCREEN_READER_USER_PREFIX}
               >
-                {config.getUseTerminalBuffer() ? (
-                  <ScrollableList
-                    ref={listRef}
-                    hasFocus={focus}
-                    data={scrollableData}
-                    renderItem={renderItem}
-                    estimatedItemHeight={() => 1}
-                    fixedItemHeight={true}
-                    keyExtractor={(item) =>
+                (r:){' '}
+              </Text>
+            ) : (
+              '!'
+            )
+          ) : commandSearchActive ? (
+            <Text color={theme.text.accent}>(r:) </Text>
+          ) : showYoloStyling ? (
+            '*'
+          ) : (
+            '❯'
+          )}{' '}
+        </Text>
+        <Box flexGrow={1} flexDirection="column" ref={innerBoxRef}>
+          {buffer.text.length === 0 && placeholder ? (
+            showCursor ? (
+              <Text terminalCursorFocus={showCursor} terminalCursorPosition={0}>
+                {chalk.inverse(placeholder.slice(0, 1))}
+                <Text color={theme.text.secondary}>{placeholder.slice(1)}</Text>
+              </Text>
+            ) : (
+              <Text color={theme.text.secondary}>{placeholder}</Text>
+            )
+          ) : (
+            <Box
+              flexDirection="column"
+              height={Math.min(buffer.viewportHeight, scrollableData.length)}
+              width="100%"
+            >
+              {config.getUseTerminalBuffer() ? (
+                <ScrollableList
+                  ref={listRef}
+                  hasFocus={focus}
+                  data={scrollableData}
+                  renderItem={renderItem}
+                  estimatedItemHeight={() => 1}
+                  fixedItemHeight={true}
+                  keyExtractor={(item) =>
+                    item.type === 'visualLine'
+                      ? `line-${item.absoluteVisualIdx}`
+                      : `ghost-${item.index}`
+                  }
+                  width={inputWidth}
+                  backgroundColor={listBackgroundColor}
+                  containerHeight={Math.min(
+                    buffer.viewportHeight,
+                    scrollableData.length,
+                  )}
+                />
+              ) : (
+                scrollableData
+                  .slice(
+                    buffer.visualScrollRow,
+                    buffer.visualScrollRow + buffer.viewportHeight,
+                  )
+                  .map((item, index) => {
+                    const actualIndex = buffer.visualScrollRow + index;
+                    const key =
                       item.type === 'visualLine'
                         ? `line-${item.absoluteVisualIdx}`
-                        : `ghost-${item.index}`
-                    }
-                    width={inputWidth}
-                    backgroundColor={listBackgroundColor}
-                    containerHeight={Math.min(
-                      buffer.viewportHeight,
-                      scrollableData.length,
-                    )}
-                  />
-                ) : (
-                  scrollableData
-                    .slice(
-                      buffer.visualScrollRow,
-                      buffer.visualScrollRow + buffer.viewportHeight,
-                    )
-                    .map((item, index) => {
-                      const actualIndex = buffer.visualScrollRow + index;
-                      const key =
-                        item.type === 'visualLine'
-                          ? `line-${item.absoluteVisualIdx}`
-                          : `ghost-${item.index}`;
-                      return (
-                        <Fragment key={key}>
-                          {renderItem({ item, index: actualIndex })}
-                        </Fragment>
-                      );
-                    })
-                )}
-              </Box>
-            )}
-          </Box>
+                        : `ghost-${item.index}`;
+                    return (
+                      <Fragment key={key}>
+                        {renderItem({ item, index: actualIndex })}
+                      </Fragment>
+                    );
+                  })
+              )}
+            </Box>
+          )}
         </Box>
-      </HalfLinePaddedBox>
-      {useLineFallback ? (
-        <Box
-          borderStyle="round"
-          borderTop={false}
-          borderBottom={true}
-          borderLeft={false}
-          borderRight={false}
-          borderColor={borderColor}
-          width={terminalWidth}
-          flexDirection="row"
-          alignItems="flex-start"
-          height={0}
-        />
-      ) : null}
+        {statusText &&
+          !reverseSearchActive &&
+          !commandSearchActive &&
+          streamingState === StreamingState.Idle && (
+            <Box flexShrink={0} paddingLeft={1}>
+              <Text dimColor color={statusColor}>
+                {statusText}
+              </Text>
+            </Box>
+          )}
+      </Box>
+      <HorizontalLine />
       {suggestionsPosition === 'below' && suggestionsNode}
     </>
   );

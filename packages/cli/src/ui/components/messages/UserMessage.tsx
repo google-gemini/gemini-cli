@@ -15,7 +15,6 @@ import {
   calculateTransformedLine,
 } from '../shared/text-buffer.js';
 import { HalfLinePaddedBox } from '../shared/HalfLinePaddedBox.js';
-import { useConfig } from '../../contexts/ConfigContext.js';
 
 interface UserMessageProps {
   text: string;
@@ -26,8 +25,6 @@ export const UserMessage: React.FC<UserMessageProps> = ({ text, width }) => {
   const prefix = '> ';
   const prefixWidth = prefix.length;
   const isSlashCommand = checkIsSlashCommand(text);
-  const config = useConfig();
-  const useBackgroundColor = config.getUseBackgroundColor();
 
   const textColor = isSlashCommand ? theme.text.accent : theme.text.primary;
 
@@ -53,13 +50,13 @@ export const UserMessage: React.FC<UserMessageProps> = ({ text, width }) => {
     <HalfLinePaddedBox
       backgroundBaseColor={theme.background.message}
       backgroundOpacity={1}
-      useBackgroundColor={useBackgroundColor}
+      useBackgroundColor={false}
     >
       <Box
         flexDirection="row"
         paddingY={0}
-        marginY={useBackgroundColor ? 0 : 1}
-        paddingX={useBackgroundColor ? 1 : 0}
+        marginY={1}
+        paddingX={0}
         alignSelf="flex-start"
         width={width}
       >

@@ -1403,6 +1403,13 @@ Logging in with Google... Restarting Gemini CLI to continue.
         return;
       }
 
+      // Queue new messages while agent is running; auto-drain when idle
+      if (isAgentRunning && !isSlash) {
+        addMessage(submittedValue);
+        addInput(submittedValue);
+        return;
+      }
+
       const isMcpOrConfigReady = isConfigInitialized && isMcpReady;
       if ((isSlash && isConfigInitialized) || (isIdle && isMcpOrConfigReady)) {
         if (!isSlash) {
