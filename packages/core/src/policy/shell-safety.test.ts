@@ -150,6 +150,64 @@ describe('Shell Safety Policy', () => {
     expect(result.decision).toBe(PolicyDecision.ASK_USER);
   });
 
+  describe('Sequence-based matching (e.g. ["git", "log"])', () => {
+    let sequencePolicyEngine: PolicyEngine;
+
+    beforeEach(() => {
+      const argsPatterns = buildArgsPatterns(
+        undefined,
+        [['git', 'log']],
+        undefined,
+      );
+      sequencePolicyEngine = new PolicyEngine({
+        rules: [
+          {
+            toolName: 'run_shell_command',
+            argsPattern: new RegExp(argsPatterns[0]!),
+            decision: PolicyDecision.ALLOW,
+            priority: 10,
+          },
+        ],
+        defaultDecision: PolicyDecision.ASK_USER,
+      });
+    });
+
+    it('SHOULD allow "git log" and variations with flags', async () => {
+      const commands = [
+        'git log',
+        'git log --oneline',
+        'git --no-pager log',
+        'git -c color.ui=always log',
+      ];
+
+      for (const command of commands) {
+        const result = await sequencePolicyEngine.check(
+          { name: 'run_shell_command', args: { command } },
+          undefined,
+        );
+        expect(result.decision).toBe(PolicyDecision.ALLOW);
+      }
+    });
+
+    it('SHOULD NOT allow "git push" or unrelated git commands', async () => {
+      const toolCall: FunctionCall = {
+        name: 'run_shell_command',
+        args: { command: 'git push' },
+      };
+      const result = await sequencePolicyEngine.check(toolCall, undefined);
+      expect(result.decision).toBe(PolicyDecision.ASK_USER);
+    });
+
+    it('SHOULD NOT allow compound commands if any part is disallowed', async () => {
+      const toolCall: FunctionCall = {
+        name: 'run_shell_command',
+        args: { command: 'git log && rm -rf /' },
+      };
+      const result = await sequencePolicyEngine.check(toolCall, undefined);
+      expect(result.decision).toBe(PolicyDecision.ASK_USER);
+    });
+  });
+
   it('SHOULD NOT allow "git log; rm -rf /" (semicolon separator)', async () => {
     const toolCall: FunctionCall = {
       name: 'run_shell_command',
@@ -327,6 +385,7 @@ describe('Shell Safety Policy', () => {
       undefined,
       'git log',
       undefined,
+      true,
     );
     const policyWithRedirection = new PolicyEngine({
       rules: [

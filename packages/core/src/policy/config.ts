@@ -539,7 +539,7 @@ interface TomlRule {
   mcpName?: string;
   decision?: string;
   priority?: number;
-  commandPrefix?: string | string[];
+  commandPrefix?: string | string[] | string[][];
   argsPattern?: string;
   allowRedirection?: boolean;
   modes?: ApprovalMode[];
@@ -555,7 +555,7 @@ function findMatchingRule(
   criteria: {
     toolName: string;
     mcpName?: string;
-    commandPrefix?: string | string[];
+    commandPrefix?: string | string[] | string[][];
     argsPattern?: string;
   },
 ): TomlRule | undefined {
@@ -615,7 +615,12 @@ export function createPolicyUpdater(
 
       if (message.commandPrefix) {
         // Convert commandPrefix(es) to argsPatterns for in-memory rules
-        const patterns = buildArgsPatterns(undefined, message.commandPrefix);
+        const patterns = buildArgsPatterns(
+          undefined,
+          message.commandPrefix,
+          undefined,
+          message.allowRedirection,
+        );
         const tier =
           message.persistScope === 'user'
             ? USER_POLICY_TIER

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Config } from '../config/config.js';
 import { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { PolicyEngine } from '../policy/policy-engine.js';
@@ -30,6 +30,7 @@ describe('Tracker Tools Integration', () => {
 
   beforeEach(async () => {
     tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'tracker-tools-test-'));
+    vi.stubEnv('GEMINI_CLI_HOME', tempDir);
     config = new Config({
       sessionId: 'test-session',
       targetDir: tempDir,
@@ -41,6 +42,7 @@ describe('Tracker Tools Integration', () => {
   });
 
   afterEach(async () => {
+    vi.unstubAllEnvs();
     await fs.rm(tempDir, { recursive: true, force: true });
   });
 

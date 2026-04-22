@@ -796,6 +796,165 @@ export function getCommandRoots(command: string): string[] {
     .filter(Boolean);
 }
 
+/**
+ * Binaries that are generally safe and whose arguments are typically variable and non-sensitive.
+ * Rules for these binaries should be saved "naked" (binary only) without positional arguments.
+ */
+export const ARGUMENT_UNRESTRICTED_BINARIES = new Set([
+  'grep',
+  'sed',
+  'awk',
+  'rg',
+  'ls',
+  'cat',
+  'head',
+  'tail',
+  'wc',
+  'sort',
+  'uniq',
+  'cut',
+  'tr',
+  'echo',
+  'printf',
+  'true',
+  'false',
+  'pwd',
+  'whoami',
+  'id',
+  'hostname',
+  'uname',
+  'cd',
+]);
+
+/**
+ * Binaries that are considered sensitive and should not be allowed to be saved as "naked" rules.
+ * Rules for these binaries must include at least one positional argument (e.g., "git diff", "rm /tmp").
+ */
+export const ARGUMENT_RESTRICTED_BINARIES = new Set([
+  'git',
+  'node',
+  'npm',
+  'npx',
+  'yarn',
+  'pnpm',
+  'python',
+  'python3',
+  'pip',
+  'pip3',
+  'bash',
+  'sh',
+  'zsh',
+  'sudo',
+  'docker',
+  'kubectl',
+  'aws',
+  'gcloud',
+  'az',
+  'chmod',
+  'chown',
+  'rm',
+  'mv',
+  'cp',
+  'find',
+  'curl',
+  'wget',
+  'ssh',
+  'scp',
+  'rsync',
+]);
+
+/**
+ * Checks if a command sequence represents a "naked" restricted command.
+ * A command is naked if it only contains the binary name without any subcommands or scripts.
+ *
+ * @param sequence - The command sequence (e.g., ['git', 'log']).
+ * @returns true if the command is a naked restricted command.
+ */
+export function isArgumentRestrictedCommand(sequence: string[]): boolean {
+  if (sequence.length === 0) return false;
+  const binary = sequence[0];
+  // A command is "naked" if it has only one token (the binary itself)
+  // and that binary is in the restricted list.
+  return sequence.length === 1 && ARGUMENT_RESTRICTED_BINARIES.has(binary);
+}
+
+/**
+ * Extracts sequences of positional arguments for each command in a potentially chained shell command.
+ * Flags (starting with -) are ignored, and subcommands/scripts are captured.
+ *
+ * @param command - The shell command string to parse.
+ * @returns An array of sequences, where each sequence is string[].
+ * @example "git --no-pager log" -> [["git", "log"]]
+ * @example "git log && ls -la" -> [["git", "log"], ["ls"]]
+ */
+export function getCommandSegments(command: string): string[][] {
+  if (!command) {
+    return [];
+  }
+
+  const bashResult = parseBashCommandDetails(command);
+  if (!bashResult || bashResult.hasError) {
+    // Fallback to simple root extraction if tree-sitter fails or is not bash
+    const roots = getCommandRoots(command);
+    return roots.map((r) => [r]);
+  }
+
+  const tree = parseCommandTree(command);
+  if (!tree) {
+    const roots = getCommandRoots(command);
+    return roots.map((r) => [r]);
+  }
+
+  const segments: string[][] = [];
+
+  function walk(node: Node) {
+    if (node.type === 'command') {
+      const sequence: string[] = [];
+      const nameNode = node.childForFieldName('name');
+      let binaryName = '';
+      if (nameNode) {
+        binaryName = normalizeCommandName(nameNode.text);
+        sequence.push(binaryName);
+      }
+
+      // Safe utilities like grep/sed should be allowed "nakedly" (binary only)
+      // because their arguments are highly variable and non-sensitive.
+      const limit = ARGUMENT_UNRESTRICTED_BINARIES.has(binaryName) ? 1 : 2;
+
+      for (let i = 0; i < node.childCount; i++) {
+        // Limit sequence length based on binary sensitivity
+        if (sequence.length >= limit) break;
+
+        const child = node.child(i);
+        if (!child || child.id === nameNode?.id) continue;
+
+        // We only care about words/strings that are arguments
+        if (
+          child.type === 'word' ||
+          child.type === 'string' ||
+          child.type === 'raw_string'
+        ) {
+          const text = child.text;
+          if (!text.startsWith('-')) {
+            sequence.push(normalizeCommandName(text));
+          }
+        }
+      }
+      if (sequence.length > 0) {
+        segments.push(sequence);
+      }
+    }
+
+    for (let i = 0; i < node.childCount; i++) {
+      const child = node.child(i);
+      if (child) walk(child);
+    }
+  }
+
+  walk(tree.rootNode);
+  return segments;
+}
+
 export function stripShellWrapper(command: string): string {
   const pattern =
     /^\s*(?:(?:(?:\S+\/)?(?:sh|bash|zsh))\s+-c|cmd\.exe\s+\/c|powershell(?:\.exe)?\s+(?:-NoProfile\s+)?-Command|pwsh(?:\.exe)?\s+(?:-NoProfile\s+)?-Command)\s+/i;

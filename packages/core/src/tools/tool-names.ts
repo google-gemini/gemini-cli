@@ -175,11 +175,8 @@ export const EDIT_TOOL_NAMES = new Set([EDIT_TOOL_NAME, WRITE_FILE_TOOL_NAME]);
  * when granting persistent or session-wide approval.
  */
 export const TOOLS_REQUIRING_NARROWING = new Set([
-  GLOB_TOOL_NAME,
-  GREP_TOOL_NAME,
   READ_MANY_FILES_TOOL_NAME,
   READ_FILE_TOOL_NAME,
-  LS_TOOL_NAME,
   WRITE_FILE_TOOL_NAME,
   EDIT_TOOL_NAME,
   SHELL_TOOL_NAME,

@@ -25,12 +25,14 @@ vi.mock('node:fs/promises');
 vi.mock('../config/storage.js');
 vi.mock('../utils/shell-utils.js', () => ({
   getCommandRoots: vi.fn(),
+  getCommandSegments: vi.fn(),
   stripShellWrapper: vi.fn(),
   hasRedirection: vi.fn(),
+  isArgumentRestrictedCommand: vi.fn(),
 }));
 interface ParsedPolicy {
   rule?: Array<{
-    commandPrefix?: string | string[];
+    commandPrefix?: string | string[] | string[][];
     mcpName?: string;
     toolName?: string;
   }>;
@@ -82,7 +84,7 @@ describe('createPolicyUpdater', () => {
         priority: ALWAYS_ALLOW_PRIORITY,
         mcpName: 'test-mcp',
         argsPattern: new RegExp(
-          escapeRegex('"command":"echo') + '(?:[\\s"]|\\\\")',
+          `\\x00${escapeRegex('"command":"')}echo\\b(?:(?:[^"&|;\\n\\r<>]|\\\\"))*${escapeRegex('"')}\\x00`,
         ),
       }),
     );
@@ -93,7 +95,7 @@ describe('createPolicyUpdater', () => {
         priority: ALWAYS_ALLOW_PRIORITY,
         mcpName: 'test-mcp',
         argsPattern: new RegExp(
-          escapeRegex('"command":"ls') + '(?:[\\s"]|\\\\")',
+          `\\x00${escapeRegex('"command":"')}ls\\b(?:(?:[^"&|;\\n\\r<>]|\\\\"))*${escapeRegex('"')}\\x00`,
         ),
       }),
     );
@@ -172,7 +174,7 @@ describe('createPolicyUpdater', () => {
         toolName: 'run_shell_command',
         priority: ALWAYS_ALLOW_PRIORITY,
         argsPattern: new RegExp(
-          escapeRegex('"command":"git') + '(?:[\\s"]|\\\\")',
+          `\\x00${escapeRegex('"command":"git')}\\b(?:(?:[^"&|;\n\r<>]|\\\\"))*${escapeRegex('"')}\\x00`,
         ),
       }),
     );
@@ -259,10 +261,14 @@ describe('ShellToolInvocation Policy Update', () => {
       (c: string) => c,
     );
     vi.mocked(shellUtils.hasRedirection).mockReturnValue(false);
+    vi.mocked(shellUtils.isArgumentRestrictedCommand).mockReturnValue(false);
   });
 
-  it('should extract multiple root commands for chained commands', () => {
-    vi.mocked(shellUtils.getCommandRoots).mockReturnValue(['git', 'npm']);
+  it('should extract multiple command segments for chained commands', () => {
+    vi.mocked(shellUtils.getCommandSegments).mockReturnValue([
+      ['git'],
+      ['npm'],
+    ]);
 
     const invocation = new ShellToolInvocation(
       mockConfig,
@@ -276,14 +282,14 @@ describe('ShellToolInvocation Policy Update', () => {
     const options = (
       invocation as unknown as TestableShellToolInvocation
     ).getPolicyUpdateOptions(ToolConfirmationOutcome.ProceedAlways);
-    expect(options!.commandPrefix).toEqual(['git', 'npm']);
-    expect(shellUtils.getCommandRoots).toHaveBeenCalledWith(
+    expect(options!.commandPrefix).toEqual([['git'], ['npm']]);
+    expect(shellUtils.getCommandSegments).toHaveBeenCalledWith(
       'git status && npm test',
     );
   });
 
-  it('should extract a single root command', () => {
-    vi.mocked(shellUtils.getCommandRoots).mockReturnValue(['ls']);
+  it('should extract a single command segment', () => {
+    vi.mocked(shellUtils.getCommandSegments).mockReturnValue([['ls']]);
 
     const invocation = new ShellToolInvocation(
       mockConfig,
@@ -297,12 +303,12 @@ describe('ShellToolInvocation Policy Update', () => {
     const options = (
       invocation as unknown as TestableShellToolInvocation
     ).getPolicyUpdateOptions(ToolConfirmationOutcome.ProceedAlways);
-    expect(options!.commandPrefix).toEqual(['ls']);
-    expect(shellUtils.getCommandRoots).toHaveBeenCalledWith('ls -la /tmp');
+    expect(options!.commandPrefix).toEqual([['ls']]);
+    expect(shellUtils.getCommandSegments).toHaveBeenCalledWith('ls -la /tmp');
   });
 
   it('should include allowRedirection if command has redirection', () => {
-    vi.mocked(shellUtils.getCommandRoots).mockReturnValue(['echo']);
+    vi.mocked(shellUtils.getCommandSegments).mockReturnValue([['echo']]);
     vi.mocked(shellUtils.hasRedirection).mockReturnValue(true);
 
     const invocation = new ShellToolInvocation(
@@ -316,7 +322,7 @@ describe('ShellToolInvocation Policy Update', () => {
     const options = (
       invocation as unknown as TestableShellToolInvocation
     ).getPolicyUpdateOptions(ToolConfirmationOutcome.ProceedAlways);
-    expect(options!.commandPrefix).toEqual(['echo']);
+    expect(options!.commandPrefix).toEqual([['echo']]);
     expect(options!.allowRedirection).toBe(true);
     expect(shellUtils.hasRedirection).toHaveBeenCalledWith(
       'echo "hello" > file.txt',
