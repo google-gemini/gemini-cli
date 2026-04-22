@@ -1471,6 +1471,17 @@ const SETTINGS_SCHEMA = {
             description: 'Respect .geminiignore files when searching.',
             showInDialog: true,
           },
+          enableFileWatcher: {
+            type: 'boolean',
+            label: 'Enable File Watcher',
+            category: 'Context',
+            requiresRestart: true,
+            default: false,
+            description: oneLine`
+              Enable file watcher updates for @ file suggestions (experimental).
+            `,
+            showInDialog: false,
+          },
           enableRecursiveFileSearch: {
             type: 'boolean',
             label: 'Enable Recursive File Search',
@@ -2129,8 +2140,9 @@ const SETTINGS_SCHEMA = {
         label: 'JIT Context Loading',
         category: 'Experimental',
         requiresRestart: true,
-        default: false,
-        description: 'Enable Just-In-Time (JIT) context loading.',
+        default: true,
+        description:
+          'Enable Just-In-Time (JIT) context loading. Defaults to true; set to false to opt out and load all GEMINI.md files into the system instruction up-front.',
         showInDialog: false,
       },
       useOSC52Paste: {
@@ -2263,14 +2275,14 @@ const SETTINGS_SCHEMA = {
           },
         },
       },
-      memoryManager: {
+      memoryV2: {
         type: 'boolean',
-        label: 'Memory Manager Agent',
+        label: 'Memory v2',
         category: 'Experimental',
         requiresRestart: true,
         default: false,
         description:
-          'Replace the built-in save_memory tool with a memory manager subagent that supports adding, removing, de-duplicating, and organizing memories.',
+          'Disable the built-in save_memory tool and let the main agent persist project context by editing markdown files directly with edit/write_file. Routes facts across four tiers: team-shared conventions go to project GEMINI.md files, project-specific personal notes go to the per-project private memory folder (MEMORY.md as index + sibling .md files for detail), and cross-project personal preferences go to the global ~/.gemini/GEMINI.md (the only file under ~/.gemini/ that the agent can edit — settings, credentials, etc. remain off-limits).',
         showInDialog: true,
       },
       autoMemory: {
@@ -3059,6 +3071,11 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
         type: 'string',
         description: 'Protocol for OTLP exporters.',
         enum: ['grpc', 'http'],
+      },
+      traces: {
+        type: 'boolean',
+        description:
+          'Whether detailed traces with large attributes are captured.',
       },
       logPrompts: {
         type: 'boolean',

@@ -41,7 +41,11 @@ import { EditTool } from '../tools/edit.js';
 import { ShellTool } from '../tools/shell.js';
 import { WriteFileTool } from '../tools/write-file.js';
 import { WebFetchTool } from '../tools/web-fetch.js';
-import { MemoryTool, setGeminiMdFilename } from '../tools/memoryTool.js';
+import {
+  MemoryTool,
+  setGeminiMdFilename,
+  getCurrentGeminiMdFilename,
+} from '../tools/memoryTool.js';
 import { WebSearchTool } from '../tools/web-search.js';
 import { AskUserTool } from '../tools/ask-user.js';
 import { UpdateTopicTool } from '../tools/topicTool.js';
@@ -205,6 +209,7 @@ export interface PlanSettings {
 
 export interface TelemetrySettings {
   enabled?: boolean;
+  traces?: boolean;
   target?: TelemetryTarget;
   otlpEndpoint?: string;
   otlpProtocol?: 'grpc' | 'http';
@@ -615,6 +620,7 @@ export interface ConfigParameters {
   fileFiltering?: {
     respectGitIgnore?: boolean;
     respectGeminiIgnore?: boolean;
+    enableFileWatcher?: boolean;
     enableRecursiveFileSearch?: boolean;
     enableFuzzySearch?: boolean;
     maxFileCount?: number;
@@ -703,7 +709,7 @@ export interface ConfigParameters {
   adminSkillsEnabled?: boolean;
   experimentalJitContext?: boolean;
   autoDistillation?: boolean;
-  experimentalMemoryManager?: boolean;
+  experimentalMemoryV2?: boolean;
   experimentalAutoMemory?: boolean;
   experimentalContextManagementConfig?: string;
   experimentalAgentHistoryTruncation?: boolean;
@@ -798,6 +804,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly fileFiltering: {
     respectGitIgnore: boolean;
     respectGeminiIgnore: boolean;
+    enableFileWatcher: boolean;
     enableRecursiveFileSearch: boolean;
     enableFuzzySearch: boolean;
     maxFileCount: number;
@@ -947,7 +954,7 @@ export class Config implements McpContext, AgentLoopContext {
   private disabledSkills: string[];
   private readonly adminSkillsEnabled: boolean;
   private readonly experimentalJitContext: boolean;
-  private readonly experimentalMemoryManager: boolean;
+  private readonly experimentalMemoryV2: boolean;
   private readonly experimentalAutoMemory: boolean;
   private readonly experimentalContextManagementConfig?: string;
   private readonly memoryBoundaryMarkers: readonly string[];
@@ -1061,6 +1068,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.accessibility = params.accessibility ?? {};
     this.telemetrySettings = {
       enabled: params.telemetry?.enabled ?? false,
+      traces: params.telemetry?.traces ?? false,
       target: params.telemetry?.target ?? DEFAULT_TELEMETRY_TARGET,
       otlpEndpoint: params.telemetry?.otlpEndpoint ?? DEFAULT_OTLP_ENDPOINT,
       otlpProtocol: params.telemetry?.otlpProtocol,
@@ -1078,6 +1086,10 @@ export class Config implements McpContext, AgentLoopContext {
       respectGeminiIgnore:
         params.fileFiltering?.respectGeminiIgnore ??
         DEFAULT_FILE_FILTERING_OPTIONS.respectGeminiIgnore,
+      enableFileWatcher:
+        params.fileFiltering?.enableFileWatcher ??
+        DEFAULT_FILE_FILTERING_OPTIONS.enableFileWatcher ??
+        true,
       enableRecursiveFileSearch:
         params.fileFiltering?.enableRecursiveFileSearch ?? true,
       enableFuzzySearch: params.fileFiltering?.enableFuzzySearch ?? true,
@@ -1159,8 +1171,8 @@ export class Config implements McpContext, AgentLoopContext {
       modelConfigServiceConfig ?? DEFAULT_MODEL_CONFIGS,
     );
 
-    this.experimentalJitContext = params.experimentalJitContext ?? false;
-    this.experimentalMemoryManager = params.experimentalMemoryManager ?? false;
+    this.experimentalJitContext = params.experimentalJitContext ?? true;
+    this.experimentalMemoryV2 = params.experimentalMemoryV2 ?? false;
     this.experimentalAutoMemory = params.experimentalAutoMemory ?? false;
     this.experimentalContextManagementConfig =
       params.experimentalContextManagementConfig;
@@ -2494,8 +2506,8 @@ export class Config implements McpContext, AgentLoopContext {
     return this.memoryBoundaryMarkers;
   }
 
-  isMemoryManagerEnabled(): boolean {
-    return this.experimentalMemoryManager;
+  isMemoryV2Enabled(): boolean {
+    return this.experimentalMemoryV2;
   }
 
   isAutoMemoryEnabled(): boolean {
@@ -2732,6 +2744,10 @@ export class Config implements McpContext, AgentLoopContext {
     return this.telemetrySettings.enabled ?? false;
   }
 
+  getTelemetryTracesEnabled(): boolean {
+    return this.telemetrySettings.traces ?? false;
+  }
+
   getTelemetryLogPromptsEnabled(): boolean {
     return this.telemetrySettings.logPrompts ?? true;
   }
@@ -2825,6 +2841,7 @@ export class Config implements McpContext, AgentLoopContext {
     return {
       respectGitIgnore: this.fileFiltering.respectGitIgnore,
       respectGeminiIgnore: this.fileFiltering.respectGeminiIgnore,
+      enableFileWatcher: this.fileFiltering.enableFileWatcher,
       maxFileCount: this.fileFiltering.maxFileCount,
       searchTimeout: this.fileFiltering.searchTimeout,
       customIgnoreFilePaths: this.fileFiltering.customIgnoreFilePaths,
@@ -3018,7 +3035,10 @@ export class Config implements McpContext, AgentLoopContext {
 
   /**
    * Checks if a given absolute path is allowed for file system operations.
-   * A path is allowed if it's within the workspace context or the project's temporary directory.
+   * A path is allowed if it's within the workspace context, the project's
+   * temporary directory, or is exactly the global personal `~/.gemini/GEMINI.md`
+   * file (the latter is the only file under `~/.gemini/` that is reachable —
+   * settings, credentials, keybindings, etc. remain disallowed).
    *
    * @param absolutePath The absolute path to check.
    * @returns true if the path is allowed, false otherwise.
@@ -3033,8 +3053,25 @@ export class Config implements McpContext, AgentLoopContext {
 
     const projectTempDir = this.storage.getProjectTempDir();
     const resolvedTempDir = resolveToRealPath(projectTempDir);
+    if (isSubpath(resolvedTempDir, resolvedPath)) {
+      return true;
+    }
 
-    return isSubpath(resolvedTempDir, resolvedPath);
+    // Surgical allowlist: the global personal GEMINI.md file (and ONLY that
+    // file) is reachable so the prompt-driven memory flow can persist
+    // cross-project personal preferences. This deliberately does NOT
+    // allowlist the rest of `~/.gemini/`.
+    const globalMemoryFilePath = path.join(
+      Storage.getGlobalGeminiDir(),
+      getCurrentGeminiMdFilename(),
+    );
+    const resolvedGlobalMemoryFilePath =
+      resolveToRealPath(globalMemoryFilePath);
+    if (resolvedPath === resolvedGlobalMemoryFilePath) {
+      return true;
+    }
+
+    return false;
   }
 
   /**
@@ -3668,7 +3705,7 @@ export class Config implements McpContext, AgentLoopContext {
         new ReadBackgroundOutputTool(this, this.messageBus),
       ),
     );
-    if (!this.isMemoryManagerEnabled()) {
+    if (!this.isMemoryV2Enabled()) {
       maybeRegister(MemoryTool, () =>
         registry.registerTool(new MemoryTool(this.messageBus, this.storage)),
       );
@@ -3816,8 +3853,6 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   private onAgentsRefreshed = async () => {
-    await this.agentRegistry.initialize();
-
     // Propagate updates to the active chat session
     const client = this.geminiClient;
     if (client?.isInitialized()) {
