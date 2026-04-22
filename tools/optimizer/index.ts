@@ -10,9 +10,9 @@ async function main() {
   const program = new Command();
   program
     .option('--investigate', 'Run investigation phase', false)
-    .option('--update-processes', 'Update processes based on learnings', false)
+    .option('--update-processes', 'Run the update-processes phase to generate/improve scripts', false)
     .option('--create-pr', 'Create a PR when updating processes', false)
-    .option('--commit', 'Run processes and commit changes', false)
+    .option('--execute-actions', 'Actually execute destructive or state-changing actions (e.g., closing issues, commenting)', false)
     .parse(process.argv);
 
   const options = program.opts();
@@ -48,27 +48,36 @@ async function main() {
     console.warn('Artifact check/download skipped, proceeding with fresh state.');
   }
 
+  const policyPath = options.executeActions ? undefined : path.join(__dirname, 'policies', 'readonly-gh.toml');
+
   // 1. Initial Metrics
-  await runPhase('metrics', { PRE_RUN: 'true' }, options);
+  await runPhase('metrics', { PRE_RUN: 'true' }, options, policyPath);
 
   // 2. Investigation (Optional)
   if (options.investigate) {
-    await runPhase('investigations', {}, options);
+    await runPhase('investigations', {}, options, policyPath);
   }
 
-  // 3. Update Processes & Run
-  await runPhase('processes', {
-    UPDATE_PROCESSES: String(options.updateProcesses),
-    COMMIT: String(options.commit),
-  }, options);
+  // 3. Update Processes (Optional)
+  if (options.updateProcesses) {
+    await runPhase('process-updater', {
+      CREATE_PR: String(options.createPr),
+      EXECUTE_ACTIONS: String(options.executeActions),
+    }, options, policyPath);
+  }
 
-  // 4. Final Metrics
-  await runPhase('metrics', { PRE_RUN: 'false' }, options);
+  // 4. Run Processes
+  await runPhase('processes', {
+    EXECUTE_ACTIONS: String(options.executeActions),
+  }, options, policyPath);
+
+  // 5. Final Metrics
+  await runPhase('metrics', { PRE_RUN: 'false' }, options, policyPath);
 
   console.log('\nOptimizer1000 completed.');
 }
 
-async function runPhase(phaseDir: string, env: Record<string, string>, options: any) {
+async function runPhase(phaseDir: string, env: Record<string, string>, options: any, policyPath?: string) {
   console.log(`\n--- Phase: ${phaseDir} ---`);
   const phasePath = path.join(__dirname, phaseDir);
   
@@ -98,11 +107,17 @@ async function runPhase(phaseDir: string, env: Record<string, string>, options: 
   const rootDir = path.resolve(__dirname, '../..');
   
   try {
-    // Run GCLI non-interactively with --yolo to bypass policies
+    // Run GCLI non-interactively. Use --yolo to auto-approve 'allow' rules,
+    // but policies can still 'deny' actions.
     const cliPath = path.join(rootDir, 'packages', 'cli');
+    const args = ['--prompt', userPrompt, '--yolo', '--model', 'gemini-3-flash-preview'];
+    
+    if (policyPath) {
+      args.push('--admin-policy', policyPath);
+    }
     
     await new Promise<void>((resolve, reject) => {
-      const child = spawn('node', [cliPath, '--prompt', userPrompt, '--yolo', '--model', 'gemini-3-flash-preview'], {
+      const child = spawn('node', [cliPath, ...args], {
         stdio: 'inherit',
         cwd: rootDir,
         env: { ...process.env, ...env }

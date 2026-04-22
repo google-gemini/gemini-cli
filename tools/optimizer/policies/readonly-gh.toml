@@ -1,0 +1,17 @@
+# Optimizer Read-Only Policy
+# This policy prevents the agent from performing destructive actions on GitHub.
+
+[[rule]]
+toolName = "run_shell_command"
+commandRegex = "^gh (issue|pr) (list|view)"
+decision = "allow"
+priority = 200
+description = "Allow listing and viewing issues/PRs for data gathering."
+
+[[rule]]
+toolName = "run_shell_command"
+commandPrefix = "gh"
+decision = "deny"
+priority = 100
+denyMessage = "State-changing GitHub commands are prohibited in dry-run mode. Use --execute-actions to enable them."
+description = "Deny all other gh commands to prevent accidental modifications."

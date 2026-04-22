@@ -12,6 +12,7 @@
   "devDependencies": {
     "tsx": "^4.20.3",
     "typescript": "^5.4.5",
-    "@types/node": "^20.12.7"
+    "@types/node": "^20.12.7",
+    "@google/gemini-cli-core": "file:../../packages/core"
   }
 }

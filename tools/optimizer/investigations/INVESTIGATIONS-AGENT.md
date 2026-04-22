@@ -13,7 +13,7 @@ of the data and identify any opportunities for improvement.
    - **Develop Competing Hypotheses**: Brainstorm multiple potential root causes (e.g., "Latency is due to slow reviews" vs. "Latency is due to slow author responses").
    - **Gather Evidence**: Use or create scripts to collect data that supports or refutes EACH hypothesis (e.g., check timestamp of last review vs. last commit).
    - **Select Root Cause**: Identify the hypothesis most strongly supported by the data.
-5. **Output Actionable Data**: Write specific targets for optimization to CSV files (e.g., `reviewer_bottlenecks.csv`, `author_stale_prs.csv`). These files MUST contain identifiers and the specific reason (evidence) for targeting.
+5. **Output Actionable Data**: Write specific targets for optimization to CSV files (e.g., `author_stale_prs.csv`). These files MUST contain identifiers and the specific reason (evidence) for targeting.
 6. Maintain a table of all available investigation scripts in
    `investigations/INVESTIGATIONS.md`.
 7. Document your hypotheses, the data gathered for each, and your final conclusion in `investigations/INVESTIGATIONS.md`.
