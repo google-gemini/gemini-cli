@@ -3345,7 +3345,7 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
 export function getSettingsSchema(): SettingsSchemaType {
   // Force enablePermanentToolApproval to false in Vitest to keep snapshots stable,
   // unless explicitly overridden in tests.
-  if (process.env.VITEST) {
+  if (process.env['VITEST']) {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const schema = JSON.parse(JSON.stringify(SETTINGS_SCHEMA));
     schema.security.properties.enablePermanentToolApproval.default = false;
