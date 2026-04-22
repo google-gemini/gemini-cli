@@ -1184,16 +1184,12 @@ export class Session {
         let completionListener:
           | ((info: BackgroundCompletionInfo) => void)
           | null = null;
-        let abortHandler: (() => void) | null = null;
 
         const emitTerminal = (failed: boolean) => {
           if (terminalEmitted) return;
           terminalEmitted = true;
           if (completionListener) {
             ExecutionLifecycleService.offBackgroundComplete(completionListener);
-          }
-          if (abortHandler) {
-            abortSignal.removeEventListener('abort', abortHandler);
           }
           this.sendUpdate({
             sessionUpdate: 'tool_call_update',
@@ -1221,14 +1217,14 @@ export class Session {
           const failed = info.error !== null;
           setImmediate(() => emitTerminal(failed));
         };
-        abortHandler = () => emitTerminal(false);
 
+        // The stream deliberately outlives the current turn: we do NOT wire
+        // the turn's abortSignal to emitTerminal. The terminal status lands
+        // only when the process actually exits (via onBackgroundComplete)
+        // or the ACP session ends — otherwise a new prompt or user cancel
+        // would prematurely close a stream whose process is still producing
+        // output the model may care about in future turns.
         ExecutionLifecycleService.onBackgroundComplete(completionListener);
-        if (abortSignal.aborted) {
-          emitTerminal(false);
-        } else {
-          abortSignal.addEventListener('abort', abortHandler, { once: true });
-        }
       } else {
         await this.sendUpdate({
           sessionUpdate: 'tool_call_update',

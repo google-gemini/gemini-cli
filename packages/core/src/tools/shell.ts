@@ -688,10 +688,14 @@ export class ShellToolInvocation extends BaseToolInvocation<
                 }
               },
             );
+            // The listener deliberately does NOT tear down on the turn's
+            // abortSignal: stream_output streams are designed to outlive the
+            // spawning turn (issue #25803 PR 2 / ConsultaSkill semantics).
+            // Teardown happens only on the process's own `exit` event or when
+            // the session ends. A stream already-aborted at subscribe time
+            // would indicate an abnormal state; flush defensively in that case.
             if (signal.aborted) {
               teardownStream();
-            } else {
-              signal.addEventListener('abort', teardownStream, { once: true });
             }
           }
 

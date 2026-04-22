@@ -603,7 +603,11 @@ describe('ShellTool', () => {
       await promise;
     });
 
-    it('flushes pending stream_output lines and unsubscribes on abort', async () => {
+    it('stream_output listener outlives the spawning turn abort (PR 2 semantics)', async () => {
+      // PR 2 explicitly detaches the stream_output listener from the turn's
+      // abortSignal: a new user prompt (which aborts the previous turn) must
+      // NOT tear down background streams whose process is still producing
+      // output the model may want to react to in the next turn.
       vi.useFakeTimers();
       mockShellBackground.mockImplementationOnce(() => {});
       const updateOutputMock = vi.fn();
@@ -621,26 +625,32 @@ describe('ShellTool', () => {
 
       await vi.advanceTimersByTimeAsync(0);
 
-      ExecutionLifecycleService.emitEvent(12345, {
-        type: 'data',
-        chunk: 'pending-line\n',
-      });
-
-      // Abort before the 200ms batch timer fires — must flush immediately.
+      // Abort the turn — the stream listener must remain subscribed.
       abortController.abort();
 
-      expect(updateOutputMock).toHaveBeenCalledTimes(1);
-      expect(updateOutputMock).toHaveBeenCalledWith('pending-line');
-
-      // Any further emits are ignored — the listener has unsubscribed.
+      // Output arriving AFTER the abort must still propagate.
       ExecutionLifecycleService.emitEvent(12345, {
         type: 'data',
-        chunk: 'should-not-arrive\n',
+        chunk: 'post-abort-line\n',
+      });
+      await vi.advanceTimersByTimeAsync(250);
+
+      expect(updateOutputMock).toHaveBeenCalledTimes(1);
+      expect(updateOutputMock).toHaveBeenCalledWith('post-abort-line');
+
+      // The real process exit is still what finally tears the stream down.
+      ExecutionLifecycleService.emitEvent(12345, {
+        type: 'exit',
+        exitCode: 0,
+        signal: null,
+      });
+      ExecutionLifecycleService.emitEvent(12345, {
+        type: 'data',
+        chunk: 'after-exit-should-not-arrive\n',
       });
       await vi.advanceTimersByTimeAsync(400);
       expect(updateOutputMock).toHaveBeenCalledTimes(1);
 
-      await vi.advanceTimersByTimeAsync(250);
       await promise;
     });
 
