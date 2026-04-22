@@ -15,7 +15,6 @@ import { CodebaseInvestigatorAgent } from './codebase-investigator.js';
 import { CliHelpAgent } from './cli-help-agent.js';
 import { GeneralistAgent } from './generalist-agent.js';
 import { BrowserAgentDefinition } from './browser/browserAgentDefinition.js';
-import { MemoryManagerAgent } from './memory-manager-agent.js';
 import { AgentTool } from './agent-tool.js';
 import { A2AAuthProviderFactory } from './auth-provider/factory.js';
 import type { AuthenticationHandler } from '@a2a-js/sdk/client';
@@ -292,14 +291,6 @@ export class AgentRegistry {
       } else {
         this.registerLocalAgent(BrowserAgentDefinition(this.config));
       }
-    }
-
-    // Register the memory manager agent as a replacement for the save_memory tool.
-    // The agent declares its own workspaceDirectories (e.g. ~/.gemini) which are
-    // scoped to its execution via runWithScopedWorkspaceContext in LocalAgentExecutor,
-    // keeping the main agent's workspace context clean.
-    if (this.config.isMemoryManagerEnabled()) {
-      this.registerLocalAgent(MemoryManagerAgent(this.config));
     }
   }
 
