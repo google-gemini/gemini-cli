@@ -18,6 +18,11 @@ platforms, they execute with `bash -c`.
   workspace root where the command runs.
 - `is_background` (boolean, optional): Whether to move the process to the
   background immediately after starting.
+- `stream_output` (boolean, optional): When set together with
+  `is_background: true`, each stdout line from the background process is
+  forwarded into the conversation in real time as incremental tool-call updates.
+  See the [Streaming background output](#streaming-background-output) section
+  below. Ignored when `is_background` is not also true.
 
 ### Return values
 
@@ -100,6 +105,54 @@ interactive version control operations (`git rebase -i`).
 When an interactive command is running, you can send input to it from the Gemini
 CLI. To focus on the interactive shell, press `Tab`. The terminal output,
 including complex TUIs, will be rendered correctly.
+
+## Streaming background output
+
+When the model launches a long-running background process with
+`is_background: true` it usually has no way to observe progress until the next
+user prompt. Adding `stream_output: true` opens a live side-channel: each stdout
+line is pushed to the client as an asynchronous tool-call update for the
+duration of the current turn, so the model can react as output arrives.
+
+```js
+run_shell_command({
+  command: "bash watcher.sh /inbox/ | grep --line-buffered '^NEW:'",
+  is_background: true,
+  stream_output: true,
+});
+```
+
+Behavior:
+
+- Lines are coalesced on a 200 ms batch window to avoid flooding the client on
+  bursty output. The batch is force-flushed on turn abort and when the process
+  exits.
+- The existing `read_background_output` tool continues to return the full output
+  from disk for the same `pid` — the live stream is a parallel observer and
+  never consumes or interferes with the disk log.
+- Output is line-buffered: partial lines are held until a newline arrives (or
+  until the process exits, at which point the trailing fragment is flushed).
+  Individual lines are capped at 64 KiB; the remainder of an over-sized line is
+  discarded up to the next newline.
+- The stream is tied to the current turn. When the turn ends the live forwarding
+  stops; the process itself continues running and remains reachable via
+  `read_background_output`, `list_background_processes`, and
+  `kill_background_process`.
+- Only `stdout` in plain-text (non-PTY) mode is forwarded. Interactive PTY
+  output with ANSI styling is skipped by the line buffer; pipe through
+  `grep --line-buffered` / `sed -u` to force line-based plain text if needed.
+
+Common use cases:
+
+- **File watchers** — `fswatch /inbox | grep NEW:` emitting per-event lines the
+  agent reacts to immediately.
+- **CI / deploys** — tailing `gh run watch` or a log file to trigger follow-up
+  actions on failure markers.
+- **Long jobs** — training runs, migrations, or imports that periodically log
+  progress.
+
+Note that reacting to events while the agent is idle (no user prompt in flight)
+is tracked as a follow-up; PR 1 scopes the stream to the active turn.
 
 ## Important notes
 
