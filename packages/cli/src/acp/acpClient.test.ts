@@ -1094,6 +1094,123 @@ describe('Session', () => {
     expect(result).toMatchObject({ stopReason: 'end_turn' });
   });
 
+  it('forwards updateOutput calls as in_progress tool_call_update events', async () => {
+    const executeMock = vi.fn(async ({ updateOutput }) => {
+      updateOutput?.('progress: 50%');
+      updateOutput?.('progress: 100%');
+      return { llmContent: 'Tool Result' };
+    });
+    mockTool.build.mockReturnValue({
+      getDescription: () => 'Test Tool',
+      toolLocations: () => [],
+      shouldConfirmExecute: vi.fn().mockResolvedValue(null),
+      execute: executeMock,
+    });
+
+    const stream1 = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: {
+          functionCalls: [{ name: 'test_tool', args: {} }],
+        },
+      },
+    ]);
+    const stream2 = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: { candidates: [] },
+      },
+    ]);
+
+    mockChat.sendMessageStream
+      .mockResolvedValueOnce(stream1)
+      .mockResolvedValueOnce(stream2);
+
+    await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Call tool' }],
+    });
+
+    expect(executeMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        abortSignal: expect.any(Object),
+        updateOutput: expect.any(Function),
+      }),
+    );
+
+    const progressUpdates = mockConnection.sessionUpdate.mock.calls
+      .map((c) => c[0]?.update)
+      .filter(
+        (u) =>
+          u?.sessionUpdate === 'tool_call_update' &&
+          u?.status === 'in_progress',
+      );
+
+    expect(progressUpdates).toHaveLength(2);
+    expect(progressUpdates[0]).toMatchObject({
+      toolCallId: expect.any(String),
+      status: 'in_progress',
+      content: [
+        { type: 'content', content: { type: 'text', text: 'progress: 50%' } },
+      ],
+    });
+    expect(progressUpdates[1]).toMatchObject({
+      content: [
+        { type: 'content', content: { type: 'text', text: 'progress: 100%' } },
+      ],
+    });
+    // All progress events share the same toolCallId as the terminal completion.
+    const terminalUpdate = mockConnection.sessionUpdate.mock.calls
+      .map((c) => c[0]?.update)
+      .find(
+        (u) =>
+          u?.sessionUpdate === 'tool_call_update' && u?.status === 'completed',
+      );
+    expect(progressUpdates[0].toolCallId).toBe(terminalUpdate.toolCallId);
+  });
+
+  it('does not emit tool_call_update when updateOutput is called with empty or non-string values', async () => {
+    const executeMock = vi.fn(async ({ updateOutput }) => {
+      updateOutput?.('');
+      updateOutput?.(undefined);
+      updateOutput?.({ some: 'object' });
+      return { llmContent: 'Tool Result' };
+    });
+    mockTool.build.mockReturnValue({
+      getDescription: () => 'Test Tool',
+      toolLocations: () => [],
+      shouldConfirmExecute: vi.fn().mockResolvedValue(null),
+      execute: executeMock,
+    });
+
+    const stream1 = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: { functionCalls: [{ name: 'test_tool', args: {} }] },
+      },
+    ]);
+    const stream2 = createMockStream([
+      { type: StreamEventType.CHUNK, value: { candidates: [] } },
+    ]);
+    mockChat.sendMessageStream
+      .mockResolvedValueOnce(stream1)
+      .mockResolvedValueOnce(stream2);
+
+    await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Call tool' }],
+    });
+
+    const progressUpdates = mockConnection.sessionUpdate.mock.calls
+      .map((c) => c[0]?.update)
+      .filter(
+        (u) =>
+          u?.sessionUpdate === 'tool_call_update' &&
+          u?.status === 'in_progress',
+      );
+    expect(progressUpdates).toHaveLength(0);
+  });
+
   it('should handle tool call permission request', async () => {
     const confirmationDetails = {
       type: 'info',

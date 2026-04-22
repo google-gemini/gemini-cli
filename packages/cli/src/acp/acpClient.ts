@@ -1132,8 +1132,26 @@ export class Session {
         });
       }
 
+      const updateOutput = (output: unknown) => {
+        if (typeof output !== 'string' || output.length === 0) {
+          return;
+        }
+        void this.sendUpdate({
+          sessionUpdate: 'tool_call_update',
+          toolCallId: callId,
+          status: 'in_progress',
+          title: displayTitle,
+          content: [
+            { type: 'content', content: { type: 'text', text: output } },
+          ],
+          locations: invocation.toolLocations(),
+          kind: toAcpToolKind(tool.kind),
+        });
+      };
+
       const toolResult: ToolResult = await invocation.execute({
         abortSignal,
+        updateOutput,
       });
       const content = toToolCallContent(toolResult);
 
