@@ -1595,7 +1595,9 @@ describe('Settings Loading and Merging', () => {
         const settings1 = loadSettings(MOCK_WORKSPACE_DIR);
         const settings2 = loadSettings(MOCK_WORKSPACE_DIR);
 
-        expect(mockedRead).toHaveBeenCalledTimes(5); // system, systemDefaults, user, workspace, and potentially an env file
+        // 4 settings files (system, systemDefaults, user, workspace) +
+        // up to 3 env files (~/.env, ~/.gemini/.env, workspace/.gemini/.env).
+        expect(mockedRead).toHaveBeenCalledTimes(7);
         expect(settings1).toBe(settings2);
       });
 
@@ -1611,7 +1613,7 @@ describe('Settings Loading and Merging', () => {
         const settings1 = loadSettings(workspace1);
         const settings2 = loadSettings(workspace2);
 
-        expect(mockedRead).toHaveBeenCalledTimes(10); // 5 for each workspace
+        expect(mockedRead).toHaveBeenCalledTimes(14); // 7 for each workspace
         expect(settings1).not.toBe(settings2);
       });
 
@@ -1622,12 +1624,12 @@ describe('Settings Loading and Merging', () => {
         (mockFsExistsSync as Mock).mockReturnValue(true);
 
         const settings1 = loadSettings(MOCK_WORKSPACE_DIR);
-        expect(mockedRead).toHaveBeenCalledTimes(5);
+        expect(mockedRead).toHaveBeenCalledTimes(7);
 
         saveSettings(settings1.user);
 
         const settings2 = loadSettings(MOCK_WORKSPACE_DIR);
-        expect(mockedRead).toHaveBeenCalledTimes(10); // Should have re-read from disk
+        expect(mockedRead).toHaveBeenCalledTimes(14); // Should have re-read from disk
         expect(settings1).not.toBe(settings2);
       });
 
@@ -1643,7 +1645,7 @@ describe('Settings Loading and Merging', () => {
         const settings1W1 = loadSettings(workspace1);
         const settings1W2 = loadSettings(workspace2);
 
-        expect(mockedRead).toHaveBeenCalledTimes(10);
+        expect(mockedRead).toHaveBeenCalledTimes(14);
 
         // Save settings for workspace 1
         saveSettings(settings1W1.workspace);
@@ -1651,8 +1653,8 @@ describe('Settings Loading and Merging', () => {
         const settings2W1 = loadSettings(workspace1);
         const settings2W2 = loadSettings(workspace2);
 
-        // Both workspace caches should have been cleared and re-read from disk (+10 reads)
-        expect(mockedRead).toHaveBeenCalledTimes(20);
+        // Both workspace caches should have been cleared and re-read from disk (+14 reads)
+        expect(mockedRead).toHaveBeenCalledTimes(28);
         expect(settings1W1).not.toBe(settings2W1);
         expect(settings1W2).not.toBe(settings2W2);
       });
@@ -1671,66 +1673,50 @@ describe('Settings Loading and Merging', () => {
     });
 
     it('should exclude DEBUG and DEBUG_MODE from project .env files by default', () => {
-      // Create a workspace settings file with excludedProjectEnvVars
+      const projectEnvPath = path.resolve(
+        path.join(MOCK_WORKSPACE_DIR, '.env'),
+      );
       const workspaceSettingsContent = {
         general: {},
         advanced: { excludedEnvVars: ['DEBUG', 'DEBUG_MODE'] },
       };
 
-      (mockFsExistsSync as Mock).mockImplementation(
-        (p: fs.PathLike) =>
-          normalizePath(p) === normalizePath(MOCK_WORKSPACE_SETTINGS_PATH),
-      );
+      (mockFsExistsSync as Mock).mockImplementation((p: fs.PathLike) => {
+        const normalizedP = normalizePath(p);
+        return (
+          normalizedP === normalizePath(MOCK_WORKSPACE_SETTINGS_PATH) ||
+          normalizedP === normalizePath(projectEnvPath)
+        );
+      });
 
       (fs.readFileSync as Mock).mockImplementation(
         (p: fs.PathOrFileDescriptor) => {
-          if (normalizePath(p) === normalizePath(MOCK_WORKSPACE_SETTINGS_PATH))
+          const normalizedP = normalizePath(p);
+          if (normalizedP === normalizePath(MOCK_WORKSPACE_SETTINGS_PATH))
             return JSON.stringify(workspaceSettingsContent);
-          return '{}';
-        },
-      );
-
-      // Mock findEnvFile to return a project .env file
-      const originalFindEnvFile = (
-        loadSettings as unknown as { findEnvFile: () => string }
-      ).findEnvFile;
-      (loadSettings as unknown as { findEnvFile: () => string }).findEnvFile =
-        () => path.resolve('/mock/project/.env');
-
-      // Mock fs.readFileSync for .env file content
-      const originalReadFileSync = fs.readFileSync;
-      (fs.readFileSync as Mock).mockImplementation(
-        (p: fs.PathOrFileDescriptor) => {
-          if (p === path.resolve('/mock/project/.env')) {
+          if (normalizedP === normalizePath(projectEnvPath))
             return 'DEBUG=true\nDEBUG_MODE=1\nGEMINI_API_KEY=test-key';
-          }
-          if (
-            normalizePath(p) === normalizePath(MOCK_WORKSPACE_SETTINGS_PATH)
-          ) {
-            return JSON.stringify(workspaceSettingsContent);
-          }
           return '{}';
         },
       );
 
-      try {
-        // This will call loadEnvironment internally with the merged settings
-        const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      delete process.env['DEBUG'];
+      delete process.env['DEBUG_MODE'];
+      delete process.env['GEMINI_API_KEY'];
 
-        // Verify the settings were loaded correctly
-        expect(settings.merged.advanced?.excludedEnvVars).toEqual([
-          'DEBUG',
-          'DEBUG_MODE',
-        ]);
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
 
-        // Note: We can't directly test process.env changes here because the mocking
-        // prevents the actual file system operations, but we can verify the settings
-        // are correctly merged and passed to loadEnvironment
-      } finally {
-        (loadSettings as unknown as { findEnvFile: () => string }).findEnvFile =
-          originalFindEnvFile;
-        (fs.readFileSync as Mock).mockImplementation(originalReadFileSync);
-      }
+      // Verify the settings were loaded correctly
+      expect(settings.merged.advanced?.excludedEnvVars).toEqual([
+        'DEBUG',
+        'DEBUG_MODE',
+      ]);
+
+      // DEBUG and DEBUG_MODE come from a generic .env file and should be excluded.
+      expect(process.env['DEBUG']).toBeUndefined();
+      expect(process.env['DEBUG_MODE']).toBeUndefined();
+      // GEMINI_API_KEY is not excluded and should be loaded.
+      expect(process.env['GEMINI_API_KEY']).toBe('test-key');
     });
 
     it('should respect custom excludedProjectEnvVars from user settings', () => {
@@ -2025,6 +2011,168 @@ describe('Settings Loading and Merging', () => {
       } finally {
         process.argv = originalArgv;
       }
+    });
+  });
+
+  describe('hierarchical .env loading', () => {
+    const homeDir = path.resolve('/mock/home/user');
+    const homeEnvPath = path.join(homeDir, '.env');
+    const homeGeminiEnvPath = path.join(homeDir, GEMINI_DIR, '.env');
+    const workspaceGeminiEnvPath = path.resolve(
+      path.join(MOCK_WORKSPACE_DIR, GEMINI_DIR, '.env'),
+    );
+
+    let originalEnv: NodeJS.ProcessEnv;
+
+    beforeEach(() => {
+      originalEnv = { ...process.env };
+      delete process.env['USER_VAR'];
+      delete process.env['WORKSPACE_VAR'];
+      delete process.env['SHARED_VAR'];
+      delete process.env['GEMINI_API_KEY'];
+      vi.resetAllMocks();
+      vi.spyOn(trustedFolders, 'isWorkspaceTrusted').mockReturnValue({
+        isTrusted: true,
+        source: 'file',
+      });
+    });
+
+    afterEach(() => {
+      process.env = originalEnv;
+    });
+
+    it('loads both user-level and workspace-level env files', () => {
+      (mockFsExistsSync as Mock).mockImplementation((p: fs.PathLike) => {
+        const normalizedP = path.resolve(p.toString());
+        return [homeGeminiEnvPath, workspaceGeminiEnvPath].includes(
+          normalizedP,
+        );
+      });
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          const normalizedP = path.resolve(p.toString());
+          if (normalizedP === homeGeminiEnvPath)
+            return 'USER_VAR=from_user\nGEMINI_API_KEY=user-key';
+          if (normalizedP === workspaceGeminiEnvPath)
+            return 'WORKSPACE_VAR=from_workspace';
+          return '{}';
+        },
+      );
+
+      const settings = {
+        security: { folderTrust: { enabled: false } },
+      } as Settings;
+      loadEnvironment(settings, MOCK_WORKSPACE_DIR, isWorkspaceTrusted);
+
+      // Variables from both files should be available.
+      expect(process.env['USER_VAR']).toBe('from_user');
+      expect(process.env['WORKSPACE_VAR']).toBe('from_workspace');
+      expect(process.env['GEMINI_API_KEY']).toBe('user-key');
+    });
+
+    it('workspace-level variables override user-level variables', () => {
+      (mockFsExistsSync as Mock).mockImplementation((p: fs.PathLike) => {
+        const normalizedP = path.resolve(p.toString());
+        return [homeGeminiEnvPath, workspaceGeminiEnvPath].includes(
+          normalizedP,
+        );
+      });
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          const normalizedP = path.resolve(p.toString());
+          if (normalizedP === homeGeminiEnvPath)
+            return 'SHARED_VAR=user_value\nGEMINI_API_KEY=user-key';
+          if (normalizedP === workspaceGeminiEnvPath)
+            return 'SHARED_VAR=workspace_value';
+          return '{}';
+        },
+      );
+
+      const settings = {
+        security: { folderTrust: { enabled: false } },
+      } as Settings;
+      loadEnvironment(settings, MOCK_WORKSPACE_DIR, isWorkspaceTrusted);
+
+      // Workspace-level should override user-level for shared variables.
+      expect(process.env['SHARED_VAR']).toBe('workspace_value');
+      // User-level-only variable should still be loaded.
+      expect(process.env['GEMINI_API_KEY']).toBe('user-key');
+    });
+
+    it('shell-set variables are never overridden by any .env file', () => {
+      process.env['SHARED_VAR'] = 'shell_value';
+
+      (mockFsExistsSync as Mock).mockImplementation((p: fs.PathLike) => {
+        const normalizedP = path.resolve(p.toString());
+        return [homeGeminiEnvPath, workspaceGeminiEnvPath].includes(
+          normalizedP,
+        );
+      });
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          const normalizedP = path.resolve(p.toString());
+          if (normalizedP === homeGeminiEnvPath) return 'SHARED_VAR=user_value';
+          if (normalizedP === workspaceGeminiEnvPath)
+            return 'SHARED_VAR=workspace_value';
+          return '{}';
+        },
+      );
+
+      const settings = {
+        security: { folderTrust: { enabled: false } },
+      } as Settings;
+      loadEnvironment(settings, MOCK_WORKSPACE_DIR, isWorkspaceTrusted);
+
+      // Shell-set variable must not be overridden by any .env file.
+      expect(process.env['SHARED_VAR']).toBe('shell_value');
+    });
+
+    it('works correctly with only a user-level home env file and no workspace file', () => {
+      (mockFsExistsSync as Mock).mockImplementation((p: fs.PathLike) => {
+        const normalizedP = path.resolve(p.toString());
+        return normalizedP === homeEnvPath;
+      });
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (path.resolve(p.toString()) === homeEnvPath)
+            return 'USER_VAR=from_home\nGEMINI_API_KEY=home-key';
+          return '{}';
+        },
+      );
+
+      const settings = {
+        security: { folderTrust: { enabled: false } },
+      } as Settings;
+      loadEnvironment(settings, MOCK_WORKSPACE_DIR, isWorkspaceTrusted);
+
+      expect(process.env['USER_VAR']).toBe('from_home');
+      expect(process.env['GEMINI_API_KEY']).toBe('home-key');
+    });
+
+    it('loads ~/.env before ~/.gemini/.env so gemini-specific user file takes precedence', () => {
+      (mockFsExistsSync as Mock).mockImplementation((p: fs.PathLike) => {
+        const normalizedP = path.resolve(p.toString());
+        return [homeEnvPath, homeGeminiEnvPath].includes(normalizedP);
+      });
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          const normalizedP = path.resolve(p.toString());
+          if (normalizedP === homeEnvPath)
+            return 'SHARED_VAR=generic_home\nGEMINI_API_KEY=generic-key';
+          if (normalizedP === homeGeminiEnvPath)
+            return 'SHARED_VAR=gemini_home\nGEMINI_API_KEY=gemini-key';
+          return '{}';
+        },
+      );
+
+      const settings = {
+        security: { folderTrust: { enabled: false } },
+      } as Settings;
+      loadEnvironment(settings, MOCK_WORKSPACE_DIR, isWorkspaceTrusted);
+
+      // ~/.gemini/.env is loaded after ~/.env, so it takes precedence.
+      expect(process.env['SHARED_VAR']).toBe('gemini_home');
+      expect(process.env['GEMINI_API_KEY']).toBe('gemini-key');
     });
   });
 
