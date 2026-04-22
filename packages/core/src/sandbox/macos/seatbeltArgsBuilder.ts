@@ -159,6 +159,19 @@ export function buildSeatbeltProfile(options: SeatbeltArgsOptions): string {
     );
     const realGovernanceFile = resolveToRealPath(governanceFile);
 
+    // Skip deny if explicitly allowed by additional write permissions
+    const isExplicitlyAllowed = resolvedPaths.policyWrite.some(
+      (p) =>
+        p === governanceFile ||
+        p === realGovernanceFile ||
+        governanceFile.startsWith(p + path.sep) ||
+        realGovernanceFile.startsWith(p + path.sep),
+    );
+
+    if (isExplicitlyAllowed) {
+      continue;
+    }
+
     // Determine if it should be treated as a directory (subpath) or a file (literal).
     // .git is generally a directory, while ignore files are literals.
     let isDirectory = GOVERNANCE_FILES[i].isDirectory;

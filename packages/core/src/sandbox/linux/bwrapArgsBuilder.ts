@@ -116,11 +116,6 @@ export async function buildBwrapArgs(
     mounts.push({ type: '--ro-bind-try', src: p, dest: p });
   }
 
-  // Collect explicit additional write permissions.
-  for (const p of resolvedPaths.policyWrite) {
-    mounts.push({ type: '--bind-try', src: p, dest: p });
-  }
-
   const policyWriteKeys = new Set(resolvedPaths.policyWrite.map(toPathKey));
 
   for (const file of GOVERNANCE_FILES) {
@@ -160,6 +155,13 @@ export async function buildBwrapArgs(
         dest: mainGitDir,
       });
     }
+  }
+
+  // Apply explicit additional write permissions.
+  // We apply these after GOVERNANCE_FILES and gitWorktree rules so that if a user explicitly requests
+  // write access to a protected directory (like .git), the explicit allow takes precedence in bwrap.
+  for (const p of resolvedPaths.policyWrite) {
+    bwrapArgs.push('--bind-try', p, p);
   }
 
   for (const p of resolvedPaths.forbidden) {

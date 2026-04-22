@@ -396,7 +396,7 @@ describe.skipIf(os.platform() === 'win32')('buildBwrapArgs', () => {
     expect(args[args.indexOf(worktreeGitDir) - 1]).toBe('--ro-bind-try');
   });
 
-  it('git worktree read-only bindings should override previous policyWrite bindings', async () => {
+  it('explicit policyWrite bindings should override git worktree read-only bindings', async () => {
     const worktreeGitDir = '/custom/worktree/.git';
 
     const args = await buildBwrapArgs({
@@ -409,11 +409,11 @@ describe.skipIf(os.platform() === 'win32')('buildBwrapArgs', () => {
       }),
     });
 
-    const writeBindIndex = args.indexOf('/custom/worktree');
-    const worktreeBindIndex = args.lastIndexOf(worktreeGitDir);
+    const writeBindIndex = args.lastIndexOf('/custom/worktree');
+    const worktreeBindIndex = args.indexOf(worktreeGitDir);
 
     expect(writeBindIndex).toBeGreaterThan(-1);
     expect(worktreeBindIndex).toBeGreaterThan(-1);
-    expect(worktreeBindIndex).toBeGreaterThan(writeBindIndex);
+    expect(writeBindIndex).toBeGreaterThan(worktreeBindIndex);
   });
 });

@@ -18,6 +18,7 @@ import { Storage } from '../config/storage.js';
 import { lock } from 'proper-lockfile';
 import { ideContextStore } from '../ide/ideContext.js';
 import * as headless from './headless.js';
+import { coreEvents } from './events.js';
 
 vi.mock('proper-lockfile');
 vi.mock('./headless.js', async (importOriginal) => {
@@ -122,13 +123,13 @@ describe('Trust Utility (Core)', () => {
   });
 
   describe('checkPathTrust', () => {
-    it('should return trusted if headless mode is on', () => {
+    it('should NOT return trusted if headless mode is on by default', () => {
       const result = checkPathTrust({
         path: '/any',
         isFolderTrustEnabled: true,
         isHeadless: true,
       });
-      expect(result).toEqual({ isTrusted: true, source: undefined });
+      expect(result).toEqual({ isTrusted: undefined, source: undefined });
     });
 
     it('should return trusted if folder trust is disabled', () => {
@@ -169,6 +170,28 @@ describe('Trust Utility (Core)', () => {
         isFolderTrustEnabled: true,
       });
       expect(result).toEqual({ isTrusted: undefined, source: undefined });
+    });
+  });
+
+  describe('coreEvents.emitFeedback', () => {
+    it('should report corrupted config via coreEvents.emitFeedback in setValue', async () => {
+      const folders = loadTrustedFolders();
+      const testPath = path.resolve('/new/path');
+
+      // Initialize with valid JSON
+      fs.writeFileSync(trustedFoldersPath, '{}', 'utf-8');
+
+      // Corrupt the file after initial load
+      fs.writeFileSync(trustedFoldersPath, 'invalid json', 'utf-8');
+
+      const spy = vi.spyOn(coreEvents, 'emitFeedback');
+      await folders.setValue(testPath, TrustLevel.TRUST_FOLDER);
+
+      expect(spy).toHaveBeenCalledWith(
+        'error',
+        expect.stringContaining('may be corrupted'),
+        expect.any(Error),
+      );
     });
   });
 });

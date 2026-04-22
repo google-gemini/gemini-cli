@@ -105,6 +105,7 @@ export interface CliArgs {
   startupMessages?: string[];
   rawOutput: boolean | undefined;
   acceptRawOutputRisk: boolean | undefined;
+  skipTrust: boolean | undefined;
   isCommand: boolean | undefined;
 }
 
@@ -288,6 +289,11 @@ export async function parseArguments(
           description:
             'Execute the provided prompt and continue in interactive mode',
         })
+        .option('skip-trust', {
+          type: 'boolean',
+          description: 'Trust the current workspace for this session.',
+          default: false,
+        })
         .option('worktree', {
           alias: 'w',
           type: 'string',
@@ -456,7 +462,10 @@ export async function parseArguments(
   yargsInstance.wrap(yargsInstance.terminalWidth());
   let result;
   try {
-    result = await yargsInstance.parse();
+    result = await yargsInstance.parse() as Record<string, unknown>;
+    if (result['skip-trust']) {
+      process.env['GEMINI_TRUST_WORKSPACE'] = 'true';
+    }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     debugLogger.error(msg);

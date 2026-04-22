@@ -26,7 +26,7 @@ export enum TrustLevel {
 
 export interface TrustResult {
   isTrusted: boolean | undefined;
-  source: 'ide' | 'file' | undefined;
+  source: 'ide' | 'file' | 'env' | undefined;
 }
 
 export interface TrustOptions {
@@ -38,7 +38,7 @@ export interface TrustOptions {
 export function isTrustLevel(value: unknown): value is TrustLevel {
   return (
     typeof value === 'string' &&
-    Object.values(TrustLevel).includes(value as TrustLevel)
+    Object.values(TrustLevel).some((v) => v === value)
   );
 }
 
@@ -47,8 +47,8 @@ export function isTrustLevel(value: unknown): value is TrustLevel {
  * IDE context, and local configuration file.
  */
 export function checkPathTrust(options: TrustOptions): TrustResult {
-  if (options.isHeadless) {
-    return { isTrusted: true, source: undefined };
+  if (process.env['GEMINI_TRUST_WORKSPACE'] === 'true') {
+    return { isTrusted: true, source: 'env' };
   }
 
   if (!options.isFolderTrustEnabled) {
@@ -60,7 +60,7 @@ export function checkPathTrust(options: TrustOptions): TrustResult {
     return { isTrusted: ideTrust, source: 'ide' };
   }
 
-  const folders = loadTrustedFolders(options.isHeadless);
+  const folders = loadTrustedFolders();
 
   if (folders.errors.length > 0) {
     const errorMessages = folders.errors.map(
@@ -130,7 +130,6 @@ export class LoadedTrustedFolders {
   constructor(
     readonly user: TrustedFoldersFile,
     readonly errors: TrustedFoldersError[],
-    private readonly isHeadless?: boolean,
   ) {}
 
   get rules(): TrustRule[] {
@@ -151,9 +150,7 @@ export class LoadedTrustedFolders {
     location: string,
     config?: Record<string, TrustLevel>,
   ): boolean | undefined {
-    if (this.isHeadless) {
-      return true;
-    }
+
 
     const configToUse = config ?? this.user.config;
 
@@ -222,6 +219,9 @@ export class LoadedTrustedFolders {
       },
     });
 
+    const normalizedPath = normalizePath(folderPath);
+    const originalTrustLevel = this.user.config[normalizedPath];
+
     try {
       // Re-read the file to handle concurrent updates
       const content = await fsPromises.readFile(this.user.path, 'utf-8');
@@ -238,8 +238,6 @@ export class LoadedTrustedFolders {
       }
 
       // Use normalized path as key
-      const normalizedPath = normalizePath(folderPath);
-      const originalTrustLevel = config[normalizedPath];
       config[normalizedPath] = trustLevel;
       this.user.config[normalizedPath] = trustLevel;
 
@@ -271,7 +269,7 @@ export function resetTrustedFoldersForTesting(): void {
   clearRealPathCacheForTesting();
 }
 
-export function loadTrustedFolders(isHeadless?: boolean): LoadedTrustedFolders {
+export function loadTrustedFolders(): LoadedTrustedFolders {
   if (loadedTrustedFolders) {
     return loadedTrustedFolders;
   }
@@ -283,7 +281,7 @@ export function loadTrustedFolders(isHeadless?: boolean): LoadedTrustedFolders {
   try {
     if (fs.existsSync(userPath)) {
       const content = fs.readFileSync(userPath, 'utf-8');
-      const parsed = parseTrustedFoldersJson(content) as Record<string, string>;
+      const parsed = parseTrustedFoldersJson(content);
 
       if (
         typeof parsed !== 'object' ||
@@ -295,7 +293,8 @@ export function loadTrustedFolders(isHeadless?: boolean): LoadedTrustedFolders {
           path: userPath,
         });
       } else {
-        for (const [rawPath, trustLevel] of Object.entries(parsed)) {
+        const config = parsed as Record<string, unknown>;
+        for (const [rawPath, trustLevel] of Object.entries(config)) {
           const normalizedPath = normalizePath(rawPath);
           if (isTrustLevel(trustLevel)) {
             userConfig[normalizedPath] = trustLevel;
@@ -316,11 +315,7 @@ export function loadTrustedFolders(isHeadless?: boolean): LoadedTrustedFolders {
     });
   }
 
-  loadedTrustedFolders = new LoadedTrustedFolders(
-    { path: userPath, config: userConfig },
-    errors,
-    isHeadless,
-  );
+  loadedTrustedFolders = new LoadedTrustedFolders({ path: userPath, config: userConfig }, errors);
   return loadedTrustedFolders;
 }
 
