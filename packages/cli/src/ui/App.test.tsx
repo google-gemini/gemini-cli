@@ -94,7 +94,10 @@ describe('App', () => {
   it('should render main content and composer when not quitting', async () => {
     const { lastFrame, unmount } = await renderWithProviders(<App />, {
       uiState: mockUIState,
-      settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
+      settings: createMockSettings({
+        ui: { useAlternateBuffer: false },
+        security: { enablePermanentToolApproval: false },
+      }),
     });
 
     expect(lastFrame()).toContain('Tips for getting started');
@@ -111,7 +114,10 @@ describe('App', () => {
 
     const { lastFrame, unmount } = await renderWithProviders(<App />, {
       uiState: quittingUIState,
-      settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
+      settings: createMockSettings({
+        ui: { useAlternateBuffer: false },
+        security: { enablePermanentToolApproval: false },
+      }),
     });
 
     expect(lastFrame()).toContain('Quitting...');
@@ -128,7 +134,10 @@ describe('App', () => {
 
     const { lastFrame, unmount } = await renderWithProviders(<App />, {
       uiState: quittingUIState,
-      settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
+      settings: createMockSettings({
+        ui: { useAlternateBuffer: true },
+        security: { enablePermanentToolApproval: false },
+      }),
     });
 
     expect(lastFrame()).toContain('HistoryItemDisplay');
@@ -144,7 +153,10 @@ describe('App', () => {
 
     const { lastFrame, unmount } = await renderWithProviders(<App />, {
       uiState: dialogUIState,
-      settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
+      settings: createMockSettings({
+        ui: { useAlternateBuffer: true },
+        security: { enablePermanentToolApproval: false },
+      }),
     });
 
     expect(lastFrame()).toContain('Tips for getting started');
@@ -167,7 +179,10 @@ describe('App', () => {
 
       const { lastFrame, unmount } = await renderWithProviders(<App />, {
         uiState,
-        settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
+        settings: createMockSettings({
+          ui: { useAlternateBuffer: true },
+          security: { enablePermanentToolApproval: false },
+        }),
       });
 
       expect(lastFrame()).toContain(`Press Ctrl+${key} again to exit.`);
@@ -180,7 +195,10 @@ describe('App', () => {
 
     const { lastFrame, unmount } = await renderWithProviders(<App />, {
       uiState: mockUIState,
-      settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
+      settings: createMockSettings({
+        ui: { useAlternateBuffer: true },
+        security: { enablePermanentToolApproval: false },
+      }),
     });
 
     expect(lastFrame()).toContain('Notifications');
@@ -195,7 +213,10 @@ describe('App', () => {
 
     const { lastFrame, unmount } = await renderWithProviders(<App />, {
       uiState: mockUIState,
-      settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
+      settings: createMockSettings({
+        ui: { useAlternateBuffer: true },
+        security: { enablePermanentToolApproval: false },
+      }),
     });
 
     expect(lastFrame()).toContain('Tips for getting started');
@@ -247,7 +268,10 @@ describe('App', () => {
     const { lastFrame, unmount } = await renderWithProviders(<App />, {
       uiState: stateWithConfirmingTool,
       config: configWithExperiment,
-      settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
+      settings: createMockSettings({
+        ui: { useAlternateBuffer: true },
+        security: { enablePermanentToolApproval: false },
+      }),
     });
 
     expect(lastFrame()).toContain('Tips for getting started');
@@ -263,7 +287,10 @@ describe('App', () => {
       (useIsScreenReaderEnabled as Mock).mockReturnValue(false);
       const { lastFrame, unmount } = await renderWithProviders(<App />, {
         uiState: mockUIState,
-        settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
+        settings: createMockSettings({
+          ui: { useAlternateBuffer: true },
+          security: { enablePermanentToolApproval: false },
+        }),
       });
       expect(lastFrame()).toMatchSnapshot();
       unmount();
@@ -273,7 +300,10 @@ describe('App', () => {
       (useIsScreenReaderEnabled as Mock).mockReturnValue(true);
       const { lastFrame, unmount } = await renderWithProviders(<App />, {
         uiState: mockUIState,
-        settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
+        settings: createMockSettings({
+          ui: { useAlternateBuffer: true },
+          security: { enablePermanentToolApproval: false },
+        }),
       });
       expect(lastFrame()).toMatchSnapshot();
       unmount();
@@ -286,7 +316,10 @@ describe('App', () => {
       } as UIState;
       const { lastFrame, unmount } = await renderWithProviders(<App />, {
         uiState: dialogUIState,
-        settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
+        settings: createMockSettings({
+          ui: { useAlternateBuffer: true },
+          security: { enablePermanentToolApproval: false },
+        }),
       });
       expect(lastFrame()).toMatchSnapshot();
       unmount();

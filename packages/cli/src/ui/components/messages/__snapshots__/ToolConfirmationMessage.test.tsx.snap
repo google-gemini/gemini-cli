@@ -1,6 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`ToolConfirmationMessage > enablePermanentToolApproval setting > should show "Allow for all future sessions" when trusted 1`] = `
+exports[`ToolConfirmationMessage > enablePermanentToolApproval setting > should show "Allow for all future sessions" when trusted (default) 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │                                                                              │
 │  No changes detected.                                                        │

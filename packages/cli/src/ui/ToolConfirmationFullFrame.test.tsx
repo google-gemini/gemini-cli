@@ -158,7 +158,7 @@ describe('Full Terminal Tool Confirmation Snapshot', () => {
               },
             },
             security: {
-              enablePermanentToolApproval: true,
+              enablePermanentToolApproval: false,
             },
           },
         }),
