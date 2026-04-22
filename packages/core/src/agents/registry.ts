@@ -4,16 +4,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import * as crypto from 'node:crypto';
 import { Storage } from '../config/storage.js';
 import { CoreEvent, coreEvents } from '../utils/events.js';
 import type { AgentOverride, Config } from '../config/config.js';
 import type { AgentDefinition, LocalAgentDefinition } from './types.js';
+import { getAgentCardLoadOptions, getRemoteAgentTargetUrl } from './types.js';
 import { loadAgentsFromDirectory } from './agentLoader.js';
 import { CodebaseInvestigatorAgent } from './codebase-investigator.js';
 import { CliHelpAgent } from './cli-help-agent.js';
 import { GeneralistAgent } from './generalist-agent.js';
 import { BrowserAgentDefinition } from './browser/browserAgentDefinition.js';
-import { MemoryManagerAgent } from './memory-manager-agent.js';
+import { AgentTool } from './agent-tool.js';
 import { A2AAuthProviderFactory } from './auth-provider/factory.js';
 import type { AuthenticationHandler } from '@a2a-js/sdk/client';
 import { type z } from 'zod';
@@ -35,6 +37,8 @@ export function getModelConfigAlias<TOutput extends z.ZodTypeAny>(
   return `${definition.name}-config`;
 }
 
+export const DYNAMIC_RULE_SOURCE = 'AgentRegistry (Dynamic)';
+
 /**
  * Manages the discovery, loading, validation, and registration of
  * AgentDefinitions.
@@ -45,19 +49,27 @@ export class AgentRegistry {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private readonly allDefinitions = new Map<string, AgentDefinition<any>>();
 
+  private initialized = false;
+
   constructor(private readonly config: Config) {}
 
   /**
    * Discovers and loads agents.
    */
   async initialize(): Promise<void> {
+    if (this.initialized) {
+      await this.loadAgents();
+      return;
+    }
+    this.initialized = true;
+
     coreEvents.on(CoreEvent.ModelChanged, this.onModelChanged);
 
     await this.loadAgents();
   }
 
   private onModelChanged = () => {
-    this.refreshAgents().catch((e) => {
+    this.refreshAgents('local').catch((e) => {
       debugLogger.error(
         '[AgentRegistry] Failed to refresh agents on model change:',
         e,
@@ -105,6 +117,9 @@ export class AgentRegistry {
     this.agents.clear();
     this.allDefinitions.clear();
     this.loadBuiltInAgents();
+
+    // Clear old dynamic rules before reloading
+    this.config.getPolicyEngine()?.removeRulesBySource(DYNAMIC_RULE_SOURCE);
 
     if (!this.config.isAgentsEnabled()) {
       return;
@@ -162,7 +177,14 @@ export class AgentRegistry {
           if (!agent.metadata) {
             agent.metadata = {};
           }
-          agent.metadata.hash = agent.agentCardUrl;
+          agent.metadata.hash =
+            agent.agentCardUrl ??
+            (agent.agentCardJson
+              ? crypto
+                  .createHash('sha256')
+                  .update(agent.agentCardJson)
+                  .digest('hex')
+              : undefined);
         }
 
         if (!agent.metadata?.hash) {
@@ -248,34 +270,40 @@ export class AgentRegistry {
     // Tools are configured dynamically at invocation time via browserAgentFactory.
     const browserConfig = this.config.getBrowserAgentConfig();
     if (browserConfig.enabled) {
-      this.registerLocalAgent(BrowserAgentDefinition(this.config));
-    }
+      // In container sandboxes (Docker/Podman/gVisor/LXC), Chrome is not
+      // available inside the container. The browser agent can only work with
+      // sessionMode "existing" (connecting to a host Chrome instance).
+      const sandboxType = process.env['SANDBOX'];
+      const isContainerSandbox =
+        !!sandboxType &&
+        sandboxType !== 'sandbox-exec' &&
+        sandboxType !== 'sandbox:none';
+      const sessionMode =
+        browserConfig.customConfig.sessionMode ?? 'persistent';
 
-    // Register the memory manager agent as a replacement for the save_memory tool.
-    if (this.config.isMemoryManagerEnabled()) {
-      this.registerLocalAgent(MemoryManagerAgent(this.config));
-
-      // Ensure the global .gemini directory is accessible to tools.
-      // This allows the save_memory agent to read and write to it.
-      // Access control is enforced by the Policy Engine (memory-manager.toml).
-      try {
-        const globalDir = Storage.getGlobalGeminiDir();
-        this.config.getWorkspaceContext().addDirectory(globalDir);
-      } catch (e) {
-        debugLogger.warn(
-          `[AgentRegistry] Could not add global .gemini directory to workspace:`,
-          e,
+      if (isContainerSandbox && sessionMode !== 'existing') {
+        coreEvents.emitFeedback(
+          'info',
+          'Browser agent disabled in container sandbox. ' +
+            'To use it, set sessionMode to "existing" in settings and start Chrome ' +
+            'with --remote-debugging-port=9222 on the host.',
         );
+      } else {
+        this.registerLocalAgent(BrowserAgentDefinition(this.config));
       }
     }
   }
 
-  private async refreshAgents(): Promise<void> {
+  private async refreshAgents(
+    scope: AgentDefinition['kind'] | 'all' = 'all',
+  ): Promise<void> {
     this.loadBuiltInAgents();
     await Promise.allSettled(
-      Array.from(this.agents.values()).map((agent) =>
-        this.registerAgent(agent),
-      ),
+      Array.from(this.agents.values()).map(async (agent) => {
+        if (scope === 'all' || agent.kind === scope) {
+          await this.registerAgent(agent);
+        }
+      }),
     );
   }
 
@@ -354,19 +382,16 @@ export class AgentRegistry {
       return;
     }
 
-    // Clean up any old dynamic policy for this tool (e.g. if we are overwriting an agent)
-    policyEngine.removeRulesForTool(definition.name, 'AgentRegistry (Dynamic)');
-
-    // Add the new dynamic policy
-    policyEngine.addRule({
-      toolName: definition.name,
-      decision:
-        definition.kind === 'local'
-          ? PolicyDecision.ALLOW
-          : PolicyDecision.ASK_USER,
-      priority: PRIORITY_SUBAGENT_TOOL,
-      source: 'AgentRegistry (Dynamic)',
-    });
+    // Only add override for remote agents. Local agents are handled by blanket allow.
+    if (definition.kind === 'remote') {
+      policyEngine.addRule({
+        toolName: AgentTool.Name,
+        argsPattern: new RegExp(`"agent_name":\\s*"${definition.name}"`),
+        decision: PolicyDecision.ASK_USER,
+        priority: PRIORITY_SUBAGENT_TOOL + 0.1, // Higher priority to override blanket allow
+        source: DYNAMIC_RULE_SOURCE,
+      });
+    }
   }
 
   private isAgentEnabled<TOutput extends z.ZodTypeAny>(
@@ -439,12 +464,13 @@ export class AgentRegistry {
         );
         return;
       }
+      const targetUrl = getRemoteAgentTargetUrl(remoteDef);
       let authHandler: AuthenticationHandler | undefined;
       if (definition.auth) {
         const provider = await A2AAuthProviderFactory.create({
           authConfig: definition.auth,
           agentName: definition.name,
-          targetUrl: definition.agentCardUrl,
+          targetUrl,
           agentCardUrl: remoteDef.agentCardUrl,
         });
         if (!provider) {
@@ -457,7 +483,7 @@ export class AgentRegistry {
 
       const agentCard = await clientManager.loadAgent(
         remoteDef.name,
-        remoteDef.agentCardUrl,
+        getAgentCardLoadOptions(remoteDef),
         authHandler,
       );
 
@@ -511,7 +537,7 @@ export class AgentRegistry {
 
       if (this.config.getDebugMode()) {
         debugLogger.log(
-          `[AgentRegistry] Registered remote agent '${definition.name}' with card: ${definition.agentCardUrl}`,
+          `[AgentRegistry] Registered remote agent '${definition.name}' with card: ${definition.agentCardUrl ?? 'inline JSON'}`,
         );
       }
       this.agents.set(definition.name, definition);

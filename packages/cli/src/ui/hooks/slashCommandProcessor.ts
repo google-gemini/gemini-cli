@@ -84,7 +84,7 @@ interface SlashCommandProcessorActions {
   toggleDebugProfiler: () => void;
   dispatchExtensionStateUpdate: (action: ExtensionUpdateAction) => void;
   addConfirmUpdateExtensionRequest: (request: ConfirmationRequest) => void;
-  toggleBackgroundShell: () => void;
+  toggleBackgroundTasks: () => void;
   toggleShortcutsHelp: () => void;
   setText: (text: string) => void;
 }
@@ -242,7 +242,7 @@ export const useSlashCommandProcessor = (
           actions.addConfirmUpdateExtensionRequest,
         setConfirmationRequest,
         removeComponent: () => setCustomDialog(null),
-        toggleBackgroundShell: actions.toggleBackgroundShell,
+        toggleBackgroundTasks: actions.toggleBackgroundTasks,
         toggleShortcutsHelp: actions.toggleShortcutsHelp,
       },
       session: {
@@ -281,10 +281,16 @@ export const useSlashCommandProcessor = (
     const listener = () => {
       reloadCommands();
     };
+    let isActive = true;
+    let activeIdeClient: IdeClient | undefined;
 
     // eslint-disable-next-line @typescript-eslint/no-floating-promises
     (async () => {
       const ideClient = await IdeClient.getInstance();
+      if (!isActive) {
+        return;
+      }
+      activeIdeClient = ideClient;
       ideClient.addStatusChangeListener(listener);
     })();
 
@@ -307,11 +313,8 @@ export const useSlashCommandProcessor = (
     coreEvents.on('extensionsStopping', extensionEventListener);
 
     return () => {
-      // eslint-disable-next-line @typescript-eslint/no-floating-promises
-      (async () => {
-        const ideClient = await IdeClient.getInstance();
-        ideClient.removeStatusChangeListener(listener);
-      })();
+      isActive = false;
+      activeIdeClient?.removeStatusChangeListener(listener);
       removeMCPStatusChangeListener(listener);
       coreEvents.off('extensionsStarting', extensionEventListener);
       coreEvents.off('extensionsStopping', extensionEventListener);
@@ -505,7 +508,9 @@ export const useSlashCommandProcessor = (
                       const props = result.props as Record<string, unknown>;
                       if (
                         !props ||
+                        // eslint-disable-next-line no-restricted-syntax
                         typeof props['name'] !== 'string' ||
+                        // eslint-disable-next-line no-restricted-syntax
                         typeof props['displayName'] !== 'string' ||
                         !props['definition']
                       ) {

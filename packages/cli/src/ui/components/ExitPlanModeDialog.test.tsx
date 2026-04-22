@@ -158,6 +158,8 @@ Implement a comprehensive authentication system with multiple providers.
           getIdeMode: () => false,
           isTrustedFolder: () => true,
           getPreferredEditor: () => undefined,
+          getSessionId: () => 'test-session-id',
+          getProjectRoot: () => mockTargetDir,
           storage: {
             getPlansDir: () => mockPlansDir,
           },
@@ -166,8 +168,14 @@ Implement a comprehensive authentication system with multiple providers.
             writeTextFile: vi.fn(),
           }),
           getUseAlternateBuffer: () => useAlternateBuffer,
+          getUseTerminalBuffer: () => false,
         } as unknown as import('@google/gemini-cli-core').Config,
         settings: createMockSettings({ ui: { useAlternateBuffer } }),
+        inputState: {
+          buffer: { text: '' } as never,
+          showEscapePrompt: false,
+          shellModeActive: false,
+        },
       },
     );
   };
@@ -440,36 +448,46 @@ Implement a comprehensive authentication system with multiple providers.
           return <>{children}</>;
         };
 
-        const { stdin, lastFrame } = await renderWithProviders(
-          <BubbleListener>
-            <ExitPlanModeDialog
-              planPath={mockPlanFullPath}
-              onApprove={onApprove}
-              onFeedback={onFeedback}
-              onCancel={onCancel}
-              getPreferredEditor={vi.fn()}
-              width={80}
-              availableHeight={24}
-            />
-          </BubbleListener>,
-          {
-            config: {
-              getTargetDir: () => mockTargetDir,
-              getIdeMode: () => false,
-              isTrustedFolder: () => true,
-              storage: {
-                getPlansDir: () => mockPlansDir,
-              },
-              getFileSystemService: (): FileSystemService => ({
-                readTextFile: vi.fn(),
-                writeTextFile: vi.fn(),
+        const { stdin, lastFrame } = await act(async () =>
+          renderWithProviders(
+            <BubbleListener>
+              <ExitPlanModeDialog
+                planPath={mockPlanFullPath}
+                onApprove={onApprove}
+                onFeedback={onFeedback}
+                onCancel={onCancel}
+                getPreferredEditor={vi.fn()}
+                width={80}
+                availableHeight={24}
+              />
+            </BubbleListener>,
+            {
+              config: {
+                getTargetDir: () => mockTargetDir,
+                getIdeMode: () => false,
+                isTrustedFolder: () => true,
+                getSessionId: () => 'test-session-id',
+                getProjectRoot: () => mockTargetDir,
+                storage: {
+                  getPlansDir: () => mockPlansDir,
+                },
+                getFileSystemService: (): FileSystemService => ({
+                  readTextFile: vi.fn(),
+                  writeTextFile: vi.fn(),
+                }),
+                getUseAlternateBuffer: () => useAlternateBuffer ?? true,
+                getUseTerminalBuffer: () => false,
+              } as unknown as import('@google/gemini-cli-core').Config,
+              settings: createMockSettings({
+                ui: { useAlternateBuffer: useAlternateBuffer ?? true },
               }),
-              getUseAlternateBuffer: () => useAlternateBuffer ?? true,
-            } as unknown as import('@google/gemini-cli-core').Config,
-            settings: createMockSettings({
-              ui: { useAlternateBuffer: useAlternateBuffer ?? true },
-            }),
-          },
+              inputState: {
+                buffer: { text: '' } as never,
+                showEscapePrompt: false,
+                shellModeActive: false,
+              },
+            },
+          ),
         );
 
         await act(async () => {
@@ -573,7 +591,7 @@ Implement a comprehensive authentication system with multiple providers.
         expect(onFeedback).not.toHaveBeenCalled();
       });
 
-      it('automatically submits feedback when Ctrl+X is used to edit the plan', async () => {
+      it('automatically submits feedback when Ctrl+G is used to edit the plan', async () => {
         const { stdin, lastFrame } = await act(async () =>
           renderDialog({ useAlternateBuffer }),
         );
@@ -586,9 +604,9 @@ Implement a comprehensive authentication system with multiple providers.
           expect(lastFrame()).toContain('Add user authentication');
         });
 
-        // Press Ctrl+X
+        // Press Ctrl+G
         await act(async () => {
-          writeKey(stdin, '\x18'); // Ctrl+X
+          writeKey(stdin, '\x07'); // Ctrl+G
         });
 
         await waitFor(() => {

@@ -286,6 +286,11 @@ async function exploreAction(
             await installAction(context, extension.url, requestConsentOverride);
             context.ui.removeComponent();
           },
+          onLink: async (extension, requestConsentOverride) => {
+            debugLogger.log(`Linking extension: ${extension.extensionName}`);
+            await linkAction(context, extension.url, requestConsentOverride);
+            context.ui.removeComponent();
+          },
           onClose: () => context.ui.removeComponent(),
           extensionManager,
         }),
@@ -316,7 +321,7 @@ async function exploreAction(
     });
     try {
       await open(extensionsUrl);
-    } catch (_error) {
+    } catch {
       context.ui.addItem({
         type: MessageType.ERROR,
         text: `Failed to open browser. Check out the extensions gallery at ${extensionsUrl}`,
@@ -533,7 +538,11 @@ async function installAction(
   }
 }
 
-async function linkAction(context: CommandContext, args: string) {
+async function linkAction(
+  context: CommandContext,
+  args: string,
+  requestConsentOverride?: (consent: string) => Promise<boolean>,
+) {
   const extensionLoader =
     context.services.agentContext?.config.getExtensionLoader();
   if (!(extensionLoader instanceof ExtensionManager)) {
@@ -582,8 +591,11 @@ async function linkAction(context: CommandContext, args: string) {
       source: sourceFilepath,
       type: 'link',
     };
-    const extension =
-      await extensionLoader.installOrUpdateExtension(installMetadata);
+    const extension = await extensionLoader.installOrUpdateExtension(
+      installMetadata,
+      undefined,
+      requestConsentOverride,
+    );
     context.ui.addItem({
       type: MessageType.INFO,
       text: `Extension "${extension.name}" linked successfully.`,
@@ -777,6 +789,7 @@ const listExtensionsCommand: SlashCommand = {
   description: 'List active extensions',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
+  takesArgs: false,
   action: listAction,
 };
 
@@ -837,6 +850,7 @@ const exploreExtensionsCommand: SlashCommand = {
   description: 'Open extensions page in your browser',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
+  takesArgs: false,
   action: exploreAction,
 };
 
@@ -858,6 +872,8 @@ const configCommand: SlashCommand = {
   action: configAction,
 };
 
+import { parseSlashCommand } from '../../utils/commands.js';
+
 export function extensionsCommand(
   enableExtensionReloading?: boolean,
 ): SlashCommand {
@@ -871,20 +887,29 @@ export function extensionsCommand(
         configCommand,
       ]
     : [];
+  const subCommands = [
+    listExtensionsCommand,
+    updateExtensionsCommand,
+    exploreExtensionsCommand,
+    reloadCommand,
+    ...conditionalCommands,
+  ];
+
   return {
     name: 'extensions',
     description: 'Manage extensions',
     kind: CommandKind.BUILT_IN,
     autoExecute: false,
-    subCommands: [
-      listExtensionsCommand,
-      updateExtensionsCommand,
-      exploreExtensionsCommand,
-      reloadCommand,
-      ...conditionalCommands,
-    ],
-    action: (context, args) =>
+    subCommands,
+    action: async (context, args) => {
+      if (args) {
+        const parsed = parseSlashCommand(`/${args}`, subCommands);
+        if (parsed.commandToExecute?.action) {
+          return parsed.commandToExecute.action(context, parsed.args);
+        }
+      }
       // Default to list if no subcommand is provided
-      listExtensionsCommand.action!(context, args),
+      return listExtensionsCommand.action!(context, args);
+    },
   };
 }

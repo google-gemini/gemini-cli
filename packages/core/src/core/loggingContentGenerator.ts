@@ -276,8 +276,10 @@ export class LoggingContentGenerator implements ContentGenerator {
   }
 
   private _fixGaxiosErrorData(error: unknown): void {
-    // Fix for raw ASCII buffer strings appearing in dev with the latest
-    // Gaxios updates.
+    // Fix for raw buffer data appearing in Gaxios errors.
+    // Gaxios may return the response body as a Uint8Array, a Buffer, or
+    // a string of comma-separated byte values (e.g. "72,101,108,108,111").
+    // All three forms need to be decoded as UTF-8.
     if (
       typeof error === 'object' &&
       error !== null &&
@@ -288,13 +290,22 @@ export class LoggingContentGenerator implements ContentGenerator {
     ) {
       const response = error.response as { data: unknown };
       const data = response.data;
-      if (typeof data === 'string' && data.includes(',')) {
+
+      if (data instanceof Uint8Array) {
+        // Gaxios returned raw bytes directly
+        response.data = new TextDecoder().decode(data);
+      } else if (typeof data === 'string' && data.includes(',')) {
+        // Gaxios returned bytes as a comma-separated string
         try {
-          const charCodes = data.split(',').map(Number);
-          if (charCodes.every((code) => !isNaN(code))) {
-            response.data = String.fromCharCode(...charCodes);
+          const byteValues = data.split(',').map(Number);
+          if (
+            byteValues.every((b) => Number.isInteger(b) && b >= 0 && b <= 255)
+          ) {
+            response.data = new TextDecoder().decode(
+              new Uint8Array(byteValues),
+            );
           }
-        } catch (_e) {
+        } catch {
           // If parsing fails, just leave it alone
         }
       }
@@ -349,6 +360,9 @@ export class LoggingContentGenerator implements ContentGenerator {
     return runInDevTraceSpan(
       {
         operation: GeminiCliOperation.LLMCall,
+        logPrompts: this.config.getTelemetryLogPromptsEnabled(),
+        tracesEnabled: this.config.getTelemetryTracesEnabled(),
+        sessionId: this.config.getSessionId(),
         attributes: {
           [GEN_AI_REQUEST_MODEL]: req.model,
           [GEN_AI_PROMPT_NAME]: userPromptId,
@@ -438,7 +452,9 @@ export class LoggingContentGenerator implements ContentGenerator {
     return runInDevTraceSpan(
       {
         operation: GeminiCliOperation.LLMCall,
-        noAutoEnd: true,
+        logPrompts: this.config.getTelemetryLogPromptsEnabled(),
+        tracesEnabled: this.config.getTelemetryTracesEnabled(),
+        sessionId: this.config.getSessionId(),
         attributes: {
           [GEN_AI_REQUEST_MODEL]: req.model,
           [GEN_AI_PROMPT_NAME]: userPromptId,
@@ -448,7 +464,7 @@ export class LoggingContentGenerator implements ContentGenerator {
           [GEN_AI_TOOL_DEFINITIONS]: safeJsonStringify(req.config?.tools ?? []),
         },
       },
-      async ({ metadata: spanMetadata, endSpan }) => {
+      async ({ metadata: spanMetadata }) => {
         spanMetadata.input = req.contents;
 
         const startTime = Date.now();
@@ -504,7 +520,6 @@ export class LoggingContentGenerator implements ContentGenerator {
           userPromptId,
           role,
           spanMetadata,
-          endSpan,
         );
       },
     );
@@ -517,7 +532,6 @@ export class LoggingContentGenerator implements ContentGenerator {
     userPromptId: string,
     role: LlmRole,
     spanMetadata: SpanMetadata,
-    endSpan: () => void,
   ): AsyncGenerator<GenerateContentResponse> {
     const responses: GenerateContentResponse[] = [];
 
@@ -581,8 +595,6 @@ export class LoggingContentGenerator implements ContentGenerator {
         serverDetails,
       );
       throw error;
-    } finally {
-      endSpan();
     }
   }
 
@@ -596,6 +608,9 @@ export class LoggingContentGenerator implements ContentGenerator {
     return runInDevTraceSpan(
       {
         operation: GeminiCliOperation.LLMCall,
+        logPrompts: this.config.getTelemetryLogPromptsEnabled(),
+        tracesEnabled: this.config.getTelemetryTracesEnabled(),
+        sessionId: this.config.getSessionId(),
         attributes: {
           [GEN_AI_REQUEST_MODEL]: req.model,
         },

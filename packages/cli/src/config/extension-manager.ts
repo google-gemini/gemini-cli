@@ -614,7 +614,7 @@ Would you like to attempt to install via "git clone" instead?`,
 
     this.loadingPromise = (async () => {
       try {
-        if (this.settings.admin.extensions.enabled === false) {
+        if (this.settings.admin?.extensions?.enabled === false) {
           this.loadedExtensions = [];
           return this.loadedExtensions;
         }
@@ -824,11 +824,11 @@ Would you like to attempt to install via "git clone" instead?`,
       }
 
       if (config.mcpServers) {
-        if (this.settings.admin.mcp.enabled === false) {
+        if (this.settings.admin?.mcp?.enabled === false) {
           config.mcpServers = undefined;
         } else {
           // Apply admin allowlist if configured
-          const adminAllowlist = this.settings.admin.mcp.config;
+          const adminAllowlist = this.settings.admin?.mcp?.config;
           if (adminAllowlist && Object.keys(adminAllowlist).length > 0) {
             const result = applyAdminAllowlist(
               config.mcpServers,
@@ -982,18 +982,11 @@ Would you like to attempt to install via "git clone" instead?`,
         plan: config.plan,
       };
     } catch (e) {
-      const extName = path.basename(extensionDir);
-      debugLogger.warn(
-        `Warning: Removing broken extension ${extName}: ${getErrorMessage(e)}`,
+      debugLogger.error(
+        `Warning: Skipping extension in ${effectiveExtensionPath}: ${getErrorMessage(
+          e,
+        )}`,
       );
-      try {
-        await fs.promises.rm(extensionDir, { recursive: true, force: true });
-      } catch (rmError) {
-        debugLogger.error(
-          `Failed to remove broken extension directory ${extensionDir}:`,
-          rmError,
-        );
-      }
       return null;
     }
   }
@@ -1305,7 +1298,9 @@ export async function inferInstallMetadata(
     source.startsWith('http://') ||
     source.startsWith('https://') ||
     source.startsWith('git@') ||
-    source.startsWith('sso://')
+    source.startsWith('sso://') ||
+    source.startsWith('github:') ||
+    source.startsWith('gitlab:')
   ) {
     return {
       source,

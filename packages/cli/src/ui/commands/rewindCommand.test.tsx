@@ -38,6 +38,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   return {
     ...actual,
     coreEvents: {
+      // eslint-disable-next-line @typescript-eslint/no-misused-spread
       ...actual.coreEvents,
       emitFeedback: vi.fn(),
     },
@@ -105,7 +106,7 @@ describe('rewindCommand', () => {
           },
           config: {
             getSessionId: () => 'test-session-id',
-            getContextManager: () => ({ refresh: mockResetContext }),
+            getMemoryContextManager: () => ({ refresh: mockResetContext }),
             getProjectRoot: mockGetProjectRoot,
           },
         },
