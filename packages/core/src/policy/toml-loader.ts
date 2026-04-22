@@ -461,83 +461,86 @@ export async function loadPoliciesFromToml(
             );
 
             // For each argsPattern, expand toolName arrays
-            return argsPatterns.flatMap((argsPattern) => {
-              const toolNames: string[] = Array.isArray(rule.toolName)
-                ? rule.toolName
-                : [rule.toolName];
+            return argsPatterns.flatMap(
+              ({ pattern: argsPattern, display: constraintDisplay }) => {
+                const toolNames: string[] = Array.isArray(rule.toolName)
+                  ? rule.toolName
+                  : [rule.toolName];
 
-              // Create a policy rule for each tool name
-              return toolNames.map((toolName) => {
-                let effectiveToolName: string = toolName;
-                const mcpName = rule.mcpName;
+                // Create a policy rule for each tool name
+                return toolNames.map((toolName) => {
+                  let effectiveToolName: string = toolName;
+                  const mcpName = rule.mcpName;
 
-                if (mcpName) {
-                  // TODO(mcp): Decouple mcpName rules from FQN string parsing
-                  // to support underscores in server aliases natively. Leaving
-                  // mcpName and toolName separate here and relying on metadata
-                  // during policy evaluation will avoid underscore splitting bugs.
-                  // See: https://github.com/google-gemini/gemini-cli/issues/21727
-                  effectiveToolName = formatMcpToolName(
-                    mcpName,
-                    effectiveToolName,
-                  );
-                }
-
-                const policyRule: PolicyRule = {
-                  toolName: effectiveToolName,
-                  subagent: rule.subagent,
-                  mcpName: rule.mcpName,
-                  decision: rule.decision,
-                  priority: transformPriority(rule.priority, tier),
-                  modes: rule.modes,
-                  interactive: rule.interactive,
-                  toolAnnotations: rule.toolAnnotations,
-                  allowRedirection:
-                    rule.allowRedirection ?? rule.allow_redirection,
-                  source: `${tierName.charAt(0).toUpperCase() + tierName.slice(1)}: ${file}`,
-                  denyMessage: rule.denyMessage ?? rule.deny_message,
-                };
-
-                // Compile regex pattern
-                if (argsPattern) {
-                  try {
-                    new RegExp(argsPattern);
-                  } catch (e) {
-                    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-                    const error = e as Error;
-                    errors.push({
-                      filePath,
-                      fileName: file,
-                      tier: tierName,
-                      errorType: 'regex_compilation',
-                      message: 'Invalid regex pattern',
-                      details: `Pattern: ${argsPattern}\nError: ${error.message}`,
-                      suggestion:
-                        'Check regex syntax for errors like unmatched brackets or invalid escape sequences',
-                    });
-                    return null;
+                  if (mcpName) {
+                    // TODO(mcp): Decouple mcpName rules from FQN string parsing
+                    // to support underscores in server aliases natively. Leaving
+                    // mcpName and toolName separate here and relying on metadata
+                    // during policy evaluation will avoid underscore splitting bugs.
+                    // See: https://github.com/google-gemini/gemini-cli/issues/21727
+                    effectiveToolName = formatMcpToolName(
+                      mcpName,
+                      effectiveToolName,
+                    );
                   }
 
-                  if (!isSafeRegExp(argsPattern)) {
-                    errors.push({
-                      filePath,
-                      fileName: file,
-                      tier: tierName,
-                      errorType: 'regex_compilation',
-                      message: 'Unsafe regex pattern (potential ReDoS)',
-                      details: `Pattern: ${argsPattern}`,
-                      suggestion:
-                        'Avoid nested quantifiers or extremely long patterns',
-                    });
-                    return null;
+                  const policyRule: PolicyRule = {
+                    toolName: effectiveToolName,
+                    subagent: rule.subagent,
+                    mcpName: rule.mcpName,
+                    decision: rule.decision,
+                    priority: transformPriority(rule.priority, tier),
+                    modes: rule.modes,
+                    interactive: rule.interactive,
+                    toolAnnotations: rule.toolAnnotations,
+                    allowRedirection:
+                      rule.allowRedirection ?? rule.allow_redirection,
+                    source: `${tierName.charAt(0).toUpperCase() + tierName.slice(1)}: ${file}`,
+                    denyMessage: rule.denyMessage ?? rule.deny_message,
+                    constraintDisplay,
+                  };
+
+                  // Compile regex pattern
+                  if (argsPattern) {
+                    try {
+                      new RegExp(argsPattern);
+                    } catch (e) {
+                      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+                      const error = e as Error;
+                      errors.push({
+                        filePath,
+                        fileName: file,
+                        tier: tierName,
+                        errorType: 'regex_compilation',
+                        message: 'Invalid regex pattern',
+                        details: `Pattern: ${argsPattern}\nError: ${error.message}`,
+                        suggestion:
+                          'Check regex syntax for errors like unmatched brackets or invalid escape sequences',
+                      });
+                      return null;
+                    }
+
+                    if (!isSafeRegExp(argsPattern)) {
+                      errors.push({
+                        filePath,
+                        fileName: file,
+                        tier: tierName,
+                        errorType: 'regex_compilation',
+                        message: 'Unsafe regex pattern (potential ReDoS)',
+                        details: `Pattern: ${argsPattern}`,
+                        suggestion:
+                          'Avoid nested quantifiers or extremely long patterns',
+                      });
+                      return null;
+                    }
+
+                    policyRule.argsPattern = new RegExp(argsPattern);
                   }
 
-                  policyRule.argsPattern = new RegExp(argsPattern);
-                }
-
-                return policyRule;
-              });
-            });
+                  return policyRule;
+                });
+              },
+            );
           })
           .filter((rule): rule is PolicyRule => rule !== null);
 
@@ -598,68 +601,71 @@ export async function loadPoliciesFromToml(
               checker.commandRegex,
             );
 
-            return argsPatterns.flatMap((argsPattern) => {
-              const toolNames: string[] = Array.isArray(checker.toolName)
-                ? checker.toolName
-                : [checker.toolName];
+            return argsPatterns.flatMap(
+              ({ pattern: argsPattern, display: constraintDisplay }) => {
+                const toolNames: string[] = Array.isArray(checker.toolName)
+                  ? checker.toolName
+                  : [checker.toolName];
 
-              return toolNames.map((toolName) => {
-                let effectiveToolName: string;
-                if (checker.mcpName && toolName !== '*') {
-                  effectiveToolName = `${MCP_TOOL_PREFIX}${checker.mcpName}_${toolName}`;
-                } else if (checker.mcpName) {
-                  effectiveToolName = `${MCP_TOOL_PREFIX}${checker.mcpName}_*`;
-                } else {
-                  effectiveToolName = toolName;
-                }
+                return toolNames.map((toolName) => {
+                  let effectiveToolName: string;
+                  if (checker.mcpName && toolName !== '*') {
+                    effectiveToolName = `${MCP_TOOL_PREFIX}${checker.mcpName}_${toolName}`;
+                  } else if (checker.mcpName) {
+                    effectiveToolName = `${MCP_TOOL_PREFIX}${checker.mcpName}_*`;
+                  } else {
+                    effectiveToolName = toolName;
+                  }
 
-                const safetyCheckerRule: SafetyCheckerRule = {
-                  toolName: effectiveToolName,
-                  mcpName: checker.mcpName,
-                  priority: transformPriority(checker.priority, tier),
-                  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-                  checker: checker.checker as SafetyCheckerConfig,
-                  modes: checker.modes,
-                  toolAnnotations: checker.toolAnnotations,
-                  source: `${tierName.charAt(0).toUpperCase() + tierName.slice(1)}: ${file}`,
-                };
-
-                if (argsPattern) {
-                  try {
-                    new RegExp(argsPattern);
-                  } catch (e) {
+                  const safetyCheckerRule: SafetyCheckerRule = {
+                    toolName: effectiveToolName,
+                    mcpName: checker.mcpName,
+                    priority: transformPriority(checker.priority, tier),
                     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-                    const error = e as Error;
-                    errors.push({
-                      filePath,
-                      fileName: file,
-                      tier: tierName,
-                      errorType: 'regex_compilation',
-                      message: 'Invalid regex pattern in safety checker',
-                      details: `Pattern: ${argsPattern}\nError: ${error.message}`,
-                    });
-                    return null;
+                    checker: checker.checker as SafetyCheckerConfig,
+                    modes: checker.modes,
+                    toolAnnotations: checker.toolAnnotations,
+                    source: `${tierName.charAt(0).toUpperCase() + tierName.slice(1)}: ${file}`,
+                    constraintDisplay,
+                  };
+
+                  if (argsPattern) {
+                    try {
+                      new RegExp(argsPattern);
+                    } catch (e) {
+                      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+                      const error = e as Error;
+                      errors.push({
+                        filePath,
+                        fileName: file,
+                        tier: tierName,
+                        errorType: 'regex_compilation',
+                        message: 'Invalid regex pattern in safety checker',
+                        details: `Pattern: ${argsPattern}\nError: ${error.message}`,
+                      });
+                      return null;
+                    }
+
+                    if (!isSafeRegExp(argsPattern)) {
+                      errors.push({
+                        filePath,
+                        fileName: file,
+                        tier: tierName,
+                        errorType: 'regex_compilation',
+                        message:
+                          'Unsafe regex pattern in safety checker (potential ReDoS)',
+                        details: `Pattern: ${argsPattern}`,
+                      });
+                      return null;
+                    }
+
+                    safetyCheckerRule.argsPattern = new RegExp(argsPattern);
                   }
 
-                  if (!isSafeRegExp(argsPattern)) {
-                    errors.push({
-                      filePath,
-                      fileName: file,
-                      tier: tierName,
-                      errorType: 'regex_compilation',
-                      message:
-                        'Unsafe regex pattern in safety checker (potential ReDoS)',
-                      details: `Pattern: ${argsPattern}`,
-                    });
-                    return null;
-                  }
-
-                  safetyCheckerRule.argsPattern = new RegExp(argsPattern);
-                }
-
-                return safetyCheckerRule;
-              });
-            });
+                  return safetyCheckerRule;
+                });
+              },
+            );
           })
           .filter((checker): checker is SafetyCheckerRule => checker !== null);
 

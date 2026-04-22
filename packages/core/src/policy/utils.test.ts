@@ -64,62 +64,80 @@ describe('policy/utils', () => {
   describe('buildArgsPatterns', () => {
     it('should return argsPattern if provided and no commandPrefix/regex', () => {
       const result = buildArgsPatterns('my-pattern', undefined, undefined);
-      expect(result).toEqual(['my-pattern']);
+      expect(result).toEqual([
+        { pattern: 'my-pattern', display: 'my-pattern' },
+      ]);
     });
 
     it('should build pattern from a single commandPrefix', () => {
       const result = buildArgsPatterns(undefined, 'ls', undefined);
-      expect(result).toEqual(['\\"command\\":\\"ls(?:[\\s"]|\\\\")']);
+      expect(result).toEqual([
+        { pattern: '\\"command\\":\\"ls(?:[\\s"]|\\\\")', display: 'ls*' },
+      ]);
     });
 
     it('should build patterns from an array of commandPrefixes', () => {
       const result = buildArgsPatterns(undefined, ['echo', 'ls'], undefined);
       expect(result).toEqual([
-        '\\"command\\":\\"echo(?:[\\s"]|\\\\")',
-        '\\"command\\":\\"ls(?:[\\s"]|\\\\")',
+        { pattern: '\\"command\\":\\"echo(?:[\\s"]|\\\\")', display: 'echo*' },
+        { pattern: '\\"command\\":\\"ls(?:[\\s"]|\\\\")', display: 'ls*' },
       ]);
     });
 
     it('should build pattern from commandRegex', () => {
       const result = buildArgsPatterns(undefined, undefined, 'rm -rf .*');
-      expect(result).toEqual(['"command":"rm -rf .*']);
+      expect(result).toEqual([
+        { pattern: '"command":"rm -rf .*', display: 'rm -rf .*' },
+      ]);
     });
 
     it('should prioritize commandPrefix over commandRegex and argsPattern', () => {
       const result = buildArgsPatterns('raw', 'prefix', 'regex');
-      expect(result).toEqual(['\\"command\\":\\"prefix(?:[\\s"]|\\\\")']);
+      expect(result).toEqual([
+        {
+          pattern: '\\"command\\":\\"prefix(?:[\\s"]|\\\\")',
+          display: 'prefix*',
+        },
+      ]);
     });
 
     it('should prioritize commandRegex over argsPattern if no commandPrefix', () => {
       const result = buildArgsPatterns('raw', undefined, 'regex');
-      expect(result).toEqual(['"command":"regex']);
+      expect(result).toEqual([
+        { pattern: '"command":"regex', display: 'regex' },
+      ]);
     });
 
     it('should escape characters in commandPrefix', () => {
       const result = buildArgsPatterns(undefined, 'git checkout -b', undefined);
       expect(result).toEqual([
-        '\\"command\\":\\"git\\ checkout\\ \\-b(?:[\\s"]|\\\\")',
+        {
+          pattern: '\\"command\\":\\"git\\ checkout\\ \\-b(?:[\\s"]|\\\\")',
+          display: 'git checkout -b*',
+        },
       ]);
     });
 
     it('should correctly escape quotes in commandPrefix', () => {
       const result = buildArgsPatterns(undefined, 'git "fix"', undefined);
       expect(result).toEqual([
-        // eslint-disable-next-line no-useless-escape
-        '\\\"command\\\":\\\"git\\ \\\\\\\"fix\\\\\\\"(?:[\\s\"]|\\\\\")',
+        {
+          pattern: '\\"command\\":\\"git\\ \\\\\\"fix\\\\\\"(?:[\\s"]|\\\\")',
+          display: 'git "fix"*',
+        },
       ]);
     });
 
     it('should handle undefined correctly when no inputs are provided', () => {
       const result = buildArgsPatterns(undefined, undefined, undefined);
-      expect(result).toEqual([undefined]);
+      expect(result).toEqual([{ pattern: undefined, display: undefined }]);
     });
 
     it('should match prefixes followed by JSON escaped quotes', () => {
       // Testing the security fix logic: allowing "echo \"foo\""
       const prefix = 'echo ';
       const patterns = buildArgsPatterns(undefined, prefix, undefined);
-      const regex = new RegExp(patterns[0]!);
+      const regex = new RegExp(patterns[0].pattern!);
 
       // Mimic JSON stringified args
       // echo "foo" -> {"command":"echo \"foo\""}
@@ -131,7 +149,7 @@ describe('policy/utils', () => {
       // Testing that we blocked the hole: "echo\foo"
       const prefix = 'echo ';
       const patterns = buildArgsPatterns(undefined, prefix, undefined);
-      const regex = new RegExp(patterns[0]!);
+      const regex = new RegExp(patterns[0].pattern!);
 
       // echo\foo -> {"command":"echo\\foo"}
       // In regex matching: "echo " is followed by "\" which is NOT in [\s"] and is not \"
@@ -140,7 +158,7 @@ describe('policy/utils', () => {
 
       // Also validation for "git " matching "git\status"
       const gitPatterns = buildArgsPatterns(undefined, 'git ', undefined);
-      const gitRegex = new RegExp(gitPatterns[0]!);
+      const gitRegex = new RegExp(gitPatterns[0].pattern!);
       // git\status -> {"command":"git\\status"}
       const gitAttack = '{"command":"git\\\\status"}';
       expect(gitAttack).not.toMatch(gitRegex);
