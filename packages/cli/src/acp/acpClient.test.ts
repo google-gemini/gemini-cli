@@ -1169,6 +1169,54 @@ describe('Session', () => {
     expect(progressUpdates[0].toolCallId).toBe(terminalUpdate.toolCallId);
   });
 
+  it('forwards updateOutput _meta to tool_call_update._meta', async () => {
+    const executeMock = vi.fn(async ({ updateOutput }) => {
+      updateOutput?.('NEW:line1', {
+        'gemini-cli/stream_output': true,
+        pid: 42,
+      });
+      return { llmContent: 'ok' };
+    });
+    mockTool.build.mockReturnValue({
+      getDescription: () => 'Test Tool',
+      toolLocations: () => [],
+      shouldConfirmExecute: vi.fn().mockResolvedValue(null),
+      execute: executeMock,
+    });
+
+    const stream1 = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: { functionCalls: [{ name: 'test_tool', args: {} }] },
+      },
+    ]);
+    const stream2 = createMockStream([
+      { type: StreamEventType.CHUNK, value: { candidates: [] } },
+    ]);
+    mockChat.sendMessageStream
+      .mockResolvedValueOnce(stream1)
+      .mockResolvedValueOnce(stream2);
+
+    await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'go' }],
+    });
+
+    const marked = mockConnection.sessionUpdate.mock.calls
+      .map((c) => c[0]?.update)
+      .filter(
+        (u) =>
+          u?.sessionUpdate === 'tool_call_update' &&
+          u?.status === 'in_progress' &&
+          u?._meta?.['gemini-cli/stream_output'] === true,
+      );
+    expect(marked).toHaveLength(1);
+    expect(marked[0]._meta).toMatchObject({
+      'gemini-cli/stream_output': true,
+      pid: 42,
+    });
+  });
+
   it('holds the tool call in in_progress when the tool returns backgroundedStreamId', async () => {
     const { ExecutionLifecycleService } = await import(
       '@google/gemini-cli-core'

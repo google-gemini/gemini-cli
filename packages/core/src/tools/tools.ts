@@ -35,7 +35,16 @@ export type ForcedToolDecision = 'allow' | 'deny' | 'ask_user';
  */
 export interface ExecuteOptions {
   abortSignal: AbortSignal;
-  updateOutput?: (output: ToolLiveOutput) => void;
+  /**
+   * Incremental progress callback. The optional second `_meta` parameter
+   * is forwarded verbatim to the ACP `tool_call_update._meta` field so
+   * clients (and sidecars) can tag / filter specific update kinds —
+   * e.g. stream_output lines carry `{ 'gemini-cli/stream_output': true }`.
+   */
+  updateOutput?: (
+    output: ToolLiveOutput,
+    _meta?: Record<string, unknown>,
+  ) => void;
   shellExecutionConfig?: ShellExecutionConfig;
   setExecutionIdCallback?: (executionId: number) => void;
 }

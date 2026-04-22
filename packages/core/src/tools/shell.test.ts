@@ -526,7 +526,10 @@ describe('ShellTool', () => {
       const result = await promise;
 
       expect(result.backgroundedStreamId).toBe(12345);
-      expect(updateOutputMock).toHaveBeenCalledWith('NEW:foo.txt\nNEW:bar.txt');
+      expect(updateOutputMock).toHaveBeenCalledWith(
+        'NEW:foo.txt\nNEW:bar.txt',
+        expect.objectContaining({ 'gemini-cli/stream_output': true }),
+      );
     });
 
     it('buffers partial lines across chunks in stream_output mode', async () => {
@@ -560,7 +563,10 @@ describe('ShellTool', () => {
       await promise;
 
       expect(updateOutputMock).toHaveBeenCalledTimes(1);
-      expect(updateOutputMock).toHaveBeenCalledWith('NEW:foo.txt');
+      expect(updateOutputMock).toHaveBeenCalledWith(
+        'NEW:foo.txt',
+        expect.objectContaining({ 'gemini-cli/stream_output': true }),
+      );
     });
 
     it('coalesces multiple lines arriving within the 200ms batch window into one updateOutput call', async () => {
@@ -598,7 +604,10 @@ describe('ShellTool', () => {
       await vi.advanceTimersByTimeAsync(200);
 
       expect(updateOutputMock).toHaveBeenCalledTimes(1);
-      expect(updateOutputMock).toHaveBeenCalledWith('line1\nline2');
+      expect(updateOutputMock).toHaveBeenCalledWith(
+        'line1\nline2',
+        expect.objectContaining({ 'gemini-cli/stream_output': true }),
+      );
 
       await promise;
     });
@@ -636,7 +645,10 @@ describe('ShellTool', () => {
       await vi.advanceTimersByTimeAsync(250);
 
       expect(updateOutputMock).toHaveBeenCalledTimes(1);
-      expect(updateOutputMock).toHaveBeenCalledWith('post-abort-line');
+      expect(updateOutputMock).toHaveBeenCalledWith(
+        'post-abort-line',
+        expect.objectContaining({ 'gemini-cli/stream_output': true }),
+      );
 
       // The real process exit is still what finally tears the stream down.
       ExecutionLifecycleService.emitEvent(12345, {
@@ -686,7 +698,10 @@ describe('ShellTool', () => {
         signal: null,
       });
       expect(updateOutputMock).toHaveBeenCalledTimes(1);
-      expect(updateOutputMock).toHaveBeenCalledWith('no-newline');
+      expect(updateOutputMock).toHaveBeenCalledWith(
+        'no-newline',
+        expect.objectContaining({ 'gemini-cli/stream_output': true }),
+      );
 
       await vi.advanceTimersByTimeAsync(250);
       await promise;

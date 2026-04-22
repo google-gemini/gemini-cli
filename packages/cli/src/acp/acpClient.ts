@@ -1134,7 +1134,10 @@ export class Session {
         });
       }
 
-      const updateOutput = (output: unknown) => {
+      const updateOutput = (
+        output: unknown,
+        _meta?: Record<string, unknown>,
+      ) => {
         if (typeof output !== 'string' || output.length === 0) {
           return;
         }
@@ -1148,6 +1151,7 @@ export class Session {
           ],
           locations: invocation.toolLocations(),
           kind: toAcpToolKind(tool.kind),
+          ...(_meta ? { _meta } : {}),
         }).catch((err) => {
           debugLogger.error(
             `Failed to forward tool incremental update for call ${callId}: ${err instanceof Error ? err.message : String(err)}`,

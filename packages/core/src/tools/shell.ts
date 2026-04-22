@@ -651,7 +651,10 @@ export class ShellToolInvocation extends BaseToolInvocation<
               if (pendingLines.length === 0) return;
               const payload = pendingLines.join('\n');
               pendingLines.length = 0;
-              updateOutput(payload);
+              updateOutput(payload, {
+                'gemini-cli/stream_output': true,
+                pid,
+              });
             };
             const enqueueLines = (lines: string[]) => {
               if (lines.length === 0) return;
