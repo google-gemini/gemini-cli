@@ -1138,7 +1138,7 @@ export class Session {
         if (typeof output !== 'string' || output.length === 0) {
           return;
         }
-        void this.sendUpdate({
+        this.sendUpdate({
           sessionUpdate: 'tool_call_update',
           toolCallId: callId,
           status: 'in_progress',
@@ -1148,6 +1148,10 @@ export class Session {
           ],
           locations: invocation.toolLocations(),
           kind: toAcpToolKind(tool.kind),
+        }).catch((err) => {
+          debugLogger.error(
+            `Failed to forward tool incremental update for call ${callId}: ${err instanceof Error ? err.message : String(err)}`,
+          );
         });
       };
 
@@ -1191,7 +1195,7 @@ export class Session {
           if (abortHandler) {
             abortSignal.removeEventListener('abort', abortHandler);
           }
-          void this.sendUpdate({
+          this.sendUpdate({
             sessionUpdate: 'tool_call_update',
             toolCallId: callId,
             status: failed ? 'failed' : 'completed',
@@ -1199,6 +1203,10 @@ export class Session {
             content: updateContent,
             locations: invocation.toolLocations(),
             kind: toAcpToolKind(tool.kind),
+          }).catch((err) => {
+            debugLogger.error(
+              `Failed to emit terminal tool_call_update for call ${callId}: ${err instanceof Error ? err.message : String(err)}`,
+            );
           });
         };
 

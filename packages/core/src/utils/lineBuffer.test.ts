@@ -78,20 +78,29 @@ describe('LineBuffer', () => {
   });
 
   it('emits a truncated line when a partial line exceeds the size cap', () => {
-    const buf = new LineBuffer({ maxLineBytes: 8, truncationMarker: '[T]' });
+    const buf = new LineBuffer({
+      maxLineCodePoints: 8,
+      truncationMarker: '[T]',
+    });
     const lines = buf.push('0123456789abcdef');
     expect(lines).toEqual(['01234567[T]']);
   });
 
   it('discards the remainder of an over-sized line until the next newline', () => {
-    const buf = new LineBuffer({ maxLineBytes: 4, truncationMarker: '[T]' });
+    const buf = new LineBuffer({
+      maxLineCodePoints: 4,
+      truncationMarker: '[T]',
+    });
     const first = buf.push('aaaaaXXXXXXXXXX\nnext');
     expect(first).toEqual(['aaaa[T]']);
     expect(buf.push('\n')).toEqual(['next']);
   });
 
   it('discard state spans chunk boundaries', () => {
-    const buf = new LineBuffer({ maxLineBytes: 4, truncationMarker: '[T]' });
+    const buf = new LineBuffer({
+      maxLineCodePoints: 4,
+      truncationMarker: '[T]',
+    });
     expect(buf.push('aaaaaBBBBBB')).toEqual(['aaaa[T]']);
     expect(buf.push('BBBBBB')).toEqual([]);
     expect(buf.push('\nok\n')).toEqual(['ok']);
@@ -110,15 +119,48 @@ describe('LineBuffer', () => {
   });
 
   it('flush() after overflow discard cleans state without emitting', () => {
-    const buf = new LineBuffer({ maxLineBytes: 8, truncationMarker: '[T]' });
+    const buf = new LineBuffer({
+      maxLineCodePoints: 8,
+      truncationMarker: '[T]',
+    });
     expect(buf.push('aaaaBBBBCCCC')).toEqual(['aaaaBBBB[T]']);
     expect(buf.flush()).toEqual([]);
     expect(buf.push('next\n')).toEqual(['next']);
   });
 
   it('truncates a fully-terminated line that exceeds the size cap', () => {
-    const buf = new LineBuffer({ maxLineBytes: 4, truncationMarker: '[T]' });
+    const buf = new LineBuffer({
+      maxLineCodePoints: 4,
+      truncationMarker: '[T]',
+    });
     expect(buf.push('toolongline\n')).toEqual(['tool[T]']);
     expect(buf.push('ok\n')).toEqual(['ok']);
+  });
+
+  it('never splits a surrogate pair when truncating a fully-terminated line', () => {
+    // Each of 🙂 / 🐱 is one code point encoded as a 2-code-unit surrogate
+    // pair in UTF-16. Plain .slice(4) would cut the 3rd emoji in half.
+    const buf = new LineBuffer({
+      maxLineCodePoints: 4,
+      truncationMarker: '[T]',
+    });
+    const [line] = buf.push('🙂🐱🙂🐱🙂🐱\n');
+    expect(line).toBe('🙂🐱🙂🐱[T]');
+    // Sanity: no lone high-surrogate anywhere in the emitted string.
+    for (const ch of line ?? '') {
+      const cp = ch.codePointAt(0) ?? 0;
+      expect(cp >= 0xd800 && cp <= 0xdbff).toBe(false);
+    }
+  });
+
+  it('never splits a surrogate pair when the partial buffer overflows', () => {
+    const buf = new LineBuffer({
+      maxLineCodePoints: 3,
+      truncationMarker: '[T]',
+    });
+    // No newline → takes the overflow branch. 5 emoji = 5 code points = 10
+    // UTF-16 units. Must emit the first 3 emoji intact + marker.
+    const lines = buf.push('🙂🐱🙂🐱🙂');
+    expect(lines).toEqual(['🙂🐱🙂[T]']);
   });
 });
