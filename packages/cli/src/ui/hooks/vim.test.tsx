@@ -103,6 +103,14 @@ const TEST_SEQUENCES = {
   F12: createKey({ sequence: '\u001b[24~', name: 'f12' }),
 } as const;
 
+beforeEach(() => {
+  vi.useFakeTimers();
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
+
 describe('useVim hook', async () => {
   let mockBuffer: Partial<TextBuffer>;
   let mockHandleFinalSubmit: Mock;
@@ -1820,11 +1828,6 @@ describe('useVim hook', async () => {
       mockVimContext.vimEnabled = true;
       mockVimContext.vimMode = 'INSERT';
       mockHandleFinalSubmit = vi.fn();
-      vi.useFakeTimers();
-    });
-
-    afterEach(() => {
-      vi.useRealTimers();
     });
 
     it('should clear buffer on double-escape in NORMAL mode', async () => {
