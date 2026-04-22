@@ -48,6 +48,7 @@ import {
   type OutputFormat,
   detectIdeFromEnv,
   generalistProfile,
+  validateModelName,
 } from '@google/gemini-cli-core';
 import {
   type Settings,
@@ -803,6 +804,13 @@ export async function loadCliConfig(
   const defaultModel = PREVIEW_GEMINI_MODEL_AUTO;
   const specifiedModel =
     argv.model || process.env['GEMINI_MODEL'] || settings.model?.name;
+
+  if (specifiedModel) {
+    const customAliases = new Set(
+      Object.keys(settings.modelConfigs?.aliases ?? {}),
+    );
+    validateModelName(specifiedModel, customAliases);
+  }
 
   const resolvedModel =
     specifiedModel === GEMINI_MODEL_ALIAS_AUTO
