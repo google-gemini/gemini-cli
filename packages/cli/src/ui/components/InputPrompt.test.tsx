@@ -3837,7 +3837,7 @@ describe('InputPrompt', () => {
 
       // With plain borders offset
       await act(async () => {
-        stdin.write(`\x1b[<0;4;1M`); // Click at col 4, row 1
+        stdin.write(`\x1b[<0;4;2M`); // Click at col 4, row 2
       });
 
       await waitFor(() => {
