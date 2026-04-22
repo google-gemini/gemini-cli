@@ -15,9 +15,6 @@ import { FatalConfigError } from './errors.js';
 import { coreEvents } from './events.js';
 import { ideContextStore } from '../ide/ideContext.js';
 
-
-const { promises: fsPromises } = fs;
-
 export enum TrustLevel {
   TRUST_FOLDER = 'TRUST_FOLDER',
   TRUST_PARENT = 'TRUST_PARENT',
@@ -102,6 +99,10 @@ function parseTrustedFoldersJson(content: string): unknown {
   return JSON.parse(stripJsonComments(content));
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 /**
  * FOR TESTING PURPOSES ONLY.
  * Clears the real path cache.
@@ -150,8 +151,6 @@ export class LoadedTrustedFolders {
     location: string,
     config?: Record<string, TrustLevel>,
   ): boolean | undefined {
-
-
     const configToUse = config ?? this.user.config;
 
     // Resolve location to its realpath for canonical comparison
@@ -224,17 +223,23 @@ export class LoadedTrustedFolders {
 
     try {
       // Re-read the file to handle concurrent updates
-      const content = await fsPromises.readFile(this.user.path, 'utf-8');
-      let config: Record<string, TrustLevel>;
+      const content = await fs.promises.readFile(this.user.path, 'utf-8');
+      const config: Record<string, TrustLevel> = {};
       try {
-        config = parseTrustedFoldersJson(content) as Record<string, TrustLevel>;
+        const parsed = parseTrustedFoldersJson(content);
+        if (isRecord(parsed)) {
+          for (const [rawPath, value] of Object.entries(parsed)) {
+            if (isTrustLevel(value)) {
+              config[rawPath] = value;
+            }
+          }
+        }
       } catch (error) {
         coreEvents.emitFeedback(
           'error',
           `Failed to parse trusted folders file at ${this.user.path}. The file may be corrupted.`,
           error,
         );
-        config = {};
       }
 
       // Use normalized path as key
@@ -283,18 +288,13 @@ export function loadTrustedFolders(): LoadedTrustedFolders {
       const content = fs.readFileSync(userPath, 'utf-8');
       const parsed = parseTrustedFoldersJson(content);
 
-      if (
-        typeof parsed !== 'object' ||
-        parsed === null ||
-        Array.isArray(parsed)
-      ) {
+      if (!isRecord(parsed)) {
         errors.push({
           message: 'Trusted folders file is not a valid JSON object.',
           path: userPath,
         });
       } else {
-        const config = parsed as Record<string, unknown>;
-        for (const [rawPath, trustLevel] of Object.entries(config)) {
+        for (const [rawPath, trustLevel] of Object.entries(parsed)) {
           const normalizedPath = normalizePath(rawPath);
           if (isTrustLevel(trustLevel)) {
             userConfig[normalizedPath] = trustLevel;
@@ -315,7 +315,10 @@ export function loadTrustedFolders(): LoadedTrustedFolders {
     });
   }
 
-  loadedTrustedFolders = new LoadedTrustedFolders({ path: userPath, config: userConfig }, errors);
+  loadedTrustedFolders = new LoadedTrustedFolders(
+    { path: userPath, config: userConfig },
+    errors,
+  );
   return loadedTrustedFolders;
 }
 

@@ -45,7 +45,10 @@ export function isWorkspaceTrusted(
   settings: Settings,
   workspaceDir: string = process.cwd(),
   headlessOptions?: HeadlessModeOptions,
-): { isTrusted: boolean | undefined; source: 'ide' | 'file' | 'env' | undefined } {
+): {
+  isTrusted: boolean | undefined;
+  source: 'ide' | 'file' | 'env' | undefined;
+} {
   return checkPathTrust({
     path: workspaceDir,
     isFolderTrustEnabled: isFolderTrustEnabled(settings),

@@ -499,12 +499,12 @@ function findEnvFile(startDir: string, isTrusted: boolean): string | null {
   while (true) {
     // prefer gemini-specific .env under GEMINI_DIR
     if (isTrusted) {
-      const geminiEnvPath = path.join(currentDir, GEMINI_DIR, ".env");
+      const geminiEnvPath = path.join(currentDir, GEMINI_DIR, '.env');
       if (fs.existsSync(geminiEnvPath)) {
         return geminiEnvPath;
       }
     }
-    const envPath = path.join(currentDir, ".env");
+    const envPath = path.join(currentDir, '.env');
     if (fs.existsSync(envPath)) {
       return envPath;
     }
@@ -512,12 +512,12 @@ function findEnvFile(startDir: string, isTrusted: boolean): string | null {
     if (parentDir === currentDir || !parentDir) {
       // check .env under home as fallback, again preferring gemini-specific .env
       if (isTrusted) {
-        const homeGeminiEnvPath = path.join(homedir(), GEMINI_DIR, ".env");
+        const homeGeminiEnvPath = path.join(homedir(), GEMINI_DIR, '.env');
         if (fs.existsSync(homeGeminiEnvPath)) {
           return homeGeminiEnvPath;
         }
       }
-      const homeEnvPath = path.join(homedir(), ".env");
+      const homeEnvPath = path.join(homedir(), '.env');
       if (fs.existsSync(homeEnvPath)) {
         return homeEnvPath;
       }
@@ -568,17 +568,17 @@ export function loadEnvironment(
   // sandbox flag before the full command-line parser is initialized to ensure
   // security constraints are applied when loading environment variables.
   const args = process.argv.slice(2);
-  const doubleDashIndex = args.indexOf("--");
+  const doubleDashIndex = args.indexOf('--');
   const relevantArgs =
     doubleDashIndex === -1 ? args : args.slice(0, doubleDashIndex);
 
   const isSandboxed =
     !!settings.tools?.sandbox ||
-    relevantArgs.includes("-s") ||
-    relevantArgs.includes("--sandbox");
+    relevantArgs.includes('-s') ||
+    relevantArgs.includes('--sandbox');
 
   // Cloud Shell environment variable handling
-  if (process.env["CLOUD_SHELL"] === "true") {
+  if (process.env['CLOUD_SHELL'] === 'true') {
     setUpCloudShellEnvironment(envFilePath, isTrusted, isSandboxed);
   }
 

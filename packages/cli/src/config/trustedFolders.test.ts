@@ -8,11 +8,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
-import {
-  FatalConfigError,
-  ideContextStore,
-  // coreEvents,
-} from '@google/gemini-cli-core';
+import { FatalConfigError, ideContextStore } from '@google/gemini-cli-core';
 import {
   loadTrustedFolders,
   TrustLevel,
@@ -32,9 +28,13 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     ...actual,
     homedir: () => '/mock/home/user',
     isHeadlessMode: vi.fn(() => false),
-    coreEvents: Object.assign(Object.create(Object.getPrototypeOf(actual.coreEvents)), actual.coreEvents, {
-      emitFeedback: vi.fn(),
-    }),
+    coreEvents: Object.assign(
+      Object.create(Object.getPrototypeOf(actual.coreEvents)),
+      actual.coreEvents,
+      {
+        emitFeedback: vi.fn(),
+      },
+    ),
     FatalConfigError: actual.FatalConfigError,
   };
 });
@@ -238,8 +238,6 @@ describe('Trusted Folders', () => {
         loadedFolders.setValue('/some/path', TrustLevel.TRUST_FOLDER),
       ).rejects.toThrow(FatalConfigError);
     });
-
- // Removed redundant test covered in core
   });
 
   describe('isWorkspaceTrusted Integration', () => {

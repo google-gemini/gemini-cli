@@ -462,7 +462,7 @@ export async function parseArguments(
   yargsInstance.wrap(yargsInstance.terminalWidth());
   let result;
   try {
-    result = await yargsInstance.parse() as Record<string, unknown>;
+    result = (await yargsInstance.parse()) as Record<string, unknown>;
     if (result['skip-trust']) {
       process.env['GEMINI_TRUST_WORKSPACE'] = 'true';
     }
@@ -481,7 +481,6 @@ export async function parseArguments(
   }
 
   // Normalize query args: handle both quoted "@path file" and unquoted @path file
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const queryArg = (result as { query?: string | string[] | undefined }).query;
   const q: string | undefined = Array.isArray(queryArg)
     ? queryArg.join(' ')
@@ -500,8 +499,8 @@ export async function parseArguments(
   }
 
   // Keep CliArgs.query as a string for downstream typing
-  (result as Record<string, unknown>)['query'] = q || undefined;
-  (result as Record<string, unknown>)['startupMessages'] = startupMessages;
+  result['query'] = q || undefined;
+  result['startupMessages'] = startupMessages;
 
   // The import format is now only controlled by settings.memoryImportFormat
   // We no longer accept it as a CLI argument

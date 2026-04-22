@@ -13,6 +13,7 @@ import {
   WarningPriority,
   type StartupWarning,
   isHeadlessMode,
+  FatalUntrustedWorkspaceError,
 } from '@google/gemini-cli-core';
 import type { Settings } from '../config/settingsSchema.js';
 import {
@@ -94,7 +95,9 @@ const folderTrustCheck: WarningCheck = {
     }
 
     if (isHeadlessMode()) {
-      return 'This folder is currently untrusted, to run gemini-cli in this folder please trust the folder ensure that you review it carefully, and provide the command: gemini-cli --skip-trust';
+      throw new FatalUntrustedWorkspaceError(
+        'Gemini CLI is not running in a trusted directory. To proceed, either use `--skip-trust`, set the `GEMINI_TRUST_WORKSPACE=true` environment variable, or trust this directory in interactive mode.',
+      );
     }
 
     return null;

@@ -30,12 +30,17 @@ vi.mock('./headless.js', async (importOriginal) => {
 });
 
 describe('Trust Utility (Core)', () => {
-  const tempDir = path.join(os.tmpdir(), 'gemini-trust-test-' + Math.random().toString(36).slice(2));
+  const tempDir = path.join(
+    os.tmpdir(),
+    'gemini-trust-test-' + Math.random().toString(36).slice(2),
+  );
   const trustedFoldersPath = path.join(tempDir, 'trustedFolders.json');
 
   beforeEach(() => {
     fs.mkdirSync(tempDir, { recursive: true });
-    vi.spyOn(Storage, 'getTrustedFoldersPath').mockReturnValue(trustedFoldersPath);
+    vi.spyOn(Storage, 'getTrustedFoldersPath').mockReturnValue(
+      trustedFoldersPath,
+    );
     vi.mocked(lock).mockResolvedValue(vi.fn().mockResolvedValue(undefined));
     vi.mocked(headless.isHeadlessMode).mockReturnValue(false);
     ideContextStore.clear();
@@ -93,7 +98,9 @@ describe('Trust Utility (Core)', () => {
     const folders = loadTrustedFolders();
 
     expect(folders.isPathTrusted(path.resolve('/project/file.txt'))).toBe(true);
-    expect(folders.isPathTrusted(path.resolve('/project/.gemini/config.yaml'))).toBe(true);
+    expect(
+      folders.isPathTrusted(path.resolve('/project/.gemini/config.yaml')),
+    ).toBe(true);
   });
 
   it('should save config correctly', async () => {
@@ -101,7 +108,9 @@ describe('Trust Utility (Core)', () => {
     const testPath = path.resolve('/new/trusted/path');
     await folders.setValue(testPath, TrustLevel.TRUST_FOLDER);
 
-    const savedContent = JSON.parse(fs.readFileSync(trustedFoldersPath, 'utf-8'));
+    const savedContent = JSON.parse(
+      fs.readFileSync(trustedFoldersPath, 'utf-8'),
+    );
     const normalizedKey = testPath.replace(/\\/g, '/');
     const isWindows = process.platform === 'win32';
     const finalKey = isWindows ? normalizedKey.toLowerCase() : normalizedKey;

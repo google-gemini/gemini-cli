@@ -646,7 +646,7 @@ export async function main() {
 
     if (!config.isInteractive()) {
       for (const warning of startupWarnings) {
-        writeToStderr(warning.message + "\n");
+        writeToStderr(warning.message + '\n');
       }
     }
 
