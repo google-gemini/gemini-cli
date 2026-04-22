@@ -127,6 +127,7 @@ export class HookEventHandler {
     const input: BeforeAgentInput = {
       ...this.createBaseInput(HookEventName.BeforeAgent),
       prompt,
+      agent_name: this.context.agentName,
     };
 
     return this.executeHooks(HookEventName.BeforeAgent, input);
@@ -164,6 +165,7 @@ export class HookEventHandler {
       prompt,
       prompt_response: promptResponse,
       stop_hook_active: stopHookActive,
+      agent_name: this.context.agentName,
     };
 
     return this.executeHooks(HookEventName.AfterAgent, input);

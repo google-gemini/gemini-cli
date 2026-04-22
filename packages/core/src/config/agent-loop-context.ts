@@ -26,6 +26,9 @@ export interface AgentLoopContext {
   /** The unique ID for the parent session if this is a subagent. */
   readonly parentSessionId?: string;
 
+  /** The name of the agent (e.g. 'browser_agent'). Undefined for the main agent. */
+  readonly agentName?: string;
+
   /** The registry of tools available to the agent in this context. */
   readonly toolRegistry: ToolRegistry;
 
