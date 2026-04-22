@@ -124,7 +124,7 @@ export class DevTools extends EventEmitter {
         chunks: payload.chunk ? [payload.chunk] : undefined,
       } as NetworkLog;
       this.logs.push(entry);
-      if (this.logs.length > 2000) this.logs.shift();
+      if (this.logs.length > 10) this.logs.shift();
       this.emit('update', entry);
     }
   }

@@ -37,6 +37,14 @@ process.env.FORCE_GENERIC_KEYBINDING_HINTS = 'true';
 // Force generic terminal declaration to ensure stable snapshots across different host environments.
 process.env.TERM_PROGRAM = 'generic';
 
+// Force true color support for terminal capability checks to ensure stable snapshots across different terminals.
+process.env.COLORTERM = 'truecolor';
+
+// Mock stdout color depth to ensure true color capability is detected consistently across local and headless CI runners.
+if (process.stdout) {
+  process.stdout.getColorDepth = () => 24;
+}
+
 import './src/test-utils/customMatchers.js';
 
 let consoleErrorSpy: vi.SpyInstance;
