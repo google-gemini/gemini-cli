@@ -63,6 +63,7 @@ jobs:
         uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806'
         with:
           name: 'node-modules-tarball'
+          path: '.'
 
       - name: 'Extract Node Modules'
         run: |
@@ -98,6 +99,7 @@ jobs:
         uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806'
         with:
           name: 'node-modules-tarball'
+          path: '.'
 
       - name: 'Extract Node Modules'
         run: |
@@ -133,6 +135,7 @@ jobs:
         uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806'
         with:
           name: 'node-modules-tarball'
+          path: '.'
 
       - name: 'Extract Node Modules'
         run: |
@@ -168,6 +171,7 @@ jobs:
         uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806'
         with:
           name: 'node-modules-tarball'
+          path: '.'
 
       - name: 'Extract Node Modules'
         run: |
@@ -203,6 +207,7 @@ jobs:
         uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806'
         with:
           name: 'node-modules-tarball'
+          path: '.'
 
       - name: 'Extract Node Modules'
         run: |
@@ -238,6 +243,7 @@ jobs:
         uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806'
         with:
           name: 'node-modules-tarball'
+          path: '.'
 
       - name: 'Extract Node Modules'
         run: |
@@ -273,6 +279,7 @@ jobs:
         uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806'
         with:
           name: 'node-modules-tarball'
+          path: '.'
 
       - name: 'Extract Node Modules'
         run: |
@@ -308,6 +315,7 @@ jobs:
         uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806'
         with:
           name: 'node-modules-tarball'
+          path: '.'
 
       - name: 'Extract Node Modules'
         run: |
