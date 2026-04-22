@@ -33,41 +33,47 @@ export class HistoryObserver {
     private readonly graphMapper: ContextGraphMapper,
   ) {}
 
+  private processEvent = (event: HistoryEvent) => {
+    let nodes: ConcreteNode[] = [];
+
+    if (event.type === 'CLEAR') {
+      this.seenNodeIds.clear();
+    }
+
+    nodes = this.graphMapper.applyEvent(event, this.tokenCalculator);
+
+    const newNodes = new Set<string>();
+    for (const node of nodes) {
+      if (!this.seenNodeIds.has(node.id)) {
+        newNodes.add(node.id);
+        this.seenNodeIds.add(node.id);
+      }
+    }
+
+    this.tracer.logEvent(
+      'HistoryObserver',
+      `Rebuilt pristine graph from ${event.type} event`,
+      { nodesSize: nodes.length, newNodesCount: newNodes.size },
+    );
+
+    this.eventBus.emitPristineHistoryUpdated({
+      nodes,
+      newNodes,
+    });
+  };
+
   start() {
     if (this.unsubscribeHistory) {
       this.unsubscribeHistory();
     }
 
-    this.unsubscribeHistory = this.chatHistory.subscribe(
-      (event: HistoryEvent) => {
-        let nodes: ConcreteNode[] = [];
+    this.unsubscribeHistory = this.chatHistory.subscribe(this.processEvent);
 
-        if (event.type === 'CLEAR') {
-          this.seenNodeIds.clear();
-        }
-
-        nodes = this.graphMapper.applyEvent(event, this.tokenCalculator);
-
-        const newNodes = new Set<string>();
-        for (const node of nodes) {
-          if (!this.seenNodeIds.has(node.id)) {
-            newNodes.add(node.id);
-            this.seenNodeIds.add(node.id);
-          }
-        }
-
-        this.tracer.logEvent(
-          'HistoryObserver',
-          `Rebuilt pristine graph from ${event.type} event`,
-          { nodesSize: nodes.length, newNodesCount: newNodes.size },
-        );
-
-        this.eventBus.emitPristineHistoryUpdated({
-          nodes,
-          newNodes,
-        });
-      },
-    );
+    // Process any existing history immediately upon start
+    const existing = this.chatHistory.get();
+    if (existing && existing.length > 0) {
+      this.processEvent({ type: 'SYNC_FULL', payload: existing });
+    }
   }
 
   stop() {
