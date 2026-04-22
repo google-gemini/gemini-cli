@@ -429,6 +429,11 @@ export interface UseShellCompletionProps {
   setSuggestions: (suggestions: Suggestion[]) => void;
   /** Callback to set loading state on the parent. */
   setIsLoadingSuggestions: (isLoading: boolean) => void;
+  /**
+   * When true, skip command/executable scanning and only offer path completions.
+   * Used when Tab-completing file paths in the normal (non-shell) prompt mode.
+   */
+  suppressCommandSuggestions?: boolean;
 }
 
 export interface UseShellCompletionReturn {
@@ -447,6 +452,7 @@ export function useShellCompletion({
   cwd,
   setSuggestions,
   setIsLoadingSuggestions,
+  suppressCommandSuggestions = false,
 }: UseShellCompletionProps): UseShellCompletionReturn {
   const pathCachePromiseRef = useRef<Promise<string[]> | null>(null);
   const pathEnvRef = useRef<string>(process.env['PATH'] ?? '');
@@ -509,7 +515,12 @@ export function useShellCompletion({
     try {
       let results: Suggestion[];
 
-      if (isCommandPosition) {
+      if (suppressCommandSuggestions) {
+        // Normal prompt mode: skip all shell command/argument logic and only
+        // offer file path completions to avoid irrelevant flag suggestions.
+        setIsLoadingSuggestions(true);
+        results = await resolvePathCompletions(query, cwd, signal);
+      } else if (isCommandPosition) {
         setIsLoadingSuggestions(true);
 
         if (!pathCachePromiseRef.current) {
@@ -594,6 +605,7 @@ export function useShellCompletion({
     tokenInfo,
     query,
     isCommandPosition,
+    suppressCommandSuggestions,
     tokens,
     cursorIndex,
     commandToken,

@@ -764,6 +764,15 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           }
         }
       } else if (isPlainTab) {
+        if (
+          completion.completionMode === CompletionMode.IDLE &&
+          !hasTabCompletionInteraction
+        ) {
+          // Trigger file path completion in normal prompt mode
+          setForceShowShellSuggestions(true);
+          resetPlainTabPress();
+          return true;
+        }
         if (!hasTabCompletionInteraction) {
           if (registerPlainTabPress() === 2) {
             toggleCleanUiDetailsVisible();
