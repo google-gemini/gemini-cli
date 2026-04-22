@@ -20,7 +20,10 @@ import {
   CallToolResultSchema,
   ListToolsResultSchema,
 } from '@modelcontextprotocol/sdk/types.js';
-import { IDE_REQUEST_TIMEOUT_MS } from './constants.js';
+import {
+  IDE_REQUEST_TIMEOUT_MS,
+  IDE_PROCESS_DETECTION_TIMEOUT_MS,
+} from './constants.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import {
   getConnectionConfigFromFile,
@@ -91,7 +94,19 @@ export class IdeClient {
     if (!IdeClient.instancePromise) {
       IdeClient.instancePromise = (async () => {
         const client = new IdeClient();
-        client.ideProcessInfo = await getIdeProcessInfo();
+        // Wrap process detection in a timeout to guard against slow process
+        // traversal (e.g. on systems with many processes or slow PowerShell).
+        const timeoutPromise: Promise<{ pid: number; command: string }> =
+          new Promise((resolve) =>
+            setTimeout(
+              () => resolve({ pid: 0, command: '' }),
+              IDE_PROCESS_DETECTION_TIMEOUT_MS,
+            ),
+          );
+        client.ideProcessInfo = await Promise.race([
+          getIdeProcessInfo(),
+          timeoutPromise,
+        ]);
         const connectionConfig = client.ideProcessInfo
           ? await getConnectionConfigFromFile(client.ideProcessInfo.pid)
           : undefined;
@@ -126,7 +141,7 @@ export class IdeClient {
     if (!this.currentIde) {
       this.setState(
         IDEConnectionStatus.Disconnected,
-        `IDE integration is not supported in your current environment. To use this feature, run Gemini CLI in one of these supported IDEs: Antigravity, VS Code, or VS Code forks.`,
+        `IDE integration is not supported in your current environment. To use this feature, run Gemini CLI in one of these supported IDEs: VS Code, Antigravity, Sublime Text, Zed, XCode, or a JetBrains IDE (IntelliJ IDEA, PyCharm, WebStorm, GoLand, etc.).`,
         false,
       );
       return;

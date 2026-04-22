@@ -315,6 +315,27 @@ class AntigravityInstaller implements IdeInstaller {
   }
 }
 
+/**
+ * Installer for JetBrains IDEs.
+ *
+ * JetBrains IDEs do not support a CLI-based extension install workflow,
+ * so this installer provides a helpful message directing users to the
+ * JetBrains Marketplace to install the companion plugin manually.
+ */
+class JetBrainsInstaller implements IdeInstaller {
+  constructor(readonly ideInfo: IdeInfo) {}
+
+  async install(): Promise<InstallResult> {
+    return {
+      success: false,
+      message:
+        `Automatic installation is not supported for ${this.ideInfo.displayName}. ` +
+        `Please install the '${GEMINI_CLI_COMPANION_EXTENSION_NAME}' plugin manually from the JetBrains Marketplace: ` +
+        `https://plugins.jetbrains.com/search?search=${encodeURIComponent(GEMINI_CLI_COMPANION_EXTENSION_NAME)}`,
+    };
+  }
+}
+
 export function getIdeInstaller(
   ide: IdeInfo,
   platform = process.platform,
@@ -327,6 +348,17 @@ export function getIdeInstaller(
       return new PositronInstaller(ide, platform);
     case IDE_DEFINITIONS.antigravity.name:
       return new AntigravityInstaller(ide, platform);
+    case IDE_DEFINITIONS.jetbrains.name:
+    case IDE_DEFINITIONS.intellijidea.name:
+    case IDE_DEFINITIONS.webstorm.name:
+    case IDE_DEFINITIONS.pycharm.name:
+    case IDE_DEFINITIONS.goland.name:
+    case IDE_DEFINITIONS.androidstudio.name:
+    case IDE_DEFINITIONS.clion.name:
+    case IDE_DEFINITIONS.rustrover.name:
+    case IDE_DEFINITIONS.datagrip.name:
+    case IDE_DEFINITIONS.phpstorm.name:
+      return new JetBrainsInstaller(ide);
     default:
       return null;
   }
