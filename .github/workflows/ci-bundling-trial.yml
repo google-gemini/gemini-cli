@@ -377,3 +377,40 @@ jobs:
       - name: 'Run All CLI Tests'
         run: 'npx vitest run --pool=threads packages/cli/src'
         shell: 'bash'
+ 
+  test_core:
+    name: 'Test (Linux) - Core'
+    needs: build
+    runs-on: 'ubuntu-latest'
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
+
+      - name: 'Download Workspace'
+        uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806'
+        with:
+          name: 'workspace-artifact'
+          path: '.'
+
+      - name: 'Download Node Modules Tarball'
+        uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806'
+        with:
+          name: 'node-modules-tarball'
+          path: '.'
+
+      - name: 'Extract Node Modules'
+        run: |
+          rm -rf node_modules
+          tar -xzf node_modules.tar.gz
+          rm node_modules.tar.gz
+        shell: 'bash'
+
+      - name: 'Setup Gemini'
+        uses: './.github/actions/setup-gemini'
+        with:
+          mode: 'source'
+          skip-npm-ci: 'true'
+
+      - name: 'Run All Core Tests'
+        run: 'npx vitest run --pool=threads packages/core/src'
+        shell: 'bash'
