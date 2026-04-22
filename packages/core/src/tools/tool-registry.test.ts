@@ -794,6 +794,58 @@ describe('ToolRegistry', () => {
       expect(mockProcess.kill).toHaveBeenCalled();
     });
 
+    it('should ignore nullish chunks and not append "undefined"', async () => {
+      vi.spyOn(config, 'getToolCallCommand').mockReturnValue('call');
+
+      const tool = new DiscoveredTool(
+        config,
+        'clean-tool',
+        DISCOVERED_TOOL_PREFIX + 'clean-tool',
+        'desc',
+        {},
+        mockMessageBus,
+        true,
+      );
+
+      const mockProcess: any = {
+        stdout: { on: vi.fn(), removeListener: vi.fn() },
+        stderr: { on: vi.fn(), removeListener: vi.fn() },
+        stdin: { write: vi.fn(), end: vi.fn() },
+        on: vi.fn(),
+        connected: true,
+        disconnect: vi.fn(),
+        removeListener: vi.fn(),
+      };
+
+      mockProcess.stdout.on.mockImplementation(
+        (event: string, callback: any) => {
+          if (event === 'data') {
+            callback(null); // Send nullish chunk
+            callback(Buffer.from('Valid data'));
+          }
+        },
+      );
+
+      mockProcess.on.mockImplementation((event: string, callback: any) => {
+        if (event === 'close') {
+          callback(0);
+        }
+      });
+
+      vi.mocked(spawn).mockReturnValue(mockProcess);
+
+      const updateOutput = vi.fn();
+      const invocation = tool.build({});
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+        updateOutput,
+      });
+
+      expect(updateOutput).toHaveBeenCalledWith('Valid data');
+      expect(updateOutput).not.toHaveBeenCalledWith('undefined');
+      expect(result.llmContent).toBe('Valid data');
+    });
+
     it('should pass MessageBus to DiscoveredTool and its invocations', async () => {
       const discoveryCommand = 'my-discovery-command';
       mockConfigGetToolDiscoveryCommand.mockReturnValue(discoveryCommand);

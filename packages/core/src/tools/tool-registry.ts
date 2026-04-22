@@ -106,14 +106,14 @@ class DiscoveredToolInvocation extends BaseToolInvocation<
 
       await new Promise<void>((resolve, reject) => {
         const onStdout = (data: Buffer) => {
-          if (sizeLimitExceeded) return;
+          if (sizeLimitExceeded || !data) return;
           if (stdoutByteLength + data.length > MAX_STDOUT_SIZE) {
             sizeLimitExceeded = true;
             child.kill();
             return;
           }
           stdoutByteLength += data.length;
-          const chunk = data?.toString();
+          const chunk = data.toString();
           stdout += chunk;
           if (_updateOutput) {
             _updateOutput(chunk);
@@ -121,14 +121,14 @@ class DiscoveredToolInvocation extends BaseToolInvocation<
         };
 
         const onStderr = (data: Buffer) => {
-          if (sizeLimitExceeded) return;
+          if (sizeLimitExceeded || !data) return;
           if (stderrByteLength + data.length > MAX_STDERR_SIZE) {
             sizeLimitExceeded = true;
             child.kill();
             return;
           }
           stderrByteLength += data.length;
-          const chunk = data?.toString();
+          const chunk = data.toString();
           stderr += chunk;
           if (_updateOutput) {
             _updateOutput(chunk);
