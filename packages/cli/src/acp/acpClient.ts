@@ -76,6 +76,7 @@ import { randomUUID } from 'node:crypto';
 import { loadCliConfig, type CliArgs } from '../config/config.js';
 import { runExitCleanup } from '../utils/cleanup.js';
 import { SessionSelector } from '../utils/sessionUtils.js';
+import { startAutoMemoryIfEnabled } from '../utils/autoMemory.js';
 
 import { CommandHandler } from './commandHandler.js';
 
@@ -324,6 +325,7 @@ export class GeminiAgent {
 
     await config.initialize();
     startupProfiler.flush(config);
+    startAutoMemoryIfEnabled(config);
 
     const geminiClient = config.getGeminiClient();
     const chat = await geminiClient.startChat();
@@ -372,7 +374,7 @@ export class GeminiAgent {
       mcpServers,
     );
 
-    const sessionSelector = new SessionSelector(config);
+    const sessionSelector = new SessionSelector(config.storage);
     const { sessionData, sessionPath } =
       await sessionSelector.resolveSession(sessionId);
 
@@ -465,6 +467,7 @@ export class GeminiAgent {
     // which starts the MCP servers and other heavy resources.
     await config.initialize();
     startupProfiler.flush(config);
+    startAutoMemoryIfEnabled(config);
 
     return config;
   }
@@ -863,7 +866,10 @@ export class Session {
           (error &&
             typeof error === 'object' &&
             'type' in error &&
-            error.type === 'NO_RESPONSE_TEXT')
+            (error.type === 'NO_RESPONSE_TEXT' ||
+              error.type === 'NO_FINISH_REASON' ||
+              error.type === 'MALFORMED_FUNCTION_CALL' ||
+              error.type === 'UNEXPECTED_TOOL_CALL'))
         ) {
           // The stream ended with an empty response or malformed tool call.
           // Treat this as a graceful end to the model's turn rather than a crash.
@@ -1126,7 +1132,9 @@ export class Session {
         });
       }
 
-      const toolResult: ToolResult = await invocation.execute(abortSignal);
+      const toolResult: ToolResult = await invocation.execute({
+        abortSignal,
+      });
       const content = toToolCallContent(toolResult);
 
       const updateContent: acp.ToolCallContent[] = content ? [content] : [];
@@ -1668,7 +1676,7 @@ export class Session {
           kind: toAcpToolKind(readManyFilesTool.kind),
         });
 
-        const result = await invocation.execute(abortSignal);
+        const result = await invocation.execute({ abortSignal });
         const content = toToolCallContent(result) || {
           type: 'content',
           content: {

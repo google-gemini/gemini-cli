@@ -23,9 +23,11 @@ import { ContextUsageDisplay } from './ContextUsageDisplay.js';
 import { QuotaDisplay } from './QuotaDisplay.js';
 import { DebugProfiler } from './DebugProfiler.js';
 import { useUIState } from '../contexts/UIStateContext.js';
+import { useQuotaState } from '../contexts/QuotaContext.js';
 import { useConfig } from '../contexts/ConfigContext.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 import { useVimMode } from '../contexts/VimModeContext.js';
+import { useInputState } from '../contexts/InputContext.js';
 import {
   ALL_ITEMS,
   type FooterItemId,
@@ -67,26 +69,19 @@ interface SandboxIndicatorProps {
 const SandboxIndicator: React.FC<SandboxIndicatorProps> = ({
   isTrustedFolder,
 }) => {
+  const config = useConfig();
+  const sandboxEnabled = config.getSandboxEnabled();
   if (isTrustedFolder === false) {
     return <Text color={theme.status.warning}>untrusted</Text>;
   }
 
   const sandbox = process.env['SANDBOX'];
-  if (sandbox && sandbox !== 'sandbox-exec') {
-    return (
-      <Text color="green">{sandbox.replace(/^gemini-(?:cli-)?/, '')}</Text>
-    );
+  if (sandbox) {
+    return <Text color={theme.status.warning}>current process</Text>;
   }
 
-  if (sandbox === 'sandbox-exec') {
-    return (
-      <Text color={theme.status.warning}>
-        macOS Seatbelt{' '}
-        <Text color={theme.ui.comment}>
-          ({process.env['SEATBELT_PROFILE']})
-        </Text>
-      </Text>
-    );
+  if (sandboxEnabled) {
+    return <Text color={theme.status.warning}>all tools</Text>;
   }
 
   return <Text color={theme.status.error}>no sandbox</Text>;
@@ -178,10 +173,10 @@ interface FooterColumn {
   isHighPriority: boolean;
 }
 
-export const Footer: React.FC<{ copyModeEnabled?: boolean }> = ({
-  copyModeEnabled = false,
-}) => {
+export const Footer: React.FC = () => {
   const uiState = useUIState();
+  const quotaState = useQuotaState();
+  const { copyModeEnabled } = useInputState();
   const config = useConfig();
   const settings = useSettings();
   const { vimEnabled, vimMode } = useVimMode();
@@ -198,10 +193,6 @@ export const Footer: React.FC<{ copyModeEnabled?: boolean }> = ({
     }
   }, [authType]);
 
-  if (copyModeEnabled) {
-    return <Box height={1} />;
-  }
-
   const {
     model,
     targetDir,
@@ -214,7 +205,6 @@ export const Footer: React.FC<{ copyModeEnabled?: boolean }> = ({
     promptTokenCount,
     isTrustedFolder,
     terminalWidth,
-    quotaStats,
   } = {
     model: uiState.currentModel,
     targetDir: config.getTargetDir(),
@@ -227,8 +217,9 @@ export const Footer: React.FC<{ copyModeEnabled?: boolean }> = ({
     promptTokenCount: uiState.sessionStats.lastPromptTokenCount,
     isTrustedFolder: uiState.isTrustedFolder,
     terminalWidth: uiState.terminalWidth,
-    quotaStats: uiState.quota.stats,
   };
+
+  const quotaStats = quotaState.stats;
 
   const isFullErrorVerbosity = settings.merged.ui.errorVerbosity === 'full';
   const showErrorSummary =
@@ -317,9 +308,8 @@ export const Footer: React.FC<{ copyModeEnabled?: boolean }> = ({
         let str = 'no sandbox';
         const sandbox = process.env['SANDBOX'];
         if (isTrustedFolder === false) str = 'untrusted';
-        else if (sandbox === 'sandbox-exec')
-          str = `macOS Seatbelt (${process.env['SEATBELT_PROFILE']})`;
-        else if (sandbox) str = sandbox.replace(/^gemini-(?:cli-)?/, '');
+        else if (sandbox) str = 'current process';
+        else if (config.getSandboxEnabled()) str = 'all tools';
 
         addCol(
           id,
@@ -363,13 +353,11 @@ export const Footer: React.FC<{ copyModeEnabled?: boolean }> = ({
               <QuotaDisplay
                 remaining={quotaStats.remaining}
                 limit={quotaStats.limit}
-                resetTime={quotaStats.resetTime}
-                terse={true}
                 forceShow={true}
                 lowercase={true}
               />
             ),
-            10, // "daily 100%" is 10 chars, but terse is "100%" (4 chars)
+            9, // "100% used" is 9 chars
           );
         }
         break;
@@ -379,10 +367,7 @@ export const Footer: React.FC<{ copyModeEnabled?: boolean }> = ({
           id,
           header,
           () => (
-            <MemoryUsageDisplay
-              color={itemColor}
-              isActive={!uiState.copyModeEnabled}
-            />
+            <MemoryUsageDisplay color={itemColor} isActive={!copyModeEnabled} />
           ),
           10,
         );

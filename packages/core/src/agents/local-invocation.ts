@@ -10,7 +10,7 @@ import { LocalAgentExecutor } from './local-executor.js';
 import {
   BaseToolInvocation,
   type ToolResult,
-  type ToolLiveOutput,
+  type ExecuteOptions,
 } from '../tools/tools.js';
 import {
   type LocalAgentDefinition,
@@ -25,12 +25,14 @@ import {
   isToolActivityError,
 } from './types.js';
 import { randomUUID } from 'node:crypto';
+import type { z } from 'zod';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import {
   sanitizeThoughtContent,
   sanitizeToolArgs,
   sanitizeErrorMessage,
 } from '../utils/agent-sanitization-utils.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 const INPUT_PREVIEW_MAX_LENGTH = 50;
 const DESCRIPTION_MAX_LENGTH = 200;
@@ -103,11 +105,10 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
    * agent's thoughts, to the user interface.
    * @returns A `Promise` that resolves with the final `ToolResult`.
    */
-  async execute(
-    signal: AbortSignal,
-    updateOutput?: (output: ToolLiveOutput) => void,
-  ): Promise<ToolResult> {
+  async execute(options: ExecuteOptions): Promise<ToolResult> {
+    const { abortSignal: signal, updateOutput } = options;
     const recentActivity: SubagentActivityItem[] = [];
+    let executor: LocalAgentExecutor<z.ZodUnknown> | undefined;
 
     try {
       if (updateOutput) {
@@ -273,7 +274,7 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
         }
       };
 
-      const executor = await LocalAgentExecutor.create(
+      executor = await LocalAgentExecutor.create(
         this.definition,
         this.context,
         onActivity,
@@ -319,10 +320,13 @@ ${output.result}`;
       return {
         llmContent: [{ text: resultContent }],
         returnDisplay: progress,
+        data: { agentId: executor.agentId },
       };
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
+
+      debugLogger.error(`Subagent '${this.definition.name}' failed:`, error);
 
       const isAbort =
         (error instanceof Error && error.name === 'AbortError') ||
@@ -369,6 +373,7 @@ ${output.result}`;
       return {
         llmContent: `Subagent '${this.definition.name}' failed. Error: ${errorMessage}`,
         returnDisplay: progress,
+        data: executor ? { agentId: executor.agentId } : undefined,
         // We omit the 'error' property so that the UI renders our rich returnDisplay
         // instead of the raw error message. The llmContent still informs the agent of the failure.
       };

@@ -1,203 +1,170 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  loadJitSubdirectoryMemory,
-  concatenateInstructions,
-  getGlobalMemoryPaths,
-  getUserProjectMemoryPaths,
-  getExtensionMemoryPaths,
-  getEnvironmentMemoryPaths,
-  readGeminiMdFiles,
-  categorizeAndConcatenate,
-  type GeminiFileContent,
-  deduplicatePathsByFileIdentity,
-} from '../utils/memoryDiscovery.js';
-import type { Config } from '../config/config.js';
-import { coreEvents, CoreEvent } from '../utils/events.js';
+import type { Content } from '@google/genai';
+import type { AgentChatHistory } from '../core/agentChatHistory.js';
+import type { ConcreteNode } from './graph/types.js';
+import type { ContextEventBus } from './eventBus.js';
+import type { ContextTracer } from './tracer.js';
+import type { ContextEnvironment } from './pipeline/environment.js';
+import type { ContextProfile } from './config/profiles.js';
+import type { PipelineOrchestrator } from './pipeline/orchestrator.js';
+import { HistoryObserver } from './historyObserver.js';
+import { render } from './graph/render.js';
+import { ContextWorkingBufferImpl } from './pipeline/contextWorkingBuffer.js';
 
 export class ContextManager {
-  private readonly loadedPaths: Set<string> = new Set();
-  private readonly loadedFileIdentities: Set<string> = new Set();
-  private readonly config: Config;
-  private globalMemory: string = '';
-  private extensionMemory: string = '';
-  private projectMemory: string = '';
-  private userProjectMemoryContent: string = '';
+  // The master state containing the pristine graph and current active graph.
+  private buffer: ContextWorkingBufferImpl =
+    ContextWorkingBufferImpl.initialize([]);
 
-  constructor(config: Config) {
-    this.config = config;
-  }
+  private readonly eventBus: ContextEventBus;
 
-  /**
-   * Refreshes the memory by reloading global, extension, and project memory.
-   */
-  async refresh(): Promise<void> {
-    this.loadedPaths.clear();
-    this.loadedFileIdentities.clear();
+  // Internal sub-components
+  private readonly orchestrator: PipelineOrchestrator;
+  private readonly historyObserver: HistoryObserver;
 
-    const paths = await this.discoverMemoryPaths();
-    const contentsMap = await this.loadMemoryContents(paths);
-
-    this.categorizeMemoryContents(paths, contentsMap);
-    this.emitMemoryChanged();
-  }
-
-  private async discoverMemoryPaths() {
-    const [global, extension, project, userProjectMemory] = await Promise.all([
-      getGlobalMemoryPaths(),
-      Promise.resolve(
-        getExtensionMemoryPaths(this.config.getExtensionLoader()),
-      ),
-      this.config.isTrustedFolder()
-        ? getEnvironmentMemoryPaths(
-            [...this.config.getWorkspaceContext().getDirectories()],
-            this.config.getMemoryBoundaryMarkers(),
-          )
-        : Promise.resolve([]),
-      getUserProjectMemoryPaths(this.config.storage.getProjectMemoryDir()),
-    ]);
-
-    return { global, extension, project, userProjectMemory };
-  }
-
-  private async loadMemoryContents(paths: {
-    global: string[];
-    extension: string[];
-    project: string[];
-    userProjectMemory: string[];
-  }) {
-    const allPathsStringDeduped = Array.from(
-      new Set([
-        ...paths.global,
-        ...paths.extension,
-        ...paths.project,
-        ...paths.userProjectMemory,
-      ]),
-    );
-
-    // deduplicate by file identity to handle case-insensitive filesystems
-    const { paths: allPaths, identityMap: pathIdentityMap } =
-      await deduplicatePathsByFileIdentity(allPathsStringDeduped);
-
-    const allContents = await readGeminiMdFiles(
-      allPaths,
-      this.config.getImportFormat(),
-      this.config.getMemoryBoundaryMarkers(),
-    );
-
-    const loadedFilePaths = allContents
-      .filter((c) => c.content !== null)
-      .map((c) => c.filePath);
-    this.markAsLoaded(loadedFilePaths);
-
-    // Cache file identities for performance optimization
-    for (const filePath of loadedFilePaths) {
-      const identity = pathIdentityMap.get(filePath);
-      if (identity) {
-        this.loadedFileIdentities.add(identity);
-      }
-    }
-
-    return new Map(allContents.map((c) => [c.filePath, c]));
-  }
-
-  private categorizeMemoryContents(
-    paths: {
-      global: string[];
-      extension: string[];
-      project: string[];
-      userProjectMemory: string[];
-    },
-    contentsMap: Map<string, GeminiFileContent>,
+  constructor(
+    private readonly sidecar: ContextProfile,
+    private readonly env: ContextEnvironment,
+    private readonly tracer: ContextTracer,
+    orchestrator: PipelineOrchestrator,
+    chatHistory: AgentChatHistory,
   ) {
-    const hierarchicalMemory = categorizeAndConcatenate(paths, contentsMap);
+    this.eventBus = env.eventBus;
+    this.orchestrator = orchestrator;
 
-    this.globalMemory = hierarchicalMemory.global || '';
-    this.extensionMemory = hierarchicalMemory.extension || '';
-    this.userProjectMemoryContent = hierarchicalMemory.userProjectMemory || '';
-
-    const mcpInstructions =
-      this.config.getMcpClientManager()?.getMcpInstructions() || '';
-    const projectMemoryWithMcp = [
-      hierarchicalMemory.project,
-      mcpInstructions.trimStart(),
-    ]
-      .filter(Boolean)
-      .join('\n\n');
-
-    this.projectMemory = this.config.isTrustedFolder()
-      ? projectMemoryWithMcp
-      : '';
-  }
-
-  /**
-   * Discovers and loads context for a specific accessed path (Tier 3 - JIT).
-   * Traverses upwards from the accessed path to the project root.
-   */
-  async discoverContext(
-    accessedPath: string,
-    trustedRoots: string[],
-  ): Promise<string> {
-    if (!this.config.isTrustedFolder()) {
-      return '';
-    }
-    const result = await loadJitSubdirectoryMemory(
-      accessedPath,
-      trustedRoots,
-      this.loadedPaths,
-      this.loadedFileIdentities,
-      this.config.getMemoryBoundaryMarkers(),
+    this.historyObserver = new HistoryObserver(
+      chatHistory,
+      this.env.eventBus,
+      this.tracer,
+      this.env.tokenCalculator,
+      this.env.graphMapper,
     );
+    this.historyObserver.start();
 
-    if (result.files.length === 0) {
-      return '';
-    }
+    this.eventBus.onPristineHistoryUpdated((event) => {
+      const existingIds = new Set(this.buffer.nodes.map((n) => n.id));
+      const newIds = new Set(event.nodes.map((n) => n.id));
+      const addedNodes = event.nodes.filter((n) => !existingIds.has(n.id));
 
-    const newFilePaths = result.files.map((f) => f.path);
-    this.markAsLoaded(newFilePaths);
+      // Prune any pristine nodes that were dropped from the upstream history
+      this.buffer = this.buffer.prunePristineNodes(newIds);
 
-    // Cache identities for newly loaded files
-    if (result.fileIdentities) {
-      for (const identity of result.fileIdentities) {
-        this.loadedFileIdentities.add(identity);
+      if (addedNodes.length > 0) {
+        this.buffer = this.buffer.appendPristineNodes(addedNodes);
       }
-    }
-    return concatenateInstructions(
-      result.files.map((f) => ({ filePath: f.path, content: f.content })),
-    );
-  }
 
-  private emitMemoryChanged(): void {
-    coreEvents.emit(CoreEvent.MemoryChanged, {
-      fileCount: this.loadedPaths.size,
+      this.evaluateTriggers(event.newNodes);
     });
   }
 
-  getGlobalMemory(): string {
-    return this.globalMemory;
+  /**
+   * Safely stops background async pipelines and clears event listeners.
+   */
+  shutdown() {
+    this.orchestrator.shutdown();
+    this.historyObserver.stop();
   }
 
-  getExtensionMemory(): string {
-    return this.extensionMemory;
+  /**
+   * Evaluates if the current working buffer exceeds configured budget thresholds,
+   * firing consolidation events if necessary.
+   */
+  private evaluateTriggers(newNodes: Set<string>) {
+    if (!this.sidecar.config.budget) return;
+
+    if (newNodes.size > 0) {
+      this.eventBus.emitChunkReceived({
+        nodes: this.buffer.nodes,
+        targetNodeIds: newNodes,
+      });
+    }
+
+    const currentTokens = this.env.tokenCalculator.calculateConcreteListTokens(
+      this.buffer.nodes,
+    );
+
+    if (currentTokens > this.sidecar.config.budget.retainedTokens) {
+      const agedOutNodes = new Set<string>();
+      let rollingTokens = 0;
+      // Walk backwards finding nodes that fall out of the retained budget
+      for (let i = this.buffer.nodes.length - 1; i >= 0; i--) {
+        const node = this.buffer.nodes[i];
+        rollingTokens += this.env.tokenCalculator.calculateConcreteListTokens([
+          node,
+        ]);
+        if (rollingTokens > this.sidecar.config.budget.retainedTokens) {
+          agedOutNodes.add(node.id);
+        }
+      }
+
+      if (agedOutNodes.size > 0) {
+        this.env.tokenCalculator.garbageCollectCache(
+          new Set(this.buffer.nodes.map((n) => n.id)),
+        );
+        this.eventBus.emitConsolidationNeeded({
+          nodes: this.buffer.nodes,
+          targetDeficit:
+            currentTokens - this.sidecar.config.budget.retainedTokens,
+          targetNodeIds: agedOutNodes,
+        });
+      }
+    }
   }
 
-  getEnvironmentMemory(): string {
-    return this.projectMemory;
+  /**
+   * Retrieves the raw, uncompressed Episodic Context Graph graph.
+   * Useful for internal tool rendering (like the trace viewer).
+   * Note: This is an expensive, deep clone operation.
+   */
+  getPristineGraph(): readonly ConcreteNode[] {
+    const pristineSet = new Map<string, ConcreteNode>();
+    for (const node of this.buffer.nodes) {
+      const roots = this.buffer.getPristineNodes(node.id);
+      for (const root of roots) {
+        pristineSet.set(root.id, root);
+      }
+    }
+    // We sort them by timestamp to ensure they are returned in chronological order
+    return Array.from(pristineSet.values()).sort(
+      (a, b) => a.timestamp - b.timestamp,
+    );
   }
 
-  getUserProjectMemory(): string {
-    return this.userProjectMemoryContent;
+  /**
+   * Generates a virtual view of the pristine graph, substituting in variants
+   * up to the configured token budget.
+   * This is the view that will eventually be projected back to the LLM.
+   */
+  getNodes(): readonly ConcreteNode[] {
+    return [...this.buffer.nodes];
   }
 
-  private markAsLoaded(paths: string[]): void {
-    paths.forEach((p) => this.loadedPaths.add(p));
-  }
+  /**
+   * Executes the final 'gc_backstop' pipeline if necessary, enforcing the token budget,
+   * and maps the Episodic Context Graph back into a raw Gemini Content[] array for transmission.
+   * This is the primary method called by the agent framework before sending a request.
+   */
+  async renderHistory(
+    activeTaskIds: Set<string> = new Set(),
+  ): Promise<Content[]> {
+    this.tracer.logEvent('ContextManager', 'Starting rendering of LLM context');
+    // Apply final GC Backstop pressure barrier synchronously before mapping
+    const finalHistory = await render(
+      this.buffer.nodes,
+      this.orchestrator,
+      this.sidecar,
+      this.tracer,
+      this.env,
+      activeTaskIds,
+    );
 
-  getLoadedPaths(): ReadonlySet<string> {
-    return this.loadedPaths;
+    this.tracer.logEvent('ContextManager', 'Finished rendering');
+
+    return finalHistory;
   }
 }

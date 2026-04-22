@@ -109,6 +109,7 @@ import {
   ToolConfirmationOutcome,
   type AnyDeclarativeTool,
   type AnyToolInvocation,
+  Kind,
 } from '../tools/tools.js';
 import {
   type ToolCallRequestInfo,
@@ -140,6 +141,7 @@ vi.mock('../core/geminiChat.js', () => ({
     CHUNK: 'chunk',
   },
   GeminiChat: vi.fn().mockImplementation(() => ({
+    initialize: vi.fn(),
     sendMessageStream: mockSendMessageStream,
     getHistory: vi.fn((_curated?: boolean) => [...mockChatHistory]),
     setHistory: mockSetHistory,
@@ -197,6 +199,27 @@ vi.mock('../utils/promptIdContext.js', async (importOriginal) => {
     },
   };
 });
+
+vi.mock('../config/scoped-config.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../config/scoped-config.js')>();
+  return {
+    ...actual,
+    runWithScopedWorkspaceContext: vi.fn(actual.runWithScopedWorkspaceContext),
+    createScopedWorkspaceContext: vi.fn(actual.createScopedWorkspaceContext),
+  };
+});
+
+import {
+  runWithScopedWorkspaceContext,
+  createScopedWorkspaceContext,
+} from '../config/scoped-config.js';
+const mockedRunWithScopedWorkspaceContext = vi.mocked(
+  runWithScopedWorkspaceContext,
+);
+const mockedCreateScopedWorkspaceContext = vi.mocked(
+  createScopedWorkspaceContext,
+);
 
 const MockedGeminiChat = vi.mocked(GeminiChat);
 const mockedGetDirectoryContextString = vi.mocked(getDirectoryContextString);
@@ -396,6 +419,8 @@ describe('LocalAgentExecutor', () => {
       );
     mockedLogAgentStart.mockReset();
     mockedLogAgentFinish.mockReset();
+    mockedRunWithScopedWorkspaceContext.mockClear();
+    mockedCreateScopedWorkspaceContext.mockClear();
     mockedPromptIdContext.getStore.mockReset();
     mockedPromptIdContext.run.mockImplementation((_id, fn) => fn());
 
@@ -410,6 +435,7 @@ describe('LocalAgentExecutor', () => {
     MockedGeminiChat.mockImplementation(
       () =>
         ({
+          initialize: vi.fn(),
           sendMessageStream: mockSendMessageStream,
           setSystemInstruction: mockSetSystemInstruction,
           getHistory: vi.fn((_curated?: boolean) => [...mockChatHistory]),
@@ -726,7 +752,9 @@ describe('LocalAgentExecutor', () => {
     it('should filter out subagent tools to prevent recursion', async () => {
       const subAgentName = 'recursive-agent';
       // Register a mock tool that simulates a subagent
-      parentToolRegistry.registerTool(new MockTool({ name: subAgentName }));
+      parentToolRegistry.registerTool(
+        new MockTool({ name: subAgentName, kind: Kind.Agent }),
+      );
 
       // Mock the agent registry to return the subagent name
       vi.spyOn(
@@ -755,7 +783,9 @@ describe('LocalAgentExecutor', () => {
       // LS_TOOL_NAME is already registered in beforeEach
       const otherTool = new MockTool({ name: 'other-tool' });
       parentToolRegistry.registerTool(otherTool);
-      parentToolRegistry.registerTool(new MockTool({ name: subAgentName }));
+      parentToolRegistry.registerTool(
+        new MockTool({ name: subAgentName, kind: Kind.Agent }),
+      );
 
       // Mock the agent registry to return the subagent name
       vi.spyOn(
@@ -882,6 +912,55 @@ describe('LocalAgentExecutor', () => {
       // Verify that LS_TOOL_NAME is in the list (since LS was registered in beforeEach)
       const toolNames = toolsList.map((t) => t.name);
       expect(toolNames).toContain(LS_TOOL_NAME);
+    });
+  });
+
+  describe('run (Workspace Scoping)', () => {
+    it('should use runWithScopedWorkspaceContext when workspaceDirectories is set', async () => {
+      const definition = createTestDefinition();
+      definition.workspaceDirectories = ['/tmp/extra-dir'];
+      const executor = await LocalAgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+
+      // Mock a simple complete_task response so run() terminates
+      mockModelResponse([
+        {
+          name: COMPLETE_TASK_TOOL_NAME,
+          args: { finalResult: 'done' },
+          id: 'c1',
+        },
+      ]);
+
+      await executor.run({ goal: 'test' }, signal);
+
+      expect(mockedCreateScopedWorkspaceContext).toHaveBeenCalledOnce();
+      expect(mockedRunWithScopedWorkspaceContext).toHaveBeenCalledOnce();
+    });
+
+    it('should not use runWithScopedWorkspaceContext when workspaceDirectories is not set', async () => {
+      const definition = createTestDefinition();
+      const executor = await LocalAgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+
+      // Mock a simple complete_task response so run() terminates
+      mockModelResponse([
+        {
+          name: COMPLETE_TASK_TOOL_NAME,
+          args: { finalResult: 'done' },
+          id: 'c1',
+        },
+      ]);
+
+      await executor.run({ goal: 'test' }, signal);
+
+      expect(mockedCreateScopedWorkspaceContext).not.toHaveBeenCalled();
+      expect(mockedRunWithScopedWorkspaceContext).not.toHaveBeenCalled();
     });
   });
 

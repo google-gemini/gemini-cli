@@ -78,7 +78,12 @@ export function getMergeStrategyForPath(
 
 export const USER_SETTINGS_PATH = Storage.getGlobalSettingsPath();
 export const USER_SETTINGS_DIR = path.dirname(USER_SETTINGS_PATH);
-export const DEFAULT_EXCLUDED_ENV_VARS = ['DEBUG', 'DEBUG_MODE'];
+export const DEFAULT_EXCLUDED_ENV_VARS = [
+  'DEBUG',
+  'DEBUG_MODE',
+  'GEMINI_CLI_IDE_SERVER_STDIO_COMMAND',
+  'GEMINI_CLI_IDE_SERVER_STDIO_ARGS',
+];
 
 const AUTH_ENV_VAR_WHITELIST = [
   'GEMINI_API_KEY',
@@ -612,7 +617,7 @@ export function loadEnvironment(
           }
         }
       }
-    } catch (_e) {
+    } catch {
       // Errors are ignored to match the behavior of `dotenv.config({ quiet: true })`.
     }
   }
