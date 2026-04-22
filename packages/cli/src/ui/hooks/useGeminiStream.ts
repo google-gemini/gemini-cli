@@ -306,10 +306,9 @@ export const useGeminiStream = (
           const tcIndex = toolCalls.indexOf(firstToolToPush);
           const prevTool = tcIndex > 0 ? toolCalls[tcIndex - 1] : null;
 
-          let borderTop = isFirstToolInGroupRef.current;
-          if (!borderTop && prevTool) {
-            // If the first tool in this push is non-compact but follows a compact tool,
-            // we must start a new border group.
+          // Start a new box for a new history item
+          let borderTop = true;
+          if (prevTool) {
             const currentIsCompact = isCompactTool(
               mapTrackedToolCallsToDisplay(firstToolToPush).tools[0],
               isCompactModeEnabled,
@@ -318,8 +317,10 @@ export const useGeminiStream = (
               mapTrackedToolCallsToDisplay(prevTool).tools[0],
               isCompactModeEnabled,
             );
-            if (!currentIsCompact && prevWasCompact) {
-              borderTop = true;
+
+            // Continue the existing border group for consecutive non-compact tools
+            if (!currentIsCompact && !prevWasCompact) {
+              borderTop = false;
             }
           }
 
@@ -490,7 +491,6 @@ export const useGeminiStream = (
 
     if (toolsToPush.length > 0) {
       const newPushed = new Set(pushedToolCallIdsRef.current);
-      const isFirstInThisPush = isFirstToolInGroupRef.current;
       const isCompactModeEnabled =
         settings.merged.ui?.compactToolOutput === true;
 
@@ -516,19 +516,12 @@ export const useGeminiStream = (
 
       for (let i = 0; i < groups.length; i++) {
         const group = groups[i];
-        const isFirstInBatch = i === 0 && isFirstInThisPush;
-        const lastTcInGroup = group[group.length - 1];
-        const tcIndexInBatch = toolCalls.indexOf(lastTcInGroup);
-        const isLastInBatch = tcIndexInBatch === toolCalls.length - 1;
+        const isFirstInBatch = i === 0; // Each new history item starts its own border group
+        const isLastInBatch = i === groups.length - 1; // Each history item closes its own border group
 
-        const nextTcInBatch =
-          tcIndexInBatch < toolCalls.length - 1
-            ? toolCalls[tcIndexInBatch + 1]
-            : null;
+        const nextTcInBatch = i < groups.length - 1 ? groups[i + 1][0] : null;
         const prevTcInBatch =
-          toolCalls.indexOf(group[0]) > 0
-            ? toolCalls[toolCalls.indexOf(group[0]) - 1]
-            : null;
+          i > 0 ? groups[i - 1][groups[i - 1].length - 1] : null;
 
         const historyItem = mapTrackedToolCallsToDisplay(group, {
           ...getToolGroupBorderAppearance(
@@ -611,17 +604,9 @@ export const useGeminiStream = (
     );
 
     if (remainingTools.length > 0) {
-      // Should we draw a top border? Yes if NO previous tools were drawn,
-      // OR if ALL previously drawn tools were topics (which don't draw top borders).
-      let needsTopBorder = pushedToolCallIds.size === 0;
-      if (!needsTopBorder) {
-        const allPushedWereTopics = toolCalls
-          .filter((tc) => pushedToolCallIds.has(tc.request.callId))
-          .every((tc) => isTopicTool(tc.request.name));
-        if (allPushedWereTopics) {
-          needsTopBorder = true;
-        }
-      }
+      // The pending group always needs a top border because any previously
+      // pushed tool history items have already closed their own border boxes.
+      const needsTopBorder = true;
 
       items.push(
         mapTrackedToolCallsToDisplay(remainingTools, {
