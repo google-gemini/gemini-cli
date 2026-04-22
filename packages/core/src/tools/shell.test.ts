@@ -430,7 +430,69 @@ describe('ShellTool', () => {
         'sleep 10',
       );
 
-      await promise;
+      const result = await promise;
+      expect(result.backgroundedStreamId).toBeUndefined();
+    });
+
+    it('sets backgroundedStreamId when is_background and stream_output are both true', async () => {
+      vi.useFakeTimers();
+      // Simulate a real long-running process: background() does NOT resolve
+      // the execution promise, so the shell tool takes the early-return path.
+      mockShellBackground.mockImplementationOnce(() => {});
+
+      const invocation = shellTool.build({
+        command: 'sleep 10',
+        is_background: true,
+        stream_output: true,
+      });
+      const promise = invocation.execute({ abortSignal: mockAbortSignal });
+
+      await vi.advanceTimersByTimeAsync(250);
+
+      const result = await promise;
+      expect(result.backgroundedStreamId).toBe(12345);
+      expect(result.returnDisplay).toBe(
+        'Background process started with PID 12345.',
+      );
+    });
+
+    it('does not set backgroundedStreamId on the early-return path when stream_output is false', async () => {
+      vi.useFakeTimers();
+      mockShellBackground.mockImplementationOnce(() => {});
+
+      const invocation = shellTool.build({
+        command: 'sleep 10',
+        is_background: true,
+      });
+      const promise = invocation.execute({ abortSignal: mockAbortSignal });
+
+      await vi.advanceTimersByTimeAsync(250);
+
+      const result = await promise;
+      expect(result.backgroundedStreamId).toBeUndefined();
+      expect(result.returnDisplay).toBe(
+        'Background process started with PID 12345.',
+      );
+    });
+
+    it('does not set backgroundedStreamId when stream_output is true but is_background is false', async () => {
+      const invocation = shellTool.build({
+        command: 'echo hello',
+        stream_output: true,
+      });
+      const promise = invocation.execute({ abortSignal: mockAbortSignal });
+      resolveShellExecution({
+        rawOutput: Buffer.from(''),
+        output: '',
+        exitCode: 0,
+        signal: null,
+        error: null,
+        aborted: false,
+        pid: 12345,
+        executionMethod: 'child_process',
+      });
+      const result = await promise;
+      expect(result.backgroundedStreamId).toBeUndefined();
     });
 
     itWindowsOnly(

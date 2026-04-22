@@ -627,6 +627,9 @@ export class ShellToolInvocation extends BaseToolInvocation<
             return {
               llmContent: `Command is running in background. PID: ${pid}. Initial output:\n${cumulativeOutput}`,
               returnDisplay: `Background process started with PID ${pid}.`,
+              ...(this.params.stream_output
+                ? { backgroundedStreamId: pid }
+                : {}),
             };
           }
         }

@@ -776,6 +776,19 @@ export interface ToolResult {
     name: string;
     args: Record<string, unknown>;
   };
+
+  /**
+   * Optional. When the tool returns early because it handed a long-running
+   * process off to the background AND the caller requested live streaming
+   * of stdout (e.g. `run_shell_command` with `stream_output: true`), this
+   * field carries the correlating stream id (typically the process PID).
+   *
+   * The ACP layer uses this to keep the tool call in `in_progress` state
+   * so subsequent streamed lines can still be emitted; the terminal
+   * `completed` status is deferred until the process actually exits or the
+   * turn is aborted.
+   */
+  backgroundedStreamId?: number;
 }
 
 /**
