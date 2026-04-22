@@ -1126,6 +1126,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
               // Default behavior: auto-complete to prompt box
               completion.handleAutocomplete(targetIndex);
               setExpandedSuggestionIndex(-1); // Reset expansion after selection
+              hasUserNavigatedSuggestions.current = false;
             }
           }
           return true;
