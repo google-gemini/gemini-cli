@@ -21,6 +21,7 @@ import {
   PARAM_DESCRIPTION,
   PARAM_DIR_PATH,
   SHELL_PARAM_IS_BACKGROUND,
+  SHELL_PARAM_STREAM_OUTPUT,
   EXIT_PLAN_PARAM_PLAN_FILENAME,
   SKILL_PARAM_NAME,
   PARAM_ADDITIONAL_PERMISSIONS,
@@ -114,6 +115,11 @@ export function getShellDeclaration(
           type: 'boolean',
           description:
             'Set to true if this command should be run in the background (e.g. for long-running servers or watchers). The command will be started, allowed to run for a brief moment to check for immediate errors, and then moved to the background.',
+        },
+        [SHELL_PARAM_STREAM_OUTPUT]: {
+          type: 'boolean',
+          description:
+            'Optional. Only effective when `is_background` is also true. When true, each stdout line from the background process is forwarded to the conversation in real time as incremental tool-call updates, allowing the model to react to live output (e.g. a file-watcher emitting `NEW:<name>` on detected changes, a long build streaming progress). The stream lasts for the current turn; the full output remains retrievable via `read_background_output`.',
         },
         delay_ms: {
           type: 'integer',
