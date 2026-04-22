@@ -1757,15 +1757,16 @@ their corresponding top-level category object in your `settings.json` file.
   - **Requires restart:** Yes
 
 - **`experimental.memoryV2`** (boolean):
-  - **Description:** Disable the built-in save_memory tool and let the main
+  - **Description:** Disables the built-in save_memory tool and lets the main
     agent persist project context by editing markdown files directly with
     edit/write_file. Routes facts across four tiers: team-shared conventions go
     to project GEMINI.md files, project-specific personal notes go to the
     per-project private memory folder (MEMORY.md as index + sibling .md files
     for detail), and cross-project personal preferences go to the global
     ~/.gemini/GEMINI.md (the only file under ~/.gemini/ that the agent can edit
-    — settings, credentials, etc. remain off-limits).
-  - **Default:** `false`
+    — settings, credentials, etc. remain off-limits). Set to false to fall back
+    to the legacy save_memory tool.
+  - **Default:** `true`
   - **Requires restart:** Yes
 
 - **`experimental.autoMemory`** (boolean):
