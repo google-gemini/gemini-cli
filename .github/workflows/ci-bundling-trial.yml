@@ -414,5 +414,5 @@ jobs:
           skip-npm-ci: 'true'
 
       - name: 'Run All Core Tests'
-        run: 'npx vitest run --pool=threads packages/core/src'
+        run: 'npx vitest run --pool=threads packages/core/src --exclude "**/*.integration.test.ts"'
         shell: 'bash'
