@@ -44,7 +44,6 @@ export class ContextManager {
       this.env.tokenCalculator,
       this.env.graphMapper,
     );
-    this.historyObserver.start();
 
     this.eventBus.onPristineHistoryUpdated((event) => {
       const newIds = new Set(event.nodes.map((n) => n.id));
@@ -66,6 +65,8 @@ export class ContextManager {
         event.returnedNodes,
       );
     });
+
+    this.historyObserver.start();
   }
 
   /**

@@ -123,8 +123,8 @@ export const AgentYieldBehavior: NodeBehavior<AgentYield> = {
     return [{ text: yieldNode.text }];
   },
   serialize(yieldNode, writer) {
-    writer.appendModelPart({ text: yieldNode.text });
-    writer.flushModelParts();
+    // AGENT_YIELD is a synthetic marker node used for internal graph tracking.
+    // We intentionally do NOT serialize it to the LLM to prevent prompt corruption.
   },
 };
 
