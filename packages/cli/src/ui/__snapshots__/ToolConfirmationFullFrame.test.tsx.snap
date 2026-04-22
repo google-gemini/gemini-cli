@@ -1,43 +1,43 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`Full Terminal Tool Confirmation Snapshot > renders tool confirmation box in the frame of the entire terminal 1`] = `
-"▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
- > Can you edit InputPrompt.tsx for me?                                                             
+" > Can you edit InputPrompt.tsx for me?                                                             
 ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+
 ╭─────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ Action Required                                                                                 │
-│                                                                                                 │
-│ ?  Edit packages/.../InputPrompt.tsx:   return kittyProtocolSupporte... =>   return kittyProto… │
-│                                                                                                 │
-│ ... first 44 lines hidden (Ctrl+O to show) ...                                                  │
-│ 45   const line45 = true;                                                                       │
-│ 46   const line46 = true;                                                                       │
-│ 47   const line47 = true;                                                                       │█
-│ 48   const line48 = true;                                                                       │█
-│ 49   const line49 = true;                                                                       │█
-│ 50   const line50 = true;                                                                       │█
-│ 51   const line51 = true;                                                                       │█
-│ 52   const line52 = true;                                                                       │█
-│ 53   const line53 = true;                                                                       │█
-│ 54   const line54 = true;                                                                       │█
-│ 55   const line55 = true;                                                                       │█
-│ 56   const line56 = true;                                                                       │█
-│ 57   const line57 = true;                                                                       │█
-│ 58   const line58 = true;                                                                       │█
-│ 59   const line59 = true;                                                                       │█
-│ 60   const line60 = true;                                                                       │█
-│ 61 -  return kittyProtocolSupporte...;                                                          │█
-│ 61 +  return kittyProtocolSupporte...;                                                          │█
-│ 62    buffer: TextBuffer;                                                                       │█
-│ 63    onSubmit: (value: string) => void;                                                        │█
+│ ? Edit packages/.../InputPrompt.tsx:   return kittyProtocolSupporte... =>   return kittyProto…  │
+│ ╭─────────────────────────────────────────────────────────────────────────────────────────────╮ │
+│ │ ... first 42 lines hidden (Ctrl+O to show) ...                                              │ │
+│ │ 43   const line43 = true;                                                                   │ │
+│ │ 44   const line44 = true;                                                                   │ │
+│ │ 45   const line45 = true;                                                                   │ │
+│ │ 46   const line46 = true;                                                                   │ │
+│ │ 47   const line47 = true;                                                                   │ │▄
+│ │ 48   const line48 = true;                                                                   │ │█
+│ │ 49   const line49 = true;                                                                   │ │█
+│ │ 50   const line50 = true;                                                                   │ │█
+│ │ 51   const line51 = true;                                                                   │ │█
+│ │ 52   const line52 = true;                                                                   │ │█
+│ │ 53   const line53 = true;                                                                   │ │█
+│ │ 54   const line54 = true;                                                                   │ │█
+│ │ 55   const line55 = true;                                                                   │ │█
+│ │ 56   const line56 = true;                                                                   │ │█
+│ │ 57   const line57 = true;                                                                   │ │█
+│ │ 58   const line58 = true;                                                                   │ │█
+│ │ 59   const line59 = true;                                                                   │ │█
+│ │ 60   const line60 = true;                                                                   │ │█
+│ │ 61 -  return kittyProtocolSupporte...;                                                      │ │█
+│ │ 61 +  return kittyProtocolSupporte...;                                                      │ │█
+│ │ 62    buffer: TextBuffer;                                                                   │ │█
+│ │ 63    onSubmit: (value: string) => void;                                                    │ │█
+│ ╰─────────────────────────────────────────────────────────────────────────────────────────────╯ │█
 │ Apply this change?                                                                              │█
 │                                                                                                 │█
 │ ● 1. Allow once                                                                                 │█
 │   2. Allow for this session                                                                     │█
-│   3. Allow for this file in all future sessions                                                 │█
+│   3. Allow for this file in all future sessions ~/.gemini/policies/auto-saved.toml              │█
 │   4. Modify with external editor                                                                │█
 │   5. No, suggest changes (esc)                                                                  │█
-│                                                                                                 │█
 ╰─────────────────────────────────────────────────────────────────────────────────────────────────╯█
 "
 `;

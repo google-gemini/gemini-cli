@@ -1,7 +1,7 @@
 # File system tools reference
 
-The Gemini CLI core provides a suite of tools for interacting with the local
-file system. These tools allow the model to explore and modify your codebase.
+Gemini CLI core provides a suite of tools for interacting with the local file
+system. These tools allow the model to explore and modify your codebase.
 
 ## Technical reference
 
@@ -49,8 +49,8 @@ Finds files matching specific glob patterns across the workspace.
 - **Display name:** FindFiles
 - **File:** `glob.ts`
 - **Parameters:**
-  - `pattern` (string, required): The glob pattern to match against (e.g.,
-    `"*.py"`, `"src/**/*.js"`).
+  - `pattern` (string, required): The glob pattern to match against (for
+    example, `"*.py"`, `"src/**/*.js"`).
   - `path` (string, optional): The absolute path to the directory to search
     within. If omitted, searches the tool's root directory.
   - `case_sensitive` (boolean, optional): Whether the search should be
@@ -78,18 +78,18 @@ lines containing matches, along with their file paths and line numbers.
 - **File:** `grep.ts`
 - **Parameters:**
   - `pattern` (string, required): The regular expression (regex) to search for
-    (e.g., `"function\s+myFunction"`).
+    (for example, `"function\s+myFunction"`).
   - `path` (string, optional): The absolute path to the directory to search
     within. Defaults to the current working directory.
   - `include` (string, optional): A glob pattern to filter which files are
-    searched (e.g., `"*.js"`, `"src/**/*.{ts,tsx}"`). If omitted, searches most
-    files (respecting common ignores).
+    searched (for example, `"*.js"`, `"src/**/*.{ts,tsx}"`). If omitted,
+    searches most files (respecting common ignores).
 - **Behavior:**
   - Uses `git grep` if available in a Git repository for speed; otherwise, falls
     back to system `grep` or a JavaScript-based search.
   - Returns a list of matching lines, each prefixed with its file path (relative
     to the search directory) and line number.
-- **Output (`llmContent`):** A formatted string of matches, e.g.:
+- **Output (`llmContent`):** A formatted string of matches, for example:
   ```
   Found 3 matches for pattern "myFunction" in path "." (filter: "*.ts"):
   ---

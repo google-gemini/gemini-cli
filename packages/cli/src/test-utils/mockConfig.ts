@@ -38,11 +38,14 @@ export const createMockConfig = (overrides: Partial<Config> = {}): Config =>
       fireSessionEndEvent: vi.fn().mockResolvedValue(undefined),
       fireSessionStartEvent: vi.fn().mockResolvedValue(undefined),
     })),
+    isMemoryV2Enabled: vi.fn(() => false),
+    isAutoMemoryEnabled: vi.fn(() => false),
     getListExtensions: vi.fn(() => false),
     getExtensions: vi.fn(() => []),
     getListSessions: vi.fn(() => false),
     getDeleteSession: vi.fn(() => undefined),
     setSessionId: vi.fn(),
+    resetNewSessionState: vi.fn(),
     getSessionId: vi.fn().mockReturnValue('mock-session-id'),
     getWorktreeSettings: vi.fn(() => undefined),
     getContentGeneratorConfig: vi.fn(() => ({ authType: 'google' })),
@@ -86,6 +89,7 @@ export const createMockConfig = (overrides: Partial<Config> = {}): Config =>
     getAccessibility: vi.fn().mockReturnValue({}),
     getTelemetryEnabled: vi.fn().mockReturnValue(false),
     getTelemetryLogPromptsEnabled: vi.fn().mockReturnValue(false),
+    getTelemetryTracesEnabled: vi.fn().mockReturnValue(false),
     getTelemetryOtlpEndpoint: vi.fn().mockReturnValue(''),
     getTelemetryOtlpProtocol: vi.fn().mockReturnValue('grpc'),
     getTelemetryTarget: vi.fn().mockReturnValue(''),
@@ -135,6 +139,7 @@ export const createMockConfig = (overrides: Partial<Config> = {}): Config =>
     getRetryFetchErrors: vi.fn().mockReturnValue(true),
     getEnableShellOutputEfficiency: vi.fn().mockReturnValue(true),
     getShellToolInactivityTimeout: vi.fn().mockReturnValue(300000),
+    getRequestTimeoutMs: vi.fn().mockReturnValue(undefined),
     getShellExecutionConfig: vi.fn().mockReturnValue({
       sandboxManager: new NoopSandboxManager(),
       sanitizationConfig: {
@@ -175,6 +180,8 @@ export const createMockConfig = (overrides: Partial<Config> = {}): Config =>
     getHasAccessToPreviewModel: vi.fn().mockReturnValue(false),
     validatePathAccess: vi.fn().mockReturnValue(null),
     getUseAlternateBuffer: vi.fn().mockReturnValue(false),
+    getUseTerminalBuffer: vi.fn().mockReturnValue(false),
+    getUseRenderProcess: vi.fn().mockReturnValue(false),
     ...overrides,
   }) as unknown as Config;
 

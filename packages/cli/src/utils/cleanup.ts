@@ -24,8 +24,22 @@ export function registerCleanup(fn: (() => void) | (() => Promise<void>)) {
   cleanupFunctions.push(fn);
 }
 
+export function removeCleanup(fn: (() => void) | (() => Promise<void>)) {
+  const index = cleanupFunctions.indexOf(fn);
+  if (index !== -1) {
+    cleanupFunctions.splice(index, 1);
+  }
+}
+
 export function registerSyncCleanup(fn: () => void) {
   syncCleanupFunctions.push(fn);
+}
+
+export function removeSyncCleanup(fn: () => void) {
+  const index = syncCleanupFunctions.indexOf(fn);
+  if (index !== -1) {
+    syncCleanupFunctions.splice(index, 1);
+  }
 }
 
 /**
@@ -43,7 +57,7 @@ export function runSyncCleanup() {
   for (const fn of syncCleanupFunctions) {
     try {
       fn();
-    } catch (_) {
+    } catch {
       // Ignore errors during cleanup.
     }
   }
@@ -67,7 +81,7 @@ export async function runExitCleanup() {
   for (const fn of cleanupFunctions) {
     try {
       await fn();
-    } catch (_) {
+    } catch {
       // Ignore errors during cleanup.
     }
   }
@@ -76,14 +90,14 @@ export async function runExitCleanup() {
   // Close persistent browser sessions before disposing config
   try {
     await resetBrowserSession();
-  } catch (_) {
+  } catch {
     // Ignore errors during browser cleanup
   }
 
   if (configForTelemetry) {
     try {
       await configForTelemetry.dispose();
-    } catch (_) {
+    } catch {
       // Ignore errors during disposal
     }
   }
@@ -93,7 +107,7 @@ export async function runExitCleanup() {
   if (configForTelemetry && isTelemetrySdkInitialized()) {
     try {
       await shutdownTelemetry(configForTelemetry);
-    } catch (_) {
+    } catch {
       // Ignore errors during telemetry shutdown
     }
   }

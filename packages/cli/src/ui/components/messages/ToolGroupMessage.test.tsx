@@ -10,6 +10,7 @@ import { ToolGroupMessage } from './ToolGroupMessage.js';
 import {
   UPDATE_TOPIC_TOOL_NAME,
   TOPIC_PARAM_TITLE,
+  TOPIC_PARAM_SUMMARY,
   TOPIC_PARAM_STRATEGIC_INTENT,
   makeFakeConfig,
   CoreToolCallStatus,
@@ -279,8 +280,8 @@ describe('<ToolGroupMessage />', () => {
       );
 
       const output = lastFrame();
-      expect(output).toContain('Testing Topic');
-      expect(output).toContain('— This is the description');
+      expect(output).toContain('Testing Topic: ');
+      expect(output).toContain('This is the description');
       expect(output).toMatchSnapshot('update_topic_tool');
       unmount();
     });
@@ -292,7 +293,7 @@ describe('<ToolGroupMessage />', () => {
           name: UPDATE_TOPIC_TOOL_NAME,
           args: {
             [TOPIC_PARAM_TITLE]: 'Testing Topic',
-            summary: 'This is the summary',
+            [TOPIC_PARAM_SUMMARY]: 'This is the summary',
           },
         }),
       ];
@@ -307,8 +308,8 @@ describe('<ToolGroupMessage />', () => {
       );
 
       const output = lastFrame();
-      expect(output).toContain('Testing Topic');
-      expect(output).toContain('— This is the summary');
+      expect(output).toContain('Testing Topic: ');
+      expect(output).toContain('This is the summary');
       unmount();
     });
 

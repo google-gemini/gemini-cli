@@ -43,8 +43,8 @@ import type {
 } from '../services/chatRecordingService.js';
 import type { ContentGenerator } from './contentGenerator.js';
 import { LoopDetectionService } from '../services/loopDetectionService.js';
-import { ChatCompressionService } from '../services/chatCompressionService.js';
-import { AgentHistoryProvider } from '../services/agentHistoryProvider.js';
+import { ChatCompressionService } from '../context/chatCompressionService.js';
+import { AgentHistoryProvider } from '../context/agentHistoryProvider.js';
 import { ideContextStore } from '../ide/ideContext.js';
 import {
   logContentRetryFailure,
@@ -65,7 +65,7 @@ import { handleFallback } from '../fallback/handler.js';
 import type { RoutingContext } from '../routing/routingStrategy.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
-import { ToolOutputMaskingService } from '../services/toolOutputMaskingService.js';
+import { ToolOutputMaskingService } from '../context/toolOutputMaskingService.js';
 import { calculateRequestTokenCount } from '../utils/tokenCalculation.js';
 import {
   applyModelSelection,
@@ -312,7 +312,7 @@ export class GeminiClient {
     this.updateTelemetryTokenCount();
     // Reset JIT context loaded paths so subdirectory context can be
     // re-discovered in the new session.
-    await this.config.getContextManager()?.refresh();
+    await this.config.getMemoryContextManager()?.refresh();
   }
 
   dispose() {
@@ -378,7 +378,7 @@ export class GeminiClient {
     try {
       const systemMemory = this.config.getSystemInstructionMemory();
       const systemInstruction = getCoreSystemPrompt(this.config, systemMemory);
-      return new GeminiChat(
+      const chat = new GeminiChat(
         this.config,
         systemInstruction,
         tools,
@@ -392,6 +392,8 @@ export class GeminiClient {
           return [{ functionDeclarations: toolDeclarations }];
         },
       );
+      await chat.initialize(resumedSessionData, 'main');
+      return chat;
     } catch (error) {
       await reportError(
         error,
@@ -1231,9 +1233,6 @@ export class GeminiClient {
    * Masks bulky tool outputs to save context window space.
    */
   private async tryMaskToolOutputs(history: readonly Content[]): Promise<void> {
-    if (!this.config.getToolOutputMaskingEnabled()) {
-      return;
-    }
     const result = await this.toolOutputMaskingService.mask(
       history,
       this.config,

@@ -28,7 +28,7 @@ export const AUTO_SAVED_POLICY_FILENAME = 'auto-saved.toml';
 
 export class Storage {
   private readonly targetDir: string;
-  private readonly sessionId: string | undefined;
+  private sessionId: string | undefined;
   private projectIdentifier: string | undefined;
   private initPromise: Promise<void> | undefined;
   private customPlansDir: string | undefined;
@@ -40,6 +40,14 @@ export class Storage {
 
   setCustomPlansDir(dir: string | undefined): void {
     this.customPlansDir = dir;
+  }
+
+  setSessionId(sessionId: string | undefined): void {
+    this.sessionId = sessionId;
+  }
+
+  isInitialized(): boolean {
+    return !!this.projectIdentifier;
   }
 
   static getGlobalGeminiDir(): string {
@@ -267,8 +275,15 @@ export class Storage {
   }
 
   getProjectMemoryDir(): string {
-    const identifier = this.getProjectIdentifier();
-    return path.join(Storage.getGlobalGeminiDir(), 'memory', identifier);
+    return this.getProjectMemoryTempDir();
+  }
+
+  getProjectMemoryTempDir(): string {
+    return path.join(this.getProjectTempDir(), 'memory');
+  }
+
+  getProjectSkillsMemoryDir(): string {
+    return path.join(this.getProjectMemoryTempDir(), 'skills');
   }
 
   getWorkspaceSettingsPath(): string {
@@ -346,7 +361,9 @@ export class Storage {
     const chatsDir = path.join(this.getProjectTempDir(), 'chats');
     try {
       const files = await fs.promises.readdir(chatsDir);
-      const jsonFiles = files.filter((f) => f.endsWith('.json'));
+      const jsonFiles = files.filter(
+        (f) => f.endsWith('.json') || f.endsWith('.jsonl'),
+      );
 
       const sessions = await Promise.all(
         jsonFiles.map(async (file) => {
