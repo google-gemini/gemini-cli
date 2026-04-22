@@ -2,7 +2,7 @@
   "experimental": {
     "extensionReloading": true,
     "modelSteering": true,
-    "memoryManager": true
+    "autoMemory": true
   },
   "general": {
     "devtools": true

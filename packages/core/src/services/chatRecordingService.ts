@@ -109,6 +109,7 @@ export async function loadConversationRecord(
 ): Promise<
   | (ConversationRecord & {
       messageCount?: number;
+      userMessageCount?: number;
       firstUserMessage?: string;
       hasUserOrAssistantMessage?: boolean;
     })
@@ -128,8 +129,11 @@ export async function loadConversationRecord(
     let metadata: Partial<ConversationRecord> = {};
     const messagesMap = new Map<string, MessageRecord>();
     const messageIds: string[] = [];
+    const messageKinds = new Map<
+      string,
+      { isUser: boolean; isUserOrAssistant: boolean }
+    >();
     let firstUserMessageStr: string | undefined;
-    let hasUserOrAssistant = false;
 
     for await (const line of rl) {
       if (!line.trim()) continue;
@@ -140,13 +144,14 @@ export async function loadConversationRecord(
           if (options?.metadataOnly) {
             const idx = messageIds.indexOf(rewindId);
             if (idx !== -1) {
-              messageIds.splice(idx);
+              const removedIds = messageIds.splice(idx);
+              for (const removedId of removedIds) {
+                messageKinds.delete(removedId);
+              }
             } else {
               messageIds.length = 0;
+              messageKinds.clear();
             }
-            // For metadataOnly we can't perfectly un-track hasUserOrAssistant if it was rewinded,
-            // but we can assume false if messageIds is empty.
-            if (messageIds.length === 0) hasUserOrAssistant = false;
           } else {
             let found = false;
             const idsToDelete: string[] = [];
@@ -164,20 +169,18 @@ export async function loadConversationRecord(
           }
         } else if (isMessageRecord(record)) {
           const id = record.id;
-          if (
+          const isUser = hasProperty(record, 'type') && record.type === 'user';
+          const isUserOrAssistant =
             hasProperty(record, 'type') &&
-            (record.type === 'user' || record.type === 'gemini')
-          ) {
-            hasUserOrAssistant = true;
-          }
+            (record.type === 'user' || record.type === 'gemini');
           // Track message count and first user message
           if (options?.metadataOnly) {
             messageIds.push(id);
+            messageKinds.set(id, { isUser, isUserOrAssistant });
           }
           if (
             !firstUserMessageStr &&
-            hasProperty(record, 'type') &&
-            record['type'] === 'user' &&
+            isUser &&
             hasProperty(record, 'content') &&
             record['content']
           ) {
@@ -221,6 +224,33 @@ export async function loadConversationRecord(
       return await parseLegacyRecordFallback(filePath, options);
     }
 
+    const metadataMessages = Array.isArray(metadata.messages)
+      ? metadata.messages
+      : [];
+    const loadedMessages =
+      metadataMessages.length > 0
+        ? metadataMessages
+        : Array.from(messagesMap.values());
+    const metadataFirstUserMessage =
+      metadataMessages.find((message) => message.type === 'user') ?? null;
+    let fallbackFirstUserMessage = firstUserMessageStr;
+    if (!fallbackFirstUserMessage && metadataFirstUserMessage) {
+      const rawContent = metadataFirstUserMessage.content;
+      if (Array.isArray(rawContent)) {
+        fallbackFirstUserMessage = rawContent
+          .map((part: unknown) => (isTextPart(part) ? part['text'] : ''))
+          .join('');
+      } else if (typeof rawContent === 'string') {
+        fallbackFirstUserMessage = rawContent;
+      }
+    }
+    const userMessageCount = options?.metadataOnly
+      ? Array.from(messageKinds.values()).filter((m) => m.isUser).length
+      : loadedMessages.filter((m) => m.type === 'user').length;
+    const hasUserOrAssistant = options?.metadataOnly
+      ? Array.from(messageKinds.values()).some((m) => m.isUserOrAssistant)
+      : loadedMessages.some((m) => m.type === 'user' || m.type === 'gemini');
+
     return {
       sessionId: metadata.sessionId,
       projectHash: metadata.projectHash,
@@ -229,16 +259,21 @@ export async function loadConversationRecord(
       summary: metadata.summary,
       directories: metadata.directories,
       kind: metadata.kind,
-      messages: Array.from(messagesMap.values()),
+      messages: options?.metadataOnly ? [] : loadedMessages,
       messageCount: options?.metadataOnly
-        ? messageIds.length
-        : messagesMap.size,
-      firstUserMessage: firstUserMessageStr,
-      hasUserOrAssistantMessage: options?.metadataOnly
-        ? hasUserOrAssistant
-        : Array.from(messagesMap.values()).some(
-            (m) => m.type === 'user' || m.type === 'gemini',
-          ),
+        ? metadataMessages.length || messageIds.length
+        : loadedMessages.length,
+      userMessageCount:
+        options?.metadataOnly && metadataMessages.length > 0
+          ? metadataMessages.filter((m) => m.type === 'user').length
+          : userMessageCount,
+      firstUserMessage: fallbackFirstUserMessage,
+      hasUserOrAssistantMessage:
+        options?.metadataOnly && metadataMessages.length > 0
+          ? metadataMessages.some(
+              (m) => m.type === 'user' || m.type === 'gemini',
+            )
+          : hasUserOrAssistant,
     };
   } catch (error) {
     debugLogger.error('Error loading conversation record from JSONL:', error);
@@ -816,6 +851,7 @@ async function parseLegacyRecordFallback(
 ): Promise<
   | (ConversationRecord & {
       messageCount?: number;
+      userMessageCount?: number;
       firstUserMessage?: string;
       hasUserOrAssistantMessage?: boolean;
     })
@@ -849,6 +885,8 @@ async function parseLegacyRecordFallback(
           ...legacyRecord,
           messages: [],
           messageCount: legacyRecord.messages?.length || 0,
+          userMessageCount:
+            legacyRecord.messages?.filter((m) => m.type === 'user').length || 0,
           firstUserMessage: fallbackFirstUserMessageStr,
           hasUserOrAssistantMessage:
             legacyRecord.messages?.some(
@@ -858,6 +896,8 @@ async function parseLegacyRecordFallback(
       }
       return {
         ...legacyRecord,
+        userMessageCount:
+          legacyRecord.messages?.filter((m) => m.type === 'user').length || 0,
         hasUserOrAssistantMessage:
           legacyRecord.messages?.some(
             (m) => m.type === 'user' || m.type === 'gemini',

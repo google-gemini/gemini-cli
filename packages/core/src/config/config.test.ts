@@ -3501,13 +3501,27 @@ describe('Config JIT Initialization', () => {
   });
 
   describe('isMemoryV2Enabled', () => {
-    it('should default to false', () => {
+    it('should default to true', () => {
       const params: ConfigParameters = {
         sessionId: 'test-session',
         targetDir: '/tmp/test',
         debugMode: false,
         model: 'test-model',
         cwd: '/tmp/test',
+      };
+
+      config = new Config(params);
+      expect(config.isMemoryV2Enabled()).toBe(true);
+    });
+
+    it('should return false when experimentalMemoryV2 is explicitly false', () => {
+      const params: ConfigParameters = {
+        sessionId: 'test-session',
+        targetDir: '/tmp/test',
+        debugMode: false,
+        model: 'test-model',
+        cwd: '/tmp/test',
+        experimentalMemoryV2: false,
       };
 
       config = new Config(params);

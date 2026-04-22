@@ -1172,7 +1172,7 @@ export class Config implements McpContext, AgentLoopContext {
     );
 
     this.experimentalJitContext = params.experimentalJitContext ?? true;
-    this.experimentalMemoryV2 = params.experimentalMemoryV2 ?? false;
+    this.experimentalMemoryV2 = params.experimentalMemoryV2 ?? true;
     this.experimentalAutoMemory = params.experimentalAutoMemory ?? false;
     this.experimentalContextManagementConfig =
       params.experimentalContextManagementConfig;
