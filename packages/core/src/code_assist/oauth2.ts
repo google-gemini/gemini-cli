@@ -413,6 +413,7 @@ async function authWithUserCode(client: OAuth2Client): Promise<boolean> {
     const authUrl: string = client.generateAuthUrl({
       redirect_uri: redirectUri,
       access_type: 'offline',
+      prompt: 'consent',
       scope: OAUTH_SCOPE,
       code_challenge_method: CodeChallengeMethod.S256,
       code_challenge: codeVerifier.codeChallenge,
@@ -512,6 +513,7 @@ async function authWithWeb(client: OAuth2Client): Promise<OauthWebLogin> {
   const authUrl = client.generateAuthUrl({
     redirect_uri: redirectUri,
     access_type: 'offline',
+    prompt: 'consent',
     scope: OAUTH_SCOPE,
     state,
   });
@@ -750,7 +752,23 @@ async function cacheCredentials(credentials: Credentials) {
   const filePath = Storage.getOAuthCredsPath();
   await fs.mkdir(path.dirname(filePath), { recursive: true });
 
-  const credString = JSON.stringify(credentials, null, 2);
+  // Preserve existing refresh_token when Google only sends a new access_token
+  // during token refresh (refresh_token is only included on initial auth).
+  let merged = credentials;
+  if (!credentials.refresh_token) {
+    try {
+      const existing = await fs.readFile(filePath, 'utf-8');
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      const parsed = JSON.parse(existing) as Credentials;
+      if (parsed.refresh_token) {
+        merged = { ...credentials, refresh_token: parsed.refresh_token };
+      }
+    } catch {
+      // No existing file or parse error — proceed with what we have
+    }
+  }
+
+  const credString = JSON.stringify(merged, null, 2);
   await fs.writeFile(filePath, credString, { mode: 0o600 });
   try {
     await fs.chmod(filePath, 0o600);
