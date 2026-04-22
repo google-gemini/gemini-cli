@@ -17,13 +17,8 @@ import {
   getDirectoryContextString,
   getInitialChatHistory,
 } from '../utils/environmentContext.js';
-import {
-  CompressionStatus,
-  Turn,
-  GeminiEventType,
-  type ServerGeminiStreamEvent,
-  type ChatCompressionInfo,
-} from './turn.js';
+import { CompressionStatus, Turn, GeminiEventType } from './turn.js';
+import type { ServerGeminiStreamEvent, ChatCompressionInfo } from './turn.js';
 import type { Config } from '../config/config.js';
 import { type AgentLoopContext } from '../config/agent-loop-context.js';
 import { getCoreSystemPrompt } from './prompts.js';
