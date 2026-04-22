@@ -573,7 +573,13 @@ export class ShellToolInvocation extends BaseToolInvocation<
             }
           },
           combinedController.signal,
-          this.context.config.getEnableInteractiveShell(),
+          // When stream_output is combined with is_background we need the
+          // child_process path: it emits decoded string chunks that LineBuffer
+          // can split into lines. The node-pty path emits AnsiOutput (terminal
+          // redraw snapshots) which isn't suitable for per-line streaming.
+          this.params.is_background && this.params.stream_output
+            ? false
+            : this.context.config.getEnableInteractiveShell(),
           {
             ...shellExecutionConfig,
             sessionId: this.context.config?.getSessionId?.() ?? 'default',
