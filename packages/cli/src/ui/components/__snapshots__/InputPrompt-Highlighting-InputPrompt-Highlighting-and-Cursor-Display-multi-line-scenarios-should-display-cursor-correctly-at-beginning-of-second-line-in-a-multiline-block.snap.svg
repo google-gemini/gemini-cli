@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="88" viewBox="0 0 920 88">
+  <style>
+    text { font-family: Consolas, "Courier New", monospace; font-size: 14px; dominant-baseline: text-before-edge; white-space: pre; }
+  </style>
+  <rect width="920" height="88" fill="#000000" />
+  <g transform="translate(10, 10)">
+    <rect x="0" y="0" width="900" height="17" fill="#1f1f1f" />
+    <text x="0" y="2" fill="#000000" textLength="900" lengthAdjust="spacingAndGlyphs">▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀</text>
+    <rect x="0" y="17" width="9" height="17" fill="#1f1f1f" />
+    <rect x="9" y="17" width="18" height="17" fill="#1f1f1f" />
+    <text x="9" y="19" fill="#d7afff" textLength="18" lengthAdjust="spacingAndGlyphs">&gt; </text>
+    <rect x="27" y="17" width="54" height="17" fill="#1f1f1f" />
+    <text x="27" y="19" fill="#ffffff" textLength="54" lengthAdjust="spacingAndGlyphs">line 1</text>
+    <rect x="81" y="17" width="819" height="17" fill="#1f1f1f" />
+    <rect x="0" y="34" width="27" height="17" fill="#1f1f1f" />
+    <rect x="27" y="34" width="9" height="17" fill="#ffffff" />
+    <text x="27" y="36" fill="#1f1f1f" textLength="9" lengthAdjust="spacingAndGlyphs">l</text>
+    <rect x="36" y="34" width="45" height="17" fill="#1f1f1f" />
+    <text x="36" y="36" fill="#ffffff" textLength="45" lengthAdjust="spacingAndGlyphs">ine 2</text>
+    <rect x="81" y="34" width="819" height="17" fill="#1f1f1f" />
+    <rect x="0" y="51" width="900" height="17" fill="#1f1f1f" />
+    <text x="0" y="53" fill="#000000" textLength="900" lengthAdjust="spacingAndGlyphs">▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄</text>
+  </g>
+</svg>
