@@ -24,9 +24,6 @@ exports[`System Lifecycle Golden Tests > Scenario 1: Organic Growth with Huge To
         {
           "text": "Yes we can.",
         },
-        {
-          "text": "Yield",
-        },
       ],
       "role": "model",
     },
@@ -92,9 +89,6 @@ exports[`System Lifecycle Golden Tests > Scenario 2: Under Budget (No Modificati
       "parts": [
         {
           "text": "Hi, how can I help?",
-        },
-        {
-          "text": "Yield",
         },
       ],
       "role": "model",
@@ -162,9 +156,6 @@ exports[`System Lifecycle Golden Tests > Scenario 3: Async-Driven Background GC 
       "parts": [
         {
           "text": "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
-        },
-        {
-          "text": "Yield",
         },
       ],
       "role": "model",
