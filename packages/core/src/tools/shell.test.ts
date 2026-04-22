@@ -580,6 +580,85 @@ describe('ShellTool', () => {
       await promise;
     });
 
+    it('flushes pending stream_output lines and unsubscribes on abort', async () => {
+      vi.useFakeTimers();
+      mockShellBackground.mockImplementationOnce(() => {});
+      const updateOutputMock = vi.fn();
+      const abortController = new AbortController();
+
+      const invocation = shellTool.build({
+        command: 'watch /inbox',
+        is_background: true,
+        stream_output: true,
+      });
+      const promise = invocation.execute({
+        abortSignal: abortController.signal,
+        updateOutput: updateOutputMock,
+      });
+
+      await vi.advanceTimersByTimeAsync(0);
+
+      ExecutionLifecycleService.emitEvent(12345, {
+        type: 'data',
+        chunk: 'pending-line\n',
+      });
+
+      // Abort before the 200ms batch timer fires — must flush immediately.
+      abortController.abort();
+
+      expect(updateOutputMock).toHaveBeenCalledTimes(1);
+      expect(updateOutputMock).toHaveBeenCalledWith('pending-line');
+
+      // Any further emits are ignored — the listener has unsubscribed.
+      ExecutionLifecycleService.emitEvent(12345, {
+        type: 'data',
+        chunk: 'should-not-arrive\n',
+      });
+      await vi.advanceTimersByTimeAsync(400);
+      expect(updateOutputMock).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(250);
+      await promise;
+    });
+
+    it('flushes trailing partial lines when the process exits', async () => {
+      vi.useFakeTimers();
+      mockShellBackground.mockImplementationOnce(() => {});
+      const updateOutputMock = vi.fn();
+
+      const invocation = shellTool.build({
+        command: 'run',
+        is_background: true,
+        stream_output: true,
+      });
+      const promise = invocation.execute({
+        abortSignal: mockAbortSignal,
+        updateOutput: updateOutputMock,
+      });
+
+      await vi.advanceTimersByTimeAsync(0);
+
+      // Incomplete line (no trailing \n) — should be buffered.
+      ExecutionLifecycleService.emitEvent(12345, {
+        type: 'data',
+        chunk: 'no-newline',
+      });
+      await vi.advanceTimersByTimeAsync(300);
+      expect(updateOutputMock).not.toHaveBeenCalled();
+
+      // Process exits — LineBuffer.flush() emits the partial as a line.
+      ExecutionLifecycleService.emitEvent(12345, {
+        type: 'exit',
+        exitCode: 0,
+        signal: null,
+      });
+      expect(updateOutputMock).toHaveBeenCalledTimes(1);
+      expect(updateOutputMock).toHaveBeenCalledWith('no-newline');
+
+      await vi.advanceTimersByTimeAsync(250);
+      await promise;
+    });
+
     it('does not subscribe to ExecutionLifecycleService when stream_output is false', async () => {
       vi.useFakeTimers();
       mockShellBackground.mockImplementationOnce(() => {});
