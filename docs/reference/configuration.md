@@ -1688,8 +1688,10 @@ their corresponding top-level category object in your `settings.json` file.
   - **Requires restart:** Yes
 
 - **`experimental.jitContext`** (boolean):
-  - **Description:** Enable Just-In-Time (JIT) context loading.
-  - **Default:** `false`
+  - **Description:** Enable Just-In-Time (JIT) context loading. Defaults to
+    true; set to false to opt out and load all GEMINI.md files into the system
+    instruction up-front.
+  - **Default:** `true`
   - **Requires restart:** Yes
 
 - **`experimental.useOSC52Paste`** (boolean):
@@ -1754,10 +1756,15 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `"gemma3-1b-gpu-custom"`
   - **Requires restart:** Yes
 
-- **`experimental.memoryManager`** (boolean):
-  - **Description:** Replace the built-in save_memory tool with a memory manager
-    subagent that supports adding, removing, de-duplicating, and organizing
-    memories.
+- **`experimental.memoryV2`** (boolean):
+  - **Description:** Disable the built-in save_memory tool and let the main
+    agent persist project context by editing markdown files directly with
+    edit/write_file. Routes facts across four tiers: team-shared conventions go
+    to project GEMINI.md files, project-specific personal notes go to the
+    per-project private memory folder (MEMORY.md as index + sibling .md files
+    for detail), and cross-project personal preferences go to the global
+    ~/.gemini/GEMINI.md (the only file under ~/.gemini/ that the agent can edit
+    — settings, credentials, etc. remain off-limits).
   - **Default:** `false`
   - **Requires restart:** Yes
 
