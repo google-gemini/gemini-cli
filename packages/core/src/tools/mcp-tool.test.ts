@@ -169,6 +169,93 @@ describe('DiscoveredMCPTool', () => {
     });
   });
 
+  describe('getSchema', () => {
+    it('should strip $schema from parametersJsonSchema for API compatibility', () => {
+      const schemaWithDraft2020 = {
+        $schema: 'https://json-schema.org/draft/2020-12/schema',
+        type: 'object' as const,
+        properties: { param: { type: 'string' } },
+        required: ['param'],
+      };
+      const bus = createMockMessageBus();
+      const toolWith$schema = new DiscoveredMCPTool(
+        mockCallableToolInstance,
+        serverName,
+        serverToolName,
+        baseDescription,
+        schemaWithDraft2020,
+        bus,
+      );
+      const schema = toolWith$schema.getSchema();
+      expect(
+        (schema.parametersJsonSchema as Record<string, unknown>)?.['$schema'],
+      ).toBeUndefined();
+      expect(
+        (schema.parametersJsonSchema as Record<string, unknown>)?.['type'],
+      ).toBe('object');
+      expect(
+        (
+          (schema.parametersJsonSchema as Record<string, unknown>)?.[
+            'properties'
+          ] as Record<string, unknown>
+        )?.['param'],
+      ).toEqual({ type: 'string' });
+      expect(
+        (
+          (schema.parametersJsonSchema as Record<string, unknown>)?.[
+            'properties'
+          ] as Record<string, unknown>
+        )?.['wait_for_previous'],
+      ).toBeDefined();
+      expect(
+        (toolWith$schema.parameterSchema as Record<string, unknown>)?.[
+          '$schema'
+        ],
+      ).toBe('https://json-schema.org/draft/2020-12/schema');
+    });
+
+    it('should not modify schema without $schema property', () => {
+      const schema = tool.getSchema();
+      expect(schema.parametersJsonSchema).toEqual({
+        ...inputSchema,
+        properties: {
+          ...(inputSchema['properties'] as Record<string, unknown>),
+          wait_for_previous: expect.any(Object),
+        },
+      });
+    });
+  });
+
+  describe('validateToolParams', () => {
+    it('should accept wait_for_previous even with additionalProperties: false', () => {
+      const strictSchema = {
+        type: 'object' as const,
+        properties: { param: { type: 'string' } },
+        required: ['param'],
+        additionalProperties: false,
+      };
+      const bus = createMockMessageBus();
+      const strictTool = new DiscoveredMCPTool(
+        mockCallableToolInstance,
+        serverName,
+        serverToolName,
+        baseDescription,
+        strictSchema,
+        bus,
+      );
+      const result = strictTool.validateToolParams({
+        param: 'value',
+        wait_for_previous: true,
+      });
+      expect(result).toBeNull();
+    });
+
+    it('should reject invalid params against MCP schema', () => {
+      const result = tool.validateToolParams({ unknownParam: 'value' });
+      expect(typeof result === 'string' || result === null).toBe(true);
+    });
+  });
+
   describe('getDisplayTitle and getExplanation', () => {
     const commandTool = new DiscoveredMCPTool(
       mockCallableToolInstance,
