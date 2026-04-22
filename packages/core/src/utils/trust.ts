@@ -201,12 +201,12 @@ export class LoadedTrustedFolders {
 
     const dirPath = path.dirname(this.user.path);
     if (!fs.existsSync(dirPath)) {
-      await fsPromises.mkdir(dirPath, { recursive: true });
+      await fs.promises.mkdir(dirPath, { recursive: true });
     }
 
     // lockfile requires the file to exist
     if (!fs.existsSync(this.user.path)) {
-      await fsPromises.writeFile(this.user.path, JSON.stringify({}, null, 2), {
+      await fs.promises.writeFile(this.user.path, JSON.stringify({}, null, 2), {
         mode: 0o600,
       });
     }
