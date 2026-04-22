@@ -12,7 +12,7 @@ concurrency:
 jobs:
   build:
     name: 'Build and Bundle'
-    runs-on: 'ubuntu-latest'
+    runs-on: 'gemini-cli-ubuntu-16-core'
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
@@ -48,7 +48,7 @@ jobs:
   test_ui_messages:
     name: 'Test (Linux) - UI Messages'
     needs: build
-    runs-on: 'ubuntu-latest'
+    runs-on: 'gemini-cli-ubuntu-16-core'
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
@@ -85,7 +85,7 @@ jobs:
   test_ui_shared:
     name: 'Test (Linux) - UI Shared'
     needs: build
-    runs-on: 'ubuntu-latest'
+    runs-on: 'gemini-cli-ubuntu-16-core'
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
@@ -122,7 +122,7 @@ jobs:
   test_ui_views:
     name: 'Test (Linux) - UI Views'
     needs: build
-    runs-on: 'ubuntu-latest'
+    runs-on: 'gemini-cli-ubuntu-16-core'
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
@@ -159,7 +159,7 @@ jobs:
   test_ui_rest:
     name: 'Test (Linux) - UI Rest'
     needs: build
-    runs-on: 'ubuntu-latest'
+    runs-on: 'gemini-cli-ubuntu-16-core'
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
@@ -196,7 +196,7 @@ jobs:
   test_ui_components_top:
     name: 'Test (Linux) - UI Components Top'
     needs: build
-    runs-on: 'ubuntu-latest'
+    runs-on: 'gemini-cli-ubuntu-16-core'
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
@@ -233,7 +233,7 @@ jobs:
   test_batch_1:
     name: 'Test (Linux) - Batch 1 (Utils & Test-Utils)'
     needs: build
-    runs-on: 'ubuntu-latest'
+    runs-on: 'gemini-cli-ubuntu-16-core'
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
@@ -270,7 +270,7 @@ jobs:
   test_batch_2:
     name: 'Test (Linux) - Batch 2 (Core & Services & ACP)'
     needs: build
-    runs-on: 'ubuntu-latest'
+    runs-on: 'gemini-cli-ubuntu-16-core'
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
@@ -307,7 +307,7 @@ jobs:
   test_batch_3:
     name: 'Test (Linux) - Batch 3 (Commands & Config)'
     needs: build
-    runs-on: 'ubuntu-latest'
+    runs-on: 'gemini-cli-ubuntu-16-core'
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
@@ -344,7 +344,7 @@ jobs:
   test_cli_aggregate:
     name: 'Test (Linux) - CLI Aggregate'
     needs: build
-    runs-on: 'ubuntu-latest'
+    runs-on: 'gemini-cli-ubuntu-16-core'
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
@@ -377,11 +377,11 @@ jobs:
       - name: 'Run All CLI Tests'
         run: 'npx vitest run --pool=threads packages/cli/src'
         shell: 'bash'
- 
+
   test_core:
     name: 'Test (Linux) - Core'
     needs: build
-    runs-on: 'ubuntu-latest'
+    runs-on: 'gemini-cli-ubuntu-16-core'
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
