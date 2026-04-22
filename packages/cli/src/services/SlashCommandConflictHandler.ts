@@ -34,6 +34,7 @@ export class SlashCommandConflictHandler {
   stop() {
     coreEvents.off(CoreEvent.SlashCommandConflicts, this.handleConflicts);
     this.activeConflicts.clear();
+    this.pendingConflicts = [];
     if (this.flushTimeout) {
       clearTimeout(this.flushTimeout);
       this.flushTimeout = null;
