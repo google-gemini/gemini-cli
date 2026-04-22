@@ -44,11 +44,6 @@ const MIN_USER_MESSAGES = 10;
 const MIN_IDLE_MS = 3 * 60 * 60 * 1000; // 3 hours
 const MAX_SESSION_INDEX_SIZE = 50;
 const MAX_NEW_SESSION_BATCH_SIZE = 10;
-// Cap how many session files we touch per scan. We need to open files to read
-// their actual `lastUpdated` (filename mtime is only a coarse proxy), so we
-// pre-sort by filesystem mtime descending and stop after this many candidates.
-// This keeps long-lived `chats/` directories from dominating each scan.
-const MAX_SESSIONS_TO_SCAN = 100;
 
 /**
  * Lock file content for coordinating across CLI instances.
@@ -487,12 +482,9 @@ function shouldProcessConversation(
 /**
  * Scans the chats directory for eligible session files, loading metadata from
  * both JSONL and legacy JSON sessions, deduplicating migrated sessions by
- * session ID, and sorting by actual lastUpdated.
- *
- * To bound work in long-lived chats directories, we pre-sort candidate files
- * by filesystem mtime descending and only open the top {@link
- * MAX_SESSIONS_TO_SCAN}. mtime is a coarse proxy for `lastUpdated`, but it's
- * cheap and monotonically increasing under normal session activity.
+ * session ID, and sorting by actual lastUpdated. We scan the full directory
+ * here so already-processed recent sessions cannot permanently block older
+ * backlog sessions from surfacing as new candidates.
  */
 async function scanEligibleSessions(
   chatsDir: string,
@@ -505,26 +497,23 @@ async function scanEligibleSessions(
   }
 
   const candidates: Array<{ filePath: string; mtimeMs: number }> = [];
-  await Promise.all(
-    allFiles.map(async (file) => {
-      if (!isSupportedSessionFile(file)) return;
-      const filePath = path.join(chatsDir, file);
-      try {
-        const stat = await fs.stat(filePath);
-        if (!stat.isFile()) return;
-        candidates.push({ filePath, mtimeMs: stat.mtimeMs });
-      } catch {
-        // Skip files that disappeared between readdir and stat.
-      }
-    }),
-  );
+  for (const file of allFiles) {
+    if (!isSupportedSessionFile(file)) continue;
+    const filePath = path.join(chatsDir, file);
+    try {
+      const stat = await fs.stat(filePath);
+      if (!stat.isFile()) continue;
+      candidates.push({ filePath, mtimeMs: stat.mtimeMs });
+    } catch {
+      // Skip files that disappeared between readdir and stat.
+    }
+  }
 
   candidates.sort((a, b) => b.mtimeMs - a.mtimeMs);
-  const toScan = candidates.slice(0, MAX_SESSIONS_TO_SCAN);
 
   const latestBySessionId = new Map<string, IndexedSession>();
 
-  for (const { filePath } of toScan) {
+  for (const { filePath } of candidates) {
     try {
       const conversation = await loadConversationRecord(filePath, {
         metadataOnly: true,

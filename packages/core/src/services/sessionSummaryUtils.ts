@@ -23,11 +23,47 @@ type LoadedSession = ConversationRecord & {
   userMessageCount?: number;
 };
 
+interface SessionFileCandidate {
+  filePath: string;
+  mtimeMs: number;
+}
+
 function isSupportedSessionFile(fileName: string): boolean {
   return (
     fileName.startsWith(SESSION_FILE_PREFIX) &&
     (fileName.endsWith('.json') || fileName.endsWith('.jsonl'))
   );
+}
+
+async function listSessionFileCandidates(
+  chatsDir: string,
+): Promise<SessionFileCandidate[]> {
+  const allFiles = await fs.readdir(chatsDir);
+  const candidates: SessionFileCandidate[] = [];
+
+  for (const fileName of allFiles) {
+    if (!isSupportedSessionFile(fileName)) continue;
+
+    const filePath = path.join(chatsDir, fileName);
+    try {
+      const stat = await fs.stat(filePath);
+      if (!stat.isFile()) continue;
+      candidates.push({ filePath, mtimeMs: stat.mtimeMs });
+    } catch {
+      // Skip files that disappeared between readdir and stat.
+    }
+  }
+
+  candidates.sort((a, b) => {
+    const mtimeDelta = b.mtimeMs - a.mtimeMs;
+    if (mtimeDelta !== 0) {
+      return mtimeDelta;
+    }
+
+    return path.basename(b.filePath).localeCompare(path.basename(a.filePath));
+  });
+
+  return candidates;
 }
 
 function getSessionTimestampMs(session: LoadedSession): number {
@@ -108,7 +144,7 @@ async function generateAndSaveSummary(
     return;
   }
 
-  const lastUpdated = new Date().toISOString();
+  const lastUpdated = freshConversation.lastUpdated;
   if (isJsonl) {
     await fs.appendFile(
       sessionPath,
@@ -134,7 +170,7 @@ async function generateAndSaveSummary(
 }
 
 /**
- * Finds the most recently created session that needs a summary.
+ * Finds the most recently updated previous session that still needs a summary.
  * Returns the path if it needs a summary, null otherwise.
  */
 export async function getPreviousSession(
@@ -151,78 +187,74 @@ export async function getPreviousSession(
       return null;
     }
 
-    // List session files
-    const allFiles = await fs.readdir(chatsDir);
-    const sessionFiles = allFiles.filter(isSupportedSessionFile);
-
+    const sessionFiles = await listSessionFileCandidates(chatsDir);
     if (sessionFiles.length === 0) {
       debugLogger.debug('[SessionSummary] No session files found');
       return null;
     }
 
-    const sessions: Array<{ filePath: string; conversation: LoadedSession }> =
-      [];
-    for (const sessionFile of sessionFiles) {
-      const filePath = path.join(chatsDir, sessionFile);
+    let bestPreviousSession: {
+      filePath: string;
+      conversation: LoadedSession;
+    } | null = null;
+
+    for (const { filePath, mtimeMs } of sessionFiles) {
+      const bestTimestamp = bestPreviousSession
+        ? getSessionTimestampMs(bestPreviousSession.conversation)
+        : null;
+      if (
+        bestPreviousSession &&
+        bestTimestamp !== null &&
+        bestTimestamp > 0 &&
+        mtimeMs < bestTimestamp
+      ) {
+        break;
+      }
+
       try {
         const conversation = await loadConversationRecord(filePath, {
           metadataOnly: true,
         });
-        if (conversation) {
-          sessions.push({ filePath, conversation });
+        if (!conversation) continue;
+        if (conversation.sessionId === config.getSessionId()) continue;
+        if (conversation.summary) continue;
+
+        // Only generate summaries for sessions with more than 1 user message.
+        // `loadConversationRecord` populates `userMessageCount` in metadataOnly
+        // mode; fall back to scanning messages for the legacy fallback path.
+        const userMessageCount =
+          conversation.userMessageCount ??
+          conversation.messages.filter((message) => message.type === 'user')
+            .length;
+        if (userMessageCount <= MIN_MESSAGES_FOR_SUMMARY) {
+          continue;
+        }
+
+        if (
+          !bestPreviousSession ||
+          getSessionTimestampMs(conversation) >
+            getSessionTimestampMs(bestPreviousSession.conversation) ||
+          (getSessionTimestampMs(conversation) ===
+            getSessionTimestampMs(bestPreviousSession.conversation) &&
+            path
+              .basename(filePath)
+              .localeCompare(path.basename(bestPreviousSession.filePath)) > 0)
+        ) {
+          bestPreviousSession = { filePath, conversation };
         }
       } catch {
         // Ignore unreadable session files
       }
     }
 
-    if (sessions.length === 0) {
-      debugLogger.debug('[SessionSummary] Could not read most recent session');
-      return null;
-    }
-
-    const previousSessions = sessions.filter(
-      ({ conversation }) => conversation.sessionId !== config.getSessionId(),
-    );
-    if (previousSessions.length === 0) {
+    if (!bestPreviousSession) {
       debugLogger.debug(
-        '[SessionSummary] No previous sessions found after excluding active session',
+        '[SessionSummary] No previous session needs summary generation',
       );
       return null;
     }
 
-    previousSessions.sort((a, b) => {
-      const timestampDelta =
-        getSessionTimestampMs(b.conversation) -
-        getSessionTimestampMs(a.conversation);
-      if (timestampDelta !== 0) {
-        return timestampDelta;
-      }
-      return path.basename(b.filePath).localeCompare(path.basename(a.filePath));
-    });
-
-    const { filePath, conversation } = previousSessions[0];
-    if (conversation.summary) {
-      debugLogger.debug(
-        '[SessionSummary] Most recent session already has summary',
-      );
-      return null;
-    }
-
-    // Only generate summaries for sessions with more than 1 user message.
-    // `loadConversationRecord` populates `userMessageCount` in metadataOnly
-    // mode; fall back to scanning messages for the legacy fallback path.
-    const userMessageCount =
-      conversation.userMessageCount ??
-      conversation.messages.filter((message) => message.type === 'user').length;
-    if (userMessageCount <= MIN_MESSAGES_FOR_SUMMARY) {
-      debugLogger.debug(
-        `[SessionSummary] Most recent session has ${userMessageCount} user message(s), skipping (need more than ${MIN_MESSAGES_FOR_SUMMARY})`,
-      );
-      return null;
-    }
-
-    return filePath;
+    return bestPreviousSession.filePath;
   } catch (error) {
     debugLogger.debug(
       `[SessionSummary] Error finding previous session: ${error instanceof Error ? error.message : String(error)}`,

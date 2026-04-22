@@ -8,6 +8,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { generateSummary, getPreviousSession } from './sessionSummaryUtils.js';
 import type { Config } from '../config/config.js';
 import type { ContentGenerator } from '../core/contentGenerator.js';
+import * as chatRecordingService from './chatRecordingService.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import * as os from 'node:os';
@@ -23,6 +24,16 @@ vi.mock('./sessionSummaryService.js', () => ({
 vi.mock('../core/baseLlmClient.js', () => ({
   BaseLlmClient: vi.fn(),
 }));
+
+vi.mock('./chatRecordingService.js', async () => {
+  const actual = await vi.importActual<
+    typeof import('./chatRecordingService.js')
+  >('./chatRecordingService.js');
+  return {
+    ...actual,
+    loadConversationRecord: vi.fn(actual.loadConversationRecord),
+  };
+});
 
 interface SessionFixture {
   summary?: string;
@@ -78,6 +89,14 @@ async function writeSession(
   const filePath = path.join(chatsDir, fileName);
   await fs.writeFile(filePath, contents);
   return filePath;
+}
+
+async function setSessionMtime(
+  filePath: string,
+  timestamp: string,
+): Promise<void> {
+  const date = new Date(timestamp);
+  await fs.utimes(filePath, date, date);
 }
 
 describe('sessionSummaryUtils', () => {
@@ -236,6 +255,53 @@ describe('sessionSummaryUtils', () => {
 
       expect(result).toBe(newerPath);
     });
+
+    it('should stop scanning once older mtimes cannot beat the best lastUpdated', async () => {
+      const loadConversationRecord = vi.mocked(
+        chatRecordingService.loadConversationRecord,
+      );
+
+      const currentPath = await writeSession(
+        chatsDir,
+        'session-2024-01-03T10-00-cur00001.jsonl',
+        buildJsonlSession({
+          sessionId: 'current-session',
+          userMessageCount: 2,
+          lastUpdated: '2024-01-03T10:00:00Z',
+        }),
+      );
+      await setSessionMtime(currentPath, '2024-01-03T10:00:00Z');
+
+      const bestPath = await writeSession(
+        chatsDir,
+        'session-2024-01-02T10-00-best0001.jsonl',
+        buildJsonlSession({
+          sessionId: 'best-session',
+          userMessageCount: 2,
+          lastUpdated: '2024-01-02T10:00:00Z',
+        }),
+      );
+      await setSessionMtime(bestPath, '2024-01-02T10:00:00Z');
+
+      const olderPath = await writeSession(
+        chatsDir,
+        'session-2024-01-01T10-00-older001.jsonl',
+        buildJsonlSession({
+          sessionId: 'older-session',
+          userMessageCount: 2,
+          lastUpdated: '2024-01-01T10:00:00Z',
+        }),
+      );
+      await setSessionMtime(olderPath, '2024-01-01T10:00:00Z');
+
+      const result = await getPreviousSession(mockConfig);
+
+      expect(result).toBe(bestPath);
+      expect(loadConversationRecord).toHaveBeenCalledTimes(2);
+      expect(loadConversationRecord).not.toHaveBeenCalledWith(olderPath, {
+        metadataOnly: true,
+      });
+    });
   });
 
   describe('generateSummary', () => {
@@ -246,10 +312,11 @@ describe('sessionSummaryUtils', () => {
     });
 
     it('should generate and save summary for legacy JSON sessions', async () => {
+      const lastUpdated = '2024-01-01T10:00:00Z';
       const filePath = await writeSession(
         chatsDir,
         'session-2024-01-01T10-00-abc12345.json',
-        buildLegacySessionJson({ userMessageCount: 2 }),
+        buildLegacySessionJson({ userMessageCount: 2, lastUpdated }),
       );
 
       await generateSummary(mockConfig);
@@ -257,7 +324,7 @@ describe('sessionSummaryUtils', () => {
       expect(mockGenerateSummary).toHaveBeenCalledTimes(1);
       const written = JSON.parse(await fs.readFile(filePath, 'utf-8'));
       expect(written.summary).toBe('Add dark mode to the app');
-      expect(typeof written.lastUpdated).toBe('string');
+      expect(written.lastUpdated).toBe(lastUpdated);
     });
 
     it('should handle errors gracefully without throwing', async () => {
@@ -272,10 +339,11 @@ describe('sessionSummaryUtils', () => {
     });
 
     it('should append a metadata update when saving a summary to JSONL', async () => {
+      const lastUpdated = '2024-01-01T10:00:00Z';
       const filePath = await writeSession(
         chatsDir,
         'session-2024-01-01T10-00-abc12345.jsonl',
-        buildJsonlSession({ userMessageCount: 2 }),
+        buildJsonlSession({ userMessageCount: 2, lastUpdated }),
       );
 
       await generateSummary(mockConfig);
@@ -288,7 +356,7 @@ describe('sessionSummaryUtils', () => {
       expect(lastRecord).toEqual({
         $set: {
           summary: 'Add dark mode to the app',
-          lastUpdated: expect.any(String),
+          lastUpdated,
         },
       });
     });
@@ -323,7 +391,7 @@ describe('sessionSummaryUtils', () => {
       expect(JSON.parse(previousLines[previousLines.length - 1])).toEqual({
         $set: {
           summary: 'Add dark mode to the app',
-          lastUpdated: expect.any(String),
+          lastUpdated: '2024-01-01T10:00:00Z',
         },
       });
 
