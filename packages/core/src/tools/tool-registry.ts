@@ -90,6 +90,12 @@ class DiscoveredToolInvocation extends BaseToolInvocation<
     let error: Error | null = null;
     let code: number | null = null;
     let signal: NodeJS.Signals | null = null;
+    let sizeLimitExceeded = false;
+    const MAX_STDOUT_SIZE = 10 * 1024 * 1024; // 10MB limit
+    const MAX_STDERR_SIZE = 10 * 1024 * 1024; // 10MB limit
+
+    let stdoutByteLength = 0;
+    let stderrByteLength = 0;
 
     try {
       const child = spawn(finalCommand, finalArgs, {
@@ -98,8 +104,15 @@ class DiscoveredToolInvocation extends BaseToolInvocation<
       child.stdin.write(JSON.stringify(this.params));
       child.stdin.end();
 
-      await new Promise<void>((resolve) => {
+      await new Promise<void>((resolve, reject) => {
         const onStdout = (data: Buffer) => {
+          if (sizeLimitExceeded) return;
+          if (stdoutByteLength + data.length > MAX_STDOUT_SIZE) {
+            sizeLimitExceeded = true;
+            child.kill();
+            return;
+          }
+          stdoutByteLength += data.length;
           const chunk = data?.toString();
           stdout += chunk;
           if (_updateOutput) {
@@ -108,6 +121,13 @@ class DiscoveredToolInvocation extends BaseToolInvocation<
         };
 
         const onStderr = (data: Buffer) => {
+          if (sizeLimitExceeded) return;
+          if (stderrByteLength + data.length > MAX_STDERR_SIZE) {
+            sizeLimitExceeded = true;
+            child.kill();
+            return;
+          }
+          stderrByteLength += data.length;
           const chunk = data?.toString();
           stderr += chunk;
           if (_updateOutput) {
@@ -126,6 +146,14 @@ class DiscoveredToolInvocation extends BaseToolInvocation<
           code = _code;
           signal = _signal;
           cleanup();
+
+          if (sizeLimitExceeded) {
+            return reject(
+              new Error(
+                `Tool execution exceeded memory limit of ${MAX_STDOUT_SIZE} bytes.`,
+              ),
+            );
+          }
           resolve();
         };
 
@@ -144,6 +172,8 @@ class DiscoveredToolInvocation extends BaseToolInvocation<
         child.on('error', onError);
         child.on('close', onClose);
       });
+    } catch (e) {
+      error = e instanceof Error ? e : new Error(String(e));
     } finally {
       cleanupFunc?.();
     }

@@ -740,6 +740,60 @@ describe('ToolRegistry', () => {
       expect(result.error).toBeUndefined();
     });
 
+    it('should kill subprocess and reject if output exceeds memory limit', async () => {
+      vi.spyOn(config, 'getToolCallCommand').mockReturnValue('call');
+
+      const tool = new DiscoveredTool(
+        config,
+        'runaway-tool',
+        DISCOVERED_TOOL_PREFIX + 'runaway-tool',
+        'desc',
+        {},
+        mockMessageBus,
+        true,
+      );
+
+      const mockProcess: any = {
+        stdout: { on: vi.fn(), removeListener: vi.fn() },
+        stderr: { on: vi.fn(), removeListener: vi.fn() },
+        stdin: { write: vi.fn(), end: vi.fn() },
+        on: vi.fn(),
+        connected: true,
+        disconnect: vi.fn(),
+        kill: vi.fn(),
+        removeListener: vi.fn(),
+      };
+
+      // Mock a huge chunk (11MB)
+      const hugeChunk = Buffer.alloc(11 * 1024 * 1024);
+
+      mockProcess.stdout.on.mockImplementation(
+        (event: string, callback: any) => {
+          if (event === 'data') {
+            callback(hugeChunk);
+          }
+        },
+      );
+
+      mockProcess.on.mockImplementation((event: string, callback: any) => {
+        if (event === 'close') {
+          callback(null, 'SIGTERM'); // Process killed
+        }
+      });
+
+      vi.mocked(spawn).mockReturnValue(mockProcess);
+
+      const invocation = tool.build({});
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+
+      expect(result.error?.message).toContain(
+        'Tool execution exceeded memory limit',
+      );
+      expect(mockProcess.kill).toHaveBeenCalled();
+    });
+
     it('should pass MessageBus to DiscoveredTool and its invocations', async () => {
       const discoveryCommand = 'my-discovery-command';
       mockConfigGetToolDiscoveryCommand.mockReturnValue(discoveryCommand);
