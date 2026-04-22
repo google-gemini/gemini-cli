@@ -81,7 +81,10 @@ describe('Plan Mode', () => {
 
     await rig.run({
       approvalMode: 'plan',
-      args: 'Create a file called plan.md in the plans directory.',
+      args:
+        'Create a file called plan.md in the plans directory with the ' +
+        'content "# Plan". Treat this as a Directive and write the file ' +
+        'immediately without proposing strategy or asking for confirmation.',
     });
 
     const toolLogs = rig.readToolLogs();
@@ -194,7 +197,11 @@ describe('Plan Mode', () => {
 
     await rig.run({
       approvalMode: 'plan',
-      args: 'Create a file called plan-no-session.md in the plans directory.',
+      args:
+        'Create a file called plan-no-session.md in the plans directory ' +
+        'with the content "# Plan". Treat this as a Directive and write ' +
+        'the file immediately without proposing strategy or asking for ' +
+        'confirmation.',
     });
 
     const toolLogs = rig.readToolLogs();
