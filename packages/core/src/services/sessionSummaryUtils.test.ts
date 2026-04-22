@@ -100,6 +100,7 @@ describe('sessionSummaryUtils', () => {
 
     mockConfig = {
       getContentGenerator: vi.fn().mockReturnValue(mockContentGenerator),
+      getSessionId: vi.fn().mockReturnValue('current-session'),
       storage: {
         getProjectTempDir: vi.fn().mockReturnValue(projectTempDir),
       },
@@ -290,6 +291,46 @@ describe('sessionSummaryUtils', () => {
           lastUpdated: expect.any(String),
         },
       });
+    });
+
+    it('should skip the active startup session and summarize the previous session', async () => {
+      const previousPath = await writeSession(
+        chatsDir,
+        'session-2024-01-01T10-00-prev0001.jsonl',
+        buildJsonlSession({
+          sessionId: 'previous-session',
+          userMessageCount: 2,
+          lastUpdated: '2024-01-01T10:00:00Z',
+        }),
+      );
+      const currentPath = await writeSession(
+        chatsDir,
+        'session-2024-01-02T10-00-cur00001.jsonl',
+        buildJsonlSession({
+          sessionId: 'current-session',
+          userMessageCount: 1,
+          lastUpdated: '2024-01-02T10:00:00Z',
+        }),
+      );
+
+      await generateSummary(mockConfig);
+
+      expect(mockGenerateSummary).toHaveBeenCalledTimes(1);
+
+      const previousLines = (await fs.readFile(previousPath, 'utf-8'))
+        .split('\n')
+        .filter(Boolean);
+      expect(JSON.parse(previousLines[previousLines.length - 1])).toEqual({
+        $set: {
+          summary: 'Add dark mode to the app',
+          lastUpdated: expect.any(String),
+        },
+      });
+
+      const currentLines = (await fs.readFile(currentPath, 'utf-8'))
+        .split('\n')
+        .filter(Boolean);
+      expect(currentLines).toHaveLength(2);
     });
   });
 });

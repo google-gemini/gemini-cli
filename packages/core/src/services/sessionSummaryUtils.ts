@@ -181,7 +181,17 @@ export async function getPreviousSession(
       return null;
     }
 
-    sessions.sort((a, b) => {
+    const previousSessions = sessions.filter(
+      ({ conversation }) => conversation.sessionId !== config.getSessionId(),
+    );
+    if (previousSessions.length === 0) {
+      debugLogger.debug(
+        '[SessionSummary] No previous sessions found after excluding active session',
+      );
+      return null;
+    }
+
+    previousSessions.sort((a, b) => {
       const timestampDelta =
         getSessionTimestampMs(b.conversation) -
         getSessionTimestampMs(a.conversation);
@@ -191,7 +201,7 @@ export async function getPreviousSession(
       return path.basename(b.filePath).localeCompare(path.basename(a.filePath));
     });
 
-    const { filePath, conversation } = sessions[0];
+    const { filePath, conversation } = previousSessions[0];
     if (conversation.summary) {
       debugLogger.debug(
         '[SessionSummary] Most recent session already has summary',
