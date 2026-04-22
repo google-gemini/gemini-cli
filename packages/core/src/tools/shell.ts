@@ -64,6 +64,14 @@ export const OUTPUT_UPDATE_INTERVAL_MS = 1000;
 const BACKGROUND_DELAY_MS = 200;
 const SHOW_NL_DESCRIPTION_THRESHOLD = 150;
 
+/**
+ * Debounce window for `stream_output` line forwarding. Lines that arrive
+ * within this window are coalesced into a single `updateOutput` call to
+ * avoid flooding the ACP client on bursty output. Mirrors the reference
+ * value used by Claude Code's Monitor tool.
+ */
+export const STREAM_OUTPUT_BATCH_MS = 200;
+
 export interface ShellToolParams {
   command: string;
   description?: string;
@@ -611,16 +619,33 @@ export class ShellToolInvocation extends BaseToolInvocation<
           // Subscribe BEFORE the background() delay so no output is lost.
           if (this.params.stream_output && updateOutput) {
             const lineBuffer = new LineBuffer();
+            const pendingLines: string[] = [];
+            let batchTimer: NodeJS.Timeout | null = null;
             let teardown = false;
             let unsubscribeStream: (() => void) | null = null;
-            const emitLines = (lines: string[]) => {
+
+            const flushPending = () => {
+              if (batchTimer) {
+                clearTimeout(batchTimer);
+                batchTimer = null;
+              }
+              if (pendingLines.length === 0) return;
+              const payload = pendingLines.join('\n');
+              pendingLines.length = 0;
+              updateOutput(payload);
+            };
+            const enqueueLines = (lines: string[]) => {
               if (lines.length === 0) return;
-              updateOutput(lines.join('\n'));
+              pendingLines.push(...lines);
+              if (batchTimer === null) {
+                batchTimer = setTimeout(flushPending, STREAM_OUTPUT_BATCH_MS);
+              }
             };
             const teardownStream = () => {
               if (teardown) return;
               teardown = true;
-              emitLines(lineBuffer.flush());
+              enqueueLines(lineBuffer.flush());
+              flushPending();
               signal.removeEventListener('abort', teardownStream);
               unsubscribeStream?.();
               unsubscribeStream = null;
@@ -632,7 +657,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
                 switch (event.type) {
                   case 'data': {
                     if (typeof event.chunk !== 'string') return;
-                    emitLines(lineBuffer.push(event.chunk));
+                    enqueueLines(lineBuffer.push(event.chunk));
                     break;
                   }
                   case 'exit': {

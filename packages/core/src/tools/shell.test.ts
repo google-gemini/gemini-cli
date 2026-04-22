@@ -540,6 +540,46 @@ describe('ShellTool', () => {
       expect(updateOutputMock).toHaveBeenCalledWith('NEW:foo.txt');
     });
 
+    it('coalesces multiple lines arriving within the 200ms batch window into one updateOutput call', async () => {
+      vi.useFakeTimers();
+      mockShellBackground.mockImplementationOnce(() => {});
+      const updateOutputMock = vi.fn();
+
+      const invocation = shellTool.build({
+        command: 'watch /inbox',
+        is_background: true,
+        stream_output: true,
+      });
+      const promise = invocation.execute({
+        abortSignal: mockAbortSignal,
+        updateOutput: updateOutputMock,
+      });
+
+      await vi.advanceTimersByTimeAsync(0);
+
+      // Two chunks, each with a complete line, arrive within the 200ms window.
+      ExecutionLifecycleService.emitEvent(12345, {
+        type: 'data',
+        chunk: 'line1\n',
+      });
+      await vi.advanceTimersByTimeAsync(50);
+      ExecutionLifecycleService.emitEvent(12345, {
+        type: 'data',
+        chunk: 'line2\n',
+      });
+
+      // Nothing has flushed yet — still within the batch window.
+      expect(updateOutputMock).not.toHaveBeenCalled();
+
+      // Advance past the 200ms batch boundary.
+      await vi.advanceTimersByTimeAsync(200);
+
+      expect(updateOutputMock).toHaveBeenCalledTimes(1);
+      expect(updateOutputMock).toHaveBeenCalledWith('line1\nline2');
+
+      await promise;
+    });
+
     it('does not subscribe to ExecutionLifecycleService when stream_output is false', async () => {
       vi.useFakeTimers();
       mockShellBackground.mockImplementationOnce(() => {});
