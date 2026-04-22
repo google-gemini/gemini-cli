@@ -283,7 +283,7 @@ describe('save_memory', () => {
     name: proactiveMemoryFromLongSession,
     params: {
       settings: {
-        experimental: { memoryManager: true },
+        experimental: { memoryV2: true },
       },
     },
     messages: [
@@ -341,29 +341,75 @@ describe('save_memory', () => {
     prompt:
       'Please save any persistent preferences or facts about me from our conversation to memory.',
     assert: async (rig, result) => {
-      const wasToolCalled = await rig.waitForToolCall(
-        'invoke_agent',
-        undefined,
-        (args) => /save_memory/i.test(args) && /vitest/i.test(args),
-      );
+      // Under experimental.memoryV2, the agent persists memories by
+      // editing markdown files directly with write_file or replace — not via
+      // a save_memory subagent. The user said "I always prefer Vitest over
+      // Jest for testing in all my projects" — that matches the new
+      // cross-project cue phrase ("across all my projects"), so under the
+      // 4-tier model the correct destination is the global personal memory
+      // file (~/.gemini/GEMINI.md). It must NOT land in a committed project
+      // GEMINI.md (that tier is for team conventions) or the per-project
+      // private memory folder (that tier is for project-specific personal
+      // notes). The chat history mixes this durable preference with
+      // transient debugging chatter, so the eval also verifies the agent
+      // picks out the persistent fact among the noise.
+      await rig.waitForToolCall('write_file').catch(() => {});
+      const writeCalls = rig
+        .readToolLogs()
+        .filter((log) =>
+          ['write_file', 'replace'].includes(log.toolRequest.name),
+        );
+
+      const wroteVitestToGlobal = writeCalls.some((log) => {
+        const args = log.toolRequest.args;
+        return (
+          /\.gemini\/GEMINI\.md/i.test(args) &&
+          !/tmp\/[^/]+\/memory/i.test(args) &&
+          /vitest/i.test(args)
+        );
+      });
       expect(
-        wasToolCalled,
-        'Expected invoke_agent to be called with save_memory agent and the Vitest preference from the conversation history',
+        wroteVitestToGlobal,
+        'Expected the cross-project Vitest preference to be written to the global personal memory file (~/.gemini/GEMINI.md) via write_file or replace',
       ).toBe(true);
+
+      const leakedToCommittedProject = writeCalls.some((log) => {
+        const args = log.toolRequest.args;
+        return (
+          /GEMINI\.md/i.test(args) &&
+          !/\.gemini\//i.test(args) &&
+          /vitest/i.test(args)
+        );
+      });
+      expect(
+        leakedToCommittedProject,
+        'Cross-project Vitest preference must NOT be mirrored into a committed project ./GEMINI.md (that tier is for team-shared conventions only)',
+      ).toBe(false);
+
+      const leakedToPrivateProject = writeCalls.some((log) => {
+        const args = log.toolRequest.args;
+        return (
+          /\.gemini\/tmp\/[^/]+\/memory\//i.test(args) && /vitest/i.test(args)
+        );
+      });
+      expect(
+        leakedToPrivateProject,
+        'Cross-project Vitest preference must NOT be mirrored into the private project memory folder (that tier is for project-specific personal notes only)',
+      ).toBe(false);
 
       assertModelHasOutput(result);
     },
   });
 
-  const memoryManagerRoutingPreferences =
-    'Agent routes global and project preferences to memory';
+  const memoryV2RoutesTeamConventionsToProjectGemini =
+    'Agent routes team-shared project conventions to ./GEMINI.md';
   evalTest('USUALLY_PASSES', {
     suiteName: 'default',
     suiteType: 'behavioral',
-    name: memoryManagerRoutingPreferences,
+    name: memoryV2RoutesTeamConventionsToProjectGemini,
     params: {
       settings: {
-        experimental: { memoryManager: true },
+        experimental: { memoryV2: true },
       },
     },
     messages: [
@@ -372,7 +418,7 @@ describe('save_memory', () => {
         type: 'user',
         content: [
           {
-            text: 'I always use dark mode in all my editors and terminals.',
+            text: 'For this project, the team always runs tests with `npm run test` — please remember that as our project convention.',
           },
         ],
         timestamp: '2026-01-01T00:00:00Z',
@@ -380,7 +426,9 @@ describe('save_memory', () => {
       {
         id: 'msg-2',
         type: 'gemini',
-        content: [{ text: 'Got it, I will keep that in mind!' }],
+        content: [
+          { text: 'Got it, I will keep `npm run test` in mind for tests.' },
+        ],
         timestamp: '2026-01-01T00:00:05Z',
       },
       {
@@ -404,15 +452,237 @@ describe('save_memory', () => {
     ],
     prompt: 'Please save the preferences I mentioned earlier to memory.',
     assert: async (rig, result) => {
-      const wasToolCalled = await rig.waitForToolCall(
-        'invoke_agent',
-        undefined,
-        (args) => /save_memory/i.test(args),
-      );
+      // Under experimental.memoryV2, the prompt enforces an explicit
+      // one-tier-per-fact rule: team-shared project conventions (the team's
+      // test command, project-wide indentation rules) belong in the
+      // committed project-root ./GEMINI.md and must NOT be mirrored or
+      // cross-referenced into the private project memory folder
+      // (~/.gemini/tmp/<hash>/memory/). The global ~/.gemini/GEMINI.md must
+      // never be touched in this mode either.
+      await rig.waitForToolCall('write_file').catch(() => {});
+      const writeCalls = rig
+        .readToolLogs()
+        .filter((log) =>
+          ['write_file', 'replace'].includes(log.toolRequest.name),
+        );
+
+      const wroteToProjectRoot = (factPattern: RegExp) =>
+        writeCalls.some((log) => {
+          const args = log.toolRequest.args;
+          return (
+            /GEMINI\.md/i.test(args) &&
+            !/\.gemini\//i.test(args) &&
+            factPattern.test(args)
+          );
+        });
+
       expect(
-        wasToolCalled,
-        'Expected invoke_agent to be called with save_memory agent',
+        wroteToProjectRoot(/npm run test/i),
+        'Expected the team test-command convention to be written to the project-root ./GEMINI.md',
       ).toBe(true);
+
+      expect(
+        wroteToProjectRoot(/2[- ]space/i),
+        'Expected the project-wide "2-space indentation" convention to be written to the project-root ./GEMINI.md',
+      ).toBe(true);
+
+      const leakedToPrivateMemory = writeCalls.some((log) => {
+        const args = log.toolRequest.args;
+        return (
+          /\.gemini\/tmp\/[^/]+\/memory\//i.test(args) &&
+          (/npm run test/i.test(args) || /2[- ]space/i.test(args))
+        );
+      });
+      expect(
+        leakedToPrivateMemory,
+        'Team-shared project conventions must NOT be mirrored into the private project memory folder (~/.gemini/tmp/<hash>/memory/) — each fact lives in exactly one tier.',
+      ).toBe(false);
+
+      const leakedToGlobal = writeCalls.some((log) => {
+        const args = log.toolRequest.args;
+        return (
+          /\.gemini\/GEMINI\.md/i.test(args) &&
+          !/tmp\/[^/]+\/memory/i.test(args)
+        );
+      });
+      expect(
+        leakedToGlobal,
+        'Project preferences must NOT be written to the global ~/.gemini/GEMINI.md',
+      ).toBe(false);
+
+      assertModelHasOutput(result);
+    },
+  });
+
+  const memoryV2RoutesUserProject =
+    'Agent routes personal-to-user project notes to user-project memory';
+  evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
+    name: memoryV2RoutesUserProject,
+    params: {
+      settings: {
+        experimental: { memoryV2: true },
+      },
+    },
+    prompt: `Please remember my personal local dev setup for THIS project's Postgres database. This is private to my machine — do NOT commit it to the repo.
+
+Connection details:
+- Host: localhost
+- Port: 6543 (non-standard, I run multiple Postgres instances)
+- Database: myproj_dev
+- User: sandy_local
+- Password: read from the SANDY_PG_LOCAL_PASS env var in my shell
+
+How I start it locally:
+1. Run \`brew services start postgresql@15\` to bring the server up.
+2. Run \`./scripts/seed-local-db.sh\` from the repo root to load my personal seed data.
+3. Verify with \`psql -h localhost -p 6543 -U sandy_local myproj_dev -c '\\dt'\`.
+
+Quirks to remember:
+- The migrations runner sometimes hangs on my machine if I forget step 1; kill it with Ctrl+C and rerun.
+- I keep an extra \`scratch\` schema for ad-hoc experiments — never reference it from project code.`,
+    assert: async (rig, result) => {
+      // Under experimental.memoryV2 with the Private Project Memory bullet
+      // surfaced in the prompt, a fact that is project-specific AND
+      // personal-to-the-user (must not be committed) should land in the
+      // private project memory folder under ~/.gemini/tmp/<hash>/memory/. The
+      // detailed note should be written to a sibling markdown file, with
+      // MEMORY.md updated as the index. It must NOT go to committed
+      // ./GEMINI.md or the global ~/.gemini/GEMINI.md.
+      await rig.waitForToolCall('write_file').catch(() => {});
+      const writeCalls = rig
+        .readToolLogs()
+        .filter((log) =>
+          ['write_file', 'replace'].includes(log.toolRequest.name),
+        );
+
+      const wroteUserProjectDetail = writeCalls.some((log) => {
+        const args = log.toolRequest.args;
+        return (
+          /\.gemini\/tmp\/[^/]+\/memory\/(?!MEMORY\.md)[^"]+\.md/i.test(args) &&
+          /6543/.test(args)
+        );
+      });
+      expect(
+        wroteUserProjectDetail,
+        'Expected the personal-to-user project note to be written to a private project memory detail file (~/.gemini/tmp/<hash>/memory/*.md)',
+      ).toBe(true);
+
+      const wroteUserProjectIndex = writeCalls.some((log) => {
+        const args = log.toolRequest.args;
+        return /\.gemini\/tmp\/[^/]+\/memory\/MEMORY\.md/i.test(args);
+      });
+      expect(
+        wroteUserProjectIndex,
+        'Expected the personal-to-user project note to update the private project memory index (~/.gemini/tmp/<hash>/memory/MEMORY.md)',
+      ).toBe(true);
+
+      // Defensive: should NOT have written this private note to the
+      // committed project GEMINI.md or the global GEMINI.md.
+      const leakedToCommittedProject = writeCalls.some((log) => {
+        const args = log.toolRequest.args;
+        return (
+          /\/GEMINI\.md/i.test(args) &&
+          !/\.gemini\//i.test(args) &&
+          /6543/.test(args)
+        );
+      });
+      expect(
+        leakedToCommittedProject,
+        'Personal-to-user note must NOT be written to the committed project GEMINI.md',
+      ).toBe(false);
+
+      const leakedToGlobal = writeCalls.some((log) => {
+        const args = log.toolRequest.args;
+        return (
+          /\.gemini\/GEMINI\.md/i.test(args) &&
+          !/tmp\/[^/]+\/memory/i.test(args) &&
+          /6543/.test(args)
+        );
+      });
+      expect(
+        leakedToGlobal,
+        'Personal-to-user project note must NOT be written to the global ~/.gemini/GEMINI.md',
+      ).toBe(false);
+
+      assertModelHasOutput(result);
+    },
+  });
+
+  const memoryV2RoutesCrossProjectToGlobal =
+    'Agent routes cross-project personal preferences to ~/.gemini/GEMINI.md';
+  evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
+    name: memoryV2RoutesCrossProjectToGlobal,
+    params: {
+      settings: {
+        experimental: { memoryV2: true },
+      },
+    },
+    prompt:
+      'Please remember this about me in general: across all my projects I always prefer Prettier with single quotes and trailing commas, and I always prefer tabs over spaces for indentation. These are my personal coding-style defaults that follow me into every workspace.',
+    assert: async (rig, result) => {
+      // Under experimental.memoryV2 with the Global Personal Memory
+      // tier surfaced in the prompt, a fact that explicitly applies to the
+      // user "across all my projects" / "in every workspace" must land in
+      // the global ~/.gemini/GEMINI.md (the cross-project tier). It must
+      // NOT be mirrored into a committed project-root ./GEMINI.md (that
+      // tier is for team-shared conventions) or into the per-project
+      // private memory folder (that tier is for project-specific personal
+      // notes). Each fact lives in exactly one tier across all four tiers.
+      await rig.waitForToolCall('write_file').catch(() => {});
+      const writeCalls = rig
+        .readToolLogs()
+        .filter((log) =>
+          ['write_file', 'replace'].includes(log.toolRequest.name),
+        );
+
+      const wroteToGlobal = (factPattern: RegExp) =>
+        writeCalls.some((log) => {
+          const args = log.toolRequest.args;
+          return (
+            /\.gemini\/GEMINI\.md/i.test(args) &&
+            !/tmp\/[^/]+\/memory/i.test(args) &&
+            factPattern.test(args)
+          );
+        });
+
+      expect(
+        wroteToGlobal(/Prettier/i),
+        'Expected the cross-project Prettier preference to be written to the global personal memory file (~/.gemini/GEMINI.md)',
+      ).toBe(true);
+
+      expect(
+        wroteToGlobal(/tabs/i),
+        'Expected the cross-project "tabs over spaces" preference to be written to the global personal memory file (~/.gemini/GEMINI.md)',
+      ).toBe(true);
+
+      const leakedToCommittedProject = writeCalls.some((log) => {
+        const args = log.toolRequest.args;
+        return (
+          /GEMINI\.md/i.test(args) &&
+          !/\.gemini\//i.test(args) &&
+          (/Prettier/i.test(args) || /tabs/i.test(args))
+        );
+      });
+      expect(
+        leakedToCommittedProject,
+        'Cross-project personal preferences must NOT be mirrored into a committed project ./GEMINI.md (that tier is for team-shared conventions only)',
+      ).toBe(false);
+
+      const leakedToPrivateProject = writeCalls.some((log) => {
+        const args = log.toolRequest.args;
+        return (
+          /\.gemini\/tmp\/[^/]+\/memory\//i.test(args) &&
+          (/Prettier/i.test(args) || /tabs/i.test(args))
+        );
+      });
+      expect(
+        leakedToPrivateProject,
+        'Cross-project personal preferences must NOT be mirrored into the private project memory folder (that tier is for project-specific personal notes only)',
+      ).toBe(false);
 
       assertModelHasOutput(result);
     },

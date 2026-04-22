@@ -45,19 +45,28 @@ describe('Config Path Validation', () => {
     });
   });
 
-  it('should allow access to ~/.gemini if it is added to the workspace', () => {
-    const geminiMdPath = path.join(globalGeminiDir, 'GEMINI.md');
+  it('should allow access to a file under ~/.gemini once that directory is added to the workspace', () => {
+    // Use settings.json rather than GEMINI.md as the example: the latter is
+    // now reachable via a surgical isPathAllowed allowlist regardless of
+    // workspace membership (covered by dedicated tests in config.test.ts), so
+    // it can no longer demonstrate the workspace-addition semantic on its
+    // own. settings.json is NOT on the allowlist, so it preserves the
+    // original "denied -> add to workspace -> allowed" flow this test was
+    // written to verify, and additionally double-asserts the least-privilege
+    // guarantee that the allowlist does not leak access to other files
+    // under ~/.gemini/.
+    const settingsPath = path.join(globalGeminiDir, 'settings.json');
 
     // Before adding, it should be denied
-    expect(config.isPathAllowed(geminiMdPath)).toBe(false);
+    expect(config.isPathAllowed(settingsPath)).toBe(false);
 
     // Add to workspace
     config.getWorkspaceContext().addDirectory(globalGeminiDir);
 
     // Now it should be allowed
-    expect(config.isPathAllowed(geminiMdPath)).toBe(true);
-    expect(config.validatePathAccess(geminiMdPath, 'read')).toBeNull();
-    expect(config.validatePathAccess(geminiMdPath, 'write')).toBeNull();
+    expect(config.isPathAllowed(settingsPath)).toBe(true);
+    expect(config.validatePathAccess(settingsPath, 'read')).toBeNull();
+    expect(config.validatePathAccess(settingsPath, 'write')).toBeNull();
   });
 
   it('should still allow project workspace paths', () => {
