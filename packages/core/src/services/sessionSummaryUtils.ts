@@ -144,13 +144,13 @@ async function generateAndSaveSummary(
     return;
   }
 
-  const lastUpdated = freshConversation.lastUpdated;
   if (isJsonl) {
     await fs.appendFile(
       sessionPath,
-      `${JSON.stringify({ $set: { summary, lastUpdated } })}\n`,
+      `${JSON.stringify({ $set: { summary } })}\n`,
     );
   } else {
+    const lastUpdated = freshConversation.lastUpdated;
     await fs.writeFile(
       sessionPath,
       JSON.stringify(

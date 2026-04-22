@@ -356,7 +356,70 @@ describe('sessionSummaryUtils', () => {
       expect(lastRecord).toEqual({
         $set: {
           summary: 'Add dark mode to the app',
-          lastUpdated,
+        },
+      });
+    });
+
+    it('should preserve a newer JSONL lastUpdated written concurrently', async () => {
+      const initialLastUpdated = '2024-01-01T10:00:00Z';
+      const newerLastUpdated = '2024-01-02T12:34:56Z';
+      const filePath = await writeSession(
+        chatsDir,
+        'session-2024-01-01T10-00-race.jsonl',
+        buildJsonlSession({
+          userMessageCount: 2,
+          lastUpdated: initialLastUpdated,
+        }),
+      );
+
+      const actualChatRecordingService = await vi.importActual<
+        typeof import('./chatRecordingService.js')
+      >('./chatRecordingService.js');
+      let injectedConcurrentUpdate = false;
+      let sessionReadCount = 0;
+      vi.mocked(chatRecordingService.loadConversationRecord).mockImplementation(
+        async (targetPath, options) => {
+          const conversation =
+            await actualChatRecordingService.loadConversationRecord(
+              targetPath,
+              options,
+            );
+
+          if (targetPath === filePath) {
+            sessionReadCount += 1;
+          }
+
+          if (
+            !injectedConcurrentUpdate &&
+            targetPath === filePath &&
+            sessionReadCount === 2
+          ) {
+            injectedConcurrentUpdate = true;
+            await fs.appendFile(
+              filePath,
+              `${JSON.stringify({ $set: { lastUpdated: newerLastUpdated } })}\n`,
+            );
+          }
+
+          return conversation;
+        },
+      );
+
+      await generateSummary(mockConfig);
+
+      expect(injectedConcurrentUpdate).toBe(true);
+      const savedConversation =
+        await chatRecordingService.loadConversationRecord(filePath);
+      expect(savedConversation?.summary).toBe('Add dark mode to the app');
+      expect(savedConversation?.lastUpdated).toBe(newerLastUpdated);
+
+      const lines = (await fs.readFile(filePath, 'utf-8'))
+        .split('\n')
+        .filter(Boolean);
+      const lastRecord = JSON.parse(lines[lines.length - 1]);
+      expect(lastRecord).toEqual({
+        $set: {
+          summary: 'Add dark mode to the app',
         },
       });
     });
@@ -391,7 +454,6 @@ describe('sessionSummaryUtils', () => {
       expect(JSON.parse(previousLines[previousLines.length - 1])).toEqual({
         $set: {
           summary: 'Add dark mode to the app',
-          lastUpdated: '2024-01-01T10:00:00Z',
         },
       });
 

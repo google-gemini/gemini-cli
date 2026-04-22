@@ -53,6 +53,20 @@ interface LockInfo {
   startedAt: string;
 }
 
+function hasProperty<T extends string>(
+  obj: unknown,
+  prop: T,
+): obj is { [key in T]: unknown } {
+  return obj !== null && typeof obj === 'object' && prop in obj;
+}
+
+function isStringProperty<T extends string>(
+  obj: unknown,
+  prop: T,
+): obj is { [key in T]: string } {
+  return hasProperty(obj, prop) && typeof obj[prop] === 'string';
+}
+
 interface SessionVersion {
   sessionId: string;
   lastUpdated: string;
@@ -277,10 +291,10 @@ function shouldReplaceIndexedSession(
   return compareIndexedSessions(candidate, existing) < 0;
 }
 
-function isReadFileActivity(
+function isReadFileStartActivity(
   activity: SubagentActivityEvent,
 ): activity is SubagentActivityEvent & {
-  data: { name: string; args?: { file_path?: unknown } };
+  data: { name: string; args?: { file_path?: unknown }; callId?: unknown };
 } {
   return (
     activity.type === 'TOOL_CALL_START' &&
@@ -288,11 +302,11 @@ function isReadFileActivity(
   );
 }
 
-function getResolvedActivityFilePath(
+function getResolvedReadFilePath(
   config: Config,
   activity: SubagentActivityEvent,
 ): string | null {
-  if (!isReadFileActivity(activity)) {
+  if (!isReadFileStartActivity(activity)) {
     return null;
   }
 
@@ -307,6 +321,47 @@ function getResolvedActivityFilePath(
   }
 
   return path.resolve(config.getTargetDir(), args.file_path);
+}
+
+function getReadFileStartCallId(
+  activity: SubagentActivityEvent,
+): string | null {
+  if (
+    !isReadFileStartActivity(activity) ||
+    !isStringProperty(activity.data, 'callId')
+  ) {
+    return null;
+  }
+
+  return activity.data.callId;
+}
+
+function getCompletedReadFileCallId(
+  activity: SubagentActivityEvent,
+): string | null {
+  if (
+    activity.type !== 'TOOL_CALL_END' ||
+    activity.data['name'] !== READ_FILE_TOOL_NAME ||
+    !isStringProperty(activity.data, 'id')
+  ) {
+    return null;
+  }
+
+  return activity.data['id'];
+}
+
+function getFailedReadFileCallId(
+  activity: SubagentActivityEvent,
+): string | null {
+  if (
+    activity.type !== 'ERROR' ||
+    activity.data['name'] !== READ_FILE_TOOL_NAME ||
+    !isStringProperty(activity.data, 'callId')
+  ) {
+    return null;
+  }
+
+  return activity.data['callId'];
 }
 
 function getUserMessageCount(
@@ -945,23 +1000,50 @@ export async function startMemoryService(config: Config): Promise<void> {
       ]),
     );
     const processedSessionKeys = new Set<string>();
+    const pendingReadFileSessions = new Map<string, string>();
 
     // Create and run the extraction agent
     const executor = await LocalAgentExecutor.create(
       agentDefinition,
       context,
       (activity) => {
-        const resolvedPath = getResolvedActivityFilePath(config, activity);
-        if (!resolvedPath) {
+        const readFileCallId = getReadFileStartCallId(activity);
+        if (readFileCallId) {
+          const resolvedPath = getResolvedReadFilePath(config, activity);
+          if (!resolvedPath) {
+            return;
+          }
+
+          const session = candidateSessionsByPath.get(resolvedPath);
+          if (!session) {
+            return;
+          }
+
+          pendingReadFileSessions.set(
+            readFileCallId,
+            getSessionVersionKey(session),
+          );
           return;
         }
 
-        const session = candidateSessionsByPath.get(resolvedPath);
-        if (!session) {
+        const completedReadFileCallId = getCompletedReadFileCallId(activity);
+        if (completedReadFileCallId) {
+          const sessionKey = pendingReadFileSessions.get(
+            completedReadFileCallId,
+          );
+          if (!sessionKey) {
+            return;
+          }
+
+          processedSessionKeys.add(sessionKey);
+          pendingReadFileSessions.delete(completedReadFileCallId);
           return;
         }
 
-        processedSessionKeys.add(getSessionVersionKey(session));
+        const failedReadFileCallId = getFailedReadFileCallId(activity);
+        if (failedReadFileCallId) {
+          pendingReadFileSessions.delete(failedReadFileCallId);
+        }
       },
     );
 

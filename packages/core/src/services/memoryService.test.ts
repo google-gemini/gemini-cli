@@ -565,7 +565,7 @@ describe('memoryService', () => {
       );
     });
 
-    it('records only sessions actually opened with read_file as processed', async () => {
+    it('records only sessions whose read_file calls succeed as processed', async () => {
       const { startMemoryService, readExtractionState } = await import(
         './memoryService.js'
       );
@@ -619,6 +619,36 @@ describe('memoryService', () => {
                   name: 'read_file',
                   args: { file_path: openedPath },
                   callId: 'call-opened',
+                },
+              });
+              onActivity?.({
+                isSubagentActivityEvent: true,
+                agentName: 'Skill Extractor',
+                type: 'TOOL_CALL_START',
+                data: {
+                  name: 'read_file',
+                  args: { file_path: skippedPath },
+                  callId: 'call-skipped',
+                },
+              });
+              onActivity?.({
+                isSubagentActivityEvent: true,
+                agentName: 'Skill Extractor',
+                type: 'ERROR',
+                data: {
+                  name: 'read_file',
+                  callId: 'call-skipped',
+                  error: 'access denied',
+                },
+              });
+              onActivity?.({
+                isSubagentActivityEvent: true,
+                agentName: 'Skill Extractor',
+                type: 'TOOL_CALL_END',
+                data: {
+                  name: 'read_file',
+                  id: 'call-opened',
+                  data: { content: 'Read this one' },
                 },
               });
               onActivity?.({
