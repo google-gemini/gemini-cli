@@ -32,6 +32,8 @@ import {
   ShellExecutionService,
   type ShellOutputEvent,
 } from '../services/shellExecutionService.js';
+import { ExecutionLifecycleService } from '../services/executionLifecycleService.js';
+import { LineBuffer } from '../utils/lineBuffer.js';
 import { formatBytes } from '../utils/formatters.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import {
@@ -605,6 +607,50 @@ export class ShellToolInvocation extends BaseToolInvocation<
         // If the model requested to run in the background, do so after a short delay.
         let completed = false;
         if (this.params.is_background) {
+          // Stream stdout lines to the ACP client in real time if requested.
+          // Subscribe BEFORE the background() delay so no output is lost.
+          if (this.params.stream_output && updateOutput) {
+            const lineBuffer = new LineBuffer();
+            let teardown = false;
+            let unsubscribeStream: (() => void) | null = null;
+            const emitLines = (lines: string[]) => {
+              if (lines.length === 0) return;
+              updateOutput(lines.join('\n'));
+            };
+            const teardownStream = () => {
+              if (teardown) return;
+              teardown = true;
+              emitLines(lineBuffer.flush());
+              signal.removeEventListener('abort', teardownStream);
+              unsubscribeStream?.();
+              unsubscribeStream = null;
+            };
+            unsubscribeStream = ExecutionLifecycleService.subscribe(
+              pid,
+              (event) => {
+                if (teardown) return;
+                switch (event.type) {
+                  case 'data': {
+                    if (typeof event.chunk !== 'string') return;
+                    emitLines(lineBuffer.push(event.chunk));
+                    break;
+                  }
+                  case 'exit': {
+                    teardownStream();
+                    break;
+                  }
+                  default:
+                    break;
+                }
+              },
+            );
+            if (signal.aborted) {
+              teardownStream();
+            } else {
+              signal.addEventListener('abort', teardownStream, { once: true });
+            }
+          }
+
           resultPromise
             .then(() => {
               completed = true;

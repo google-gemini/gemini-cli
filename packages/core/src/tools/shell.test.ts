@@ -46,6 +46,7 @@ vi.mock('../utils/summarizer.js');
 
 import { initializeShellParsers } from '../utils/shell-utils.js';
 import { ShellTool, OUTPUT_UPDATE_INTERVAL_MS } from './shell.js';
+import { ExecutionLifecycleService } from '../services/executionLifecycleService.js';
 import { debugLogger } from '../index.js';
 import { type Config } from '../config/config.js';
 import { NoopSandboxManager } from '../services/sandboxManager.js';
@@ -473,6 +474,97 @@ describe('ShellTool', () => {
       expect(result.returnDisplay).toBe(
         'Background process started with PID 12345.',
       );
+    });
+
+    it('forwards background stdout lines to updateOutput when stream_output is true', async () => {
+      vi.useFakeTimers();
+      mockShellBackground.mockImplementationOnce(() => {});
+      const updateOutputMock = vi.fn();
+
+      const invocation = shellTool.build({
+        command: 'watch /inbox',
+        is_background: true,
+        stream_output: true,
+      });
+      const promise = invocation.execute({
+        abortSignal: mockAbortSignal,
+        updateOutput: updateOutputMock,
+      });
+
+      // Flush pending microtasks so the subscribe() registration runs.
+      await vi.advanceTimersByTimeAsync(0);
+
+      ExecutionLifecycleService.emitEvent(12345, {
+        type: 'data',
+        chunk: 'NEW:foo.txt\nNEW:bar.txt\n',
+      });
+
+      await vi.advanceTimersByTimeAsync(250);
+      const result = await promise;
+
+      expect(result.backgroundedStreamId).toBe(12345);
+      expect(updateOutputMock).toHaveBeenCalledWith('NEW:foo.txt\nNEW:bar.txt');
+    });
+
+    it('buffers partial lines across chunks in stream_output mode', async () => {
+      vi.useFakeTimers();
+      mockShellBackground.mockImplementationOnce(() => {});
+      const updateOutputMock = vi.fn();
+
+      const invocation = shellTool.build({
+        command: 'watch /inbox',
+        is_background: true,
+        stream_output: true,
+      });
+      const promise = invocation.execute({
+        abortSignal: mockAbortSignal,
+        updateOutput: updateOutputMock,
+      });
+
+      await vi.advanceTimersByTimeAsync(0);
+
+      // Two chunks that split a line across the boundary.
+      ExecutionLifecycleService.emitEvent(12345, {
+        type: 'data',
+        chunk: 'NEW:fo',
+      });
+      ExecutionLifecycleService.emitEvent(12345, {
+        type: 'data',
+        chunk: 'o.txt\n',
+      });
+
+      await vi.advanceTimersByTimeAsync(250);
+      await promise;
+
+      expect(updateOutputMock).toHaveBeenCalledTimes(1);
+      expect(updateOutputMock).toHaveBeenCalledWith('NEW:foo.txt');
+    });
+
+    it('does not subscribe to ExecutionLifecycleService when stream_output is false', async () => {
+      vi.useFakeTimers();
+      mockShellBackground.mockImplementationOnce(() => {});
+      const updateOutputMock = vi.fn();
+
+      const invocation = shellTool.build({
+        command: 'sleep 10',
+        is_background: true,
+      });
+      const promise = invocation.execute({
+        abortSignal: mockAbortSignal,
+        updateOutput: updateOutputMock,
+      });
+
+      await vi.advanceTimersByTimeAsync(0);
+
+      ExecutionLifecycleService.emitEvent(12345, {
+        type: 'data',
+        chunk: 'should-not-propagate\n',
+      });
+
+      await vi.advanceTimersByTimeAsync(250);
+      await promise;
+
+      expect(updateOutputMock).not.toHaveBeenCalled();
     });
 
     it('does not set backgroundedStreamId when stream_output is true but is_background is false', async () => {
