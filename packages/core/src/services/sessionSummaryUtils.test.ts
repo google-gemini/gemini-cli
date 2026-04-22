@@ -30,17 +30,39 @@ vi.mock('../core/baseLlmClient.js', () => ({
 // Helper to create a session with N user messages
 function createSessionWithUserMessages(
   count: number,
-  options: { summary?: string; sessionId?: string } = {},
+  options: { summary?: string; sessionId?: string; lastUpdated?: string } = {},
 ) {
   return JSON.stringify({
     sessionId: options.sessionId ?? 'session-id',
     summary: options.summary,
+    lastUpdated: options.lastUpdated,
     messages: Array.from({ length: count }, (_, i) => ({
       id: String(i + 1),
       type: 'user',
       content: [{ text: `Message ${i + 1}` }],
     })),
   });
+}
+
+function createJsonlSessionWithUserMessages(
+  count: number,
+  options: { summary?: string; sessionId?: string; lastUpdated?: string } = {},
+) {
+  const metadata = JSON.stringify({
+    sessionId: options.sessionId ?? 'session-id',
+    projectHash: 'abc123',
+    startTime: '2024-01-01T00:00:00Z',
+    lastUpdated: options.lastUpdated,
+    summary: options.summary,
+  });
+  const messages = Array.from({ length: count }, (_, i) =>
+    JSON.stringify({
+      id: String(i + 1),
+      type: 'user',
+      content: [{ text: `Message ${i + 1}` }],
+    }),
+  );
+  return [metadata, ...messages, ''].join('\n');
 }
 
 describe('sessionSummaryUtils', () => {
@@ -170,6 +192,35 @@ describe('sessionSummaryUtils', () => {
 
       expect(result).toBeNull();
     });
+
+    it('should support JSONL sessions and sort by lastUpdated instead of filename', async () => {
+      vi.mocked(fs.access).mockResolvedValue(undefined);
+      mockReaddir.mockResolvedValue([
+        'session-2024-01-02T10-00-older000.jsonl',
+        'session-2024-01-01T10-00-newer000.jsonl',
+      ]);
+      vi.mocked(fs.readFile)
+        .mockResolvedValueOnce(
+          createJsonlSessionWithUserMessages(2, {
+            lastUpdated: '2024-01-01T10:00:00Z',
+          }),
+        )
+        .mockResolvedValueOnce(
+          createJsonlSessionWithUserMessages(2, {
+            lastUpdated: '2024-01-03T10:00:00Z',
+          }),
+        );
+
+      const result = await getPreviousSession(mockConfig);
+
+      expect(result).toBe(
+        path.join(
+          '/tmp/project',
+          'chats',
+          'session-2024-01-01T10-00-newer000.jsonl',
+        ),
+      );
+    });
   });
 
   describe('generateSummary', () => {
@@ -212,6 +263,32 @@ describe('sessionSummaryUtils', () => {
       mockGenerateSummary.mockRejectedValue(new Error('API Error'));
 
       await expect(generateSummary(mockConfig)).resolves.not.toThrow();
+    });
+
+    it('should append a metadata update when saving a summary to JSONL', async () => {
+      const sessionPath = path.join(
+        '/tmp/project',
+        'chats',
+        'session-2024-01-01T10-00-abc12345.jsonl',
+      );
+
+      vi.mocked(fs.access).mockResolvedValue(undefined);
+      mockReaddir.mockResolvedValue([
+        'session-2024-01-01T10-00-abc12345.jsonl',
+      ]);
+      vi.mocked(fs.readFile).mockResolvedValue(
+        createJsonlSessionWithUserMessages(2),
+      );
+      vi.mocked(fs.appendFile).mockResolvedValue(undefined);
+
+      await generateSummary(mockConfig);
+
+      expect(mockGenerateSummary).toHaveBeenCalledTimes(1);
+      expect(fs.appendFile).toHaveBeenCalledTimes(1);
+      expect(fs.appendFile).toHaveBeenCalledWith(
+        sessionPath,
+        expect.stringContaining('"summary":"Add dark mode to the app"'),
+      );
     });
   });
 });
