@@ -222,5 +222,52 @@ describe('parsingUtils', () => {
         ),
       );
     });
+
+    describe('LaTeX conversion (issue #25656)', () => {
+      it('converts LaTeX in plain text (no markdown tokens)', () => {
+        const input = 'No cycles $\\to$ no deadlock';
+        const output = parseMarkdownToANSI(input);
+        expect(output).toBe(primary('No cycles → no deadlock'));
+      });
+
+      it('converts LaTeX in the set example from the issue', () => {
+        const input = 'Processes $\\{P_0, \\dots, P_n\\}$';
+        const output = parseMarkdownToANSI(input);
+        expect(output).toBe(primary('Processes {P₀, …, Pₙ}'));
+      });
+
+      it('preserves LaTeX inside inline code', () => {
+        // Content between backticks must be rendered verbatim — conversion
+        // must NOT be applied inside code spans, even when the code contains
+        // `$...$` that would otherwise be stripped.
+        const input = 'use `$\\to$` for an arrow';
+        const output = parseMarkdownToANSI(input);
+        expect(output).toBe(
+          `${primary('use ')}${accent('$\\to$')}${primary(' for an arrow')}`,
+        );
+      });
+
+      it('converts LaTeX in slices around markdown tokens', () => {
+        const input = '$\\alpha$ is **bold** and $\\beta$ is plain';
+        const output = parseMarkdownToANSI(input);
+        expect(output).toBe(
+          `${primary('α is ')}${chalk.bold(primary('bold'))}${primary(
+            ' and β is plain',
+          )}`,
+        );
+      });
+
+      it('leaves Windows paths alone', () => {
+        const input = 'Path: C:\\Users\\foo';
+        const output = parseMarkdownToANSI(input);
+        expect(output).toBe(primary('Path: C:\\Users\\foo'));
+      });
+
+      it('leaves currency amounts alone', () => {
+        const input = 'It costs $5.99 total';
+        const output = parseMarkdownToANSI(input);
+        expect(output).toBe(primary('It costs $5.99 total'));
+      });
+    });
   });
 });
