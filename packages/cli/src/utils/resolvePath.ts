@@ -1,21 +1,30 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-
-import * as path from 'node:path';
 import { homedir } from '@google/gemini-cli-core';
+import path from 'node:path';
 
-export function resolvePath(p: string): string {
-  if (!p) {
+/**
+ * Resolves paths starting with ~ or %userprofile% to the user's home directory.
+ * Also normalizes the resulting path.
+ */
+export function resolvePath(inputPath: string): string {
+  if (!inputPath) {
     return '';
   }
-  let expandedPath = p;
-  if (p.toLowerCase().startsWith('%userprofile%')) {
-    expandedPath = homedir() + p.substring('%userprofile%'.length);
-  } else if (p === '~' || p.startsWith('~/')) {
-    expandedPath = homedir() + p.substring(1);
+
+  let resolved = inputPath;
+
+  // Handle ~ prefix
+  if (inputPath === '~' || inputPath.startsWith('~/')) {
+    resolved = path.join(homedir(), inputPath.slice(1));
   }
-  return path.normalize(expandedPath);
+  // Handle %userprofile% prefix
+  else if (inputPath.toLowerCase().startsWith('%userprofile%')) {
+    resolved = path.join(homedir(), inputPath.slice('%userprofile%'.length));
+  }
+
+  return path.normalize(resolved);
 }

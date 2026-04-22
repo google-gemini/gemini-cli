@@ -14,6 +14,8 @@ import {
   type MockInstance,
   type Mock,
 } from 'vitest';
+import * as fs from 'node:fs';
+import { writeToStderr } from '@google/gemini-cli-core';
 import {
   main,
   setupUnhandledRejectionHandler,
@@ -21,6 +23,7 @@ import {
   startInteractiveUI,
   getNodeMemoryArgs,
 } from './gemini.js';
+import { bootstrapWorkspace } from './utils/resolveWorkspace.js';
 import {
   loadCliConfig,
   parseArguments,
@@ -88,6 +91,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
         ...(args as Parameters<typeof process.stdout.write>),
       ),
     ),
+    writeToStderr: vi.fn(),
     patchStdio: vi.fn(() => () => {}),
     createWorkingStdio: vi.fn(() => ({
       stdout: {
@@ -552,6 +556,7 @@ describe('gemini.tsx main function kitty protocol', () => {
       outputFormat: undefined,
       fakeResponses: undefined,
       recordResponses: undefined,
+      workspace: undefined,
       rawOutput: undefined,
       acceptRawOutputRisk: undefined,
       isCommand: undefined,
@@ -610,6 +615,7 @@ describe('gemini.tsx main function kitty protocol', () => {
       outputFormat: undefined,
       fakeResponses: undefined,
       recordResponses: undefined,
+      workspace: undefined,
       rawOutput: undefined,
       acceptRawOutputRisk: undefined,
       isCommand: undefined,
@@ -1625,5 +1631,104 @@ describe('startInteractiveUI', () => {
       expect(writeSpy).not.toHaveBeenCalledWith('\x1b[?7l');
     }
     writeSpy.mockRestore();
+  });
+});
+
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
+  return {
+    ...actual,
+    existsSync: vi.fn(actual.existsSync),
+    statSync: vi.fn(actual.statSync),
+  };
+});
+
+vi.mock('./utils/resolveWorkspace.js', () => ({
+  bootstrapWorkspace: vi.fn(),
+}));
+
+describe('Workspace argument validation', () => {
+  let processExitSpy: MockInstance;
+  let processChdirSpy: MockInstance;
+
+  beforeEach(async () => {
+    processExitSpy = vi.spyOn(process, 'exit').mockImplementation((code) => {
+      throw new MockProcessExitError(code);
+    });
+    processChdirSpy = vi
+      .spyOn(process, 'chdir')
+      .mockImplementation(() => undefined);
+
+    vi.mocked(fs.existsSync).mockClear();
+    vi.mocked(fs.statSync).mockClear();
+    vi.mocked(writeToStderr).mockClear();
+  });
+
+  afterEach(() => {
+    processExitSpy.mockRestore();
+    processChdirSpy.mockRestore();
+  });
+
+  it('should exit with code 42 if workspace does not exist', async () => {
+    const originalArgv = process.argv;
+    process.argv = ['node', 'gemini', '--workspace=/fake/path'];
+    vi.mocked(bootstrapWorkspace).mockImplementation(() => {
+      throw new Error('Workspace path "/fake/path" does not exist.');
+    });
+
+    try {
+      await main();
+      expect.fail('Should have exited');
+    } catch (e) {
+      if (!(e instanceof MockProcessExitError)) throw e;
+      expect(e.code).toBe(42);
+      expect(vi.mocked(writeToStderr)).toHaveBeenCalledWith(
+        expect.stringContaining('does not exist'),
+      );
+    } finally {
+      process.argv = originalArgv;
+    }
+  });
+
+  it('should exit with code 42 if workspace is a file', async () => {
+    const originalArgv = process.argv;
+    process.argv = ['node', 'gemini', '--workspace=/fake/file.txt'];
+    vi.mocked(bootstrapWorkspace).mockImplementation(() => {
+      throw new Error('Workspace path "/fake/file.txt" is not a directory.');
+    });
+
+    try {
+      await main();
+      expect.fail('Should have exited');
+    } catch (e) {
+      if (!(e instanceof MockProcessExitError)) throw e;
+      expect(e.code).toBe(42);
+      expect(vi.mocked(writeToStderr)).toHaveBeenCalledWith(
+        expect.stringContaining('is not a directory'),
+      );
+    } finally {
+      process.argv = originalArgv;
+    }
+  });
+
+  it('should chdir to workspace before loading settings', async () => {
+    const { loadSettings } = await import('./config/settings.js');
+    const originalArgv = process.argv;
+    process.argv = ['node', 'gemini', '--workspace=/valid/dir'];
+    vi.mocked(bootstrapWorkspace).mockReturnValue('/valid/dir');
+
+    // We need to throw at loadSettings to stop main() from continuing
+    vi.mocked(loadSettings).mockImplementationOnce(() => {
+      throw new Error('STOP_AT_SETTINGS');
+    });
+
+    try {
+      await main();
+    } catch (e) {
+      if ((e as Error).message !== 'STOP_AT_SETTINGS') throw e;
+    }
+
+    expect(processChdirSpy).toHaveBeenCalledWith('/valid/dir');
+    process.argv = originalArgv;
   });
 });
