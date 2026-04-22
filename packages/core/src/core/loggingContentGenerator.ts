@@ -377,6 +377,37 @@ export class LoggingContentGenerator implements ContentGenerator {
         const startTime = Date.now();
         const contents: Content[] = toContents(req.contents);
         const serverDetails = this._getEndpointUrl(req, 'generateContent');
+
+        // --- DEBUG LOGGING ---
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const truncateText = (obj: any): any => {
+          if (Array.isArray(obj)) return obj.map(truncateText);
+          if (obj !== null && typeof obj === 'object') {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const newObj: any = {};
+            for (const [k, v] of Object.entries(obj)) {
+              if (k === 'text' && typeof v === 'string') {
+                newObj[k] =
+                  v.length > 200 ? v.slice(0, 200) + '...[TRUNCATED]' : v;
+              } else {
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+                newObj[k] = truncateText(v);
+              }
+            }
+            return newObj;
+          }
+          return obj;
+        };
+        // eslint-disable-next-line no-console
+        console.error(
+          `[LLM_REQUEST] model: ${req.model}, role: ${role}, prompt_id: ${userPromptId}`,
+        );
+        // eslint-disable-next-line no-console
+        console.error(
+          `[LLM_REQUEST_PAYLOAD]\n${JSON.stringify(truncateText(req.contents), null, 2)}`,
+        );
+        // ---------------------
+
         this.logApiRequest(
           contents,
           req.model,
@@ -476,6 +507,36 @@ export class LoggingContentGenerator implements ContentGenerator {
         if (/########\d+$/.test(userPromptId)) {
           this.config.setLatestApiRequest(req);
         }
+
+        // --- DEBUG LOGGING ---
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const truncateText = (obj: any): any => {
+          if (Array.isArray(obj)) return obj.map(truncateText);
+          if (obj !== null && typeof obj === 'object') {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const newObj: any = {};
+            for (const [k, v] of Object.entries(obj)) {
+              if (k === 'text' && typeof v === 'string') {
+                newObj[k] =
+                  v.length > 200 ? v.slice(0, 200) + '...[TRUNCATED]' : v;
+              } else {
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+                newObj[k] = truncateText(v);
+              }
+            }
+            return newObj;
+          }
+          return obj;
+        };
+        // eslint-disable-next-line no-console
+        console.error(
+          `[LLM_REQUEST] model: ${req.model}, role: ${role}, prompt_id: ${userPromptId}`,
+        );
+        // eslint-disable-next-line no-console
+        console.error(
+          `[LLM_REQUEST_PAYLOAD]\n${JSON.stringify(truncateText(req.contents), null, 2)}`,
+        );
+        // ---------------------
 
         this.logApiRequest(
           toContents(req.contents),
