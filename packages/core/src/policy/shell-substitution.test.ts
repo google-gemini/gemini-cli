@@ -9,6 +9,21 @@ import { PolicyEngine } from './policy-engine.js';
 import { PolicyDecision } from './types.js';
 import { initializeShellParsers } from '../utils/shell-utils.js';
 
+// Mock node:os to ensure shell-utils logic always thinks it's on a POSIX-like system.
+// This ensures that internal calls to getShellConfiguration() and isWindows()
+// within the shell-utils module return 'bash' configuration, even on Windows CI.
+vi.mock('node:os', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:os')>();
+  return {
+    ...actual,
+    default: {
+      ...actual,
+      platform: () => 'linux',
+    },
+    platform: () => 'linux',
+  };
+});
+
 // Mock shell-utils to ensure consistent behavior across platforms (especially Windows CI)
 // We want to test PolicyEngine logic with Bash syntax rules.
 vi.mock('../utils/shell-utils.js', async (importOriginal) => {

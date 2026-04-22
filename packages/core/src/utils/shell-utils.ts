@@ -365,8 +365,9 @@ function extractNameFromNode(node: Node): string | null {
     case 'herestring_redirect':
       return 'herestring (<<<)';
     case 'command_substitution':
-    case 'backtick_substitution':
       return 'command substitution';
+    case 'backtick_substitution':
+      return 'backtick substitution';
     case 'process_substitution':
       return 'process substitution';
     case 'subshell':
