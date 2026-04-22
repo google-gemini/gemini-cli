@@ -1204,7 +1204,14 @@ export class Session {
 
         completionListener = (info: BackgroundCompletionInfo) => {
           if (info.executionId !== streamId) return;
-          emitTerminal(info.error !== null);
+          // Defer one turn of the event loop so any pending flush from the
+          // stream_output LineBuffer (triggered synchronously from the same
+          // ExecutionLifecycleService exit notification) can land its final
+          // tool_call_update(in_progress) BEFORE our terminal status arrives
+          // — otherwise strict ACP clients may drop updates that arrive
+          // after status:'completed'.
+          const failed = info.error !== null;
+          setImmediate(() => emitTerminal(failed));
         };
         abortHandler = () => emitTerminal(false);
 
