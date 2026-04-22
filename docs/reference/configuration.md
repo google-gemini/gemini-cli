@@ -436,6 +436,20 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `"ask"`
   - **Values:** `"ask"`, `"always"`, `"never"`
 
+- **`billing.vertexAi.requestType`** (enum):
+  - **Description:** Sets the X-Vertex-AI-LLM-Request-Type header for Vertex AI
+    requests.
+  - **Default:** `undefined`
+  - **Values:** `"dedicated"`, `"shared"`
+  - **Requires restart:** Yes
+
+- **`billing.vertexAi.sharedRequestType`** (enum):
+  - **Description:** Sets the X-Vertex-AI-LLM-Shared-Request-Type header for
+    Vertex AI requests.
+  - **Default:** `undefined`
+  - **Values:** `"priority"`, `"flex"`
+  - **Requires restart:** Yes
+
 #### `model`
 
 - **`model.name`** (string):
@@ -1359,6 +1373,12 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `true`
   - **Requires restart:** Yes
 
+- **`context.fileFiltering.enableFileWatcher`** (boolean):
+  - **Description:** Enable file watcher updates for @ file suggestions
+    (experimental).
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
 - **`context.fileFiltering.enableRecursiveFileSearch`** (boolean):
   - **Description:** Enable recursive file search functionality when completing
     @ references in the prompt.
@@ -1711,6 +1731,18 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
+- **`experimental.gemmaModelRouter.autoStartServer`** (boolean):
+  - **Description:** Automatically start the LiteRT-LM server when Gemini CLI
+    starts and the Gemma router is enabled.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
+- **`experimental.gemmaModelRouter.binaryPath`** (string):
+  - **Description:** Custom path to the LiteRT-LM binary. Leave empty to use the
+    default location (~/.gemini/bin/litert/).
+  - **Default:** `""`
+  - **Requires restart:** Yes
+
 - **`experimental.gemmaModelRouter.classifier.host`** (string):
   - **Description:** The host of the classifier.
   - **Default:** `"http://localhost:9379"`
@@ -1986,6 +2018,8 @@ see [Telemetry](../cli/telemetry.md).
 
 - **Properties:**
   - **`enabled`** (boolean): Whether or not telemetry is enabled.
+  - **`traces`** (boolean): Whether detailed traces with large attributes (like
+    tool outputs and file reads) are captured. Defaults to `false`.
   - **`target`** (string): The destination for collected telemetry. Supported
     values are `local` and `gcp`.
   - **`otlpEndpoint`** (string): The endpoint for the OTLP Exporter.
@@ -2186,6 +2220,10 @@ the `advanced.excludedEnvVars` setting in your `settings.json` file.
   - Set to `true` or `1` to enable telemetry. Any other value is treated as
     disabling it.
   - Overrides the `telemetry.enabled` setting.
+- **`GEMINI_TELEMETRY_TRACES_ENABLED`**:
+  - Set to `true` or `1` to enable detailed tracing with large attributes. Any
+    other value is treated as disabling it.
+  - Overrides the `telemetry.traces` setting.
 - **`GEMINI_TELEMETRY_TARGET`**:
   - Sets the telemetry target (`local` or `gcp`).
   - Overrides the `telemetry.target` setting.
