@@ -181,6 +181,7 @@ describe('gemini.tsx main function cleanup', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env['GEMINI_CLI_NO_RELAUNCH'] = 'true';
+    vi.stubEnv('GEMINI_TRUST_WORKSPACE', 'true');
   });
 
   afterEach(() => {
