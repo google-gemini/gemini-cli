@@ -590,7 +590,7 @@ async function readLocalFiles(
                 query: fileActualContent,
                 config,
                 addItem: () => 0, // Mock addItem to prevent history pollution.
-                onDebugMessage: () => {}, 
+                onDebugMessage,
                 messageId: userMessageTimestamp,
                 signal,
                 depth: depth + 1,
