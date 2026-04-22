@@ -6,6 +6,7 @@
 
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { isNodeError } from '@google/gemini-cli-core';
 import { CommandKind, type SlashCommand } from './types.js';
 
 export const noteCommand: SlashCommand = {
@@ -24,17 +25,25 @@ export const noteCommand: SlashCommand = {
           messageType: 'info',
           content: `Current notes in ${notesPath}:\n\n${content}`,
         };
-      } catch {
+      } catch (error) {
+        if (isNodeError(error) && error.code === 'ENOENT') {
+          return {
+            type: 'message',
+            messageType: 'info',
+            content: 'No notes found. Use "/note <text>" to add one.',
+          };
+        }
         return {
           type: 'message',
-          messageType: 'info',
-          content: 'No notes found. Use "/note <text>" to add one.',
+          messageType: 'error',
+          content: `Failed to read notes: ${error instanceof Error ? error.message : String(error)}`,
         };
       }
     }
 
     try {
-      await fs.appendFile(notesPath, `${args}\n`);
+      const trimmedNote = args.trim();
+      await fs.appendFile(notesPath, `${trimmedNote}\n`);
       return {
         type: 'message',
         messageType: 'info',

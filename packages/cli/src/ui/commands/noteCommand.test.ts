@@ -33,8 +33,10 @@ describe('noteCommand', () => {
     });
   });
 
-  it('should return info message when no args provided and file does not exist', async () => {
-    vi.mocked(fs.readFile).mockRejectedValue(new Error('File not found'));
+  it('should return info message when no args provided and file does not exist (ENOENT)', async () => {
+    const error = new Error('File not found') as NodeJS.ErrnoException;
+    error.code = 'ENOENT';
+    vi.mocked(fs.readFile).mockRejectedValue(error);
 
     const result = await noteCommand.action!(mockContext, '  ');
 
@@ -45,13 +47,30 @@ describe('noteCommand', () => {
     });
   });
 
-  it('should append note to file when args are provided', async () => {
-    const note = 'this is a new note';
+  it('should return error message when readFile fails with other error', async () => {
+    vi.mocked(fs.readFile).mockRejectedValue(new Error('Permission denied'));
+
+    const result = await noteCommand.action!(mockContext, '');
+
+    expect(result).toEqual({
+      type: 'message',
+      messageType: 'error',
+      content: expect.stringContaining(
+        'Failed to read notes: Permission denied',
+      ),
+    });
+  });
+
+  it('should append trimmed note to file when args are provided', async () => {
+    const note = '  this is a new note  ';
     vi.mocked(fs.appendFile).mockResolvedValue(undefined);
 
     const result = await noteCommand.action!(mockContext, note);
 
-    expect(fs.appendFile).toHaveBeenCalledWith(notesPath, `${note}\n`);
+    expect(fs.appendFile).toHaveBeenCalledWith(
+      notesPath,
+      `this is a new note\n`,
+    );
     expect(result).toEqual({
       type: 'message',
       messageType: 'info',
