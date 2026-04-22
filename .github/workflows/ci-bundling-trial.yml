@@ -35,11 +35,15 @@ jobs:
           name: 'workspace-artifact'
           path: '.'
 
-      - name: 'Upload Node Modules'
+      - name: 'Tar Node Modules'
+        run: 'tar -czf node_modules.tar.gz node_modules'
+        shell: 'bash'
+
+      - name: 'Upload Node Modules Tarball'
         uses: 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02'
         with:
-          name: 'node-modules-artifact'
-          path: 'node_modules'
+          name: 'node-modules-tarball'
+          path: 'node_modules.tar.gz'
 
   test_ui_messages:
     name: 'Test (Linux) - UI Messages'
@@ -55,11 +59,16 @@ jobs:
           name: 'workspace-artifact'
           path: '.'
 
-      - name: 'Download Node Modules'
+      - name: 'Download Node Modules Tarball'
         uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806'
         with:
-          name: 'node-modules-artifact'
-          path: 'node_modules'
+          name: 'node-modules-tarball'
+
+      - name: 'Extract Node Modules'
+        run: |
+          tar -xzf node_modules.tar.gz
+          rm node_modules.tar.gz
+        shell: 'bash'
 
       - name: 'Setup Gemini'
         uses: './.github/actions/setup-gemini'
@@ -85,11 +94,16 @@ jobs:
           name: 'workspace-artifact'
           path: '.'
 
-      - name: 'Download Node Modules'
+      - name: 'Download Node Modules Tarball'
         uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806'
         with:
-          name: 'node-modules-artifact'
-          path: 'node_modules'
+          name: 'node-modules-tarball'
+
+      - name: 'Extract Node Modules'
+        run: |
+          tar -xzf node_modules.tar.gz
+          rm node_modules.tar.gz
+        shell: 'bash'
 
       - name: 'Setup Gemini'
         uses: './.github/actions/setup-gemini'
@@ -115,11 +129,16 @@ jobs:
           name: 'workspace-artifact'
           path: '.'
 
-      - name: 'Download Node Modules'
+      - name: 'Download Node Modules Tarball'
         uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806'
         with:
-          name: 'node-modules-artifact'
-          path: 'node_modules'
+          name: 'node-modules-tarball'
+
+      - name: 'Extract Node Modules'
+        run: |
+          tar -xzf node_modules.tar.gz
+          rm node_modules.tar.gz
+        shell: 'bash'
 
       - name: 'Setup Gemini'
         uses: './.github/actions/setup-gemini'
@@ -145,11 +164,16 @@ jobs:
           name: 'workspace-artifact'
           path: '.'
 
-      - name: 'Download Node Modules'
+      - name: 'Download Node Modules Tarball'
         uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806'
         with:
-          name: 'node-modules-artifact'
-          path: 'node_modules'
+          name: 'node-modules-tarball'
+
+      - name: 'Extract Node Modules'
+        run: |
+          tar -xzf node_modules.tar.gz
+          rm node_modules.tar.gz
+        shell: 'bash'
 
       - name: 'Setup Gemini'
         uses: './.github/actions/setup-gemini'
@@ -175,11 +199,16 @@ jobs:
           name: 'workspace-artifact'
           path: '.'
 
-      - name: 'Download Node Modules'
+      - name: 'Download Node Modules Tarball'
         uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806'
         with:
-          name: 'node-modules-artifact'
-          path: 'node_modules'
+          name: 'node-modules-tarball'
+
+      - name: 'Extract Node Modules'
+        run: |
+          tar -xzf node_modules.tar.gz
+          rm node_modules.tar.gz
+        shell: 'bash'
 
       - name: 'Setup Gemini'
         uses: './.github/actions/setup-gemini'
@@ -205,11 +234,16 @@ jobs:
           name: 'workspace-artifact'
           path: '.'
 
-      - name: 'Download Node Modules'
+      - name: 'Download Node Modules Tarball'
         uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806'
         with:
-          name: 'node-modules-artifact'
-          path: 'node_modules'
+          name: 'node-modules-tarball'
+
+      - name: 'Extract Node Modules'
+        run: |
+          tar -xzf node_modules.tar.gz
+          rm node_modules.tar.gz
+        shell: 'bash'
 
       - name: 'Setup Gemini'
         uses: './.github/actions/setup-gemini'
@@ -235,11 +269,16 @@ jobs:
           name: 'workspace-artifact'
           path: '.'
 
-      - name: 'Download Node Modules'
+      - name: 'Download Node Modules Tarball'
         uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806'
         with:
-          name: 'node-modules-artifact'
-          path: 'node_modules'
+          name: 'node-modules-tarball'
+
+      - name: 'Extract Node Modules'
+        run: |
+          tar -xzf node_modules.tar.gz
+          rm node_modules.tar.gz
+        shell: 'bash'
 
       - name: 'Setup Gemini'
         uses: './.github/actions/setup-gemini'
@@ -265,11 +304,16 @@ jobs:
           name: 'workspace-artifact'
           path: '.'
 
-      - name: 'Download Node Modules'
+      - name: 'Download Node Modules Tarball'
         uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806'
         with:
-          name: 'node-modules-artifact'
-          path: 'node_modules'
+          name: 'node-modules-tarball'
+
+      - name: 'Extract Node Modules'
+        run: |
+          tar -xzf node_modules.tar.gz
+          rm node_modules.tar.gz
+        shell: 'bash'
 
       - name: 'Setup Gemini'
         uses: './.github/actions/setup-gemini'
