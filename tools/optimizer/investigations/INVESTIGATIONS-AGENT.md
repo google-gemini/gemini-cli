@@ -9,10 +9,11 @@ of the data and identify any opportunities for improvement.
 2. Run existing scripts in `investigations/scripts/` to gather more data.
 3. If necessary, create NEW investigation scripts in `investigations/scripts/`
    to dig deeper (e.g., check issue labels, age, or assignees).
-4. Maintain a table of all available investigation scripts in
+4. **Hypothesis Testing**: For each metric not meeting goals:
+   - **Develop Competing Hypotheses**: Brainstorm multiple potential root causes (e.g., "Latency is due to slow reviews" vs. "Latency is due to slow author responses").
+   - **Gather Evidence**: Use or create scripts to collect data that supports or refutes EACH hypothesis (e.g., check timestamp of last review vs. last commit).
+   - **Select Root Cause**: Identify the hypothesis most strongly supported by the data.
+5. **Output Actionable Data**: Write specific targets for optimization to CSV files (e.g., `reviewer_bottlenecks.csv`, `author_stale_prs.csv`). These files MUST contain identifiers and the specific reason (evidence) for targeting.
+6. Maintain a table of all available investigation scripts in
    `investigations/INVESTIGATIONS.md`.
-5. Write any gathered data to corresponding CSV files. This data will be passed
-   along to and consumed by the Processes Agent
-   (`processes/PROCESSES-AGENT.md`).
-6. Document your findings in `investigations/INVESTIGATIONS.md`, noting if
-   metrics are improving or worsening.
+7. Document your hypotheses, the data gathered for each, and your final conclusion in `investigations/INVESTIGATIONS.md`.

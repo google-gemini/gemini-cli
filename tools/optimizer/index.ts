@@ -2,7 +2,7 @@ import { Command } from 'commander';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { execSync } from 'node:child_process';
+import { execSync, spawn } from 'node:child_process';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -11,6 +11,7 @@ async function main() {
   program
     .option('--investigate', 'Run investigation phase', false)
     .option('--update-processes', 'Update processes based on learnings', false)
+    .option('--create-pr', 'Create a PR when updating processes', false)
     .option('--commit', 'Run processes and commit changes', false)
     .parse(process.argv);
 
@@ -86,9 +87,10 @@ async function runPhase(phaseDir: string, env: Record<string, string>, options: 
   }
 
   const instructionsPath = path.join(phasePath, promptFile);
+  const instructionsContent = await fs.readFile(instructionsPath, 'utf8');
 
   const envString = Object.entries(env).map(([k, v]) => `${k}=${v}`).join('\n');
-  const userPrompt = `Execution Context:\n${envString}\n\nPlease proceed with the ${phaseDir} tasks as defined in your instructions. Always output CSV files as requested.`;
+  const userPrompt = `Execution Context:\n${envString}\n\n${instructionsContent}\n\nPlease proceed with the ${phaseDir} tasks as defined in your instructions. Always output CSV files as requested.`;
 
   console.log(`Running agent with prompt: ${promptFile}`);
   
@@ -98,14 +100,27 @@ async function runPhase(phaseDir: string, env: Record<string, string>, options: 
   try {
     // Run GCLI non-interactively with --yolo to bypass policies
     const cliPath = path.join(rootDir, 'packages', 'cli');
-    const command = `node ${cliPath} --prompt "${userPrompt}" --instructions-path "${instructionsPath}" --yolo`;
     
-    execSync(command, { 
-      stdio: 'inherit',
-      cwd: rootDir,
-      env: { ...process.env, ...env }
+    await new Promise<void>((resolve, reject) => {
+      const child = spawn('node', [cliPath, '--prompt', userPrompt, '--yolo', '--model', 'gemini-3-flash-preview'], {
+        stdio: 'inherit',
+        cwd: rootDir,
+        env: { ...process.env, ...env }
+      });
+
+      child.on('close', (code) => {
+        if (code === 0) {
+          resolve();
+        } else {
+          reject(new Error(`Exit code ${code}`));
+        }
+      });
+
+      child.on('error', (err) => {
+        reject(err);
+      });
     });
-  } catch (err) {
+  } catch (err: any) {
     console.error(`Error in phase ${phaseDir}:`, err.message);
   }
 
