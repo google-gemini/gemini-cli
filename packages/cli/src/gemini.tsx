@@ -164,6 +164,14 @@ export function getNodeMemoryArgs(isDebugMode: boolean): string[] {
 export function setupUnhandledRejectionHandler() {
   let unhandledRejectionOccurred = false;
   process.on('unhandledRejection', (reason, _promise) => {
+    // AbortError is expected when the user cancels a request (e.g. pressing ESC).
+    // It may surface as an unhandled rejection due to async timing in the
+    // streaming pipeline, but it is not a bug.
+    if (reason instanceof Error && reason.name === 'AbortError') {
+      debugLogger.log(`Suppressed unhandled AbortError: ${reason.message}`);
+      return;
+    }
+
     const errorMessage = `=========================================
 This is an unexpected error. Please file a bug report using the /bug tool.
 CRITICAL: Unhandled Promise Rejection!
@@ -603,6 +611,23 @@ export async function main() {
     const initAppHandle = startupProfiler.start('initialize_app');
     const initializationResult = await initializeApp(config, settings);
     initAppHandle?.end();
+
+    import('./services/liteRtServerManager.js')
+      .then(({ LiteRtServerManager }) => {
+        const mergedGemma = settings.merged.experimental?.gemmaModelRouter;
+        if (!mergedGemma) return;
+        // Security: binaryPath and autoStartServer must come from user-scoped
+        // settings only to prevent workspace configs from triggering arbitrary
+        // binary execution.
+        const userGemma = settings.forScope(SettingScope.User).settings
+          .experimental?.gemmaModelRouter;
+        return LiteRtServerManager.ensureRunning({
+          ...mergedGemma,
+          binaryPath: userGemma?.binaryPath,
+          autoStartServer: userGemma?.autoStartServer,
+        });
+      })
+      .catch((e) => debugLogger.warn('LiteRT auto-start import failed:', e));
 
     if (
       settings.merged.security.auth.selectedType ===

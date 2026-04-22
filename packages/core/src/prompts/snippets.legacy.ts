@@ -25,6 +25,7 @@ import {
   TOPIC_PARAM_SUMMARY,
   WRITE_FILE_TOOL_NAME,
   WRITE_TODOS_TOOL_NAME,
+  AGENT_TOOL_NAME,
 } from '../tools/tool-names.js';
 
 // --- Options Structs ---
@@ -73,7 +74,12 @@ export interface OperationalGuidelinesOptions {
   enableShellEfficiency: boolean;
   interactiveShellEnabled: boolean;
   topicUpdateNarration?: boolean;
-  memoryManagerEnabled: boolean;
+  memoryV2Enabled: boolean;
+  /**
+   * Absolute path to the user's per-project private memory index. See
+   * snippets.ts for full semantics.
+   */
+  userProjectMemoryPath?: string;
 }
 
 export type SandboxMode = 'macos-seatbelt' | 'generic' | 'outside';
@@ -202,9 +208,9 @@ export function renderSubAgents(subAgents?: SubAgentOptions[]): string {
 # Available Sub-Agents
 Sub-agents are specialized expert agents that you can use to assist you in the completion of all or part of a task.
 
-Each sub-agent is available as a tool of the same name. You MUST always delegate tasks to the sub-agent with the relevant expertise, if one is available.
+You can invoke sub-agents using the \`${AGENT_TOOL_NAME}\` tool by passing their name to the \`agent_name\` parameter. You MUST always delegate tasks to the sub-agent with the relevant expertise, if one is available.
 
-The following tools can be used to start sub-agents:
+The following sub-agents are available:
 
 ${subAgentsList}
 
@@ -408,7 +414,7 @@ ${trimmed}
   }
   if (memory.userProjectMemory?.trim()) {
     sections.push(
-      `<user_project_memory>\n--- User's Project Memory (private, not committed to repo) ---\n${memory.userProjectMemory.trim()}\n--- End User's Project Memory ---\n</user_project_memory>`,
+      `<user_project_memory>\n--- Private Project Memory Index (private, not committed to repo) ---\n${memory.userProjectMemory.trim()}\n--- End Private Project Memory Index ---\n</user_project_memory>`,
     );
   }
   if (memory.extension?.trim()) {
@@ -559,7 +565,7 @@ function mandateContinueWork(interactive: boolean): string {
 
 function workflowStepUnderstand(options: PrimaryWorkflowsOptions): string {
   if (options.enableCodebaseInvestigator) {
-    return `1. **Understand & Strategize:** Think about the user's request and the relevant codebase context. When the task involves **complex refactoring, codebase exploration or system-wide analysis**, your **first and primary action** must be to delegate to the 'codebase_investigator' agent using the 'codebase_investigator' tool. Use it to build a comprehensive understanding of the code, its structure, and dependencies. For **simple, targeted searches** (like finding a specific function name, file path, or variable declaration), you should use '${GREP_TOOL_NAME}' or '${GLOB_TOOL_NAME}' directly.`;
+    return `1. **Understand & Strategize:** Think about the user's request and the relevant codebase context. When the task involves **complex refactoring, codebase exploration or system-wide analysis**, your **first and primary action** must be to delegate to the 'codebase_investigator' agent using the \`${AGENT_TOOL_NAME}\` tool. Use it to build a comprehensive understanding of the code, its structure, and dependencies. For **simple, targeted searches** (like finding a specific function name, file path, or variable declaration), you should use '${GREP_TOOL_NAME}' or '${GLOB_TOOL_NAME}' directly.`;
   }
   return `1. **Understand:** Think about the user's request and the relevant codebase context. Use '${GREP_TOOL_NAME}' and '${GLOB_TOOL_NAME}' search tools extensively (in parallel if independent) to understand file structures, existing code patterns, and conventions.
 Use '${READ_FILE_TOOL_NAME}' to understand context and validate any assumptions you may have. If you need to read multiple files, you should make multiple parallel calls to '${READ_FILE_TOOL_NAME}'.`;
@@ -696,9 +702,16 @@ function toolUsageInteractive(
 function toolUsageRememberingFacts(
   options: OperationalGuidelinesOptions,
 ): string {
-  if (options.memoryManagerEnabled) {
+  if (options.memoryV2Enabled) {
+    const userProjectBullet = options.userProjectMemoryPath
+      ? `
+  - **Private Project Memory** (\`${options.userProjectMemoryPath}\`): Personal-to-the-user, project-specific notes that must **NOT** be committed to the repo. Keep this file concise: it is the private index for this workspace. Store richer detail in sibling \`*.md\` files in the same folder and use \`MEMORY.md\` to point to them.`
+      : '';
     return `
-- **Memory Tool:** You MUST use the '${MEMORY_TOOL_NAME}' tool to proactively record facts, preferences, and workflows that apply across all sessions. Whenever the user explicitly tells you to "remember" something, or when they state a preference or workflow (like "always lint after editing"), you MUST immediately call the save_memory subagent. Never save transient session state. Do not use memory to store summaries of code changes, bug fixes, or findings discovered during a task; this tool is strictly for persistent general knowledge.`;
+- **Instruction and Memory Files:** You persist long-lived project context by editing markdown files directly with '${EDIT_TOOL_NAME}' or '${WRITE_FILE_TOOL_NAME}'. There is no \`save_memory\` tool. The current contents of all loaded \`GEMINI.md\` files and the private project \`MEMORY.md\` index are already in your context — do not re-read them before editing.
+  - **Project Instructions** (\`./GEMINI.md\`): Team-shared architecture, conventions, workflows, and other repo guidance. **Committed to the repo and shared with the team.**
+  - **Subdirectory Instructions** (e.g. \`./src/GEMINI.md\`): Scoped instructions for one part of the project. Reference them from \`./GEMINI.md\` so they remain discoverable.${userProjectBullet}
+  Whenever the user tells you to "remember" something or states a durable personal workflow for this codebase, save it in the private project memory folder immediately. Put concise index entries in \`MEMORY.md\`; if more detail is useful, create or update a sibling \`*.md\` note in the same folder and keep \`MEMORY.md\` as the pointer. Only update \`GEMINI.md\` files when the memory is a shared project instruction or convention that belongs in the repo. If it could be either tier, ask the user. Never save transient session state, summaries of code changes, bug fixes, or task-specific findings — these files are loaded into every session and must stay lean.`;
   }
   const base = `
 - **Remembering Facts:** Use the '${MEMORY_TOOL_NAME}' tool to remember specific, *user-related* facts or preferences when the user explicitly asks, or when they state a clear, concise piece of information that would help personalize or streamline *your future interactions with them* (e.g., preferred coding style, common project paths they use, personal tool aliases, or a workflow like "always lint after editing"). This tool is for user-specific information that should persist across sessions. Do *not* use it for general project context or information.`;
