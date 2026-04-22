@@ -13,6 +13,7 @@ import {
   extractStringFromParseEntry,
 } from '../utils/shell-utils.js';
 import { parse as shellParse } from 'shell-quote';
+import { isSubpath } from '../utils/paths.js';
 import {
   PolicyDecision,
   type PolicyEngineConfig,
@@ -25,9 +26,11 @@ import {
 } from './types.js';
 import { stableStringify } from './stable-stringify.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { isRecord } from '../utils/markdownUtils.js';
 import type { CheckerRunner } from '../safety/checker-runner.js';
 import { SafetyCheckDecision } from '../safety/protocol.js';
-import { getToolAliases } from '../tools/tool-names.js';
+import { getToolAliases, AGENT_TOOL_NAME } from '../tools/tool-names.js';
+import { PARAM_ADDITIONAL_PERMISSIONS } from '../tools/definitions/base-declarations.js';
 import {
   MCP_TOOL_PREFIX,
   isMcpToolAnnotation,
@@ -38,6 +41,7 @@ import {
 import {
   type SandboxManager,
   NoopSandboxManager,
+  type SandboxPermissions,
 } from '../services/sandboxManager.js';
 
 function isWildcardPattern(name: string): boolean {
@@ -244,8 +248,10 @@ export class PolicyEngine {
       }
     }
 
-    this.defaultDecision = config.defaultDecision ?? PolicyDecision.ASK_USER;
     this.nonInteractive = config.nonInteractive ?? false;
+    this.defaultDecision =
+      config.defaultDecision ??
+      (this.nonInteractive ? PolicyDecision.DENY : PolicyDecision.ASK_USER);
     this.disableAlwaysAllow = config.disableAlwaysAllow ?? false;
     this.checkerRunner = checkerRunner;
     this.approvalMode = config.approvalMode ?? ApprovalMode.DEFAULT;
@@ -306,6 +312,13 @@ export class PolicyEngine {
       const parsedArgs = parsedObjArgs.map(extractStringFromParseEntry);
 
       if (this.sandboxManager.isDangerousCommand(parsedArgs)) {
+        if (this.approvalMode === ApprovalMode.YOLO) {
+          debugLogger.debug(
+            `[PolicyEngine.check] Command evaluated as dangerous, but YOLO mode is active. Preserving decision: ${command}`,
+          );
+          return decision;
+        }
+
         debugLogger.debug(
           `[PolicyEngine.check] Command evaluated as dangerous, forcing ASK_USER: ${command}`,
         );
@@ -340,7 +353,7 @@ export class PolicyEngine {
   ): Promise<CheckResult> {
     if (!command) {
       return {
-        decision: this.applyNonInteractiveMode(ruleDecision),
+        decision: ruleDecision,
         rule,
       };
     }
@@ -363,13 +376,13 @@ export class PolicyEngine {
       }
 
       debugLogger.debug(
-        `[PolicyEngine.check] Command parsing failed for: ${command}. Falling back to ASK_USER.`,
+        `[PolicyEngine.check] Command parsing failed for: ${command}. Falling back to ${this.defaultDecision}.`,
       );
 
-      // Parsing logic failed, we can't trust it. Force ASK_USER (or DENY).
+      // Parsing logic failed, we can't trust it. Use default decision ASK_USER (or DENY in non-interactive).
       // We return the rule that matched so the evaluation loop terminates.
       return {
-        decision: this.applyNonInteractiveMode(PolicyDecision.ASK_USER),
+        decision: this.defaultDecision,
         rule,
       };
     }
@@ -466,7 +479,7 @@ export class PolicyEngine {
       }
 
       return {
-        decision: this.applyNonInteractiveMode(aggregateDecision),
+        decision: aggregateDecision,
         // If we stayed at ALLOW, we return the original rule (if any).
         // If we downgraded, we return the responsible rule (or undefined if implicit).
         rule: aggregateDecision === ruleDecision ? rule : responsibleRule,
@@ -474,7 +487,7 @@ export class PolicyEngine {
     }
 
     return {
-      decision: this.applyNonInteractiveMode(ruleDecision),
+      decision: ruleDecision,
       rule,
     };
   }
@@ -541,6 +554,16 @@ export class PolicyEngine {
     // We also want to check legacy aliases for the tool name.
     const toolNamesToTry = toolCall.name ? getToolAliases(toolCall.name) : [];
 
+    if (toolCall.name === AGENT_TOOL_NAME) {
+      if (isRecord(toolCall.args)) {
+        const subagentName = toolCall.args['agent_name'];
+        if (typeof subagentName === 'string') {
+          // Inject the subagent name as a virtual tool alias for transparent rule matching
+          toolNamesToTry.push(subagentName);
+        }
+      }
+    }
+
     const toolCallsToTry: FunctionCall[] = [];
     for (const name of toolNamesToTry) {
       toolCallsToTry.push({ ...toolCall, name });
@@ -597,7 +620,7 @@ export class PolicyEngine {
             break;
           }
         } else {
-          decision = this.applyNonInteractiveMode(rule.decision);
+          decision = rule.decision;
           matchedRule = rule;
           break;
         }
@@ -641,7 +664,37 @@ export class PolicyEngine {
         decision = shellResult.decision;
         matchedRule = shellResult.rule;
       } else {
-        decision = this.applyNonInteractiveMode(this.defaultDecision);
+        decision = this.defaultDecision;
+      }
+    }
+
+    if (decision === PolicyDecision.ALLOW) {
+      const args = toolCall.args;
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      const additionalPermissions = args?.[PARAM_ADDITIONAL_PERMISSIONS] as
+        | SandboxPermissions
+        | undefined;
+
+      const fsPerms = additionalPermissions?.fileSystem;
+      if (fsPerms) {
+        const workspace = this.sandboxManager.getWorkspace();
+        const readPaths = Array.isArray(fsPerms.read) ? fsPerms.read : [];
+        const writePaths = Array.isArray(fsPerms.write) ? fsPerms.write : [];
+        const allPaths = [...readPaths, ...writePaths];
+
+        for (const p of allPaths) {
+          if (
+            typeof p === 'string' &&
+            !isSubpath(workspace, p) &&
+            workspace !== p
+          ) {
+            debugLogger.debug(
+              `[PolicyEngine.check] Additional permission path '${p}' is outside workspace '${workspace}'. Downgrading to ASK_USER.`,
+            );
+            decision = PolicyDecision.ASK_USER;
+            break;
+          }
+        }
       }
     }
 
@@ -697,7 +750,7 @@ export class PolicyEngine {
     }
 
     return {
-      decision: this.applyNonInteractiveMode(decision),
+      decision,
       rule: matchedRule,
     };
   }
@@ -866,7 +919,7 @@ export class PolicyEngine {
             continue;
           } else {
             // Unconditional rule for this tool
-            const decision = this.applyNonInteractiveMode(rule.decision);
+            const decision = rule.decision;
             staticallyExcluded = decision === PolicyDecision.DENY;
             matchFound = true;
             break;
@@ -876,7 +929,7 @@ export class PolicyEngine {
 
       if (!matchFound) {
         // Fallback to default decision if no rule matches
-        const defaultDec = this.applyNonInteractiveMode(this.defaultDecision);
+        const defaultDec = this.defaultDecision;
         if (defaultDec === PolicyDecision.DENY) {
           staticallyExcluded = true;
         }
@@ -888,13 +941,5 @@ export class PolicyEngine {
     }
 
     return excludedTools;
-  }
-
-  private applyNonInteractiveMode(decision: PolicyDecision): PolicyDecision {
-    // In non-interactive mode, ASK_USER becomes DENY
-    if (this.nonInteractive && decision === PolicyDecision.ASK_USER) {
-      return PolicyDecision.DENY;
-    }
-    return decision;
   }
 }

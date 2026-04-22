@@ -49,6 +49,7 @@ import { resolveConfirmation } from './confirmation.js';
 import { checkPolicy, updatePolicy } from './policy.js';
 import { ToolExecutor } from './tool-executor.js';
 import { ToolModificationHandler } from './tool-modifier.js';
+import { MessageBusType, type Message } from '../confirmation-bus/types.js';
 
 vi.mock('./state-manager.js');
 vi.mock('./confirmation.js');
@@ -74,6 +75,7 @@ import {
   type AnyDeclarativeTool,
   type AnyToolInvocation,
 } from '../tools/tools.js';
+import { UPDATE_TOPIC_TOOL_NAME } from '../tools/tool-names.js';
 import {
   CoreToolCallStatus,
   ROOT_SCHEDULER_ID,
@@ -176,6 +178,8 @@ describe('Scheduler (Orchestrator)', () => {
       setApprovalMode: vi.fn(),
       getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
       getTelemetryLogPromptsEnabled: vi.fn().mockReturnValue(false),
+      getTelemetryTracesEnabled: vi.fn().mockReturnValue(false),
+      getSessionId: vi.fn().mockReturnValue('test-session-id'),
     } as unknown as Mocked<Config>;
 
     (mockConfig as unknown as { config: Config }).config = mockConfig as Config;
@@ -440,6 +444,44 @@ describe('Scheduler (Orchestrator)', () => {
           }),
         ]),
       );
+    });
+
+    it('should sort UPDATE_TOPIC_TOOL_NAME to the front of the batch', async () => {
+      const topicReq: ToolCallRequestInfo = {
+        callId: 'call-topic',
+        name: UPDATE_TOPIC_TOOL_NAME,
+        args: { title: 'New Chapter' },
+        prompt_id: 'p1',
+        isClientInitiated: false,
+      };
+      const otherReq: ToolCallRequestInfo = {
+        callId: 'call-other',
+        name: 'test-tool',
+        args: {},
+        prompt_id: 'p1',
+        isClientInitiated: false,
+      };
+
+      // Mock tool registry to return a tool for update_topic
+      vi.mocked(mockToolRegistry.getTool).mockImplementation((name) => {
+        if (name === UPDATE_TOPIC_TOOL_NAME) {
+          return {
+            name: UPDATE_TOPIC_TOOL_NAME,
+            build: vi.fn().mockReturnValue({}),
+          } as unknown as AnyDeclarativeTool;
+        }
+        return mockTool;
+      });
+
+      // Schedule in reverse order (other first, topic second)
+      await scheduler.schedule([otherReq, topicReq], signal);
+
+      // Verify they were enqueued in the correct sorted order (topic first)
+      const enqueueCalls = vi.mocked(mockStateManager.enqueue).mock.calls;
+      const lastCall = enqueueCalls[enqueueCalls.length - 1][0];
+
+      expect(lastCall[0].request.callId).toBe('call-topic');
+      expect(lastCall[1].request.callId).toBe('call-other');
     });
   });
 
@@ -1259,6 +1301,64 @@ describe('Scheduler (Orchestrator)', () => {
     });
   });
 
+  describe('Fallback Handlers', () => {
+    it('should respond to TOOL_CONFIRMATION_REQUEST with requiresUserConfirmation: true', async () => {
+      const listeners: Record<
+        string,
+        Array<(message: Message) => void | Promise<void>>
+      > = {};
+
+      const mockBus = {
+        subscribe: vi.fn(
+          (
+            type: string,
+            handler: (message: Message) => void | Promise<void>,
+          ) => {
+            listeners[type] = listeners[type] || [];
+            listeners[type].push(handler);
+          },
+        ),
+        publish: vi.fn(async (message: Message) => {
+          const type = message.type as string;
+          if (listeners[type]) {
+            for (const handler of listeners[type]) {
+              await handler(message);
+            }
+          }
+        }),
+      } as unknown as MessageBus;
+
+      const scheduler = new Scheduler({
+        context: mockConfig,
+        messageBus: mockBus,
+        getPreferredEditor,
+        schedulerId: 'fallback-test',
+      });
+
+      const handler = vi.fn();
+      mockBus.subscribe(MessageBusType.TOOL_CONFIRMATION_RESPONSE, handler);
+
+      await mockBus.publish({
+        type: MessageBusType.TOOL_CONFIRMATION_REQUEST,
+        correlationId: 'test-correlation-id',
+        toolCall: { name: 'test-tool' },
+      });
+
+      // Wait for async handler to fire
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(handler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          correlationId: 'test-correlation-id',
+          confirmed: false,
+          requiresUserConfirmation: true,
+        }),
+      );
+
+      scheduler.dispose();
+    });
+  });
+
   describe('Cleanup', () => {
     it('should unregister McpProgress listener on dispose()', () => {
       const onSpy = vi.spyOn(coreEvents, 'on');
@@ -1282,6 +1382,40 @@ describe('Scheduler (Orchestrator)', () => {
         CoreEvent.McpProgress,
         expect.any(Function),
       );
+    });
+
+    it('should abort disposeController signal on dispose()', () => {
+      const mockSubscribe =
+        vi.fn<
+          (
+            type: unknown,
+            listener: unknown,
+            options?: { signal?: AbortSignal },
+          ) => void
+        >();
+      const mockBus = {
+        subscribe: mockSubscribe,
+        publish: vi.fn(),
+      } as unknown as MessageBus;
+
+      let capturedSignal: AbortSignal | undefined;
+      mockSubscribe.mockImplementation((type, listener, options) => {
+        capturedSignal = options?.signal;
+      });
+
+      const s = new Scheduler({
+        context: mockConfig,
+        messageBus: mockBus,
+        getPreferredEditor,
+        schedulerId: 'cleanup-test-2',
+      });
+
+      expect(capturedSignal).toBeDefined();
+      expect(capturedSignal?.aborted).toBe(false);
+
+      s.dispose();
+
+      expect(capturedSignal?.aborted).toBe(true);
     });
   });
 });
@@ -1384,6 +1518,8 @@ describe('Scheduler MCP Progress', () => {
       setApprovalMode: vi.fn(),
       getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
       getTelemetryLogPromptsEnabled: vi.fn().mockReturnValue(false),
+      getTelemetryTracesEnabled: vi.fn().mockReturnValue(false),
+      getSessionId: vi.fn().mockReturnValue('test-session-id'),
     } as unknown as Mocked<Config>;
 
     (mockConfig as unknown as { config: Config }).config = mockConfig as Config;

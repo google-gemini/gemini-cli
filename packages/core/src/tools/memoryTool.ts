@@ -11,6 +11,7 @@ import {
   ToolConfirmationOutcome,
   type ToolEditConfirmationDetails,
   type ToolResult,
+  type ExecuteOptions,
 } from './tools.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
@@ -30,6 +31,7 @@ import { resolveToolDeclaration } from './definitions/resolver.js';
 
 export const DEFAULT_CONTEXT_FILENAME = 'GEMINI.md';
 export const MEMORY_SECTION_HEADER = '## Gemini Added Memories';
+export const PROJECT_MEMORY_INDEX_FILENAME = 'MEMORY.md';
 
 // This variable will hold the currently configured filename for GEMINI.md context files.
 // It defaults to DEFAULT_CONTEXT_FILENAME but can be overridden by setGeminiMdFilename.
@@ -61,12 +63,20 @@ export function getAllGeminiMdFilenames(): string[] {
 
 interface SaveMemoryParams {
   fact: string;
+  scope?: 'global' | 'project';
   modified_by_user?: boolean;
   modified_content?: string;
 }
 
 export function getGlobalMemoryFilePath(): string {
   return path.join(Storage.getGlobalGeminiDir(), getCurrentGeminiMdFilename());
+}
+
+export function getProjectMemoryIndexFilePath(storage: Storage): string {
+  return path.join(
+    storage.getProjectMemoryDir(),
+    PROJECT_MEMORY_INDEX_FILENAME,
+  );
 }
 
 /**
@@ -82,11 +92,11 @@ function ensureNewlineSeparation(currentContent: string): string {
 }
 
 /**
- * Reads the current content of the memory file
+ * Reads the current content of a memory file at the given path.
  */
-async function readMemoryFileContent(): Promise<string> {
+async function readMemoryFileContent(filePath: string): Promise<string> {
   try {
-    return await fs.readFile(getGlobalMemoryFilePath(), 'utf-8');
+    return await fs.readFile(filePath, 'utf-8');
   } catch (err) {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const error = err as Error & { code?: string };
@@ -95,13 +105,25 @@ async function readMemoryFileContent(): Promise<string> {
   }
 }
 
-/**
- * Computes the new content that would result from adding a memory entry
- */
-function computeNewContent(currentContent: string, fact: string): string {
-  // Sanitize to prevent markdown injection by collapsing to a single line.
+function sanitizeFact(fact: string): string {
+  // Sanitize to prevent markdown injection by collapsing to a single line, and
+  // collapse XML angle brackets so a persisted fact cannot break out of the
+  // `<user_project_memory>` / `<global_context>` / `<project_context>` style
+  // context tags that `renderUserMemory` wraps memory content in. Without this
+  // a malicious fact like `</user_project_memory>... new instructions ...` would
+  // survive sanitization, hit disk, and inject prompt content on every future
+  // session that loads the memory file.
   let processedText = fact.replace(/[\r\n]/g, ' ').trim();
   processedText = processedText.replace(/^(-+\s*)+/, '').trim();
+  processedText = processedText.replace(/[<>]/g, ' ');
+  return processedText;
+}
+
+function computeGlobalMemoryContent(
+  currentContent: string,
+  fact: string,
+): string {
+  const processedText = sanitizeFact(fact);
   const newMemoryItem = `- ${processedText}`;
 
   const headerIndex = currentContent.indexOf(MEMORY_SECTION_HEADER);
@@ -140,38 +162,78 @@ function computeNewContent(currentContent: string, fact: string): string {
   }
 }
 
+function computeProjectMemoryContent(
+  currentContent: string,
+  fact: string,
+): string {
+  const processedText = sanitizeFact(fact);
+  const newMemoryItem = `- ${processedText}`;
+
+  if (currentContent.length === 0) {
+    return `${newMemoryItem}\n`;
+  }
+  if (currentContent.endsWith('\n') || currentContent.endsWith('\r\n')) {
+    return `${currentContent}${newMemoryItem}\n`;
+  }
+  return `${currentContent}\n${newMemoryItem}\n`;
+}
+
+/**
+ * Computes the new content that would result from adding a memory entry.
+ */
+function computeNewContent(
+  currentContent: string,
+  fact: string,
+  scope?: 'global' | 'project',
+): string {
+  if (scope === 'project') {
+    return computeProjectMemoryContent(currentContent, fact);
+  }
+  return computeGlobalMemoryContent(currentContent, fact);
+}
+
 class MemoryToolInvocation extends BaseToolInvocation<
   SaveMemoryParams,
   ToolResult
 > {
   private static readonly allowlist: Set<string> = new Set();
   private proposedNewContent: string | undefined;
+  private readonly storage: Storage | undefined;
 
   constructor(
     params: SaveMemoryParams,
     messageBus: MessageBus,
     toolName?: string,
     displayName?: string,
+    storage?: Storage,
   ) {
     super(params, messageBus, toolName, displayName);
+    this.storage = storage;
+  }
+
+  private getMemoryFilePath(): string {
+    if (this.params.scope === 'project' && this.storage) {
+      return getProjectMemoryIndexFilePath(this.storage);
+    }
+    return getGlobalMemoryFilePath();
   }
 
   getDescription(): string {
-    const memoryFilePath = getGlobalMemoryFilePath();
+    const memoryFilePath = this.getMemoryFilePath();
     return `in ${tildeifyPath(memoryFilePath)}`;
   }
 
   protected override async getConfirmationDetails(
     _abortSignal: AbortSignal,
   ): Promise<ToolEditConfirmationDetails | false> {
-    const memoryFilePath = getGlobalMemoryFilePath();
+    const memoryFilePath = this.getMemoryFilePath();
     const allowlistKey = memoryFilePath;
 
     if (MemoryToolInvocation.allowlist.has(allowlistKey)) {
       return false;
     }
 
-    const currentContent = await readMemoryFileContent();
+    const currentContent = await readMemoryFileContent(memoryFilePath);
     const { fact, modified_by_user, modified_content } = this.params;
 
     // If an attacker injects modified_content, use it for the diff
@@ -179,7 +241,7 @@ class MemoryToolInvocation extends BaseToolInvocation<
     const contentForDiff =
       modified_by_user && modified_content !== undefined
         ? modified_content
-        : computeNewContent(currentContent, fact);
+        : computeNewContent(currentContent, fact, this.params.scope);
 
     this.proposedNewContent = contentForDiff;
 
@@ -211,8 +273,9 @@ class MemoryToolInvocation extends BaseToolInvocation<
     return confirmationDetails;
   }
 
-  async execute(_signal: AbortSignal): Promise<ToolResult> {
+  async execute({ abortSignal: _signal }: ExecuteOptions): Promise<ToolResult> {
     const { fact, modified_by_user, modified_content } = this.params;
+    const memoryFilePath = this.getMemoryFilePath();
 
     try {
       let contentToWrite: string;
@@ -220,7 +283,7 @@ class MemoryToolInvocation extends BaseToolInvocation<
 
       // Sanitize the fact for use in the success message, matching the sanitization
       // that happened inside computeNewContent.
-      const sanitizedFact = fact.replace(/[\r\n]/g, ' ').trim();
+      const sanitizedFact = sanitizeFact(fact);
 
       if (modified_by_user && modified_content !== undefined) {
         // User modified the content, so that is the source of truth.
@@ -233,17 +296,21 @@ class MemoryToolInvocation extends BaseToolInvocation<
           // This case can be hit in flows without a confirmation step (e.g., --auto-confirm).
           // As a fallback, we recompute the content now. This is safe because
           // computeNewContent sanitizes the input.
-          const currentContent = await readMemoryFileContent();
-          this.proposedNewContent = computeNewContent(currentContent, fact);
+          const currentContent = await readMemoryFileContent(memoryFilePath);
+          this.proposedNewContent = computeNewContent(
+            currentContent,
+            fact,
+            this.params.scope,
+          );
         }
         contentToWrite = this.proposedNewContent;
         successMessage = `Okay, I've remembered that: "${sanitizedFact}"`;
       }
 
-      await fs.mkdir(path.dirname(getGlobalMemoryFilePath()), {
+      await fs.mkdir(path.dirname(memoryFilePath), {
         recursive: true,
       });
-      await fs.writeFile(getGlobalMemoryFilePath(), contentToWrite, 'utf-8');
+      await fs.writeFile(memoryFilePath, contentToWrite, 'utf-8');
 
       return {
         llmContent: JSON.stringify({
@@ -275,8 +342,9 @@ export class MemoryTool
   implements ModifiableDeclarativeTool<SaveMemoryParams>
 {
   static readonly Name = MEMORY_TOOL_NAME;
+  private readonly storage: Storage | undefined;
 
-  constructor(messageBus: MessageBus) {
+  constructor(messageBus: MessageBus, storage?: Storage) {
     super(
       MemoryTool.Name,
       'SaveMemory',
@@ -287,6 +355,14 @@ export class MemoryTool
       true,
       false,
     );
+    this.storage = storage;
+  }
+
+  private resolveMemoryFilePath(params: SaveMemoryParams): string {
+    if (params.scope === 'project' && this.storage) {
+      return getProjectMemoryIndexFilePath(this.storage);
+    }
+    return getGlobalMemoryFilePath();
   }
 
   protected override validateToolParamValues(
@@ -294,6 +370,10 @@ export class MemoryTool
   ): string | null {
     if (params.fact.trim() === '') {
       return 'Parameter "fact" must be a non-empty string.';
+    }
+
+    if (params.scope === 'project' && !this.storage) {
+      return 'Project-level memory is not available: storage is not initialized.';
     }
 
     return null;
@@ -310,6 +390,7 @@ export class MemoryTool
       messageBus,
       toolName ?? this.name,
       displayName ?? this.displayName,
+      this.storage,
     );
   }
 
@@ -319,17 +400,19 @@ export class MemoryTool
 
   getModifyContext(_abortSignal: AbortSignal): ModifyContext<SaveMemoryParams> {
     return {
-      getFilePath: (_params: SaveMemoryParams) => getGlobalMemoryFilePath(),
-      getCurrentContent: async (_params: SaveMemoryParams): Promise<string> =>
-        readMemoryFileContent(),
+      getFilePath: (params: SaveMemoryParams) =>
+        this.resolveMemoryFilePath(params),
+      getCurrentContent: async (params: SaveMemoryParams): Promise<string> =>
+        readMemoryFileContent(this.resolveMemoryFilePath(params)),
       getProposedContent: async (params: SaveMemoryParams): Promise<string> => {
-        const currentContent = await readMemoryFileContent();
+        const filePath = this.resolveMemoryFilePath(params);
+        const currentContent = await readMemoryFileContent(filePath);
         const { fact, modified_by_user, modified_content } = params;
         // Ensure the editor is populated with the same content
         // that the confirmation diff would show.
         return modified_by_user && modified_content !== undefined
           ? modified_content
-          : computeNewContent(currentContent, fact);
+          : computeNewContent(currentContent, fact, params.scope);
       },
       createUpdatedParams: (
         _oldContent: string,

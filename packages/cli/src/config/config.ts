@@ -13,6 +13,7 @@ import { mcpCommand } from '../commands/mcp.js';
 import { extensionsCommand } from '../commands/extensions.js';
 import { skillsCommand } from '../commands/skills.js';
 import { hooksCommand } from '../commands/hooks.js';
+import { gemmaCommand } from '../commands/gemma.js';
 import {
   setGeminiMdFilename as setServerGeminiMdFilename,
   getCurrentGeminiMdFilename,
@@ -46,6 +47,7 @@ import {
   type HookEventName,
   type OutputFormat,
   detectIdeFromEnv,
+  generalistProfile,
 } from '@google/gemini-cli-core';
 import {
   type Settings,
@@ -180,6 +182,7 @@ export async function parseArguments(
         extensionsCommand,
         skillsCommand,
         hooksCommand,
+        gemmaCommand,
       ];
 
       const subcommands = commandModules.flatMap((mod) => {
@@ -259,6 +262,7 @@ export async function parseArguments(
   yargsInstance.command(extensionsCommand);
   yargsInstance.command(skillsCommand);
   yargsInstance.command(hooksCommand);
+  yargsInstance.command(gemmaCommand);
 
   yargsInstance
     .command('$0 [query..]', 'Launch Gemini CLI', (yargsInstance) =>
@@ -613,7 +617,7 @@ export async function loadCliConfig(
     .getExtensions()
     .find((ext) => ext.isActive && ext.plan?.directory)?.plan;
 
-  const experimentalJitContext = settings.experimental.jitContext;
+  const experimentalJitContext = settings.experimental.jitContext ?? true;
 
   let extensionRegistryURI =
     process.env['GEMINI_CLI_EXTENSION_REGISTRY_URI'] ??
@@ -642,6 +646,7 @@ export async function loadCliConfig(
       memoryImportFormat,
       memoryFileFiltering,
       settings.context?.discoveryMaxDirs,
+      settings.context?.memoryBoundaryMarkers,
     );
     memoryContent = result.memoryContent;
     fileCount = result.fileCount;
@@ -668,9 +673,9 @@ export async function loadCliConfig(
         approvalMode = ApprovalMode.AUTO_EDIT;
         break;
       case 'plan':
-        if (!(settings.experimental?.plan ?? false)) {
+        if (!(settings.general?.plan?.enabled ?? true)) {
           debugLogger.warn(
-            'Approval mode "plan" is only available when experimental.plan is enabled. Falling back to "default".',
+            'Approval mode "plan" is disabled in your settings. Falling back to "default".',
           );
           approvalMode = ApprovalMode.DEFAULT;
         } else {
@@ -792,8 +797,8 @@ export async function loadCliConfig(
     effectiveSettings,
     approvalMode,
     workspacePoliciesDir,
+    interactive,
   );
-  policyEngineConfig.nonInteractive = !interactive;
 
   const defaultModel = PREVIEW_GEMINI_MODEL_AUTO;
   const specifiedModel =
@@ -882,6 +887,16 @@ export async function loadCliConfig(
     }
   }
 
+  const useGeneralistProfile =
+    settings.experimental?.generalistProfile ?? false;
+  const useContextManagement =
+    settings.experimental?.contextManagement ?? false;
+  const contextManagement = {
+    ...(useGeneralistProfile ? generalistProfile : {}),
+    ...(useContextManagement ? settings?.contextManagement : {}),
+    enabled: useContextManagement || useGeneralistProfile,
+  };
+
   return new Config({
     acpMode: isAcpMode,
     clientName,
@@ -896,6 +911,7 @@ export async function loadCliConfig(
     loadMemoryFromIncludeDirectories:
       settings.context?.loadMemoryFromIncludeDirectories || false,
     discoveryMaxDirs: settings.context?.discoveryMaxDirs,
+    memoryBoundaryMarkers: settings.context?.memoryBoundaryMarkers,
     importFormat: settings.context?.importFormat,
     debugMode,
     question,
@@ -925,6 +941,8 @@ export async function loadCliConfig(
       : undefined,
     blockedEnvironmentVariables:
       settings.security?.environmentVariableRedaction?.blocked,
+    allowedEnvironmentVariables:
+      settings.security?.environmentVariableRedaction?.allowed,
     enableEnvironmentVariableRedaction:
       settings.security?.environmentVariableRedaction?.enabled,
     userMemory: memoryContent,
@@ -964,7 +982,7 @@ export async function loadCliConfig(
     extensionRegistryURI,
     enableExtensionReloading: settings.experimental?.extensionReloading,
     enableAgents: settings.experimental?.enableAgents,
-    plan: settings.experimental?.plan,
+    plan: settings.general?.plan?.enabled ?? true,
     tracker: settings.experimental?.taskTracker,
     directWebFetch: settings.experimental?.directWebFetch,
     planSettings: settings.general?.plan?.directory
@@ -973,11 +991,14 @@ export async function loadCliConfig(
     enableEventDrivenScheduler: true,
     skillsSupport: settings.skills?.enabled ?? true,
     disabledSkills: settings.skills?.disabled,
-    experimentalJitContext: settings.experimental?.jitContext,
-    experimentalMemoryManager: settings.experimental?.memoryManager,
+    experimentalJitContext,
+    experimentalMemoryV2: settings.experimental?.memoryV2,
+    experimentalAutoMemory: settings.experimental?.autoMemory,
+    contextManagement,
     modelSteering: settings.experimental?.modelSteering,
-    topicUpdateNarration: settings.experimental?.topicUpdateNarration,
-    toolOutputMasking: settings.experimental?.toolOutputMasking,
+    topicUpdateNarration:
+      settings.general?.topicUpdateNarration ??
+      settings.experimental?.topicUpdateNarration,
     noBrowser: !!process.env['NO_BROWSER'],
     summarizeToolOutput: settings.model?.summarizeToolOutput,
     ideMode,
@@ -988,8 +1009,12 @@ export async function loadCliConfig(
     trustedFolder,
     useBackgroundColor: settings.ui?.useBackgroundColor,
     useAlternateBuffer: settings.ui?.useAlternateBuffer,
+    useTerminalBuffer: settings.ui?.terminalBuffer,
+    useRenderProcess: settings.ui?.renderProcess,
     useRipgrep: settings.tools?.useRipgrep,
     enableInteractiveShell: settings.tools?.shell?.enableInteractiveShell,
+    shellBackgroundCompletionBehavior: settings.tools?.shell
+      ?.backgroundCompletionBehavior as string | undefined,
     shellToolInactivityTimeout: settings.tools?.shell?.inactivityTimeout,
     enableShellOutputEfficiency:
       settings.tools?.shell?.enableShellOutputEfficiency ?? true,
@@ -1002,10 +1027,12 @@ export async function loadCliConfig(
       format: (argv.outputFormat ?? settings.output?.format) as OutputFormat,
     },
     gemmaModelRouter: settings.experimental?.gemmaModelRouter,
+    adk: settings.experimental?.adk,
     fakeResponses: argv.fakeResponses,
     recordResponses: argv.recordResponses,
     retryFetchErrors: settings.general?.retryFetchErrors,
     billing: settings.billing,
+    vertexAiRouting: settings.billing?.vertexAi,
     maxAttempts: settings.general?.maxAttempts,
     ptyInfo: ptyInfo?.name,
     disableLLMCorrection: settings.tools?.disableLLMCorrection,
@@ -1056,7 +1083,7 @@ async function resolveWorktreeSettings(
     if (isGeminiWorktree(toplevel, projectRoot)) {
       worktreePath = toplevel;
     }
-  } catch (_e) {
+  } catch {
     return undefined;
   }
 

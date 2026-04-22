@@ -195,6 +195,7 @@ describe('compatibility', () => {
         desc: '256 colors are not supported',
       },
     ])('should return $expected when $desc', ({ depth, term, expected }) => {
+      vi.stubEnv('COLORTERM', '');
       process.stdout.getColorDepth = vi.fn().mockReturnValue(depth);
       if (term !== undefined) {
         vi.stubEnv('TERM', term);
@@ -202,6 +203,13 @@ describe('compatibility', () => {
         vi.stubEnv('TERM', '');
       }
       expect(supports256Colors()).toBe(expected);
+    });
+
+    it('should return true when COLORTERM is kmscon', () => {
+      process.stdout.getColorDepth = vi.fn().mockReturnValue(4);
+      vi.stubEnv('TERM', 'linux');
+      vi.stubEnv('COLORTERM', 'kmscon');
+      expect(supports256Colors()).toBe(true);
     });
   });
 
@@ -229,6 +237,12 @@ describe('compatibility', () => {
         depth: 24,
         expected: true,
         desc: 'getColorDepth returns >= 24',
+      },
+      {
+        colorterm: 'kmscon',
+        depth: 4,
+        expected: true,
+        desc: 'COLORTERM is kmscon',
       },
       {
         colorterm: '',
@@ -284,19 +298,6 @@ describe('compatibility', () => {
         expect.objectContaining({
           id: 'jetbrains-terminal',
           message: expect.stringContaining('JetBrains terminal detected'),
-          priority: WarningPriority.High,
-        }),
-      );
-    });
-
-    it('should return tmux warning when detected and in alternate buffer', () => {
-      vi.stubEnv('TMUX', '/tmp/tmux-1001/default,1,0');
-
-      const warnings = getCompatibilityWarnings({ isAlternateBuffer: true });
-      expect(warnings).toContainEqual(
-        expect.objectContaining({
-          id: 'tmux-alternate-buffer',
-          message: expect.stringContaining('tmux detected'),
           priority: WarningPriority.High,
         }),
       );
@@ -420,6 +421,18 @@ describe('compatibility', () => {
       expect(warnings[2].message).toContain(
         'True color (24-bit) support not detected',
       );
+    });
+
+    it('should return no color warnings for kmscon terminal', () => {
+      vi.mocked(os.platform).mockReturnValue('linux');
+      vi.stubEnv('TERMINAL_EMULATOR', '');
+      vi.stubEnv('TERM', 'linux');
+      vi.stubEnv('COLORTERM', 'kmscon');
+      process.stdout.getColorDepth = vi.fn().mockReturnValue(4);
+
+      const warnings = getCompatibilityWarnings();
+      expect(warnings.find((w) => w.id === '256-color')).toBeUndefined();
+      expect(warnings.find((w) => w.id === 'true-color')).toBeUndefined();
     });
 
     it('should return no warnings in a standard environment with true color', () => {

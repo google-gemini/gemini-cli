@@ -54,11 +54,17 @@ describe('Core System Prompt Substitution', () => {
       getAgentRegistry: vi.fn().mockReturnValue({
         getDirectoryContext: vi.fn().mockReturnValue('Mock Agent Directory'),
         getAllDefinitions: vi.fn().mockReturnValue([]),
+        getDefinition: vi.fn().mockReturnValue(undefined),
       }),
       getSkillManager: vi.fn().mockReturnValue({
         getSkills: vi.fn().mockReturnValue([]),
       }),
       getApprovedPlanPath: vi.fn().mockReturnValue(undefined),
+      isTopicUpdateNarrationEnabled: vi.fn().mockReturnValue(false),
+      isTrackerEnabled: vi.fn().mockReturnValue(false),
+      isModelSteeringEnabled: vi.fn().mockReturnValue(false),
+      getHasAccessToPreviewModel: vi.fn().mockReturnValue(true),
+      getGemini31LaunchedSync: vi.fn().mockReturnValue(true),
     } as unknown as Config;
   });
 

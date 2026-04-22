@@ -71,10 +71,12 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
     getEnableHooks: () => true,
     getExperiments: () => {},
     getTelemetryLogPromptsEnabled: () => false,
+    getTelemetryTracesEnabled: () => false,
     getPolicyEngine: () =>
       ({
         check: async () => ({ decision: 'allow' }),
       }) as unknown as PolicyEngine,
+    isContextManagementEnabled: () => false,
   } as unknown as Config;
 
   const mockConfig = Object.assign({}, baseConfig, overrides) as Config;
