@@ -43,6 +43,12 @@ export class AgentChatHistory {
   }
 
   set(history: readonly Content[]) {
+    if (history.length < 5 && this.history.length > 5) {
+      // eslint-disable-next-line no-console
+      console.error(
+        `[AgentChatHistory] WARNING: set() called with smaller history! Prev: ${this.history.length}, New: ${history.length}`,
+      );
+    }
     this.history = [...history];
     this.notify('SYNC_FULL', this.history);
   }
