@@ -149,6 +149,7 @@ export interface PolicyUpdateOptions {
   mcpName?: string;
   toolName?: string;
   allowRedirection?: boolean;
+  allowEnv?: boolean;
 }
 
 /**

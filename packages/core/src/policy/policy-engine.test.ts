@@ -819,6 +819,57 @@ describe('PolicyEngine', () => {
       expect(result.decision).toBe(PolicyDecision.ALLOW);
     });
 
+    it('should allow env prefixed shell commands when allowEnv is true', async () => {
+      const engineWithEnvRule = new PolicyEngine({
+        rules: [
+          {
+            toolName: 'run_shell_command',
+            decision: PolicyDecision.ALLOW,
+            priority: 1,
+            allowEnv: true,
+          },
+        ],
+      });
+
+      const command = 'PAGER=cat git log';
+
+      const result = await engineWithEnvRule.check(
+        {
+          name: 'run_shell_command',
+          args: { command },
+        },
+        undefined,
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.ALLOW);
+    });
+
+    it('should NOT allow env prefixed shell commands by default', async () => {
+      const engineWithRule = new PolicyEngine({
+        rules: [
+          {
+            toolName: 'run_shell_command',
+            decision: PolicyDecision.ALLOW,
+            priority: 1,
+          },
+        ],
+      });
+
+      const command = 'PAGER=cat git log';
+
+      const result = await engineWithRule.check(
+        {
+          name: 'run_shell_command',
+          args: { command },
+        },
+        undefined,
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.ASK_USER);
+    });
+
     it('should handle tools with no args', async () => {
       const rules: PolicyRule[] = [
         {

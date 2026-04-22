@@ -23,6 +23,7 @@ import {
   stripShellWrapper,
   normalizeCommand,
   hasRedirection,
+  hasEnvPrefix,
   resolveExecutable,
 } from './shell-utils.js';
 import path from 'node:path';
@@ -287,6 +288,12 @@ describe('hasRedirection', () => {
   it('should return false when redirection characters are inside quotes in bash', () => {
     mockPlatform.mockReturnValue('linux');
     expect(hasRedirection('echo "a > b"')).toBe(false);
+  });
+
+  it('should not detect redirection in chained commands', () => {
+    expect(hasRedirection('cmd1 && echo hello > world')).toBe(false);
+    expect(hasRedirection('echo hello > world || cmd2')).toBe(false);
+    expect(hasRedirection('cmd1 ; echo hello > world')).toBe(false);
   });
 });
 
@@ -619,5 +626,36 @@ describe('resolveExecutable', () => {
     mockAccess.mockRejectedValue(new Error('ENOENT'));
 
     expect(await resolveExecutable('unknown')).toBeUndefined();
+  });
+});
+
+describe('hasEnvPrefix', () => {
+  it('should detect simple environment variable assignments', () => {
+    expect(hasEnvPrefix('FOO=bar cmd')).toBe(true);
+    expect(hasEnvPrefix('FOO=bar')).toBe(true);
+    expect(hasEnvPrefix('FOO=bar baz=qux cmd')).toBe(true);
+  });
+
+  it('should detect quoted environment variable assignments', () => {
+    expect(hasEnvPrefix('FOO="bar baz" cmd')).toBe(true);
+    expect(hasEnvPrefix("FOO='bar baz' cmd")).toBe(true);
+  });
+
+  it('should detect environment variable assignments using env', () => {
+    expect(hasEnvPrefix('env FOO=bar cmd')).toBe(true);
+    expect(hasEnvPrefix('FOO=bar env cmd')).toBe(true);
+    expect(hasEnvPrefix('env FOO="bar baz" cmd')).toBe(true);
+    expect(hasEnvPrefix('env cmd')).toBe(true);
+  });
+
+  it('should not detect environment variables used in the command', () => {
+    expect(hasEnvPrefix('echo $FOO')).toBe(false);
+    expect(hasEnvPrefix('echo "${FOO}"')).toBe(false);
+  });
+
+  it('should not detect environment variables in chained commands', () => {
+    expect(hasEnvPrefix('FOO=bar cmd && cmd2')).toBe(false);
+    expect(hasEnvPrefix('cmd1 || FOO=bar cmd2')).toBe(false);
+    expect(hasEnvPrefix('cmd1 ; FOO=bar cmd2')).toBe(false);
   });
 });
