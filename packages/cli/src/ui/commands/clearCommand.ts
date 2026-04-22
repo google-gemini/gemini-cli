@@ -9,14 +9,16 @@ import {
   SessionEndReason,
   SessionStartSource,
   flushTelemetry,
+  resetBrowserSession,
 } from '@google/gemini-cli-core';
 import { CommandKind, type SlashCommand } from './types.js';
 import { MessageType } from '../types.js';
 import { randomUUID } from 'node:crypto';
 
 export const clearCommand: SlashCommand = {
-  name: 'clear',
-  description: 'Clear the screen and conversation history',
+  name: 'clear (new)',
+  altNames: ['new'],
+  description: 'Clear the screen and start a new session',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: async (context, _args) => {
@@ -38,11 +40,15 @@ export const clearCommand: SlashCommand = {
     let newSessionId: string | undefined;
     if (config) {
       newSessionId = randomUUID();
-      config.setSessionId(newSessionId);
+      config.resetNewSessionState(newSessionId);
     }
 
     if (geminiClient) {
       context.ui.setDebugMessage('Clearing terminal and resetting chat.');
+
+      // Close persistent browser sessions before resetting chat
+      await resetBrowserSession();
+
       // If resetChat fails, the exception will propagate and halt the command,
       // which is the correct behavior to signal a failure to the user.
       await geminiClient.resetChat();

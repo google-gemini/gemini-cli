@@ -17,7 +17,7 @@ import { CoreToolCallStatus } from '@google/gemini-cli-core';
  */
 export const TOOL_RESULT_STATIC_HEIGHT = 1;
 export const TOOL_RESULT_ASB_RESERVED_LINE_COUNT = 6;
-export const TOOL_RESULT_STANDARD_RESERVED_LINE_COUNT = 3;
+export const TOOL_RESULT_STANDARD_RESERVED_LINE_COUNT = 4;
 export const TOOL_RESULT_MIN_LINES_SHOWN = 2;
 
 /**
