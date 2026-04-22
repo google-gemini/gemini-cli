@@ -1,0 +1,62 @@
+[2026-04-18 20:11:32] [32mINFO[0m [hats.config_loader:174] Configuration file not found, creating default: configs/tools.yaml
+[2026-04-18 20:11:32] [32mINFO[0m [hats.config_loader:204] Default configuration created successfully
+[2026-04-18 20:11:32] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-18 20:11:32] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-18 20:11:32] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-18 20:11:32] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-18 20:11:32] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-18 20:11:32] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-18 20:11:32] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-18 20:11:32] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-18 20:11:32] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-18 20:11:32] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-18 20:11:32] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-18 20:11:32] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-18 20:16:27] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-18 20:16:27] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-18 20:16:27] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-18 20:16:27] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-18 20:16:27] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-18 20:16:27] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-18 20:16:27] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-18 20:16:27] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-18 20:16:27] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-18 20:16:27] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-18 20:16:27] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-18 20:16:27] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-18 23:17:58] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-18 23:17:58] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-18 23:17:58] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-18 23:17:58] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-18 23:17:58] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-18 23:17:58] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-18 23:17:58] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-18 23:17:58] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-18 23:17:58] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-18 23:17:58] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-18 23:17:58] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-18 23:17:58] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-18 23:42:36] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-18 23:42:36] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-18 23:42:36] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-18 23:42:36] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-18 23:42:36] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-18 23:42:36] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-18 23:42:36] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-18 23:42:36] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-18 23:42:36] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-18 23:42:36] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-18 23:42:36] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-18 23:42:36] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-18 23:44:04] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-18 23:44:04] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-18 23:44:04] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-18 23:44:04] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-18 23:44:04] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-18 23:44:04] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-18 23:44:04] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-18 23:44:04] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-18 23:44:04] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan
+[2026-04-18 23:44:04] [32mINFO[0m [hats.config_loader:38] Loaded 2 tools from configuration
+[2026-04-18 23:44:04] [32mINFO[0m [hats.tool_manager:211] Tool registered at runtime: customscan
+[2026-04-18 23:44:04] [32mINFO[0m [hats.core:74] Plugin tool registered: customscan

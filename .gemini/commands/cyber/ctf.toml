@@ -1,0 +1,15 @@
+description = "CTF/HackTheBox box workflow: full enumeration → exploit → privesc → flags."
+prompt = """
+Start a CTF/HackTheBox engagement on target: {{args}}
+
+Follow the CTF methodology:
+1) Run hats_full_recon_chain for comprehensive initial enumeration.
+2) Analyze all discovered services for known vulnerabilities.
+3) Identify the most promising attack vector.
+4) Attempt exploitation (with proof-of-concept).
+5) If initial access gained, run privilege escalation enumeration.
+6) Find user.txt and root.txt flags.
+7) Document the full attack chain.
+
+Be aggressive but methodical. Enumerate everything before exploiting.
+"""

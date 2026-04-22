@@ -8,6 +8,7 @@ import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import process from 'node:process';
 import * as path from 'node:path';
+import fs from 'node:fs';
 import { execa } from 'execa';
 import { mcpCommand } from '../commands/mcp.js';
 import { extensionsCommand } from '../commands/extensions.js';
@@ -19,6 +20,7 @@ import {
   getCurrentGeminiMdFilename,
   ApprovalMode,
   DEFAULT_GEMINI_EMBEDDING_MODEL,
+  DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_FILE_FILTERING_OPTIONS,
   DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
   FileDiscoveryService,
@@ -29,13 +31,13 @@ import {
   loadServerHierarchicalMemory,
   ASK_USER_TOOL_NAME,
   getVersion,
-  PREVIEW_GEMINI_MODEL_AUTO,
   type HierarchicalMemory,
   coreEvents,
   GEMINI_MODEL_ALIAS_AUTO,
   getAdminErrorMessage,
   isHeadlessMode,
   Config,
+  MCPServerConfig,
   resolveToRealPath,
   applyAdminAllowlist,
   applyRequiredServers,
@@ -74,6 +76,8 @@ import { requestConsentNonInteractive } from './extensions/consent.js';
 import { promptForSetting } from './extensions/extensionSettings.js';
 import type { EventEmitter } from 'node:stream';
 import { runExitCleanup } from '../utils/cleanup.js';
+
+const CYBER_BINARY_NAME = 'gemini-cyber';
 
 export interface CliArgs {
   query: string | undefined;
@@ -161,9 +165,9 @@ export async function parseArguments(
   const startupMessages: string[] = [];
   const yargsInstance = yargs(rawArgv)
     .locale('en')
-    .scriptName('gemini')
+    .scriptName('gemini-cyber')
     .usage(
-      'Usage: gemini [options] [command]\n\nGemini CLI - Defaults to interactive mode. Use -p/--prompt for non-interactive (headless) mode.',
+      'Usage: gemini-cyber [options] [command]\n\nGemini Cyber CLI - defensive security assistant. Defaults to interactive mode. Use -p/--prompt for non-interactive (headless) mode.',
     )
     .option('isCommand', {
       type: 'boolean',
@@ -512,6 +516,49 @@ export function isDebugMode(argv: CliArgs): boolean {
   );
 }
 
+async function createHatsMcpServerConfig(
+  cwd: string,
+): Promise<MCPServerConfig | undefined> {
+  const currentBin = process.argv[1] ?? '';
+  const currentBinName = path.basename(currentBin);
+  const shouldEnableHatsMcp =
+    process.env['GEMINI_CYBER_ENABLE_HATS_MCP'] === '1' ||
+    currentBinName === CYBER_BINARY_NAME;
+  if (!shouldEnableHatsMcp) {
+    return undefined;
+  }
+
+  const projectRoot = (await getProjectRootForWorktree(cwd)) ?? cwd;
+  const scriptPath =
+    process.env['GEMINI_CYBER_HATS_MCP_SERVER_PATH'] ||
+    path.resolve(projectRoot, 'scripts/hats_mcp_server.py');
+
+  if (!fs.existsSync(scriptPath)) {
+    return undefined;
+  }
+
+  const pythonBin = process.env['GEMINI_CYBER_HATS_PYTHON_BIN'] || 'python3';
+  const env: Record<string, string> = {};
+  if (process.env['HATS_BIN']) {
+    env['HATS_BIN'] = process.env['HATS_BIN'];
+  }
+
+  return new MCPServerConfig(
+    pythonBin,
+    [scriptPath],
+    Object.keys(env).length > 0 ? env : undefined,
+    projectRoot,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    true,
+    'Built-in HATS MCP bridge for authorized ethical security workflows.',
+  );
+}
+
 export interface LoadCliConfigOptions {
   cwd?: string;
   projectHooks?: { [K in HookEventName]?: HookDefinition[] } & {
@@ -800,7 +847,7 @@ export async function loadCliConfig(
     interactive,
   );
 
-  const defaultModel = PREVIEW_GEMINI_MODEL_AUTO;
+  const defaultModel = DEFAULT_GEMINI_FLASH_MODEL;
   const specifiedModel =
     argv.model || process.env['GEMINI_MODEL'] || settings.model?.name;
 
@@ -842,6 +889,13 @@ export async function loadCliConfig(
   const adminAllowlist = settings.admin?.mcp?.config;
   let mcpServerCommand = mcpEnabled ? settings.mcp?.serverCommand : undefined;
   let mcpServers = mcpEnabled ? settings.mcpServers : {};
+
+  if (mcpEnabled && !mcpServers?.['hats']) {
+    const hatsServerConfig = await createHatsMcpServerConfig(cwd);
+    if (hatsServerConfig) {
+      mcpServers = { ...mcpServers, hats: hatsServerConfig };
+    }
+  }
 
   if (mcpEnabled && adminAllowlist && Object.keys(adminAllowlist).length > 0) {
     const result = applyAdminAllowlist(mcpServers, adminAllowlist);

@@ -1,0 +1,42 @@
+{
+  "name": "gemini-cyber-builtin",
+  "version": "2.1.0",
+  "contextFileName": "GEMINI.md",
+  "mcpServers": {
+    "hats": {
+      "command": "python3",
+      "args": ["${extensionPath}${/}hats_mcp_server.py"],
+      "cwd": "${extensionPath}",
+      "env": {
+        "HATS_TIMEOUT_SECONDS": "300"
+      },
+      "trust": true
+    }
+  },
+  "themes": [
+    {
+      "name": "hacker-green",
+      "type": "custom",
+      "background": {
+        "primary": "#000000"
+      },
+      "text": {
+        "primary": "#00FF00",
+        "secondary": "#008800",
+        "link": "#00FF41"
+      },
+      "status": {
+        "success": "#00FF00",
+        "warning": "#FFFF00",
+        "error": "#FF0000"
+      },
+      "border": {
+        "default": "#00FF00"
+      },
+      "ui": {
+        "comment": "#004400",
+        "gradient": ["#00FF00", "#00FF88", "#00FFCC"]
+      }
+    }
+  ]
+}

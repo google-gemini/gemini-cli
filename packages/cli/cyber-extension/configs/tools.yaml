@@ -1,0 +1,16 @@
+tools:
+  nikto:
+    args:
+    - -h
+    category: scanning
+    command: nikto
+    description: Web server scanner
+    version_cmd: nikto -Version
+  nmap:
+    args:
+    - -sS
+    - -O
+    category: scanning
+    command: nmap
+    description: Network discovery and security auditing
+    version_cmd: nmap --version

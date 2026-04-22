@@ -1,0 +1,9 @@
+description = "Active Directory / SMB enumeration chain: enum4linux, smbclient, smbmap."
+prompt = """
+Run Active Directory and SMB enumeration on target: {{args}}
+
+1) Run hats_enum4linux for full AD enumeration (users, shares, groups, policies).
+2) Run hats_smbclient to list available shares (try null session).
+3) Run hats_smbmap to check share permissions.
+4) Summarize: users found, accessible shares, password policies, potential attack vectors.
+"""

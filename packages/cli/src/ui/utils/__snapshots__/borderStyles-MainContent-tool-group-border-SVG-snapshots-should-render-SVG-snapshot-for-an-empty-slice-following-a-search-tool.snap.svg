@@ -19,7 +19,7 @@
     <text x="9" y="70" fill="#4796e4" textLength="9" lengthAdjust="spacingAndGlyphs">▝</text>
     <text x="18" y="70" fill="#6688d9" textLength="9" lengthAdjust="spacingAndGlyphs">▀</text>
     <text x="90" y="70" fill="#ffffff" textLength="297" lengthAdjust="spacingAndGlyphs"> ▀▀▀▀▘▝▀▀▀▀▘▀▀▘  ▀▀▘▀▀▘▀▀▘ ▝▀▀▝▀▀</text>
-    <text x="9" y="104" fill="#ffffff" textLength="90" lengthAdjust="spacingAndGlyphs" font-weight="bold">Gemini CLI</text>
+    <text x="9" y="104" fill="#ffffff" textLength="90" lengthAdjust="spacingAndGlyphs" font-weight="bold">Gemini-Cyber-CLI</text>
     <text x="99" y="104" fill="#afafaf" textLength="63" lengthAdjust="spacingAndGlyphs"> v1.2.3</text>
     <text x="0" y="155" fill="#ffffff" textLength="225" lengthAdjust="spacingAndGlyphs">Tips for getting started:</text>
     <text x="0" y="172" fill="#ffffff" textLength="90" lengthAdjust="spacingAndGlyphs">1. Create </text>

@@ -162,4 +162,20 @@ export const INFORMATIVE_TIPS = [
   'Find relevant documentation with /find-docs',
   'Execute any shell command with !<command>',
   // Command tips end here
+  // Cyber tips start here
+  'Start a full recon chain on a target with /cyber/scan <target>',
+  'Enumerate all 65535 ports with /cyber/enumerate <target>',
+  'Run a web app security assessment with /cyber/web-scan <url>',
+  'Crack password hashes with /cyber/crack <hash>',
+  'Check Linux privilege escalation vectors with /cyber/privesc',
+  'Enumerate Active Directory with /cyber/ad-enum <target>',
+  'Start a CTF/HackTheBox workflow with /cyber/ctf <target>',
+  'Generate a professional pentest report with /cyber/report',
+  'Check which Kali tools are installed with hats_check_tools',
+  'Use HATS MCP tools for structured JSON output instead of raw terminal text',
+  'Chain recon tools automatically with hats_full_recon_chain',
+  'Activate the recon skill for structured reconnaissance methodology',
+  'Activate the exploit skill for safe vulnerability verification',
+  'Activate the ctf skill for HackTheBox/CTF box workflows',
+  // Cyber tips end here
 ];

@@ -1,0 +1,14 @@
+description = "Linux privilege escalation enumeration using linpeas and manual checks."
+prompt = """
+Run privilege escalation enumeration on the current system.
+
+1) Run hats_linpeas for automated enumeration.
+2) Check sudo permissions: sudo -l
+3) Find SUID binaries: find / -perm -4000 -type f 2>/dev/null
+4) Check cron jobs: cat /etc/crontab && ls -la /etc/cron.*
+5) Check writable directories in PATH.
+6) Check kernel version for known exploits via hats_searchsploit.
+7) Summarize all privilege escalation vectors by likelihood and difficulty.
+
+Context: {{args}}
+"""

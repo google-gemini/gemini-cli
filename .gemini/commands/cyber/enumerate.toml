@@ -1,0 +1,11 @@
+description = "Full target enumeration: all ports + service detection + OS fingerprinting."
+prompt = """
+Run comprehensive enumeration on target: {{args}}
+
+1) Run hats_check_tools to verify tool availability.
+2) Fast port scan all 65535 ports with hats_masscan (or hats_nmap_scan if unavailable).
+3) Deep scan discovered open ports with hats_nmap_scan using -sV -sC -O flags.
+4) For each discovered service, run hats_searchsploit with the service name and version.
+5) Organize all findings into a markdown table with columns: Port, Protocol, Service, Version, Exploit Leads.
+6) Provide a prioritized list of attack vectors based on the findings.
+"""

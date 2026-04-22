@@ -28,6 +28,8 @@ import { commandsCommand } from '../ui/commands/commandsCommand.js';
 import { compressCommand } from '../ui/commands/compressCommand.js';
 import { copyCommand } from '../ui/commands/copyCommand.js';
 import { corgiCommand } from '../ui/commands/corgiCommand.js';
+import { cyberReportCommand } from '../ui/commands/cyberReportCommand.js';
+import { cyberScanCommand } from '../ui/commands/cyberScanCommand.js';
 import { docsCommand } from '../ui/commands/docsCommand.js';
 import { directoryCommand } from '../ui/commands/directoryCommand.js';
 import { editorCommand } from '../ui/commands/editorCommand.js';
@@ -126,6 +128,8 @@ export class BuiltinCommandLoader implements ICommandLoader {
         ...chatCommand,
         subCommands: chatResumeSubCommands,
       },
+      cyberScanCommand,
+      cyberReportCommand,
       clearCommand,
       commandsCommand,
       compressCommand,
