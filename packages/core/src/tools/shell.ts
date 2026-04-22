@@ -68,6 +68,13 @@ export interface ShellToolParams {
   dir_path?: string;
   is_background?: boolean;
   delay_ms?: number;
+  /**
+   * When true and `is_background` is also true, each stdout line from the
+   * background process is forwarded to the ACP client in real time (as
+   * `tool_call_update` events) during the current turn. Ignored when
+   * `is_background` is false.
+   */
+  stream_output?: boolean;
   [PARAM_ADDITIONAL_PERMISSIONS]?: SandboxPermissions;
 }
 
