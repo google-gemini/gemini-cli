@@ -181,9 +181,12 @@ class DiscoveredToolInvocation extends BaseToolInvocation<
     // If there is a process error, signal, or non-zero exit code, return error details.
     // We allow code 1 as successful ONLY if the tool supports streaming updates (canUpdateOutput),
     // because many tools use it for non-fatal status (e.g. progress).
-    // For non-streaming tools, we maintain the original strict contract (code 0 only).
-    const failureThreshold = this.canUpdateOutput ? 1 : 0;
-    if (error || (code !== null && code > failureThreshold) || signal) {
+    // For non-streaming tools, we maintain the original strict contract (code 0 and NO stderr).
+    const isFailure = this.canUpdateOutput
+      ? error || (code !== null && code > 1) || signal
+      : error || code !== 0 || signal || stderr;
+
+    if (isFailure) {
       const llmContent = [
         `Stdout: ${stdout || '(empty)'}`,
         `Stderr: ${stderr || '(empty)'}`,
@@ -201,9 +204,10 @@ class DiscoveredToolInvocation extends BaseToolInvocation<
       };
     }
 
+    const output = stdout || stderr;
     return {
-      llmContent: stdout,
-      returnDisplay: stdout,
+      llmContent: output,
+      returnDisplay: output,
     };
   }
 }
