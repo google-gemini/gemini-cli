@@ -836,10 +836,35 @@ describe('Server Config (config.ts)', () => {
         undefined,
         undefined,
         undefined,
+        undefined,
       );
       // Verify that contentGeneratorConfig is updated
       expect(config.getContentGeneratorConfig()).toEqual(mockContentConfig);
       expect(GeminiClient).toHaveBeenCalledWith(config);
+    });
+
+    it('should pass Vertex AI routing settings when refreshing auth', async () => {
+      const vertexAiRouting = {
+        requestType: 'shared' as const,
+        sharedRequestType: 'priority' as const,
+      };
+      const config = new Config({
+        ...baseParams,
+        vertexAiRouting,
+      });
+
+      vi.mocked(createContentGeneratorConfig).mockResolvedValue({});
+
+      await config.refreshAuth(AuthType.USE_VERTEX_AI);
+
+      expect(createContentGeneratorConfig).toHaveBeenCalledWith(
+        config,
+        AuthType.USE_VERTEX_AI,
+        undefined,
+        undefined,
+        undefined,
+        vertexAiRouting,
+      );
     });
 
     it('should reset model availability status', async () => {
@@ -3475,7 +3500,7 @@ describe('Config JIT Initialization', () => {
     expect(config.getUserMemory()).toBe('Initial Memory');
   });
 
-  describe('isMemoryManagerEnabled', () => {
+  describe('isMemoryV2Enabled', () => {
     it('should default to false', () => {
       const params: ConfigParameters = {
         sessionId: 'test-session',
@@ -3486,21 +3511,92 @@ describe('Config JIT Initialization', () => {
       };
 
       config = new Config(params);
-      expect(config.isMemoryManagerEnabled()).toBe(false);
+      expect(config.isMemoryV2Enabled()).toBe(false);
     });
 
-    it('should return true when experimentalMemoryManager is true', () => {
+    it('should return true when experimentalMemoryV2 is true', () => {
       const params: ConfigParameters = {
         sessionId: 'test-session',
         targetDir: '/tmp/test',
         debugMode: false,
         model: 'test-model',
         cwd: '/tmp/test',
-        experimentalMemoryManager: true,
+        experimentalMemoryV2: true,
       };
 
       config = new Config(params);
-      expect(config.isMemoryManagerEnabled()).toBe(true);
+      expect(config.isMemoryV2Enabled()).toBe(true);
+    });
+
+    it('should NOT add the global ~/.gemini directory to the workspace when enabled', async () => {
+      // The prompt-driven memoryV2 mode does not broaden the workspace
+      // to include the global ~/.gemini/ directory. Cross-project personal
+      // preferences are routed to ~/.gemini/GEMINI.md via the surgical
+      // isPathAllowed allowlist instead — see the next two tests.
+      const params: ConfigParameters = {
+        sessionId: 'test-session',
+        targetDir: '/tmp/test',
+        debugMode: false,
+        model: 'test-model',
+        cwd: '/tmp/test',
+        experimentalMemoryV2: true,
+      };
+
+      config = new Config(params);
+      await config.initialize();
+
+      const directories = config.getWorkspaceContext().getDirectories();
+      expect(directories).not.toContain(Storage.getGlobalGeminiDir());
+    });
+
+    it('should allow isPathAllowed to write the global ~/.gemini/GEMINI.md file', async () => {
+      // Surgical allowlist: when memoryV2 is on, the prompt routes
+      // cross-project personal preferences to ~/.gemini/GEMINI.md, so the
+      // agent must be able to edit that exact file via edit/write_file.
+      const params: ConfigParameters = {
+        sessionId: 'test-session',
+        targetDir: '/tmp/test',
+        debugMode: false,
+        model: 'test-model',
+        cwd: '/tmp/test',
+        experimentalMemoryV2: true,
+      };
+
+      config = new Config(params);
+      await config.initialize();
+
+      const globalGeminiMdPath = path.join(
+        Storage.getGlobalGeminiDir(),
+        'GEMINI.md',
+      );
+      expect(config.isPathAllowed(globalGeminiMdPath)).toBe(true);
+    });
+
+    it('should NOT allow isPathAllowed to write other files under ~/.gemini/ (least privilege)', async () => {
+      // The allowlist is surgical: only ~/.gemini/GEMINI.md is reachable.
+      // settings.json, keybindings.json, credentials, etc. remain disallowed.
+      const params: ConfigParameters = {
+        sessionId: 'test-session',
+        targetDir: '/tmp/test',
+        debugMode: false,
+        model: 'test-model',
+        cwd: '/tmp/test',
+        experimentalMemoryV2: true,
+      };
+
+      config = new Config(params);
+      await config.initialize();
+
+      const globalDir = Storage.getGlobalGeminiDir();
+      expect(config.isPathAllowed(path.join(globalDir, 'settings.json'))).toBe(
+        false,
+      );
+      expect(
+        config.isPathAllowed(path.join(globalDir, 'keybindings.json')),
+      ).toBe(false);
+      expect(
+        config.isPathAllowed(path.join(globalDir, 'oauth_creds.json')),
+      ).toBe(false);
     });
   });
 
@@ -3532,18 +3628,18 @@ describe('Config JIT Initialization', () => {
       expect(config.isAutoMemoryEnabled()).toBe(true);
     });
 
-    it('should be independent of experimentalMemoryManager', () => {
+    it('should be independent of experimentalMemoryV2', () => {
       const params: ConfigParameters = {
         sessionId: 'test-session',
         targetDir: '/tmp/test',
         debugMode: false,
         model: 'test-model',
         cwd: '/tmp/test',
-        experimentalMemoryManager: true,
+        experimentalMemoryV2: true,
       };
 
       config = new Config(params);
-      expect(config.isMemoryManagerEnabled()).toBe(true);
+      expect(config.isMemoryV2Enabled()).toBe(true);
       expect(config.isAutoMemoryEnabled()).toBe(false);
     });
   });
