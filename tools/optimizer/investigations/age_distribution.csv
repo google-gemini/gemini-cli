@@ -1,0 +1,11 @@
+type,age_bucket,count
+issue,"< 1 week",128
+issue,"1-4 weeks",488
+issue,"1-3 months",384
+issue,"3-6 months",0
+issue,"> 6 months",0
+pr,"< 1 week",71
+pr,"1-4 weeks",222
+pr,"1-3 months",193
+pr,"3-6 months",0
+pr,"> 6 months",0

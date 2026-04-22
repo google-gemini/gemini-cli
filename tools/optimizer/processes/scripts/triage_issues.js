@@ -54,6 +54,7 @@ async function processIssues() {
 
     if (issue && state.includes('OPEN')) {
       const isPossibleDuplicate = issue.labels.some(l => l.name === 'status/possible-duplicate');
+      const isUnassigned = !issue.assignees || issue.assignees.length === 0;
       
       // We implement a phased rollout. Instead of closing possible duplicates immediately, 
       // we apply a 'stale-candidate' label. We do not close them yet to preserve project health.
@@ -62,9 +63,15 @@ async function processIssues() {
           // In commit mode, we would apply the label.
           try {
              execSync(`gh issue edit ${number} --add-label "stale-candidate"`);
-          } catch(e) {}
+          } catch { /* ignore */ }
         }
         // We do NOT change state to closed in the CSV simulation either. It remains open.
+      }
+
+      if (isUnassigned && commitMode) {
+        try {
+          execSync(`gh issue edit ${number} --add-label "needs-assignee"`);
+        } catch { /* ignore */ }
       }
     }
 

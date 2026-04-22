@@ -3,8 +3,8 @@ import readline from 'readline';
 import { execSync } from 'child_process';
 
 async function processPRs() {
-  const prsFile = 'prs-before.csv';
-  const afterFile = 'prs-after.csv';
+  const prsFile = 'open-community-prs-before.csv';
+  const afterFile = 'open-community-prs-after.csv';
   if (!fs.existsSync(prsFile)) return 0;
 
   // Counter-metric: 'active_contributors'
@@ -62,7 +62,7 @@ async function processPRs() {
         if (commitMode) {
           try {
             execSync(`gh pr close ${number} --comment "Closing PR as it has been marked Stale with no recent activity."`);
-          } catch(e) {}
+          } catch { /* ignore */ }
         }
       } else {
         const needsIssue = pr.labels.some(l => l.name === 'status/need-issue');
@@ -71,7 +71,7 @@ async function processPRs() {
           if (commitMode) {
             try {
               execSync(`gh pr edit ${number} --add-label "Stale"`);
-            } catch(e) {}
+            } catch { /* ignore */ }
           }
         }
       }
