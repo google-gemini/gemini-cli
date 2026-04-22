@@ -35,16 +35,18 @@ The observability system provides:
 You control telemetry behavior through the `.gemini/settings.json` file.
 Environment variables can override these settings.
 
-| Setting        | Environment Variable             | Description                                         | Values            | Default                 |
-| -------------- | -------------------------------- | --------------------------------------------------- | ----------------- | ----------------------- |
-| `enabled`      | `GEMINI_TELEMETRY_ENABLED`       | Enable or disable telemetry                         | `true`/`false`    | `false`                 |
-| `target`       | `GEMINI_TELEMETRY_TARGET`        | Where to send telemetry data                        | `"gcp"`/`"local"` | `"local"`               |
-| `otlpEndpoint` | `GEMINI_TELEMETRY_OTLP_ENDPOINT` | OTLP collector endpoint                             | URL string        | `http://localhost:4317` |
-| `otlpProtocol` | `GEMINI_TELEMETRY_OTLP_PROTOCOL` | OTLP transport protocol                             | `"grpc"`/`"http"` | `"grpc"`                |
-| `outfile`      | `GEMINI_TELEMETRY_OUTFILE`       | Save telemetry to file (overrides `otlpEndpoint`)   | file path         | -                       |
-| `logPrompts`   | `GEMINI_TELEMETRY_LOG_PROMPTS`   | Include prompts in telemetry logs                   | `true`/`false`    | `true`                  |
-| `useCollector` | `GEMINI_TELEMETRY_USE_COLLECTOR` | Use external OTLP collector (advanced)              | `true`/`false`    | `false`                 |
-| `useCliAuth`   | `GEMINI_TELEMETRY_USE_CLI_AUTH`  | Use CLI credentials for telemetry (GCP target only) | `true`/`false`    | `false`                 |
+| Setting        | Environment Variable              | Description                                         | Values            | Default                 |
+| -------------- | --------------------------------- | --------------------------------------------------- | ----------------- | ----------------------- |
+| `enabled`      | `GEMINI_TELEMETRY_ENABLED`        | Enable or disable telemetry                         | `true`/`false`    | `false`                 |
+| `traces`       | `GEMINI_TELEMETRY_TRACES_ENABLED` | Enable detailed attribute tracing                   | `true`/`false`    | `false`                 |
+| `target`       | `GEMINI_TELEMETRY_TARGET`         | Where to send telemetry data                        | `"gcp"`/`"local"` | `"local"`               |
+| `otlpEndpoint` | `GEMINI_TELEMETRY_OTLP_ENDPOINT`  | OTLP collector endpoint                             | URL string        | `http://localhost:4317` |
+| `otlpProtocol` | `GEMINI_TELEMETRY_OTLP_PROTOCOL`  | OTLP transport protocol                             | `"grpc"`/`"http"` | `"grpc"`                |
+| `outfile`      | `GEMINI_TELEMETRY_OUTFILE`        | Save telemetry to file (overrides `otlpEndpoint`)   | file path         | -                       |
+| `logPrompts`   | `GEMINI_TELEMETRY_LOG_PROMPTS`    | Include prompts in telemetry logs                   | `true`/`false`    | `true`                  |
+| `useCollector` | `GEMINI_TELEMETRY_USE_COLLECTOR`  | Use external OTLP collector (advanced)              | `true`/`false`    | `false`                 |
+| `useCliAuth`   | `GEMINI_TELEMETRY_USE_CLI_AUTH`   | Use CLI credentials for telemetry (GCP target only) | `true`/`false`    | `false`                 |
+| -              | `GEMINI_CLI_SURFACE`              | Optional custom label for traffic reporting         | string            | -                       |
 
 **Note on boolean environment variables:** For boolean settings like `enabled`,
 setting the environment variable to `true` or `1` enables the feature.
@@ -124,9 +126,11 @@ You must complete several setup steps before enabling Google Cloud telemetry.
       }
       ```
 
-      > **Note:** This setting requires **Direct export** (in-process exporters)
-      > and cannot be used when `useCollector` is `true`. If both are enabled,
-      > telemetry will be disabled.
+<!-- prettier-ignore -->
+> [!NOTE]
+> This setting requires **Direct export** (in-process exporters)
+> and cannot be used when `useCollector` is `true`. If both are enabled,
+> telemetry will be disabled.
 
 3.  Ensure your account or service account has these IAM roles:
     - Cloud Trace Agent
@@ -216,6 +220,50 @@ recommend using file-based output for local development.
 For advanced local telemetry setups (such as Jaeger or Genkit), see the
 [Local development guide](../local-development.md#viewing-traces).
 
+## Client identification
+
+Gemini CLI includes identifiers in its `User-Agent` header to help you
+differentiate and report on API traffic from different environments (for
+example, identifying calls from Gemini Code Assist versus a standard terminal).
+
+### Automatic identification
+
+Most integrated environments are identified automatically without additional
+configuration. The identifier is included as a prefix to the `User-Agent` and as
+a "surface" tag in the parenthetical metadata.
+
+| Environment                         | User-Agent Prefix            | Surface Tag |
+| :---------------------------------- | :--------------------------- | :---------- |
+| **Gemini Code Assist (Agent Mode)** | `GeminiCLI-a2a-server`       | `vscode`    |
+| **Zed (via ACP)**                   | `GeminiCLI-acp-zed`          | `zed`       |
+| **XCode (via ACP)**                 | `GeminiCLI-acp-xcode`        | `xcode`     |
+| **IntelliJ IDEA (via ACP)**         | `GeminiCLI-acp-intellijidea` | `jetbrains` |
+| **Standard Terminal**               | `GeminiCLI`                  | `terminal`  |
+
+**Example User-Agent:**
+`GeminiCLI-a2a-server/0.34.0/gemini-pro (linux; x64; vscode)`
+
+### Custom identification
+
+You can provide a custom identifier for your own scripts or automation by
+setting the `GEMINI_CLI_SURFACE` environment variable. This is useful for
+tracking specific internal tools or distribution channels in your GCP logs.
+
+**macOS/Linux**
+
+```bash
+export GEMINI_CLI_SURFACE="my-custom-tool"
+```
+
+**Windows (PowerShell)**
+
+```powershell
+$env:GEMINI_CLI_SURFACE="my-custom-tool"
+```
+
+When set, the value appears at the end of the `User-Agent` parenthetical:
+`GeminiCLI/0.34.0/gemini-pro (linux; x64; my-custom-tool)`
+
 ## Logs, metrics, and traces
 
 This section describes the structure of logs, metrics, and traces generated by
@@ -259,6 +307,7 @@ Emitted at startup with the CLI configuration.
 - `extension_ids` (string)
 - `extensions_count` (int)
 - `auth_type` (string)
+- `worktree_active` (boolean)
 - `github_workflow_name` (string, optional)
 - `github_repository_hash` (string, optional)
 - `github_event_name` (string, optional)
@@ -856,6 +905,20 @@ Logs keychain availability checks.
 
 - `available` (boolean)
 
+##### `gemini_cli.startup_stats`
+
+Logs detailed startup performance statistics.
+
+<details>
+<summary>Attributes</summary>
+
+- `phases` (json array of startup phases)
+- `os_platform` (string)
+- `os_release` (string)
+- `is_docker` (boolean)
+
+</details>
+
 </details>
 
 ### Metrics
@@ -871,6 +934,20 @@ Gemini CLI exports several custom metrics.
 ##### `gemini_cli.session.count`
 
 Incremented once per CLI startup.
+
+##### Onboarding
+
+Tracks onboarding flow from authentication to the user
+
+- `gemini_cli.onboarding.start` (Counter, Int): Incremented when the
+  authentication flow begins.
+
+- `gemini_cli.onboarding.success` (Counter, Int): Incremented when the user
+onboarding flow completes successfully.
+<details>
+<summary>Attributes (Success)</summary>
+
+- `user_tier` (string)
 
 ##### Tools
 
@@ -1158,6 +1235,12 @@ These metrics follow standard [OpenTelemetry GenAI semantic conventions].
 
 Traces provide an "under-the-hood" view of agent and backend operations. Use
 traces to debug tool interactions and optimize performance.
+
+<!-- prettier-ignore -->
+> [!NOTE]
+> Detailed trace attributes (like full prompts and tool outputs) are disabled by default
+> to minimize overhead. You must explicitly set `telemetry.traces` to `true` (or set
+> `GEMINI_TELEMETRY_TRACES_ENABLED=true`) to capture them.
 
 Every trace captures rich metadata via standard span attributes.
 

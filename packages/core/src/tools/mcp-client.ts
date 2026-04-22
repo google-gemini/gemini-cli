@@ -27,6 +27,8 @@ import {
   ReadResourceResultSchema,
   ResourceListChangedNotificationSchema,
   ToolListChangedNotificationSchema,
+  ErrorCode,
+  McpError,
   PromptListChangedNotificationSchema,
   ProgressNotificationSchema,
   type GetPromptResult,
@@ -130,6 +132,12 @@ export interface McpProgressReporter {
   unregisterProgressToken(token: string | number): void;
 }
 
+export interface RegistrySet {
+  toolRegistry: ToolRegistry;
+  promptRegistry: PromptRegistry;
+  resourceRegistry: ResourceRegistry;
+}
+
 /**
  * A client for a single MCP server.
  *
@@ -147,6 +155,8 @@ export class McpClient implements McpProgressReporter {
   private isRefreshingPrompts: boolean = false;
   private pendingPromptRefresh: boolean = false;
 
+  private readonly registeredRegistries = new Set<RegistrySet>();
+
   /**
    * Map of progress tokens to tool call IDs.
    * This allows us to route progress notifications to the correct tool call.
@@ -156,15 +166,16 @@ export class McpClient implements McpProgressReporter {
   constructor(
     private readonly serverName: string,
     private readonly serverConfig: MCPServerConfig,
-    private readonly toolRegistry: ToolRegistry,
-    private readonly promptRegistry: PromptRegistry,
-    private readonly resourceRegistry: ResourceRegistry,
     private readonly workspaceContext: WorkspaceContext,
     private readonly cliConfig: McpContext,
     private readonly debugMode: boolean,
     private readonly clientVersion: string,
     private readonly onContextUpdated?: (signal?: AbortSignal) => Promise<void>,
   ) {}
+
+  getServerName(): string {
+    return this.serverName;
+  }
 
   /**
    * Connects to the MCP server.
@@ -210,27 +221,34 @@ export class McpClient implements McpProgressReporter {
   }
 
   /**
-   * Discovers tools and prompts from the MCP server.
+   * Discovers tools and prompts from the MCP server into the specified registries.
    */
-  async discover(cliConfig: McpContext): Promise<void> {
+  async discoverInto(
+    cliConfig: McpContext,
+    registries: RegistrySet,
+  ): Promise<void> {
     this.assertConnected();
+    this.registeredRegistries.add(registries);
 
     const prompts = await this.fetchPrompts();
-    const tools = await this.discoverTools(cliConfig);
+    const tools = await this.discoverTools(
+      cliConfig,
+      registries.toolRegistry.getMessageBus(),
+    );
     const resources = await this.discoverResources();
-    this.updateResourceRegistry(resources);
+    this.updateResourceRegistry(resources, registries.resourceRegistry);
 
     if (prompts.length === 0 && tools.length === 0 && resources.length === 0) {
       throw new Error('No prompts, tools, or resources found on the server.');
     }
 
     for (const prompt of prompts) {
-      this.promptRegistry.registerPrompt(prompt);
+      registries.promptRegistry.registerPrompt(prompt);
     }
     for (const tool of tools) {
-      this.toolRegistry.registerTool(tool);
+      registries.toolRegistry.registerTool(tool);
     }
-    this.toolRegistry.sortTools();
+    registries.toolRegistry.sortTools();
 
     // Validate MCP tool names in policy rules against discovered tools
     try {
@@ -251,15 +269,25 @@ export class McpClient implements McpProgressReporter {
   }
 
   /**
+   * Unregisters registries so this client will no longer update them when it receives
+   * list_changed notifications from the server.
+   */
+  removeRegistries(registries: RegistrySet): void {
+    this.registeredRegistries.delete(registries);
+  }
+
+  /**
    * Disconnects from the MCP server.
    */
   async disconnect(): Promise<void> {
     if (this.status !== MCPServerStatus.CONNECTED) {
       return;
     }
-    this.toolRegistry.removeMcpToolsByServer(this.serverName);
-    this.promptRegistry.removePromptsByServer(this.serverName);
-    this.resourceRegistry.removeResourcesByServer(this.serverName);
+    for (const registries of this.registeredRegistries) {
+      registries.toolRegistry.removeMcpToolsByServer(this.serverName);
+      registries.promptRegistry.removePromptsByServer(this.serverName);
+      registries.resourceRegistry.removeResourcesByServer(this.serverName);
+    }
     this.updateStatus(MCPServerStatus.DISCONNECTING);
     const client = this.client;
     this.client = undefined;
@@ -294,6 +322,7 @@ export class McpClient implements McpProgressReporter {
 
   private async discoverTools(
     cliConfig: McpContext,
+    messageBus: MessageBus,
     options?: { timeout?: number; signal?: AbortSignal },
   ): Promise<DiscoveredMCPTool[]> {
     this.assertConnected();
@@ -302,7 +331,7 @@ export class McpClient implements McpProgressReporter {
       this.serverConfig,
       this.client!,
       cliConfig,
-      this.toolRegistry.getMessageBus(),
+      messageBus,
       {
         ...(options ?? {
           timeout: this.serverConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
@@ -329,8 +358,11 @@ export class McpClient implements McpProgressReporter {
     return discoverResources(this.serverName, this.client!, this.cliConfig);
   }
 
-  private updateResourceRegistry(resources: Resource[]): void {
-    this.resourceRegistry.setResourcesForServer(this.serverName, resources);
+  private updateResourceRegistry(
+    resources: Resource[],
+    resourceRegistry: ResourceRegistry,
+  ): void {
+    resourceRegistry.setResourcesForServer(this.serverName, resources);
   }
 
   async readResource(
@@ -482,23 +514,32 @@ export class McpClient implements McpProgressReporter {
         try {
           newResources = await this.discoverResources();
 
-          // Verification Retry: If no resources are found or resources didn't change,
-          // wait briefly and try one more time. Some servers notify before they're fully ready.
-          const currentResources =
-            this.resourceRegistry.getResourcesByServer(this.serverName) || [];
-          const resourceMatch =
-            newResources.length === currentResources.length &&
-            newResources.every((nr: Resource) =>
-              currentResources.some((cr: MCPResource) => cr.uri === nr.uri),
-            );
+          for (const registries of this.registeredRegistries) {
+            // Verification Retry: If no resources are found or resources didn't change,
+            // wait briefly and try one more time. Some servers notify before they're fully ready.
+            const currentResources =
+              registries.resourceRegistry.getResourcesByServer(
+                this.serverName,
+              ) || [];
+            const resourceMatch =
+              newResources.length === currentResources.length &&
+              newResources.every((nr: Resource) =>
+                currentResources.some((cr: MCPResource) => cr.uri === nr.uri),
+              );
 
-          if (resourceMatch && !this.pendingResourceRefresh) {
-            debugLogger.log(
-              `No resource changes detected for '${this.serverName}'. Retrying once in 500ms...`,
+            if (resourceMatch && !this.pendingResourceRefresh) {
+              debugLogger.log(
+                `No resource changes detected for '${this.serverName}'. Retrying once in 500ms...`,
+              );
+              const retryDelay = 500;
+              await new Promise((resolve) => setTimeout(resolve, retryDelay));
+              newResources = await this.discoverResources();
+            }
+
+            this.updateResourceRegistry(
+              newResources,
+              registries.resourceRegistry,
             );
-            const retryDelay = 500;
-            await new Promise((resolve) => setTimeout(resolve, retryDelay));
-            newResources = await this.discoverResources();
           }
         } catch (err) {
           debugLogger.error(
@@ -507,8 +548,6 @@ export class McpClient implements McpProgressReporter {
           clearTimeout(timeoutId);
           break;
         }
-
-        this.updateResourceRegistry(newResources);
 
         if (this.onContextUpdated) {
           await this.onContextUpdated(abortController.signal);
@@ -575,30 +614,33 @@ export class McpClient implements McpProgressReporter {
             signal: abortController.signal,
           });
 
-          // Verification Retry: If no prompts are found or prompts didn't change,
-          // wait briefly and try one more time. Some servers notify before they're fully ready.
-          const currentPrompts =
-            this.promptRegistry.getPromptsByServer(this.serverName) || [];
-          const promptsMatch =
-            newPrompts.length === currentPrompts.length &&
-            newPrompts.every((np) =>
-              currentPrompts.some((cp) => cp.name === np.name),
-            );
+          for (const registries of this.registeredRegistries) {
+            // Verification Retry: If no prompts are found or prompts didn't change,
+            // wait briefly and try one more time. Some servers notify before they're fully ready.
+            const currentPrompts =
+              registries.promptRegistry.getPromptsByServer(this.serverName) ||
+              [];
+            const promptsMatch =
+              newPrompts.length === currentPrompts.length &&
+              newPrompts.every((np) =>
+                currentPrompts.some((cp) => cp.name === np.name),
+              );
 
-          if (promptsMatch && !this.pendingPromptRefresh) {
-            debugLogger.log(
-              `No prompt changes detected for '${this.serverName}'. Retrying once in 500ms...`,
-            );
-            const retryDelay = 500;
-            await new Promise((resolve) => setTimeout(resolve, retryDelay));
-            newPrompts = await this.fetchPrompts({
-              signal: abortController.signal,
-            });
-          }
+            if (promptsMatch && !this.pendingPromptRefresh) {
+              debugLogger.log(
+                `No prompt changes detected for '${this.serverName}'. Retrying once in 500ms...`,
+              );
+              const retryDelay = 500;
+              await new Promise((resolve) => setTimeout(resolve, retryDelay));
+              newPrompts = await this.fetchPrompts({
+                signal: abortController.signal,
+              });
+            }
 
-          this.promptRegistry.removePromptsByServer(this.serverName);
-          for (const prompt of newPrompts) {
-            this.promptRegistry.registerPrompt(prompt);
+            registries.promptRegistry.removePromptsByServer(this.serverName);
+            for (const prompt of newPrompts) {
+              registries.promptRegistry.registerPrompt(prompt);
+            }
           }
         } catch (err) {
           debugLogger.error(
@@ -666,42 +708,58 @@ export class McpClient implements McpProgressReporter {
         const abortController = new AbortController();
         const timeoutId = setTimeout(() => abortController.abort(), timeoutMs);
 
-        let newTools;
         try {
-          newTools = await this.discoverTools(this.cliConfig, {
-            signal: abortController.signal,
-          });
-          debugLogger.log(
-            `Refresh for '${this.serverName}' discovered ${newTools.length} tools.`,
-          );
-
-          // Verification Retry (Option 3): If no tools are found or tools didn't change,
-          // wait briefly and try one more time. Some servers notify before they're fully ready.
-          const currentTools =
-            this.toolRegistry.getToolsByServer(this.serverName) || [];
-          const toolNamesMatch =
-            newTools.length === currentTools.length &&
-            newTools.every((nt) =>
-              currentTools.some(
-                (ct) =>
-                  ct.name === nt.name ||
-                  (ct instanceof DiscoveredMCPTool &&
-                    ct.serverToolName === nt.serverToolName),
-              ),
+          for (const registries of this.registeredRegistries) {
+            let newTools = await this.discoverTools(
+              this.cliConfig,
+              registries.toolRegistry.getMessageBus(),
+              {
+                signal: abortController.signal,
+              },
+            );
+            debugLogger.log(
+              `Refresh for '${this.serverName}' discovered ${newTools.length} tools.`,
             );
 
-          if (toolNamesMatch && !this.pendingToolRefresh) {
-            debugLogger.log(
-              `No tool changes detected for '${this.serverName}'. Retrying once in 500ms...`,
-            );
-            const retryDelay = 500;
-            await new Promise((resolve) => setTimeout(resolve, retryDelay));
-            newTools = await this.discoverTools(this.cliConfig, {
-              signal: abortController.signal,
-            });
-            debugLogger.log(
-              `Retry refresh for '${this.serverName}' discovered ${newTools.length} tools.`,
-            );
+            // Verification Retry (Option 3): If no tools are found or tools didn't change,
+            // wait briefly and try one more time. Some servers notify before they're fully ready.
+            const currentTools =
+              registries.toolRegistry.getToolsByServer(this.serverName) || [];
+            const toolNamesMatch =
+              newTools.length === currentTools.length &&
+              newTools.every((nt) =>
+                currentTools.some(
+                  (ct) =>
+                    ct.name === nt.name ||
+                    (ct instanceof DiscoveredMCPTool &&
+                      ct.serverToolName === nt.serverToolName),
+                ),
+              );
+
+            if (toolNamesMatch && !this.pendingToolRefresh) {
+              debugLogger.log(
+                `No tool changes detected for '${this.serverName}'. Retrying once in 500ms...`,
+              );
+              const retryDelay = 500;
+              await new Promise((resolve) => setTimeout(resolve, retryDelay));
+              newTools = await this.discoverTools(
+                this.cliConfig,
+                registries.toolRegistry.getMessageBus(),
+                {
+                  signal: abortController.signal,
+                },
+              );
+              debugLogger.log(
+                `Retry refresh for '${this.serverName}' discovered ${newTools.length} tools.`,
+              );
+            }
+
+            registries.toolRegistry.removeMcpToolsByServer(this.serverName);
+
+            for (const tool of newTools) {
+              registries.toolRegistry.registerTool(tool);
+            }
+            registries.toolRegistry.sortTools();
           }
         } catch (err) {
           debugLogger.error(
@@ -710,13 +768,6 @@ export class McpClient implements McpProgressReporter {
           clearTimeout(timeoutId);
           break;
         }
-
-        this.toolRegistry.removeMcpToolsByServer(this.serverName);
-
-        for (const tool of newTools) {
-          this.toolRegistry.registerTool(tool);
-        }
-        this.toolRegistry.sortTools();
 
         if (this.onContextUpdated) {
           await this.onContextUpdated(abortController.signal);
@@ -763,7 +814,7 @@ type StatusChangeListener = (
   serverName: string,
   status: MCPServerStatus,
 ) => void;
-const statusChangeListeners: StatusChangeListener[] = [];
+const statusChangeListeners: Set<StatusChangeListener> = new Set();
 
 /**
  * Add a listener for MCP server status changes
@@ -771,7 +822,7 @@ const statusChangeListeners: StatusChangeListener[] = [];
 export function addMCPStatusChangeListener(
   listener: StatusChangeListener,
 ): void {
-  statusChangeListeners.push(listener);
+  statusChangeListeners.add(listener);
 }
 
 /**
@@ -780,10 +831,7 @@ export function addMCPStatusChangeListener(
 export function removeMCPStatusChangeListener(
   listener: StatusChangeListener,
 ): void {
-  const index = statusChangeListeners.indexOf(listener);
-  if (index !== -1) {
-    statusChangeListeners.splice(index, 1);
-  }
+  statusChangeListeners.delete(listener);
 }
 
 /**
@@ -1167,7 +1215,7 @@ export async function connectAndDiscover(
       mcpServerConfig,
       mcpClient,
       cliConfig,
-      toolRegistry.getMessageBus(),
+      toolRegistry.messageBus,
       { timeout: mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC },
     );
 
@@ -1202,6 +1250,10 @@ export async function connectAndDiscover(
     );
     updateMCPServerStatus(mcpServerName, MCPServerStatus.DISCONNECTED);
   }
+}
+
+function isMcpMethodNotFoundError(error: unknown): boolean {
+  return error instanceof McpError && error.code === ErrorCode.MethodNotFound;
 }
 
 /**
@@ -1283,10 +1335,7 @@ export async function discoverTools(
     }
     return discoveredTools;
   } catch (error) {
-    if (
-      error instanceof Error &&
-      !error.message?.includes('Method not found')
-    ) {
+    if (!isMcpMethodNotFoundError(error)) {
       cliConfig.emitMcpDiagnostic(
         'error',
         `Error discovering tools from ${mcpServerName}: ${getErrorMessage(
@@ -1410,8 +1459,7 @@ export async function discoverPrompts(
         ),
     }));
   } catch (error) {
-    // It's okay if the method is not found, which is a common case.
-    if (error instanceof Error && error.message?.includes('Method not found')) {
+    if (isMcpMethodNotFoundError(error)) {
       return [];
     }
     cliConfig.emitMcpDiagnostic(
@@ -1459,7 +1507,7 @@ async function listResources(
       cursor = response.nextCursor ?? undefined;
     } while (cursor);
   } catch (error) {
-    if (error instanceof Error && error.message?.includes('Method not found')) {
+    if (isMcpMethodNotFoundError(error)) {
       return [];
     }
     cliConfig.emitMcpDiagnostic(
@@ -1706,7 +1754,11 @@ export interface McpContext {
   setUserInteractedWithMcp?(): void;
   isTrustedFolder(): boolean;
   getPolicyEngine?(): {
-    getRules(): ReadonlyArray<{ toolName?: string; source?: string }>;
+    getRules(): ReadonlyArray<{
+      toolName: string;
+      mcpName?: string;
+      source?: string;
+    }>;
   };
 }
 
@@ -1764,7 +1816,7 @@ export async function connectToMcpServer(
         await mcpClient.notification({
           method: 'notifications/roots/list_changed',
         });
-      } catch (_) {
+      } catch {
         // If this fails, its almost certainly because the connection was closed
         // and we should just stop listening for future directory changes.
         unlistenDirectories?.();
@@ -1903,7 +1955,6 @@ export async function connectToMcpServer(
             acceptHeader = 'application/json';
           }
 
-          // eslint-disable-next-line no-restricted-syntax -- TODO: Migrate to safeFetch for SSRF protection
           const response = await fetch(urlToFetch, {
             method: 'HEAD',
             headers: {

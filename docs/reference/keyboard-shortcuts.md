@@ -86,22 +86,25 @@ available combinations.
 
 #### Text Input
 
-| Command                    | Action                                                     | Keys                                                                                |
-| -------------------------- | ---------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| `input.submit`             | Submit the current prompt.                                 | `Enter`                                                                             |
-| `input.newline`            | Insert a newline without submitting.                       | `Ctrl+Enter`<br />`Cmd/Win+Enter`<br />`Alt+Enter`<br />`Shift+Enter`<br />`Ctrl+J` |
-| `input.openExternalEditor` | Open the current prompt or the plan in an external editor. | `Ctrl+X`                                                                            |
-| `input.paste`              | Paste from the clipboard.                                  | `Ctrl+V`<br />`Cmd/Win+V`<br />`Alt+V`                                              |
+| Command                              | Action                                                                    | Keys                                                                                |
+| ------------------------------------ | ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `input.submit`                       | Submit the current prompt.                                                | `Enter`                                                                             |
+| `input.queueMessage`                 | Queue the current prompt to be processed after the current task finishes. | `Tab`                                                                               |
+| `input.newline`                      | Insert a newline without submitting.                                      | `Ctrl+Enter`<br />`Cmd/Win+Enter`<br />`Alt+Enter`<br />`Shift+Enter`<br />`Ctrl+J` |
+| `input.openExternalEditor`           | Open the current prompt or the plan in an external editor.                | `Ctrl+G`<br />`Ctrl+Shift+G`                                                        |
+| `input.deprecatedOpenExternalEditor` | Deprecated command to open external editor.                               | `Ctrl+X`                                                                            |
+| `input.paste`                        | Paste from the clipboard.                                                 | `Ctrl+V`<br />`Cmd/Win+V`<br />`Alt+V`                                              |
 
 #### App Controls
 
 | Command                       | Action                                                                                                                                             | Keys               |
 | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
-| `app.showErrorDetails`        | Toggle detailed error information.                                                                                                                 | `F12`              |
+| `app.showErrorDetails`        | Toggle the debug console for detailed error information.                                                                                           | `F12`              |
 | `app.showFullTodos`           | Toggle the full TODO list.                                                                                                                         | `Ctrl+T`           |
-| `app.showIdeContextDetail`    | Show IDE context details.                                                                                                                          | `Ctrl+G`           |
+| `app.showIdeContextDetail`    | Show IDE context details.                                                                                                                          | `F4`               |
 | `app.toggleMarkdown`          | Toggle Markdown rendering.                                                                                                                         | `Alt+M`            |
-| `app.toggleCopyMode`          | Toggle copy mode when in alternate buffer mode.                                                                                                    | `Ctrl+S`           |
+| `app.toggleCopyMode`          | Toggle copy mode when in alternate buffer mode.                                                                                                    | `F9`               |
+| `app.toggleMouseMode`         | Toggle mouse mode (scrolling and clicking).                                                                                                        | `Ctrl+S`           |
 | `app.toggleYolo`              | Toggle YOLO (auto-approval) mode for tool calls.                                                                                                   | `Ctrl+Y`           |
 | `app.cycleApprovalMode`       | Cycle through approval modes: default (prompt), auto_edit (auto-approve edits), and plan (read-only). Plan mode is skipped when the agent is busy. | `Shift+Tab`        |
 | `app.showMoreLines`           | Expand and collapse blocks of content when not in alternate buffer mode.                                                                           | `Ctrl+O`           |
@@ -125,15 +128,24 @@ available combinations.
 | `background.unfocus`        | Move focus from background shell to Gemini.                        | `Shift+Tab` |
 | `background.unfocusList`    | Move focus from background shell list to Gemini.                   | `Tab`       |
 | `background.unfocusWarning` | Show warning when trying to move focus away from background shell. | `Tab`       |
+| `app.dumpFrame`             | Dump the current frame as a snapshot.                              | `F8`        |
+| `app.startRecording`        | Start recording the session.                                       | `F6`        |
+| `app.stopRecording`         | Stop recording the session.                                        | `F7`        |
+
+#### Extension Controls
+
+| Command            | Action                                      | Keys |
+| ------------------ | ------------------------------------------- | ---- |
+| `extension.update` | Update the current extension if available.  | `I`  |
+| `extension.link`   | Link the current extension to a local path. | `L`  |
 
 <!-- KEYBINDINGS-AUTOGEN:END -->
 
 ## Customizing Keybindings
 
-You can add alternative keybindings for commands by creating or modifying the
+You can add alternative keybindings or remove default keybindings by creating a
 `keybindings.json` file in your home gemini directory (typically
-`~/.gemini/keybindings.json`). This allows you to bind commands to additional
-key combinations. Note that default keybindings cannot be removed.
+`~/.gemini/keybindings.json`).
 
 ### Configuration Format
 
@@ -144,28 +156,57 @@ a `key` combination.
 ```json
 [
   {
-    "command": "input.submit",
-    "key": "cmd+s"
+    "command": "edit.clear",
+    "key": "cmd+l"
   },
   {
-    "command": "edit.clear",
-    "key": "ctrl+l"
+    // prefix "-" to unbind a key
+    "command": "-app.toggleYolo",
+    "key": "ctrl+y"
+  },
+  {
+    "command": "input.submit",
+    "key": "ctrl+y"
+  },
+  {
+    // multiple modifiers
+    "command": "cursor.right",
+    "key": "shift+alt+a"
+  },
+  {
+    // Some mac keyboards send "Å" instead of "shift+option+a"
+    "command": "cursor.right",
+    "key": "Å"
+  },
+  {
+    // some base keys have special multi-char names
+    "command": "cursor.right",
+    "key": "shift+pageup"
   }
 ]
 ```
 
-### Keyboard Rules
-
+- **Unbinding** To remove an existing or default keybinding, prefix a minus sign
+  (`-`) to the `command` name.
+- **No Auto-unbinding** The same key can be bound to multiple commands in
+  different contexts at the same time. Therefore, creating a binding does not
+  automatically unbind the key from other commands.
 - **Explicit Modifiers**: Key matching is explicit. For example, a binding for
   `ctrl+f` will only trigger on exactly `ctrl+f`, not `ctrl+shift+f` or
-  `alt+ctrl+f`. You must specify the exact modifier keys (`ctrl`, `shift`,
-  `alt`/`opt`/`option`, `cmd`/`meta`).
+  `alt+ctrl+f`.
 - **Literal Characters**: Terminals often translate complex key combinations
-  (especially on macOS with the `Option` key) into special characters. To handle
-  this reliably across all operating systems and SSH sessions, you can bind
-  directly to the literal character produced. For example, instead of trying to
-  bind `shift+5`, bind directly to `%`.
-- **Special Keys**: Supported special keys include:
+  (especially on macOS with the `Option` key) into special characters, losing
+  modifier and keystroke information along the way. For example,`shift+5` might
+  be sent as `%`. In these cases, you must bind to the literal character `%` as
+  bindings to `shift+5` will never fire. To see precisely what is being sent,
+  enable `Debug Keystroke Logging` and hit f12 to open the debug log console.
+- **Key Modifiers**: The supported key modifiers are:
+  - `ctrl`
+  - `shift`,
+  - `alt` (synonyms: `opt`, `option`)
+  - `cmd` (synonym: `meta`)
+- **Base Key**: The base key can be any single unicode code point or any of the
+  following special keys:
   - **Navigation**: `up`, `down`, `left`, `right`, `home`, `end`, `pageup`,
     `pagedown`
   - **Actions**: `enter`, `escape`, `tab`, `space`, `backspace`, `delete`,
@@ -201,8 +242,88 @@ a `key` combination.
   the numbered radio option and confirm when the full number is entered.
 - `Ctrl + O`: Expand or collapse paste placeholders (`[Pasted Text: X lines]`)
   inline when the cursor is over the placeholder.
+- `Ctrl + X` (while a plan is presented): Open the plan in an external editor to
+  [collaboratively edit or comment](../cli/plan-mode.md#collaborative-plan-editing)
+  on the implementation strategy.
 - `Double-click` on a paste placeholder (alternate buffer mode only): Expand to
   view full content inline. Double-click again to collapse.
+
+## Vi mode shortcuts
+
+When vim mode is enabled with `/vim` or `general.vimMode: true`, Gemini CLI
+supports NORMAL and INSERT modes.
+
+### Mode switching
+
+| Action                                       | Keys      |
+| -------------------------------------------- | --------- |
+| Enter NORMAL mode from INSERT mode           | `Esc`     |
+| Enter INSERT mode at the cursor              | `i`       |
+| Enter INSERT mode after the cursor           | `a`       |
+| Enter INSERT mode at the start of the line   | `I`       |
+| Enter INSERT mode at the end of the line     | `A`       |
+| Insert a new line below and switch to INSERT | `o`       |
+| Insert a new line above and switch to INSERT | `O`       |
+| Clear input in NORMAL mode                   | `Esc Esc` |
+
+### Navigation in NORMAL mode
+
+| Action                            | Keys            |
+| --------------------------------- | --------------- |
+| Move left                         | `h`             |
+| Move down                         | `j`             |
+| Move up                           | `k`             |
+| Move right                        | `l`             |
+| Move to start of line             | `0`             |
+| Move to first non-whitespace char | `^`             |
+| Move to end of line               | `$`             |
+| Move forward by word              | `w`             |
+| Move backward by word             | `b`             |
+| Move to end of word               | `e`             |
+| Move forward by WORD              | `W`             |
+| Move backward by WORD             | `B`             |
+| Move to end of WORD               | `E`             |
+| Go to first line                  | `gg`            |
+| Go to last line                   | `G`             |
+| Go to line N                      | `N G` or `N gg` |
+
+Counts are supported for navigation commands. For example, `5j` moves down five
+lines and `3w` moves forward three words.
+
+### Editing in NORMAL mode
+
+| Action                         | Keys  |
+| ------------------------------ | ----- |
+| Delete character under cursor  | `x`   |
+| Delete to end of line          | `D`   |
+| Delete line                    | `dd`  |
+| Change to end of line          | `C`   |
+| Change line                    | `cc`  |
+| Delete forward word            | `dw`  |
+| Delete backward word           | `db`  |
+| Delete to end of word          | `de`  |
+| Delete forward WORD            | `dW`  |
+| Delete backward WORD           | `dB`  |
+| Delete to end of WORD          | `dE`  |
+| Change forward word            | `cw`  |
+| Change backward word           | `cb`  |
+| Change to end of word          | `ce`  |
+| Change forward WORD            | `cW`  |
+| Change backward WORD           | `cB`  |
+| Change to end of WORD          | `cE`  |
+| Delete to start of line        | `d0`  |
+| Delete to first non-whitespace | `d^`  |
+| Change to start of line        | `c0`  |
+| Change to first non-whitespace | `c^`  |
+| Delete from first line to here | `dgg` |
+| Delete from here to last line  | `dG`  |
+| Change from first line to here | `cgg` |
+| Change from here to last line  | `cG`  |
+| Undo last change               | `u`   |
+| Repeat last command            | `.`   |
+
+Counts are also supported for editing commands. For example, `3dd` deletes three
+lines and `2cw` changes two words.
 
 ## Limitations
 

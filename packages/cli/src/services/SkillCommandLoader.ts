@@ -41,11 +41,15 @@ export class SkillCommandLoader implements ICommandLoader {
         description: skill.description || `Activate the ${skill.name} skill`,
         kind: CommandKind.SKILL,
         autoExecute: true,
+        extensionName: skill.extensionName,
         action: async (_context, args) => ({
           type: 'tool',
           toolName: ACTIVATE_SKILL_TOOL_NAME,
           toolArgs: { name: skill.name },
-          postSubmitPrompt: args.trim().length > 0 ? args.trim() : undefined,
+          postSubmitPrompt:
+            args.trim().length > 0
+              ? args.trim()
+              : `Use the skill ${skill.name}`,
         }),
       };
     });

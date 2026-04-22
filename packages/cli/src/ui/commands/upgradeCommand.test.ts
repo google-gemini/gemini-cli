@@ -33,10 +33,13 @@ describe('upgradeCommand', () => {
     vi.clearAllMocks();
     mockContext = createMockCommandContext({
       services: {
-        config: {
-          getContentGeneratorConfig: vi.fn().mockReturnValue({
-            authType: AuthType.LOGIN_WITH_GOOGLE,
-          }),
+        agentContext: {
+          config: {
+            getContentGeneratorConfig: vi.fn().mockReturnValue({
+              authType: AuthType.LOGIN_WITH_GOOGLE,
+            }),
+            getUserTierName: vi.fn().mockReturnValue(undefined),
+          },
         },
       },
     } as unknown as CommandContext);
@@ -61,7 +64,7 @@ describe('upgradeCommand', () => {
 
   it('should return an error message when NOT logged in with Google', async () => {
     vi.mocked(
-      mockContext.services.config!.getContentGeneratorConfig,
+      mockContext.services.agentContext!.config.getContentGeneratorConfig,
     ).mockReturnValue({
       authType: AuthType.USE_GEMINI,
     });
@@ -112,6 +115,25 @@ describe('upgradeCommand', () => {
       type: 'message',
       messageType: 'info',
       content: `Please open this URL in a browser: ${UPGRADE_URL_PAGE}`,
+    });
+    expect(openBrowserSecurely).not.toHaveBeenCalled();
+  });
+
+  it('should return info message for ultra tiers', async () => {
+    vi.mocked(
+      mockContext.services.agentContext!.config.getUserTierName,
+    ).mockReturnValue('Advanced Ultra');
+
+    if (!upgradeCommand.action) {
+      throw new Error('The upgrade command must have an action.');
+    }
+
+    const result = await upgradeCommand.action(mockContext, '');
+
+    expect(result).toEqual({
+      type: 'message',
+      messageType: 'info',
+      content: 'You are already on the highest tier: Advanced Ultra.',
     });
     expect(openBrowserSecurely).not.toHaveBeenCalled();
   });

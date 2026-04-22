@@ -9,19 +9,18 @@ import { act } from 'react';
 import { renderHook } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
 import { useSlashCommandProcessor } from './slashCommandProcessor.js';
-import type { SlashCommand } from '../commands/types.js';
-import { CommandKind } from '../commands/types.js';
+import { CommandKind, type SlashCommand } from '../commands/types.js';
 import type { LoadedSettings } from '../../config/settings.js';
 import { MessageType } from '../types.js';
 import { BuiltinCommandLoader } from '../../services/BuiltinCommandLoader.js';
 import { FileCommandLoader } from '../../services/FileCommandLoader.js';
 import { McpPromptLoader } from '../../services/McpPromptLoader.js';
 import {
-  type GeminiClient,
   SlashCommandStatus,
   MCPDiscoveryState,
   makeFakeConfig,
   coreEvents,
+  type GeminiClient,
 } from '@google/gemini-cli-core';
 
 const {
@@ -188,7 +187,7 @@ describe('useSlashCommandProcessor', () => {
     let rerender!: (props?: unknown) => void;
 
     await act(async () => {
-      const hook = renderHook(() =>
+      const hook = await renderHook(() =>
         useSlashCommandProcessor(
           mockConfig,
           mockSettings,
@@ -214,7 +213,7 @@ describe('useSlashCommandProcessor', () => {
             toggleDebugProfiler: vi.fn(),
             dispatchExtensionStateUpdate: vi.fn(),
             addConfirmUpdateExtensionRequest: vi.fn(),
-            toggleBackgroundShell: vi.fn(),
+            toggleBackgroundTasks: vi.fn(),
             toggleShortcutsHelp: vi.fn(),
             setText: vi.fn(),
           },
@@ -424,7 +423,7 @@ describe('useSlashCommandProcessor', () => {
       expect(childAction).toHaveBeenCalledWith(
         expect.objectContaining({
           services: expect.objectContaining({
-            config: mockConfig,
+            agentContext: mockConfig,
           }),
           ui: expect.objectContaining({
             addItem: mockAddItem,
@@ -859,11 +858,81 @@ describe('useSlashCommandProcessor', () => {
   });
 
   describe('Lifecycle', () => {
+    it('removes the IDE status listener on unmount after async initialization', async () => {
+      let resolveIdeClient:
+        | ((client: {
+            addStatusChangeListener: (listener: () => void) => void;
+            removeStatusChangeListener: (listener: () => void) => void;
+          }) => void)
+        | undefined;
+      const addStatusChangeListener = vi.fn();
+      const removeStatusChangeListener = vi.fn();
+
+      mockIdeClientGetInstance.mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            resolveIdeClient = resolve;
+          }),
+      );
+
+      const result = await setupProcessorHook();
+
+      await act(async () => {
+        resolveIdeClient?.({
+          addStatusChangeListener,
+          removeStatusChangeListener,
+        });
+      });
+
+      result.unmount();
+      unmountHook = undefined;
+
+      expect(addStatusChangeListener).toHaveBeenCalledTimes(1);
+      expect(removeStatusChangeListener).toHaveBeenCalledTimes(1);
+      expect(removeStatusChangeListener).toHaveBeenCalledWith(
+        addStatusChangeListener.mock.calls[0]?.[0],
+      );
+    });
+
+    it('does not register an IDE status listener if unmounted before async initialization resolves', async () => {
+      let resolveIdeClient:
+        | ((client: {
+            addStatusChangeListener: (listener: () => void) => void;
+            removeStatusChangeListener: (listener: () => void) => void;
+          }) => void)
+        | undefined;
+      const addStatusChangeListener = vi.fn();
+      const removeStatusChangeListener = vi.fn();
+
+      mockIdeClientGetInstance.mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            resolveIdeClient = resolve;
+          }),
+      );
+
+      const result = await setupProcessorHook();
+
+      result.unmount();
+      unmountHook = undefined;
+
+      await act(async () => {
+        resolveIdeClient?.({
+          addStatusChangeListener,
+          removeStatusChangeListener,
+        });
+      });
+
+      expect(addStatusChangeListener).not.toHaveBeenCalled();
+      expect(removeStatusChangeListener).not.toHaveBeenCalled();
+    });
+
     it('should abort command loading when the hook unmounts', async () => {
       const abortSpy = vi.spyOn(AbortController.prototype, 'abort');
       const { unmount } = await setupProcessorHook();
 
       unmount();
+      unmountHook = undefined;
 
       expect(abortSpy).toHaveBeenCalledTimes(1);
     });

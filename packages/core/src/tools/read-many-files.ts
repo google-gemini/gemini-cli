@@ -13,12 +13,14 @@ import {
   type ToolResult,
   type PolicyUpdateOptions,
   type ToolConfirmationOutcome,
+  type ReadManyFilesResult,
+  type ExecuteOptions,
 } from './tools.js';
 import { getErrorMessage } from '../utils/errors.js';
 import * as fsPromises from 'node:fs/promises';
 import * as path from 'node:path';
 import { glob, escape } from 'glob';
-import { buildPatternArgsPattern } from '../policy/utils.js';
+import { buildParamArgsPattern } from '../policy/utils.js';
 import {
   detectFileType,
   processSingleFileContent,
@@ -36,11 +38,19 @@ import { getProgrammingLanguage } from '../telemetry/telemetry-utils.js';
 import { logFileOperation } from '../telemetry/loggers.js';
 import { FileOperationEvent } from '../telemetry/types.js';
 import { ToolErrorType } from './tool-error.js';
-import { READ_MANY_FILES_TOOL_NAME } from './tool-names.js';
+import {
+  READ_MANY_FILES_TOOL_NAME,
+  READ_MANY_FILES_DISPLAY_NAME,
+} from './tool-names.js';
 import { READ_MANY_FILES_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
 
 import { REFERENCE_CONTENT_END } from '../utils/constants.js';
+import {
+  discoverJitContext,
+  JIT_CONTEXT_PREFIX,
+  JIT_CONTEXT_SUFFIX,
+} from './jit-context.js';
 
 /**
  * Parameters for the ReadManyFilesTool.
@@ -127,9 +137,9 @@ class ReadManyFilesToolInvocation extends BaseToolInvocation<
   }
 
   getDescription(): string {
-    const pathDesc = `using patterns: 
+    const pathDesc = `using patterns:
 ${this.params.include.join('`, `')}
- (within target directory: 
+ (within target directory:
 ${this.config.getTargetDir()}
 ) `;
 
@@ -143,7 +153,7 @@ ${this.config.getTargetDir()}
 
     const excludeDesc = `Excluding: ${
       finalExclusionPatternsForDescription.length > 0
-        ? `patterns like 
+        ? `patterns like
 ${finalExclusionPatternsForDescription
   .slice(0, 2)
   .join(
@@ -161,14 +171,12 @@ ${finalExclusionPatternsForDescription
   override getPolicyUpdateOptions(
     _outcome: ToolConfirmationOutcome,
   ): PolicyUpdateOptions | undefined {
-    // We join the include patterns to match the JSON stringified arguments.
-    // buildPatternArgsPattern handles JSON stringification.
     return {
-      argsPattern: buildPatternArgsPattern(JSON.stringify(this.params.include)),
+      argsPattern: buildParamArgsPattern('include', this.params.include),
     };
   }
 
-  async execute(signal: AbortSignal): Promise<ToolResult> {
+  async execute({ abortSignal: signal }: ExecuteOptions): Promise<ToolResult> {
     const { include, exclude = [], useDefaultExcludes = true } = this.params;
 
     const filesToConsider = new Set<string>();
@@ -266,7 +274,7 @@ ${finalExclusionPatternsForDescription
       const errorMessage = `Error during file search: ${getErrorMessage(error)}`;
       return {
         llmContent: errorMessage,
-        returnDisplay: `## File Search Error\n\nAn error occurred while searching for files:\n\`\`\`\n${getErrorMessage(error)}\n\`\`\``,
+        returnDisplay: `Error: ${getErrorMessage(error)}`,
         error: {
           message: errorMessage,
           type: ToolErrorType.READ_MANY_FILES_SEARCH_ERROR,
@@ -413,6 +421,25 @@ ${finalExclusionPatternsForDescription
       }
     }
 
+    // Discover JIT subdirectory context for all unique directories of processed files.
+    // Run sequentially so each call sees paths marked as loaded by the previous
+    // one, preventing shared parent GEMINI.md files from being injected twice.
+    const uniqueDirs = new Set(
+      Array.from(filesToConsider).map((f) => path.dirname(f)),
+    );
+    const jitParts: string[] = [];
+    for (const dir of uniqueDirs) {
+      const ctx = await discoverJitContext(this.config, dir);
+      if (ctx) {
+        jitParts.push(ctx);
+      }
+    }
+    if (jitParts.length > 0) {
+      contentParts.push(
+        `${JIT_CONTEXT_PREFIX}${jitParts.join('\n')}${JIT_CONTEXT_SUFFIX}`,
+      );
+    }
+
     let displayMessage = `### ReadManyFiles Result (Target Dir: \`${this.config.getTargetDir()}\`)\n\n`;
     if (processedFilesRelativePaths.length > 0) {
       displayMessage += `Successfully read and concatenated content from **${processedFilesRelativePaths.length} file(s)**.\n`;
@@ -461,9 +488,19 @@ ${finalExclusionPatternsForDescription
         'No files matching the criteria were found or all were skipped.',
       );
     }
+
+    const returnDisplay: ReadManyFilesResult = {
+      summary: displayMessage.trim(),
+      files: processedFilesRelativePaths,
+      skipped: skippedFiles,
+      include: this.params.include,
+      excludes: effectiveExcludes,
+      targetDir: this.config.getTargetDir(),
+    };
+
     return {
       llmContent: contentParts,
-      returnDisplay: displayMessage.trim(),
+      returnDisplay,
     };
   }
 }
@@ -485,7 +522,7 @@ export class ReadManyFilesTool extends BaseDeclarativeTool<
   ) {
     super(
       ReadManyFilesTool.Name,
-      'ReadManyFiles',
+      READ_MANY_FILES_DISPLAY_NAME,
       READ_MANY_FILES_DEFINITION.base.description!,
       Kind.Read,
       READ_MANY_FILES_DEFINITION.base.parametersJsonSchema,

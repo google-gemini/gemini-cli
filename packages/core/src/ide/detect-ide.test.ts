@@ -140,6 +140,21 @@ describe('detectIde', () => {
     expect(detectIde(ideProcessInfo)).toBe(IDE_DEFINITIONS.antigravity);
   });
 
+  it('should detect Zed via ZED_SESSION_ID', () => {
+    vi.stubEnv('ZED_SESSION_ID', 'test-session-id');
+    expect(detectIde(ideProcessInfo)).toBe(IDE_DEFINITIONS.zed);
+  });
+
+  it('should detect Zed via TERM_PROGRAM', () => {
+    vi.stubEnv('TERM_PROGRAM', 'Zed');
+    expect(detectIde(ideProcessInfo)).toBe(IDE_DEFINITIONS.zed);
+  });
+
+  it('should detect XCode via XCODE_VERSION_ACTUAL', () => {
+    vi.stubEnv('XCODE_VERSION_ACTUAL', '1500');
+    expect(detectIde(ideProcessInfo)).toBe(IDE_DEFINITIONS.xcode);
+  });
+
   it('should detect JetBrains IDE via TERMINAL_EMULATOR', () => {
     vi.stubEnv('TERMINAL_EMULATOR', 'JetBrains-JediTerm');
     expect(detectIde(ideProcessInfo)).toBe(IDE_DEFINITIONS.jetbrains);

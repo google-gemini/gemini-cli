@@ -11,7 +11,6 @@ import os from 'node:os';
 import * as Diff from 'diff';
 import { WRITE_FILE_TOOL_NAME, WRITE_FILE_DISPLAY_NAME } from './tool-names.js';
 import type { Config } from '../config/config.js';
-import { ApprovalMode } from '../policy/types.js';
 
 import {
   BaseDeclarativeTool,
@@ -25,6 +24,7 @@ import {
   type ToolResult,
   type ToolConfirmationOutcome,
   type PolicyUpdateOptions,
+  type ExecuteOptions,
 } from './tools.js';
 import { buildFilePathArgsPattern } from '../policy/utils.js';
 import { ToolErrorType } from './tool-error.js';
@@ -49,7 +49,9 @@ import { debugLogger } from '../utils/debugLogger.js';
 import { WRITE_FILE_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
 import { detectOmissionPlaceholders } from './omissionPlaceholderDetector.js';
+import { resolveAndValidatePlanPath } from '../utils/planUtils.js';
 import { isGemini3Model } from '../config/models.js';
+import { discoverJitContext, appendJitContext } from './jit-context.js';
 
 /**
  * Parameters for the WriteFile tool
@@ -155,11 +157,38 @@ class WriteFileToolInvocation extends BaseToolInvocation<
     toolName?: string,
     displayName?: string,
   ) {
-    super(params, messageBus, toolName, displayName);
-    this.resolvedPath = path.resolve(
-      this.config.getTargetDir(),
-      this.params.file_path,
+    super(
+      params,
+      messageBus,
+      toolName,
+      displayName,
+      undefined,
+      undefined,
+      true,
+      () => this.config.getApprovalMode(),
     );
+
+    if (this.config.isPlanMode()) {
+      try {
+        this.resolvedPath = resolveAndValidatePlanPath(
+          this.params.file_path,
+          this.config.storage.getPlansDir(),
+          this.config.getProjectRoot(),
+        );
+      } catch (e) {
+        debugLogger.error(
+          'Failed to resolve plan path during WriteFileTool invocation setup',
+          e,
+        );
+        // Validation fails, set resolvedPath to something that will fail validation downstream or just the raw path.
+        this.resolvedPath = this.params.file_path;
+      }
+    } else {
+      this.resolvedPath = path.resolve(
+        this.config.getTargetDir(),
+        this.params.file_path,
+      );
+    }
   }
 
   override toolLocations(): ToolLocation[] {
@@ -185,10 +214,6 @@ class WriteFileToolInvocation extends BaseToolInvocation<
   protected override async getConfirmationDetails(
     abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
-    if (this.config.getApprovalMode() === ApprovalMode.AUTO_EDIT) {
-      return false;
-    }
-
     const correctedContentResult = await getCorrectedFileContent(
       this.config,
       this.resolvedPath,
@@ -247,7 +272,9 @@ class WriteFileToolInvocation extends BaseToolInvocation<
     return confirmationDetails;
   }
 
-  async execute(abortSignal: AbortSignal): Promise<ToolResult> {
+  async execute({
+    abortSignal: abortSignal,
+  }: ExecuteOptions): Promise<ToolResult> {
     const validationError = this.config.validatePathAccess(this.resolvedPath);
     if (validationError) {
       return {
@@ -391,8 +418,18 @@ class WriteFileToolInvocation extends BaseToolInvocation<
         isNewFile,
       };
 
+      // Discover JIT subdirectory context for the written file path
+      const jitContext = await discoverJitContext(
+        this.config,
+        this.resolvedPath,
+      );
+      let llmContent = llmSuccessMessageParts.join(' ');
+      if (jitContext) {
+        llmContent = appendJitContext(llmContent, jitContext);
+      }
+
       return {
-        llmContent: llmSuccessMessageParts.join(' '),
+        llmContent,
         returnDisplay: displayResult,
       };
     } catch (error) {
@@ -472,7 +509,20 @@ export class WriteFileTool
       return `Missing or empty "file_path"`;
     }
 
-    const resolvedPath = path.resolve(this.config.getTargetDir(), filePath);
+    let resolvedPath: string;
+    if (this.config.isPlanMode()) {
+      try {
+        resolvedPath = resolveAndValidatePlanPath(
+          filePath,
+          this.config.storage.getPlansDir(),
+          this.config.getProjectRoot(),
+        );
+      } catch (err) {
+        return err instanceof Error ? err.message : String(err);
+      }
+    } else {
+      resolvedPath = path.resolve(this.config.getTargetDir(), filePath);
+    }
 
     const validationError = this.config.validatePathAccess(resolvedPath);
     if (validationError) {

@@ -10,6 +10,8 @@ import { AtomOneDark } from './builtin/dark/atom-one-dark.js';
 import { Dracula } from './builtin/dark/dracula-dark.js';
 import { GitHubDark } from './builtin/dark/github-dark.js';
 import { GitHubLight } from './builtin/light/github-light.js';
+import { GitHubDarkColorblind } from './builtin/dark/github-dark-colorblind.js';
+import { GitHubLightColorblind } from './builtin/light/github-light-colorblind.js';
 import { GoogleCode } from './builtin/light/googlecode-light.js';
 import { Holiday } from './builtin/dark/holiday-dark.js';
 import { DefaultLight } from './builtin/light/default-light.js';
@@ -18,10 +20,10 @@ import { ShadesOfPurple } from './builtin/dark/shades-of-purple-dark.js';
 import { SolarizedDark } from './builtin/dark/solarized-dark.js';
 import { SolarizedLight } from './builtin/light/solarized-light.js';
 import { XCode } from './builtin/light/xcode-light.js';
+import { TokyoNight } from './builtin/dark/tokyonight-dark.js';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { Theme, ThemeType, ColorsTheme } from './theme.js';
-import type { CustomTheme } from '@google/gemini-cli-core';
+import type { Theme, ThemeType, ColorsTheme, CustomTheme } from './theme.js';
 import {
   createCustomTheme,
   validateCustomTheme,
@@ -79,12 +81,15 @@ class ThemeManager {
       DefaultDark,
       GitHubDark,
       GitHubLight,
+      GitHubDarkColorblind,
+      GitHubLightColorblind,
       GoogleCode,
       Holiday,
       ShadesOfPurple,
       SolarizedDark,
       SolarizedLight,
       XCode,
+      TokyoNight,
       ANSI,
       ANSILight,
     ];
@@ -175,11 +180,6 @@ class ThemeManager {
       return;
     }
 
-    debugLogger.log(
-      `Registering extension themes for "${extensionName}":`,
-      customThemes,
-    );
-
     for (const customThemeConfig of customThemes) {
       const namespacedName = `${customThemeConfig.name} (${extensionName})`;
 
@@ -239,6 +239,17 @@ class ThemeManager {
       this.extensionThemes.delete(namespacedName);
       debugLogger.log(`Unregistered theme: ${namespacedName}`);
     }
+  }
+
+  /**
+   * Checks if themes for a given extension are already registered.
+   * @param extensionName The name of the extension.
+   * @returns True if any themes from the extension are registered.
+   */
+  hasExtensionThemes(extensionName: string): boolean {
+    return Array.from(this.extensionThemes.keys()).some((name) =>
+      name.endsWith(`(${extensionName})`),
+    );
   }
 
   /**

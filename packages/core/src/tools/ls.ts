@@ -15,16 +15,18 @@ import {
   type ToolResult,
   type PolicyUpdateOptions,
   type ToolConfirmationOutcome,
+  type ExecuteOptions,
 } from './tools.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import type { Config } from '../config/config.js';
 import { DEFAULT_FILE_FILTERING_OPTIONS } from '../config/constants.js';
 import { ToolErrorType } from './tool-error.js';
-import { LS_TOOL_NAME } from './tool-names.js';
-import { buildFilePathArgsPattern } from '../policy/utils.js';
+import { LS_TOOL_NAME, LS_DISPLAY_NAME } from './tool-names.js';
+import { buildDirPathArgsPattern } from '../policy/utils.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { LS_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
+import { discoverJitContext, appendJitContext } from './jit-context.js';
 
 /**
  * Parameters for the LS tool
@@ -130,7 +132,7 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
     _outcome: ToolConfirmationOutcome,
   ): PolicyUpdateOptions | undefined {
     return {
-      argsPattern: buildFilePathArgsPattern(this.params.dir_path),
+      argsPattern: buildDirPathArgsPattern(this.params.dir_path),
     };
   }
 
@@ -142,7 +144,6 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
   ): ToolResult {
     return {
       llmContent,
-      // Keep returnDisplay simpler in core logic
       returnDisplay: `Error: ${returnDisplay}`,
       error: {
         message: llmContent,
@@ -155,7 +156,7 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
    * Executes the LS operation with the given parameters
    * @returns Result of the LS operation
    */
-  async execute(_signal: AbortSignal): Promise<ToolResult> {
+  async execute({ abortSignal: _signal }: ExecuteOptions): Promise<ToolResult> {
     const resolvedDirPath = path.resolve(
       this.config.getTargetDir(),
       this.params.dir_path,
@@ -270,14 +271,25 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
         resultMessage += `\n\n(${ignoredCount} ignored)`;
       }
 
-      let displayMessage = `Listed ${entries.length} item(s).`;
+      // Discover JIT subdirectory context for the listed directory
+      const jitContext = await discoverJitContext(this.config, resolvedDirPath);
+      if (jitContext) {
+        resultMessage = appendJitContext(resultMessage, jitContext);
+      }
+
+      let displayMessage = `Found ${entries.length} item(s).`;
       if (ignoredCount > 0) {
         displayMessage += ` (${ignoredCount} ignored)`;
       }
 
       return {
         llmContent: resultMessage,
-        returnDisplay: displayMessage,
+        returnDisplay: {
+          summary: displayMessage,
+          files: entries.map(
+            (entry) => `${entry.isDirectory ? '[DIR] ' : ''}${entry.name}`,
+          ),
+        },
       };
     } catch (error) {
       const errorMsg = `Error listing directory: ${error instanceof Error ? error.message : String(error)}`;
@@ -302,7 +314,7 @@ export class LSTool extends BaseDeclarativeTool<LSToolParams, ToolResult> {
   ) {
     super(
       LSTool.Name,
-      'ReadFolder',
+      LS_DISPLAY_NAME,
       LS_DEFINITION.base.description!,
       Kind.Search,
       LS_DEFINITION.base.parametersJsonSchema,
