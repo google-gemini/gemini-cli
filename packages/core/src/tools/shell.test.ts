@@ -435,7 +435,7 @@ describe('ShellTool', () => {
       expect(result.backgroundedStreamId).toBeUndefined();
     });
 
-    it('sets backgroundedStreamId when is_background and stream_output are both true', async () => {
+    it('sets backgroundedStreamId when is_background and stream_output are both true (early-return path)', async () => {
       vi.useFakeTimers();
       // Simulate a real long-running process: background() does NOT resolve
       // the execution promise, so the shell tool takes the early-return path.
@@ -454,6 +454,29 @@ describe('ShellTool', () => {
       expect(result.backgroundedStreamId).toBe(12345);
       expect(result.returnDisplay).toBe(
         'Background process started with PID 12345.',
+      );
+    });
+
+    it('sets backgroundedStreamId on the fall-through path (real production pattern)', async () => {
+      // In the real ShellExecutionService, background() resolves the result
+      // promise (backgrounded: true) inside the BACKGROUND_DELAY_MS window,
+      // so `completed` becomes true before the early-return check. The tool
+      // then falls through to `await resultPromise` and must still set
+      // backgroundedStreamId there.
+      vi.useFakeTimers();
+
+      const invocation = shellTool.build({
+        command: 'sleep 10',
+        is_background: true,
+        stream_output: true,
+      });
+      const promise = invocation.execute({ abortSignal: mockAbortSignal });
+      await vi.advanceTimersByTimeAsync(250);
+
+      const result = await promise;
+      expect(result.backgroundedStreamId).toBe(12345);
+      expect(result.returnDisplay).toBe(
+        'Command moved to background (PID: 12345). Output hidden. Press Ctrl+B to view.',
       );
     });
 

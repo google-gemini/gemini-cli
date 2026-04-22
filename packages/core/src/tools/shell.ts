@@ -708,6 +708,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
 
       const result = await resultPromise;
 
+      let backgroundedStreamId: number | undefined;
       const backgroundPIDs: number[] = [];
       if (os.platform() !== 'win32') {
         let tempFileExists = false;
@@ -773,6 +774,9 @@ export class ShellToolInvocation extends BaseToolInvocation<
           command: this.params.command,
           initialOutput: result.output,
         };
+        if (this.params.stream_output && result.pid !== undefined) {
+          backgroundedStreamId = result.pid;
+        }
       } else {
         // Create a formatted error string for display, replacing the wrapper command
         // with the user-facing command.
@@ -1006,6 +1010,9 @@ export class ShellToolInvocation extends BaseToolInvocation<
         return {
           llmContent: summary,
           returnDisplay,
+          ...(backgroundedStreamId !== undefined
+            ? { backgroundedStreamId }
+            : {}),
           ...executionError,
         };
       }
@@ -1014,6 +1021,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
         llmContent,
         returnDisplay,
         data,
+        ...(backgroundedStreamId !== undefined ? { backgroundedStreamId } : {}),
         ...executionError,
       };
     } finally {
