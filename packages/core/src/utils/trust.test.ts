@@ -45,6 +45,7 @@ describe('Trust Utility (Core)', () => {
     vi.mocked(headless.isHeadlessMode).mockReturnValue(false);
     ideContextStore.clear();
     resetTrustedFoldersForTesting();
+    delete process.env['GEMINI_TRUST_WORKSPACE'];
   });
 
   afterEach(() => {

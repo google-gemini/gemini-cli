@@ -58,6 +58,7 @@ describe('Trusted Folders', () => {
     // Reset the internal state
     resetTrustedFoldersForTesting();
     vi.clearAllMocks();
+    delete process.env['GEMINI_TRUST_WORKSPACE'];
   });
 
   afterEach(() => {
