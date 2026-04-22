@@ -1169,6 +1169,85 @@ describe('Session', () => {
     expect(progressUpdates[0].toolCallId).toBe(terminalUpdate.toolCallId);
   });
 
+  it('holds the tool call in in_progress when the tool returns backgroundedStreamId', async () => {
+    const { ExecutionLifecycleService } = await import(
+      '@google/gemini-cli-core'
+    );
+    mockTool.build.mockReturnValue({
+      getDescription: () => 'Test Tool',
+      toolLocations: () => [],
+      shouldConfirmExecute: vi.fn().mockResolvedValue(null),
+      execute: vi.fn().mockResolvedValue({
+        llmContent: 'Command is running in background. PID: 54321.',
+        returnDisplay: 'Background process started with PID 54321.',
+        backgroundedStreamId: 54321,
+      }),
+    });
+
+    const stream1 = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: { functionCalls: [{ name: 'test_tool', args: {} }] },
+      },
+    ]);
+    const stream2 = createMockStream([
+      { type: StreamEventType.CHUNK, value: { candidates: [] } },
+    ]);
+    mockChat.sendMessageStream
+      .mockResolvedValueOnce(stream1)
+      .mockResolvedValueOnce(stream2);
+
+    await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Run it' }],
+    });
+
+    const toolCallUpdates = mockConnection.sessionUpdate.mock.calls
+      .map((c) => c[0]?.update)
+      .filter((u) => u?.sessionUpdate === 'tool_call_update');
+
+    // With backgroundedStreamId set, only an in_progress update is emitted
+    // during the prompt turn — no completed/failed yet.
+    expect(toolCallUpdates).toHaveLength(1);
+    expect(toolCallUpdates[0]).toMatchObject({
+      status: 'in_progress',
+    });
+
+    // Now simulate the background process actually exiting.
+    const completedCalls = vi.fn();
+    mockConnection.sessionUpdate.mockImplementation(async (params) => {
+      if (params.update?.sessionUpdate === 'tool_call_update') {
+        completedCalls(params.update);
+      }
+    });
+    // Fire a completion for the matching streamId.
+    const listeners = (
+      ExecutionLifecycleService as unknown as {
+        backgroundCompletionListeners: Set<(info: unknown) => void>;
+      }
+    ).backgroundCompletionListeners;
+    for (const listener of listeners) {
+      listener({
+        executionId: 54321,
+        executionMethod: 'child_process',
+        output: '',
+        error: null,
+        injectionText: null,
+        completionBehavior: 'silent',
+      });
+    }
+    // Allow any scheduled microtasks from sendUpdate to resolve.
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(completedCalls).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionUpdate: 'tool_call_update',
+        status: 'completed',
+        toolCallId: toolCallUpdates[0].toolCallId,
+      }),
+    );
+  });
+
   it('does not emit tool_call_update when updateOutput is called with empty or non-string values', async () => {
     const executeMock = vi.fn(async ({ updateOutput }) => {
       updateOutput?.('');

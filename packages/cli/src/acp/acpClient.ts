@@ -52,6 +52,8 @@ import {
   InvalidStreamError,
   type AgentLoopContext,
   updatePolicy,
+  ExecutionLifecycleService,
+  type BackgroundCompletionInfo,
 } from '@google/gemini-cli-core';
 import * as acp from '@agentclientprotocol/sdk';
 import { AcpFileSystemService } from './fileSystemService.js';
@@ -1157,15 +1159,72 @@ export class Session {
 
       const updateContent: acp.ToolCallContent[] = content ? [content] : [];
 
-      await this.sendUpdate({
-        sessionUpdate: 'tool_call_update',
-        toolCallId: callId,
-        status: 'completed',
-        title: displayTitle,
-        content: updateContent,
-        locations: invocation.toolLocations(),
-        kind: toAcpToolKind(tool.kind),
-      });
+      if (toolResult.backgroundedStreamId !== undefined) {
+        // The tool handed off to a long-running background stream. Hold the
+        // ACP tool call in `in_progress` so subsequent stdout lines can still
+        // be forwarded as `tool_call_update`s; emit the terminal `completed`
+        // only when the process actually exits or the turn is aborted
+        // (whichever happens first).
+        await this.sendUpdate({
+          sessionUpdate: 'tool_call_update',
+          toolCallId: callId,
+          status: 'in_progress',
+          title: displayTitle,
+          content: updateContent,
+          locations: invocation.toolLocations(),
+          kind: toAcpToolKind(tool.kind),
+        });
+
+        const streamId = toolResult.backgroundedStreamId;
+        let terminalEmitted = false;
+        let completionListener:
+          | ((info: BackgroundCompletionInfo) => void)
+          | null = null;
+        let abortHandler: (() => void) | null = null;
+
+        const emitTerminal = (failed: boolean) => {
+          if (terminalEmitted) return;
+          terminalEmitted = true;
+          if (completionListener) {
+            ExecutionLifecycleService.offBackgroundComplete(completionListener);
+          }
+          if (abortHandler) {
+            abortSignal.removeEventListener('abort', abortHandler);
+          }
+          void this.sendUpdate({
+            sessionUpdate: 'tool_call_update',
+            toolCallId: callId,
+            status: failed ? 'failed' : 'completed',
+            title: displayTitle,
+            content: updateContent,
+            locations: invocation.toolLocations(),
+            kind: toAcpToolKind(tool.kind),
+          });
+        };
+
+        completionListener = (info: BackgroundCompletionInfo) => {
+          if (info.executionId !== streamId) return;
+          emitTerminal(info.error !== null);
+        };
+        abortHandler = () => emitTerminal(false);
+
+        ExecutionLifecycleService.onBackgroundComplete(completionListener);
+        if (abortSignal.aborted) {
+          emitTerminal(false);
+        } else {
+          abortSignal.addEventListener('abort', abortHandler, { once: true });
+        }
+      } else {
+        await this.sendUpdate({
+          sessionUpdate: 'tool_call_update',
+          toolCallId: callId,
+          status: 'completed',
+          title: displayTitle,
+          content: updateContent,
+          locations: invocation.toolLocations(),
+          kind: toAcpToolKind(tool.kind),
+        });
+      }
 
       const durationMs = Date.now() - startTime;
       logToolCall(
