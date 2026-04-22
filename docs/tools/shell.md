@@ -125,8 +125,7 @@ run_shell_command({
 Behavior:
 
 - Lines are coalesced on a 200 ms batch window to avoid flooding the client on
-  bursty output. The batch is force-flushed on turn abort and when the process
-  exits.
+  bursty output. The batch is force-flushed when the process exits.
 - The existing `read_background_output` tool continues to return the full output
   from disk for the same `pid` — the live stream is a parallel observer and
   never consumes or interferes with the disk log.
@@ -134,10 +133,16 @@ Behavior:
   until the process exits, at which point the trailing fragment is flushed).
   Individual lines are capped at 64 KiB; the remainder of an over-sized line is
   discarded up to the next newline.
-- The stream is tied to the current turn. When the turn ends the live forwarding
-  stops; the process itself continues running and remains reachable via
-  `read_background_output`, `list_background_processes`, and
-  `kill_background_process`.
+- **The stream outlives the spawning turn.** When the user sends a new prompt
+  (or the previous turn ends), the stream stays subscribed and keeps emitting
+  `tool_call_update(in_progress)` events against the original `toolCallId`.
+  Terminal status (`completed` / `failed`) fires only when the real process
+  exits. Clients that display tool cards inline typically keep the original card
+  visible and update it live.
+- Each streamed event carries `_meta: { 'gemini-cli/stream_output': true, pid }`
+  on the `tool_call_update`. Sidecar tooling can filter on this marker to
+  distinguish background-stream events from other kinds of incremental tool-call
+  updates (binary-detection notices, periodic throttled progress, etc.).
 - Only `stdout` in plain-text (non-PTY) mode is forwarded. Interactive PTY
   output with ANSI styling is skipped by the line buffer; pipe through
   `grep --line-buffered` / `sed -u` to force line-based plain text if needed.
@@ -145,14 +150,29 @@ Behavior:
 Common use cases:
 
 - **File watchers** — `fswatch /inbox | grep NEW:` emitting per-event lines the
-  agent reacts to immediately.
+  agent reacts to immediately, even across turn boundaries (file arrives while
+  the user is mid-conversation about something else).
 - **CI / deploys** — tailing `gh run watch` or a log file to trigger follow-up
   actions on failure markers.
 - **Long jobs** — training runs, migrations, or imports that periodically log
   progress.
 
-Note that reacting to events while the agent is idle (no user prompt in flight)
-is tracked as a follow-up; PR 1 scopes the stream to the active turn.
+### Reacting automatically while the agent is idle
+
+ACP is client-driven: agents cannot unilaterally initiate a new prompt turn. So
+while streamed events _arrive_ on the wire between turns, making the model
+_react_ to them still requires a new `session/prompt` from the client side.
+
+The recommended pattern is a small sidecar that sits between the ACP client
+(e.g. Zed) and `gemini-cli`: it observes the wire, filters for
+`tool_call_update._meta['gemini-cli/stream_output']`, buffers events in a FIFO
+queue while the agent is busy, and flushes them as a consolidated
+`session/prompt` ("while you were busy these events arrived, in order: ...")
+once the current turn ends. This matches the Claude Code Monitor pattern and
+keeps `gemini-cli` itself protocol-pure — no upstream ACP extension is required.
+
+See `scripts/acp-wiretap.js` in the repo for a minimal stdio wiretap that can be
+adapted into such a sidecar.
 
 ## Important notes
 
