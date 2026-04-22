@@ -8,7 +8,7 @@ import { renderWithProviders } from '../../../test-utils/render.js';
 import { HalfLinePaddedBox } from './HalfLinePaddedBox.js';
 import { Text, useIsScreenReaderEnabled } from 'ink';
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { isITerm2 } from '../../utils/terminalUtils.js';
+import { isITerm2, isAppleTerminal } from '../../utils/terminalUtils.js';
 
 vi.mock('ink', async () => {
   const actual = await vi.importActual('ink');
@@ -25,34 +25,55 @@ describe('<HalfLinePaddedBox />', () => {
     vi.restoreAllMocks();
   });
 
-  it('renders standard background and blocks when not iTerm2', async () => {
+  it('renders standard background and blocks when not iTerm2 or Apple Terminal', async () => {
     vi.mocked(isITerm2).mockReturnValue(false);
+    vi.mocked(isAppleTerminal).mockReturnValue(false);
 
-    const { lastFrame, unmount } = await renderWithProviders(
+    const renderResult = await renderWithProviders(
       <HalfLinePaddedBox backgroundBaseColor="blue" backgroundOpacity={0.5}>
         <Text>Content</Text>
       </HalfLinePaddedBox>,
       { width: 10 },
     );
 
-    expect(lastFrame()).toMatchSnapshot();
+    await renderResult.waitUntilReady();
+    await expect(renderResult).toMatchSvgSnapshot();
 
-    unmount();
+    renderResult.unmount();
   });
 
   it('renders iTerm2-specific blocks when iTerm2 is detected', async () => {
     vi.mocked(isITerm2).mockReturnValue(true);
+    vi.mocked(isAppleTerminal).mockReturnValue(false);
 
-    const { lastFrame, unmount } = await renderWithProviders(
+    const renderResult = await renderWithProviders(
       <HalfLinePaddedBox backgroundBaseColor="blue" backgroundOpacity={0.5}>
         <Text>Content</Text>
       </HalfLinePaddedBox>,
       { width: 10 },
     );
 
-    expect(lastFrame()).toMatchSnapshot();
+    await renderResult.waitUntilReady();
+    await expect(renderResult).toMatchSvgSnapshot();
 
-    unmount();
+    renderResult.unmount();
+  });
+
+  it('renders Apple Terminal-specific blocks when Apple Terminal is detected', async () => {
+    vi.mocked(isITerm2).mockReturnValue(false);
+    vi.mocked(isAppleTerminal).mockReturnValue(true);
+
+    const renderResult = await renderWithProviders(
+      <HalfLinePaddedBox backgroundBaseColor="blue" backgroundOpacity={0.5}>
+        <Text>Content</Text>
+      </HalfLinePaddedBox>,
+      { width: 10 },
+    );
+
+    await renderResult.waitUntilReady();
+    await expect(renderResult).toMatchSvgSnapshot();
+
+    renderResult.unmount();
   });
 
   it('renders nothing when useBackgroundColor is false', async () => {

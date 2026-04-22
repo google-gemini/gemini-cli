@@ -74,6 +74,7 @@ vi.mock('../ui/utils/terminalUtils.js', () => ({
   isLowColorDepth: vi.fn(() => false),
   getColorDepth: vi.fn(() => 24),
   isITerm2: vi.fn(() => false),
+  isAppleTerminal: vi.fn(() => false),
 }));
 
 type TerminalState = {
