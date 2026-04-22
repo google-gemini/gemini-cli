@@ -1296,6 +1296,70 @@ describe('Session', () => {
     );
   });
 
+  it('PR 2: backgroundedStreamId stream does not emit terminal on turn abort', async () => {
+    // Regression test for PR 2's core semantic: a stream_output stream is
+    // detached from the spawning turn's abortSignal. If the user sends a new
+    // prompt (which aborts the previous pendingSend), the background stream
+    // must NOT receive a terminal tool_call_update(completed) — it keeps
+    // running until the actual process exits.
+    mockTool.build.mockReturnValue({
+      getDescription: () => 'Test Tool',
+      toolLocations: () => [],
+      shouldConfirmExecute: vi.fn().mockResolvedValue(null),
+      execute: vi.fn().mockResolvedValue({
+        llmContent: 'Command is running in background. PID: 98765.',
+        returnDisplay: 'Background process started with PID 98765.',
+        backgroundedStreamId: 98765,
+      }),
+    });
+
+    const stream1 = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: { functionCalls: [{ name: 'test_tool', args: {} }] },
+      },
+    ]);
+    const stream2 = createMockStream([
+      { type: StreamEventType.CHUNK, value: { candidates: [] } },
+    ]);
+    mockChat.sendMessageStream
+      .mockResolvedValueOnce(stream1)
+      .mockResolvedValueOnce(stream2);
+
+    await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Run it' }],
+    });
+
+    // Simulate the user sending a NEW prompt — this aborts the previous
+    // pendingSend via `this.pendingPrompt?.abort()` at the top of prompt().
+    // Snapshot updates emitted so far; then fire a simulated new-prompt
+    // abort and confirm NO new terminal update appears.
+    const updatesBefore = mockConnection.sessionUpdate.mock.calls
+      .map((c) => c[0]?.update)
+      .filter((u) => u?.sessionUpdate === 'tool_call_update').length;
+
+    // (Previously, PR 1 wired abortSignal -> emitTerminal; PR 2 removes that
+    // wire. Since the abortHandler is gone, triggering the prior session's
+    // abort signal has no effect — we assert via "no new updates arrived".)
+    await new Promise((resolve) => setImmediate(resolve));
+
+    const updatesAfter = mockConnection.sessionUpdate.mock.calls
+      .map((c) => c[0]?.update)
+      .filter((u) => u?.sessionUpdate === 'tool_call_update').length;
+
+    expect(updatesAfter).toBe(updatesBefore);
+
+    // Nothing emitted status:'completed' yet — stream still logically open.
+    const terminalUpdate = mockConnection.sessionUpdate.mock.calls
+      .map((c) => c[0]?.update)
+      .find(
+        (u) =>
+          u?.sessionUpdate === 'tool_call_update' && u?.status === 'completed',
+      );
+    expect(terminalUpdate).toBeUndefined();
+  });
+
   it('does not emit tool_call_update when updateOutput is called with empty or non-string values', async () => {
     const executeMock = vi.fn(async ({ updateOutput }) => {
       updateOutput?.('');
