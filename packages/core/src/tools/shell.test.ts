@@ -210,7 +210,7 @@ describe('ShellTool', () => {
         mockShellOutputCallback = callback;
         const match = cmd.match(/pgrep -g 0 >([^ ]+)/);
         if (match) {
-          extractedTmpFile = match[1].replace(/['"]/g, ''); 
+          extractedTmpFile = match[1].replace(/['"]/g, '');
         }
         return {
           pid: 12345,
