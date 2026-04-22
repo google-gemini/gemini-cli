@@ -52,7 +52,7 @@ export class GitIgnoreParser implements GitIgnoreFilter {
           .split(path.sep)
           .join(path.posix.sep);
 
-    const rawPatterns = content.split('\n');
+    const rawPatterns = content.split(/\r\n|\n|\r/);
     return ignore().add(this.processPatterns(rawPatterns, relativeBaseDir));
   }
 
