@@ -5,7 +5,14 @@
  */
 
 import type React from 'react';
-import { useCallback, useEffect, useState, useRef, useMemo } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useState,
+  useRef,
+  useMemo,
+  Fragment,
+} from 'react';
 import clipboardy from 'clipboardy';
 import { Box, Text, useStdout, type DOMElement } from 'ink';
 import { SuggestionsDisplay, MAX_WIDTH } from './SuggestionsDisplay.js';
@@ -70,6 +77,7 @@ import { getSafeLowColorBackground } from '../themes/color-utils.js';
 import { isLowColorDepth } from '../utils/terminalUtils.js';
 import { useShellFocusState } from '../contexts/ShellFocusContext.js';
 import { useUIState } from '../contexts/UIStateContext.js';
+import { useInputState } from '../contexts/InputContext.js';
 import {
   appEvents,
   AppEvent,
@@ -104,18 +112,13 @@ export type ScrollableItem =
   | { type: 'ghostLine'; ghostLine: string; index: number };
 
 export interface InputPromptProps {
-  buffer: TextBuffer;
   onSubmit: (value: string) => void;
-  userMessages: readonly string[];
   onClearScreen: () => void;
   config: Config;
   slashCommands: readonly SlashCommand[];
   commandContext: CommandContext;
   placeholder?: string;
   focus?: boolean;
-  inputWidth: number;
-  suggestionsWidth: number;
-  shellModeActive: boolean;
   setShellModeActive: (value: boolean) => void;
   approvalMode: ApprovalMode;
   onEscapePromptChange?: (showPrompt: boolean) => void;
@@ -128,7 +131,6 @@ export interface InputPromptProps {
   onQueueMessage?: (message: string) => void;
   suggestionsPosition?: 'above' | 'below';
   setBannerVisible: (visible: boolean) => void;
-  copyModeEnabled?: boolean;
 }
 
 // The input content, input container, and input suggestions list may have different widths
@@ -199,18 +201,13 @@ export function tryTogglePasteExpansion(buffer: TextBuffer): boolean {
 }
 
 export const InputPrompt: React.FC<InputPromptProps> = ({
-  buffer,
   onSubmit,
-  userMessages,
   onClearScreen,
   config,
   slashCommands,
   commandContext,
   placeholder = '  Type your message or @path/to/file',
   focus = true,
-  inputWidth,
-  suggestionsWidth,
-  shellModeActive,
   setShellModeActive,
   approvalMode,
   onEscapePromptChange,
@@ -223,8 +220,16 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   onQueueMessage,
   suggestionsPosition = 'below',
   setBannerVisible,
-  copyModeEnabled = false,
 }) => {
+  const inputState = useInputState();
+  const {
+    buffer,
+    userMessages,
+    shellModeActive,
+    copyModeEnabled,
+    inputWidth,
+    suggestionsWidth,
+  } = inputState;
   const isHelpDismissKey = useIsHelpDismissKey();
   const keyMatchers = useKeyMatchers();
   const { stdout } = useStdout();
@@ -434,7 +439,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             slashCommands,
           );
           if (commandToExecute?.isSafeConcurrent) {
-            inputHistory.handleSubmit(trimmedMessage);
+            handleSubmitAndClear(trimmedMessage);
             return;
           }
         }
@@ -452,6 +457,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       streamingState,
       setQueueErrorMessage,
       slashCommands,
+      handleSubmitAndClear,
     ],
   );
 
@@ -1266,6 +1272,15 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return true;
       }
 
+      if (keyMatchers[Command.DEPRECATED_OPEN_EXTERNAL_EDITOR](key)) {
+        const cmdKey = formatCommand(Command.OPEN_EXTERNAL_EDITOR);
+        appEvents.emit(AppEvent.TransientMessage, {
+          message: `Use ${cmdKey} to open the external editor.`,
+          type: TransientMessageType.Hint,
+        });
+        return true;
+      }
+
       // Ctrl+V for clipboard paste
       if (keyMatchers[Command.PASTE_CLIPBOARD](key)) {
         // eslint-disable-next-line @typescript-eslint/no-floating-promises
@@ -1821,24 +1836,45 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                 height={Math.min(buffer.viewportHeight, scrollableData.length)}
                 width="100%"
               >
-                <ScrollableList
-                  ref={listRef}
-                  hasFocus={focus}
-                  data={scrollableData}
-                  renderItem={renderItem}
-                  estimatedItemHeight={() => 1}
-                  keyExtractor={(item) =>
-                    item.type === 'visualLine'
-                      ? `line-${item.absoluteVisualIdx}`
-                      : `ghost-${item.index}`
-                  }
-                  width="100%"
-                  backgroundColor={listBackgroundColor}
-                  containerHeight={Math.min(
-                    buffer.viewportHeight,
-                    scrollableData.length,
-                  )}
-                />
+                {config.getUseTerminalBuffer() ? (
+                  <ScrollableList
+                    ref={listRef}
+                    hasFocus={focus}
+                    data={scrollableData}
+                    renderItem={renderItem}
+                    estimatedItemHeight={() => 1}
+                    fixedItemHeight={true}
+                    keyExtractor={(item) =>
+                      item.type === 'visualLine'
+                        ? `line-${item.absoluteVisualIdx}`
+                        : `ghost-${item.index}`
+                    }
+                    width={inputWidth}
+                    backgroundColor={listBackgroundColor}
+                    containerHeight={Math.min(
+                      buffer.viewportHeight,
+                      scrollableData.length,
+                    )}
+                  />
+                ) : (
+                  scrollableData
+                    .slice(
+                      buffer.visualScrollRow,
+                      buffer.visualScrollRow + buffer.viewportHeight,
+                    )
+                    .map((item, index) => {
+                      const actualIndex = buffer.visualScrollRow + index;
+                      const key =
+                        item.type === 'visualLine'
+                          ? `line-${item.absoluteVisualIdx}`
+                          : `ghost-${item.index}`;
+                      return (
+                        <Fragment key={key}>
+                          {renderItem({ item, index: actualIndex })}
+                        </Fragment>
+                      );
+                    })
+                )}
               </Box>
             )}
           </Box>

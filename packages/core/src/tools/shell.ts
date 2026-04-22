@@ -8,12 +8,8 @@ import fsPromises from 'node:fs/promises';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import crypto from 'node:crypto';
 import { debugLogger } from '../index.js';
-import {
-  type SandboxPermissions,
-  getPathIdentity,
-} from '../services/sandboxManager.js';
+import { type SandboxPermissions } from '../services/sandboxManager.js';
 import { ToolErrorType } from './tool-error.js';
 import {
   BaseDeclarativeTool,
@@ -26,7 +22,6 @@ import {
   type ToolCallConfirmationDetails,
   type ToolExecuteConfirmationDetails,
   type PolicyUpdateOptions,
-  type ToolLiveOutput,
   type ExecuteOptions,
   type ForcedToolDecision,
 } from './tools.js';
@@ -46,14 +41,16 @@ import {
   parseCommandDetails,
   hasRedirection,
   normalizeCommand,
+  escapeShellArg,
 } from '../utils/shell-utils.js';
 import { SHELL_TOOL_NAME } from './tool-names.js';
 import { PARAM_ADDITIONAL_PERMISSIONS } from './definitions/base-declarations.js';
+import { ApprovalMode } from '../policy/types.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { getShellDefinition } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
-import { isSubpath, resolveToRealPath } from '../utils/paths.js';
+import { toPathKey, isSubpath, resolveToRealPath } from '../utils/paths.js';
 import {
   getProactiveToolSuggestions,
   isNetworkReliantCommand,
@@ -63,6 +60,7 @@ export const OUTPUT_UPDATE_INTERVAL_MS = 1000;
 
 // Delay so user does not see the output of the process before the process is moved to the background.
 const BACKGROUND_DELAY_MS = 200;
+const SHOW_NL_DESCRIPTION_THRESHOLD = 150;
 
 export interface ShellToolParams {
   command: string;
@@ -113,7 +111,8 @@ export class ShellToolInvocation extends BaseToolInvocation<
     if (trimmed.endsWith('\\')) {
       trimmed += ' ';
     }
-    return `(\n${trimmed}\n); __code=$?; pgrep -g 0 >${tempFilePath} 2>&1; exit $__code;`;
+    const escapedTempFilePath = escapeShellArg(tempFilePath, 'bash');
+    return `(\n${trimmed}\n)\n__code=$?; pgrep -g 0 >${escapedTempFilePath} 2>&1; exit $__code;`;
   }
 
   private getContextualDetails(): string {
@@ -136,7 +135,12 @@ export class ShellToolInvocation extends BaseToolInvocation<
   }
 
   getDescription(): string {
-    return this.params.description || '';
+    const descStr = this.params.description?.trim();
+    const commandStr = this.params.command;
+    return Array.from(commandStr).length <= SHOW_NL_DESCRIPTION_THRESHOLD ||
+      !descStr
+      ? commandStr
+      : descStr;
   }
 
   private simplifyPaths(paths: Set<string>): string[] {
@@ -247,6 +251,10 @@ export class ShellToolInvocation extends BaseToolInvocation<
     abortSignal: AbortSignal,
     forcedDecision?: ForcedToolDecision,
   ): Promise<ToolCallConfirmationDetails | false> {
+    if (this.context.config.getApprovalMode() === ApprovalMode.YOLO) {
+      return super.shouldConfirmExecute(abortSignal, forcedDecision);
+    }
+
     if (this.params[PARAM_ADDITIONAL_PERMISSIONS]) {
       return this.getConfirmationDetails(abortSignal);
     }
@@ -302,15 +310,13 @@ export class ShellToolInvocation extends BaseToolInvocation<
               approvedPaths?: string[],
             ): boolean => {
               if (!approvedPaths || approvedPaths.length === 0) return false;
-              const requestedRealIdentity = getPathIdentity(
+              const requestedRealIdentity = toPathKey(
                 resolveToRealPath(requestedPath),
               );
 
               // Identity check is fast, subpath check is slower
               return approvedPaths.some((p) => {
-                const approvedRealIdentity = getPathIdentity(
-                  resolveToRealPath(p),
-                );
+                const approvedRealIdentity = toPathKey(resolveToRealPath(p));
                 return (
                   requestedRealIdentity === approvedRealIdentity ||
                   isSubpath(approvedRealIdentity, requestedRealIdentity)
@@ -428,12 +434,13 @@ export class ShellToolInvocation extends BaseToolInvocation<
     return confirmationDetails;
   }
 
-  async execute(
-    signal: AbortSignal,
-    updateOutput?: (output: ToolLiveOutput) => void,
-    options?: ExecuteOptions,
-  ): Promise<ToolResult> {
-    const { shellExecutionConfig, setExecutionIdCallback } = options ?? {};
+  async execute(options: ExecuteOptions): Promise<ToolResult> {
+    const {
+      abortSignal: signal,
+      updateOutput,
+      shellExecutionConfig,
+      setExecutionIdCallback,
+    } = options;
     const strippedCommand = stripShellWrapper(this.params.command);
 
     if (signal.aborted) {
@@ -444,10 +451,8 @@ export class ShellToolInvocation extends BaseToolInvocation<
     }
 
     const isWindows = os.platform() === 'win32';
-    const tempFileName = `shell_pgrep_${crypto
-      .randomBytes(6)
-      .toString('hex')}.tmp`;
-    const tempFilePath = path.join(os.tmpdir(), tempFileName);
+    let tempFilePath = '';
+    let tempDir = '';
 
     const timeoutMs = this.context.config.getShellToolInactivityTimeout();
     const timeoutController = new AbortController();
@@ -457,8 +462,10 @@ export class ShellToolInvocation extends BaseToolInvocation<
     const combinedController = new AbortController();
 
     const onAbort = () => combinedController.abort();
-
     try {
+      tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gemini-shell-'));
+      tempFilePath = path.join(tempDir, 'pgrep.tmp');
+
       // pgrep is not available on Windows, so we can't get background PIDs
       const commandToExecute = this.wrapCommandForPgrep(
         strippedCommand,
@@ -632,7 +639,10 @@ export class ShellToolInvocation extends BaseToolInvocation<
 
         if (tempFileExists) {
           const pgrepContent = await fsPromises.readFile(tempFilePath, 'utf8');
-          const pgrepLines = pgrepContent.split(os.EOL).filter(Boolean);
+          const pgrepLines = pgrepContent
+            .split('\n')
+            .map((line) => line.trim())
+            .filter(Boolean);
           for (const line of pgrepLines) {
             if (!/^\d+$/.test(line)) {
               if (
@@ -929,10 +939,19 @@ export class ShellToolInvocation extends BaseToolInvocation<
       if (timeoutTimer) clearTimeout(timeoutTimer);
       signal.removeEventListener('abort', onAbort);
       timeoutController.signal.removeEventListener('abort', onAbort);
-      try {
-        await fsPromises.unlink(tempFilePath);
-      } catch {
-        // Ignore errors during unlink
+      if (tempFilePath) {
+        try {
+          await fsPromises.unlink(tempFilePath);
+        } catch {
+          // Ignore errors during unlink
+        }
+      }
+      if (tempDir) {
+        try {
+          await fsPromises.rm(tempDir, { recursive: true, force: true });
+        } catch {
+          // Ignore errors during rm
+        }
       }
     }
   }

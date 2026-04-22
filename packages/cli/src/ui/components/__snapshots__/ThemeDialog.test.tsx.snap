@@ -11,12 +11,12 @@ exports[`Initial Theme Selection > should default to a dark theme when terminal 
 │ ●  4. Default Dark (Matches terminal)        │ 3     a, b = 0, 1                               │ │
 │    5. Dracula Dark                           │ 4     for _ in range(n):                        │ │
 │    6. GitHub Dark                            │ 5         a, b = b, a + b                       │ │
-│    7. Holiday Dark                           │ 6     return a                                  │ │
-│    8. Shades Of Purple Dark                  │                                                 │ │
-│    9. Solarized Dark                         │ 1 - print("Hello, " + name)                     │ │
-│   10. Tokyo Night Dark                       │ 1 + print(f"Hello, {name}!")                    │ │
-│   11. ANSI Light                             │                                                 │ │
-│   12. Ayu Light                              └─────────────────────────────────────────────────┘ │
+│    7. GitHub Dark Colorblind Dark            │ 6     return a                                  │ │
+│    8. Holiday Dark                           │                                                 │ │
+│    9. Shades Of Purple Dark                  │ 1 - print("Hello, " + name)                     │ │
+│   10. Solarized Dark                         │ 1 + print(f"Hello, {name}!")                    │ │
+│   11. Tokyo Night Dark                       │                                                 │ │
+│   12. ANSI Light (Incompatible)              └─────────────────────────────────────────────────┘ │
 │ ▼                                                                                                │
 │                                                                                                  │
 │ (Use Enter to select, Tab to configure scope, Esc to close)                                      │
@@ -32,16 +32,16 @@ exports[`Initial Theme Selection > should default to a light theme when terminal
 │ ▲                                            ┌─────────────────────────────────────────────────┐ │
 │    1. ANSI Light                             │                                                 │ │
 │    2. Ayu Light                              │ 1 # function                                    │ │
-│ ●  3. Default Light                          │ 2 def fibonacci(n):                             │ │
+│ ●  3. Default Light (Matches terminal)       │ 2 def fibonacci(n):                             │ │
 │    4. GitHub Light                           │ 3     a, b = 0, 1                               │ │
-│    5. Google Code Light                      │ 4     for _ in range(n):                        │ │
-│    6. Solarized Light                        │ 5         a, b = b, a + b                       │ │
-│    7. Xcode Light                            │ 6     return a                                  │ │
-│    8. ANSI Dark (Incompatible)               │                                                 │ │
-│    9. Atom One Dark (Incompatible)           │ 1 - print("Hello, " + name)                     │ │
-│   10. Ayu Dark (Incompatible)                │ 1 + print(f"Hello, {name}!")                    │ │
-│   11. Default Dark (Incompatible)            │                                                 │ │
-│   12. Dracula Dark (Incompatible)            └─────────────────────────────────────────────────┘ │
+│    5. GitHub Light Colorblind Light (Mat…    │ 4     for _ in range(n):                        │ │
+│    6. Google Code Light                      │ 5         a, b = b, a + b                       │ │
+│    7. Solarized Light                        │ 6     return a                                  │ │
+│    8. Xcode Light                            │                                                 │ │
+│    9. ANSI Dark (Incompatible)               │ 1 - print("Hello, " + name)                     │ │
+│   10. Atom One Dark (Incompatible)           │ 1 + print(f"Hello, {name}!")                    │ │
+│   11. Ayu Dark (Incompatible)                │                                                 │ │
+│   12. Default Dark (Incompatible)            └─────────────────────────────────────────────────┘ │
 │ ▼                                                                                                │
 │                                                                                                  │
 │ (Use Enter to select, Tab to configure scope, Esc to close)                                      │
@@ -61,12 +61,12 @@ exports[`Initial Theme Selection > should use the theme from settings even if te
 │    4. Default Dark (Matches terminal)        │ 3     a, b = 0, 1                               │ │
 │    5. Dracula Dark                           │ 4     for _ in range(n):                        │ │
 │    6. GitHub Dark                            │ 5         a, b = b, a + b                       │ │
-│    7. Holiday Dark                           │ 6     return a                                  │ │
-│    8. Shades Of Purple Dark                  │                                                 │ │
-│    9. Solarized Dark                         │ 1 - print("Hello, " + name)                     │ │
-│   10. Tokyo Night Dark                       │ 1 + print(f"Hello, {name}!")                    │ │
-│   11. ANSI Light                             │                                                 │ │
-│   12. Ayu Light                              └─────────────────────────────────────────────────┘ │
+│    7. GitHub Dark Colorblind Dark            │ 6     return a                                  │ │
+│    8. Holiday Dark                           │                                                 │ │
+│    9. Shades Of Purple Dark                  │ 1 - print("Hello, " + name)                     │ │
+│   10. Solarized Dark                         │ 1 + print(f"Hello, {name}!")                    │ │
+│   11. Tokyo Night Dark                       │                                                 │ │
+│   12. ANSI Light (Incompatible)              └─────────────────────────────────────────────────┘ │
 │ ▼                                                                                                │
 │                                                                                                  │
 │ (Use Enter to select, Tab to configure scope, Esc to close)                                      │
@@ -100,12 +100,12 @@ exports[`ThemeDialog Snapshots > should render correctly in theme selection mode
 │    4. Default Dark                           │ 3     a, b = 0, 1                               │ │
 │    5. Dracula Dark                           │ 4     for _ in range(n):                        │ │
 │    6. GitHub Dark                            │ 5         a, b = b, a + b                       │ │
-│    7. Holiday Dark                           │ 6     return a                                  │ │
-│    8. Shades Of Purple Dark                  │                                                 │ │
-│    9. Solarized Dark                         │ 1 - print("Hello, " + name)                     │ │
-│   10. Tokyo Night Dark                       │ 1 + print(f"Hello, {name}!")                    │ │
-│   11. ANSI Light                             │                                                 │ │
-│   12. Ayu Light                              └─────────────────────────────────────────────────┘ │
+│    7. GitHub Dark Colorblind Dark            │ 6     return a                                  │ │
+│    8. Holiday Dark                           │                                                 │ │
+│    9. Shades Of Purple Dark                  │ 1 - print("Hello, " + name)                     │ │
+│   10. Solarized Dark                         │ 1 + print(f"Hello, {name}!")                    │ │
+│   11. Tokyo Night Dark                       │                                                 │ │
+│   12. ANSI Light (Incompatible)              └─────────────────────────────────────────────────┘ │
 │ ▼                                                                                                │
 │                                                                                                  │
 │ (Use Enter to select, Tab to configure scope, Esc to close)                                      │
@@ -125,12 +125,12 @@ exports[`ThemeDialog Snapshots > should render correctly in theme selection mode
 │    4. Default Dark                           │ 3     a, b = 0, 1                               │ │
 │    5. Dracula Dark                           │ 4     for _ in range(n):                        │ │
 │    6. GitHub Dark                            │ 5         a, b = b, a + b                       │ │
-│    7. Holiday Dark                           │ 6     return a                                  │ │
-│    8. Shades Of Purple Dark                  │                                                 │ │
-│    9. Solarized Dark                         │ 1 - print("Hello, " + name)                     │ │
-│   10. Tokyo Night Dark                       │ 1 + print(f"Hello, {name}!")                    │ │
-│   11. ANSI Light                             │                                                 │ │
-│   12. Ayu Light                              └─────────────────────────────────────────────────┘ │
+│    7. GitHub Dark Colorblind Dark            │ 6     return a                                  │ │
+│    8. Holiday Dark                           │                                                 │ │
+│    9. Shades Of Purple Dark                  │ 1 - print("Hello, " + name)                     │ │
+│   10. Solarized Dark                         │ 1 + print(f"Hello, {name}!")                    │ │
+│   11. Tokyo Night Dark                       │                                                 │ │
+│   12. ANSI Light (Incompatible)              └─────────────────────────────────────────────────┘ │
 │ ▼                                                                                                │
 │                                              ╭─────────────────────────────────────────────────╮ │
 │                                              │ DEVELOPER TOOLS (Not visible to users)          │ │

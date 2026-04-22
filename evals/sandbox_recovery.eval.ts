@@ -3,6 +3,8 @@ import { evalTest } from './test-helper.js';
 
 describe('Sandbox recovery', () => {
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'attempts to use additional_permissions when operation not permitted',
     prompt:
       'Run ./script.sh. It will fail with "Operation not permitted". When it does, you must retry running it by passing the appropriate additional_permissions.',

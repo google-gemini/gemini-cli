@@ -52,9 +52,11 @@ describe('ToolConfirmationQueue', () => {
     getModel: () => 'gemini-pro',
     getDebugMode: () => false,
     getTargetDir: () => '/mock/target/dir',
+    getProjectRoot: () => '/mock/project/root',
     getFileSystemService: () => ({
       readFile: vi.fn().mockResolvedValue('Plan content'),
     }),
+    getSessionId: () => 'test-session-id',
     storage: {
       getPlansDir: () => '/mock/temp/plans',
     },
@@ -64,6 +66,44 @@ describe('ToolConfirmationQueue', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it('explicitly renders the tool description (containing filename) for edit confirmations', async () => {
+    const confirmingTool = {
+      tool: {
+        callId: 'call-1',
+        name: 'Edit',
+        description: 'Editing src/main.ts',
+        status: CoreToolCallStatus.AwaitingApproval,
+        confirmationDetails: {
+          type: 'edit' as const,
+          title: 'Confirm edit',
+          fileName: 'main.ts',
+          filePath: '/src/main.ts',
+          fileDiff: '--- a/main.ts\n+++ b/main.ts\n@@ -1 +1 @@\n-old\n+new',
+          originalContent: 'old',
+          newContent: 'new',
+        },
+      },
+      index: 1,
+      total: 1,
+    };
+
+    const { lastFrame, unmount } = await renderWithProviders(
+      <ToolConfirmationQueue
+        confirmingTool={confirmingTool as unknown as ConfirmingToolState}
+      />,
+      {
+        config: mockConfig,
+        uiState: {
+          terminalWidth: 80,
+        },
+      },
+    );
+
+    const output = lastFrame();
+    expect(output).toContain('Editing src/main.ts');
+    unmount();
   });
 
   it('renders the confirming tool with progress indicator', async () => {
