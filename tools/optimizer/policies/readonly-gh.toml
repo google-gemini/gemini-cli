@@ -3,15 +3,31 @@
 
 [[rule]]
 toolName = "run_shell_command"
-commandRegex = "^gh (issue|pr) (list|view)"
-decision = "allow"
+commandRegex = "^gh [a-z0-9-]+ (create|close|comment|delete|develop|edit|lock|pin|reopen|transfer|unlock|unpin|checkout|merge|ready|revert|review|update-branch|copy|field-create|field-delete|item-add|item-archive|item-create|item-delete|item-edit|link|mark-template|unlink|set)\\b"
+decision = "deny"
 priority = 200
-description = "Allow listing and viewing issues/PRs for data gathering."
+denyMessage = "State-changing GitHub commands are prohibited in dry-run mode. Use --execute-actions to enable them."
+description = "Deny state-changing commands for issues, PRs, projects, and repos."
 
 [[rule]]
 toolName = "run_shell_command"
-commandPrefix = "gh"
+commandRegex = "^gh api.*(?:-X|--method)\\s*(?:POST|PUT|PATCH|DELETE)"
 decision = "deny"
+priority = 200
+denyMessage = "State-changing GitHub API commands are prohibited in dry-run mode."
+description = "Deny state-changing gh api calls."
+
+[[rule]]
+toolName = "run_shell_command"
+commandRegex = "^gh co\\b"
+decision = "deny"
+priority = 200
+denyMessage = "State-changing GitHub commands are prohibited in dry-run mode."
+description = "Deny gh co alias."
+
+[[rule]]
+toolName = "run_shell_command"
+commandPrefix = "gh "
+decision = "allow"
 priority = 100
-denyMessage = "State-changing GitHub commands are prohibited in dry-run mode. Use --execute-actions to enable them."
-description = "Deny all other gh commands to prevent accidental modifications."
+description = "Allow all other read-only GitHub commands for data gathering."

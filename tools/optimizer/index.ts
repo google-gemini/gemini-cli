@@ -9,8 +9,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 async function main() {
   const program = new Command();
   program
-    .option('--investigate', 'Run investigation phase', false)
-    .option('--update-processes', 'Run the update-processes phase to generate/improve scripts', false)
+    .option('--investigate', 'Run investigation and process-updater phase', false)
     .option('--create-pr', 'Create a PR when updating processes', false)
     .option('--execute-actions', 'Actually execute destructive or state-changing actions (e.g., closing issues, commenting)', false)
     .parse(process.argv);
@@ -53,17 +52,17 @@ async function main() {
   // 1. Initial Metrics
   await runPhase('metrics', { PRE_RUN: 'true' }, options, policyPath);
 
-  // 2. Investigation (Optional)
+  // 2. Investigation & Update Processes (Optional)
   if (options.investigate) {
-    await runPhase('investigations', {}, options, policyPath);
-  }
+    await runPhase('investigations', {
+      EXECUTE_ACTIONS: String(options.executeActions),
+    }, options, undefined);
 
-  // 3. Update Processes (Optional)
-  if (options.updateProcesses) {
-    await runPhase('process-updater', {
+    // 3. Critique Phase (Only runs if investigations ran)
+    await runPhase('critique', {
       CREATE_PR: String(options.createPr),
       EXECUTE_ACTIONS: String(options.executeActions),
-    }, options, policyPath);
+    }, options, undefined);
   }
 
   // 4. Run Processes
@@ -77,7 +76,7 @@ async function main() {
   console.log('\nOptimizer1000 completed.');
 }
 
-async function runPhase(phaseDir: string, env: Record<string, string>, options: any, policyPath?: string) {
+async function runPhase(phaseDir: string, env: Record<string, string>, options: any, policyPath?: string): Promise<string | undefined> {
   console.log(`\n--- Phase: ${phaseDir} ---`);
   const phasePath = path.join(__dirname, phaseDir);
   
