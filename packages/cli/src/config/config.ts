@@ -13,6 +13,7 @@ import { mcpCommand } from '../commands/mcp.js';
 import { extensionsCommand } from '../commands/extensions.js';
 import { skillsCommand } from '../commands/skills.js';
 import { hooksCommand } from '../commands/hooks.js';
+import { gemmaCommand } from '../commands/gemma.js';
 import {
   setGeminiMdFilename as setServerGeminiMdFilename,
   getCurrentGeminiMdFilename,
@@ -181,6 +182,7 @@ export async function parseArguments(
         extensionsCommand,
         skillsCommand,
         hooksCommand,
+        gemmaCommand,
       ];
 
       const subcommands = commandModules.flatMap((mod) => {
@@ -260,6 +262,7 @@ export async function parseArguments(
   yargsInstance.command(extensionsCommand);
   yargsInstance.command(skillsCommand);
   yargsInstance.command(hooksCommand);
+  yargsInstance.command(gemmaCommand);
 
   yargsInstance
     .command('$0 [query..]', 'Launch Gemini CLI', (yargsInstance) =>
@@ -614,7 +617,7 @@ export async function loadCliConfig(
     .getExtensions()
     .find((ext) => ext.isActive && ext.plan?.directory)?.plan;
 
-  const experimentalJitContext = settings.experimental.jitContext;
+  const experimentalJitContext = settings.experimental.jitContext ?? true;
 
   let extensionRegistryURI =
     process.env['GEMINI_CLI_EXTENSION_REGISTRY_URI'] ??
@@ -988,11 +991,14 @@ export async function loadCliConfig(
     enableEventDrivenScheduler: true,
     skillsSupport: settings.skills?.enabled ?? true,
     disabledSkills: settings.skills?.disabled,
-    experimentalJitContext: settings.experimental?.jitContext,
-    experimentalMemoryManager: settings.experimental?.memoryManager,
+    experimentalJitContext,
+    experimentalMemoryV2: settings.experimental?.memoryV2,
+    experimentalAutoMemory: settings.experimental?.autoMemory,
     contextManagement,
     modelSteering: settings.experimental?.modelSteering,
-    topicUpdateNarration: settings.experimental?.topicUpdateNarration,
+    topicUpdateNarration:
+      settings.general?.topicUpdateNarration ??
+      settings.experimental?.topicUpdateNarration,
     noBrowser: !!process.env['NO_BROWSER'],
     summarizeToolOutput: settings.model?.summarizeToolOutput,
     ideMode,
@@ -1026,6 +1032,7 @@ export async function loadCliConfig(
     recordResponses: argv.recordResponses,
     retryFetchErrors: settings.general?.retryFetchErrors,
     billing: settings.billing,
+    vertexAiRouting: settings.billing?.vertexAi,
     maxAttempts: settings.general?.maxAttempts,
     ptyInfo: ptyInfo?.name,
     disableLLMCorrection: settings.tools?.disableLLMCorrection,

@@ -24,7 +24,7 @@ export function flattenMemory(memory?: string | HierarchicalMemory): string {
   }
   if (memory.userProjectMemory?.trim()) {
     sections.push({
-      name: 'User Project Memory',
+      name: 'Private Project Memory',
       content: memory.userProjectMemory.trim(),
     });
   }
