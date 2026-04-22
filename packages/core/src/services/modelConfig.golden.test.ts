@@ -7,21 +7,20 @@
 import { describe, it, expect } from 'vitest';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { ModelConfigService } from './modelConfigService.js';
 import { DEFAULT_MODEL_CONFIGS } from '../config/defaultModelConfigs.js';
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
 const GOLDEN_FILE_PATH = path.resolve(
-  process.cwd(),
-  'src',
-  'services',
+  __dirname,
   'test-data',
   'resolved-aliases.golden.json',
 );
 
 const RETRY_GOLDEN_FILE_PATH = path.resolve(
-  process.cwd(),
-  'src',
-  'services',
+  __dirname,
   'test-data',
   'resolved-aliases-retry.golden.json',
 );
