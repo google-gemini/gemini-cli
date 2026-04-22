@@ -338,17 +338,23 @@ function useCommandSuggestions(
 
           if (isTopLevelChatOrResumeContext) {
             const canonicalParentName = leafCommand.name;
-            const autoSectionSuggestion: Suggestion = {
-              label: 'list',
-              value: 'list',
-              insertValue: canonicalParentName,
-              description: 'Browse auto-saved chats',
-              commandKind: CommandKind.BUILT_IN,
-              sectionTitle: 'auto',
-              submitValue: `/${canonicalParentName}`,
-            };
-            setSuggestions([autoSectionSuggestion, ...finalSuggestions]);
-            return;
+            const autoLabel = 'list';
+            if (
+              partial === '' ||
+              autoLabel.toLowerCase().startsWith(partial.toLowerCase())
+            ) {
+              const autoSectionSuggestion: Suggestion = {
+                label: autoLabel,
+                value: autoLabel,
+                insertValue: canonicalParentName,
+                description: 'Browse auto-saved chats',
+                commandKind: CommandKind.BUILT_IN,
+                sectionTitle: 'auto',
+                submitValue: `/${canonicalParentName}`,
+              };
+              setSuggestions([autoSectionSuggestion, ...finalSuggestions]);
+              return;
+            }
           }
 
           setSuggestions(finalSuggestions);
