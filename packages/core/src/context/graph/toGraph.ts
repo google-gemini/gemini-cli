@@ -265,7 +265,19 @@ function parseModelParts(
       if (callId) {
         pendingCallParts.set(callId, part);
       } else {
-        pendingCallPartsWithoutId.push(part);
+        const lastIdx = pendingCallPartsWithoutId.length - 1;
+        const lastPart = pendingCallPartsWithoutId[lastIdx];
+        
+        if (
+          lastPart && 
+          lastPart.functionCall && 
+          lastPart.functionCall.name === part.functionCall.name
+        ) {
+          // Replace the previous chunk with the more complete one
+          pendingCallPartsWithoutId[lastIdx] = part;
+        } else {
+          pendingCallPartsWithoutId.push(part);
+        }
       }
     } else if (part.text) {
       const thought: AgentThought = {
