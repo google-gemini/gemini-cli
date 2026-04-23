@@ -888,6 +888,9 @@ export class GeminiChat {
     let hasThoughts = false;
     let finishReason: FinishReason | undefined;
 
+    // The SDK provides fully assembled FunctionCall objects in chunk.functionCalls
+    const finalFunctionCalls: import('@google/genai').FunctionCall[] = [];
+
     for await (const chunk of streamResponse) {
       const candidateWithReason = chunk?.candidates?.find(
         (candidate) => candidate.finishReason,
@@ -895,6 +898,10 @@ export class GeminiChat {
       if (candidateWithReason) {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         finishReason = candidateWithReason.finishReason as FinishReason;
+      }
+
+      if (chunk.functionCalls && chunk.functionCalls.length > 0) {
+        finalFunctionCalls.push(...chunk.functionCalls);
       }
 
       if (isValidResponse(chunk)) {
@@ -951,16 +958,43 @@ export class GeminiChat {
 
     // String thoughts and consolidate text parts.
     const consolidatedParts: Part[] = [];
+
     for (const part of modelResponseParts) {
-      const lastPart = consolidatedParts[consolidatedParts.length - 1];
-      if (
-        lastPart?.text &&
-        isValidNonThoughtTextPart(lastPart) &&
-        isValidNonThoughtTextPart(part)
-      ) {
-        lastPart.text += part.text;
+      if (part.functionCall) {
+        // Skip partial functionCall stream chunks! We will replace them
+        // entirely with the pristine, fully assembled objects from the SDK
+        // (finalFunctionCalls) immediately below. We only push the very first
+        // partial chunk of a sequence as a placeholder so we know *where*
+        // in the sequence of parts the tool call happened.
+        const lastPart = consolidatedParts[consolidatedParts.length - 1];
+        if (
+          !lastPart?.functionCall ||
+          lastPart.functionCall.name !== part.functionCall.name
+        ) {
+          consolidatedParts.push({ ...part }); // Push placeholder
+        }
       } else {
-        consolidatedParts.push(part);
+        const lastPart = consolidatedParts[consolidatedParts.length - 1];
+        if (
+          lastPart?.text &&
+          isValidNonThoughtTextPart(lastPart) &&
+          isValidNonThoughtTextPart(part)
+        ) {
+          lastPart.text += part.text;
+        } else {
+          consolidatedParts.push(part);
+        }
+      }
+    }
+
+    // Now, replace the placeholders with the perfectly assembled final arguments
+    if (finalFunctionCalls.length > 0) {
+      let callIndex = 0;
+      for (const part of consolidatedParts) {
+        if (part.functionCall && callIndex < finalFunctionCalls.length) {
+          part.functionCall = finalFunctionCalls[callIndex];
+          callIndex++;
+        }
       }
     }
 
