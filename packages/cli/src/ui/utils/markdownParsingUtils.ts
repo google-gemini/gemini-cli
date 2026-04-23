@@ -96,7 +96,10 @@ const convertLatexPreservingSpans = (text: string): string => {
   const converted = convertLatexToUnicode(masked);
   return converted.replace(
     MASK_PATTERN,
-    (_, i: string) => preserved[Number(i)],
+    // Fallback to the literal match if the index is somehow out of range —
+    // defensive against the unlikely case where the PUA sentinel appears in
+    // user input. Without the fallback, replace would emit "undefined".
+    (match, i: string) => preserved[Number(i)] ?? match,
   );
 };
 

@@ -148,8 +148,15 @@ describe('convertLatexToUnicode', () => {
       expect(convertLatexToUnicode('word\\ boundary')).toBe('word boundary');
     });
 
-    it('converts \\\\ to a newline', () => {
-      expect(convertLatexToUnicode('line1\\\\line2')).toBe('line1\nline2');
+    it('converts \\\\ to a newline inside math mode', () => {
+      // `\\` is a LaTeX line break in math/tabular contexts. Only convert
+      // inside `$...$` — outside math this would mangle Windows UNC paths
+      // (`\\server\share`) and escaped backslashes in code-like prose.
+      expect(convertLatexToUnicode('$a\\\\b$')).toBe('a\nb');
+    });
+
+    it('leaves \\\\ alone outside math mode', () => {
+      expect(convertLatexToUnicode('line1\\\\line2')).toBe('line1\\\\line2');
     });
   });
 
@@ -246,6 +253,14 @@ describe('convertLatexToUnicode', () => {
     it('leaves Windows paths alone', () => {
       expect(convertLatexToUnicode('C:\\Users\\foo\\bar')).toBe(
         'C:\\Users\\foo\\bar',
+      );
+    });
+
+    it('leaves Windows UNC paths alone (no line-break rewrite in prose)', () => {
+      // `\\server\share\file` must NOT be rewritten to a newline. Line-break
+      // conversion is restricted to math mode. See PR #25802.
+      expect(convertLatexToUnicode('\\\\server\\share\\file')).toBe(
+        '\\\\server\\share\\file',
       );
     });
 

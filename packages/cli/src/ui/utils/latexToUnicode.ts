@@ -559,7 +559,11 @@ function applyProseConversions(text: string): string {
   out = convertTextFormatting(out);
   out = convertFractionsAndRoots(out);
   out = convertEscapedSpecials(out);
-  out = convertLineBreaks(out);
+  // Deliberately NOT running convertLineBreaks here: outside math delimiters
+  // `\\` is far more likely to be a Windows UNC path (`\\server\share`) or an
+  // escaped backslash in code-like prose than a LaTeX line break. Legitimate
+  // LaTeX line breaks belong inside `$...$` or `$$...$$` and are handled by
+  // applyMathModeConversions. See PR #25802 review.
   out = convertNamedCommands(out);
   out = convertPunctuationCommands(out);
   return out;
