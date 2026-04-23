@@ -264,9 +264,9 @@ export function getDisplayString(
     case DEFAULT_GEMINI_MODEL_AUTO:
       return 'Auto (Gemini 2.5)';
     case GEMMA_4_31B_IT_MODEL:
-      return 'Gemma 4 31B';
+      return GEMMA_4_31B_IT_MODEL;
     case GEMMA_4_26B_A4B_IT_MODEL:
-      return 'Gemma 4 26B';
+      return GEMMA_4_26B_A4B_IT_MODEL;
     case GEMINI_MODEL_ALIAS_PRO:
       return PREVIEW_GEMINI_MODEL;
     case GEMINI_MODEL_ALIAS_FLASH:
@@ -448,9 +448,13 @@ export function isActiveModel(
   useGemini3_1: boolean = false,
   useGemini3_1FlashLite: boolean = false,
   useCustomToolModel: boolean = false,
+  experimentalGemma: boolean = false,
 ): boolean {
   if (!VALID_GEMINI_MODELS.has(model)) {
     return false;
+  }
+  if (model === GEMMA_4_31B_IT_MODEL || model === GEMMA_4_26B_A4B_IT_MODEL) {
+    return experimentalGemma;
   }
   if (model === PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL) {
     return useGemini3_1FlashLite;
