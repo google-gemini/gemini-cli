@@ -40,6 +40,7 @@ import {
   applyParsedSkillPatches,
   hasParsedPatchHunks,
 } from './memoryPatchUtils.js';
+import { sanitizeWorkflowSummaryForScratchpad } from './sessionScratchpadUtils.js';
 
 const LOCK_FILENAME = '.extraction.lock';
 const STATE_FILENAME = '.extraction-state.json';
@@ -589,11 +590,14 @@ async function scanEligibleSessions(
 }
 
 function formatSessionHeadline(session: IndexedSession): string {
-  const summary =
-    session.summary ??
-    session.memoryScratchpad?.workflowSummary ??
-    '(no summary)';
-  const workflowSummary = session.memoryScratchpad?.workflowSummary;
+  const rawWorkflowSummary = session.memoryScratchpad?.workflowSummary;
+  const sanitizedWorkflowSummary = rawWorkflowSummary
+    ? sanitizeWorkflowSummaryForScratchpad(rawWorkflowSummary)
+    : undefined;
+  const workflowSummary = sanitizedWorkflowSummary?.trim()
+    ? sanitizedWorkflowSummary
+    : undefined;
+  const summary = session.summary ?? workflowSummary ?? '(no summary)';
 
   if (
     session.summary &&

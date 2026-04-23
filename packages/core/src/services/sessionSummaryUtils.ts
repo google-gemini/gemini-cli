@@ -17,13 +17,16 @@ import {
 } from './chatRecordingService.js';
 import { CoreToolCallStatus } from '../scheduler/types.js';
 import { SHELL_TOOL_NAME } from '../tools/definitions/base-declarations.js';
+import {
+  sanitizeWorkflowSummaryForScratchpad,
+  summarizeShellCommandForScratchpad,
+} from './sessionScratchpadUtils.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
 const MIN_MESSAGES_FOR_SUMMARY = 1;
 const MAX_SCRATCHPAD_TOOLS = 6;
 const MAX_SCRATCHPAD_PATHS = 4;
-const MAX_SCRATCHPAD_COMMAND_LENGTH = 80;
 const MAX_WORKFLOW_SUMMARY_LENGTH = 160;
 const VALIDATION_COMMAND_REGEX =
   /\b(test|tests|vitest|jest|pytest|cargo test|npm test|pnpm test|yarn test|bun test|lint|build|check|typecheck)\b/i;
@@ -187,17 +190,6 @@ function getToolCallCommand(toolCall: ToolCallRecord): string | undefined {
   return undefined;
 }
 
-function normalizeCommandForScratchpad(command: string): string | undefined {
-  const normalized = command.replace(/\s+/g, ' ').trim();
-  if (normalized.length === 0) {
-    return undefined;
-  }
-
-  return normalized.length > MAX_SCRATCHPAD_COMMAND_LENGTH
-    ? `${normalized.slice(0, MAX_SCRATCHPAD_COMMAND_LENGTH - 3)}...`
-    : normalized;
-}
-
 function getToolSequenceEntry(toolCall: ToolCallRecord): string {
   const toolName = normalizeToolName(toolCall.name);
   if (toolName !== SHELL_TOOL_NAME) {
@@ -205,10 +197,10 @@ function getToolSequenceEntry(toolCall: ToolCallRecord): string {
   }
 
   const command = getToolCallCommand(toolCall);
-  const normalizedCommand = command
-    ? normalizeCommandForScratchpad(command)
+  const commandSummary = command
+    ? summarizeShellCommandForScratchpad(command)
     : undefined;
-  return normalizedCommand ? `${toolName}: ${normalizedCommand}` : toolName;
+  return commandSummary ? `${toolName}: ${commandSummary}` : toolName;
 }
 
 function getValidationStatusForToolCall(
@@ -257,7 +249,10 @@ function buildWorkflowSummary(
     return undefined;
   }
 
-  const summary = parts.join(' | ');
+  const summary = sanitizeWorkflowSummaryForScratchpad(parts.join(' | '));
+  if (summary.length === 0) {
+    return undefined;
+  }
   return summary.length > MAX_WORKFLOW_SUMMARY_LENGTH
     ? `${summary.slice(0, MAX_WORKFLOW_SUMMARY_LENGTH - 3)}...`
     : summary;

@@ -1009,6 +1009,37 @@ describe('memoryService', () => {
       expect(result.sessionIndex).toContain('sessionSummaryUtils.ts');
     });
 
+    it('sanitizes shell command workflow summaries before indexing sessions', async () => {
+      const { buildSessionIndex } = await import('./memoryService.js');
+
+      const conversation = createConversation({
+        sessionId: 'raw-shell-scratchpad',
+        summary: 'Investigate API migration',
+        memoryScratchpad: {
+          version: 1,
+          workflowSummary:
+            'run_shell_command: curl https://api.example.com -H "Authorization: Bearer sk-secret-token" -> read_file | paths package.json',
+        },
+        messageCount: 20,
+      });
+      await writeConversationJsonl(
+        path.join(
+          chatsDir,
+          `${SESSION_FILE_PREFIX}2025-01-01T00-00-shellraw.jsonl`,
+        ),
+        conversation,
+      );
+
+      const result = await buildSessionIndex(chatsDir, { runs: [] });
+
+      expect(result.sessionIndex).toContain(
+        'workflow: run_shell_command: curl -> read_file | paths package.json',
+      );
+      expect(result.sessionIndex).not.toContain('Authorization');
+      expect(result.sessionIndex).not.toContain('sk-secret-token');
+      expect(result.sessionIndex).not.toContain('https://api.example.com');
+    });
+
     it('filters out subagent sessions', async () => {
       const { buildSessionIndex } = await import('./memoryService.js');
 

@@ -617,7 +617,7 @@ describe('sessionSummaryUtils', () => {
       });
     });
 
-    it('should preserve shell command details in scratchpad tool sequence', async () => {
+    it('should summarize shell commands without raw arguments in scratchpad tool sequence', async () => {
       const filePath = await writeSession(
         chatsDir,
         'session-2024-01-01T10-00-shellcmd.jsonl',
@@ -641,14 +641,20 @@ describe('sessionSummaryUtils', () => {
                 {
                   id: 'tool-1',
                   name: 'run_shell_command',
-                  args: { command: 'npm run migrate -- --name add-users' },
+                  args: {
+                    command:
+                      'curl https://api.example.com -H "Authorization: Bearer sk-secret-token"',
+                  },
                   status: CoreToolCallStatus.Success,
                   timestamp: '2024-01-01T00:00:01Z',
                 },
                 {
                   id: 'tool-2',
                   name: 'run_shell_command',
-                  args: { command: 'npm run docs:generate' },
+                  args: {
+                    command:
+                      'DATABASE_URL=postgresql://user:password@localhost/db npm run migrate -- --name add-users',
+                  },
                   status: CoreToolCallStatus.Success,
                   timestamp: '2024-01-01T00:00:02Z',
                 },
@@ -670,13 +676,21 @@ describe('sessionSummaryUtils', () => {
         await chatRecordingService.loadConversationRecord(filePath);
       expect(savedConversation?.memoryScratchpad).toEqual({
         version: 1,
-        workflowSummary:
-          'run_shell_command: npm run migrate -- --name add-users -> run_shell_command: npm run docs:generate',
-        toolSequence: [
-          'run_shell_command: npm run migrate -- --name add-users',
-          'run_shell_command: npm run docs:generate',
-        ],
+        workflowSummary: 'run_shell_command: curl -> run_shell_command: npm',
+        toolSequence: ['run_shell_command: curl', 'run_shell_command: npm'],
       });
+      expect(
+        savedConversation?.memoryScratchpad?.workflowSummary,
+      ).not.toContain('Authorization');
+      expect(
+        savedConversation?.memoryScratchpad?.workflowSummary,
+      ).not.toContain('sk-secret-token');
+      expect(
+        savedConversation?.memoryScratchpad?.workflowSummary,
+      ).not.toContain('password');
+      expect(
+        savedConversation?.memoryScratchpad?.workflowSummary,
+      ).not.toContain('add-users');
     });
   });
 });
