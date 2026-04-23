@@ -22,7 +22,7 @@ on:
 
 jobs:
   generate-release-notes:
-    if: "github.repository == 'google-gemini/gemini-cli'"
+    if: ${{ always() }}
     runs-on: 'ubuntu-latest'
     permissions:
       contents: 'write'
