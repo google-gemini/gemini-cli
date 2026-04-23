@@ -2323,6 +2323,15 @@ const SETTINGS_SCHEMA = {
         description: 'Deprecated: Use general.topicUpdateNarration instead.',
         showInDialog: false,
       },
+      'enable-awesome': {
+        type: 'boolean',
+        label: 'Enable Awesome',
+        category: 'Experimental',
+        requiresRestart: false,
+        default: false,
+        description: "When enabled, the ASCII art says 'matt'.",
+        showInDialog: true,
+      },
     },
   },
   extensions: {
