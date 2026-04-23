@@ -1,0 +1,56 @@
+name: '🔄 Gemini CLI Bot: Pulse'
+
+on:
+  schedule:
+    - cron: '*/30 * * * *' # Every 30 minutes
+  workflow_dispatch:
+
+concurrency:
+  group: '${{ github.workflow }}-${{ github.ref }}'
+  cancel-in-progress: true
+
+permissions:
+  contents: 'write'
+  issues: 'write'
+  pull-requests: 'write'
+
+jobs:
+  pulse:
+    name: 'Pulse (Reflex Layer)'
+    runs-on: 'ubuntu-latest'
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@v4'
+
+      - name: 'Setup Node.js'
+        uses: 'actions/setup-node@v4'
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: 'Install dependencies'
+        run: 'npm ci'
+
+      - name: 'Collect Metrics'
+        env:
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+        run: 'npm run metrics'
+
+      - name: 'Archive Metrics'
+        uses: 'actions/upload-artifact@v4'
+        with:
+          name: 'metrics-before'
+          path: 'metrics-before.csv'
+
+      - name: 'Run Reflex Processes'
+        env:
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+        run: |
+          if [ -d "tools/gemini-cli-bot/processes/scripts" ] && [ "$(ls -A tools/gemini-cli-bot/processes/scripts)" ]; then
+            for script in tools/gemini-cli-bot/processes/scripts/*.ts; do
+              echo "Running reflex script: $script"
+              npx tsx "$script"
+            done
+          else
+            echo "No reflex scripts found."
+          fi

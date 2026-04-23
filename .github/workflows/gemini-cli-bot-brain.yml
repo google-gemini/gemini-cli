@@ -1,0 +1,53 @@
+name: '🧠 Gemini CLI Bot: Brain'
+
+on:
+  schedule:
+    - cron: '0 0 * * *' # Every 24 hours
+  workflow_dispatch:
+
+concurrency:
+  group: '${{ github.workflow }}-${{ github.ref }}'
+  cancel-in-progress: true
+
+permissions:
+  contents: 'write'
+  issues: 'write'
+  pull-requests: 'write'
+
+jobs:
+  brain:
+    name: 'Brain (Reasoning Layer)'
+    runs-on: 'ubuntu-latest'
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@v4'
+
+      - name: 'Setup Node.js'
+        uses: 'actions/setup-node@v4'
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: 'Install dependencies'
+        run: 'npm ci'
+
+      - name: 'Build Gemini CLI'
+        run: 'npm run bundle'
+
+      - name: 'Download Previous Metrics'
+        uses: 'actions/download-artifact@v4'
+        with:
+          name: 'metrics-before'
+          path: 'tools/gemini-cli-bot/history/'
+        continue-on-error: true
+
+      - name: 'Run Brain Investigation'
+        env:
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+        run: |
+          if [ -d "tools/gemini-cli-bot/investigations" ]; then
+            ./bundle/gemini.js "Run repo health investigation based on tools/gemini-cli-bot/history/metrics-before.csv and current repo state."
+          else
+            echo "No investigations directory found. Skipping agentic phase."
+          fi
