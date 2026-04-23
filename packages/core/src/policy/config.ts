@@ -446,7 +446,9 @@ export async function createPolicyEngineConfig(
     priority: number,
     source: string,
     modes?: ApprovalMode[],
+    addDefaultDenyForTools = false,
   ) => {
+    const toolsWithNarrowing = new Set<string>();
     for (const tool of tools) {
       // Check for legacy format: toolName(args)
       const match = tool.match(/^([a-zA-Z0-9_-]+)\((.*)\)$/);
@@ -459,6 +461,7 @@ export async function createPolicyEngineConfig(
 
         // Treat args as a command prefix for shell tool
         if (toolName === SHELL_TOOL_NAME) {
+          toolsWithNarrowing.add(toolName);
           const patterns = buildArgsPatterns(undefined, args);
           for (const pattern of patterns) {
             if (pattern) {
@@ -497,6 +500,18 @@ export async function createPolicyEngineConfig(
         });
       }
     }
+
+    if (addDefaultDenyForTools) {
+      for (const toolName of toolsWithNarrowing) {
+        rules.push({
+          toolName,
+          decision: PolicyDecision.DENY,
+          priority: priority - 0.01,
+          source: `${source} (Narrowing Enforcement)`,
+          modes,
+        });
+      }
+    }
   };
 
   // Tools that are explicitly allowed in the settings.
@@ -506,7 +521,8 @@ export async function createPolicyEngineConfig(
       settings.tools.allowed,
       ALLOWED_TOOLS_FLAG_PRIORITY,
       'Settings (Tools Allowed)',
-      nonPlanModes,
+      undefined,
+      true,
     );
   }
 
