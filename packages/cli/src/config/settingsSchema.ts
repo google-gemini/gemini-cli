@@ -2052,6 +2052,15 @@ const SETTINGS_SCHEMA = {
     description: 'Setting to enable experimental features',
     showInDialog: false,
     properties: {
+      gemma: {
+        type: 'boolean',
+        label: 'Gemma Models',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description: 'Enable access to Gemma 4 models (experimental).',
+        showInDialog: true,
+      },
       adk: {
         type: 'object',
         label: 'ADK',
