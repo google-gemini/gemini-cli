@@ -65,6 +65,7 @@ describe('getUserStartupWarnings', () => {
 
   afterEach(async () => {
     await fs.rm(testRootDir, { recursive: true, force: true });
+    vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
 
