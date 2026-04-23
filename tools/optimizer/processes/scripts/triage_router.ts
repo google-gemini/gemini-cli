@@ -5,7 +5,7 @@
  */
 
 import { execSync } from 'node:child_process';
-import { getMaintainers, execGh, getRepoInfo, updateSimulationCsv } from './utils.js';
+import { getMaintainers, execGh, getRepoInfo, updateSimulationCsv, getMaintainerWorkload } from './utils.js';
 
 const EXECUTE_ACTIONS = process.env.EXECUTE_ACTIONS === 'true';
 
@@ -15,13 +15,14 @@ async function run() {
 
   try {
     const MAINTAINERS = await getMaintainers();
-    console.log(`Fetched ${MAINTAINERS.length} maintainers.`);
+    const WORKLOAD = await getMaintainerWorkload();
+    console.log(`Fetched ${MAINTAINERS.length} maintainers and current workloads.`);
 
-    // 1. Fetch untriaged issues
+    // 1. Fetch untriaged issues (Increase limit to process the backlog)
     const query = `
     query($owner: String!, $repo: String!) {
       repository(owner: $owner, name: $repo) {
-        issues(first: 100, states: OPEN, labels: ["status/need-triage"]) {
+        issues(first: 1000, states: OPEN, labels: ["status/need-triage"], orderBy: {field: CREATED_AT, direction: ASC}) {
           nodes {
             number
             title
@@ -46,43 +47,53 @@ async function run() {
     const issues = data.issues.nodes;
 
     const actions = [];
-    let maintainerIndex = Math.floor(Math.random() * MAINTAINERS.length);
+    
+    // Sort maintainers by workload (ascending)
+    const sortedMaintainers = MAINTAINERS
+      .filter(m => m !== 'TOTAL_MAINTAINERS') // safeguard
+      .sort((a, b) => (WORKLOAD[a] || 0) - (WORKLOAD[b] || 0));
+
+    let mIndex = 0;
 
     for (const issue of issues) {
       if (issue.assignees.nodes.length > 0) continue;
 
       const body = issue.body || '';
-      const title = issue.title || '';
+      const title = issue.title.toLowerCase();
+
+      // Better categorization
+      const labelsToAdd: string[] = [];
+      if (title.includes('bug') || body.toLowerCase().includes('expected behavior')) {
+        labelsToAdd.push('type/bug');
+      } else if (title.includes('feature') || title.includes('enhancement') || body.toLowerCase().includes('proposed change')) {
+        labelsToAdd.push('type/feature');
+      }
 
       // Low quality check
       if (body.length < 50 || title.length < 10 || !body.includes('###')) {
         actions.push({
           number: issue.number,
           type: 'needs-info',
+          labelsToAdd: ['status/needs-info'],
+          labelsToRemove: ['status/need-triage'],
           comment: `Hi @${issue.author?.login || 'author'}! Thank you for the report. This issue seems to be missing some critical information or doesn't follow the template. Could you please provide more details? Labeling as 'status/needs-info' for now.`
         });
         continue;
       }
 
-      // Potential duplicate check (very naive but better than nothing)
-      if (title.toLowerCase().includes('duplicate') || title.toLowerCase().includes('same as #')) {
-          actions.push({
-              number: issue.number,
-              type: 'possible-duplicate',
-              comment: `Hi @${issue.author?.login || 'author'}! This issue might be a duplicate of another existing issue. Labeling as 'status/possible-duplicate' for maintainer review.`
-          });
-          continue;
-      }
-
-      // Assign to a maintainer (round-robin)
-      const assignee = MAINTAINERS[maintainerIndex % MAINTAINERS.length];
-      maintainerIndex++;
+      // Assign to the maintainer with the lowest workload
+      const assignee = sortedMaintainers[mIndex % sortedMaintainers.length];
+      mIndex++;
+      // Increment local workload tracker to keep distribution even during this run
+      WORKLOAD[assignee] = (WORKLOAD[assignee] || 0) + 1;
 
       actions.push({
         number: issue.number,
         type: 'assign',
         assignee,
-        comment: `Automated Triage: Assigning to @${assignee} for initial review. Please categorize and set priority.`
+        labelsToAdd: [...labelsToAdd, 'status/manual-triage'],
+        labelsToRemove: ['status/need-triage'],
+        comment: `Automated Triage: Assigning to @${assignee} based on current workload. Please categorize and set priority.`
       });
     }
 
@@ -91,19 +102,22 @@ async function run() {
 
     for (const action of actions) {
       try {
-        if (action.type === 'needs-info') {
-          execGh(`issue edit ${action.number} --add-label "status/needs-info" --remove-label "status/need-triage"`, EXECUTE_ACTIONS);
-          simulationUpdates.set(action.number.toString(), { labels: 'status/needs-info' });
-        } else if (action.type === 'possible-duplicate') {
-            execGh(`issue edit ${action.number} --add-label "status/possible-duplicate" --remove-label "status/need-triage"`, EXECUTE_ACTIONS);
-            simulationUpdates.set(action.number.toString(), { labels: 'status/possible-duplicate' });
-        } else if (action.type === 'assign') {
-          execGh(`issue edit ${action.number} --add-assignee "${action.assignee}" --remove-label "status/need-triage" --add-label "status/manual-triage"`, EXECUTE_ACTIONS);
-          simulationUpdates.set(action.number.toString(), { labels: 'status/manual-triage' });
-        }
+        const addLabels = action.labelsToAdd?.map(l => `"${l}"`).join(',') || '';
+        const removeLabels = action.labelsToRemove?.map(l => `"${l}"`).join(',') || '';
+        
+        let editCmd = `issue edit ${action.number}`;
+        if (addLabels) editCmd += ` --add-label ${addLabels}`;
+        if (removeLabels) editCmd += ` --remove-label ${removeLabels}`;
+        if (action.assignee) editCmd += ` --add-assignee "${action.assignee}"`;
+
+        await execGh(editCmd, EXECUTE_ACTIONS);
+        simulationUpdates.set(action.number.toString(), { 
+            labels: action.labelsToAdd?.join(', ') || '',
+            assignee: action.assignee || ''
+        });
         
         if (action.comment) {
-          execGh(`issue comment ${action.number} --body "${action.comment}"`, EXECUTE_ACTIONS);
+          await execGh(`issue comment ${action.number} --body "${action.comment}"`, EXECUTE_ACTIONS);
         }
       } catch (err) {
         console.error(`Failed to process issue #${action.number}:`, err);
