@@ -75,6 +75,7 @@ describe('ToolExecutor', () => {
     vi.mocked(fileUtils.formatTruncatedToolOutput).mockReturnValue(
       'TruncatedContent...',
     );
+    vi.spyOn(config, 'isContextManagementEnabled').mockReturnValue(false);
   });
 
   afterEach(() => {

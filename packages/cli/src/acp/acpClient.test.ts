@@ -27,6 +27,7 @@ import {
   type MessageBus,
   LlmRole,
   type GitService,
+  type ModelRouterService,
   processSingleFileContent,
   InvalidStreamError,
 } from '@google/gemini-cli-core';
@@ -39,6 +40,8 @@ import { loadCliConfig, type CliArgs } from '../config/config.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { ApprovalMode } from '@google/gemini-cli-core/src/policy/types.js';
+
+const startMemoryServiceMock = vi.hoisted(() => vi.fn());
 
 vi.mock('../config/config.js', () => ({
   loadCliConfig: vi.fn(),
@@ -100,19 +103,10 @@ vi.mock(
     const actual = await importOriginal();
     return {
       ...actual,
+      startMemoryService: startMemoryServiceMock,
       updatePolicy: vi.fn(),
       createPolicyUpdater: vi.fn(),
-      ReadManyFilesTool: vi.fn().mockImplementation(() => ({
-        name: 'read_many_files',
-        kind: 'read',
-        build: vi.fn().mockReturnValue({
-          getDescription: () => 'Read files',
-          toolLocations: () => [],
-          execute: vi.fn().mockResolvedValue({
-            llmContent: ['--- file.txt ---\n\nFile content\n\n'],
-          }),
-        }),
-      })),
+      ReadManyFilesTool: vi.fn(),
       logToolCall: vi.fn(),
       LlmRole: {
         MAIN: 'main',
@@ -157,6 +151,8 @@ describe('GeminiAgent', () => {
   let agent: GeminiAgent;
 
   beforeEach(() => {
+    vi.clearAllMocks();
+    startMemoryServiceMock.mockResolvedValue(undefined);
     mockConfig = {
       refreshAuth: vi.fn(),
       initialize: vi.fn(),
@@ -164,6 +160,7 @@ describe('GeminiAgent', () => {
       getFileSystemService: vi.fn(),
       setFileSystemService: vi.fn(),
       getContentGeneratorConfig: vi.fn(),
+      isAutoMemoryEnabled: vi.fn().mockReturnValue(false),
       getActiveModel: vi.fn().mockReturnValue('gemini-pro'),
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getGeminiClient: vi.fn().mockReturnValue({
@@ -363,6 +360,34 @@ describe('GeminiAgent', () => {
     vi.useRealTimers();
   });
 
+  it('should start auto memory for new ACP sessions when enabled', async () => {
+    mockConfig.getContentGeneratorConfig = vi.fn().mockReturnValue({
+      apiKey: 'test-key',
+    });
+    mockConfig.isAutoMemoryEnabled = vi.fn().mockReturnValue(true);
+
+    await agent.newSession({
+      cwd: '/tmp',
+      mcpServers: [],
+    });
+
+    expect(startMemoryServiceMock).toHaveBeenCalledWith(mockConfig);
+  });
+
+  it('should not start auto memory for new ACP sessions when disabled', async () => {
+    mockConfig.getContentGeneratorConfig = vi.fn().mockReturnValue({
+      apiKey: 'test-key',
+    });
+    mockConfig.isAutoMemoryEnabled = vi.fn().mockReturnValue(false);
+
+    await agent.newSession({
+      cwd: '/tmp',
+      mcpServers: [],
+    });
+
+    expect(startMemoryServiceMock).not.toHaveBeenCalled();
+  });
+
   it('should return modes without plan mode when plan is disabled', async () => {
     mockConfig.getContentGeneratorConfig = vi.fn().mockReturnValue({
       apiKey: 'test-key',
@@ -416,6 +441,26 @@ describe('GeminiAgent', () => {
         expect.objectContaining({
           modelId: 'gemini-3.1-pro-preview',
           name: 'gemini-3.1-pro-preview',
+        }),
+      ]),
+    );
+  });
+
+  it('should include gemini-3.1-flash-lite when useGemini31FlashLite is true', async () => {
+    mockConfig.getHasAccessToPreviewModel = vi.fn().mockReturnValue(true);
+    mockConfig.getGemini31LaunchedSync = vi.fn().mockReturnValue(true);
+    mockConfig.getGemini31FlashLiteLaunchedSync = vi.fn().mockReturnValue(true);
+
+    const response = await agent.newSession({
+      cwd: '/tmp',
+      mcpServers: [],
+    });
+
+    expect(response.models?.availableModels).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          modelId: 'gemini-3.1-flash-lite-preview',
+          name: 'gemini-3.1-flash-lite-preview',
         }),
       ]),
     );
@@ -646,6 +691,7 @@ describe('Session', () => {
       sendMessageStream: vi.fn(),
       addHistory: vi.fn(),
       recordCompletedToolCalls: vi.fn(),
+      getHistory: vi.fn().mockReturnValue([]),
     } as unknown as Mocked<GeminiChat>;
     mockTool = {
       kind: 'read',
@@ -667,6 +713,9 @@ describe('Session', () => {
     mockConfig = {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getActiveModel: vi.fn().mockReturnValue('gemini-pro'),
+      getModelRouterService: vi.fn().mockReturnValue({
+        route: vi.fn().mockResolvedValue({ model: 'resolved-model' }),
+      }),
       getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
       getMcpServers: vi.fn(),
       getFileService: vi.fn().mockReturnValue({
@@ -713,10 +762,22 @@ describe('Session', () => {
       },
       errors: [],
     } as unknown as LoadedSettings);
+
+    (ReadManyFilesTool as unknown as Mock).mockImplementation(() => ({
+      name: 'read_many_files',
+      kind: 'read',
+      build: vi.fn().mockReturnValue({
+        getDescription: () => 'Read files',
+        toolLocations: () => [],
+        execute: vi.fn().mockResolvedValue({
+          llmContent: ['--- file.txt ---\n\nFile content\n\n'],
+        }),
+      }),
+    }));
   });
 
   afterEach(() => {
-    vi.clearAllMocks();
+    vi.restoreAllMocks();
   });
 
   it('should send available commands', async () => {
@@ -786,6 +847,42 @@ describe('Session', () => {
     expect(result).toMatchObject({ stopReason: 'end_turn' });
   });
 
+  it('should use model router to determine model', async () => {
+    const mockRouter = {
+      route: vi.fn().mockResolvedValue({ model: 'routed-model' }),
+    } as unknown as ModelRouterService;
+    mockConfig.getModelRouterService.mockReturnValue(mockRouter);
+
+    const stream = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: {
+          candidates: [{ content: { parts: [{ text: 'Hello' }] } }],
+        },
+      },
+    ]);
+    mockChat.sendMessageStream.mockResolvedValue(stream);
+
+    await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Hi' }],
+    });
+
+    expect(mockRouter.route).toHaveBeenCalledWith(
+      expect.objectContaining({
+        requestedModel: 'gemini-pro',
+        request: [{ text: 'Hi' }],
+      }),
+    );
+    expect(mockChat.sendMessageStream).toHaveBeenCalledWith(
+      expect.objectContaining({ model: 'routed-model' }),
+      expect.any(Array),
+      expect.any(String),
+      expect.any(Object),
+      expect.any(String),
+    );
+  });
+
   it('should handle prompt with empty response (InvalidStreamError)', async () => {
     mockChat.sendMessageStream.mockRejectedValue(
       new InvalidStreamError('Empty response', 'NO_RESPONSE_TEXT'),
@@ -802,6 +899,32 @@ describe('Session', () => {
 
   it('should handle prompt with empty response (NO_RESPONSE_TEXT anomaly)', async () => {
     mockChat.sendMessageStream.mockRejectedValue({ type: 'NO_RESPONSE_TEXT' });
+
+    const result = await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Hi' }],
+    });
+
+    expect(mockChat.sendMessageStream).toHaveBeenCalled();
+    expect(result).toMatchObject({ stopReason: 'end_turn' });
+  });
+
+  it('should handle prompt with no finish reason (InvalidStreamError)', async () => {
+    mockChat.sendMessageStream.mockRejectedValue(
+      new InvalidStreamError('No finish reason', 'NO_FINISH_REASON'),
+    );
+
+    const result = await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Hi' }],
+    });
+
+    expect(mockChat.sendMessageStream).toHaveBeenCalled();
+    expect(result).toMatchObject({ stopReason: 'end_turn' });
+  });
+
+  it('should handle prompt with no finish reason (NO_FINISH_REASON anomaly)', async () => {
+    mockChat.sendMessageStream.mockRejectedValue({ type: 'NO_FINISH_REASON' });
 
     const result = await session.prompt({
       sessionId: 'session-1',

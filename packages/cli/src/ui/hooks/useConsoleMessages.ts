@@ -4,13 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  useCallback,
-  useEffect,
-  useReducer,
-  useRef,
-  startTransition,
-} from 'react';
+import { useCallback, useSyncExternalStore } from 'react';
 import type { ConsoleMessageItem } from '../types.js';
 import {
   coreEvents,
@@ -18,207 +12,170 @@ import {
   type ConsoleLogPayload,
 } from '@google/gemini-cli-core';
 
-export interface UseConsoleMessagesReturn {
-  consoleMessages: ConsoleMessageItem[];
-  clearConsoleMessages: () => void;
-}
-
-type Action =
-  | { type: 'ADD_MESSAGES'; payload: ConsoleMessageItem[] }
-  | { type: 'CLEAR' };
-
-function consoleMessagesReducer(
-  state: ConsoleMessageItem[],
-  action: Action,
-): ConsoleMessageItem[] {
-  const MAX_CONSOLE_MESSAGES = 1000;
-  switch (action.type) {
-    case 'ADD_MESSAGES': {
-      const newMessages = [...state];
-      for (const queuedMessage of action.payload) {
-        const lastMessage = newMessages[newMessages.length - 1];
-        if (
-          lastMessage &&
-          lastMessage.type === queuedMessage.type &&
-          lastMessage.content === queuedMessage.content
-        ) {
-          // Create a new object for the last message to ensure React detects
-          // the change, preventing mutation of the existing state object.
-          newMessages[newMessages.length - 1] = {
-            ...lastMessage,
-            count: lastMessage.count + 1,
-          };
-        } else {
-          newMessages.push({ ...queuedMessage, count: 1 });
-        }
-      }
-
-      // Limit the number of messages to prevent memory issues
-      if (newMessages.length > MAX_CONSOLE_MESSAGES) {
-        return newMessages.slice(newMessages.length - MAX_CONSOLE_MESSAGES);
-      }
-
-      return newMessages;
-    }
-    case 'CLEAR':
-      return [];
-    default:
-      return state;
-  }
-}
-
-export function useConsoleMessages(): UseConsoleMessagesReturn {
-  const [consoleMessages, dispatch] = useReducer(consoleMessagesReducer, []);
-  const messageQueueRef = useRef<ConsoleMessageItem[]>([]);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const isProcessingRef = useRef(false);
-
-  const processQueue = useCallback(() => {
-    if (messageQueueRef.current.length > 0) {
-      isProcessingRef.current = true;
-      const messagesToProcess = messageQueueRef.current;
-      messageQueueRef.current = [];
-      startTransition(() => {
-        dispatch({ type: 'ADD_MESSAGES', payload: messagesToProcess });
-      });
-    }
-    timeoutRef.current = null;
-  }, []);
-
-  const handleNewMessage = useCallback(
-    (message: ConsoleMessageItem) => {
-      messageQueueRef.current.push(message);
-      if (!isProcessingRef.current && !timeoutRef.current) {
-        // Batch updates using a timeout. 50ms is a reasonable delay to batch
-        // rapid-fire messages without noticeable lag while avoiding React update
-        // queue flooding.
-        timeoutRef.current = setTimeout(processQueue, 50);
-      }
-    },
-    [processQueue],
-  );
-
-  // Once the updated consoleMessages have been committed to the screen,
-  // we can safely process the next batch of queued messages if any exist.
-  // This completely eliminates overlapping concurrent updates to this state.
-  useEffect(() => {
-    isProcessingRef.current = false;
-    if (messageQueueRef.current.length > 0 && !timeoutRef.current) {
-      timeoutRef.current = setTimeout(processQueue, 50);
-    }
-  }, [consoleMessages, processQueue]);
-
-  useEffect(() => {
-    const handleConsoleLog = (payload: ConsoleLogPayload) => {
-      let content = payload.content;
-      const MAX_CONSOLE_MSG_LENGTH = 10000;
-      if (content.length > MAX_CONSOLE_MSG_LENGTH) {
-        content =
-          content.slice(0, MAX_CONSOLE_MSG_LENGTH) +
-          `... [Truncated ${content.length - MAX_CONSOLE_MSG_LENGTH} characters]`;
-      }
-
-      handleNewMessage({
-        type: payload.type,
-        content,
-        count: 1,
-      });
-    };
-
-    const handleOutput = (payload: {
-      isStderr: boolean;
-      chunk: Uint8Array | string;
-    }) => {
-      let content =
-        typeof payload.chunk === 'string'
-          ? payload.chunk
-          : new TextDecoder().decode(payload.chunk);
-
-      const MAX_OUTPUT_CHUNK_LENGTH = 10000;
-      if (content.length > MAX_OUTPUT_CHUNK_LENGTH) {
-        content =
-          content.slice(0, MAX_OUTPUT_CHUNK_LENGTH) +
-          `... [Truncated ${content.length - MAX_OUTPUT_CHUNK_LENGTH} characters]`;
-      }
-
-      // It would be nice if we could show stderr as 'warn' but unfortunately
-      // we log non warning info to stderr before the app starts so that would
-      // be misleading.
-      handleNewMessage({ type: 'log', content, count: 1 });
-    };
-
-    coreEvents.on(CoreEvent.ConsoleLog, handleConsoleLog);
-    coreEvents.on(CoreEvent.Output, handleOutput);
-    return () => {
-      coreEvents.off(CoreEvent.ConsoleLog, handleConsoleLog);
-      coreEvents.off(CoreEvent.Output, handleOutput);
-    };
-  }, [handleNewMessage]);
-
-  const clearConsoleMessages = useCallback(() => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
-    }
-    messageQueueRef.current = [];
-    isProcessingRef.current = true;
-    startTransition(() => {
-      dispatch({ type: 'CLEAR' });
-    });
-  }, []);
-
-  // Cleanup on unmount
-  useEffect(
-    () => () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-    },
-    [],
-  );
-
-  return { consoleMessages, clearConsoleMessages };
-}
-
 export interface UseErrorCountReturn {
   errorCount: number;
   clearErrorCount: () => void;
 }
 
+// --- Global Console Store ---
+
+const MAX_CONSOLE_MESSAGES = 1000;
+let globalConsoleMessages: ConsoleMessageItem[] = [];
+let globalErrorCount = 0;
+const listeners = new Set<() => void>();
+
+let messageQueue: ConsoleMessageItem[] = [];
+let timeoutId: NodeJS.Timeout | null = null;
+
+/**
+ * Initializes the global console store and subscribes to coreEvents.
+ * Acts as a safe reset function, making it idempotent and useful for test isolation.
+ * Must be called during application startup.
+ */
+export function initializeConsoleStore() {
+  if (timeoutId) {
+    clearTimeout(timeoutId);
+    timeoutId = null;
+  }
+  messageQueue = [];
+  globalConsoleMessages = [];
+  globalErrorCount = 0;
+  notifyListeners();
+
+  // Safely detach first to ensure idempotency and prevent listener leaks
+  coreEvents.off(CoreEvent.ConsoleLog, handleConsoleLog);
+  coreEvents.off(CoreEvent.Output, handleOutput);
+
+  coreEvents.on(CoreEvent.ConsoleLog, handleConsoleLog);
+  coreEvents.on(CoreEvent.Output, handleOutput);
+}
+
+function notifyListeners() {
+  for (const listener of listeners) {
+    listener();
+  }
+}
+
+function processQueue() {
+  if (messageQueue.length === 0) return;
+
+  // Create a new array to trigger React updates
+  const newMessages = [...globalConsoleMessages];
+
+  for (const queuedMessage of messageQueue) {
+    if (queuedMessage.type === 'error') {
+      globalErrorCount++;
+    }
+
+    // Coalesce consecutive identical messages
+    const prev = newMessages[newMessages.length - 1];
+    if (
+      prev &&
+      prev.type === queuedMessage.type &&
+      prev.content === queuedMessage.content
+    ) {
+      newMessages[newMessages.length - 1] = {
+        ...prev,
+        count: prev.count + 1,
+      };
+    } else {
+      newMessages.push({ ...queuedMessage, count: 1 });
+    }
+  }
+
+  globalConsoleMessages =
+    newMessages.length > MAX_CONSOLE_MESSAGES
+      ? newMessages.slice(-MAX_CONSOLE_MESSAGES)
+      : newMessages;
+
+  messageQueue = [];
+  timeoutId = null;
+  notifyListeners();
+}
+
+function handleNewMessage(message: ConsoleMessageItem) {
+  messageQueue.push(message);
+  if (!timeoutId) {
+    // Batch updates using a timeout. 50ms is a reasonable delay to batch
+    // rapid-fire messages without noticeable lag while avoiding React update
+    // queue flooding.
+    timeoutId = setTimeout(processQueue, 50);
+  }
+}
+
+// --- Subscription API for useSyncExternalStore ---
+
+function subscribe(listener: () => void) {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+function getConsoleMessagesSnapshot() {
+  return globalConsoleMessages;
+}
+
+function getErrorCountSnapshot() {
+  return globalErrorCount;
+}
+
+// --- Core Event Listeners (Always active at module level) ---
+
+const handleConsoleLog = (payload: ConsoleLogPayload) => {
+  let content = payload.content;
+  const MAX_CONSOLE_MSG_LENGTH = 10000;
+  if (content.length > MAX_CONSOLE_MSG_LENGTH) {
+    content =
+      content.slice(0, MAX_CONSOLE_MSG_LENGTH) +
+      `... [Truncated ${content.length - MAX_CONSOLE_MSG_LENGTH} characters]`;
+  }
+
+  handleNewMessage({
+    type: payload.type,
+    content,
+    count: 1,
+  });
+};
+
+const handleOutput = (payload: {
+  isStderr: boolean;
+  chunk: Uint8Array | string;
+}) => {
+  let content =
+    typeof payload.chunk === 'string'
+      ? payload.chunk
+      : new TextDecoder().decode(payload.chunk);
+
+  const MAX_OUTPUT_CHUNK_LENGTH = 10000;
+  if (content.length > MAX_OUTPUT_CHUNK_LENGTH) {
+    content =
+      content.slice(0, MAX_OUTPUT_CHUNK_LENGTH) +
+      `... [Truncated ${content.length - MAX_OUTPUT_CHUNK_LENGTH} characters]`;
+  }
+
+  handleNewMessage({ type: 'log', content, count: 1 });
+};
+
+/**
+ * Hook to access the global console message history.
+ * Decoupled from any component lifecycle to ensure history is preserved even
+ * when the UI is unmounted.
+ */
+export function useConsoleMessages(): ConsoleMessageItem[] {
+  return useSyncExternalStore(subscribe, getConsoleMessagesSnapshot);
+}
+
+/**
+ * Hook to access the global error count.
+ * Uses the same external store as useConsoleMessages for consistency.
+ */
 export function useErrorCount(): UseErrorCountReturn {
-  const [errorCount, dispatch] = useReducer(
-    (state: number, action: 'INCREMENT' | 'CLEAR') => {
-      switch (action) {
-        case 'INCREMENT':
-          return state + 1;
-        case 'CLEAR':
-          return 0;
-        default:
-          return state;
-      }
-    },
-    0,
-  );
-
-  useEffect(() => {
-    const handleConsoleLog = (payload: ConsoleLogPayload) => {
-      if (payload.type === 'error') {
-        startTransition(() => {
-          dispatch('INCREMENT');
-        });
-      }
-    };
-
-    coreEvents.on(CoreEvent.ConsoleLog, handleConsoleLog);
-    return () => {
-      coreEvents.off(CoreEvent.ConsoleLog, handleConsoleLog);
-    };
-  }, []);
+  const errorCount = useSyncExternalStore(subscribe, getErrorCountSnapshot);
 
   const clearErrorCount = useCallback(() => {
-    startTransition(() => {
-      dispatch('CLEAR');
-    });
+    globalErrorCount = 0;
+    notifyListeners();
   }, []);
 
   return { errorCount, clearErrorCount };

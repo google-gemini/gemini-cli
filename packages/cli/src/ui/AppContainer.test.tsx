@@ -53,6 +53,7 @@ const mocks = vi.hoisted(() => ({
 const terminalNotificationsMocks = vi.hoisted(() => ({
   notifyViaTerminal: vi.fn().mockResolvedValue(true),
   isNotificationsEnabled: vi.fn(() => true),
+  getNotificationMethod: vi.fn(() => 'auto'),
   buildRunEventNotificationContent: vi.fn((event) => ({
     title: 'Mock Notification',
     subtitle: 'Mock Subtitle',
@@ -122,13 +123,20 @@ vi.mock('ink', async (importOriginal) => {
   };
 });
 
+import { InputContext, type InputState } from './contexts/InputContext.js';
+import { QuotaContext, type QuotaState } from './contexts/QuotaContext.js';
+
 // Helper component will read the context values provided by AppContainer
 // so we can assert against them in our tests.
 let capturedUIState: UIState;
+let capturedInputState: InputState;
+let capturedQuotaState: QuotaState;
 let capturedUIActions: UIActions;
 let capturedOverflowActions: OverflowActions;
 function TestContextConsumer() {
   capturedUIState = useContext(UIStateContext)!;
+  capturedInputState = useContext(InputContext)!;
+  capturedQuotaState = useContext(QuotaContext)!;
   capturedUIActions = useContext(UIActionsContext)!;
   capturedOverflowActions = useOverflowActions()!;
   return null;
@@ -187,6 +195,7 @@ vi.mock('./hooks/useShellInactivityStatus.js', () => ({
 vi.mock('../utils/terminalNotifications.js', () => ({
   notifyViaTerminal: terminalNotificationsMocks.notifyViaTerminal,
   isNotificationsEnabled: terminalNotificationsMocks.isNotificationsEnabled,
+  getNotificationMethod: terminalNotificationsMocks.getNotificationMethod,
   buildRunEventNotificationContent:
     terminalNotificationsMocks.buildRunEventNotificationContent,
 }));
@@ -346,6 +355,7 @@ describe('AppContainer State Management', () => {
     // Initialize mock stdout for terminal title tests
 
     mocks.mockStdout.write.mockClear();
+    (disableMouseEvents as import('vitest').Mock).mockClear();
 
     capturedUIState = null!;
 
@@ -470,6 +480,7 @@ describe('AppContainer State Management', () => {
 
     // Mock Config
     mockConfig = makeFakeConfig();
+    vi.spyOn(mockConfig, 'getUseRenderProcess').mockReturnValue(false);
 
     // Mock config's getTargetDir to return consistent workspace directory
     vi.spyOn(mockConfig, 'getTargetDir').mockReturnValue('/test/workspace');
@@ -1303,15 +1314,15 @@ describe('AppContainer State Management', () => {
   });
 
   describe('Quota and Fallback Integration', () => {
-    it('passes a null proQuotaRequest to UIStateContext by default', async () => {
+    it('passes a null proQuotaRequest to QuotaContext by default', async () => {
       // The default mock from beforeEach already sets proQuotaRequest to null
       const { unmount } = await act(async () => renderAppContainer());
       // Assert that the context value is as expected
-      expect(capturedUIState.quota.proQuotaRequest).toBeNull();
+      expect(capturedQuotaState.proQuotaRequest).toBeNull();
       unmount();
     });
 
-    it('passes a valid proQuotaRequest to UIStateContext when provided by the hook', async () => {
+    it('passes a valid proQuotaRequest to QuotaContext when provided by the hook', async () => {
       // Arrange: Create a mock request object that a UI dialog would receive
       const mockRequest = {
         failedModel: 'gemini-pro',
@@ -1326,7 +1337,7 @@ describe('AppContainer State Management', () => {
       // Act: Render the container
       const { unmount } = await act(async () => renderAppContainer());
       // Assert: The mock request is correctly passed through the context
-      expect(capturedUIState.quota.proQuotaRequest).toEqual(mockRequest);
+      expect(capturedQuotaState.proQuotaRequest).toEqual(mockRequest);
       unmount();
     });
 
@@ -1356,6 +1367,7 @@ describe('AppContainer State Management', () => {
     beforeEach(() => {
       // Reset mock stdout for each test
       mocks.mockStdout.write.mockClear();
+      (disableMouseEvents as import('vitest').Mock).mockClear();
     });
 
     it('verifies useStdout is mocked', async () => {
@@ -2459,7 +2471,7 @@ describe('AppContainer State Management', () => {
     });
   });
 
-  describe('Copy Mode (CTRL+S)', () => {
+  describe('Copy Mode (F9)', () => {
     let rerender: () => void;
     let unmount: () => void;
     let stdin: Awaited<ReturnType<typeof render>>['stdin'];
@@ -2468,6 +2480,8 @@ describe('AppContainer State Management', () => {
       isAlternateMode = false,
       childHandler?: Mock,
     ) => {
+      vi.spyOn(mockConfig, 'getUseTerminalBuffer').mockReturnValue(false);
+
       vi.spyOn(mockConfig, 'getUseAlternateBuffer').mockReturnValue(
         isAlternateMode,
       );
@@ -2512,6 +2526,8 @@ describe('AppContainer State Management', () => {
 
     beforeEach(() => {
       mocks.mockStdout.write.mockClear();
+      (disableMouseEvents as import('vitest').Mock).mockClear();
+
       vi.useFakeTimers();
     });
 
@@ -2532,12 +2548,13 @@ describe('AppContainer State Management', () => {
         modeName: 'Alternate Buffer Mode',
       },
     ])('$modeName', ({ isAlternateMode, shouldEnable }) => {
-      it(`should ${shouldEnable ? 'toggle' : 'NOT toggle'} mouse off when Ctrl+S is pressed`, async () => {
+      it(`should ${shouldEnable ? 'toggle' : 'NOT toggle'} mouse off when F9 is pressed`, async () => {
         await setupCopyModeTest(isAlternateMode);
         mocks.mockStdout.write.mockClear(); // Clear initial enable call
+        (disableMouseEvents as import('vitest').Mock).mockClear();
 
         act(() => {
-          stdin.write('\x13'); // Ctrl+S
+          stdin.write('\x1b[20~'); // F9
         });
         rerender();
 
@@ -2550,13 +2567,13 @@ describe('AppContainer State Management', () => {
       });
 
       if (shouldEnable) {
-        it('should toggle mouse back on when Ctrl+S is pressed again', async () => {
+        it('should toggle mouse back on when F9 is pressed again', async () => {
           await setupCopyModeTest(isAlternateMode);
           (writeToStdout as Mock).mockClear();
 
           // Turn it on (disable mouse)
           act(() => {
-            stdin.write('\x13'); // Ctrl+S
+            stdin.write('\x1b[20~'); // F9
           });
           rerender();
           expect(disableMouseEvents).toHaveBeenCalled();
@@ -2576,7 +2593,7 @@ describe('AppContainer State Management', () => {
 
           // Enter copy mode
           act(() => {
-            stdin.write('\x13'); // Ctrl+S
+            stdin.write('\x1b[20~'); // F9
           });
           rerender();
 
@@ -2656,7 +2673,7 @@ describe('AppContainer State Management', () => {
 
           // 2. Enter copy mode
           act(() => {
-            stdin.write('\x13'); // Ctrl+S
+            stdin.write('\x1b[20~'); // F9
           });
           rerender();
 
@@ -3028,7 +3045,7 @@ describe('AppContainer State Management', () => {
       });
 
       const { unmount } = await act(async () => renderAppContainer());
-      expect(capturedUIState.userMessages).toContain('previous message');
+      expect(capturedInputState.userMessages).toContain('previous message');
 
       const { onCancelSubmit } = extractUseGeminiStreamArgs(
         mockedUseGeminiStream.mock.lastCall!,
@@ -3056,8 +3073,8 @@ describe('AppContainer State Management', () => {
       const { rerender, unmount } = await act(async () => renderAppContainer());
 
       // Verify userMessages is populated from inputHistory
-      expect(capturedUIState.userMessages).toContain('first prompt');
-      expect(capturedUIState.userMessages).toContain('second prompt');
+      expect(capturedInputState.userMessages).toContain('first prompt');
+      expect(capturedInputState.userMessages).toContain('second prompt');
 
       // Clear the conversation history (simulating /clear command)
       const mockClearItems = vi.fn();
@@ -3076,8 +3093,8 @@ describe('AppContainer State Management', () => {
 
       // Verify that userMessages still contains the input history
       // (it should not be affected by clearing conversation history)
-      expect(capturedUIState.userMessages).toContain('first prompt');
-      expect(capturedUIState.userMessages).toContain('second prompt');
+      expect(capturedInputState.userMessages).toContain('first prompt');
+      expect(capturedInputState.userMessages).toContain('second prompt');
 
       unmount();
     });
@@ -3093,6 +3110,7 @@ describe('AppContainer State Management', () => {
 
       // Clear previous calls
       mocks.mockStdout.write.mockClear();
+      (disableMouseEvents as import('vitest').Mock).mockClear();
 
       const { unmount } = await act(async () => renderAppContainer());
 
@@ -3135,16 +3153,13 @@ describe('AppContainer State Management', () => {
 
       // Reset mock stdout to clear any initial writes
       mocks.mockStdout.write.mockClear();
+      (disableMouseEvents as import('vitest').Mock).mockClear();
 
       // Submit
       await act(async () => capturedUIActions.handleFinalSubmit('test prompt'));
 
       // Should be reset
       expect(capturedUIState.constrainHeight).toBe(true);
-      // Should refresh static (which clears terminal in non-alternate buffer)
-      expect(mocks.mockStdout.write).toHaveBeenCalledWith(
-        ansiEscapes.clearTerminal,
-      );
       unmount();
     });
 
@@ -3153,6 +3168,8 @@ describe('AppContainer State Management', () => {
         './hooks/atCommandProcessor.js'
       );
       vi.mocked(checkPermissions).mockResolvedValue([]);
+
+      vi.spyOn(mockConfig, 'getUseTerminalBuffer').mockReturnValue(false);
 
       vi.spyOn(mockConfig, 'getUseAlternateBuffer').mockReturnValue(true);
 
@@ -3170,6 +3187,7 @@ describe('AppContainer State Management', () => {
 
       // Reset mock stdout
       mocks.mockStdout.write.mockClear();
+      (disableMouseEvents as import('vitest').Mock).mockClear();
 
       // Submit
       await act(async () => capturedUIActions.handleFinalSubmit('test prompt'));
@@ -3402,6 +3420,8 @@ describe('AppContainer State Management', () => {
       const settingsWithAlternateBuffer = createMockSettings({
         ui: { useAlternateBuffer: true },
       });
+
+      vi.spyOn(mockConfig, 'getUseTerminalBuffer').mockReturnValue(false);
 
       vi.spyOn(mockConfig, 'getUseAlternateBuffer').mockReturnValue(true);
 

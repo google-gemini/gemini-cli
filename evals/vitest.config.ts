@@ -24,7 +24,10 @@ export default defineConfig({
     environment: 'node',
     globals: true,
     alias: {
-      react: path.resolve(__dirname, '../node_modules/react'),
+      '@google/gemini-cli-core': path.resolve(
+        __dirname,
+        '../packages/core/index.ts',
+      ),
     },
     setupFiles: [path.resolve(__dirname, '../packages/cli/test-setup.ts')],
     server: {

@@ -104,7 +104,7 @@ describe('WebSearchTool', () => {
       });
 
       const invocation = tool.build(params);
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
 
       expect(result.llmContent).toBe(
         'Web search results for "successful query":\n\nHere are your results.',
@@ -129,7 +129,7 @@ describe('WebSearchTool', () => {
       });
 
       const invocation = tool.build(params);
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
 
       expect(result.llmContent).toBe(
         'No search results or information found for query: "no results query"',
@@ -143,7 +143,7 @@ describe('WebSearchTool', () => {
       (mockGeminiClient.generateContent as Mock).mockRejectedValue(testError);
 
       const invocation = tool.build(params);
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
 
       expect(result.error?.type).toBe(ToolErrorType.WEB_SEARCH_FAILED);
       expect(result.llmContent).toContain('Error:');
@@ -181,7 +181,7 @@ describe('WebSearchTool', () => {
       });
 
       const invocation = tool.build(params);
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
 
       const expectedLlmContent = `Web search results for "grounding query":
 
@@ -252,7 +252,7 @@ Sources:
       });
 
       const invocation = tool.build(params);
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
 
       const expectedLlmContent = `Web search results for "multibyte query":
 

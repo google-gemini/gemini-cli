@@ -6,6 +6,10 @@
 
 import { type ParsedSandboxDenial } from '../../services/sandboxManager.js';
 import type { ShellExecutionResult } from '../../services/shellExecutionService.js';
+import {
+  type SandboxDenialCache,
+  sanitizeExtractedPath,
+} from '../utils/sandboxDenialUtils.js';
 
 /**
  * Windows-specific sandbox denial detection.
@@ -13,10 +17,18 @@ import type { ShellExecutionResult } from '../../services/shellExecutionService.
  */
 export function parseWindowsSandboxDenials(
   result: ShellExecutionResult,
+  cache?: SandboxDenialCache,
 ): ParsedSandboxDenial | undefined {
   const output = result.output || '';
   const errorOutput = result.error?.message;
-  const combined = (output + ' ' + (errorOutput || '')).toLowerCase();
+  const fullText = output + '\n' + (errorOutput || '');
+  const combined = fullText.toLowerCase();
+
+  // Cache by the first 200 characters of the error to handle variable data (timestamps, PIDs)
+  const cacheKey = combined.trim().slice(0, 200);
+  if (cacheKey && cache?.has(cacheKey)) {
+    return undefined;
+  }
 
   const isFileDenial = [
     'access is denied',
@@ -46,30 +58,24 @@ export function parseWindowsSandboxDenials(
 
   // 1. Quoted paths: 'C:\Foo Bar' or "C:\Foo Bar"
   const quotedRegex = /['"]((?:\\\\(?:\?|\.)\\)?[a-zA-Z]:[\\/][^'"]+)['"]/g;
-  for (const match of output.matchAll(quotedRegex)) {
-    filePaths.add(match[1]);
-  }
-  if (errorOutput) {
-    for (const match of errorOutput.matchAll(quotedRegex)) {
-      filePaths.add(match[1]);
-    }
+  for (const match of fullText.matchAll(quotedRegex)) {
+    const sanitized = sanitizeExtractedPath(match[1]);
+    if (sanitized) filePaths.add(sanitized);
   }
 
   // 2. Unquoted paths or paths in PowerShell error format: PermissionDenied: (C:\path:String)
   const generalRegex =
     /(?:^|[\s(])((?:\\\\(?:\?|\.)\\)?[a-zA-Z]:[\\/][^"'\s()<>|?*]+)/g;
-  for (const match of output.matchAll(generalRegex)) {
+  for (const match of fullText.matchAll(generalRegex)) {
     // Clean up trailing colon which might be part of the error message rather than the path
     let p = match[1];
     if (p.endsWith(':')) p = p.slice(0, -1);
-    filePaths.add(p);
+    const sanitized = sanitizeExtractedPath(p);
+    if (sanitized) filePaths.add(sanitized);
   }
-  if (errorOutput) {
-    for (const match of errorOutput.matchAll(generalRegex)) {
-      let p = match[1];
-      if (p.endsWith(':')) p = p.slice(0, -1);
-      filePaths.add(p);
-    }
+
+  if (cacheKey && cache) {
+    cache.set(cacheKey, true);
   }
 
   return {

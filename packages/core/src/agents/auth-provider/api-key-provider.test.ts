@@ -6,10 +6,20 @@
 
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { ApiKeyAuthProvider } from './api-key-provider.js';
+import * as resolver from './value-resolver.js';
+
+vi.mock('./value-resolver.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./value-resolver.js')>();
+  return {
+    ...actual,
+    resolveAuthValue: vi.fn(),
+  };
+});
 
 describe('ApiKeyAuthProvider', () => {
   afterEach(() => {
     vi.unstubAllEnvs();
+    vi.restoreAllMocks();
   });
 
   describe('initialization', () => {
@@ -26,6 +36,7 @@ describe('ApiKeyAuthProvider', () => {
 
     it('should resolve API key from environment variable', async () => {
       vi.stubEnv('TEST_API_KEY', 'env-api-key');
+      vi.mocked(resolver.resolveAuthValue).mockResolvedValue('env-api-key');
 
       const provider = new ApiKeyAuthProvider({
         type: 'apiKey',
@@ -38,6 +49,10 @@ describe('ApiKeyAuthProvider', () => {
     });
 
     it('should throw if environment variable is not set', async () => {
+      vi.mocked(resolver.resolveAuthValue).mockRejectedValue(
+        new Error("Environment variable 'MISSING_KEY_12345' is not set"),
+      );
+
       const provider = new ApiKeyAuthProvider({
         type: 'apiKey',
         key: '$MISSING_KEY_12345',
@@ -114,6 +129,8 @@ describe('ApiKeyAuthProvider', () => {
 
     it('should return undefined for env-var keys on 403', async () => {
       vi.stubEnv('RETRY_TEST_KEY', 'some-key');
+      vi.mocked(resolver.resolveAuthValue).mockResolvedValue('some-key');
+
       const provider = new ApiKeyAuthProvider({
         type: 'apiKey',
         key: '$RETRY_TEST_KEY',
@@ -128,9 +145,13 @@ describe('ApiKeyAuthProvider', () => {
     });
 
     it('should re-resolve and return headers for command keys on 401', async () => {
+      vi.mocked(resolver.resolveAuthValue)
+        .mockResolvedValueOnce('initial-key')
+        .mockResolvedValueOnce('refreshed-key');
+
       const provider = new ApiKeyAuthProvider({
         type: 'apiKey',
-        key: '!echo refreshed-key',
+        key: '!some command',
       });
       await provider.initialize();
 
@@ -142,9 +163,11 @@ describe('ApiKeyAuthProvider', () => {
     });
 
     it('should stop retrying after MAX_AUTH_RETRIES', async () => {
+      vi.mocked(resolver.resolveAuthValue).mockResolvedValue('rotating-key');
+
       const provider = new ApiKeyAuthProvider({
         type: 'apiKey',
-        key: '!echo rotating-key',
+        key: '!some command',
       });
       await provider.initialize();
 

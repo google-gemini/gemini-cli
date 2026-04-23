@@ -30,7 +30,7 @@ Learn all about Gemini CLI in our [documentation](https://geminicli.com/docs/).
 ## 📦 Installation
 
 See
-[Gemini CLI installation, execution, and releases](./docs/get-started/installation.md)
+[Gemini CLI installation, execution, and releases](https://www.geminicli.com/docs/get-started/installation)
 for recommended system specifications and a detailed installation guide.
 
 ### Quick Install
@@ -71,9 +71,9 @@ conda activate gemini_env
 npm install -g @google/gemini-cli
 ```
 
-## Release Cadence and Tags
+## Release Channels
 
-See [Releases](./docs/releases.md) for more details.
+See [Releases](https://www.geminicli.com/docs/changelogs) for more details.
 
 ### Preview
 
@@ -209,7 +209,7 @@ gemini
 ```
 
 For Google Workspace accounts and other authentication methods, see the
-[authentication guide](./docs/get-started/authentication.md).
+[authentication guide](https://www.geminicli.com/docs/get-started/authentication).
 
 ## 🚀 Getting Started
 
@@ -278,59 +278,64 @@ gemini
 
 ### Getting Started
 
-- [**Quickstart Guide**](./docs/get-started/index.md) - Get up and running
-  quickly.
-- [**Authentication Setup**](./docs/get-started/authentication.md) - Detailed
-  auth configuration.
-- [**Configuration Guide**](./docs/reference/configuration.md) - Settings and
-  customization.
-- [**Keyboard Shortcuts**](./docs/reference/keyboard-shortcuts.md) -
+- [**Quickstart Guide**](https://www.geminicli.com/docs/get-started) - Get up
+  and running quickly.
+- [**Authentication Setup**](https://www.geminicli.com/docs/get-started/authentication) -
+  Detailed auth configuration.
+- [**Configuration Guide**](https://www.geminicli.com/docs/reference/configuration) -
+  Settings and customization.
+- [**Keyboard Shortcuts**](https://www.geminicli.com/docs/reference/keyboard-shortcuts) -
   Productivity tips.
 
 ### Core Features
 
-- [**Commands Reference**](./docs/reference/commands.md) - All slash commands
-  (`/help`, `/chat`, etc).
-- [**Custom Commands**](./docs/cli/custom-commands.md) - Create your own
-  reusable commands.
-- [**Context Files (GEMINI.md)**](./docs/cli/gemini-md.md) - Provide persistent
-  context to Gemini CLI.
-- [**Checkpointing**](./docs/cli/checkpointing.md) - Save and resume
-  conversations.
-- [**Token Caching**](./docs/cli/token-caching.md) - Optimize token usage.
+- [**Commands Reference**](https://www.geminicli.com/docs/reference/commands) -
+  All slash commands (`/help`, `/chat`, etc).
+- [**Custom Commands**](https://www.geminicli.com/docs/cli/custom-commands) -
+  Create your own reusable commands.
+- [**Context Files (GEMINI.md)**](https://www.geminicli.com/docs/cli/gemini-md) -
+  Provide persistent context to Gemini CLI.
+- [**Checkpointing**](https://www.geminicli.com/docs/cli/checkpointing) - Save
+  and resume conversations.
+- [**Token Caching**](https://www.geminicli.com/docs/cli/token-caching) -
+  Optimize token usage.
 
 ### Tools & Extensions
 
-- [**Built-in Tools Overview**](./docs/reference/tools.md)
-  - [File System Operations](./docs/tools/file-system.md)
-  - [Shell Commands](./docs/tools/shell.md)
-  - [Web Fetch & Search](./docs/tools/web-fetch.md)
-- [**MCP Server Integration**](./docs/tools/mcp-server.md) - Extend with custom
-  tools.
-- [**Custom Extensions**](./docs/extensions/index.md) - Build and share your own
-  commands.
+- [**Built-in Tools Overview**](https://www.geminicli.com/docs/reference/tools)
+  - [File System Operations](https://www.geminicli.com/docs/tools/file-system)
+  - [Shell Commands](https://www.geminicli.com/docs/tools/shell)
+  - [Web Fetch & Search](https://www.geminicli.com/docs/tools/web-fetch)
+- [**MCP Server Integration**](https://www.geminicli.com/docs/tools/mcp-server) -
+  Extend with custom tools.
+- [**Custom Extensions**](https://geminicli.com/docs/extensions/writing-extensions) -
+  Build and share your own commands.
 
 ### Advanced Topics
 
-- [**Headless Mode (Scripting)**](./docs/cli/headless.md) - Use Gemini CLI in
-  automated workflows.
-- [**IDE Integration**](./docs/ide-integration/index.md) - VS Code companion.
-- [**Sandboxing & Security**](./docs/cli/sandbox.md) - Safe execution
-  environments.
-- [**Trusted Folders**](./docs/cli/trusted-folders.md) - Control execution
-  policies by folder.
-- [**Enterprise Guide**](./docs/cli/enterprise.md) - Deploy and manage in a
-  corporate environment.
-- [**Telemetry & Monitoring**](./docs/cli/telemetry.md) - Usage tracking.
-- [**Tools reference**](./docs/reference/tools.md) - Built-in tools overview.
-- [**Local development**](./docs/local-development.md) - Local development
-  tooling.
+- [**Headless Mode (Scripting)**](https://www.geminicli.com/docs/cli/headless) -
+  Use Gemini CLI in automated workflows.
+- [**IDE Integration**](https://www.geminicli.com/docs/ide-integration) - VS
+  Code companion.
+- [**Sandboxing & Security**](https://www.geminicli.com/docs/cli/sandbox) - Safe
+  execution environments.
+- [**Trusted Folders**](https://www.geminicli.com/docs/cli/trusted-folders) -
+  Control execution policies by folder.
+- [**Enterprise Guide**](https://www.geminicli.com/docs/cli/enterprise) - Deploy
+  and manage in a corporate environment.
+- [**Telemetry & Monitoring**](https://www.geminicli.com/docs/cli/telemetry) -
+  Usage tracking.
+- [**Tools reference**](https://www.geminicli.com/docs/reference/tools) -
+  Built-in tools overview.
+- [**Local development**](https://www.geminicli.com/docs/local-development) -
+  Local development tooling.
 
 ### Troubleshooting & Support
 
-- [**Troubleshooting Guide**](./docs/resources/troubleshooting.md) - Common
-  issues and solutions.
-- [**FAQ**](./docs/resources/faq.md) - Frequently asked questions.
+- [**Troubleshooting Guide**](https://www.geminicli.com/docs/resources/troubleshooting) -
+  Common issues and solutions.
+- [**FAQ**](https://www.geminicli.com/docs/resources/faq) - Frequently asked
+  questions.
 - Use `/bug` command to report issues directly from the CLI.
 
 ### Using MCP Servers
@@ -344,8 +349,9 @@ custom tools:
 > @database Run a query to find inactive users
 ```
 
-See the [MCP Server Integration guide](./docs/tools/mcp-server.md) for setup
-instructions.
+See the
+[MCP Server Integration guide](https://www.geminicli.com/docs/tools/mcp-server)
+for setup instructions.
 
 ## 🤝 Contributing
 
@@ -366,7 +372,8 @@ for planned features and priorities.
 ## 📖 Resources
 
 - **[Official Roadmap](./ROADMAP.md)** - See what's coming next.
-- **[Changelog](./docs/changelogs/index.md)** - See recent notable updates.
+- **[Changelog](https://www.geminicli.com/docs/changelogs)** - See recent
+  notable updates.
 - **[NPM Package](https://www.npmjs.com/package/@google/gemini-cli)** - Package
   registry.
 - **[GitHub Issues](https://github.com/google-gemini/gemini-cli/issues)** -
@@ -376,13 +383,14 @@ for planned features and priorities.
 
 ### Uninstall
 
-See the [Uninstall Guide](./docs/resources/uninstall.md) for removal
-instructions.
+See the [Uninstall Guide](https://www.geminicli.com/docs/resources/uninstall)
+for removal instructions.
 
 ## 📄 Legal
 
 - **License**: [Apache License 2.0](LICENSE)
-- **Terms of Service**: [Terms & Privacy](./docs/resources/tos-privacy.md)
+- **Terms of Service**:
+  [Terms & Privacy](https://www.geminicli.com/docs/resources/tos-privacy)
 - **Security**: [Security Policy](SECURITY.md)
 
 ---

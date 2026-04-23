@@ -48,6 +48,10 @@ vi.mock('node:fs', () => {
     writeFileSync: vi.fn((path: string, data: string) => {
       mockFileSystem.set(path, data);
     }),
+    appendFileSync: vi.fn((path: string, data: string) => {
+      const current = mockFileSystem.get(path) || '';
+      mockFileSystem.set(path, current + data);
+    }),
     readFileSync: vi.fn((path: string) => {
       if (mockFileSystem.has(path)) {
         return mockFileSystem.get(path);
@@ -142,12 +146,14 @@ describe('GeminiChat', () => {
     let currentActiveModel = 'gemini-pro';
 
     mockConfig = {
+      getRequestTimeoutMs: vi.fn().mockReturnValue(undefined),
       get config() {
         return this;
       },
       promptId: 'test-session-id',
       getSessionId: () => 'test-session-id',
       getTelemetryLogPromptsEnabled: () => true,
+      getTelemetryTracesEnabled: () => false,
       getUsageStatisticsEnabled: () => true,
       getDebugMode: () => false,
       getContentGeneratorConfig: vi.fn().mockImplementation(() => ({
@@ -1081,8 +1087,10 @@ describe('GeminiChat', () => {
       );
 
       const { default: fs } = await import('node:fs');
-      const writeFileSync = vi.mocked(fs.writeFileSync);
-      const writeCountBefore = writeFileSync.mock.calls.length;
+      const appendFileSync = vi.mocked(fs.appendFileSync);
+      const writeCountBefore = appendFileSync.mock.calls.length;
+
+      await chat.initialize();
 
       const stream = await chat.sendMessageStream(
         { model: 'test-model' },
@@ -1095,17 +1103,19 @@ describe('GeminiChat', () => {
         // consume
       }
 
-      const newWrites = writeFileSync.mock.calls.slice(writeCountBefore);
+      const newWrites = appendFileSync.mock.calls.slice(writeCountBefore);
       expect(newWrites.length).toBeGreaterThan(0);
 
-      const lastWriteData = JSON.parse(
-        newWrites[newWrites.length - 1][1] as string,
-      ) as { messages: Array<{ type: string }> };
+      const geminiWrite = newWrites.find((w) => {
+        try {
+          const data = JSON.parse(w[1] as string);
+          return data.type === 'gemini';
+        } catch {
+          return false;
+        }
+      });
 
-      const geminiMessages = lastWriteData.messages.filter(
-        (m) => m.type === 'gemini',
-      );
-      expect(geminiMessages.length).toBeGreaterThan(0);
+      expect(geminiWrite).toBeDefined();
     });
   });
 
@@ -1140,41 +1150,6 @@ describe('GeminiChat', () => {
   });
 
   describe('sendMessageStream with retries', () => {
-    it('should not retry on invalid content if model does not start with gemini-2', async () => {
-      // Mock the stream to fail.
-      vi.mocked(mockContentGenerator.generateContentStream).mockImplementation(
-        async () =>
-          (async function* () {
-            yield {
-              candidates: [{ content: { parts: [{ text: '' }] } }],
-            } as unknown as GenerateContentResponse;
-          })(),
-      );
-
-      const stream = await chat.sendMessageStream(
-        { model: 'gemini-1.5-pro' },
-        'test',
-        'prompt-id-no-retry',
-        new AbortController().signal,
-        LlmRole.MAIN,
-      );
-
-      await expect(
-        (async () => {
-          for await (const _ of stream) {
-            // Must loop to trigger the internal logic that throws.
-          }
-        })(),
-      ).rejects.toThrow(InvalidStreamError);
-
-      // Should be called only 1 time (no retry)
-      expect(mockContentGenerator.generateContentStream).toHaveBeenCalledTimes(
-        1,
-      );
-      expect(mockLogContentRetry).not.toHaveBeenCalled();
-      expect(mockLogContentRetryFailure).toHaveBeenCalledTimes(1);
-    });
-
     it('should yield a RETRY event when an invalid stream is encountered', async () => {
       // ARRANGE: Mock the stream to fail once, then succeed.
       vi.mocked(mockContentGenerator.generateContentStream)

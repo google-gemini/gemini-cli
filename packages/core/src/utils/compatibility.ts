@@ -85,6 +85,11 @@ export function supports256Colors(): boolean {
     return true;
   }
 
+  // Terminals supporting true color (like kmscon) also support 256 colors
+  if (supportsTrueColor()) {
+    return true;
+  }
+
   return false;
 }
 
@@ -95,7 +100,8 @@ export function supportsTrueColor(): boolean {
   // Check COLORTERM environment variable
   if (
     process.env['COLORTERM'] === 'truecolor' ||
-    process.env['COLORTERM'] === '24bit'
+    process.env['COLORTERM'] === '24bit' ||
+    process.env['COLORTERM'] === 'kmscon'
   ) {
     return true;
   }
@@ -141,15 +147,6 @@ export function getCompatibilityWarnings(options?: {
       id: 'jetbrains-terminal',
       message:
         'Warning: JetBrains terminal detected — alternate buffer mode may cause scroll wheel issues and rendering artifacts. If you experience problems, disable it in /settings → "Use Alternate Screen Buffer".',
-      priority: WarningPriority.High,
-    });
-  }
-
-  if (isTmux() && options?.isAlternateBuffer) {
-    warnings.push({
-      id: 'tmux-alternate-buffer',
-      message:
-        'Warning: tmux detected — alternate buffer mode may cause unexpected scrollback loss and flickering. If you experience issues, disable it in /settings → "Use Alternate Screen Buffer".\n    Tip: Use Ctrl-b [ to access tmux copy mode for scrolling history.',
       priority: WarningPriority.High,
     });
   }

@@ -16,6 +16,7 @@ import type { AnySchema } from 'ajv';
 import type { AgentCard } from '@a2a-js/sdk';
 import type { A2AAuthConfig } from './auth-provider/types.js';
 import type { MCPServerConfig } from '../config/config.js';
+import type { GeminiChat } from '../core/geminiChat.js';
 
 /**
  * Describes the possible termination modes for an agent.
@@ -215,6 +216,18 @@ export interface LocalAgentDefinition<
   toolConfig?: ToolConfig;
 
   /**
+   * Optional additional workspace directories scoped to this agent.
+   * When provided, the agent receives a workspace context that extends
+   * the parent's with these directories. Other agents and the main
+   * session are unaffected. If omitted, the parent workspace context
+   * is inherited unchanged.
+   *
+   * Note: Filesystem root paths (e.g. `/` or `C:\`) are rejected at
+   * runtime to prevent accidentally granting access to the entire filesystem.
+   */
+  workspaceDirectories?: string[];
+
+  /**
    * Optional inline MCP servers for this agent.
    */
   mcpServers?: Record<string, MCPServerConfig>;
@@ -227,6 +240,18 @@ export interface LocalAgentDefinition<
    * @returns A string representation of the final output.
    */
   processOutput?: (output: z.infer<TOutput>) => string;
+
+  /**
+   * Optional hook invoked before each model call. Receives the active
+   * {@link GeminiChat} instance and may modify chat history (e.g., to
+   * supersede stale tool outputs and reclaim context-window tokens).
+   *
+   * Runs immediately after chat compression in the agent loop.
+   */
+  onBeforeTurn?: (
+    chat: GeminiChat,
+    signal?: AbortSignal,
+  ) => Promise<void> | void;
 }
 
 export interface BaseRemoteAgentDefinition<

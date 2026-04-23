@@ -130,7 +130,7 @@ export class ListCheckpointsCommand implements Command {
       const checkpointDir = config.storage.getProjectTempCheckpointsDir();
       try {
         await fs.mkdir(checkpointDir, { recursive: true });
-      } catch (_e) {
+      } catch {
         // Ignore
       }
 
@@ -169,7 +169,7 @@ export class ListCheckpointsCommand implements Command {
         name: this.name,
         data: `Available Checkpoints:\n${formatted}`,
       };
-    } catch (_error) {
+    } catch {
       return {
         name: this.name,
         data: 'An unexpected error occurred while listing checkpoints.',

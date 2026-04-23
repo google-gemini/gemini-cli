@@ -1,8 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="920" height="343" viewBox="0 0 920 343">
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="360" viewBox="0 0 920 360">
   <style>
     text { font-family: Consolas, "Courier New", monospace; font-size: 14px; dominant-baseline: text-before-edge; white-space: pre; }
   </style>
-  <rect width="920" height="343" fill="#000000" />
+  <rect width="920" height="360" fill="#000000" />
   <g transform="translate(10, 10)">
     <text x="9" y="19" fill="#4796e4" textLength="9" lengthAdjust="spacingAndGlyphs">▝</text>
     <text x="18" y="19" fill="#6688d9" textLength="9" lengthAdjust="spacingAndGlyphs">▜</text>
@@ -30,16 +30,16 @@
     <text x="72" y="189" fill="#ffffff" textLength="189" lengthAdjust="spacingAndGlyphs"> for more information</text>
     <text x="0" y="206" fill="#ffffff" textLength="450" lengthAdjust="spacingAndGlyphs">3. Ask coding questions, edit code or run commands</text>
     <text x="0" y="223" fill="#ffffff" textLength="315" lengthAdjust="spacingAndGlyphs">4. Be specific for the best results</text>
-    <text x="0" y="240" fill="#87afff" textLength="864" lengthAdjust="spacingAndGlyphs">╭──────────────────────────────────────────────────────────────────────────────────────────────╮</text>
-    <text x="0" y="257" fill="#87afff" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="18" y="257" fill="#87afff" textLength="9" lengthAdjust="spacingAndGlyphs">⊶</text>
-    <text x="45" y="257" fill="#ffffff" textLength="153" lengthAdjust="spacingAndGlyphs" font-weight="bold">run_shell_command</text>
-    <text x="855" y="257" fill="#87afff" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="257" fill="#87afff" textLength="864" lengthAdjust="spacingAndGlyphs">╭──────────────────────────────────────────────────────────────────────────────────────────────╮</text>
     <text x="0" y="274" fill="#87afff" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="18" y="274" fill="#87afff" textLength="9" lengthAdjust="spacingAndGlyphs">⊶</text>
+    <text x="45" y="274" fill="#ffffff" textLength="153" lengthAdjust="spacingAndGlyphs" font-weight="bold">run_shell_command</text>
     <text x="855" y="274" fill="#87afff" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="291" fill="#87afff" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="18" y="291" fill="#ffffff" textLength="162" lengthAdjust="spacingAndGlyphs">Running command...</text>
     <text x="855" y="291" fill="#87afff" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="0" y="308" fill="#87afff" textLength="864" lengthAdjust="spacingAndGlyphs">╰──────────────────────────────────────────────────────────────────────────────────────────────╯</text>
+    <text x="0" y="308" fill="#87afff" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="18" y="308" fill="#ffffff" textLength="162" lengthAdjust="spacingAndGlyphs">Running command...</text>
+    <text x="855" y="308" fill="#87afff" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="325" fill="#87afff" textLength="864" lengthAdjust="spacingAndGlyphs">╰──────────────────────────────────────────────────────────────────────────────────────────────╯</text>
   </g>
 </svg>

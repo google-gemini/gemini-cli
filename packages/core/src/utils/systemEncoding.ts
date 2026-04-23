@@ -88,7 +88,7 @@ export function getSystemEncoding(): string | null {
       locale = execSync('locale charmap', { encoding: 'utf8' })
         .toString()
         .trim();
-    } catch (_e) {
+    } catch {
       debugLogger.warn('Failed to get locale charmap.');
       return null;
     }

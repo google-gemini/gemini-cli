@@ -34,6 +34,9 @@ describe('ToolConfirmationMessage', () => {
     confirm: mockConfirm,
     cancel: vi.fn(),
     isDiffingEnabled: false,
+    isExpanded: vi.fn().mockReturnValue(false),
+    toggleExpansion: vi.fn(),
+    toggleAllExpansion: vi.fn(),
   });
 
   const mockConfig = {
@@ -59,6 +62,7 @@ describe('ToolConfirmationMessage', () => {
         getPreferredEditor={vi.fn()}
         availableTerminalHeight={30}
         terminalWidth={80}
+        toolName="shell"
       />,
     );
 
@@ -85,6 +89,7 @@ describe('ToolConfirmationMessage', () => {
         getPreferredEditor={vi.fn()}
         availableTerminalHeight={30}
         terminalWidth={80}
+        toolName="shell"
       />,
     );
 
@@ -108,6 +113,7 @@ describe('ToolConfirmationMessage', () => {
         getPreferredEditor={vi.fn()}
         availableTerminalHeight={30}
         terminalWidth={80}
+        toolName="shell"
       />,
     );
 
@@ -137,6 +143,7 @@ describe('ToolConfirmationMessage', () => {
         getPreferredEditor={vi.fn()}
         availableTerminalHeight={30}
         terminalWidth={80}
+        toolName="shell"
       />,
     );
 
@@ -166,6 +173,7 @@ describe('ToolConfirmationMessage', () => {
         getPreferredEditor={vi.fn()}
         availableTerminalHeight={30}
         terminalWidth={80}
+        toolName="shell"
       />,
     );
 
@@ -194,6 +202,7 @@ describe('ToolConfirmationMessage', () => {
         getPreferredEditor={vi.fn()}
         availableTerminalHeight={30}
         terminalWidth={80}
+        toolName="shell"
       />,
     );
 
@@ -222,6 +231,7 @@ describe('ToolConfirmationMessage', () => {
         getPreferredEditor={vi.fn()}
         availableTerminalHeight={30}
         terminalWidth={80}
+        toolName="shell"
       />,
     );
 
@@ -250,6 +260,7 @@ describe('ToolConfirmationMessage', () => {
         getPreferredEditor={vi.fn()}
         availableTerminalHeight={30}
         terminalWidth={80}
+        toolName="shell"
       />,
     );
     await result.waitUntilReady();
@@ -335,6 +346,7 @@ describe('ToolConfirmationMessage', () => {
             getPreferredEditor={vi.fn()}
             availableTerminalHeight={30}
             terminalWidth={80}
+            toolName="shell"
           />,
         );
 
@@ -358,6 +370,7 @@ describe('ToolConfirmationMessage', () => {
             getPreferredEditor={vi.fn()}
             availableTerminalHeight={30}
             terminalWidth={80}
+            toolName="shell"
           />,
         );
 
@@ -393,6 +406,7 @@ describe('ToolConfirmationMessage', () => {
           getPreferredEditor={vi.fn()}
           availableTerminalHeight={30}
           terminalWidth={80}
+          toolName="shell"
         />,
         {
           settings: createMockSettings({
@@ -420,6 +434,7 @@ describe('ToolConfirmationMessage', () => {
           getPreferredEditor={vi.fn()}
           availableTerminalHeight={30}
           terminalWidth={80}
+          toolName="shell"
         />,
         {
           settings: createMockSettings({
@@ -458,7 +473,11 @@ describe('ToolConfirmationMessage', () => {
         confirm: vi.fn(),
         cancel: vi.fn(),
         isDiffingEnabled: false,
+        isExpanded: vi.fn().mockReturnValue(false),
+        toggleExpansion: vi.fn(),
+        toggleAllExpansion: vi.fn(),
       });
+
       const { lastFrame, unmount } = await renderWithProviders(
         <ToolConfirmationMessage
           callId="test-call-id"
@@ -467,6 +486,7 @@ describe('ToolConfirmationMessage', () => {
           getPreferredEditor={vi.fn()}
           availableTerminalHeight={30}
           terminalWidth={80}
+          toolName="shell"
         />,
       );
 
@@ -485,7 +505,11 @@ describe('ToolConfirmationMessage', () => {
         confirm: vi.fn(),
         cancel: vi.fn(),
         isDiffingEnabled: false,
+        isExpanded: vi.fn().mockReturnValue(false),
+        toggleExpansion: vi.fn(),
+        toggleAllExpansion: vi.fn(),
       });
+
       const { lastFrame, unmount } = await renderWithProviders(
         <ToolConfirmationMessage
           callId="test-call-id"
@@ -494,6 +518,7 @@ describe('ToolConfirmationMessage', () => {
           getPreferredEditor={vi.fn()}
           availableTerminalHeight={30}
           terminalWidth={80}
+          toolName="shell"
         />,
       );
 
@@ -512,6 +537,9 @@ describe('ToolConfirmationMessage', () => {
         confirm: vi.fn(),
         cancel: vi.fn(),
         isDiffingEnabled: true,
+        isExpanded: vi.fn().mockReturnValue(false),
+        toggleExpansion: vi.fn(),
+        toggleAllExpansion: vi.fn(),
       });
 
       const { lastFrame, unmount } = await renderWithProviders(
@@ -522,6 +550,7 @@ describe('ToolConfirmationMessage', () => {
           getPreferredEditor={vi.fn()}
           availableTerminalHeight={30}
           terminalWidth={80}
+          toolName="shell"
         />,
       );
 
@@ -548,6 +577,7 @@ describe('ToolConfirmationMessage', () => {
         getPreferredEditor={vi.fn()}
         availableTerminalHeight={30}
         terminalWidth={80}
+        toolName="shell"
       />,
     );
 
@@ -593,6 +623,7 @@ describe('ToolConfirmationMessage', () => {
         getPreferredEditor={vi.fn()}
         availableTerminalHeight={30}
         terminalWidth={80}
+        toolName="shell"
       />,
     );
 
@@ -624,6 +655,7 @@ describe('ToolConfirmationMessage', () => {
         getPreferredEditor={vi.fn()}
         availableTerminalHeight={30}
         terminalWidth={80}
+        toolName="shell"
       />,
     );
 
@@ -658,13 +690,14 @@ describe('ToolConfirmationMessage', () => {
             getPreferredEditor={vi.fn()}
             availableTerminalHeight={40}
             terminalWidth={80}
+            toolName="shell"
           />,
         );
       await waitUntilReady();
 
       const outputLines = lastFrame().split('\n');
-      // Should use the entire terminal height minus 1 line for the "Press Ctrl+O to show more lines" hint
-      expect(outputLines.length).toBe(39);
+      // Should use the entire terminal height
+      expect(outputLines.length).toBe(40);
 
       await expect({ lastFrame, generateSvg }).toMatchSvgSnapshot();
       unmount();
@@ -698,13 +731,14 @@ describe('ToolConfirmationMessage', () => {
             getPreferredEditor={vi.fn()}
             availableTerminalHeight={40}
             terminalWidth={80}
+            toolName="shell"
           />,
         );
       await waitUntilReady();
 
       const outputLines = lastFrame().split('\n');
-      // Should use the entire terminal height minus 1 line for the "Press Ctrl+O to show more lines" hint
-      expect(outputLines.length).toBe(39);
+      // Should use the entire terminal height
+      expect(outputLines.length).toBe(40);
 
       await expect({ lastFrame, generateSvg }).toMatchSvgSnapshot();
       unmount();
@@ -728,6 +762,9 @@ describe('ToolConfirmationMessage', () => {
         confirm: mockConfirm,
         cancel: vi.fn(),
         isDiffingEnabled: false,
+        isExpanded: vi.fn().mockReturnValue(false),
+        toggleExpansion: vi.fn(),
+        toggleAllExpansion: vi.fn(),
       });
       const confirmationDetails: SerializableConfirmationDetails = {
         type: 'info',
@@ -744,6 +781,7 @@ describe('ToolConfirmationMessage', () => {
           getPreferredEditor={vi.fn()}
           availableTerminalHeight={30}
           terminalWidth={80}
+          toolName="shell"
         />,
       );
 

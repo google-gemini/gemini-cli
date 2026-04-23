@@ -29,7 +29,7 @@ vi.mock('node:fs', async (importOriginal) => {
 });
 
 describe('worktree utilities', () => {
-  const projectRoot = '/mock/project';
+  const projectRoot = path.resolve('/mock/project');
   const worktreeName = 'test-feature';
   const expectedPath = path.join(
     projectRoot,
@@ -49,12 +49,12 @@ describe('worktree utilities', () => {
         stdout: '.git\n',
       } as never);
 
-      const result = await getProjectRootForWorktree('/mock/project');
-      expect(result).toBe('/mock/project');
+      const result = await getProjectRootForWorktree(projectRoot);
+      expect(result).toBe(projectRoot);
       expect(execa).toHaveBeenCalledWith(
         'git',
         ['rev-parse', '--git-common-dir'],
-        { cwd: '/mock/project' },
+        { cwd: projectRoot },
       );
     });
 
@@ -119,7 +119,9 @@ describe('worktree utilities', () => {
       expect(isGeminiWorktree(path.join(projectRoot, 'src'), projectRoot)).toBe(
         false,
       );
-      expect(isGeminiWorktree('/some/other/path', projectRoot)).toBe(false);
+      expect(
+        isGeminiWorktree(path.resolve('/some/other/path'), projectRoot),
+      ).toBe(false);
     });
   });
 
@@ -229,7 +231,7 @@ describe('worktree utilities', () => {
 });
 
 describe('WorktreeService', () => {
-  const projectRoot = '/mock/project';
+  const projectRoot = path.resolve('/mock/project');
   const service = new WorktreeService(projectRoot);
 
   beforeEach(() => {
@@ -267,7 +269,7 @@ describe('WorktreeService', () => {
   describe('maybeCleanup', () => {
     const info = {
       name: 'feature-x',
-      path: '/mock/project/.gemini/worktrees/feature-x',
+      path: path.join(projectRoot, '.gemini', 'worktrees', 'feature-x'),
       baseSha: 'base-sha',
     };
 

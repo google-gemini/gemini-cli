@@ -116,6 +116,8 @@ export function startCallbackServer(
     portReject = reject;
   });
 
+  let timeoutId: NodeJS.Timeout | undefined;
+
   const responsePromise = new Promise<OAuthAuthorizationResponse>(
     (resolve, reject) => {
       let serverPort: number;
@@ -221,18 +223,31 @@ export function startCallbackServer(
         portResolve(serverPort); // Resolve port promise immediately
       });
 
-      // Timeout after 5 minutes
-      setTimeout(
+      const abortController = new AbortController();
+      timeoutId = setTimeout(
         () => {
-          server.close();
-          reject(new Error('OAuth callback timeout'));
+          abortController.abort(new Error('OAuth callback timeout'));
         },
         5 * 60 * 1000,
       );
+      timeoutId.unref();
+
+      const onAbort = () => {
+        server.close();
+        reject(abortController.signal.reason);
+      };
+      abortController.signal.addEventListener('abort', onAbort, { once: true });
+
+      server.on('close', () => {
+        abortController.signal.removeEventListener('abort', onAbort);
+      });
     },
   );
 
-  return { port: portPromise, response: responsePromise };
+  return {
+    port: portPromise,
+    response: responsePromise,
+  };
 }
 
 /**

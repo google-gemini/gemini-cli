@@ -43,6 +43,35 @@ vi.mock('../utils/shell-utils.js', async (importOriginal) => {
       }
       return [command];
     }),
+    parseCommandDetails: vi.fn().mockImplementation((command: string) => {
+      // Basic mock implementation for PolicyEngine test needs
+      const commands = command.includes('&&')
+        ? command.split('&&').map((c) => c.trim())
+        : [command.trim()];
+
+      // Detect $(...) or `...` and add as sub-commands for recursion tests
+      const subCommands = [...commands];
+      for (const cmd of commands) {
+        const subMatch = cmd.match(/\$\((.*)\)/) || cmd.match(/`(.*)`/);
+        if (subMatch?.[1]) {
+          subCommands.push(subMatch[1].trim());
+        }
+      }
+
+      return {
+        details: subCommands.map((c, i) => ({
+          name: c.split(' ')[0],
+          text: c,
+          startIndex: i === 0 ? 0 : -1, // Simple root indication
+        })),
+        hasError: false,
+      };
+    }),
+    stripShellWrapper: vi.fn().mockImplementation((command: string) => {
+      // Simple mock for stripping wrappers
+      const match = command.match(/^(?:bash|sh|zsh)\s+-c\s+["'](.*)["']$/i);
+      return match ? match[1] : command;
+    }),
     hasRedirection: vi.fn().mockImplementation(
       (command: string) =>
         // Simple mock: true if '>' is present, unless it looks like "-> arrow"
@@ -270,6 +299,22 @@ describe('PolicyEngine', () => {
       // Call using legacyName1, should be denied because legacyName2 has a deny rule
       // and they both point to the same canonical tool.
       const { decision } = await engine.check({ name: legacyName1 }, undefined);
+      expect(decision).toBe(PolicyDecision.DENY);
+    });
+
+    it('should match subagent name as alias for invoke_agent', async () => {
+      const rules: PolicyRule[] = [
+        { toolName: 'codebase_investigator', decision: PolicyDecision.DENY },
+      ];
+
+      engine = new PolicyEngine({ rules });
+
+      const toolCall: FunctionCall = {
+        name: 'invoke_agent',
+        args: { agent_name: 'codebase_investigator', prompt: 'Hello' },
+      };
+
+      const { decision } = await engine.check(toolCall, undefined);
       expect(decision).toBe(PolicyDecision.DENY);
     });
 
@@ -1715,13 +1760,13 @@ describe('PolicyEngine', () => {
 
   describe('Plan Mode vs Subagent Priority (Regression)', () => {
     it('should DENY subagents in Plan Mode despite dynamic allow rules', async () => {
-      // Plan Mode Deny (1.06) > Subagent Allow (1.05)
+      // Plan Mode Deny (1.04) > Subagent Allow (1.03)
 
       const fixedRules: PolicyRule[] = [
         {
           toolName: '*',
           decision: PolicyDecision.DENY,
-          priority: 1.06,
+          priority: 1.04,
           modes: [ApprovalMode.PLAN],
         },
         {
@@ -1746,6 +1791,39 @@ describe('PolicyEngine', () => {
   });
 
   describe('shell command parsing failure', () => {
+    it('should return ALLOW in YOLO mode for dangerous commands due to heuristics override', async () => {
+      // Create an engine with YOLO mode and a sandbox manager that flags a command as dangerous
+      const rules: PolicyRule[] = [
+        {
+          toolName: '*',
+          decision: PolicyDecision.ALLOW,
+          priority: 999,
+          modes: [ApprovalMode.YOLO],
+        },
+      ];
+
+      const mockSandboxManager = new NoopSandboxManager();
+      mockSandboxManager.isDangerousCommand = vi.fn().mockReturnValue(true);
+      mockSandboxManager.isKnownSafeCommand = vi.fn().mockReturnValue(false);
+
+      engine = new PolicyEngine({
+        rules,
+        approvalMode: ApprovalMode.YOLO,
+        sandboxManager: mockSandboxManager,
+      });
+
+      const result = await engine.check(
+        {
+          name: 'run_shell_command',
+          args: { command: 'powershell echo "dangerous"' },
+        },
+        undefined,
+      );
+
+      // Even though the command is flagged as dangerous, YOLO mode should preserve the ALLOW decision
+      expect(result.decision).toBe(PolicyDecision.ALLOW);
+    });
+
     it('should return ALLOW in YOLO mode even if shell command parsing fails', async () => {
       const { splitCommands } = await import('../utils/shell-utils.js');
       const rules: PolicyRule[] = [
@@ -1813,7 +1891,6 @@ describe('PolicyEngine', () => {
     });
 
     it('should return ASK_USER in non-YOLO mode if shell command parsing fails', async () => {
-      const { splitCommands } = await import('../utils/shell-utils.js');
       const rules: PolicyRule[] = [
         {
           toolName: 'run_shell_command',
@@ -1828,7 +1905,11 @@ describe('PolicyEngine', () => {
       });
 
       // Simulate parsing failure
-      vi.mocked(splitCommands).mockReturnValueOnce([]);
+      const { parseCommandDetails } = await import('../utils/shell-utils.js');
+      vi.mocked(parseCommandDetails).mockReturnValueOnce({
+        details: [],
+        hasError: true,
+      });
 
       const result = await engine.check(
         { name: 'run_shell_command', args: { command: 'complex command' } },
@@ -2930,6 +3011,12 @@ describe('PolicyEngine', () => {
             modes: [ApprovalMode.PLAN],
           },
           {
+            toolName: 'web_fetch',
+            decision: PolicyDecision.ASK_USER,
+            priority: 70,
+            modes: [ApprovalMode.PLAN],
+          },
+          {
             toolName: '*',
             decision: PolicyDecision.DENY,
             priority: 60,
@@ -2972,7 +3059,6 @@ describe('PolicyEngine', () => {
       const excluded = engine.getExcludedTools(toolMetadata, allToolNames);
       // These should be excluded (caught by catch-all DENY)
       expect(excluded.has('shell')).toBe(true);
-      expect(excluded.has('web_fetch')).toBe(true);
       expect(excluded.has('write_todos')).toBe(true);
       expect(excluded.has('memory')).toBe(true);
       // write_file and replace are excluded unless they have argsPattern rules
@@ -2988,6 +3074,7 @@ describe('PolicyEngine', () => {
       expect(excluded.has('list_directory')).toBe(false);
       expect(excluded.has('google_web_search')).toBe(false);
       expect(excluded.has('activate_skill')).toBe(false);
+      expect(excluded.has('web_fetch')).toBe(false);
       expect(excluded.has('ask_user')).toBe(false);
       expect(excluded.has('exit_plan_mode')).toBe(false);
       expect(excluded.has('save_memory')).toBe(false);
@@ -3622,6 +3709,152 @@ describe('PolicyEngine', () => {
           )
         ).decision,
       ).toBe(PolicyDecision.ALLOW);
+    });
+  });
+
+  describe('additional_permissions', () => {
+    const workspace = '/workspace';
+    let mockSandboxManager: SandboxManager;
+    let engine: PolicyEngine;
+
+    beforeEach(() => {
+      mockSandboxManager = {
+        prepareCommand: vi.fn(),
+        isKnownSafeCommand: vi.fn().mockReturnValue(false),
+        isDangerousCommand: vi.fn().mockReturnValue(false),
+        parseDenials: vi.fn(),
+        getWorkspace: vi.fn().mockReturnValue(workspace),
+      } as never as SandboxManager;
+
+      engine = new PolicyEngine({
+        rules: [
+          {
+            toolName: 'run_shell_command',
+            decision: PolicyDecision.ALLOW,
+            modes: [ApprovalMode.AUTO_EDIT],
+          },
+        ],
+        approvalMode: ApprovalMode.AUTO_EDIT,
+        sandboxManager: mockSandboxManager,
+      });
+    });
+
+    it('should allow permissions exactly at the workspace root', async () => {
+      const call = {
+        name: 'run_shell_command',
+        args: {
+          command: 'ls',
+          additional_permissions: {
+            fileSystem: {
+              read: [workspace],
+            },
+          },
+        },
+      };
+      expect((await engine.check(call, undefined)).decision).toBe(
+        PolicyDecision.ALLOW,
+      );
+    });
+
+    it('should allow permissions for subpaths of the workspace', async () => {
+      const call = {
+        name: 'run_shell_command',
+        args: {
+          command: 'ls',
+          additional_permissions: {
+            fileSystem: {
+              read: [`${workspace}/subdir/file.txt`],
+            },
+          },
+        },
+      };
+      expect((await engine.check(call, undefined)).decision).toBe(
+        PolicyDecision.ALLOW,
+      );
+    });
+
+    it('should downgrade ALLOW to ASK_USER if a read path is outside workspace', async () => {
+      const call = {
+        name: 'run_shell_command',
+        args: {
+          command: 'ls',
+          additional_permissions: {
+            fileSystem: {
+              read: ['/outside'],
+            },
+          },
+        },
+      };
+      expect((await engine.check(call, undefined)).decision).toBe(
+        PolicyDecision.ASK_USER,
+      );
+    });
+
+    it('should downgrade ALLOW to ASK_USER if a write path is outside workspace', async () => {
+      const call = {
+        name: 'run_shell_command',
+        args: {
+          command: 'ls',
+          additional_permissions: {
+            fileSystem: {
+              write: ['/outside/secret.txt'],
+            },
+          },
+        },
+      };
+      expect((await engine.check(call, undefined)).decision).toBe(
+        PolicyDecision.ASK_USER,
+      );
+    });
+
+    it('should downgrade ALLOW to ASK_USER if any path in a list is outside workspace', async () => {
+      const call = {
+        name: 'run_shell_command',
+        args: {
+          command: 'ls',
+          additional_permissions: {
+            fileSystem: {
+              read: [`${workspace}/safe`, '/outside'],
+            },
+          },
+        },
+      };
+      expect((await engine.check(call, undefined)).decision).toBe(
+        PolicyDecision.ASK_USER,
+      );
+    });
+
+    it('should handle missing or empty fileSystem permissions gracefully (ALLOW)', async () => {
+      const call = {
+        name: 'run_shell_command',
+        args: {
+          command: 'ls',
+          additional_permissions: {
+            network: true,
+          },
+        },
+      };
+      expect((await engine.check(call, undefined)).decision).toBe(
+        PolicyDecision.ALLOW,
+      );
+    });
+
+    it('should handle non-array fileSystem paths gracefully', async () => {
+      const call = {
+        name: 'run_shell_command',
+        args: {
+          command: 'ls',
+          additional_permissions: {
+            fileSystem: {
+              read: '/not/an/array' as never as string[],
+            },
+          },
+        },
+      };
+      // It should just ignore the non-array and keep ALLOW if no other rules trigger
+      expect((await engine.check(call, undefined)).decision).toBe(
+        PolicyDecision.ALLOW,
+      );
     });
   });
 });

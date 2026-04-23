@@ -302,6 +302,10 @@ export async function openDiff(
 
   if (isTerminalEditor(editor)) {
     try {
+      if (!commandExists(diffCommand.command)) {
+        throw new Error(`Editor command not found: ${diffCommand.command}`);
+      }
+
       const result = spawnSync(diffCommand.command, diffCommand.args, {
         stdio: 'inherit',
       });

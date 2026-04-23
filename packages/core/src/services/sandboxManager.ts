@@ -15,7 +15,6 @@ import {
   isKnownSafeCommand as isWindowsSafeCommand,
   isDangerousCommand as isWindowsDangerousCommand,
 } from '../sandbox/windows/commandSafety.js';
-import { isNodeError } from '../utils/errors.js';
 import {
   sanitizeEnvironment,
   getSecureSanitizationConfig,
@@ -23,6 +22,45 @@ import {
 } from './environmentSanitization.js';
 import type { ShellExecutionResult } from './shellExecutionService.js';
 import type { SandboxPolicyManager } from '../policy/sandboxPolicyManager.js';
+import {
+  toPathKey,
+  deduplicateAbsolutePaths,
+  resolveToRealPath,
+} from '../utils/paths.js';
+import { resolveGitWorktreePaths } from '../sandbox/utils/fsUtils.js';
+
+/**
+ * A structured result of fully resolved sandbox paths.
+ * All paths in this object are absolute, deduplicated, and expanded to include
+ * both the original path and its real target (if it is a symlink).
+ */
+export interface ResolvedSandboxPaths {
+  /** The primary workspace directory. */
+  workspace: {
+    /** The original path provided in the sandbox options. */
+    original: string;
+    /** The real path. */
+    resolved: string;
+  };
+  /** Explicitly denied paths. */
+  forbidden: string[];
+  /** Directories included globally across all commands in this sandbox session. */
+  globalIncludes: string[];
+  /** Paths explicitly allowed by the policy of the currently executing command. */
+  policyAllowed: string[];
+  /** Paths granted temporary read access by the current command's dynamic permissions. */
+  policyRead: string[];
+  /** Paths granted temporary write access by the current command's dynamic permissions. */
+  policyWrite: string[];
+  /** Auto-detected paths for git worktrees/submodules. */
+  gitWorktree?: {
+    /** The actual .git directory for this worktree. */
+    worktreeGitDir: string;
+    /** The main repository's .git directory (if applicable). */
+    mainGitDir?: string;
+  };
+}
+
 export interface SandboxPermissions {
   /** Filesystem permissions. */
   fileSystem?: {
@@ -57,19 +95,19 @@ export interface SandboxModeConfig {
   network?: boolean;
   approvedTools?: string[];
   allowOverrides?: boolean;
+  yolo?: boolean;
 }
 
 /**
  * Global configuration options used to initialize a SandboxManager.
  */
 export interface GlobalSandboxOptions {
-  /**
-   * The primary workspace path the sandbox is anchored to.
-   * This directory is granted full read and write access.
-   */
+  /** The absolute path to the primary workspace directory, granted full read/write access. */
   workspace: string;
-  /** Absolute paths to explicitly deny read/write access to (overrides allowlists). */
-  forbiddenPaths?: string[];
+  /** Absolute paths to explicitly include in the workspace context. */
+  includeDirectories?: string[];
+  /** An optional asynchronous resolver function for paths that should be explicitly denied. */
+  forbiddenPaths?: () => Promise<string[]>;
   /** The current sandbox mode behavior from config. */
   modeConfig?: SandboxModeConfig;
   /** The policy manager for persistent approvals. */
@@ -104,6 +142,8 @@ export interface SandboxedCommand {
   env: NodeJS.ProcessEnv;
   /** The working directory. */
   cwd?: string;
+  /** An optional cleanup function to be called after the command terminates. */
+  cleanup?: () => void;
 }
 
 /**
@@ -139,6 +179,16 @@ export interface SandboxManager {
    * Parses the output of a command to detect sandbox denials.
    */
   parseDenials(result: ShellExecutionResult): ParsedSandboxDenial | undefined;
+
+  /**
+   * Returns the primary workspace directory for this sandbox.
+   */
+  getWorkspace(): string;
+
+  /**
+   * Returns the global sandbox options for this sandbox.
+   */
+  getOptions(): GlobalSandboxOptions | undefined;
 }
 
 /**
@@ -237,6 +287,8 @@ export async function findSecretFiles(
  * through while applying environment sanitization.
  */
 export class NoopSandboxManager implements SandboxManager {
+  constructor(private options?: GlobalSandboxOptions) {}
+
   /**
    * Prepares a command by sanitizing the environment and passing through
    * the original program and arguments.
@@ -270,12 +322,22 @@ export class NoopSandboxManager implements SandboxManager {
   parseDenials(): undefined {
     return undefined;
   }
+
+  getWorkspace(): string {
+    return this.options?.workspace ?? process.cwd();
+  }
+
+  getOptions(): GlobalSandboxOptions | undefined {
+    return this.options;
+  }
 }
 
 /**
  * A SandboxManager implementation that just runs locally (no sandboxing yet).
  */
 export class LocalSandboxManager implements SandboxManager {
+  constructor(private options?: GlobalSandboxOptions) {}
+
   async prepareCommand(_req: SandboxRequest): Promise<SandboxedCommand> {
     throw new Error('Tool sandboxing is not yet implemented.');
   }
@@ -291,58 +353,102 @@ export class LocalSandboxManager implements SandboxManager {
   parseDenials(): undefined {
     return undefined;
   }
-}
 
-/**
- * Sanitizes an array of paths by deduplicating them and ensuring they are absolute.
- */
-export function sanitizePaths(paths?: string[]): string[] | undefined {
-  if (!paths) return undefined;
-
-  // We use a Map to deduplicate paths based on their normalized,
-  // platform-specific identity e.g. handling case-insensitivity on Windows)
-  // while preserving the original string casing.
-  const uniquePathsMap = new Map<string, string>();
-  for (const p of paths) {
-    if (!path.isAbsolute(p)) {
-      throw new Error(`Sandbox path must be absolute: ${p}`);
-    }
-
-    // Normalize the path (resolves slashes and redundant components)
-    let key = path.normalize(p);
-
-    // Windows file systems are case-insensitive, so we lowercase the key for
-    // deduplication
-    if (os.platform() === 'win32') {
-      key = key.toLowerCase();
-    }
-
-    if (!uniquePathsMap.has(key)) {
-      uniquePathsMap.set(key, p);
-    }
+  getWorkspace(): string {
+    return this.options?.workspace ?? process.cwd();
   }
 
-  return Array.from(uniquePathsMap.values());
+  getOptions(): GlobalSandboxOptions | undefined {
+    return this.options;
+  }
 }
 
 /**
- * Resolves symlinks for a given path to prevent sandbox escapes.
- * If a file does not exist (ENOENT), it recursively resolves the parent directory.
- * Other errors (e.g. EACCES) are re-thrown.
+ * Resolves and sanitizes all path categories for a sandbox request.
  */
-export async function tryRealpath(p: string): Promise<string> {
-  try {
-    return await fs.realpath(p);
-  } catch (e) {
-    if (isNodeError(e) && e.code === 'ENOENT') {
-      const parentDir = path.dirname(p);
-      if (parentDir === p) {
-        return p;
+export async function resolveSandboxPaths(
+  options: GlobalSandboxOptions,
+  req: SandboxRequest,
+  overridePermissions?: SandboxPermissions,
+): Promise<ResolvedSandboxPaths> {
+  /**
+   * Helper that expands each path to include its realpath (if it's a symlink)
+   * and pipes the result through deduplicateAbsolutePaths for deduplication and absolute path enforcement.
+   */
+  const expand = (paths?: string[] | null): string[] => {
+    if (!paths || paths.length === 0) return [];
+    const expanded = paths.flatMap((p) => {
+      try {
+        const resolved = resolveToRealPath(p);
+        return resolved === p ? [p] : [p, resolved];
+      } catch {
+        return [p];
       }
-      return path.join(await tryRealpath(parentDir), path.basename(p));
+    });
+    return deduplicateAbsolutePaths(expanded);
+  };
+
+  const forbidden = expand(await options.forbiddenPaths?.());
+
+  const globalIncludes = expand(options.includeDirectories);
+  const policyAllowed = expand(req.policy?.allowedPaths);
+
+  const policyRead = expand(overridePermissions?.fileSystem?.read);
+  const policyWrite = expand(overridePermissions?.fileSystem?.write);
+
+  const resolvedWorkspace = resolveToRealPath(options.workspace);
+
+  const workspaceIdentities = new Set(
+    [options.workspace, resolvedWorkspace].map(toPathKey),
+  );
+  const forbiddenIdentities = new Set(forbidden.map(toPathKey));
+
+  const { worktreeGitDir, mainGitDir } =
+    await resolveGitWorktreePaths(resolvedWorkspace);
+  const gitWorktree = worktreeGitDir
+    ? { gitWorktree: { worktreeGitDir, mainGitDir } }
+    : undefined;
+
+  if (worktreeGitDir) {
+    const gitIdentities = new Set(
+      [
+        path.join(options.workspace, '.git'),
+        path.join(resolvedWorkspace, '.git'),
+      ].map(toPathKey),
+    );
+    if (policyRead.some((p) => gitIdentities.has(toPathKey(p)))) {
+      policyRead.push(worktreeGitDir);
+      if (mainGitDir) policyRead.push(mainGitDir);
     }
-    throw e;
+    if (policyWrite.some((p) => gitIdentities.has(toPathKey(p)))) {
+      policyWrite.push(worktreeGitDir);
+      if (mainGitDir) policyWrite.push(mainGitDir);
+    }
   }
+
+  /**
+   * Filters out any paths that are explicitly forbidden or match the workspace root (original or resolved).
+   */
+  const filter = (paths: string[]) =>
+    paths.filter((p) => {
+      const identity = toPathKey(p);
+      return (
+        !workspaceIdentities.has(identity) && !forbiddenIdentities.has(identity)
+      );
+    });
+
+  return {
+    workspace: {
+      original: options.workspace,
+      resolved: resolvedWorkspace,
+    },
+    forbidden,
+    globalIncludes: filter(globalIncludes),
+    policyAllowed: filter(policyAllowed),
+    policyRead: filter(policyRead),
+    policyWrite: filter(policyWrite),
+    ...gitWorktree,
+  };
 }
 
 export { createSandboxManager } from './sandboxManagerFactory.js';

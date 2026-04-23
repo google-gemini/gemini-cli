@@ -10,11 +10,13 @@ import { DiffRenderer } from './DiffRenderer.js';
 import { MarkdownDisplay } from '../../utils/MarkdownDisplay.js';
 import { AnsiOutputText, AnsiLineText } from '../AnsiOutput.js';
 import { SlicingMaxSizedBox } from '../shared/SlicingMaxSizedBox.js';
+import { MaxSizedBox } from '../shared/MaxSizedBox.js';
 import { theme } from '../../semantic-colors.js';
 import {
   type AnsiOutput,
   type AnsiLine,
   isSubagentProgress,
+  isStructuredToolResult,
 } from '@google/gemini-cli-core';
 import { useUIState } from '../../contexts/UIStateContext.js';
 import { tryParseJSON } from '../../../utils/jsonoutput.js';
@@ -50,7 +52,7 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
   hasFocus = false,
   overflowDirection = 'top',
 }) => {
-  const { renderMarkdown } = useUIState();
+  const { renderMarkdown, constrainHeight } = useUIState();
   const isAlternateBuffer = useAlternateBuffer();
 
   const availableHeight = calculateToolContentMaxLines({
@@ -123,7 +125,28 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
           {contentData}
         </Text>
       );
-    } else if (typeof contentData === 'object' && 'fileDiff' in contentData) {
+    } else if (isStructuredToolResult(contentData)) {
+      if (renderOutputAsMarkdown) {
+        content = (
+          <MarkdownDisplay
+            text={contentData.summary}
+            terminalWidth={childWidth}
+            renderMarkdown={renderMarkdown}
+            isPending={false}
+          />
+        );
+      } else {
+        content = (
+          <Text wrap="wrap" color={theme.text.primary}>
+            {contentData.summary}
+          </Text>
+        );
+      }
+    } else if (
+      typeof contentData === 'object' &&
+      contentData !== null &&
+      'fileDiff' in contentData
+    ) {
       content = (
         <DiffRenderer
           diffContent={
@@ -136,7 +159,7 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
           terminalWidth={childWidth}
         />
       );
-    } else {
+    } else if (Array.isArray(contentData)) {
       const shouldDisableTruncation =
         isAlternateBuffer ||
         (availableTerminalHeight === undefined && maxLines === undefined);
@@ -153,14 +176,26 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
           disableTruncation={shouldDisableTruncation}
         />
       );
+    } else if (typeof contentData === 'object' && contentData !== null) {
+      // Render as JSON for other non-null objects
+      content = (
+        <Text wrap="wrap" color={theme.text.primary}>
+          {JSON.stringify(contentData, null, 2)}
+        </Text>
+      );
+    } else {
+      content = null;
     }
 
     // Final render based on session mode
     if (isAlternateBuffer) {
+      // Use maxLines if provided, otherwise fall back to the calculated available height
+      const effectiveMaxHeight = maxLines ?? availableHeight;
+
       return (
         <Scrollable
           width={childWidth}
-          maxHeight={maxLines ?? availableHeight}
+          maxHeight={effectiveMaxHeight}
           hasFocus={hasFocus} // Allow scrolling via keyboard (Shift+Up/Down)
           scrollToBottom={true}
           reportOverflow={true}
@@ -173,33 +208,79 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
     return content;
   };
 
-  // ASB Mode Handling (Interactive/Fullscreen)
-  if (isAlternateBuffer) {
-    // Virtualized path for large ANSI arrays
-    if (Array.isArray(resultDisplay)) {
-      const limit = maxLines ?? availableHeight ?? ACTIVE_SHELL_MAX_LINES;
-      const listHeight = Math.min(
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        (resultDisplay as AnsiOutput).length,
-        limit,
-      );
+  if (Array.isArray(resultDisplay)) {
+    const limit = maxLines ?? availableHeight ?? ACTIVE_SHELL_MAX_LINES;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    const data = resultDisplay as AnsiOutput;
+
+    // Calculate list height: if not constrained, use full data length.
+    // If constrained (e.g. alternate buffer), limit to available height
+    // to ensure virtualization works and fits within the viewport.
+    const listHeight = !constrainHeight
+      ? data.length
+      : Math.min(data.length, limit);
+
+    if (isAlternateBuffer) {
+      const initialScrollIndex =
+        overflowDirection === 'bottom' ? 0 : SCROLL_TO_ITEM_END;
 
       return (
         <Box width={childWidth} flexDirection="column" maxHeight={listHeight}>
           <ScrollableList
             width={childWidth}
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            data={resultDisplay as AnsiOutput}
+            containerHeight={listHeight}
+            data={data}
             renderItem={renderVirtualizedAnsiLine}
             estimatedItemHeight={() => 1}
+            fixedItemHeight={true}
             keyExtractor={keyExtractor}
-            initialScrollIndex={SCROLL_TO_ITEM_END}
+            initialScrollIndex={initialScrollIndex}
             hasFocus={hasFocus}
           />
         </Box>
       );
-    }
+    } else {
+      let displayData = data;
+      let hiddenLines = 0;
 
+      if (constrainHeight && data.length > listHeight) {
+        hiddenLines = data.length - listHeight;
+        if (overflowDirection === 'top') {
+          displayData = data.slice(hiddenLines);
+        } else {
+          displayData = data.slice(0, listHeight);
+        }
+      }
+
+      return (
+        <Box width={childWidth} flexDirection="column">
+          <MaxSizedBox
+            maxHeight={constrainHeight ? listHeight : undefined}
+            maxWidth={childWidth}
+            overflowDirection={overflowDirection}
+            additionalHiddenLinesCount={hiddenLines}
+          >
+            {displayData.map((item, index) => {
+              const actualIndex =
+                (overflowDirection === 'top' ? hiddenLines : 0) + index;
+              return (
+                <Box
+                  key={keyExtractor(item, actualIndex)}
+                  height={1}
+                  overflow="hidden"
+                >
+                  <AnsiLineText line={item} />
+                </Box>
+              );
+            })}
+          </MaxSizedBox>
+        </Box>
+      );
+    }
+  }
+
+  // ASB Mode Handling (Interactive/Fullscreen)
+  if (isAlternateBuffer) {
     // Standard path for strings/diffs in ASB
     return (
       <Box width={childWidth} flexDirection="column">
