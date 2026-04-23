@@ -892,11 +892,7 @@ export class GeminiChat {
 
     for await (const chunk of streamResponse) {
       if (chunk.functionCalls && chunk.functionCalls.length > 0) {
-        finalFunctionCalls.splice(
-          0,
-          finalFunctionCalls.length,
-          ...chunk.functionCalls,
-        );
+        finalFunctionCalls.push(...chunk.functionCalls);
       }
 
       const candidateWithReason = chunk?.candidates?.find(
@@ -1031,7 +1027,8 @@ export class GeminiChat {
     // but the fully assembled calls are accessible via the last chunk's 'functionCalls' getter.
     if (finalFunctionCalls.length > 0) {
       let sdkIndex = 0;
-      for (const part of consolidatedParts) {
+      for (let i = 0; i < consolidatedParts.length; i++) {
+        const part = consolidatedParts[i];
         if (part.functionCall && sdkIndex < finalFunctionCalls.length) {
           const assembledCall = finalFunctionCalls[sdkIndex];
           // Since the GenAI SDK might split one tool call across multiple adjacent parts
@@ -1045,8 +1042,7 @@ export class GeminiChat {
           // Peek ahead: if the NEXT part in consolidatedParts is a DIFFERENT tool call name,
           // then we can advance the SDK index. Otherwise, we keep the index the same so
           // subsequent duplicate deltas of this same tool get backfilled with the same object.
-          const nextPart =
-            consolidatedParts[consolidatedParts.indexOf(part) + 1];
+          const nextPart = consolidatedParts[i + 1];
           if (
             !nextPart ||
             !nextPart.functionCall ||
