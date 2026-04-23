@@ -23,7 +23,10 @@ import { FRONTMATTER_REGEX, parseFrontmatter } from '../skills/skillLoader.js';
 import { LocalAgentExecutor } from '../agents/local-executor.js';
 import { SkillExtractionAgent } from '../agents/skill-extraction-agent.js';
 import { getModelConfigAlias } from '../agents/registry.js';
-import type { SubagentActivityEvent } from '../agents/types.js';
+import {
+  isToolActivityError,
+  type SubagentActivityEvent,
+} from '../agents/types.js';
 import { ExecutionLifecycleService } from './executionLifecycleService.js';
 import { PromptRegistry } from '../prompts/prompt-registry.js';
 import { ResourceRegistry } from '../resources/resource-registry.js';
@@ -301,12 +304,31 @@ function shouldReplaceIndexedSession(
 function isReadFileActivity(
   activity: SubagentActivityEvent,
 ): activity is SubagentActivityEvent & {
-  data: { name: string; args?: { file_path?: unknown } };
+  data: { name: string; args?: { file_path?: unknown }; callId?: unknown };
 } {
   return (
     activity.type === 'TOOL_CALL_START' &&
     activity.data['name'] === READ_FILE_TOOL_NAME
   );
+}
+
+function getReadFileCallId(activity: SubagentActivityEvent): string | null {
+  if (isReadFileActivity(activity)) {
+    const { callId } = activity.data;
+    return typeof callId === 'string' ? callId : null;
+  }
+
+  if (activity.type === 'TOOL_CALL_END') {
+    const id = activity.data['id'];
+    return typeof id === 'string' ? id : null;
+  }
+
+  if (activity.type === 'ERROR') {
+    const callId = activity.data['callId'];
+    return typeof callId === 'string' ? callId : null;
+  }
+
+  return null;
 }
 
 function getResolvedActivityFilePath(
@@ -988,6 +1010,7 @@ export async function startMemoryService(config: Config): Promise<void> {
         session,
       ]),
     );
+    const pendingReadFileSessions = new Map<string, SessionVersion>();
     const processedSessionKeys = new Set<string>();
 
     // Create and run the extraction agent
@@ -995,17 +1018,40 @@ export async function startMemoryService(config: Config): Promise<void> {
       agentDefinition,
       context,
       (activity) => {
-        const resolvedPath = getResolvedActivityFilePath(config, activity);
-        if (!resolvedPath) {
+        const readFileCallId = getReadFileCallId(activity);
+
+        if (activity.type === 'TOOL_CALL_START') {
+          const resolvedPath = getResolvedActivityFilePath(config, activity);
+          if (!resolvedPath || !readFileCallId) {
+            return;
+          }
+
+          const session = candidateSessionsByPath.get(resolvedPath);
+          if (!session) {
+            return;
+          }
+
+          pendingReadFileSessions.set(readFileCallId, session);
           return;
         }
 
-        const session = candidateSessionsByPath.get(resolvedPath);
+        if (!readFileCallId) {
+          return;
+        }
+
+        const session = pendingReadFileSessions.get(readFileCallId);
         if (!session) {
           return;
         }
 
-        processedSessionKeys.add(getSessionVersionKey(session));
+        pendingReadFileSessions.delete(readFileCallId);
+
+        if (
+          activity.type === 'TOOL_CALL_END' &&
+          !isToolActivityError(activity.data['data'])
+        ) {
+          processedSessionKeys.add(getSessionVersionKey(session));
+        }
       },
     );
 

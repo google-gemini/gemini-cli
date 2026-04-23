@@ -566,7 +566,7 @@ describe('memoryService', () => {
       );
     });
 
-    it('records only sessions actually opened with read_file as processed', async () => {
+    it('records only sessions whose read_file completed successfully as processed', async () => {
       const { startMemoryService, readExtractionState } = await import(
         './memoryService.js'
       );
@@ -596,12 +596,34 @@ describe('memoryService', () => {
         messageCount: 20,
         lastUpdated: '2025-01-01T01:00:00Z',
       });
+      const failedConversation = createConversation({
+        sessionId: 'failed-session',
+        summary: 'read_file errors on this one',
+        messageCount: 20,
+        lastUpdated: '2025-01-03T01:00:00Z',
+      });
+      const rejectedConversation = createConversation({
+        sessionId: 'rejected-session',
+        summary: 'read_file was rejected for this one',
+        messageCount: 20,
+        lastUpdated: '2025-01-02T02:00:00Z',
+      });
 
       const openedPath = path.join(
         chatsDir,
         `${SESSION_FILE_PREFIX}2025-01-02T00-00-opened.jsonl`,
       );
+      const failedPath = path.join(
+        chatsDir,
+        `${SESSION_FILE_PREFIX}2025-01-03T00-00-failed.jsonl`,
+      );
+      const rejectedPath = path.join(
+        chatsDir,
+        `${SESSION_FILE_PREFIX}2025-01-02T00-00-rejected.jsonl`,
+      );
       await writeConversationJsonl(openedPath, openedConversation);
+      await writeConversationJsonl(failedPath, failedConversation);
+      await writeConversationJsonl(rejectedPath, rejectedConversation);
       await writeConversationJsonl(
         path.join(
           chatsDir,
@@ -621,6 +643,57 @@ describe('memoryService', () => {
                 data: {
                   name: 'read_file',
                   args: { file_path: openedPath },
+                  callId: 'call-opened',
+                },
+              });
+              onActivity?.({
+                isSubagentActivityEvent: true,
+                agentName: 'Skill Extractor',
+                type: 'TOOL_CALL_END',
+                data: {
+                  name: 'read_file',
+                  id: 'call-opened',
+                  data: {},
+                },
+              });
+              onActivity?.({
+                isSubagentActivityEvent: true,
+                agentName: 'Skill Extractor',
+                type: 'TOOL_CALL_START',
+                data: {
+                  name: 'read_file',
+                  args: { file_path: failedPath },
+                  callId: 'call-failed',
+                },
+              });
+              onActivity?.({
+                isSubagentActivityEvent: true,
+                agentName: 'Skill Extractor',
+                type: 'TOOL_CALL_END',
+                data: {
+                  name: 'read_file',
+                  id: 'call-failed',
+                  data: { isError: true },
+                },
+              });
+              onActivity?.({
+                isSubagentActivityEvent: true,
+                agentName: 'Skill Extractor',
+                type: 'TOOL_CALL_START',
+                data: {
+                  name: 'read_file',
+                  args: { file_path: rejectedPath },
+                  callId: 'call-rejected',
+                },
+              });
+              onActivity?.({
+                isSubagentActivityEvent: true,
+                agentName: 'Skill Extractor',
+                type: 'ERROR',
+                data: {
+                  name: 'read_file',
+                  callId: 'call-rejected',
+                  error: 'User rejected this operation.',
                 },
               });
               onActivity?.({
@@ -663,6 +736,14 @@ describe('memoryService', () => {
       );
       expect(state.runs).toHaveLength(1);
       expect(state.runs[0].candidateSessions).toEqual([
+        {
+          sessionId: 'failed-session',
+          lastUpdated: '2025-01-03T01:00:00Z',
+        },
+        {
+          sessionId: 'rejected-session',
+          lastUpdated: '2025-01-02T02:00:00Z',
+        },
         {
           sessionId: 'opened-session',
           lastUpdated: '2025-01-02T01:00:00Z',

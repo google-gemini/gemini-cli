@@ -9,6 +9,7 @@ import { generateSummary, getPreviousSession } from './sessionSummaryUtils.js';
 import type { Config } from '../config/config.js';
 import type { ContentGenerator } from '../core/contentGenerator.js';
 import * as chatRecordingService from './chatRecordingService.js';
+import type { ConversationRecord } from './chatRecordingService.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import * as os from 'node:os';
@@ -41,10 +42,20 @@ interface SessionFixture {
   sessionId?: string;
   startTime?: string;
   lastUpdated?: string;
+  kind?: ConversationRecord['kind'];
+  messages?: ConversationRecord['messages'];
   userMessageCount: number;
 }
 
 function buildLegacySessionJson(fixture: SessionFixture): string {
+  const messages =
+    fixture.messages ??
+    Array.from({ length: fixture.userMessageCount }, (_, i) => ({
+      id: String(i + 1),
+      timestamp: '2024-01-01T00:00:00Z',
+      type: 'user',
+      content: [{ text: `Message ${i + 1}` }],
+    }));
   return JSON.stringify({
     sessionId: fixture.sessionId ?? 'session-id',
     projectHash: 'abc123',
@@ -52,12 +63,8 @@ function buildLegacySessionJson(fixture: SessionFixture): string {
     lastUpdated: fixture.lastUpdated ?? '2024-01-01T00:00:00Z',
     summary: fixture.summary,
     memoryScratchpad: fixture.memoryScratchpad,
-    messages: Array.from({ length: fixture.userMessageCount }, (_, i) => ({
-      id: String(i + 1),
-      timestamp: '2024-01-01T00:00:00Z',
-      type: 'user',
-      content: [{ text: `Message ${i + 1}` }],
-    })),
+    ...(fixture.kind ? { kind: fixture.kind } : {}),
+    messages,
   });
 }
 
@@ -71,17 +78,19 @@ function buildJsonlSession(fixture: SessionFixture): string {
     ...(fixture.memoryScratchpad !== undefined
       ? { memoryScratchpad: fixture.memoryScratchpad }
       : {}),
+    ...(fixture.kind ? { kind: fixture.kind } : {}),
   };
+  const messages =
+    fixture.messages ??
+    Array.from({ length: fixture.userMessageCount }, (_, i) => ({
+      id: String(i + 1),
+      timestamp: '2024-01-01T00:00:00Z',
+      type: 'user',
+      content: [{ text: `Message ${i + 1}` }],
+    }));
   const lines: string[] = [JSON.stringify(metadata)];
-  for (let i = 0; i < fixture.userMessageCount; i++) {
-    lines.push(
-      JSON.stringify({
-        id: String(i + 1),
-        timestamp: '2024-01-01T00:00:00Z',
-        type: 'user',
-        content: [{ text: `Message ${i + 1}` }],
-      }),
-    );
+  for (const message of messages) {
+    lines.push(JSON.stringify(message));
   }
   return lines.join('\n') + '\n';
 }
@@ -327,6 +336,36 @@ describe('sessionSummaryUtils', () => {
         metadataOnly: true,
       });
     });
+
+    it('should skip subagent sessions when backfilling scratchpads', async () => {
+      const mainPath = await writeSession(
+        chatsDir,
+        'session-2024-01-01T10-00-main0001.jsonl',
+        buildJsonlSession({
+          sessionId: 'main-session',
+          userMessageCount: 2,
+          lastUpdated: '2024-01-01T10:00:00Z',
+          summary: 'Main session summary',
+        }),
+      );
+      await setSessionMtime(mainPath, '2024-01-01T10:00:00Z');
+
+      await writeSession(
+        chatsDir,
+        'session-2024-01-02T10-00-sub00001.jsonl',
+        buildJsonlSession({
+          sessionId: 'subagent-session',
+          userMessageCount: 2,
+          lastUpdated: '2024-01-02T10:00:00Z',
+          summary: 'Subagent summary',
+          kind: 'subagent',
+        }),
+      );
+
+      const result = await getPreviousSession(mockConfig);
+
+      expect(result).toBe(mainPath);
+    });
   });
 
   describe('generateSummary', () => {
@@ -523,6 +562,58 @@ describe('sessionSummaryUtils', () => {
         .split('\n')
         .filter(Boolean);
       expect(currentLines).toHaveLength(2);
+    });
+
+    it('should preserve repo-root file names in scratchpad touched paths', async () => {
+      const filePath = await writeSession(
+        chatsDir,
+        'session-2024-01-01T10-00-rootpath.jsonl',
+        buildJsonlSession({
+          sessionId: 'root-path-session',
+          userMessageCount: 2,
+          summary: 'Existing summary',
+          messages: [
+            {
+              id: 'u1',
+              timestamp: '2024-01-01T00:00:00Z',
+              type: 'user',
+              content: [{ text: 'Inspect package.json' }],
+            },
+            {
+              id: 'g1',
+              timestamp: '2024-01-01T00:00:01Z',
+              type: 'gemini',
+              content: [{ text: 'Reading files' }],
+              toolCalls: [
+                {
+                  id: 'tool-1',
+                  name: 'read_file',
+                  args: { file_path: 'package.json' },
+                  status: 'success',
+                  timestamp: '2024-01-01T00:00:01Z',
+                },
+              ],
+            },
+            {
+              id: 'u2',
+              timestamp: '2024-01-01T00:00:02Z',
+              type: 'user',
+              content: [{ text: 'Done' }],
+            },
+          ],
+        }),
+      );
+
+      await generateSummary(mockConfig);
+
+      const savedConversation =
+        await chatRecordingService.loadConversationRecord(filePath);
+      expect(savedConversation?.memoryScratchpad).toEqual({
+        version: 1,
+        workflowSummary: 'read_file | paths package.json',
+        toolSequence: ['read_file'],
+        touchedPaths: ['package.json'],
+      });
     });
   });
 });

@@ -108,7 +108,8 @@ function normalizePathCandidate(
     trimmed.includes('\n') ||
     (!trimmed.includes('/') &&
       !trimmed.includes('\\') &&
-      !trimmed.startsWith('.'))
+      !trimmed.startsWith('.') &&
+      path.extname(trimmed).length === 0)
   ) {
     return null;
   }
@@ -447,6 +448,7 @@ export async function getPreviousSession(
         });
         if (!conversation) continue;
         if (conversation.sessionId === config.getSessionId()) continue;
+        if (conversation.kind === 'subagent') continue;
         if (hasSessionSummaryMetadata(conversation)) continue;
 
         // Only generate summaries for sessions with more than 1 user message.
