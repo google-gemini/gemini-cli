@@ -294,3 +294,6 @@ export { LocalWhisperBackend } from './services/voice/LocalWhisperBackend.js';
 // Export context types and profiles
 export * from './context/types.js';
 export * from './context/profiles.js';
+
+// Export trust utility
+export * from './utils/trust.js';
