@@ -14,6 +14,7 @@ import {
   SESSION_FILE_PREFIX,
   loadConversationRecord,
   type ConversationRecord,
+  type MemoryScratchpad,
 } from './chatRecordingService.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { coreEvents } from '../utils/events.js';
@@ -61,6 +62,7 @@ interface SessionVersion {
 interface IndexedSession extends SessionVersion {
   filePath: string;
   summary?: string;
+  memoryScratchpad?: MemoryScratchpad;
   userMessageCount: number;
 }
 
@@ -73,6 +75,9 @@ export interface ExtractionRun {
   candidateSessions?: SessionVersion[];
   processedSessions?: SessionVersion[];
   skillsCreated: string[];
+  turnCount?: number;
+  durationMs?: number;
+  terminateReason?: string;
 }
 
 /**
@@ -139,12 +144,25 @@ function normalizeStringArray(value: unknown): string[] {
   return value.filter((item): item is string => typeof item === 'string');
 }
 
+function normalizeOptionalNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value)
+    ? value
+    : undefined;
+}
+
+function normalizeOptionalString(value: unknown): string | undefined {
+  return typeof value === 'string' ? value : undefined;
+}
+
 function isExtractionRunLike(value: unknown): value is {
   runAt: string;
   sessionIds?: unknown;
   candidateSessions?: unknown;
   processedSessions?: unknown;
   skillsCreated: unknown;
+  turnCount?: unknown;
+  durationMs?: unknown;
+  terminateReason?: unknown;
 } {
   return (
     typeof value === 'object' &&
@@ -184,6 +202,9 @@ function buildExtractionRun(value: unknown): ExtractionRun | null {
     processedSessions:
       processedSessions.length > 0 ? processedSessions : undefined,
     skillsCreated: normalizeStringArray(value.skillsCreated),
+    turnCount: normalizeOptionalNumber(value.turnCount),
+    durationMs: normalizeOptionalNumber(value.durationMs),
+    terminateReason: normalizeOptionalString(value.terminateReason),
   };
 }
 
@@ -517,6 +538,7 @@ async function scanEligibleSessions(
         lastUpdated: conversation.lastUpdated,
         filePath,
         summary: conversation.summary,
+        memoryScratchpad: conversation.memoryScratchpad,
         userMessageCount: getUserMessageCount(conversation),
       };
 
@@ -530,6 +552,25 @@ async function scanEligibleSessions(
   }
 
   return Array.from(latestBySessionId.values()).sort(compareIndexedSessions);
+}
+
+function formatSessionHeadline(session: IndexedSession): string {
+  const summary =
+    session.summary ??
+    session.memoryScratchpad?.workflowSummary ??
+    '(no summary)';
+  const workflowSummary = session.memoryScratchpad?.workflowSummary;
+
+  if (
+    session.summary &&
+    workflowSummary &&
+    workflowSummary.trim().length > 0 &&
+    workflowSummary !== session.summary
+  ) {
+    return `${summary} | workflow: ${workflowSummary}`;
+  }
+
+  return summary;
 }
 
 /**
@@ -588,8 +629,7 @@ export async function buildSessionIndex(
       const status = candidateSessionIds.has(getSessionVersionKey(session))
         ? '[NEW]'
         : '[old]';
-      const summary = session.summary ?? '(no summary)';
-      return `${status} ${summary} (${session.userMessageCount} user msgs) — ${session.filePath}`;
+      return `${status} ${formatSessionHeadline(session)} (${session.userMessageCount} user msgs) — ${session.filePath}`;
     },
   );
 
@@ -957,7 +997,7 @@ export async function startMemoryService(config: Config): Promise<void> {
       },
     );
 
-    await executor.run(
+    const executorResult = await executor.run(
       { request: 'Extract skills from the provided sessions.' },
       abortController.signal,
     );
@@ -1017,6 +1057,11 @@ export async function startMemoryService(config: Config): Promise<void> {
       })),
       processedSessions,
       skillsCreated,
+      turnCount: normalizeOptionalNumber(executorResult?.turn_count),
+      durationMs: normalizeOptionalNumber(executorResult?.duration_ms),
+      terminateReason: normalizeOptionalString(
+        executorResult?.terminate_reason,
+      ),
     };
     const updatedState: ExtractionState = {
       runs: [...state.runs, run],

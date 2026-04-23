@@ -257,6 +257,7 @@ export async function loadConversationRecord(
       startTime: metadata.startTime || new Date().toISOString(),
       lastUpdated: metadata.lastUpdated || new Date().toISOString(),
       summary: metadata.summary,
+      memoryScratchpad: metadata.memoryScratchpad,
       directories: metadata.directories,
       kind: metadata.kind,
       messages: options?.metadataOnly ? [] : loadedMessages,
@@ -327,6 +328,7 @@ export class ChatRecordingService {
               kind: this.cachedConversation.kind,
               directories: this.cachedConversation.directories,
               summary: this.cachedConversation.summary,
+              memoryScratchpad: this.cachedConversation.memoryScratchpad,
             };
             this.appendRecord(initialMetadata);
             for (const msg of this.cachedConversation.messages) {

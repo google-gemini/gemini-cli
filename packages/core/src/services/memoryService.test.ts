@@ -127,6 +127,7 @@ async function writeConversationJsonl(
     startTime: conversation.startTime,
     lastUpdated: conversation.lastUpdated,
     summary: conversation.summary,
+    memoryScratchpad: conversation.memoryScratchpad,
     directories: conversation.directories,
     kind: conversation.kind,
   };
@@ -864,6 +865,60 @@ describe('memoryService', () => {
       expect(result.sessionIndex).toContain(path.join(chatsDir, fileName));
     });
 
+    it('falls back to scratchpad workflow summary when summary is missing', async () => {
+      const { buildSessionIndex } = await import('./memoryService.js');
+
+      const conversation = createConversation({
+        sessionId: 'scratchpad-only',
+        summary: undefined,
+        memoryScratchpad: {
+          version: 1,
+          workflowSummary:
+            'read_file -> edit | paths packages/core/src/services/memoryService.ts | validated',
+        },
+        messageCount: 20,
+      });
+      await writeConversationJsonl(
+        path.join(
+          chatsDir,
+          `${SESSION_FILE_PREFIX}2025-01-01T00-00-scratch01.jsonl`,
+        ),
+        conversation,
+      );
+
+      const result = await buildSessionIndex(chatsDir, { runs: [] });
+
+      expect(result.sessionIndex).toContain('read_file -> edit');
+      expect(result.sessionIndex).not.toContain('(no summary)');
+    });
+
+    it('appends workflow summary when both summary and scratchpad are present', async () => {
+      const { buildSessionIndex } = await import('./memoryService.js');
+
+      const conversation = createConversation({
+        sessionId: 'summary-and-scratchpad',
+        summary: 'Fix session scanning',
+        memoryScratchpad: {
+          version: 1,
+          workflowSummary:
+            'read_file -> edit | paths packages/core/src/services/sessionSummaryUtils.ts',
+        },
+        messageCount: 20,
+      });
+      await writeConversationJsonl(
+        path.join(
+          chatsDir,
+          `${SESSION_FILE_PREFIX}2025-01-01T00-00-scratch02.jsonl`,
+        ),
+        conversation,
+      );
+
+      const result = await buildSessionIndex(chatsDir, { runs: [] });
+
+      expect(result.sessionIndex).toContain('Fix session scanning | workflow:');
+      expect(result.sessionIndex).toContain('sessionSummaryUtils.ts');
+    });
+
     it('filters out subagent sessions', async () => {
       const { buildSessionIndex } = await import('./memoryService.js');
 
@@ -1086,6 +1141,9 @@ describe('memoryService', () => {
               },
             ],
             skillsCreated: ['debug-helper', 'test-gen'],
+            turnCount: 4,
+            durationMs: 1875,
+            terminateReason: 'GOAL',
           },
         ],
       };
@@ -1112,6 +1170,9 @@ describe('memoryService', () => {
       ]);
       expect(result.runs[0].sessionIds).toEqual(['s1']);
       expect(result.runs[0].runAt).toBe('2025-06-01T00:00:00Z');
+      expect(result.runs[0].turnCount).toBe(4);
+      expect(result.runs[0].durationMs).toBe(1875);
+      expect(result.runs[0].terminateReason).toBe('GOAL');
     });
 
     it('writeExtractionState + readExtractionState roundtrips runs correctly', async () => {
@@ -1145,11 +1206,17 @@ describe('memoryService', () => {
             },
           ],
           skillsCreated: ['skill-x'],
+          turnCount: 3,
+          durationMs: 2400,
+          terminateReason: 'GOAL',
         },
         {
           runAt: '2025-01-02T00:00:00Z',
           sessionIds: ['c'],
           skillsCreated: [],
+          turnCount: 1,
+          durationMs: 900,
+          terminateReason: 'GOAL',
         },
       ];
       const state: ExtractionState = { runs };

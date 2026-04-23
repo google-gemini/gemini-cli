@@ -11,16 +11,31 @@ import { debugLogger } from '../utils/debugLogger.js';
 import {
   SESSION_FILE_PREFIX,
   type ConversationRecord,
+  type MemoryScratchpad,
   type MessageRecord,
+  type ToolCallRecord,
 } from './chatRecordingService.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
 const MIN_MESSAGES_FOR_SUMMARY = 1;
+const MAX_SCRATCHPAD_TOOLS = 6;
+const MAX_SCRATCHPAD_PATHS = 4;
+const MAX_WORKFLOW_SUMMARY_LENGTH = 160;
+const VALIDATION_COMMAND_REGEX =
+  /\b(test|tests|vitest|jest|pytest|cargo test|npm test|pnpm test|yarn test|bun test|lint|build|check|typecheck)\b/i;
+const PATH_KEY_REGEX = /(path|file|dir|directory|cwd|root)/i;
+const VALIDATION_TOOL_REGEX = /(test|lint|build|check)/i;
 
 interface LoadedSession {
+  sessionId?: string;
+  projectHash?: string;
+  startTime?: string;
   summary?: string;
+  memoryScratchpad?: MemoryScratchpad;
   lastUpdated?: string;
+  directories?: string[];
+  kind?: 'main' | 'subagent';
   messages: ConversationRecord['messages'];
 }
 
@@ -47,6 +62,52 @@ function getStringProperty<T extends string>(
   prop: T,
 ): string | undefined {
   return isStringProperty(obj, prop) ? obj[prop] : undefined;
+}
+
+function getStringArrayProperty<T extends string>(
+  obj: unknown,
+  prop: T,
+): string[] | undefined {
+  if (!hasProperty(obj, prop) || !Array.isArray(obj[prop])) {
+    return undefined;
+  }
+
+  const values = obj[prop].filter(
+    (value): value is string => typeof value === 'string',
+  );
+  return values.length > 0 ? values : [];
+}
+
+function getKindProperty(obj: unknown): ConversationRecord['kind'] | undefined {
+  const kind = getStringProperty(obj, 'kind');
+  return kind === 'main' || kind === 'subagent' ? kind : undefined;
+}
+
+function isMemoryValidationStatus(
+  value: unknown,
+): value is MemoryScratchpad['validationStatus'] {
+  return value === 'passed' || value === 'failed' || value === 'unknown';
+}
+
+function parseMemoryScratchpad(value: unknown): MemoryScratchpad | undefined {
+  if (!isObjectRecord(value) || value['version'] !== 1) {
+    return undefined;
+  }
+
+  const workflowSummary = getStringProperty(value, 'workflowSummary');
+  const toolSequence = getStringArrayProperty(value, 'toolSequence');
+  const touchedPaths = getStringArrayProperty(value, 'touchedPaths');
+  const validationStatus = isMemoryValidationStatus(value['validationStatus'])
+    ? value['validationStatus']
+    : undefined;
+
+  return {
+    version: 1,
+    ...(workflowSummary ? { workflowSummary } : {}),
+    ...(toolSequence ? { toolSequence } : {}),
+    ...(touchedPaths ? { touchedPaths } : {}),
+    ...(validationStatus ? { validationStatus } : {}),
+  };
 }
 
 function isMessageRecord(value: unknown): value is MessageRecord {
@@ -82,8 +143,14 @@ function parseJsonSession(content: string): LoadedSession | null {
     }
 
     return {
+      sessionId: getStringProperty(parsed, 'sessionId'),
+      projectHash: getStringProperty(parsed, 'projectHash'),
+      startTime: getStringProperty(parsed, 'startTime'),
       summary: getStringProperty(parsed, 'summary'),
+      memoryScratchpad: parseMemoryScratchpad(parsed['memoryScratchpad']),
       lastUpdated: getStringProperty(parsed, 'lastUpdated'),
+      directories: getStringArrayProperty(parsed, 'directories'),
+      kind: getKindProperty(parsed),
       messages: parsed['messages'],
     };
   } catch {
@@ -94,8 +161,14 @@ function parseJsonSession(content: string): LoadedSession | null {
 function parseJsonlSession(content: string): LoadedSession | null {
   const messages: ConversationRecord['messages'] = [];
   const messageIndex = new Map<string, number>();
+  let sessionId: string | undefined;
+  let projectHash: string | undefined;
+  let startTime: string | undefined;
   let summary: string | undefined;
+  let memoryScratchpad: MemoryScratchpad | undefined;
   let lastUpdated: string | undefined;
+  let directories: string[] | undefined;
+  let kind: ConversationRecord['kind'] | undefined;
 
   for (const line of content.split(/\r?\n/)) {
     if (!line.trim()) {
@@ -146,28 +219,262 @@ function parseJsonlSession(content: string): LoadedSession | null {
 
     if ('$set' in parsed && isObjectRecord(parsed['$set'])) {
       const updates = parsed['$set'];
+      sessionId = getStringProperty(updates, 'sessionId') ?? sessionId;
+      projectHash = getStringProperty(updates, 'projectHash') ?? projectHash;
+      startTime = getStringProperty(updates, 'startTime') ?? startTime;
       summary = getStringProperty(updates, 'summary') ?? summary;
+      memoryScratchpad =
+        parseMemoryScratchpad(updates['memoryScratchpad']) ?? memoryScratchpad;
       lastUpdated = getStringProperty(updates, 'lastUpdated') ?? lastUpdated;
+      directories =
+        getStringArrayProperty(updates, 'directories') ?? directories;
+      kind = getKindProperty(updates) ?? kind;
       continue;
     }
 
     if (isMessageRecordArray(parsed['messages'])) {
       return {
+        sessionId: getStringProperty(parsed, 'sessionId') ?? sessionId,
+        projectHash: getStringProperty(parsed, 'projectHash') ?? projectHash,
+        startTime: getStringProperty(parsed, 'startTime') ?? startTime,
         summary: getStringProperty(parsed, 'summary') ?? summary,
+        memoryScratchpad:
+          parseMemoryScratchpad(parsed['memoryScratchpad']) ?? memoryScratchpad,
         lastUpdated: getStringProperty(parsed, 'lastUpdated') ?? lastUpdated,
+        directories:
+          getStringArrayProperty(parsed, 'directories') ?? directories,
+        kind: getKindProperty(parsed) ?? kind,
         messages: parsed['messages'],
       };
     }
 
+    sessionId = getStringProperty(parsed, 'sessionId') ?? sessionId;
+    projectHash = getStringProperty(parsed, 'projectHash') ?? projectHash;
+    startTime = getStringProperty(parsed, 'startTime') ?? startTime;
     summary = getStringProperty(parsed, 'summary') ?? summary;
+    memoryScratchpad =
+      parseMemoryScratchpad(parsed['memoryScratchpad']) ?? memoryScratchpad;
     lastUpdated = getStringProperty(parsed, 'lastUpdated') ?? lastUpdated;
+    directories = getStringArrayProperty(parsed, 'directories') ?? directories;
+    kind = getKindProperty(parsed) ?? kind;
   }
 
   return {
+    sessionId,
+    projectHash,
+    startTime,
     summary,
+    memoryScratchpad,
     lastUpdated,
+    directories,
+    kind,
     messages,
   };
+}
+
+function normalizeToolName(name: string): string {
+  const trimmed = name.trim();
+  return trimmed.length > 0 ? trimmed : 'unknown_tool';
+}
+
+function pushUniqueLimited(
+  target: string[],
+  value: string,
+  limit: number,
+): void {
+  if (!value || target.includes(value) || target.length >= limit) {
+    return;
+  }
+  target.push(value);
+}
+
+function normalizePathCandidate(
+  candidate: string,
+  projectRoot: string,
+): string | null {
+  const trimmed = candidate.trim();
+  if (
+    trimmed.length === 0 ||
+    trimmed.length > 240 ||
+    trimmed.includes('\n') ||
+    (!trimmed.includes('/') &&
+      !trimmed.includes('\\') &&
+      !trimmed.startsWith('.'))
+  ) {
+    return null;
+  }
+
+  let normalized = trimmed.replace(/\\/g, '/');
+  if (path.isAbsolute(trimmed)) {
+    const relative = path.relative(projectRoot, trimmed);
+    normalized =
+      relative && !relative.startsWith('..') && !path.isAbsolute(relative)
+        ? relative.replace(/\\/g, '/')
+        : path.basename(trimmed);
+  }
+
+  if (normalized.length > 120) {
+    normalized = normalized.split('/').slice(-3).join('/');
+  }
+
+  return normalized.length > 0 ? normalized : null;
+}
+
+function collectPathsFromValue(
+  value: unknown,
+  projectRoot: string,
+  paths: string[],
+  keyHint?: string,
+): void {
+  if (paths.length >= MAX_SCRATCHPAD_PATHS) {
+    return;
+  }
+
+  if (typeof value === 'string') {
+    if (!keyHint || !PATH_KEY_REGEX.test(keyHint)) {
+      return;
+    }
+
+    const normalized = normalizePathCandidate(value, projectRoot);
+    if (normalized) {
+      pushUniqueLimited(paths, normalized, MAX_SCRATCHPAD_PATHS);
+    }
+    return;
+  }
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      collectPathsFromValue(item, projectRoot, paths, keyHint);
+      if (paths.length >= MAX_SCRATCHPAD_PATHS) {
+        return;
+      }
+    }
+    return;
+  }
+
+  if (!isObjectRecord(value)) {
+    return;
+  }
+
+  for (const [key, nestedValue] of Object.entries(value)) {
+    collectPathsFromValue(nestedValue, projectRoot, paths, key);
+    if (paths.length >= MAX_SCRATCHPAD_PATHS) {
+      return;
+    }
+  }
+}
+
+function getToolCallCommand(toolCall: ToolCallRecord): string | undefined {
+  for (const key of ['command', 'cmd', 'script']) {
+    const value = toolCall.args[key];
+    if (typeof value === 'string' && value.trim().length > 0) {
+      return value;
+    }
+  }
+  return undefined;
+}
+
+function getValidationStatusForToolCall(
+  toolCall: ToolCallRecord,
+): MemoryScratchpad['validationStatus'] | undefined {
+  const command = getToolCallCommand(toolCall);
+  const isValidationTool =
+    VALIDATION_TOOL_REGEX.test(toolCall.name) ||
+    (command ? VALIDATION_COMMAND_REGEX.test(command) : false);
+  if (!isValidationTool) {
+    return undefined;
+  }
+
+  if (toolCall.status === 'success') {
+    return 'passed';
+  }
+  if (toolCall.status === 'error' || toolCall.status === 'cancelled') {
+    return 'failed';
+  }
+  return 'unknown';
+}
+
+function buildWorkflowSummary(
+  toolSequence: string[],
+  touchedPaths: string[],
+  validationStatus?: MemoryScratchpad['validationStatus'],
+): string | undefined {
+  const parts: string[] = [];
+
+  if (toolSequence.length > 0) {
+    parts.push(toolSequence.join(' -> '));
+  }
+  if (touchedPaths.length > 0) {
+    parts.push(`paths ${touchedPaths.join(', ')}`);
+  }
+  if (validationStatus === 'passed') {
+    parts.push('validated');
+  } else if (validationStatus === 'failed') {
+    parts.push('validation failed');
+  }
+
+  if (parts.length === 0) {
+    return undefined;
+  }
+
+  const summary = parts.join(' | ');
+  return summary.length > MAX_WORKFLOW_SUMMARY_LENGTH
+    ? `${summary.slice(0, MAX_WORKFLOW_SUMMARY_LENGTH - 3)}...`
+    : summary;
+}
+
+function buildMemoryScratchpad(
+  messages: ConversationRecord['messages'],
+  projectRoot: string,
+): MemoryScratchpad {
+  const toolSequence: string[] = [];
+  const touchedPaths: string[] = [];
+  let validationStatus: MemoryScratchpad['validationStatus'];
+
+  for (const message of messages) {
+    if (message.type !== 'gemini' || !message.toolCalls) {
+      continue;
+    }
+
+    for (const toolCall of message.toolCalls) {
+      pushUniqueLimited(
+        toolSequence,
+        normalizeToolName(toolCall.name),
+        MAX_SCRATCHPAD_TOOLS,
+      );
+      collectPathsFromValue(toolCall.args, projectRoot, touchedPaths);
+
+      const toolValidationStatus = getValidationStatusForToolCall(toolCall);
+      if (toolValidationStatus === 'failed') {
+        validationStatus = 'failed';
+      } else if (
+        toolValidationStatus === 'passed' &&
+        validationStatus !== 'failed'
+      ) {
+        validationStatus = 'passed';
+      } else if (!validationStatus && toolValidationStatus === 'unknown') {
+        validationStatus = 'unknown';
+      }
+    }
+  }
+
+  const workflowSummary = buildWorkflowSummary(
+    toolSequence,
+    touchedPaths,
+    validationStatus,
+  );
+
+  return {
+    version: 1,
+    ...(workflowSummary ? { workflowSummary } : {}),
+    ...(toolSequence.length > 0 ? { toolSequence } : {}),
+    ...(touchedPaths.length > 0 ? { touchedPaths } : {}),
+    ...(validationStatus ? { validationStatus } : {}),
+  };
+}
+
+function hasSessionSummaryMetadata(session: LoadedSession): boolean {
+  return Boolean(session.summary && session.memoryScratchpad);
 }
 
 async function loadSessionForSummary(
@@ -192,10 +499,10 @@ async function generateAndSaveSummary(
     return;
   }
 
-  // Skip if summary already exists
-  if (conversation.summary) {
+  // Skip if both summary metadata fields already exist.
+  if (hasSessionSummaryMetadata(conversation)) {
     debugLogger.debug(
-      `[SessionSummary] Summary already exists for ${sessionPath}, skipping`,
+      `[SessionSummary] Summary metadata already exists for ${sessionPath}, skipping`,
     );
     return;
   }
@@ -208,28 +515,32 @@ async function generateAndSaveSummary(
     return;
   }
 
-  // Create summary service
-  const contentGenerator = config.getContentGenerator();
-  if (!contentGenerator) {
-    debugLogger.debug(
-      '[SessionSummary] Content generator not available, skipping summary generation',
-    );
-    return;
-  }
-  const baseLlmClient = new BaseLlmClient(contentGenerator, config);
-  const summaryService = new SessionSummaryService(baseLlmClient);
-
-  // Generate summary
-  const summary = await summaryService.generateSummary({
-    messages: conversation.messages,
-  });
-
+  let summary = conversation.summary;
   if (!summary) {
-    debugLogger.warn(
-      `[SessionSummary] Failed to generate summary for ${sessionPath}`,
-    );
-    return;
+    const contentGenerator = config.getContentGenerator();
+    if (!contentGenerator) {
+      debugLogger.debug(
+        '[SessionSummary] Content generator not available, skipping summary generation',
+      );
+    } else {
+      const baseLlmClient = new BaseLlmClient(contentGenerator, config);
+      const summaryService = new SessionSummaryService(baseLlmClient);
+      summary =
+        (await summaryService.generateSummary({
+          messages: conversation.messages,
+        })) ?? undefined;
+
+      if (!summary) {
+        debugLogger.warn(
+          `[SessionSummary] Failed to generate summary for ${sessionPath}`,
+        );
+      }
+    }
   }
+
+  const memoryScratchpad =
+    conversation.memoryScratchpad ??
+    buildMemoryScratchpad(conversation.messages, config.getProjectRoot());
 
   // Re-read the file before writing to handle race conditions
   const freshConversation = await loadSessionForSummary(sessionPath);
@@ -238,19 +549,31 @@ async function generateAndSaveSummary(
     return;
   }
 
-  // Check if summary was added by another process
-  if (freshConversation.summary) {
+  if (hasSessionSummaryMetadata(freshConversation)) {
     debugLogger.debug(
-      `[SessionSummary] Summary was added by another process for ${sessionPath}`,
+      `[SessionSummary] Summary metadata was added by another process for ${sessionPath}`,
     );
     return;
   }
 
+  const metadataUpdate: Partial<ConversationRecord> = {};
+  if (!freshConversation.summary && summary) {
+    metadataUpdate.summary = summary;
+  }
+  if (!freshConversation.memoryScratchpad) {
+    metadataUpdate.memoryScratchpad = memoryScratchpad;
+  }
+
+  if (Object.keys(metadataUpdate).length === 0) {
+    return;
+  }
+
   const lastUpdated = new Date().toISOString();
+  metadataUpdate.lastUpdated = lastUpdated;
   if (sessionPath.endsWith('.jsonl')) {
     await fs.appendFile(
       sessionPath,
-      `${JSON.stringify({ $set: { summary, lastUpdated } })}\n`,
+      `${JSON.stringify({ $set: metadataUpdate })}\n`,
     );
   } else {
     await fs.writeFile(
@@ -258,7 +581,7 @@ async function generateAndSaveSummary(
       JSON.stringify(
         {
           ...freshConversation,
-          summary,
+          ...metadataUpdate,
           lastUpdated,
         },
         null,
@@ -267,13 +590,13 @@ async function generateAndSaveSummary(
     );
   }
   debugLogger.debug(
-    `[SessionSummary] Saved summary for ${sessionPath}: "${summary}"`,
+    `[SessionSummary] Saved summary metadata for ${sessionPath}${summary ? `: "${summary}"` : ''}`,
   );
 }
 
 /**
- * Finds the most recently created session that needs a summary.
- * Returns the path if it needs a summary, null otherwise.
+ * Finds the most recently created session that needs summary metadata.
+ * Returns the path if it needs a summary or scratchpad, null otherwise.
  */
 export async function getPreviousSession(
   config: Config,
@@ -328,9 +651,9 @@ export async function getPreviousSession(
     });
 
     const { filePath, conversation } = sessions[0];
-    if (conversation.summary) {
+    if (hasSessionSummaryMetadata(conversation)) {
       debugLogger.debug(
-        '[SessionSummary] Most recent session already has summary',
+        '[SessionSummary] Most recent session already has summary metadata',
       );
       return null;
     }

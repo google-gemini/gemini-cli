@@ -30,11 +30,19 @@ vi.mock('../core/baseLlmClient.js', () => ({
 // Helper to create a session with N user messages
 function createSessionWithUserMessages(
   count: number,
-  options: { summary?: string; sessionId?: string; lastUpdated?: string } = {},
+  options: {
+    summary?: string;
+    sessionId?: string;
+    lastUpdated?: string;
+    memoryScratchpad?: unknown;
+  } = {},
 ) {
   return JSON.stringify({
     sessionId: options.sessionId ?? 'session-id',
+    projectHash: 'abc123',
+    startTime: '2024-01-01T00:00:00Z',
     summary: options.summary,
+    memoryScratchpad: options.memoryScratchpad,
     lastUpdated: options.lastUpdated,
     messages: Array.from({ length: count }, (_, i) => ({
       id: String(i + 1),
@@ -46,7 +54,12 @@ function createSessionWithUserMessages(
 
 function createJsonlSessionWithUserMessages(
   count: number,
-  options: { summary?: string; sessionId?: string; lastUpdated?: string } = {},
+  options: {
+    summary?: string;
+    sessionId?: string;
+    lastUpdated?: string;
+    memoryScratchpad?: unknown;
+  } = {},
 ) {
   const metadata = JSON.stringify({
     sessionId: options.sessionId ?? 'session-id',
@@ -54,6 +67,7 @@ function createJsonlSessionWithUserMessages(
     startTime: '2024-01-01T00:00:00Z',
     lastUpdated: options.lastUpdated,
     summary: options.summary,
+    memoryScratchpad: options.memoryScratchpad,
   });
   const messages = Array.from({ length: count }, (_, i) =>
     JSON.stringify({
@@ -79,6 +93,7 @@ describe('sessionSummaryUtils', () => {
     // Setup mock config
     mockConfig = {
       getContentGenerator: vi.fn().mockReturnValue(mockContentGenerator),
+      getProjectRoot: vi.fn().mockReturnValue('/tmp/project'),
       storage: {
         getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
       },
@@ -120,7 +135,25 @@ describe('sessionSummaryUtils', () => {
       expect(result).toBeNull();
     });
 
-    it('should return null if most recent session already has summary', async () => {
+    it('should return null if most recent session already has summary metadata', async () => {
+      vi.mocked(fs.access).mockResolvedValue(undefined);
+      mockReaddir.mockResolvedValue(['session-2024-01-01T10-00-abc12345.json']);
+      vi.mocked(fs.readFile).mockResolvedValue(
+        createSessionWithUserMessages(5, {
+          summary: 'Existing summary',
+          memoryScratchpad: {
+            version: 1,
+            workflowSummary: 'read_file -> edit',
+          },
+        }),
+      );
+
+      const result = await getPreviousSession(mockConfig);
+
+      expect(result).toBeNull();
+    });
+
+    it('should return path if most recent session has summary but no scratchpad', async () => {
       vi.mocked(fs.access).mockResolvedValue(undefined);
       mockReaddir.mockResolvedValue(['session-2024-01-01T10-00-abc12345.json']);
       vi.mocked(fs.readFile).mockResolvedValue(
@@ -129,7 +162,13 @@ describe('sessionSummaryUtils', () => {
 
       const result = await getPreviousSession(mockConfig);
 
-      expect(result).toBeNull();
+      expect(result).toBe(
+        path.join(
+          '/tmp/project',
+          'chats',
+          'session-2024-01-01T10-00-abc12345.json',
+        ),
+      );
     });
 
     it('should return null if most recent session has 1 or fewer user messages', async () => {
@@ -252,6 +291,10 @@ describe('sessionSummaryUtils', () => {
         sessionPath,
         expect.stringContaining('Add dark mode to the app'),
       );
+      expect(fs.writeFile).toHaveBeenCalledWith(
+        sessionPath,
+        expect.stringContaining('"memoryScratchpad"'),
+      );
     });
 
     it('should handle errors gracefully without throwing', async () => {
@@ -288,6 +331,37 @@ describe('sessionSummaryUtils', () => {
       expect(fs.appendFile).toHaveBeenCalledWith(
         sessionPath,
         expect.stringContaining('"summary":"Add dark mode to the app"'),
+      );
+      expect(fs.appendFile).toHaveBeenCalledWith(
+        sessionPath,
+        expect.stringContaining('"memoryScratchpad":{"version":1}'),
+      );
+    });
+
+    it('should backfill scratchpad without regenerating summary', async () => {
+      const sessionPath = path.join(
+        '/tmp/project',
+        'chats',
+        'session-2024-01-01T10-00-abc12345.jsonl',
+      );
+
+      vi.mocked(fs.access).mockResolvedValue(undefined);
+      mockReaddir.mockResolvedValue([
+        'session-2024-01-01T10-00-abc12345.jsonl',
+      ]);
+      vi.mocked(fs.readFile).mockResolvedValue(
+        createJsonlSessionWithUserMessages(2, {
+          summary: 'Existing summary',
+        }),
+      );
+      vi.mocked(fs.appendFile).mockResolvedValue(undefined);
+
+      await generateSummary(mockConfig);
+
+      expect(mockGenerateSummary).not.toHaveBeenCalled();
+      expect(fs.appendFile).toHaveBeenCalledWith(
+        sessionPath,
+        expect.stringContaining('"memoryScratchpad":{"version":1}'),
       );
     });
   });
