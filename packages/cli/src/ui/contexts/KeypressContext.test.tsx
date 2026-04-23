@@ -442,7 +442,16 @@ describe('KeypressContext', () => {
   });
 
   describe('Windows Terminal Backspace handling', () => {
+    let kittySpy: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+      kittySpy = vi
+        .spyOn(terminalCapabilityManager, 'isKittyProtocolEnabled')
+        .mockReturnValue(false);
+    });
+
     afterEach(() => {
+      kittySpy.mockRestore();
       vi.unstubAllEnvs();
     });
 
@@ -493,6 +502,42 @@ describe('KeypressContext', () => {
         expect.objectContaining({
           name: 'backspace',
           ctrl: true,
+        }),
+      );
+    });
+
+    it('should treat \\b as regular backspace when Kitty protocol is enabled on Windows', async () => {
+      kittySpy.mockReturnValue(true);
+      vi.stubEnv('WT_SESSION', '');
+      vi.stubEnv('OS', 'Windows_NT');
+      const { keyHandler } = await setupKeypressTest();
+
+      act(() => {
+        stdin.write('\b');
+      });
+
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'backspace',
+          ctrl: false,
+        }),
+      );
+    });
+
+    it('should treat \\b as regular backspace when Kitty protocol is enabled via WT_SESSION', async () => {
+      kittySpy.mockReturnValue(true);
+      vi.stubEnv('WT_SESSION', 'some-id');
+      vi.stubEnv('OS', 'Linux');
+      const { keyHandler } = await setupKeypressTest();
+
+      act(() => {
+        stdin.write('\b');
+      });
+
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'backspace',
+          ctrl: false,
         }),
       );
     });

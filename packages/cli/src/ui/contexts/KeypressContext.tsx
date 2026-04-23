@@ -654,10 +654,13 @@ function* emitKeys(
     } else if (ch === '\b') {
       // ctrl+h / ctrl+backspace (windows terminals send \x08 for ctrl+backspace)
       name = 'backspace';
-      // In Windows environments, \b is sent for Ctrl+Backspace (standard backspace is translated to \x7f).
-      // We scope this to Windows/WT_SESSION to avoid breaking other unixes where \b is a plain backspace.
+      // In some Windows terminals without Kitty keyboard protocol support, \b is
+      // sent for Ctrl+Backspace while standard backspace is translated to \x7f.
+      // When Kitty is enabled, Ctrl+Backspace arrives as CSI-u (e.g. \x1b[127;5u),
+      // and regular backspace may still arrive as \b, so the fallback must stay off.
       if (
         typeof process !== 'undefined' &&
+        !terminalCapabilityManager.isKittyProtocolEnabled() &&
         (process.env?.['OS'] === 'Windows_NT' || !!process.env?.['WT_SESSION'])
       ) {
         ctrl = true;
