@@ -82,28 +82,28 @@ export const handleSlashCommand = async (
       lastPromptTokenCount: 0,
       promptCount: 1,
     };
-const logger = new Logger(config?.getSessionId() || '', config?.storage);
+    const logger = new Logger(config?.getSessionId() || '', config?.storage);
 
-const commandContext: CommandContext = {
-  services: {
-    agentContext: config,
-    settings,
-    git: undefined,
-    logger,
-  },
-  ui: createNonInteractiveUI(),
-  session: {
-    stats: sessionStats,
-    sessionShellAllowlist: new Set(),
-  },
-  invocation: {
-    raw: trimmed,
-    name: commandToExecute.name,
-    args,
-  },
-};
+    const commandContext: CommandContext = {
+      services: {
+        agentContext: config,
+        settings,
+        git: undefined,
+        logger,
+      },
+      ui: createNonInteractiveUI(),
+      session: {
+        stats: sessionStats,
+        sessionShellAllowlist: new Set(),
+      },
+      invocation: {
+        raw: trimmed,
+        name: commandToExecute.name,
+        args,
+      },
+    };
 
-const result = await commandToExecute.action(commandContext, args);
+    const result = await commandToExecute.action(commandContext, args);
 
     if (result) {
       switch (result.type) {

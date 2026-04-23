@@ -36,6 +36,7 @@ import type {
   EmbedContentResponse,
   GenerateContentParameters,
   GenerateContentResponse,
+  GenerateContentConfig,
 } from '@google/genai';
 import * as readline from 'node:readline';
 import { Readable } from 'node:stream';
@@ -89,8 +90,9 @@ export class CodeAssistServer implements ContentGenerator {
   async generateContentStream(
     req: GenerateContentParameters,
     userPromptId: string,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+     
     role: LlmRole,
+    config?: GenerateContentConfig,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
     const autoUse = this.config
       ? shouldAutoUseCredits(
@@ -120,7 +122,7 @@ export class CodeAssistServer implements ContentGenerator {
           this.sessionId,
           enabledCreditTypes,
         ),
-        req.config?.abortSignal,
+        config?.abortSignal ?? req.config?.abortSignal,
       );
 
     const streamingLatency: StreamingLatency = {};
@@ -152,7 +154,7 @@ export class CodeAssistServer implements ContentGenerator {
           response.traceId,
           translatedResponse,
           streamingLatency,
-          req.config?.abortSignal,
+          config?.abortSignal ?? req.config?.abortSignal,
           server.sessionId, // Use sessionId as trajectoryId
         );
 
@@ -194,8 +196,9 @@ export class CodeAssistServer implements ContentGenerator {
   async generateContent(
     req: GenerateContentParameters,
     userPromptId: string,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+     
     role: LlmRole,
+    config?: GenerateContentConfig,
   ): Promise<GenerateContentResponse> {
     const start = Date.now();
     const response = await this.requestPost<CaGenerateContentResponse>(
@@ -207,7 +210,7 @@ export class CodeAssistServer implements ContentGenerator {
         this.sessionId,
         undefined,
       ),
-      req.config?.abortSignal,
+      config?.abortSignal ?? req.config?.abortSignal,
       GENERATE_CONTENT_RETRY_DELAY_IN_MILLISECONDS,
     );
     const duration = formatProtoJsonDuration(Date.now() - start);
@@ -223,7 +226,7 @@ export class CodeAssistServer implements ContentGenerator {
       response.traceId,
       translatedResponse,
       streamingLatency,
-      req.config?.abortSignal,
+      config?.abortSignal ?? req.config?.abortSignal,
       this.sessionId, // Use sessionId as trajectoryId
     );
 

@@ -34,6 +34,7 @@ export class GeminiRestBackend implements VoiceBackend {
   private recordingProcess: ReturnType<typeof spawn> | null = null;
   private audioChunks: Buffer[] = [];
   private stderrChunks: Buffer[] = [];
+  private abortController: AbortController | null = null;
 
   constructor(
     private readonly options: VoiceBackendOptions,
@@ -46,6 +47,7 @@ export class GeminiRestBackend implements VoiceBackend {
     try {
       this.audioChunks = [];
       this.stderrChunks = [];
+      this.abortController = new AbortController();
       let recordingProcess: ReturnType<typeof spawn> | null = null;
 
       const soxPath = await resolveExecutable('sox');
@@ -122,6 +124,7 @@ export class GeminiRestBackend implements VoiceBackend {
   }
 
   async cancel(): Promise<void> {
+    this.abortController?.abort();
     if (!this.recordingProcess) return;
 
     const proc = this.recordingProcess;
@@ -207,6 +210,7 @@ export class GeminiRestBackend implements VoiceBackend {
 
       const wavBuffer = this.createWavBuffer(audioBuffer, SAMPLE_RATE);
       const transcript = await this.transcribe(wavBuffer);
+      if (this.abortController?.signal.aborted) return;
       coreEvents.emitVoiceTranscript(transcript);
 
       void this.options.onStateChange({
@@ -278,6 +282,7 @@ export class GeminiRestBackend implements VoiceBackend {
       request,
       'voice-transcription',
       LlmRole.UTILITY_TOOL,
+      { abortSignal: this.abortController?.signal },
     );
 
     const parts = response.candidates?.[0]?.content?.parts;
@@ -310,6 +315,7 @@ export class GeminiRestBackend implements VoiceBackend {
   }
 
   async cleanup(): Promise<void> {
+    this.abortController?.abort();
     if (this.recordingProcess) {
       this.recordingProcess.kill('SIGTERM');
       this.recordingProcess = null;

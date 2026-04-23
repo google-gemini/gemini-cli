@@ -356,6 +356,7 @@ export class LoggingContentGenerator implements ContentGenerator {
     req: GenerateContentParameters,
     userPromptId: string,
     role: LlmRole,
+    config?: GenerateContentConfig,
   ): Promise<GenerateContentResponse> {
     return runInDevTraceSpan(
       {
@@ -366,9 +367,11 @@ export class LoggingContentGenerator implements ContentGenerator {
           [GEN_AI_REQUEST_MODEL]: req.model,
           [GEN_AI_PROMPT_NAME]: userPromptId,
           [GEN_AI_SYSTEM_INSTRUCTIONS]: safeJsonStringify(
-            req.config?.systemInstruction ?? [],
+            req.config?.systemInstruction ?? config?.systemInstruction ?? [],
           ),
-          [GEN_AI_TOOL_DEFINITIONS]: safeJsonStringify(req.config?.tools ?? []),
+          [GEN_AI_TOOL_DEFINITIONS]: safeJsonStringify(
+            req.config?.tools ?? config?.tools ?? [],
+          ),
         },
       },
       async ({ metadata: spanMetadata }) => {
@@ -382,7 +385,7 @@ export class LoggingContentGenerator implements ContentGenerator {
           req.model,
           userPromptId,
           role,
-          req.config,
+          req.config ?? config,
           serverDetails,
         );
 
@@ -391,6 +394,7 @@ export class LoggingContentGenerator implements ContentGenerator {
             req,
             userPromptId,
             role,
+            config,
           );
           spanMetadata.output = response.candidates?.[0]?.content ?? null;
           spanMetadata.attributes[GEN_AI_USAGE_INPUT_TOKENS] =
@@ -414,7 +418,7 @@ export class LoggingContentGenerator implements ContentGenerator {
               modelVersion: response.modelVersion,
               promptFeedback: response.promptFeedback,
             }),
-            req.config,
+            req.config ?? config,
             serverDetails,
           );
           this.config
@@ -434,7 +438,7 @@ export class LoggingContentGenerator implements ContentGenerator {
             userPromptId,
             contents,
             role,
-            req.config,
+            req.config ?? config,
             serverDetails,
           );
           throw error;
@@ -447,6 +451,7 @@ export class LoggingContentGenerator implements ContentGenerator {
     req: GenerateContentParameters,
     userPromptId: string,
     role: LlmRole,
+    config?: GenerateContentConfig,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
     return runInDevTraceSpan(
       {
@@ -457,9 +462,11 @@ export class LoggingContentGenerator implements ContentGenerator {
           [GEN_AI_REQUEST_MODEL]: req.model,
           [GEN_AI_PROMPT_NAME]: userPromptId,
           [GEN_AI_SYSTEM_INSTRUCTIONS]: safeJsonStringify(
-            req.config?.systemInstruction ?? [],
+            req.config?.systemInstruction ?? config?.systemInstruction ?? [],
           ),
-          [GEN_AI_TOOL_DEFINITIONS]: safeJsonStringify(req.config?.tools ?? []),
+          [GEN_AI_TOOL_DEFINITIONS]: safeJsonStringify(
+            req.config?.tools ?? config?.tools ?? [],
+          ),
         },
       },
       async ({ metadata: spanMetadata }) => {
@@ -482,7 +489,7 @@ export class LoggingContentGenerator implements ContentGenerator {
           req.model,
           userPromptId,
           role,
-          req.config,
+          req.config ?? config,
           serverDetails,
         );
 
@@ -492,6 +499,7 @@ export class LoggingContentGenerator implements ContentGenerator {
             req,
             userPromptId,
             role,
+            config,
           );
         } catch (error) {
           const durationMs = Date.now() - startTime;
@@ -505,7 +513,7 @@ export class LoggingContentGenerator implements ContentGenerator {
             userPromptId,
             toContents(req.contents),
             role,
-            req.config,
+            req.config ?? config,
             serverDetails,
           );
           throw error;
@@ -518,6 +526,7 @@ export class LoggingContentGenerator implements ContentGenerator {
           userPromptId,
           role,
           spanMetadata,
+          config,
         );
       },
     );
@@ -530,6 +539,7 @@ export class LoggingContentGenerator implements ContentGenerator {
     userPromptId: string,
     role: LlmRole,
     spanMetadata: SpanMetadata,
+    config?: GenerateContentConfig,
   ): AsyncGenerator<GenerateContentResponse> {
     const responses: GenerateContentResponse[] = [];
 
@@ -564,7 +574,7 @@ export class LoggingContentGenerator implements ContentGenerator {
             promptFeedback: r.promptFeedback,
           })),
         ),
-        req.config,
+        req.config ?? config,
         serverDetails,
       );
       this.config

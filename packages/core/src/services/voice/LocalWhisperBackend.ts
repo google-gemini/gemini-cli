@@ -33,6 +33,7 @@ export class LocalWhisperBackend implements VoiceBackend {
   private tempDir: string | null = null;
   private audioFile: string | null = null;
   private stderrChunks: Buffer[] = [];
+  private abortController: AbortController | null = null;
 
   constructor(
     private readonly options: VoiceBackendOptions,
@@ -47,6 +48,7 @@ export class LocalWhisperBackend implements VoiceBackend {
 
     try {
       this.stderrChunks = [];
+      this.abortController = new AbortController();
       this.tempDir = await mkdtemp(join(tmpdir(), 'gemini-voice-'));
       this.audioFile = join(this.tempDir, `recording.${RECORDING_FORMAT}`);
       let recordingProcess: ReturnType<typeof spawn> | null = null;
@@ -119,7 +121,9 @@ export class LocalWhisperBackend implements VoiceBackend {
   }
 
   async cancel(): Promise<void> {
+    this.abortController?.abort();
     if (!this.recordingProcess) return;
+
     const proc = this.recordingProcess;
     this.recordingProcess = null;
 
@@ -197,6 +201,7 @@ export class LocalWhisperBackend implements VoiceBackend {
       }
 
       const transcript = await this.transcribe(this.audioFile);
+      if (this.abortController?.signal.aborted) return;
       coreEvents.emitVoiceTranscript(transcript);
       void this.options.onStateChange({
         isRecording: false,
@@ -204,6 +209,7 @@ export class LocalWhisperBackend implements VoiceBackend {
         error: null,
       });
     } catch (err) {
+      if (this.abortController?.signal.aborted) return;
       void this.options.onStateChange({
         isRecording: false,
         isTranscribing: false,
@@ -233,15 +239,23 @@ export class LocalWhisperBackend implements VoiceBackend {
       this.tempDir!,
     ];
 
+    const spawnOptions = { signal: this.abortController?.signal };
+
     if (this.config.whisperPath) {
-      await spawnAsync(validatePath(this.config.whisperPath), args);
+      await spawnAsync(
+        validatePath(this.config.whisperPath),
+        args,
+        spawnOptions,
+      );
     } else {
       try {
-        await spawnAsync('whisper-faster', args);
-      } catch {
+        await spawnAsync('whisper-faster', args, spawnOptions);
+      } catch (err) {
+        if (this.abortController?.signal.aborted) throw err;
         try {
-          await spawnAsync('whisper', args);
-        } catch {
+          await spawnAsync('whisper', args, spawnOptions);
+        } catch (innerErr) {
+          if (this.abortController?.signal.aborted) throw innerErr;
           throw new Error(
             'Whisper not found. Please install faster-whisper or openai-whisper, ' +
               'or configure the path in settings.',
@@ -256,7 +270,7 @@ export class LocalWhisperBackend implements VoiceBackend {
       .split('\n')
       .map((l) =>
         l
-          .replace(/^\[\d{2}:\d{2}\.\d{3} --> \d{2}:\d{2}\.\d{3}\]\s*/, '')
+          .replace(/^\[\d{2}:\d{2}\.\d{3} --> \d{2}:\d{2}\.\d.{3}\]\s*/, '')
           .trim(),
       )
       .filter(Boolean)
@@ -264,6 +278,7 @@ export class LocalWhisperBackend implements VoiceBackend {
   }
 
   async cleanup(): Promise<void> {
+    this.abortController?.abort();
     if (this.tempDir) {
       await rm(this.tempDir, { recursive: true, force: true }).catch(() => {});
       this.tempDir = null;

@@ -8,6 +8,7 @@ import {
   GoogleGenAI,
   type CountTokensResponse,
   type GenerateContentResponse,
+  type GenerateContentConfig,
   type GenerateContentParameters,
   type CountTokensParameters,
   type EmbedContentResponse,
@@ -37,12 +38,14 @@ export interface ContentGenerator {
     request: GenerateContentParameters,
     userPromptId: string,
     role: LlmRole,
+    config?: GenerateContentConfig,
   ): Promise<GenerateContentResponse>;
 
   generateContentStream(
     request: GenerateContentParameters,
     userPromptId: string,
     role: LlmRole,
+    config?: GenerateContentConfig,
   ): Promise<AsyncGenerator<GenerateContentResponse>>;
 
   countTokens(request: CountTokensParameters): Promise<CountTokensResponse>;

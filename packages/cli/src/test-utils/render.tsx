@@ -813,10 +813,10 @@ export const renderWithProviders = async (
                             </ToolActionsProvider>
                           </OverflowProvider>
                         </UIActionsContext.Provider>
-                    </StreamingContext.Provider>
-                  </SessionStatsProvider>
-                </ShellFocusContext.Provider>
-              </VimModeProvider>
+                      </StreamingContext.Provider>
+                    </SessionStatsProvider>
+                  </ShellFocusContext.Provider>
+                </VimModeProvider>
               </UIStateContext.Provider>
             </InputContext.Provider>
           </QuotaContext.Provider>
