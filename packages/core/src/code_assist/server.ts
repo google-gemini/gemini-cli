@@ -481,29 +481,34 @@ export class CodeAssistServer implements ContentGenerator {
       });
 
       let bufferedLines: string[] = [];
+      const yieldBufferedChunk = async function* (): AsyncGenerator<T> {
+        if (bufferedLines.length === 0) {
+          return;
+        }
+        const chunk = bufferedLines.join('\n');
+        try {
+          yield JSON.parse(chunk);
+        } catch (_e) {
+          if (server.config) {
+            logInvalidChunk(
+              server.config,
+              // Don't include the chunk content in the log for security/privacy reasons.
+              new InvalidChunkEvent('Malformed JSON chunk'),
+            );
+          }
+        }
+        bufferedLines = [];
+      };
+
       for await (const line of rl) {
         if (line.startsWith('data: ')) {
           bufferedLines.push(line.slice(6).trim());
         } else if (line === '') {
-          if (bufferedLines.length === 0) {
-            continue; // no data to yield
-          }
-          const chunk = bufferedLines.join('\n');
-          try {
-            yield JSON.parse(chunk);
-          } catch {
-            if (server.config) {
-              logInvalidChunk(
-                server.config,
-                // Don't include the chunk content in the log for security/privacy reasons.
-                new InvalidChunkEvent('Malformed JSON chunk'),
-              );
-            }
-          }
-          bufferedLines = []; // Reset the buffer after yielding
+          yield* yieldBufferedChunk();
         }
         // Ignore other lines like comments or id fields
       }
+      yield* yieldBufferedChunk();
     })(this);
   }
 

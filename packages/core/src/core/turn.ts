@@ -29,6 +29,7 @@ import { parseThought, type ThoughtSummary } from '../utils/thoughtUtils.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
 import { getCitations } from '../utils/generateContentResponseUtilities.js';
 import { LlmRole } from '../telemetry/types.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 import {
   type ToolCallRequestInfo,
@@ -299,7 +300,12 @@ export class Turn {
 
         // Assuming other events are chunks with a `value` property
         const resp = streamEvent.value;
-        if (!resp) continue; // Skip if there's no response body
+        if (!resp) {
+          debugLogger.warn(
+            '[Turn.run] Received stream event without a response body; skipping chunk.',
+          );
+          continue;
+        }
 
         this.debugResponses.push(resp);
 
