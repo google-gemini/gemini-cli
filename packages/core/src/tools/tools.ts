@@ -361,12 +361,10 @@ export abstract class BaseToolInvocation<
         );
       };
 
-      try {
-        void this.messageBus.publish(request);
-      } catch {
+      void this.messageBus.publish(request).catch(() => {
         cleanup();
         resolve('allow');
-      }
+      });
     });
   }
 
