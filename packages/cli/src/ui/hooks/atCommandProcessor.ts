@@ -584,8 +584,12 @@ async function readLocalFiles(
             parts.push({
               text: `\nContent from @${displayPath}:\n`,
             });
-            
-            if (depth < 2 && typeof fileActualContent === 'string' && fileActualContent.includes('@')) {
+
+            if (
+              depth < 2 &&
+              typeof fileActualContent === 'string' &&
+              fileActualContent.includes('@')
+            ) {
               const nestedResult = await handleAtCommand({
                 query: fileActualContent,
                 config,
@@ -596,7 +600,11 @@ async function readLocalFiles(
                 depth: depth + 1,
               });
               if (nestedResult.processedQuery) {
-                parts.push(...nestedResult.processedQuery);
+                if (typeof nestedResult.processedQuery === 'string') {
+                  parts.push({ text: nestedResult.processedQuery });
+                } else {
+                  parts.push(...nestedResult.processedQuery);
+                }
               } else {
                 parts.push({ text: fileActualContent });
               }
@@ -737,7 +745,15 @@ export async function handleAtCommand({
 
   const [mcpResult, fileResult] = await Promise.all([
     readMcpResources(resourceParts, config, signal),
-    readLocalFiles(resolvedFiles, config, signal, userMessageTimestamp, depth, addItem, onDebugMessage),
+    readLocalFiles(
+      resolvedFiles,
+      config,
+      signal,
+      userMessageTimestamp,
+      depth,
+      addItem,
+      onDebugMessage,
+    ),
   ]);
 
   const hasContent = mcpResult.parts.length > 0 || fileResult.parts.length > 0;
