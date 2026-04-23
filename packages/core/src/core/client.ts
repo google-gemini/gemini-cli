@@ -17,13 +17,8 @@ import {
   getDirectoryContextString,
   getInitialChatHistory,
 } from '../utils/environmentContext.js';
-import {
-  CompressionStatus,
-  Turn,
-  GeminiEventType,
-  type ServerGeminiStreamEvent,
-  type ChatCompressionInfo,
-} from './turn.js';
+import { CompressionStatus, Turn, GeminiEventType } from './turn.js';
+import type { ServerGeminiStreamEvent, ChatCompressionInfo } from './turn.js';
 import type { Config } from '../config/config.js';
 import { type AgentLoopContext } from '../config/agent-loop-context.js';
 import { getCoreSystemPrompt } from './prompts.js';
@@ -783,7 +778,13 @@ export class GeminiClient {
     }
 
     if (loopDetectedAbort) {
-      controller.abort();
+      // Delay the abort slightly to allow the current event loop iteration
+      // (and the generator yield) to complete.
+      // This prevents the underlying stream (and node-fetch) from synchronously
+      // emitting an unhandled 'error' event while the ReadableStreamToAsyncIterable
+      // wrapper has temporarily detached its listeners.
+      // See Issue #20106.
+      setTimeout(() => controller.abort(), 0);
       return turn;
     }
 
