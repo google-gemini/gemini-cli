@@ -138,7 +138,7 @@ describe('mcp list command', () => {
       merged: { ...defaultMergedSettings, mcpServers: {} },
     });
 
-    await listMcpServers();
+    await listMcpServers(undefined, true);
 
     expect(debugLogger.log).toHaveBeenCalledWith('No MCP servers configured.');
   });
@@ -165,7 +165,7 @@ describe('mcp list command', () => {
     mockClient.connect.mockResolvedValue(undefined);
     mockClient.ping.mockResolvedValue(undefined);
 
-    await listMcpServers();
+    await listMcpServers(undefined, true);
 
     expect(debugLogger.log).toHaveBeenCalledWith('Configured MCP servers:\n');
     expect(debugLogger.log).toHaveBeenCalledWith(
@@ -208,7 +208,7 @@ describe('mcp list command', () => {
 
     mockClient.connect.mockRejectedValue(new Error('Connection failed'));
 
-    await listMcpServers();
+    await listMcpServers(undefined, true);
 
     expect(debugLogger.log).toHaveBeenCalledWith(
       expect.stringContaining(
@@ -239,7 +239,7 @@ describe('mcp list command', () => {
     mockClient.connect.mockResolvedValue(undefined);
     mockClient.ping.mockResolvedValue(undefined);
 
-    await listMcpServers();
+    await listMcpServers(undefined, true);
 
     expect(debugLogger.log).toHaveBeenCalledWith(
       expect.stringContaining(
@@ -280,10 +280,13 @@ describe('mcp list command', () => {
     mockClient.connect.mockResolvedValue(undefined);
     mockClient.ping.mockResolvedValue(undefined);
 
-    await listMcpServers({
-      merged: settingsWithAllowlist,
-      isTrusted: true,
-    } as unknown as LoadedSettings);
+    await listMcpServers(
+      {
+        merged: settingsWithAllowlist,
+        isTrusted: true,
+      } as unknown as LoadedSettings,
+      true,
+    );
 
     expect(debugLogger.log).toHaveBeenCalledWith(
       expect.stringContaining('allowed-server'),
@@ -314,7 +317,7 @@ describe('mcp list command', () => {
     // createTransport will throw in core if not trusted
     mockedCreateTransport.mockRejectedValue(new Error('Folder not trusted'));
 
-    await listMcpServers();
+    await listMcpServers(undefined, true);
 
     expect(debugLogger.log).toHaveBeenCalledWith(
       expect.stringContaining(
@@ -338,7 +341,7 @@ describe('mcp list command', () => {
       isTrusted: true,
     });
 
-    await listMcpServers();
+    await listMcpServers(undefined, true);
 
     expect(debugLogger.log).toHaveBeenCalledWith(
       expect.stringContaining(
@@ -365,7 +368,7 @@ describe('mcp list command', () => {
       'isFileEnabled',
     ).mockResolvedValue(false);
 
-    await listMcpServers();
+    await listMcpServers(undefined, true);
 
     expect(debugLogger.log).toHaveBeenCalledWith(
       expect.stringContaining(
@@ -373,5 +376,26 @@ describe('mcp list command', () => {
       ),
     );
     expect(mockedCreateTransport).not.toHaveBeenCalled();
+  });
+
+  it('should display fast list (bullets) by default without connecting', async () => {
+    const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
+    mockedLoadSettings.mockReturnValue({
+      merged: {
+        ...defaultMergedSettings,
+        mcpServers: {
+          'fast-server': { command: '/path/to/server' },
+        },
+      },
+      isTrusted: true,
+    });
+
+    await listMcpServers(); // Default checkConnections = false
+
+    expect(debugLogger.log).toHaveBeenCalledWith('Configured MCP servers:\n');
+    expect(debugLogger.log).toHaveBeenCalledWith(
+      expect.stringContaining('• fast-server: /path/to/server  (stdio)'),
+    );
+    expect(mockedCreateTransport).not.toHaveBeenCalled(); // Fast list should not connect
   });
 });

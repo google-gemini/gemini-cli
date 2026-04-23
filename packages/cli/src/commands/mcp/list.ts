@@ -46,13 +46,14 @@ export async function getMcpServersFromConfig(
     requestConsent: requestConsentNonInteractive,
     requestSetting: promptForSetting,
   });
+
   const extensions = await extensionManager.loadExtensions();
   const mcpServers = { ...settings.mcpServers };
+
   for (const extension of extensions) {
     Object.entries(extension.mcpServers || {}).forEach(([key, server]) => {
-      if (mcpServers[key]) {
-        return;
-      }
+      if (mcpServers[key]) return;
+
       mcpServers[key] = {
         // eslint-disable-next-line @typescript-eslint/no-misused-spread
         ...server,
@@ -62,9 +63,7 @@ export async function getMcpServersFromConfig(
   }
 
   const adminAllowlist = settings.admin?.mcp?.config;
-  const filteredResult = applyAdminAllowlist(mcpServers, adminAllowlist);
-
-  return filteredResult;
+  return applyAdminAllowlist(mcpServers, adminAllowlist);
 }
 
 async function testMCPConnection(
@@ -73,9 +72,8 @@ async function testMCPConnection(
   isTrusted: boolean,
   activeSettings: MergedSettings,
 ): Promise<MCPServerStatus> {
-  // SECURITY: Only test connection if workspace is trusted or if it's a remote server.
-  // stdio servers execute local commands and must never run in untrusted workspaces.
   const isStdio = !!config.command;
+
   if (isStdio && !isTrusted) {
     return MCPServerStatus.DISCONNECTED;
   }
@@ -97,7 +95,6 @@ async function testMCPConnection(
       error?: unknown,
       serverName?: string,
     ) => {
-      // In non-interactive list, we log everything through debugLogger for consistency
       if (severity === 'error') {
         debugLogger.error(
           chalk.red(`Error${serverName ? ` (${serverName})` : ''}: ${message}`),
@@ -119,7 +116,6 @@ async function testMCPConnection(
 
   let transport;
   try {
-    // Use the same transport creation logic as core
     transport = await createTransport(serverName, config, false, mcpContext);
   } catch {
     await client.close();
@@ -127,10 +123,7 @@ async function testMCPConnection(
   }
 
   try {
-    // Attempt actual MCP connection with short timeout
-    await client.connect(transport, { timeout: 5000 }); // 5s timeout
-
-    // Test basic MCP protocol by pinging the server
+    await client.connect(transport, { timeout: 5000 });
     await client.ping();
 
     await client.close();
@@ -141,43 +134,16 @@ async function testMCPConnection(
   }
 }
 
-async function getServerStatus(
-  serverName: string,
-  server: MCPServerConfig,
-  isTrusted: boolean,
-  activeSettings: MergedSettings,
-): Promise<MCPServerStatus> {
-  const mcpEnablementManager = McpServerEnablementManager.getInstance();
-  const loadResult = await canLoadServer(serverName, {
-    adminMcpEnabled: activeSettings.admin?.mcp?.enabled ?? true,
-    allowedList: activeSettings.mcp?.allowed,
-    excludedList: activeSettings.mcp?.excluded,
-    enablement: mcpEnablementManager.getEnablementCallbacks(),
-  });
-
-  if (!loadResult.allowed) {
-    if (
-      loadResult.blockType === 'admin' ||
-      loadResult.blockType === 'allowlist' ||
-      loadResult.blockType === 'excludelist'
-    ) {
-      return MCPServerStatus.BLOCKED;
-    }
-    return MCPServerStatus.DISABLED;
-  }
-
-  // Test all server types by attempting actual connection
-  return testMCPConnection(serverName, server, isTrusted, activeSettings);
-}
-
 export async function listMcpServers(
   loadedSettingsArg?: LoadedSettings,
+  checkConnections = false,
 ): Promise<void> {
   const loadedSettings = loadedSettingsArg ?? loadSettings();
   const activeSettings = loadedSettings.merged;
 
   const { mcpServers, blockedServerNames } =
     await getMcpServersFromConfig(activeSettings);
+
   const serverNames = Object.keys(mcpServers);
 
   if (blockedServerNames.length > 0) {
@@ -197,46 +163,50 @@ export async function listMcpServers(
 
   debugLogger.log('Configured MCP servers:\n');
 
+  // ✅ Optimization: compute once
+  const enablementCallbacks =
+    McpServerEnablementManager.getInstance().getEnablementCallbacks();
+
   for (const serverName of serverNames) {
     const server = mcpServers[serverName];
 
-    const status = await getServerStatus(
-      serverName,
-      server,
-      loadedSettings.isTrusted,
-      activeSettings,
-    );
+    let status: MCPServerStatus;
 
-    let statusIndicator = '';
-    let statusText = '';
-    switch (status) {
-      case MCPServerStatus.CONNECTED:
-        statusIndicator = chalk.green('✓');
-        statusText = 'Connected';
-        break;
-      case MCPServerStatus.CONNECTING:
-        statusIndicator = chalk.yellow('…');
-        statusText = 'Connecting';
-        break;
-      case MCPServerStatus.BLOCKED:
-        statusIndicator = chalk.red('⛔');
-        statusText = 'Blocked';
-        break;
-      case MCPServerStatus.DISABLED:
-        statusIndicator = chalk.gray('○');
-        statusText = 'Disabled';
-        break;
-      case MCPServerStatus.DISCONNECTED:
-      default:
-        statusIndicator = chalk.red('✗');
-        statusText = 'Disconnected';
-        break;
+    // ✅ Always perform local checks (fast)
+    const loadResult = await canLoadServer(serverName, {
+      adminMcpEnabled: activeSettings.admin?.mcp?.enabled ?? true,
+      allowedList: activeSettings.mcp?.allowed,
+      excludedList: activeSettings.mcp?.excluded,
+      enablement: enablementCallbacks,
+    });
+
+    if (!loadResult.allowed) {
+      if (
+        loadResult.blockType === 'admin' ||
+        loadResult.blockType === 'allowlist' ||
+        loadResult.blockType === 'excludelist'
+      ) {
+        status = MCPServerStatus.BLOCKED;
+      } else {
+        status = MCPServerStatus.DISABLED;
+      }
+    } else if (checkConnections) {
+      // ✅ Only slow check when explicitly requested
+      status = await testMCPConnection(
+        serverName,
+        server,
+        loadedSettings.isTrusted,
+        activeSettings,
+      );
+    } else {
+      status = MCPServerStatus.DISCONNECTED;
     }
 
     let serverInfo =
       serverName +
       (server.extension?.name ? ` (from ${server.extension.name})` : '') +
       ': ';
+
     if (server.httpUrl) {
       serverInfo += `${server.httpUrl} (http)`;
     } else if (server.url) {
@@ -246,19 +216,56 @@ export async function listMcpServers(
       serverInfo += `${server.command} ${server.args?.join(' ') || ''} (stdio)`;
     }
 
-    debugLogger.log(`${statusIndicator} ${serverInfo} - ${statusText}`);
+    if (checkConnections) {
+      let statusIndicator = '';
+      let statusText = '';
+
+      switch (status) {
+        case MCPServerStatus.CONNECTED:
+          statusIndicator = chalk.green('✓');
+          statusText = 'Connected';
+          break;
+        case MCPServerStatus.CONNECTING:
+          statusIndicator = chalk.yellow('…');
+          statusText = 'Connecting';
+          break;
+        case MCPServerStatus.BLOCKED:
+          statusIndicator = chalk.red('⛔');
+          statusText = 'Blocked';
+          break;
+        case MCPServerStatus.DISABLED:
+          statusIndicator = chalk.gray('○');
+          statusText = 'Disabled';
+          break;
+        case MCPServerStatus.DISCONNECTED:
+        default:
+          statusIndicator = chalk.red('✗');
+          statusText = 'Disconnected';
+          break;
+      }
+
+      debugLogger.log(`${statusIndicator} ${serverInfo} - ${statusText}`);
+    } else {
+      debugLogger.log(`• ${serverInfo}`);
+    }
   }
 }
 
 interface ListArgs {
-  loadedSettings?: LoadedSettings;
+  check?: boolean;
 }
 
 export const listCommand: CommandModule<object, ListArgs> = {
   command: 'list',
   describe: 'List all configured MCP servers',
+  builder: (yargs) =>
+    yargs.option('check', {
+      type: 'boolean',
+      default: false,
+      describe: 'Test connection to each MCP server',
+    }),
   handler: async (argv) => {
-    await listMcpServers(argv.loadedSettings);
+    await listMcpServers(undefined, argv.check);
     await exitCli();
   },
 };
