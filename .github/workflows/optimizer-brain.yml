@@ -1,0 +1,48 @@
+name: Optimizer Brain
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  brain:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run Optimizer Brain
+        run: |
+          cd tools/optimizer
+          npx tsx index.ts --investigate
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          EXECUTE_ACTIONS: 'true'
+
+      - name: Upload Brain Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: optimizer-brain-results
+          path: |
+            metrics-before.csv
+            metrics-after.csv
+            *-before.csv
+            *-after.csv
+            investigations/INVESTIGATIONS.md
+            lessons-learned.md
