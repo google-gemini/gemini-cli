@@ -62,6 +62,71 @@ export interface CheckpointingSettings {
   enabled?: boolean;
 }
 
+type MergeableValue =
+  | string
+  | number
+  | boolean
+  | null
+  | undefined
+  | MergeableValue[]
+  | { [key: string]: MergeableValue };
+
+type MergeableObject = Record<string, MergeableValue>;
+
+function isPlainObject(value: unknown): value is MergeableObject {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+function mergeRecursively(
+  target: MergeableObject,
+  source: MergeableObject,
+): MergeableObject {
+  for (const key of Object.keys(source)) {
+    // Prevent prototype pollution from untrusted JSON keys.
+    if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
+      continue;
+    }
+
+    const targetValue = target[key];
+    const sourceValue = source[key];
+
+    if (sourceValue === undefined) {
+      continue;
+    }
+
+    if (isPlainObject(targetValue) && isPlainObject(sourceValue)) {
+      target[key] = mergeRecursively({ ...targetValue }, sourceValue);
+      continue;
+    }
+
+    if (isPlainObject(sourceValue)) {
+      target[key] = mergeRecursively({}, sourceValue);
+      continue;
+    }
+
+    target[key] = sourceValue;
+  }
+
+  return target;
+}
+
+function deepMergeSettings(...sources: Settings[]): Settings {
+  const result: MergeableObject = {};
+
+  for (const source of sources) {
+    if (source) {
+      mergeRecursively(
+        result,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        source as unknown as MergeableObject,
+      );
+    }
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+  return result as unknown as Settings;
+}
+
 /**
  * Loads settings from user and workspace directories.
  * Project settings override user settings.
@@ -123,12 +188,8 @@ export function loadSettings(workspaceDir: string): Settings {
     }
   }
 
-  // If there are overlapping keys, the values of workspaceSettings will
-  // override values from userSettings
-  return {
-    ...userSettings,
-    ...workspaceSettings,
-  };
+  // Workspace values override user values while preserving unspecified nested keys.
+  return deepMergeSettings(userSettings, workspaceSettings);
 }
 
 function resolveEnvVarsInString(value: string): string {
