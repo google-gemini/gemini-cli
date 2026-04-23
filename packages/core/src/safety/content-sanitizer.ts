@@ -11,25 +11,31 @@ export interface SanitizationResult {
 }
 
 /** Unicode codepoints with no visible representation. */
-const INVISIBLE_UNICODE_RE =
-  /[​‌‍‪‫‬‭‮⁠﻿]/g;
+const INVISIBLE_UNICODE_RE = /[​‌‍‪‫‬‭‮⁠﻿]/g;
 
 /** HTML comment pattern. */
 const HTML_COMMENT_RE = /<!--[\s\S]*?-->/g;
 
 /**
- * Injection phrase patterns: imperative + capability escalation combo.
- * Requires at least two components to reduce false positives on individual phrases.
+ * Injection phrase patterns.
+ * Compound patterns (two-component) catch multi-step attacks; simple patterns
+ * catch standalone hijack phrases that are unambiguously adversarial.
  */
 const INJECTION_PATTERNS: RegExp[] = [
-  // Instruction hijacking + follow-up imperative
+  // Instruction hijacking + follow-up imperative (compound)
   /\b(?:ignore|disregard|forget|override)\s+(?:all\s+)?(?:previous|prior|above|earlier)\s+(?:instructions?|context|rules?|prompts?|system)\b[\s\S]{0,200}?(?:instead|now|and|;)\s+(?:you\s+(?:must|should|will)|do|execute|run|perform)/i,
-  // Role manipulation + command
+  // Standalone instruction hijacking — unambiguously adversarial without follow-up
+  /\b(?:ignore|disregard|forget|override)\s+(?:all\s+)?(?:previous|prior|above|earlier)\s+(?:instructions?|context|rules?|prompts?|system prompt)\b/i,
+  // Role manipulation + command (compound)
   /\byou\s+are\s+now\s+(?:a|an|the)\s+\w+[\s\S]{0,100}?(?:you\s+(?:must|should|will)|do|execute|run|perform)/i,
+  // Standalone new-role assignment
+  /\byour\s+(?:new\s+)?(?:instructions?|rules?|directives?|purpose)\s+(?:are|is)\s*:/i,
   // Exfiltration directive
   /\b(?:send|post|upload|exfiltrate|transmit)\s+(?:the\s+)?(?:contents?\s+of\s+|all\s+)?(?:\.env|api\s+keys?|credentials?|secrets?|password)/i,
   // Output suppression
   /\b(?:do\s+not|never|don't)\s+(?:mention|reveal|show|tell|disclose)\s+(?:this|these|the\s+(?:above|following|previous))/i,
+  // System prompt extraction
+  /\b(?:print|show|output|reveal|repeat|display)\s+(?:your\s+)?(?:system\s+prompt|initial\s+instructions?|original\s+instructions?|prompt\s+above)\b/i,
 ];
 
 const ALERT_THRESHOLD = 3;

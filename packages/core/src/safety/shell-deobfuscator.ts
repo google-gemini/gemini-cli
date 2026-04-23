@@ -25,13 +25,25 @@ export interface DeobfuscationResult {
   findings: DeobfuscationFinding[];
 }
 
-/** Unicode codepoints that have no visible representation and no legitimate use in shell commands. */
-const INVISIBLE_UNICODE_RE =
-  /[​‌‍‪‫‬‭‮⁠﻿]/;
+/**
+ * Unicode codepoints with no visible representation and no legitimate use in shell commands.
+ * Written as explicit \uXXXX escapes so the regex survives editor/git normalization intact:
+ *   U+200B zero-width space, U+200C ZWNJ, U+200D ZWJ,
+ *   U+202A–U+202E directional formatting (incl. RTL override U+202E),
+ *   U+2060 word joiner, U+FEFF BOM.
+ */
+const INVISIBLE_UNICODE_RE = /[​‌‍‪‫‬‭‮⁠﻿]/;
 
-/** Base64 subshell: $(echo <b64> | base64 -d) or $(base64 -d <<< <b64>) */
+/**
+ * Base64 subshell patterns:
+ *   $(echo <b64> | base64 -d)
+ *   $(echo <b64> | base64 --decode)
+ *   $(printf '%s' <b64> | base64 -d)
+ *   $(base64 -d <<< <b64>)
+ *   $(base64 --decode <<< <b64>)
+ */
 const BASE64_SUBSHELL_RE =
-  /\$\(\s*(?:echo\s+([A-Za-z0-9+/=]{8,})\s*\|\s*base64\s+-d|base64\s+-d\s*<<<\s*([A-Za-z0-9+/=]{8,}))\s*\)/g;
+  /\$\(\s*(?:(?:echo|printf\s+['"]?%s['"]?)\s+([A-Za-z0-9+/=]{8,})\s*\|\s*base64\s+(?:-d|--decode)|base64\s+(?:-d|--decode)\s*<<<\s*([A-Za-z0-9+/=]{8,}))\s*\)/g;
 
 /** Hex escape: $'\xNN\xNN...' */
 const HEX_ESCAPE_RE = /\$'((?:\\x[0-9a-fA-F]{2})+)'/g;
@@ -79,7 +91,10 @@ export function deobfuscateCommand(raw: string): DeobfuscationResult {
 
   // 1. Unicode invisible characters — deny immediately
   if (INVISIBLE_UNICODE_RE.test(raw)) {
-    const cleaned = raw.replace(INVISIBLE_UNICODE_RE, '');
+    const cleaned = raw.replace(
+      new RegExp(INVISIBLE_UNICODE_RE.source, 'g'),
+      '',
+    );
     findings.push({
       type: 'unicode_invisible',
       severity: 'deny',

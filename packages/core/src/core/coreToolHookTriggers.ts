@@ -16,8 +16,13 @@ import type {
 import { ToolErrorType } from '../tools/tool-error.js';
 import { DiscoveredMCPToolInvocation } from '../tools/mcp-tool.js';
 import { debugLogger } from '../utils/debugLogger.js';
-import { scanAndRedact, summarizeSecrets } from '../safety/secret-scanner.js';
+import {
+  scanAndRedact,
+  summarizeSecrets,
+  isSensitiveFilename,
+} from '../safety/secret-scanner.js';
 import { sanitizeExternalContent } from '../safety/content-sanitizer.js';
+import path from 'node:path';
 
 /**
  * Extracts MCP context from a tool invocation if it's an MCP tool.
@@ -257,12 +262,22 @@ export async function executeToolWithHooks(
 const SECRET_SCAN_TOOLS = new Set([
   'read_file',
   'read_many_files',
-  'grep',
+  'grep_search',
   'run_shell_command',
 ]);
 
-/** Tools that fetch external/untrusted content and should be content-sanitized. */
-const CONTENT_SANITIZE_TOOLS = new Set(['web_fetch']);
+/**
+ * Tools whose outputs should be content-sanitized for injection patterns.
+ * Includes file read tools (project files are a primary injection vector),
+ * web_fetch (external untrusted content), and directory listing.
+ */
+const CONTENT_SANITIZE_TOOLS = new Set([
+  'web_fetch',
+  'read_file',
+  'read_many_files',
+  'grep_search',
+  'list_directory',
+]);
 
 function applyStringTransform(
   content: ToolResult['llmContent'],
@@ -288,21 +303,38 @@ function applySecurityProcessors(
   invocation: AnyToolInvocation,
   config: Config,
 ): void {
-  // Secret scanning — silently redact credentials, surface notice in returnDisplay
+  // Secret scanning — redact credentials from both string and array llmContent
   if (config.enableSecretScanning && SECRET_SCAN_TOOLS.has(toolName)) {
-    const original =
-      typeof toolResult.llmContent === 'string' ? toolResult.llmContent : '';
-    if (original) {
-      const { matches, sanitized } = scanAndRedact(original);
-      if (matches.length > 0) {
-        toolResult.llmContent = sanitized;
-        const summary = summarizeSecrets(matches);
-        const notice = `\n⚠ Secret scanning: ${summary} redacted from ${toolName} output.`;
+    // Warn when about to read a known-sensitive file (before content is exposed)
+    if (toolName === 'read_file') {
+      const filePath = (invocation.params as { file_path?: string }).file_path;
+      if (filePath && isSensitiveFilename(filePath)) {
+        const notice = `\n⚠ Secret scanning: reading sensitive file (${path.basename(filePath)}) — credentials will be redacted from model context.`;
         if (typeof toolResult.returnDisplay === 'string') {
           toolResult.returnDisplay += notice;
         } else {
           toolResult.returnDisplay = notice;
         }
+      }
+    }
+
+    // Collect all matches across string or array content, then redact
+    const allMatches: import('../safety/secret-scanner.js').SecretMatch[] = [];
+    toolResult.llmContent = applyStringTransform(
+      toolResult.llmContent,
+      (text) => {
+        const { matches, sanitized } = scanAndRedact(text);
+        allMatches.push(...matches);
+        return sanitized;
+      },
+    );
+    if (allMatches.length > 0) {
+      const summary = summarizeSecrets(allMatches);
+      const notice = `\n⚠ Secret scanning: ${summary} redacted from ${toolName} output.`;
+      if (typeof toolResult.returnDisplay === 'string') {
+        toolResult.returnDisplay += notice;
+      } else {
+        toolResult.returnDisplay = notice;
       }
     }
   }

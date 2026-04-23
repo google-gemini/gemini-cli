@@ -43,6 +43,13 @@ const SECRET_PATTERNS: PatternDef[] = [
     type: 'jwt',
     re: /(?:(?:Authorization|Bearer|token|jwt)\s*[:=]\s*|["'])(eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)/gi,
   },
+  // Generic high-confidence key=value credential patterns (env var style).
+  // Runs last so more specific patterns (google_api_key, github_token, etc.) take precedence.
+  // The negative lookahead excludes placeholders, template vars, and already-redacted values.
+  {
+    type: 'env_credential',
+    re: /\b(PASSWORD|SECRET|TOKEN|API_KEY|APIKEY|PRIVATE_KEY|ACCESS_KEY|SECRET_KEY|AUTH_TOKEN|BEARER_TOKEN|CLIENT_SECRET)\s*=\s*(?!["']?(?:your[-_]|<|\[REDACTED|{|\$\{|example|placeholder|changeme|xxx|todo|test))[^\s"']{6,}/gi,
+  },
 ];
 
 /** Filename patterns that indicate the file likely contains credentials. */
