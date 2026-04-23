@@ -115,15 +115,7 @@ available combinations.
 | `app.restart`                 | Restart the application.                                                                                                                           | `R`<br />`Shift+R` |
 | `app.suspend`                 | Suspend the CLI and move it to the background.                                                                                                     | `Ctrl+Z`           |
 | `app.showShellUnfocusWarning` | Show warning when trying to move focus away from shell input.                                                                                      | `Tab`              |
-
-#### Voice Mode Controls
-
-> **Note**: These shortcuts are only active when Voice Mode is enabled (via
-> `/voice`).
-
-| Command            | Action                                    | Keys    |
-| ------------------ | ----------------------------------------- | ------- |
-| `app.voiceModePTT` | Trigger voice recording (Hold or Toggle). | `Space` |
+| `app.voiceModePTT`            | Hold to speak in Voice Mode.                                                                                                                       | `Space`            |
 
 #### Background Shell Controls
 
