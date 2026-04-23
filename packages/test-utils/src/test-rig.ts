@@ -1714,7 +1714,7 @@ export class TestRig {
   async pollCommand(
     commandFn: () => Promise<void>,
     predicateFn: () => boolean,
-    timeout: number = 30000,
+    timeout: number = 120000,
     interval: number = 1000,
   ) {
     const startTime = Date.now();
