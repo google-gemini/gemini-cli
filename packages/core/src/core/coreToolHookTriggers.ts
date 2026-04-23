@@ -24,7 +24,6 @@ import {
 } from '../safety/secret-scanner.js';
 import { sanitizeExternalContent } from '../safety/content-sanitizer.js';
 import { nerScanAndRedact } from '../safety/ner-pii-scanner.js';
-import path from 'node:path';
 
 /**
  * Extracts MCP context from a tool invocation if it's an MCP tool.
@@ -342,7 +341,7 @@ async function applySecurityProcessors(
       if (filePath && isSensitiveFilename(filePath)) {
         appendNotice(
           toolResult,
-          `\n⚠ Secret scanning: reading sensitive file (${path.basename(filePath)}) — credentials will be redacted from model context.`,
+          `\n⚠ Secret scanning: reading sensitive file (${filePath}) — credentials will be redacted from model context.`,
         );
       }
     }

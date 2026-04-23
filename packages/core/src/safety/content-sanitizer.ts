@@ -17,7 +17,9 @@ export interface SanitizationResult {
  * U+202A–U+202E directional formatting (incl. RTL override U+202E),
  * U+2060 word joiner, U+FEFF BOM.
  */
-const INVISIBLE_UNICODE_RE = /[​‌‍‪-‮⁠﻿]/g;
+const INVISIBLE_UNICODE_RE =
+  // eslint-disable-next-line no-misleading-character-class -- intentional match on invisible/bidi codepoints
+  /[\u200B\u200C\u200D\u202A-\u202E\u2060\uFEFF]/gu;
 
 /** HTML comment pattern. */
 const HTML_COMMENT_RE = /<!--[\s\S]*?-->/g;
@@ -56,7 +58,7 @@ const CONTEXT_BRACKET_RE = /^\]/gm;
  * used to push injected content past the visible context window and inject fake
  * new conversation turns.
  */
-const EXCESSIVE_NEWLINE_RE = /\n{3,}/g;
+const EXCESSIVE_NEWLINE_RE = /(?:\r?\n){3,}/g;
 
 const ALERT_THRESHOLD = 3;
 
@@ -103,9 +105,11 @@ export function sanitizeExternalContent(raw: string): SanitizationResult {
   sanitized = sanitized.replace(EXCESSIVE_NEWLINE_RE, '\n\n');
   if (sanitized !== newlineBefore) strippedCount++;
 
-  // 6. Normalize excessive whitespace padding (>100 consecutive spaces)
+  // 6. Normalize excessive whitespace padding (>100 consecutive spaces or tabs).
+  //    Uses [ \t] rather than \s so newlines are preserved — collapsing \n here
+  //    would destroy paragraph structure for legitimate content.
   const paddingBefore = sanitized;
-  sanitized = sanitized.replace(/ {100,}/g, ' ');
+  sanitized = sanitized.replace(/[ \t]{100,}/g, ' ');
   if (sanitized !== paddingBefore) strippedCount++;
 
   if (strippedCount >= ALERT_THRESHOLD) {

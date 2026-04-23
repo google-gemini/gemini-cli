@@ -9,7 +9,8 @@ export type DeobfuscationFindingType =
   | 'hex_escape'
   | 'variable_indirection'
   | 'whitespace_padding'
-  | 'unicode_invisible';
+  | 'unicode_invisible'
+  | 'decode_limit_reached';
 
 export type DeobfuscationSeverity = 'deny' | 'warn';
 
@@ -32,10 +33,12 @@ export interface DeobfuscationResult {
  * U+2060 word joiner, U+FEFF BOM.
  */
 const INVISIBLE_UNICODE_RE =
-  /[​‌‍‪‫‬‭‮⁠﻿]/;
+  // eslint-disable-next-line no-misleading-character-class -- intentional match on invisible/bidi codepoints
+  /[\u200B\u200C\u200D\u202A-\u202E\u2060\uFEFF]/u;
 
 const INVISIBLE_UNICODE_GLOBAL_RE =
-  /[​‌‍‪‫‬‭‮⁠﻿]/g;
+  // eslint-disable-next-line no-misleading-character-class -- intentional match on invisible/bidi codepoints
+  /[\u200B\u200C\u200D\u202A-\u202E\u2060\uFEFF]/gu;
 
 /**
  * Base64 subshell patterns including quoted payloads and macOS -D flag:
@@ -62,7 +65,7 @@ const VAR_ASSIGN_RE =
 const WHITESPACE_PADDING_RE = /\s{20,}/;
 const WHITESPACE_PADDING_GLOBAL_RE = /\s{20,}/g;
 
-const MAX_DECODE_ITERATIONS = 5;
+const MAX_DECODE_ITERATIONS = 10;
 
 function tryDecodeBase64(b64: string): string | null {
   try {
@@ -141,6 +144,7 @@ export function deobfuscateCommand(raw: string): DeobfuscationResult {
   decoded = applyDenyCheck(decoded, findings, seenTypes);
 
   // 2. Iterative decoding: hex → base64 → variable substitution, until stable
+  let stabilized = false;
   for (let iter = 0; iter < MAX_DECODE_ITERATIONS; iter++) {
     const prev = decoded;
 
@@ -149,7 +153,7 @@ export function deobfuscateCommand(raw: string): DeobfuscationResult {
     if (hexMatches.length > 0) {
       let hexDecoded = decoded;
       for (const m of hexMatches) {
-        const resolved = resolveHexEscapes(m[1]!);
+        const resolved = resolveHexEscapes(m[1]);
         hexDecoded = hexDecoded.replace(m[0], () => resolved);
       }
       if (hexDecoded !== decoded) {
@@ -166,7 +170,7 @@ export function deobfuscateCommand(raw: string): DeobfuscationResult {
     if (base64Matches.length > 0) {
       let b64Decoded = decoded;
       for (const m of base64Matches) {
-        const b64 = (m[1] ?? m[2])!;
+        const b64 = m[1] ?? m[2];
         const plain = tryDecodeBase64(b64);
         if (plain !== null) {
           b64Decoded = b64Decoded.replace(m[0], () => plain);
@@ -188,7 +192,7 @@ export function deobfuscateCommand(raw: string): DeobfuscationResult {
     while ((varMatch = VAR_ASSIGN_RE.exec(decoded)) !== null) {
       const value = varMatch[2] ?? varMatch[3] ?? varMatch[4];
       if (value !== undefined) {
-        varMap.set(varMatch[1]!, value);
+        varMap.set(varMatch[1], value);
       }
     }
     if (varMap.size > 0) {
@@ -202,7 +206,21 @@ export function deobfuscateCommand(raw: string): DeobfuscationResult {
       }
     }
 
-    if (decoded === prev) break; // stable — no further decoding possible
+    if (decoded === prev) {
+      stabilized = true;
+      break; // stable — no further decoding possible
+    }
+  }
+
+  // If the loop exited without stabilizing, residual obfuscation may remain.
+  // Surface a deny finding so the caller treats it as "unsafe to silently pass".
+  if (!stabilized) {
+    findings.push({
+      type: 'decode_limit_reached',
+      severity: 'deny',
+      decoded,
+    });
+    seenTypes.add('decode_limit_reached');
   }
 
   // 3. Re-run deny checks on the fully decoded output — catches deny patterns
@@ -230,6 +248,7 @@ export function summarizeFindings(result: DeobfuscationResult): string {
     variable_indirection: 'variable indirection',
     whitespace_padding: 'whitespace padding (potential hidden command)',
     unicode_invisible: 'invisible Unicode characters',
+    decode_limit_reached: 'layered obfuscation beyond decode limit',
   };
   return result.findings.map((f) => names[f.type]).join('; ');
 }
