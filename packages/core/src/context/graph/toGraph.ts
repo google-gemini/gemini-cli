@@ -6,6 +6,7 @@
 
 import type { Content, Part } from '@google/genai';
 import type {
+  ConcreteNode,
   Episode,
   SemanticPart,
   ToolExecution,
@@ -38,67 +39,105 @@ function isCompleteEpisode(ep: Partial<Episode>): ep is Episode {
   );
 }
 
-export function toGraph(
-  history: readonly Content[],
-  tokenCalculator: ContextTokenCalculator,
-  nodeIdentityMap: WeakMap<object, string>,
-): Episode[] {
-  const episodes: Episode[] = [];
-  let currentEpisode: Partial<Episode> | null = null;
-  const pendingCallParts: Map<string, Part> = new Map();
+export class ContextGraphBuilder {
+  private episodes: Episode[] = [];
+  private currentEpisode: Partial<Episode> | null = null;
+  private pendingCallParts: Map<string, Part> = new Map();
+  private pendingCallPartsWithoutId: Part[] = [];
 
-  const finalizeEpisode = () => {
-    if (currentEpisode && isCompleteEpisode(currentEpisode)) {
-      episodes.push(currentEpisode);
-    }
-    currentEpisode = null;
-  };
+  constructor(
+    private readonly tokenCalculator: ContextTokenCalculator,
+    private readonly nodeIdentityMap: WeakMap<object, string> = new WeakMap(),
+  ) {}
 
-  for (const msg of history) {
-    if (!msg.parts) continue;
+  clear() {
+    this.episodes = [];
+    this.currentEpisode = null;
+    this.pendingCallParts.clear();
+    this.pendingCallPartsWithoutId = [];
+  }
 
-    if (msg.role === 'user') {
-      const hasToolResponses = msg.parts.some((p) => !!p.functionResponse);
-      const hasUserParts = msg.parts.some(
-        (p) => !!p.text || !!p.inlineData || !!p.fileData,
-      );
+  processHistory(history: readonly Content[]) {
+    const finalizeEpisode = () => {
+      if (this.currentEpisode && isCompleteEpisode(this.currentEpisode)) {
+        this.episodes.push(this.currentEpisode);
+      }
+      this.currentEpisode = null;
+    };
 
-      if (hasToolResponses) {
-        currentEpisode = parseToolResponses(
+    for (const msg of history) {
+      if (!msg.parts) continue;
+
+      if (msg.role === 'user') {
+        const hasToolResponses = msg.parts.some((p) => !!p.functionResponse);
+        const hasUserParts = msg.parts.some(
+          (p) => !!p.text || !!p.inlineData || !!p.fileData,
+        );
+
+        if (hasToolResponses) {
+          this.currentEpisode = parseToolResponses(
+            msg,
+            this.currentEpisode,
+            this.pendingCallParts,
+            this.pendingCallPartsWithoutId,
+            this.tokenCalculator,
+            this.nodeIdentityMap,
+          );
+        }
+
+        if (hasUserParts) {
+          finalizeEpisode();
+          this.currentEpisode = parseUserParts(msg, this.nodeIdentityMap);
+        }
+      } else if (msg.role === 'model') {
+        this.currentEpisode = parseModelParts(
           msg,
-          currentEpisode,
-          pendingCallParts,
-          tokenCalculator,
-          nodeIdentityMap,
+          this.currentEpisode,
+          this.pendingCallParts,
+          this.pendingCallPartsWithoutId,
+          this.nodeIdentityMap,
         );
       }
-
-      if (hasUserParts) {
-        finalizeEpisode();
-        currentEpisode = parseUserParts(msg, nodeIdentityMap);
-      }
-    } else if (msg.role === 'model') {
-      currentEpisode = parseModelParts(
-        msg,
-        currentEpisode,
-        pendingCallParts,
-        nodeIdentityMap,
-      );
     }
   }
 
-  if (currentEpisode) {
-    finalizeYield(currentEpisode);
-    finalizeEpisode();
-  }
+  getNodes(): ConcreteNode[] {
+    const copy = [...this.episodes];
+    if (this.currentEpisode) {
+      const activeEp = {
+        ...this.currentEpisode,
+        concreteNodes: [...(this.currentEpisode.concreteNodes || [])],
+      };
+      finalizeYield(activeEp);
+      if (isCompleteEpisode(activeEp)) {
+        copy.push(activeEp);
+      } else {
+        // --- DEBUG ---
+        // eslint-disable-next-line no-console
+        console.error(
+          `[ContextGraphBuilder] WARNING: active episode dropped because isCompleteEpisode is false!`,
+        );
+        // -------------
+      }
+    }
 
-  return episodes;
+    const nodes: ConcreteNode[] = [];
+    for (const ep of copy) {
+      if (ep.concreteNodes) {
+        for (const child of ep.concreteNodes) {
+          nodes.push(child);
+        }
+      }
+    }
+    return nodes;
+  }
 }
 
 function parseToolResponses(
   msg: Content,
   currentEpisode: Partial<Episode> | null,
   pendingCallParts: Map<string, Part>,
+  pendingCallPartsWithoutId: Part[],
   tokenCalculator: ContextTokenCalculator,
   nodeIdentityMap: WeakMap<object, string>,
 ): Partial<Episode> {
@@ -114,7 +153,19 @@ function parseToolResponses(
   for (const part of parts) {
     if (part.functionResponse) {
       const callId = part.functionResponse.id || '';
-      const matchingCall = pendingCallParts.get(callId);
+      let matchingCall = pendingCallParts.get(callId);
+
+      if (!matchingCall && pendingCallPartsWithoutId.length > 0) {
+        const idx = pendingCallPartsWithoutId.findLastIndex(
+          (p) => p.functionCall?.name === part.functionResponse!.name,
+        );
+        if (idx !== -1) {
+          matchingCall = pendingCallPartsWithoutId[idx];
+          pendingCallPartsWithoutId.splice(idx, 1);
+        } else {
+          matchingCall = pendingCallPartsWithoutId.pop();
+        }
+      }
 
       const intentTokens = matchingCall
         ? tokenCalculator.estimateTokensForParts([matchingCall])
@@ -190,6 +241,7 @@ function parseModelParts(
   msg: Content,
   currentEpisode: Partial<Episode> | null,
   pendingCallParts: Map<string, Part>,
+  pendingCallPartsWithoutId: Part[],
   nodeIdentityMap: WeakMap<object, string>,
 ): Partial<Episode> {
   if (!currentEpisode) {
@@ -204,7 +256,11 @@ function parseModelParts(
   for (const part of parts) {
     if (part.functionCall) {
       const callId = part.functionCall.id || '';
-      if (callId) pendingCallParts.set(callId, part);
+      if (callId) {
+        pendingCallParts.set(callId, part);
+      } else {
+        pendingCallPartsWithoutId.push(part);
+      }
     } else if (part.text) {
       const thought: AgentThought = {
         id: getStableId(part, nodeIdentityMap),

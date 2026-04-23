@@ -44,12 +44,10 @@ export class ContextManager {
       this.env.tokenCalculator,
       this.env.graphMapper,
     );
-    this.historyObserver.start();
 
     this.eventBus.onPristineHistoryUpdated((event) => {
-      const existingIds = new Set(this.buffer.nodes.map((n) => n.id));
       const newIds = new Set(event.nodes.map((n) => n.id));
-      const addedNodes = event.nodes.filter((n) => !existingIds.has(n.id));
+      const addedNodes = event.nodes.filter((n) => event.newNodes.has(n.id));
 
       // Prune any pristine nodes that were dropped from the upstream history
       this.buffer = this.buffer.prunePristineNodes(newIds);
@@ -60,6 +58,15 @@ export class ContextManager {
 
       this.evaluateTriggers(event.newNodes);
     });
+    this.eventBus.onProcessorResult((event) => {
+      this.buffer = this.buffer.applyProcessorResult(
+        event.processorId,
+        event.targets,
+        event.returnedNodes,
+      );
+    });
+
+    this.historyObserver.start();
   }
 
   /**
@@ -153,6 +160,11 @@ export class ContextManager {
     activeTaskIds: Set<string> = new Set(),
   ): Promise<Content[]> {
     this.tracer.logEvent('ContextManager', 'Starting rendering of LLM context');
+
+    // --- DEBUG ---
+    // console.error(`[ContextManager:renderHistory] IN: buffer nodes length: ${this.buffer.nodes.length}`);
+    // -------------
+
     // Apply final GC Backstop pressure barrier synchronously before mapping
     const finalHistory = await render(
       this.buffer.nodes,
@@ -162,6 +174,17 @@ export class ContextManager {
       this.env,
       activeTaskIds,
     );
+
+    // --- DEBUG ---
+    // eslint-disable-next-line no-console
+    console.error(
+      `[ContextManager:renderHistory] OUT: finalHistory length: ${finalHistory.length}`,
+    );
+    if (finalHistory.length < 5 && this.buffer.nodes.length > 5) {
+      // eslint-disable-next-line no-console
+      console.error(`[ContextManager:renderHistory] WARNING: graph collapsed!`);
+    }
+    // -------------
 
     this.tracer.logEvent('ContextManager', 'Finished rendering');
 

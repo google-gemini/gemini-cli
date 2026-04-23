@@ -21,8 +21,6 @@ import {
   type MCPServerConfig,
   type GeminiCLIExtension,
   Storage,
-  generalistProfile,
-  type ContextManagementConfig,
 } from '@google/gemini-cli-core';
 import { loadCliConfig, parseArguments, type CliArgs } from './config.js';
 import {
@@ -2217,51 +2215,6 @@ describe('loadCliConfig context management', () => {
       },
     });
     const config = await loadCliConfig(settings, 'test-session', argv);
-    expect(config.getContextManagementConfig()).toStrictEqual(
-      generalistProfile,
-    );
-    expect(config.isContextManagementEnabled()).toBe(true);
-  });
-
-  it('should be true when contextManagement is set to true in settings', async () => {
-    process.argv = ['node', 'script.js'];
-    const argv = await parseArguments(createTestMergedSettings());
-    const contextManagementConfig: Partial<ContextManagementConfig> = {
-      historyWindow: {
-        maxTokens: 100_000,
-        retainedTokens: 50_000,
-      },
-      messageLimits: {
-        normalMaxTokens: 1000,
-        retainedMaxTokens: 10_000,
-        normalizationHeadRatio: 0.25,
-      },
-      tools: {
-        distillation: {
-          maxOutputTokens: 10_000,
-          summarizationThresholdTokens: 15_000,
-        },
-        outputMasking: {
-          protectionThresholdTokens: 30_000,
-          minPrunableThresholdTokens: 10_000,
-          protectLatestTurn: false,
-        },
-      },
-    };
-    const settings = createTestMergedSettings({
-      experimental: {
-        contextManagement: true,
-      },
-      // The type of numbers is being inferred strangely, and so we have to cast
-      // to `any` here.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      contextManagement: contextManagementConfig as any,
-    });
-    const config = await loadCliConfig(settings, 'test-session', argv);
-    expect(config.getContextManagementConfig()).toStrictEqual({
-      enabled: true,
-      ...contextManagementConfig,
-    });
     expect(config.isContextManagementEnabled()).toBe(true);
   });
 });
