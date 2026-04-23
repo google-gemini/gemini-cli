@@ -81,8 +81,7 @@
     "glob": "^12.0.0",
     "node-domexception": "npm:empty@^0.10.1",
     "prebuild-install": "npm:nop@1.0.0",
-    "cross-spawn": "^7.0.6",
-    "minimatch": "^10.2.2"
+    "cross-spawn": "^7.0.6"
   },
   "bin": {
     "gemini": "bundle/gemini.js"
