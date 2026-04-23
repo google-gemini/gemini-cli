@@ -10,6 +10,7 @@ import type { Config } from '../config/config.js';
 import type { ContentGenerator } from '../core/contentGenerator.js';
 import * as chatRecordingService from './chatRecordingService.js';
 import type { ConversationRecord } from './chatRecordingService.js';
+import { CoreToolCallStatus } from '../scheduler/types.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import * as os from 'node:os';
@@ -589,7 +590,7 @@ describe('sessionSummaryUtils', () => {
                   id: 'tool-1',
                   name: 'read_file',
                   args: { file_path: 'package.json' },
-                  status: 'success',
+                  status: CoreToolCallStatus.Success,
                   timestamp: '2024-01-01T00:00:01Z',
                 },
               ],
@@ -613,6 +614,68 @@ describe('sessionSummaryUtils', () => {
         workflowSummary: 'read_file | paths package.json',
         toolSequence: ['read_file'],
         touchedPaths: ['package.json'],
+      });
+    });
+
+    it('should preserve shell command details in scratchpad tool sequence', async () => {
+      const filePath = await writeSession(
+        chatsDir,
+        'session-2024-01-01T10-00-shellcmd.jsonl',
+        buildJsonlSession({
+          sessionId: 'shell-command-session',
+          userMessageCount: 2,
+          summary: 'Existing summary',
+          messages: [
+            {
+              id: 'u1',
+              timestamp: '2024-01-01T00:00:00Z',
+              type: 'user',
+              content: [{ text: 'Run the migration and regenerate docs' }],
+            },
+            {
+              id: 'g1',
+              timestamp: '2024-01-01T00:00:01Z',
+              type: 'gemini',
+              content: [{ text: 'Running commands' }],
+              toolCalls: [
+                {
+                  id: 'tool-1',
+                  name: 'run_shell_command',
+                  args: { command: 'npm run migrate -- --name add-users' },
+                  status: CoreToolCallStatus.Success,
+                  timestamp: '2024-01-01T00:00:01Z',
+                },
+                {
+                  id: 'tool-2',
+                  name: 'run_shell_command',
+                  args: { command: 'npm run docs:generate' },
+                  status: CoreToolCallStatus.Success,
+                  timestamp: '2024-01-01T00:00:02Z',
+                },
+              ],
+            },
+            {
+              id: 'u2',
+              timestamp: '2024-01-01T00:00:03Z',
+              type: 'user',
+              content: [{ text: 'Done' }],
+            },
+          ],
+        }),
+      );
+
+      await generateSummary(mockConfig);
+
+      const savedConversation =
+        await chatRecordingService.loadConversationRecord(filePath);
+      expect(savedConversation?.memoryScratchpad).toEqual({
+        version: 1,
+        workflowSummary:
+          'run_shell_command: npm run migrate -- --name add-users -> run_shell_command: npm run docs:generate',
+        toolSequence: [
+          'run_shell_command: npm run migrate -- --name add-users',
+          'run_shell_command: npm run docs:generate',
+        ],
       });
     });
   });
