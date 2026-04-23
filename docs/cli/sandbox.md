@@ -353,3 +353,25 @@ gemini -s -p "run shell command: mount | grep workspace"
 - [Configuration](../reference/configuration.md): Full configuration options.
 - [Commands](../reference/commands.md): Available commands.
 - [Troubleshooting](../resources/troubleshooting.md): General troubleshooting.
+
+---
+
+## Understanding Sandbox Mode
+
+Sandbox mode provides a secure and isolated environment for executing commands within Gemini CLI.
+
+### Why use sandbox?
+
+- Prevents unintended system changes  
+- Safely test commands and workflows  
+- Protects your local environment  
+
+### When to use?
+
+- Testing new commands  
+- Running experimental workflows  
+- Debugging automation tasks  
+
+### Key benefit
+
+Sandbox ensures that even if something goes wrong, your system remains unaffected.
