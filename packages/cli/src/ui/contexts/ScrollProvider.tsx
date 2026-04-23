@@ -26,7 +26,7 @@ export interface ScrollState {
 
 export interface ScrollableEntry {
   id: string;
-  ref: React.RefObject<DOMElement>;
+  ref: React.RefObject<DOMElement | null>;
   getScrollState: () => ScrollState;
   scrollBy: (delta: number) => void;
   scrollTo?: (scrollTop: number, duration?: number) => void;

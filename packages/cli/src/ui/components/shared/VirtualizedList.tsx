@@ -8,7 +8,6 @@ import {
   useState,
   useRef,
   useLayoutEffect,
-  forwardRef,
   useImperativeHandle,
   useMemo,
   useCallback,
@@ -42,6 +41,7 @@ export type VirtualizedListProps<T> = {
   copyModeEnabled?: boolean;
   fixedItemHeight?: boolean;
   containerHeight?: number;
+  ref?: React.Ref<VirtualizedListRef<T>>;
 };
 
 export type VirtualizedListRef<T> = {
@@ -126,10 +126,7 @@ const VirtualizedListItem = memo(
 
 VirtualizedListItem.displayName = 'VirtualizedListItem';
 
-function VirtualizedList<T>(
-  props: VirtualizedListProps<T>,
-  ref: React.Ref<VirtualizedListRef<T>>,
-) {
+function VirtualizedList<T>(props: VirtualizedListProps<T>) {
   const {
     data,
     renderItem,
@@ -146,6 +143,7 @@ function VirtualizedList<T>(
     stableScrollback,
     copyModeEnabled = false,
     fixedItemHeight = false,
+    ref,
   } = props;
   const dataRef = useRef(data);
   useLayoutEffect(() => {
@@ -754,11 +752,6 @@ function VirtualizedList<T>(
   );
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-const VirtualizedListWithForwardRef = forwardRef(VirtualizedList) as <T>(
-  props: VirtualizedListProps<T> & { ref?: React.Ref<VirtualizedListRef<T>> },
-) => React.ReactElement;
-
-export { VirtualizedListWithForwardRef as VirtualizedList };
+export { VirtualizedList };
 
 VirtualizedList.displayName = 'VirtualizedList';

@@ -28,6 +28,19 @@ import { ACTIVE_SHELL_MAX_LINES } from '../../constants.js';
 import { calculateToolContentMaxLines } from '../../utils/toolLayoutUtils.js';
 import { SubagentProgressDisplay } from './SubagentProgressDisplay.js';
 
+function isAnsiOutput(value: unknown): value is AnsiOutput {
+  return Array.isArray(value) && value.every(Array.isArray);
+}
+
+function isFileDiffResult(value: unknown): value is FileDiffResult {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'fileDiff' in value &&
+    'fileName' in value
+  );
+}
+
 export interface ToolResultDisplayProps {
   resultDisplay: string | object | undefined;
   availableTerminalHeight?: number;
@@ -142,32 +155,23 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
           </Text>
         );
       }
-    } else if (
-      typeof contentData === 'object' &&
-      contentData !== null &&
-      'fileDiff' in contentData
-    ) {
+    } else if (isFileDiffResult(contentData)) {
       content = (
         <DiffRenderer
-          diffContent={
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            (contentData as FileDiffResult).fileDiff
-          }
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          filename={(contentData as FileDiffResult).fileName}
+          diffContent={contentData.fileDiff}
+          filename={contentData.fileName}
           availableTerminalHeight={availableHeight}
           terminalWidth={childWidth}
         />
       );
-    } else if (Array.isArray(contentData)) {
+    } else if (isAnsiOutput(contentData)) {
       const shouldDisableTruncation =
         isAlternateBuffer ||
         (availableTerminalHeight === undefined && maxLines === undefined);
 
       content = (
         <AnsiOutputText
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          data={contentData as AnsiOutput}
+          data={contentData}
           availableTerminalHeight={
             isAlternateBuffer ? undefined : availableHeight
           }
@@ -208,10 +212,9 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
     return content;
   };
 
-  if (Array.isArray(resultDisplay)) {
+  if (isAnsiOutput(resultDisplay)) {
     const limit = maxLines ?? availableHeight ?? ACTIVE_SHELL_MAX_LINES;
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    const data = resultDisplay as AnsiOutput;
+    const data = resultDisplay;
 
     // Calculate list height: if not constrained, use full data length.
     // If constrained (e.g. alternate buffer), limit to available height
