@@ -21,9 +21,14 @@ vi.mock('fs', () => ({
 
 describe('generate-settings-schema', () => {
   it('keeps schema in sync in check mode', async () => {
+    vi.stubEnv('GENERATE_DOCS', 'true');
     const previousExitCode = process.exitCode;
-    await expect(generateSchema(['--check'])).resolves.toBeUndefined();
-    expect(process.exitCode).toBe(previousExitCode);
+    try {
+      await expect(generateSchema(['--check'])).resolves.toBeUndefined();
+      expect(process.exitCode).toBe(previousExitCode);
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it('includes $schema property in generated schema', async () => {
