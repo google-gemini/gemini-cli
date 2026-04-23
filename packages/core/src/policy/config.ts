@@ -435,10 +435,17 @@ export async function createPolicyEngineConfig(
     }
   }
 
+  const nonPlanModes = [
+    ApprovalMode.DEFAULT,
+    ApprovalMode.AUTO_EDIT,
+    ApprovalMode.YOLO,
+  ];
+
   const mapToolsToRules = (
     tools: string[],
     priority: number,
     source: string,
+    modes?: ApprovalMode[],
   ) => {
     for (const tool of tools) {
       // Check for legacy format: toolName(args)
@@ -461,6 +468,7 @@ export async function createPolicyEngineConfig(
                 priority,
                 argsPattern: new RegExp(pattern),
                 source,
+                modes,
               });
             }
           }
@@ -472,6 +480,7 @@ export async function createPolicyEngineConfig(
             decision: PolicyDecision.ALLOW,
             priority,
             source,
+            modes,
           });
         }
       } else {
@@ -484,6 +493,7 @@ export async function createPolicyEngineConfig(
           decision: PolicyDecision.ALLOW,
           priority,
           source,
+          modes,
         });
       }
     }
@@ -496,6 +506,7 @@ export async function createPolicyEngineConfig(
       settings.tools.allowed,
       ALLOWED_TOOLS_FLAG_PRIORITY,
       'Settings (Tools Allowed)',
+      nonPlanModes,
     );
   }
 
@@ -506,6 +517,7 @@ export async function createPolicyEngineConfig(
       settings.tools.core,
       CORE_TOOLS_FLAG_PRIORITY,
       'Settings (Core Tools)',
+      nonPlanModes,
     );
 
     // If core tools are restricted, we should add a default DENY rule for everything else
@@ -515,6 +527,7 @@ export async function createPolicyEngineConfig(
       decision: PolicyDecision.DENY,
       priority: CORE_TOOLS_FLAG_PRIORITY - 0.01,
       source: 'Settings (Core Tools Allowlist Enforcement)',
+      modes: nonPlanModes,
     });
   }
 
@@ -533,6 +546,7 @@ export async function createPolicyEngineConfig(
           decision: PolicyDecision.ALLOW,
           priority: TRUSTED_MCP_SERVER_PRIORITY,
           source: 'Settings (MCP Trusted)',
+          modes: nonPlanModes,
         });
       }
     }
@@ -551,6 +565,7 @@ export async function createPolicyEngineConfig(
         decision: PolicyDecision.ALLOW,
         priority: ALLOWED_MCP_SERVER_PRIORITY,
         source: 'Settings (MCP Allowed)',
+        modes: nonPlanModes,
       });
     }
   }

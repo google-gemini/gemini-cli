@@ -397,18 +397,24 @@ export class PolicyEngine {
       return { decision: PolicyDecision.DENY, rule };
     }
 
-    // Start optimistically. If all parts are ALLOW, the whole is ALLOW.
-    // We will downgrade if any part is ASK_USER or DENY.
-    let aggregateDecision = PolicyDecision.ALLOW;
-    let responsibleRule: PolicyRule | undefined;
+    // Start with the decision from the rule or heuristics.
+    // If the tool call was already downgraded (e.g. by heuristics), we start there.
+    let aggregateDecision = ruleDecision;
 
-    // Check for redirection on the full command string
+    // If heuristics downgraded the decision, we don't blame the rule.
+    let responsibleRule: PolicyRule | undefined =
+      rule && ruleDecision === rule.decision ? rule : undefined;
+
+    // Check for redirection on the full command string.
+    // Redirection always downgrades ALLOW to ASK_USER (it never upgrades).
     if (this.shouldDowngradeForRedirection(command, allowRedirection)) {
-      debugLogger.debug(
-        `[PolicyEngine.check] Downgrading ALLOW to ASK_USER for redirected command: ${command}`,
-      );
-      aggregateDecision = PolicyDecision.ASK_USER;
-      responsibleRule = undefined; // Inherent policy
+      if (aggregateDecision === PolicyDecision.ALLOW) {
+        debugLogger.debug(
+          `[PolicyEngine.check] Downgrading ALLOW to ASK_USER for redirected command: ${command}`,
+        );
+        aggregateDecision = PolicyDecision.ASK_USER;
+        responsibleRule = undefined; // Inherent policy
+      }
     }
 
     for (const detail of subCommands) {
@@ -435,20 +441,16 @@ export class PolicyEngine {
         if (wrapperResult.decision === PolicyDecision.DENY)
           return wrapperResult;
         if (wrapperResult.decision === PolicyDecision.ASK_USER) {
-          aggregateDecision = PolicyDecision.ASK_USER;
-          responsibleRule ??= wrapperResult.rule;
+          if (aggregateDecision === PolicyDecision.ALLOW) {
+            aggregateDecision = PolicyDecision.ASK_USER;
+            responsibleRule = wrapperResult.rule;
+          } else {
+            responsibleRule ??= wrapperResult.rule;
+          }
         }
       }
 
-      if (isAtomic) {
-        if (
-          ruleDecision === PolicyDecision.ASK_USER &&
-          aggregateDecision === PolicyDecision.ALLOW
-        ) {
-          aggregateDecision = PolicyDecision.ASK_USER;
-          responsibleRule = rule;
-        }
-      } else {
+      if (!isAtomic) {
         const subResult = await this.check(
           { name: toolName, args: { command: subCmd, dir_path } },
           serverName,
@@ -460,8 +462,12 @@ export class PolicyEngine {
         if (subResult.decision === PolicyDecision.DENY) return subResult;
 
         if (subResult.decision === PolicyDecision.ASK_USER) {
-          aggregateDecision = PolicyDecision.ASK_USER;
-          responsibleRule ??= subResult.rule;
+          if (aggregateDecision === PolicyDecision.ALLOW) {
+            aggregateDecision = PolicyDecision.ASK_USER;
+            responsibleRule = subResult.rule;
+          } else {
+            responsibleRule ??= subResult.rule;
+          }
         }
 
         // Downgrade if sub-command has redirection
