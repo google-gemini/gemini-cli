@@ -74,6 +74,7 @@ export const ADMIN_POLICY_TIER = 5;
 
 export const MCP_EXCLUDED_PRIORITY = USER_POLICY_TIER + 0.9;
 export const EXCLUDE_TOOLS_FLAG_PRIORITY = USER_POLICY_TIER + 0.4;
+export const CONFIRMATION_REQUIRED_PRIORITY = USER_POLICY_TIER + 0.35;
 export const ALLOWED_TOOLS_FLAG_PRIORITY = USER_POLICY_TIER + 0.3;
 export const CORE_TOOLS_FLAG_PRIORITY = USER_POLICY_TIER + 0.25;
 export const TRUSTED_MCP_SERVER_PRIORITY = USER_POLICY_TIER + 0.2;
@@ -524,6 +525,19 @@ export async function createPolicyEngineConfig(
       undefined,
       true,
     );
+  }
+
+  // Tools that explicitly require confirmation in the settings.
+  // Priority: CONFIRMATION_REQUIRED_PRIORITY (overrides allowed and core)
+  if (settings.tools?.confirmationRequired) {
+    for (const tool of settings.tools.confirmationRequired) {
+      rules.push({
+        toolName: SHELL_TOOL_NAMES.includes(tool) ? SHELL_TOOL_NAME : tool,
+        decision: PolicyDecision.ASK_USER,
+        priority: CONFIRMATION_REQUIRED_PRIORITY,
+        source: 'Settings (Confirmation Required)',
+      });
+    }
   }
 
   // Core tools that are restricted in the settings.
