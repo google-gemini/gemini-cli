@@ -123,7 +123,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   const isLowErrorVerbosity = settings.merged.ui?.errorVerbosity !== 'full';
   const isCompactModeEnabled = settings.merged.ui?.compactToolOutput === true;
   const compactAllowlist = useMemo(
-    () => settings.merged.ui?.compactToolOutputAllowlist ?? [],
+    () => new Set(settings.merged.ui?.compactToolOutputAllowlist ?? []),
     [settings.merged.ui?.compactToolOutputAllowlist],
   );
 
