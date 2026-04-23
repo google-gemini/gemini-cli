@@ -59,6 +59,30 @@ vi.mock('../utils/shell-utils.js', async (importOriginal) => {
   return {
     ...actual,
     initializeShellParsers: vi.fn(),
+    parseCommandDetails: (command: string) => {
+      if (Object.prototype.hasOwnProperty.call(commandMap, command)) {
+        const subcommands = commandMap[command];
+        return {
+          details: subcommands.map((text) => ({
+            name: text.split(' ')[0],
+            text,
+            startIndex: command.indexOf(text),
+          })),
+          hasError: subcommands.length === 0 && command.includes('&&&'),
+        };
+      }
+      return {
+        details: [
+          {
+            name: command.split(' ')[0],
+            text: command,
+            startIndex: 0,
+          },
+        ],
+        hasError: false,
+      };
+    },
+    stripShellWrapper: (command: string) => command,
     splitCommands: (command: string) => {
       if (Object.prototype.hasOwnProperty.call(commandMap, command)) {
         return commandMap[command];

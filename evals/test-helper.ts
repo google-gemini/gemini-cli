@@ -172,6 +172,7 @@ export async function internalEvalTest(evalCase: EvalCase) {
         timeout: evalCase.timeout,
         env: {
           GEMINI_CLI_ACTIVITY_LOG_TARGET: activityLogFile,
+          GEMINI_CLI_TRUST_WORKSPACE: 'true',
         },
       });
 
