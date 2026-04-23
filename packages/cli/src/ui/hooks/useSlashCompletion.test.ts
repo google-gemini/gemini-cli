@@ -513,6 +513,70 @@ describe('useSlashCompletion', () => {
       unmountResume();
     });
 
+    it('should NOT suggest the auto-list command when typing a non-matching partial after /chat', async () => {
+      const slashCommands = [
+        createTestCommand({
+          name: 'chat',
+          description: 'Manage chat history',
+          subCommands: [
+            createTestCommand({ name: 'list', description: 'List chats' }),
+          ],
+        }),
+      ];
+
+      const { result, unmount } = await renderHook(() =>
+        useTestHarnessForSlashCompletion(
+          true,
+          '/chat x', // 'x' does not match 'list'
+          slashCommands,
+          mockCommandContext,
+        ),
+      );
+
+      await resolveMatch();
+
+      await waitFor(() => {
+        // It should NOT have the 'auto' section 'list' suggestion
+        const autoSuggestion = result.current.suggestions.find(
+          (s) => s.sectionTitle === 'auto',
+        );
+        expect(autoSuggestion).toBeUndefined();
+      });
+      unmount();
+    });
+
+    it('should STILL suggest the auto-list command when typing a matching partial after /chat', async () => {
+      const slashCommands = [
+        createTestCommand({
+          name: 'chat',
+          description: 'Manage chat history',
+          subCommands: [
+            createTestCommand({ name: 'list', description: 'List chats' }),
+          ],
+        }),
+      ];
+
+      const { result, unmount } = await renderHook(() =>
+        useTestHarnessForSlashCompletion(
+          true,
+          '/chat l', // 'l' matches 'list'
+          slashCommands,
+          mockCommandContext,
+        ),
+      );
+
+      await resolveMatch();
+
+      await waitFor(() => {
+        const autoSuggestion = result.current.suggestions.find(
+          (s) => s.sectionTitle === 'auto',
+        );
+        expect(autoSuggestion).toBeDefined();
+        expect(autoSuggestion?.label).toBe('list');
+      });
+      unmount();
+    });
+
     it('should sort exact altName matches to the top', async () => {
       const slashCommands = [
         createTestCommand({
