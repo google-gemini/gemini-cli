@@ -16,19 +16,17 @@ import {
 import { EventEmitter } from 'node:events';
 import { RELAUNCH_EXIT_CODE } from './processUtils.js';
 import { spawn, type ChildProcess } from 'node:child_process';
+import { writeFileSync } from 'node:fs';
 
-const mocks = vi.hoisted(() => ({
-  writeToStderr: vi.fn(),
-}));
-
-vi.mock('@google/gemini-cli-core', async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import('@google/gemini-cli-core')>();
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
   return {
     ...actual,
-    writeToStderr: mocks.writeToStderr,
+    writeFileSync: vi.fn(),
   };
 });
+
+const mockedWriteFileSync = vi.mocked(writeFileSync);
 
 vi.mock('node:child_process', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:child_process')>();
@@ -55,7 +53,7 @@ describe('relaunchOnExitCode', () => {
       .spyOn(process.stdin, 'resume')
       .mockImplementation(() => process.stdin);
     vi.clearAllMocks();
-    mocks.writeToStderr.mockClear();
+    mockedWriteFileSync.mockClear();
   });
 
   afterEach(() => {
@@ -100,7 +98,8 @@ describe('relaunchOnExitCode', () => {
     );
 
     expect(runner).toHaveBeenCalledTimes(1);
-    expect(mocks.writeToStderr).toHaveBeenCalledWith(
+    expect(mockedWriteFileSync).toHaveBeenCalledWith(
+      2,
       expect.stringContaining(
         'Fatal error: Failed to relaunch the CLI process.',
       ),
@@ -123,7 +122,7 @@ describe('relaunchAppInChildProcess', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.writeToStderr.mockClear();
+    mockedWriteFileSync.mockClear();
 
     process.env = { ...originalEnv };
     delete process.env['GEMINI_CLI_NO_RELAUNCH'];
