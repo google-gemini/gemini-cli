@@ -139,6 +139,14 @@ async function writeConversationJsonl(
   );
 }
 
+async function setSessionMtime(
+  filePath: string,
+  timestamp: string,
+): Promise<void> {
+  const date = new Date(timestamp);
+  await fs.utimes(filePath, date, date);
+}
+
 describe('memoryService', () => {
   let tmpDir: string;
 
@@ -593,12 +601,14 @@ describe('memoryService', () => {
         chatsDir,
         `${SESSION_FILE_PREFIX}2025-01-02T00-00-opened.jsonl`,
       );
-      const skippedPath = path.join(
-        chatsDir,
-        `${SESSION_FILE_PREFIX}2025-01-01T00-00-skipped.jsonl`,
-      );
       await writeConversationJsonl(openedPath, openedConversation);
-      await writeConversationJsonl(skippedPath, skippedConversation);
+      await writeConversationJsonl(
+        path.join(
+          chatsDir,
+          `${SESSION_FILE_PREFIX}2025-01-01T00-00-skipped.jsonl`,
+        ),
+        skippedConversation,
+      );
 
       vi.mocked(LocalAgentExecutor.create).mockImplementationOnce(
         async (_definition, _context, onActivity) =>
@@ -611,7 +621,6 @@ describe('memoryService', () => {
                 data: {
                   name: 'read_file',
                   args: { file_path: openedPath },
-                  callId: 'call-opened',
                 },
               });
               onActivity?.({
@@ -1115,6 +1124,58 @@ describe('memoryService', () => {
 
       expect(result.newSessionIds).toContain('backlog-10');
       expect(result.newSessionIds).not.toContain('backlog-9');
+    });
+
+    it('surfaces older unprocessed sessions even when the newest 100 files were already processed', async () => {
+      const { buildSessionIndex } = await import('./memoryService.js');
+
+      const processedSessions: ExtractionRun['processedSessions'] = [];
+
+      for (let i = 0; i < 105; i++) {
+        const timestamp = new Date(
+          Date.UTC(2025, 0, 1, 0, 0, 105 - i),
+        ).toISOString();
+        const conversation = createConversation({
+          sessionId: `backlog-${i}`,
+          summary: `Backlog ${i}`,
+          messageCount: 20,
+          lastUpdated: timestamp,
+        });
+        const filePath = path.join(
+          chatsDir,
+          `${SESSION_FILE_PREFIX}2025-01-01T00-00-backlog${String(i).padStart(3, '0')}.json`,
+        );
+        await fs.writeFile(filePath, JSON.stringify(conversation));
+        await setSessionMtime(filePath, timestamp);
+
+        if (i < 100) {
+          processedSessions.push({
+            sessionId: conversation.sessionId,
+            lastUpdated: conversation.lastUpdated,
+          });
+        }
+      }
+
+      const result = await buildSessionIndex(chatsDir, {
+        runs: [
+          {
+            runAt: '2025-02-01T00:00:00Z',
+            sessionIds: processedSessions.map((session) => session.sessionId),
+            processedSessions,
+            skillsCreated: [],
+          },
+        ],
+      });
+
+      expect(result.newSessionIds).toEqual([
+        'backlog-100',
+        'backlog-101',
+        'backlog-102',
+        'backlog-103',
+        'backlog-104',
+      ]);
+      expect(result.sessionIndex).toContain('Backlog 100');
+      expect(result.sessionIndex).toContain('Backlog 104');
     });
   });
 

@@ -507,7 +507,9 @@ function shouldProcessConversation(
 /**
  * Scans the chats directory for eligible session files, loading metadata from
  * both JSONL and legacy JSON sessions, deduplicating migrated sessions by
- * session ID, and sorting by actual lastUpdated.
+ * session ID, and sorting by actual lastUpdated. We scan the full directory
+ * here so already-processed recent sessions cannot permanently block older
+ * backlog sessions from surfacing as new candidates.
  */
 async function scanEligibleSessions(
   chatsDir: string,
@@ -519,14 +521,24 @@ async function scanEligibleSessions(
     return [];
   }
 
+  const candidates: Array<{ filePath: string; mtimeMs: number }> = [];
+  for (const file of allFiles) {
+    if (!isSupportedSessionFile(file)) continue;
+    const filePath = path.join(chatsDir, file);
+    try {
+      const stat = await fs.stat(filePath);
+      if (!stat.isFile()) continue;
+      candidates.push({ filePath, mtimeMs: stat.mtimeMs });
+    } catch {
+      // Skip files that disappeared between readdir and stat.
+    }
+  }
+
+  candidates.sort((a, b) => b.mtimeMs - a.mtimeMs);
+
   const latestBySessionId = new Map<string, IndexedSession>();
 
-  for (const file of allFiles) {
-    if (!isSupportedSessionFile(file)) {
-      continue;
-    }
-
-    const filePath = path.join(chatsDir, file);
+  for (const { filePath } of candidates) {
     try {
       const conversation = await loadConversationRecord(filePath, {
         metadataOnly: true,

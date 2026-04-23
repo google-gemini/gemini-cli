@@ -10,9 +10,9 @@ import { BaseLlmClient } from '../core/baseLlmClient.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import {
   SESSION_FILE_PREFIX,
+  loadConversationRecord,
   type ConversationRecord,
   type MemoryScratchpad,
-  type MessageRecord,
   type ToolCallRecord,
 } from './chatRecordingService.js';
 import fs from 'node:fs/promises';
@@ -27,97 +27,14 @@ const VALIDATION_COMMAND_REGEX =
 const PATH_KEY_REGEX = /(path|file|dir|directory|cwd|root)/i;
 const VALIDATION_TOOL_REGEX = /(test|lint|build|check)/i;
 
-interface LoadedSession {
-  sessionId?: string;
-  projectHash?: string;
-  startTime?: string;
-  summary?: string;
-  memoryScratchpad?: MemoryScratchpad;
-  lastUpdated?: string;
-  directories?: string[];
-  kind?: 'main' | 'subagent';
-  messages: ConversationRecord['messages'];
-}
+type LoadedSession = ConversationRecord & {
+  messageCount?: number;
+  userMessageCount?: number;
+};
 
-function isObjectRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
-
-function hasProperty<T extends string>(
-  obj: unknown,
-  prop: T,
-): obj is { [key in T]: unknown } {
-  return isObjectRecord(obj) && prop in obj;
-}
-
-function isStringProperty<T extends string>(
-  obj: unknown,
-  prop: T,
-): obj is { [key in T]: string } {
-  return hasProperty(obj, prop) && typeof obj[prop] === 'string';
-}
-
-function getStringProperty<T extends string>(
-  obj: unknown,
-  prop: T,
-): string | undefined {
-  return isStringProperty(obj, prop) ? obj[prop] : undefined;
-}
-
-function getStringArrayProperty<T extends string>(
-  obj: unknown,
-  prop: T,
-): string[] | undefined {
-  if (!hasProperty(obj, prop) || !Array.isArray(obj[prop])) {
-    return undefined;
-  }
-
-  const values = obj[prop].filter(
-    (value): value is string => typeof value === 'string',
-  );
-  return values.length > 0 ? values : [];
-}
-
-function getKindProperty(obj: unknown): ConversationRecord['kind'] | undefined {
-  const kind = getStringProperty(obj, 'kind');
-  return kind === 'main' || kind === 'subagent' ? kind : undefined;
-}
-
-function isMemoryValidationStatus(
-  value: unknown,
-): value is MemoryScratchpad['validationStatus'] {
-  return value === 'passed' || value === 'failed' || value === 'unknown';
-}
-
-function parseMemoryScratchpad(value: unknown): MemoryScratchpad | undefined {
-  if (!isObjectRecord(value) || value['version'] !== 1) {
-    return undefined;
-  }
-
-  const workflowSummary = getStringProperty(value, 'workflowSummary');
-  const toolSequence = getStringArrayProperty(value, 'toolSequence');
-  const touchedPaths = getStringArrayProperty(value, 'touchedPaths');
-  const validationStatus = isMemoryValidationStatus(value['validationStatus'])
-    ? value['validationStatus']
-    : undefined;
-
-  return {
-    version: 1,
-    ...(workflowSummary ? { workflowSummary } : {}),
-    ...(toolSequence ? { toolSequence } : {}),
-    ...(touchedPaths ? { touchedPaths } : {}),
-    ...(validationStatus ? { validationStatus } : {}),
-  };
-}
-
-function isMessageRecord(value: unknown): value is MessageRecord {
-  return isStringProperty(value, 'id');
-}
-
-function isMessageRecordArray(
-  value: unknown,
-): value is ConversationRecord['messages'] {
-  return Array.isArray(value) && value.every(isMessageRecord);
+interface SessionFileCandidate {
+  filePath: string;
+  mtimeMs: number;
 }
 
 function isSupportedSessionFile(fileName: string): boolean {
@@ -127,149 +44,41 @@ function isSupportedSessionFile(fileName: string): boolean {
   );
 }
 
-function getLoadedSessionTimestamp(session: LoadedSession): number {
-  if (!session.lastUpdated) {
-    return 0;
+async function listSessionFileCandidates(
+  chatsDir: string,
+): Promise<SessionFileCandidate[]> {
+  const allFiles = await fs.readdir(chatsDir);
+  const candidates: SessionFileCandidate[] = [];
+
+  for (const fileName of allFiles) {
+    if (!isSupportedSessionFile(fileName)) continue;
+
+    const filePath = path.join(chatsDir, fileName);
+    try {
+      const stat = await fs.stat(filePath);
+      if (!stat.isFile()) continue;
+      candidates.push({ filePath, mtimeMs: stat.mtimeMs });
+    } catch {
+      // Skip files that disappeared between readdir and stat.
+    }
   }
+
+  candidates.sort((a, b) => {
+    const mtimeDelta = b.mtimeMs - a.mtimeMs;
+    if (mtimeDelta !== 0) {
+      return mtimeDelta;
+    }
+
+    return path.basename(b.filePath).localeCompare(path.basename(a.filePath));
+  });
+
+  return candidates;
+}
+
+function getSessionTimestampMs(session: LoadedSession): number {
+  if (!session.lastUpdated) return 0;
   const parsed = Date.parse(session.lastUpdated);
   return Number.isNaN(parsed) ? 0 : parsed;
-}
-
-function parseJsonSession(content: string): LoadedSession | null {
-  try {
-    const parsed = JSON.parse(content) as unknown;
-    if (!isObjectRecord(parsed) || !isMessageRecordArray(parsed['messages'])) {
-      return null;
-    }
-
-    return {
-      sessionId: getStringProperty(parsed, 'sessionId'),
-      projectHash: getStringProperty(parsed, 'projectHash'),
-      startTime: getStringProperty(parsed, 'startTime'),
-      summary: getStringProperty(parsed, 'summary'),
-      memoryScratchpad: parseMemoryScratchpad(parsed['memoryScratchpad']),
-      lastUpdated: getStringProperty(parsed, 'lastUpdated'),
-      directories: getStringArrayProperty(parsed, 'directories'),
-      kind: getKindProperty(parsed),
-      messages: parsed['messages'],
-    };
-  } catch {
-    return null;
-  }
-}
-
-function parseJsonlSession(content: string): LoadedSession | null {
-  const messages: ConversationRecord['messages'] = [];
-  const messageIndex = new Map<string, number>();
-  let sessionId: string | undefined;
-  let projectHash: string | undefined;
-  let startTime: string | undefined;
-  let summary: string | undefined;
-  let memoryScratchpad: MemoryScratchpad | undefined;
-  let lastUpdated: string | undefined;
-  let directories: string[] | undefined;
-  let kind: ConversationRecord['kind'] | undefined;
-
-  for (const line of content.split(/\r?\n/)) {
-    if (!line.trim()) {
-      continue;
-    }
-
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(line) as unknown;
-    } catch {
-      return null;
-    }
-
-    if (!isObjectRecord(parsed)) {
-      continue;
-    }
-
-    if (isStringProperty(parsed, '$rewindTo')) {
-      const rewindTo = parsed['$rewindTo'];
-      const rewindIndex = messageIndex.get(rewindTo);
-      if (rewindIndex === undefined) {
-        messages.length = 0;
-        messageIndex.clear();
-        continue;
-      }
-
-      messages.splice(rewindIndex);
-      for (const [messageId, index] of [...messageIndex.entries()]) {
-        if (index >= rewindIndex) {
-          messageIndex.delete(messageId);
-        }
-      }
-      continue;
-    }
-
-    if (isMessageRecord(parsed)) {
-      const messageId = parsed['id'];
-      const message = parsed;
-      const existingIndex = messageIndex.get(messageId);
-      if (existingIndex === undefined) {
-        messageIndex.set(messageId, messages.length);
-        messages.push(message);
-      } else {
-        messages[existingIndex] = message;
-      }
-      continue;
-    }
-
-    if ('$set' in parsed && isObjectRecord(parsed['$set'])) {
-      const updates = parsed['$set'];
-      sessionId = getStringProperty(updates, 'sessionId') ?? sessionId;
-      projectHash = getStringProperty(updates, 'projectHash') ?? projectHash;
-      startTime = getStringProperty(updates, 'startTime') ?? startTime;
-      summary = getStringProperty(updates, 'summary') ?? summary;
-      memoryScratchpad =
-        parseMemoryScratchpad(updates['memoryScratchpad']) ?? memoryScratchpad;
-      lastUpdated = getStringProperty(updates, 'lastUpdated') ?? lastUpdated;
-      directories =
-        getStringArrayProperty(updates, 'directories') ?? directories;
-      kind = getKindProperty(updates) ?? kind;
-      continue;
-    }
-
-    if (isMessageRecordArray(parsed['messages'])) {
-      return {
-        sessionId: getStringProperty(parsed, 'sessionId') ?? sessionId,
-        projectHash: getStringProperty(parsed, 'projectHash') ?? projectHash,
-        startTime: getStringProperty(parsed, 'startTime') ?? startTime,
-        summary: getStringProperty(parsed, 'summary') ?? summary,
-        memoryScratchpad:
-          parseMemoryScratchpad(parsed['memoryScratchpad']) ?? memoryScratchpad,
-        lastUpdated: getStringProperty(parsed, 'lastUpdated') ?? lastUpdated,
-        directories:
-          getStringArrayProperty(parsed, 'directories') ?? directories,
-        kind: getKindProperty(parsed) ?? kind,
-        messages: parsed['messages'],
-      };
-    }
-
-    sessionId = getStringProperty(parsed, 'sessionId') ?? sessionId;
-    projectHash = getStringProperty(parsed, 'projectHash') ?? projectHash;
-    startTime = getStringProperty(parsed, 'startTime') ?? startTime;
-    summary = getStringProperty(parsed, 'summary') ?? summary;
-    memoryScratchpad =
-      parseMemoryScratchpad(parsed['memoryScratchpad']) ?? memoryScratchpad;
-    lastUpdated = getStringProperty(parsed, 'lastUpdated') ?? lastUpdated;
-    directories = getStringArrayProperty(parsed, 'directories') ?? directories;
-    kind = getKindProperty(parsed) ?? kind;
-  }
-
-  return {
-    sessionId,
-    projectHash,
-    startTime,
-    summary,
-    memoryScratchpad,
-    lastUpdated,
-    directories,
-    kind,
-    messages,
-  };
 }
 
 function normalizeToolName(name: string): string {
@@ -352,7 +161,7 @@ function collectPathsFromValue(
     return;
   }
 
-  if (!isObjectRecord(value)) {
+  if (typeof value !== 'object' || value === null) {
     return;
   }
 
@@ -477,15 +286,6 @@ function hasSessionSummaryMetadata(session: LoadedSession): boolean {
   return Boolean(session.summary && session.memoryScratchpad);
 }
 
-async function loadSessionForSummary(
-  sessionPath: string,
-): Promise<LoadedSession | null> {
-  const content = await fs.readFile(sessionPath, 'utf-8');
-  return sessionPath.endsWith('.jsonl')
-    ? parseJsonlSession(content)
-    : parseJsonSession(content);
-}
-
 /**
  * Generates and saves a summary for a session file.
  */
@@ -493,13 +293,13 @@ async function generateAndSaveSummary(
   config: Config,
   sessionPath: string,
 ): Promise<void> {
-  const conversation = await loadSessionForSummary(sessionPath);
+  const conversation = await loadConversationRecord(sessionPath);
   if (!conversation) {
     debugLogger.debug(`[SessionSummary] Could not read session ${sessionPath}`);
     return;
   }
 
-  // Skip if both summary metadata fields already exist.
+  // Skip if both summary fields already exist
   if (hasSessionSummaryMetadata(conversation)) {
     debugLogger.debug(
       `[SessionSummary] Summary metadata already exists for ${sessionPath}, skipping`,
@@ -542,13 +342,19 @@ async function generateAndSaveSummary(
     conversation.memoryScratchpad ??
     buildMemoryScratchpad(conversation.messages, config.getProjectRoot());
 
-  // Re-read the file before writing to handle race conditions
-  const freshConversation = await loadSessionForSummary(sessionPath);
+  // Re-read the file before writing to handle race conditions. For JSONL we
+  // only need the metadata; for legacy JSON we need the full record so we can
+  // round-trip the messages back to disk.
+  const isJsonl = sessionPath.endsWith('.jsonl');
+  const freshConversation = await loadConversationRecord(sessionPath, {
+    metadataOnly: isJsonl,
+  });
   if (!freshConversation) {
     debugLogger.debug(`[SessionSummary] Could not re-read ${sessionPath}`);
     return;
   }
 
+  // Check if summary metadata was added by another process
   if (hasSessionSummaryMetadata(freshConversation)) {
     debugLogger.debug(
       `[SessionSummary] Summary metadata was added by another process for ${sessionPath}`,
@@ -568,14 +374,13 @@ async function generateAndSaveSummary(
     return;
   }
 
-  const lastUpdated = new Date().toISOString();
-  metadataUpdate.lastUpdated = lastUpdated;
-  if (sessionPath.endsWith('.jsonl')) {
+  if (isJsonl) {
     await fs.appendFile(
       sessionPath,
       `${JSON.stringify({ $set: metadataUpdate })}\n`,
     );
   } else {
+    const lastUpdated = freshConversation.lastUpdated;
     await fs.writeFile(
       sessionPath,
       JSON.stringify(
@@ -595,7 +400,7 @@ async function generateAndSaveSummary(
 }
 
 /**
- * Finds the most recently created session that needs summary metadata.
+ * Finds the most recently updated previous session that still needs summary metadata.
  * Returns the path if it needs a summary or scratchpad, null otherwise.
  */
 export async function getPreviousSession(
@@ -612,64 +417,74 @@ export async function getPreviousSession(
       return null;
     }
 
-    // List session files
-    const allFiles = await fs.readdir(chatsDir);
-    const sessionFiles = allFiles.filter(isSupportedSessionFile);
-
+    const sessionFiles = await listSessionFileCandidates(chatsDir);
     if (sessionFiles.length === 0) {
       debugLogger.debug('[SessionSummary] No session files found');
       return null;
     }
 
-    const sessions: Array<{ filePath: string; conversation: LoadedSession }> =
-      [];
-    for (const sessionFile of sessionFiles) {
-      const filePath = path.join(chatsDir, sessionFile);
+    let bestPreviousSession: {
+      filePath: string;
+      conversation: LoadedSession;
+    } | null = null;
+
+    for (const { filePath, mtimeMs } of sessionFiles) {
+      const bestTimestamp = bestPreviousSession
+        ? getSessionTimestampMs(bestPreviousSession.conversation)
+        : null;
+      if (
+        bestPreviousSession &&
+        bestTimestamp !== null &&
+        bestTimestamp > 0 &&
+        mtimeMs < bestTimestamp
+      ) {
+        break;
+      }
+
       try {
-        const conversation = await loadSessionForSummary(filePath);
-        if (conversation) {
-          sessions.push({ filePath, conversation });
+        const conversation = await loadConversationRecord(filePath, {
+          metadataOnly: true,
+        });
+        if (!conversation) continue;
+        if (conversation.sessionId === config.getSessionId()) continue;
+        if (hasSessionSummaryMetadata(conversation)) continue;
+
+        // Only generate summaries for sessions with more than 1 user message.
+        // `loadConversationRecord` populates `userMessageCount` in metadataOnly
+        // mode; fall back to scanning messages for the legacy fallback path.
+        const userMessageCount =
+          conversation.userMessageCount ??
+          conversation.messages.filter((message) => message.type === 'user')
+            .length;
+        if (userMessageCount <= MIN_MESSAGES_FOR_SUMMARY) {
+          continue;
+        }
+
+        if (
+          !bestPreviousSession ||
+          getSessionTimestampMs(conversation) >
+            getSessionTimestampMs(bestPreviousSession.conversation) ||
+          (getSessionTimestampMs(conversation) ===
+            getSessionTimestampMs(bestPreviousSession.conversation) &&
+            path
+              .basename(filePath)
+              .localeCompare(path.basename(bestPreviousSession.filePath)) > 0)
+        ) {
+          bestPreviousSession = { filePath, conversation };
         }
       } catch {
         // Ignore unreadable session files
       }
     }
 
-    if (sessions.length === 0) {
-      debugLogger.debug('[SessionSummary] Could not read most recent session');
-      return null;
-    }
-
-    sessions.sort((a, b) => {
-      const timestampDelta =
-        getLoadedSessionTimestamp(b.conversation) -
-        getLoadedSessionTimestamp(a.conversation);
-      if (timestampDelta !== 0) {
-        return timestampDelta;
-      }
-      return path.basename(b.filePath).localeCompare(path.basename(a.filePath));
-    });
-
-    const { filePath, conversation } = sessions[0];
-    if (hasSessionSummaryMetadata(conversation)) {
+    if (!bestPreviousSession) {
       debugLogger.debug(
-        '[SessionSummary] Most recent session already has summary metadata',
+        '[SessionSummary] No previous session needs summary generation',
       );
       return null;
     }
 
-    // Only generate summaries for sessions with more than 1 user message
-    const userMessageCount = conversation.messages.filter(
-      (message) => message.type === 'user',
-    ).length;
-    if (userMessageCount <= MIN_MESSAGES_FOR_SUMMARY) {
-      debugLogger.debug(
-        `[SessionSummary] Most recent session has ${userMessageCount} user message(s), skipping (need more than ${MIN_MESSAGES_FOR_SUMMARY})`,
-      );
-      return null;
-    }
-
-    return filePath;
+    return bestPreviousSession.filePath;
   } catch (error) {
     debugLogger.debug(
       `[SessionSummary] Error finding previous session: ${error instanceof Error ? error.message : String(error)}`,
