@@ -1,20 +1,12 @@
 /**
  * @license
  * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *   http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * @license
  */
 
+import { GITHUB_OWNER, GITHUB_REPO, MetricOutput } from '../types.js';
 import { execSync } from 'node:child_process';
 
 try {
@@ -57,16 +49,23 @@ try {
   }
   `;
   const output = execSync(
-    `gh api graphql -F owner=google-gemini -F repo=gemini-cli -f query='${query}'`,
+    `gh api graphql -F owner=${GITHUB_OWNER} -F repo=${GITHUB_REPO} -f query='${query}'`,
     { encoding: 'utf-8' },
   );
   const data = JSON.parse(output).data.repository;
 
-  const getFirstResponseTime = (item: any) => {
+  const getFirstResponseTime = (item: {
+    createdAt: string;
+    author: { login: string };
+    comments: { nodes: { createdAt: string; author?: { login: string } }[] };
+    reviews?: { nodes: { createdAt: string; author?: { login: string } }[] };
+  }) => {
     const authorLogin = item.author?.login;
     let earliestResponse: number | null = null;
 
-    const checkNodes = (nodes: any[]) => {
+    const checkNodes = (
+      nodes: { createdAt: string; author?: { login: string } }[],
+    ) => {
       for (const node of nodes) {
         if (node.author?.login && node.author.login !== authorLogin) {
           const login = node.author.login.toLowerCase();
@@ -93,7 +92,7 @@ try {
     return null; // No response yet
   };
 
-  const processItems = (items: any[]) => {
+  const processItems = (items: { ttfr: number; association: string }[]) => {
     return items
       .map((item) => ({
         association: item.authorAssociation,
@@ -112,7 +111,7 @@ try {
   const isMaintainer = (assoc: string) => ['MEMBER', 'OWNER'].includes(assoc);
   const is1P = (assoc: string) => ['COLLABORATOR'].includes(assoc);
 
-  const calculateAvg = (items: any[]) =>
+  const calculateAvg = (items: { ttfr: number; association: string }[]) =>
     items.length ? items.reduce((a, b) => a + b.ttfr, 0) / items.length : 0;
 
   const maintainers = calculateAvg(
@@ -123,7 +122,7 @@ try {
 
   const timestamp = new Date().toISOString();
 
-  const metrics = [
+  const metrics: MetricOutput[] = [
     {
       metric: 'time_to_first_response_overall_hours',
       value: Math.round(overall * 100) / 100,
