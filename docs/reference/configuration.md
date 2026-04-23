@@ -1688,8 +1688,10 @@ their corresponding top-level category object in your `settings.json` file.
   - **Requires restart:** Yes
 
 - **`experimental.jitContext`** (boolean):
-  - **Description:** Enable Just-In-Time (JIT) context loading.
-  - **Default:** `false`
+  - **Description:** Enable Just-In-Time (JIT) context loading. Defaults to
+    true; set to false to opt out and load all GEMINI.md files into the system
+    instruction up-front.
+  - **Default:** `true`
   - **Requires restart:** Yes
 
 - **`experimental.useOSC52Paste`** (boolean):
@@ -1754,11 +1756,17 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `"gemma3-1b-gpu-custom"`
   - **Requires restart:** Yes
 
-- **`experimental.memoryManager`** (boolean):
-  - **Description:** Replace the built-in save_memory tool with a memory manager
-    subagent that supports adding, removing, de-duplicating, and organizing
-    memories.
-  - **Default:** `false`
+- **`experimental.memoryV2`** (boolean):
+  - **Description:** Disable the built-in save_memory tool and let the main
+    agent persist project context by editing markdown files directly with
+    edit/write_file. Route facts across four tiers: team-shared conventions go
+    to project GEMINI.md files, project-specific personal notes go to the
+    per-project private memory folder (MEMORY.md as index + sibling .md files
+    for detail), and cross-project personal preferences go to the global
+    ~/.gemini/GEMINI.md (the only file under ~/.gemini/ that the agent can edit
+    — settings, credentials, etc. remain off-limits). Set to false to fall back
+    to the legacy save_memory tool.
+  - **Default:** `true`
   - **Requires restart:** Yes
 
 - **`experimental.autoMemory`** (boolean):
@@ -2148,6 +2156,14 @@ the `advanced.excludedEnvVars` setting in your `settings.json` file.
   - Overrides the hardcoded default
   - Example: `export GEMINI_MODEL="gemini-3-flash-preview"` (Windows PowerShell:
     `$env:GEMINI_MODEL="gemini-3-flash-preview"`)
+- **`GEMINI_CLI_TRUST_WORKSPACE`**:
+  - If set to `"true"`, trusts the current workspace for the duration of the
+    session, bypassing the folder trust check.
+  - Useful for headless environments (for example, CI/CD pipelines).
+- **`GEMINI_CLI_TRUSTED_FOLDERS_PATH`**:
+  - Overrides the default location for the `trustedFolders.json` file.
+  - Useful if you want to store this configuration in a custom location instead
+    of the default `~/.gemini/`.
 - **`GEMINI_CLI_IDE_PID`**:
   - Manually specifies the PID of the IDE process to use for integration. This
     is useful when running Gemini CLI in a standalone terminal while still
