@@ -60,8 +60,10 @@ export function useVoiceMode({
   bufferRef.current = buffer;
 
   const stopVoiceRecording = useCallback(() => {
+    if (stopRequestedRef.current) return;
     debugLogger.debug('[Voice] Stop requested');
     stopRequestedRef.current = true;
+
     setIsRecording(false);
     isRecordingRef.current = false;
     setIsConnecting(false);
@@ -94,7 +96,10 @@ export function useVoiceMode({
   }, [settings.experimental.voice]);
 
   const startVoiceRecording = useCallback(() => {
-    if (Date.now() - lastFailureTimeRef.current < 2000) {
+    if (
+      isRecordingRef.current ||
+      Date.now() - lastFailureTimeRef.current < 2000
+    ) {
       return;
     }
 
@@ -165,6 +170,10 @@ export function useVoiceMode({
       );
 
       transcriptionServiceRef.current.on('transcription', (text) => {
+        // If stop was requested, ignore incoming transcriptions to prevent "pasting things"
+        // while the service is draining in the grace period.
+        if (stopRequestedRef.current) return;
+
         if (text) {
           const currentBufferText = bufferRef.current.text;
           const previousTranscription = liveTranscriptionRef.current;
@@ -201,6 +210,8 @@ export function useVoiceMode({
         debugLogger.error('[Voice] Transcription error:', err);
         lastFailureTimeRef.current = Date.now();
         recordingInProgressRef.current = false;
+        // Don't call stopVoiceRecording here as it might be an intermittent error
+        // or the service might recover. If it's fatal, 'close' will fire.
       });
 
       transcriptionServiceRef.current.on('close', () => {
@@ -232,10 +243,7 @@ export function useVoiceMode({
         });
         recorderRef.current?.on('error', (err) => {
           debugLogger.error('[Voice] Recorder error:', err);
-          setIsRecording(false);
-          isRecordingRef.current = false;
-          setIsConnecting(false);
-          recordingInProgressRef.current = false;
+          stopVoiceRecording();
           lastFailureTimeRef.current = Date.now();
         });
       } catch (err: unknown) {
@@ -259,7 +267,12 @@ export function useVoiceMode({
     };
 
     void startAsync();
-  }, [config, settings.experimental.voice, setQueueErrorMessage]);
+  }, [
+    config,
+    settings.experimental.voice,
+    setQueueErrorMessage,
+    stopVoiceRecording,
+  ]);
 
   useEffect(
     () => () => {
@@ -280,7 +293,9 @@ export function useVoiceMode({
 
   const handleVoiceInput = useCallback(
     (key: Key): boolean => {
-      if (isRecording) {
+      const activeRecording = isRecording || isRecordingRef.current;
+
+      if (activeRecording) {
         const activationMode =
           settings.experimental.voice?.activationMode ?? 'push-to-talk';
 

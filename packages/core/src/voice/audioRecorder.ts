@@ -45,6 +45,8 @@ export class AudioRecorder extends EventEmitter<AudioRecorderEvents> {
 
     try {
       const available = await AudioRecorder.isAvailable();
+      if (!this.isRecordingInternal) return; // Check if stopped while checking availability
+
       if (!available) {
         throw new Error(
           'The `rec` command (provided by SoX) is required for voice mode. Please install SoX (e.g., `brew install sox` on macOS or `sudo apt install sox libsox-fmt-all` on Linux).',
@@ -67,6 +69,12 @@ export class AudioRecorder extends EventEmitter<AudioRecorderEvents> {
         'raw',
         '-',
       ]);
+
+      if (!this.isRecordingInternal) {
+        this.recProcess.kill('SIGTERM');
+        this.recProcess = null;
+        return;
+      }
 
       this.recProcess.stdout.on('data', (data: Buffer) => {
         this.emit('data', data);
