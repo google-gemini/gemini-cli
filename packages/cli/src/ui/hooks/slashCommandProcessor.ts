@@ -281,10 +281,16 @@ export const useSlashCommandProcessor = (
     const listener = () => {
       reloadCommands();
     };
+    let isActive = true;
+    let activeIdeClient: IdeClient | undefined;
 
     // eslint-disable-next-line @typescript-eslint/no-floating-promises
     (async () => {
       const ideClient = await IdeClient.getInstance();
+      if (!isActive) {
+        return;
+      }
+      activeIdeClient = ideClient;
       ideClient.addStatusChangeListener(listener);
     })();
 
@@ -307,11 +313,8 @@ export const useSlashCommandProcessor = (
     coreEvents.on('extensionsStopping', extensionEventListener);
 
     return () => {
-      // eslint-disable-next-line @typescript-eslint/no-floating-promises
-      (async () => {
-        const ideClient = await IdeClient.getInstance();
-        ideClient.removeStatusChangeListener(listener);
-      })();
+      isActive = false;
+      activeIdeClient?.removeStatusChangeListener(listener);
       removeMCPStatusChangeListener(listener);
       coreEvents.off('extensionsStarting', extensionEventListener);
       coreEvents.off('extensionsStopping', extensionEventListener);
