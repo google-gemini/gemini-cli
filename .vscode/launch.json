@@ -41,12 +41,17 @@
       "localRoot": "${workspaceFolder}/packages"
     },
     {
+      "name": "CLI: Run Current File",
       "type": "node",
       "request": "launch",
-      "name": "Launch Program",
-      "skipFiles": ["<node_internals>/**"],
       "program": "${file}",
-      "outFiles": ["${workspaceFolder}/**/*.js"]
+      "runtimeArgs": ["--import", "tsx"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"],
+      "env": {
+        "NODE_ENV": "development"
+      }
     },
     {
       "type": "node",
