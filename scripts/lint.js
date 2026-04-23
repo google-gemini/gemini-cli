@@ -6,7 +6,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { execSync } from 'node:child_process';
+import { execSync, spawnSync } from 'node:child_process';
 import {
   mkdirSync,
   rmSync,
@@ -158,7 +158,7 @@ const LINTERS = {
   },
 };
 
-function runCommand(command, stdio = 'inherit') {
+function runCommand(command, args = [], stdio = 'inherit') {
   try {
     const env = { ...process.env };
     const nodeBin = join(process.cwd(), 'node_modules', '.bin');
@@ -175,11 +175,36 @@ function runCommand(command, stdio = 'inherit') {
       pythonBin,
       env[pathKey],
     ].join(sep);
-    execSync(command, { stdio, env, shell: true });
-    return true;
+
+    if (Array.isArray(args) && args.length > 0) {
+      // On Windows, npm.cmd and npx.cmd need a shell to be found in the PATH
+      const useShell =
+        isWindows && (command === 'npm.cmd' || command === 'npx.cmd');
+      const result = spawnSync(command, args, { stdio, env, shell: useShell });
+      return result.status === 0;
+    } else {
+      execSync(command, { stdio, env, shell: true });
+      return true;
+    }
   } catch {
     return false;
   }
+}
+
+/**
+ * Get git-tracked files matching a pattern, cross-platform.
+ * Uses Node.js filtering on Windows to avoid shell pipe issues.
+ */
+function getGitFiles(pattern) {
+  const files = execSync('git ls-files', { encoding: 'utf-8' })
+    .trim()
+    .split('\n')
+    .filter(Boolean);
+
+  if (!pattern) return files;
+
+  const regex = new RegExp(pattern);
+  return files.filter((f) => regex.test(f));
 }
 
 export function setupLinters() {
@@ -191,7 +216,7 @@ export function setupLinters() {
 
   for (const linter in LINTERS) {
     const { check, installer } = LINTERS[linter];
-    if (!runCommand(check, 'ignore')) {
+    if (!runCommand(check, [], 'ignore')) {
       console.log(`Installing ${linter}...`);
       if (!runCommand(installer)) {
         console.error(
@@ -206,35 +231,118 @@ export function setupLinters() {
 
 export function runESLint() {
   console.log('\nRunning ESLint...');
-  if (!runCommand('npm run lint')) {
+  const command = isWindows ? 'npm.cmd' : 'npm';
+  if (!runCommand(command, ['run', 'lint'])) {
     process.exit(1);
   }
 }
 
 export function runActionlint() {
   console.log('\nRunning actionlint...');
-  if (!runCommand(LINTERS.actionlint.run)) {
-    process.exit(1);
+  if (isWindows) {
+    if (
+      !runCommand('actionlint', [
+        '-color',
+        '-ignore',
+        'SC2002:',
+        '-ignore',
+        'SC2016:',
+        '-ignore',
+        'SC2129:',
+        '-ignore',
+        'label .+ is unknown',
+      ])
+    ) {
+      process.exit(1);
+    }
+  } else {
+    if (!runCommand(LINTERS.actionlint.run)) {
+      process.exit(1);
+    }
   }
 }
 
 export function runShellcheck() {
   console.log('\nRunning shellcheck...');
-  if (!runCommand(LINTERS.shellcheck.run)) {
-    process.exit(1);
+
+  if (isWindows) {
+    // Node.js file filtering on Windows to avoid shell pipe issues
+    // Only match files with explicit shell extension (not files without extensions like LICENSE)
+    const shellFiles = getGitFiles('^.*\\.(sh|zsh|bash)$');
+
+    if (shellFiles.length === 0) {
+      console.log('No shell files found.');
+      return true;
+    }
+
+    // Build file argument string and run shellcheck
+    // Use array of arguments to prevent command injection
+    const args = [
+      '--check-sourced',
+      '--enable=all',
+      '--exclude=SC2002,SC2129,SC2310',
+      '--severity=style',
+      '--format=gcc',
+      '--color=never',
+      ...shellFiles,
+    ];
+
+    if (!runCommand('shellcheck', args)) {
+      process.exit(1);
+    }
+  } else {
+    // Unix: use original shell pipeline
+    if (!runCommand(LINTERS.shellcheck.run)) {
+      process.exit(1);
+    }
   }
 }
 
 export function runYamllint() {
   console.log('\nRunning yamllint...');
-  if (!runCommand(LINTERS.yamllint.run)) {
-    process.exit(1);
+
+  if (isWindows) {
+    // Node.js file filtering on Windows to avoid shell pipe issues
+    const yamlFiles = getGitFiles('\\.(yaml|yml)$');
+
+    if (yamlFiles.length === 0) {
+      console.log('No YAML files found.');
+      return true;
+    }
+
+    // Set UTF-8 encoding for Python on Windows to handle non-ASCII files
+    const env = { ...process.env, PYTHONUTF8: '1' };
+
+    // Run yamllint on each file
+    for (const file of yamlFiles) {
+      // Use the venv python directly to avoid PATH issues
+      const pythonExe = join(PYTHON_VENV_PATH, 'Scripts', 'python.exe');
+      const args = ['-X', 'utf8', '-m', 'yamllint', '--format', 'github', file];
+      try {
+        const result = spawnSync(pythonExe, args, {
+          stdio: 'inherit',
+          env,
+          shell: false,
+        });
+        if (result.status !== 0) {
+          process.exit(1);
+        }
+      } catch {
+        process.exit(1);
+      }
+    }
+  } else {
+    // Unix: use original shell pipeline
+    if (!runCommand(LINTERS.yamllint.run)) {
+      process.exit(1);
+    }
   }
 }
 
 export function runPrettier() {
   console.log('\nRunning Prettier...');
-  if (!runCommand('prettier --check .')) {
+  const command = isWindows ? 'npx.cmd' : 'npx';
+  if (!runCommand(command, ['prettier', '--check', '.'])) {
     console.log(
       'Prettier check failed. Please run "npm run format" to fix formatting issues.',
     );
