@@ -84,6 +84,11 @@ describe('save_memory', () => {
     suiteName: 'default',
     suiteType: 'behavioral',
     name: rememberingFavoriteColor,
+    params: {
+      settings: {
+        experimental: { memoryV2: false },
+      },
+    },
 
     prompt: `remember that my favorite color is  blue.
   
@@ -106,6 +111,11 @@ describe('save_memory', () => {
     suiteName: 'default',
     suiteType: 'behavioral',
     name: rememberingCommandRestrictions,
+    params: {
+      settings: {
+        experimental: { memoryV2: false },
+      },
+    },
 
     prompt: `I don't want you to ever run npm commands.`,
     assert: async (rig, result) => {
@@ -127,6 +137,11 @@ describe('save_memory', () => {
     suiteName: 'default',
     suiteType: 'behavioral',
     name: rememberingWorkflow,
+    params: {
+      settings: {
+        experimental: { memoryV2: false },
+      },
+    },
 
     prompt: `I want you to always lint after building.`,
     assert: async (rig, result) => {
@@ -149,6 +164,11 @@ describe('save_memory', () => {
     suiteName: 'default',
     suiteType: 'behavioral',
     name: ignoringTemporaryInformation,
+    params: {
+      settings: {
+        experimental: { memoryV2: false },
+      },
+    },
 
     prompt: `I'm going to get a coffee.`,
     assert: async (rig, result) => {
@@ -174,6 +194,11 @@ describe('save_memory', () => {
     suiteName: 'default',
     suiteType: 'behavioral',
     name: rememberingPetName,
+    params: {
+      settings: {
+        experimental: { memoryV2: false },
+      },
+    },
 
     prompt: `Please remember that my dog's name is Buddy.`,
     assert: async (rig, result) => {
@@ -195,6 +220,11 @@ describe('save_memory', () => {
     suiteName: 'default',
     suiteType: 'behavioral',
     name: rememberingCommandAlias,
+    params: {
+      settings: {
+        experimental: { memoryV2: false },
+      },
+    },
 
     prompt: `When I say 'start server', you should run 'npm run dev'.`,
     assert: async (rig, result) => {
@@ -217,6 +247,11 @@ describe('save_memory', () => {
     suiteName: 'default',
     suiteType: 'behavioral',
     name: savingDbSchemaLocationAsProjectMemory,
+    params: {
+      settings: {
+        experimental: { memoryV2: false },
+      },
+    },
     prompt: `The database schema for this workspace is located in \`db/schema.sql\`.`,
     assert: async (rig, result) => {
       const wasToolCalled = await rig.waitForToolCall(
@@ -246,6 +281,11 @@ describe('save_memory', () => {
     suiteName: 'default',
     suiteType: 'behavioral',
     name: rememberingCodingStyle,
+    params: {
+      settings: {
+        experimental: { memoryV2: false },
+      },
+    },
 
     prompt: `I prefer to use tabs instead of spaces for indentation.`,
     assert: async (rig, result) => {
@@ -268,6 +308,11 @@ describe('save_memory', () => {
     suiteName: 'default',
     suiteType: 'behavioral',
     name: savingBuildArtifactLocationAsProjectMemory,
+    params: {
+      settings: {
+        experimental: { memoryV2: false },
+      },
+    },
     prompt: `In this workspace, build artifacts are stored in the \`dist/artifacts\` directory.`,
     assert: async (rig, result) => {
       const wasToolCalled = await rig.waitForToolCall(
@@ -297,6 +342,11 @@ describe('save_memory', () => {
     suiteName: 'default',
     suiteType: 'behavioral',
     name: savingMainEntryPointAsProjectMemory,
+    params: {
+      settings: {
+        experimental: { memoryV2: false },
+      },
+    },
     prompt: `The main entry point for this workspace is \`src/index.js\`.`,
     assert: async (rig, result) => {
       const wasToolCalled = await rig.waitForToolCall(
@@ -325,6 +375,11 @@ describe('save_memory', () => {
     suiteName: 'default',
     suiteType: 'behavioral',
     name: rememberingBirthday,
+    params: {
+      settings: {
+        experimental: { memoryV2: false },
+      },
+    },
 
     prompt: `My birthday is on June 15th.`,
     assert: async (rig, result) => {
