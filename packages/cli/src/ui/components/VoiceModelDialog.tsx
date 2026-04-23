@@ -95,9 +95,10 @@ export function VoiceModelDialog({
           'experimental.voice.backend',
           'gemini-live',
         );
+        onClose();
       }
     },
-    [setSetting],
+    [setSetting, onClose],
   );
 
   const handleWhisperModelSelect = useCallback(
@@ -109,6 +110,7 @@ export function VoiceModelDialog({
           'experimental.voice.whisperModel',
           modelName,
         );
+        onClose();
       } else {
         setError(null);
         const onProgress = (p: WhisperModelProgress) => setDownloadProgress(p);
@@ -127,6 +129,7 @@ export function VoiceModelDialog({
             'experimental.voice.whisperModel',
             modelName,
           );
+          onClose();
         } catch (err) {
           setError(
             `Failed to download: ${err instanceof Error ? err.message : String(err)}`,
@@ -137,7 +140,7 @@ export function VoiceModelDialog({
         }
       }
     },
-    [modelManager, setSetting],
+    [modelManager, setSetting, onClose],
   );
 
   const backendOptions = useMemo(

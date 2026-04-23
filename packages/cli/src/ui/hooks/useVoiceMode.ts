@@ -77,8 +77,10 @@ export function useVoiceMode({
     transcriptionServiceRef.current = null;
 
     if (serviceToDisconnect) {
+      const isLive = settings.experimental.voice?.backend === 'gemini-live';
       const gracePeriodMs =
-        settings.experimental.voice?.stopGracePeriodMs ?? 1000;
+        settings.experimental.voice?.stopGracePeriodMs ??
+        (isLive ? 2000 : 1000);
       debugLogger.debug(
         `[Voice] Draining transcription for ${gracePeriodMs}ms`,
       );
@@ -170,10 +172,6 @@ export function useVoiceMode({
       );
 
       transcriptionServiceRef.current.on('transcription', (text) => {
-        // If stop was requested, ignore incoming transcriptions to prevent "pasting things"
-        // while the service is draining in the grace period.
-        if (stopRequestedRef.current) return;
-
         if (text) {
           const currentBufferText = bufferRef.current.text;
           const previousTranscription = liveTranscriptionRef.current;
