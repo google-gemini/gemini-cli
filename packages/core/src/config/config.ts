@@ -711,6 +711,7 @@ export interface ConfigParameters {
   autoDistillation?: boolean;
   experimentalMemoryV2?: boolean;
   experimentalAutoMemory?: boolean;
+  experimentalGemma?: boolean;
   experimentalContextManagementConfig?: string;
   experimentalAgentHistoryTruncation?: boolean;
   experimentalAgentHistoryTruncationThreshold?: number;
@@ -956,6 +957,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly experimentalJitContext: boolean;
   private readonly experimentalMemoryV2: boolean;
   private readonly experimentalAutoMemory: boolean;
+  private readonly experimentalGemma: boolean;
   private readonly experimentalContextManagementConfig?: string;
   private readonly memoryBoundaryMarkers: readonly string[];
   private readonly topicUpdateNarration: boolean;
@@ -1174,6 +1176,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.experimentalJitContext = params.experimentalJitContext ?? true;
     this.experimentalMemoryV2 = params.experimentalMemoryV2 ?? true;
     this.experimentalAutoMemory = params.experimentalAutoMemory ?? false;
+    this.experimentalGemma = params.experimentalGemma ?? false;
     this.experimentalContextManagementConfig =
       params.experimentalContextManagementConfig;
     this.memoryBoundaryMarkers = params.memoryBoundaryMarkers ?? ['.git'];
@@ -2519,6 +2522,10 @@ export class Config implements McpContext, AgentLoopContext {
 
   isAutoMemoryEnabled(): boolean {
     return this.experimentalAutoMemory;
+  }
+
+  getExperimentalGemma(): boolean {
+    return this.experimentalGemma;
   }
 
   getExperimentalContextManagementConfig(): string | undefined {

@@ -69,6 +69,7 @@ describe('Session Cleanup (Refactored)', () => {
       },
       getSessionId: () => 'current123',
       getDebugMode: () => false,
+      getExperimentalGemma: () => false,
       initialize: async () => {},
       ...overrides,
     } as unknown as Config;
