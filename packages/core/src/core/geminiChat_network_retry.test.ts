@@ -103,6 +103,8 @@ describe('GeminiChat Network Retries', () => {
         authType: 'oauth-personal',
         model: 'test-model',
       }),
+      getProTimeoutMinutes: vi.fn().mockResolvedValue(5),
+      getProTimeoutFallbackDurationMinutes: vi.fn().mockResolvedValue(60),
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getActiveModel: vi.fn().mockReturnValue('gemini-pro'),
       setActiveModel: vi.fn(),

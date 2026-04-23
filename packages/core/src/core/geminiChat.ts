@@ -687,6 +687,10 @@ export class GeminiChat {
       );
     };
 
+    const proTimeoutMinutes = await this.context.config.getProTimeoutMinutes();
+    const proTimeoutFallbackDurationMinutes =
+      await this.context.config.getProTimeoutFallbackDurationMinutes();
+
     const streamResponse = await retryWithBackoff(apiCall, {
       onPersistent429: onPersistent429Callback,
       onValidationRequired: onValidationRequiredCallback,
@@ -696,6 +700,10 @@ export class GeminiChat {
       maxAttempts:
         availabilityMaxAttempts ?? this.context.config.getMaxAttempts(),
       getAvailabilityContext,
+      timeoutFallback: {
+        timeoutMs: proTimeoutMinutes * 60 * 1000,
+        fallbackDurationMs: proTimeoutFallbackDurationMinutes * 60 * 1000,
+      },
       onRetry: (attempt, error, delayMs) => {
         coreEvents.emitRetryAttempt({
           attempt,

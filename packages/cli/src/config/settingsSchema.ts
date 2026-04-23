@@ -1112,6 +1112,46 @@ const SETTINGS_SCHEMA = {
         description: 'Skip the next speaker check.',
         showInDialog: true,
       },
+      autoRouting: {
+        type: 'object',
+        label: 'Auto Routing',
+        category: 'Model',
+        requiresRestart: false,
+        default: {},
+        description: 'Settings for automatic model routing.',
+        showInDialog: false,
+        properties: {
+          bestEffortPro: {
+            type: 'boolean',
+            label: 'Best Effort Pro',
+            category: 'Model',
+            requiresRestart: false,
+            default: false,
+            description:
+              'Always prefer the Pro model unless it is unavailable (e.g., due to timeouts or quota), ignoring other routing hints.',
+            showInDialog: true,
+          },
+          proTimeoutMinutes: {
+            type: 'number',
+            label: 'Pro Timeout (Minutes)',
+            category: 'Model',
+            requiresRestart: false,
+            default: 5,
+            description:
+              'If a Pro request takes longer than this many minutes, it will be marked as temporarily unavailable and fallback to Flash.',
+            showInDialog: true,
+          },
+          proTimeoutFallbackDurationMinutes: {
+            type: 'number',
+            label: 'Pro Timeout Fallback Duration (Minutes)',
+            category: 'Model',
+            requiresRestart: false,
+            default: 60,
+            description: 'How long to route to Flash after Pro times out.',
+            showInDialog: true,
+          },
+        },
+      },
     },
   },
 

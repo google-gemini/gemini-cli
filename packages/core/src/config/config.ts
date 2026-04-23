@@ -679,6 +679,11 @@ export interface ConfigParameters {
   policyUpdateConfirmationRequest?: PolicyUpdateConfirmationRequest;
   output?: OutputSettings;
   gemmaModelRouter?: GemmaModelRouterSettings;
+  autoRouting?: {
+    bestEffortPro?: boolean;
+    proTimeoutMinutes?: number;
+    proTimeoutFallbackDurationMinutes?: number;
+  };
   adk?: ADKSettings;
   disableModelRouterForAuth?: AuthType[];
   continueOnFailedApiCall?: boolean;
@@ -963,6 +968,9 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly planEnabled: boolean;
   private readonly trackerEnabled: boolean;
   private readonly planModeRoutingEnabled: boolean;
+  private readonly autoRoutingBestEffortPro: boolean;
+  private readonly autoRoutingProTimeoutMinutes: number;
+  private readonly autoRoutingProTimeoutFallbackDurationMinutes: number;
   private readonly modelSteering: boolean;
   private memoryContextManager?: MemoryContextManager;
   private readonly contextManagement: ContextManagementConfig;
@@ -1117,6 +1125,11 @@ export class Config implements McpContext, AgentLoopContext {
     this.planEnabled = params.plan ?? true;
     this.trackerEnabled = params.tracker ?? false;
     this.planModeRoutingEnabled = params.planSettings?.modelRouting ?? true;
+    this.autoRoutingBestEffortPro = params.autoRouting?.bestEffortPro ?? false;
+    this.autoRoutingProTimeoutMinutes =
+      params.autoRouting?.proTimeoutMinutes ?? 5;
+    this.autoRoutingProTimeoutFallbackDurationMinutes =
+      params.autoRouting?.proTimeoutFallbackDurationMinutes ?? 60;
     this.enableEventDrivenScheduler = params.enableEventDrivenScheduler ?? true;
     this.skillsSupport = params.skillsSupport ?? true;
     this.disabledSkills = params.disabledSkills ?? [];
@@ -3142,6 +3155,18 @@ export class Config implements McpContext, AgentLoopContext {
     const flag =
       this.experiments?.flags[ExperimentFlags.ENABLE_NUMERICAL_ROUTING];
     return flag?.boolValue ?? true;
+  }
+
+  async getBestEffortProEnabled(): Promise<boolean> {
+    return this.autoRoutingBestEffortPro;
+  }
+
+  async getProTimeoutMinutes(): Promise<number> {
+    return this.autoRoutingProTimeoutMinutes;
+  }
+
+  async getProTimeoutFallbackDurationMinutes(): Promise<number> {
+    return this.autoRoutingProTimeoutFallbackDurationMinutes;
   }
 
   /**

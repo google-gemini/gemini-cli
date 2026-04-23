@@ -160,6 +160,8 @@ describe('GeminiChat', () => {
         authType: 'oauth-personal',
         model: currentModel,
       })),
+      getProTimeoutMinutes: vi.fn().mockResolvedValue(5),
+      getProTimeoutFallbackDurationMinutes: vi.fn().mockResolvedValue(60),
       getModel: vi.fn().mockImplementation(() => currentModel),
       setModel: vi.fn().mockImplementation((m: string) => {
         currentModel = m;
