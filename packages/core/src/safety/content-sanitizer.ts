@@ -23,26 +23,40 @@ const INVISIBLE_UNICODE_RE = /[​‌‍‪-‮⁠﻿]/g;
 const HTML_COMMENT_RE = /<!--[\s\S]*?-->/g;
 
 /**
- * Injection phrase patterns.
+ * Injection phrase patterns — all use /gi so every occurrence is replaced, not
+ * just the first. Without the g flag an attacker can repeat the phrase to bypass.
  * Compound patterns (two-component) catch multi-step attacks; simple patterns
  * catch standalone hijack phrases that are unambiguously adversarial.
  */
 const INJECTION_PATTERNS: RegExp[] = [
   // Instruction hijacking + follow-up imperative (compound)
-  /\b(?:ignore|disregard|forget|override)\s+(?:all\s+)?(?:previous|prior|above|earlier)\s+(?:instructions?|context|rules?|prompts?|system)\b[\s\S]{0,200}?(?:instead|now|and|;)\s+(?:you\s+(?:must|should|will)|do|execute|run|perform)/i,
+  /\b(?:ignore|disregard|forget|override)\s+(?:all\s+)?(?:previous|prior|above|earlier)\s+(?:instructions?|context|rules?|prompts?|system)\b[\s\S]{0,200}?(?:instead|now|and|;)\s+(?:you\s+(?:must|should|will)|do|execute|run|perform)/gi,
   // Standalone instruction hijacking — unambiguously adversarial without follow-up
-  /\b(?:ignore|disregard|forget|override)\s+(?:all\s+)?(?:previous|prior|above|earlier)\s+(?:instructions?|context|rules?|prompts?|system prompt)\b/i,
+  /\b(?:ignore|disregard|forget|override)\s+(?:all\s+)?(?:previous|prior|above|earlier)\s+(?:instructions?|context|rules?|prompts?|system prompt)\b/gi,
   // Role manipulation + command (compound)
-  /\byou\s+are\s+now\s+(?:a|an|the)\s+\w+[\s\S]{0,100}?(?:you\s+(?:must|should|will)|do|execute|run|perform)/i,
+  /\byou\s+are\s+now\s+(?:a|an|the)\s+\w+[\s\S]{0,100}?(?:you\s+(?:must|should|will)|do|execute|run|perform)/gi,
   // Standalone new-role assignment
-  /\byour\s+(?:new\s+)?(?:instructions?|rules?|directives?|purpose)\s+(?:are|is)\s*:/i,
+  /\byour\s+(?:new\s+)?(?:instructions?|rules?|directives?|purpose)\s+(?:are|is)\s*:/gi,
   // Exfiltration directive
-  /\b(?:send|post|upload|exfiltrate|transmit)\s+(?:the\s+)?(?:contents?\s+of\s+|all\s+)?(?:\.env|api\s+keys?|credentials?|secrets?|password)/i,
+  /\b(?:send|post|upload|exfiltrate|transmit)\s+(?:the\s+)?(?:contents?\s+of\s+|all\s+)?(?:\.env|api\s+keys?|credentials?|secrets?|password)/gi,
   // Output suppression
-  /\b(?:do\s+not|never|don't)\s+(?:mention|reveal|show|tell|disclose)\s+(?:this|these|the\s+(?:above|following|previous))/i,
+  /\b(?:do\s+not|never|don't)\s+(?:mention|reveal|show|tell|disclose)\s+(?:this|these|the\s+(?:above|following|previous))/gi,
   // System prompt extraction
-  /\b(?:print|show|output|reveal|repeat|display)\s+(?:your\s+)?(?:system\s+prompt|initial\s+instructions?|original\s+instructions?|prompt\s+above)\b/i,
+  /\b(?:print|show|output|reveal|repeat|display)\s+(?:your\s+)?(?:system\s+prompt|initial\s+instructions?|original\s+instructions?|prompt\s+above)\b/gi,
 ];
+
+/**
+ * Strips leading ']' at the start of a line. Some LLMs use [Role] turn markers;
+ * a lone ']' at line-start can break out of such a marker to inject a new turn.
+ */
+const CONTEXT_BRACKET_RE = /^\]/gm;
+
+/**
+ * Collapses runs of 3+ consecutive blank lines to 2. Excessive blank lines are
+ * used to push injected content past the visible context window and inject fake
+ * new conversation turns.
+ */
+const EXCESSIVE_NEWLINE_RE = /\n{3,}/g;
 
 const ALERT_THRESHOLD = 3;
 
@@ -50,8 +64,8 @@ const ALERT_THRESHOLD = 3;
  * Sanitizes external content (web_fetch responses, untrusted MCP results) before
  * it enters the LLM context window.
  *
- * Strips HTML comments, invisible Unicode, injection phrase patterns, and
- * excessive whitespace padding.
+ * Strips HTML comments, invisible Unicode, injection phrase patterns, leading
+ * context-bracket characters, and normalizes excessive blank lines.
  */
 export function sanitizeExternalContent(raw: string): SanitizationResult {
   let sanitized = raw;
@@ -72,20 +86,27 @@ export function sanitizeExternalContent(raw: string): SanitizationResult {
     strippedCount += htmlCommentMatches.length;
   }
 
-  // 3. Detect and remove injection phrase patterns
+  // 3. Detect and remove injection phrase patterns (global replace — all occurrences)
   for (const pattern of INJECTION_PATTERNS) {
-    if (pattern.test(sanitized)) {
-      sanitized = sanitized.replace(pattern, '[SANITIZED]');
-      strippedCount++;
-    }
+    const before = sanitized;
+    sanitized = sanitized.replace(pattern, '[SANITIZED]');
+    if (sanitized !== before) strippedCount++;
   }
 
-  // 4. Normalize excessive whitespace padding (>100 consecutive spaces)
-  const paddingRe = / {100,}/g;
-  if (paddingRe.test(sanitized)) {
-    sanitized = sanitized.replace(paddingRe, ' ');
-    strippedCount++;
-  }
+  // 4. Strip leading ']' at line-start (context turn-marker escape)
+  const bracketBefore = sanitized;
+  sanitized = sanitized.replace(CONTEXT_BRACKET_RE, '');
+  if (sanitized !== bracketBefore) strippedCount++;
+
+  // 5. Collapse excessive blank lines (fake turn injection)
+  const newlineBefore = sanitized;
+  sanitized = sanitized.replace(EXCESSIVE_NEWLINE_RE, '\n\n');
+  if (sanitized !== newlineBefore) strippedCount++;
+
+  // 6. Normalize excessive whitespace padding (>100 consecutive spaces)
+  const paddingBefore = sanitized;
+  sanitized = sanitized.replace(/ {100,}/g, ' ');
+  if (sanitized !== paddingBefore) strippedCount++;
 
   if (strippedCount >= ALERT_THRESHOLD) {
     warnings.push(
