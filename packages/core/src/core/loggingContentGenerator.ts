@@ -362,6 +362,7 @@ export class LoggingContentGenerator implements ContentGenerator {
       {
         operation: GeminiCliOperation.LLMCall,
         logPrompts: this.config.getTelemetryLogPromptsEnabled(),
+        tracesEnabled: this.config.getTelemetryTracesEnabled(),
         sessionId: this.config.getSessionId(),
         attributes: {
           [GEN_AI_REQUEST_MODEL]: req.model,
@@ -457,6 +458,7 @@ export class LoggingContentGenerator implements ContentGenerator {
       {
         operation: GeminiCliOperation.LLMCall,
         logPrompts: this.config.getTelemetryLogPromptsEnabled(),
+        tracesEnabled: this.config.getTelemetryTracesEnabled(),
         sessionId: this.config.getSessionId(),
         attributes: {
           [GEN_AI_REQUEST_MODEL]: req.model,
@@ -617,6 +619,7 @@ export class LoggingContentGenerator implements ContentGenerator {
       {
         operation: GeminiCliOperation.LLMCall,
         logPrompts: this.config.getTelemetryLogPromptsEnabled(),
+        tracesEnabled: this.config.getTelemetryTracesEnabled(),
         sessionId: this.config.getSessionId(),
         attributes: {
           [GEN_AI_REQUEST_MODEL]: req.model,

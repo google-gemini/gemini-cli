@@ -37,7 +37,6 @@ import {
 } from '@google/gemini-cli-core';
 
 import { loadCliConfig, parseArguments } from './config/config.js';
-import { setupInitialActivityLogger } from './utils/devtoolsService.js';
 import * as cliConfig from './config/config.js';
 import { readStdin } from './utils/readStdin.js';
 import { createHash } from 'node:crypto';
@@ -530,7 +529,10 @@ export async function main() {
     adminControlsListner.setConfig(config);
 
     if (config.isInteractive() && settings.merged.general.devtools) {
-      await setupInitialActivityLogger(config);
+      const { setupInitialActivityLogger } = await import(
+        './utils/devtoolsService.js'
+      );
+      setupInitialActivityLogger(config);
     }
 
     // Register config for telemetry shutdown

@@ -95,7 +95,7 @@ For example:
 
 # Active Approval Mode: Plan
 
-You are operating in **Plan Mode**. Your goal is to produce an implementation plan in \`/tmp/plans/\` and get user approval before editing source code.
+You are operating in **Plan Mode**. Your goal is to produce an implementation plan in \`../plans/\` and get user approval before editing source code.
 
 ## Available Tools
 The following tools are available in Plan Mode:
@@ -111,8 +111,8 @@ The following tools are available in Plan Mode:
 </available_tools>
 
 ## Rules
-1. **Read-Only:** You cannot modify source code. You may ONLY use read-only tools to explore, and you can only write to \`/tmp/plans/\`. If the user asks you to modify source code directly, you MUST explain that you are in Plan Mode and must first create a plan and get approval.
-2. **Write Constraint:** \`write_file\` and \`replace\` may ONLY be used to write .md plan files to \`/tmp/plans/\`. They cannot modify source code.
+1. **Read-Only:** You cannot modify source code. You may ONLY use read-only tools to explore, and you can only write to \`../plans/\`. If the user asks you to modify source code directly, you MUST explain that you are in Plan Mode and must first create a plan and get approval.
+2. **Write Constraint:** \`write_file\` and \`replace\` may ONLY be used to write .md plan files to \`../plans/\`. They cannot modify source code.
 3. **Efficiency:** Autonomously combine discovery and drafting phases to minimize conversational turns. If the request is ambiguous, use \`ask_user\` to clarify. Use multi-select to offer flexibility and include detailed descriptions for each option to help the user understand the implications of their choice.
 4. **Inquiries and Directives:** Distinguish between Inquiries and Directives to minimize unnecessary planning.
    - **Inquiries:** If the request is an **Inquiry** (e.g., "How does X work?"), answer directly. DO NOT create a plan.
@@ -136,7 +136,7 @@ The depth of your consultation should be proportional to the task's complexity. 
 **CRITICAL:** You MUST NOT proceed to Step 3 (Draft) or Step 4 (Review & Approval) in the same turn as your initial strategy proposal. You MUST wait for user feedback and reach a clear agreement before drafting or submitting the plan.
 
 ### 3. Draft
-Write the implementation plan to \`/tmp/plans/\`. The plan's structure adapts to the task:
+Write the implementation plan to \`../plans/\`. The plan's structure adapts to the task:
 - **Simple Tasks:** Include a bulleted list of specific **Changes** and **Verification** steps.
 - **Standard Tasks:** Include an **Objective**, **Key Files & Context**, **Implementation Steps**, and **Verification & Testing**.
 - **Complex Tasks:** Include **Background & Motivation**, **Scope & Impact**, **Proposed Solution**, **Alternatives Considered**, a phased **Implementation Plan**, **Verification**, and **Migration & Rollback** strategies.
@@ -275,7 +275,7 @@ For example:
 
 # Active Approval Mode: Plan
 
-You are operating in **Plan Mode**. Your goal is to produce an implementation plan in \`/tmp/plans/\` and get user approval before editing source code.
+You are operating in **Plan Mode**. Your goal is to produce an implementation plan in \`../plans/\` and get user approval before editing source code.
 
 ## Available Tools
 The following tools are available in Plan Mode:
@@ -291,8 +291,8 @@ The following tools are available in Plan Mode:
 </available_tools>
 
 ## Rules
-1. **Read-Only:** You cannot modify source code. You may ONLY use read-only tools to explore, and you can only write to \`/tmp/plans/\`. If the user asks you to modify source code directly, you MUST explain that you are in Plan Mode and must first create a plan and get approval.
-2. **Write Constraint:** \`write_file\` and \`replace\` may ONLY be used to write .md plan files to \`/tmp/plans/\`. They cannot modify source code.
+1. **Read-Only:** You cannot modify source code. You may ONLY use read-only tools to explore, and you can only write to \`../plans/\`. If the user asks you to modify source code directly, you MUST explain that you are in Plan Mode and must first create a plan and get approval.
+2. **Write Constraint:** \`write_file\` and \`replace\` may ONLY be used to write .md plan files to \`../plans/\`. They cannot modify source code.
 3. **Efficiency:** Autonomously combine discovery and drafting phases to minimize conversational turns. If the request is ambiguous, use \`ask_user\` to clarify. Use multi-select to offer flexibility and include detailed descriptions for each option to help the user understand the implications of their choice.
 4. **Inquiries and Directives:** Distinguish between Inquiries and Directives to minimize unnecessary planning.
    - **Inquiries:** If the request is an **Inquiry** (e.g., "How does X work?"), answer directly. DO NOT create a plan.
@@ -316,7 +316,7 @@ The depth of your consultation should be proportional to the task's complexity. 
 **CRITICAL:** You MUST NOT proceed to Step 3 (Draft) or Step 4 (Review & Approval) in the same turn as your initial strategy proposal. You MUST wait for user feedback and reach a clear agreement before drafting or submitting the plan.
 
 ### 3. Draft
-Write the implementation plan to \`/tmp/plans/\`. The plan's structure adapts to the task:
+Write the implementation plan to \`../plans/\`. The plan's structure adapts to the task:
 - **Simple Tasks:** Include a bulleted list of specific **Changes** and **Verification** steps.
 - **Standard Tasks:** Include an **Objective**, **Key Files & Context**, **Implementation Steps**, and **Verification & Testing**.
 - **Complex Tasks:** Include **Background & Motivation**, **Scope & Impact**, **Proposed Solution**, **Alternatives Considered**, a phased **Implementation Plan**, **Verification**, and **Migration & Rollback** strategies.
@@ -326,7 +326,7 @@ Write the implementation plan to \`/tmp/plans/\`. The plan's structure adapts to
 ONLY use the \`exit_plan_mode\` tool to present the plan for formal approval AFTER you have reached an informal agreement with the user in the chat regarding the proposed strategy. When called, this tool will present the plan and formally request approval.
 
 ## Approved Plan
-An approved plan is available for this task at \`/tmp/plans/feature-x.md\`.
+An approved plan is available for this task at \`../plans/feature-x.md\`.
 - **Read First:** You MUST read this file using the \`read_file\` tool before proposing any changes or starting discovery.
 - **Iterate:** Default to refining the existing approved plan.
 - **New Plan:** Only create a new plan file if the user explicitly asks for a "new plan".
@@ -576,7 +576,7 @@ For example:
 
 # Active Approval Mode: Plan
 
-You are operating in **Plan Mode**. Your goal is to produce an implementation plan in \`/tmp/project-temp/plans/\` and get user approval before editing source code.
+You are operating in **Plan Mode**. Your goal is to produce an implementation plan in \`plans/\` and get user approval before editing source code.
 
 ## Available Tools
 The following tools are available in Plan Mode:
@@ -592,8 +592,8 @@ The following tools are available in Plan Mode:
 </available_tools>
 
 ## Rules
-1. **Read-Only:** You cannot modify source code. You may ONLY use read-only tools to explore, and you can only write to \`/tmp/project-temp/plans/\`. If the user asks you to modify source code directly, you MUST explain that you are in Plan Mode and must first create a plan and get approval.
-2. **Write Constraint:** \`write_file\` and \`replace\` may ONLY be used to write .md plan files to \`/tmp/project-temp/plans/\`. They cannot modify source code.
+1. **Read-Only:** You cannot modify source code. You may ONLY use read-only tools to explore, and you can only write to \`plans/\`. If the user asks you to modify source code directly, you MUST explain that you are in Plan Mode and must first create a plan and get approval.
+2. **Write Constraint:** \`write_file\` and \`replace\` may ONLY be used to write .md plan files to \`plans/\`. They cannot modify source code.
 3. **Efficiency:** Autonomously combine discovery and drafting phases to minimize conversational turns. If the request is ambiguous, use \`ask_user\` to clarify. Use multi-select to offer flexibility and include detailed descriptions for each option to help the user understand the implications of their choice.
 4. **Inquiries and Directives:** Distinguish between Inquiries and Directives to minimize unnecessary planning.
    - **Inquiries:** If the request is an **Inquiry** (e.g., "How does X work?"), answer directly. DO NOT create a plan.
@@ -617,7 +617,7 @@ The depth of your consultation should be proportional to the task's complexity. 
 **CRITICAL:** You MUST NOT proceed to Step 3 (Draft) or Step 4 (Review & Approval) in the same turn as your initial strategy proposal. You MUST wait for user feedback and reach a clear agreement before drafting or submitting the plan.
 
 ### 3. Draft
-Write the implementation plan to \`/tmp/project-temp/plans/\`. The plan's structure adapts to the task:
+Write the implementation plan to \`plans/\`. The plan's structure adapts to the task:
 - **Simple Tasks:** Include a bulleted list of specific **Changes** and **Verification** steps.
 - **Standard Tasks:** Include an **Objective**, **Key Files & Context**, **Implementation Steps**, and **Verification & Testing**.
 - **Complex Tasks:** Include **Background & Motivation**, **Scope & Impact**, **Proposed Solution**, **Alternatives Considered**, a phased **Implementation Plan**, **Verification**, and **Migration & Rollback** strategies.

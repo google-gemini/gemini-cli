@@ -46,7 +46,6 @@ import {
   handleMaxTurnsExceededError,
 } from './utils/errors.js';
 import { TextOutput } from './ui/utils/textOutput.js';
-import { setupInitialActivityLogger } from './utils/devtoolsService.js';
 import { runNonInteractive as runNonInteractiveAgentSession } from './nonInteractiveCliAgentSession.js';
 
 interface RunNonInteractiveParams {
@@ -78,7 +77,10 @@ export async function runNonInteractive(
     });
 
     if (process.env['GEMINI_CLI_ACTIVITY_LOG_TARGET']) {
-      await setupInitialActivityLogger(config);
+      const { setupInitialActivityLogger } = await import(
+        './utils/devtoolsService.js'
+      );
+      setupInitialActivityLogger(config);
     }
 
     const { stdout: workingStdout } = createWorkingStdio();

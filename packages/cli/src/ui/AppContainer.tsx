@@ -94,7 +94,6 @@ import {
   ApiKeyUpdatedEvent,
   LegacyAgentProtocol,
   type InjectionSource,
-  startMemoryService,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import process from 'node:process';
@@ -127,6 +126,7 @@ import { type BackgroundTask } from './hooks/useExecutionLifecycle.js';
 import { useVim } from './hooks/vim.js';
 import { type LoadableSettingScope, SettingScope } from '../config/settings.js';
 import { type InitializationResult } from '../core/initializer.js';
+import { startAutoMemoryIfEnabled } from '../utils/autoMemory.js';
 import { useFocus } from './hooks/useFocus.js';
 import { useVoiceInput, type VoiceInputConfig } from './hooks/useVoiceInput.js';
 import { useKeypress, type Key } from './hooks/useKeypress.js';
@@ -510,12 +510,7 @@ export const AppContainer = (props: AppContainerProps) => {
       setConfigInitialized(true);
       startupProfiler.flush(config);
 
-      // Fire-and-forget Auto Memory service (skill extraction from past sessions)
-      if (config.isAutoMemoryEnabled()) {
-        startMemoryService(config).catch((e) => {
-          debugLogger.error('Failed to start memory service:', e);
-        });
-      }
+      startAutoMemoryIfEnabled(config);
 
       const sessionStartSource = resumedSessionData
         ? SessionStartSource.Resume
