@@ -98,6 +98,7 @@ runs:
       working-directory: '${{ inputs.working-directory }}'
       env:
         GEMINI_API_KEY: '${{ inputs.gemini_api_key }}'
+        GEMINI_CLI_TRUST_WORKSPACE: true
         INTEGRATION_TEST_USE_INSTALLED_GEMINI: 'true'
         # We must diable CI mode here because it interferes with interactive tests.
         # See https://github.com/google-gemini/gemini-cli/issues/10517

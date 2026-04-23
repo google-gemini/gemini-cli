@@ -179,6 +179,7 @@ jobs:
       - name: 'Run tests and generate reports'
         env:
           NO_COLOR: true
+          GEMINI_CLI_TRUST_WORKSPACE: true
         run: |
           if [[ "${{ matrix.shard }}" == "cli" ]]; then
             npm run test:ci --workspace "@google/gemini-cli"
@@ -267,6 +268,7 @@ jobs:
       - name: 'Run tests and generate reports'
         env:
           NO_COLOR: true
+          GEMINI_CLI_TRUST_WORKSPACE: true
         run: |
           if [[ "${{ matrix.shard }}" == "cli" ]]; then
             npm run test:ci --workspace "@google/gemini-cli" -- --coverage.enabled=false
@@ -430,6 +432,7 @@ jobs:
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
           NO_COLOR: true
+          GEMINI_CLI_TRUST_WORKSPACE: true
           NODE_OPTIONS: '--max-old-space-size=32768 --max-semi-space-size=256'
           UV_THREADPOOL_SIZE: '32'
           NODE_ENV: 'test'

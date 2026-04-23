@@ -661,6 +661,12 @@ export async function main() {
 
     cliStartupHandle?.end();
 
+    if (!config.isInteractive()) {
+      for (const warning of startupWarnings) {
+        writeToStderr(warning.message + '\n');
+      }
+    }
+
     // Render UI, passing necessary config values. Check that there is no command line question.
     if (config.isInteractive()) {
       // Earlier initialization phases (like TerminalCapabilityManager resolving

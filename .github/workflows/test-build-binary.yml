@@ -141,6 +141,7 @@ jobs:
         if: "github.event_name != 'pull_request'"
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+          GEMINI_CLI_TRUST_WORKSPACE: true
         run: |
           echo "Running integration tests with binary..."
           if [[ "${{ matrix.os }}" == 'windows-latest' ]]; then
