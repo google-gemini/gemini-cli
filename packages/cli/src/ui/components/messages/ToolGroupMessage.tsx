@@ -60,8 +60,11 @@ const COMPACT_OUTPUT_ALLOWLIST = new Set([
 export const isCompactTool = (
   tool: IndividualToolCallDisplay,
   isCompactModeEnabled: boolean,
+  extraAllowlist: readonly string[] = [],
 ): boolean => {
-  const hasCompactOutputSupport = COMPACT_OUTPUT_ALLOWLIST.has(tool.name);
+  const hasCompactOutputSupport =
+    COMPACT_OUTPUT_ALLOWLIST.has(tool.name) ||
+    extraAllowlist.includes(tool.name);
   const displayStatus = mapCoreStatusToDisplayStatus(tool.status);
   return (
     isCompactModeEnabled &&
@@ -119,6 +122,10 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   const settings = useSettings();
   const isLowErrorVerbosity = settings.merged.ui?.errorVerbosity !== 'full';
   const isCompactModeEnabled = settings.merged.ui?.compactToolOutput === true;
+  const compactAllowlist = useMemo(
+    () => settings.merged.ui?.compactToolOutputAllowlist ?? [],
+    [settings.merged.ui?.compactToolOutputAllowlist],
+  );
 
   // Filter out tool calls that should be hidden (e.g. in-progress Ask User, or Plan Mode operations).
   const visibleToolCalls = useMemo(
@@ -190,20 +197,21 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
       const prevIsCompact =
         prevGroup &&
         !Array.isArray(prevGroup) &&
-        isCompactTool(prevGroup, isCompactModeEnabled);
+        isCompactTool(prevGroup, isCompactModeEnabled, compactAllowlist);
 
       const nextGroup = !isLast ? groupedTools[i + 1] : null;
       const nextIsCompact =
         nextGroup &&
         !Array.isArray(nextGroup) &&
-        isCompactTool(nextGroup, isCompactModeEnabled);
+        isCompactTool(nextGroup, isCompactModeEnabled, compactAllowlist);
 
       const nextIsTopicToolCall =
         nextGroup && !Array.isArray(nextGroup) && isTopicTool(nextGroup.name);
 
       const isAgentGroup = Array.isArray(group);
       const isCompact =
-        !isAgentGroup && isCompactTool(group, isCompactModeEnabled);
+        !isAgentGroup &&
+        isCompactTool(group, isCompactModeEnabled, compactAllowlist);
       const isTopicToolCall = !isAgentGroup && isTopicTool(group.name);
 
       // Align isFirst logic with rendering
@@ -270,12 +278,12 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
       }
     }
     return height;
-  }, [groupedTools, isCompactModeEnabled, borderTopOverride]);
+  }, [groupedTools, isCompactModeEnabled, compactAllowlist, borderTopOverride]);
 
   let countToolCallsWithResults = 0;
   for (const tool of visibleToolCalls) {
     if (tool.kind !== Kind.Agent) {
-      if (isCompactTool(tool, isCompactModeEnabled)) {
+      if (isCompactTool(tool, isCompactModeEnabled, compactAllowlist)) {
         if (hasDensePayload(tool)) {
           countToolCallsWithResults++;
         }
@@ -362,19 +370,20 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
         const prevIsCompact =
           prevGroup &&
           !Array.isArray(prevGroup) &&
-          isCompactTool(prevGroup, isCompactModeEnabled);
+          isCompactTool(prevGroup, isCompactModeEnabled, compactAllowlist);
 
         const nextGroup = !isLast ? groupedTools[index + 1] : null;
         const nextIsCompact =
           nextGroup &&
           !Array.isArray(nextGroup) &&
-          isCompactTool(nextGroup, isCompactModeEnabled);
+          isCompactTool(nextGroup, isCompactModeEnabled, compactAllowlist);
         const nextIsTopicToolCall =
           nextGroup && !Array.isArray(nextGroup) && isTopicTool(nextGroup.name);
 
         const isAgentGroup = Array.isArray(group);
         const isCompact =
-          !isAgentGroup && isCompactTool(group, isCompactModeEnabled);
+          !isAgentGroup &&
+          isCompactTool(group, isCompactModeEnabled, compactAllowlist);
         const isTopicToolCall = !isAgentGroup && isTopicTool(group.name);
 
         const isFirstProp = !!(isFirst

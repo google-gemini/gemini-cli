@@ -617,6 +617,17 @@ const SETTINGS_SCHEMA = {
           'Display tool outputs (like directory listings and file reads) in a compact, structured format.',
         showInDialog: true,
       },
+      compactToolOutputAllowlist: {
+        type: 'array',
+        label: 'Compact Tool Output Allowlist',
+        category: 'UI',
+        requiresRestart: false,
+        default: [] as string[],
+        description:
+          'Additional tool names to display in compact format (e.g. MCP tool names). Extends the built-in list when compactToolOutput is enabled.',
+        showInDialog: false,
+        items: { type: 'string' },
+      },
       hideBanner: {
         type: 'boolean',
         label: 'Hide Banner',

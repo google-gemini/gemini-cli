@@ -302,6 +302,8 @@ export const useGeminiStream = (
         if (toolsToPush.length > 0) {
           const isCompactModeEnabled =
             settings.merged.ui?.compactToolOutput === true;
+          const compactAllowlist =
+            settings.merged.ui?.compactToolOutputAllowlist ?? [];
           const firstToolToPush = toolsToPush[0];
           const tcIndex = toolCalls.indexOf(firstToolToPush);
           const prevTool = tcIndex > 0 ? toolCalls[tcIndex - 1] : null;
@@ -313,10 +315,12 @@ export const useGeminiStream = (
             const currentIsCompact = isCompactTool(
               mapTrackedToolCallsToDisplay(firstToolToPush).tools[0],
               isCompactModeEnabled,
+              compactAllowlist,
             );
             const prevWasCompact = isCompactTool(
               mapTrackedToolCallsToDisplay(prevTool).tools[0],
               isCompactModeEnabled,
+              compactAllowlist,
             );
             if (!currentIsCompact && prevWasCompact) {
               borderTop = true;
@@ -493,6 +497,8 @@ export const useGeminiStream = (
       const isFirstInThisPush = isFirstToolInGroupRef.current;
       const isCompactModeEnabled =
         settings.merged.ui?.compactToolOutput === true;
+      const compactAllowlist =
+        settings.merged.ui?.compactToolOutputAllowlist ?? [];
 
       const groups: TrackedToolCall[][] = [];
       let currentGroup: TrackedToolCall[] = [];
@@ -543,14 +549,22 @@ export const useGeminiStream = (
         // Determine if this group starts with a compact tool
         const currentIsCompact =
           historyItem.tools.length === 1 &&
-          isCompactTool(historyItem.tools[0], isCompactModeEnabled);
+          isCompactTool(
+            historyItem.tools[0],
+            isCompactModeEnabled,
+            compactAllowlist,
+          );
 
         let nextIsCompact = false;
         if (nextTcInBatch) {
           const nextHistoryItem = mapTrackedToolCallsToDisplay(nextTcInBatch);
           nextIsCompact =
             nextHistoryItem.tools.length === 1 &&
-            isCompactTool(nextHistoryItem.tools[0], isCompactModeEnabled);
+            isCompactTool(
+              nextHistoryItem.tools[0],
+              isCompactModeEnabled,
+              compactAllowlist,
+            );
         }
 
         let prevWasCompact = false;
@@ -558,7 +572,11 @@ export const useGeminiStream = (
           const prevHistoryItem = mapTrackedToolCallsToDisplay(prevTcInBatch);
           prevWasCompact =
             prevHistoryItem.tools.length === 1 &&
-            isCompactTool(prevHistoryItem.tools[0], isCompactModeEnabled);
+            isCompactTool(
+              prevHistoryItem.tools[0],
+              isCompactModeEnabled,
+              compactAllowlist,
+            );
         }
 
         historyItem.borderTop =
@@ -594,6 +612,7 @@ export const useGeminiStream = (
     isShellFocused,
     backgroundTasks,
     settings.merged.ui?.compactToolOutput,
+    settings.merged.ui?.compactToolOutputAllowlist,
   ]);
   const pendingToolGroupItems = useMemo((): HistoryItemWithoutId[] => {
     const remainingTools = toolCalls.filter(
@@ -667,11 +686,17 @@ export const useGeminiStream = (
 
     let lastVisibleIsCompact = false;
     const isCompactModeEnabled = settings.merged.ui?.compactToolOutput === true;
+    const compactAllowlist =
+      settings.merged.ui?.compactToolOutputAllowlist ?? [];
     for (let i = toolCalls.length - 1; i >= 0; i--) {
       if (isToolVisible(toolCalls[i])) {
         const mapped = mapTrackedToolCallsToDisplay(toolCalls[i]);
         lastVisibleIsCompact = mapped.tools[0]
-          ? isCompactTool(mapped.tools[0], isCompactModeEnabled)
+          ? isCompactTool(
+              mapped.tools[0],
+              isCompactModeEnabled,
+              compactAllowlist,
+            )
           : false;
         break;
       }
@@ -700,6 +725,7 @@ export const useGeminiStream = (
     isShellFocused,
     backgroundTasks,
     settings.merged.ui?.compactToolOutput,
+    settings.merged.ui?.compactToolOutputAllowlist,
   ]);
 
   const lastQueryRef = useRef<PartListUnion | null>(null);
