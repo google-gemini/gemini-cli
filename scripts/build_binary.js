@@ -179,6 +179,31 @@ try {
   process.exit(1);
 }
 
+// 2b. Copy host-platform ripgrep binary into bundle/vendor/ripgrep/.
+// The npm `bundle` step intentionally omits these binaries (they would push
+// the published tarball past the registry's upload limit). The SEA build,
+// being per-platform, only needs the binary for the host it's targeting,
+// so we copy just one. The runtime resolver in packages/core/src/tools/
+// ripGrep.ts (getRipgrepPath) looks for rg-${platform}-${arch}.
+const ripgrepVendorSrc = join(root, 'packages/core/vendor/ripgrep');
+const ripgrepVendorDest = join(bundleDir, 'vendor', 'ripgrep');
+if (existsSync(ripgrepVendorSrc)) {
+  const rgBinName = `rg-${process.platform}-${process.arch}${
+    process.platform === 'win32' ? '.exe' : ''
+  }`;
+  const rgSrc = join(ripgrepVendorSrc, rgBinName);
+  if (existsSync(rgSrc)) {
+    mkdirSync(ripgrepVendorDest, { recursive: true });
+    cpSync(rgSrc, join(ripgrepVendorDest, rgBinName), { dereference: true });
+    console.log(`Copied ${rgBinName} to bundle/vendor/ripgrep/`);
+  } else {
+    console.warn(
+      `Warning: bundled ripgrep binary not found for ${process.platform}/${process.arch} at ${rgSrc}. ` +
+        `The SEA will fall back to system grep at runtime.`,
+    );
+  }
+}
+
 // 3. Stage & Sign Native Modules
 const includeNativeModules = process.env.BUNDLE_NATIVE_MODULES !== 'false';
 console.log(`Include Native Modules: ${includeNativeModules}`);
