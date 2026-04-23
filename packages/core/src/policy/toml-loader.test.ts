@@ -686,6 +686,107 @@ priority = 100
     });
   });
 
+  describe('Symlink support', () => {
+    it('should load a symlinked policy file', async () => {
+      const realFile = path.join(tempDir, 'real.txt'); // Not .toml
+      await fs.writeFile(
+        realFile,
+        '[[rule]]\ntoolName = "symlink-test"\ndecision = "allow"\npriority = 100\n',
+      );
+
+      const symlinkFile = path.join(tempDir, 'link.toml');
+      await fs.symlink(realFile, symlinkFile);
+
+      const getPolicyTier = (_dir: string) => 1;
+      const result = await loadPoliciesFromToml([tempDir], getPolicyTier);
+
+      expect(result.errors).toHaveLength(0);
+      expect(result.rules).toHaveLength(1);
+      expect(result.rules[0].toolName).toBe('symlink-test');
+    });
+
+    it('should load from a symlinked directory', async () => {
+      const realSubDir = path.join(tempDir, 'real-dir');
+      await fs.mkdir(realSubDir);
+      await fs.writeFile(
+        path.join(realSubDir, 'policy.toml'),
+        '[[rule]]\ntoolName = "dir-link-test"\ndecision = "allow"\npriority = 100\n',
+      );
+
+      const symlinkDir = path.join(tempDir, 'link-dir');
+      await fs.symlink(realSubDir, symlinkDir);
+
+      const getPolicyTier = (_dir: string) => 1;
+      const result = await loadPoliciesFromToml([symlinkDir], getPolicyTier);
+
+      expect(result.errors).toHaveLength(0);
+      expect(result.rules).toHaveLength(1);
+      expect(result.rules[0].toolName).toBe('dir-link-test');
+    });
+
+    it('should load from a symlinked subdirectory (recursive)', async () => {
+      const realSubDir = path.join(tempDir, 'real-subdir');
+      await fs.mkdir(realSubDir);
+      await fs.writeFile(
+        path.join(realSubDir, 'policy.toml'),
+        '[[rule]]\ntoolName = "subdir-link-test"\ndecision = "allow"\npriority = 100\n',
+      );
+
+      const symlinkSubDir = path.join(tempDir, 'link-subdir');
+      await fs.symlink(realSubDir, symlinkSubDir);
+
+      const getPolicyTier = (_dir: string) => 1;
+      // Load from tempDir, which contains link-subdir
+      const result = await loadPoliciesFromToml([tempDir], getPolicyTier);
+
+      // Current implementation is NOT recursive, so this is expected to FAIL
+      // but once we add recursion and symlink following, it should PASS.
+      expect(result.rules.some((r) => r.toolName === 'subdir-link-test')).toBe(
+        true,
+      );
+    });
+
+    it('should prevent circular symlink traversal', async () => {
+      const subDir = path.join(tempDir, 'circular-dir');
+      await fs.mkdir(subDir);
+      await fs.writeFile(
+        path.join(subDir, 'policy.toml'),
+        '[[rule]]\ntoolName = "circular-test"\ndecision = "allow"\npriority = 100\n',
+      );
+
+      // Create a symlink back to its parent
+      await fs.symlink(subDir, path.join(subDir, 'link-back'));
+
+      const getPolicyTier = (_dir: string) => 1;
+      const result = await loadPoliciesFromToml([subDir], getPolicyTier);
+
+      // Should load policy.toml once and stop
+      expect(
+        result.rules.filter((r) => r.toolName === 'circular-test'),
+      ).toHaveLength(1);
+      expect(result.errors).toHaveLength(0);
+    });
+
+    it('should ignore broken symlinks and continue loading other policies', async () => {
+      const realFile = path.join(tempDir, 'real.toml');
+      await fs.writeFile(
+        realFile,
+        '[[rule]]\ntoolName = "valid-test"\ndecision = "allow"\npriority = 100\n',
+      );
+
+      // Create a broken symlink (points to a non-existent file)
+      const brokenLink = path.join(tempDir, 'broken.toml');
+      await fs.symlink(path.join(tempDir, 'does-not-exist.toml'), brokenLink);
+
+      const getPolicyTier = (_dir: string) => 1;
+      const result = await loadPoliciesFromToml([tempDir], getPolicyTier);
+
+      expect(result.errors).toHaveLength(0);
+      expect(result.rules).toHaveLength(1);
+      expect(result.rules[0].toolName).toBe('valid-test');
+    });
+  });
+
   describe('Tool name validation', () => {
     it('should warn for unrecognized tool names with suggestions', async () => {
       const result = await runLoadPoliciesFromToml(`
