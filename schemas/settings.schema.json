@@ -2531,6 +2531,15 @@
             "type": "string"
           }
         },
+        "confirmationRequired": {
+          "title": "Confirmation Required",
+          "description": "Tool names that always require user confirmation. Takes precedence over allowed tools and core tool allowlists.",
+          "markdownDescription": "Tool names that always require user confirmation. Takes precedence over allowed tools and core tool allowlists.\n\n- Category: `Advanced`\n- Requires restart: `yes`",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
         "exclude": {
           "title": "Exclude Tools",
           "description": "Tool names to exclude from discovery.",
