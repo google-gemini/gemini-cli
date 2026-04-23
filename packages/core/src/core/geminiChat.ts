@@ -14,6 +14,7 @@ import {
   type Content,
   type Part,
   type Tool,
+  type FunctionCall,
   type PartListUnion,
   type GenerateContentConfig,
   type GenerateContentParameters,
@@ -887,8 +888,17 @@ export class GeminiChat {
     let hasToolCall = false;
     let hasThoughts = false;
     let finishReason: FinishReason | undefined;
+    const finalFunctionCalls: FunctionCall[] = [];
 
     for await (const chunk of streamResponse) {
+      if (chunk.functionCalls && chunk.functionCalls.length > 0) {
+        finalFunctionCalls.splice(
+          0,
+          finalFunctionCalls.length,
+          ...chunk.functionCalls,
+        );
+      }
+
       const candidateWithReason = chunk?.candidates?.find(
         (candidate) => candidate.finishReason,
       );
@@ -1013,6 +1023,38 @@ export class GeminiChat {
           'Model stream ended with empty response text.',
           'NO_RESPONSE_TEXT',
         );
+      }
+    }
+
+    // Backfill any missing tool call arguments/IDs from the SDK's internal accumulator.
+    // The raw chunks often contain empty argument objects for streaming function calls,
+    // but the fully assembled calls are accessible via the last chunk's 'functionCalls' getter.
+    if (finalFunctionCalls.length > 0) {
+      let sdkIndex = 0;
+      for (const part of consolidatedParts) {
+        if (part.functionCall && sdkIndex < finalFunctionCalls.length) {
+          const assembledCall = finalFunctionCalls[sdkIndex];
+          // Since the GenAI SDK might split one tool call across multiple adjacent parts
+          // (e.g. streaming its args over several chunks), we only advance our SDK index
+          // when we encounter a new tool call name.
+          if (part.functionCall.name === assembledCall.name) {
+            // Safely mutate the raw part to contain the fully assembled object
+            part.functionCall = assembledCall;
+          }
+
+          // Peek ahead: if the NEXT part in consolidatedParts is a DIFFERENT tool call name,
+          // then we can advance the SDK index. Otherwise, we keep the index the same so
+          // subsequent duplicate deltas of this same tool get backfilled with the same object.
+          const nextPart =
+            consolidatedParts[consolidatedParts.indexOf(part) + 1];
+          if (
+            !nextPart ||
+            !nextPart.functionCall ||
+            nextPart.functionCall.name !== assembledCall.name
+          ) {
+            sdkIndex++;
+          }
+        }
       }
     }
 
