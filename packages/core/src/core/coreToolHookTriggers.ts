@@ -20,8 +20,10 @@ import {
   scanAndRedact,
   summarizeSecrets,
   isSensitiveFilename,
+  type SecretMatch,
 } from '../safety/secret-scanner.js';
 import { sanitizeExternalContent } from '../safety/content-sanitizer.js';
+import { nerScanAndRedact } from '../safety/ner-pii-scanner.js';
 import path from 'node:path';
 
 /**
@@ -169,7 +171,7 @@ export async function executeToolWithHooks(
 
   // Apply security processors to tool results before they enter the context window.
   if (config) {
-    applySecurityProcessors(toolResult, toolName, invocation, config);
+    await applySecurityProcessors(toolResult, toolName, invocation, config);
   }
 
   // Append notification if parameters were modified
@@ -297,29 +299,55 @@ function applyStringTransform(
   return content;
 }
 
-function applySecurityProcessors(
+async function applyStringTransformAsync(
+  content: ToolResult['llmContent'],
+  transform: (s: string) => Promise<string>,
+): Promise<ToolResult['llmContent']> {
+  if (typeof content === 'string') {
+    return transform(content);
+  }
+  if (Array.isArray(content)) {
+    return Promise.all(
+      content.map(async (part) => {
+        if (typeof part === 'object' && part !== null && 'text' in part && typeof part.text === 'string') {
+          return { ...part, text: await transform(part.text) };
+        }
+        return part;
+      }),
+    );
+  }
+  return content;
+}
+
+function appendNotice(toolResult: ToolResult, notice: string): void {
+  if (typeof toolResult.returnDisplay === 'string') {
+    toolResult.returnDisplay += notice;
+  } else {
+    toolResult.returnDisplay = notice;
+  }
+}
+
+async function applySecurityProcessors(
   toolResult: ToolResult,
   toolName: string,
   invocation: AnyToolInvocation,
   config: Config,
-): void {
+): Promise<void> {
   // Secret scanning — redact credentials from both string and array llmContent
   if (config.enableSecretScanning && SECRET_SCAN_TOOLS.has(toolName)) {
     // Warn when about to read a known-sensitive file (before content is exposed)
     if (toolName === 'read_file') {
       const filePath = (invocation.params as { file_path?: string }).file_path;
       if (filePath && isSensitiveFilename(filePath)) {
-        const notice = `\n⚠ Secret scanning: reading sensitive file (${path.basename(filePath)}) — credentials will be redacted from model context.`;
-        if (typeof toolResult.returnDisplay === 'string') {
-          toolResult.returnDisplay += notice;
-        } else {
-          toolResult.returnDisplay = notice;
-        }
+        appendNotice(
+          toolResult,
+          `\n⚠ Secret scanning: reading sensitive file (${path.basename(filePath)}) — credentials will be redacted from model context.`,
+        );
       }
     }
 
     // Collect all matches across string or array content, then redact
-    const allMatches: import('../safety/secret-scanner.js').SecretMatch[] = [];
+    const allMatches: SecretMatch[] = [];
     toolResult.llmContent = applyStringTransform(
       toolResult.llmContent,
       (text) => {
@@ -329,13 +357,35 @@ function applySecurityProcessors(
       },
     );
     if (allMatches.length > 0) {
-      const summary = summarizeSecrets(allMatches);
-      const notice = `\n⚠ Secret scanning: ${summary} redacted from ${toolName} output.`;
-      if (typeof toolResult.returnDisplay === 'string') {
-        toolResult.returnDisplay += notice;
-      } else {
-        toolResult.returnDisplay = notice;
-      }
+      appendNotice(
+        toolResult,
+        `\n⚠ Secret scanning: ${summarizeSecrets(allMatches)} redacted from ${toolName} output.`,
+      );
+    }
+  }
+
+  // NER-based PII scanning — runs after regex to catch context-dependent PII
+  if (config.enableNerScanning && SECRET_SCAN_TOOLS.has(toolName)) {
+    const nerMatches: SecretMatch[] = [];
+    let downloadNotice = '';
+    toolResult.llmContent = await applyStringTransformAsync(
+      toolResult.llmContent,
+      async (text) => {
+        const { matches, sanitized } = await nerScanAndRedact(text, (msg) => {
+          downloadNotice = msg;
+        });
+        nerMatches.push(...matches);
+        return sanitized;
+      },
+    );
+    if (downloadNotice) {
+      appendNotice(toolResult, `\n⚠ NER scanning: ${downloadNotice}`);
+    }
+    if (nerMatches.length > 0) {
+      appendNotice(
+        toolResult,
+        `\n⚠ NER scanning: ${summarizeSecrets(nerMatches)} redacted from ${toolName} output.`,
+      );
     }
   }
 
@@ -353,12 +403,10 @@ function applySecurityProcessors(
       (text) => {
         const { sanitized, warnings } = sanitizeExternalContent(text);
         if (warnings.length > 0) {
-          const warningMsg = `\n⚠ Content sanitization: ${warnings.join(' ')}`;
-          if (typeof toolResult.returnDisplay === 'string') {
-            toolResult.returnDisplay += warningMsg;
-          } else {
-            toolResult.returnDisplay = warningMsg;
-          }
+          appendNotice(
+            toolResult,
+            `\n⚠ Content sanitization: ${warnings.join(' ')}`,
+          );
         }
         return sanitized;
       },

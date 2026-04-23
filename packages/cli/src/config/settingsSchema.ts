@@ -2033,6 +2033,35 @@ const SETTINGS_SCHEMA = {
               },
             },
           },
+          nerScanning: {
+            type: 'object',
+            label: 'NER PII Scanning',
+            category: 'Security',
+            requiresRestart: false,
+            default: {},
+            description: oneLine`
+              Uses a local GLiNER-PII ONNX model (~197 MB, downloaded once to
+              ~/.gemini/models/gliner-pii/) to detect and redact PII that regex
+              patterns miss: names, SSNs, phone numbers, dates of birth, addresses,
+              and more. Requires the optional "gliner" npm package.
+            `,
+            showInDialog: false,
+            properties: {
+              enabled: {
+                type: 'boolean',
+                label: 'Enable NER PII Scanning',
+                category: 'Security',
+                requiresRestart: false,
+                default: false,
+                description: oneLine`
+                  Enable context-aware NER-based PII detection using a local
+                  GLiNER-PII model. The model is downloaded on first use (~197 MB).
+                  Requires: npm install gliner
+                `,
+                showInDialog: true,
+              },
+            },
+          },
         },
       },
     },

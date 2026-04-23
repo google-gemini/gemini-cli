@@ -1059,6 +1059,8 @@ export async function loadCliConfig(
       settings.security?.experimental?.secretScanning?.enabled,
     enableContentSanitization:
       settings.security?.experimental?.contentSanitization?.enabled,
+    enableNerScanning:
+      settings.security?.experimental?.nerScanning?.enabled,
   });
 }
 
