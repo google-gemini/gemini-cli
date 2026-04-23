@@ -1,9 +1,6 @@
 name: '🧠 Gemini CLI Bot: Brain'
 
 on:
-  pull_request:
-    branches:
-      - 'main'
   schedule:
     - cron: '0 0 * * *' # Every 24 hours
   workflow_dispatch:

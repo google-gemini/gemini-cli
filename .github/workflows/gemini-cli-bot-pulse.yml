@@ -1,9 +1,6 @@
 name: '🔄 Gemini CLI Bot: Pulse'
 
 on:
-  pull_request:
-    branches:
-      - 'main'
   schedule:
     - cron: '*/30 * * * *' # Every 30 minutes
   workflow_dispatch:
