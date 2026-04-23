@@ -21,10 +21,15 @@ import { createNonInteractiveUI } from './ui/noninteractive/nonInteractiveUi.js'
 import type { LoadedSettings } from './config/settings.js';
 import type { SessionStatsState } from './ui/contexts/SessionContext.js';
 
+export interface NonInteractiveSlashCommandResult {
+  content: PartListUnion;
+  modelOverride?: string;
+}
+
 /**
  * Processes a slash command in a non-interactive environment.
  *
- * @returns A Promise that resolves to `PartListUnion` if a valid command is
+ * @returns A Promise that resolves to a result object if a valid command is
  *   found and results in a prompt, or `undefined` otherwise.
  * @throws {FatalInputError} if the command result is not supported in
  *   non-interactive mode.
@@ -34,7 +39,7 @@ export const handleSlashCommand = async (
   abortController: AbortController,
   config: Config,
   settings: LoadedSettings,
-): Promise<PartListUnion | undefined> => {
+): Promise<NonInteractiveSlashCommandResult | undefined> => {
   const trimmed = rawQuery.trim();
   if (!trimmed.startsWith('/')) {
     return;
@@ -89,7 +94,10 @@ export const handleSlashCommand = async (
       if (result) {
         switch (result.type) {
           case 'submit_prompt':
-            return result.content;
+            return {
+              content: result.content,
+              modelOverride: result.modelOverride,
+            };
           case 'confirm_shell_commands':
             // This result indicates a command attempted to confirm shell commands.
             // However note that currently, ShellTool is excluded in non-interactive
