@@ -10,8 +10,14 @@ export interface SanitizationResult {
   warnings: string[];
 }
 
-/** Unicode codepoints with no visible representation. */
-const INVISIBLE_UNICODE_RE = /[​‌‍‪‫‬‭‮⁠﻿]/g;
+/**
+ * Unicode codepoints with no visible representation.
+ * Explicit \uXXXX escapes ensure the regex survives editor/git normalization.
+ * U+200B zero-width space, U+200C ZWNJ, U+200D ZWJ,
+ * U+202A–U+202E directional formatting (incl. RTL override U+202E),
+ * U+2060 word joiner, U+FEFF BOM.
+ */
+const INVISIBLE_UNICODE_RE = /[​‌‍‪-‮⁠﻿]/g;
 
 /** HTML comment pattern. */
 const HTML_COMMENT_RE = /<!--[\s\S]*?-->/g;
