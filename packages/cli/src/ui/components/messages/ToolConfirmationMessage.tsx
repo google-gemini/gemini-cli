@@ -758,11 +758,22 @@ export const ToolConfirmationMessage: React.FC<
           </Box>
         );
 
+        const { decodedCommand, deobfuscationWarning } = executionProps;
+
         bodyContent = (
           <>
+            {deobfuscationWarning && (
+              <Box marginBottom={1}>
+                <Text color={theme.status.error} bold>
+                  ⚠ Obfuscation detected: {deobfuscationWarning}
+                </Text>
+              </Box>
+            )}
             <Box
               borderStyle="round"
-              borderColor={theme.border.default}
+              borderColor={
+                deobfuscationWarning ? theme.status.error : theme.border.default
+              }
               paddingX={1}
               paddingY={0}
               marginBottom={0}
@@ -776,6 +787,11 @@ export const ToolConfirmationMessage: React.FC<
                 maxWidth={Math.max(terminalWidth, 1) - 4}
               >
                 <Box flexDirection="column">
+                  {deobfuscationWarning && (
+                    <Text color={theme.text.secondary} dimColor>
+                      Original:
+                    </Text>
+                  )}
                   {commandsToDisplay.map((cmd, idx) => (
                     <Box
                       key={idx}
@@ -796,6 +812,25 @@ export const ToolConfirmationMessage: React.FC<
                       })}
                     </Box>
                   ))}
+                  {decodedCommand && (
+                    <>
+                      <Text color={theme.status.warning} bold>
+                        Decoded:
+                      </Text>
+                      {colorizeCode({
+                        code: decodedCommand.trim(),
+                        language: 'bash',
+                        maxWidth: Math.max(terminalWidth, 1) - 6,
+                        settings,
+                        theme: activeTheme,
+                        hideLineNumbers: true,
+                        availableHeight:
+                          bodyHeight !== undefined
+                            ? Math.max(bodyHeight - 2, 2)
+                            : undefined,
+                      })}
+                    </>
+                  )}
                 </Box>
               </MaxSizedBox>
             </Box>

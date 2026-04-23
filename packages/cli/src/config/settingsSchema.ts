@@ -1975,6 +1975,66 @@ const SETTINGS_SCHEMA = {
           'Enable the context-aware security checker. This feature uses an LLM to dynamically generate and enforce security policies for tool use based on your prompt, providing an additional layer of protection against unintended actions.',
         showInDialog: true,
       },
+      experimental: {
+        type: 'object',
+        label: 'Experimental Security',
+        category: 'Security',
+        requiresRestart: false,
+        default: {},
+        description: 'Experimental security features (opt-in, off by default).',
+        showInDialog: false,
+        properties: {
+          secretScanning: {
+            type: 'object',
+            label: 'Secret Scanning',
+            category: 'Security',
+            requiresRestart: false,
+            default: {},
+            description: oneLine`
+              Scans file content for known credential patterns (API keys, tokens, private keys)
+              and redacts them before the content is sent to the Gemini API.
+              Applies to read_file, read_many_files, grep, and shell command output.
+            `,
+            showInDialog: false,
+            properties: {
+              enabled: {
+                type: 'boolean',
+                label: 'Enable Secret Scanning',
+                category: 'Security',
+                requiresRestart: false,
+                default: false,
+                description: 'Enable automatic secret redaction in file content.',
+                showInDialog: true,
+              },
+            },
+          },
+          contentSanitization: {
+            type: 'object',
+            label: 'Content Sanitization',
+            category: 'Security',
+            requiresRestart: false,
+            default: {},
+            description: oneLine`
+              Sanitizes external content (web_fetch responses, untrusted MCP tool results)
+              by stripping HTML comments, invisible Unicode characters, and structural
+              injection patterns before the content enters the LLM context window.
+            `,
+            showInDialog: false,
+            properties: {
+              enabled: {
+                type: 'boolean',
+                label: 'Enable Content Sanitization',
+                category: 'Security',
+                requiresRestart: false,
+                default: false,
+                description:
+                  'Enable sanitization of external content before LLM ingestion.',
+                showInDialog: true,
+              },
+            },
+          },
+        },
+      },
     },
   },
 

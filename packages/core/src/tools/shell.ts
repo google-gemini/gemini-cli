@@ -44,6 +44,12 @@ import {
   normalizeCommand,
   escapeShellArg,
 } from '../utils/shell-utils.js';
+import {
+  deobfuscateCommand,
+  hasDenyFinding,
+  hasAnyFinding,
+  summarizeFindings,
+} from '../safety/shell-deobfuscator.js';
 import { SHELL_TOOL_NAME } from './tool-names.js';
 import { PARAM_ADDITIONAL_PERMISSIONS } from './definitions/base-declarations.js';
 import { ApprovalMode } from '../policy/types.js';
@@ -422,6 +428,8 @@ export class ShellToolInvocation extends BaseToolInvocation<
       };
     }
 
+    const deobResult = deobfuscateCommand(command);
+
     const confirmationDetails: ToolExecuteConfirmationDetails = {
       type: 'exec',
       title: 'Confirm Shell Command',
@@ -432,6 +440,12 @@ export class ShellToolInvocation extends BaseToolInvocation<
         // Policy updates are now handled centrally by the scheduler
       },
     };
+
+    if (hasAnyFinding(deobResult)) {
+      confirmationDetails.decodedCommand = deobResult.decoded;
+      confirmationDetails.deobfuscationWarning = summarizeFindings(deobResult);
+    }
+
     return confirmationDetails;
   }
 
@@ -453,6 +467,15 @@ export class ShellToolInvocation extends BaseToolInvocation<
           'This is a security risk and the command was blocked.',
         returnDisplay:
           'Blocked: command substitution detected in shell command.',
+      };
+    }
+
+    const deobResult = deobfuscateCommand(strippedCommand);
+    if (hasDenyFinding(deobResult)) {
+      const summary = summarizeFindings(deobResult);
+      return {
+        llmContent: `Command blocked: shell obfuscation detected (${summary}). This is a security risk.`,
+        returnDisplay: `Blocked: shell obfuscation detected — ${summary}.`,
       };
     }
 
