@@ -19,7 +19,9 @@ export const HintMessage: React.FC<HintMessageProps> = ({ text }) => {
   const prefix = '💡 ';
   const prefixWidth = prefix.length;
   const config = useConfig();
-  const useBackgroundColor = config.getUseBackgroundColor();
+  const useBackgroundColorSetting = config.getUseBackgroundColor();
+  const useBackgroundColor =
+    useBackgroundColorSetting && !!theme.background.message;
 
   return (
     <HalfLinePaddedBox

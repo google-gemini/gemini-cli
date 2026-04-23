@@ -1,0 +1,7 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`UserShellMessage > with NO_COLOR set > uses margins instead of background blocks when NO_COLOR is set 1`] = `
+"
+$ ls -la
+"
+`;
