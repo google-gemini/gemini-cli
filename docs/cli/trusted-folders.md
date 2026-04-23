@@ -117,6 +117,10 @@ the following methods:
 These methods will trust the current workspace for the duration of the session
 without prompting.
 
+For detailed instructions on managing folder trust within CI/CD workflows,
+review the
+[Gemini CLI trust guidance for GitHub Actions](https://github.com/google-github-actions/run-gemini-cli/blob/main/docs/trust-guidance.md).
+
 ## Overriding the trust file location
 
 By default, trust settings are saved to `~/.gemini/trustedFolders.json`. If you
