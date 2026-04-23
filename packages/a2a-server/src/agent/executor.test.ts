@@ -40,47 +40,57 @@ vi.mock('../http/requestStorage.js', () => ({
 }));
 
 vi.mock('./task.js', () => {
-  const mockTaskInstance = (taskId: string, contextId: string) => ({
-    id: taskId,
-    contextId,
-    taskState: 'working',
-    acceptUserMessage: vi
-      .fn()
-      .mockImplementation(async function* (context, aborted) {
-        const isConfirmation = (
-          context.userMessage.parts as Array<{ kind: string }>
-        ).some((p) => p.kind === 'confirmation');
-        // Hang only for main user messages (text), allow confirmations to finish quickly
-        if (!isConfirmation && aborted) {
-          await new Promise((resolve) => {
-            aborted.addEventListener('abort', resolve, { once: true });
-          });
-        }
-        yield { type: 'content', value: 'hello' };
-      }),
-    acceptAgentMessage: vi.fn().mockResolvedValue(undefined),
-    scheduleToolCalls: vi.fn().mockResolvedValue(undefined),
-    waitForPendingTools: vi.fn().mockResolvedValue(undefined),
-    getAndClearCompletedTools: vi.fn().mockReturnValue([]),
-    addToolResponsesToHistory: vi.fn(),
-    sendCompletedToolsToLlm: vi.fn().mockImplementation(async function* () {}),
-    cancelPendingTools: vi.fn(),
-    setTaskStateAndPublishUpdate: vi.fn(),
-    dispose: vi.fn(),
-    getMetadata: vi.fn().mockResolvedValue({}),
-    geminiClient: {
-      initialize: vi.fn().mockResolvedValue(undefined),
-    },
-    toSDKTask: () => ({
+  const mockTaskInstance = (taskId: string, contextId: string) => {
+    const task = {
       id: taskId,
       contextId,
-      kind: 'task',
-      status: { state: 'working', timestamp: new Date().toISOString() },
-      metadata: {},
-      history: [],
-      artifacts: [],
-    }),
-  });
+      taskState: 'working',
+      acceptUserMessage: vi
+        .fn()
+        .mockImplementation(async function* (context, aborted) {
+          const isConfirmation = (
+            context.userMessage.parts as Array<{ kind: string }>
+          ).some((p) => p.kind === 'confirmation');
+          // Hang only for main user messages (text), allow confirmations to finish quickly
+          if (!isConfirmation && aborted) {
+            await new Promise((resolve) => {
+              aborted.addEventListener('abort', resolve, { once: true });
+            });
+          }
+          yield { type: 'content', value: 'hello' };
+        }),
+      acceptAgentMessage: vi.fn().mockResolvedValue(undefined),
+      scheduleToolCalls: vi.fn().mockResolvedValue(undefined),
+      waitForPendingTools: vi.fn().mockResolvedValue(undefined),
+      getAndClearCompletedTools: vi.fn().mockReturnValue([]),
+      addToolResponsesToHistory: vi.fn(),
+      sendCompletedToolsToLlm: vi
+        .fn()
+        .mockImplementation(async function* () {}),
+      cancelPendingTools: vi.fn(),
+      setTaskStateAndPublishUpdate: vi.fn(),
+      dispose: vi.fn(),
+      getMetadata: vi.fn().mockResolvedValue({}),
+      config: {
+        getEnableHooks: vi.fn().mockReturnValue(false),
+        getHookSystem: vi.fn().mockReturnValue(undefined),
+      },
+      geminiClient: {
+        initialize: vi.fn().mockResolvedValue(undefined),
+      },
+      toSDKTask: () => ({
+        id: taskId,
+        contextId,
+        kind: 'task',
+        status: { state: task.taskState, timestamp: new Date().toISOString() },
+        metadata: {},
+        history: [],
+        artifacts: [],
+      }),
+    };
+
+    return task;
+  };
 
   const MockTask = vi.fn().mockImplementation(mockTaskInstance);
   (MockTask as unknown as { create: Mock }).create = vi
@@ -244,5 +254,64 @@ describe('CoderAgentExecutor', () => {
 
     expect(executor.getTask(taskId)).toBeUndefined();
     expect(wrapper.task.dispose).toHaveBeenCalled();
+  });
+
+  it('fires the user cancel hook after the task state is updated', async () => {
+    const taskId = 'test-task-cancel';
+    const contextId = 'test-context';
+    const callOrder: string[] = [];
+    const fireUserCancelEvent = vi.fn().mockImplementation(async () => {
+      callOrder.push('hook');
+      expect(mockTask.taskState).toBe('canceled');
+    });
+    const mockTask = {
+      id: taskId,
+      contextId,
+      taskState: 'working',
+      cancelPendingTools: vi.fn(),
+      setTaskStateAndPublishUpdate: vi.fn((state: string) => {
+        callOrder.push('state');
+        mockTask.taskState = state;
+      }),
+      dispose: vi.fn(),
+      config: {
+        getEnableHooks: vi.fn().mockReturnValue(true),
+        getHookSystem: vi.fn().mockReturnValue({
+          fireUserCancelEvent,
+        }),
+      },
+    };
+    const wrapper = {
+      task: mockTask,
+      toSDKTask: vi.fn().mockReturnValue({
+        id: taskId,
+        contextId,
+        kind: 'task',
+        status: {
+          state: 'canceled',
+          timestamp: new Date().toISOString(),
+        },
+        metadata: {},
+        history: [],
+        artifacts: [],
+      }),
+    };
+
+    (
+      executor as unknown as {
+        tasks: Map<string, typeof wrapper>;
+      }
+    ).tasks.set(taskId, wrapper);
+
+    await executor.cancelTask(taskId, mockEventBus);
+
+    expect(callOrder).toEqual(['state', 'hook']);
+    expect(mockTask.cancelPendingTools).toHaveBeenCalledWith(
+      'Task canceled by user request.',
+    );
+    expect(fireUserCancelEvent).toHaveBeenCalledWith('user_request', taskId);
+    expect(mockTask.dispose).toHaveBeenCalled();
+    expect(mockTaskStore.save).toHaveBeenCalledTimes(1);
+    expect(executor.getTask(taskId)).toBeUndefined();
   });
 });

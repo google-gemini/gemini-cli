@@ -52,6 +52,7 @@ export enum HookEventName {
   BeforeModel = 'BeforeModel',
   AfterModel = 'AfterModel',
   BeforeToolSelection = 'BeforeToolSelection',
+  UserCancel = 'UserCancel',
 }
 
 /**
@@ -643,6 +644,14 @@ export enum SessionEndReason {
  */
 export interface SessionEndInput extends HookInput {
   reason: SessionEndReason;
+}
+
+/**
+ * UserCancel hook input
+ */
+export interface UserCancelInput extends HookInput {
+  reason: string;
+  task_id?: string;
 }
 
 /**

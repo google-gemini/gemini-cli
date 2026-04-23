@@ -147,6 +147,7 @@ const mockHookSystem = {
   fireBeforeAgentEvent: vi.fn().mockResolvedValue(undefined),
   fireAfterAgentEvent: vi.fn().mockResolvedValue(undefined),
   firePreCompressEvent: vi.fn().mockResolvedValue(undefined),
+  fireUserCancelEvent: vi.fn().mockResolvedValue(undefined),
 };
 
 /**
@@ -816,6 +817,7 @@ describe('Gemini Client (client.ts)', () => {
     });
 
     it('yields UserCancelled when processTurn throws AbortError', async () => {
+      vi.mocked(mockConfig.getEnableHooks).mockReturnValue(true);
       const abortError = new Error('Aborted');
       abortError.name = 'AbortError';
       vi.spyOn(client['loopDetector'], 'turnStarted').mockRejectedValueOnce(
@@ -830,6 +832,9 @@ describe('Gemini Client (client.ts)', () => {
       const events = await fromAsync(stream);
 
       expect(events).toEqual([{ type: GeminiEventType.UserCancelled }]);
+      expect(mockHookSystem.fireUserCancelEvent).toHaveBeenCalledWith(
+        'user_request',
+      );
     });
 
     it.each([
