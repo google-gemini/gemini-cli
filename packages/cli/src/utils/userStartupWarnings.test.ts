@@ -139,17 +139,10 @@ describe('getUserStartupWarnings', () => {
     it('should not return a warning when GEMINI_CLI_HOME differs from os.homedir', async () => {
       const projectDir = path.join(testRootDir, 'project');
       await fs.mkdir(projectDir, { recursive: true });
-      const originalEnv = process.env['GEMINI_CLI_HOME'];
-      process.env['GEMINI_CLI_HOME'] = projectDir;
+      vi.stubEnv('GEMINI_CLI_HOME', projectDir);
 
       const warnings = await getUserStartupWarnings({}, projectDir);
       expect(warnings.find((w) => w.id === 'home-directory')).toBeUndefined();
-
-      if (originalEnv === undefined) {
-        delete process.env['GEMINI_CLI_HOME'];
-      } else {
-        process.env['GEMINI_CLI_HOME'] = originalEnv;
-      }
     });
 
     it('should not return a warning when folder trust is enabled and workspace is trusted', async () => {
