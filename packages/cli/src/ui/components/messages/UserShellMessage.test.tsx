@@ -12,6 +12,7 @@ import { makeFakeConfig } from '@google/gemini-cli-core';
 describe('UserShellMessage', () => {
   afterEach(() => {
     vi.unstubAllEnvs();
+    vi.restoreAllMocks();
   });
 
   it('renders normal shell message with correct prefix', async () => {
@@ -44,6 +45,8 @@ describe('UserShellMessage', () => {
       const lines = output.split('\n').filter((l) => l.trim() !== '');
       expect(lines).toHaveLength(1);
       expect(lines[0]).toContain('$ ls -la');
+
+      expect(output).toMatchSnapshot();
 
       unmount();
     });

@@ -12,6 +12,7 @@ import { makeFakeConfig } from '@google/gemini-cli-core';
 describe('HintMessage', () => {
   afterEach(() => {
     vi.unstubAllEnvs();
+    vi.restoreAllMocks();
   });
 
   it('renders normal hint message with correct prefix', async () => {
@@ -46,6 +47,8 @@ describe('HintMessage', () => {
       expect(lines).toHaveLength(1);
       expect(lines[0]).toContain('💡');
       expect(lines[0]).toContain('Steering Hint: Try this instead');
+
+      expect(output).toMatchSnapshot();
 
       unmount();
     });

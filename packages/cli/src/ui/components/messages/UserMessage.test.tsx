@@ -17,6 +17,7 @@ vi.mock('../../utils/commandUtils.js', () => ({
 describe('UserMessage', () => {
   afterEach(() => {
     vi.unstubAllEnvs();
+    vi.restoreAllMocks();
   });
 
   it('renders normal user message with correct prefix', async () => {
@@ -87,6 +88,8 @@ describe('UserMessage', () => {
       const lines = output.split('\n').filter((l) => l.trim() !== '');
       expect(lines).toHaveLength(1);
       expect(lines[0]).toContain('> Hello Gemini');
+
+      expect(output).toMatchSnapshot();
 
       unmount();
     });
