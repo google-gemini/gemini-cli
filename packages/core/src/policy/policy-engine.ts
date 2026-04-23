@@ -442,11 +442,11 @@ export class PolicyEngine {
           return wrapperResult;
         if (wrapperResult.decision === PolicyDecision.ASK_USER) {
           if (aggregateDecision === PolicyDecision.ALLOW) {
-            aggregateDecision = PolicyDecision.ASK_USER;
             responsibleRule = wrapperResult.rule;
           } else {
             responsibleRule ??= wrapperResult.rule;
           }
+          aggregateDecision = PolicyDecision.ASK_USER;
         }
       }
 
@@ -463,11 +463,11 @@ export class PolicyEngine {
 
         if (subResult.decision === PolicyDecision.ASK_USER) {
           if (aggregateDecision === PolicyDecision.ALLOW) {
-            aggregateDecision = PolicyDecision.ASK_USER;
             responsibleRule = subResult.rule;
           } else {
             responsibleRule ??= subResult.rule;
           }
+          aggregateDecision = PolicyDecision.ASK_USER;
         }
 
         // Downgrade if sub-command has redirection
