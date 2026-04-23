@@ -17,7 +17,6 @@ vi.mock('fs', () => ({
 
 describe('generate-settings-doc', () => {
   it('keeps documentation in sync in check mode', async () => {
-    vi.stubEnv('GENERATE_DOCS', 'true');
     const previousExitCode = process.exitCode;
     try {
       process.exitCode = 0;
@@ -25,7 +24,6 @@ describe('generate-settings-doc', () => {
       expect(process.exitCode).toBe(0);
     } finally {
       process.exitCode = previousExitCode;
-      vi.unstubAllEnvs();
     }
   });
 });

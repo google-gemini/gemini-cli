@@ -3343,15 +3343,6 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
 };
 
 export function getSettingsSchema(): SettingsSchemaType {
-  // Force enablePermanentToolApproval to false in Vitest to keep snapshots stable,
-  // unless explicitly overridden in tests or during doc generation.
-  if (process.env['VITEST'] && !process.env['GENERATE_DOCS']) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const schema = JSON.parse(JSON.stringify(SETTINGS_SCHEMA));
-    schema.security.properties.enablePermanentToolApproval.default = false;
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-    return schema;
-  }
   return SETTINGS_SCHEMA;
 }
 
