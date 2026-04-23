@@ -41,13 +41,13 @@ jobs:
           path: 'tools/gemini-cli-bot/history/'
         continue-on-error: true
 
-      - name: 'Run Brain Investigation'
-        env:
-          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
-          GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
-        run: |
-          if [ -d "tools/gemini-cli-bot/investigations" ]; then
-            ./bundle/gemini.js "Run repo health investigation based on tools/gemini-cli-bot/history/metrics-before.csv and current repo state."
-          else
-            echo "No investigations directory found. Skipping agentic phase."
-          fi
+      # - name: 'Run Brain Investigation'
+      #   env:
+      #     GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+      #     GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+      #   run: |
+      #     if [ -d "tools/gemini-cli-bot/investigations" ]; then
+      #       ./bundle/gemini.js "Run repo health investigation based on tools/gemini-cli-bot/history/metrics-before.csv and current repo state."
+      #     else
+      #       echo "No investigations directory found. Skipping agentic phase."
+      #     fi
