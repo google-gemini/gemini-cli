@@ -28,6 +28,7 @@ runs:
     - name: 'Run Tests'
       env:
         GEMINI_API_KEY: '${{ inputs.gemini_api_key }}'
+        GEMINI_CLI_TRUST_WORKSPACE: true
       working-directory: '${{ inputs.working-directory }}'
       run: |-
         echo "::group::Build"
