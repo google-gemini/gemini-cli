@@ -21,6 +21,7 @@ import {
   type AgentOverride,
   type CustomTheme,
   type SandboxConfig,
+  type VertexAiRoutingConfig,
 } from '@google/gemini-cli-core';
 import type { SessionRetentionSettings } from './settings.js';
 import { DEFAULT_MIN_RETENTION } from '../utils/sessionCleanup.js';
@@ -990,6 +991,45 @@ const SETTINGS_SCHEMA = {
           { value: 'never', label: 'Never use credits' },
         ],
       },
+      vertexAi: {
+        type: 'object',
+        label: 'Vertex AI',
+        category: 'Advanced',
+        requiresRestart: true,
+        default: undefined as VertexAiRoutingConfig | undefined,
+        description: 'Vertex AI request routing settings.',
+        showInDialog: false,
+        properties: {
+          requestType: {
+            type: 'enum',
+            label: 'Vertex AI Request Type',
+            category: 'Advanced',
+            requiresRestart: true,
+            default: undefined as VertexAiRoutingConfig['requestType'],
+            description:
+              'Sets the X-Vertex-AI-LLM-Request-Type header for Vertex AI requests.',
+            showInDialog: false,
+            options: [
+              { value: 'dedicated', label: 'Dedicated' },
+              { value: 'shared', label: 'Shared' },
+            ],
+          },
+          sharedRequestType: {
+            type: 'enum',
+            label: 'Vertex AI Shared Request Type',
+            category: 'Advanced',
+            requiresRestart: true,
+            default: undefined as VertexAiRoutingConfig['sharedRequestType'],
+            description:
+              'Sets the X-Vertex-AI-LLM-Shared-Request-Type header for Vertex AI requests.',
+            showInDialog: false,
+            options: [
+              { value: 'priority', label: 'Priority' },
+              { value: 'flex', label: 'Flex' },
+            ],
+          },
+        },
+      },
     },
   },
 
@@ -1431,6 +1471,17 @@ const SETTINGS_SCHEMA = {
             description: 'Respect .geminiignore files when searching.',
             showInDialog: true,
           },
+          enableFileWatcher: {
+            type: 'boolean',
+            label: 'Enable File Watcher',
+            category: 'Context',
+            requiresRestart: true,
+            default: false,
+            description: oneLine`
+              Enable file watcher updates for @ file suggestions (experimental).
+            `,
+            showInDialog: false,
+          },
           enableRecursiveFileSearch: {
             type: 'boolean',
             label: 'Enable Recursive File Search',
@@ -1612,6 +1663,19 @@ const SETTINGS_SCHEMA = {
           Tool names that bypass the confirmation dialog.
           Useful for trusted commands (for example ["run_shell_command(git)", "run_shell_command(npm test)"]).
           See shell tool command restrictions for matching details.
+        `,
+        showInDialog: false,
+        items: { type: 'string' },
+      },
+      confirmationRequired: {
+        type: 'array',
+        label: 'Confirmation Required',
+        category: 'Advanced',
+        requiresRestart: true,
+        default: undefined as string[] | undefined,
+        description: oneLine`
+          Tool names that always require user confirmation.
+          Takes precedence over allowed tools and core tool allowlists.
         `,
         showInDialog: false,
         items: { type: 'string' },
@@ -2089,8 +2153,9 @@ const SETTINGS_SCHEMA = {
         label: 'JIT Context Loading',
         category: 'Experimental',
         requiresRestart: true,
-        default: false,
-        description: 'Enable Just-In-Time (JIT) context loading.',
+        default: true,
+        description:
+          'Enable Just-In-Time (JIT) context loading. Defaults to true; set to false to opt out and load all GEMINI.md files into the system instruction up-front.',
         showInDialog: false,
       },
       useOSC52Paste: {
@@ -2223,14 +2288,14 @@ const SETTINGS_SCHEMA = {
           },
         },
       },
-      memoryManager: {
+      memoryV2: {
         type: 'boolean',
-        label: 'Memory Manager Agent',
+        label: 'Memory v2',
         category: 'Experimental',
         requiresRestart: true,
-        default: false,
+        default: true,
         description:
-          'Replace the built-in save_memory tool with a memory manager subagent that supports adding, removing, de-duplicating, and organizing memories.',
+          'Disable the built-in save_memory tool and let the main agent persist project context by editing markdown files directly with edit/write_file. Route facts across four tiers: team-shared conventions go to project GEMINI.md files, project-specific personal notes go to the per-project private memory folder (MEMORY.md as index + sibling .md files for detail), and cross-project personal preferences go to the global ~/.gemini/GEMINI.md (the only file under ~/.gemini/ that the agent can edit — settings, credentials, etc. remain off-limits). Set to false to fall back to the legacy save_memory tool.',
         showInDialog: true,
       },
       autoMemory: {
@@ -3019,6 +3084,11 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
         type: 'string',
         description: 'Protocol for OTLP exporters.',
         enum: ['grpc', 'http'],
+      },
+      traces: {
+        type: 'boolean',
+        description:
+          'Whether detailed traces with large attributes are captured.',
       },
       logPrompts: {
         type: 'boolean',

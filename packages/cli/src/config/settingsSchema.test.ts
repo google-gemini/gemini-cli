@@ -140,6 +140,10 @@ describe('SettingsSchema', () => {
       ).toBeDefined();
       expect(
         getSettingsSchema().context.properties.fileFiltering.properties
+          ?.enableFileWatcher,
+      ).toBeDefined();
+      expect(
+        getSettingsSchema().context.properties.fileFiltering.properties
           ?.customIgnoreFilePaths,
       ).toBeDefined();
       expect(
@@ -311,6 +315,22 @@ describe('SettingsSchema', () => {
         getSettingsSchema().context?.properties.loadMemoryFromIncludeDirectories
           .default,
       ).toBe(false);
+    });
+
+    it('should have Vertex AI routing settings in schema', () => {
+      const vertexAi =
+        getSettingsSchema().billing.properties.vertexAi.properties;
+
+      expect(vertexAi.requestType).toBeDefined();
+      expect(vertexAi.requestType.type).toBe('enum');
+      expect(
+        vertexAi.requestType.options?.map((option) => option.value),
+      ).toEqual(['dedicated', 'shared']);
+      expect(vertexAi.sharedRequestType).toBeDefined();
+      expect(vertexAi.sharedRequestType.type).toBe('enum');
+      expect(
+        vertexAi.sharedRequestType.options?.map((option) => option.value),
+      ).toEqual(['priority', 'flex']);
     });
 
     it('should have folderTrustFeature setting in schema', () => {
