@@ -179,12 +179,8 @@ try {
   process.exit(1);
 }
 
-// 2b. Copy host-platform ripgrep binary into bundle/vendor/ripgrep/.
-// The npm `bundle` step intentionally omits these binaries (they would push
-// the published tarball past the registry's upload limit). The SEA build,
-// being per-platform, only needs the binary for the host it's targeting,
-// so we copy just one. The runtime resolver in packages/core/src/tools/
-// ripGrep.ts (getRipgrepPath) looks for rg-${platform}-${arch}.
+// 2b. Copy host-platform ripgrep binary into the bundle for the SEA.
+// (npm tarballs omit these to stay under the registry upload limit.)
 const ripgrepVendorSrc = join(root, 'packages/core/vendor/ripgrep');
 const ripgrepVendorDest = join(bundleDir, 'vendor', 'ripgrep');
 if (existsSync(ripgrepVendorSrc)) {
@@ -324,6 +320,23 @@ if (existsSync(policyDir)) {
     // Use a unique key to avoid collision if filenames overlap (though unlikely here)
     // But sea-launch writes to 'path', so key is just for lookup.
     const assetKey = `policies:${policyFile}`;
+    assets[assetKey] = fsPath;
+    manifest.files.push({ key: assetKey, path: relativePath, hash: hash });
+  }
+}
+
+// Add ripgrep binary (copied in step 2b). Must be registered here so that
+// sea-launch.cjs extracts it to runtimeDir/vendor/ripgrep/ on startup; the
+// runtime resolver in packages/core/src/tools/ripGrep.ts uses __dirname-
+// relative paths to find it.
+if (existsSync(ripgrepVendorDest)) {
+  const rgFiles = globSync('*', { cwd: ripgrepVendorDest, nodir: true });
+  for (const rgFile of rgFiles) {
+    const fsPath = join(ripgrepVendorDest, rgFile);
+    const relativePath = join('vendor', 'ripgrep', rgFile);
+    const content = readFileSync(fsPath);
+    const hash = sha256(content);
+    const assetKey = `vendor:${rgFile}`;
     assets[assetKey] = fsPath;
     manifest.files.push({ key: assetKey, path: relativePath, hash: hash });
   }
