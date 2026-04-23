@@ -27,6 +27,27 @@ const SCRIPTS_DIR = join(
 );
 const OUTPUT_FILE = join(process.cwd(), 'metrics-before.csv');
 
+function processOutputLine(line: string, results: string[]) {
+  const trimmedLine = line.trim();
+  if (!trimmedLine) return;
+
+  try {
+    const parsed = JSON.parse(trimmedLine);
+    if (
+      parsed &&
+      typeof parsed === 'object' &&
+      'metric' in parsed &&
+      'value' in parsed
+    ) {
+      results.push(`${parsed.metric},${parsed.value}`);
+    } else {
+      results.push(trimmedLine);
+    }
+  } catch {
+    results.push(trimmedLine);
+  }
+}
+
 async function run() {
   const scripts = readdirSync(SCRIPTS_DIR).filter(
     (file) => file.endsWith('.ts') || file.endsWith('.js'),
@@ -41,7 +62,11 @@ async function run() {
       const output = execSync(`npx tsx ${scriptPath}`, {
         encoding: 'utf-8',
       });
-      results.push(output.trim());
+
+      const lines = output.trim().split('\n');
+      for (const line of lines) {
+        processOutputLine(line, results);
+      }
     } catch (error) {
       console.error(`Error running ${script}:`, error);
     }
