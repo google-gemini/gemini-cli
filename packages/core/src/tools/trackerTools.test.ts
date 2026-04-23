@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Config } from '../config/config.js';
 import { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { PolicyEngine } from '../policy/policy-engine.js';
@@ -37,7 +37,9 @@ describe('Tracker Tools Integration', () => {
       model: 'gemini-3-flash',
       debugMode: false,
     });
-    await config.initialize();
+    vi.spyOn(config.storage, 'getProjectTempTrackerDir').mockReturnValue(
+      tempDir,
+    );
     messageBus = new MessageBus(null as unknown as PolicyEngine, false);
   });
 
