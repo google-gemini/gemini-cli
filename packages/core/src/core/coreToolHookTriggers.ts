@@ -322,9 +322,10 @@ async function applyStringTransformAsync(
 function appendNotice(toolResult: ToolResult, notice: string): void {
   if (typeof toolResult.returnDisplay === 'string') {
     toolResult.returnDisplay += notice;
-  } else {
-    toolResult.returnDisplay = notice;
   }
+  // Structured returnDisplay (AnsiOutput, GrepResult, etc.) is left untouched —
+  // overwriting it would corrupt rendering. The notice is still visible in
+  // llmContent which is where redaction matters.
 }
 
 async function applySecurityProcessors(
