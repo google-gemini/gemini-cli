@@ -626,6 +626,29 @@
           "default": "ask",
           "type": "string",
           "enum": ["ask", "always", "never"]
+        },
+        "vertexAi": {
+          "title": "Vertex AI",
+          "description": "Vertex AI request routing settings.",
+          "markdownDescription": "Vertex AI request routing settings.\n\n- Category: `Advanced`\n- Requires restart: `yes`",
+          "type": "object",
+          "properties": {
+            "requestType": {
+              "title": "Vertex AI Request Type",
+              "description": "Sets the X-Vertex-AI-LLM-Request-Type header for Vertex AI requests.",
+              "markdownDescription": "Sets the X-Vertex-AI-LLM-Request-Type header for Vertex AI requests.\n\n- Category: `Advanced`\n- Requires restart: `yes`",
+              "type": "string",
+              "enum": ["dedicated", "shared"]
+            },
+            "sharedRequestType": {
+              "title": "Vertex AI Shared Request Type",
+              "description": "Sets the X-Vertex-AI-LLM-Shared-Request-Type header for Vertex AI requests.",
+              "markdownDescription": "Sets the X-Vertex-AI-LLM-Shared-Request-Type header for Vertex AI requests.\n\n- Category: `Advanced`\n- Requires restart: `yes`",
+              "type": "string",
+              "enum": ["priority", "flex"]
+            }
+          },
+          "additionalProperties": false
         }
       },
       "additionalProperties": false
@@ -2370,6 +2393,13 @@
               "default": true,
               "type": "boolean"
             },
+            "enableFileWatcher": {
+              "title": "Enable File Watcher",
+              "description": "Enable file watcher updates for @ file suggestions (experimental).",
+              "markdownDescription": "Enable file watcher updates for @ file suggestions (experimental).\n\n- Category: `Context`\n- Requires restart: `yes`\n- Default: `false`",
+              "default": false,
+              "type": "boolean"
+            },
             "enableRecursiveFileSearch": {
               "title": "Enable Recursive File Search",
               "description": "Enable recursive file search functionality when completing @ references in the prompt.",
@@ -2859,9 +2889,9 @@
         },
         "jitContext": {
           "title": "JIT Context Loading",
-          "description": "Enable Just-In-Time (JIT) context loading.",
-          "markdownDescription": "Enable Just-In-Time (JIT) context loading.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
-          "default": false,
+          "description": "Enable Just-In-Time (JIT) context loading. Defaults to true; set to false to opt out and load all GEMINI.md files into the system instruction up-front.",
+          "markdownDescription": "Enable Just-In-Time (JIT) context loading. Defaults to true; set to false to opt out and load all GEMINI.md files into the system instruction up-front.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
           "type": "boolean"
         },
         "useOSC52Paste": {
@@ -2920,6 +2950,20 @@
               "default": false,
               "type": "boolean"
             },
+            "autoStartServer": {
+              "title": "Auto-start LiteRT Server",
+              "description": "Automatically start the LiteRT-LM server when Gemini CLI starts and the Gemma router is enabled.",
+              "markdownDescription": "Automatically start the LiteRT-LM server when Gemini CLI starts and the Gemma router is enabled.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+              "default": false,
+              "type": "boolean"
+            },
+            "binaryPath": {
+              "title": "LiteRT Binary Path",
+              "description": "Custom path to the LiteRT-LM binary. Leave empty to use the default location (~/.gemini/bin/litert/).",
+              "markdownDescription": "Custom path to the LiteRT-LM binary. Leave empty to use the default location (~/.gemini/bin/litert/).\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: ``",
+              "default": "",
+              "type": "string"
+            },
             "classifier": {
               "title": "Classifier",
               "description": "Classifier configuration.",
@@ -2947,11 +2991,11 @@
           },
           "additionalProperties": false
         },
-        "memoryManager": {
-          "title": "Memory Manager Agent",
-          "description": "Replace the built-in save_memory tool with a memory manager subagent that supports adding, removing, de-duplicating, and organizing memories.",
-          "markdownDescription": "Replace the built-in save_memory tool with a memory manager subagent that supports adding, removing, de-duplicating, and organizing memories.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
-          "default": false,
+        "memoryV2": {
+          "title": "Memory v2",
+          "description": "Disable the built-in save_memory tool and let the main agent persist project context by editing markdown files directly with edit/write_file. Route facts across four tiers: team-shared conventions go to project GEMINI.md files, project-specific personal notes go to the per-project private memory folder (MEMORY.md as index + sibling .md files for detail), and cross-project personal preferences go to the global ~/.gemini/GEMINI.md (the only file under ~/.gemini/ that the agent can edit — settings, credentials, etc. remain off-limits). Set to false to fall back to the legacy save_memory tool.",
+          "markdownDescription": "Disable the built-in save_memory tool and let the main agent persist project context by editing markdown files directly with edit/write_file. Route facts across four tiers: team-shared conventions go to project GEMINI.md files, project-specific personal notes go to the per-project private memory folder (MEMORY.md as index + sibling .md files for detail), and cross-project personal preferences go to the global ~/.gemini/GEMINI.md (the only file under ~/.gemini/ that the agent can edit — settings, credentials, etc. remain off-limits). Set to false to fall back to the legacy save_memory tool.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
           "type": "boolean"
         },
         "autoMemory": {
@@ -3582,6 +3626,10 @@
           "type": "string",
           "description": "Protocol for OTLP exporters.",
           "enum": ["grpc", "http"]
+        },
+        "traces": {
+          "type": "boolean",
+          "description": "Whether detailed traces with large attributes are captured."
         },
         "logPrompts": {
           "type": "boolean",

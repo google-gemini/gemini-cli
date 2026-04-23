@@ -710,6 +710,59 @@ describe('Server Config (config.ts)', () => {
       );
     });
 
+    describe('getProModelNoAccessSync', () => {
+      it('should return experiment value for AuthType.LOGIN_WITH_GOOGLE', async () => {
+        vi.mocked(getExperiments).mockResolvedValue({
+          experimentIds: [],
+          flags: {
+            [ExperimentFlags.PRO_MODEL_NO_ACCESS]: {
+              boolValue: true,
+            },
+          },
+        });
+        const config = new Config(baseParams);
+        vi.mocked(createContentGeneratorConfig).mockResolvedValue({
+          authType: AuthType.LOGIN_WITH_GOOGLE,
+        });
+        await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
+        expect(config.getProModelNoAccessSync()).toBe(true);
+      });
+
+      it('should return experiment value for AuthType.COMPUTE_ADC', async () => {
+        vi.mocked(getExperiments).mockResolvedValue({
+          experimentIds: [],
+          flags: {
+            [ExperimentFlags.PRO_MODEL_NO_ACCESS]: {
+              boolValue: true,
+            },
+          },
+        });
+        const config = new Config(baseParams);
+        vi.mocked(createContentGeneratorConfig).mockResolvedValue({
+          authType: AuthType.COMPUTE_ADC,
+        });
+        await config.refreshAuth(AuthType.COMPUTE_ADC);
+        expect(config.getProModelNoAccessSync()).toBe(true);
+      });
+
+      it('should return false for other auth types even if experiment is true', async () => {
+        vi.mocked(getExperiments).mockResolvedValue({
+          experimentIds: [],
+          flags: {
+            [ExperimentFlags.PRO_MODEL_NO_ACCESS]: {
+              boolValue: true,
+            },
+          },
+        });
+        const config = new Config(baseParams);
+        vi.mocked(createContentGeneratorConfig).mockResolvedValue({
+          authType: AuthType.USE_GEMINI,
+        });
+        await config.refreshAuth(AuthType.USE_GEMINI);
+        expect(config.getProModelNoAccessSync()).toBe(false);
+      });
+    });
+
     describe('getRequestTimeoutMs', () => {
       it('should return undefined if the flag is not set', () => {
         const config = new Config(baseParams);
@@ -783,10 +836,35 @@ describe('Server Config (config.ts)', () => {
         undefined,
         undefined,
         undefined,
+        undefined,
       );
       // Verify that contentGeneratorConfig is updated
       expect(config.getContentGeneratorConfig()).toEqual(mockContentConfig);
       expect(GeminiClient).toHaveBeenCalledWith(config);
+    });
+
+    it('should pass Vertex AI routing settings when refreshing auth', async () => {
+      const vertexAiRouting = {
+        requestType: 'shared' as const,
+        sharedRequestType: 'priority' as const,
+      };
+      const config = new Config({
+        ...baseParams,
+        vertexAiRouting,
+      });
+
+      vi.mocked(createContentGeneratorConfig).mockResolvedValue({});
+
+      await config.refreshAuth(AuthType.USE_VERTEX_AI);
+
+      expect(createContentGeneratorConfig).toHaveBeenCalledWith(
+        config,
+        AuthType.USE_VERTEX_AI,
+        undefined,
+        undefined,
+        undefined,
+        vertexAiRouting,
+      );
     });
 
     it('should reset model availability status', async () => {
@@ -1922,6 +2000,8 @@ describe('GemmaModelRouterSettings', () => {
     const config = new Config(baseParams);
     const settings = config.getGemmaModelRouterSettings();
     expect(settings.enabled).toBe(false);
+    expect(settings.autoStartServer).toBe(true);
+    expect(settings.binaryPath).toBe('');
     expect(settings.classifier?.host).toBe('http://localhost:9379');
     expect(settings.classifier?.model).toBe('gemma3-1b-gpu-custom');
   });
@@ -1931,6 +2011,8 @@ describe('GemmaModelRouterSettings', () => {
       ...baseParams,
       gemmaModelRouter: {
         enabled: true,
+        autoStartServer: false,
+        binaryPath: '/custom/lit',
         classifier: {
           host: 'http://custom:1234',
           model: 'custom-gemma',
@@ -1940,6 +2022,8 @@ describe('GemmaModelRouterSettings', () => {
     const config = new Config(params);
     const settings = config.getGemmaModelRouterSettings();
     expect(settings.enabled).toBe(true);
+    expect(settings.autoStartServer).toBe(false);
+    expect(settings.binaryPath).toBe('/custom/lit');
     expect(settings.classifier?.host).toBe('http://custom:1234');
     expect(settings.classifier?.model).toBe('custom-gemma');
   });
@@ -1954,6 +2038,8 @@ describe('GemmaModelRouterSettings', () => {
     const config = new Config(params);
     const settings = config.getGemmaModelRouterSettings();
     expect(settings.enabled).toBe(true);
+    expect(settings.autoStartServer).toBe(true);
+    expect(settings.binaryPath).toBe('');
     expect(settings.classifier?.host).toBe('http://localhost:9379');
     expect(settings.classifier?.model).toBe('gemma3-1b-gpu-custom');
   });
@@ -3414,8 +3500,8 @@ describe('Config JIT Initialization', () => {
     expect(config.getUserMemory()).toBe('Initial Memory');
   });
 
-  describe('isMemoryManagerEnabled', () => {
-    it('should default to false', () => {
+  describe('isMemoryV2Enabled', () => {
+    it('should default to true', () => {
       const params: ConfigParameters = {
         sessionId: 'test-session',
         targetDir: '/tmp/test',
@@ -3425,21 +3511,106 @@ describe('Config JIT Initialization', () => {
       };
 
       config = new Config(params);
-      expect(config.isMemoryManagerEnabled()).toBe(false);
+      expect(config.isMemoryV2Enabled()).toBe(true);
     });
 
-    it('should return true when experimentalMemoryManager is true', () => {
+    it('should return false when experimentalMemoryV2 is explicitly false', () => {
       const params: ConfigParameters = {
         sessionId: 'test-session',
         targetDir: '/tmp/test',
         debugMode: false,
         model: 'test-model',
         cwd: '/tmp/test',
-        experimentalMemoryManager: true,
+        experimentalMemoryV2: false,
       };
 
       config = new Config(params);
-      expect(config.isMemoryManagerEnabled()).toBe(true);
+      expect(config.isMemoryV2Enabled()).toBe(false);
+    });
+
+    it('should return true when experimentalMemoryV2 is true', () => {
+      const params: ConfigParameters = {
+        sessionId: 'test-session',
+        targetDir: '/tmp/test',
+        debugMode: false,
+        model: 'test-model',
+        cwd: '/tmp/test',
+        experimentalMemoryV2: true,
+      };
+
+      config = new Config(params);
+      expect(config.isMemoryV2Enabled()).toBe(true);
+    });
+
+    it('should NOT add the global ~/.gemini directory to the workspace when enabled', async () => {
+      // The prompt-driven memoryV2 mode does not broaden the workspace
+      // to include the global ~/.gemini/ directory. Cross-project personal
+      // preferences are routed to ~/.gemini/GEMINI.md via the surgical
+      // isPathAllowed allowlist instead — see the next two tests.
+      const params: ConfigParameters = {
+        sessionId: 'test-session',
+        targetDir: '/tmp/test',
+        debugMode: false,
+        model: 'test-model',
+        cwd: '/tmp/test',
+        experimentalMemoryV2: true,
+      };
+
+      config = new Config(params);
+      await config.initialize();
+
+      const directories = config.getWorkspaceContext().getDirectories();
+      expect(directories).not.toContain(Storage.getGlobalGeminiDir());
+    });
+
+    it('should allow isPathAllowed to write the global ~/.gemini/GEMINI.md file', async () => {
+      // Surgical allowlist: when memoryV2 is on, the prompt routes
+      // cross-project personal preferences to ~/.gemini/GEMINI.md, so the
+      // agent must be able to edit that exact file via edit/write_file.
+      const params: ConfigParameters = {
+        sessionId: 'test-session',
+        targetDir: '/tmp/test',
+        debugMode: false,
+        model: 'test-model',
+        cwd: '/tmp/test',
+        experimentalMemoryV2: true,
+      };
+
+      config = new Config(params);
+      await config.initialize();
+
+      const globalGeminiMdPath = path.join(
+        Storage.getGlobalGeminiDir(),
+        'GEMINI.md',
+      );
+      expect(config.isPathAllowed(globalGeminiMdPath)).toBe(true);
+    });
+
+    it('should NOT allow isPathAllowed to write other files under ~/.gemini/ (least privilege)', async () => {
+      // The allowlist is surgical: only ~/.gemini/GEMINI.md is reachable.
+      // settings.json, keybindings.json, credentials, etc. remain disallowed.
+      const params: ConfigParameters = {
+        sessionId: 'test-session',
+        targetDir: '/tmp/test',
+        debugMode: false,
+        model: 'test-model',
+        cwd: '/tmp/test',
+        experimentalMemoryV2: true,
+      };
+
+      config = new Config(params);
+      await config.initialize();
+
+      const globalDir = Storage.getGlobalGeminiDir();
+      expect(config.isPathAllowed(path.join(globalDir, 'settings.json'))).toBe(
+        false,
+      );
+      expect(
+        config.isPathAllowed(path.join(globalDir, 'keybindings.json')),
+      ).toBe(false);
+      expect(
+        config.isPathAllowed(path.join(globalDir, 'oauth_creds.json')),
+      ).toBe(false);
     });
   });
 
@@ -3471,18 +3642,18 @@ describe('Config JIT Initialization', () => {
       expect(config.isAutoMemoryEnabled()).toBe(true);
     });
 
-    it('should be independent of experimentalMemoryManager', () => {
+    it('should be independent of experimentalMemoryV2', () => {
       const params: ConfigParameters = {
         sessionId: 'test-session',
         targetDir: '/tmp/test',
         debugMode: false,
         model: 'test-model',
         cwd: '/tmp/test',
-        experimentalMemoryManager: true,
+        experimentalMemoryV2: true,
       };
 
       config = new Config(params);
-      expect(config.isMemoryManagerEnabled()).toBe(true);
+      expect(config.isMemoryV2Enabled()).toBe(true);
       expect(config.isAutoMemoryEnabled()).toBe(false);
     });
   });

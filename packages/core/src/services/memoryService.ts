@@ -12,6 +12,7 @@ import * as Diff from 'diff';
 import type { Config } from '../config/config.js';
 import {
   SESSION_FILE_PREFIX,
+  loadConversationRecord,
   type ConversationRecord,
 } from './chatRecordingService.js';
 import { debugLogger } from '../utils/debugLogger.js';
@@ -21,6 +22,7 @@ import { FRONTMATTER_REGEX, parseFrontmatter } from '../skills/skillLoader.js';
 import { LocalAgentExecutor } from '../agents/local-executor.js';
 import { SkillExtractionAgent } from '../agents/skill-extraction-agent.js';
 import { getModelConfigAlias } from '../agents/registry.js';
+import type { SubagentActivityEvent } from '../agents/types.js';
 import { ExecutionLifecycleService } from './executionLifecycleService.js';
 import { PromptRegistry } from '../prompts/prompt-registry.js';
 import { ResourceRegistry } from '../resources/resource-registry.js';
@@ -29,6 +31,7 @@ import { PolicyDecision } from '../policy/types.js';
 import { MessageBus } from '../confirmation-bus/message-bus.js';
 import { Storage } from '../config/storage.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
+import { READ_FILE_TOOL_NAME } from '../tools/tool-names.js';
 import {
   applyParsedSkillPatches,
   hasParsedPatchHunks,
@@ -40,6 +43,7 @@ const LOCK_STALE_MS = 35 * 60 * 1000; // 35 minutes (exceeds agent's 30-min time
 const MIN_USER_MESSAGES = 10;
 const MIN_IDLE_MS = 3 * 60 * 60 * 1000; // 3 hours
 const MAX_SESSION_INDEX_SIZE = 50;
+const MAX_NEW_SESSION_BATCH_SIZE = 10;
 
 /**
  * Lock file content for coordinating across CLI instances.
@@ -49,12 +53,39 @@ interface LockInfo {
   startedAt: string;
 }
 
+function hasProperty<T extends string>(
+  obj: unknown,
+  prop: T,
+): obj is { [key in T]: unknown } {
+  return obj !== null && typeof obj === 'object' && prop in obj;
+}
+
+function isStringProperty<T extends string>(
+  obj: unknown,
+  prop: T,
+): obj is { [key in T]: string } {
+  return hasProperty(obj, prop) && typeof obj[prop] === 'string';
+}
+
+interface SessionVersion {
+  sessionId: string;
+  lastUpdated: string;
+}
+
+interface IndexedSession extends SessionVersion {
+  filePath: string;
+  summary?: string;
+  userMessageCount: number;
+}
+
 /**
  * Metadata for a single extraction run.
  */
 export interface ExtractionRun {
   runAt: string;
   sessionIds: string[];
+  candidateSessions?: SessionVersion[];
+  processedSessions?: SessionVersion[];
   skillsCreated: string[];
 }
 
@@ -71,7 +102,10 @@ export interface ExtractionState {
 export function getProcessedSessionIds(state: ExtractionState): Set<string> {
   const ids = new Set<string>();
   for (const run of state.runs) {
-    for (const id of run.sessionIds) {
+    const processedSessionIds =
+      run.processedSessions?.map((session) => session.sessionId) ??
+      run.sessionIds;
+    for (const id of processedSessionIds) {
       ids.add(id);
     }
   }
@@ -89,30 +123,49 @@ function isLockInfo(value: unknown): value is LockInfo {
   );
 }
 
-function isConversationRecord(value: unknown): value is ConversationRecord {
+function isSessionVersion(value: unknown): value is SessionVersion {
   return (
     typeof value === 'object' &&
     value !== null &&
     'sessionId' in value &&
     typeof value.sessionId === 'string' &&
-    'messages' in value &&
-    Array.isArray(value.messages) &&
-    'projectHash' in value &&
-    'startTime' in value &&
-    'lastUpdated' in value
+    'lastUpdated' in value &&
+    typeof value.lastUpdated === 'string'
   );
 }
 
-function isExtractionRun(value: unknown): value is ExtractionRun {
+function normalizeSessionVersions(value: unknown): SessionVersion[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter(isSessionVersion).map((session) => ({
+    sessionId: session.sessionId,
+    lastUpdated: session.lastUpdated,
+  }));
+}
+
+function normalizeStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter((item): item is string => typeof item === 'string');
+}
+
+function isExtractionRunLike(value: unknown): value is {
+  runAt: string;
+  sessionIds?: unknown;
+  candidateSessions?: unknown;
+  processedSessions?: unknown;
+  skillsCreated: unknown;
+} {
   return (
     typeof value === 'object' &&
     value !== null &&
     'runAt' in value &&
     typeof value.runAt === 'string' &&
-    'sessionIds' in value &&
-    Array.isArray(value.sessionIds) &&
-    'skillsCreated' in value &&
-    Array.isArray(value.skillsCreated)
+    'skillsCreated' in value
   );
 }
 
@@ -122,6 +175,208 @@ function isExtractionState(value: unknown): value is { runs: unknown[] } {
     value !== null &&
     'runs' in value &&
     Array.isArray(value.runs)
+  );
+}
+
+function buildExtractionRun(value: unknown): ExtractionRun | null {
+  if (!isExtractionRunLike(value)) {
+    return null;
+  }
+
+  const candidateSessions = normalizeSessionVersions(value.candidateSessions);
+  const processedSessions = normalizeSessionVersions(value.processedSessions);
+  const sessionIds = normalizeStringArray(value.sessionIds);
+
+  return {
+    runAt: value.runAt,
+    sessionIds:
+      sessionIds.length > 0
+        ? sessionIds
+        : processedSessions.map((session) => session.sessionId),
+    candidateSessions:
+      candidateSessions.length > 0 ? candidateSessions : undefined,
+    processedSessions:
+      processedSessions.length > 0 ? processedSessions : undefined,
+    skillsCreated: normalizeStringArray(value.skillsCreated),
+  };
+}
+
+function getTimestampMs(timestamp: string): number {
+  const parsed = Date.parse(timestamp);
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+function getSessionVersionKey(session: SessionVersion): string {
+  return `${session.sessionId}\u0000${session.lastUpdated}`;
+}
+
+function hasLegacyRunProcessedSession(
+  run: ExtractionRun,
+  session: SessionVersion,
+): boolean {
+  return (
+    run.sessionIds.includes(session.sessionId) &&
+    getTimestampMs(run.runAt) >= getTimestampMs(session.lastUpdated)
+  );
+}
+
+function isSessionVersionProcessed(
+  state: ExtractionState,
+  session: SessionVersion,
+): boolean {
+  const sessionKey = getSessionVersionKey(session);
+
+  for (const run of state.runs) {
+    if (
+      run.processedSessions?.some(
+        (processed) => getSessionVersionKey(processed) === sessionKey,
+      )
+    ) {
+      return true;
+    }
+
+    if (!run.processedSessions && hasLegacyRunProcessedSession(run, session)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function getSessionAttemptCount(
+  state: ExtractionState,
+  session: SessionVersion,
+): number {
+  const sessionKey = getSessionVersionKey(session);
+  let attempts = 0;
+
+  for (const run of state.runs) {
+    if (run.candidateSessions) {
+      if (
+        run.candidateSessions.some(
+          (candidate) => getSessionVersionKey(candidate) === sessionKey,
+        )
+      ) {
+        attempts++;
+      }
+      continue;
+    }
+
+    if (hasLegacyRunProcessedSession(run, session)) {
+      attempts++;
+    }
+  }
+
+  return attempts;
+}
+
+function compareIndexedSessions(a: IndexedSession, b: IndexedSession): number {
+  const timestampDelta =
+    getTimestampMs(b.lastUpdated) - getTimestampMs(a.lastUpdated);
+  if (timestampDelta !== 0) {
+    return timestampDelta;
+  }
+
+  if (a.filePath.endsWith('.jsonl') !== b.filePath.endsWith('.jsonl')) {
+    return a.filePath.endsWith('.jsonl') ? -1 : 1;
+  }
+
+  return b.filePath.localeCompare(a.filePath);
+}
+
+function shouldReplaceIndexedSession(
+  existing: IndexedSession,
+  candidate: IndexedSession,
+): boolean {
+  return compareIndexedSessions(candidate, existing) < 0;
+}
+
+function isReadFileStartActivity(
+  activity: SubagentActivityEvent,
+): activity is SubagentActivityEvent & {
+  data: { name: string; args?: { file_path?: unknown }; callId?: unknown };
+} {
+  return (
+    activity.type === 'TOOL_CALL_START' &&
+    activity.data['name'] === READ_FILE_TOOL_NAME
+  );
+}
+
+function getResolvedReadFilePath(
+  config: Config,
+  activity: SubagentActivityEvent,
+): string | null {
+  if (!isReadFileStartActivity(activity)) {
+    return null;
+  }
+
+  const args = activity.data.args;
+  if (
+    typeof args !== 'object' ||
+    args === null ||
+    !('file_path' in args) ||
+    typeof args.file_path !== 'string'
+  ) {
+    return null;
+  }
+
+  return path.resolve(config.getTargetDir(), args.file_path);
+}
+
+function getReadFileStartCallId(
+  activity: SubagentActivityEvent,
+): string | null {
+  if (
+    !isReadFileStartActivity(activity) ||
+    !isStringProperty(activity.data, 'callId')
+  ) {
+    return null;
+  }
+
+  return activity.data.callId;
+}
+
+function getCompletedReadFileCallId(
+  activity: SubagentActivityEvent,
+): string | null {
+  if (
+    activity.type !== 'TOOL_CALL_END' ||
+    activity.data['name'] !== READ_FILE_TOOL_NAME ||
+    !isStringProperty(activity.data, 'id')
+  ) {
+    return null;
+  }
+
+  return activity.data['id'];
+}
+
+function getFailedReadFileCallId(
+  activity: SubagentActivityEvent,
+): string | null {
+  if (
+    activity.type !== 'ERROR' ||
+    activity.data['name'] !== READ_FILE_TOOL_NAME ||
+    !isStringProperty(activity.data, 'callId')
+  ) {
+    return null;
+  }
+
+  return activity.data['callId'];
+}
+
+function getUserMessageCount(
+  conversation: ConversationRecord & { userMessageCount?: number },
+): number {
+  return (
+    conversation.userMessageCount ??
+    conversation.messages.filter((message) => message.type === 'user').length
+  );
+}
+
+function isSupportedSessionFile(fileName: string): boolean {
+  return (
+    fileName.startsWith(SESSION_FILE_PREFIX) &&
+    (fileName.endsWith('.json') || fileName.endsWith('.jsonl'))
   );
 }
 
@@ -231,16 +486,9 @@ export async function readExtractionState(
 
     const runs: ExtractionRun[] = [];
     for (const run of parsed.runs) {
-      if (!isExtractionRun(run)) continue;
-      runs.push({
-        runAt: run.runAt,
-        sessionIds: run.sessionIds.filter(
-          (sid): sid is string => typeof sid === 'string',
-        ),
-        skillsCreated: run.skillsCreated.filter(
-          (sk): sk is string => typeof sk === 'string',
-        ),
-      });
+      const normalizedRun = buildExtractionRun(run);
+      if (!normalizedRun) continue;
+      runs.push(normalizedRun);
     }
 
     return { runs };
@@ -270,30 +518,32 @@ export async function writeExtractionState(
  * Filters out subagent sessions, sessions that haven't been idle long enough,
  * and sessions with too few user messages.
  */
-function shouldProcessConversation(parsed: ConversationRecord): boolean {
+function shouldProcessConversation(
+  parsed: ConversationRecord & { userMessageCount?: number },
+): boolean {
   // Skip subagent sessions
   if (parsed.kind === 'subagent') return false;
 
   // Skip sessions that are still active (not idle for 3+ hours)
-  const lastUpdated = new Date(parsed.lastUpdated).getTime();
+  const lastUpdated = getTimestampMs(parsed.lastUpdated);
   if (Date.now() - lastUpdated < MIN_IDLE_MS) return false;
 
   // Skip sessions with too few user messages
-  const userMessageCount = parsed.messages.filter(
-    (m) => m.type === 'user',
-  ).length;
-  if (userMessageCount < MIN_USER_MESSAGES) return false;
+  if (getUserMessageCount(parsed) < MIN_USER_MESSAGES) return false;
 
   return true;
 }
 
 /**
- * Scans the chats directory for eligible session files (sorted most-recent-first,
- * capped at MAX_SESSION_INDEX_SIZE). Shared by buildSessionIndex.
+ * Scans the chats directory for eligible session files, loading metadata from
+ * both JSONL and legacy JSON sessions, deduplicating migrated sessions by
+ * session ID, and sorting by actual lastUpdated. We scan the full directory
+ * here so already-processed recent sessions cannot permanently block older
+ * backlog sessions from surfacing as new candidates.
  */
 async function scanEligibleSessions(
   chatsDir: string,
-): Promise<Array<{ conversation: ConversationRecord; filePath: string }>> {
+): Promise<IndexedSession[]> {
   let allFiles: string[];
   try {
     allFiles = await fs.readdir(chatsDir);
@@ -301,33 +551,48 @@ async function scanEligibleSessions(
     return [];
   }
 
-  const sessionFiles = allFiles.filter(
-    (f) => f.startsWith(SESSION_FILE_PREFIX) && f.endsWith('.json'),
-  );
-
-  // Sort by filename descending (most recent first)
-  sessionFiles.sort((a, b) => b.localeCompare(a));
-
-  const results: Array<{ conversation: ConversationRecord; filePath: string }> =
-    [];
-
-  for (const file of sessionFiles) {
-    if (results.length >= MAX_SESSION_INDEX_SIZE) break;
-
+  const candidates: Array<{ filePath: string; mtimeMs: number }> = [];
+  for (const file of allFiles) {
+    if (!isSupportedSessionFile(file)) continue;
     const filePath = path.join(chatsDir, file);
     try {
-      const content = await fs.readFile(filePath, 'utf-8');
-      const parsed: unknown = JSON.parse(content);
-      if (!isConversationRecord(parsed)) continue;
-      if (!shouldProcessConversation(parsed)) continue;
+      const stat = await fs.stat(filePath);
+      if (!stat.isFile()) continue;
+      candidates.push({ filePath, mtimeMs: stat.mtimeMs });
+    } catch {
+      // Skip files that disappeared between readdir and stat.
+    }
+  }
 
-      results.push({ conversation: parsed, filePath });
+  candidates.sort((a, b) => b.mtimeMs - a.mtimeMs);
+
+  const latestBySessionId = new Map<string, IndexedSession>();
+
+  for (const { filePath } of candidates) {
+    try {
+      const conversation = await loadConversationRecord(filePath, {
+        metadataOnly: true,
+      });
+      if (!conversation || !shouldProcessConversation(conversation)) continue;
+
+      const indexedSession: IndexedSession = {
+        sessionId: conversation.sessionId,
+        lastUpdated: conversation.lastUpdated,
+        filePath,
+        summary: conversation.summary,
+        userMessageCount: getUserMessageCount(conversation),
+      };
+
+      const existing = latestBySessionId.get(indexedSession.sessionId);
+      if (!existing || shouldReplaceIndexedSession(existing, indexedSession)) {
+        latestBySessionId.set(indexedSession.sessionId, indexedSession);
+      }
     } catch {
       // Skip unreadable files
     }
   }
 
-  return results;
+  return Array.from(latestBySessionId.values()).sort(compareIndexedSessions);
 }
 
 /**
@@ -335,39 +600,67 @@ async function scanEligibleSessions(
  * eligible sessions with their summary, file path, and new/previously-processed status.
  * The agent can use read_file on paths to inspect sessions that look promising.
  *
- * Returns the index text and the list of new (unprocessed) session IDs.
+ * Returns the index text, the list of selected new (unprocessed) session IDs,
+ * and the surfaced candidate sessions for this run.
  */
 export async function buildSessionIndex(
   chatsDir: string,
   state: ExtractionState,
-): Promise<{ sessionIndex: string; newSessionIds: string[] }> {
-  const processedSet = getProcessedSessionIds(state);
+): Promise<{
+  sessionIndex: string;
+  newSessionIds: string[];
+  candidateSessions: IndexedSession[];
+}> {
   const eligible = await scanEligibleSessions(chatsDir);
 
   if (eligible.length === 0) {
-    return { sessionIndex: '', newSessionIds: [] };
+    return { sessionIndex: '', newSessionIds: [], candidateSessions: [] };
   }
 
-  const lines: string[] = [];
-  const newSessionIds: string[] = [];
-
-  for (const { conversation, filePath } of eligible) {
-    const userMessageCount = conversation.messages.filter(
-      (m) => m.type === 'user',
-    ).length;
-    const isNew = !processedSet.has(conversation.sessionId);
-    if (isNew) {
-      newSessionIds.push(conversation.sessionId);
+  const newSessions: IndexedSession[] = [];
+  const oldSessions: IndexedSession[] = [];
+  for (const session of eligible) {
+    if (isSessionVersionProcessed(state, session)) {
+      oldSessions.push(session);
+    } else {
+      newSessions.push(session);
     }
-
-    const status = isNew ? '[NEW]' : '[old]';
-    const summary = conversation.summary ?? '(no summary)';
-    lines.push(
-      `${status} ${summary} (${userMessageCount} user msgs) — ${filePath}`,
-    );
   }
 
-  return { sessionIndex: lines.join('\n'), newSessionIds };
+  newSessions.sort((a, b) => {
+    const attemptDelta =
+      getSessionAttemptCount(state, a) - getSessionAttemptCount(state, b);
+    if (attemptDelta !== 0) {
+      return attemptDelta;
+    }
+    return compareIndexedSessions(a, b);
+  });
+
+  const candidateSessions = newSessions.slice(0, MAX_NEW_SESSION_BATCH_SIZE);
+  const remainingSlots = Math.max(
+    0,
+    MAX_SESSION_INDEX_SIZE - candidateSessions.length,
+  );
+  const displayedOldSessions = oldSessions.slice(0, remainingSlots);
+  const candidateSessionIds = new Set(
+    candidateSessions.map((session) => getSessionVersionKey(session)),
+  );
+
+  const lines = [...candidateSessions, ...displayedOldSessions].map(
+    (session) => {
+      const status = candidateSessionIds.has(getSessionVersionKey(session))
+        ? '[NEW]'
+        : '[old]';
+      const summary = session.summary ?? '(no summary)';
+      return `${status} ${summary} (${session.userMessageCount} user msgs) — ${session.filePath}`;
+    },
+  );
+
+  return {
+    sessionIndex: lines.join('\n'),
+    newSessionIds: candidateSessions.map((session) => session.sessionId),
+    candidateSessions,
+  };
 }
 
 /**
@@ -632,14 +925,12 @@ export async function startMemoryService(config: Config): Promise<void> {
 
     // Build session index: all eligible sessions with summaries + file paths.
     // The agent decides which to read in full via read_file.
-    const { sessionIndex, newSessionIds } = await buildSessionIndex(
-      chatsDir,
-      state,
-    );
+    const { sessionIndex, newSessionIds, candidateSessions } =
+      await buildSessionIndex(chatsDir, state);
 
     const totalInIndex = sessionIndex ? sessionIndex.split('\n').length : 0;
     debugLogger.log(
-      `[MemoryService] Session scan: ${totalInIndex} eligible session(s) found, ${newSessionIds.length} new`,
+      `[MemoryService] Session scan: ${totalInIndex} indexed session(s), ${candidateSessions.length} surfaced as new candidates`,
     );
 
     if (newSessionIds.length === 0) {
@@ -702,8 +993,59 @@ export async function startMemoryService(config: Config): Promise<void> {
       `[MemoryService] Starting extraction agent (model: ${agentDefinition.modelConfig.model}, maxTurns: 30, maxTime: 30min)`,
     );
 
+    const candidateSessionsByPath = new Map(
+      candidateSessions.map((session) => [
+        path.resolve(session.filePath),
+        session,
+      ]),
+    );
+    const processedSessionKeys = new Set<string>();
+    const pendingReadFileSessions = new Map<string, string>();
+
     // Create and run the extraction agent
-    const executor = await LocalAgentExecutor.create(agentDefinition, context);
+    const executor = await LocalAgentExecutor.create(
+      agentDefinition,
+      context,
+      (activity) => {
+        const readFileCallId = getReadFileStartCallId(activity);
+        if (readFileCallId) {
+          const resolvedPath = getResolvedReadFilePath(config, activity);
+          if (!resolvedPath) {
+            return;
+          }
+
+          const session = candidateSessionsByPath.get(resolvedPath);
+          if (!session) {
+            return;
+          }
+
+          pendingReadFileSessions.set(
+            readFileCallId,
+            getSessionVersionKey(session),
+          );
+          return;
+        }
+
+        const completedReadFileCallId = getCompletedReadFileCallId(activity);
+        if (completedReadFileCallId) {
+          const sessionKey = pendingReadFileSessions.get(
+            completedReadFileCallId,
+          );
+          if (!sessionKey) {
+            return;
+          }
+
+          processedSessionKeys.add(sessionKey);
+          pendingReadFileSessions.delete(completedReadFileCallId);
+          return;
+        }
+
+        const failedReadFileCallId = getFailedReadFileCallId(activity);
+        if (failedReadFileCallId) {
+          pendingReadFileSessions.delete(failedReadFileCallId);
+        }
+      },
+    );
 
     await executor.run(
       { request: 'Extract skills from the provided sessions.' },
@@ -746,10 +1088,24 @@ export async function startMemoryService(config: Config): Promise<void> {
       );
     }
 
+    const processedSessions = candidateSessions
+      .filter((session) =>
+        processedSessionKeys.has(getSessionVersionKey(session)),
+      )
+      .map((session) => ({
+        sessionId: session.sessionId,
+        lastUpdated: session.lastUpdated,
+      }));
+
     // Record the run with full metadata
     const run: ExtractionRun = {
       runAt: new Date().toISOString(),
-      sessionIds: newSessionIds,
+      sessionIds: processedSessions.map((session) => session.sessionId),
+      candidateSessions: candidateSessions.map((session) => ({
+        sessionId: session.sessionId,
+        lastUpdated: session.lastUpdated,
+      })),
+      processedSessions,
       skillsCreated,
     };
     const updatedState: ExtractionState = {
@@ -770,7 +1126,7 @@ export async function startMemoryService(config: Config): Promise<void> {
         );
       }
       debugLogger.log(
-        `[MemoryService] Completed in ${elapsed}s. ${completionParts.join('; ')} (processed ${newSessionIds.length} session(s))`,
+        `[MemoryService] Completed in ${elapsed}s. ${completionParts.join('; ')} (read ${processedSessions.length}/${candidateSessions.length} surfaced session(s))`,
       );
       const feedbackParts: string[] = [];
       if (skillsCreated.length > 0) {
@@ -789,7 +1145,7 @@ export async function startMemoryService(config: Config): Promise<void> {
       );
     } else {
       debugLogger.log(
-        `[MemoryService] Completed in ${elapsed}s. No new skills or patches created (processed ${newSessionIds.length} session(s))`,
+        `[MemoryService] Completed in ${elapsed}s. No new skills or patches created (read ${processedSessions.length}/${candidateSessions.length} surfaced session(s))`,
       );
     }
   } catch (error) {
