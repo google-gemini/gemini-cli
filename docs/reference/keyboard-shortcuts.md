@@ -92,7 +92,7 @@ available combinations.
 | `input.queueMessage`                 | Queue the current prompt to be processed after the current task finishes. | `Tab`                                                                               |
 | `input.newline`                      | Insert a newline without submitting.                                      | `Ctrl+Enter`<br />`Cmd/Win+Enter`<br />`Alt+Enter`<br />`Shift+Enter`<br />`Ctrl+J` |
 | `input.openExternalEditor`           | Open the current prompt or the plan in an external editor.                | `Ctrl+G`<br />`Ctrl+Shift+G`                                                        |
-| `input.deprecatedOpenExternalEditor` | Deprecated command to open external editor.                               | `Ctrl+X`                                                                            |
+| `input.deprecatedOpenExternalEditor` | Deprecated command to open external editor.                               |                                                                                     |
 | `input.paste`                        | Paste from the clipboard.                                                 | `Ctrl+V`<br />`Cmd/Win+V`<br />`Alt+V`                                              |
 
 #### App Controls
@@ -138,6 +138,13 @@ available combinations.
 | ------------------ | ------------------------------------------- | ---- |
 | `extension.update` | Update the current extension if available.  | `I`  |
 | `extension.link`   | Link the current extension to a local path. | `L`  |
+
+#### Model Controls
+
+| Command               | Action                                | Keys           |
+| --------------------- | ------------------------------------- | -------------- |
+| `model.cycleForward`  | Cycle to the next favorite model.     | `Ctrl+X`       |
+| `model.cycleBackward` | Cycle to the previous favorite model. | `Ctrl+Shift+X` |
 
 <!-- KEYBINDINGS-AUTOGEN:END -->
 

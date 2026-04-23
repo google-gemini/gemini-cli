@@ -298,6 +298,35 @@ describe('<ModelDialog />', () => {
     unmount();
   });
 
+  it('toggles favorite status with "f" key', async () => {
+    const { lastFrame, stdin, waitUntilReady, unmount } =
+      await renderComponent();
+
+    // Default: Auto (Gemini 2.5) is selected
+    expect(lastFrame()).not.toContain('★');
+
+    // Press 'f' to favorite
+    await act(async () => {
+      stdin.write('f');
+    });
+    await waitUntilReady();
+
+    await waitFor(() => {
+      expect(lastFrame()).toContain('Auto (Gemini 2.5) ★');
+    });
+
+    // Press 'f' again to unfavorite
+    await act(async () => {
+      stdin.write('f');
+    });
+    await waitUntilReady();
+
+    await waitFor(() => {
+      expect(lastFrame()).not.toContain('★');
+    });
+    unmount();
+  });
+
   it('closes dialog on escape in "main" view', async () => {
     const { stdin, waitUntilReady, unmount } = await renderComponent();
 
