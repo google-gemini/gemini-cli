@@ -6,7 +6,7 @@
   <g transform="translate(10, 10)">
     <text x="0" y="2" fill="#303030" textLength="720" lengthAdjust="spacingAndGlyphs">╭──────────────────────────────────────────────────────────────────────────────╮</text>
     <text x="0" y="19" fill="#303030" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="18" y="19" fill="#a8a8a8" textLength="234" lengthAdjust="spacingAndGlyphs">... 11 hidden (Ctrl+O) ...</text>
+    <text x="18" y="19" fill="#a8a8a8" textLength="234" lengthAdjust="spacingAndGlyphs">... 10 hidden (Ctrl+O) ...</text>
     <text x="711" y="19" fill="#303030" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="36" fill="#303030" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <rect x="18" y="34" width="9" height="17" fill="#008700" />
@@ -481,15 +481,15 @@
     <text x="711" y="512" fill="#303030" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="529" fill="#303030" textLength="720" lengthAdjust="spacingAndGlyphs">╰──────────────────────────────────────────────────────────────────────────────╯</text>
     <text x="0" y="546" fill="#ffffff" textLength="162" lengthAdjust="spacingAndGlyphs">Apply this change?</text>
-    <rect x="0" y="578" width="9" height="17" fill="#005f00" />
+    <rect x="0" y="578" width="9" height="17" fill="#008700" />
     <text x="0" y="580" fill="#00cd00" textLength="9" lengthAdjust="spacingAndGlyphs">●</text>
-    <rect x="9" y="578" width="9" height="17" fill="#005f00" />
-    <rect x="18" y="578" width="18" height="17" fill="#005f00" />
+    <rect x="9" y="578" width="9" height="17" fill="#008700" />
+    <rect x="18" y="578" width="18" height="17" fill="#008700" />
     <text x="18" y="580" fill="#00cd00" textLength="18" lengthAdjust="spacingAndGlyphs">1.</text>
-    <rect x="36" y="578" width="9" height="17" fill="#005f00" />
-    <rect x="45" y="578" width="90" height="17" fill="#005f00" />
+    <rect x="36" y="578" width="9" height="17" fill="#008700" />
+    <rect x="45" y="578" width="90" height="17" fill="#008700" />
     <text x="45" y="580" fill="#00cd00" textLength="90" lengthAdjust="spacingAndGlyphs">Allow once</text>
-    <rect x="135" y="578" width="603" height="17" fill="#005f00" />
+    <rect x="135" y="578" width="603" height="17" fill="#008700" />
     <text x="18" y="597" fill="#ffffff" textLength="18" lengthAdjust="spacingAndGlyphs">2.</text>
     <text x="45" y="597" fill="#ffffff" textLength="198" lengthAdjust="spacingAndGlyphs">Allow for this session</text>
     <text x="18" y="614" fill="#ffffff" textLength="18" lengthAdjust="spacingAndGlyphs">3.</text>
