@@ -126,6 +126,17 @@ export function useVoiceMode({
       '';
 
     const startAsync = async () => {
+      // If there's an active draining service, disconnect it immediately
+      // before starting a new one to prevent orphaned event collisions.
+      if (disconnectTimerRef.current) {
+        clearTimeout(disconnectTimerRef.current);
+        disconnectTimerRef.current = null;
+      }
+      if (transcriptionServiceRef.current) {
+        transcriptionServiceRef.current.disconnect();
+        transcriptionServiceRef.current = null;
+      }
+
       const cleanupIfStopped = () => {
         if (stopRequestedRef.current) {
           if (recorderRef.current) {
@@ -166,12 +177,21 @@ export function useVoiceMode({
         recorderRef.current = new AudioRecorder();
       }
 
-      transcriptionServiceRef.current = TranscriptionFactory.createProvider(
+      const currentService = TranscriptionFactory.createProvider(
         settings.experimental.voice,
         apiKey,
       );
+      transcriptionServiceRef.current = currentService;
 
-      transcriptionServiceRef.current.on('transcription', (text) => {
+      currentService.on('transcription', (text) => {
+        if (
+          transcriptionServiceRef.current !== currentService &&
+          stopRequestedRef.current
+        ) {
+          // If this is an orphaned service that was replaced by a new session, ignore its events
+          return;
+        }
+
         if (text) {
           const currentBufferText = bufferRef.current.text;
           const previousTranscription = liveTranscriptionRef.current;
@@ -200,19 +220,24 @@ export function useVoiceMode({
         liveTranscriptionRef.current = text;
       });
 
-      transcriptionServiceRef.current.on('turnComplete', () => {
+      currentService.on('turnComplete', () => {
+        if (
+          transcriptionServiceRef.current !== currentService &&
+          stopRequestedRef.current
+        )
+          return;
         liveTranscriptionRef.current = '';
       });
 
-      transcriptionServiceRef.current.on('error', (err) => {
+      currentService.on('error', (err) => {
+        if (transcriptionServiceRef.current !== currentService) return;
         debugLogger.error('[Voice] Transcription error:', err);
         lastFailureTimeRef.current = Date.now();
         recordingInProgressRef.current = false;
-        // Don't call stopVoiceRecording here as it might be an intermittent error
-        // or the service might recover. If it's fatal, 'close' will fire.
       });
 
-      transcriptionServiceRef.current.on('close', () => {
+      currentService.on('close', () => {
+        if (transcriptionServiceRef.current !== currentService) return;
         if (!stopRequestedRef.current) {
           setIsRecording(false);
           isRecordingRef.current = false;
@@ -223,7 +248,7 @@ export function useVoiceMode({
       });
 
       try {
-        await transcriptionServiceRef.current.connect();
+        await currentService.connect();
         if (cleanupIfStopped()) return;
 
         await recorderRef.current?.start();
@@ -236,7 +261,7 @@ export function useVoiceMode({
 
         recorderRef.current?.on('data', (chunk) => {
           if (currentVoiceBackend === 'gemini-live') {
-            transcriptionServiceRef.current?.sendAudioChunk(chunk);
+            currentService.sendAudioChunk(chunk);
           }
         });
         recorderRef.current?.on('error', (err) => {
@@ -245,6 +270,7 @@ export function useVoiceMode({
           lastFailureTimeRef.current = Date.now();
         });
       } catch (err: unknown) {
+        if (transcriptionServiceRef.current !== currentService) return;
         const message = err instanceof Error ? err.message : String(err);
         setQueueErrorMessage(`Voice mode failure: ${message}`);
         setIsRecording(false);
