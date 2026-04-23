@@ -331,6 +331,7 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       features: { thinking: false, multimodalToolUse: false },
     },
     'gemma-4-31b-it': {
+      displayName: 'gemma-4-31b-it',
       tier: 'custom',
       family: 'gemma-4',
       isPreview: false,
@@ -338,6 +339,7 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       features: { thinking: true, multimodalToolUse: false },
     },
     'gemma-4-26b-a4b-it': {
+      displayName: 'gemma-4-26b-a4b-it',
       tier: 'custom',
       family: 'gemma-4',
       isPreview: false,
