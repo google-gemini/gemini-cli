@@ -882,11 +882,14 @@ export class GeminiChat {
     streamResponse: AsyncGenerator<GenerateContentResponse>,
     originalRequest: GenerateContentParameters,
   ): AsyncGenerator<GenerateContentResponse> {
-    const modelResponseParts: Part[] = [];
+    
 
     let hasToolCall = false;
     let hasThoughts = false;
     let finishReason: FinishReason | undefined;
+
+    const modelResponseTextParts: Part[] = [];
+    const modelFunctionCalls: Map<string, Part> = new Map();
 
     for await (const chunk of streamResponse) {
       const candidateWithReason = chunk?.candidates?.find(
@@ -909,9 +912,17 @@ export class GeminiChat {
             hasToolCall = true;
           }
 
-          modelResponseParts.push(
-            ...content.parts.filter((part) => !part.thought),
+          // Accumulate only non-thought and non-function parts from the raw deltas.
+          modelResponseTextParts.push(
+            ...content.parts.filter((part) => !part.thought && !part.functionCall),
           );
+        }
+
+        // Extract the fully assembled function calls provided by the SDK getter.
+        if (chunk.functionCalls && chunk.functionCalls.length > 0) {
+          for (const fnCall of chunk.functionCalls) {
+            modelFunctionCalls.set(fnCall.name || 'unknown', { functionCall: fnCall });
+          }
         }
       }
 
@@ -951,7 +962,7 @@ export class GeminiChat {
 
     // String thoughts and consolidate text parts.
     const consolidatedParts: Part[] = [];
-    for (const part of modelResponseParts) {
+    for (const part of modelResponseTextParts) {
       const lastPart = consolidatedParts[consolidatedParts.length - 1];
       if (
         lastPart?.text &&
@@ -962,6 +973,11 @@ export class GeminiChat {
       } else {
         consolidatedParts.push(part);
       }
+    }
+
+    // Append the fully assembled function calls at the end.
+    for (const fcPart of modelFunctionCalls.values()) {
+      consolidatedParts.push(fcPart);
     }
 
     const responseText = consolidatedParts

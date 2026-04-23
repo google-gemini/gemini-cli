@@ -156,14 +156,14 @@ function parseToolResponses(
       let matchingCall = pendingCallParts.get(callId);
 
       if (!matchingCall && pendingCallPartsWithoutId.length > 0) {
-        const idx = pendingCallPartsWithoutId.findIndex(
+        const idx = pendingCallPartsWithoutId.findLastIndex(
           (p) => p.functionCall?.name === part.functionResponse!.name,
         );
         if (idx !== -1) {
           matchingCall = pendingCallPartsWithoutId[idx];
           pendingCallPartsWithoutId.splice(idx, 1);
         } else {
-          matchingCall = pendingCallPartsWithoutId.shift();
+          matchingCall = pendingCallPartsWithoutId.pop();
         }
       }
 
