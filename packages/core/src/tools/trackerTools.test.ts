@@ -243,6 +243,66 @@ describe('Tracker Tools Integration', () => {
       ]);
     });
 
+    it('nests children by dependency chain', async () => {
+      const epic = {
+        id: 'epic1',
+        title: 'Tracker Feature Test Epic',
+        type: TaskType.EPIC,
+        status: TaskStatus.CLOSED,
+        dependencies: [],
+      };
+      // 0b0c88 depends on f7a1ac, f7a1ac depends on 9e22bc
+      const taskA = {
+        id: '0b0c88',
+        title: 'Verify the test file',
+        type: TaskType.TASK,
+        status: TaskStatus.CLOSED,
+        parentId: 'epic1',
+        dependencies: ['f7a1ac'],
+      };
+      const taskB = {
+        id: '9e22bc',
+        title: 'Create a test file',
+        type: TaskType.TASK,
+        status: TaskStatus.CLOSED,
+        parentId: 'epic1',
+        dependencies: [],
+      };
+      const taskC = {
+        id: 'f7a1ac',
+        title: 'Modify the test file',
+        type: TaskType.TASK,
+        status: TaskStatus.CLOSED,
+        parentId: 'epic1',
+        dependencies: ['9e22bc'],
+      };
+
+      const mockService = {
+        listTasks: async () => [epic, taskA, taskB, taskC],
+      } as unknown as TrackerService;
+      const display = await buildTodosReturnDisplay(mockService);
+
+      // Should be nested by dependency chain: 9e22bc -> f7a1ac -> 0b0c88
+      expect(display.todos).toEqual([
+        {
+          description: `epic: Tracker Feature Test Epic (epic1)`,
+          status: 'completed',
+        },
+        {
+          description: `  task: Create a test file (9e22bc)`,
+          status: 'completed',
+        },
+        {
+          description: `    task: Modify the test file (f7a1ac)`,
+          status: 'completed',
+        },
+        {
+          description: `      task: Verify the test file (0b0c88)`,
+          status: 'completed',
+        },
+      ]);
+    });
+
     it('detects cycles', async () => {
       // Since TrackerTask only has a single parentId, a true cycle is unreachable from roots.
       // We simulate a database corruption (two tasks with same ID, one root, one child)
