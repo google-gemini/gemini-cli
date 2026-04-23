@@ -30,7 +30,6 @@ jobs:
         GEMINI_API_KEY: '${{ secrets.EVAL_GEMINI_API_KEY }}'
         GCLI_LOCAL_FILE_TELEMETRY: 'True'
         EVAL_GCS_BUCKET: '${{ vars.EVAL_GCS_ARTIFACTS_BUCKET }}'
-        GEMINI_CLI_TRUST_WORKSPACE: true
     steps:
       - name: 'Authenticate to Google Cloud'
         id: 'auth'

@@ -153,7 +153,6 @@ jobs:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           MODEL_LIST: '${{ env.MODEL_LIST }}'
-          GEMINI_CLI_TRUST_WORKSPACE: true
         run: |
           # Run the regression check loop. The script saves the report to a file.
           node scripts/run_eval_regression.js
