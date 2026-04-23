@@ -28,7 +28,13 @@ function buildZodSchemaFromJsonSchema(def: any): z.ZodTypeAny {
     return z.string();
   }
   if (def.type === 'number') return z.number();
-  if (def.type === 'boolean') return z.boolean();
+  if (def.type === 'boolean') {
+    return z.preprocess((val) => {
+      if (val === 'true') return true;
+      if (val === 'false') return false;
+      return val;
+    }, z.boolean());
+  }
 
   if (def.type === 'array') {
     if (def.items) {
@@ -135,7 +141,11 @@ function buildPrimitiveSchema(
     case 'number':
       return z.number();
     case 'boolean':
-      return z.boolean();
+      return z.preprocess((val) => {
+        if (val === 'true') return true;
+        if (val === 'false') return false;
+        return val;
+      }, z.boolean());
     default:
       return z.unknown();
   }
