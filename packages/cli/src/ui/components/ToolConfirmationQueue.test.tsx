@@ -203,10 +203,7 @@ describe('ToolConfirmationQueue', () => {
       />,
       {
         config: mockConfig,
-        settings: createMockSettings({
-          ui: { useAlternateBuffer: false },
-          security: { enablePermanentToolApproval: false },
-        }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
         uiState: {
           terminalWidth: 80,
           terminalHeight: 40,

@@ -419,7 +419,7 @@ describe('ToolConfirmationMessage', () => {
       unmount();
     });
 
-    it('should show "Allow for all future sessions" when trusted (default)', async () => {
+    it('should show "Allow for all future sessions" when trusted', async () => {
       const mockConfig = {
         isTrustedFolder: () => true,
         getIdeMode: () => false,
