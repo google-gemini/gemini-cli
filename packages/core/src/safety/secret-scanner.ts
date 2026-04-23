@@ -38,10 +38,11 @@ const SECRET_PATTERNS: PatternDef[] = [
     type: 'connection_string',
     re: /(postgres|mysql|mongodb|redis):\/\/[^:@\s]{1,200}:[^@\s]{1,200}@/gi,
   },
-  // JWT — only when appearing as an assignment value or after a colon (reduces false positives on arbitrary base64)
+  // JWT — lookbehind matches only the token itself (not the prefix), preventing
+  // surrounding code like `const token = "jwt"` from being corrupted by redaction.
   {
     type: 'jwt',
-    re: /(?:(?:Authorization|Bearer|token|jwt)\s*[:=]\s*|["'])(eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)/gi,
+    re: /(?<=(?:(?:Authorization|Bearer|token|jwt)\s*[:=]\s*|["']))(eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)/gi,
   },
   // Generic high-confidence key=value credential patterns (env var style).
   // Runs last so more specific patterns (google_api_key, github_token, etc.) take precedence.
