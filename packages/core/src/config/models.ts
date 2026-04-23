@@ -461,3 +461,50 @@ export function isActiveModel(
     );
   }
 }
+
+/**
+ * Checks if a model name is a known Gemini model or alias.
+ *
+ * @param model The model name or alias to check.
+ * @returns True if the model is known.
+ */
+export function isKnownModel(model: string): boolean {
+  if (VALID_GEMINI_MODELS.has(model)) return true;
+  if (isAutoModel(model)) return true;
+  if (
+    model === GEMINI_MODEL_ALIAS_PRO ||
+    model === GEMINI_MODEL_ALIAS_FLASH ||
+    model === GEMINI_MODEL_ALIAS_FLASH_LITE
+  ) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Validates a model name or alias.
+ *
+ * @param model The model name or alias to validate.
+ * @param customModelNames Optional set of custom model names or aliases to allow.
+ * @throws Error if the model name is invalid.
+ */
+export function validateModelName(
+  model: string | undefined,
+  customModelNames?: Set<string>,
+): void {
+  if (!model) return;
+
+  if (isKnownModel(model)) return;
+  if (customModelNames?.has(model)) return;
+
+  // If it starts with 'gemini-' but isn't known, it's likely a typo.
+  if (model.startsWith('gemini-')) {
+    const knownModels = Array.from(VALID_GEMINI_MODELS).join(', ');
+    throw new Error(
+      `Invalid model name: "${model}". Please check for typos. ` +
+        `Supported models include: ${knownModels}, or aliases like 'pro', 'flash', 'auto'.`,
+    );
+  }
+
+  // Custom models (non-gemini) are allowed without validation for now.
+}

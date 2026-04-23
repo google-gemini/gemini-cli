@@ -129,7 +129,12 @@ function isValidContent(content: Content): boolean {
     if (part === undefined || Object.keys(part).length === 0) {
       return false;
     }
-    if (!part.thought && part.text !== undefined && part.text === '') {
+    if (
+      !part.thought &&
+      !part.thoughtSignature &&
+      part.text !== undefined &&
+      part.text === ''
+    ) {
       return false;
     }
   }
@@ -906,9 +911,7 @@ export class GeminiChat {
             hasToolCall = true;
           }
 
-          modelResponseParts.push(
-            ...content.parts.filter((part) => !part.thought),
-          );
+          modelResponseParts.push(...content.parts);
         }
       }
 
@@ -956,6 +959,9 @@ export class GeminiChat {
         isValidNonThoughtTextPart(part)
       ) {
         lastPart.text += part.text;
+        if (part.thoughtSignature) {
+          lastPart.thoughtSignature = part.thoughtSignature;
+        }
       } else {
         consolidatedParts.push(part);
       }
