@@ -306,6 +306,7 @@ describe('gemini.tsx main function cleanup', () => {
       getMessageBus: () => ({ subscribe: vi.fn() }),
       getEnableHooks: vi.fn(() => true),
       getHookSystem: vi.fn(() => undefined),
+      getExperimentalGemma: vi.fn(() => false),
       initialize: vi.fn(),
       storage: { initialize: vi.fn().mockResolvedValue(undefined) },
       getContentGeneratorConfig: vi.fn(),

@@ -3645,6 +3645,47 @@ describe('Config JIT Initialization', () => {
       expect(config.isAutoMemoryEnabled()).toBe(true);
     });
 
+    it('should return true when experimentalGemma is true', () => {
+      const params: ConfigParameters = {
+        sessionId: 'test-session',
+        targetDir: '/tmp/test',
+        debugMode: false,
+        model: 'test-model',
+        cwd: '/tmp/test',
+        experimentalGemma: true,
+      };
+
+      config = new Config(params);
+      expect(config.getExperimentalGemma()).toBe(true);
+    });
+
+    it('should return false when experimentalGemma is false', () => {
+      const params: ConfigParameters = {
+        sessionId: 'test-session',
+        targetDir: '/tmp/test',
+        debugMode: false,
+        model: 'test-model',
+        cwd: '/tmp/test',
+        experimentalGemma: false,
+      };
+
+      config = new Config(params);
+      expect(config.getExperimentalGemma()).toBe(false);
+    });
+
+    it('should return false when experimentalGemma is not provided', () => {
+      const params: ConfigParameters = {
+        sessionId: 'test-session',
+        targetDir: '/tmp/test',
+        debugMode: false,
+        model: 'test-model',
+        cwd: '/tmp/test',
+      };
+
+      config = new Config(params);
+      expect(config.getExperimentalGemma()).toBe(false);
+    });
+
     it('should be independent of experimentalMemoryV2', () => {
       const params: ConfigParameters = {
         sessionId: 'test-session',
