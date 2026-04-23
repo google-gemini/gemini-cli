@@ -188,6 +188,12 @@ function parseToolResponses(
           observation: obsTokens,
         },
       };
+
+      // eslint-disable-next-line no-console
+      console.error(
+        `[CM_DEBUG] Mapping Tool Execution: name='${step.toolName}', matchingCallId='${matchingCall?.functionCall?.id}', args=${JSON.stringify(step.intent)}`,
+      );
+
       currentEpisode.concreteNodes = [
         ...(currentEpisode.concreteNodes || []),
         step,
