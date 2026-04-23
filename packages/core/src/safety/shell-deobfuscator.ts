@@ -27,34 +27,46 @@ export interface DeobfuscationResult {
 
 /**
  * Unicode codepoints with no visible representation and no legitimate use in shell commands.
- * Written as explicit \uXXXX escapes so the regex survives editor/git normalization intact:
- *   U+200B zero-width space, U+200C ZWNJ, U+200D ZWJ,
- *   U+202A–U+202E directional formatting (incl. RTL override U+202E),
- *   U+2060 word joiner, U+FEFF BOM.
+ * U+200B zero-width space, U+200C ZWNJ, U+200D ZWJ,
+ * U+202A–U+202E directional formatting (incl. RTL override U+202E),
+ * U+2060 word joiner, U+FEFF BOM.
  */
-const INVISIBLE_UNICODE_RE = /[​‌‍‪‫‬‭‮⁠﻿]/;
+const INVISIBLE_UNICODE_RE =
+  /[​‌‍‪‫‬‭‮⁠﻿]/;
+
+const INVISIBLE_UNICODE_GLOBAL_RE =
+  /[​‌‍‪‫‬‭‮⁠﻿]/g;
 
 /**
- * Base64 subshell patterns:
+ * Base64 subshell patterns including quoted payloads and macOS -D flag:
  *   $(echo <b64> | base64 -d)
- *   $(echo <b64> | base64 --decode)
- *   $(printf '%s' <b64> | base64 -d)
+ *   $(echo "<b64>" | base64 --decode)
+ *   $(printf '%s' <b64> | base64 -D)
  *   $(base64 -d <<< <b64>)
- *   $(base64 --decode <<< <b64>)
  */
 const BASE64_SUBSHELL_RE =
-  /\$\(\s*(?:(?:echo|printf\s+['"]?%s['"]?)\s+([A-Za-z0-9+/=]{8,})\s*\|\s*base64\s+(?:-d|--decode)|base64\s+(?:-d|--decode)\s*<<<\s*([A-Za-z0-9+/=]{8,}))\s*\)/g;
+  /\$\(\s*(?:(?:echo|printf\s+['"]?%s['"]?)\s+['"]?([A-Za-z0-9+/=]{8,})['"]?\s*\|\s*base64\s+(?:-d|-D|--decode)|base64\s+(?:-d|-D|--decode)\s*<<<\s*['"]?([A-Za-z0-9+/=]{8,})['"]?)\s*\)/g;
 
 /** Hex escape: $'\xNN\xNN...' */
 const HEX_ESCAPE_RE = /\$'((?:\\x[0-9a-fA-F]{2})+)'/g;
 
-/** Simple variable indirection: A=value; $A or A=value && $A */
-const VAR_ASSIGN_RE = /\b([A-Za-z_][A-Za-z0-9_]*)=([^\s;&|]+)/g;
+/**
+ * Variable assignment: handles unquoted, single-quoted, and double-quoted values.
+ * Groups: 1=name, 2=single-quoted value, 3=double-quoted value, 4=unquoted value.
+ * Uses a lookbehind to avoid matching VAR=val inside larger tokens like `FOO=BAR=baz`.
+ */
+const VAR_ASSIGN_RE =
+  /(?<![=\w])([A-Za-z_][A-Za-z0-9_]*)=(?:'([^']*)'|"([^"]*)"|([^'"\s;&|$][^\s;&|]*))/g;
+
+/** Whitespace padding: 20+ consecutive whitespace chars anywhere in the command. */
+const WHITESPACE_PADDING_RE = /\s{20,}/;
+const WHITESPACE_PADDING_GLOBAL_RE = /\s{20,}/g;
+
+const MAX_DECODE_ITERATIONS = 5;
 
 function tryDecodeBase64(b64: string): string | null {
   try {
     const decoded = Buffer.from(b64, 'base64').toString('utf8');
-    // Only treat as decoded if the result is valid printable text
     if (/^[\x20-\x7E\t\n\r]+$/.test(decoded) && decoded.trim().length > 0) {
       return decoded.trim();
     }
@@ -76,102 +88,126 @@ function substituteVariables(
 ): string {
   let result = command;
   for (const [name, value] of vars) {
-    result = result.replace(new RegExp(`\\$${name}\\b`, 'g'), value);
+    // Escape name for use in regex; use function replacement to prevent
+    // special replacement patterns (e.g. $& $1) from being interpreted.
+    result = result.replace(
+      new RegExp(`\\$${name}\\b`, 'g'),
+      () => value,
+    );
   }
   return result;
+}
+
+function applyDenyCheck(
+  decoded: string,
+  findings: DeobfuscationFinding[],
+  seenTypes: Set<DeobfuscationFindingType>,
+): string {
+  if (
+    !seenTypes.has('unicode_invisible') &&
+    INVISIBLE_UNICODE_RE.test(decoded)
+  ) {
+    const cleaned = decoded.replace(INVISIBLE_UNICODE_GLOBAL_RE, '');
+    findings.push({ type: 'unicode_invisible', severity: 'deny', decoded: cleaned });
+    seenTypes.add('unicode_invisible');
+    decoded = cleaned;
+  }
+  if (
+    !seenTypes.has('whitespace_padding') &&
+    WHITESPACE_PADDING_RE.test(decoded)
+  ) {
+    const normalized = decoded.replace(WHITESPACE_PADDING_GLOBAL_RE, ' ');
+    findings.push({ type: 'whitespace_padding', severity: 'deny', decoded: normalized });
+    seenTypes.add('whitespace_padding');
+    decoded = normalized;
+  }
+  return decoded;
 }
 
 /**
  * Deobfuscates a shell command string, detecting and decoding known obfuscation techniques.
  * Pure string processing — no shell execution, no LLM, no network.
+ *
+ * Performs iterative decoding (up to MAX_DECODE_ITERATIONS passes) to handle
+ * layered obfuscation, and re-checks deny conditions after decoding so that
+ * invisible Unicode or whitespace padding hidden inside encoded payloads is caught.
  */
 export function deobfuscateCommand(raw: string): DeobfuscationResult {
   const findings: DeobfuscationFinding[] = [];
+  const seenTypes = new Set<DeobfuscationFindingType>();
   let decoded = raw;
 
-  // 1. Unicode invisible characters — deny immediately
-  if (INVISIBLE_UNICODE_RE.test(raw)) {
-    const cleaned = raw.replace(
-      new RegExp(INVISIBLE_UNICODE_RE.source, 'g'),
-      '',
-    );
-    findings.push({
-      type: 'unicode_invisible',
-      severity: 'deny',
-      decoded: cleaned,
-    });
-    decoded = cleaned;
-  }
+  // 1. Deny checks on raw input — catch obvious obfuscation before decoding
+  decoded = applyDenyCheck(decoded, findings, seenTypes);
 
-  // 2. Whitespace padding — deny
-  // Detect meaningful content after >20 spaces before a separator
-  const paddingMatch = raw.match(/\S+\s{20,}([;&|]{1,2})\s*\S/);
-  if (paddingMatch) {
-    const normalized = raw.replace(/\s{20,}([;&|]{1,2})/g, ' $1');
-    findings.push({
-      type: 'whitespace_padding',
-      severity: 'deny',
-      decoded: normalized,
-    });
-    decoded = normalized;
-  }
+  // 2. Iterative decoding: hex → base64 → variable substitution, until stable
+  for (let iter = 0; iter < MAX_DECODE_ITERATIONS; iter++) {
+    const prev = decoded;
 
-  // 3. Hex escape sequences — warn
-  const hexMatches = [...decoded.matchAll(HEX_ESCAPE_RE)];
-  if (hexMatches.length > 0) {
-    let hexDecoded = decoded;
-    for (const m of hexMatches) {
-      const resolved = resolveHexEscapes(m[1]!);
-      hexDecoded = hexDecoded.replace(m[0], resolved);
-    }
-    findings.push({
-      type: 'hex_escape',
-      severity: 'warn',
-      decoded: hexDecoded,
-    });
-    decoded = hexDecoded;
-  }
-
-  // 4. Base64-encoded subshells — warn (recurse once into decoded content)
-  const base64Matches = [...decoded.matchAll(BASE64_SUBSHELL_RE)];
-  if (base64Matches.length > 0) {
-    let b64Decoded = decoded;
-    for (const m of base64Matches) {
-      const b64 = (m[1] ?? m[2])!;
-      const plain = tryDecodeBase64(b64);
-      if (plain !== null) {
-        b64Decoded = b64Decoded.replace(m[0], plain);
+    // Hex escape sequences
+    const hexMatches = [...decoded.matchAll(HEX_ESCAPE_RE)];
+    if (hexMatches.length > 0) {
+      let hexDecoded = decoded;
+      for (const m of hexMatches) {
+        const resolved = resolveHexEscapes(m[1]!);
+        hexDecoded = hexDecoded.replace(m[0], () => resolved);
+      }
+      if (hexDecoded !== decoded) {
+        if (!seenTypes.has('hex_escape')) {
+          findings.push({ type: 'hex_escape', severity: 'warn', decoded: hexDecoded });
+          seenTypes.add('hex_escape');
+        }
+        decoded = hexDecoded;
       }
     }
-    if (b64Decoded !== decoded) {
-      findings.push({
-        type: 'base64_subshell',
-        severity: 'warn',
-        decoded: b64Decoded,
-      });
-      decoded = b64Decoded;
+
+    // Base64-encoded subshells
+    const base64Matches = [...decoded.matchAll(BASE64_SUBSHELL_RE)];
+    if (base64Matches.length > 0) {
+      let b64Decoded = decoded;
+      for (const m of base64Matches) {
+        const b64 = (m[1] ?? m[2])!;
+        const plain = tryDecodeBase64(b64);
+        if (plain !== null) {
+          b64Decoded = b64Decoded.replace(m[0], () => plain);
+        }
+      }
+      if (b64Decoded !== decoded) {
+        if (!seenTypes.has('base64_subshell')) {
+          findings.push({ type: 'base64_subshell', severity: 'warn', decoded: b64Decoded });
+          seenTypes.add('base64_subshell');
+        }
+        decoded = b64Decoded;
+      }
     }
+
+    // Variable indirection (single-level substitution)
+    const varMap = new Map<string, string>();
+    let varMatch: RegExpExecArray | null;
+    VAR_ASSIGN_RE.lastIndex = 0;
+    while ((varMatch = VAR_ASSIGN_RE.exec(decoded)) !== null) {
+      const value = varMatch[2] ?? varMatch[3] ?? varMatch[4];
+      if (value !== undefined) {
+        varMap.set(varMatch[1]!, value);
+      }
+    }
+    if (varMap.size > 0) {
+      const varSubstituted = substituteVariables(decoded, varMap);
+      if (varSubstituted !== decoded) {
+        if (!seenTypes.has('variable_indirection')) {
+          findings.push({ type: 'variable_indirection', severity: 'warn', decoded: varSubstituted });
+          seenTypes.add('variable_indirection');
+        }
+        decoded = varSubstituted;
+      }
+    }
+
+    if (decoded === prev) break; // stable — no further decoding possible
   }
 
-  // 5. Variable indirection — warn (single-level substitution)
-  const varMap = new Map<string, string>();
-  let varMatch: RegExpExecArray | null;
-  VAR_ASSIGN_RE.lastIndex = 0;
-  while ((varMatch = VAR_ASSIGN_RE.exec(decoded)) !== null) {
-    varMap.set(varMatch[1]!, varMatch[2]!);
-  }
-
-  if (varMap.size > 0) {
-    const varSubstituted = substituteVariables(decoded, varMap);
-    if (varSubstituted !== decoded) {
-      findings.push({
-        type: 'variable_indirection',
-        severity: 'warn',
-        decoded: varSubstituted,
-      });
-      decoded = varSubstituted;
-    }
-  }
+  // 3. Re-run deny checks on the fully decoded output — catches deny patterns
+  //    that were hidden inside encoded payloads and only revealed after decoding.
+  decoded = applyDenyCheck(decoded, findings, seenTypes);
 
   return { original: raw, decoded, findings };
 }
