@@ -300,6 +300,66 @@ describe('settings-validation', () => {
     });
   });
 
+  describe('env variable string coercion', () => {
+    it('should coerce string "true" to boolean true', () => {
+      const settings = {
+        ui: { autoThemeSwitching: 'true' as unknown as boolean },
+      };
+      const result = validateSettings(settings);
+      expect(result.success).toBe(true);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      expect((result.data as any).ui.autoThemeSwitching).toBe(true);
+    });
+
+    it('should coerce string "false" to boolean false', () => {
+      const settings = {
+        ui: { autoThemeSwitching: 'false' as unknown as boolean },
+      };
+      const result = validateSettings(settings);
+      expect(result.success).toBe(true);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      expect((result.data as any).ui.autoThemeSwitching).toBe(false);
+    });
+
+    it('should handle case-insensitive "TRUE"/"FALSE"', () => {
+      const settings = {
+        ui: { autoThemeSwitching: 'TRUE' as unknown as boolean },
+      };
+      const result = validateSettings(settings);
+      expect(result.success).toBe(true);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      expect((result.data as any).ui.autoThemeSwitching).toBe(true);
+    });
+
+    it('should trim whitespace around boolean strings', () => {
+      const settings = {
+        ui: { autoThemeSwitching: '  true  ' as unknown as boolean },
+      };
+      const result = validateSettings(settings);
+      expect(result.success).toBe(true);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      expect((result.data as any).ui.autoThemeSwitching).toBe(true);
+    });
+
+    it('should still reject non-boolean strings like "yes"', () => {
+      const settings = {
+        ui: { autoThemeSwitching: 'yes' as unknown as boolean },
+      };
+      const result = validateSettings(settings);
+      expect(result.success).toBe(false);
+    });
+
+    it('should coerce numeric strings to numbers', () => {
+      const settings = {
+        model: { maxSessionTurns: '50' as unknown as number },
+      };
+      const result = validateSettings(settings);
+      expect(result.success).toBe(true);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      expect((result.data as any).model.maxSessionTurns).toBe(50);
+    });
+  });
+
   describe('formatValidationError', () => {
     it('should format error with file path and helpful message for model.name', () => {
       const invalidSettings = {
