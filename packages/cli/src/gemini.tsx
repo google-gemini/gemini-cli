@@ -788,18 +788,14 @@ export function initializeOutputListenersAndFlush() {
         if (payload.type === 'error' || payload.type === 'warn') {
           writeToStderr(payload.content + '\n');
         } else {
-          writeToStdout(payload.content + '\n');
+          writeToStderr(payload.content + '\n');
         }
       });
     }
 
     if (coreEvents.listenerCount(CoreEvent.UserFeedback) === 0) {
       coreEvents.on(CoreEvent.UserFeedback, (payload: UserFeedbackPayload) => {
-        if (payload.severity === 'error' || payload.severity === 'warning') {
-          writeToStderr(payload.message);
-        } else {
-          writeToStdout(payload.message);
-        }
+        writeToStderr(payload.message + '\n');
       });
     }
   }
