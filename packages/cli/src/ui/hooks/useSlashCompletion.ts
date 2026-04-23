@@ -313,7 +313,56 @@ function useCommandSuggestions(
             return 0; // Maintain FZF score order for other matches
           });
 
-          const finalSuggestions = sortedSuggestions.map((cmd) => {
+          const isTopLevelChatOrResumeContext = !!(
+            leafCommand &&
+            (leafCommand.name === 'chat' || leafCommand.name === 'resume') &&
+            (commandPathParts.length === 0 ||
+              (commandPathParts.length === 1 &&
+                matchesCommand(leafCommand, commandPathParts[0])))
+          );
+
+          const resultSuggestions: Suggestion[] = [];
+
+          if (isTopLevelChatOrResumeContext && leafCommand) {
+            const canonicalParentName = leafCommand.name;
+            const autoSectionSuggestion: Suggestion = {
+              label: 'list',
+              value: 'list',
+              insertValue: canonicalParentName,
+              description: 'Browse auto-saved chats',
+              commandKind: CommandKind.BUILT_IN,
+              sectionTitle: 'auto',
+              submitValue: `/${canonicalParentName}`,
+            };
+            resultSuggestions.push(autoSectionSuggestion);
+          }
+
+          // If we have a leaf command with an action and a trailing space,
+          // add it to the suggestions list so it is still accessible.
+          if (
+            parserResult.hasTrailingSpace &&
+            leafCommand &&
+            leafCommand.action &&
+            !isArgumentCompletion
+          ) {
+            const selfSuggestion: Suggestion = {
+              label: leafCommand.name,
+              value: leafCommand.name,
+              description: leafCommand.description,
+              commandKind: leafCommand.kind,
+              sectionTitle: 'command',
+              // Use insertValue to ensure that if selected, we don't add another space
+              insertValue: leafCommand.name,
+            };
+            resultSuggestions.push(selfSuggestion);
+          }
+
+          sortedSuggestions.forEach((cmd) => {
+            // Avoid duplicate 'list' for chat/resume context
+            if (isTopLevelChatOrResumeContext && cmd.name === 'list') {
+              return;
+            }
+
             const suggestion: Suggestion = {
               label: cmd.name,
               value: cmd.name,
@@ -325,33 +374,10 @@ function useCommandSuggestions(
               suggestion.sectionTitle = cmd.suggestionGroup;
             }
 
-            return suggestion;
+            resultSuggestions.push(suggestion);
           });
 
-          const isTopLevelChatOrResumeContext = !!(
-            leafCommand &&
-            (leafCommand.name === 'chat' || leafCommand.name === 'resume') &&
-            (commandPathParts.length === 0 ||
-              (commandPathParts.length === 1 &&
-                matchesCommand(leafCommand, commandPathParts[0])))
-          );
-
-          if (isTopLevelChatOrResumeContext) {
-            const canonicalParentName = leafCommand.name;
-            const autoSectionSuggestion: Suggestion = {
-              label: 'list',
-              value: 'list',
-              insertValue: canonicalParentName,
-              description: 'Browse auto-saved chats',
-              commandKind: CommandKind.BUILT_IN,
-              sectionTitle: 'auto',
-              submitValue: `/${canonicalParentName}`,
-            };
-            setSuggestions([autoSectionSuggestion, ...finalSuggestions]);
-            return;
-          }
-
-          setSuggestions(finalSuggestions);
+          setSuggestions(resultSuggestions);
         }
       };
 
@@ -448,7 +474,15 @@ function getCommandFromSuggestion(
   suggestion: Suggestion,
   parserResult: CommandParserResult,
 ): SlashCommand | undefined {
-  const { currentLevel } = parserResult;
+  const { currentLevel, leafCommand, hasTrailingSpace } = parserResult;
+
+  if (
+    hasTrailingSpace &&
+    leafCommand &&
+    suggestion.value === leafCommand.name
+  ) {
+    return leafCommand;
+  }
 
   if (!currentLevel) {
     return undefined;
@@ -456,7 +490,8 @@ function getCommandFromSuggestion(
 
   // suggestion.value is just the command name at the current level (e.g., "list")
   // Find it in the current level's commands
-  const command = currentLevel.find((cmd) =>
+  const command = currentLevel.find(
+    (cmd) => matchesCommand(cmd, suggestion.value),
     matchesCommand(cmd, suggestion.value),
   );
 

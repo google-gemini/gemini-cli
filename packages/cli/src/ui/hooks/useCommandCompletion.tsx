@@ -440,13 +440,10 @@ export function useCommandCompletion({
 
       let shouldAddSpace = true;
       if (completionMode === CompletionMode.SLASH) {
-        const command =
-          slashCompletionRange.getCommandFromSuggestion(suggestion);
-        // Don't add a space if the command has an action (can be executed)
-        // and doesn't have a completion function (doesn't REQUIRE more arguments)
-        const isExecutableCommand = !!(command && command.action);
-        const requiresArguments = !!(command && command.completion);
-        shouldAddSpace = !isExecutableCommand || requiresArguments;
+        // ALWAYS add a space when autocompleting a slash command via Tab.
+        // This ensures subcommands are immediately disclosed.
+        // The base command will still be accessible at the top of the suggestions list.
+        shouldAddSpace = true;
       }
 
       if (
