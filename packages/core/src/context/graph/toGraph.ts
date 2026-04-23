@@ -43,16 +43,18 @@ export class ContextGraphBuilder {
   private episodes: Episode[] = [];
   private currentEpisode: Partial<Episode> | null = null;
   private pendingCallParts: Map<string, Part> = new Map();
+  private pendingCallPartsWithoutId: Part[] = [];
 
   constructor(
     private readonly tokenCalculator: ContextTokenCalculator,
-    private readonly nodeIdentityMap: WeakMap<object, string>,
+    private readonly nodeIdentityMap: WeakMap<object, string> = new WeakMap(),
   ) {}
 
   clear() {
     this.episodes = [];
     this.currentEpisode = null;
     this.pendingCallParts.clear();
+    this.pendingCallPartsWithoutId = [];
   }
 
   processHistory(history: readonly Content[]) {
@@ -77,6 +79,7 @@ export class ContextGraphBuilder {
             msg,
             this.currentEpisode,
             this.pendingCallParts,
+            this.pendingCallPartsWithoutId,
             this.tokenCalculator,
             this.nodeIdentityMap,
           );
@@ -91,6 +94,7 @@ export class ContextGraphBuilder {
           msg,
           this.currentEpisode,
           this.pendingCallParts,
+          this.pendingCallPartsWithoutId,
           this.nodeIdentityMap,
         );
       }
@@ -133,6 +137,7 @@ function parseToolResponses(
   msg: Content,
   currentEpisode: Partial<Episode> | null,
   pendingCallParts: Map<string, Part>,
+  pendingCallPartsWithoutId: Part[],
   tokenCalculator: ContextTokenCalculator,
   nodeIdentityMap: WeakMap<object, string>,
 ): Partial<Episode> {
@@ -148,7 +153,19 @@ function parseToolResponses(
   for (const part of parts) {
     if (part.functionResponse) {
       const callId = part.functionResponse.id || '';
-      const matchingCall = pendingCallParts.get(callId);
+      let matchingCall = pendingCallParts.get(callId);
+
+      if (!matchingCall && pendingCallPartsWithoutId.length > 0) {
+        const idx = pendingCallPartsWithoutId.findIndex(
+          (p) => p.functionCall?.name === part.functionResponse!.name,
+        );
+        if (idx !== -1) {
+          matchingCall = pendingCallPartsWithoutId[idx];
+          pendingCallPartsWithoutId.splice(idx, 1);
+        } else {
+          matchingCall = pendingCallPartsWithoutId.shift();
+        }
+      }
 
       const intentTokens = matchingCall
         ? tokenCalculator.estimateTokensForParts([matchingCall])
@@ -224,6 +241,7 @@ function parseModelParts(
   msg: Content,
   currentEpisode: Partial<Episode> | null,
   pendingCallParts: Map<string, Part>,
+  pendingCallPartsWithoutId: Part[],
   nodeIdentityMap: WeakMap<object, string>,
 ): Partial<Episode> {
   if (!currentEpisode) {
@@ -238,7 +256,11 @@ function parseModelParts(
   for (const part of parts) {
     if (part.functionCall) {
       const callId = part.functionCall.id || '';
-      if (callId) pendingCallParts.set(callId, part);
+      if (callId) {
+        pendingCallParts.set(callId, part);
+      } else {
+        pendingCallPartsWithoutId.push(part);
+      }
     } else if (part.text) {
       const thought: AgentThought = {
         id: getStableId(part, nodeIdentityMap),
