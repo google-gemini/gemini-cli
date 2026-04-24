@@ -3471,6 +3471,8 @@ describe('useGeminiStream', () => {
 
       // Verify state is reset to idle
       expect(result.current.streamingState).toBe(StreamingState.Idle);
+      // Verify thought is cleared to prevent UI ghosting
+      expect(result.current.thought).toBeNull();
     });
 
     it('should reset thought to null when there is an error', async () => {
@@ -3533,6 +3535,52 @@ describe('useGeminiStream', () => {
         'gemini-2.5-pro',
         'gemini-2.5-flash',
       );
+      // Verify thought is cleared to prevent UI ghosting
+      expect(result.current.thought).toBeNull();
+    });
+
+    it('should clear thought when stream throws an exception', async () => {
+      // When the stream generator throws (not yields an error event),
+      // the finally block in submitQuery should still clear thought state.
+      mockSendMessageStream.mockReturnValue(
+        (async function* () {
+          yield {
+            type: ServerGeminiEventType.Thought,
+            value: { subject: 'Thinking...', description: 'Processing' },
+          };
+          throw new Error('Unexpected stream failure');
+        })(),
+      );
+
+      const { result } = await renderHookWithProviders(() =>
+        useGeminiStream(
+          new MockedGeminiClientClass(mockConfig),
+          [],
+          mockAddItem,
+          mockConfig,
+          mockLoadedSettings,
+          mockOnDebugMessage,
+          mockHandleSlashCommand,
+          false,
+          () => 'vscode' as EditorType,
+          () => {},
+          () => Promise.resolve(),
+          false,
+          () => {},
+          () => {},
+          () => {},
+          80,
+          24,
+        ),
+      );
+
+      await act(async () => {
+        await result.current.submitQuery('Test query');
+      });
+
+      // Even after an unexpected exception, thought must be cleared
+      expect(result.current.thought).toBeNull();
+      expect(result.current.streamingState).toBe(StreamingState.Idle);
     });
 
     it('should update lastOutputTime on Gemini thought and content events', async () => {
