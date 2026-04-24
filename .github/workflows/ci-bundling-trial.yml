@@ -417,5 +417,6 @@ jobs:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
           KEEP_OUTPUT: 'true'
           VERBOSE: 'true'
+          USE_PUBLISHED_PACKAGES: 'true'
         run: 'npm run test:integration:sandbox:none'
         shell: 'pwsh'

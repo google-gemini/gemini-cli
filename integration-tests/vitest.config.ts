@@ -14,9 +14,12 @@ export default defineConfig({
     environment: 'node',
     setupFiles: ['./globalSetup.ts'],
     globalSetup: ['./globalSetup.ts'],
-    alias: {
-      '@google/gemini-cli-core': '@google-gemini/gemini-cli-core',
-    },
+    alias:
+      process.env.USE_PUBLISHED_PACKAGES === 'true'
+        ? {
+            '@google/gemini-cli-core': '@google-gemini/gemini-cli-core',
+          }
+        : {},
     reporters: ['default'],
     include: ['**/*.test.ts'],
     retry: 2,
