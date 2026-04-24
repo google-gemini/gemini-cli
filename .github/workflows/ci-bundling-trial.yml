@@ -10,6 +10,31 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  build_bundle:
+    name: 'Build Bundle'
+    runs-on: 'gemini-cli-ubuntu-16-core'
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
+
+      - name: 'Set up Node.js'
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: 'Install dependencies'
+        run: 'npm ci'
+
+      - name: 'Build Bundle'
+        run: 'npm run bundle'
+
+      - name: 'Upload Bundle'
+        uses: 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02'
+        with:
+          name: 'gemini-bundle'
+          path: 'bundle/'
+
   test_ui_messages:
     name: 'cli:ui/messages'
     runs-on: 'gemini-cli-ubuntu-16-core'
@@ -275,10 +300,17 @@ jobs:
 
   test_e2e:
     name: 'e2e:linux'
+    needs: build_bundle
     runs-on: 'gemini-cli-ubuntu-16-core'
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
+
+      - name: 'Download Bundle'
+        uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806'
+        with:
+          name: 'gemini-bundle'
+          path: 'bundle'
 
       - name: 'Set up Node.js'
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
@@ -288,12 +320,6 @@ jobs:
 
       - name: 'Install dependencies'
         run: 'npm ci'
-
-      - name: 'Build project'
-        run: 'npm run build'
-
-      - name: 'Build Bundle'
-        run: 'npm run bundle'
 
       - name: 'Run Integration Tests'
         env:
@@ -305,10 +331,17 @@ jobs:
 
   test_e2e_mac:
     name: 'e2e:mac'
+    needs: build_bundle
     runs-on: 'macos-latest'
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
+
+      - name: 'Download Bundle'
+        uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806'
+        with:
+          name: 'gemini-bundle'
+          path: 'bundle'
 
       - name: 'Set up Node.js'
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
@@ -318,12 +351,6 @@ jobs:
 
       - name: 'Install dependencies'
         run: 'npm ci'
-
-      - name: 'Build project'
-        run: 'npm run build'
-
-      - name: 'Build Bundle'
-        run: 'npm run bundle'
 
       - name: 'Fix rollup optional dependencies on macOS'
         run: 'npm cache clean --force'
@@ -336,3 +363,35 @@ jobs:
           VERBOSE: 'true'
         run: 'npm run test:integration:sandbox:none'
         shell: 'bash'
+
+  test_e2e_windows:
+    name: 'e2e:windows'
+    needs: build_bundle
+    runs-on: 'gemini-cli-windows-16-core'
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
+
+      - name: 'Download Bundle'
+        uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806'
+        with:
+          name: 'gemini-bundle'
+          path: 'bundle'
+
+      - name: 'Set up Node.js'
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: 'Install targeted test dependencies'
+        run: 'npm install vitest node-pty --no-save'
+        shell: 'pwsh'
+
+      - name: 'Run Integration Tests'
+        env:
+          GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+          KEEP_OUTPUT: 'true'
+          VERBOSE: 'true'
+        run: 'npm run test:integration:sandbox:none'
+        shell: 'pwsh'
