@@ -32,13 +32,17 @@ jobs:
       - name: 'Build project'
         run: 'npm run build'
 
+      - name: 'Bundle'
+        run: 'npm run bundle'
+        shell: 'bash'
+
       - name: 'Set version with SHA'
         run: |
           npm version 0.0.0-${{ github.sha }} --no-git-tag-version --workspaces
         shell: 'bash'
 
-      - name: 'Prepare Packages with Scope'
-        run: 'node scripts/prepare-package.js --scope=@google-gemini'
+      - name: 'Prepare Packages for Bundled Release'
+        run: 'node scripts/prepare-bundle-package.js'
         shell: 'bash'
 
       - name: 'Configure npm for GitHub Packages'
@@ -433,7 +437,7 @@ jobs:
         shell: 'pwsh'
 
       - name: 'Install dependencies'
-        run: 'npm install @google-gemini/gemini-cli@0.0.0-${{ github.sha }} @google-gemini/gemini-cli-core@0.0.0-${{ github.sha }} vitest node-pty --no-save'
+        run: 'npm install @google-gemini/gemini-cli@0.0.0-${{ github.sha }} vitest node-pty --no-save'
         shell: 'pwsh'
 
       - name: 'Run Integration Tests'
