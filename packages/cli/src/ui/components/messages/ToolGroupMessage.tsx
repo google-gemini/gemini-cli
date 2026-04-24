@@ -63,7 +63,8 @@ export const isCompactTool = (
   isCompactModeEnabled: boolean,
 ): boolean => {
   const hasCompactOutputSupport =
-    COMPACT_OUTPUT_ALLOWLIST.has(tool.name) || isMcpToolName(tool.name);
+    (COMPACT_OUTPUT_ALLOWLIST.has(tool.name) || isMcpToolName(tool.name)) &&
+    !(mapCoreStatusToDisplayStatus(tool.status) === ToolCallStatus.Executing && tool.progress !== undefined);
   const displayStatus = mapCoreStatusToDisplayStatus(tool.status);
   return (
     isCompactModeEnabled &&
