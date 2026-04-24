@@ -21,6 +21,7 @@ import { spawn, execSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readFileSync } from 'node:fs';
+import { scrubCiEnv } from './scrub-ci-env.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, '..');
@@ -65,6 +66,20 @@ const env = {
   CLI_VERSION: pkg.version,
   DEV: 'true',
 };
+
+// Scrub CI-related env vars so that `ink` (via `is-in-ci`) does not switch to
+// non-interactive mode.  The bundled build already patches `is-in-ci` at
+// esbuild time (see esbuild.config.js), but `npm run start` bypasses esbuild,
+// so we need to remove the vars from the child process environment.
+// See https://github.com/google-gemini/gemini-cli/issues/22452
+const scrubbed = scrubCiEnv(env);
+if (scrubbed.length > 0) {
+  process.stderr.write(
+    `[gemini] Removed CI env var(s) to enable interactive mode: ${scrubbed.join(', ')}\n` +
+      `[gemini] This only affects the dev server (npm run start). ` +
+      `Set the var to "false" or "0" to suppress this warning.\n`,
+  );
+}
 
 if (isInDebugMode) {
   // If this is not set, the debugger will pause on the outer process rather
