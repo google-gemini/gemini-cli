@@ -50,10 +50,6 @@ jobs:
           if [ -n "$LAST_RUN_ID" ]; then
             echo "Found previous successful run: $LAST_RUN_ID"
             
-            # Download metrics artifacts
-            gh run download "$LAST_RUN_ID" -n metrics-before -D tools/gemini-cli-bot/history/ || echo "metrics-before not found"
-            gh run download "$LAST_RUN_ID" -n metrics-timeseries -D tools/gemini-cli-bot/history/ || echo "metrics-timeseries not found"
-            
             # Download brain memory (lessons learned and scripts)
             gh run download "$LAST_RUN_ID" -n lessons-learned -D tools/gemini-cli-bot/ || echo "lessons-learned not found"
             gh run download "$LAST_RUN_ID" -n brain-scripts -D tools/gemini-cli-bot/processes/scripts/ || echo "brain-scripts not found"
