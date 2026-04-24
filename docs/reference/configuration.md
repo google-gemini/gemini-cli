@@ -66,9 +66,11 @@ variables using `$VAR_NAME`, `${VAR_NAME}`, or `${VAR_NAME:-DEFAULT_VALUE}`
 syntax. These variables will be automatically resolved when the settings are
 loaded. For example, if you have an environment variable `MY_API_TOKEN`, you
 could use it in `settings.json` like this: `"apiKey": "$MY_API_TOKEN"`. If you
-want to provide a fallback value, use `${MY_API_TOKEN:-default-token}`.
-Additionally, each extension can have its own `.env` file in its directory,
-which will be loaded automatically.
+want to provide a fallback value, use `${MY_API_TOKEN:-default-token}`. For
+settings whose schema type is boolean, resolved values of `"true"` and `"false"`
+are automatically cast to booleans (case-insensitive). Additionally, each
+extension can have its own `.env` file in its directory, which will be loaded
+automatically.
 
 **Note for Enterprise Users:** For guidance on deploying and managing Gemini CLI
 in a corporate environment, see the
