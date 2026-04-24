@@ -97,6 +97,10 @@ class DiscoveredToolInvocation extends BaseToolInvocation<
     let stdoutByteLength = 0;
     let stderrByteLength = 0;
 
+    const stdoutDecoder = new StringDecoder('utf8');
+    const stderrDecoder = new StringDecoder('utf8');
+    let uiCumulativeOutput = '';
+
     try {
       const child = spawn(finalCommand, finalArgs, {
         env: finalEnv,
@@ -113,10 +117,11 @@ class DiscoveredToolInvocation extends BaseToolInvocation<
             return;
           }
           stdoutByteLength += data.length;
-          const chunk = data.toString();
-          stdout += chunk;
-          if (_updateOutput) {
-            _updateOutput(chunk);
+          const decoded = stdoutDecoder.write(data);
+          stdout += decoded;
+          uiCumulativeOutput += decoded;
+          if (this.canUpdateOutput) {
+            _updateOutput?.(uiCumulativeOutput);
           }
         };
 
@@ -128,10 +133,11 @@ class DiscoveredToolInvocation extends BaseToolInvocation<
             return;
           }
           stderrByteLength += data.length;
-          const chunk = data.toString();
-          stderr += chunk;
-          if (_updateOutput) {
-            _updateOutput(chunk);
+          const decoded = stderrDecoder.write(data);
+          stderr += decoded;
+          uiCumulativeOutput += decoded;
+          if (this.canUpdateOutput) {
+            _updateOutput?.(uiCumulativeOutput);
           }
         };
 
@@ -146,6 +152,10 @@ class DiscoveredToolInvocation extends BaseToolInvocation<
           code = _code;
           signal = _signal;
           cleanup();
+
+          // Flush remaining bytes from decoders
+          stdout += stdoutDecoder.end();
+          stderr += stderrDecoder.end();
 
           if (sizeLimitExceeded) {
             return reject(
