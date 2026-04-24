@@ -137,9 +137,9 @@ HistoryItemDisplay
 │                                                                                                  │
 │ ● 1. Allow once                                                                                  │
 │   2. Allow for this session                                                                      │
-│   3. No, suggest changes (esc)                                                                   │
+│   3. Allow this command for all future sessions ~/.gemini/policies/auto-saved.toml               │
+│   4. No, suggest changes (esc)                                                                   │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
-
 
 
 
