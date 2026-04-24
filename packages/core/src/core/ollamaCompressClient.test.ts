@@ -169,21 +169,24 @@ describe('OllamaCompressClient', () => {
   });
 
   it('should handle timeout correctly', async () => {
-    vi.mocked(fetch).mockImplementation(async (_, init) => new Promise((_, reject) => {
-        if (init?.signal) {
-          init.signal.addEventListener('abort', () => {
-            const err = new Error('This operation was aborted');
-            err.name = 'AbortError';
-            reject(err);
-          });
-        }
-      }));
+    vi.mocked(fetch).mockImplementation(
+      async (_, init) =>
+        new Promise((_, reject) => {
+          if (init?.signal) {
+            init.signal.addEventListener('abort', () => {
+              const err = new Error('This operation was aborted');
+              err.name = 'AbortError';
+              reject(err);
+            });
+          }
+        }),
+    );
 
     vi.useFakeTimers();
     const promise = client.generateContent({ ...defaultOptions, contents: [] });
     void promise.catch(() => {});
 
-    await vi.advanceTimersByTimeAsync(600_001);
+    await vi.advanceTimersByTimeAsync(90_001);
     await expect(promise).rejects.toThrow('This operation was aborted');
     vi.useRealTimers();
   });

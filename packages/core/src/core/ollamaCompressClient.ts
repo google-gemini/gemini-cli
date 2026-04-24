@@ -27,7 +27,7 @@ interface OllamaChatResponse {
 
 // Truncate tool outputs to keep local model context manageable.
 const MAX_CHARS_PER_TOOL_OUTPUT = 800;
-const TIMEOUT_MS = 600_000; // 10 minutes — local inference is slow for large prompts
+const TIMEOUT_MS = 90_000;
 const MAX_RETRIES = 3;
 // 3 chars per token is a conservative estimate; reserve 25% of num_ctx for
 // system prompt and response, leaving 75% for history content.
