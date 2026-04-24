@@ -652,14 +652,8 @@ function* emitKeys(
       name = 'tab';
       alt = escaped;
     } else if (ch === '\b') {
-      // ctrl+h / ctrl+backspace (windows terminals send \x08 for ctrl+backspace)
+      // ctrl+h / backspace
       name = 'backspace';
-      // Windows Terminal sends \b for Ctrl+Backspace (regular backspace is \x7f).
-      // Only set ctrl=true for WT_SESSION (Windows Terminal); cmd.exe and PowerShell
-      // send \b for plain backspace so we must not treat them as Ctrl+Backspace.
-      if (typeof process !== 'undefined' && !!process.env?.['WT_SESSION']) {
-        ctrl = true;
-      }
       alt = escaped;
     } else if (ch === '\x7f') {
       // backspace
