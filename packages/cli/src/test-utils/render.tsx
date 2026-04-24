@@ -552,6 +552,8 @@ const mockUIActions: UIActions = {
   exitPrivacyNotice: vi.fn(),
   closeSettingsDialog: vi.fn(),
   closeModelDialog: vi.fn(),
+  openVoiceModelDialog: vi.fn(),
+  closeVoiceModelDialog: vi.fn(),
   openAgentConfigDialog: vi.fn(),
   closeAgentConfigDialog: vi.fn(),
   openPermissionsDialog: vi.fn(),
@@ -598,6 +600,7 @@ const mockUIActions: UIActions = {
   handleNewAgentsSelect: vi.fn(),
   getPreferredEditor: vi.fn(),
   clearAccountSuspension: vi.fn(),
+  setVoiceModeEnabled: vi.fn(),
 };
 
 import { type TextBuffer } from '../ui/components/shared/text-buffer.js';

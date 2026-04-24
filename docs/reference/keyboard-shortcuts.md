@@ -115,6 +115,7 @@ available combinations.
 | `app.restart`                 | Restart the application.                                                                                                                           | `R`<br />`Shift+R` |
 | `app.suspend`                 | Suspend the CLI and move it to the background.                                                                                                     | `Ctrl+Z`           |
 | `app.showShellUnfocusWarning` | Show warning when trying to move focus away from shell input.                                                                                      | `Tab`              |
+| `app.voiceModePTT`            | Hold to speak in Voice Mode.                                                                                                                       | `Space`            |
 
 #### Background Shell Controls
 
