@@ -150,6 +150,7 @@ export function setupSignalHandlers() {
 
 export function setupTtyCheck(): () => void {
   let intervalId: ReturnType<typeof setInterval> | null = null;
+  let confirmTimeout: ReturnType<typeof setTimeout> | null = null;
   let isCheckingTty = false;
   // TTY loss confirmation delay to avoid false positives from momentary
   // isTTY flickers on Windows terminals (PowerShell, Windows Terminal)
@@ -172,7 +173,8 @@ export function setupTtyCheck(): () => void {
         intervalId = null;
       }
 
-      setTimeout(async () => {
+      confirmTimeout = setTimeout(async () => {
+        confirmTimeout = null;
         if (isShuttingDown) {
           return;
         }
@@ -185,6 +187,7 @@ export function setupTtyCheck(): () => void {
         }
         await gracefulShutdown('TTY loss');
       }, TTY_LOSS_CONFIRM_MS);
+      confirmTimeout.unref();
     }
   };
 
@@ -194,6 +197,10 @@ export function setupTtyCheck(): () => void {
   intervalId.unref();
 
   return () => {
+    if (confirmTimeout) {
+      clearTimeout(confirmTimeout);
+      confirmTimeout = null;
+    }
     if (intervalId) {
       clearInterval(intervalId);
       intervalId = null;
