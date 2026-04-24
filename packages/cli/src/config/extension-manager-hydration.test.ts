@@ -128,6 +128,57 @@ Use key: \${MY_API_KEY}
     expect(extension.skills![0].body).toContain('Use key: secret-123');
   });
 
+  it('should hydrate skill body from a custom skillsDir with extension settings', async () => {
+    const sourceDir = path.join(tempDir, 'source-ext-custom-skill');
+    const extensionName = 'custom-skill-hydration-ext';
+    createExtension({
+      extensionsDir: sourceDir,
+      name: extensionName,
+      version: '1.0.0',
+      skillsDir: 'claude-skills',
+      settings: [
+        {
+          name: 'API Key',
+          description: 'API Key',
+          envVar: 'MY_API_KEY',
+        },
+      ],
+      installMetadata: {
+        type: 'local',
+        source: path.join(sourceDir, extensionName),
+      },
+    });
+    const extensionPath = path.join(sourceDir, extensionName);
+
+    const skillsDir = path.join(extensionPath, 'claude-skills');
+    const skillSubdir = path.join(skillsDir, 'my-skill');
+    fs.mkdirSync(skillSubdir, { recursive: true });
+    fs.writeFileSync(
+      path.join(skillSubdir, 'SKILL.md'),
+      `---
+name: my-skill
+description: test
+---
+Use key: \${MY_API_KEY}
+`,
+    );
+
+    await extensionManager.loadExtensions();
+
+    extensionManager.setRequestSetting(async (setting) => {
+      if (setting.envVar === 'MY_API_KEY') return 'secret-456';
+      return '';
+    });
+
+    const extension = await extensionManager.installOrUpdateExtension({
+      type: 'local',
+      source: extensionPath,
+    });
+
+    expect(extension.skills).toHaveLength(1);
+    expect(extension.skills![0].body).toContain('Use key: secret-456');
+  });
+
   it('should hydrate agent system prompt with extension settings', async () => {
     const sourceDir = path.join(tempDir, 'source-ext-agent');
     const extensionName = 'agent-hydration-ext';
