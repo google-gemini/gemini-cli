@@ -3827,6 +3827,9 @@
             },
             "accent": {
               "type": "string"
+            },
+            "response": {
+              "type": "string"
             }
           }
         },
