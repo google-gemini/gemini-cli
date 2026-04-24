@@ -1,7 +1,6 @@
 # How to contribute
 
-We would love to accept your patches and contributions to this project. This
-document includes:
+Contributions and patches to this project are welcome. This document includes:
 
 - **[Before you begin](#before-you-begin):** Essential steps to take before
   becoming a Gemini CLI contributor.
@@ -12,7 +11,7 @@ document includes:
 - **[Documentation contribution process](#documentation-contribution-process):**
   How to contribute documentation to Gemini CLI.
 
-We're looking forward to seeing your contributions!
+Your contributions are appreciated!
 
 ## Before you begin
 
@@ -42,13 +41,13 @@ This project follows
 The process for contributing code is as follows:
 
 1.  **Find an issue** that you want to work on. If an issue is tagged as
-    `🔒Maintainers only`, this means it is reserved for project maintainers. We
-    will not accept pull requests related to these issues. In the near future,
-    we will explicitly mark issues looking for contributions using the
+    `🔒Maintainers only`, this means it is reserved for project maintainers.
+    Pull requests related to these issues are not accepted. In the near future,
+    issues looking for contributions will be explicitly marked using the
     `help-wanted` label. If you believe an issue is a good candidate for
-    community contribution, please leave a comment on the issue. A maintainer
-    will review it and apply the `help-wanted` label if appropriate. Only
-    maintainers should attempt to add the `help-wanted` label to an issue.
+    community contribution, leave a comment on the issue. A maintainer will
+    review it and apply the `help-wanted` label if appropriate. Only maintainers
+    add the `help-wanted` label to an issue.
 2.  **Fork the repository** and create a new branch.
 3.  **Make your changes** in the `packages/` directory.
 4.  **Ensure all checks pass** by running `npm run preflight`.
@@ -56,22 +55,21 @@ The process for contributing code is as follows:
 
 ### Code reviews
 
-All submissions, including submissions by project members, require review. We
-use [GitHub pull requests](https://docs.github.com/articles/about-pull-requests)
-for this purpose.
+All submissions, including submissions by project members, require review.
+Gemini CLI uses
+[GitHub pull requests](https://docs.github.com/articles/about-pull-requests) for
+this purpose.
 
-To assist with the review process, we provide an automated review tool that
-helps detect common anti-patterns, testing issues, and other best practices that
-are easy to miss.
+To assist with the review process, an automated review tool helps detect common
+anti-patterns, testing issues, and other best practices that are easy to miss.
 
 #### Using the automated review tool
 
 You can run the review tool in two ways:
 
-1.  **Using the helper script (Recommended):** We provide a script that
-    automatically handles checking out the PR into a separate worktree,
-    installing dependencies, building the project, and launching the review
-    tool.
+1.  **Using the helper script (Recommended):** A script automatically handles
+    checking out the PR into a separate worktree, installing dependencies,
+    building the project, and launching the review tool.
 
     ```bash
     ./scripts/review.sh <PR_NUMBER> [model]
@@ -97,7 +95,7 @@ You can run the review tool in two ways:
     /review-frontend <PR_NUMBER>
     ```
 
-Replace `<PR_NUMBER>` with your pull request number. Reviewers should use this
+Replace `<PR_NUMBER>` with your pull request number. Reviewers must use this
 tool to augment, not replace, their manual review process.
 
 ### Self-assigning and unassigning issues
@@ -105,39 +103,39 @@ tool to augment, not replace, their manual review process.
 To assign an issue to yourself, simply add a comment with the text `/assign`. To
 unassign yourself from an issue, add a comment with the text `/unassign`.
 
-The comment must contain only that text and nothing else. These commands will
-assign or unassign the issue as requested, provided the conditions are met
-(e.g., an issue must be unassigned to be assigned).
+The comment must contain only that text and nothing else. These commands assign
+or unassign the issue as requested, provided the conditions are met (for
+example, an issue must be unassigned to be assigned).
 
-Please note that you can have a maximum of 3 issues assigned to you at any given
-time and that only
+Note that you can have a maximum of 3 issues assigned to you at any given time
+and that only
 [issues labeled "help wanted"](https://github.com/google-gemini/gemini-cli/issues?q=is%3Aissue%20state%3Aopen%20label%3A%22help%20wanted%22)
 may be self-assigned.
 
 ### Pull request guidelines
 
-To help us review and merge your PRs quickly, please follow these guidelines.
-PRs that do not meet these standards may be closed.
+To ensure quick review and merging of your PRs, follow these guidelines. PRs
+that do not meet these standards may be closed.
 
 #### 1. Link to an existing issue
 
-All PRs should be linked to an existing issue in our tracker. This ensures that
+All PRs must be linked to an existing issue in our tracker. This ensures that
 every change has been discussed and is aligned with the project's goals before
 any code is written.
 
-- **For bug fixes:** The PR should be linked to the bug report issue.
-- **For features:** The PR should be linked to the feature request or proposal
+- **For bug fixes:** The PR must be linked to the bug report issue.
+- **For features:** The PR must be linked to the feature request or proposal
   issue that has been approved by a maintainer.
 
-If an issue for your change doesn't exist, we will automatically close your PR
-along with a comment reminding you to associate the PR with an issue. The ideal
-workflow starts with an issue that has been reviewed and approved by a
-maintainer. Please **open the issue first** and wait for feedback before you
-start coding.
+If an issue for your change doesn't exist, Gemini CLI automatically closes your
+PR along with a comment reminding you to associate the PR with an issue. The
+ideal workflow starts with an issue that has been reviewed and approved by a
+maintainer. **Open the issue first** and wait for feedback before you start
+coding.
 
 #### 2. Keep it small and focused
 
-We favor small, atomic PRs that address a single issue or add a single,
+Gemini CLI favors small, atomic PRs that address a single issue or add a single,
 self-contained feature.
 
 - **Do:** Create a PR that fixes one specific bug or adds one specific feature.
@@ -149,9 +147,9 @@ can be reviewed and merged independently.
 
 #### 3. Use draft PRs for work in progress
 
-If you'd like to get early feedback on your work, please use GitHub's **Draft
-Pull Request** feature. This signals to the maintainers that the PR is not yet
-ready for a formal review but is open for discussion and initial feedback.
+To get early feedback on your work, use GitHub's **Draft Pull Request** feature.
+This signals to the maintainers that the PR is not yet ready for a formal review
+but is open for discussion and initial feedback.
 
 #### 4. Ensure all checks pass
 
@@ -170,7 +168,7 @@ See more about writing documentation:
 
 #### 6. Write clear commit messages and a good PR description
 
-Your PR should have a clear, descriptive title and a detailed description of the
+Your PR must have a clear, descriptive title and a detailed description of the
 changes. Follow the [Conventional Commits](https://www.conventionalcommits.org/)
 standard for your commit messages.
 
@@ -178,21 +176,19 @@ standard for your commit messages.
 - **Bad PR title:** `Made some changes`
 
 In the PR description, explain the "why" behind your changes and link to the
-relevant issue (e.g., `Fixes #123`).
+relevant issue (for example, `Fixes #123`).
 
 ### Forking
 
-If you are forking the repository you will be able to run the Build, Test and
-Integration test workflows. However in order to make the integration tests run
-you'll need to add a
+If you fork the repository, you can run the Build, Test and Integration test
+workflows. To run the integration tests, add a
 [GitHub Repository Secret](https://docs.github.com/en/actions/security-for-github-actions/security-guides/using-secrets-in-github-actions#creating-secrets-for-a-repository)
-with a value of `GEMINI_API_KEY` and set that to a valid API key that you have
-available. Your key and secret are private to your repo; no one without access
-can see your key and you cannot see any secrets related to this repo.
+with a value of `GEMINI_API_KEY` and set that to a valid API key. Your key and
+secret are private to your repo; no one without access can see your key and you
+cannot see any secrets related to this repo.
 
-Additionally you will need to click on the `Actions` tab and enable workflows
-for your repository, you'll find it's the large blue button in the center of the
-screen.
+Additionally, click on the `Actions` tab and enable workflows for your
+repository. It is the large blue button in the center of the screen.
 
 ### Development setup and workflow
 
@@ -204,9 +200,9 @@ development setup of this project.
 **Prerequisites:**
 
 1.  **Node.js**:
-    - **Development:** Please use Node.js `~20.19.0`. This specific version is
-      required due to an upstream development dependency issue. You can use a
-      tool like [nvm](https://github.com/nvm-sh/nvm) to manage Node.js versions.
+    - **Development:** Use Node.js `~20.19.0`. This specific version is required
+      due to an upstream development dependency issue. Use a tool like
+      [nvm](https://github.com/nvm-sh/nvm) to manage Node.js versions.
     - **Production:** For running the CLI in a production environment, any
       version of Node.js `>=20` is acceptable.
 2.  **Git**
@@ -261,10 +257,10 @@ command from the root directory:
 npm start
 ```
 
-If you'd like to run the source build outside of the gemini-cli folder, you can
-utilize `npm link path/to/gemini-cli/packages/cli` (see:
+To run the source build outside of the gemini-cli folder, use
+`npm link path/to/gemini-cli/packages/cli` (see:
 [docs](https://docs.npmjs.com/cli/v9/commands/npm-link)) or
-`alias gemini="node path/to/gemini-cli/packages/cli"` to run with `gemini`
+`alias gemini="node path/to/gemini-cli/packages/cli"` to run with `gemini`.
 
 ### Running tests
 
@@ -284,8 +280,8 @@ comprehensive check, it is recommended to run `npm run preflight`.
 
 #### Integration tests
 
-The integration tests are designed to validate the end-to-end functionality of
-the Gemini CLI. They are not run as part of the default `npm run test` command.
+The integration tests validate the end-to-end functionality of the Gemini CLI.
+They are not run as part of the default `npm run test` command.
 
 To run the integration tests, use the following command:
 
@@ -293,8 +289,7 @@ To run the integration tests, use the following command:
 npm run test:e2e
 ```
 
-For more detailed information on the integration testing framework, please see
-the
+For more detailed information on the integration testing framework, see the
 [Integration Tests documentation](https://geminicli.com/docs/integration-tests).
 
 ### Linting and preflight checks
@@ -305,8 +300,8 @@ To ensure code quality and formatting consistency, run the preflight check:
 npm run preflight
 ```
 
-This command will run ESLint, Prettier, all tests, and other checks as defined
-in the project's `package.json`.
+This command runs ESLint, Prettier, all tests, and other checks as defined in
+the project's `package.json`.
 
 _ProTip_
 
@@ -346,8 +341,8 @@ npm run lint
 
 ### Coding conventions
 
-- Please adhere to the coding style, patterns, and conventions used throughout
-  the existing codebase.
+- Adhere to the coding style, patterns, and conventions used throughout the
+  existing codebase.
 - Consult
   [GEMINI.md](https://github.com/google-gemini/gemini-cli/blob/main/GEMINI.md)
   (typically found in the project root) for specific instructions related to
@@ -470,8 +465,8 @@ sandbox.
 
 ### Manual publish
 
-We publish an artifact for each commit to our internal registry. But if you need
-to manually cut a local build, then run the following commands:
+Gemini CLI publishes an artifact for each commit to an internal registry. To
+manually cut a local build, use these commands:
 
 ```
 npm run clean
@@ -483,8 +478,8 @@ npm publish --workspaces
 
 ## Documentation contribution process
 
-Our documentation must be kept up-to-date with our code contributions. We want
-our documentation to be clear, concise, and helpful to our users. We value:
+Gemini CLI documentation must be kept up-to-date with code contributions.
+Documentation should be clear, concise, and helpful to users. Gemini CLI values:
 
 - **Clarity:** Use simple and direct language. Avoid jargon where possible.
 - **Accuracy:** Ensure all information is correct and up-to-date.
@@ -494,13 +489,12 @@ our documentation to be clear, concise, and helpful to our users. We value:
 
 ### Getting started
 
-The process for contributing to the documentation is similar to contributing
-code.
+Documentation contributions follow a process similar to code contributions.
 
 1. **Fork the repository** and create a new branch.
 2. **Make your changes** in the `/docs` directory.
 3. **Preview your changes locally** in Markdown rendering.
-4. **Lint and format your changes.** Our preflight check includes linting and
+4. **Lint and format your changes.** The preflight check includes linting and
    formatting for documentation files.
    ```bash
    npm run preflight
@@ -519,9 +513,9 @@ as the table of contents. When adding new documentation:
 
 ### Style guide
 
-We follow the
+Gemini CLI follows the
 [Google Developer Documentation Style Guide](https://developers.google.com/style).
-Please refer to it for guidance on writing style, tone, and formatting.
+Refer to it for guidance on writing style, tone, and formatting.
 
 #### Key style points
 
@@ -534,8 +528,8 @@ Please refer to it for guidance on writing style, tone, and formatting.
 
 ### Linting and formatting
 
-We use `prettier` to enforce a consistent style across our documentation. The
-`npm run preflight` command will check for any linting issues.
+Gemini CLI uses `prettier` to enforce a consistent style across our
+documentation. The `npm run preflight` command checks for any linting issues.
 
 You can also run the linter and formatter separately:
 
@@ -543,12 +537,10 @@ You can also run the linter and formatter separately:
 - `npm run format` - Auto-format markdown files
 - `npm run lint:fix` - Auto-fix linting issues where possible
 
-Please make sure your contributions are free of linting errors before submitting
-a pull request.
+Ensure your contributions are free of linting errors before submitting a pull
+request.
 
-### Before you submit
-
-Before submitting your documentation pull request, please:
+### Before submitting
 
 1. Run `npm run preflight` to ensure all checks pass.
 2. Review your changes for clarity and accuracy.
@@ -562,10 +554,10 @@ Before submitting your documentation pull request, please:
 
 If you have questions about contributing documentation:
 
-- Check our [FAQ](https://geminicli.com/docs/resources/faq).
+- Check the [FAQ](https://geminicli.com/docs/resources/faq).
 - Review existing documentation for examples.
 - Open [an issue](https://github.com/google-gemini/gemini-cli/issues) to discuss
   your proposed changes.
 - Reach out to the maintainers.
 
-We appreciate your contributions to making Gemini CLI documentation better!
+Gemini CLI appreciates your contributions to making its documentation better!
