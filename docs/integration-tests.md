@@ -12,6 +12,9 @@ that it behaves as expected when interacting with the file system.
 These tests are located in the `integration-tests` directory and are run using a
 custom test runner.
 
+For information about visual regression and TTY bootstrap testing, see
+[Visual validation and TTY testing](/docs/cli/visual-validation.md).
+
 ## Building the tests
 
 Prior to running any integration tests, you need to create a release bundle that
