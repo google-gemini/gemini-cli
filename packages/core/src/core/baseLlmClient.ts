@@ -12,6 +12,8 @@ import type {
   GenerateContentParameters,
   GenerateContentConfig,
 } from '@google/genai';
+import os from 'node:os';
+import path from 'node:path';
 import type { Config } from '../config/config.js';
 import type { ContentGenerator, AuthType } from './contentGenerator.js';
 import { handleFallback } from '../fallback/handler.js';
@@ -120,6 +122,13 @@ export class BaseLlmClient {
     private readonly config: Config,
     private readonly authType?: AuthType,
   ) {}
+
+  protected getErrorReportDir(): string {
+    return path.join(
+      this.config.storage?.getProjectTempDir() ?? os.tmpdir(),
+      'error-reports',
+    );
+  }
 
   async generateJson(
     options: GenerateJsonOptions,
@@ -369,6 +378,8 @@ export class BaseLlmClient {
       }
 
       // Check if the error is from exhausting retries, and report accordingly.
+      const errorReportDir = this.getErrorReportDir();
+
       if (
         error instanceof Error &&
         error.message.includes('Retry attempts exhausted')
@@ -378,6 +389,7 @@ export class BaseLlmClient {
           `API returned invalid content after all retries.`,
           contents,
           `${errorContext}-invalid-content`,
+          errorReportDir,
         );
       } else {
         await reportError(
@@ -385,6 +397,7 @@ export class BaseLlmClient {
           `Error generating content via API.`,
           contents,
           `${errorContext}-api`,
+          errorReportDir,
         );
       }
 

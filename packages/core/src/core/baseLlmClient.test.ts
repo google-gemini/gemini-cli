@@ -378,6 +378,7 @@ describe('BaseLlmClient', () => {
         'API returned invalid content after all retries.',
         defaultOptions.contents,
         'generateJson-invalid-content',
+        expect.any(String),
       );
     });
 
@@ -395,6 +396,7 @@ describe('BaseLlmClient', () => {
         'API returned invalid content after all retries.',
         defaultOptions.contents,
         'generateJson-invalid-content',
+        expect.any(String),
       );
     });
 
@@ -414,6 +416,7 @@ describe('BaseLlmClient', () => {
         'Error generating content via API.',
         defaultOptions.contents,
         'generateJson-api',
+        expect.any(String),
       );
     });
 
@@ -616,6 +619,7 @@ describe('BaseLlmClient', () => {
         'API returned invalid content after all retries.',
         options.contents,
         'generateContent-invalid-content',
+        expect.any(String),
       );
     });
   });
