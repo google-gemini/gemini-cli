@@ -4,8 +4,8 @@
   </style>
   <rect width="920" height="71" fill="#000000" />
   <g transform="translate(10, 10)">
-    <text x="0" y="2" fill="#303030" textLength="720" lengthAdjust="spacingAndGlyphs">╭──────────────────────────────────────────────────────────────────────────────╮</text>
-    <text x="0" y="19" fill="#303030" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="2" fill="#333333" textLength="720" lengthAdjust="spacingAndGlyphs">╭──────────────────────────────────────────────────────────────────────────────╮</text>
+    <text x="0" y="19" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="18" y="19" fill="#4796e4" textLength="9" lengthAdjust="spacingAndGlyphs">I</text>
     <text x="27" y="19" fill="#5390e0" textLength="9" lengthAdjust="spacingAndGlyphs">n</text>
     <text x="36" y="19" fill="#5f8bdb" textLength="9" lengthAdjust="spacingAndGlyphs">f</text>
@@ -17,7 +17,7 @@
     <text x="99" y="19" fill="#ae6d99" textLength="9" lengthAdjust="spacingAndGlyphs">a</text>
     <text x="108" y="19" fill="#b96a8c" textLength="9" lengthAdjust="spacingAndGlyphs">g</text>
     <text x="117" y="19" fill="#c3677f" textLength="9" lengthAdjust="spacingAndGlyphs">e</text>
-    <text x="711" y="19" fill="#303030" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="0" y="36" fill="#303030" textLength="720" lengthAdjust="spacingAndGlyphs">╰──────────────────────────────────────────────────────────────────────────────╯</text>
+    <text x="711" y="19" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="36" fill="#333333" textLength="720" lengthAdjust="spacingAndGlyphs">╰──────────────────────────────────────────────────────────────────────────────╯</text>
   </g>
 </svg>
