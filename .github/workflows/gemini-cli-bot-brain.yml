@@ -78,7 +78,7 @@ jobs:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           GEMINI_MODEL: 'gemini-3-flash-preview'
-          ENABLE_PRS: '${{ github.event.inputs.enable_prs || 'false' }}'
+          ENABLE_PRS: "${{ github.event.inputs.enable_prs || 'false' }}"
         run: 'node bundle/gemini.js --policy tools/gemini-cli-bot/ci-policy.toml tools/gemini-cli-bot/brain/metrics.md'
 
       - name: 'Stash Brain Outputs'
@@ -117,6 +117,4 @@ jobs:
         with:
           name: 'brain-scripts'
           path: 'temp_outputs/reflexes/scripts/'
-          retention-days: 90
-_outputs/reflexes/scripts/'
           retention-days: 90
