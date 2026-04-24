@@ -10,6 +10,7 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import { lock } from 'proper-lockfile';
 import { debugLogger } from '../utils/debugLogger.js';
+import { z } from 'zod';
 import { isNodeError } from '../utils/errors.js';
 
 export interface RegistryData {
@@ -55,15 +56,19 @@ export class ProjectRegistry {
   }
 
   private async loadData(): Promise<RegistryData> {
+    const schema = z.object({
+      projects: z.record(z.string(), z.string()),
+    });
+    
     try {
       const content = await fs.promises.readFile(this.registryPath, 'utf8');
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-      return JSON.parse(content);
+      const parsed: unknown = JSON.parse(content);
+      return schema.parse(parsed);
     } catch (error: unknown) {
       if (isNodeError(error) && error.code === 'ENOENT') {
         return { projects: {} }; // Normal first run
       }
-      if (error instanceof SyntaxError) {
+      if (error instanceof SyntaxError || error instanceof z.ZodError) {
         debugLogger.warn(
           'Failed to load registry (JSON corrupted), resetting to empty: ',
           error,
