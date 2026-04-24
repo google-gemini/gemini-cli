@@ -459,6 +459,47 @@ describe('<LoadingIndicator />', () => {
     });
   });
 
+  it('should suppress loading phrases but still show thoughts when suppressText is true', async () => {
+    const props = {
+      thought: {
+        subject: 'Analyzing code',
+        description: 'description',
+      },
+      currentLoadingPhrase: 'Tip of the day',
+      elapsedTime: 5,
+      suppressText: true,
+    };
+    const { lastFrame, unmount, waitUntilReady } = await renderWithContext(
+      <LoadingIndicator {...props} />,
+      StreamingState.Responding,
+    );
+    await waitUntilReady();
+    const output = lastFrame();
+    // Thoughts are real progress info and should always be visible
+    expect(output).toContain('Analyzing code');
+    expect(output).not.toContain('Tip of the day');
+    expect(output).toContain('(esc to cancel, 5s)');
+    unmount();
+  });
+
+  it('should suppress fallback Thinking text when suppressText is true and no thought', async () => {
+    const props = {
+      currentLoadingPhrase: 'Tip of the day',
+      elapsedTime: 5,
+      suppressText: true,
+    };
+    const { lastFrame, unmount, waitUntilReady } = await renderWithContext(
+      <LoadingIndicator {...props} />,
+      StreamingState.Responding,
+    );
+    await waitUntilReady();
+    const output = lastFrame();
+    expect(output).not.toContain('Tip of the day');
+    expect(output).not.toContain('Thinking...');
+    expect(output).toContain('(esc to cancel, 5s)');
+    unmount();
+  });
+
   it('should use spinnerIcon when provided', async () => {
     const props = {
       currentLoadingPhrase: 'Confirm action',
