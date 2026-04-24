@@ -87,6 +87,12 @@ async function run() {
     const newEnv = { ...process.env, GEMINI_CLI_NO_RELAUNCH: 'true' };
     const RELAUNCH_EXIT_CODE = 199;
     let latestAdminSettings: unknown = undefined;
+    /**
+     * Extra script args injected for the *next* relaunch only. Cleared after
+     * each spawn. Currently used by the in-app `/restart` command to forward
+     * `--resume <sessionId>` so the new process picks up the same chat.
+     */
+    let pendingExtraScriptArgs: string[] = [];
 
     // Prevent the parent process from exiting prematurely on signals.
     // The child process will receive the same signals and handle its own cleanup.
@@ -97,7 +103,13 @@ async function run() {
     const runner = () => {
       process.stdin.pause();
 
-      const child = spawn(process.execPath, nodeArgs, {
+      const spawnNodeArgs =
+        pendingExtraScriptArgs.length === 0
+          ? nodeArgs
+          : [...nodeArgs, ...pendingExtraScriptArgs];
+      pendingExtraScriptArgs = [];
+
+      const child = spawn(process.execPath, spawnNodeArgs, {
         stdio: ['inherit', 'inherit', 'inherit', 'ipc'],
         env: newEnv,
       });
@@ -106,11 +118,21 @@ async function run() {
         child.send({ type: 'admin-settings', settings: latestAdminSettings });
       }
 
-      child.on('message', (msg: { type?: string; settings?: unknown }) => {
-        if (msg.type === 'admin-settings-update' && msg.settings) {
-          latestAdminSettings = msg.settings;
-        }
-      });
+      child.on(
+        'message',
+        (msg: { type?: string; settings?: unknown; sessionId?: unknown }) => {
+          if (msg.type === 'admin-settings-update' && msg.settings) {
+            latestAdminSettings = msg.settings;
+          } else if (
+            msg.type === 'restart-with-resume' &&
+            typeof msg.sessionId === 'string' &&
+            msg.sessionId.length > 0
+          ) {
+            // Replace any previously injected --resume flag for the next spawn.
+            pendingExtraScriptArgs = ['--resume', msg.sessionId];
+          }
+        },
+      );
 
       return new Promise<number>((resolve) => {
         child.on('error', (err) => {
