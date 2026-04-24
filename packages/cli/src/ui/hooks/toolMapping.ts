@@ -122,6 +122,7 @@ export function mapToDisplay(
       progressTotal,
       approvalMode: call.approvalMode,
       originalRequestName: call.request.originalRequestName,
+      functionName: call.tool?.name ?? call.request.name,
       subagentHistory: hasSubagentHistory(call)
         ? call.subagentHistory
         : undefined,

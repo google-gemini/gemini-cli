@@ -136,6 +136,7 @@ export interface IndividualToolCallDisplay {
   approvalMode?: ApprovalMode;
   progressMessage?: string;
   originalRequestName?: string;
+  functionName?: string;
   progress?: number;
   progressTotal?: number;
   subagentHistory?: SubagentActivityItem[];
