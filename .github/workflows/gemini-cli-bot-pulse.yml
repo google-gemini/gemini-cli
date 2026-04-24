@@ -45,6 +45,12 @@ jobs:
           name: 'metrics-before'
           path: 'metrics-before.csv'
 
+      - name: 'Archive Time-series'
+        uses: 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02' # ratchet:actions/upload-artifact@v4
+        with:
+          name: 'metrics-timeseries'
+          path: 'tools/gemini-cli-bot/history/metrics-timeseries.csv'
+
       - name: 'Run Reflex Processes'
         env:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
