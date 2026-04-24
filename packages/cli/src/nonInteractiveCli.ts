@@ -252,6 +252,11 @@ export async function runNonInteractive(
           config,
           settings,
         );
+
+        if (slashCommandResult === 'handled') {
+          return;
+        }
+
         // If a slash command is found and returns a prompt, use it.
         // Otherwise, slashCommandResult falls through to the default prompt
         // handling.
