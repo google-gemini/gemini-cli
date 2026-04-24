@@ -41,6 +41,8 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { ApprovalMode } from '@google/gemini-cli-core/src/policy/types.js';
 
+const startMemoryServiceMock = vi.hoisted(() => vi.fn());
+
 vi.mock('../config/config.js', () => ({
   loadCliConfig: vi.fn(),
 }));
@@ -101,6 +103,7 @@ vi.mock(
     const actual = await importOriginal();
     return {
       ...actual,
+      startMemoryService: startMemoryServiceMock,
       updatePolicy: vi.fn(),
       createPolicyUpdater: vi.fn(),
       ReadManyFilesTool: vi.fn(),
@@ -148,6 +151,8 @@ describe('GeminiAgent', () => {
   let agent: GeminiAgent;
 
   beforeEach(() => {
+    vi.clearAllMocks();
+    startMemoryServiceMock.mockResolvedValue(undefined);
     mockConfig = {
       refreshAuth: vi.fn(),
       initialize: vi.fn(),
@@ -155,6 +160,7 @@ describe('GeminiAgent', () => {
       getFileSystemService: vi.fn(),
       setFileSystemService: vi.fn(),
       getContentGeneratorConfig: vi.fn(),
+      isAutoMemoryEnabled: vi.fn().mockReturnValue(false),
       getActiveModel: vi.fn().mockReturnValue('gemini-pro'),
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getGeminiClient: vi.fn().mockReturnValue({
@@ -352,6 +358,34 @@ describe('GeminiAgent', () => {
       }),
     );
     vi.useRealTimers();
+  });
+
+  it('should start auto memory for new ACP sessions when enabled', async () => {
+    mockConfig.getContentGeneratorConfig = vi.fn().mockReturnValue({
+      apiKey: 'test-key',
+    });
+    mockConfig.isAutoMemoryEnabled = vi.fn().mockReturnValue(true);
+
+    await agent.newSession({
+      cwd: '/tmp',
+      mcpServers: [],
+    });
+
+    expect(startMemoryServiceMock).toHaveBeenCalledWith(mockConfig);
+  });
+
+  it('should not start auto memory for new ACP sessions when disabled', async () => {
+    mockConfig.getContentGeneratorConfig = vi.fn().mockReturnValue({
+      apiKey: 'test-key',
+    });
+    mockConfig.isAutoMemoryEnabled = vi.fn().mockReturnValue(false);
+
+    await agent.newSession({
+      cwd: '/tmp',
+      mcpServers: [],
+    });
+
+    expect(startMemoryServiceMock).not.toHaveBeenCalled();
   });
 
   it('should return modes without plan mode when plan is disabled', async () => {

@@ -119,6 +119,8 @@ describe('tracker_mode', () => {
   });
 
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should correctly identify the task tracker storage location from the system prompt',
     params: {
       settings: { experimental: { taskTracker: true } },

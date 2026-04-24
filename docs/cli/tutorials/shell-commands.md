@@ -58,7 +58,7 @@ watchers.
 
 **Prompt:** `Start the React dev server in the background.`
 
-Gemini will run the command (e.g., `npm run dev`) and detach it.
+Gemini will run the command (for example, `npm run dev`) and detach it.
 
 ### Scenario: Viewing active shells
 

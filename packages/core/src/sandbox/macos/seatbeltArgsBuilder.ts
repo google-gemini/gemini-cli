@@ -16,7 +16,7 @@ import {
   SECRET_FILES,
   type ResolvedSandboxPaths,
 } from '../../services/sandboxManager.js';
-import { tryRealpath, resolveGitWorktreePaths } from '../utils/fsUtils.js';
+import { isSubpath, resolveToRealPath } from '../../utils/paths.js';
 
 /**
  * Options for building macOS Seatbelt profile.
@@ -38,6 +38,47 @@ export function escapeSchemeString(str: string): string {
 }
 
 /**
+ * Checks if a path is explicitly allowed by additional write permissions.
+ */
+function isPathExplicitlyAllowed(
+  filePath: string,
+  realFilePath: string,
+  policyWrite: string[],
+): boolean {
+  return policyWrite.some(
+    (p) =>
+      p === filePath ||
+      p === realFilePath ||
+      isSubpath(p, filePath) ||
+      isSubpath(p, realFilePath),
+  );
+}
+
+function denyUnlessExplicitlyAllowed(
+  targetPath: string,
+  ruleType: 'literal' | 'subpath',
+  policyWrite: string[],
+  implicitlyAllowed: boolean = false,
+): string {
+  if (implicitlyAllowed) {
+    return '';
+  }
+
+  const realPath = resolveToRealPath(targetPath);
+
+  if (isPathExplicitlyAllowed(targetPath, realPath, policyWrite)) {
+    return ''; // Skip if explicitly allowed
+  }
+
+  let rules = `(deny file-write* (${ruleType} "${escapeSchemeString(targetPath)}"))\n`;
+  if (realPath !== targetPath) {
+    rules += `(deny file-write* (${ruleType} "${escapeSchemeString(realPath)}"))\n`;
+  }
+
+  return rules;
+}
+
+/**
  * Builds a complete macOS Seatbelt profile string using a strict allowlist.
  * It embeds paths directly into the profile, properly escaped for Scheme.
  */
@@ -52,21 +93,21 @@ export function buildSeatbeltProfile(options: SeatbeltArgsOptions): string {
     profile += `(allow file-write* (subpath "${escapeSchemeString(resolvedPaths.workspace.resolved)}"))\n`;
   }
 
-  const tmpPath = tryRealpath(os.tmpdir());
+  const tmpPath = resolveToRealPath(os.tmpdir());
   profile += `(allow file-read* file-write* (subpath "${escapeSchemeString(tmpPath)}"))\n`;
 
-  // Auto-detect and support git worktrees by granting read and write access to the underlying git directory
-  const { worktreeGitDir, mainGitDir } = resolveGitWorktreePaths(
-    resolvedPaths.workspace.resolved,
-  );
-  if (worktreeGitDir) {
-    profile += `(allow file-read* file-write* (subpath "${escapeSchemeString(worktreeGitDir)}"))\n`;
-  }
-  if (mainGitDir) {
-    profile += `(allow file-read* file-write* (subpath "${escapeSchemeString(mainGitDir)}"))\n`;
+  // Support git worktrees/submodules; read-only to prevent malicious hook/config modification (RCE).
+  if (resolvedPaths.gitWorktree) {
+    const { worktreeGitDir, mainGitDir } = resolvedPaths.gitWorktree;
+    if (worktreeGitDir) {
+      profile += `(allow file-read* (subpath "${escapeSchemeString(worktreeGitDir)}"))\n`;
+    }
+    if (mainGitDir) {
+      profile += `(allow file-read* (subpath "${escapeSchemeString(mainGitDir)}"))\n`;
+    }
   }
 
-  const nodeRootPath = tryRealpath(
+  const nodeRootPath = resolveToRealPath(
     path.dirname(path.dirname(process.execPath)),
   );
   profile += `(allow file-read* (subpath "${escapeSchemeString(nodeRootPath)}"))\n`;
@@ -79,7 +120,7 @@ export function buildSeatbeltProfile(options: SeatbeltArgsOptions): string {
     for (const p of paths) {
       if (!p.trim()) continue;
       try {
-        let resolved = tryRealpath(p);
+        let resolved = resolveToRealPath(p);
 
         // If this is a 'bin' directory (like /usr/local/bin or homebrew/bin),
         // also grant read access to its parent directory so that symlinked
@@ -106,6 +147,84 @@ export function buildSeatbeltProfile(options: SeatbeltArgsOptions): string {
   for (let i = 0; i < allowedPaths.length; i++) {
     const allowedPath = allowedPaths[i];
     profile += `(allow file-read* file-write* (subpath "${escapeSchemeString(allowedPath)}"))\n`;
+  }
+
+  // Add explicit deny rules for governance files in the workspace.
+  // These are added after the workspace allow rule to ensure they take precedence
+  // (Seatbelt evaluates rules in order, later rules win for same path).
+  for (let i = 0; i < GOVERNANCE_FILES.length; i++) {
+    const governanceFile = path.join(
+      resolvedPaths.workspace.resolved,
+      GOVERNANCE_FILES[i].path,
+    );
+    const realGovernanceFile = resolveToRealPath(governanceFile);
+
+    // Determine if it should be treated as a directory (subpath) or a file (literal).
+    // .git is generally a directory, while ignore files are literals.
+    let isDirectory = GOVERNANCE_FILES[i].isDirectory;
+    try {
+      if (fs.existsSync(realGovernanceFile)) {
+        isDirectory = fs.lstatSync(realGovernanceFile).isDirectory();
+      }
+    } catch {
+      // Ignore errors, use default guess
+    }
+
+    profile += denyUnlessExplicitlyAllowed(
+      governanceFile,
+      isDirectory ? 'subpath' : 'literal',
+      resolvedPaths.policyWrite,
+      workspaceWrite && GOVERNANCE_FILES[i].path !== '.git',
+    );
+  }
+
+  // Grant read-only access to git worktrees/submodules. We do this last in order to
+  // ensure that these rules aren't overwritten by broader write policies.
+  if (resolvedPaths.gitWorktree) {
+    const { worktreeGitDir, mainGitDir } = resolvedPaths.gitWorktree;
+    if (worktreeGitDir) {
+      profile += denyUnlessExplicitlyAllowed(
+        worktreeGitDir,
+        'subpath',
+        resolvedPaths.policyWrite,
+      );
+    }
+    if (mainGitDir) {
+      profile += denyUnlessExplicitlyAllowed(
+        mainGitDir,
+        'subpath',
+        resolvedPaths.policyWrite,
+      );
+    }
+  }
+
+  // Add explicit deny rules for secret files (.env, .env.*) in the workspace and allowed paths.
+  // We use regex rules to avoid expensive file discovery scans.
+  // Anchoring to workspace/allowed paths to avoid over-blocking.
+  const searchPaths = [
+    resolvedPaths.workspace.resolved,
+    resolvedPaths.workspace.original,
+    ...resolvedPaths.policyAllowed,
+    ...resolvedPaths.globalIncludes,
+  ];
+
+  for (const basePath of searchPaths) {
+    for (const secret of SECRET_FILES) {
+      // Map pattern to Seatbelt regex
+      let regexPattern: string;
+      const escapedBase = escapeRegex(basePath);
+      if (secret.pattern.endsWith('*')) {
+        // .env.* -> .env\..+ (match .env followed by dot and something)
+        // We anchor the secret file name to either a directory separator or the start of the relative path.
+        const basePattern = secret.pattern.slice(0, -1).replace(/\./g, '\\\\.');
+        regexPattern = `^${escapedBase}/(.*/)?${basePattern}[^/]+$`;
+      } else {
+        // .env -> \.env$
+        const basePattern = secret.pattern.replace(/\./g, '\\\\.');
+        regexPattern = `^${escapedBase}/(.*/)?${basePattern}$`;
+      }
+      profile += `(deny file-read* file-write* (regex #"${regexPattern}"))\n`;
+    }
   }
 
   // Handle granular additional read permissions
@@ -137,65 +256,6 @@ export function buildSeatbeltProfile(options: SeatbeltArgsOptions): string {
       profile += `(allow file-read* file-write* (literal "${escapeSchemeString(resolved)}"))\n`;
     } else {
       profile += `(allow file-read* file-write* (subpath "${escapeSchemeString(resolved)}"))\n`;
-    }
-  }
-
-  // Add explicit deny rules for governance files in the workspace.
-  // These are added after the workspace allow rule to ensure they take precedence
-  // (Seatbelt evaluates rules in order, later rules win for same path).
-  for (let i = 0; i < GOVERNANCE_FILES.length; i++) {
-    const governanceFile = path.join(
-      resolvedPaths.workspace.resolved,
-      GOVERNANCE_FILES[i].path,
-    );
-    const realGovernanceFile = tryRealpath(governanceFile);
-
-    // Determine if it should be treated as a directory (subpath) or a file (literal).
-    // .git is generally a directory, while ignore files are literals.
-    let isDirectory = GOVERNANCE_FILES[i].isDirectory;
-    try {
-      if (fs.existsSync(realGovernanceFile)) {
-        isDirectory = fs.lstatSync(realGovernanceFile).isDirectory();
-      }
-    } catch {
-      // Ignore errors, use default guess
-    }
-
-    const ruleType = isDirectory ? 'subpath' : 'literal';
-
-    profile += `(deny file-write* (${ruleType} "${escapeSchemeString(governanceFile)}"))\n`;
-
-    if (realGovernanceFile !== governanceFile) {
-      profile += `(deny file-write* (${ruleType} "${escapeSchemeString(realGovernanceFile)}"))\n`;
-    }
-  }
-
-  // Add explicit deny rules for secret files (.env, .env.*) in the workspace and allowed paths.
-  // We use regex rules to avoid expensive file discovery scans.
-  // Anchoring to workspace/allowed paths to avoid over-blocking.
-  const searchPaths = [
-    resolvedPaths.workspace.resolved,
-    resolvedPaths.workspace.original,
-    ...resolvedPaths.policyAllowed,
-    ...resolvedPaths.globalIncludes,
-  ];
-
-  for (const basePath of searchPaths) {
-    for (const secret of SECRET_FILES) {
-      // Map pattern to Seatbelt regex
-      let regexPattern: string;
-      const escapedBase = escapeRegex(basePath);
-      if (secret.pattern.endsWith('*')) {
-        // .env.* -> .env\..+ (match .env followed by dot and something)
-        // We anchor the secret file name to either a directory separator or the start of the relative path.
-        const basePattern = secret.pattern.slice(0, -1).replace(/\./g, '\\\\.');
-        regexPattern = `^${escapedBase}/(.*/)?${basePattern}[^/]+$`;
-      } else {
-        // .env -> \.env$
-        const basePattern = secret.pattern.replace(/\./g, '\\\\.');
-        regexPattern = `^${escapedBase}/(.*/)?${basePattern}$`;
-      }
-      profile += `(deny file-read* file-write* (regex #"${regexPattern}"))\n`;
     }
   }
 

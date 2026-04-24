@@ -142,5 +142,62 @@ describe.skipIf(os.platform() === 'win32')('seatbeltArgsBuilder', () => {
         expect(denyIndex).toBeGreaterThan(allowIndex);
       });
     });
+
+    describe('git worktree paths', () => {
+      it('enforces read-only binding for git worktrees even if workspaceWrite is true', () => {
+        const worktreeGitDir = '/path/to/worktree/.git';
+        const mainGitDir = '/path/to/main/.git';
+
+        const profile = buildSeatbeltProfile({
+          resolvedPaths: {
+            ...defaultResolvedPaths,
+            gitWorktree: {
+              worktreeGitDir,
+              mainGitDir,
+            },
+          },
+          workspaceWrite: true,
+        });
+
+        // Should grant read access
+        expect(profile).toContain(
+          `(allow file-read* (subpath "${worktreeGitDir}"))`,
+        );
+        expect(profile).toContain(
+          `(allow file-read* (subpath "${mainGitDir}"))`,
+        );
+
+        // Should NOT grant write access
+        expect(profile).not.toContain(
+          `(allow file-read* file-write* (subpath "${worktreeGitDir}"))`,
+        );
+        expect(profile).not.toContain(
+          `(allow file-read* file-write* (subpath "${mainGitDir}"))`,
+        );
+      });
+
+      it('git worktree read-only rules should override previous policyAllowed write paths', () => {
+        const worktreeGitDir = '/custom/worktree/.git';
+        const profile = buildSeatbeltProfile({
+          resolvedPaths: {
+            ...defaultResolvedPaths,
+            policyAllowed: ['/custom/worktree'],
+            gitWorktree: {
+              worktreeGitDir,
+            },
+          },
+        });
+
+        const allowString = `(allow file-read* file-write* (subpath "/custom/worktree"))`;
+        const denyString = `(deny file-write* (subpath "${worktreeGitDir}"))`;
+
+        expect(profile).toContain(allowString);
+        expect(profile).toContain(denyString);
+
+        const allowIndex = profile.indexOf(allowString);
+        const denyIndex = profile.indexOf(denyString);
+        expect(denyIndex).toBeGreaterThan(allowIndex);
+      });
+    });
   });
 });

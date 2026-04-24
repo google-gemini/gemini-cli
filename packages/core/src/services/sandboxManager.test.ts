@@ -10,12 +10,9 @@ import fsPromises from 'node:fs/promises';
 import { afterEach, describe, expect, it, vi, beforeEach } from 'vitest';
 import {
   NoopSandboxManager,
-  sanitizePaths,
   findSecretFiles,
   isSecretFile,
-  tryRealpath,
   resolveSandboxPaths,
-  getPathIdentity,
   type SandboxRequest,
 } from './sandboxManager.js';
 import { createSandboxManager } from './sandboxManagerFactory.js';
@@ -36,10 +33,25 @@ vi.mock('node:fs/promises', async () => {
       readdir: vi.fn(),
       realpath: vi.fn(),
       stat: vi.fn(),
+      lstat: vi.fn(),
+      readFile: vi.fn(),
     },
     readdir: vi.fn(),
     realpath: vi.fn(),
     stat: vi.fn(),
+    lstat: vi.fn(),
+    readFile: vi.fn(),
+  };
+});
+
+vi.mock('../utils/paths.js', async () => {
+  const actual =
+    await vi.importActual<typeof import('../utils/paths.js')>(
+      '../utils/paths.js',
+    );
+  return {
+    ...actual,
+    resolveToRealPath: vi.fn((p) => p),
   };
 });
 
@@ -125,64 +137,6 @@ describe('findSecretFiles', () => {
 describe('SandboxManager', () => {
   afterEach(() => vi.restoreAllMocks());
 
-  describe('sanitizePaths', () => {
-    it('should return an empty array if no paths are provided', () => {
-      expect(sanitizePaths(undefined)).toEqual([]);
-      expect(sanitizePaths(null)).toEqual([]);
-      expect(sanitizePaths([])).toEqual([]);
-    });
-
-    it('should deduplicate paths and return them', () => {
-      const paths = ['/workspace/foo', '/workspace/bar', '/workspace/foo'];
-      expect(sanitizePaths(paths)).toEqual([
-        '/workspace/foo',
-        '/workspace/bar',
-      ]);
-    });
-
-    it('should deduplicate case-insensitively on Windows and macOS', () => {
-      vi.spyOn(os, 'platform').mockReturnValue('win32');
-      const paths = ['/workspace/foo', '/WORKSPACE/FOO'];
-      expect(sanitizePaths(paths)).toEqual(['/workspace/foo']);
-
-      vi.spyOn(os, 'platform').mockReturnValue('darwin');
-      const macPaths = ['/tmp/foo', '/tmp/FOO'];
-      expect(sanitizePaths(macPaths)).toEqual(['/tmp/foo']);
-
-      vi.spyOn(os, 'platform').mockReturnValue('linux');
-      const linuxPaths = ['/tmp/foo', '/tmp/FOO'];
-      expect(sanitizePaths(linuxPaths)).toEqual(['/tmp/foo', '/tmp/FOO']);
-    });
-
-    it('should throw an error if a path is not absolute', () => {
-      const paths = ['/workspace/foo', 'relative/path'];
-      expect(() => sanitizePaths(paths)).toThrow(
-        'Sandbox path must be absolute: relative/path',
-      );
-    });
-  });
-
-  describe('getPathIdentity', () => {
-    it('should normalize slashes and strip trailing slashes', () => {
-      expect(getPathIdentity('/foo/bar//baz/')).toBe(
-        path.normalize('/foo/bar/baz'),
-      );
-    });
-
-    it('should handle case sensitivity correctly per platform', () => {
-      vi.spyOn(os, 'platform').mockReturnValue('win32');
-      expect(getPathIdentity('/Workspace/Foo')).toBe(
-        path.normalize('/workspace/foo'),
-      );
-
-      vi.spyOn(os, 'platform').mockReturnValue('darwin');
-      expect(getPathIdentity('/Tmp/Foo')).toBe(path.normalize('/tmp/foo'));
-
-      vi.spyOn(os, 'platform').mockReturnValue('linux');
-      expect(getPathIdentity('/Tmp/Foo')).toBe(path.normalize('/Tmp/Foo'));
-    });
-  });
-
   describe('resolveSandboxPaths', () => {
     it('should resolve allowed and forbidden paths', async () => {
       const workspace = path.resolve('/workspace');
@@ -254,7 +208,7 @@ describe('SandboxManager', () => {
     });
 
     it('should handle case-insensitive conflicts on supported platforms', async () => {
-      vi.spyOn(os, 'platform').mockReturnValue('darwin');
+      vi.spyOn(process, 'platform', 'get').mockReturnValue('darwin');
       const workspace = path.resolve('/workspace');
       const secretUpper = path.join(workspace, 'SECRET');
       const secretLower = path.join(workspace, 'secret');
@@ -276,104 +230,6 @@ describe('SandboxManager', () => {
 
       expect(result.policyAllowed).toEqual([]);
       expect(result.forbidden).toEqual([secretUpper]);
-    });
-  });
-
-  describe('tryRealpath', () => {
-    beforeEach(() => {
-      vi.clearAllMocks();
-    });
-
-    it('should return the realpath if the file exists', async () => {
-      const realPath = path.resolve('/real/path/to/file.txt');
-      const symlinkPath = path.resolve('/some/symlink/to/file.txt');
-      vi.mocked(fsPromises.realpath).mockResolvedValue(realPath as never);
-      const result = await tryRealpath(symlinkPath);
-      expect(result).toBe(realPath);
-      expect(fsPromises.realpath).toHaveBeenCalledWith(symlinkPath);
-    });
-
-    it('should fallback to parent directory if file does not exist (ENOENT)', async () => {
-      const nonexistent = path.resolve('/workspace/nonexistent.txt');
-      const workspace = path.resolve('/workspace');
-      const realWorkspace = path.resolve('/real/workspace');
-
-      vi.mocked(fsPromises.realpath).mockImplementation(((p: string) => {
-        if (p === nonexistent) {
-          return Promise.reject(
-            Object.assign(new Error('ENOENT: no such file or directory'), {
-              code: 'ENOENT',
-            }),
-          );
-        }
-        if (p === workspace) {
-          return Promise.resolve(realWorkspace);
-        }
-        return Promise.reject(new Error(`Unexpected path: ${p}`));
-      }) as never);
-
-      const result = await tryRealpath(nonexistent);
-
-      // It should combine the real path of the parent with the original basename
-      expect(result).toBe(path.join(realWorkspace, 'nonexistent.txt'));
-    });
-
-    it('should recursively fallback up the directory tree on multiple ENOENT errors', async () => {
-      const missingFile = path.resolve(
-        '/workspace/missing_dir/missing_file.txt',
-      );
-      const missingDir = path.resolve('/workspace/missing_dir');
-      const workspace = path.resolve('/workspace');
-      const realWorkspace = path.resolve('/real/workspace');
-
-      vi.mocked(fsPromises.realpath).mockImplementation(((p: string) => {
-        if (p === missingFile) {
-          return Promise.reject(
-            Object.assign(new Error('ENOENT'), { code: 'ENOENT' }),
-          );
-        }
-        if (p === missingDir) {
-          return Promise.reject(
-            Object.assign(new Error('ENOENT'), { code: 'ENOENT' }),
-          );
-        }
-        if (p === workspace) {
-          return Promise.resolve(realWorkspace);
-        }
-        return Promise.reject(new Error(`Unexpected path: ${p}`));
-      }) as never);
-
-      const result = await tryRealpath(missingFile);
-
-      // It should resolve '/workspace' to '/real/workspace' and append the missing parts
-      expect(result).toBe(
-        path.join(realWorkspace, 'missing_dir', 'missing_file.txt'),
-      );
-    });
-
-    it('should return the path unchanged if it reaches the root directory and it still does not exist', async () => {
-      const rootPath = path.resolve('/');
-      vi.mocked(fsPromises.realpath).mockImplementation(() =>
-        Promise.reject(Object.assign(new Error('ENOENT'), { code: 'ENOENT' })),
-      );
-
-      const result = await tryRealpath(rootPath);
-      expect(result).toBe(rootPath);
-    });
-
-    it('should throw an error if realpath fails with a non-ENOENT error (e.g. EACCES)', async () => {
-      const secretFile = path.resolve('/secret/file.txt');
-      vi.mocked(fsPromises.realpath).mockImplementation(() =>
-        Promise.reject(
-          Object.assign(new Error('EACCES: permission denied'), {
-            code: 'EACCES',
-          }),
-        ),
-      );
-
-      await expect(tryRealpath(secretFile)).rejects.toThrow(
-        'EACCES: permission denied',
-      );
     });
   });
 

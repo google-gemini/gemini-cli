@@ -50,7 +50,7 @@
     <text x="72" y="240" fill="#ffffff" textLength="54" lengthAdjust="spacingAndGlyphs"> quota</text>
     <text x="891" y="240" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="257" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="45" y="257" fill="#afafaf" textLength="540" lengthAdjust="spacingAndGlyphs"> Remaining usage on daily limit (not shown when unavailable)</text>
+    <text x="45" y="257" fill="#afafaf" textLength="540" lengthAdjust="spacingAndGlyphs"> Percentage of daily limit used (not shown when unavailable)</text>
     <text x="891" y="257" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="274" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="45" y="274" fill="#afafaf" textLength="27" lengthAdjust="spacingAndGlyphs">[ ]</text>
@@ -131,13 +131,13 @@
     <text x="27" y="631" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="45" y="631" fill="#afafaf" textLength="126" lengthAdjust="spacingAndGlyphs">~/project/path</text>
     <text x="207" y="631" fill="#afafaf" textLength="27" lengthAdjust="spacingAndGlyphs"> · </text>
-    <text x="279" y="631" fill="#afafaf" textLength="36" lengthAdjust="spacingAndGlyphs">main</text>
-    <text x="351" y="631" fill="#afafaf" textLength="27" lengthAdjust="spacingAndGlyphs"> · </text>
-    <text x="432" y="631" fill="#00cd00" textLength="54" lengthAdjust="spacingAndGlyphs">docker</text>
-    <text x="522" y="631" fill="#afafaf" textLength="27" lengthAdjust="spacingAndGlyphs"> · </text>
-    <text x="594" y="631" fill="#afafaf" textLength="126" lengthAdjust="spacingAndGlyphs">gemini-2.5-pro</text>
-    <text x="756" y="631" fill="#afafaf" textLength="27" lengthAdjust="spacingAndGlyphs"> · </text>
-    <text x="828" y="631" fill="#afafaf" textLength="27" lengthAdjust="spacingAndGlyphs">97%</text>
+    <text x="270" y="631" fill="#afafaf" textLength="36" lengthAdjust="spacingAndGlyphs">main</text>
+    <text x="342" y="631" fill="#afafaf" textLength="27" lengthAdjust="spacingAndGlyphs"> · </text>
+    <text x="405" y="631" fill="#00cd00" textLength="54" lengthAdjust="spacingAndGlyphs">docker</text>
+    <text x="495" y="631" fill="#afafaf" textLength="27" lengthAdjust="spacingAndGlyphs"> · </text>
+    <text x="558" y="631" fill="#afafaf" textLength="126" lengthAdjust="spacingAndGlyphs">gemini-2.5-pro</text>
+    <text x="720" y="631" fill="#afafaf" textLength="27" lengthAdjust="spacingAndGlyphs"> · </text>
+    <text x="783" y="631" fill="#afafaf" textLength="72" lengthAdjust="spacingAndGlyphs">42% used</text>
     <text x="864" y="631" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="891" y="631" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="648" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>

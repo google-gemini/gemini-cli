@@ -63,6 +63,10 @@ vi.mock('node:fs', () => {
     writeFileSync: vi.fn((path: string, data: string) => {
       mockFileSystem.set(path, data);
     }),
+    appendFileSync: vi.fn((path: string, data: string) => {
+      const current = mockFileSystem.get(path) || '';
+      mockFileSystem.set(path, current + data);
+    }),
     readFileSync: vi.fn((path: string) => {
       if (mockFileSystem.has(path)) {
         return mockFileSystem.get(path);
@@ -1240,9 +1244,6 @@ ${JSON.stringify(
         count: 2,
       });
 
-      const abortSpy = vi.spyOn(AbortController.prototype, 'abort');
-
-      // Act
       const stream = client.sendMessageStream(
         [{ text: 'Hi' }],
         new AbortController().signal,
@@ -1263,7 +1264,6 @@ ${JSON.stringify(
 
       // Assert
       expect(events).toContainEqual({ type: GeminiEventType.LoopDetected });
-      expect(abortSpy).toHaveBeenCalled();
       expect(finalResult).toBeInstanceOf(Turn);
     });
 

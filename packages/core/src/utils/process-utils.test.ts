@@ -75,7 +75,6 @@ describe('process-utils', () => {
 
       expect(mockProcessKill).toHaveBeenCalledWith(-1234, 'SIGKILL');
     });
-
     it('should use escalation on Unix if requested', async () => {
       vi.mocked(os.platform).mockReturnValue('linux');
       const exited = false;
@@ -86,6 +85,11 @@ describe('process-utils', () => {
         escalate: true,
         isExited,
       });
+
+      // flush microtasks
+      await new Promise(process.nextTick);
+      await new Promise(process.nextTick);
+      await new Promise(process.nextTick);
 
       // First call should be SIGTERM
       expect(mockProcessKill).toHaveBeenCalledWith(-1234, 'SIGTERM');
@@ -110,6 +114,11 @@ describe('process-utils', () => {
         isExited,
       });
 
+      // flush microtasks
+      await new Promise(process.nextTick);
+      await new Promise(process.nextTick);
+      await new Promise(process.nextTick);
+
       expect(mockProcessKill).toHaveBeenCalledWith(-1234, 'SIGTERM');
 
       // Simulate process exiting
@@ -117,10 +126,11 @@ describe('process-utils', () => {
 
       await vi.advanceTimersByTimeAsync(SIGKILL_TIMEOUT_MS);
 
+      // Second call should NOT be SIGKILL because it exited
       expect(mockProcessKill).not.toHaveBeenCalledWith(-1234, 'SIGKILL');
+
       await killPromise;
     });
-
     it('should fallback to specific process kill if group kill fails', async () => {
       vi.mocked(os.platform).mockReturnValue('linux');
       mockProcessKill.mockImplementationOnce(() => {

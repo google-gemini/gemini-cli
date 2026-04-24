@@ -1,0 +1,3 @@
+{"method":"generateContent","response":{"candidates":[{"content":{"parts":[{"text":"0"}],"role":"model"},"finishReason":"STOP","index":0}]}}
+{"method":"generateContentStream","response":[{"candidates":[{"content":{"parts":[{"functionCall":{"name":"run_shell_command","args":{"command":"yes | head -n 1000000"}}}],"role":"model"},"finishReason":"STOP","index":0}]}]}
+{"method":"generateContentStream","response":[{"candidates":[{"content":{"parts":[{"text":"I have generated 1M lines of output."}],"role":"model"},"finishReason":"STOP","index":0}]}]}
