@@ -7,6 +7,9 @@
     "type": "git",
     "url": "git+https://github.com/google-gemini/gemini-cli.git"
   },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
   "type": "module",
   "main": "dist/index.js",
   "bin": {
