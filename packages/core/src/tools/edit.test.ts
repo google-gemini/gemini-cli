@@ -9,6 +9,7 @@
 const mockFixLLMEditWithInstruction = vi.hoisted(() => vi.fn());
 const mockGenerateJson = vi.hoisted(() => vi.fn());
 const mockOpenDiff = vi.hoisted(() => vi.fn());
+const mockCreatePreWriteBackup = vi.hoisted(() => vi.fn());
 
 import { IdeClient } from '../ide/ide-client.js';
 
@@ -31,6 +32,10 @@ vi.mock('../core/client.js', () => ({
 
 vi.mock('../utils/editor.js', () => ({
   openDiff: mockOpenDiff,
+}));
+
+vi.mock('./file-backup.js', () => ({
+  createPreWriteBackup: mockCreatePreWriteBackup,
 }));
 
 vi.mock('./jit-context.js', () => ({
@@ -161,6 +166,12 @@ describe('EditTool', () => {
     (mockConfig.getApprovalMode as Mock).mockReturnValue(ApprovalMode.DEFAULT);
 
     mockFixLLMEditWithInstruction.mockReset();
+    mockCreatePreWriteBackup.mockReset();
+    mockCreatePreWriteBackup.mockResolvedValue({
+      ok: true,
+      version: 1,
+      backupPath: '/mock/backup/test.v1',
+    });
     mockFixLLMEditWithInstruction.mockResolvedValue({
       noChangesRequired: false,
       search: '',
@@ -850,6 +861,84 @@ function doIt() {
         /A secondary check by an LLM determined/,
       );
       expect(fs.readFileSync(filePath, 'utf8')).toBe(initialContent); // File is unchanged
+    });
+
+    describe('pre-write backup', () => {
+      it('should abort edit and return FILE_WRITE_FAILURE when backup fails for an existing file', async () => {
+        const filePath = path.join(rootDir, 'backup_fail_edit.txt');
+        const initialContent = 'initial content to protect';
+        fs.writeFileSync(filePath, initialContent, 'utf8');
+
+        mockCreatePreWriteBackup.mockResolvedValueOnce({
+          ok: false,
+          newFile: false,
+        });
+        const writeFileSpy = vi.spyOn(fileSystemService, 'writeTextFile');
+
+        const params: EditToolParams = {
+          file_path: filePath,
+          instruction: 'Replace initial with updated',
+          old_string: 'initial',
+          new_string: 'updated',
+        };
+
+        const invocation = tool.build(params);
+        const result = await invocation.execute({
+          abortSignal: new AbortController().signal,
+        });
+
+        expect(result.error?.type).toBe(ToolErrorType.FILE_WRITE_FAILURE);
+        expect(result.llmContent).toContain(
+          'Write aborted to prevent data loss',
+        );
+        expect(writeFileSpy).not.toHaveBeenCalled();
+        expect(fs.readFileSync(filePath, 'utf8')).toBe(initialContent);
+      });
+
+      it('should include restore_file hint in success message when backup succeeds', async () => {
+        const filePath = path.join(rootDir, 'backup_hint_edit.txt');
+        const initialContent = 'some existing content here';
+        fs.writeFileSync(filePath, initialContent, 'utf8');
+
+        mockCreatePreWriteBackup.mockResolvedValueOnce({
+          ok: true,
+          version: 5,
+          backupPath: '/mock/backup/test.v5',
+        });
+
+        const params: EditToolParams = {
+          file_path: filePath,
+          instruction: 'Replace existing with modified',
+          old_string: 'existing',
+          new_string: 'modified',
+        };
+
+        const invocation = tool.build(params);
+        const result = await invocation.execute({
+          abortSignal: new AbortController().signal,
+        });
+
+        expect(result.error).toBeUndefined();
+        expect(result.llmContent).toContain('Backed up as version 5');
+        expect(result.llmContent).toContain('restore_file(');
+        expect(result.llmContent).toContain('5) to revert');
+      });
+
+      it('should not call createPreWriteBackup when creating a new file', async () => {
+        const filePath = path.join(rootDir, 'new_file_no_backup.txt');
+
+        const params: EditToolParams = {
+          file_path: filePath,
+          instruction: 'Create a new file',
+          old_string: '',
+          new_string: 'brand new content',
+        };
+
+        const invocation = tool.build(params);
+        await invocation.execute({ abortSignal: new AbortController().signal });
+
+        expect(mockCreatePreWriteBackup).not.toHaveBeenCalled();
+      });
     });
   });
 

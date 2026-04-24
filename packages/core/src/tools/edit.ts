@@ -59,6 +59,7 @@ import { resolveToolDeclaration } from './definitions/resolver.js';
 import { detectOmissionPlaceholders } from './omissionPlaceholderDetector.js';
 import { discoverJitContext, appendJitContext } from './jit-context.js';
 import { resolveAndValidatePlanPath } from '../utils/planUtils.js';
+import { createPreWriteBackup } from './file-backup.js';
 
 const ENABLE_FUZZY_MATCH_RECOVERY = true;
 const FUZZY_MATCH_THRESHOLD = 0.1; // Allow up to 10% weighted difference
@@ -898,6 +899,33 @@ class EditToolInvocation
       if (useCRLF) {
         finalContent = finalContent.replace(/\r?\n/g, '\r\n');
       }
+
+      let backupVersion: number | null = null;
+      if (!editData.isNewFile) {
+        const backupResult = await createPreWriteBackup(
+          this.resolvedPath,
+          editData.currentContent!,
+          this.config.getSessionId(),
+          this.config.storage.getProjectTempDir(),
+        );
+        if (!backupResult.ok) {
+          if (!backupResult.newFile) {
+            const rel = makeRelative(
+              this.resolvedPath,
+              this.config.getTargetDir(),
+            );
+            const msg = `Cannot back up ${shortenPath(rel)} before writing. Write aborted to prevent data loss.`;
+            return {
+              llmContent: msg,
+              returnDisplay: msg,
+              error: { message: msg, type: ToolErrorType.FILE_WRITE_FAILURE },
+            };
+          }
+        } else {
+          backupVersion = backupResult.version;
+        }
+      }
+
       await this.config
         .getFileSystemService()
         .writeTextFile(this.resolvedPath, finalContent);
@@ -982,6 +1010,16 @@ ${snippet}`);
       if (this.params.modified_by_user) {
         llmSuccessMessageParts.push(
           `User modified the \`new_string\` content to be: ${this.params.new_string}.`,
+        );
+      }
+
+      if (backupVersion !== null) {
+        const relativePath = makeRelative(
+          this.resolvedPath,
+          this.config.getTargetDir(),
+        );
+        llmSuccessMessageParts.push(
+          `Backed up as version ${backupVersion} — restore_file("${relativePath}", ${backupVersion}) to revert.`,
         );
       }
 

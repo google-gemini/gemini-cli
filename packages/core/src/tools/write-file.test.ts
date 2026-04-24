@@ -36,6 +36,7 @@ import os from 'node:os';
 import { GeminiClient } from '../core/client.js';
 import type { BaseLlmClient } from '../core/baseLlmClient.js';
 import { ensureCorrectFileContent } from '../utils/editCorrector.js';
+import { createPreWriteBackup } from './file-backup.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
 import { IdeClient, type DiffUpdateResult } from '../ide/ide-client.js';
 import { WorkspaceContext } from '../utils/workspaceContext.js';
@@ -108,6 +109,7 @@ const mockConfigInternal = {
   getDisableLLMCorrection: vi.fn(() => true),
   isPlanMode: vi.fn(() => false),
   getActiveModel: () => 'test-model',
+  getSessionId: () => 'test-session-id',
   storage: {
     getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
   },
@@ -123,6 +125,10 @@ vi.mock('./jit-context.js', () => ({
     if (!context) return content;
     return `${content}\n\n--- Newly Discovered Project Context ---\n${context}\n--- End Project Context ---`;
   }),
+}));
+
+vi.mock('./file-backup.js', () => ({
+  createPreWriteBackup: vi.fn(),
 }));
 
 // --- END MOCKS ---
@@ -205,6 +211,12 @@ describe('WriteFileTool', () => {
     mockConfigInternal.getApprovalMode.mockReturnValue(ApprovalMode.DEFAULT);
     mockConfigInternal.setApprovalMode.mockClear();
     mockEnsureCorrectFileContent.mockReset();
+    vi.mocked(createPreWriteBackup).mockReset();
+    vi.mocked(createPreWriteBackup).mockResolvedValue({
+      ok: true,
+      version: 1,
+      backupPath: '/mock/backup/test.v1',
+    });
 
     // Default mock implementations that return valid structures
     mockEnsureCorrectFileContent.mockImplementation(
@@ -892,6 +904,68 @@ describe('WriteFileTool', () => {
       expect(result.llmContent).not.toContain('Line 100');
       // Should indicate truncation
       expect(result.llmContent).toContain('...');
+    });
+
+    describe('pre-write backup', () => {
+      it('should abort write and return FILE_WRITE_FAILURE when backup fails for an existing file', async () => {
+        const filePath = path.join(rootDir, 'backup_fail_abort.txt');
+        const originalContent = 'original content that must not be lost';
+        fs.writeFileSync(filePath, originalContent, 'utf8');
+
+        const newContent = 'new content attempting to replace';
+        mockEnsureCorrectFileContent.mockResolvedValue(newContent);
+        vi.mocked(createPreWriteBackup).mockResolvedValue({
+          ok: false,
+          newFile: false,
+        });
+        const writeFileSpy = vi.spyOn(fsService, 'writeTextFile');
+
+        const params = { file_path: filePath, content: newContent };
+        const invocation = tool.build(params);
+        const result = await invocation.execute({ abortSignal });
+
+        expect(result.error?.type).toBe(ToolErrorType.FILE_WRITE_FAILURE);
+        expect(result.llmContent).toContain(
+          'Write aborted to prevent data loss',
+        );
+        expect(writeFileSpy).not.toHaveBeenCalled();
+        expect(fs.readFileSync(filePath, 'utf8')).toBe(originalContent);
+      });
+
+      it('should include restore_file hint in success message when backup succeeds', async () => {
+        const filePath = path.join(rootDir, 'backup_hint.txt');
+        fs.writeFileSync(filePath, 'original content', 'utf8');
+
+        const newContent = 'replaced content';
+        mockEnsureCorrectFileContent.mockResolvedValue(newContent);
+        vi.mocked(createPreWriteBackup).mockResolvedValue({
+          ok: true,
+          version: 7,
+          backupPath: '/mock/backup/test.v7',
+        });
+
+        const params = { file_path: filePath, content: newContent };
+        const invocation = tool.build(params);
+        const result = await invocation.execute({ abortSignal });
+
+        expect(result.error).toBeUndefined();
+        expect(result.llmContent).toContain('Backed up as version 7');
+        expect(result.llmContent).toContain('restore_file(');
+        expect(result.llmContent).toContain('7) to revert');
+      });
+
+      it('should not call createPreWriteBackup when writing a new file', async () => {
+        const filePath = path.join(rootDir, 'brand_new_no_backup.txt');
+        const content = 'brand new file content';
+        mockEnsureCorrectFileContent.mockResolvedValue(content);
+
+        const params = { file_path: filePath, content };
+        const invocation = tool.build(params);
+        const result = await invocation.execute({ abortSignal });
+
+        expect(result.error).toBeUndefined();
+        expect(vi.mocked(createPreWriteBackup)).not.toHaveBeenCalled();
+      });
     });
   });
 

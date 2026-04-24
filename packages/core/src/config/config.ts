@@ -40,6 +40,7 @@ import { ActivateSkillTool } from '../tools/activate-skill.js';
 import { EditTool } from '../tools/edit.js';
 import { ShellTool } from '../tools/shell.js';
 import { WriteFileTool } from '../tools/write-file.js';
+import { RestoreFileTool } from '../tools/restore-file.js';
 import { WebFetchTool } from '../tools/web-fetch.js';
 import {
   MemoryTool,
@@ -3696,6 +3697,9 @@ export class Config implements McpContext, AgentLoopContext {
     );
     maybeRegister(WriteFileTool, () =>
       registry.registerTool(new WriteFileTool(this, this.messageBus)),
+    );
+    maybeRegister(RestoreFileTool, () =>
+      registry.registerTool(new RestoreFileTool(this, this.messageBus)),
     );
     maybeRegister(WebFetchTool, () =>
       registry.registerTool(new WebFetchTool(this, this.messageBus)),

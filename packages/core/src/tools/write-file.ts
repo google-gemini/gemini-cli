@@ -52,6 +52,7 @@ import { detectOmissionPlaceholders } from './omissionPlaceholderDetector.js';
 import { resolveAndValidatePlanPath } from '../utils/planUtils.js';
 import { isGemini3Model } from '../config/models.js';
 import { discoverJitContext, appendJitContext } from './jit-context.js';
+import { createPreWriteBackup } from './file-backup.js';
 
 /**
  * Parameters for the WriteFile tool
@@ -340,6 +341,32 @@ class WriteFileToolInvocation extends BaseToolInvocation<
         finalContent = finalContent.replace(/\r?\n/g, '\r\n');
       }
 
+      let backupVersion: number | null = null;
+      if (!isNewFile) {
+        const backupResult = await createPreWriteBackup(
+          this.resolvedPath,
+          originalContent,
+          this.config.getSessionId(),
+          this.config.storage.getProjectTempDir(),
+        );
+        if (!backupResult.ok) {
+          if (!backupResult.newFile) {
+            const rel = makeRelative(
+              this.resolvedPath,
+              this.config.getTargetDir(),
+            );
+            const msg = `Cannot back up ${shortenPath(rel)} before writing. Write aborted to prevent data loss.`;
+            return {
+              llmContent: msg,
+              returnDisplay: msg,
+              error: { message: msg, type: ToolErrorType.FILE_WRITE_FAILURE },
+            };
+          }
+        } else {
+          backupVersion = backupResult.version;
+        }
+      }
+
       await this.config
         .getFileSystemService()
         .writeTextFile(this.resolvedPath, finalContent);
@@ -389,6 +416,16 @@ class WriteFileToolInvocation extends BaseToolInvocation<
         5,
       );
       llmSuccessMessageParts.push(`Here is the updated code:\n${snippet}`);
+
+      if (backupVersion !== null) {
+        const relativePath = makeRelative(
+          this.resolvedPath,
+          this.config.getTargetDir(),
+        );
+        llmSuccessMessageParts.push(
+          `Backed up as version ${backupVersion} — restore_file("${relativePath}", ${backupVersion}) to revert.`,
+        );
+      }
 
       // Log file operation for telemetry (without diff_stat to avoid double-counting)
       const mimetype = getSpecificMimeType(this.resolvedPath);
