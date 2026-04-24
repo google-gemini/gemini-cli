@@ -143,16 +143,27 @@ export function useToolScheduler(
         const prevCalls = prev[event.schedulerId] ?? [];
         const prevCallIds = new Set(prevCalls.map((tc) => tc.request.callId));
 
-        // For non-root schedulers, we only show tool calls that:
+        // For non-root schedulers, we show tool calls that:
         // 1. Are currently awaiting approval.
-        // 2. Were previously shown (e.g., they are now executing or completed).
-        // This prevents "thinking" tools (reads/searches) from flickering in the UI
-        // unless they specifically required user interaction.
+        // 2. Are actively executing — two distinct reasons:
+        //    a. Interactive shell calls (pid present) need to surface so the
+        //       user can see PTY prompts. (See also: PR #21268 which fixes the
+        //       narrower case of pid-bearing shell calls for issue #21052.)
+        //    b. All other executing subagent calls (reads, searches, MCP, etc.)
+        //       must be present in state so the task-tree can build the full
+        //       parentCallId hierarchy. Without them, subagent work is invisible
+        //       in the tree regardless of nesting depth.
+        // 3. Were previously shown (now completing or completed).
+        //
+        // Calls still in Scheduled/Validating that have never been shown and
+        // don't require approval remain hidden to prevent transient flicker in
+        // the flat-list UI.
         const filteredToolCalls = isRoot
           ? event.toolCalls
           : event.toolCalls.filter(
               (tc) =>
                 tc.status === CoreToolCallStatus.AwaitingApproval ||
+                tc.status === CoreToolCallStatus.Executing ||
                 prevCallIds.has(tc.request.callId),
             );
 
