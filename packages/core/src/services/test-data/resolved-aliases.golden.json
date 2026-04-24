@@ -97,6 +97,30 @@
       "topK": 64
     }
   },
+  "gemma-4-31b-it": {
+    "model": "gemma-4-31b-it",
+    "generateContentConfig": {
+      "temperature": 1,
+      "topP": 0.95,
+      "thinkingConfig": {
+        "includeThoughts": true,
+        "thinkingLevel": "HIGH"
+      },
+      "topK": 64
+    }
+  },
+  "gemma-4-26b-a4b-it": {
+    "model": "gemma-4-26b-a4b-it",
+    "generateContentConfig": {
+      "temperature": 1,
+      "topP": 0.95,
+      "thinkingConfig": {
+        "includeThoughts": true,
+        "thinkingLevel": "HIGH"
+      },
+      "topK": 64
+    }
+  },
   "gemini-2.5-flash-base": {
     "model": "gemini-2.5-flash",
     "generateContentConfig": {
