@@ -60,6 +60,7 @@ import {
 import { GeminiClient } from '../core/client.js';
 import { BaseLlmClient } from '../core/baseLlmClient.js';
 import { LocalLiteRtLmClient } from '../core/localLiteRtLmClient.js';
+import { OllamaCompressClient } from '../core/ollamaCompressClient.js';
 import type { HookDefinition, HookEventName } from '../hooks/types.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { GitService } from '../services/gitService.js';
@@ -236,6 +237,13 @@ export interface GemmaModelRouterSettings {
 export interface ADKSettings {
   agentSessionNoninteractiveEnabled?: boolean;
   agentSessionInteractiveEnabled?: boolean;
+}
+
+export interface OllamaCompressSettings {
+  /** Ollama base URL, e.g. http://localhost:11434 */
+  host: string;
+  /** Model to use for compression, e.g. gemma3:4b */
+  model: string;
 }
 
 export interface ExtensionSetting {
@@ -740,6 +748,7 @@ export interface ConfigParameters {
     overageStrategy?: OverageStrategy;
   };
   vertexAiRouting?: VertexAiRoutingConfig;
+  ollamaCompress?: OllamaCompressSettings;
 }
 
 export class Config implements McpContext, AgentLoopContext {
@@ -907,6 +916,8 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly outputSettings: OutputSettings;
 
   private readonly gemmaModelRouter: GemmaModelRouterSettings;
+  private readonly ollamaCompressSettings: OllamaCompressSettings | undefined;
+  private ollamaCompressClient?: OllamaCompressClient;
   private readonly agentSessionNoninteractiveEnabled: boolean;
   private readonly agentSessionInteractiveEnabled: boolean;
 
@@ -1353,6 +1364,8 @@ export class Config implements McpContext, AgentLoopContext {
       },
     };
 
+    this.ollamaCompressSettings = params.ollamaCompress;
+
     this.agentSessionNoninteractiveEnabled =
       params.adk?.agentSessionNoninteractiveEnabled ?? false;
     this.agentSessionInteractiveEnabled =
@@ -1692,6 +1705,23 @@ export class Config implements McpContext, AgentLoopContext {
       }
     }
     return this.baseLlmClient;
+  }
+
+  /**
+   * Returns an OllamaCompressClient if ollamaCompress settings are configured,
+   * otherwise falls back to BaseLlmClient.
+   */
+  getCompressionLlmClient(): OllamaCompressClient | BaseLlmClient {
+    if (this.ollamaCompressSettings) {
+      if (!this.ollamaCompressClient) {
+        this.ollamaCompressClient = new OllamaCompressClient(
+          this.ollamaCompressSettings.host,
+          this.ollamaCompressSettings.model,
+        );
+      }
+      return this.ollamaCompressClient;
+    }
+    return this.getBaseLlmClient();
   }
 
   getLocalLiteRtLmClient(): LocalLiteRtLmClient {

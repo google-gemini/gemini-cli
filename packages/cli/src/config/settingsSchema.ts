@@ -2297,6 +2297,37 @@ const SETTINGS_SCHEMA = {
           },
         },
       },
+      ollamaCompress: {
+        type: 'object',
+        label: 'Ollama Compression',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: {},
+        description:
+          'Route /compress summarisation through a local Ollama model (experimental).',
+        showInDialog: false,
+        properties: {
+          host: {
+            type: 'string',
+            label: 'Ollama Host',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: 'http://localhost:11434',
+            description: 'Base URL of the local Ollama server.',
+            showInDialog: true,
+          },
+          model: {
+            type: 'string',
+            label: 'Ollama Model',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: 'gemma3:4b',
+            description:
+              'Ollama model to use for /compress summarisation. Only text in/out — no tool call structure is sent.',
+            showInDialog: true,
+          },
+        },
+      },
       memoryV2: {
         type: 'boolean',
         label: 'Memory v2',

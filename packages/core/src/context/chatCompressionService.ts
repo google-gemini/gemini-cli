@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Content } from '@google/genai';
+import type { Content, GenerateContentResponse } from '@google/genai';
 import type { Config } from '../config/config.js';
 import type { GeminiChat } from '../core/geminiChat.js';
 import { type ChatCompressionInfo, CompressionStatus } from '../core/turn.js';
@@ -33,6 +33,8 @@ import {
   PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL,
 } from '../config/models.js';
 import { PreCompressTrigger } from '../hooks/types.js';
+import type { GenerateContentOptions } from '../core/baseLlmClient.js';
+import { OllamaUnavailableError } from '../core/ollamaCompressClient.js';
 
 /**
  * Default threshold for compression token count as a fraction of the model's
@@ -234,6 +236,30 @@ async function truncateHistoryToBudget(
   return truncatedHistory;
 }
 
+/**
+ * Routes a single generateContent call through the compression LLM client.
+ * If the configured client is Ollama and it fails, transparently falls back
+ * to the main BaseLlmClient so compression never hard-fails due to Ollama
+ * being unavailable.
+ */
+async function callCompressionLlm(
+  config: Config,
+  options: GenerateContentOptions,
+): Promise<GenerateContentResponse> {
+  const client = config.getCompressionLlmClient();
+  try {
+    return await client.generateContent(options);
+  } catch (e) {
+    if (e instanceof OllamaUnavailableError) {
+      debugLogger.warn(
+        `Ollama unavailable for compression (${e.message}), falling back to main model`,
+      );
+      return config.getBaseLlmClient().generateContent(options);
+    }
+    throw e;
+  }
+}
+
 export class ChatCompressionService {
   async compress(
     chat: GeminiChat,
@@ -356,7 +382,7 @@ export class ChatCompressionService {
       ? 'A previous <state_snapshot> exists in the history. You MUST integrate all still-relevant information from that snapshot into the new one, updating it with the more recent events. Do not lose established constraints or critical knowledge.'
       : 'Generate a new <state_snapshot> based on the provided history.';
 
-    const summaryResponse = await config.getBaseLlmClient().generateContent({
+    const summaryResponse = await callCompressionLlm(config, {
       modelConfigKey: { model: modelStringToModelConfigAlias(model) },
       contents: [
         ...historyForSummarizer,
@@ -379,30 +405,28 @@ export class ChatCompressionService {
 
     // Phase 3: The "Probe" Verification (Self-Correction)
     // We perform a second lightweight turn to ensure no critical information was lost.
-    const verificationResponse = await config
-      .getBaseLlmClient()
-      .generateContent({
-        modelConfigKey: { model: modelStringToModelConfigAlias(model) },
-        contents: [
-          ...historyForSummarizer,
-          {
-            role: 'model',
-            parts: [{ text: summary }],
-          },
-          {
-            role: 'user',
-            parts: [
-              {
-                text: 'Critically evaluate the <state_snapshot> you just generated. Did you omit any specific technical details, file paths, tool results, or user constraints mentioned in the history? If anything is missing or could be more precise, generate a FINAL, improved <state_snapshot>. Otherwise, repeat the exact same <state_snapshot> again.',
-              },
-            ],
-          },
-        ],
-        systemInstruction: { text: getCompressionPrompt(config) },
-        promptId: `${promptId}-verify`,
-        role: LlmRole.UTILITY_COMPRESSOR,
-        abortSignal: abortSignal ?? new AbortController().signal,
-      });
+    const verificationResponse = await callCompressionLlm(config, {
+      modelConfigKey: { model: modelStringToModelConfigAlias(model) },
+      contents: [
+        ...historyForSummarizer,
+        {
+          role: 'model',
+          parts: [{ text: summary }],
+        },
+        {
+          role: 'user',
+          parts: [
+            {
+              text: 'Critically evaluate the <state_snapshot> you just generated. Did you omit any specific technical details, file paths, tool results, or user constraints mentioned in the history? If anything is missing or could be more precise, generate a FINAL, improved <state_snapshot>. Otherwise, repeat the exact same <state_snapshot> again.',
+            },
+          ],
+        },
+      ],
+      systemInstruction: { text: getCompressionPrompt(config) },
+      promptId: `${promptId}-verify`,
+      role: LlmRole.UTILITY_COMPRESSOR,
+      abortSignal: abortSignal ?? new AbortController().signal,
+    });
 
     const finalSummary = (
       getResponseText(verificationResponse)?.trim() || summary
