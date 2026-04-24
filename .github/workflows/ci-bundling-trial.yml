@@ -44,8 +44,9 @@ jobs:
       - name: 'Configure npm for GitHub Packages'
         run: |
           rm -f .npmrc
-          echo "//npm.pkg.github.com/:_authToken=\${{ secrets.GITHUB_TOKEN }}" > ~/.npmrc
-          echo "@google-gemini:registry=https://npm.pkg.github.com" >> ~/.npmrc
+          echo ""@google-gemini:registry=https://npm.pkg.github.com"" > ~/.npmrc
+          echo ""//npm.pkg.github.com/:_authToken=\${{ secrets.GITHUB_TOKEN }}"" >> ~/.npmrc
+          echo ""@google:registry=https://wombat-dressing-room.appspot.com"" >> ~/.npmrc
         shell: 'bash'
 
       - name: 'Publish Packages'
