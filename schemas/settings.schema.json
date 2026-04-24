@@ -702,6 +702,37 @@
           "markdownDescription": "Skip the next speaker check.\n\n- Category: `Model`\n- Requires restart: `no`\n- Default: `true`",
           "default": true,
           "type": "boolean"
+        },
+        "autoRouting": {
+          "title": "Auto Routing",
+          "description": "Settings for automatic model routing.",
+          "markdownDescription": "Settings for automatic model routing.\n\n- Category: `Model`\n- Requires restart: `no`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "properties": {
+            "bestEffortPro": {
+              "title": "Best Effort Pro",
+              "description": "Always prefer the Pro model unless it is unavailable (e.g., due to timeouts or quota), ignoring other routing hints.",
+              "markdownDescription": "Always prefer the Pro model unless it is unavailable (e.g., due to timeouts or quota), ignoring other routing hints.\n\n- Category: `Model`\n- Requires restart: `no`\n- Default: `false`",
+              "default": false,
+              "type": "boolean"
+            },
+            "proTimeoutMinutes": {
+              "title": "Pro Timeout (Minutes)",
+              "description": "If a Pro request takes longer than this many minutes, it will be marked as temporarily unavailable and fallback to Flash.",
+              "markdownDescription": "If a Pro request takes longer than this many minutes, it will be marked as temporarily unavailable and fallback to Flash.\n\n- Category: `Model`\n- Requires restart: `no`\n- Default: `5`",
+              "default": 5,
+              "type": "number"
+            },
+            "proTimeoutFallbackDurationMinutes": {
+              "title": "Pro Timeout Fallback Duration (Minutes)",
+              "description": "How long to route to Flash after Pro times out.",
+              "markdownDescription": "How long to route to Flash after Pro times out.\n\n- Category: `Model`\n- Requires restart: `no`\n- Default: `60`",
+              "default": 60,
+              "type": "number"
+            }
+          },
+          "additionalProperties": false
         }
       },
       "additionalProperties": false

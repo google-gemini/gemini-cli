@@ -99,13 +99,16 @@ they appear in the UI.
 
 ### Model
 
-| UI Label                      | Setting                      | Description                                                                            | Default     |
-| ----------------------------- | ---------------------------- | -------------------------------------------------------------------------------------- | ----------- |
-| Model                         | `model.name`                 | The Gemini model to use for conversations.                                             | `undefined` |
-| Max Session Turns             | `model.maxSessionTurns`      | Maximum number of user/model/tool turns to keep in a session. -1 means unlimited.      | `-1`        |
-| Context Compression Threshold | `model.compressionThreshold` | The fraction of context usage at which to trigger context compression (e.g. 0.2, 0.3). | `0.5`       |
-| Disable Loop Detection        | `model.disableLoopDetection` | Disable automatic detection and prevention of infinite loops.                          | `false`     |
-| Skip Next Speaker Check       | `model.skipNextSpeakerCheck` | Skip the next speaker check.                                                           | `true`      |
+| UI Label                                | Setting                                               | Description                                                                                                               | Default     |
+| --------------------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ----------- |
+| Model                                   | `model.name`                                          | The Gemini model to use for conversations.                                                                                | `undefined` |
+| Max Session Turns                       | `model.maxSessionTurns`                               | Maximum number of user/model/tool turns to keep in a session. -1 means unlimited.                                         | `-1`        |
+| Context Compression Threshold           | `model.compressionThreshold`                          | The fraction of context usage at which to trigger context compression (e.g. 0.2, 0.3).                                    | `0.5`       |
+| Disable Loop Detection                  | `model.disableLoopDetection`                          | Disable automatic detection and prevention of infinite loops.                                                             | `false`     |
+| Skip Next Speaker Check                 | `model.skipNextSpeakerCheck`                          | Skip the next speaker check.                                                                                              | `true`      |
+| Best Effort Pro                         | `model.autoRouting.bestEffortPro`                     | Always prefer the Pro model unless it is unavailable (e.g., due to timeouts or quota), ignoring other routing hints.      | `false`     |
+| Pro Timeout (Minutes)                   | `model.autoRouting.proTimeoutMinutes`                 | If a Pro request takes longer than this many minutes, it will be marked as temporarily unavailable and fallback to Flash. | `5`         |
+| Pro Timeout Fallback Duration (Minutes) | `model.autoRouting.proTimeoutFallbackDurationMinutes` | How long to route to Flash after Pro times out.                                                                           | `60`        |
 
 ### Agents
 

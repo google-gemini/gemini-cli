@@ -325,11 +325,19 @@ export class BaseLlmClient {
         );
       };
 
+      const proTimeoutMinutes = await this.config.getProTimeoutMinutes();
+      const proTimeoutFallbackDurationMinutes =
+        await this.config.getProTimeoutFallbackDurationMinutes();
+
       return await retryWithBackoff(apiCall, {
         shouldRetryOnContent,
         maxAttempts:
           availabilityMaxAttempts ?? maxAttempts ?? DEFAULT_MAX_ATTEMPTS,
         getAvailabilityContext,
+        timeoutFallback: {
+          timeoutMs: proTimeoutMinutes * 60 * 1000,
+          fallbackDurationMs: proTimeoutFallbackDurationMinutes * 60 * 1000,
+        },
         onPersistent429: this.config.isInteractive()
           ? (authType, error) =>
               handleFallback(this.config, currentModel, authType, error)

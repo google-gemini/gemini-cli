@@ -18,6 +18,7 @@ import { NumericalClassifierStrategy } from './strategies/numericalClassifierStr
 import { CompositeStrategy } from './strategies/compositeStrategy.js';
 import { FallbackStrategy } from './strategies/fallbackStrategy.js';
 import { OverrideStrategy } from './strategies/overrideStrategy.js';
+import { BestEffortProStrategy } from './strategies/bestEffortProStrategy.js';
 import { ApprovalModeStrategy } from './strategies/approvalModeStrategy.js';
 
 import { logModelRouting } from '../telemetry/loggers.js';
@@ -42,6 +43,9 @@ export class ModelRouterService {
     // Order matters here. Fallback and override are checked first.
     strategies.push(new FallbackStrategy());
     strategies.push(new OverrideStrategy());
+
+    // Best Effort Pro is next.
+    strategies.push(new BestEffortProStrategy());
 
     // Approval mode is next.
     strategies.push(new ApprovalModeStrategy());

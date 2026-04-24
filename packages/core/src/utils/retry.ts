@@ -37,6 +37,10 @@ export interface RetryOptions {
   signal?: AbortSignal;
   getAvailabilityContext?: () => RetryAvailabilityContext | undefined;
   onRetry?: (attempt: number, error: unknown, delayMs: number) => void;
+  timeoutFallback?: {
+    timeoutMs: number;
+    fallbackDurationMs: number;
+  };
 }
 
 const DEFAULT_RETRY_OPTIONS: RetryOptions = {
@@ -240,6 +244,7 @@ export async function retryWithBackoff<T>(
     signal,
     getAvailabilityContext,
     onRetry,
+    timeoutFallback,
   } = {
     ...DEFAULT_RETRY_OPTIONS,
     shouldRetryOnError: isRetryableError,
@@ -248,6 +253,7 @@ export async function retryWithBackoff<T>(
 
   let attempt = 0;
   let currentDelay = initialDelayMs;
+  let startTime = Date.now();
   const throwIfAborted = () => {
     if (signal?.aborted) {
       throw createAbortError();
@@ -293,6 +299,42 @@ export async function retryWithBackoff<T>(
       const classifiedError = classifyGoogleError(error);
 
       const errorCode = getErrorStatus(error);
+
+      const isTimeout =
+        (error instanceof Error &&
+          error.message.toLowerCase().includes('timeout')) ||
+        getRetryErrorType(error) === 'ETIMEDOUT' ||
+        getRetryErrorType(error) === 'FETCH_FAILED';
+
+      if (isTimeout && timeoutFallback) {
+        if (Date.now() - startTime >= timeoutFallback.timeoutMs) {
+          const successContext = getAvailabilityContext?.();
+          if (successContext) {
+            successContext.service.markTemporarilyUnavailable(
+              successContext.policy.model,
+              'timeout',
+              timeoutFallback.fallbackDurationMs,
+            );
+          }
+          if (onPersistent429) {
+            try {
+              const fallbackModel = await onPersistent429(
+                authType,
+                new Error('Request timed out'),
+              );
+              if (fallbackModel) {
+                attempt = 0;
+                currentDelay = initialDelayMs;
+                startTime = Date.now();
+                continue;
+              }
+            } catch (fallbackError) {
+              debugLogger.warn('Model fallback failed:', fallbackError);
+            }
+          }
+          throw error;
+        }
+      }
 
       if (
         classifiedError instanceof TerminalQuotaError ||
