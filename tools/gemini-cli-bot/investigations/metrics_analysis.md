@@ -73,16 +73,28 @@ Before proposing an intervention, accurately identify the blocker:
   (do not nudge the author).
 - **Waiting on System (CI/Infra)**: Needs tooling fixes or reporting.
 
-### 5. Record Findings & Propose Actions
+### 5. Policy Critique & Evaluation
+
+- **Review Existing Policies**: Examine the existing automation in
+  `.github/workflows/` and scripts in `tools/gemini-cli-bot/processes/scripts/`.
+- **Analyze Effectiveness**: Based on your metrics analysis, determine if
+  current policies are achieving their goals (e.g., Is triage reducing latency?
+  Are stale issues closed as expected?).
+- **Identify Gaps**: Where is the automation failing? Are there manual tasks
+  that should be automated?
+
+### 6. Record Findings & Propose Actions
 
 - Document your formulated hypotheses, the evidence gathered, and your final
   conclusions in `tools/gemini-cli-bot/lessons-learned.md`.
 - Propose specific, data-backed actions or script updates to address the root
-  cause. Ensure proposed actions align with the Repo Policy Priorities and
-  include concepts like graceful closures and terminal escalations to prevent
-  spam.
+  cause and any identified policy gaps. Ensure proposed actions align with the
+  Repo Policy Priorities and include concepts like graceful closures and
+  terminal escalations to prevent spam.
+- Recommend specific changes to GitHub Workflows, Triage scripts, or repository
+  `CONTRIBUTING.md`/`GEMINI.md` guidelines.
 
-### 6. Execution Constraints
+### 7. Execution Constraints
 
 - **Do NOT use the `invoke_agent` tool.**
 - **Do NOT delegate tasks to subagents (like the `generalist`).**
