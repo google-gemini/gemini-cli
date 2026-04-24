@@ -52,7 +52,7 @@ jobs:
             
             # Download brain memory (lessons learned and scripts)
             gh run download "$LAST_RUN_ID" -n lessons-learned -D tools/gemini-cli-bot/ || echo "lessons-learned not found"
-            gh run download "$LAST_RUN_ID" -n brain-scripts -D tools/gemini-cli-bot/processes/scripts/ || echo "brain-scripts not found"
+            gh run download "$LAST_RUN_ID" -n brain-scripts -D tools/gemini-cli-bot/reflexes/scripts/ || echo "brain-scripts not found"
           else
             echo "No previous successful run found."
           fi
@@ -60,7 +60,7 @@ jobs:
       - name: 'Collect Current Metrics'
         env:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
-        run: 'npm run metrics'
+        run: 'npx tsx tools/gemini-cli-bot/metrics/index.ts'
 
       - name: 'Prepare Metrics'
         run: |
@@ -73,7 +73,7 @@ jobs:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           GEMINI_MODEL: 'gemini-3-flash-preview'
-        run: 'npm run brain'
+        run: 'node bundle/gemini.js --policy tools/gemini-cli-bot/ci-policy.toml tools/gemini-cli-bot/brain/metrics.md'
 
       - name: 'Stash Brain Outputs'
         uses: 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02' # ratchet:actions/upload-artifact@v4
@@ -81,7 +81,7 @@ jobs:
           name: 'brain-outputs'
           path: |
             tools/gemini-cli-bot/lessons-learned.md
-            tools/gemini-cli-bot/processes/scripts/
+            tools/gemini-cli-bot/reflexes/scripts/
           retention-days: 1
 
   publish:
@@ -110,5 +110,5 @@ jobs:
         uses: 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02' # ratchet:actions/upload-artifact@v4
         with:
           name: 'brain-scripts'
-          path: 'temp_outputs/processes/scripts/'
+          path: 'temp_outputs/reflexes/scripts/'
           retention-days: 90
