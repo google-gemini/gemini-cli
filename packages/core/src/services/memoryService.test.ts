@@ -608,6 +608,18 @@ describe('memoryService', () => {
         messageCount: 20,
         lastUpdated: '2025-01-02T02:00:00Z',
       });
+      const mismatchedEndConversation = createConversation({
+        sessionId: 'mismatched-end-session',
+        summary: 'read_file start with a mismatched tool end',
+        messageCount: 20,
+        lastUpdated: '2025-01-02T03:00:00Z',
+      });
+      const mismatchedErrorConversation = createConversation({
+        sessionId: 'mismatched-error-session',
+        summary: 'read_file recovers after a mismatched tool error',
+        messageCount: 20,
+        lastUpdated: '2025-01-02T04:00:00Z',
+      });
 
       const openedPath = path.join(
         chatsDir,
@@ -621,9 +633,25 @@ describe('memoryService', () => {
         chatsDir,
         `${SESSION_FILE_PREFIX}2025-01-02T00-00-rejected.jsonl`,
       );
+      const mismatchedEndPath = path.join(
+        chatsDir,
+        `${SESSION_FILE_PREFIX}2025-01-02T00-00-mismatched-end.jsonl`,
+      );
+      const mismatchedErrorPath = path.join(
+        chatsDir,
+        `${SESSION_FILE_PREFIX}2025-01-02T00-00-mismatched-error.jsonl`,
+      );
       await writeConversationJsonl(openedPath, openedConversation);
       await writeConversationJsonl(failedPath, failedConversation);
       await writeConversationJsonl(rejectedPath, rejectedConversation);
+      await writeConversationJsonl(
+        mismatchedEndPath,
+        mismatchedEndConversation,
+      );
+      await writeConversationJsonl(
+        mismatchedErrorPath,
+        mismatchedErrorConversation,
+      );
       await writeConversationJsonl(
         path.join(
           chatsDir,
@@ -706,6 +734,56 @@ describe('memoryService', () => {
                   callId: 'call-unrelated',
                 },
               });
+              onActivity?.({
+                isSubagentActivityEvent: true,
+                agentName: 'Skill Extractor',
+                type: 'TOOL_CALL_START',
+                data: {
+                  name: 'read_file',
+                  args: { file_path: mismatchedEndPath },
+                  callId: 'call-mismatched-end',
+                },
+              });
+              onActivity?.({
+                isSubagentActivityEvent: true,
+                agentName: 'Skill Extractor',
+                type: 'TOOL_CALL_END',
+                data: {
+                  name: 'write_file',
+                  id: 'call-mismatched-end',
+                  data: {},
+                },
+              });
+              onActivity?.({
+                isSubagentActivityEvent: true,
+                agentName: 'Skill Extractor',
+                type: 'TOOL_CALL_START',
+                data: {
+                  name: 'read_file',
+                  args: { file_path: mismatchedErrorPath },
+                  callId: 'call-mismatched-error',
+                },
+              });
+              onActivity?.({
+                isSubagentActivityEvent: true,
+                agentName: 'Skill Extractor',
+                type: 'ERROR',
+                data: {
+                  name: 'write_file',
+                  callId: 'call-mismatched-error',
+                  error: 'Different tool failed.',
+                },
+              });
+              onActivity?.({
+                isSubagentActivityEvent: true,
+                agentName: 'Skill Extractor',
+                type: 'TOOL_CALL_END',
+                data: {
+                  name: 'read_file',
+                  id: 'call-mismatched-error',
+                  data: {},
+                },
+              });
               return undefined;
             }),
           }) as never,
@@ -741,6 +819,14 @@ describe('memoryService', () => {
           lastUpdated: '2025-01-03T01:00:00Z',
         },
         {
+          sessionId: 'mismatched-error-session',
+          lastUpdated: '2025-01-02T04:00:00Z',
+        },
+        {
+          sessionId: 'mismatched-end-session',
+          lastUpdated: '2025-01-02T03:00:00Z',
+        },
+        {
           sessionId: 'rejected-session',
           lastUpdated: '2025-01-02T02:00:00Z',
         },
@@ -755,11 +841,18 @@ describe('memoryService', () => {
       ]);
       expect(state.runs[0].processedSessions).toEqual([
         {
+          sessionId: 'mismatched-error-session',
+          lastUpdated: '2025-01-02T04:00:00Z',
+        },
+        {
           sessionId: 'opened-session',
           lastUpdated: '2025-01-02T01:00:00Z',
         },
       ]);
-      expect(state.runs[0].sessionIds).toEqual(['opened-session']);
+      expect(state.runs[0].sessionIds).toEqual([
+        'mismatched-error-session',
+        'opened-session',
+      ]);
     });
   });
 

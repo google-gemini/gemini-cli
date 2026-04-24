@@ -17,21 +17,19 @@ import {
 } from './chatRecordingService.js';
 import { CoreToolCallStatus } from '../scheduler/types.js';
 import { SHELL_TOOL_NAME } from '../tools/definitions/base-declarations.js';
-import {
-  sanitizeWorkflowSummaryForScratchpad,
-  summarizeShellCommandForScratchpad,
-} from './sessionScratchpadUtils.js';
+import { summarizeShellCommandForScratchpad } from './sessionScratchpadUtils.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
 const MIN_MESSAGES_FOR_SUMMARY = 1;
 const MAX_SCRATCHPAD_TOOLS = 6;
 const MAX_SCRATCHPAD_PATHS = 4;
+const MAX_SCRATCHPAD_PATH_DEPTH = 6;
 const MAX_WORKFLOW_SUMMARY_LENGTH = 160;
 const VALIDATION_COMMAND_REGEX =
   /\b(test|tests|vitest|jest|pytest|cargo test|npm test|pnpm test|yarn test|bun test|lint|build|check|typecheck)\b/i;
 const PATH_KEY_REGEX = /(path|file|dir|directory|cwd|root)/i;
-const VALIDATION_TOOL_REGEX = /(test|lint|build|check)/i;
+const VALIDATION_TOOL_REGEX = /\b(test|lint|build|check|typecheck)\b/i;
 
 type LoadedSession = ConversationRecord & {
   messageCount?: number;
@@ -142,8 +140,12 @@ function collectPathsFromValue(
   projectRoot: string,
   paths: string[],
   keyHint?: string,
+  depth = 0,
 ): void {
-  if (paths.length >= MAX_SCRATCHPAD_PATHS) {
+  if (
+    paths.length >= MAX_SCRATCHPAD_PATHS ||
+    depth > MAX_SCRATCHPAD_PATH_DEPTH
+  ) {
     return;
   }
 
@@ -161,7 +163,7 @@ function collectPathsFromValue(
 
   if (Array.isArray(value)) {
     for (const item of value) {
-      collectPathsFromValue(item, projectRoot, paths, keyHint);
+      collectPathsFromValue(item, projectRoot, paths, keyHint, depth + 1);
       if (paths.length >= MAX_SCRATCHPAD_PATHS) {
         return;
       }
@@ -174,7 +176,7 @@ function collectPathsFromValue(
   }
 
   for (const [key, nestedValue] of Object.entries(value)) {
-    collectPathsFromValue(nestedValue, projectRoot, paths, key);
+    collectPathsFromValue(nestedValue, projectRoot, paths, key, depth + 1);
     if (paths.length >= MAX_SCRATCHPAD_PATHS) {
       return;
     }
@@ -250,7 +252,7 @@ function buildWorkflowSummary(
     return undefined;
   }
 
-  const summary = sanitizeWorkflowSummaryForScratchpad(parts.join(' | '));
+  const summary = parts.join(' | ');
   if (summary.length === 0) {
     return undefined;
   }
@@ -309,7 +311,7 @@ function hasCurrentMemoryScratchpad(session: LoadedSession): boolean {
 }
 
 function hasSessionSummaryMetadata(session: LoadedSession): boolean {
-  return Boolean(session.summary && hasCurrentMemoryScratchpad(session));
+  return hasCurrentMemoryScratchpad(session);
 }
 
 function getLoadedMessageCount(session: LoadedSession): number {
@@ -329,7 +331,8 @@ async function generateAndSaveSummary(
     return;
   }
 
-  // Skip if both summary fields already exist
+  // Skip if workflow metadata already exists; memory extraction can use the
+  // scratchpad even when summary generation was unavailable.
   if (hasSessionSummaryMetadata(conversation)) {
     debugLogger.debug(
       `[SessionSummary] Summary metadata already exists for ${sessionPath}, skipping`,
@@ -451,8 +454,8 @@ async function generateAndSaveSummary(
 }
 
 /**
- * Finds the most recently updated previous session that still needs summary metadata.
- * Returns the path if it needs a summary or scratchpad, null otherwise.
+ * Finds the most recently updated previous session that still needs workflow metadata.
+ * Returns the path if it needs a scratchpad, null otherwise.
  */
 export async function getPreviousSession(
   config: Config,
@@ -546,7 +549,7 @@ export async function getPreviousSession(
 }
 
 /**
- * Generates summary for the previous session if it lacks one.
+ * Generates summary metadata for the previous session if it lacks a scratchpad.
  * This is designed to be called fire-and-forget on startup.
  */
 export async function generateSummary(config: Config): Promise<void> {

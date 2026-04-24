@@ -16,6 +16,12 @@ import {
   startMemoryService,
 } from '@google/gemini-cli-core';
 import { ComponentRig, componentEvalTest } from './component-test-helper.js';
+import {
+  average,
+  averageNullable,
+  countMatchingIds,
+  roundStat,
+} from './statistics-helper.js';
 import { prepareWorkspace } from './test-helper.js';
 
 interface SeedSession {
@@ -317,9 +323,10 @@ async function seedSessions(
   const projectRoot = config.storage.getProjectRoot();
 
   for (const session of sessions) {
-    const timestamp = new Date(
+    const sessionTimestamp = new Date(
       Date.now() - session.timestampOffsetMinutes * 60 * 1000,
-    )
+    );
+    const timestamp = sessionTimestamp
       .toISOString()
       .slice(0, 16)
       .replace(/:/g, '-');
@@ -330,7 +337,7 @@ async function seedSessions(
       summary: session.summary,
       memoryScratchpad: session.memoryScratchpad,
       startTime: new Date(Date.now() - 7 * 60 * 60 * 1000).toISOString(),
-      lastUpdated: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
+      lastUpdated: sessionTimestamp.toISOString(),
       messages: buildMessages(session.userTurns),
     };
 
@@ -394,37 +401,16 @@ async function runExtractionAndReadState(
   };
 }
 
-function countMatchingSessions(
-  sessions: SessionVersion[],
-  expectedSessionIds: string[],
-): number {
-  const expected = new Set(expectedSessionIds);
-  return sessions.filter((session) => expected.has(session.sessionId)).length;
-}
-
-function roundStat(value: number | null): number | null {
-  return value === null ? null : Number(value.toFixed(4));
-}
-
-function average(values: number[]): number {
-  return values.reduce((sum, value) => sum + value, 0) / values.length;
-}
-
-function averageNullable(values: Array<number | null>): number | null {
-  const numericValues = values.filter((value) => value !== null);
-  return numericValues.length === 0 ? null : average(numericValues);
-}
-
 async function summarizeScratchpadRun(
   outcome: ExtractionOutcome,
   run: ExtractionRunSnapshot,
   scenario: ReturnType<typeof createWorkflowComparisonSessions>,
 ): Promise<ScratchpadRunMetrics> {
-  const relevantReads = countMatchingSessions(
+  const relevantReads = countMatchingIds(
     run.processedSessions,
     scenario.relevantSessionIds,
   );
-  const distractorReads = countMatchingSessions(
+  const distractorReads = countMatchingIds(
     run.processedSessions,
     scenario.distractorSessionIds,
   );
@@ -827,15 +813,13 @@ describe('Skill Extraction', () => {
     files: WORKSPACE_FILES,
     timeout: 360000,
     configOverrides: EXTRACTION_CONFIG_OVERRIDES,
-    setup: async (config) => {
-      const baseline = createWorkflowComparisonSessions(false);
-      await seedSessions(config, baseline.sessions);
-    },
-    assert: async (config) => {
+    assert: async () => {
       const baselineScenario = createWorkflowComparisonSessions(false);
       const enhancedScenario = createWorkflowComparisonSessions(true);
 
-      const baselineOutcome = await runExtractionAndReadState(config);
+      const baselineOutcome = await runScenarioWithFreshRig(
+        baselineScenario.sessions,
+      );
       const enhancedOutcome = await runScenarioWithFreshRig(
         enhancedScenario.sessions,
       );
@@ -849,19 +833,19 @@ describe('Skill Extraction', () => {
       expectSuccessfulExtractionRun(baselineRun);
       expectSuccessfulExtractionRun(enhancedRun);
 
-      const baselineRelevantReads = countMatchingSessions(
+      const baselineRelevantReads = countMatchingIds(
         baselineRun.processedSessions,
         baselineScenario.relevantSessionIds,
       );
-      const enhancedRelevantReads = countMatchingSessions(
+      const enhancedRelevantReads = countMatchingIds(
         enhancedRun.processedSessions,
         enhancedScenario.relevantSessionIds,
       );
-      const baselineDistractorReads = countMatchingSessions(
+      const baselineDistractorReads = countMatchingIds(
         baselineRun.processedSessions,
         baselineScenario.distractorSessionIds,
       );
-      const enhancedDistractorReads = countMatchingSessions(
+      const enhancedDistractorReads = countMatchingIds(
         enhancedRun.processedSessions,
         enhancedScenario.distractorSessionIds,
       );
@@ -880,7 +864,7 @@ describe('Skill Extraction', () => {
       expect(enhancedDistractorReads).toBeLessThanOrEqual(
         baselineDistractorReads,
       );
-      expect(enhancedSignalScore).toBeGreaterThanOrEqual(baselineSignalScore);
+      expect(enhancedSignalScore).toBeGreaterThan(baselineSignalScore);
     },
   });
 

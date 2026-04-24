@@ -207,6 +207,24 @@ describe('sessionSummaryUtils', () => {
       expect(result).toBe(filePath);
     });
 
+    it('should return null if most recent session has scratchpad but no summary', async () => {
+      await writeSession(
+        chatsDir,
+        'session-2024-01-01T10-00-abc12345.json',
+        buildLegacySessionJson({
+          userMessageCount: 5,
+          memoryScratchpad: {
+            version: 1,
+            workflowSummary: 'read_file -> edit',
+          },
+        }),
+      );
+
+      const result = await getPreviousSession(mockConfig);
+
+      expect(result).toBeNull();
+    });
+
     it('should return null if most recent session has 1 or fewer user messages', async () => {
       await writeSession(
         chatsDir,
@@ -452,6 +470,61 @@ describe('sessionSummaryUtils', () => {
             version: 1,
           },
         },
+      });
+    });
+
+    it('should not retry summary generation after writing a scratchpad fallback', async () => {
+      const filePath = await writeSession(
+        chatsDir,
+        'session-2024-01-01T10-00-summary-fallback.jsonl',
+        buildJsonlSession({
+          sessionId: 'summary-fallback-session',
+          userMessageCount: 2,
+          messages: [
+            {
+              id: 'u1',
+              timestamp: '2024-01-01T00:00:00Z',
+              type: 'user',
+              content: [{ text: 'Read package metadata' }],
+            },
+            {
+              id: 'g1',
+              timestamp: '2024-01-01T00:00:01Z',
+              type: 'gemini',
+              content: [{ text: 'Reading package.json' }],
+              toolCalls: [
+                {
+                  id: 'tool-1',
+                  name: 'read_file',
+                  args: { file_path: 'package.json' },
+                  status: CoreToolCallStatus.Success,
+                  timestamp: '2024-01-01T00:00:01Z',
+                },
+              ],
+            },
+            {
+              id: 'u2',
+              timestamp: '2024-01-01T00:00:02Z',
+              type: 'user',
+              content: [{ text: 'Done' }],
+            },
+          ],
+        }),
+      );
+      mockGenerateSummary.mockResolvedValue(undefined);
+
+      await generateSummary(mockConfig);
+      await generateSummary(mockConfig);
+
+      expect(mockGenerateSummary).toHaveBeenCalledTimes(1);
+      const savedConversation =
+        await chatRecordingService.loadConversationRecord(filePath);
+      expect(savedConversation?.summary).toBeUndefined();
+      expect(savedConversation?.memoryScratchpad).toEqual({
+        version: 1,
+        workflowSummary: 'read_file | paths package.json',
+        toolSequence: ['read_file'],
+        touchedPaths: ['package.json'],
       });
     });
 
@@ -757,6 +830,126 @@ describe('sessionSummaryUtils', () => {
       expect(
         savedConversation?.memoryScratchpad?.workflowSummary,
       ).not.toContain('add-users');
+    });
+
+    it('should not classify validation substrings as validation tools', async () => {
+      const filePath = await writeSession(
+        chatsDir,
+        'session-2024-01-01T10-00-validation-substring.jsonl',
+        buildJsonlSession({
+          sessionId: 'validation-substring-session',
+          userMessageCount: 2,
+          summary: 'Existing summary',
+          messages: [
+            {
+              id: 'u1',
+              timestamp: '2024-01-01T00:00:00Z',
+              type: 'user',
+              content: [{ text: 'Run the contest helper' }],
+            },
+            {
+              id: 'g1',
+              timestamp: '2024-01-01T00:00:01Z',
+              type: 'gemini',
+              content: [{ text: 'Running helper' }],
+              toolCalls: [
+                {
+                  id: 'tool-1',
+                  name: 'contest_runner',
+                  args: {},
+                  status: CoreToolCallStatus.Success,
+                  timestamp: '2024-01-01T00:00:01Z',
+                },
+              ],
+            },
+            {
+              id: 'u2',
+              timestamp: '2024-01-01T00:00:02Z',
+              type: 'user',
+              content: [{ text: 'Done' }],
+            },
+          ],
+        }),
+      );
+
+      await generateSummary(mockConfig);
+
+      const savedConversation =
+        await chatRecordingService.loadConversationRecord(filePath);
+      expect(savedConversation?.memoryScratchpad).toEqual({
+        version: 1,
+        workflowSummary: 'contest_runner',
+        toolSequence: ['contest_runner'],
+      });
+    });
+
+    it('should cap nested path extraction depth', async () => {
+      const filePath = await writeSession(
+        chatsDir,
+        'session-2024-01-01T10-00-deep-paths.jsonl',
+        buildJsonlSession({
+          sessionId: 'deep-paths-session',
+          userMessageCount: 2,
+          summary: 'Existing summary',
+          messages: [
+            {
+              id: 'u1',
+              timestamp: '2024-01-01T00:00:00Z',
+              type: 'user',
+              content: [{ text: 'Edit shallow and deeply nested files' }],
+            },
+            {
+              id: 'g1',
+              timestamp: '2024-01-01T00:00:01Z',
+              type: 'gemini',
+              content: [{ text: 'Editing files' }],
+              toolCalls: [
+                {
+                  id: 'tool-1',
+                  name: 'replace',
+                  args: {
+                    file_path: 'src/shallow.ts',
+                    level1: {
+                      level2: {
+                        level3: {
+                          level4: {
+                            level5: {
+                              level6: {
+                                level7: {
+                                  file_path: 'src/deep.ts',
+                                },
+                              },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                  status: CoreToolCallStatus.Success,
+                  timestamp: '2024-01-01T00:00:01Z',
+                },
+              ],
+            },
+            {
+              id: 'u2',
+              timestamp: '2024-01-01T00:00:02Z',
+              type: 'user',
+              content: [{ text: 'Done' }],
+            },
+          ],
+        }),
+      );
+
+      await generateSummary(mockConfig);
+
+      const savedConversation =
+        await chatRecordingService.loadConversationRecord(filePath);
+      expect(savedConversation?.memoryScratchpad).toEqual({
+        version: 1,
+        workflowSummary: 'replace | paths src/shallow.ts',
+        toolSequence: ['replace'],
+        touchedPaths: ['src/shallow.ts'],
+      });
     });
 
     it('should use the latest validation result in scratchpad metadata', async () => {

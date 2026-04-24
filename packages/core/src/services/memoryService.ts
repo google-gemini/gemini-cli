@@ -319,12 +319,18 @@ function getReadFileCallId(activity: SubagentActivityEvent): string | null {
     return typeof callId === 'string' ? callId : null;
   }
 
-  if (activity.type === 'TOOL_CALL_END') {
+  if (
+    activity.type === 'TOOL_CALL_END' &&
+    activity.data['name'] === READ_FILE_TOOL_NAME
+  ) {
     const id = activity.data['id'];
     return typeof id === 'string' ? id : null;
   }
 
-  if (activity.type === 'ERROR') {
+  if (
+    activity.type === 'ERROR' &&
+    activity.data['name'] === READ_FILE_TOOL_NAME
+  ) {
     const callId = activity.data['callId'];
     return typeof callId === 'string' ? callId : null;
   }
@@ -606,7 +612,6 @@ function formatSessionHeadline(session: IndexedSession): string {
   if (
     session.summary &&
     workflowSummary &&
-    workflowSummary.trim().length > 0 &&
     workflowSummary !== session.summary
   ) {
     return `${summary} | workflow: ${workflowSummary}`;
