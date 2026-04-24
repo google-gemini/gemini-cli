@@ -1,0 +1,19 @@
+fix(ui): hide frames in alternate buffer mode (fixes #18701)
+
+# Conflicts:
+#	packages/cli/src/ui/components/messages/ToolGroupMessage.tsx
+
+# Please enter the commit message for your changes. Lines starting
+# with '#' will be ignored, and an empty message aborts the commit.
+#
+# interactive rebase in progress; onto 15298b28c
+# Last command done (1 command done):
+#    pick b75fa1de1 # fix(ui): hide frames in alternate buffer mode (fixes #18701)
+# No commands remaining.
+# You are currently rebasing branch 'fix-issue-18701' on '15298b28c'.
+#
+# Changes to be committed:
+#	modified:   packages/cli/src/ui/components/StickyHeader.tsx
+#	modified:   packages/cli/src/ui/components/messages/ToolGroupMessage.tsx
+#	modified:   packages/cli/src/ui/components/messages/ToolMessage.tsx
+#
