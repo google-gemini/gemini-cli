@@ -465,6 +465,9 @@ export class ShellExecutionService {
         'GIT_CONFIG_COUNT',
         newKey,
         newValue,
+        'DEBIAN_FRONTEND',
+        'APT_LISTCHANGES_FRONTEND',
+        'APT_LISTBUGS_FRONTEND',
       );
 
       Object.assign(baseEnv, {
@@ -475,6 +478,9 @@ export class ShellExecutionService {
         GCM_INTERACTIVE: 'never',
         DISPLAY: '',
         DBUS_SESSION_BUS_ADDRESS: '',
+        DEBIAN_FRONTEND: 'noninteractive',
+        APT_LISTCHANGES_FRONTEND: 'none',
+        APT_LISTBUGS_FRONTEND: 'none',
         GIT_CONFIG_COUNT: (gitConfigCount + 1).toString(),
         [newKey]: 'credential.helper',
         [newValue]: '',
