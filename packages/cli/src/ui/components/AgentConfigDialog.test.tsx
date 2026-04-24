@@ -71,6 +71,7 @@ const createMockSettings = (
     },
     true,
     [],
+    '',
   );
 
   // Mock setValue
