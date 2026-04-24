@@ -5,7 +5,11 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { safeLiteralReplace, truncateString } from './textUtils.js';
+import {
+  safeLiteralReplace,
+  truncateString,
+  safeTemplateReplace,
+} from './textUtils.js';
 
 describe('safeLiteralReplace', () => {
   it('returns original string when oldString empty or not found', () => {
@@ -97,5 +101,100 @@ describe('truncateString', () => {
 
   it('should handle empty string', () => {
     expect(truncateString('', 5)).toBe('');
+  });
+
+  it('should not slice surrogate pairs', () => {
+    const emoji = '😭'; // \uD83D\uDE2D, length 2
+    const str = 'a' + emoji; // length 3
+
+    // We expect 'a' (len 1). Adding the emoji (len 2) would make it 3, exceeding maxLength 2.
+    expect(truncateString(str, 2, '')).toBe('a');
+    expect(truncateString(str, 1, '')).toBe('a');
+    expect(truncateString(emoji, 1, '')).toBe('');
+    expect(truncateString(emoji, 2, '')).toBe(emoji);
+  });
+
+  it('should handle pre-existing dangling high surrogates at the cut point', () => {
+    // \uD83D is a high surrogate without a following low surrogate
+    const str = 'a\uD83Db';
+    // 'a' (1) + '\uD83D' (1) = 2.
+    // BUT our function should strip the dangling surrogate for safety.
+    expect(truncateString(str, 2, '')).toBe('a');
+  });
+
+  it('should handle multi-code-point grapheme clusters like combining marks', () => {
+    // FORCE Decomposed form (NFD) to ensure 'e' + 'accent' are separate code units
+    // This ensures the test behaves the same on Linux and Mac.
+    const combinedChar = 'e\u0301'.normalize('NFD');
+
+    // In NFD, combinedChar.length is 2.
+    const str = 'a' + combinedChar; // 'a' + 'e' + '\u0301' (length 3)
+
+    // Truncating at 2: 'a' (1) + 'e\u0301' (2) = 3. Too long, should stay at 'a'.
+    expect(truncateString(str, 2, '')).toBe('a');
+    expect(truncateString(str, 1, '')).toBe('a');
+
+    // Truncating combinedChar (len 2) at maxLength 1: too long, should be empty.
+    expect(truncateString(combinedChar, 1, '')).toBe('');
+
+    // Truncating combinedChar (len 2) at maxLength 2: fits perfectly.
+    expect(truncateString(combinedChar, 2, '')).toBe(combinedChar);
+  });
+});
+
+describe('safeTemplateReplace', () => {
+  it('replaces all occurrences of known keys', () => {
+    const tmpl = 'Hello {{name}}, welcome to {{place}}. {{name}} is happy.';
+    const replacements = { name: 'Alice', place: 'Wonderland' };
+    expect(safeTemplateReplace(tmpl, replacements)).toBe(
+      'Hello Alice, welcome to Wonderland. Alice is happy.',
+    );
+  });
+
+  it('ignores keys not present in replacements', () => {
+    const tmpl = 'Hello {{name}}, welcome to {{unknown}}.';
+    const replacements = { name: 'Bob' };
+    expect(safeTemplateReplace(tmpl, replacements)).toBe(
+      'Hello Bob, welcome to {{unknown}}.',
+    );
+  });
+
+  it('ignores extra keys in replacements', () => {
+    const tmpl = 'Hello {{name}}';
+    const replacements = { name: 'Charlie', age: '30' };
+    expect(safeTemplateReplace(tmpl, replacements)).toBe('Hello Charlie');
+  });
+
+  it('handles empty template', () => {
+    expect(safeTemplateReplace('', { key: 'val' })).toBe('');
+  });
+
+  it('handles template with no placeholders', () => {
+    expect(safeTemplateReplace('No keys here', { key: 'val' })).toBe(
+      'No keys here',
+    );
+  });
+
+  it('prevents double interpolation (security check)', () => {
+    const tmpl = 'User said: {{userInput}}';
+    const replacements = {
+      userInput: '{{secret}}',
+      secret: 'super_secret_value',
+    };
+    expect(safeTemplateReplace(tmpl, replacements)).toBe(
+      'User said: {{secret}}',
+    );
+  });
+
+  it('handles values with $ signs correctly (no regex group substitution)', () => {
+    const tmpl = 'Price: {{price}}';
+    const replacements = { price: '$100' };
+    expect(safeTemplateReplace(tmpl, replacements)).toBe('Price: $100');
+  });
+
+  it('treats special replacement patterns (e.g. "$&") as literal strings', () => {
+    const tmpl = 'Value: {{val}}';
+    const replacements = { val: '$&' };
+    expect(safeTemplateReplace(tmpl, replacements)).toBe('Value: $&');
   });
 });

@@ -4,8 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Attributes, Meter, Counter, Histogram } from '@opentelemetry/api';
-import { diag, metrics, ValueType } from '@opentelemetry/api';
+import {
+  diag,
+  metrics,
+  ValueType,
+  type Attributes,
+  type Meter,
+  type Counter,
+  type Histogram,
+} from '@opentelemetry/api';
 import { SERVICE_NAME } from './constants.js';
 import type { Config } from '../config/config.js';
 import type {
@@ -13,6 +20,8 @@ import type {
   ModelSlashCommandEvent,
   AgentFinishEvent,
   RecoveryAttemptEvent,
+  KeychainAvailabilityEvent,
+  TokenStorageInitializationEvent,
 } from './types.js';
 import { AuthType } from '../core/contentGenerator.js';
 import { getCommonAttributes } from './telemetryAttributes.js';
@@ -31,12 +40,20 @@ const INVALID_CHUNK_COUNT = 'gemini_cli.chat.invalid_chunk.count';
 const CONTENT_RETRY_COUNT = 'gemini_cli.chat.content_retry.count';
 const CONTENT_RETRY_FAILURE_COUNT =
   'gemini_cli.chat.content_retry_failure.count';
+const NETWORK_RETRY_COUNT = 'gemini_cli.network_retry.count';
 const MODEL_ROUTING_LATENCY = 'gemini_cli.model_routing.latency';
 const MODEL_ROUTING_FAILURE_COUNT = 'gemini_cli.model_routing.failure.count';
 const MODEL_SLASH_COMMAND_CALL_COUNT =
   'gemini_cli.slash_command.model.call_count';
 const EVENT_HOOK_CALL_COUNT = 'gemini_cli.hook_call.count';
 const EVENT_HOOK_CALL_LATENCY = 'gemini_cli.hook_call.latency';
+const KEYCHAIN_AVAILABILITY_COUNT = 'gemini_cli.keychain.availability.count';
+const TOKEN_STORAGE_TYPE_COUNT = 'gemini_cli.token_storage.type.count';
+const OVERAGE_OPTION_COUNT = 'gemini_cli.overage_option.count';
+const CREDIT_PURCHASE_COUNT = 'gemini_cli.credit_purchase.count';
+const EVENT_ONBOARDING_START = 'gemini_cli.onboarding.start';
+const EVENT_ONBOARDING_SUCCESS = 'gemini_cli.onboarding.success';
+const EVENT_ONBOARDING_DURATION_MS = 'gemini_cli.onboarding.duration';
 
 // Agent Metrics
 const AGENT_RUN_COUNT = 'gemini_cli.agent.run.count';
@@ -46,6 +63,23 @@ const AGENT_RECOVERY_ATTEMPT_COUNT = 'gemini_cli.agent.recovery_attempt.count';
 const AGENT_RECOVERY_ATTEMPT_DURATION =
   'gemini_cli.agent.recovery_attempt.duration';
 
+// Browser Agent Metrics
+const BROWSER_AGENT_CONNECTION_DURATION =
+  'gemini_cli.browser_agent.connection.duration';
+const BROWSER_AGENT_CONNECTION_FAILURE_COUNT =
+  'gemini_cli.browser_agent.connection.failure.count';
+const BROWSER_AGENT_TOOLS_DISCOVERED =
+  'gemini_cli.browser_agent.tools.discovered';
+const BROWSER_AGENT_TOOLS_MISSING_SEMANTIC =
+  'gemini_cli.browser_agent.tools.missing_semantic';
+const BROWSER_AGENT_VISION_STATUS = 'gemini_cli.browser_agent.vision.status';
+const BROWSER_AGENT_TASK_OUTCOME = 'gemini_cli.browser_agent.task.outcome';
+const BROWSER_AGENT_TASK_DURATION = 'gemini_cli.browser_agent.task.duration';
+const BROWSER_AGENT_CLEANUP_DURATION =
+  'gemini_cli.browser_agent.cleanup.duration';
+const BROWSER_AGENT_CLEANUP_FAILURE_COUNT =
+  'gemini_cli.browser_agent.cleanup.failure.count';
+
 // OpenTelemetry GenAI Semantic Convention Metrics
 const GEN_AI_CLIENT_TOKEN_USAGE = 'gen_ai.client.token.usage';
 const GEN_AI_CLIENT_OPERATION_DURATION = 'gen_ai.client.operation.duration';
@@ -54,6 +88,7 @@ const GEN_AI_CLIENT_OPERATION_DURATION = 'gen_ai.client.operation.duration';
 const STARTUP_TIME = 'gemini_cli.startup.duration';
 const MEMORY_USAGE = 'gemini_cli.memory.usage';
 const CPU_USAGE = 'gemini_cli.cpu.usage';
+const EVENT_LOOP_DELAY = 'gemini_cli.event_loop.delay';
 const TOOL_QUEUE_DEPTH = 'gemini_cli.tool.queue.depth';
 const TOOL_EXECUTION_BREAKDOWN = 'gemini_cli.tool.execution.breakdown';
 const TOKEN_EFFICIENCY = 'gemini_cli.token.efficiency';
@@ -153,6 +188,16 @@ const COUNTER_DEFINITIONS = {
     assign: (c: Counter) => (contentRetryFailureCounter = c),
     attributes: {} as Record<string, never>,
   },
+  [NETWORK_RETRY_COUNT]: {
+    description: 'Counts network retries.',
+    valueType: ValueType.INT,
+    assign: (c: Counter) => (networkRetryCounter = c),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    attributes: {} as {
+      model: string;
+      attempt: number;
+    },
+  },
   [MODEL_ROUTING_FAILURE_COUNT]: {
     description: 'Counts model routing failures.',
     valueType: ValueType.INT,
@@ -234,6 +279,115 @@ const COUNTER_DEFINITIONS = {
       hook_event_name: string;
       hook_name: string;
       success: boolean;
+    },
+  },
+  [KEYCHAIN_AVAILABILITY_COUNT]: {
+    description: 'Counts keychain availability checks.',
+    valueType: ValueType.INT,
+    assign: (c: Counter) => (keychainAvailabilityCounter = c),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    attributes: {} as {
+      available: boolean;
+    },
+  },
+  [TOKEN_STORAGE_TYPE_COUNT]: {
+    description: 'Counts token storage type initializations.',
+    valueType: ValueType.INT,
+    assign: (c: Counter) => (tokenStorageTypeCounter = c),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    attributes: {} as {
+      type: string;
+      forced: boolean;
+    },
+  },
+  [OVERAGE_OPTION_COUNT]: {
+    description: 'Counts overage option selections.',
+    valueType: ValueType.INT,
+    assign: (c: Counter) => (overageOptionCounter = c),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    attributes: {} as {
+      selected_option: string;
+      model: string;
+    },
+  },
+  [CREDIT_PURCHASE_COUNT]: {
+    description: 'Counts credit purchase link clicks.',
+    valueType: ValueType.INT,
+    assign: (c: Counter) => (creditPurchaseCounter = c),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    attributes: {} as {
+      source: string;
+      model: string;
+    },
+  },
+  [BROWSER_AGENT_CONNECTION_FAILURE_COUNT]: {
+    description: 'Counts browser agent MCP connection failures.',
+    valueType: ValueType.INT,
+    assign: (c: Counter) => (browserAgentConnectionFailureCounter = c),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    attributes: {} as {
+      session_mode: 'persistent' | 'isolated' | 'existing';
+      headless: boolean;
+      error_type:
+        | 'profile_locked'
+        | 'timeout'
+        | 'connection_refused'
+        | 'unknown';
+    },
+  },
+  [BROWSER_AGENT_TOOLS_MISSING_SEMANTIC]: {
+    description: 'Counts missing required semantic tools discovered from MCP.',
+    valueType: ValueType.INT,
+    assign: (c: Counter) => (browserAgentToolsMissingSemanticCounter = c),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    attributes: {} as { tool_name: string },
+  },
+  [BROWSER_AGENT_VISION_STATUS]: {
+    description: 'Counts browser agent invocations by vision status.',
+    valueType: ValueType.INT,
+    assign: (c: Counter) => (browserAgentVisionStatusCounter = c),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    attributes: {} as {
+      enabled: boolean;
+      disabled_reason?:
+        | 'no_visual_model'
+        | 'missing_visual_tools'
+        | 'blocked_auth_type';
+    },
+  },
+  [BROWSER_AGENT_TASK_OUTCOME]: {
+    description: 'Counts browser agent task outcomes.',
+    valueType: ValueType.INT,
+    assign: (c: Counter) => (browserAgentTaskOutcomeCounter = c),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    attributes: {} as {
+      success: boolean;
+      session_mode: 'persistent' | 'isolated' | 'existing';
+      vision_enabled: boolean;
+      headless: boolean;
+    },
+  },
+  [BROWSER_AGENT_CLEANUP_FAILURE_COUNT]: {
+    description: 'Counts browser agent cleanup failures.',
+    valueType: ValueType.INT,
+    assign: (c: Counter) => (browserAgentCleanupFailureCounter = c),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    attributes: {} as {
+      session_mode: 'persistent' | 'isolated' | 'existing';
+    },
+  },
+  [EVENT_ONBOARDING_START]: {
+    description: 'Counts onboarding started',
+    valueType: ValueType.INT,
+    assign: (c: Counter) => (onboardingStartCounter = c),
+    attributes: {} as Record<string, never>,
+  },
+  [EVENT_ONBOARDING_SUCCESS]: {
+    description: 'Counts onboarding succeeded',
+    valueType: ValueType.INT,
+    assign: (c: Counter) => (onboardingSuccessCounter = c),
+    attributes: {} as {
+      user_tier?: string;
     },
   },
 } as const;
@@ -351,6 +505,60 @@ const HISTOGRAM_DEFINITIONS = {
       success: boolean;
     },
   },
+  [BROWSER_AGENT_CONNECTION_DURATION]: {
+    description:
+      'Duration of browser agent MCP connection setup in milliseconds.',
+    unit: 'ms',
+    valueType: ValueType.INT,
+    assign: (h: Histogram) => (browserAgentConnectionDurationHistogram = h),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    attributes: {} as {
+      session_mode: 'persistent' | 'isolated' | 'existing';
+      headless: boolean;
+      success: boolean;
+    },
+  },
+  [BROWSER_AGENT_TOOLS_DISCOVERED]: {
+    description: 'Count of tools discovered from chrome-devtools-mcp.',
+    unit: 'tools',
+    valueType: ValueType.INT,
+    assign: (h: Histogram) => (browserAgentToolsDiscoveredHistogram = h),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    attributes: {} as {
+      session_mode: 'persistent' | 'isolated' | 'existing';
+    },
+  },
+  [BROWSER_AGENT_TASK_DURATION]: {
+    description:
+      'Full invocation duration of browser agent (connect + run + cleanup) in milliseconds.',
+    unit: 'ms',
+    valueType: ValueType.INT,
+    assign: (h: Histogram) => (browserAgentTaskDurationHistogram = h),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    attributes: {} as {
+      success: boolean;
+      session_mode: 'persistent' | 'isolated' | 'existing';
+    },
+  },
+  [BROWSER_AGENT_CLEANUP_DURATION]: {
+    description: 'Duration of browser agent cleanup in milliseconds.',
+    unit: 'ms',
+    valueType: ValueType.INT,
+    assign: (h: Histogram) => (browserAgentCleanupDurationHistogram = h),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    attributes: {} as {
+      session_mode: 'persistent' | 'isolated' | 'existing';
+    },
+  },
+  [EVENT_ONBOARDING_DURATION_MS]: {
+    description: 'Duration of onboarding in milliseconds.',
+    unit: 'ms',
+    valueType: ValueType.INT,
+    assign: (h: Histogram) => (onboardingDurationHistogram = h),
+    attributes: {} as {
+      user_tier?: string;
+    },
+  },
 } as const;
 
 const PERFORMANCE_COUNTER_DEFINITIONS = {
@@ -398,6 +606,17 @@ const PERFORMANCE_HISTOGRAM_DEFINITIONS = {
     valueType: ValueType.DOUBLE,
     assign: (h: Histogram) => (cpuUsageGauge = h),
     attributes: {} as {
+      component?: string;
+    },
+  },
+  [EVENT_LOOP_DELAY]: {
+    description: 'Event loop delay in milliseconds.',
+    unit: 'ms',
+    valueType: ValueType.DOUBLE,
+    assign: (h: Histogram) => (eventLoopDelayHistogram = h),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    attributes: {} as {
+      percentile: string;
       component?: string;
     },
   },
@@ -558,6 +777,7 @@ let chatCompressionCounter: Counter | undefined;
 let invalidChunkCounter: Counter | undefined;
 let contentRetryCounter: Counter | undefined;
 let contentRetryFailureCounter: Counter | undefined;
+let networkRetryCounter: Counter | undefined;
 let modelRoutingLatencyHistogram: Histogram | undefined;
 let modelRoutingFailureCounter: Counter | undefined;
 let modelSlashCommandCallCounter: Counter | undefined;
@@ -572,6 +792,23 @@ let planExecutionCounter: Counter | undefined;
 let slowRenderHistogram: Histogram | undefined;
 let hookCallCounter: Counter | undefined;
 let hookCallLatencyHistogram: Histogram | undefined;
+let keychainAvailabilityCounter: Counter | undefined;
+let tokenStorageTypeCounter: Counter | undefined;
+let overageOptionCounter: Counter | undefined;
+let creditPurchaseCounter: Counter | undefined;
+let onboardingStartCounter: Counter | undefined;
+let onboardingSuccessCounter: Counter | undefined;
+let onboardingDurationHistogram: Histogram | undefined;
+
+let browserAgentConnectionDurationHistogram: Histogram | undefined;
+let browserAgentConnectionFailureCounter: Counter | undefined;
+let browserAgentToolsDiscoveredHistogram: Histogram | undefined;
+let browserAgentToolsMissingSemanticCounter: Counter | undefined;
+let browserAgentVisionStatusCounter: Counter | undefined;
+let browserAgentTaskOutcomeCounter: Counter | undefined;
+let browserAgentTaskDurationHistogram: Histogram | undefined;
+let browserAgentCleanupDurationHistogram: Histogram | undefined;
+let browserAgentCleanupFailureCounter: Counter | undefined;
 
 // OpenTelemetry GenAI Semantic Convention Metrics
 let genAiClientTokenUsageHistogram: Histogram | undefined;
@@ -581,6 +818,7 @@ let genAiClientOperationDurationHistogram: Histogram | undefined;
 let startupTimeHistogram: Histogram | undefined;
 let memoryUsageGauge: Histogram | undefined; // Using Histogram until ObservableGauge is available
 let cpuUsageGauge: Histogram | undefined;
+let eventLoopDelayHistogram: Histogram | undefined;
 let toolQueueDepthGauge: Histogram | undefined;
 let toolExecutionBreakdownHistogram: Histogram | undefined;
 let tokenEfficiencyHistogram: Histogram | undefined;
@@ -592,7 +830,7 @@ let baselineComparisonHistogram: Histogram | undefined;
 let isMetricsInitialized = false;
 let isPerformanceMonitoringEnabled = false;
 
-export function getMeter(): Meter | undefined {
+function getMeter(): Meter | undefined {
   if (!cliMeter) {
     cliMeter = metrics.getMeter(SERVICE_NAME);
   }
@@ -745,6 +983,41 @@ export function recordLinesChanged(
 // --- New Metric Recording Functions ---
 
 /**
+ * Records a metric for when the Google auth process starts.
+ */
+export function recordOnboardingStart(config: Config): void {
+  if (!onboardingStartCounter || !isMetricsInitialized) return;
+  onboardingStartCounter.add(
+    1,
+    baseMetricDefinition.getCommonAttributes(config),
+  );
+}
+
+/**
+ * Records a metric for when the Google auth process ends successfully.
+ */
+export function recordOnboardingSuccess(
+  config: Config,
+  userTier?: string,
+  durationMs?: number,
+): void {
+  if (!isMetricsInitialized) return;
+
+  const attributes: Attributes = {
+    ...baseMetricDefinition.getCommonAttributes(config),
+    ...(userTier && { user_tier: userTier }),
+  };
+
+  if (onboardingSuccessCounter) {
+    onboardingSuccessCounter.add(1, attributes);
+  }
+
+  if (durationMs !== undefined && onboardingDurationHistogram) {
+    onboardingDurationHistogram.record(durationMs, attributes);
+  }
+}
+
+/**
  * Records a metric for when a UI frame flickers.
  */
 export function recordFlickerFrame(config: Config): void {
@@ -790,6 +1063,20 @@ export function recordSlowRender(config: Config, renderLatency: number): void {
 export function recordInvalidChunk(config: Config): void {
   if (!invalidChunkCounter || !isMetricsInitialized) return;
   invalidChunkCounter.add(1, baseMetricDefinition.getCommonAttributes(config));
+}
+
+export function recordRetryAttemptMetrics(
+  config: Config,
+  attributes: {
+    model: string;
+    attempt: number;
+  },
+): void {
+  if (!networkRetryCounter || !isMetricsInitialized) return;
+  networkRetryCounter.add(1, {
+    ...baseMetricDefinition.getCommonAttributes(config),
+    ...attributes,
+  });
 }
 
 /**
@@ -838,6 +1125,7 @@ export function recordModelRoutingMetrics(
     'routing.decision_model': event.decision_model,
     'routing.decision_source': event.decision_source,
     'routing.failed': event.failed,
+    'routing.approval_mode': event.approval_mode,
   };
 
   if (event.reasoning) {
@@ -994,7 +1282,7 @@ function getGenAiOperationName(): GenAiOperationName {
 
 // Performance Monitoring Functions
 
-export function initializePerformanceMonitoring(config: Config): void {
+function initializePerformanceMonitoring(config: Config): void {
   const meter = getMeter();
   if (!meter) return;
 
@@ -1062,6 +1350,21 @@ export function recordCpuUsage(
   };
 
   cpuUsageGauge.record(percentage, metricAttributes);
+}
+
+export function recordEventLoopDelay(
+  config: Config,
+  delayMs: number,
+  attributes: MetricDefinitions[typeof EVENT_LOOP_DELAY]['attributes'],
+): void {
+  if (!eventLoopDelayHistogram || !isPerformanceMonitoringEnabled) return;
+
+  const metricAttributes: Attributes = {
+    ...baseMetricDefinition.getCommonAttributes(config),
+    ...attributes,
+  };
+
+  eventLoopDelayHistogram.record(delayMs, metricAttributes);
 }
 
 export function recordToolQueueDepth(config: Config, queueDepth: number): void {
@@ -1278,4 +1581,207 @@ export function recordHookCallMetrics(
 
   hookCallCounter.add(1, metricAttributes);
   hookCallLatencyHistogram.record(durationMs, metricAttributes);
+}
+
+/**
+ * Records a metric for keychain availability.
+ */
+export function recordKeychainAvailability(
+  config: Config,
+  event: KeychainAvailabilityEvent,
+): void {
+  if (!keychainAvailabilityCounter || !isMetricsInitialized) return;
+  keychainAvailabilityCounter.add(1, {
+    ...baseMetricDefinition.getCommonAttributes(config),
+    available: event.available,
+  });
+}
+
+/**
+ * Records a metric for token storage type initialization.
+ */
+export function recordTokenStorageInitialization(
+  config: Config,
+  event: TokenStorageInitializationEvent,
+): void {
+  if (!tokenStorageTypeCounter || !isMetricsInitialized) return;
+  tokenStorageTypeCounter.add(1, {
+    ...baseMetricDefinition.getCommonAttributes(config),
+    type: event.type,
+    forced: event.forced,
+  });
+}
+
+/**
+ * Records a metric for an overage option selection.
+ */
+export function recordOverageOptionSelected(
+  config: Config,
+  attributes: MetricDefinitions[typeof OVERAGE_OPTION_COUNT]['attributes'],
+): void {
+  if (!overageOptionCounter || !isMetricsInitialized) return;
+  overageOptionCounter.add(1, {
+    ...baseMetricDefinition.getCommonAttributes(config),
+    ...attributes,
+  });
+}
+
+/**
+ * Records a metric for a credit purchase link click.
+ */
+export function recordCreditPurchaseClick(
+  config: Config,
+  attributes: MetricDefinitions[typeof CREDIT_PURCHASE_COUNT]['attributes'],
+): void {
+  if (!creditPurchaseCounter || !isMetricsInitialized) return;
+  creditPurchaseCounter.add(1, {
+    ...baseMetricDefinition.getCommonAttributes(config),
+    ...attributes,
+  });
+}
+
+export function recordBrowserAgentConnection(
+  config: Config,
+  durationMs: number,
+  attributes: {
+    session_mode: 'persistent' | 'isolated' | 'existing';
+    headless: boolean;
+    success: boolean;
+    error_type?:
+      | 'profile_locked'
+      | 'timeout'
+      | 'connection_refused'
+      | 'unknown';
+    tool_count?: number;
+  },
+): void {
+  if (!isMetricsInitialized) return;
+  if (!browserAgentConnectionDurationHistogram) return;
+
+  const commonAttribs = baseMetricDefinition.getCommonAttributes(config);
+  browserAgentConnectionDurationHistogram.record(durationMs, {
+    ...commonAttribs,
+    session_mode: attributes.session_mode,
+    headless: attributes.headless,
+    success: attributes.success,
+    tool_count: attributes.tool_count,
+  });
+
+  if (!attributes.success && browserAgentConnectionFailureCounter) {
+    browserAgentConnectionFailureCounter.add(1, {
+      ...commonAttribs,
+      session_mode: attributes.session_mode,
+      headless: attributes.headless,
+      error_type: attributes.error_type ?? 'unknown',
+    });
+  }
+}
+
+export function recordBrowserAgentToolDiscovery(
+  config: Config,
+  toolCount: number,
+  missingSemanticTools: string[],
+  sessionMode: 'persistent' | 'isolated' | 'existing',
+): void {
+  if (!isMetricsInitialized) return;
+
+  const commonAttribs = baseMetricDefinition.getCommonAttributes(config);
+  if (browserAgentToolsDiscoveredHistogram) {
+    browserAgentToolsDiscoveredHistogram.record(toolCount, {
+      ...commonAttribs,
+      session_mode: sessionMode,
+    });
+  }
+
+  if (browserAgentToolsMissingSemanticCounter) {
+    for (const tool of missingSemanticTools) {
+      browserAgentToolsMissingSemanticCounter.add(1, {
+        ...commonAttribs,
+        tool_name: tool,
+      });
+    }
+  }
+}
+
+export function recordBrowserAgentVisionStatus(
+  config: Config,
+  attributes: {
+    enabled: boolean;
+    disabled_reason?:
+      | 'no_visual_model'
+      | 'missing_visual_tools'
+      | 'blocked_auth_type';
+  },
+): void {
+  if (!isMetricsInitialized || !browserAgentVisionStatusCounter) return;
+
+  const metricAttributes: Record<string, string | number | boolean> = {
+    ...baseMetricDefinition.getCommonAttributes(config),
+    enabled: attributes.enabled,
+  };
+  if (attributes.disabled_reason) {
+    metricAttributes['disabled_reason'] = attributes.disabled_reason;
+  }
+
+  browserAgentVisionStatusCounter.add(1, metricAttributes);
+}
+
+export function recordBrowserAgentTaskOutcome(
+  config: Config,
+  attributes: {
+    success: boolean;
+    session_mode: 'persistent' | 'isolated' | 'existing';
+    vision_enabled: boolean;
+    headless: boolean;
+    duration_ms: number;
+  },
+): void {
+  if (!isMetricsInitialized) return;
+
+  const commonAttribs = baseMetricDefinition.getCommonAttributes(config);
+
+  if (browserAgentTaskOutcomeCounter) {
+    browserAgentTaskOutcomeCounter.add(1, {
+      ...commonAttribs,
+      success: attributes.success,
+      session_mode: attributes.session_mode,
+      vision_enabled: attributes.vision_enabled,
+      headless: attributes.headless,
+    });
+  }
+
+  if (browserAgentTaskDurationHistogram) {
+    browserAgentTaskDurationHistogram.record(attributes.duration_ms, {
+      ...commonAttribs,
+      success: attributes.success,
+      session_mode: attributes.session_mode,
+    });
+  }
+}
+
+export function recordBrowserAgentCleanup(
+  config: Config,
+  durationMs: number,
+  attributes: {
+    session_mode: 'persistent' | 'isolated' | 'existing';
+    success: boolean;
+  },
+): void {
+  if (!isMetricsInitialized) return;
+
+  const commonAttribs = baseMetricDefinition.getCommonAttributes(config);
+
+  if (browserAgentCleanupDurationHistogram) {
+    browserAgentCleanupDurationHistogram.record(durationMs, {
+      ...commonAttribs,
+      session_mode: attributes.session_mode,
+    });
+  }
+
+  if (!attributes.success && browserAgentCleanupFailureCounter) {
+    browserAgentCleanupFailureCounter.add(1, {
+      ...commonAttribs,
+      session_mode: attributes.session_mode,
+    });
+  }
 }

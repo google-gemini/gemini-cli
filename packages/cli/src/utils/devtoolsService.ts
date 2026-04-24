@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { debugLogger } from '@google/gemini-cli-core';
-import type { Config } from '@google/gemini-cli-core';
+import { debugLogger, type Config } from '@google/gemini-cli-core';
 import WebSocket from 'ws';
 import {
   initActivityLogger,
@@ -19,7 +18,6 @@ interface IDevTools {
   getPort(): number;
 }
 
-const DEVTOOLS_PKG = 'gemini-cli-devtools';
 const DEFAULT_DEVTOOLS_PORT = 25417;
 const DEFAULT_DEVTOOLS_HOST = '127.0.0.1';
 const MAX_PROMOTION_ATTEMPTS = 3;
@@ -62,7 +60,7 @@ async function startOrJoinDevTools(
   defaultHost: string,
   defaultPort: number,
 ): Promise<{ host: string; port: number }> {
-  const mod = await import(DEVTOOLS_PKG);
+  const mod = await import('@google/gemini-cli-devtools');
   const devtools: IDevTools = mod.DevTools.getInstance();
   const url = await devtools.start();
   const actualPort = devtools.getPort();
@@ -118,39 +116,17 @@ async function handlePromotion(config: Config) {
 /**
  * Initializes the activity logger.
  * Interception starts immediately in buffering mode.
- * If an existing DevTools server is found, attaches transport eagerly.
+ * Transport is only attached when the user presses F12.
  */
-export async function setupInitialActivityLogger(config: Config) {
+export function setupInitialActivityLogger(config: Config) {
   const target = process.env['GEMINI_CLI_ACTIVITY_LOG_TARGET'];
 
   if (target) {
     if (!config.storage) return;
     initActivityLogger(config, { mode: 'file', filePath: target });
   } else {
-    // Start in buffering mode (no transport attached yet)
+    // Start in buffering mode — transport attached later on F12
     initActivityLogger(config, { mode: 'buffer' });
-
-    // Eagerly probe for an existing DevTools server
-    try {
-      const existing = await probeDevTools(
-        DEFAULT_DEVTOOLS_HOST,
-        DEFAULT_DEVTOOLS_PORT,
-      );
-      if (existing) {
-        const onReconnectFailed = () => handlePromotion(config);
-        addNetworkTransport(
-          config,
-          DEFAULT_DEVTOOLS_HOST,
-          DEFAULT_DEVTOOLS_PORT,
-          onReconnectFailed,
-        );
-        ActivityLogger.getInstance().enableNetworkLogging();
-        connectedUrl = `http://localhost:${DEFAULT_DEVTOOLS_PORT}`;
-        debugLogger.log(`DevTools (existing) at startup: ${connectedUrl}`);
-      }
-    } catch {
-      // Probe failed silently — stay in buffer mode
-    }
   }
 }
 

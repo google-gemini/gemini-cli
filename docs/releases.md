@@ -1,5 +1,9 @@
 # Gemini CLI releases
 
+<!-- prettier-ignore -->
+> [!IMPORTANT]
+> **Coordinate with the Release Manager:** The release manager is responsible for coordinating patches and releases. Please update them before performing any of the release actions described in this document.
+
 ## `dev` vs `prod` environment
 
 Our release flows support both `dev` and `prod` environments.
@@ -29,7 +33,7 @@ or if we have to deviate from it. Our weekly releases will be minor version
 increments and any bug or hotfixes between releases will go out as patch
 versions on the most recent release.
 
-Each Tuesday ~2000 UTC new Stable and Preview releases will be cut. The
+Each Tuesday ~20:00 UTC new Stable and Preview releases will be cut. The
 promotion flow is:
 
 - Code is committed to main and pushed each night to nightly
@@ -41,7 +45,7 @@ promotion flow is:
 ### Preview
 
 These releases will not have been fully vetted and may contain regressions or
-other outstanding issues. Please help us test and install with `preview` tag.
+other outstanding issues. Help us test and install with `preview` tag.
 
 ```bash
 npm install -g @google/gemini-cli@preview
@@ -58,7 +62,7 @@ npm install -g @google/gemini-cli@latest
 
 ### Nightly
 
-- New releases will be published each day at UTC 0000. This will be all changes
+- New releases will be published each day at UTC 00:00. This will be all changes
   from the main branch as represented at time of release. It should be assumed
   there are pending validations and issues. Use `nightly` tag.
 
@@ -122,8 +126,8 @@ specific version from any branch, tag, or commit SHA.
 2.  Select the **Release: Manual** workflow from the list.
 3.  Click the **Run workflow** dropdown button.
 4.  Fill in the required inputs:
-    - **Version**: The exact version to release (e.g., `v0.6.1`). This must be a
-      valid semantic version with a `v` prefix.
+    - **Version**: The exact version to release (for example, `v0.6.1`). This
+      must be a valid semantic version with a `v` prefix.
     - **Ref**: The branch, tag, or full commit SHA to release from.
     - **NPM Channel**: The npm channel to publish to. The options are `preview`,
       `nightly`, `latest` (for stable releases), and `dev`. The default is
@@ -161,9 +165,10 @@ require a full release cycle.
 3.  Click the **Run workflow** dropdown button.
 4.  Fill in the required inputs:
     - **Version**: The existing package version that you want to point the tag
-      to (e.g., `0.5.0-preview-2`). This version **must** already be published
-      to the npm registry.
-    - **Channel**: The npm `dist-tag` to apply (e.g., `preview`, `stable`).
+      to (for example, `0.5.0-preview-2`). This version **must** already be
+      published to the npm registry.
+    - **Channel**: The npm `dist-tag` to apply (for example, `preview`,
+      `stable`).
     - **Dry Run**: Leave as `true` to log the action without making changes, or
       set to `false` to perform the live tag change.
     - **Environment**: Select the appropriate environment. The `dev` environment
@@ -223,7 +228,7 @@ workflow.
 This workflow will automatically:
 
 1.  Find the latest release tag for the channel.
-2.  Create a release branch from that tag if one doesn't exist (e.g.,
+2.  Create a release branch from that tag if one doesn't exist (for example,
     `release/v0.5.1-pr-12345`).
 3.  Create a new hotfix branch from the release branch.
 4.  Cherry-pick your specified commit into the hotfix branch.
@@ -234,10 +239,12 @@ This workflow will automatically:
 Review the automatically created pull request(s) to ensure the cherry-pick was
 successful and the changes are correct. Once approved, merge the pull request.
 
-**Security note:** The `release/*` branches are protected by branch protection
-rules. A pull request to one of these branches requires at least one review from
-a code owner before it can be merged. This ensures that no unauthorized code is
-released.
+<!-- prettier-ignore -->
+> [!WARNING]
+> The `release/*` branches are protected by branch protection
+> rules. A pull request to one of these branches requires at least one review from
+> a code owner before it can be merged. This ensures that no unauthorized code is
+> released.
 
 #### 2.5. Adding multiple commits to a hotfix (advanced)
 
@@ -276,9 +283,8 @@ created:
 6. **Update the PR description**: Consider updating the PR title and description
    to reflect that it includes multiple fixes.
 
-This approach allows you to group related fixes into a single patch release
-while maintaining full control over what gets included and how conflicts are
-resolved.
+This approach lets you group related fixes into a single patch release while
+maintaining full control over what gets included and how conflicts are resolved.
 
 #### 3. Automatic release
 
@@ -296,9 +302,9 @@ consistently and reliably.
 #### Troubleshooting: Older branch workflows
 
 **Issue**: If the patch trigger workflow fails with errors like "Resource not
-accessible by integration" or references to non-existent workflow files (e.g.,
-`patch-release.yml`), this indicates the hotfix branch contains an outdated
-version of the workflow files.
+accessible by integration" or references to non-existent workflow files (for
+example, `patch-release.yml`), this indicates the hotfix branch contains an
+outdated version of the workflow files.
 
 **Root cause**: When a PR is merged, GitHub Actions runs the workflow definition
 from the **source branch** (the hotfix branch), not from the target branch (the
@@ -422,7 +428,7 @@ This command will do the following:
 
 You can then inspect the generated tarballs to ensure that they contain the
 correct files and that the `package.json` files have been updated correctly. The
-tarballs will be created in the root of each package's directory (e.g.,
+tarballs will be created in the root of each package's directory (for example,
 `packages/cli/google-gemini-cli-0.1.6.tgz`).
 
 By performing a dry run, you can be confident that your changes to the packaging
@@ -471,9 +477,9 @@ executable that enables `npx` usage directly from the GitHub repository.
 1.  **The JavaScript bundle is created:**
     - **What happens:** The built JavaScript from both `packages/core/dist` and
       `packages/cli/dist`, along with all third-party JavaScript dependencies,
-      are bundled by `esbuild` into a single, executable JavaScript file (e.g.,
-      `gemini.js`). The `node-pty` library is excluded from this bundle as it
-      contains native binaries.
+      are bundled by `esbuild` into a single, executable JavaScript file (for
+      example, `gemini.js`). The `node-pty` library is excluded from this bundle
+      as it contains native binaries.
     - **Why:** This creates a single, optimized file that contains all the
       necessary application code. It simplifies execution for users who want to
       run the CLI without a full `npm install`, as all dependencies (including
@@ -524,17 +530,19 @@ Notifications use
 [GitHub for Google Chat](https://workspace.google.com/marketplace/app/github_for_google_chat/536184076190).
 To modify the notifications, use `/github-settings` within the chat space.
 
-> [!WARNING] The following instructions describe a fragile workaround that
-> depends on the internal structure of the chat application's UI. It is likely
-> to break with future updates.
+<!-- prettier-ignore -->
+> [!WARNING]
+> The following instructions describe a fragile workaround that depends on the
+> internal structure of the chat application's UI. It is likely to break with
+> future updates.
 
 The list of available labels is not currently populated correctly. If you want
 to add a label that does not appear alphabetically in the first 30 labels in the
 repo, you must use your browser's developer tools to manually modify the UI:
 
-1. Open your browser's developer tools (e.g., Chrome DevTools).
+1. Open your browser's developer tools (for example, Chrome DevTools).
 2. In the `/github-settings` dialog, inspect the list of labels.
 3. Locate one of the `<li>` elements representing a label.
 4. In the HTML, modify the `data-option-value` attribute of that `<li>` element
-   to the desired label name (e.g., `release-failure`).
+   to the desired label name (for example, `release-failure`).
 5. Click on your modified label in the UI to select it, then save your settings.

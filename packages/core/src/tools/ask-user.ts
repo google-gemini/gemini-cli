@@ -12,6 +12,7 @@ import {
   type ToolAskUserConfirmationDetails,
   type ToolConfirmationPayload,
   ToolConfirmationOutcome,
+  type ExecuteOptions,
 } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
@@ -28,9 +29,11 @@ export class AskUserTool extends BaseDeclarativeTool<
   AskUserParams,
   ToolResult
 > {
+  static readonly Name = ASK_USER_TOOL_NAME;
+
   constructor(messageBus: MessageBus) {
     super(
-      ASK_USER_TOOL_NAME,
+      AskUserTool.Name,
       ASK_USER_DISPLAY_NAME,
       ASK_USER_DEFINITION.base.description!,
       Kind.Communicate,
@@ -150,7 +153,7 @@ export class AskUserInvocation extends BaseToolInvocation<
     return `Asking user: ${this.params.questions.map((q) => q.question).join(', ')}`;
   }
 
-  async execute(_signal: AbortSignal): Promise<ToolResult> {
+  async execute({ abortSignal: _signal }: ExecuteOptions): Promise<ToolResult> {
     const questionTypes = this.params.questions.map((q) => q.type);
 
     if (this.confirmationOutcome === ToolConfirmationOutcome.Cancel) {

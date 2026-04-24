@@ -5,10 +5,12 @@
  */
 
 import { renderWithProviders } from '../../../test-utils/render.js';
-import type { CompressionDisplayProps } from './CompressionMessage.js';
-import { CompressionMessage } from './CompressionMessage.js';
+import {
+  CompressionMessage,
+  type CompressionDisplayProps,
+} from './CompressionMessage.js';
 import { CompressionStatus } from '@google/gemini-cli-core';
-import type { CompressionProps } from '../../types.js';
+import { type CompressionProps } from '../../types.js';
 import { describe, it, expect } from 'vitest';
 
 describe('<CompressionMessage />', () => {
@@ -25,9 +27,9 @@ describe('<CompressionMessage />', () => {
   });
 
   describe('pending state', () => {
-    it('renders pending message when compression is in progress', () => {
+    it('renders pending message when compression is in progress', async () => {
       const props = createCompressionProps({ isPending: true });
-      const { lastFrame, unmount } = renderWithProviders(
+      const { lastFrame, unmount } = await renderWithProviders(
         <CompressionMessage {...props} />,
       );
       const output = lastFrame();
@@ -38,14 +40,14 @@ describe('<CompressionMessage />', () => {
   });
 
   describe('normal compression (successful token reduction)', () => {
-    it('renders success message when tokens are reduced', () => {
+    it('renders success message when tokens are reduced', async () => {
       const props = createCompressionProps({
         isPending: false,
         originalTokenCount: 100,
         newTokenCount: 50,
         compressionStatus: CompressionStatus.COMPRESSED,
       });
-      const { lastFrame, unmount } = renderWithProviders(
+      const { lastFrame, unmount } = await renderWithProviders(
         <CompressionMessage {...props} />,
       );
       const output = lastFrame();
@@ -57,20 +59,19 @@ describe('<CompressionMessage />', () => {
       unmount();
     });
 
-    it('renders success message for large successful compressions', () => {
-      const testCases = [
-        { original: 50000, new: 25000 }, // Large compression
-        { original: 700000, new: 350000 }, // Very large compression
-      ];
-
-      for (const { original, new: newTokens } of testCases) {
+    it.each([
+      { original: 50000, newTokens: 25000 }, // Large compression
+      { original: 700000, newTokens: 350000 }, // Very large compression
+    ])(
+      'renders success message for large successful compression (from $original to $newTokens)',
+      async ({ original, newTokens }) => {
         const props = createCompressionProps({
           isPending: false,
           originalTokenCount: original,
           newTokenCount: newTokens,
           compressionStatus: CompressionStatus.COMPRESSED,
         });
-        const { lastFrame, unmount } = renderWithProviders(
+        const { lastFrame, unmount } = await renderWithProviders(
           <CompressionMessage {...props} />,
         );
         const output = lastFrame();
@@ -82,12 +83,12 @@ describe('<CompressionMessage />', () => {
         expect(output).not.toContain('Skipping compression');
         expect(output).not.toContain('did not reduce size');
         unmount();
-      }
-    });
+      },
+    );
   });
 
   describe('skipped compression (tokens increased or same)', () => {
-    it('renders skip message when compression would increase token count', () => {
+    it('renders skip message when compression would increase token count', async () => {
       const props = createCompressionProps({
         isPending: false,
         originalTokenCount: 50,
@@ -95,7 +96,7 @@ describe('<CompressionMessage />', () => {
         compressionStatus:
           CompressionStatus.COMPRESSION_FAILED_INFLATED_TOKEN_COUNT,
       });
-      const { lastFrame, unmount } = renderWithProviders(
+      const { lastFrame, unmount } = await renderWithProviders(
         <CompressionMessage {...props} />,
       );
       const output = lastFrame();
@@ -107,7 +108,7 @@ describe('<CompressionMessage />', () => {
       unmount();
     });
 
-    it('renders skip message when token counts are equal', () => {
+    it('renders skip message when token counts are equal', async () => {
       const props = createCompressionProps({
         isPending: false,
         originalTokenCount: 50,
@@ -115,7 +116,7 @@ describe('<CompressionMessage />', () => {
         compressionStatus:
           CompressionStatus.COMPRESSION_FAILED_INFLATED_TOKEN_COUNT,
       });
-      const { lastFrame, unmount } = renderWithProviders(
+      const { lastFrame, unmount } = await renderWithProviders(
         <CompressionMessage {...props} />,
       );
       const output = lastFrame();
@@ -128,50 +129,48 @@ describe('<CompressionMessage />', () => {
   });
 
   describe('message content validation', () => {
-    it('displays correct compression statistics', () => {
-      const testCases = [
-        {
-          original: 200,
-          new: 80,
-          expected: 'compressed from 200 to 80 tokens',
-        },
-        {
-          original: 500,
-          new: 150,
-          expected: 'compressed from 500 to 150 tokens',
-        },
-        {
-          original: 1500,
-          new: 400,
-          expected: 'compressed from 1500 to 400 tokens',
-        },
-      ];
-
-      for (const { original, new: newTokens, expected } of testCases) {
+    it.each([
+      {
+        original: 200,
+        newTokens: 80,
+        expected: 'compressed from 200 to 80 tokens',
+      },
+      {
+        original: 500,
+        newTokens: 150,
+        expected: 'compressed from 500 to 150 tokens',
+      },
+      {
+        original: 1500,
+        newTokens: 400,
+        expected: 'compressed from 1500 to 400 tokens',
+      },
+    ])(
+      'displays correct compression statistics (from $original to $newTokens)',
+      async ({ original, newTokens, expected }) => {
         const props = createCompressionProps({
           isPending: false,
           originalTokenCount: original,
           newTokenCount: newTokens,
           compressionStatus: CompressionStatus.COMPRESSED,
         });
-        const { lastFrame, unmount } = renderWithProviders(
+        const { lastFrame, unmount } = await renderWithProviders(
           <CompressionMessage {...props} />,
         );
         const output = lastFrame();
 
         expect(output).toContain(expected);
         unmount();
-      }
-    });
+      },
+    );
 
-    it('shows skip message for small histories when new tokens >= original tokens', () => {
-      const testCases = [
-        { original: 50, new: 60 }, // Increased
-        { original: 100, new: 100 }, // Same
-        { original: 49999, new: 50000 }, // Just under 50k threshold
-      ];
-
-      for (const { original, new: newTokens } of testCases) {
+    it.each([
+      { original: 50, newTokens: 60 }, // Increased
+      { original: 100, newTokens: 100 }, // Same
+      { original: 49999, newTokens: 50000 }, // Just under 50k threshold
+    ])(
+      'shows skip message for small histories when new tokens >= original tokens ($original -> $newTokens)',
+      async ({ original, newTokens }) => {
         const props = createCompressionProps({
           isPending: false,
           originalTokenCount: original,
@@ -179,7 +178,7 @@ describe('<CompressionMessage />', () => {
           compressionStatus:
             CompressionStatus.COMPRESSION_FAILED_INFLATED_TOKEN_COUNT,
         });
-        const { lastFrame, unmount } = renderWithProviders(
+        const { lastFrame, unmount } = await renderWithProviders(
           <CompressionMessage {...props} />,
         );
         const output = lastFrame();
@@ -189,17 +188,16 @@ describe('<CompressionMessage />', () => {
         );
         expect(output).not.toContain('compressed from');
         unmount();
-      }
-    });
+      },
+    );
 
-    it('shows compression failure message for large histories when new tokens >= original tokens', () => {
-      const testCases = [
-        { original: 50000, new: 50100 }, // At 50k threshold
-        { original: 700000, new: 710000 }, // Large history case
-        { original: 100000, new: 100000 }, // Large history, same count
-      ];
-
-      for (const { original, new: newTokens } of testCases) {
+    it.each([
+      { original: 50000, newTokens: 50100 }, // At 50k threshold
+      { original: 700000, newTokens: 710000 }, // Large history case
+      { original: 100000, newTokens: 100000 }, // Large history, same count
+    ])(
+      'shows compression failure message for large histories when new tokens >= original tokens ($original -> $newTokens)',
+      async ({ original, newTokens }) => {
         const props = createCompressionProps({
           isPending: false,
           originalTokenCount: original,
@@ -207,7 +205,7 @@ describe('<CompressionMessage />', () => {
           compressionStatus:
             CompressionStatus.COMPRESSION_FAILED_INFLATED_TOKEN_COUNT,
         });
-        const { lastFrame, unmount } = renderWithProviders(
+        const { lastFrame, unmount } = await renderWithProviders(
           <CompressionMessage {...props} />,
         );
         const output = lastFrame();
@@ -216,17 +214,17 @@ describe('<CompressionMessage />', () => {
         expect(output).not.toContain('compressed from');
         expect(output).not.toContain('Compression was not beneficial');
         unmount();
-      }
-    });
+      },
+    );
   });
 
   describe('failure states', () => {
-    it('renders failure message when model returns an empty summary', () => {
+    it('renders failure message when model returns an empty summary', async () => {
       const props = createCompressionProps({
         isPending: false,
         compressionStatus: CompressionStatus.COMPRESSION_FAILED_EMPTY_SUMMARY,
       });
-      const { lastFrame, unmount } = renderWithProviders(
+      const { lastFrame, unmount } = await renderWithProviders(
         <CompressionMessage {...props} />,
       );
       const output = lastFrame();
@@ -238,13 +236,13 @@ describe('<CompressionMessage />', () => {
       unmount();
     });
 
-    it('renders failure message for token count errors', () => {
+    it('renders failure message for token count errors', async () => {
       const props = createCompressionProps({
         isPending: false,
         compressionStatus:
           CompressionStatus.COMPRESSION_FAILED_TOKEN_COUNT_ERROR,
       });
-      const { lastFrame, unmount } = renderWithProviders(
+      const { lastFrame, unmount } = await renderWithProviders(
         <CompressionMessage {...props} />,
       );
       const output = lastFrame();

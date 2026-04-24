@@ -14,42 +14,80 @@ afterEach(() => {
 });
 
 describe('<HookStatusDisplay />', () => {
-  it('should render a single executing hook', () => {
+  it('should render a single executing hook', async () => {
     const props = {
       activeHooks: [{ name: 'test-hook', eventName: 'BeforeAgent' }],
     };
-    const { lastFrame, unmount } = render(<HookStatusDisplay {...props} />);
+    const { lastFrame, unmount, waitUntilReady } = await render(
+      <HookStatusDisplay {...props} />,
+    );
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
 
-  it('should render multiple executing hooks', () => {
+  it('should render multiple executing hooks', async () => {
     const props = {
       activeHooks: [
         { name: 'h1', eventName: 'BeforeAgent' },
         { name: 'h2', eventName: 'BeforeAgent' },
       ],
     };
-    const { lastFrame, unmount } = render(<HookStatusDisplay {...props} />);
+    const { lastFrame, unmount, waitUntilReady } = await render(
+      <HookStatusDisplay {...props} />,
+    );
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
 
-  it('should render sequential hook progress', () => {
+  it('should render sequential hook progress', async () => {
     const props = {
       activeHooks: [
         { name: 'step', eventName: 'BeforeAgent', index: 1, total: 3 },
       ],
     };
-    const { lastFrame, unmount } = render(<HookStatusDisplay {...props} />);
+    const { lastFrame, unmount, waitUntilReady } = await render(
+      <HookStatusDisplay {...props} />,
+    );
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
 
-  it('should return empty string if no active hooks', () => {
+  it('should return empty string if no active hooks', async () => {
     const props = { activeHooks: [] };
-    const { lastFrame, unmount } = render(<HookStatusDisplay {...props} />);
-    expect(lastFrame()).toBe('');
+    const { lastFrame, unmount, waitUntilReady } = await render(
+      <HookStatusDisplay {...props} />,
+    );
+    await waitUntilReady();
+    expect(lastFrame({ allowEmpty: true })).toBe('');
     unmount();
+  });
+
+  it('should show generic message when only system hooks are active', async () => {
+    const props = {
+      activeHooks: [
+        { name: 'sys-hook', eventName: 'BeforeAgent', source: 'system' },
+      ],
+    };
+    const { lastFrame, unmount, waitUntilReady } = await render(
+      <HookStatusDisplay {...props} />,
+    );
+    await waitUntilReady();
+    expect(lastFrame()).toContain('Working...');
+    unmount();
+  });
+
+  it('matches SVG snapshot for single hook', async () => {
+    const props = {
+      activeHooks: [
+        { name: 'test-hook', eventName: 'BeforeAgent', source: 'user' },
+      ],
+    };
+    const result = await render(<HookStatusDisplay {...props} />);
+    await result.waitUntilReady();
+    await expect(result).toMatchSvgSnapshot();
+    result.unmount();
   });
 });

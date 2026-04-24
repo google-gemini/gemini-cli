@@ -5,10 +5,18 @@ on:
     - cron: '0 1 * * *' # Runs at 1 AM every day
   workflow_dispatch:
     inputs:
-      run_all:
-        description: 'Run all evaluations (including usually passing)'
-        type: 'boolean'
-        default: true
+      suite_type:
+        description: 'Suite type to run'
+        type: 'choice'
+        options:
+          - 'behavioral'
+          - 'component-level'
+          - 'hero-scenario'
+        default: 'behavioral'
+      suite_name:
+        description: 'Specific suite name to run'
+        required: false
+        type: 'string'
       test_name_pattern:
         description: 'Test name pattern or file name'
         required: false
@@ -23,10 +31,12 @@ jobs:
   evals:
     name: 'Evals (USUALLY_PASSING) nightly run'
     runs-on: 'gemini-cli-ubuntu-16-core'
+    if: "github.repository == 'google-gemini/gemini-cli'"
     strategy:
       fail-fast: false
       matrix:
         model:
+          - 'gemini-3.1-pro-preview-customtools'
           - 'gemini-3-pro-preview'
           - 'gemini-3-flash-preview'
           - 'gemini-2.5-pro'
@@ -57,11 +67,16 @@ jobs:
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
           GEMINI_MODEL: '${{ matrix.model }}'
-          RUN_EVALS: "${{ github.event.inputs.run_all != 'false' }}"
+          RUN_EVALS: 'true'
+          EVAL_SUITE_TYPE: "${{ github.event.inputs.suite_type || 'behavioral' }}"
+          EVAL_SUITE_NAME: '${{ github.event.inputs.suite_name }}'
           TEST_NAME_PATTERN: '${{ github.event.inputs.test_name_pattern }}'
+          # Disable Vitest internal retries to avoid double-retrying;
+          # custom retry logic is handled in evals/test-helper.ts
+          VITEST_RETRY: 0
         run: |
           CMD="npm run test:all_evals"
-          PATTERN="${{ env.TEST_NAME_PATTERN }}"
+          PATTERN="${TEST_NAME_PATTERN}"
 
           if [[ -n "$PATTERN" ]]; then
             if [[ "$PATTERN" == *.ts || "$PATTERN" == *.js || "$PATTERN" == */* ]]; then
@@ -84,7 +99,7 @@ jobs:
   aggregate-results:
     name: 'Aggregate Results'
     needs: ['evals']
-    if: 'always()'
+    if: "github.repository == 'google-gemini/gemini-cli' && always()"
     runs-on: 'gemini-cli-ubuntu-16-core'
     steps:
       - name: 'Checkout'

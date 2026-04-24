@@ -44,6 +44,7 @@ describe('codeAssist', () => {
       projectId: 'test-project',
       userTier: UserTierId.FREE,
       userTierName: 'free-tier-name',
+      hasOnboardedPreviously: false,
     };
 
     it('should create a server for LOGIN_WITH_GOOGLE', async () => {
@@ -63,7 +64,7 @@ describe('codeAssist', () => {
       );
       expect(setupUser).toHaveBeenCalledWith(
         mockAuthClient,
-        mockValidationHandler,
+        mockConfig,
         httpOptions,
       );
       expect(MockedCodeAssistServer).toHaveBeenCalledWith(
@@ -73,6 +74,8 @@ describe('codeAssist', () => {
         'session-123',
         'free-tier',
         'free-tier-name',
+        undefined,
+        mockConfig,
       );
       expect(generator).toBeInstanceOf(MockedCodeAssistServer);
     });
@@ -93,7 +96,7 @@ describe('codeAssist', () => {
       );
       expect(setupUser).toHaveBeenCalledWith(
         mockAuthClient,
-        mockValidationHandler,
+        mockConfig,
         httpOptions,
       );
       expect(MockedCodeAssistServer).toHaveBeenCalledWith(
@@ -103,6 +106,8 @@ describe('codeAssist', () => {
         undefined, // No session ID
         'free-tier',
         'free-tier-name',
+        undefined,
+        mockConfig,
       );
       expect(generator).toBeInstanceOf(MockedCodeAssistServer);
     });

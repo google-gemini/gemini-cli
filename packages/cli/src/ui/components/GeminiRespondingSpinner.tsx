@@ -5,9 +5,7 @@
  */
 
 import type React from 'react';
-import { useState, useEffect, useMemo } from 'react';
 import { Text, useIsScreenReaderEnabled } from 'ink';
-import { CliSpinner } from './CliSpinner.js';
 import type { SpinnerName } from 'cli-spinners';
 import { useStreamingContext } from '../contexts/StreamingContext.js';
 import { StreamingState } from '../types.js';
@@ -16,10 +14,7 @@ import {
   SCREEN_READER_RESPONDING,
 } from '../textConstants.js';
 import { theme } from '../semantic-colors.js';
-import { Colors } from '../colors.js';
-import tinygradient from 'tinygradient';
-
-const COLOR_CYCLE_DURATION_MS = 4000;
+import { GeminiSpinner } from './GeminiSpinner.js';
 
 interface GeminiRespondingSpinnerProps {
   /**
@@ -28,14 +23,28 @@ interface GeminiRespondingSpinnerProps {
    */
   nonRespondingDisplay?: string;
   spinnerType?: SpinnerName;
+  /**
+   * If true, we prioritize showing the nonRespondingDisplay (hook icon)
+   * even if the state is Responding.
+   */
+  isHookActive?: boolean;
+  color?: string;
 }
 
 export const GeminiRespondingSpinner: React.FC<
   GeminiRespondingSpinnerProps
-> = ({ nonRespondingDisplay, spinnerType = 'dots' }) => {
+> = ({
+  nonRespondingDisplay,
+  spinnerType = 'dots',
+  isHookActive = false,
+  color,
+}) => {
   const streamingState = useStreamingContext();
   const isScreenReaderEnabled = useIsScreenReaderEnabled();
-  if (streamingState === StreamingState.Responding) {
+
+  // If a hook is active, we want to show the hook icon (nonRespondingDisplay)
+  // to be consistent, instead of the rainbow spinner which means "Gemini is talking".
+  if (streamingState === StreamingState.Responding && !isHookActive) {
     return (
       <GeminiSpinner
         spinnerType={spinnerType}
@@ -48,57 +57,9 @@ export const GeminiRespondingSpinner: React.FC<
     return isScreenReaderEnabled ? (
       <Text>{SCREEN_READER_LOADING}</Text>
     ) : (
-      <Text color={theme.text.primary}>{nonRespondingDisplay}</Text>
+      <Text color={color ?? theme.text.primary}>{nonRespondingDisplay}</Text>
     );
   }
 
   return null;
-};
-
-interface GeminiSpinnerProps {
-  spinnerType?: SpinnerName;
-  altText?: string;
-}
-
-export const GeminiSpinner: React.FC<GeminiSpinnerProps> = ({
-  spinnerType = 'dots',
-  altText,
-}) => {
-  const isScreenReaderEnabled = useIsScreenReaderEnabled();
-  const [time, setTime] = useState(0);
-
-  const googleGradient = useMemo(() => {
-    const brandColors = [
-      Colors.AccentPurple,
-      Colors.AccentBlue,
-      Colors.AccentCyan,
-      Colors.AccentGreen,
-      Colors.AccentYellow,
-      Colors.AccentRed,
-    ];
-    return tinygradient([...brandColors, brandColors[0]]);
-  }, []);
-
-  useEffect(() => {
-    if (isScreenReaderEnabled) {
-      return;
-    }
-
-    const interval = setInterval(() => {
-      setTime((prevTime) => prevTime + 30);
-    }, 30); // ~33fps for smooth color transitions
-
-    return () => clearInterval(interval);
-  }, [isScreenReaderEnabled]);
-
-  const progress = (time % COLOR_CYCLE_DURATION_MS) / COLOR_CYCLE_DURATION_MS;
-  const currentColor = googleGradient.rgbAt(progress).toHexString();
-
-  return isScreenReaderEnabled ? (
-    <Text>{altText}</Text>
-  ) : (
-    <Text color={currentColor}>
-      <CliSpinner type={spinnerType} />
-    </Text>
-  );
 };

@@ -9,10 +9,11 @@ import { UpdateNotification } from './UpdateNotification.js';
 import { describe, it, expect } from 'vitest';
 
 describe('UpdateNotification', () => {
-  it('renders message', () => {
-    const { lastFrame } = render(
+  it('renders message', async () => {
+    const { lastFrame, unmount } = await render(
       <UpdateNotification message="Update available!" />,
     );
     expect(lastFrame()).toContain('Update available!');
+    unmount();
   });
 });

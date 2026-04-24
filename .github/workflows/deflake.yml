@@ -27,6 +27,7 @@ jobs:
   deflake_e2e_linux:
     name: 'E2E Test (Linux) - ${{ matrix.sandbox }}'
     runs-on: 'gemini-cli-ubuntu-16-core'
+    if: "github.repository == 'google-gemini/gemini-cli'"
     strategy:
       fail-fast: false
       matrix:
@@ -61,6 +62,7 @@ jobs:
       - name: 'Run E2E tests'
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+          GEMINI_CLI_TRUST_WORKSPACE: true
           IS_DOCKER: "${{ matrix.sandbox == 'sandbox:docker' }}"
           KEEP_OUTPUT: 'true'
           RUNS: '${{ github.event.inputs.runs }}'
@@ -68,15 +70,16 @@ jobs:
           VERBOSE: 'true'
         shell: 'bash'
         run: |
-          if [[ "${{ env.IS_DOCKER }}" == "true" ]]; then
-            npm run deflake:test:integration:sandbox:docker -- --runs="${{ env.RUNS }}" -- --testNamePattern "'${{ env.TEST_NAME_PATTERN }}'"
+          if [[ "${IS_DOCKER}" == "true" ]]; then
+            npm run deflake:test:integration:sandbox:docker -- --runs="${RUNS}" -- --testNamePattern "'${TEST_NAME_PATTERN}'"
           else
-            npm run deflake:test:integration:sandbox:none -- --runs="${{ env.RUNS }}" -- --testNamePattern "'${{ env.TEST_NAME_PATTERN }}'"
+            npm run deflake:test:integration:sandbox:none -- --runs="${RUNS}" -- --testNamePattern "'${TEST_NAME_PATTERN}'"
           fi
 
   deflake_e2e_mac:
     name: 'E2E Test (macOS)'
-    runs-on: 'macos-latest'
+    runs-on: 'macos-latest-large'
+    if: "github.repository == 'google-gemini/gemini-cli'"
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
@@ -103,18 +106,19 @@ jobs:
         if: "runner.os != 'Windows'"
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+          GEMINI_CLI_TRUST_WORKSPACE: true
           KEEP_OUTPUT: 'true'
           RUNS: '${{ github.event.inputs.runs }}'
           SANDBOX: 'sandbox:none'
           TEST_NAME_PATTERN: '${{ github.event.inputs.test_name_pattern }}'
           VERBOSE: 'true'
         run: |
-          npm run deflake:test:integration:sandbox:none -- --runs="${{ env.RUNS }}" -- --testNamePattern "'${{ env.TEST_NAME_PATTERN }}'"
+          npm run deflake:test:integration:sandbox:none -- --runs="${RUNS}" -- --testNamePattern "'${TEST_NAME_PATTERN}'"
 
   deflake_e2e_windows:
     name: 'Slow E2E - Win'
     runs-on: 'gemini-cli-windows-16-core'
-
+    if: "github.repository == 'google-gemini/gemini-cli'"
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
@@ -157,6 +161,7 @@ jobs:
       - name: 'Run E2E tests'
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+          GEMINI_CLI_TRUST_WORKSPACE: true
           KEEP_OUTPUT: 'true'
           SANDBOX: 'sandbox:none'
           VERBOSE: 'true'
@@ -167,4 +172,4 @@ jobs:
           TEST_NAME_PATTERN: '${{ github.event.inputs.test_name_pattern }}'
         shell: 'pwsh'
         run: |
-          npm run deflake:test:integration:sandbox:none -- --runs="${{ env.RUNS }}" -- --testNamePattern "'${{ env.TEST_NAME_PATTERN }}'"
+          npm run deflake:test:integration:sandbox:none -- --runs="$env:RUNS" -- --testNamePattern "'$env:TEST_NAME_PATTERN'"

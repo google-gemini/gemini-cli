@@ -11,21 +11,27 @@ import { RenderInline } from '../../utils/InlineMarkdownRenderer.js';
 
 interface InfoMessageProps {
   text: string;
+  secondaryText?: string;
+  source?: string;
   icon?: string;
   color?: string;
+  marginBottom?: number;
 }
 
 export const InfoMessage: React.FC<InfoMessageProps> = ({
   text,
+  secondaryText,
+  source,
   icon,
   color,
+  marginBottom,
 }) => {
   color ??= theme.status.warning;
   const prefix = icon ?? 'ℹ ';
   const prefixWidth = prefix.length;
 
   return (
-    <Box flexDirection="row" marginTop={1}>
+    <Box flexDirection="row" marginTop={1} marginBottom={marginBottom ?? 0}>
       <Box width={prefixWidth}>
         <Text color={color}>{prefix}</Text>
       </Box>
@@ -33,6 +39,12 @@ export const InfoMessage: React.FC<InfoMessageProps> = ({
         {text.split('\n').map((line, index) => (
           <Text wrap="wrap" key={index}>
             <RenderInline text={line} defaultColor={color} />
+            {index === text.split('\n').length - 1 && secondaryText && (
+              <Text color={theme.text.secondary}> {secondaryText}</Text>
+            )}
+            {index === text.split('\n').length - 1 && source && (
+              <Text color={theme.text.secondary}> [{source}]</Text>
+            )}
           </Text>
         ))}
       </Box>

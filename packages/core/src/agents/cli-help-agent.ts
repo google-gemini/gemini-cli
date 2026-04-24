@@ -7,8 +7,8 @@
 import type { AgentDefinition } from './types.js';
 import { GEMINI_MODEL_ALIAS_FLASH } from '../config/models.js';
 import { z } from 'zod';
-import type { Config } from '../config/config.js';
 import { GetInternalDocsTool } from '../tools/get-internal-docs.js';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
 
 const CliHelpReportSchema = z.object({
   answer: z
@@ -24,13 +24,13 @@ const CliHelpReportSchema = z.object({
  * using its own documentation and runtime state.
  */
 export const CliHelpAgent = (
-  config: Config,
+  context: AgentLoopContext,
 ): AgentDefinition<typeof CliHelpReportSchema> => ({
   name: 'cli_help',
   kind: 'local',
   displayName: 'CLI Help Agent',
   description:
-    'Specialized in answering questions about how users use you, (Gemini CLI): features, documentation, and current runtime configuration.',
+    'Specialized agent for answering questions about the Gemini CLI application. Invoke this agent for questions regarding CLI features, configuration schemas (e.g., policies), or instructions on how to create custom subagents. It queries internal documentation to provide accurate usage guidance.',
   inputConfig: {
     inputSchema: {
       type: 'object',
@@ -69,7 +69,7 @@ export const CliHelpAgent = (
   },
 
   toolConfig: {
-    tools: [new GetInternalDocsTool(config.getMessageBus())],
+    tools: [new GetInternalDocsTool(context.messageBus)],
   },
 
   promptConfig: {

@@ -10,17 +10,21 @@ import { StickyHeader } from './StickyHeader.js';
 import { renderWithProviders } from '../../test-utils/render.js';
 
 describe('StickyHeader', () => {
-  it.each([true, false])('renders children with isFirst=%s', (isFirst) => {
-    const { lastFrame } = renderWithProviders(
-      <StickyHeader
-        isFirst={isFirst}
-        width={80}
-        borderColor="green"
-        borderDimColor={false}
-      >
-        <Text>Hello Sticky</Text>
-      </StickyHeader>,
-    );
-    expect(lastFrame()).toContain('Hello Sticky');
-  });
+  it.each([true, false])(
+    'renders children with isFirst=%s',
+    async (isFirst) => {
+      const { lastFrame, unmount } = await renderWithProviders(
+        <StickyHeader
+          isFirst={isFirst}
+          width={80}
+          borderColor="green"
+          borderDimColor={false}
+        >
+          <Text>Hello Sticky</Text>
+        </StickyHeader>,
+      );
+      expect(lastFrame()).toContain('Hello Sticky');
+      unmount();
+    },
+  );
 });

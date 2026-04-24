@@ -22,6 +22,25 @@ describe('NewAgentsNotification', () => {
     {
       name: 'Agent B',
       description: 'Description B',
+      kind: 'local' as const,
+      inputConfig: { inputSchema: {} },
+      promptConfig: {},
+      modelConfig: {},
+      runConfig: {},
+      mcpServers: {
+        github: {
+          command: 'npx',
+          args: ['-y', '@modelcontextprotocol/server-github'],
+        },
+        postgres: {
+          command: 'npx',
+          args: ['-y', '@modelcontextprotocol/server-postgres'],
+        },
+      },
+    },
+    {
+      name: 'Agent C',
+      description: 'Description C',
       kind: 'remote' as const,
       agentCardUrl: '',
       inputConfig: { inputSchema: {} },
@@ -29,8 +48,8 @@ describe('NewAgentsNotification', () => {
   ];
   const onSelect = vi.fn();
 
-  it('renders agent list', () => {
-    const { lastFrame, unmount } = render(
+  it('renders agent list', async () => {
+    const { lastFrame, unmount } = await render(
       <NewAgentsNotification agents={mockAgents} onSelect={onSelect} />,
     );
 
@@ -39,7 +58,7 @@ describe('NewAgentsNotification', () => {
     unmount();
   });
 
-  it('truncates list if more than 5 agents', () => {
+  it('truncates list if more than 5 agents', async () => {
     const manyAgents = Array.from({ length: 7 }, (_, i) => ({
       name: `Agent ${i}`,
       description: `Description ${i}`,
@@ -48,7 +67,7 @@ describe('NewAgentsNotification', () => {
       inputConfig: { inputSchema: {} },
     }));
 
-    const { lastFrame, unmount } = render(
+    const { lastFrame, unmount } = await render(
       <NewAgentsNotification agents={manyAgents} onSelect={onSelect} />,
     );
 
@@ -65,7 +84,7 @@ describe('NewAgentsNotification', () => {
         }),
     );
 
-    const { lastFrame, stdin, unmount } = render(
+    const { lastFrame, stdin, unmount } = await render(
       <NewAgentsNotification agents={mockAgents} onSelect={asyncOnSelect} />,
     );
 

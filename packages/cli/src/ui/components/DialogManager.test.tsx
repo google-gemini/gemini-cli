@@ -9,6 +9,7 @@ import { DialogManager } from './DialogManager.js';
 import { describe, it, expect, vi } from 'vitest';
 import { Text } from 'ink';
 import { type UIState } from '../contexts/UIStateContext.js';
+import { type QuotaState } from '../contexts/QuotaContext.js';
 import { type RestartReason } from '../hooks/useIdeTrustListener.js';
 import { type IdeInfo } from '@google/gemini-cli-core';
 
@@ -75,12 +76,6 @@ describe('DialogManager', () => {
     terminalWidth: 80,
     confirmUpdateExtensionRequests: [],
     showIdeRestartPrompt: false,
-    quota: {
-      userTier: undefined,
-      stats: undefined,
-      proQuotaRequest: null,
-      validationRequest: null,
-    },
     shouldShowIdePrompt: false,
     isFolderTrustDialogOpen: false,
     loopDetectionConfirmationRequest: null,
@@ -101,15 +96,16 @@ describe('DialogManager', () => {
     selectedAgentDefinition: undefined,
   };
 
-  it('renders nothing by default', () => {
-    const { lastFrame } = renderWithProviders(
+  it('renders nothing by default', async () => {
+    const { lastFrame, unmount } = await renderWithProviders(
       <DialogManager {...defaultProps} />,
       { uiState: baseUiState as Partial<UIState> as UIState },
     );
-    expect(lastFrame()).toBe('');
+    expect(lastFrame({ allowEmpty: true })).toBe('');
+    unmount();
   });
 
-  const testCases: Array<[Partial<UIState>, string]> = [
+  const testCases: Array<[Partial<UIState>, string, Partial<QuotaState>?]> = [
     [
       {
         showIdeRestartPrompt: true,
@@ -118,21 +114,17 @@ describe('DialogManager', () => {
       'IdeTrustChangeDialog',
     ],
     [
+      {},
+      'ProQuotaDialog',
       {
-        quota: {
-          userTier: undefined,
-          stats: undefined,
-          proQuotaRequest: {
-            failedModel: 'a',
-            fallbackModel: 'b',
-            message: 'c',
-            isTerminalQuotaError: false,
-            resolve: vi.fn(),
-          },
-          validationRequest: null,
+        proQuotaRequest: {
+          failedModel: 'a',
+          fallbackModel: 'b',
+          message: 'c',
+          isTerminalQuotaError: false,
+          resolve: vi.fn(),
         },
       },
-      'ProQuotaDialog',
     ],
     [
       {
@@ -190,17 +182,23 @@ describe('DialogManager', () => {
 
   it.each(testCases)(
     'renders %s when state is %o',
-    (uiStateOverride, expectedComponent) => {
-      const { lastFrame } = renderWithProviders(
+    async (
+      uiStateOverride: Partial<UIState>,
+      expectedComponent: string,
+      quotaStateOverride?: Partial<QuotaState>,
+    ) => {
+      const { lastFrame, unmount } = await renderWithProviders(
         <DialogManager {...defaultProps} />,
         {
           uiState: {
             ...baseUiState,
             ...uiStateOverride,
           } as Partial<UIState> as UIState,
+          quotaState: quotaStateOverride,
         },
       );
       expect(lastFrame()).toContain(expectedComponent);
+      unmount();
     },
   );
 });

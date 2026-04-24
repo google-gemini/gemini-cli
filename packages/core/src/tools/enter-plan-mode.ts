@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import fs from 'node:fs';
 import {
   BaseDeclarativeTool,
   BaseToolInvocation,
@@ -11,6 +12,7 @@ import {
   Kind,
   type ToolInfoConfirmationDetails,
   ToolConfirmationOutcome,
+  type ExecuteOptions,
 } from './tools.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { Config } from '../config/config.js';
@@ -18,6 +20,7 @@ import { ENTER_PLAN_MODE_TOOL_NAME } from './tool-names.js';
 import { ApprovalMode } from '../policy/types.js';
 import { ENTER_PLAN_MODE_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 export interface EnterPlanModeParams {
   reason?: string;
@@ -27,12 +30,14 @@ export class EnterPlanModeTool extends BaseDeclarativeTool<
   EnterPlanModeParams,
   ToolResult
 > {
+  static readonly Name = ENTER_PLAN_MODE_TOOL_NAME;
+
   constructor(
     private config: Config,
     messageBus: MessageBus,
   ) {
     super(
-      ENTER_PLAN_MODE_TOOL_NAME,
+      EnterPlanModeTool.Name,
       'Enter Plan Mode',
       ENTER_PLAN_MODE_DEFINITION.base.description!,
       Kind.Plan,
@@ -85,11 +90,11 @@ export class EnterPlanModeInvocation extends BaseToolInvocation<
     abortSignal: AbortSignal,
   ): Promise<ToolInfoConfirmationDetails | false> {
     const decision = await this.getMessageBusDecision(abortSignal);
-    if (decision === 'ALLOW') {
+    if (decision === 'allow') {
       return false;
     }
 
-    if (decision === 'DENY') {
+    if (decision === 'deny') {
       throw new Error(
         `Tool execution for "${
           this._toolDisplayName || this._toolName
@@ -97,7 +102,7 @@ export class EnterPlanModeInvocation extends BaseToolInvocation<
       );
     }
 
-    // ASK_USER
+    // ask_user
     return {
       type: 'info',
       title: 'Enter Plan Mode',
@@ -105,12 +110,12 @@ export class EnterPlanModeInvocation extends BaseToolInvocation<
         'This will restrict the agent to read-only tools to allow for safe planning.',
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
         this.confirmationOutcome = outcome;
-        await this.publishPolicyUpdate(outcome);
+        // Policy updates are now handled centrally by the scheduler
       },
     };
   }
 
-  async execute(_signal: AbortSignal): Promise<ToolResult> {
+  async execute({ abortSignal: _signal }: ExecuteOptions): Promise<ToolResult> {
     if (this.confirmationOutcome === ToolConfirmationOutcome.Cancel) {
       return {
         llmContent: 'User cancelled entering Plan Mode.',
@@ -119,6 +124,19 @@ export class EnterPlanModeInvocation extends BaseToolInvocation<
     }
 
     this.config.setApprovalMode(ApprovalMode.PLAN);
+
+    // Ensure plans directory exists so that the agent can write the plan file.
+    // In sandboxed environments, the plans directory must exist on the host
+    // before it can be bound/allowed in the sandbox.
+    const plansDir = this.config.storage.getPlansDir();
+    if (!fs.existsSync(plansDir)) {
+      try {
+        fs.mkdirSync(plansDir, { recursive: true });
+      } catch (e) {
+        // Log error but don't fail; write_file will try again later
+        debugLogger.error(`Failed to create plans directory: ${plansDir}`, e);
+      }
+    }
 
     return {
       llmContent: 'Switching to Plan mode.',

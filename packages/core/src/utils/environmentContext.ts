@@ -53,9 +53,20 @@ export async function getEnvironmentContext(config: Config): Promise<Part[]> {
     day: 'numeric',
   });
   const platform = process.platform;
-  const directoryContext = await getDirectoryContextString(config);
+  const directoryContext = config.getIncludeDirectoryTree()
+    ? await getDirectoryContextString(config)
+    : '';
   const tempDir = config.storage.getProjectTempDir();
-  const environmentMemory = config.getEnvironmentMemory();
+  // Tiered context model (see issue #11488):
+  // - Tier 1 (global): system instruction only
+  // - Tier 2 (extension + project): first user message (here)
+  // - Tier 3 (subdirectory): tool output (JIT)
+  // When JIT is enabled, Tier 2 memory is provided by getSessionMemory().
+  // When JIT is disabled, all memory is in the system instruction and
+  // getEnvironmentMemory() provides the project memory for this message.
+  const environmentMemory = config.isJitContextEnabled?.()
+    ? config.getSessionMemory()
+    : config.getEnvironmentMemory();
 
   const context = `
 <session_context>

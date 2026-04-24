@@ -4,13 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  PartListUnion,
-  GenerateContentResponse,
-  FunctionCall,
-  FunctionDeclaration,
-  FinishReason,
-  GenerateContentResponseUsageMetadata,
+import {
+  createUserContent,
+  type PartListUnion,
+  type GenerateContentResponse,
+  type FunctionCall,
+  type FunctionDeclaration,
+  type FinishReason,
+  type GenerateContentResponseUsageMetadata,
 } from '@google/genai';
 import type {
   ToolCallConfirmationDetails,
@@ -23,12 +24,11 @@ import {
   UnauthorizedError,
   toFriendlyError,
 } from '../utils/errors.js';
-import type { GeminiChat } from './geminiChat.js';
-import { InvalidStreamError } from './geminiChat.js';
+import { InvalidStreamError, type GeminiChat } from './geminiChat.js';
 import { parseThought, type ThoughtSummary } from '../utils/thoughtUtils.js';
-import { createUserContent } from '@google/genai';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
 import { getCitations } from '../utils/generateContentResponseUtilities.js';
+import { LlmRole } from '../telemetry/types.js';
 
 import {
   type ToolCallRequestInfo,
@@ -115,7 +115,7 @@ export interface StructuredError {
 }
 
 export interface GeminiErrorEventValue {
-  error: StructuredError;
+  error: unknown;
 }
 
 export interface GeminiFinishedEventValue {
@@ -179,6 +179,9 @@ export enum CompressionStatus {
 
   /** The compression was not necessary and no action was taken */
   NOOP,
+
+  /** The compression was skipped due to previous failure, but content was truncated to budget */
+  CONTENT_TRUNCATED,
 }
 
 export interface ChatCompressionInfo {
@@ -238,6 +241,7 @@ export class Turn {
   readonly pendingToolCalls: ToolCallRequestInfo[] = [];
   private debugResponses: GenerateContentResponse[] = [];
   private pendingCitations = new Set<string>();
+  private cachedResponseText: string | undefined = undefined;
   finishReason: FinishReason | undefined = undefined;
 
   constructor(
@@ -251,6 +255,7 @@ export class Turn {
     req: PartListUnion,
     signal: AbortSignal,
     displayContent?: PartListUnion,
+    role: LlmRole = LlmRole.MAIN,
   ): AsyncGenerator<ServerGeminiStreamEvent> {
     try {
       // Note: This assumes `sendMessageStream` yields events like
@@ -260,6 +265,7 @@ export class Turn {
         req,
         this.prompt_id,
         signal,
+        role,
         displayContent,
       );
 
@@ -427,11 +433,15 @@ export class Turn {
   /**
    * Get the concatenated response text from all responses in this turn.
    * This extracts and joins all text content from the model's responses.
+   * The result is cached since this is called multiple times per turn.
    */
   getResponseText(): string {
-    return this.debugResponses
-      .map((response) => getResponseText(response))
-      .filter((text): text is string => text !== null)
-      .join(' ');
+    if (this.cachedResponseText === undefined) {
+      this.cachedResponseText = this.debugResponses
+        .map((response) => getResponseText(response))
+        .filter((text): text is string => text !== null)
+        .join(' ');
+    }
+    return this.cachedResponseText;
   }
 }

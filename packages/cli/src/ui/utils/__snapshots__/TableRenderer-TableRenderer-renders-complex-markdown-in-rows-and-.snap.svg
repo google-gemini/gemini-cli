@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="740" height="207" viewBox="0 0 740 207">
+  <style>
+    text { font-family: Consolas, "Courier New", monospace; font-size: 14px; dominant-baseline: text-before-edge; white-space: pre; }
+  </style>
+  <rect width="740" height="207" fill="#000000" />
+  <g transform="translate(10, 10)">
+    <text x="0" y="2" fill="#333333" textLength="423" lengthAdjust="spacingAndGlyphs">┌───────────────┬─────────────────────────────┐</text>
+    <text x="0" y="19" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="18" y="19" fill="#87afff" textLength="63" lengthAdjust="spacingAndGlyphs" font-weight="bold">Feature</text>
+    <text x="144" y="19" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="162" y="19" fill="#87afff" textLength="72" lengthAdjust="spacingAndGlyphs" font-weight="bold">Markdown</text>
+    <text x="414" y="19" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="36" fill="#333333" textLength="423" lengthAdjust="spacingAndGlyphs">├───────────────┼─────────────────────────────┤</text>
+    <text x="0" y="53" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="18" y="53" fill="#ffffff" textLength="36" lengthAdjust="spacingAndGlyphs">Bold</text>
+    <text x="144" y="53" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="162" y="53" fill="#ffffff" textLength="81" lengthAdjust="spacingAndGlyphs" font-weight="bold">Bold Text</text>
+    <text x="414" y="53" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="70" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="18" y="70" fill="#ffffff" textLength="54" lengthAdjust="spacingAndGlyphs">Italic</text>
+    <text x="144" y="70" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="162" y="70" fill="#ffffff" textLength="99" lengthAdjust="spacingAndGlyphs" font-style="italic">Italic Text</text>
+    <text x="414" y="70" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="87" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="18" y="87" fill="#ffffff" textLength="72" lengthAdjust="spacingAndGlyphs">Combined</text>
+    <text x="144" y="87" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="162" y="87" fill="#ffffff" textLength="135" lengthAdjust="spacingAndGlyphs" font-weight="bold" font-style="italic">Bold and Italic</text>
+    <text x="414" y="87" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="104" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="18" y="104" fill="#ffffff" textLength="36" lengthAdjust="spacingAndGlyphs">Link</text>
+    <text x="144" y="104" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="162" y="104" fill="#ffffff" textLength="72" lengthAdjust="spacingAndGlyphs">Google (</text>
+    <text x="234" y="104" fill="#87afff" textLength="162" lengthAdjust="spacingAndGlyphs">https://google.com</text>
+    <text x="396" y="104" fill="#ffffff" textLength="9" lengthAdjust="spacingAndGlyphs">)</text>
+    <text x="414" y="104" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="121" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="18" y="121" fill="#ffffff" textLength="36" lengthAdjust="spacingAndGlyphs">Code</text>
+    <text x="144" y="121" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="162" y="121" fill="#d7afff" textLength="99" lengthAdjust="spacingAndGlyphs">const x = 1</text>
+    <text x="414" y="121" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="138" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="18" y="138" fill="#ffffff" textLength="117" lengthAdjust="spacingAndGlyphs">Strikethrough</text>
+    <text x="144" y="138" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="162" y="138" fill="#ffffff" textLength="54" lengthAdjust="spacingAndGlyphs">Strike</text>
+    <text x="414" y="138" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="155" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="18" y="155" fill="#ffffff" textLength="81" lengthAdjust="spacingAndGlyphs">Underline</text>
+    <text x="144" y="155" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="162" y="155" fill="#ffffff" textLength="81" lengthAdjust="spacingAndGlyphs" text-decoration="underline">Underline</text>
+    <text x="414" y="155" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="172" fill="#333333" textLength="423" lengthAdjust="spacingAndGlyphs">└───────────────┴─────────────────────────────┘</text>
+  </g>
+</svg>

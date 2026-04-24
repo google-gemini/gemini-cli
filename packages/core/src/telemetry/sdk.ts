@@ -52,7 +52,21 @@ import {
 } from './gcp-exporters.js';
 import { TelemetryTarget } from './index.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import {
+  startGlobalMemoryMonitoring,
+  getMemoryMonitor,
+} from './memory-monitor.js';
+import { startGlobalEventLoopMonitoring } from './event-loop-monitor.js';
 import { authEvents } from '../code_assist/oauth2.js';
+import { coreEvents, CoreEvent } from '../utils/events.js';
+import {
+  logKeychainAvailability,
+  logTokenStorageInitialization,
+} from './loggers.js';
+import type {
+  KeychainAvailabilityEvent,
+  TokenStorageInitializationEvent,
+} from './types.js';
 
 // For troubleshooting, set the log level to DiagLogLevel.DEBUG
 class DiagLoggerAdapter {
@@ -82,10 +96,17 @@ diag.setLogger(new DiagLoggerAdapter(), DiagLogLevel.INFO);
 let sdk: NodeSDK | undefined;
 let spanProcessor: BatchSpanProcessor | undefined;
 let logRecordProcessor: BatchLogRecordProcessor | undefined;
+let metricReader: PeriodicExportingMetricReader | undefined;
 let telemetryInitialized = false;
 let callbackRegistered = false;
 let authListener: ((newCredentials: JWTInput) => Promise<void>) | undefined =
   undefined;
+let keychainAvailabilityListener:
+  | ((event: KeychainAvailabilityEvent) => void)
+  | undefined = undefined;
+let tokenStorageTypeListener:
+  | ((event: TokenStorageInitializationEvent) => void)
+  | undefined = undefined;
 const telemetryBuffer: Array<() => void | Promise<void>> = [];
 let activeTelemetryEmail: string | undefined;
 
@@ -196,6 +217,26 @@ export async function initializeTelemetry(
     'session.id': config.getSessionId(),
   });
 
+  if (!keychainAvailabilityListener) {
+    keychainAvailabilityListener = (event: KeychainAvailabilityEvent) => {
+      logKeychainAvailability(config, event);
+    };
+    coreEvents.on(
+      CoreEvent.TelemetryKeychainAvailability,
+      keychainAvailabilityListener,
+    );
+  }
+
+  if (!tokenStorageTypeListener) {
+    tokenStorageTypeListener = (event: TokenStorageInitializationEvent) => {
+      logTokenStorageInitialization(config, event);
+    };
+    coreEvents.on(
+      CoreEvent.TelemetryTokenStorageType,
+      tokenStorageTypeListener,
+    );
+  }
+
   const otlpEndpoint = config.getTelemetryOtlpEndpoint();
   const otlpProtocol = config.getTelemetryOtlpProtocol();
   const telemetryTarget = config.getTelemetryTarget();
@@ -223,7 +264,6 @@ export async function initializeTelemetry(
     | GcpLogExporter
     | FileLogExporter
     | ConsoleLogRecordExporter;
-  let metricReader: PeriodicExportingMetricReader;
 
   if (useDirectGcpExport) {
     debugLogger.log(
@@ -240,15 +280,21 @@ export async function initializeTelemetry(
     });
   } else if (useOtlp) {
     if (otlpProtocol === 'http') {
+      const buildUrl = (path: string) => {
+        const url = new URL(parsedEndpoint);
+        // Join the existing pathname with the new path, handling trailing slashes.
+        url.pathname = [url.pathname.replace(/\/$/, ''), path].join('/');
+        return url.href;
+      };
       spanExporter = new OTLPTraceExporterHttp({
-        url: parsedEndpoint,
+        url: buildUrl('v1/traces'),
       });
       logExporter = new OTLPLogExporterHttp({
-        url: parsedEndpoint,
+        url: buildUrl('v1/logs'),
       });
       metricReader = new PeriodicExportingMetricReader({
         exporter: new OTLPMetricExporterHttp({
-          url: parsedEndpoint,
+          url: buildUrl('v1/metrics'),
         }),
         exportIntervalMillis: 10000,
       });
@@ -303,9 +349,29 @@ export async function initializeTelemetry(
     if (config.getDebugMode()) {
       debugLogger.log('OpenTelemetry SDK started successfully.');
     }
-    telemetryInitialized = true;
     activeTelemetryEmail = credentials?.client_email;
     initializeMetrics(config);
+
+    // Start memory monitoring if interval is specified via environment variable
+    const monitorInterval = process.env['GEMINI_MEMORY_MONITOR_INTERVAL'];
+    debugLogger.log(
+      `[TELEMETRY] GEMINI_MEMORY_MONITOR_INTERVAL: ${monitorInterval}`,
+    );
+    if (monitorInterval) {
+      const intervalMs = parseInt(monitorInterval, 10);
+      if (!isNaN(intervalMs) && intervalMs > 0) {
+        startGlobalMemoryMonitoring(config, intervalMs);
+        startGlobalEventLoopMonitoring(config, intervalMs);
+        // Disable enhanced monitoring (rate limiting/high water mark) in tests
+        // to ensure we get regular snapshots regardless of growth.
+        const monitor = getMemoryMonitor();
+        if (monitor) {
+          monitor.setEnhancedMonitoring(false);
+        }
+      }
+    }
+
+    telemetryInitialized = true;
     void flushTelemetryBuffer();
   } catch (error) {
     debugLogger.error('Error starting OpenTelemetry SDK:', error);
@@ -337,6 +403,7 @@ export async function flushTelemetry(config: Config): Promise<void> {
     await Promise.all([
       spanProcessor.forceFlush(),
       logRecordProcessor.forceFlush(),
+      metricReader ? metricReader.forceFlush() : Promise.resolve(),
     ]);
     if (config.getDebugMode()) {
       debugLogger.log('OpenTelemetry SDK flushed successfully.');
@@ -375,6 +442,20 @@ export async function shutdownTelemetry(
     if (authListener) {
       authEvents.off('post_auth', authListener);
       authListener = undefined;
+    }
+    if (keychainAvailabilityListener) {
+      coreEvents.off(
+        CoreEvent.TelemetryKeychainAvailability,
+        keychainAvailabilityListener,
+      );
+      keychainAvailabilityListener = undefined;
+    }
+    if (tokenStorageTypeListener) {
+      coreEvents.off(
+        CoreEvent.TelemetryTokenStorageType,
+        tokenStorageTypeListener,
+      );
+      tokenStorageTypeListener = undefined;
     }
     callbackRegistered = false;
     activeTelemetryEmail = undefined;

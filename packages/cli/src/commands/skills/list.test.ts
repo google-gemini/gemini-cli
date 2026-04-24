@@ -4,34 +4,31 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { format } from 'node:util';
+import {
+  vi,
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+  type MockInstance,
+} from 'vitest';
+import { type Config } from '@google/gemini-cli-core';
 import { handleList, listCommand } from './list.js';
 import { loadSettings, type LoadedSettings } from '../../config/settings.js';
 import { loadCliConfig } from '../../config/config.js';
-import type { Config } from '@google/gemini-cli-core';
 import chalk from 'chalk';
 
-const emitConsoleLog = vi.hoisted(() => vi.fn());
-const debugLogger = vi.hoisted(() => ({
-  log: vi.fn((message, ...args) => {
-    emitConsoleLog('log', format(message, ...args));
-  }),
-  error: vi.fn((message, ...args) => {
-    emitConsoleLog('error', format(message, ...args));
-  }),
-}));
-
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import('@google/gemini-cli-core')>();
-  return {
-    ...actual,
-    coreEvents: {
-      emitConsoleLog,
+  const { mockCoreDebugLogger } = await import(
+    '../../test-utils/mockDebugLogger.js'
+  );
+  return mockCoreDebugLogger(
+    await importOriginal<typeof import('@google/gemini-cli-core')>(),
+    {
+      stripAnsi: false,
     },
-    debugLogger,
-  };
+  );
 });
 
 vi.mock('../../config/settings.js');
@@ -43,12 +40,16 @@ vi.mock('../utils.js', () => ({
 describe('skills list command', () => {
   const mockLoadSettings = vi.mocked(loadSettings);
   const mockLoadCliConfig = vi.mocked(loadCliConfig);
+  let stdoutWriteSpy: MockInstance<typeof process.stdout.write>;
 
   beforeEach(async () => {
     vi.clearAllMocks();
     mockLoadSettings.mockReturnValue({
       merged: {},
     } as unknown as LoadedSettings);
+    stdoutWriteSpy = vi
+      .spyOn(process.stdout, 'write')
+      .mockImplementation(() => true);
   });
 
   afterEach(() => {
@@ -67,10 +68,7 @@ describe('skills list command', () => {
 
       await handleList({});
 
-      expect(emitConsoleLog).toHaveBeenCalledWith(
-        'log',
-        'No skills discovered.',
-      );
+      expect(stdoutWriteSpy).toHaveBeenCalledWith('No skills discovered.\n');
     });
 
     it('should list all discovered skills', async () => {
@@ -98,24 +96,19 @@ describe('skills list command', () => {
 
       await handleList({});
 
-      expect(emitConsoleLog).toHaveBeenCalledWith(
-        'log',
-        chalk.bold('Discovered Agent Skills:'),
+      expect(stdoutWriteSpy).toHaveBeenCalledWith(
+        chalk.bold('Discovered Agent Skills:') + '\n\n',
       );
-      expect(emitConsoleLog).toHaveBeenCalledWith(
-        'log',
+      expect(stdoutWriteSpy).toHaveBeenCalledWith(
         expect.stringContaining('skill1'),
       );
-      expect(emitConsoleLog).toHaveBeenCalledWith(
-        'log',
+      expect(stdoutWriteSpy).toHaveBeenCalledWith(
         expect.stringContaining(chalk.green('[Enabled]')),
       );
-      expect(emitConsoleLog).toHaveBeenCalledWith(
-        'log',
+      expect(stdoutWriteSpy).toHaveBeenCalledWith(
         expect.stringContaining('skill2'),
       );
-      expect(emitConsoleLog).toHaveBeenCalledWith(
-        'log',
+      expect(stdoutWriteSpy).toHaveBeenCalledWith(
         expect.stringContaining(chalk.red('[Disabled]')),
       );
     });
@@ -146,12 +139,10 @@ describe('skills list command', () => {
 
       // Default
       await handleList({ all: false });
-      expect(emitConsoleLog).toHaveBeenCalledWith(
-        'log',
+      expect(stdoutWriteSpy).toHaveBeenCalledWith(
         expect.stringContaining('regular'),
       );
-      expect(emitConsoleLog).not.toHaveBeenCalledWith(
-        'log',
+      expect(stdoutWriteSpy).not.toHaveBeenCalledWith(
         expect.stringContaining('builtin'),
       );
 
@@ -159,16 +150,13 @@ describe('skills list command', () => {
 
       // With all: true
       await handleList({ all: true });
-      expect(emitConsoleLog).toHaveBeenCalledWith(
-        'log',
+      expect(stdoutWriteSpy).toHaveBeenCalledWith(
         expect.stringContaining('regular'),
       );
-      expect(emitConsoleLog).toHaveBeenCalledWith(
-        'log',
+      expect(stdoutWriteSpy).toHaveBeenCalledWith(
         expect.stringContaining('builtin'),
       );
-      expect(emitConsoleLog).toHaveBeenCalledWith(
-        'log',
+      expect(stdoutWriteSpy).toHaveBeenCalledWith(
         expect.stringContaining(chalk.gray(' [Built-in]')),
       );
     });

@@ -4,13 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
-import { render } from '../../test-utils/render.js';
+import React, { act } from 'react';
+import { renderWithProviders } from '../../test-utils/render.js';
 import { Text } from 'ink';
 import { LoadingIndicator } from './LoadingIndicator.js';
 import { StreamingContext } from '../contexts/StreamingContext.js';
 import { StreamingState } from '../types.js';
-import { vi } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import * as useTerminalSize from '../hooks/useTerminalSize.js';
 
 // Mock GeminiRespondingSpinner
@@ -36,55 +36,66 @@ vi.mock('../hooks/useTerminalSize.js', () => ({
 
 const useTerminalSizeMock = vi.mocked(useTerminalSize.useTerminalSize);
 
-const renderWithContext = (
+const renderWithContext = async (
   ui: React.ReactElement,
   streamingStateValue: StreamingState,
   width = 120,
 ) => {
   useTerminalSizeMock.mockReturnValue({ columns: width, rows: 24 });
-  const contextValue: StreamingState = streamingStateValue;
-  return render(
-    <StreamingContext.Provider value={contextValue}>
-      {ui}
-    </StreamingContext.Provider>,
+  return renderWithProviders(ui, {
+    uiState: { streamingState: streamingStateValue },
     width,
-  );
+  });
 };
 
 describe('<LoadingIndicator />', () => {
   const defaultProps = {
-    currentLoadingPhrase: 'Loading...',
+    currentLoadingPhrase: 'Thinking...',
     elapsedTime: 5,
   };
 
-  it('should render blank when streamingState is Idle and no loading phrase or thought', () => {
-    const { lastFrame } = renderWithContext(
+  it('should render blank when streamingState is Idle and no loading phrase or thought', async () => {
+    const { lastFrame, waitUntilReady } = await renderWithContext(
       <LoadingIndicator elapsedTime={5} />,
       StreamingState.Idle,
     );
-    expect(lastFrame()?.trim()).toBe('');
+    await waitUntilReady();
+    expect(lastFrame({ allowEmpty: true })?.trim()).toBe('');
   });
 
-  it('should render spinner, phrase, and time when streamingState is Responding', () => {
-    const { lastFrame } = renderWithContext(
+  it('should not show cancel and timer when idle even if a phrase exists', async () => {
+    const { lastFrame, waitUntilReady } = await renderWithContext(
+      <LoadingIndicator currentLoadingPhrase="Retrying..." elapsedTime={5} />,
+      StreamingState.Idle,
+    );
+    await waitUntilReady();
+    const output = lastFrame();
+    expect(output).toContain('Retrying...');
+    expect(output).not.toContain('(esc to cancel');
+  });
+
+  it('should render spinner, phrase, and time when streamingState is Responding', async () => {
+    const { lastFrame, waitUntilReady } = await renderWithContext(
       <LoadingIndicator {...defaultProps} />,
       StreamingState.Responding,
     );
+    await waitUntilReady();
     const output = lastFrame();
     expect(output).toContain('MockRespondingSpinner');
-    expect(output).toContain('Loading...');
+    expect(output).toContain('Thinking...');
     expect(output).toContain('(esc to cancel, 5s)');
   });
 
-  it('should render spinner (static), phrase but no time/cancel when streamingState is WaitingForConfirmation', () => {
+  it('should render spinner (static), phrase but no time/cancel when streamingState is WaitingForConfirmation', async () => {
     const props = {
       currentLoadingPhrase: 'Confirm action',
       elapsedTime: 10,
     };
-    const { lastFrame } = renderWithContext(
+    const { lastFrame, waitUntilReady } = await renderWithContext(
       <LoadingIndicator {...props} />,
       StreamingState.WaitingForConfirmation,
     );
+    await waitUntilReady();
     const output = lastFrame();
     expect(output).toContain('⠏'); // Static char for WaitingForConfirmation
     expect(output).toContain('Confirm action');
@@ -92,85 +103,121 @@ describe('<LoadingIndicator />', () => {
     expect(output).not.toContain(', 10s');
   });
 
-  it('should display the currentLoadingPhrase correctly', () => {
+  it('should display the currentLoadingPhrase correctly', async () => {
     const props = {
       currentLoadingPhrase: 'Processing data...',
       elapsedTime: 3,
     };
-    const { lastFrame, unmount } = renderWithContext(
+    const { lastFrame, unmount, waitUntilReady } = await renderWithContext(
       <LoadingIndicator {...props} />,
       StreamingState.Responding,
     );
+    await waitUntilReady();
     expect(lastFrame()).toContain('Processing data...');
     unmount();
   });
 
-  it('should display the elapsedTime correctly when Responding', () => {
+  it('should display the elapsedTime correctly when Responding', async () => {
     const props = {
-      currentLoadingPhrase: 'Working...',
+      currentLoadingPhrase: 'Thinking...',
       elapsedTime: 60,
     };
-    const { lastFrame, unmount } = renderWithContext(
+    const { lastFrame, unmount, waitUntilReady } = await renderWithContext(
       <LoadingIndicator {...props} />,
       StreamingState.Responding,
     );
+    await waitUntilReady();
     expect(lastFrame()).toContain('(esc to cancel, 1m)');
     unmount();
   });
 
-  it('should display the elapsedTime correctly in human-readable format', () => {
+  it('should display the elapsedTime correctly in human-readable format', async () => {
     const props = {
-      currentLoadingPhrase: 'Working...',
+      currentLoadingPhrase: 'Thinking...',
       elapsedTime: 125,
     };
-    const { lastFrame, unmount } = renderWithContext(
+    const { lastFrame, unmount, waitUntilReady } = await renderWithContext(
       <LoadingIndicator {...props} />,
       StreamingState.Responding,
     );
+    await waitUntilReady();
     expect(lastFrame()).toContain('(esc to cancel, 2m 5s)');
     unmount();
   });
 
-  it('should render rightContent when provided', () => {
+  it('should render rightContent when provided', async () => {
     const rightContent = <Text>Extra Info</Text>;
-    const { lastFrame, unmount } = renderWithContext(
+    const { lastFrame, unmount, waitUntilReady } = await renderWithContext(
       <LoadingIndicator {...defaultProps} rightContent={rightContent} />,
       StreamingState.Responding,
     );
+    await waitUntilReady();
     expect(lastFrame()).toContain('Extra Info');
     unmount();
   });
 
-  it('should transition correctly between states using rerender', () => {
-    const { lastFrame, rerender, unmount } = renderWithContext(
-      <LoadingIndicator elapsedTime={5} />,
-      StreamingState.Idle,
+  it('should transition correctly between states', async () => {
+    let setStateExternally:
+      | React.Dispatch<
+          React.SetStateAction<{
+            state: StreamingState;
+            phrase?: string;
+            elapsedTime: number;
+          }>
+        >
+      | undefined;
+
+    const TestWrapper = () => {
+      const [config, setConfig] = React.useState<{
+        state: StreamingState;
+        phrase?: string;
+        elapsedTime: number;
+      }>({
+        state: StreamingState.Idle,
+        phrase: undefined,
+        elapsedTime: 5,
+      });
+      setStateExternally = setConfig;
+
+      return (
+        <StreamingContext.Provider value={config.state}>
+          <LoadingIndicator
+            currentLoadingPhrase={config.phrase}
+            elapsedTime={config.elapsedTime}
+          />
+        </StreamingContext.Provider>
+      );
+    };
+
+    const { lastFrame, unmount, waitUntilReady } = await renderWithProviders(
+      <TestWrapper />,
     );
-    expect(lastFrame()?.trim()).toBe(''); // Initial: Idle (no loading phrase)
+    await waitUntilReady();
+    expect(lastFrame({ allowEmpty: true })?.trim()).toBe(''); // Initial: Idle (no loading phrase)
 
     // Transition to Responding
-    rerender(
-      <StreamingContext.Provider value={StreamingState.Responding}>
-        <LoadingIndicator
-          currentLoadingPhrase="Now Responding"
-          elapsedTime={2}
-        />
-      </StreamingContext.Provider>,
-    );
+    await act(async () => {
+      setStateExternally?.({
+        state: StreamingState.Responding,
+        phrase: 'Now Responding',
+        elapsedTime: 2,
+      });
+    });
+    await waitUntilReady();
     let output = lastFrame();
     expect(output).toContain('MockRespondingSpinner');
     expect(output).toContain('Now Responding');
     expect(output).toContain('(esc to cancel, 2s)');
 
     // Transition to WaitingForConfirmation
-    rerender(
-      <StreamingContext.Provider value={StreamingState.WaitingForConfirmation}>
-        <LoadingIndicator
-          currentLoadingPhrase="Please Confirm"
-          elapsedTime={15}
-        />
-      </StreamingContext.Provider>,
-    );
+    await act(async () => {
+      setStateExternally?.({
+        state: StreamingState.WaitingForConfirmation,
+        phrase: 'Please Confirm',
+        elapsedTime: 15,
+      });
+    });
+    await waitUntilReady();
     output = lastFrame();
     expect(output).toContain('⠏');
     expect(output).toContain('Please Confirm');
@@ -178,31 +225,35 @@ describe('<LoadingIndicator />', () => {
     expect(output).not.toContain(', 15s');
 
     // Transition back to Idle
-    rerender(
-      <StreamingContext.Provider value={StreamingState.Idle}>
-        <LoadingIndicator elapsedTime={5} />
-      </StreamingContext.Provider>,
-    );
-    expect(lastFrame()?.trim()).toBe(''); // Idle with no loading phrase and no spinner
+    await act(async () => {
+      setStateExternally?.({
+        state: StreamingState.Idle,
+        phrase: undefined,
+        elapsedTime: 5,
+      });
+    });
+    await waitUntilReady();
+    expect(lastFrame({ allowEmpty: true })?.trim()).toBe(''); // Idle with no loading phrase and no spinner
     unmount();
   });
 
-  it('should display fallback phrase if thought is empty', () => {
+  it('should display fallback phrase if thought is empty', async () => {
     const props = {
       thought: null,
-      currentLoadingPhrase: 'Loading...',
+      currentLoadingPhrase: 'Thinking...',
       elapsedTime: 5,
     };
-    const { lastFrame, unmount } = renderWithContext(
+    const { lastFrame, unmount, waitUntilReady } = await renderWithContext(
       <LoadingIndicator {...props} />,
       StreamingState.Responding,
     );
+    await waitUntilReady();
     const output = lastFrame();
-    expect(output).toContain('Loading...');
+    expect(output).toContain('Thinking...');
     unmount();
   });
 
-  it('should display the subject of a thought', () => {
+  it('should display the subject of a thought', async () => {
     const props = {
       thought: {
         subject: 'Thinking about something...',
@@ -210,21 +261,42 @@ describe('<LoadingIndicator />', () => {
       },
       elapsedTime: 5,
     };
-    const { lastFrame, unmount } = renderWithContext(
+    const { lastFrame, unmount, waitUntilReady } = await renderWithContext(
       <LoadingIndicator {...props} />,
       StreamingState.Responding,
     );
+    await waitUntilReady();
     const output = lastFrame();
     expect(output).toBeDefined();
     if (output) {
-      expect(output).toContain('💬');
+      // Should NOT contain "Thinking... " prefix because the subject already starts with "Thinking"
+      expect(output).not.toContain('Thinking... Thinking');
       expect(output).toContain('Thinking about something...');
       expect(output).not.toContain('and other stuff.');
     }
     unmount();
   });
 
-  it('should prioritize thought.subject over currentLoadingPhrase', () => {
+  it('should NOT prepend "Thinking... " even if the subject does not start with "Thinking"', async () => {
+    const props = {
+      thought: {
+        subject: 'Planning the response...',
+        description: 'details',
+      },
+      elapsedTime: 5,
+    };
+    const { lastFrame, unmount, waitUntilReady } = await renderWithContext(
+      <LoadingIndicator {...props} />,
+      StreamingState.Responding,
+    );
+    await waitUntilReady();
+    const output = lastFrame();
+    expect(output).toContain('Planning the response...');
+    expect(output).not.toContain('Thinking... ');
+    unmount();
+  });
+
+  it('should prioritize thought.subject over currentLoadingPhrase', async () => {
     const props = {
       thought: {
         subject: 'This should be displayed',
@@ -233,31 +305,32 @@ describe('<LoadingIndicator />', () => {
       currentLoadingPhrase: 'This should not be displayed',
       elapsedTime: 5,
     };
-    const { lastFrame, unmount } = renderWithContext(
+    const { lastFrame, unmount, waitUntilReady } = await renderWithContext(
       <LoadingIndicator {...props} />,
       StreamingState.Responding,
     );
+    await waitUntilReady();
     const output = lastFrame();
-    expect(output).toContain('💬');
     expect(output).toContain('This should be displayed');
     expect(output).not.toContain('This should not be displayed');
     unmount();
   });
 
-  it('should not display thought icon for non-thought loading phrases', () => {
-    const { lastFrame, unmount } = renderWithContext(
+  it('should not display thought indicator for non-thought loading phrases', async () => {
+    const { lastFrame, unmount, waitUntilReady } = await renderWithContext(
       <LoadingIndicator
         currentLoadingPhrase="some random tip..."
         elapsedTime={3}
       />,
       StreamingState.Responding,
     );
-    expect(lastFrame()).not.toContain('💬');
+    await waitUntilReady();
+    expect(lastFrame()).not.toContain('Thinking... ');
     unmount();
   });
 
-  it('should truncate long primary text instead of wrapping', () => {
-    const { lastFrame, unmount } = renderWithContext(
+  it('should truncate long primary text instead of wrapping', async () => {
+    const { lastFrame, unmount, waitUntilReady } = await renderWithContext(
       <LoadingIndicator
         {...defaultProps}
         currentLoadingPhrase={
@@ -267,14 +340,14 @@ describe('<LoadingIndicator />', () => {
       StreamingState.Responding,
       80,
     );
-
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
 
   describe('responsive layout', () => {
-    it('should render on a single line on a wide terminal', () => {
-      const { lastFrame, unmount } = renderWithContext(
+    it('should render on a single line on a wide terminal', async () => {
+      const { lastFrame, unmount, waitUntilReady } = await renderWithContext(
         <LoadingIndicator
           {...defaultProps}
           rightContent={<Text>Right</Text>}
@@ -282,17 +355,18 @@ describe('<LoadingIndicator />', () => {
         StreamingState.Responding,
         120,
       );
+      await waitUntilReady();
       const output = lastFrame();
       // Check for single line output
-      expect(output?.includes('\n')).toBe(false);
-      expect(output).toContain('Loading...');
+      expect(output?.trim().includes('\n')).toBe(false);
+      expect(output).toContain('Thinking...');
       expect(output).toContain('(esc to cancel, 5s)');
       expect(output).toContain('Right');
       unmount();
     });
 
-    it('should render on multiple lines on a narrow terminal', () => {
-      const { lastFrame, unmount } = renderWithContext(
+    it('should render on multiple lines on a narrow terminal', async () => {
+      const { lastFrame, unmount, waitUntilReady } = await renderWithContext(
         <LoadingIndicator
           {...defaultProps}
           rightContent={<Text>Right</Text>}
@@ -300,15 +374,16 @@ describe('<LoadingIndicator />', () => {
         StreamingState.Responding,
         79,
       );
+      await waitUntilReady();
       const output = lastFrame();
-      const lines = output?.split('\n');
+      const lines = output?.trim().split('\n');
       // Expecting 3 lines:
       // 1. Spinner + Primary Text
       // 2. Cancel + Timer
       // 3. Right Content
       expect(lines).toHaveLength(3);
       if (lines) {
-        expect(lines[0]).toContain('Loading...');
+        expect(lines[0]).toContain('Thinking...');
         expect(lines[0]).not.toContain('(esc to cancel, 5s)');
         expect(lines[1]).toContain('(esc to cancel, 5s)');
         expect(lines[2]).toContain('Right');
@@ -316,24 +391,88 @@ describe('<LoadingIndicator />', () => {
       unmount();
     });
 
-    it('should use wide layout at 80 columns', () => {
-      const { lastFrame, unmount } = renderWithContext(
+    it('should use wide layout at 80 columns', async () => {
+      const { lastFrame, unmount, waitUntilReady } = await renderWithContext(
         <LoadingIndicator {...defaultProps} />,
         StreamingState.Responding,
         80,
       );
-      expect(lastFrame()?.includes('\n')).toBe(false);
+      await waitUntilReady();
+      expect(lastFrame()?.trim().includes('\n')).toBe(false);
       unmount();
     });
 
-    it('should use narrow layout at 79 columns', () => {
-      const { lastFrame, unmount } = renderWithContext(
+    it('should use narrow layout at 79 columns', async () => {
+      const { lastFrame, unmount, waitUntilReady } = await renderWithContext(
         <LoadingIndicator {...defaultProps} />,
         StreamingState.Responding,
         79,
       );
+      await waitUntilReady();
       expect(lastFrame()?.includes('\n')).toBe(true);
       unmount();
     });
+
+    it('should render witty phrase after cancel and timer hint in wide layout', async () => {
+      const { lastFrame, unmount, waitUntilReady } = await renderWithContext(
+        <LoadingIndicator
+          elapsedTime={5}
+          wittyPhrase="I am witty"
+          showWit={true}
+          currentLoadingPhrase="Thinking..."
+        />,
+        StreamingState.Responding,
+        120,
+      );
+      await waitUntilReady();
+      const output = lastFrame();
+      // Sequence should be: Primary Text -> Cancel/Timer -> Witty Phrase
+      expect(output).toContain('Thinking... (esc to cancel, 5s) I am witty');
+      unmount();
+    });
+
+    it('should render witty phrase after cancel and timer hint in narrow layout', async () => {
+      const { lastFrame, unmount, waitUntilReady } = await renderWithContext(
+        <LoadingIndicator
+          elapsedTime={5}
+          wittyPhrase="I am witty"
+          showWit={true}
+          currentLoadingPhrase="Thinking..."
+        />,
+        StreamingState.Responding,
+        79,
+      );
+      await waitUntilReady();
+      const output = lastFrame();
+      const lines = output?.trim().split('\n');
+      // Expecting 3 lines:
+      // 1. Spinner + Primary Text
+      // 2. Cancel + Timer
+      // 3. Witty Phrase
+      expect(lines).toHaveLength(3);
+      if (lines) {
+        expect(lines[0]).toContain('Thinking...');
+        expect(lines[1]).toContain('(esc to cancel, 5s)');
+        expect(lines[2]).toContain('I am witty');
+      }
+      unmount();
+    });
+  });
+
+  it('should use spinnerIcon when provided', async () => {
+    const props = {
+      currentLoadingPhrase: 'Confirm action',
+      elapsedTime: 10,
+      spinnerIcon: '?',
+    };
+    const { lastFrame, waitUntilReady, unmount } = await renderWithContext(
+      <LoadingIndicator {...props} />,
+      StreamingState.WaitingForConfirmation,
+    );
+    await waitUntilReady();
+    const output = lastFrame();
+    expect(output).toContain('?');
+    expect(output).not.toContain('⠏');
+    unmount();
   });
 });

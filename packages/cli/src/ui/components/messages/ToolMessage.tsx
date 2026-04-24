@@ -13,6 +13,7 @@ import {
   ToolStatusIndicator,
   ToolInfo,
   TrailingIndicator,
+  McpProgressIndicator,
   type TextEmphasis,
   STATUS_INDICATOR_WIDTH,
   isThisShellFocusable as checkIsShellFocusable,
@@ -20,8 +21,9 @@ import {
   useFocusHint,
   FocusHint,
 } from './ToolShared.js';
-import { type Config } from '@google/gemini-cli-core';
+import { type Config, CoreToolCallStatus, Kind } from '@google/gemini-cli-core';
 import { ShellInputPrompt } from '../ShellInputPrompt.js';
+import { SUBAGENT_MAX_LINES } from '../../constants.js';
 
 export type { TextEmphasis };
 
@@ -44,6 +46,7 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
   description,
   resultDisplay,
   status,
+  kind,
   availableTerminalHeight,
   terminalWidth,
   emphasis = 'medium',
@@ -55,6 +58,10 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
   embeddedShellFocused,
   ptyId,
   config,
+  progressMessage,
+  originalRequestName,
+  progress,
+  progressTotal,
 }) => {
   const isThisShellFocused = checkIsShellFocused(
     name,
@@ -83,12 +90,18 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
         borderColor={borderColor}
         borderDimColor={borderDimColor}
       >
-        <ToolStatusIndicator status={status} name={name} />
+        <ToolStatusIndicator
+          status={status}
+          name={name}
+          isFocused={isThisShellFocused}
+        />
         <ToolInfo
           name={name}
           status={status}
           description={description}
           emphasis={emphasis}
+          progressMessage={progressMessage}
+          originalRequestName={originalRequestName}
         />
         <FocusHint
           shouldShowFocusHint={shouldShowFocusHint}
@@ -108,12 +121,26 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
         paddingX={1}
         flexDirection="column"
       >
+        {status === CoreToolCallStatus.Executing && progress !== undefined && (
+          <McpProgressIndicator
+            progress={progress}
+            total={progressTotal}
+            message={progressMessage}
+            barWidth={20}
+          />
+        )}
         <ToolResultDisplay
           resultDisplay={resultDisplay}
           availableTerminalHeight={availableTerminalHeight}
           terminalWidth={terminalWidth}
           renderOutputAsMarkdown={renderOutputAsMarkdown}
           hasFocus={isThisShellFocused}
+          maxLines={
+            kind === Kind.Agent && availableTerminalHeight !== undefined
+              ? SUBAGENT_MAX_LINES
+              : undefined
+          }
+          overflowDirection={kind === Kind.Agent ? 'bottom' : 'top'}
         />
         {isThisShellFocused && config && (
           <Box paddingLeft={STATUS_INDICATOR_WIDTH} marginTop={1}>

@@ -19,6 +19,8 @@ describe('Answer vs. ask eval', () => {
    * automatically modify the file, but instead asks for permission.
    */
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should not edit files when asked to inspect for bugs',
     prompt: 'Inspect app.ts for bugs',
     files: FILES,
@@ -42,6 +44,8 @@ describe('Answer vs. ask eval', () => {
    * does modify the file.
    */
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should edit files when asked to fix bug',
     prompt: 'Fix the bug in app.ts - it should add numbers not subtract',
     files: FILES,
@@ -66,6 +70,8 @@ describe('Answer vs. ask eval', () => {
    * automatically modify the file, but instead asks for permission.
    */
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should not edit when asking "any bugs"',
     prompt: 'Any bugs in app.ts?',
     files: FILES,
@@ -88,7 +94,9 @@ describe('Answer vs. ask eval', () => {
    * Ensures that when the user asks a general question, the agent does NOT
    * automatically modify the file.
    */
-  evalTest('USUALLY_PASSES', {
+  evalTest('ALWAYS_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should not edit files when asked a general question',
     prompt: 'How does app.ts work?',
     files: FILES,
@@ -111,7 +119,9 @@ describe('Answer vs. ask eval', () => {
    * Ensures that when the user asks a question about style, the agent does NOT
    * automatically modify the file.
    */
-  evalTest('USUALLY_PASSES', {
+  evalTest('ALWAYS_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should not edit files when asked about style',
     prompt: 'Is app.ts following good style?',
     files: FILES,
@@ -135,6 +145,8 @@ describe('Answer vs. ask eval', () => {
    * the agent does NOT automatically modify the file.
    */
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should not edit files when user notes an issue',
     prompt: 'The add function subtracts numbers.',
     files: FILES,
