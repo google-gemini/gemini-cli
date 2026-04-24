@@ -17,7 +17,7 @@ import {
   WhisperModelManager,
   type WhisperModelProgress,
 } from '@google/gemini-cli-core';
-import { CircularProgress } from './shared/CircularProgress.js';
+import { CliSpinner } from './CliSpinner.js';
 
 interface VoiceModelDialogProps {
   onClose: () => void;
@@ -63,9 +63,10 @@ export function VoiceModelDialog({
   );
   const modelManager = useMemo(() => new WhisperModelManager(), []);
 
-  const currentBackend = settings.merged.voice?.backend ?? 'gemini-live';
+  const currentBackend =
+    settings.merged.experimental.voice?.backend ?? 'gemini-live';
   const currentWhisperModel =
-    settings.merged.voice?.whisperModel ?? 'ggml-base.en.bin';
+    settings.merged.experimental.voice?.whisperModel ?? 'ggml-base.en.bin';
 
   const handleKeypress = useCallback(
     (key: Key) => {
@@ -89,7 +90,11 @@ export function VoiceModelDialog({
       if (value === 'whisper') {
         setView('whisper-models');
       } else {
-        setSetting(SettingScope.User, 'voice.backend', 'gemini-live');
+        setSetting(
+          SettingScope.User,
+          'experimental.voice.backend',
+          'gemini-live',
+        );
       }
     },
     [setSetting],
@@ -98,8 +103,12 @@ export function VoiceModelDialog({
   const handleWhisperModelSelect = useCallback(
     async (modelName: string) => {
       if (modelManager.isModelInstalled(modelName)) {
-        setSetting(SettingScope.User, 'voice.backend', 'whisper');
-        setSetting(SettingScope.User, 'voice.whisperModel', modelName);
+        setSetting(SettingScope.User, 'experimental.voice.backend', 'whisper');
+        setSetting(
+          SettingScope.User,
+          'experimental.voice.whisperModel',
+          modelName,
+        );
       } else {
         setError(null);
         const onProgress = (p: WhisperModelProgress) => setDownloadProgress(p);
@@ -108,8 +117,16 @@ export function VoiceModelDialog({
         try {
           await modelManager.downloadModel(modelName);
 
-          setSetting(SettingScope.User, 'voice.backend', 'whisper');
-          setSetting(SettingScope.User, 'voice.whisperModel', modelName);
+          setSetting(
+            SettingScope.User,
+            'experimental.voice.backend',
+            'whisper',
+          );
+          setSetting(
+            SettingScope.User,
+            'experimental.voice.whisperModel',
+            modelName,
+          );
         } catch (err) {
           setError(
             `Failed to download: ${err instanceof Error ? err.message : String(err)}`,
@@ -178,7 +195,7 @@ export function VoiceModelDialog({
         <Box marginTop={1} flexDirection="column">
           <Box>
             <Text>Downloading {downloadProgress.modelName}... </Text>
-            <CircularProgress percentage={downloadProgress.percentage} />
+            <CliSpinner />
             <Text> {Math.round(downloadProgress.percentage * 100)}%</Text>
           </Box>
         </Box>

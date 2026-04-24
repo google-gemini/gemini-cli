@@ -109,12 +109,12 @@ they appear in the UI.
 
 ### Voice
 
-| UI Label               | Setting                   | Description                                                        | Default              |
-| ---------------------- | ------------------------- | ------------------------------------------------------------------ | -------------------- |
-| Activation Mode        | `voice.activationMode`    | How to trigger voice recording with the Space key.                 | `"push-to-talk"`     |
-| Transcription Backend  | `voice.backend`           | The backend to use for voice transcription.                        | `"gemini-live"`      |
-| Whisper Model          | `voice.whisperModel`      | The Whisper model to use for local transcription.                  | `"ggml-base.en.bin"` |
-| Stop Grace Period (ms) | `voice.stopGracePeriodMs` | How long to wait for final transcription after stopping recording. | `1000`               |
+| UI Label               | Setting                                | Description                                                        | Default              |
+| ---------------------- | -------------------------------------- | ------------------------------------------------------------------ | -------------------- |
+| Activation Mode        | `experimental.voice.activationMode`    | How to trigger voice recording with the Space key.                 | `"push-to-talk"`     |
+| Transcription Backend  | `experimental.voice.backend`           | The backend to use for voice transcription.                        | `"gemini-live"`      |
+| Whisper Model          | `experimental.voice.whisperModel`      | The Whisper model to use for local transcription.                  | `"ggml-base.en.bin"` |
+| Stop Grace Period (ms) | `experimental.voice.stopGracePeriodMs` | How long to wait for final transcription after stopping recording. | `1000`               |
 
 ### Agents
 

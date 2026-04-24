@@ -9,10 +9,22 @@ import { CommandKind, type SlashCommand } from './types.js';
 export const voiceCommand: SlashCommand = {
   name: 'voice',
   altNames: [],
-  description: 'Toggle push-to-talk voice dictation mode',
+  description: 'Toggle voice dictation mode',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: (context) => {
     context.ui.toggleVoiceMode();
   },
+  subCommands: [
+    {
+      name: 'model',
+      description: 'Manage voice transcription models',
+      kind: CommandKind.BUILT_IN,
+      autoExecute: true,
+      action: async () => ({
+        type: 'dialog',
+        dialog: 'voice-model',
+      }),
+    },
+  ],
 };

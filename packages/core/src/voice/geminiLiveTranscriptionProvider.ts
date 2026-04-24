@@ -5,7 +5,7 @@
  */
 
 import WebSocket from 'ws';
-import { EventEmitter } from 'node:events';
+import { EventEmitter, once } from 'node:events';
 import { debugLogger } from '../utils/debugLogger.js';
 import type {
   TranscriptionProvider,
@@ -72,87 +72,83 @@ export class GeminiLiveTranscriptionProvider
       throw new Error('No API key provided');
     }
 
+    // NOTE: The Generative Language WebSocket API requires the API key to be passed via the 'key' query parameter.
     const url = `${baseUrl}?key=${this.apiKey}`;
     debugLogger.debug(
       `[GeminiLiveTranscription] Connecting to model ${modelName} via raw WebSocket with API Key...`,
     );
 
-    return new Promise((resolve, reject) => {
-      try {
-        this.ws = new WebSocket(url);
+    try {
+      this.ws = new WebSocket(url, {
+        maxPayload: 1 << 20, // 1MB limit for safety
+      });
 
-        this.ws.on('open', () => {
-          const setupMessage = {
-            setup: {
-              model: `models/${modelName}`,
-              generation_config: {
-                response_modalities: ['audio'],
-              },
-              input_audio_transcription: {},
-            },
-          };
+      this.ws.on('message', (data) => {
+        try {
+          const parsedData: unknown = JSON.parse(data.toString());
+          const result = LiveAPIResponseSchema.safeParse(parsedData);
 
-          this.ws?.send(JSON.stringify(setupMessage));
-          this.currentTranscription = '';
-          resolve();
-        });
+          if (result.success) {
+            const response = result.data;
+            if (response.serverContent) {
+              const content = response.serverContent;
 
-        this.ws.on('message', (data) => {
-          try {
-            const parsedData: unknown = JSON.parse(data.toString());
-            const result = LiveAPIResponseSchema.safeParse(parsedData);
+              if (content.turnComplete) {
+                this.emit('turnComplete');
+              }
 
-            if (result.success) {
-              const response = result.data;
-              if (response.serverContent) {
-                const content = response.serverContent;
-
-                if (content.turnComplete) {
-                  this.emit('turnComplete');
-                }
-
-                if (content.inputTranscription?.text) {
-                  const text = content.inputTranscription.text;
-                  debugLogger.debug(
-                    `[GeminiLiveTranscription] Transcription received (Cloud): "${text}"`,
-                  );
-                  this.currentTranscription = text;
-                  this.emit('transcription', this.currentTranscription);
-                }
+              if (content.inputTranscription?.text) {
+                const text = content.inputTranscription.text;
+                debugLogger.debug(
+                  `[GeminiLiveTranscription] Transcription received (Cloud): "${text}"`,
+                );
+                this.currentTranscription = text;
+                this.emit('transcription', this.currentTranscription);
               }
             }
-          } catch (e) {
-            debugLogger.error(
-              '[GeminiLiveTranscription] Error parsing message:',
-              e,
-            );
           }
-        });
-
-        this.ws.on('error', (error) => {
+        } catch (e) {
           debugLogger.error(
-            '[GeminiLiveTranscription] WebSocket Error:',
-            error,
+            '[GeminiLiveTranscription] Error parsing message:',
+            e,
           );
-          this.emit('error', error);
-          reject(error);
-        });
+        }
+      });
 
-        this.ws.on('close', (code, reason) => {
-          debugLogger.debug(
-            `[GeminiLiveTranscription] Connection Closed. Code: ${code}, Reason: ${reason}`,
-          );
-          this.emit('close');
-          this.ws = null;
-        });
-      } catch (err) {
-        debugLogger.error(
-          '[GeminiLiveTranscription] Failed to establish connection:',
-          err,
+      this.ws.on('error', (error) => {
+        debugLogger.error('[GeminiLiveTranscription] WebSocket Error:', error);
+        this.emit('error', error);
+      });
+
+      this.ws.on('close', (code, reason) => {
+        debugLogger.debug(
+          `[GeminiLiveTranscription] Connection Closed. Code: ${code}, Reason: ${reason}`,
         );
-        reject(err);
-      }
-    });
+        this.emit('close');
+        this.ws = null;
+      });
+
+      await once(this.ws, 'open');
+
+      const setupMessage = {
+        setup: {
+          model: `models/${modelName}`,
+          generation_config: {
+            response_modalities: ['audio'],
+          },
+          input_audio_transcription: {},
+        },
+      };
+
+      this.ws.send(JSON.stringify(setupMessage));
+      this.currentTranscription = '';
+    } catch (err) {
+      debugLogger.error(
+        '[GeminiLiveTranscription] Failed to establish connection:',
+        err,
+      );
+      throw err;
+    }
   }
 
   sendAudioChunk(chunk: Buffer): void {

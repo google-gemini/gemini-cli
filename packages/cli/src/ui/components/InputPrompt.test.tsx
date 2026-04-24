@@ -43,6 +43,7 @@ import {
   type InputPromptProps,
 } from './InputPrompt.js';
 import { InputContext } from '../contexts/InputContext.js';
+import { type UIState } from '../contexts/UIStateContext.js';
 import {
   calculateTransformationsForLine,
   calculateTransformedLine,
@@ -446,7 +447,6 @@ describe('InputPrompt', () => {
           getDirectories: () => ['/test/project/src'],
         }),
         getContentGeneratorConfig: () => ({ apiKey: 'test-api-key' }),
-        getChatRecordingService: () => fakeTranscriptionProvider,
       } as unknown as Config,
       slashCommands: mockSlashCommands,
       commandContext: mockCommandContext,
@@ -4973,7 +4973,7 @@ describe('InputPrompt', () => {
         {
           uiState: { isVoiceModeEnabled: true } as UIState,
           settings: createMockSettings({
-            voice: { activationMode: 'toggle' },
+            experimental: { voice: { activationMode: 'toggle' } },
           }),
         },
       );
@@ -5006,7 +5006,7 @@ describe('InputPrompt', () => {
         {
           uiState: { isVoiceModeEnabled: true } as UIState,
           settings: createMockSettings({
-            voice: { activationMode: 'toggle' },
+            experimental: { voice: { activationMode: 'toggle' } },
           }),
         },
       );
@@ -5042,7 +5042,7 @@ describe('InputPrompt', () => {
         {
           uiState: { isVoiceModeEnabled: true } as UIState,
           settings: createMockSettings({
-            voice: { activationMode: 'toggle' },
+            experimental: { voice: { activationMode: 'toggle' } },
           }),
         },
       );
@@ -5074,7 +5074,7 @@ describe('InputPrompt', () => {
         {
           uiState: { isVoiceModeEnabled: false } as UIState,
           settings: createMockSettings({
-            voice: { activationMode: 'toggle' },
+            experimental: { voice: { activationMode: 'toggle' } },
           }),
         },
       );
@@ -5099,7 +5099,7 @@ describe('InputPrompt', () => {
         {
           uiState: { isVoiceModeEnabled: true } as UIState,
           settings: createMockSettings({
-            voice: { activationMode: 'toggle' },
+            experimental: { voice: { activationMode: 'toggle' } },
           }),
         },
       );
@@ -5154,7 +5154,7 @@ describe('InputPrompt', () => {
         {
           uiState: { isVoiceModeEnabled: true } as UIState,
           settings: createMockSettings({
-            voice: { activationMode: 'toggle' },
+            experimental: { voice: { activationMode: 'toggle' } },
           }),
         },
       );
@@ -5197,7 +5197,7 @@ describe('InputPrompt', () => {
           {
             uiState: { isVoiceModeEnabled: true } as UIState,
             settings: createMockSettings({
-              voice: { activationMode: 'push-to-talk' },
+              experimental: { voice: { activationMode: 'push-to-talk' } },
             }),
           },
         );
@@ -5228,7 +5228,7 @@ describe('InputPrompt', () => {
           {
             uiState: { isVoiceModeEnabled: true } as UIState,
             settings: createMockSettings({
-              voice: { activationMode: 'push-to-talk' },
+              experimental: { voice: { activationMode: 'push-to-talk' } },
             }),
           },
         );
@@ -5260,7 +5260,7 @@ describe('InputPrompt', () => {
           {
             uiState: { isVoiceModeEnabled: true } as UIState,
             settings: createMockSettings({
-              voice: { activationMode: 'push-to-talk' },
+              experimental: { voice: { activationMode: 'push-to-talk' } },
             }),
           },
         );
@@ -5304,7 +5304,7 @@ describe('InputPrompt', () => {
           {
             uiState: { isVoiceModeEnabled: true } as UIState,
             settings: createMockSettings({
-              voice: { activationMode: 'push-to-talk' },
+              experimental: { voice: { activationMode: 'push-to-talk' } },
             }),
           },
         );

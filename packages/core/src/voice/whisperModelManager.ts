@@ -17,10 +17,21 @@ export interface WhisperModelProgress {
   percentage: number;
 }
 
+export interface WhisperModelManagerEvents {
+  progress: [WhisperModelProgress];
+}
+
+const ALLOWED_MODELS = [
+  'ggml-tiny.en.bin',
+  'ggml-base.en.bin',
+  'ggml-large-v3-turbo-q5_0.bin',
+  'ggml-large-v3-turbo-q8_0.bin',
+];
+
 /**
  * Manages Whisper models (checking existence, downloading).
  */
-export class WhisperModelManager extends EventEmitter {
+export class WhisperModelManager extends EventEmitter<WhisperModelManagerEvents> {
   private readonly modelsDir: string;
 
   constructor() {
@@ -29,14 +40,18 @@ export class WhisperModelManager extends EventEmitter {
   }
 
   isModelInstalled(modelName: string): boolean {
+    this.validateModelName(modelName);
     return fs.existsSync(path.join(this.modelsDir, modelName));
   }
 
   getModelPath(modelName: string): string {
+    this.validateModelName(modelName);
     return path.join(this.modelsDir, modelName);
   }
 
   async downloadModel(modelName: string): Promise<void> {
+    this.validateModelName(modelName);
+
     if (!fs.existsSync(this.modelsDir)) {
       fs.mkdirSync(this.modelsDir, { recursive: true });
     }
@@ -77,10 +92,16 @@ export class WhisperModelManager extends EventEmitter {
           transferred,
           total,
           percentage,
-        } as WhisperModelProgress);
+        });
       }
     } finally {
       writer.end();
+    }
+  }
+
+  private validateModelName(modelName: string): void {
+    if (!ALLOWED_MODELS.includes(modelName)) {
+      throw new Error(`Unauthorized model name: ${modelName}`);
     }
   }
 }

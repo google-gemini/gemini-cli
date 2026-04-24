@@ -63,7 +63,6 @@ import { terminalSetupCommand } from '../ui/commands/terminalSetupCommand.js';
 import { upgradeCommand } from '../ui/commands/upgradeCommand.js';
 import { gemmaStatusCommand } from '../ui/commands/gemmaStatusCommand.js';
 import { voiceCommand } from '../ui/commands/voiceCommand.js';
-import { voiceModelCommand } from '../ui/commands/voiceModelCommand.js';
 
 /**
  * Loads the core, hard-coded slash commands that are an integral part
@@ -229,9 +228,7 @@ export class BuiltinCommandLoader implements ICommandLoader {
       vimCommand,
       setupGithubCommand,
       terminalSetupCommand,
-      ...(this.config?.isVoiceModeEnabled()
-        ? [voiceCommand, voiceModelCommand]
-        : []),
+      ...(this.config?.isVoiceModeEnabled() ? [voiceCommand] : []),
       ...(this.config?.getContentGeneratorConfig()?.authType ===
       AuthType.LOGIN_WITH_GOOGLE
         ? [upgradeCommand]

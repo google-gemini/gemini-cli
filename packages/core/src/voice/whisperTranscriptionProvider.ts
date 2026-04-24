@@ -68,6 +68,8 @@ export class WhisperTranscriptionProvider
     );
 
     return new Promise((resolve, reject) => {
+      let isResolved = false;
+
       try {
         // whisper-stream -m <model_path> -t <threads> --step 0 --length <length> -vth 0.6
         // Setting step == 0 enables sliding window mode with VAD, which outputs
@@ -94,13 +96,28 @@ export class WhisperTranscriptionProvider
           const msg = data.toString();
           if (msg.includes('error')) {
             debugLogger.error(`[WhisperTranscription] stderr: ${msg}`);
+            if (!isResolved) {
+              isResolved = true;
+              reject(new Error(msg));
+            }
+          }
+
+          // whisper-stream prints "whisper_init_from_file_with_params_no_state: loading model from..."
+          // and finally "main: processing, press Ctrl+C to stop" when ready.
+          if (!isResolved && msg.includes('main: processing')) {
+            debugLogger.debug('[WhisperTranscription] whisper-stream is ready');
+            isResolved = true;
+            resolve();
           }
         });
 
         this.process.on('error', (err) => {
           debugLogger.error('[WhisperTranscription] Process error:', err);
           this.emit('error', err);
-          reject(err);
+          if (!isResolved) {
+            isResolved = true;
+            reject(err);
+          }
         });
 
         this.process.on('close', (code) => {
@@ -111,13 +128,25 @@ export class WhisperTranscriptionProvider
           this.process = null;
         });
 
-        resolve();
+        // Fallback timeout in case "main: processing" is never seen
+        setTimeout(() => {
+          if (!isResolved) {
+            debugLogger.warn(
+              '[WhisperTranscription] Connection timeout (fallback resolve)',
+            );
+            isResolved = true;
+            resolve();
+          }
+        }, 10000);
       } catch (err) {
         debugLogger.error(
           '[WhisperTranscription] Failed to spawn process:',
           err,
         );
-        reject(err);
+        if (!isResolved) {
+          isResolved = true;
+          reject(err);
+        }
       }
     });
   }

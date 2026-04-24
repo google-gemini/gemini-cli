@@ -21,10 +21,10 @@ export interface AudioRecorderEvents {
  */
 export class AudioRecorder extends EventEmitter<AudioRecorderEvents> {
   private recProcess: ChildProcessWithoutNullStreams | null = null;
-  private _isRecording = false;
+  private isRecordingInternal = false;
 
   get isRecording(): boolean {
-    return this._isRecording;
+    return this.isRecordingInternal;
   }
 
   /**
@@ -40,57 +40,62 @@ export class AudioRecorder extends EventEmitter<AudioRecorderEvents> {
   }
 
   async start(): Promise<void> {
-    if (this._isRecording) return;
+    if (this.isRecordingInternal) return;
+    this.isRecordingInternal = true;
 
-    const available = await AudioRecorder.isAvailable();
-    if (!available) {
-      throw new Error(
-        'The `rec` command (provided by SoX) is required for voice mode. Please install SoX (e.g., `brew install sox` on macOS or `sudo apt install sox libsox-fmt-all` on Linux).',
-      );
+    try {
+      const available = await AudioRecorder.isAvailable();
+      if (!available) {
+        throw new Error(
+          'The `rec` command (provided by SoX) is required for voice mode. Please install SoX (e.g., `brew install sox` on macOS or `sudo apt install sox libsox-fmt-all` on Linux).',
+        );
+      }
+
+      // rec -q -V0 -e signed -c 1 -b 16 -r 16000 -t raw -
+      this.recProcess = spawn('rec', [
+        '-q',
+        '-V0',
+        '-e',
+        'signed',
+        '-c',
+        '1',
+        '-b',
+        '16',
+        '-r',
+        '16000',
+        '-t',
+        'raw',
+        '-',
+      ]);
+
+      this.recProcess.stdout.on('data', (data: Buffer) => {
+        this.emit('data', data);
+      });
+
+      this.recProcess.stderr.on('data', (_data: Buffer) => {
+        // rec might print warnings to stderr, we could log them or ignore
+        // console.warn(`rec stderr: ${data.toString()}`);
+      });
+
+      this.recProcess.on('error', (err) => {
+        this.emit('error', err);
+        this.stop();
+      });
+
+      this.recProcess.on('close', () => {
+        this.stop();
+      });
+
+      this.emit('start');
+    } catch (err) {
+      this.isRecordingInternal = false;
+      throw err;
     }
-
-    // rec -q -V0 -e signed -c 1 -b 16 -r 16000 -t raw -
-    this.recProcess = spawn('rec', [
-      '-q',
-      '-V0',
-      '-e',
-      'signed',
-      '-c',
-      '1',
-      '-b',
-      '16',
-      '-r',
-      '16000',
-      '-t',
-      'raw',
-      '-',
-    ]);
-
-    this.recProcess.stdout.on('data', (data: Buffer) => {
-      this.emit('data', data);
-    });
-
-    this.recProcess.stderr.on('data', (_data: Buffer) => {
-      // rec might print warnings to stderr, we could log them or ignore
-      // console.warn(`rec stderr: ${data.toString()}`);
-    });
-
-    this.recProcess.on('error', (err) => {
-      this.emit('error', err);
-      this.stop();
-    });
-
-    this.recProcess.on('close', () => {
-      this.stop();
-    });
-
-    this._isRecording = true;
-    this.emit('start');
   }
 
   stop(): void {
-    if (!this._isRecording) return;
-    this._isRecording = false;
+    if (!this.isRecordingInternal) return;
+    this.isRecordingInternal = false;
 
     if (this.recProcess) {
       this.recProcess.kill('SIGTERM');
