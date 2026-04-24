@@ -190,6 +190,12 @@ export const Help: React.FC<Help> = ({ commands }) => (
       </Text>{' '}
       - Cycle through your prompt history
     </Text>
+    <Text color={theme.text.primary}>
+      <Text bold color={theme.text.accent}>
+        {formatCommand(Command.EXPORT_LOGS)}
+      </Text>{' '}
+      - Export debug console logs
+    </Text>
     <Box height={1} />
     <Text color={theme.text.primary}>
       For a full list of shortcuts, see{' '}
