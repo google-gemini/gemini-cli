@@ -79,7 +79,7 @@ const actionlintInstaller = isWindows
     `[System.IO.Compression.ZipFile]::ExtractToDirectory('${TEMP_DIR}/.actionlint.zip', '${TEMP_DIR}/actionlint')"`
   : `
       mkdir -p "${TEMP_DIR}/actionlint"
-      curl -sSLo "${TEMP_DIR}/.actionlint.tgz" "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_${platformArch.actionlint}.tar.gz"
+      wget -O "${TEMP_DIR}/.actionlint.tgz" "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_${platformArch.actionlint}.tar.gz"
       tar -xzf "${TEMP_DIR}/.actionlint.tgz" -C "${TEMP_DIR}/actionlint"
     `;
 
@@ -94,7 +94,7 @@ const shellcheckInstaller = isWindows
     `[System.IO.Compression.ZipFile]::ExtractToDirectory('${TEMP_DIR}/.shellcheck.zip', '${TEMP_DIR}/shellcheck')"`
   : `
       mkdir -p "${TEMP_DIR}/shellcheck"
-      curl -sSLo "${TEMP_DIR}/.shellcheck.txz" "https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.${platformArch.shellcheck}.tar.xz"
+      wget -O "${TEMP_DIR}/.shellcheck.txz" "https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.${platformArch.shellcheck}.tar.xz"
       tar -xf "${TEMP_DIR}/.shellcheck.txz" -C "${TEMP_DIR}/shellcheck" --strip-components=1
     `;
 
