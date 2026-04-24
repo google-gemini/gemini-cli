@@ -1667,6 +1667,19 @@ const SETTINGS_SCHEMA = {
         showInDialog: false,
         items: { type: 'string' },
       },
+      confirmationRequired: {
+        type: 'array',
+        label: 'Confirmation Required',
+        category: 'Advanced',
+        requiresRestart: true,
+        default: undefined as string[] | undefined,
+        description: oneLine`
+          Tool names that always require user confirmation.
+          Takes precedence over allowed tools and core tool allowlists.
+        `,
+        showInDialog: false,
+        items: { type: 'string' },
+      },
       exclude: {
         type: 'array',
         label: 'Exclude Tools',
