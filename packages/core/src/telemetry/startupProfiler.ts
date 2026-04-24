@@ -33,6 +33,7 @@ export interface StartupPhaseHandle {
  */
 export class StartupProfiler {
   private phases: Map<string, StartupPhase> = new Map();
+  private lastFlushResults: readonly StartupPhaseStats[] = [];
   private static instance: StartupProfiler;
 
   private constructor() {}
@@ -221,6 +222,8 @@ export class StartupProfiler {
       }
     }
 
+    this.lastFlushResults = Object.freeze(startupPhases);
+
     if (startupPhases.length > 0) {
       logStartupStats(
         config,
@@ -245,6 +248,10 @@ export class StartupProfiler {
 
     // Clear all phases.
     this.phases.clear();
+  }
+
+  getLastFlushResults(): readonly StartupPhaseStats[] {
+    return this.lastFlushResults;
   }
 }
 
