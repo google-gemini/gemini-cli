@@ -6,13 +6,19 @@
 
 import path from 'node:path';
 import { promises as fsp, readFileSync } from 'node:fs';
+import { z } from 'zod';
 import { Storage } from '../config/storage.js';
 import { debugLogger } from './debugLogger.js';
 
-interface UserAccounts {
+const UserAccountsSchema = z.object({
+  active: z.string().nullable().optional(),
+  old: z.array(z.string()).optional(),
+});
+
+type UserAccounts = {
   active: string | null;
   old: string[];
-}
+};
 
 export class UserAccountManager {
   private getGoogleAccountsCachePath(): string {
@@ -30,31 +36,17 @@ export class UserAccountManager {
       return defaultState;
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const parsed = JSON.parse(content);
+    const parsed: unknown = JSON.parse(content);
+    const result = UserAccountsSchema.safeParse(parsed);
 
-    // Inlined validation logic
-    if (typeof parsed !== 'object' || parsed === null) {
-      debugLogger.log('Invalid accounts file schema, starting fresh.');
-      return defaultState;
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    const { active, old } = parsed as Partial<UserAccounts>;
-    const isValid =
-      (active === undefined || active === null || typeof active === 'string') &&
-      (old === undefined ||
-        (Array.isArray(old) && old.every((i) => typeof i === 'string')));
-
-    if (!isValid) {
+    if (!result.success) {
       debugLogger.log('Invalid accounts file schema, starting fresh.');
       return defaultState;
     }
 
     return {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      active: parsed.active ?? null,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      old: parsed.old ?? [],
+      active: result.data.active ?? null,
+      old: result.data.old ?? [],
     };
   }
 

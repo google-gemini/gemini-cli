@@ -5,7 +5,10 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { safeJsonStringify } from './safeJsonStringify.js';
+import {
+  safeJsonStringify,
+  safeJsonStringifyBooleanValuesOnly,
+} from './safeJsonStringify.js';
 
 describe('safeJsonStringify', () => {
   it('should stringify normal objects without issues', () => {
@@ -69,5 +72,29 @@ describe('safeJsonStringify', () => {
     expect(safeJsonStringify('test')).toBe('"test"');
     expect(safeJsonStringify(42)).toBe('42');
     expect(safeJsonStringify(true)).toBe('true');
+  });
+});
+
+describe('safeJsonStringifyBooleanValuesOnly', () => {
+  it('should retain only boolean values', () => {
+    const obj = { enabled: true, disabled: false, name: 'test', count: 42 };
+    const result = JSON.parse(safeJsonStringifyBooleanValuesOnly(obj));
+    expect(result).toEqual({ enabled: true, disabled: false });
+  });
+
+  it('should return empty object for non-object input', () => {
+    const result = safeJsonStringifyBooleanValuesOnly(null);
+    expect(result).toBe('{}');
+  });
+
+  it('should handle object with no boolean values', () => {
+    const obj = { name: 'test', count: 42 };
+    const result = JSON.parse(safeJsonStringifyBooleanValuesOnly(obj));
+    expect(result).toEqual({});
+  });
+
+  it('should handle empty object', () => {
+    const result = JSON.parse(safeJsonStringifyBooleanValuesOnly({}));
+    expect(result).toEqual({});
   });
 });
