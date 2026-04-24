@@ -358,8 +358,8 @@ export async function main() {
 
   const isDebugMode = cliConfig.isDebugMode(argv);
   const consolePatcher = new ConsolePatcher({
-    stderr: true,
-    interactive: isHeadlessMode() ? false : true,
+    stderr: argv.isCommand ? false : true,
+    interactive: isHeadlessMode() && !argv.isCommand ? false : true,
     debugMode: isDebugMode,
     onNewMessage: (msg) => {
       coreEvents.emitConsoleLog(msg.type, msg.content);
@@ -532,7 +532,7 @@ export async function main() {
       const { setupInitialActivityLogger } = await import(
         './utils/devtoolsService.js'
       );
-      await setupInitialActivityLogger(config);
+      setupInitialActivityLogger(config);
     }
 
     // Register config for telemetry shutdown
@@ -612,6 +612,23 @@ export async function main() {
     const initializationResult = await initializeApp(config, settings);
     initAppHandle?.end();
 
+    import('./services/liteRtServerManager.js')
+      .then(({ LiteRtServerManager }) => {
+        const mergedGemma = settings.merged.experimental?.gemmaModelRouter;
+        if (!mergedGemma) return;
+        // Security: binaryPath and autoStartServer must come from user-scoped
+        // settings only to prevent workspace configs from triggering arbitrary
+        // binary execution.
+        const userGemma = settings.forScope(SettingScope.User).settings
+          .experimental?.gemmaModelRouter;
+        return LiteRtServerManager.ensureRunning({
+          ...mergedGemma,
+          binaryPath: userGemma?.binaryPath,
+          autoStartServer: userGemma?.autoStartServer,
+        });
+      })
+      .catch((e) => debugLogger.warn('LiteRT auto-start import failed:', e));
+
     if (
       settings.merged.security.auth.selectedType ===
         AuthType.LOGIN_WITH_GOOGLE &&
@@ -643,6 +660,12 @@ export async function main() {
     ];
 
     cliStartupHandle?.end();
+
+    if (!config.isInteractive()) {
+      for (const warning of startupWarnings) {
+        writeToStderr(warning.message + '\n');
+      }
+    }
 
     // Render UI, passing necessary config values. Check that there is no command line question.
     if (config.isInteractive()) {
@@ -763,20 +786,16 @@ export function initializeOutputListenersAndFlush() {
     if (coreEvents.listenerCount(CoreEvent.ConsoleLog) === 0) {
       coreEvents.on(CoreEvent.ConsoleLog, (payload: ConsoleLogPayload) => {
         if (payload.type === 'error' || payload.type === 'warn') {
-          writeToStderr(payload.content);
+          writeToStderr(payload.content + '\n');
         } else {
-          writeToStdout(payload.content);
+          writeToStderr(payload.content + '\n');
         }
       });
     }
 
     if (coreEvents.listenerCount(CoreEvent.UserFeedback) === 0) {
       coreEvents.on(CoreEvent.UserFeedback, (payload: UserFeedbackPayload) => {
-        if (payload.severity === 'error' || payload.severity === 'warning') {
-          writeToStderr(payload.message);
-        } else {
-          writeToStdout(payload.message);
-        }
+        writeToStderr(payload.message + '\n');
       });
     }
   }
