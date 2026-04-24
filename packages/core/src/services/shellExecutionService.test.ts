@@ -213,7 +213,7 @@ describe('ShellExecutionService', () => {
     mockSerializeTerminalToObject.mockReturnValue([]);
     mockIsBinary.mockReturnValue(false);
     mockPlatform.mockReturnValue('linux');
-    mockResolveExecutable.mockImplementation(async (exe: string) => exe);
+    mockResolveExecutable.mockImplementation((exe: string) => exe);
     process.env['PATH'] = '/test/path';
     mockGetPty.mockResolvedValue({
       module: { spawn: mockPtySpawn },
@@ -2058,7 +2058,7 @@ describe('ShellExecutionService environment variables', () => {
       sandboxManager: mockSandboxManager,
     };
 
-    mockResolveExecutable.mockResolvedValue('/bin/bash/resolved');
+    mockResolveExecutable.mockReturnValue('/bin/bash/resolved');
     const mockChild = new EventEmitter() as unknown as ChildProcess;
     mockChild.stdout = new EventEmitter() as unknown as Readable;
     mockChild.stderr = new EventEmitter() as unknown as Readable;

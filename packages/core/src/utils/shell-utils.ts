@@ -76,29 +76,32 @@ export interface ShellConfiguration {
   shell: ShellType;
 }
 
-export async function resolveExecutable(
-  exe: string,
-): Promise<string | undefined> {
-  if (path.isAbsolute(exe)) {
-    try {
-      await fs.promises.access(exe, fs.constants.X_OK);
-      return exe;
-    } catch {
-      return undefined;
-    }
+function isExecutable(filePath: string): boolean {
+  try {
+    fs.accessSync(filePath, fs.constants.X_OK);
+    return true;
+  } catch {
+    return false;
   }
-  const paths = (process.env['PATH'] || '').split(path.delimiter);
-  const extensions =
-    os.platform() === 'win32' ? ['.exe', '.cmd', '.bat', ''] : [''];
+}
 
-  for (const p of paths) {
+export function resolveExecutable(exe: string): string | undefined {
+  if (path.isAbsolute(exe)) {
+    return isExecutable(exe) ? exe : undefined;
+  }
+  const pathEnv = process.env['PATH'];
+  if (!pathEnv) {
+    return undefined;
+  }
+  const extensions =
+    os.platform() === 'win32' && !path.extname(exe)
+      ? ['.exe', '.cmd', '.bat']
+      : [''];
+  for (const dir of pathEnv.split(path.delimiter)) {
     for (const ext of extensions) {
-      const fullPath = path.join(p, exe + ext);
-      try {
-        await fs.promises.access(fullPath, fs.constants.X_OK);
+      const fullPath = path.join(dir, exe + ext);
+      if (isExecutable(fullPath)) {
         return fullPath;
-      } catch {
-        continue;
       }
     }
   }
@@ -632,6 +635,14 @@ export function parseCommandDetails(
  * This ensures we can execute command strings predictably and securely across platforms
  * using the `spawn(executable, [...argsPrefix, commandString], { shell: false })` pattern.
  *
+ * On Windows, PowerShell 7 (pwsh.exe) is preferred over Windows PowerShell 5.1
+ * (powershell.exe) when available on PATH. Windows PowerShell 5.1 silently
+ * strips embedded double quotes from arguments to native executables — see
+ * issue #25859. PowerShell 7 uses standards-compliant argument passing and
+ * does not exhibit this regression. When pwsh.exe is not installed, we fall
+ * back to powershell.exe to preserve the existing behavior and the full
+ * cmdlet surface users depend on.
+ *
  * @returns The ShellConfiguration for the current environment.
  */
 export function getShellConfiguration(): ShellConfiguration {
@@ -651,7 +662,16 @@ export function getShellConfiguration(): ShellConfiguration {
       }
     }
 
-    // Default to PowerShell for all other Windows configurations.
+    const pwshPath = resolveExecutable('pwsh.exe');
+    if (pwshPath) {
+      return {
+        executable: pwshPath,
+        argsPrefix: ['-NoProfile', '-Command'],
+        shell: 'powershell',
+      };
+    }
+
+    // Fall back to Windows PowerShell 5.1 when pwsh.exe is not installed.
     return {
       executable: 'powershell.exe',
       argsPrefix: ['-NoProfile', '-Command'],
