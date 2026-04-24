@@ -10,448 +10,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
-    name: 'Build and Bundle'
-    runs-on: 'gemini-cli-ubuntu-16-core'
-    steps:
-      - name: 'Checkout'
-        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
-
-      - name: 'Set up Node.js'
-        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
-        with:
-          node-version-file: '.nvmrc'
-          cache: 'npm'
-
-      - name: 'Install dependencies'
-        run: 'npm ci'
-
-      - name: 'Build project'
-        run: 'npm run build'
-
-      - name: 'Upload Workspace'
-        uses: 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02'
-        with:
-          name: 'workspace-artifact'
-          path: '.'
-
-      - name: 'Tar Node Modules'
-        run: 'tar -czf node_modules.tar.gz node_modules'
-        shell: 'bash'
-
-      - name: 'Upload Node Modules Tarball'
-        uses: 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02'
-        with:
-          name: 'node-modules-tarball'
-          path: 'node_modules.tar.gz'
-
-  build_aggregate:
-    name: 'Build for Aggregate'
-    runs-on: 'gemini-cli-ubuntu-16-core'
-    steps:
-      - name: 'Checkout'
-        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
-
-      - name: 'Set up Node.js'
-        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
-        with:
-          node-version-file: '.nvmrc'
-          cache: 'npm'
-
-      - name: 'Install dependencies'
-        run: 'npm ci'
-
-      - name: 'Build project'
-        run: 'npm run build'
-
-      - name: 'Upload Workspace'
-        uses: 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02'
-        with:
-          name: 'workspace-artifact-aggregate'
-          path: '.'
-
-      - name: 'Tar Node Modules'
-        run: 'tar -czf node_modules_aggregate.tar.gz node_modules'
-        shell: 'bash'
-
-      - name: 'Upload Node Modules Tarball'
-        uses: 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02'
-        with:
-          name: 'node-modules-tarball-aggregate'
-          path: 'node_modules_aggregate.tar.gz'
-
-  test_ui_messages:
-    name: 'Test (Linux) - UI Messages'
-    needs: build
-    runs-on: 'gemini-cli-ubuntu-16-core'
-    steps:
-      - name: 'Checkout'
-        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
-
-      - name: 'Download Workspace'
-        uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806'
-        with:
-          name: 'workspace-artifact'
-          path: '.'
-
-      - name: 'Download Node Modules Tarball'
-        uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806'
-        with:
-          name: 'node-modules-tarball'
-          path: '.'
-
-      - name: 'Extract Node Modules'
-        run: |
-          rm -rf node_modules
-          tar -xzf node_modules.tar.gz
-          rm node_modules.tar.gz
-        shell: 'bash'
-
-      - name: 'Setup Gemini'
-        uses: './.github/actions/setup-gemini'
-        with:
-          mode: 'source'
-          skip-npm-ci: 'true'
-
-      - name: 'Run UI Messages Tests'
-        run: 'npx vitest run --pool=threads packages/cli/src/ui/components/messages'
-        shell: 'bash'
-
-  test_ui_shared:
-    name: 'Test (Linux) - UI Shared'
-    needs: build
-    runs-on: 'gemini-cli-ubuntu-16-core'
-    steps:
-      - name: 'Checkout'
-        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
-
-      - name: 'Download Workspace'
-        uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806'
-        with:
-          name: 'workspace-artifact'
-          path: '.'
-
-      - name: 'Download Node Modules Tarball'
-        uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806'
-        with:
-          name: 'node-modules-tarball'
-          path: '.'
-
-      - name: 'Extract Node Modules'
-        run: |
-          rm -rf node_modules
-          tar -xzf node_modules.tar.gz
-          rm node_modules.tar.gz
-        shell: 'bash'
-
-      - name: 'Setup Gemini'
-        uses: './.github/actions/setup-gemini'
-        with:
-          mode: 'source'
-          skip-npm-ci: 'true'
-
-      - name: 'Run UI Shared Tests'
-        run: 'npx vitest run --pool=threads packages/cli/src/ui/components/shared'
-        shell: 'bash'
-
-  test_ui_views:
-    name: 'Test (Linux) - UI Views'
-    needs: build
-    runs-on: 'gemini-cli-ubuntu-16-core'
-    steps:
-      - name: 'Checkout'
-        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
-
-      - name: 'Download Workspace'
-        uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806'
-        with:
-          name: 'workspace-artifact'
-          path: '.'
-
-      - name: 'Download Node Modules Tarball'
-        uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806'
-        with:
-          name: 'node-modules-tarball'
-          path: '.'
-
-      - name: 'Extract Node Modules'
-        run: |
-          rm -rf node_modules
-          tar -xzf node_modules.tar.gz
-          rm node_modules.tar.gz
-        shell: 'bash'
-
-      - name: 'Setup Gemini'
-        uses: './.github/actions/setup-gemini'
-        with:
-          mode: 'source'
-          skip-npm-ci: 'true'
-
-      - name: 'Run UI Views Tests'
-        run: 'npx vitest run --pool=threads packages/cli/src/ui/components/views packages/cli/src/ui/components/SessionBrowser'
-        shell: 'bash'
-
-  test_ui_rest:
-    name: 'Test (Linux) - UI Rest'
-    needs: build
-    runs-on: 'gemini-cli-ubuntu-16-core'
-    steps:
-      - name: 'Checkout'
-        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
-
-      - name: 'Download Workspace'
-        uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806'
-        with:
-          name: 'workspace-artifact'
-          path: '.'
-
-      - name: 'Download Node Modules Tarball'
-        uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806'
-        with:
-          name: 'node-modules-tarball'
-          path: '.'
-
-      - name: 'Extract Node Modules'
-        run: |
-          rm -rf node_modules
-          tar -xzf node_modules.tar.gz
-          rm node_modules.tar.gz
-        shell: 'bash'
-
-      - name: 'Setup Gemini'
-        uses: './.github/actions/setup-gemini'
-        with:
-          mode: 'source'
-          skip-npm-ci: 'true'
-
-      - name: 'Run UI Rest Tests'
-        run: 'npx vitest run --pool=threads packages/cli/src/ui/App.test.tsx packages/cli/src/ui/AppContainer.test.tsx packages/cli/src/ui/IdeIntegrationNudge.test.tsx packages/cli/src/ui/ToolConfirmationFullFrame.test.tsx packages/cli/src/ui/auth packages/cli/src/ui/commands packages/cli/src/ui/contexts packages/cli/src/ui/hooks packages/cli/src/ui/key packages/cli/src/ui/layouts packages/cli/src/ui/noninteractive packages/cli/src/ui/privacy packages/cli/src/ui/state packages/cli/src/ui/themes packages/cli/src/ui/utils'
-        shell: 'bash'
-
-  test_ui_components_top:
-    name: 'Test (Linux) - UI Components Top'
-    needs: build
-    runs-on: 'gemini-cli-ubuntu-16-core'
-    steps:
-      - name: 'Checkout'
-        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
-
-      - name: 'Download Workspace'
-        uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806'
-        with:
-          name: 'workspace-artifact'
-          path: '.'
-
-      - name: 'Download Node Modules Tarball'
-        uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806'
-        with:
-          name: 'node-modules-tarball'
-          path: '.'
-
-      - name: 'Extract Node Modules'
-        run: |
-          rm -rf node_modules
-          tar -xzf node_modules.tar.gz
-          rm node_modules.tar.gz
-        shell: 'bash'
-
-      - name: 'Setup Gemini'
-        uses: './.github/actions/setup-gemini'
-        with:
-          mode: 'source'
-          skip-npm-ci: 'true'
-
-      - name: 'Run UI Components Top Tests'
-        run: 'npx vitest run --pool=threads packages/cli/src/ui/components/*.test.tsx'
-        shell: 'bash'
-
-  test_batch_1:
-    name: 'Test (Linux) - Batch 1 (Utils & Test-Utils)'
-    needs: build
-    runs-on: 'gemini-cli-ubuntu-16-core'
-    steps:
-      - name: 'Checkout'
-        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
-
-      - name: 'Download Workspace'
-        uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806'
-        with:
-          name: 'workspace-artifact'
-          path: '.'
-
-      - name: 'Download Node Modules Tarball'
-        uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806'
-        with:
-          name: 'node-modules-tarball'
-          path: '.'
-
-      - name: 'Extract Node Modules'
-        run: |
-          rm -rf node_modules
-          tar -xzf node_modules.tar.gz
-          rm node_modules.tar.gz
-        shell: 'bash'
-
-      - name: 'Setup Gemini'
-        uses: './.github/actions/setup-gemini'
-        with:
-          mode: 'source'
-          skip-npm-ci: 'true'
-
-      - name: 'Run Batch 1 Tests'
-        run: 'npx vitest run --pool=threads packages/cli/src/test-utils packages/cli/src/utils'
-        shell: 'bash'
-
-  test_batch_2:
-    name: 'Test (Linux) - Batch 2 (Core & Services & ACP)'
-    needs: build
-    runs-on: 'gemini-cli-ubuntu-16-core'
-    steps:
-      - name: 'Checkout'
-        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
-
-      - name: 'Download Workspace'
-        uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806'
-        with:
-          name: 'workspace-artifact'
-          path: '.'
-
-      - name: 'Download Node Modules Tarball'
-        uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806'
-        with:
-          name: 'node-modules-tarball'
-          path: '.'
-
-      - name: 'Extract Node Modules'
-        run: |
-          rm -rf node_modules
-          tar -xzf node_modules.tar.gz
-          rm node_modules.tar.gz
-        shell: 'bash'
-
-      - name: 'Setup Gemini'
-        uses: './.github/actions/setup-gemini'
-        with:
-          mode: 'source'
-          skip-npm-ci: 'true'
-
-      - name: 'Run Batch 2 Tests'
-        run: 'npx vitest run --pool=threads packages/cli/src/core packages/cli/src/services packages/cli/src/acp'
-        shell: 'bash'
-
-  test_batch_3:
-    name: 'Test (Linux) - Batch 3 (Commands & Config)'
-    needs: build
-    runs-on: 'gemini-cli-ubuntu-16-core'
-    steps:
-      - name: 'Checkout'
-        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
-
-      - name: 'Download Workspace'
-        uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806'
-        with:
-          name: 'workspace-artifact'
-          path: '.'
-
-      - name: 'Download Node Modules Tarball'
-        uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806'
-        with:
-          name: 'node-modules-tarball'
-          path: '.'
-
-      - name: 'Extract Node Modules'
-        run: |
-          rm -rf node_modules
-          tar -xzf node_modules.tar.gz
-          rm node_modules.tar.gz
-        shell: 'bash'
-
-      - name: 'Setup Gemini'
-        uses: './.github/actions/setup-gemini'
-        with:
-          mode: 'source'
-          skip-npm-ci: 'true'
-
-      - name: 'Run Batch 3 Tests'
-        run: 'npx vitest run --pool=threads packages/cli/src/commands packages/cli/src/config'
-        shell: 'bash'
-
-  test_cli_aggregate:
-    name: 'Test (Linux) - CLI Aggregate'
-    needs: build_aggregate
-    runs-on: 'gemini-cli-ubuntu-16-core'
-    steps:
-      - name: 'Checkout'
-        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
-
-      - name: 'Download Workspace'
-        uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806'
-        with:
-          name: 'workspace-artifact-aggregate'
-          path: '.'
-
-      - name: 'Download Node Modules Tarball'
-        uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806'
-        with:
-          name: 'node-modules-tarball-aggregate'
-          path: '.'
-
-      - name: 'Extract Node Modules'
-        run: |
-          rm -rf node_modules
-          tar -xzf node_modules_aggregate.tar.gz
-          rm node_modules_aggregate.tar.gz
-        shell: 'bash'
-
-      - name: 'Setup Gemini'
-        uses: './.github/actions/setup-gemini'
-        with:
-          mode: 'source'
-          skip-npm-ci: 'true'
-
-      - name: 'Run All CLI Tests'
-        run: 'npx vitest run --pool=threads packages/cli/src'
-        shell: 'bash'
-
-  test_core:
-    name: 'Test (Linux) - Core'
-    needs: build
-    runs-on: 'gemini-cli-ubuntu-16-core'
-    env:
-      GEMINI_SANDBOX: 'false'
-    steps:
-      - name: 'Checkout'
-        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
-
-      - name: 'Download Workspace'
-        uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806'
-        with:
-          name: 'workspace-artifact'
-          path: '.'
-
-      - name: 'Download Node Modules Tarball'
-        uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806'
-        with:
-          name: 'node-modules-tarball'
-          path: '.'
-
-      - name: 'Extract Node Modules'
-        run: |
-          rm -rf node_modules
-          tar -xzf node_modules.tar.gz
-          rm node_modules.tar.gz
-        shell: 'bash'
-
-      - name: 'Setup Gemini'
-        uses: './.github/actions/setup-gemini'
-        with:
-          mode: 'source'
-          skip-npm-ci: 'true'
-
-      - name: 'Run All Core Tests'
-        run: 'npx vitest run --pool=threads packages/core/src --exclude "**/*.integration.test.ts"'
-        shell: 'bash'
-
   build_bundle:
     name: 'Build Bundle'
     runs-on: 'gemini-cli-ubuntu-16-core'
@@ -475,6 +33,298 @@ jobs:
         with:
           name: 'gemini-bundle'
           path: 'bundle/'
+
+  test_ui_messages:
+    name: 'Test (Linux) - UI Messages'
+    runs-on: 'gemini-cli-ubuntu-16-core'
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
+
+      - name: 'Set up Node.js'
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: 'Install dependencies'
+        run: 'npm ci'
+
+      - name: 'Build project'
+        run: 'npm run build'
+
+      - name: 'Setup Gemini'
+        uses: './.github/actions/setup-gemini'
+        with:
+          mode: 'source'
+          skip-npm-ci: 'true'
+
+      - name: 'Run UI Messages Tests'
+        run: 'npx vitest run --pool=threads packages/cli/src/ui/components/messages'
+        shell: 'bash'
+
+  test_ui_shared:
+    name: 'Test (Linux) - UI Shared'
+    runs-on: 'gemini-cli-ubuntu-16-core'
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
+
+      - name: 'Set up Node.js'
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: 'Install dependencies'
+        run: 'npm ci'
+
+      - name: 'Build project'
+        run: 'npm run build'
+
+      - name: 'Setup Gemini'
+        uses: './.github/actions/setup-gemini'
+        with:
+          mode: 'source'
+          skip-npm-ci: 'true'
+
+      - name: 'Run UI Shared Tests'
+        run: 'npx vitest run --pool=threads packages/cli/src/ui/components/shared'
+        shell: 'bash'
+
+  test_ui_views:
+    name: 'Test (Linux) - UI Views'
+    runs-on: 'gemini-cli-ubuntu-16-core'
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
+
+      - name: 'Set up Node.js'
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: 'Install dependencies'
+        run: 'npm ci'
+
+      - name: 'Build project'
+        run: 'npm run build'
+
+      - name: 'Setup Gemini'
+        uses: './.github/actions/setup-gemini'
+        with:
+          mode: 'source'
+          skip-npm-ci: 'true'
+
+      - name: 'Run UI Views Tests'
+        run: 'npx vitest run --pool=threads packages/cli/src/ui/components/views packages/cli/src/ui/components/SessionBrowser'
+        shell: 'bash'
+
+  test_ui_rest:
+    name: 'Test (Linux) - UI Rest'
+    runs-on: 'gemini-cli-ubuntu-16-core'
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
+
+      - name: 'Set up Node.js'
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: 'Install dependencies'
+        run: 'npm ci'
+
+      - name: 'Build project'
+        run: 'npm run build'
+
+      - name: 'Setup Gemini'
+        uses: './.github/actions/setup-gemini'
+        with:
+          mode: 'source'
+          skip-npm-ci: 'true'
+
+      - name: 'Run UI Rest Tests'
+        run: 'npx vitest run --pool=threads packages/cli/src/ui/App.test.tsx packages/cli/src/ui/AppContainer.test.tsx packages/cli/src/ui/IdeIntegrationNudge.test.tsx packages/cli/src/ui/ToolConfirmationFullFrame.test.tsx packages/cli/src/ui/auth packages/cli/src/ui/commands packages/cli/src/ui/contexts packages/cli/src/ui/hooks packages/cli/src/ui/key packages/cli/src/ui/layouts packages/cli/src/ui/noninteractive packages/cli/src/ui/privacy packages/cli/src/ui/state packages/cli/src/ui/themes packages/cli/src/ui/utils'
+        shell: 'bash'
+
+  test_ui_components_top:
+    name: 'Test (Linux) - UI Components Top'
+    runs-on: 'gemini-cli-ubuntu-16-core'
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
+
+      - name: 'Set up Node.js'
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: 'Install dependencies'
+        run: 'npm ci'
+
+      - name: 'Build project'
+        run: 'npm run build'
+
+      - name: 'Setup Gemini'
+        uses: './.github/actions/setup-gemini'
+        with:
+          mode: 'source'
+          skip-npm-ci: 'true'
+
+      - name: 'Run UI Components Top Tests'
+        run: 'npx vitest run --pool=threads packages/cli/src/ui/components/*.test.tsx'
+        shell: 'bash'
+
+  test_batch_1:
+    name: 'Test (Linux) - Batch 1 (Utils & Test-Utils)'
+    runs-on: 'gemini-cli-ubuntu-16-core'
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
+
+      - name: 'Set up Node.js'
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: 'Install dependencies'
+        run: 'npm ci'
+
+      - name: 'Build project'
+        run: 'npm run build'
+
+      - name: 'Setup Gemini'
+        uses: './.github/actions/setup-gemini'
+        with:
+          mode: 'source'
+          skip-npm-ci: 'true'
+
+      - name: 'Run Batch 1 Tests'
+        run: 'npx vitest run --pool=threads packages/cli/src/test-utils packages/cli/src/utils'
+        shell: 'bash'
+
+  test_batch_2:
+    name: 'Test (Linux) - Batch 2 (Core & Services & ACP)'
+    runs-on: 'gemini-cli-ubuntu-16-core'
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
+
+      - name: 'Set up Node.js'
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: 'Install dependencies'
+        run: 'npm ci'
+
+      - name: 'Build project'
+        run: 'npm run build'
+
+      - name: 'Setup Gemini'
+        uses: './.github/actions/setup-gemini'
+        with:
+          mode: 'source'
+          skip-npm-ci: 'true'
+
+      - name: 'Run Batch 2 Tests'
+        run: 'npx vitest run --pool=threads packages/cli/src/core packages/cli/src/services packages/cli/src/acp'
+        shell: 'bash'
+
+  test_batch_3:
+    name: 'Test (Linux) - Batch 3 (Commands & Config)'
+    runs-on: 'gemini-cli-ubuntu-16-core'
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
+
+      - name: 'Set up Node.js'
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: 'Install dependencies'
+        run: 'npm ci'
+
+      - name: 'Build project'
+        run: 'npm run build'
+
+      - name: 'Setup Gemini'
+        uses: './.github/actions/setup-gemini'
+        with:
+          mode: 'source'
+          skip-npm-ci: 'true'
+
+      - name: 'Run Batch 3 Tests'
+        run: 'npx vitest run --pool=threads packages/cli/src/commands packages/cli/src/config'
+        shell: 'bash'
+
+  test_cli_aggregate:
+    name: 'Test (Linux) - CLI Aggregate'
+    runs-on: 'gemini-cli-ubuntu-16-core'
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
+
+      - name: 'Set up Node.js'
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: 'Install dependencies'
+        run: 'npm ci'
+
+      - name: 'Build project'
+        run: 'npm run build'
+
+      - name: 'Setup Gemini'
+        uses: './.github/actions/setup-gemini'
+        with:
+          mode: 'source'
+          skip-npm-ci: 'true'
+
+      - name: 'Run All CLI Tests'
+        run: 'npx vitest run --pool=threads packages/cli/src'
+        shell: 'bash'
+
+  test_core:
+    name: 'Test (Linux) - Core'
+    runs-on: 'gemini-cli-ubuntu-16-core'
+    env:
+      GEMINI_SANDBOX: 'false'
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
+
+      - name: 'Set up Node.js'
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: 'Install dependencies'
+        run: 'npm ci'
+
+      - name: 'Build project'
+        run: 'npm run build'
+
+      - name: 'Setup Gemini'
+        uses: './.github/actions/setup-gemini'
+        with:
+          mode: 'source'
+          skip-npm-ci: 'true'
+
+      - name: 'Run All Core Tests'
+        run: 'npx vitest run --pool=threads packages/core/src --exclude "**/*.integration.test.ts"'
+        shell: 'bash'
 
   test_e2e:
     name: 'Test (Linux) - E2E with Bundle'
