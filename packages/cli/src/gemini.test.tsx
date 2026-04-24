@@ -280,6 +280,7 @@ describe('gemini.tsx main function', () => {
     vi.stubEnv('GEMINI_SANDBOX', '');
     vi.stubEnv('SANDBOX', '');
     vi.stubEnv('SHPOOL_SESSION_NAME', '');
+    vi.stubEnv('GEMINI_CLI_TRUST_WORKSPACE', 'true');
 
     initialUnhandledRejectionListeners =
       process.listeners('unhandledRejection');
@@ -555,6 +556,7 @@ describe('gemini.tsx main function kitty protocol', () => {
       rawOutput: undefined,
       acceptRawOutputRisk: undefined,
       isCommand: undefined,
+      skipTrust: undefined,
     });
 
     await act(async () => {
@@ -613,6 +615,7 @@ describe('gemini.tsx main function kitty protocol', () => {
       rawOutput: undefined,
       acceptRawOutputRisk: undefined,
       isCommand: undefined,
+      skipTrust: undefined,
     });
 
     await act(async () => {

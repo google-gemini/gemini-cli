@@ -73,6 +73,7 @@ describe('LoggingContentGenerator', () => {
         authType: 'API_KEY',
       }),
       getTelemetryLogPromptsEnabled: vi.fn().mockReturnValue(true),
+      getTelemetryTracesEnabled: vi.fn().mockReturnValue(false),
       refreshUserQuotaIfStale: vi.fn().mockResolvedValue(undefined),
       getSessionId: vi.fn().mockReturnValue('test-session-id'),
     } as unknown as Config;
