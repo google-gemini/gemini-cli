@@ -7,9 +7,14 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { ShellExecutionService } from '../services/shellExecutionService.js';
 import {
+  ExecutionLifecycleService,
+  type ExecutionOutputEvent,
+} from '../services/executionLifecycleService.js';
+import {
   ListBackgroundProcessesTool,
   ReadBackgroundOutputTool,
 } from './shellBackgroundTools.js';
+import { LineBuffer } from '../utils/lineBuffer.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 import { NoopSandboxManager } from '../services/sandboxManager.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
@@ -118,6 +123,89 @@ describe('Background Tools Integration', () => {
 
     // Cleanup
     await ShellExecutionService.kill(pid);
+    controller.abort();
+  });
+
+  it('stream_output: live stdout lines propagate via ExecutionLifecycleService AND disk log still works', async () => {
+    const controller = new AbortController();
+
+    // Script that emits exactly three lines, 50ms apart, then exits.
+    const scriptPath = path.join(tempRootDir, 'three_lines.js');
+    fs.writeFileSync(
+      scriptPath,
+      `
+      const lines = ['line1', 'line2', 'line3'];
+      (async () => {
+        for (const line of lines) {
+          console.log(line);
+          await new Promise((r) => setTimeout(r, 50));
+        }
+      })();
+      `,
+    );
+    const commandString = `node "${scriptPath}"`;
+
+    // Mirror what shell.ts's stream_output path does: subscribe before
+    // backgrounding, feed chunks through a LineBuffer.
+    const emittedLines: string[] = [];
+    const lineBuffer = new LineBuffer();
+    let unsubscribe: (() => void) | null = null;
+
+    const handle = await ShellExecutionService.execute(
+      commandString,
+      process.cwd(),
+      () => {},
+      controller.signal,
+      false, // child_process path — produces decoded strings (stream_output's target mode)
+      {
+        originalCommand: 'node three_lines',
+        sessionId: 'default',
+        sanitizationConfig: {
+          allowedEnvironmentVariables: [],
+          blockedEnvironmentVariables: [],
+          enableEnvironmentVariableRedaction: false,
+        },
+        sandboxManager: new NoopSandboxManager(),
+      },
+    );
+    const pid = handle.pid;
+    if (pid === undefined) throw new Error('pid is undefined');
+
+    unsubscribe = ExecutionLifecycleService.subscribe(
+      pid,
+      (event: ExecutionOutputEvent) => {
+        if (event.type === 'data' && typeof event.chunk === 'string') {
+          emittedLines.push(...lineBuffer.push(event.chunk));
+        } else if (event.type === 'exit') {
+          emittedLines.push(...lineBuffer.flush());
+        }
+      },
+    );
+
+    // Move to background (same sequence the shell tool performs).
+    ShellExecutionService.background(pid, 'default', 'node three_lines');
+
+    // Wait for the script to finish (3 lines * 50ms = 150ms + margin).
+    await new Promise((r) => setTimeout(r, 800));
+
+    // Live stream captured all three lines in order.
+    expect(emittedLines).toEqual(['line1', 'line2', 'line3']);
+
+    // read_background_output still works — disk log was populated in parallel
+    // (our live subscriber is a parallel observer, not a consumer).
+    const readInvocation = readTool.build({ pid, lines: 5 });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (readInvocation as any).context = {
+      config: { getSessionId: () => 'default' },
+    };
+    const readResult = await readInvocation.execute({
+      abortSignal: new AbortController().signal,
+    });
+    expect(readResult.llmContent).toContain('line1');
+    expect(readResult.llmContent).toContain('line2');
+    expect(readResult.llmContent).toContain('line3');
+
+    unsubscribe();
     controller.abort();
   });
 });
