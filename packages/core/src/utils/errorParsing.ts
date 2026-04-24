@@ -43,6 +43,18 @@ export function parseAndFormatApiError(
     let text = `[API Error: ${error.message}]`;
     if (error.status === 429) {
       text += getRateLimitMessage(authType, fallbackModel);
+    } else if (
+      error.status === 400 &&
+      error.message.includes('API key not valid')
+    ) {
+      text =
+        'Your API key is invalid or incorrect. Please run `gemini login` or `gemini config set --api-key <YOUR_KEY>` to configure a valid API Key.';
+    } else if (
+      error.status === 401 ||
+      (error.message && error.message.includes('API_KEY_INVALID'))
+    ) {
+      text =
+        'Your API key is invalid, please check and try again. Run `gemini login` to re-authenticate.';
     }
     return text;
   }
@@ -72,6 +84,18 @@ export function parseAndFormatApiError(
         let text = `[API Error: ${finalMessage} (Status: ${parsedError.error.status})]`;
         if (parsedError.error.code === 429) {
           text += getRateLimitMessage(authType, fallbackModel);
+        } else if (
+          parsedError.error.code === 400 &&
+          finalMessage.includes('API key not valid')
+        ) {
+          text =
+            'Your API key is invalid or incorrect. Please run `gemini login` or `gemini config set --api-key <YOUR_KEY>` to configure a valid API Key.';
+        } else if (
+          parsedError.error.code === 401 ||
+          finalMessage.includes('API_KEY_INVALID')
+        ) {
+          text =
+            'Your API key is invalid, please check and try again. Run `gemini login` to re-authenticate.';
         }
         return text;
       }
