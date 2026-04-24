@@ -739,7 +739,7 @@ export interface ConfigParameters {
   billing?: {
     overageStrategy?: OverageStrategy;
   };
-  vertexAiRouting?: VertexAiRoutingConfig;
+  vertexLocation?: string;
 }
 
 export class Config implements McpContext, AgentLoopContext {
@@ -816,6 +816,7 @@ export class Config implements McpContext, AgentLoopContext {
   private gitService: GitService | undefined = undefined;
   private readonly checkpointing: boolean;
   private readonly proxy: string | undefined;
+  private vertexLocation: string | undefined;
   private readonly cwd: string;
   private readonly bugCommand: BugCommandSettings | undefined;
   private model: string;
@@ -1107,6 +1108,7 @@ export class Config implements McpContext, AgentLoopContext {
     };
     this.checkpointing = params.checkpointing ?? false;
     this.proxy = params.proxy;
+    this.vertexLocation = params.vertexLocation;
     this.cwd = params.cwd ?? process.cwd();
     this.fileDiscoveryService = params.fileDiscoveryService ?? null;
     this.bugCommand = params.bugCommand;
@@ -2883,6 +2885,10 @@ export class Config implements McpContext, AgentLoopContext {
 
   getProxy(): string | undefined {
     return this.proxy;
+  }
+
+  getVertexLocation(): string | undefined {
+    return this.vertexLocation;
   }
 
   getWorkingDir(): string {

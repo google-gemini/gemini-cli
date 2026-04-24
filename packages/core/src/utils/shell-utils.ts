@@ -1,59 +1,22 @@
 /**
  * @license
- * Copyright 2026 Google LLC
+ * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
 import os from 'node:os';
 import fs from 'node:fs';
 import path from 'node:path';
-import { quote, type ParseEntry } from 'shell-quote';
+import { quote } from 'shell-quote';
 import {
   spawn,
   spawnSync,
   type SpawnOptionsWithoutStdio,
 } from 'node:child_process';
-
-/**
- * Extracts the primary command name from a potentially wrapped shell command.
- * Strips shell wrappers and handles shopt/set/etc.
- *
- * @param command - The full command string.
- * @param args - The arguments for the command.
- * @returns The primary command name.
- */
-export async function getCommandName(
-  command: string,
-  args: string[],
-): Promise<string> {
-  await initializeShellParsers();
-  const fullCmd = [command, ...args].join(' ');
-  const stripped = stripShellWrapper(fullCmd);
-  const roots = getCommandRoots(stripped).filter(
-    (r) => r !== 'shopt' && r !== 'set',
-  );
-  if (roots.length > 0) {
-    return roots[0];
-  }
-  return path.basename(command);
-}
-
-/**
- * Extracts a string representation from a shell-quote ParseEntry.
- */
-export function extractStringFromParseEntry(entry: ParseEntry): string {
-  if (typeof entry === 'string') return entry;
-  if ('pattern' in entry) return entry.pattern;
-  if ('op' in entry) return entry.op;
-  if ('comment' in entry) return ''; // We can typically ignore comments for safety checks
-  return '';
-}
 import * as readline from 'node:readline';
 import { Language, Parser, Query, type Node, type Tree } from 'web-tree-sitter';
 import { loadWasmBinary } from './fileUtils.js';
 import { debugLogger } from './debugLogger.js';
-import type { SandboxManager } from '../services/sandboxManager.js';
-import { NoopSandboxManager } from '../services/sandboxManager.js';
 
 export const SHELL_TOOL_NAMES = ['run_shell_command', 'ShellTool'];
 
@@ -179,7 +142,6 @@ export interface ParsedCommandDetail {
   name: string;
   text: string;
   startIndex: number;
-  args?: string[];
 }
 
 interface CommandParseResult {
@@ -219,16 +181,9 @@ foreach ($commandAst in $commandAsts) {
   if ([string]::IsNullOrWhiteSpace($name)) {
     continue
   }
-  $args = @()
-  if ($commandAst.CommandElements.Count -gt 1) {
-    for ($i = 1; $i -lt $commandAst.CommandElements.Count; $i++) {
-      $args += $commandAst.CommandElements[$i].Extent.Text.Trim()
-    }
-  }
   $commandObjects += [PSCustomObject]@{
     name = $name
     text = $commandAst.Extent.Text.Trim()
-    args = $args
   }
 }
 [PSCustomObject]@{
@@ -311,21 +266,11 @@ function normalizeCommandName(raw: string): string {
       return raw.slice(1, -1);
     }
   }
-  return raw.trim();
-}
-
-/**
- * Normalizes a command name for sandbox policy lookups.
- * Converts to lowercase and removes the .exe extension for cross-platform consistency.
- *
- * @param commandName - The command name to normalize.
- * @returns The normalized command name.
- */
-export function normalizeCommand(commandName: string): string {
-  // Split by both separators and get the last non-empty part
-  const parts = commandName.split(/[\\/]/).filter(Boolean);
-  const base = parts.length > 0 ? parts[parts.length - 1] : '';
-  return base.toLowerCase().replace(/\.exe$/, '');
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return trimmed;
+  }
+  return trimmed.split(/[\\/]/).pop() ?? trimmed;
 }
 
 function extractNameFromNode(node: Node): string | null {
@@ -389,31 +334,11 @@ function collectCommandDetails(
 
     const name = extractNameFromNode(current);
     if (name) {
-      const detail: ParsedCommandDetail = {
+      details.push({
         name,
         text: source.slice(current.startIndex, current.endIndex).trim(),
         startIndex: current.startIndex,
-      };
-
-      if (current.type === 'command') {
-        const args: string[] = [];
-        const nameNode = current.childForFieldName('name');
-        for (let i = 0; i < current.childCount; i += 1) {
-          const child = current.child(i);
-          if (
-            child &&
-            child.type === 'word' &&
-            child.startIndex !== nameNode?.startIndex
-          ) {
-            args.push(child.text);
-          }
-        }
-        if (args.length > 0) {
-          detail.args = args;
-        }
-      }
-
-      details.push(detail);
+      });
     }
 
     // Traverse all children to find all sub-components (commands, redirections, etc.)
@@ -462,9 +387,7 @@ function hasPromptCommandTransform(root: Node): boolean {
   return false;
 }
 
-export function parseBashCommandDetails(
-  command: string,
-): CommandParseResult | null {
+function parseBashCommandDetails(command: string): CommandParseResult | null {
   if (treeSitterInitializationError) {
     debugLogger.debug(
       'Bash parser not initialized:',
@@ -563,7 +486,7 @@ function parsePowerShellCommandDetails(
 
     let parsed: {
       success?: boolean;
-      commands?: Array<{ name?: string; text?: string; args?: string[] }>;
+      commands?: Array<{ name?: string; text?: string }>;
       hasRedirection?: boolean;
     } | null = null;
     try {
@@ -578,7 +501,7 @@ function parsePowerShellCommandDetails(
     }
 
     const details = (parsed.commands ?? [])
-      .map((commandDetail): ParsedCommandDetail | null => {
+      .map((commandDetail) => {
         if (!commandDetail || typeof commandDetail.name !== 'string') {
           return null;
         }
@@ -593,9 +516,6 @@ function parsePowerShellCommandDetails(
           name,
           text,
           startIndex: 0,
-          args: Array.isArray(commandDetail.args)
-            ? commandDetail.args
-            : undefined,
         };
       })
       .filter((detail): detail is ParsedCommandDetail => detail !== null);
@@ -616,19 +536,7 @@ export function parseCommandDetails(
   const configuration = getShellConfiguration();
 
   if (configuration.shell === 'powershell') {
-    const result = parsePowerShellCommandDetails(
-      command,
-      configuration.executable,
-    );
-    if (!result || result.hasError) {
-      // Fallback to bash parser which is usually good enough for simple commands
-      // and doesn't rely on the host PowerShell environment restrictions (e.g., ConstrainedLanguage)
-      const bashResult = parseBashCommandDetails(command);
-      if (bashResult && !bashResult.hasError) {
-        return bashResult;
-      }
-    }
-    return result;
+    return parsePowerShellCommandDetails(command, configuration.executable);
   }
 
   if (configuration.shell === 'bash') {
@@ -769,10 +677,7 @@ export function splitCommands(command: string): string[] {
     return [];
   }
 
-  return parsed.details
-    .filter((detail) => !REDIRECTION_NAMES.has(detail.name))
-    .map((detail) => detail.text)
-    .filter(Boolean);
+  return parsed.details.map((detail) => detail.text).filter(Boolean);
 }
 
 /**
@@ -810,7 +715,7 @@ export function getCommandRoots(command: string): string[] {
 
 export function stripShellWrapper(command: string): string {
   const pattern =
-    /^\s*(?:(?:(?:\S+\/)?(?:sh|bash|zsh))\s+-c|cmd\.exe\s+\/c|powershell(?:\.exe)?\s+(?:-NoProfile\s+)?-Command|pwsh(?:\.exe)?\s+(?:-NoProfile\s+)?-Command)\s+/i;
+    /^\s*(?:(?:sh|bash|zsh)\s+-c|cmd\.exe\s+\/c|powershell(?:\.exe)?\s+(?:-NoProfile\s+)?-Command|pwsh(?:\.exe)?\s+(?:-NoProfile\s+)?-Command)\s+/i;
   const match = command.match(pattern);
   if (match) {
     let newCommand = command.substring(match[0].length).trim();
@@ -844,56 +749,36 @@ export function stripShellWrapper(command: string): string {
  * @param config The application configuration.
  * @returns An object with 'allowed' boolean and optional 'reason' string if not allowed.
  */
-export const spawnAsync = async (
+export const spawnAsync = (
   command: string,
   args: string[],
-  options?: SpawnOptionsWithoutStdio & { sandboxManager?: SandboxManager },
-): Promise<{ stdout: string; stderr: string }> => {
-  const sandboxManager = options?.sandboxManager ?? new NoopSandboxManager();
-  const prepared = await sandboxManager.prepareCommand({
-    command,
-    args,
-    cwd: options?.cwd?.toString() ?? process.cwd(),
-    env: options?.env ?? process.env,
-  });
+  options?: SpawnOptionsWithoutStdio,
+): Promise<{ stdout: string; stderr: string }> =>
+  new Promise((resolve, reject) => {
+    const child = spawn(command, args, options);
+    let stdout = '';
+    let stderr = '';
 
-  const { program: finalCommand, args: finalArgs, env: finalEnv } = prepared;
-
-  try {
-    return await new Promise((resolve, reject) => {
-      const child = spawn(finalCommand, finalArgs, {
-        ...options,
-        env: finalEnv,
-      });
-      let stdout = '';
-      let stderr = '';
-
-      child.stdout.on('data', (data) => {
-        stdout += data.toString();
-      });
-
-      child.stderr.on('data', (data) => {
-        stderr += data.toString();
-      });
-
-      child.on('close', (code) => {
-        if (code === 0) {
-          resolve({ stdout, stderr });
-        } else {
-          reject(
-            new Error(`Command failed with exit code ${code}:\n${stderr}`),
-          );
-        }
-      });
-
-      child.on('error', (err) => {
-        reject(err);
-      });
+    child.stdout.on('data', (data) => {
+      stdout += data.toString();
     });
-  } finally {
-    prepared.cleanup?.();
-  }
-};
+
+    child.stderr.on('data', (data) => {
+      stderr += data.toString();
+    });
+
+    child.on('close', (code) => {
+      if (code === 0) {
+        resolve({ stdout, stderr });
+      } else {
+        reject(new Error(`Command failed with exit code ${code}:\n${stderr}`));
+      }
+    });
+
+    child.on('error', (err) => {
+      reject(err);
+    });
+  });
 
 /**
  * Executes a command and yields lines of output as they appear.
@@ -909,127 +794,109 @@ export async function* execStreaming(
   options?: SpawnOptionsWithoutStdio & {
     signal?: AbortSignal;
     allowedExitCodes?: number[];
-    sandboxManager?: SandboxManager;
   },
 ): AsyncGenerator<string, void, void> {
-  const sandboxManager = options?.sandboxManager ?? new NoopSandboxManager();
-  const prepared = await sandboxManager.prepareCommand({
-    command,
-    args,
-    cwd: options?.cwd?.toString() ?? process.cwd(),
-    env: options?.env ?? process.env,
+  const child = spawn(command, args, {
+    ...options,
+    // ensure we don't open a window on windows if possible/relevant
+    windowsHide: true,
   });
 
+  const rl = readline.createInterface({
+    input: child.stdout,
+    terminal: false,
+  });
+
+  const errorChunks: Buffer[] = [];
+  let stderrTotalBytes = 0;
+  const MAX_STDERR_BYTES = 20 * 1024; // 20KB limit
+
+  child.stderr.on('data', (chunk) => {
+    if (stderrTotalBytes < MAX_STDERR_BYTES) {
+      errorChunks.push(chunk);
+      stderrTotalBytes += chunk.length;
+    }
+  });
+
+  let error: Error | null = null;
+  child.on('error', (err) => {
+    error = err;
+  });
+
+  const onAbort = () => {
+    // If manually aborted by signal, we kill immediately.
+    if (!child.killed) child.kill();
+  };
+
+  if (options?.signal?.aborted) {
+    onAbort();
+  } else {
+    options?.signal?.addEventListener('abort', onAbort);
+  }
+
+  let finished = false;
   try {
-    const { program: finalCommand, args: finalArgs, env: finalEnv } = prepared;
+    for await (const line of rl) {
+      if (options?.signal?.aborted) break;
+      yield line;
+    }
+    finished = true;
+  } finally {
+    rl.close();
+    options?.signal?.removeEventListener('abort', onAbort);
 
-    const child = spawn(finalCommand, finalArgs, {
-      ...options,
-      env: finalEnv,
-      // ensure we don't open a window on windows if possible/relevant
-      windowsHide: true,
-    });
-
-    const rl = readline.createInterface({
-      input: child.stdout,
-      terminal: false,
-    });
-
-    const errorChunks: Buffer[] = [];
-    let stderrTotalBytes = 0;
-    const MAX_STDERR_BYTES = 20 * 1024; // 20KB limit
-
-    child.stderr.on('data', (chunk) => {
-      if (stderrTotalBytes < MAX_STDERR_BYTES) {
-        errorChunks.push(chunk);
-        stderrTotalBytes += chunk.length;
+    // Ensure process is killed when the generator is closed (consumer breaks loop)
+    let killedByGenerator = false;
+    if (!finished && child.exitCode === null && !child.killed) {
+      try {
+        child.kill();
+      } catch {
+        // ignore error if process is already dead
       }
-    });
-
-    let error: Error | null = null;
-    child.on('error', (err) => {
-      error = err;
-    });
-
-    const onAbort = () => {
-      // If manually aborted by signal, we kill immediately.
-      if (!child.killed) child.kill();
-    };
-
-    if (options?.signal?.aborted) {
-      onAbort();
-    } else {
-      options?.signal?.addEventListener('abort', onAbort);
+      killedByGenerator = true;
     }
 
-    let finished = false;
-    try {
-      for await (const line of rl) {
-        if (options?.signal?.aborted) break;
-        yield line;
-      }
-      finished = true;
-    } finally {
-      rl.close();
-      options?.signal?.removeEventListener('abort', onAbort);
-
-      // Ensure process is killed when the generator is closed (consumer breaks loop)
-      let killedByGenerator = false;
-      if (!finished && child.exitCode === null && !child.killed) {
-        try {
-          child.kill();
-        } catch {
-          // ignore error if process is already dead
-        }
-        killedByGenerator = true;
+    // Ensure we wait for the process to exit to check codes
+    await new Promise<void>((resolve, reject) => {
+      // If an error occurred before we got here (e.g. spawn failure), reject immediately.
+      if (error) {
+        reject(error);
+        return;
       }
 
-      // Ensure we wait for the process to exit to check codes
-      await new Promise<void>((resolve, reject) => {
-        // If an error occurred before we got here (e.g. spawn failure), reject immediately.
-        if (error) {
-          reject(error);
+      function checkExit(code: number | null) {
+        // If we aborted or killed it manually, we treat it as success (stop waiting)
+        if (options?.signal?.aborted || killedByGenerator) {
+          resolve();
           return;
         }
 
-        function checkExit(code: number | null) {
-          // If we aborted or killed it manually, we treat it as success (stop waiting)
-          if (options?.signal?.aborted || killedByGenerator) {
-            resolve();
-            return;
-          }
-
-          const allowed = options?.allowedExitCodes ?? [0];
-          if (code !== null && allowed.includes(code)) {
-            resolve();
-          } else {
-            // If we have an accumulated error or explicit error event
-            if (error) reject(error);
-            else {
-              const stderr = Buffer.concat(errorChunks).toString('utf8');
-              const truncatedMsg =
-                stderrTotalBytes >= MAX_STDERR_BYTES ? '...[truncated]' : '';
-              reject(
-                new Error(
-                  `Process exited with code ${code}: ${stderr}${truncatedMsg}`,
-                ),
-              );
-            }
-          }
-        }
-
-        if (child.exitCode !== null) {
-          checkExit(child.exitCode);
+        const allowed = options?.allowedExitCodes ?? [0];
+        if (code !== null && allowed.includes(code)) {
+          resolve();
         } else {
-          child.on('close', (code) => checkExit(code));
-          child.on('error', (err) => {
-            reject(err);
-          });
+          // If we have an accumulated error or explicit error event
+          if (error) reject(error);
+          else {
+            const stderr = Buffer.concat(errorChunks).toString('utf8');
+            const truncatedMsg =
+              stderrTotalBytes >= MAX_STDERR_BYTES ? '...[truncated]' : '';
+            reject(
+              new Error(
+                `Process exited with code ${code}: ${stderr}${truncatedMsg}`,
+              ),
+            );
+          }
         }
-      });
-    }
-  } finally {
-    prepared.cleanup?.();
+      }
+
+      if (child.exitCode !== null) {
+        checkExit(child.exitCode);
+      } else {
+        child.on('close', (code) => checkExit(code));
+        child.on('error', (err) => reject(err));
+      }
+    });
   }
 }
 
