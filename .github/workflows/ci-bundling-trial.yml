@@ -11,7 +11,7 @@ concurrency:
 
 jobs:
   test_ui_messages:
-    name: 'Test (Linux) - UI Messages'
+    name: 'cli:ui/messages'
     runs-on: 'gemini-cli-ubuntu-16-core'
     steps:
       - name: 'Checkout'
@@ -40,7 +40,7 @@ jobs:
         shell: 'bash'
 
   test_ui_shared:
-    name: 'Test (Linux) - UI Shared'
+    name: 'cli:ui/shared'
     runs-on: 'gemini-cli-ubuntu-16-core'
     steps:
       - name: 'Checkout'
@@ -69,7 +69,7 @@ jobs:
         shell: 'bash'
 
   test_ui_views:
-    name: 'Test (Linux) - UI Views'
+    name: 'cli:ui/views'
     runs-on: 'gemini-cli-ubuntu-16-core'
     steps:
       - name: 'Checkout'
@@ -98,7 +98,7 @@ jobs:
         shell: 'bash'
 
   test_ui_rest:
-    name: 'Test (Linux) - UI Rest'
+    name: 'cli:ui/rest'
     runs-on: 'gemini-cli-ubuntu-16-core'
     steps:
       - name: 'Checkout'
@@ -127,7 +127,7 @@ jobs:
         shell: 'bash'
 
   test_ui_components_top:
-    name: 'Test (Linux) - UI Components Top'
+    name: 'cli:ui/components'
     runs-on: 'gemini-cli-ubuntu-16-core'
     steps:
       - name: 'Checkout'
@@ -156,7 +156,7 @@ jobs:
         shell: 'bash'
 
   test_batch_1:
-    name: 'Test (Linux) - Batch 1 (Utils & Test-Utils)'
+    name: 'cli:utils'
     runs-on: 'gemini-cli-ubuntu-16-core'
     steps:
       - name: 'Checkout'
@@ -185,7 +185,7 @@ jobs:
         shell: 'bash'
 
   test_batch_2:
-    name: 'Test (Linux) - Batch 2 (Core & Services & ACP)'
+    name: 'cli:core-services'
     runs-on: 'gemini-cli-ubuntu-16-core'
     steps:
       - name: 'Checkout'
@@ -214,7 +214,7 @@ jobs:
         shell: 'bash'
 
   test_batch_3:
-    name: 'Test (Linux) - Batch 3 (Commands & Config)'
+    name: 'cli:commands-config'
     runs-on: 'gemini-cli-ubuntu-16-core'
     steps:
       - name: 'Checkout'
@@ -242,37 +242,8 @@ jobs:
         run: 'npx vitest run --pool=threads packages/cli/src/commands packages/cli/src/config'
         shell: 'bash'
 
-  test_cli_aggregate:
-    name: 'Test (Linux) - CLI Aggregate'
-    runs-on: 'gemini-cli-ubuntu-16-core'
-    steps:
-      - name: 'Checkout'
-        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
-
-      - name: 'Set up Node.js'
-        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
-        with:
-          node-version-file: '.nvmrc'
-          cache: 'npm'
-
-      - name: 'Install dependencies'
-        run: 'npm ci'
-
-      - name: 'Build project'
-        run: 'npm run build'
-
-      - name: 'Setup Gemini'
-        uses: './.github/actions/setup-gemini'
-        with:
-          mode: 'source'
-          skip-npm-ci: 'true'
-
-      - name: 'Run All CLI Tests'
-        run: 'npx vitest run --pool=threads packages/cli/src'
-        shell: 'bash'
-
   test_core:
-    name: 'Test (Linux) - Core'
+    name: 'core'
     runs-on: 'gemini-cli-ubuntu-16-core'
     env:
       GEMINI_SANDBOX: 'false'
@@ -303,7 +274,7 @@ jobs:
         shell: 'bash'
 
   test_e2e:
-    name: 'Test (Linux) - E2E with Bundle'
+    name: 'e2e:linux'
     runs-on: 'gemini-cli-ubuntu-16-core'
     steps:
       - name: 'Checkout'
