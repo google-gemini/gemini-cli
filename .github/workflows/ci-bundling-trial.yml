@@ -32,13 +32,13 @@ jobs:
       - name: 'Build project'
         run: 'npm run build'
 
-      - name: 'Prepare Packages with Scope'
-        run: 'node scripts/prepare-package.js --scope=@google-gemini'
-        shell: 'bash'
-
       - name: 'Set version with SHA'
         run: |
           npm version 0.0.0-${{ github.sha }} --no-git-tag-version --workspaces
+        shell: 'bash'
+
+      - name: 'Prepare Packages with Scope'
+        run: 'node scripts/prepare-package.js --scope=@google-gemini'
         shell: 'bash'
 
       - name: 'Configure npm for GitHub Packages'
