@@ -1,6 +1,6 @@
-# Preview release: v0.39.0-preview.0
+# Preview release: v0.40.0-preview.3
 
-Released: April 14, 2026
+Released: April 24, 2026
 
 Our preview release includes the latest, new, and experimental features. This
 release may not be as stable as our [latest weekly release](latest.md).
@@ -31,8 +31,10 @@ npm install -g @google/gemini-cli@preview
 
 ## What's Changed
 
-- refactor(plan): simplify policy priorities and consolidate read-only rules by
-  @ruomengz in [#24849](https://github.com/google-gemini/gemini-cli/pull/24849)
+- update FatalUntrustedWorkspaceError message to include doc link by @ehedlund in [#25874](https://github.com/google-gemini/gemini-cli/pull/25874)
+- feat(core): enhance shell command validation and add core tools allowlist by @galz10 in [#25720](https://github.com/google-gemini/gemini-cli/pull/25720)
+- feat(cli): secure .env loading and enforce workspace trust in headless mode by @ehedlund in [#25814](https://github.com/google-gemini/gemini-cli/pull/25814)
+- refactor(plan): simplify policy priorities and consolidate read-only rules by @ruomengz in [#24849](https://github.com/google-gemini/gemini-cli/pull/24849)
 - feat(test-utils): add memory usage integration test harness by @sripasg in
   [#24876](https://github.com/google-gemini/gemini-cli/pull/24876)
 - feat(memory): add /memory inbox command for reviewing extracted skills by
@@ -253,5 +255,4 @@ npm install -g @google/gemini-cli@preview
 - Changelog for v0.37.2 by @gemini-cli-robot in
   [#25336](https://github.com/google-gemini/gemini-cli/pull/25336)
 
-**Full Changelog**:
-https://github.com/google-gemini/gemini-cli/compare/v0.38.0-preview.0...v0.39.0-preview.0
+**Full Changelog**: https://github.com/google-gemini/gemini-cli/compare/v0.38.0-preview.0...v0.40.0-preview.3
