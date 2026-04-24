@@ -72,6 +72,7 @@ export interface CommandContext {
     loadHistory: (history: HistoryItem[], postLoadInput?: string) => void;
     /** Toggles a special display mode. */
     toggleCorgiMode: () => void;
+    toggleVoiceMode: () => void;
     toggleDebugProfiler: () => void;
     toggleVimEnabled: () => Promise<boolean>;
     reloadCommands: () => void;
@@ -125,6 +126,7 @@ export interface OpenDialogActionReturn {
     | 'settings'
     | 'sessionBrowser'
     | 'model'
+    | 'voice-model'
     | 'agentConfig'
     | 'permissions';
 }

@@ -1000,6 +1000,7 @@ export async function loadCliConfig(
     enableExtensionReloading: settings.experimental?.extensionReloading,
     enableAgents: settings.experimental?.enableAgents,
     plan: settings.general?.plan?.enabled ?? true,
+    voiceMode: settings.experimental?.voiceMode,
     tracker: settings.experimental?.taskTracker,
     directWebFetch: settings.experimental?.directWebFetch,
     planSettings: settings.general?.plan?.directory
@@ -1011,6 +1012,7 @@ export async function loadCliConfig(
     experimentalJitContext,
     experimentalMemoryV2: settings.experimental?.memoryV2,
     experimentalAutoMemory: settings.experimental?.autoMemory,
+    experimentalGemma: settings.experimental?.gemma,
     contextManagement,
     modelSteering: settings.experimental?.modelSteering,
     topicUpdateNarration:
