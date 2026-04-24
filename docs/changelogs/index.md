@@ -18,6 +18,24 @@ on GitHub.
 | [Preview](preview.md) | Experimental features ready for early feedback. |
 | [Stable](latest.md)   | Stable, recommended for general use.            |
 
+## Announcements: v0.39.0 - 2026-04-23
+
+- **Skill Management:** Added a new `/memory` inbox command for reviewing and
+  patching skills extracted during sessions
+  ([#24544](https://github.com/google-gemini/gemini-cli/pull/24544) by
+  @SandyTao520, [#25148](https://github.com/google-gemini/gemini-cli/pull/25148)
+  by @SandyTao520).
+- **Improved Transparency:** Plan Mode now requires confirmation for skill
+  activation and allows plan inspection
+  ([#24946](https://github.com/google-gemini/gemini-cli/pull/24946),
+  [#25058](https://github.com/google-gemini/gemini-cli/pull/25058) by
+  @ruomengz).
+- **Architecture & Reliability:** Introduced a decoupled `ContextManager`
+  architecture and resolved several critical memory leaks and PTY exhaustion
+  issues ([#24752](https://github.com/google-gemini/gemini-cli/pull/24752) by
+  @joshualitt, [#25079](https://github.com/google-gemini/gemini-cli/pull/25079)
+  by @spencer426).
+
 ## Announcements: v0.38.0 - 2026-04-14
 
 - **Chapters Narrative Flow:** Group agent interactions into "Chapters" based on
