@@ -485,12 +485,14 @@ describe('PolicyEngine', () => {
       const originalMock = vi
         .mocked(parseCommandDetails)
         .getMockImplementation();
-      vi.mocked(parseCommandDetails).mockImplementation((command: string) => {
-        if (command === 'echo bypass') {
-          return { details: [], hasError: true };
-        }
-        return originalMock!(command);
-      });
+      vi.mocked(parseCommandDetails).mockImplementationOnce(
+        (command: string) => {
+          if (command === 'echo bypass') {
+            return { details: [], hasError: true };
+          }
+          return originalMock!(command);
+        },
+      );
 
       const rules: PolicyRule[] = [
         {
@@ -511,23 +513,23 @@ describe('PolicyEngine', () => {
       );
 
       expect(decision).toBe(PolicyDecision.DENY);
-
-      vi.mocked(parseCommandDetails).mockImplementation(originalMock!);
     });
 
     it('should fail closed in YOLO mode when shell parsing has errors for restricted rule', async () => {
       const originalMock = vi
         .mocked(parseCommandDetails)
         .getMockImplementation();
-      vi.mocked(parseCommandDetails).mockImplementation((command: string) => {
-        if (command === 'echo bypass') {
-          return {
-            details: [{ name: 'echo', text: 'echo bypass', startIndex: 0 }],
-            hasError: true,
-          };
-        }
-        return originalMock!(command);
-      });
+      vi.mocked(parseCommandDetails).mockImplementationOnce(
+        (command: string) => {
+          if (command === 'echo bypass') {
+            return {
+              details: [{ name: 'echo', text: 'echo bypass', startIndex: 0 }],
+              hasError: true,
+            };
+          }
+          return originalMock!(command);
+        },
+      );
 
       const rules: PolicyRule[] = [
         {
@@ -548,8 +550,6 @@ describe('PolicyEngine', () => {
       );
 
       expect(decision).toBe(PolicyDecision.DENY);
-
-      vi.mocked(parseCommandDetails).mockImplementation(originalMock!);
     });
   });
 
