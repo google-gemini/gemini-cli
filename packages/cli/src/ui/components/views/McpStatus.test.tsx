@@ -202,6 +202,30 @@ describe('McpStatus', () => {
     unmount();
   });
 
+  it('filters blocked servers case-insensitively and ignores whitespace', async () => {
+    const { lastFrame, unmount } = await render(
+      <McpStatus
+        {...baseProps}
+        servers={{
+          'SERVER-1 ': {
+            url: 'http://localhost:8080',
+            description: 'A test server',
+          },
+          ' server-2': {
+            url: 'http://localhost:8081',
+            description: 'A blocked server',
+          },
+        }}
+        blockedServers={[
+          { name: ' server-1', extensionName: 'test-extension' },
+          { name: 'SERVER-2 ', extensionName: 'test-extension' },
+        ]}
+      />,
+    );
+    expect(lastFrame()).toMatchSnapshot();
+    unmount();
+  });
+
   it('renders only blocked servers when no configured servers exist', async () => {
     const { lastFrame, unmount } = await render(
       <McpStatus
