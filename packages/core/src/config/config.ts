@@ -711,6 +711,7 @@ export interface ConfigParameters {
   autoDistillation?: boolean;
   experimentalMemoryV2?: boolean;
   experimentalAutoMemory?: boolean;
+  experimentalGemma?: boolean;
   experimentalContextManagementConfig?: string;
   experimentalAgentHistoryTruncation?: boolean;
   experimentalAgentHistoryTruncationThreshold?: number;
@@ -956,6 +957,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly experimentalJitContext: boolean;
   private readonly experimentalMemoryV2: boolean;
   private readonly experimentalAutoMemory: boolean;
+  private readonly experimentalGemma: boolean;
   private readonly experimentalContextManagementConfig?: string;
   private readonly memoryBoundaryMarkers: readonly string[];
   private readonly topicUpdateNarration: boolean;
@@ -1174,6 +1176,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.experimentalJitContext = params.experimentalJitContext ?? true;
     this.experimentalMemoryV2 = params.experimentalMemoryV2 ?? true;
     this.experimentalAutoMemory = params.experimentalAutoMemory ?? false;
+    this.experimentalGemma = params.experimentalGemma ?? false;
     this.experimentalContextManagementConfig =
       params.experimentalContextManagementConfig;
     this.memoryBoundaryMarkers = params.memoryBoundaryMarkers ?? ['.git'];
@@ -1590,8 +1593,12 @@ export class Config implements McpContext, AgentLoopContext {
         return undefined;
       });
 
-    // Fetch experiments and update timeouts before continuing initialization
-    const experiments = await this.experimentsPromise;
+    const [experiments] = await Promise.all([
+      this.experimentsPromise,
+      quotaPromise.catch((e) => {
+        debugLogger.error('Failed to fetch user quota', e);
+      }),
+    ]);
 
     const requestTimeoutMs = this.getRequestTimeoutMs();
     if (requestTimeoutMs !== undefined) {
@@ -1600,8 +1607,6 @@ export class Config implements McpContext, AgentLoopContext {
 
     // Initialize BaseLlmClient now that the ContentGenerator and experiments are available
     this.baseLlmClient = new BaseLlmClient(this.contentGenerator, this);
-
-    await quotaPromise;
 
     const authType = this.contentGeneratorConfig.authType;
     if (
@@ -1623,16 +1628,21 @@ export class Config implements McpContext, AgentLoopContext {
     const adminControlsEnabled =
       experiments?.flags[ExperimentFlags.ENABLE_ADMIN_CONTROLS]?.boolValue ??
       false;
-    const adminControls = await fetchAdminControls(
-      codeAssistServer,
-      this.getRemoteAdminSettings(),
-      adminControlsEnabled,
-      (newSettings: AdminControlsSettings) => {
-        this.setRemoteAdminSettings(newSettings);
-        coreEvents.emitAdminSettingsChanged();
-      },
-    );
-    this.setRemoteAdminSettings(adminControls);
+
+    try {
+      const adminControls = await fetchAdminControls(
+        codeAssistServer,
+        this.getRemoteAdminSettings(),
+        adminControlsEnabled,
+        (newSettings: AdminControlsSettings) => {
+          this.setRemoteAdminSettings(newSettings);
+          coreEvents.emitAdminSettingsChanged();
+        },
+      );
+      this.setRemoteAdminSettings(adminControls);
+    } catch (e) {
+      debugLogger.error('Failed to fetch admin controls', e);
+    }
 
     if ((await this.getProModelNoAccess()) && isAutoModel(this.model)) {
       this.setModel(PREVIEW_GEMINI_FLASH_MODEL);
@@ -2512,6 +2522,10 @@ export class Config implements McpContext, AgentLoopContext {
 
   isAutoMemoryEnabled(): boolean {
     return this.experimentalAutoMemory;
+  }
+
+  getExperimentalGemma(): boolean {
+    return this.experimentalGemma;
   }
 
   getExperimentalContextManagementConfig(): string | undefined {

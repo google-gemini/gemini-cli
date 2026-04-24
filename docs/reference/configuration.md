@@ -563,6 +563,18 @@ their corresponding top-level category object in your `settings.json` file.
           "model": "gemini-2.5-flash-lite"
         }
       },
+      "gemma-4-31b-it": {
+        "extends": "chat-base-3",
+        "modelConfig": {
+          "model": "gemma-4-31b-it"
+        }
+      },
+      "gemma-4-26b-a4b-it": {
+        "extends": "chat-base-3",
+        "modelConfig": {
+          "model": "gemma-4-26b-a4b-it"
+        }
+      },
       "gemini-2.5-flash-base": {
         "extends": "base",
         "modelConfig": {
@@ -834,6 +846,28 @@ their corresponding top-level category object in your `settings.json` file.
           "multimodalToolUse": false
         }
       },
+      "gemma-4-31b-it": {
+        "displayName": "gemma-4-31b-it",
+        "tier": "custom",
+        "family": "gemma-4",
+        "isPreview": false,
+        "isVisible": true,
+        "features": {
+          "thinking": true,
+          "multimodalToolUse": false
+        }
+      },
+      "gemma-4-26b-a4b-it": {
+        "displayName": "gemma-4-26b-a4b-it",
+        "tier": "custom",
+        "family": "gemma-4",
+        "isPreview": false,
+        "isVisible": true,
+        "features": {
+          "thinking": true,
+          "multimodalToolUse": false
+        }
+      },
       "auto": {
         "tier": "auto",
         "isPreview": true,
@@ -904,6 +938,12 @@ their corresponding top-level category object in your `settings.json` file.
 
     ```json
     {
+      "gemma-4-31b-it": {
+        "default": "gemma-4-31b-it"
+      },
+      "gemma-4-26b-a4b-it": {
+        "default": "gemma-4-26b-a4b-it"
+      },
       "gemini-3.1-pro-preview": {
         "default": "gemini-3.1-pro-preview",
         "contexts": [
@@ -1467,6 +1507,12 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `undefined`
   - **Requires restart:** Yes
 
+- **`tools.confirmationRequired`** (array):
+  - **Description:** Tool names that always require user confirmation. Takes
+    precedence over allowed tools and core tool allowlists.
+  - **Default:** `undefined`
+  - **Requires restart:** Yes
+
 - **`tools.exclude`** (array):
   - **Description:** Tool names to exclude from discovery.
   - **Default:** `undefined`
@@ -1639,6 +1685,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `undefined`
 
 #### `experimental`
+
+- **`experimental.gemma`** (boolean):
+  - **Description:** Enable access to Gemma 4 models (experimental).
+  - **Default:** `false`
+  - **Requires restart:** Yes
 
 - **`experimental.adk.agentSessionNoninteractiveEnabled`** (boolean):
   - **Description:** Enable non-interactive agent sessions.

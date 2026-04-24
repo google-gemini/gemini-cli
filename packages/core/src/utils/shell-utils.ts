@@ -240,11 +240,15 @@ foreach ($commandAst in $commandAsts) {
   'utf16le',
 ).toString('base64');
 
-const REDIRECTION_NAMES = new Set([
+export const REDIRECTION_NAMES = new Set([
   'redirection (<)',
   'redirection (>)',
   'heredoc (<<)',
   'herestring (<<<)',
+  'command substitution',
+  'backtick substitution',
+  'process substitution',
+  'subshell',
 ]);
 
 function createParser(): Parser | null {
@@ -360,6 +364,14 @@ function extractNameFromNode(node: Node): string | null {
       return 'heredoc (<<)';
     case 'herestring_redirect':
       return 'herestring (<<<)';
+    case 'command_substitution':
+      return 'command substitution';
+    case 'backtick_substitution':
+      return 'backtick substitution';
+    case 'process_substitution':
+      return 'process substitution';
+    case 'subshell':
+      return 'subshell';
     default:
       return null;
   }
