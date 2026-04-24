@@ -2,7 +2,7 @@
 # This policy guarantees permission for shell commands and file writing in the bot's CI environment.
 
 [[rule]]
-toolName = ["run_shell_command", "write_file"]
+toolName = ["run_shell_command", "write_file", "replace"]
 decision = "allow"
 # Max priority to ensure it overrides all default and workspace rules.
 priority = 999

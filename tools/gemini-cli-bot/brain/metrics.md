@@ -59,6 +59,15 @@ repository health.
   terminal escalations to prevent spam.
 - Recommend specific changes to GitHub Workflows, Triage scripts, or repository
   `CONTRIBUTING.md`/`GEMINI.md` guidelines.
+- **Pull Request Preparation**: If the `ENABLE_PRS` environment variable is
+  `true` and you are proposing script or configuration changes, you MUST
+  generate a file named `pr-description.md` in the root directory. This file
+  will be used as both the commit message and PR description. The file MUST
+  include:
+  1. What the change is.
+  2. Why it is recommended.
+  3. Which metric is expected to be improved.
+  4. By how much the metric is expected to improve.
 
 ### 7. Execution Constraints
 
