@@ -14,6 +14,7 @@ import {
   SCREEN_READER_LOADING,
   SCREEN_READER_RESPONDING,
 } from '../textConstants.js';
+import { useTerminalEnvironment } from '../hooks/useTerminalEnvironment.js';
 
 vi.mock('../contexts/StreamingContext.js');
 vi.mock('ink', async (importOriginal) => {
@@ -30,13 +31,19 @@ vi.mock('./GeminiSpinner.js', () => ({
   ),
 }));
 
+vi.mock('../hooks/useTerminalEnvironment.js', () => ({
+  useTerminalEnvironment: vi.fn(),
+}));
+
 describe('GeminiRespondingSpinner', () => {
   const mockUseStreamingContext = vi.mocked(useStreamingContext);
   const mockUseIsScreenReaderEnabled = vi.mocked(useIsScreenReaderEnabled);
+  const mockUseTerminalEnvironment = vi.mocked(useTerminalEnvironment);
 
   beforeEach(() => {
     vi.clearAllMocks();
     mockUseIsScreenReaderEnabled.mockReturnValue(false);
+    mockUseTerminalEnvironment.mockReturnValue({ isTmux: false });
   });
 
   it('renders spinner when responding', async () => {
@@ -77,6 +84,37 @@ describe('GeminiRespondingSpinner', () => {
       <GeminiRespondingSpinner nonRespondingDisplay="Waiting..." />,
     );
     expect(lastFrame()).toContain(SCREEN_READER_LOADING);
+    unmount();
+  });
+
+  it('renders animated dots when responding in tmux', async () => {
+    mockUseStreamingContext.mockReturnValue(StreamingState.Responding);
+    mockUseTerminalEnvironment.mockReturnValue({ isTmux: true });
+    const { lastFrame, waitUntilReady, unmount } = render(
+      <GeminiRespondingSpinner />,
+    );
+    await waitUntilReady();
+    // Animated dots should be present (one of: ., .., ...)
+    const frame = lastFrame();
+    expect(
+      frame.includes('.') || frame.includes('..') || frame.includes('...'),
+    ).toBe(true);
+    // Animated spinner should not be present
+    expect(lastFrame()).not.toContain('Spinner');
+    unmount();
+  });
+
+  it('renders animated spinner when responding and not in tmux', async () => {
+    mockUseStreamingContext.mockReturnValue(StreamingState.Responding);
+    mockUseTerminalEnvironment.mockReturnValue({ isTmux: false });
+    const { lastFrame, waitUntilReady, unmount } = render(
+      <GeminiRespondingSpinner />,
+    );
+    await waitUntilReady();
+    // Animated spinner should be present
+    expect(lastFrame()).toContain('Spinner');
+    // Static indicator should not be present
+    expect(lastFrame()).not.toContain('●');
     unmount();
   });
 });
