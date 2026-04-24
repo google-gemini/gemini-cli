@@ -349,11 +349,11 @@ and ensure your workspace paths align.
 **Example**:
 
 ```bash
-docker run -it \\
-  -v /var/run/docker.sock:/var/run/docker.sock \\
-  -v /absolute/path/on/host/project:/absolute/path/on/host/project \\
-  -w /absolute/path/on/host/project \\
-  -e GEMINI_SANDBOX=docker \\
+docker run -it \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -v /absolute/path/on/host/project:/absolute/path/on/host/project \
+  -w /absolute/path/on/host/project \
+  -e GEMINI_SANDBOX=docker \
   ghcr.io/google/gemini-cli:latest
 ```
 
