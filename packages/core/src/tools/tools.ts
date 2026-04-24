@@ -14,6 +14,7 @@ import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { isRecord } from '../utils/markdownUtils.js';
 import { randomUUID } from 'node:crypto';
+import { debugLogger } from '../utils/debugLogger.js';
 import {
   MessageBusType,
   type ToolConfirmationRequest,
@@ -23,7 +24,6 @@ import {
 import { ApprovalMode } from '../policy/types.js';
 import type { SubagentProgress } from '../agents/types.js';
 
-/**
 /**
  * Supported decisions for forcing tool execution behavior.
  */
@@ -305,31 +305,6 @@ export abstract class BaseToolInvocation<
         return;
       }
 
-      let timeoutId: NodeJS.Timeout | null = null;
-      let unsubscribe: (() => void) | null = null;
-
-      const cleanup = () => {
-        if (timeoutId) {
-          clearTimeout(timeoutId);
-          timeoutId = null;
-        }
-        if (unsubscribe) {
-          unsubscribe();
-          unsubscribe = null;
-        }
-        abortSignal.removeEventListener('abort', abortHandler);
-      };
-
-      const abortHandler = () => {
-        cleanup();
-        resolve('deny');
-      };
-
-      if (abortSignal.aborted) {
-        resolve('deny');
-        return;
-      }
-
       const responseHandler = (response: ToolConfirmationResponse) => {
         if (response.correlationId === correlationId) {
           cleanup();
@@ -343,27 +318,47 @@ export abstract class BaseToolInvocation<
         }
       };
 
-      abortSignal.addEventListener('abort', abortHandler, { once: true });
-
-      timeoutId = setTimeout(() => {
-        cleanup();
-        resolve('ask_user'); // Default to ask_user on timeout
-      }, 30000);
-
-      this.messageBus.subscribe(
-        MessageBusType.TOOL_CONFIRMATION_RESPONSE,
-        responseHandler,
-      );
-      unsubscribe = () => {
+      const unsubscribe = () => {
         this.messageBus?.unsubscribe(
           MessageBusType.TOOL_CONFIRMATION_RESPONSE,
           responseHandler,
         );
       };
 
+      const cleanup = () => {
+        abortSignal.removeEventListener('abort', abortHandler);
+        unsubscribe();
+      };
+
+      const abortHandler = () => {
+        cleanup();
+        resolve('deny');
+      };
+
+      if (abortSignal.aborted) {
+        resolve('deny');
+        return;
+      }
+
+      abortSignal.addEventListener('abort', abortHandler, { once: true });
+
+      this.messageBus.subscribe(
+        MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+        responseHandler,
+      );
+
       try {
-        void this.messageBus.publish(request);
-      } catch {
+        this.messageBus.publish(request).catch((err) => {
+          debugLogger.error(
+            `Failed to publish tool confirmation request: ${err}`,
+          );
+          cleanup();
+          resolve('allow');
+        });
+      } catch (err) {
+        debugLogger.error(
+          `Failed to publish tool confirmation request: ${err}`,
+        );
         cleanup();
         resolve('allow');
       }
