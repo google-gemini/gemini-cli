@@ -12,7 +12,8 @@ import type { Config } from '../config/config.js';
 import { Storage } from '../config/storage.js';
 import { isNodeError } from '../utils/errors.js';
 import { debugLogger } from '../utils/debugLogger.js';
-import { isSubpath } from '../utils/paths.js';
+import { isSubpath, normalizePath } from '../utils/paths.js';
+import { getExtensionMemoryPaths } from '../utils/memoryDiscovery.js';
 
 export function getAllowedSkillPatchRoots(config: Config): string[] {
   return Array.from(
@@ -68,6 +69,55 @@ async function getCanonicalAllowedSkillPatchRoots(
   );
 }
 
+/**
+ * Returns the absolute paths of the GEMINI.md (and equivalently named) memory
+ * files that are eligible to be patched by the skill-extraction agent.
+ *
+ * The set is the user/project memory files reported by the loaded
+ * configuration, minus any files that originate from installed extensions.
+ * Extension-supplied context files belong to the extension package and would
+ * be overwritten on extension upgrades, so they are intentionally excluded.
+ */
+export function getAllowedGeminiMdPatchTargets(config: Config): string[] {
+  const allPaths = config.getGeminiMdFilePaths?.() ?? [];
+  if (allPaths.length === 0) {
+    return [];
+  }
+  // `getExtensionMemoryPaths` returns paths normalized via `normalizePath`,
+  // which lowercases on darwin and Windows. Compare on the normalized form so
+  // case differences between the two sources do not let an extension path
+  // slip through the filter, but return the absolute (non-lowercased) path so
+  // downstream `realpath`-based resolution still works on case-sensitive
+  // filesystems.
+  const extensionPaths = new Set(
+    getExtensionMemoryPaths(config.getExtensionLoader()),
+  );
+  return Array.from(
+    new Set(
+      allPaths
+        .filter((p) => !extensionPaths.has(normalizePath(p)))
+        .map((p) => path.resolve(p)),
+    ),
+  );
+}
+
+async function getCanonicalAllowedGeminiMdPatchTargets(
+  config: Config,
+): Promise<string[]> {
+  const canonicalTargets = await Promise.all(
+    getAllowedGeminiMdPatchTargets(config).map((target) =>
+      resolvePathWithExistingAncestors(target),
+    ),
+  );
+  return Array.from(
+    new Set(
+      canonicalTargets.filter(
+        (target): target is string => typeof target === 'string',
+      ),
+    ),
+  );
+}
+
 export async function resolveAllowedSkillPatchTarget(
   targetPath: string,
   config: Config,
@@ -80,6 +130,12 @@ export async function resolveAllowedSkillPatchTarget(
 
   const allowedRoots = await getCanonicalAllowedSkillPatchRoots(config);
   if (allowedRoots.some((root) => isSubpath(root, canonicalTargetPath))) {
+    return canonicalTargetPath;
+  }
+
+  const allowedGeminiMdTargets =
+    await getCanonicalAllowedGeminiMdPatchTargets(config);
+  if (allowedGeminiMdTargets.includes(canonicalTargetPath)) {
     return canonicalTargetPath;
   }
 
@@ -210,6 +266,26 @@ export async function isProjectSkillPatchTarget(
   }
 
   return isSubpath(canonicalProjectSkillsDir, canonicalTargetPath);
+}
+
+/**
+ * Returns true when `targetPath` resolves to one of the loaded GEMINI.md
+ * memory files that the skill-extraction agent is allowed to patch.
+ * Used by the inbox UI to distinguish project-memory patches from skill patches.
+ */
+export async function isGeminiMdPatchTarget(
+  targetPath: string,
+  config: Config,
+): Promise<boolean> {
+  const canonicalTargetPath =
+    await resolvePathWithExistingAncestors(targetPath);
+  if (!canonicalTargetPath) {
+    return false;
+  }
+
+  const allowedGeminiMdTargets =
+    await getCanonicalAllowedGeminiMdPatchTargets(config);
+  return allowedGeminiMdTargets.includes(canonicalTargetPath);
 }
 
 export function hasParsedPatchHunks(parsedPatches: StructuredPatch[]): boolean {

@@ -14,6 +14,7 @@ import {
   moveInboxSkill,
   applyInboxPatch,
   dismissInboxPatch,
+  isGeminiMdPatchTarget,
   isProjectSkillPatchTarget,
 } from '@google/gemini-cli-core';
 import { waitFor } from '../../test-utils/async.js';
@@ -32,6 +33,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     moveInboxSkill: vi.fn(),
     applyInboxPatch: vi.fn(),
     dismissInboxPatch: vi.fn(),
+    isGeminiMdPatchTarget: vi.fn(),
     isProjectSkillPatchTarget: vi.fn(),
     getErrorMessage: vi.fn((error: unknown) =>
       error instanceof Error ? error.message : String(error),
@@ -45,6 +47,7 @@ const mockMoveInboxSkill = vi.mocked(moveInboxSkill);
 const mockDismissInboxSkill = vi.mocked(dismissInboxSkill);
 const mockApplyInboxPatch = vi.mocked(applyInboxPatch);
 const mockDismissInboxPatch = vi.mocked(dismissInboxPatch);
+const mockIsGeminiMdPatchTarget = vi.mocked(isGeminiMdPatchTarget);
 const mockIsProjectSkillPatchTarget = vi.mocked(isProjectSkillPatchTarget);
 
 const inboxSkill: InboxSkill = {
@@ -170,6 +173,7 @@ describe('SkillInboxDialog', () => {
           : false;
       },
     );
+    mockIsGeminiMdPatchTarget.mockResolvedValue(false);
   });
 
   afterEach(() => {
