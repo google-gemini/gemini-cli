@@ -1912,6 +1912,9 @@ describe('Settings Loading and Merging', () => {
       const geminiEnvPath = path.resolve(
         path.join(MOCK_WORKSPACE_DIR, GEMINI_DIR, '.env'),
       );
+      const workspaceEnvPath = path.resolve(
+        path.join(MOCK_WORKSPACE_DIR, '.env'),
+      );
 
       vi.spyOn(trustedFolders, 'isWorkspaceTrusted').mockReturnValue({
         isTrusted: isWorkspaceTrustedValue,
@@ -1919,9 +1922,11 @@ describe('Settings Loading and Merging', () => {
       });
       (mockFsExistsSync as Mock).mockImplementation((p: fs.PathLike) => {
         const normalizedP = path.resolve(p.toString());
-        return [path.resolve(USER_SETTINGS_PATH), geminiEnvPath].includes(
-          normalizedP,
-        );
+        return [
+          path.resolve(USER_SETTINGS_PATH),
+          geminiEnvPath,
+          workspaceEnvPath,
+        ].includes(normalizedP);
       });
       const userSettingsContent: Settings = {
         ui: {
@@ -1941,7 +1946,7 @@ describe('Settings Loading and Merging', () => {
           const normalizedP = path.resolve(p.toString());
           if (normalizedP === path.resolve(USER_SETTINGS_PATH))
             return JSON.stringify(userSettingsContent);
-          if (normalizedP === geminiEnvPath)
+          if (normalizedP === geminiEnvPath || normalizedP === workspaceEnvPath)
             return 'TESTTEST=1234\nGEMINI_API_KEY=test-key';
           return '{}';
         },
@@ -1970,7 +1975,7 @@ describe('Settings Loading and Merging', () => {
       expect(process.env['TESTTEST']).not.toEqual('1234');
     });
 
-    it('does load env files from untrusted spaces when NOT sandboxed', () => {
+    it('does NOT load non-whitelisted env files from untrusted spaces even when NOT sandboxed', () => {
       setup({ isFolderTrustEnabled: true, isWorkspaceTrustedValue: false });
       const settings = {
         security: { folderTrust: { enabled: true } },
@@ -1978,7 +1983,8 @@ describe('Settings Loading and Merging', () => {
       } as Settings;
       loadEnvironment(settings, MOCK_WORKSPACE_DIR, isWorkspaceTrusted);
 
-      expect(process.env['TESTTEST']).toEqual('1234');
+      expect(process.env['TESTTEST']).not.toEqual('1234');
+      expect(process.env['GEMINI_API_KEY']).toEqual('test-key');
     });
 
     it('does not load env files when trust is undefined and sandboxed', () => {

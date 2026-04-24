@@ -1,6 +1,6 @@
 {
   "name": "@google/gemini-cli-core",
-  "version": "0.40.0-nightly.20260414.g5b1f7375a",
+  "version": "0.41.0-nightly.20260423.gaa05b4583",
   "description": "Gemini CLI Core",
   "license": "Apache-2.0",
   "repository": {
@@ -20,8 +20,7 @@
     "typecheck": "tsc --noEmit"
   },
   "files": [
-    "dist",
-    "vendor"
+    "dist"
   ],
   "dependencies": {
     "@a2a-js/sdk": "0.3.11",
