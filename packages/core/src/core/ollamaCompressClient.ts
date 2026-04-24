@@ -32,6 +32,16 @@ const MAX_TOTAL_CHARS = 120_000;
 const TIMEOUT_MS = 90_000;
 const MAX_RETRIES = 3;
 
+/** Strip characters that could break the flat-text prompt structure. */
+function sanitizeText(s: string): string {
+  return s.replace(/[\n\r\]]/g, ' ');
+}
+
+function truncate(s: string): string {
+  const t = s.slice(0, MAX_CHARS_PER_TOOL_OUTPUT);
+  return t.length < s.length ? `${t}…` : t;
+}
+
 /**
  * Converts Google GenAI Content[] (which may contain functionCall /
  * functionResponse parts) into plain text Ollama messages.
@@ -45,9 +55,13 @@ function sanitizeHistory(contents: Content[]): OllamaMessage[] {
 
     for (const part of content.parts ?? []) {
       if (part.text) {
-        lines.push(part.text);
+        // part.thought is a boolean marker; when true, part.text holds the thought content.
+        const prefix = part.thought ? '[Thought] ' : '';
+        lines.push(prefix + sanitizeText(part.text));
       } else if (part.functionCall) {
-        const args = JSON.stringify(part.functionCall.args ?? {}).slice(0, 300);
+        const args = sanitizeText(
+          JSON.stringify(part.functionCall.args ?? {}).slice(0, 300),
+        );
         lines.push(`[Tool call: ${part.functionCall.name}(${args})]`);
       } else if (part.functionResponse) {
         const raw = part.functionResponse.response;
@@ -55,15 +69,25 @@ function sanitizeHistory(contents: Content[]): OllamaMessage[] {
         if (typeof raw === 'string') {
           output = raw;
         } else if (raw && typeof raw === 'object' && 'output' in raw) {
-          output = String((raw)['output'] ?? '');
+          output = String(raw['output'] ?? '');
         } else {
           output = JSON.stringify(raw ?? '');
         }
-        const truncated = output.slice(0, MAX_CHARS_PER_TOOL_OUTPUT);
-        const ellipsis = output.length > MAX_CHARS_PER_TOOL_OUTPUT ? '…' : '';
         lines.push(
-          `[Tool result from ${part.functionResponse.name}: ${truncated}${ellipsis}]`,
+          `[Tool result from ${part.functionResponse.name}: ${truncate(sanitizeText(output))}]`,
         );
+      } else if (part.executableCode) {
+        lines.push(
+          `[Executable code (${part.executableCode.language}): ${truncate(sanitizeText(part.executableCode.code ?? ''))}]`,
+        );
+      } else if (part.codeExecutionResult) {
+        lines.push(
+          `[Code execution result (${part.codeExecutionResult.outcome}): ${truncate(sanitizeText(part.codeExecutionResult.output ?? ''))}]`,
+        );
+      } else if (part.inlineData) {
+        lines.push(`[Media: ${part.inlineData.mimeType}]`);
+      } else if (part.fileData) {
+        lines.push(`[Media: ${part.fileData.mimeType}]`);
       }
     }
 
@@ -97,12 +121,16 @@ function extractSystemInstruction(
 ): string {
   if (!si) return '';
   if (typeof si === 'string') return si;
-   
-  if ('text' in (si as object))
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    return (si as { text: string }).text;
   if (Array.isArray(si))
     return (si as Array<{ text?: string }>).map((p) => p.text ?? '').join('\n');
+  if (typeof si === 'object' && 'parts' in si && Array.isArray(si.parts))
+     
+    return (si.parts as Array<{ text?: string }>)
+      .map((p) => p.text ?? '')
+      .join('\n');
+  if (typeof si === 'object' && 'text' in si)
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    return (si as { text: string }).text;
   return JSON.stringify(si);
 }
 
@@ -220,11 +248,19 @@ export class OllamaCompressClient {
       );
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    const body = (await response.json()) as unknown as OllamaChatResponse;
+    let body: OllamaChatResponse;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      body = (await response.json()) as unknown as OllamaChatResponse;
+    } catch (e) {
+      throw new OllamaUnavailableError(
+        `Ollama returned invalid JSON: ${e instanceof Error ? e.message : String(e)}`,
+        e,
+      );
+    }
     const text = body?.message?.content;
     if (!text) {
-      throw new Error('Ollama returned empty content');
+      throw new OllamaUnavailableError('Ollama returned empty content');
     }
     return text;
   }
