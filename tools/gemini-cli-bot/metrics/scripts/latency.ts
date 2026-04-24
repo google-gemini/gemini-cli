@@ -71,28 +71,26 @@ try {
       : 0;
 
   const prMaintainers = calculateAvg(
-    prs.filter(
-      (i: { authorAssociation: string; closedAt: string; createdAt: string }) =>
-        isMaintainer(i.association),
+    prs.filter((i: { association: string; latencyHours: number }) =>
+      isMaintainer(i.association),
     ),
   );
   const prCommunity = calculateAvg(
     prs.filter(
-      (i: { authorAssociation: string; closedAt: string; createdAt: string }) =>
+      (i: { association: string; latencyHours: number }) =>
         !isMaintainer(i.association),
     ),
   );
   const prOverall = calculateAvg(prs);
 
   const issueMaintainers = calculateAvg(
-    issues.filter(
-      (i: { authorAssociation: string; closedAt: string; createdAt: string }) =>
-        isMaintainer(i.association),
+    issues.filter((i: { association: string; latencyHours: number }) =>
+      isMaintainer(i.association),
     ),
   );
   const issueCommunity = calculateAvg(
     issues.filter(
-      (i: { authorAssociation: string; closedAt: string; createdAt: string }) =>
+      (i: { association: string; latencyHours: number }) =>
         !isMaintainer(i.association),
     ),
   );

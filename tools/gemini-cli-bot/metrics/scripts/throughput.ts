@@ -63,26 +63,26 @@ try {
 
   const prOverall = calculateThroughput(prs);
   const prMaintainers = calculateThroughput(
-    prs.filter((i: { authorAssociation: string; closedAt: string }) =>
+    prs.filter((i: { association: string; date: number }) =>
       isMaintainer(i.association),
     ),
   );
   const prCommunity = calculateThroughput(
     prs.filter(
-      (i: { authorAssociation: string; closedAt: string }) =>
+      (i: { association: string; date: number }) =>
         !isMaintainer(i.association),
     ),
   );
 
   const issueOverall = calculateThroughput(issues);
   const issueMaintainers = calculateThroughput(
-    issues.filter((i: { authorAssociation: string; closedAt: string }) =>
+    issues.filter((i: { association: string; date: number }) =>
       isMaintainer(i.association),
     ),
   );
   const issueCommunity = calculateThroughput(
     issues.filter(
-      (i: { authorAssociation: string; closedAt: string }) =>
+      (i: { association: string; date: number }) =>
         !isMaintainer(i.association),
     ),
   );

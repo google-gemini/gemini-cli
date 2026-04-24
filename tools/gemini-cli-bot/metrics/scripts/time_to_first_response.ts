@@ -91,8 +91,19 @@ try {
     }
     return null; // No response yet
   };
-
-  const processItems = (items: { ttfr: number; association: string }[]) => {
+  const processItems = (
+    items: {
+      authorAssociation: string;
+      createdAt: string;
+      author: { login: string };
+      comments: {
+        nodes: { createdAt: string; author?: { login: string } }[];
+      };
+      reviews?: {
+        nodes: { createdAt: string; author?: { login: string } }[];
+      };
+    }[],
+  ) => {
     return items
       .map((item) => ({
         association: item.authorAssociation,
@@ -103,7 +114,6 @@ try {
       ttfr: number;
     }[];
   };
-
   const prs = processItems(data.pullRequests.nodes);
   const issues = processItems(data.issues.nodes);
   const allItems = [...prs, ...issues];

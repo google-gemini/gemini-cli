@@ -94,7 +94,7 @@ try {
       }
     };
 
-    const reviewersOnPR = new Map<string, unknown>();
+    const reviewersOnPR = new Map<string, { name?: string }>();
     for (const review of pr.reviews.nodes) {
       if (
         ['MEMBER', 'OWNER'].includes(review.authorAssociation) &&

@@ -42,25 +42,15 @@ try {
     ...prs.map(
       (p: {
         authorAssociation: string;
-        timelineItems: {
-          nodes: { createdAt: string; author?: { login: string } }[];
-        };
+        comments: { totalCount: number };
+        reviews?: { totalCount: number };
       }) => ({
         association: p.authorAssociation,
         touches: p.comments.totalCount + (p.reviews ? p.reviews.totalCount : 0),
       }),
     ),
     ...issues.map(
-      (i: {
-        authorAssociation: string;
-        timelineItems: {
-          nodes: {
-            createdAt: string;
-            actor?: { login: string };
-            author?: { login: string };
-          }[];
-        };
-      }) => ({
+      (i: { authorAssociation: string; comments: { totalCount: number } }) => ({
         association: i.authorAssociation,
         touches: i.comments.totalCount,
       }),
