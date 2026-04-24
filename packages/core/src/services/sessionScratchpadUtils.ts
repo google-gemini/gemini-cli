@@ -14,13 +14,46 @@ const SAFE_TOOL_SEQUENCE_ENTRY_REGEX = /^[A-Za-z_][A-Za-z0-9_:.]*$/;
 
 function tokenizeShellCommand(command: string): string[] {
   const tokens: string[] = [];
-  const tokenRegex = /"((?:\\.|[^"\\])*)"|'([^']*)'|`([^`]*)`|[^\s]+/g;
+  let currentToken = '';
+  let quote: '"' | "'" | '`' | undefined;
 
-  for (const match of command.matchAll(tokenRegex)) {
-    const token = match[1] ?? match[2] ?? match[3] ?? match[0];
-    if (token) {
-      tokens.push(token);
+  for (let i = 0; i < command.length; i++) {
+    const char = command[i];
+
+    if (quote) {
+      if (char === quote) {
+        quote = undefined;
+        continue;
+      }
+
+      if (quote === '"' && char === '\\' && i + 1 < command.length) {
+        currentToken += command[i + 1];
+        i++;
+        continue;
+      }
+
+      currentToken += char;
+      continue;
     }
+
+    if (char === ' ' || char === '\t' || char === '\n' || char === '\r') {
+      if (currentToken) {
+        tokens.push(currentToken);
+        currentToken = '';
+      }
+      continue;
+    }
+
+    if (char === '"' || char === "'" || char === '`') {
+      quote = char;
+      continue;
+    }
+
+    currentToken += char;
+  }
+
+  if (currentToken) {
+    tokens.push(currentToken);
   }
 
   return tokens;
