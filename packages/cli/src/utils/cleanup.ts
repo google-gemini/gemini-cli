@@ -151,16 +151,19 @@ export function setupSignalHandlers() {
 export function setupTtyCheck(): () => void {
   let intervalId: ReturnType<typeof setInterval> | null = null;
   let isCheckingTty = false;
+  // TTY loss confirmation delay to avoid false positives from momentary
+  // isTTY flickers on Windows terminals (PowerShell, Windows Terminal)
+  // during resize, focus changes, or buffer flushes.
+  // See https://github.com/google-gemini/gemini-cli/issues/25908
+  const TTY_LOSS_CONFIRM_MS = 1000;
 
-  intervalId = setInterval(async () => {
+  const checkTty = () => {
     if (isCheckingTty || isShuttingDown) {
       return;
     }
-
     if (process.env['SANDBOX']) {
       return;
     }
-
     if (!process.stdin.isTTY && !process.stdout.isTTY) {
       isCheckingTty = true;
 
@@ -169,9 +172,23 @@ export function setupTtyCheck(): () => void {
         intervalId = null;
       }
 
-      await gracefulShutdown('TTY loss');
+      setTimeout(async () => {
+        if (isShuttingDown) {
+          return;
+        }
+        // If TTY came back, it was a transient flicker — restart monitoring.
+        if (process.stdin.isTTY || process.stdout.isTTY) {
+          isCheckingTty = false;
+          intervalId = setInterval(checkTty, 5000);
+          if (intervalId) intervalId.unref();
+          return;
+        }
+        await gracefulShutdown('TTY loss');
+      }, TTY_LOSS_CONFIRM_MS);
     }
-  }, 5000);
+  };
+
+  intervalId = setInterval(checkTty, 5000);
 
   // Don't keep the process alive just for this interval
   intervalId.unref();
