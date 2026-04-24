@@ -45,6 +45,41 @@ jobs:
           name: 'node-modules-tarball'
           path: 'node_modules.tar.gz'
 
+  build_aggregate:
+    name: 'Build for Aggregate'
+    runs-on: 'gemini-cli-ubuntu-16-core'
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
+
+      - name: 'Set up Node.js'
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: 'Install dependencies'
+        run: 'npm ci'
+
+      - name: 'Build project'
+        run: 'npm run build'
+
+      - name: 'Upload Workspace'
+        uses: 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02'
+        with:
+          name: 'workspace-artifact-aggregate'
+          path: '.'
+
+      - name: 'Tar Node Modules'
+        run: 'tar -czf node_modules_aggregate.tar.gz node_modules'
+        shell: 'bash'
+
+      - name: 'Upload Node Modules Tarball'
+        uses: 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02'
+        with:
+          name: 'node-modules-tarball-aggregate'
+          path: 'node_modules_aggregate.tar.gz'
+
   test_ui_messages:
     name: 'Test (Linux) - UI Messages'
     needs: build
@@ -343,7 +378,7 @@ jobs:
 
   test_cli_aggregate:
     name: 'Test (Linux) - CLI Aggregate'
-    needs: build
+    needs: build_aggregate
     runs-on: 'gemini-cli-ubuntu-16-core'
     steps:
       - name: 'Checkout'
@@ -352,20 +387,20 @@ jobs:
       - name: 'Download Workspace'
         uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806'
         with:
-          name: 'workspace-artifact'
+          name: 'workspace-artifact-aggregate'
           path: '.'
 
       - name: 'Download Node Modules Tarball'
         uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806'
         with:
-          name: 'node-modules-tarball'
+          name: 'node-modules-tarball-aggregate'
           path: '.'
 
       - name: 'Extract Node Modules'
         run: |
           rm -rf node_modules
-          tar -xzf node_modules.tar.gz
-          rm node_modules.tar.gz
+          tar -xzf node_modules_aggregate.tar.gz
+          rm node_modules_aggregate.tar.gz
         shell: 'bash'
 
       - name: 'Setup Gemini'
