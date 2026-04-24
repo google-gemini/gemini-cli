@@ -437,7 +437,7 @@ jobs:
         shell: 'pwsh'
 
       - name: 'Install dependencies'
-        run: 'npm install @google-gemini/gemini-cli@0.0.0-${{ github.sha }} vitest node-pty --no-save'
+        run: 'npm install @google-gemini/gemini-cli@0.0.0-${{ github.sha }} @google-gemini/gemini-cli-core@0.0.0-${{ github.sha }} vitest node-pty --no-save'
         shell: 'pwsh'
 
       - name: 'Run Integration Tests'
