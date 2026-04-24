@@ -36,6 +36,7 @@ const VALIDATION_TOOL_REGEX = /(test|lint|build|check)/i;
 type LoadedSession = ConversationRecord & {
   messageCount?: number;
   userMessageCount?: number;
+  memoryScratchpadIsStale?: boolean;
 };
 
 interface SessionFileCandidate {
@@ -280,15 +281,8 @@ function buildMemoryScratchpad(
       collectPathsFromValue(toolCall.args, projectRoot, touchedPaths);
 
       const toolValidationStatus = getValidationStatusForToolCall(toolCall);
-      if (toolValidationStatus === 'failed') {
-        validationStatus = 'failed';
-      } else if (
-        toolValidationStatus === 'passed' &&
-        validationStatus !== 'failed'
-      ) {
-        validationStatus = 'passed';
-      } else if (!validationStatus && toolValidationStatus === 'unknown') {
-        validationStatus = 'unknown';
+      if (toolValidationStatus) {
+        validationStatus = toolValidationStatus;
       }
     }
   }
@@ -308,8 +302,18 @@ function buildMemoryScratchpad(
   };
 }
 
+function hasCurrentMemoryScratchpad(session: LoadedSession): boolean {
+  return Boolean(
+    session.memoryScratchpad && session.memoryScratchpadIsStale !== true,
+  );
+}
+
 function hasSessionSummaryMetadata(session: LoadedSession): boolean {
-  return Boolean(session.summary && session.memoryScratchpad);
+  return Boolean(session.summary && hasCurrentMemoryScratchpad(session));
+}
+
+function getLoadedMessageCount(session: LoadedSession): number {
+  return session.messageCount ?? session.messages.length;
 }
 
 /**
@@ -364,9 +368,7 @@ async function generateAndSaveSummary(
     }
   }
 
-  const memoryScratchpad =
-    conversation.memoryScratchpad ??
-    buildMemoryScratchpad(conversation.messages, config.getProjectRoot());
+  let scratchpadSourceConversation = conversation;
 
   // Re-read the file before writing to handle race conditions. For JSONL we
   // only need the metadata; for legacy JSON we need the full record so we can
@@ -388,12 +390,35 @@ async function generateAndSaveSummary(
     return;
   }
 
+  if (
+    !hasCurrentMemoryScratchpad(freshConversation) &&
+    (getLoadedMessageCount(freshConversation) !==
+      getLoadedMessageCount(conversation) ||
+      freshConversation.lastUpdated !== conversation.lastUpdated)
+  ) {
+    const latestConversation = await loadConversationRecord(sessionPath);
+    if (!latestConversation) {
+      debugLogger.debug(`[SessionSummary] Could not re-read ${sessionPath}`);
+      return;
+    }
+    if (hasSessionSummaryMetadata(latestConversation)) {
+      debugLogger.debug(
+        `[SessionSummary] Summary metadata was added by another process for ${sessionPath}`,
+      );
+      return;
+    }
+    scratchpadSourceConversation = latestConversation;
+  }
+
   const metadataUpdate: Partial<ConversationRecord> = {};
   if (!freshConversation.summary && summary) {
     metadataUpdate.summary = summary;
   }
-  if (!freshConversation.memoryScratchpad) {
-    metadataUpdate.memoryScratchpad = memoryScratchpad;
+  if (!hasCurrentMemoryScratchpad(freshConversation)) {
+    metadataUpdate.memoryScratchpad = buildMemoryScratchpad(
+      scratchpadSourceConversation.messages,
+      config.getProjectRoot(),
+    );
   }
 
   if (Object.keys(metadataUpdate).length === 0) {

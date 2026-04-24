@@ -573,7 +573,10 @@ async function scanEligibleSessions(
         lastUpdated: conversation.lastUpdated,
         filePath,
         summary: conversation.summary,
-        memoryScratchpad: conversation.memoryScratchpad,
+        memoryScratchpad:
+          conversation.memoryScratchpadIsStale === true
+            ? undefined
+            : conversation.memoryScratchpad,
         userMessageCount: getUserMessageCount(conversation),
       };
 

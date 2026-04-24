@@ -1009,6 +1009,53 @@ describe('memoryService', () => {
       expect(result.sessionIndex).toContain('sessionSummaryUtils.ts');
     });
 
+    it('omits stale scratchpad workflow summaries from resumed JSONL sessions', async () => {
+      const { buildSessionIndex } = await import('./memoryService.js');
+
+      const conversation = createConversation({
+        sessionId: 'stale-scratchpad',
+        summary: 'Resume memory work',
+        messageCount: 20,
+        lastUpdated: '2025-01-01T01:00:00Z',
+      });
+      const filePath = path.join(
+        chatsDir,
+        `${SESSION_FILE_PREFIX}2025-01-01T00-00-stale001.jsonl`,
+      );
+      await writeConversationJsonl(filePath, conversation);
+      await fs.appendFile(
+        filePath,
+        `${JSON.stringify({
+          $set: {
+            memoryScratchpad: {
+              version: 1,
+              workflowSummary: 'stale_workflow | paths stale.ts',
+            },
+          },
+        })}\n`,
+      );
+      await fs.appendFile(
+        filePath,
+        [
+          JSON.stringify({
+            id: 'resumed-user-message',
+            timestamp: '2025-01-02T01:00:00Z',
+            type: 'user',
+            content: [{ text: 'Continue after the scratchpad was written' }],
+          }),
+          JSON.stringify({
+            $set: { lastUpdated: '2025-01-02T01:00:01Z' },
+          }),
+        ].join('\n') + '\n',
+      );
+
+      const result = await buildSessionIndex(chatsDir, { runs: [] });
+
+      expect(result.sessionIndex).toContain('Resume memory work');
+      expect(result.sessionIndex).not.toContain('stale_workflow');
+      expect(result.sessionIndex).not.toContain('stale.ts');
+    });
+
     it('sanitizes shell command workflow summaries before indexing sessions', async () => {
       const { buildSessionIndex } = await import('./memoryService.js');
 
