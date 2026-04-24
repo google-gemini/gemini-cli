@@ -656,11 +656,17 @@ export class GeminiChat {
       lastConfig = config;
       lastContentsToUse = contentsToUse;
 
+      // Rationale: serviceTier is an internal SDK property used to enable priority processing.
+      interface GeminiInternalConfig { serviceTier: string; }
+      const updatedConfig = this.context.config.getGeminiApiPriority()
+        ? ({ ...config, serviceTier: 'priority' } as GenerateContentConfig & GeminiInternalConfig)
+        : config;
+
       return this.context.config.getContentGenerator().generateContentStream(
         {
           model: modelToUse,
           contents: contentsToUse,
-          config,
+          config: updatedConfig,
         },
         prompt_id,
         role,

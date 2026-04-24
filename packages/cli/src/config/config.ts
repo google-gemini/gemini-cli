@@ -931,6 +931,7 @@ export async function loadCliConfig(
     memoryBoundaryMarkers: settings.context?.memoryBoundaryMarkers,
     importFormat: settings.context?.importFormat,
     debugMode,
+    geminiApiPriority: settings.model?.geminiApiPriority,
     question,
     worktreeSettings,
 
