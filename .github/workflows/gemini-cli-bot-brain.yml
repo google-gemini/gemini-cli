@@ -9,16 +9,17 @@ concurrency:
   group: '${{ github.workflow }}-${{ github.ref }}'
   cancel-in-progress: true
 
-permissions:
-  contents: 'write'
-  issues: 'write'
-  pull-requests: 'write'
-
 jobs:
-  brain:
+  reasoning:
     name: 'Brain (Reasoning Layer)'
     runs-on: 'ubuntu-latest'
     if: "github.repository == 'google-gemini/gemini-cli'"
+    # The reasoning phase is strictly readonly.
+    permissions:
+      contents: 'read'
+      issues: 'read'
+      pull-requests: 'read'
+      actions: 'read'
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
@@ -37,9 +38,78 @@ jobs:
       - name: 'Build Gemini CLI'
         run: 'npm run bundle'
 
-      - name: 'Download Previous Metrics'
+      - name: 'Download Previous State'
+        env:
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+        run: |
+          # Find the last successful run of this workflow
+          LAST_RUN_ID=$(gh run list --workflow "${{ github.workflow }}" --status success --limit 1 --json databaseId --jq '.[0].databaseId')
+
+          if [ -n "$LAST_RUN_ID" ]; then
+            echo "Found previous successful run: $LAST_RUN_ID"
+            
+            # Download metrics artifacts
+            gh run download "$LAST_RUN_ID" -n metrics-before -D tools/gemini-cli-bot/history/ || echo "metrics-before not found"
+            gh run download "$LAST_RUN_ID" -n metrics-timeseries -D tools/gemini-cli-bot/history/ || echo "metrics-timeseries not found"
+            
+            # Download brain memory (lessons learned and scripts)
+            gh run download "$LAST_RUN_ID" -n lessons-learned -D tools/gemini-cli-bot/ || echo "lessons-learned not found"
+            gh run download "$LAST_RUN_ID" -n brain-scripts -D tools/gemini-cli-bot/processes/scripts/ || echo "brain-scripts not found"
+          else
+            echo "No previous successful run found."
+          fi
+
+      - name: 'Collect Current Metrics'
+        env:
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+        run: 'npm run metrics'
+
+      - name: 'Prepare Metrics'
+        run: |
+          if [ -f "tools/gemini-cli-bot/history/metrics-before.csv" ]; then
+            mv tools/gemini-cli-bot/history/metrics-before.csv tools/gemini-cli-bot/history/metrics-before-prev.csv
+          fi
+
+      - name: 'Run Brain Phases'
+        env:
+          GOOGLE_GENERATIVE_AI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+        run: 'npm run brain'
+
+      - name: 'Stash Brain Outputs'
+        uses: 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02' # ratchet:actions/upload-artifact@v4
+        with:
+          name: 'brain-outputs'
+          path: |
+            tools/gemini-cli-bot/lessons-learned.md
+            tools/gemini-cli-bot/processes/scripts/
+          retention-days: 1
+
+  publish:
+    name: 'Publish Artifacts (Archive Layer)'
+    needs: reasoning
+    runs-on: 'ubuntu-latest'
+    if: "github.repository == 'google-gemini/gemini-cli'"
+    # The publish phase is now just for archiving artifacts to preserve state.
+    permissions:
+      actions: 'write'
+    steps:
+      - name: 'Download Brain Outputs'
         uses: 'actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093' # ratchet:actions/download-artifact@v4
         with:
-          name: 'metrics-before'
-          path: 'tools/gemini-cli-bot/history/'
-        continue-on-error: true
+          name: 'brain-outputs'
+          path: 'temp_outputs/'
+
+      - name: 'Archive Lessons Learned'
+        uses: 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02' # ratchet:actions/upload-artifact@v4
+        with:
+          name: 'lessons-learned'
+          path: 'temp_outputs/lessons-learned.md'
+          retention-days: 90
+
+      - name: 'Archive Brain Scripts'
+        uses: 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02' # ratchet:actions/upload-artifact@v4
+        with:
+          name: 'brain-scripts'
+          path: 'temp_outputs/processes/scripts/'
+          retention-days: 90
