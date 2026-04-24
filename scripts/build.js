@@ -4,23 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
-import { execSync } from 'node:child_process';
+import { execSync, exec } from 'node:child_process';
+import { promisify } from 'node:util';
 import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+const execPromise = promisify(exec);
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, '..');
@@ -38,37 +28,53 @@ const workspaces = [
   'gemini-cli-vscode-ide-companion',
 ];
 
-function buildWorkspace(workspace) {
+async function buildWorkspace(workspace) {
   console.log(`Building ${workspace}...`);
-  execSync(`npm run build --workspace ${workspace}`, {
-    stdio: 'inherit',
-    cwd: root,
-  });
+  try {
+    const { stdout, stderr } = await execPromise(
+      `npm run build --workspace ${workspace}`,
+      { cwd: root },
+    );
+    console.log(`Successfully built ${workspace}`);
+    if (stdout) console.log(stdout);
+    if (stderr) console.error(stderr);
+  } catch (error) {
+    console.error(`Failed to build ${workspace}:`);
+    if (error.stdout) console.log(error.stdout);
+    if (error.stderr) console.error(error.stderr);
+    throw error;
+  }
 }
 
-// build all workspaces/packages
-execSync('npm run generate', { stdio: 'inherit', cwd: root });
+async function main() {
+  // build all workspaces/packages
+  execSync('npm run generate', { stdio: 'inherit', cwd: root });
 
-for (const workspace of workspaces) {
-  buildWorkspace(workspace);
-}
+  console.log('Building workspaces in parallel...');
+  await Promise.all(workspaces.map(buildWorkspace));
 
-// also build container image if sandboxing is enabled
-// skip (-s) npm install + build since we did that above
-try {
-  execSync('node scripts/sandbox_command.js -q', {
-    stdio: 'inherit',
-    cwd: root,
-  });
-  if (
-    process.env.BUILD_SANDBOX === '1' ||
-    process.env.BUILD_SANDBOX === 'true'
-  ) {
-    execSync('node scripts/build_sandbox.js -s', {
+  // also build container image if sandboxing is enabled
+  // skip (-s) npm install + build since we did that above
+  try {
+    execSync('node scripts/sandbox_command.js -q', {
       stdio: 'inherit',
       cwd: root,
     });
+    if (
+      process.env.BUILD_SANDBOX === '1' ||
+      process.env.BUILD_SANDBOX === 'true'
+    ) {
+      execSync('node scripts/build_sandbox.js -s', {
+        stdio: 'inherit',
+        cwd: root,
+      });
+    }
+  } catch {
+    // ignore
   }
-} catch {
-  // ignore
 }
+
+main().catch((err) => {
+  console.error('Build failed:', err);
+  process.exit(1);
+});
