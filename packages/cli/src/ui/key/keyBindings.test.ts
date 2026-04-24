@@ -108,6 +108,18 @@ describe('keyBindings config', () => {
     }
   });
 
+  it('preserves the intentional Ctrl+X overlap for mention selection and the legacy editor alias', () => {
+    expect(defaultKeyBindingConfig.get(Command.OPEN_SELECTED_MENTION)).toEqual([
+      new KeyBinding('ctrl+x'),
+    ]);
+    expect(
+      defaultKeyBindingConfig.get(Command.OPEN_SELECTED_MENTION_LOCATION),
+    ).toEqual([new KeyBinding('ctrl+shift+x')]);
+    expect(
+      commandDescriptions[Command.DEPRECATED_OPEN_EXTERNAL_EDITOR],
+    ).toContain('@ mention completion');
+  });
+
   describe('command metadata', () => {
     const commandValues = Object.values(Command);
 
@@ -149,7 +161,7 @@ describe('loadCustomKeybindings', () => {
       path.join(os.tmpdir(), 'gemini-keybindings-test-'),
     );
     tempFilePath = path.join(tempDir, 'keybindings.json');
-    vi.spyOn(Storage, 'getUserKeybindingsPath').mockReturnValue(tempFilePath);
+    vi.spyOn(Storage, 'getGlobalGeminiDir').mockReturnValue(tempDir);
   });
 
   afterEach(async () => {

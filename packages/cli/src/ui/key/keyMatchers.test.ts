@@ -311,8 +311,21 @@ describe('keyMatchers', () => {
     // External tools
     {
       command: Command.OPEN_EXTERNAL_EDITOR,
-      positive: [createKey('g', { ctrl: true })],
+      positive: [
+        createKey('g', { ctrl: true }),
+        createKey('g', { ctrl: true, shift: true }),
+      ],
       negative: [createKey('g'), createKey('c', { ctrl: true })],
+    },
+    {
+      command: Command.OPEN_SELECTED_MENTION,
+      positive: [createKey('x', { ctrl: true })],
+      negative: [createKey('x'), createKey('x', { ctrl: true, shift: true })],
+    },
+    {
+      command: Command.OPEN_SELECTED_MENTION_LOCATION,
+      positive: [createKey('x', { ctrl: true, shift: true })],
+      negative: [createKey('x', { ctrl: true }), createKey('x')],
     },
     {
       command: Command.DEPRECATED_OPEN_EXTERNAL_EDITOR,
@@ -525,7 +538,7 @@ describe('loadKeyMatchers integration', () => {
       path.join(os.tmpdir(), 'gemini-keymatchers-test-'),
     );
     tempFilePath = path.join(tempDir, 'keybindings.json');
-    vi.spyOn(Storage, 'getUserKeybindingsPath').mockReturnValue(tempFilePath);
+    vi.spyOn(Storage, 'getGlobalGeminiDir').mockReturnValue(tempDir);
   });
 
   afterEach(async () => {
