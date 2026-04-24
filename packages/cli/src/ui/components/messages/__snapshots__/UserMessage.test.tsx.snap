@@ -28,3 +28,9 @@ exports[`UserMessage > transforms image paths in user message 1`] = `
 ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
 "
 `;
+
+exports[`UserMessage > with NO_COLOR set > uses margins instead of background blocks when NO_COLOR is set 1`] = `
+"
+> Hello Gemini
+"
+`;
