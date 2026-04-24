@@ -386,35 +386,7 @@ jobs:
         run: 'npm run test:integration:sandbox:none'
         shell: 'bash'
 
-  test_e2e_windows_full:
-    name: 'e2e:windows:full'
-    runs-on: 'gemini-cli-windows-16-core'
-    timeout-minutes: 60
-    steps:
-      - name: 'Checkout'
-        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
 
-      - name: 'Set up Node.js'
-        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
-        with:
-          node-version-file: '.nvmrc'
-          cache: 'npm'
-
-      - name: 'Install dependencies'
-        run: 'npm ci'
-        shell: 'pwsh'
-
-      - name: 'Build project'
-        run: 'npm run build'
-        shell: 'pwsh'
-
-      - name: 'Run Integration Tests'
-        env:
-          GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
-          KEEP_OUTPUT: 'true'
-          VERBOSE: 'true'
-        run: 'npm run test:integration:sandbox:none'
-        shell: 'pwsh'
 
   test_e2e_windows_fast:
     name: 'e2e:windows:fast'

@@ -8,8 +8,15 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
-    testTimeout: 300000, // 5 minutes
-    globalSetup: './globalSetup.ts',
+    testTimeout: 120000,
+    hookTimeout: 60000,
+    globals: true,
+    environment: 'node',
+    setupFiles: ['./globalSetup.ts'],
+    globalSetup: ['./globalSetup.ts'],
+    alias: {
+      '@google/gemini-cli-core': '@google-gemini/gemini-cli-core',
+    },
     reporters: ['default'],
     include: ['**/*.test.ts'],
     retry: 2,
