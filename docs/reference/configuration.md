@@ -1846,10 +1846,13 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `true`
   - **Requires restart:** Yes
 
-- **`experimental.autoMemory`** (boolean):
-  - **Description:** Automatically extract reusable skills from past sessions in
-    the background. Review results with /memory inbox.
+- **`experimental.autoMemory`** (enum):
+  - **Description:** Automatically extract memory candidates from past sessions
+    in the background. Set to true or "review" to review generated memory in
+    /memory inbox. Set to "autoApply" to directly apply low-risk private project
+    memory while keeping skills and shared/global memory candidates reviewable.
   - **Default:** `false`
+  - **Values:** `false`, `true`, `"review"`, `"autoApply"`
   - **Requires restart:** Yes
 
 - **`experimental.generalistProfile`** (boolean):

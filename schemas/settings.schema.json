@@ -3149,10 +3149,10 @@
         },
         "autoMemory": {
           "title": "Auto Memory",
-          "description": "Automatically extract reusable skills from past sessions in the background. Review results with /memory inbox.",
-          "markdownDescription": "Automatically extract reusable skills from past sessions in the background. Review results with /memory inbox.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+          "description": "Automatically extract memory candidates from past sessions in the background. Set to true or \"review\" to review generated memory in /memory inbox. Set to \"autoApply\" to directly apply low-risk private project memory while keeping skills and shared/global memory candidates reviewable.",
+          "markdownDescription": "Automatically extract memory candidates from past sessions in the background. Set to true or \"review\" to review generated memory in /memory inbox. Set to \"autoApply\" to directly apply low-risk private project memory while keeping skills and shared/global memory candidates reviewable.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
           "default": false,
-          "type": "boolean"
+          "enum": [false, true, "review", "autoApply"]
         },
         "generalistProfile": {
           "title": "Use the generalist profile to manage agent contexts.",

@@ -69,6 +69,36 @@ describe('SkillExtractionAgent', () => {
     expect(prompt).toContain('cannot survive renaming the specific');
   });
 
+  it('should document review and autoApply memory boundaries', () => {
+    const reviewPrompt = agent.promptConfig.systemPrompt;
+    const autoApplyPrompt = SkillExtractionAgent(
+      skillsDir,
+      sessionIndex,
+      existingSkillsSummary,
+      '/tmp/memory',
+      'autoApply',
+    ).promptConfig.systemPrompt;
+
+    expect(reviewPrompt).toContain('Current autoMemory mode: review');
+    expect(reviewPrompt).toContain(
+      'Write all generated private project memory as reviewable drafts',
+    );
+    expect(reviewPrompt).toContain(
+      'Do NOT update active MEMORY.md or sibling active memory files directly.',
+    );
+
+    expect(autoApplyPrompt).toContain('Current autoMemory mode: autoApply');
+    expect(autoApplyPrompt).toContain(
+      'You may directly update low-risk private project memory files',
+    );
+    expect(autoApplyPrompt).toContain(
+      'Skills: write SKILL.md candidates under /tmp/skills for /memory inbox review.',
+    );
+    expect(autoApplyPrompt).toContain(
+      'Project/shared instructions: write patch candidates under /tmp/memory/.inbox/project-instructions/ only.',
+    );
+  });
+
   it('should warn that session summaries are user-intent summaries, not workflow evidence', () => {
     const query = agent.promptConfig.query ?? '';
 
@@ -86,7 +116,10 @@ describe('SkillExtractionAgent', () => {
       'Only write a skill if the evidence shows a durable, recurring workflow',
     );
     expect(query).toContain(
-      'If recurrence or future reuse is unclear, create no skill and explain why.',
+      'Only write memory if it would clearly help a future session.',
+    );
+    expect(query).toContain(
+      'If recurrence, durability, or future reuse is unclear, create no artifact and explain why.',
     );
   });
 });

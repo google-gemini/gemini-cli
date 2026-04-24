@@ -53,7 +53,7 @@ export const TOGGLE_TYPES: ReadonlySet<SettingsType | undefined> = new Set([
 ]);
 
 export interface SettingEnumOption {
-  value: string | number;
+  value: string | number | boolean;
   label: string;
 }
 
@@ -2389,13 +2389,19 @@ const SETTINGS_SCHEMA = {
         showInDialog: true,
       },
       autoMemory: {
-        type: 'boolean',
+        type: 'enum',
         label: 'Auto Memory',
         category: 'Experimental',
         requiresRestart: true,
         default: false,
+        options: [
+          { value: false, label: 'Off' },
+          { value: true, label: 'Review' },
+          { value: 'review', label: 'Review' },
+          { value: 'autoApply', label: 'Auto Apply' },
+        ],
         description:
-          'Automatically extract reusable skills from past sessions in the background. Review results with /memory inbox.',
+          'Automatically extract memory candidates from past sessions in the background. Set to true or "review" to review generated memory in /memory inbox. Set to "autoApply" to directly apply low-risk private project memory while keeping skills and shared/global memory candidates reviewable.',
         showInDialog: true,
       },
       generalistProfile: {

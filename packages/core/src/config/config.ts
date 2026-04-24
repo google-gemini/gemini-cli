@@ -711,7 +711,7 @@ export interface ConfigParameters {
   experimentalJitContext?: boolean;
   autoDistillation?: boolean;
   experimentalMemoryV2?: boolean;
-  experimentalAutoMemory?: boolean;
+  experimentalAutoMemory?: AutoMemorySetting;
   experimentalGemma?: boolean;
   experimentalContextManagementConfig?: string;
   experimentalAgentHistoryTruncation?: boolean;
@@ -741,6 +741,22 @@ export interface ConfigParameters {
     overageStrategy?: OverageStrategy;
   };
   vertexAiRouting?: VertexAiRoutingConfig;
+}
+
+export type AutoMemoryMode = 'review' | 'autoApply';
+export type AutoMemorySetting = boolean | AutoMemoryMode;
+
+function normalizeAutoMemorySetting(setting: AutoMemorySetting | undefined): {
+  enabled: boolean;
+  mode: AutoMemoryMode;
+} {
+  if (setting === 'autoApply') {
+    return { enabled: true, mode: 'autoApply' };
+  }
+  if (setting === 'review') {
+    return { enabled: true, mode: 'review' };
+  }
+  return { enabled: setting === true, mode: 'review' };
 }
 
 export class Config implements McpContext, AgentLoopContext {
@@ -959,6 +975,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly experimentalMemoryV2: boolean;
   private readonly experimentalAutoMemory: boolean;
   private readonly experimentalGemma: boolean;
+  private readonly autoMemoryMode: AutoMemoryMode;
   private readonly experimentalContextManagementConfig?: string;
   private readonly memoryBoundaryMarkers: readonly string[];
   private readonly topicUpdateNarration: boolean;
@@ -1178,7 +1195,11 @@ export class Config implements McpContext, AgentLoopContext {
 
     this.experimentalJitContext = params.experimentalJitContext ?? true;
     this.experimentalMemoryV2 = params.experimentalMemoryV2 ?? true;
-    this.experimentalAutoMemory = params.experimentalAutoMemory ?? false;
+    const autoMemory = normalizeAutoMemorySetting(
+      params.experimentalAutoMemory,
+    );
+    this.experimentalAutoMemory = autoMemory.enabled;
+    this.autoMemoryMode = autoMemory.mode;
     this.experimentalGemma = params.experimentalGemma ?? false;
     this.experimentalContextManagementConfig =
       params.experimentalContextManagementConfig;
@@ -2529,6 +2550,10 @@ export class Config implements McpContext, AgentLoopContext {
 
   getExperimentalGemma(): boolean {
     return this.experimentalGemma;
+  }
+
+  getAutoMemoryMode(): AutoMemoryMode {
+    return this.autoMemoryMode;
   }
 
   getExperimentalContextManagementConfig(): string | undefined {

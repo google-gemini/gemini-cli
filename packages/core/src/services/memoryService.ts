@@ -6,7 +6,7 @@
 
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import { constants as fsConstants } from 'node:fs';
+import { constants as fsConstants, type Dirent } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import * as Diff from 'diff';
 import type { Config } from '../config/config.js';
@@ -78,6 +78,8 @@ export interface ExtractionRun {
   sessionIds: string[];
   candidateSessions?: SessionVersion[];
   processedSessions?: SessionVersion[];
+  memoryCandidatesCreated?: string[];
+  memoryFilesUpdated?: string[];
   skillsCreated: string[];
   turnCount?: number;
   durationMs?: number;
@@ -163,6 +165,8 @@ function isExtractionRunLike(value: unknown): value is {
   sessionIds?: unknown;
   candidateSessions?: unknown;
   processedSessions?: unknown;
+  memoryCandidatesCreated?: unknown;
+  memoryFilesUpdated?: unknown;
   skillsCreated: unknown;
   turnCount?: unknown;
   durationMs?: unknown;
@@ -194,22 +198,44 @@ function buildExtractionRun(value: unknown): ExtractionRun | null {
   const candidateSessions = normalizeSessionVersions(value.candidateSessions);
   const processedSessions = normalizeSessionVersions(value.processedSessions);
   const sessionIds = normalizeStringArray(value.sessionIds);
-
-  return {
+  const run: ExtractionRun = {
     runAt: value.runAt,
     sessionIds:
       sessionIds.length > 0
         ? sessionIds
         : processedSessions.map((session) => session.sessionId),
-    candidateSessions:
-      candidateSessions.length > 0 ? candidateSessions : undefined,
-    processedSessions:
-      processedSessions.length > 0 ? processedSessions : undefined,
     skillsCreated: normalizeStringArray(value.skillsCreated),
-    turnCount: normalizeOptionalNumber(value.turnCount),
-    durationMs: normalizeOptionalNumber(value.durationMs),
-    terminateReason: normalizeOptionalString(value.terminateReason),
   };
+
+  if (candidateSessions.length > 0) {
+    run.candidateSessions = candidateSessions;
+  }
+  if (processedSessions.length > 0) {
+    run.processedSessions = processedSessions;
+  }
+  if ('memoryCandidatesCreated' in value) {
+    run.memoryCandidatesCreated = normalizeStringArray(
+      value.memoryCandidatesCreated,
+    );
+  }
+  if ('memoryFilesUpdated' in value) {
+    run.memoryFilesUpdated = normalizeStringArray(value.memoryFilesUpdated);
+  }
+
+  const turnCount = normalizeOptionalNumber(value.turnCount);
+  if (turnCount !== undefined) {
+    run.turnCount = turnCount;
+  }
+  const durationMs = normalizeOptionalNumber(value.durationMs);
+  if (durationMs !== undefined) {
+    run.durationMs = durationMs;
+  }
+  const terminateReason = normalizeOptionalString(value.terminateReason);
+  if (terminateReason !== undefined) {
+    run.terminateReason = terminateReason;
+  }
+
+  return run;
 }
 
 function getTimestampMs(timestamp: string): number {
@@ -814,6 +840,12 @@ function buildAgentLoopContext(config: Config): AgentLoopContext {
   };
 }
 
+function getAutoMemoryMode(config: Config): 'review' | 'autoApply' {
+  return typeof config.getAutoMemoryMode === 'function'
+    ? config.getAutoMemoryMode()
+    : 'review';
+}
+
 /**
  * Validates all .patch files in the skills directory using the `diff` library.
  * Parses each patch, reads the target file(s), and attempts a dry-run apply.
@@ -895,6 +927,96 @@ export async function validatePatches(
   }
 
   return validPatches;
+}
+
+type FileSnapshot = Map<string, string>;
+
+function isHiddenPath(relativePath: string): boolean {
+  return relativePath
+    .split(path.sep)
+    .some((part) => part.length > 0 && part.startsWith('.'));
+}
+
+async function snapshotFiles(
+  rootDir: string,
+  shouldIncludeFile: (relativePath: string) => boolean = () => true,
+  shouldDescendDirectory: (relativePath: string) => boolean = () => true,
+): Promise<FileSnapshot> {
+  const snapshot: FileSnapshot = new Map();
+
+  async function walk(currentDir: string): Promise<void> {
+    let entries: Array<Dirent<string>>;
+    try {
+      entries = await fs.readdir(currentDir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+
+    for (const entry of entries) {
+      const absolutePath = path.join(currentDir, entry.name);
+      const relativePath = path.relative(rootDir, absolutePath);
+      if (!relativePath) {
+        continue;
+      }
+
+      if (entry.isDirectory()) {
+        if (shouldDescendDirectory(relativePath)) {
+          await walk(absolutePath);
+        }
+        continue;
+      }
+
+      if (!entry.isFile() || !shouldIncludeFile(relativePath)) {
+        continue;
+      }
+
+      try {
+        snapshot.set(relativePath, await fs.readFile(absolutePath, 'utf-8'));
+      } catch {
+        // Best-effort snapshot: ignore files that disappear or are unreadable.
+      }
+    }
+  }
+
+  await walk(rootDir);
+  return snapshot;
+}
+
+async function snapshotInboxCandidates(
+  memoryDir: string,
+): Promise<FileSnapshot> {
+  return snapshotFiles(path.join(memoryDir, '.inbox'));
+}
+
+async function snapshotActiveProjectMemory(
+  memoryDir: string,
+): Promise<FileSnapshot> {
+  return snapshotFiles(
+    memoryDir,
+    (relativePath) =>
+      relativePath.endsWith('.md') && !isHiddenPath(relativePath),
+    (relativePath) => {
+      const firstPart = relativePath.split(path.sep)[0];
+      return firstPart !== 'skills' && !firstPart.startsWith('.');
+    },
+  );
+}
+
+function diffSnapshots(before: FileSnapshot, after: FileSnapshot): string[] {
+  const changed: string[] = [];
+  for (const [relativePath, content] of after) {
+    if (before.get(relativePath) !== content) {
+      changed.push(relativePath);
+    }
+  }
+  return changed.sort();
+}
+
+function prefixRelativePaths(
+  prefix: string,
+  relativePaths: string[],
+): string[] {
+  return relativePaths.map((relativePath) => path.join(prefix, relativePath));
 }
 
 /**
@@ -988,6 +1110,9 @@ export async function startMemoryService(config: Config): Promise<void> {
       `[MemoryService] ${skillsBefore.size} existing skill(s) in memory`,
     );
 
+    const inboxCandidatesBefore = await snapshotInboxCandidates(memoryDir);
+    const activeMemoryBefore = await snapshotActiveProjectMemory(memoryDir);
+
     // Read existing skills for context (memory-extracted + global/workspace)
     const existingSkillsSummary = await buildExistingSkillsSummary(
       skillsDir,
@@ -1004,6 +1129,8 @@ export async function startMemoryService(config: Config): Promise<void> {
       skillsDir,
       sessionIndex,
       existingSkillsSummary,
+      memoryDir,
+      getAutoMemoryMode(config),
     );
 
     const context = buildAgentLoopContext(config);
@@ -1109,6 +1236,18 @@ export async function startMemoryService(config: Config): Promise<void> {
       );
     }
 
+    const memoryCandidatesCreated = prefixRelativePaths(
+      '.inbox',
+      diffSnapshots(
+        inboxCandidatesBefore,
+        await snapshotInboxCandidates(memoryDir),
+      ),
+    );
+    const memoryFilesUpdated = diffSnapshots(
+      activeMemoryBefore,
+      await snapshotActiveProjectMemory(memoryDir),
+    );
+
     const processedSessions = candidateSessions
       .filter((session) =>
         processedSessionKeys.has(getSessionVersionKey(session)),
@@ -1127,6 +1266,8 @@ export async function startMemoryService(config: Config): Promise<void> {
         lastUpdated: session.lastUpdated,
       })),
       processedSessions,
+      memoryCandidatesCreated,
+      memoryFilesUpdated,
       skillsCreated,
       turnCount: normalizeOptionalNumber(executorResult?.turn_count),
       durationMs: normalizeOptionalNumber(executorResult?.duration_ms),
@@ -1139,8 +1280,23 @@ export async function startMemoryService(config: Config): Promise<void> {
     };
     await writeExtractionState(statePath, updatedState);
 
-    if (skillsCreated.length > 0 || patchesCreatedThisRun.length > 0) {
+    if (
+      skillsCreated.length > 0 ||
+      patchesCreatedThisRun.length > 0 ||
+      memoryCandidatesCreated.length > 0 ||
+      memoryFilesUpdated.length > 0
+    ) {
       const completionParts: string[] = [];
+      if (memoryFilesUpdated.length > 0) {
+        completionParts.push(
+          `updated ${memoryFilesUpdated.length} memory file(s): ${memoryFilesUpdated.join(', ')}`,
+        );
+      }
+      if (memoryCandidatesCreated.length > 0) {
+        completionParts.push(
+          `prepared ${memoryCandidatesCreated.length} memory candidate(s): ${memoryCandidatesCreated.join(', ')}`,
+        );
+      }
       if (skillsCreated.length > 0) {
         completionParts.push(
           `created ${skillsCreated.length} skill(s): ${skillsCreated.join(', ')}`,
@@ -1155,6 +1311,16 @@ export async function startMemoryService(config: Config): Promise<void> {
         `[MemoryService] Completed in ${elapsed}s. ${completionParts.join('; ')} (read ${processedSessions.length}/${candidateSessions.length} surfaced session(s))`,
       );
       const feedbackParts: string[] = [];
+      if (memoryFilesUpdated.length > 0) {
+        feedbackParts.push(
+          `${memoryFilesUpdated.length} project memory file${memoryFilesUpdated.length > 1 ? 's' : ''} updated from past sessions`,
+        );
+      }
+      if (memoryCandidatesCreated.length > 0) {
+        feedbackParts.push(
+          `${memoryCandidatesCreated.length} memory candidate${memoryCandidatesCreated.length > 1 ? 's' : ''} extracted from past sessions`,
+        );
+      }
       if (skillsCreated.length > 0) {
         feedbackParts.push(
           `${skillsCreated.length} new skill${skillsCreated.length > 1 ? 's' : ''} extracted from past sessions: ${skillsCreated.join(', ')}`,
@@ -1165,9 +1331,13 @@ export async function startMemoryService(config: Config): Promise<void> {
           `${patchesCreatedThisRun.length} skill update${patchesCreatedThisRun.length > 1 ? 's' : ''} extracted from past sessions`,
         );
       }
+      const hasReviewableItems =
+        memoryCandidatesCreated.length > 0 ||
+        skillsCreated.length > 0 ||
+        patchesCreatedThisRun.length > 0;
       coreEvents.emitFeedback(
         'info',
-        `${feedbackParts.join('. ')}. Use /memory inbox to review.`,
+        `${feedbackParts.join('. ')}${hasReviewableItems ? '. Use /memory inbox to review.' : '.'}`,
       );
     } else {
       debugLogger.log(

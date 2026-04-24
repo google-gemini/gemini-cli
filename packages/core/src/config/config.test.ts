@@ -3629,6 +3629,7 @@ describe('Config JIT Initialization', () => {
 
       config = new Config(params);
       expect(config.isAutoMemoryEnabled()).toBe(false);
+      expect(config.getAutoMemoryMode()).toBe('review');
     });
 
     it('should return true when experimentalAutoMemory is true', () => {
@@ -3643,6 +3644,37 @@ describe('Config JIT Initialization', () => {
 
       config = new Config(params);
       expect(config.isAutoMemoryEnabled()).toBe(true);
+      expect(config.getAutoMemoryMode()).toBe('review');
+    });
+
+    it('should support review mode explicitly', () => {
+      const params: ConfigParameters = {
+        sessionId: 'test-session',
+        targetDir: '/tmp/test',
+        debugMode: false,
+        model: 'test-model',
+        cwd: '/tmp/test',
+        experimentalAutoMemory: 'review',
+      };
+
+      config = new Config(params);
+      expect(config.isAutoMemoryEnabled()).toBe(true);
+      expect(config.getAutoMemoryMode()).toBe('review');
+    });
+
+    it('should support autoApply mode', () => {
+      const params: ConfigParameters = {
+        sessionId: 'test-session',
+        targetDir: '/tmp/test',
+        debugMode: false,
+        model: 'test-model',
+        cwd: '/tmp/test',
+        experimentalAutoMemory: 'autoApply',
+      };
+
+      config = new Config(params);
+      expect(config.isAutoMemoryEnabled()).toBe(true);
+      expect(config.getAutoMemoryMode()).toBe('autoApply');
     });
 
     it('should return true when experimentalGemma is true', () => {

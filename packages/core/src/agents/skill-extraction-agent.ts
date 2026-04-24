@@ -21,20 +21,27 @@ import { PREVIEW_GEMINI_FLASH_MODEL } from '../config/models.js';
 const SkillExtractionSchema = z.object({
   response: z
     .string()
-    .describe('A summary of the skills extracted or updated.'),
+    .describe('A summary of the memories or skills extracted or updated.'),
 });
+
+type AutoMemoryMode = 'review' | 'autoApply';
 
 /**
  * Builds the system prompt for the skill extraction agent.
  */
-function buildSystemPrompt(skillsDir: string): string {
+function buildSystemPrompt(
+  skillsDir: string,
+  memoryDir: string,
+  autoMemoryMode: AutoMemoryMode,
+): string {
   return [
-    'You are a Skill Extraction Agent.',
+    'You are an Auto Memory Extraction Agent.',
     '',
-    'Your job: analyze past conversation sessions and extract reusable skills that will help',
-    'future agents work more efficiently. You write SKILL.md files to a specific directory.',
+    'Your job: analyze past conversation sessions and extract durable memory candidates',
+    'and reusable skills that will help future agents work more efficiently.',
     '',
     'The goal is to help future agents:',
+    '- remember durable project facts, preferences, and workflow constraints',
     '- solve similar tasks with fewer tool calls and fewer reasoning tokens',
     '- reuse proven workflows and verification checklists',
     '- avoid known failure modes and landmines',
@@ -48,8 +55,35 @@ function buildSystemPrompt(skillsDir: string): string {
     '- Evidence-based only: do not invent facts or claim verification that did not happen.',
     '- Redact secrets: never store tokens/keys/passwords; replace with [REDACTED].',
     '- Do not copy large tool outputs. Prefer compact summaries + exact error snippets.',
-    `  Write all files under this directory ONLY: ${skillsDir}`,
-    '  NEVER write files outside this directory. You may read session files from the paths provided in the index.',
+    `- Write all files under this memory work directory ONLY: ${memoryDir}`,
+    `- Reusable skill candidates go under: ${skillsDir}`,
+    `- Reviewable memory candidates go under: ${memoryDir}/.inbox`,
+    '  NEVER write files outside the memory work directory. You may read session files from the paths provided in the index.',
+    '',
+    '============================================================',
+    'MEMORY MODES',
+    '============================================================',
+    '',
+    `Current autoMemory mode: ${autoMemoryMode}`,
+    '',
+    'In review mode:',
+    `- Write all generated private project memory as reviewable drafts under ${memoryDir}/.inbox/private/`,
+    '- Do NOT update active MEMORY.md or sibling active memory files directly.',
+    '',
+    'In autoApply mode:',
+    `- You may directly update low-risk private project memory files under ${memoryDir} (for example MEMORY.md or topic .md files).`,
+    '- Only auto-apply facts that are clearly scoped to this project and strongly supported by transcript evidence.',
+    '- If confidence is weak, write a reviewable draft instead.',
+    '',
+    'Always review-only, in every mode:',
+    `- Skills: write SKILL.md candidates under ${skillsDir} for /memory inbox review.`,
+    `- Global personal memory: write drafts under ${memoryDir}/.inbox/global/ only.`,
+    `- Project/shared instructions: write patch candidates under ${memoryDir}/.inbox/project-instructions/ only.`,
+    '- Never directly edit GEMINI.md, global memory files, settings, credentials, or files outside the memory work directory.',
+    '',
+    'Private memory is for durable facts, preferences, decisions, and project context.',
+    'Skills are only for reusable procedures. If both apply, avoid duplicating the same content.',
+    'Default to no-op. Prefer 0-5 memory candidates and 0-2 skills per run.',
     '',
     '============================================================',
     'NO-OP / MINIMUM SIGNAL GATE',
@@ -228,15 +262,17 @@ function buildSystemPrompt(skillsDir: string): string {
     '7. For each candidate, verify it meets ALL criteria. Before writing, make sure you can',
     '   state: future trigger, evidence sessions, recurrence signal, validation signal, and',
     '   why it is not generic.',
-    '8. Write new SKILL.md files or update existing ones in your directory.',
+    '8. Write durable private memory and reviewable memory candidates according to MEMORY MODES.',
+    '   Private memory should be concise and should prefer updating existing memory files over duplicating facts.',
+    '9. Write new SKILL.md files or update existing ones in your directory.',
     '   Use run_shell_command to run init_skill.cjs for scaffolding and package_skill.cjs for validation.',
     '   For skills that live OUTSIDE your directory, write a .patch file instead (see UPDATING EXISTING SKILLS).',
-    '9. Write COMPLETE files — never partially update a SKILL.md.',
+    '10. Write COMPLETE files — never partially update a SKILL.md or memory draft.',
     '',
     'IMPORTANT: Do NOT read every session. Only read sessions whose summaries suggest a',
     'repeated pattern or a stable recurring repo workflow worth investigating. Most runs',
-    'should read 0-3 sessions and create 0 skills.',
-    'Do not explore the codebase. Work only with the session index, session files, and the skills directory.',
+    'should read 0-3 sessions and create few or no artifacts.',
+    'Do not explore the codebase. Work only with the session index, session files, and the memory work directory.',
   ].join('\n');
 }
 
@@ -253,12 +289,14 @@ export const SkillExtractionAgent = (
   skillsDir: string,
   sessionIndex: string,
   existingSkillsSummary: string,
+  memoryDir: string = skillsDir.replace(/[/\\]skills$/, ''),
+  autoMemoryMode: AutoMemoryMode = 'review',
 ): LocalAgentDefinition<typeof SkillExtractionSchema> => ({
   kind: 'local',
   name: 'confucius',
   displayName: 'Skill Extractor',
   description:
-    'Extracts reusable skills from past conversation sessions and writes them as SKILL.md files.',
+    'Extracts durable memories and reusable skills from past conversation sessions.',
   inputConfig: {
     inputSchema: {
       type: 'object',
@@ -326,8 +364,8 @@ export const SkillExtractionAgent = (
       .replace(/\$\{(\w+)\}/g, '{$1}');
 
     return {
-      systemPrompt: buildSystemPrompt(skillsDir),
-      query: `${initialContext}\n\nAnalyze the session index above. Session summaries describe user intent; optional workflow hints describe likely procedural traces. Use workflow hints for routing, then read sessions that suggest repeated workflows using read_file to verify recurrence from transcript evidence. Only write a skill if the evidence shows a durable, recurring workflow or a stable recurring repo procedure. If recurrence or future reuse is unclear, create no skill and explain why.`,
+      systemPrompt: buildSystemPrompt(skillsDir, memoryDir, autoMemoryMode),
+      query: `${initialContext}\n\nAnalyze the session index above. Session summaries describe user intent; optional workflow hints describe likely procedural traces. Use workflow hints for routing, then read sessions that suggest durable memory or repeated workflows using read_file to verify from transcript evidence. Only write a skill if the evidence shows a durable, recurring workflow or a stable recurring repo procedure. Only write memory if it would clearly help a future session. If recurrence, durability, or future reuse is unclear, create no artifact and explain why. If no skill is justified, create no skill and explain why.`,
     };
   },
   runConfig: {
