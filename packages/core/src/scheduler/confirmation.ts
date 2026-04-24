@@ -46,6 +46,11 @@ export interface ConfirmationResult {
 export interface ResolutionResult {
   outcome: ToolConfirmationOutcome;
   lastDetails?: SerializableConfirmationDetails;
+  /**
+   * Final payload from the user's confirmation response. May carry feedback
+   * (when outcome is Cancel) or other outcome-specific data.
+   */
+  payload?: ToolConfirmationPayload;
 }
 
 /**
@@ -125,6 +130,7 @@ export async function resolveConfirmation(
   const callId = toolCall.request.callId;
   let outcome = ToolConfirmationOutcome.ModifyWithEditor;
   let lastDetails: SerializableConfirmationDetails | undefined;
+  let lastPayload: ToolConfirmationPayload | undefined;
 
   // Loop exists to allow the user to modify the parameters and see the new
   // diff.
@@ -173,6 +179,7 @@ export async function resolveConfirmation(
     );
     onWaitingForConfirmation?.(false);
     outcome = response.outcome;
+    lastPayload = response.payload;
 
     if ('onConfirm' in details && typeof details.onConfirm === 'function') {
       await details.onConfirm(outcome, response.payload);
@@ -195,7 +202,7 @@ export async function resolveConfirmation(
     }
   }
 
-  return { outcome, lastDetails };
+  return { outcome, lastDetails, payload: lastPayload };
 }
 
 /**
