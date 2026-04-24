@@ -43,6 +43,35 @@ vi.mock('../utils/shell-utils.js', async (importOriginal) => {
       }
       return [command];
     }),
+    parseCommandDetails: vi.fn().mockImplementation((command: string) => {
+      // Basic mock implementation for PolicyEngine test needs
+      const commands = command.includes('&&')
+        ? command.split('&&').map((c) => c.trim())
+        : [command.trim()];
+
+      // Detect $(...) or `...` and add as sub-commands for recursion tests
+      const subCommands = [...commands];
+      for (const cmd of commands) {
+        const subMatch = cmd.match(/\$\((.*)\)/) || cmd.match(/`(.*)`/);
+        if (subMatch?.[1]) {
+          subCommands.push(subMatch[1].trim());
+        }
+      }
+
+      return {
+        details: subCommands.map((c, i) => ({
+          name: c.split(' ')[0],
+          text: c,
+          startIndex: i === 0 ? 0 : -1, // Simple root indication
+        })),
+        hasError: false,
+      };
+    }),
+    stripShellWrapper: vi.fn().mockImplementation((command: string) => {
+      // Simple mock for stripping wrappers
+      const match = command.match(/^(?:bash|sh|zsh)\s+-c\s+["'](.*)["']$/i);
+      return match ? match[1] : command;
+    }),
     hasRedirection: vi.fn().mockImplementation(
       (command: string) =>
         // Simple mock: true if '>' is present, unless it looks like "-> arrow"
@@ -1862,7 +1891,6 @@ describe('PolicyEngine', () => {
     });
 
     it('should return ASK_USER in non-YOLO mode if shell command parsing fails', async () => {
-      const { splitCommands } = await import('../utils/shell-utils.js');
       const rules: PolicyRule[] = [
         {
           toolName: 'run_shell_command',
@@ -1877,7 +1905,11 @@ describe('PolicyEngine', () => {
       });
 
       // Simulate parsing failure
-      vi.mocked(splitCommands).mockReturnValueOnce([]);
+      const { parseCommandDetails } = await import('../utils/shell-utils.js');
+      vi.mocked(parseCommandDetails).mockReturnValueOnce({
+        details: [],
+        hasError: true,
+      });
 
       const result = await engine.check(
         { name: 'run_shell_command', args: { command: 'complex command' } },

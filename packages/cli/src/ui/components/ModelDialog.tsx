@@ -19,6 +19,8 @@ import {
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
+  GEMMA_4_31B_IT_MODEL,
+  GEMMA_4_26B_A4B_IT_MODEL,
   ModelSlashCommandEvent,
   logModelSlashCommand,
   getDisplayString,
@@ -222,7 +224,9 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
     }
 
     // --- LEGACY PATH ---
-    const list = [
+    const showGemmaModels = config?.getExperimentalGemma() ?? false;
+
+    const options = [
       {
         value: DEFAULT_GEMINI_MODEL,
         title: getDisplayString(DEFAULT_GEMINI_MODEL),
@@ -239,6 +243,21 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
         key: DEFAULT_GEMINI_FLASH_LITE_MODEL,
       },
     ];
+
+    if (showGemmaModels) {
+      options.push(
+        {
+          value: GEMMA_4_31B_IT_MODEL,
+          title: getDisplayString(GEMMA_4_31B_IT_MODEL),
+          key: GEMMA_4_31B_IT_MODEL,
+        },
+        {
+          value: GEMMA_4_26B_A4B_IT_MODEL,
+          title: getDisplayString(GEMMA_4_26B_A4B_IT_MODEL),
+          key: GEMMA_4_26B_A4B_IT_MODEL,
+        },
+      );
+    }
 
     if (shouldShowPreviewModels) {
       const previewProModel = useGemini31
@@ -270,15 +289,15 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
         });
       }
 
-      list.unshift(...previewOptions);
+      options.unshift(...previewOptions);
     }
 
     if (!hasAccessToProModel) {
       // Filter out all Pro models for free tier
-      return list.filter((option) => !isProModel(option.value));
+      return options.filter((option) => !isProModel(option.value));
     }
 
-    return list;
+    return options;
   }, [
     shouldShowPreviewModels,
     useGemini31,
