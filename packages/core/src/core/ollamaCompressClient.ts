@@ -27,10 +27,12 @@ interface OllamaChatResponse {
 
 // Truncate tool outputs to keep local model context manageable.
 const MAX_CHARS_PER_TOOL_OUTPUT = 800;
-// Total character cap across all sanitized messages (~30K tokens for gemma3:4b).
-const MAX_TOTAL_CHARS = 120_000;
-const TIMEOUT_MS = 90_000;
+const TIMEOUT_MS = 600_000; // 10 minutes — local inference is slow for large prompts
 const MAX_RETRIES = 3;
+// 3 chars per token is a conservative estimate; reserve 25% of num_ctx for
+// system prompt and response, leaving 75% for history content.
+const CHARS_PER_TOKEN = 3;
+const HISTORY_CTX_FRACTION = 0.75;
 
 /** Strip characters that could break the flat-text prompt structure. */
 function sanitizeText(s: string): string {
@@ -99,19 +101,30 @@ function sanitizeHistory(contents: Content[]): OllamaMessage[] {
 }
 
 /**
- * If the total character count exceeds the cap, drop the oldest non-system
- * messages from the front until we are under the limit.
+ * Drops oldest non-system, non-snapshot messages until total chars fit within
+ * the limit. The system message and any turn containing a prior
+ * <state_snapshot> are always protected so existing compressed context is
+ * never lost, regardless of session size.
  */
-function capMessages(messages: OllamaMessage[]): OllamaMessage[] {
+function capMessages(
+  messages: OllamaMessage[],
+  maxChars: number,
+): OllamaMessage[] {
   let total = messages.reduce((sum, m) => sum + m.content.length, 0);
-  if (total <= MAX_TOTAL_CHARS) return messages;
+  if (total <= maxChars) return messages;
 
   const result = [...messages];
-  // Never drop the system message (index 0 if present).
-  const start = result[0]?.role === 'system' ? 1 : 0;
-  while (result.length > start + 1 && total > MAX_TOTAL_CHARS) {
-    const removed = result.splice(start, 1)[0];
-    total -= removed.content.length;
+  const isProtected = (m: OllamaMessage) =>
+    m.role === 'system' || m.content.includes('<state_snapshot>');
+
+  let i = result[0]?.role === 'system' ? 1 : 0;
+  while (total > maxChars && i < result.length - 1) {
+    if (!isProtected(result[i])) {
+      total -= result[i].content.length;
+      result.splice(i, 1);
+    } else {
+      i++;
+    }
   }
   return result;
 }
@@ -124,7 +137,6 @@ function extractSystemInstruction(
   if (Array.isArray(si))
     return (si as Array<{ text?: string }>).map((p) => p.text ?? '').join('\n');
   if (typeof si === 'object' && 'parts' in si && Array.isArray(si.parts))
-     
     return (si.parts as Array<{ text?: string }>)
       .map((p) => p.text ?? '')
       .join('\n');
@@ -147,11 +159,19 @@ function buildResponse(text: string): GenerateContentResponse {
  * in the history is flattened to readable plain text before sending so the
  * small model never needs to understand the Google GenAI protocol.
  */
+// 32K tokens — enough for most sessions, overrides Ollama's default 4096.
+const DEFAULT_NUM_CTX = 32_768;
+
 export class OllamaCompressClient {
+  private readonly numCtx: number;
+
   constructor(
     private readonly host: string,
     private readonly model: string,
-  ) {}
+    numCtx?: number,
+  ) {
+    this.numCtx = numCtx ?? DEFAULT_NUM_CTX;
+  }
 
   async generateContent(
     options: GenerateContentOptions,
@@ -165,8 +185,11 @@ export class OllamaCompressClient {
       baseMessages.push({ role: 'system', content: sysText });
     }
 
+    const maxHistoryChars = Math.floor(
+      this.numCtx * CHARS_PER_TOKEN * HISTORY_CTX_FRACTION,
+    );
     const sanitized = sanitizeHistory(contents);
-    baseMessages.push(...capMessages(sanitized));
+    baseMessages.push(...capMessages(sanitized, maxHistoryChars));
 
     const expectsSnapshot = baseMessages.some((m) =>
       m.content.includes('state_snapshot'),
@@ -188,7 +211,7 @@ export class OllamaCompressClient {
             ];
 
       try {
-        const text = await this.callOllama(messages);
+        const text = await this.callOllama(messages, options.abortSignal);
 
         if (expectsSnapshot && !text.includes('<state_snapshot>')) {
           debugLogger.warn(
@@ -214,10 +237,16 @@ export class OllamaCompressClient {
     );
   }
 
-  private async callOllama(messages: OllamaMessage[]): Promise<string> {
+  private async callOllama(
+    messages: OllamaMessage[],
+    abortSignal?: AbortSignal,
+  ): Promise<string> {
     const url = `${this.host.replace(/\/$/, '')}/api/chat`;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+    const signal = abortSignal
+      ? AbortSignal.any([controller.signal, abortSignal])
+      : controller.signal;
 
     let response: Response;
     try {
@@ -228,8 +257,9 @@ export class OllamaCompressClient {
           model: this.model,
           messages,
           stream: false,
+          options: { num_ctx: this.numCtx },
         }),
-        signal: controller.signal,
+        signal,
       });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);

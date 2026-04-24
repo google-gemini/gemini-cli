@@ -2326,6 +2326,16 @@ const SETTINGS_SCHEMA = {
               'Ollama model to use for /compress summarisation. Only text in/out — no tool call structure is sent.',
             showInDialog: true,
           },
+          numCtx: {
+            type: 'number',
+            label: 'Ollama Context Window',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: 32768,
+            description:
+              'Context window size (num_ctx) passed to Ollama. Overrides the model default of 4096.',
+            showInDialog: true,
+          },
         },
       },
       memoryV2: {

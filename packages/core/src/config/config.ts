@@ -238,12 +238,15 @@ export interface ADKSettings {
   agentSessionNoninteractiveEnabled?: boolean;
   agentSessionInteractiveEnabled?: boolean;
 }
-
 export interface OllamaCompressSettings {
   /** Ollama base URL, e.g. http://localhost:11434 */
   host: string;
   /** Model to use for compression, e.g. gemma3:4b */
   model: string;
+  /** Optional timeout for Ollama calls in milliseconds. Default: 90000 */
+  timeoutMs?: number;
+  /** Context window size passed to Ollama (num_ctx). Defaults to 32768. */
+  numCtx?: number;
 }
 
 export interface ExtensionSetting {
@@ -1717,6 +1720,7 @@ export class Config implements McpContext, AgentLoopContext {
         this.ollamaCompressClient = new OllamaCompressClient(
           this.ollamaCompressSettings.host,
           this.ollamaCompressSettings.model,
+          this.ollamaCompressSettings.numCtx,
         );
       }
       return this.ollamaCompressClient;
