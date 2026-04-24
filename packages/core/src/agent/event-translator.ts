@@ -437,7 +437,6 @@ function isStructuredError(error: unknown): error is StructuredError {
   return (
     typeof error === 'object' &&
     error !== null &&
-    'status' in error &&
     'message' in error &&
     typeof error.message === 'string'
   );
