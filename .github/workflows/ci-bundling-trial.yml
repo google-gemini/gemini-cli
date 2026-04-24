@@ -456,5 +456,9 @@ jobs:
           bundle-artifact: 'gemini-bundle'
 
       - name: 'Run Integration Tests'
+        env:
+          GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+          KEEP_OUTPUT: 'true'
+          VERBOSE: 'true'
         run: 'npm run test:integration:sandbox:none'
         shell: 'bash'
