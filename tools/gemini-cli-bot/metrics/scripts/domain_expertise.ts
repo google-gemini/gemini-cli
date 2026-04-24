@@ -79,7 +79,7 @@ try {
       if (authorCache.has(targetPath)) return authorCache.get(targetPath)!;
       try {
         const authors = execSync(
-          `git log --format="%an|%ae" -- "${targetPath}"`,
+          `git log --format="%an|%ae" -- ${JSON.stringify(targetPath)}`,
           {
             cwd: repoRoot,
             encoding: 'utf-8',

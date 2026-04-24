@@ -49,7 +49,7 @@ async function run() {
     console.log(`Running metric script: ${script}`);
     try {
       const scriptPath = join(SCRIPTS_DIR, script);
-      const output = execSync(`npx tsx ${scriptPath}`, {
+      const output = execSync(`npx tsx ${JSON.stringify(scriptPath)}`, {
         encoding: 'utf-8',
       });
 
