@@ -12,8 +12,6 @@ import { z } from 'zod';
 import {
   Storage,
   coreEvents,
-  resolveToRealPath,
-  normalizePath,
   type Config,
 } from '@google/gemini-cli-core';
 import type { ICommandLoader } from './types.js';
