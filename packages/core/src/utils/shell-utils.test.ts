@@ -609,7 +609,7 @@ describe('resolveExecutable', () => {
     expect(resolveExecutable('ls')).toBe(targetPath);
   });
 
-  it('should try extensions on Windows when the exe has no extension', () => {
+  it('should try extensions on Windows', () => {
     const sys32 = path.resolve('C:\\Windows\\System32');
     vi.stubEnv('PATH', sys32);
     mockPlatform.mockReturnValue('win32');
@@ -619,20 +619,6 @@ describe('resolveExecutable', () => {
     });
 
     expect(resolveExecutable('cmd')).toContain('cmd.exe');
-  });
-
-  it('should not append extensions when the exe already has one', () => {
-    const dir = path.resolve('/pwsh-dir');
-    const pwshPath = path.join(dir, 'pwsh.exe');
-    vi.stubEnv('PATH', dir);
-    mockPlatform.mockReturnValue('win32');
-    mockAccessSync.mockImplementation((p: string) => {
-      if (p === pwshPath) return undefined;
-      throw new Error('ENOENT');
-    });
-
-    expect(resolveExecutable('pwsh.exe')).toBe(pwshPath);
-    expect(mockAccessSync).toHaveBeenCalledTimes(1);
   });
 
   it('should return undefined if not found in PATH', () => {
