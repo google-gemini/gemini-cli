@@ -121,6 +121,20 @@ We marked the entire `file-system.test.ts` suite as flaky and skipped it.
 - **Timings:** The passing tests took 2-5 minutes each, making the file
   extremely slow.
 
+## E2E Test Optimization: `sendKeys` vs `type`
+
+We found that interactive E2E tests were slow because they used `run.type()`,
+which types characters one by one and waits for echo with a 5-second timeout per
+character.
+
+- **Optimization:** We replaced `run.type()` with `run.sendKeys()` in
+  `shell-background.test.ts`, which sends characters with a fixed 5ms delay
+  without waiting for echo.
+- **Result:** The test duration dropped from hanging/minutes to just **8.3
+  seconds**!
+- **Impact:** This brought down the total E2E job time significantly in the
+  successful run (to ~3m 16s).
+
 ## Recommended Future Work
 
 To further improve test speed and quality:
