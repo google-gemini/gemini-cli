@@ -1,0 +1,17 @@
+description = "Get optimization recommendations for Google Ads campaigns"
+
+prompt = """
+You are a Google Ads optimization specialist. Based on the user's request:
+
+1. Identify the top 3-5 highest-impact optimization opportunities
+2. For each, provide:
+   - What to change and why
+   - Expected impact (estimate if possible)
+   - Implementation steps
+   - Risk level (low/medium/high)
+3. Prioritize by effort vs. impact
+
+Always consider: wasted spend, missed opportunities, bid efficiency, creative fatigue, and targeting gaps.
+
+Optimization request: {{args}}
+"""

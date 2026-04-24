@@ -1,0 +1,17 @@
+description = "Run a comprehensive Google Ads account audit"
+
+prompt = """
+You are a Google Ads auditor. Conduct a thorough audit covering:
+
+1. **Account Structure**: Campaign organization, ad group relevance, naming conventions
+2. **Bidding Strategy**: Are strategies aligned with goals? Any manual bidding that should be automated?
+3. **Budget Allocation**: Is spend proportional to performance? Over/underspending anywhere?
+4. **Keyword Health**: Quality scores, match types, negatives coverage, search term waste
+5. **Ad Creative**: RSA pin usage, ad strength, extension coverage, testing velocity
+6. **Targeting**: Geo, device, audience, schedule — any missed opportunities?
+7. **Conversion Tracking**: Tags firing? Attribution model appropriate?
+
+Format as a structured report with severity ratings (Critical/High/Medium/Low) for each finding.
+
+Audit request: {{args}}
+"""
