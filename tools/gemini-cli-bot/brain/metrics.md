@@ -1,4 +1,4 @@
-# Phase: Metrics Investigation & Root-Cause Analysis
+# Phase: The Brain (Metrics & Root-Cause Analysis)
 
 ## Goal
 
@@ -55,14 +55,14 @@ For each metric not meeting goals or showing a negative trend:
 
 ### 3. Maintainer Workload Assessment
 
-Before blaming or proposing processes that rely on maintainer action (e.g., more
+Before blaming or proposing reflexes that rely on maintainer action (e.g., more
 triage, more reviews):
 
 - **Quantify Capacity**: Assess the volume of open, unactioned work (untriaged
   issues, review requests) against the number of active maintainers.
 - If the ratio indicates overload, **do not propose solutions that simply
   generate more pings**. Instead, prioritize systemic triage, automated routing,
-  or auto-closure processes.
+  or auto-closure reflexes.
 
 ### 4. Actor-Aware Bottleneck Identification
 
@@ -76,7 +76,7 @@ Before proposing an intervention, accurately identify the blocker:
 ### 5. Policy Critique & Evaluation
 
 - **Review Existing Policies**: Examine the existing automation in
-  `.github/workflows/` and scripts in `tools/gemini-cli-bot/processes/scripts/`.
+  `.github/workflows/` and scripts in `tools/gemini-cli-bot/reflexes/scripts/`.
 - **Analyze Effectiveness**: Based on your metrics analysis, determine if
   current policies are achieving their goals (e.g., Is triage reducing latency?
   Are stale issues closed as expected?).
