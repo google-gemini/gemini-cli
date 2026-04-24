@@ -2,7 +2,8 @@
   "experimental": {
     "extensionReloading": true,
     "modelSteering": true,
-    "autoMemory": true
+    "autoMemory": true,
+    "gemma": true
   },
   "general": {
     "devtools": true
