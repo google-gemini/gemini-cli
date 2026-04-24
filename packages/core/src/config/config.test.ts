@@ -960,8 +960,11 @@ describe('Server Config (config.ts)', () => {
       });
 
       await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
+      await config.getExperimentsAsync();
 
-      expect(config.getModel()).toBe(PREVIEW_GEMINI_FLASH_MODEL);
+      await vi.waitFor(() => {
+        expect(config.getModel()).toBe(PREVIEW_GEMINI_FLASH_MODEL);
+      });
     });
 
     it('should NOT switch to flash model if user has Pro access and model is auto', async () => {
@@ -3640,6 +3643,47 @@ describe('Config JIT Initialization', () => {
 
       config = new Config(params);
       expect(config.isAutoMemoryEnabled()).toBe(true);
+    });
+
+    it('should return true when experimentalGemma is true', () => {
+      const params: ConfigParameters = {
+        sessionId: 'test-session',
+        targetDir: '/tmp/test',
+        debugMode: false,
+        model: 'test-model',
+        cwd: '/tmp/test',
+        experimentalGemma: true,
+      };
+
+      config = new Config(params);
+      expect(config.getExperimentalGemma()).toBe(true);
+    });
+
+    it('should return false when experimentalGemma is false', () => {
+      const params: ConfigParameters = {
+        sessionId: 'test-session',
+        targetDir: '/tmp/test',
+        debugMode: false,
+        model: 'test-model',
+        cwd: '/tmp/test',
+        experimentalGemma: false,
+      };
+
+      config = new Config(params);
+      expect(config.getExperimentalGemma()).toBe(false);
+    });
+
+    it('should return false when experimentalGemma is not provided', () => {
+      const params: ConfigParameters = {
+        sessionId: 'test-session',
+        targetDir: '/tmp/test',
+        debugMode: false,
+        model: 'test-model',
+        cwd: '/tmp/test',
+      };
+
+      config = new Config(params);
+      expect(config.getExperimentalGemma()).toBe(false);
     });
 
     it('should be independent of experimentalMemoryV2', () => {
