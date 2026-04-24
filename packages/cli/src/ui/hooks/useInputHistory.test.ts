@@ -81,6 +81,135 @@ describe('useInputHistory', () => {
 
       expect(mockOnSubmit).not.toHaveBeenCalled();
     });
+
+    it('should clear unsent checkpoint on submit so it cannot reappear later', () => {
+      const { result, rerender } = renderHook(
+        (props: { currentQuery: string; currentCursorOffset: number }) =>
+          useInputHistory({
+            userMessages,
+            onSubmit: mockOnSubmit,
+            isActive: true,
+            currentQuery: props.currentQuery,
+            currentCursorOffset: props.currentCursorOffset,
+            onChange: mockOnChange,
+          }),
+        {
+          initialProps: { currentQuery: '', currentCursorOffset: 0 },
+        },
+      );
+
+      act(() => {
+        result.current.checkpointCurrentInput('zombie draft', 2);
+      });
+      act(() => {
+        result.current.handleSubmit('submitted');
+      });
+
+      rerender({ currentQuery: '', currentCursorOffset: 0 });
+      mockOnChange.mockClear();
+
+      act(() => {
+        result.current.navigateUp();
+      });
+
+      expect(mockOnChange).toHaveBeenCalledWith(userMessages[2], 'start');
+      expect(mockOnChange).not.toHaveBeenCalledWith(
+        'zombie draft',
+        expect.anything(),
+      );
+    });
+  });
+
+  describe('checkpointCurrentInput and unsent draft restore', () => {
+    it('should persist trimmed-non-empty text to cache -1 for navigateUp when compose buffer is empty', () => {
+      const { result, rerender } = renderHook(
+        (props: { currentQuery: string; currentCursorOffset: number }) =>
+          useInputHistory({
+            userMessages: ['hist'],
+            onSubmit: mockOnSubmit,
+            isActive: true,
+            currentQuery: props.currentQuery,
+            currentCursorOffset: props.currentCursorOffset,
+            onChange: mockOnChange,
+          }),
+        {
+          initialProps: { currentQuery: 'typing', currentCursorOffset: 3 },
+        },
+      );
+
+      act(() => {
+        result.current.checkpointCurrentInput('saved draft', 4);
+      });
+      rerender({ currentQuery: '', currentCursorOffset: 0 });
+
+      act(() => {
+        result.current.navigateUp();
+      });
+
+      expect(mockOnChange).toHaveBeenCalledWith('saved draft', 4);
+    });
+
+    it('should not store checkpoint when text is empty after trim', () => {
+      const { result } = renderHook(
+        (props: { currentQuery: string; currentCursorOffset: number }) =>
+          useInputHistory({
+            userMessages: ['hist'],
+            onSubmit: mockOnSubmit,
+            isActive: true,
+            currentQuery: props.currentQuery,
+            currentCursorOffset: props.currentCursorOffset,
+            onChange: mockOnChange,
+          }),
+        {
+          initialProps: { currentQuery: '', currentCursorOffset: 0 },
+        },
+      );
+
+      act(() => {
+        result.current.checkpointCurrentInput('   ', 0);
+      });
+
+      act(() => {
+        result.current.navigateUp();
+      });
+
+      expect(mockOnChange).toHaveBeenCalledWith('hist', 'start');
+    });
+
+    it('should clear cache -1 after draft restore so the next navigateUp uses history', () => {
+      const { result, rerender } = renderHook(
+        (props: { currentQuery: string; currentCursorOffset: number }) =>
+          useInputHistory({
+            userMessages: ['h1', 'h2', 'h3'],
+            onSubmit: mockOnSubmit,
+            isActive: true,
+            currentQuery: props.currentQuery,
+            currentCursorOffset: props.currentCursorOffset,
+            onChange: mockOnChange,
+          }),
+        {
+          initialProps: { currentQuery: '', currentCursorOffset: 0 },
+        },
+      );
+
+      act(() => {
+        result.current.checkpointCurrentInput('draft', 2);
+      });
+
+      act(() => {
+        result.current.navigateUp();
+      });
+      expect(mockOnChange).toHaveBeenLastCalledWith('draft', 2);
+      mockOnChange.mockClear();
+
+      rerender({ currentQuery: 'draft', currentCursorOffset: 2 });
+
+      act(() => {
+        result.current.navigateUp();
+      });
+
+      expect(mockOnChange).toHaveBeenCalledWith('h3', 'start');
+    });
   });
 
   describe('navigateUp', () => {
