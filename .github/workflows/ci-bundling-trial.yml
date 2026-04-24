@@ -32,6 +32,10 @@ jobs:
       - name: 'Build project'
         run: 'npm run build'
 
+      - name: 'Prepare Packages with Scope'
+        run: 'node scripts/prepare-package.js --scope=@google-gemini'
+        shell: 'bash'
+
       - name: 'Set version with SHA'
         run: |
           npm version 0.0.0-${{ github.sha }} --no-git-tag-version --workspaces
@@ -39,14 +43,15 @@ jobs:
 
       - name: 'Configure npm for GitHub Packages'
         run: |
+          rm -f .npmrc
           echo "//npm.pkg.github.com/:_authToken=\${{ secrets.GITHUB_TOKEN }}" > ~/.npmrc
           echo "@google-gemini:registry=https://npm.pkg.github.com" >> ~/.npmrc
         shell: 'bash'
 
       - name: 'Publish Packages'
         run: |
-          npm publish --workspace @google/gemini-cli-core
-          npm publish --workspace @google/gemini-cli
+          npm publish --workspace @google-gemini/gemini-cli-core --registry=https://npm.pkg.github.com
+          npm publish --workspace @google-gemini/gemini-cli --registry=https://npm.pkg.github.com
         shell: 'bash'
 
   test_ui_messages:
