@@ -37,7 +37,7 @@ import {
  * @param messageId The ID of the message to rewind to.
  * @param newText The new text for the input field after rewinding.
  */
-async function rewindConversation(
+export async function rewindConversation(
   context: CommandContext,
   client: GeminiClient,
   recordingService: ChatRecordingService,
