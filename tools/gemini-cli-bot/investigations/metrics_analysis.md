@@ -81,3 +81,10 @@ Before proposing an intervention, accurately identify the blocker:
   cause. Ensure proposed actions align with the Repo Policy Priorities and
   include concepts like graceful closures and terminal escalations to prevent
   spam.
+
+### 6. Execution Constraints
+
+- **Do NOT use the `invoke_agent` tool.**
+- **Do NOT delegate tasks to subagents (like the `generalist`).**
+- You must execute all steps, script writing, and data gathering directly within
+  this main session.
