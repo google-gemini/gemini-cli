@@ -95,6 +95,7 @@
   },
   "optionalDependencies": {
     "@github/keytar": "^7.10.6",
+    "gliner": "^0.0.19",
     "@lydell/node-pty": "1.1.0",
     "@lydell/node-pty-darwin-arm64": "1.1.0",
     "@lydell/node-pty-darwin-x64": "1.1.0",

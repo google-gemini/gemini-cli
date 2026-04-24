@@ -737,6 +737,9 @@ export interface ConfigParameters {
     agents?: AgentSettings;
   }>;
   enableConseca?: boolean;
+  enableSecretScanning?: boolean;
+  enableContentSanitization?: boolean;
+  enableNerScanning?: boolean;
   billing?: {
     overageStrategy?: OverageStrategy;
   };
@@ -775,6 +778,9 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly question: string | undefined;
   private readonly worktreeSettings: WorktreeSettings | undefined;
   readonly enableConseca: boolean;
+  readonly enableSecretScanning: boolean;
+  readonly enableContentSanitization: boolean;
+  readonly enableNerScanning: boolean;
 
   private readonly coreTools: string[] | undefined;
   private readonly mainAgentTools: string[] | undefined;
@@ -1304,6 +1310,9 @@ export class Config implements McpContext, AgentLoopContext {
     this.fileExclusions = new FileExclusions(this);
     this.eventEmitter = params.eventEmitter;
     this.enableConseca = params.enableConseca ?? false;
+    this.enableSecretScanning = params.enableSecretScanning ?? false;
+    this.enableContentSanitization = params.enableContentSanitization ?? false;
+    this.enableNerScanning = params.enableNerScanning ?? false;
 
     // Initialize Safety Infrastructure
     const contextBuilder = new ContextBuilder(this);

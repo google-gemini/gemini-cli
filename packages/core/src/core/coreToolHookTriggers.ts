@@ -16,6 +16,14 @@ import type {
 import { ToolErrorType } from '../tools/tool-error.js';
 import { DiscoveredMCPToolInvocation } from '../tools/mcp-tool.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import {
+  scanAndRedact,
+  summarizeSecrets,
+  isSensitiveFilename,
+  type SecretMatch,
+} from '../safety/secret-scanner.js';
+import { sanitizeExternalContent } from '../safety/content-sanitizer.js';
+import { nerScanAndRedact } from '../safety/ner-pii-scanner.js';
 
 /**
  * Extracts MCP context from a tool invocation if it's an MCP tool.
@@ -160,6 +168,11 @@ export async function executeToolWithHooks(
     updateOutput: liveOutputCallback,
   });
 
+  // Apply security processors to tool results before they enter the context window.
+  if (config) {
+    await applySecurityProcessors(toolResult, toolName, invocation, config);
+  }
+
   // Append notification if parameters were modified
   if (inputWasModified) {
     const modificationMsg = `\n\n[System] Tool input parameters (${modifiedKeys.join(
@@ -244,4 +257,159 @@ export async function executeToolWithHooks(
   }
 
   return toolResult;
+}
+
+/** Tools whose outputs may contain user credentials and should be secret-scanned. */
+const SECRET_SCAN_TOOLS = new Set([
+  'read_file',
+  'read_many_files',
+  'grep_search',
+  'run_shell_command',
+]);
+
+/**
+ * Tools whose outputs should be content-sanitized for injection patterns.
+ * Includes file read tools (project files are a primary injection vector),
+ * web_fetch (external untrusted content), and directory listing.
+ */
+const CONTENT_SANITIZE_TOOLS = new Set([
+  'web_fetch',
+  'read_file',
+  'read_many_files',
+  'grep_search',
+  'list_directory',
+]);
+
+function applyStringTransform(
+  content: ToolResult['llmContent'],
+  transform: (s: string) => string,
+): ToolResult['llmContent'] {
+  if (typeof content === 'string') {
+    return transform(content);
+  }
+  if (Array.isArray(content)) {
+    return content.map((part) => {
+      if (typeof part === 'object' && part !== null && 'text' in part && typeof part.text === 'string') {
+        return { ...part, text: transform(part.text) };
+      }
+      return part;
+    });
+  }
+  return content;
+}
+
+async function applyStringTransformAsync(
+  content: ToolResult['llmContent'],
+  transform: (s: string) => Promise<string>,
+): Promise<ToolResult['llmContent']> {
+  if (typeof content === 'string') {
+    return transform(content);
+  }
+  if (Array.isArray(content)) {
+    return Promise.all(
+      content.map(async (part) => {
+        if (typeof part === 'object' && part !== null && 'text' in part && typeof part.text === 'string') {
+          return { ...part, text: await transform(part.text) };
+        }
+        return part;
+      }),
+    );
+  }
+  return content;
+}
+
+function appendNotice(toolResult: ToolResult, notice: string): void {
+  if (typeof toolResult.returnDisplay === 'string') {
+    toolResult.returnDisplay += notice;
+  }
+  // Structured returnDisplay (AnsiOutput, GrepResult, etc.) is left untouched —
+  // overwriting it would corrupt rendering. The notice is still visible in
+  // llmContent which is where redaction matters.
+}
+
+async function applySecurityProcessors(
+  toolResult: ToolResult,
+  toolName: string,
+  invocation: AnyToolInvocation,
+  config: Config,
+): Promise<void> {
+  // Secret scanning — redact credentials from both string and array llmContent
+  if (config.enableSecretScanning && SECRET_SCAN_TOOLS.has(toolName)) {
+    // Warn when about to read a known-sensitive file (before content is exposed)
+    if (toolName === 'read_file') {
+      const filePath = (invocation.params as { file_path?: string }).file_path;
+      if (filePath && isSensitiveFilename(filePath)) {
+        appendNotice(
+          toolResult,
+          `\n⚠ Secret scanning: reading sensitive file (${filePath}) — credentials will be redacted from model context.`,
+        );
+      }
+    }
+
+    // Collect all matches across string or array content, then redact
+    const allMatches: SecretMatch[] = [];
+    toolResult.llmContent = applyStringTransform(
+      toolResult.llmContent,
+      (text) => {
+        const { matches, sanitized } = scanAndRedact(text);
+        allMatches.push(...matches);
+        return sanitized;
+      },
+    );
+    if (allMatches.length > 0) {
+      appendNotice(
+        toolResult,
+        `\n⚠ Secret scanning: ${summarizeSecrets(allMatches)} redacted from ${toolName} output.`,
+      );
+    }
+  }
+
+  // NER-based PII scanning — runs after regex to catch context-dependent PII
+  if (config.enableNerScanning && SECRET_SCAN_TOOLS.has(toolName)) {
+    const nerMatches: SecretMatch[] = [];
+    let downloadNotice = '';
+    toolResult.llmContent = await applyStringTransformAsync(
+      toolResult.llmContent,
+      async (text) => {
+        const { matches, sanitized } = await nerScanAndRedact(text, (msg) => {
+          downloadNotice = msg;
+        });
+        nerMatches.push(...matches);
+        return sanitized;
+      },
+    );
+    if (downloadNotice) {
+      appendNotice(toolResult, `\n⚠ NER scanning: ${downloadNotice}`);
+    }
+    if (nerMatches.length > 0) {
+      appendNotice(
+        toolResult,
+        `\n⚠ NER scanning: ${summarizeSecrets(nerMatches)} redacted from ${toolName} output.`,
+      );
+    }
+  }
+
+  // Content sanitization — strip injection patterns from external content.
+  // Also applies to MCP tool results from untrusted servers.
+  const isMcpUntrusted =
+    invocation instanceof DiscoveredMCPToolInvocation &&
+    !config.getMcpServers()?.[invocation.serverName]?.trust;
+  if (
+    config.enableContentSanitization &&
+    (CONTENT_SANITIZE_TOOLS.has(toolName) || isMcpUntrusted)
+  ) {
+    toolResult.llmContent = applyStringTransform(
+      toolResult.llmContent,
+      (text) => {
+        const { sanitized, warnings } = sanitizeExternalContent(text);
+        if (warnings.length > 0) {
+          appendNotice(
+            toolResult,
+            `\n⚠ Content sanitization: ${warnings.join(' ')}`,
+          );
+        }
+        return sanitized;
+      },
+    );
+  }
 }

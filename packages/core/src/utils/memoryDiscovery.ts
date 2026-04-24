@@ -25,6 +25,7 @@ import type { Config } from '../config/config.js';
 import type { HierarchicalMemory } from '../config/memory.js';
 import { CoreEvent, coreEvents } from './events.js';
 import { getErrorMessage } from './errors.js';
+import { sanitizeExternalContent } from '../safety/content-sanitizer.js';
 
 // Simple console logger, similar to the one previously in CLI's config.ts
 // TODO: Integrate with a more robust server-side logger if available/appropriate.
@@ -786,12 +787,28 @@ export async function refreshServerHierarchicalMemory(config: Config) {
   );
   const mcpInstructions =
     config.getMcpClientManager()?.getMcpInstructions() || '';
-  const finalMemory: HierarchicalMemory = {
+  let finalMemory: HierarchicalMemory = {
     ...result.memoryContent,
     project: [result.memoryContent.project, mcpInstructions.trimStart()]
       .filter(Boolean)
       .join('\n\n'),
   };
+
+  // Sanitize GEMINI.md content to strip injection patterns before it enters the
+  // context window. Project files are the highest-value injection target because
+  // they're loaded on every session.
+  if (config.enableContentSanitization) {
+    finalMemory = {
+      ...finalMemory,
+      ...(finalMemory.project !== undefined && {
+        project: sanitizeExternalContent(finalMemory.project).sanitized,
+      }),
+      ...(finalMemory.global !== undefined && {
+        global: sanitizeExternalContent(finalMemory.global).sanitized,
+      }),
+    };
+  }
+
   config.setUserMemory(finalMemory);
   config.setGeminiMdFileCount(result.fileCount);
   config.setGeminiMdFilePaths(result.filePaths);
