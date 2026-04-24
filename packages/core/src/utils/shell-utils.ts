@@ -94,9 +94,7 @@ export function resolveExecutable(exe: string): string | undefined {
     return undefined;
   }
   const extensions =
-    os.platform() === 'win32' && !path.extname(exe)
-      ? ['.exe', '.cmd', '.bat']
-      : [''];
+    os.platform() === 'win32' ? ['.exe', '.cmd', '.bat', ''] : [''];
   for (const dir of pathEnv.split(path.delimiter)) {
     for (const ext of extensions) {
       const fullPath = path.join(dir, exe + ext);
