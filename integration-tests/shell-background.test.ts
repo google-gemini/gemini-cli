@@ -82,23 +82,23 @@ describe('shell-background-tools', () => {
 
     // 1. Start a background process
     // We use a command that stays alive for a bit to ensure it shows up in lists
-    await run.type(
+    await run.sendKeys(
       "Run 'sleep 10 && echo hello-from-background' in the background.",
     );
-    await run.type('\r');
+    await run.sendKeys('\r');
 
     // Wait for the model's canned response acknowledging the start
     await run.expectText('background', 30000);
 
     // 2. List background processes
-    await run.type('List my background processes.');
-    await run.type('\r');
+    await run.sendKeys('List my background processes.');
+    await run.sendKeys('\r');
     // Wait for the model's canned response showing the list
     await run.expectText('hello-from-background', 30000);
 
     // 3. Read the output
-    await run.type('Read the output of that process.');
-    await run.type('\r');
+    await run.sendKeys('Read the output of that process.');
+    await run.sendKeys('\r');
     // Wait for the model's canned response showing the output
     await run.expectText('hello-from-background', 30000);
   }, 60000);
