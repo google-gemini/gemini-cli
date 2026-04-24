@@ -4,6 +4,15 @@ on:
   schedule:
     - cron: '0 0 * * *' # Every 24 hours
   workflow_dispatch:
+    inputs:
+      clear_memory:
+        description: 'Clear memory (drops learnings from previous runs)'
+        type: 'boolean'
+        default: false
+      enable_prs:
+        description: 'Enable PRs (automatically promote changes to PRs)'
+        type: 'boolean'
+        default: false
 
 concurrency:
   group: '${{ github.workflow }}-${{ github.ref }}'
