@@ -594,9 +594,10 @@ async function scanEligibleSessions(
 
 function formatSessionHeadline(session: IndexedSession): string {
   const rawWorkflowSummary = session.memoryScratchpad?.workflowSummary;
-  const sanitizedWorkflowSummary = rawWorkflowSummary
-    ? sanitizeWorkflowSummaryForScratchpad(rawWorkflowSummary)
-    : undefined;
+  const sanitizedWorkflowSummary =
+    typeof rawWorkflowSummary === 'string'
+      ? sanitizeWorkflowSummaryForScratchpad(rawWorkflowSummary)
+      : undefined;
   const workflowSummary = sanitizedWorkflowSummary?.trim()
     ? sanitizedWorkflowSummary
     : undefined;

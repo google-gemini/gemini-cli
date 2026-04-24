@@ -982,6 +982,46 @@ describe('memoryService', () => {
       expect(result.sessionIndex).not.toContain('(no summary)');
     });
 
+    it('ignores malformed scratchpad workflow summaries while indexing sessions', async () => {
+      const { buildSessionIndex } = await import('./memoryService.js');
+
+      const malformedConversation = createConversation({
+        sessionId: 'malformed-scratchpad',
+        summary: undefined,
+        memoryScratchpad: {
+          version: 1,
+          workflowSummary: 123,
+        } as unknown as ConversationRecord['memoryScratchpad'],
+        messageCount: 20,
+      });
+      await writeConversationJsonl(
+        path.join(
+          chatsDir,
+          `${SESSION_FILE_PREFIX}2025-01-01T00-00-badpad.jsonl`,
+        ),
+        malformedConversation,
+      );
+
+      const validConversation = createConversation({
+        sessionId: 'valid-session',
+        summary: 'Still indexes other sessions',
+        messageCount: 20,
+      });
+      await writeConversationJsonl(
+        path.join(
+          chatsDir,
+          `${SESSION_FILE_PREFIX}2025-01-01T00-00-valid.jsonl`,
+        ),
+        validConversation,
+      );
+
+      const result = await buildSessionIndex(chatsDir, { runs: [] });
+
+      expect(result.sessionIndex).toContain('(no summary)');
+      expect(result.sessionIndex).toContain('Still indexes other sessions');
+      expect(result.sessionIndex).not.toContain('123');
+    });
+
     it('appends workflow summary when both summary and scratchpad are present', async () => {
       const { buildSessionIndex } = await import('./memoryService.js');
 
