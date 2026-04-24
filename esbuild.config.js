@@ -64,6 +64,11 @@ const external = [
   '@lydell/node-pty-win32-x64',
   '@github/keytar',
   '@google/gemini-cli-devtools',
+  // https-proxy-agent is a CJS package. When bundled with esbuild code splitting,
+  // its named exports (HttpsProxyAgent) get lost in the CJS→ESM interop layer —
+  // they end up on `default` instead of as named exports. Marking it external lets
+  // Node.js's native CJS interop handle the import correctly.
+  'https-proxy-agent',
 ];
 
 const baseConfig = {
