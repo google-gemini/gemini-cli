@@ -72,7 +72,7 @@ jobs:
 
       - name: 'Run Brain Phases'
         env:
-          GOOGLE_GENERATIVE_AI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+          GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
         run: 'npm run brain'
 
