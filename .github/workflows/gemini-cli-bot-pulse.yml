@@ -1,0 +1,59 @@
+name: '🔄 Gemini CLI Bot: Pulse'
+
+on:
+  schedule:
+    - cron: '*/30 * * * *' # Every 30 minutes
+  workflow_dispatch:
+
+concurrency:
+  group: '${{ github.workflow }}-${{ github.ref }}'
+  cancel-in-progress: true
+
+permissions:
+  contents: 'write'
+  issues: 'write'
+  pull-requests: 'write'
+
+jobs:
+  pulse:
+    name: 'Pulse (Reflex Layer)'
+    runs-on: 'ubuntu-latest'
+    if: "github.repository == 'google-gemini/gemini-cli'"
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: 'Setup Node.js'
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: 'Install dependencies'
+        run: 'npm ci'
+
+      - name: 'Collect Metrics'
+        env:
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+        run: 'npm run metrics'
+
+      - name: 'Archive Metrics'
+        uses: 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02' # ratchet:actions/upload-artifact@v4
+        with:
+          name: 'metrics-before'
+          path: 'metrics-before.csv'
+
+      - name: 'Run Reflex Processes'
+        env:
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+        run: |
+          if [ -d "tools/gemini-cli-bot/processes/scripts" ] && [ "$(ls -A tools/gemini-cli-bot/processes/scripts)" ]; then
+            for script in tools/gemini-cli-bot/processes/scripts/*.ts; do
+              echo "Running reflex script: $script"
+              npx tsx "$script"
+            done
+          else
+            echo "No reflex scripts found."
+          fi
