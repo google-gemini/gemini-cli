@@ -56,11 +56,8 @@ import * as clipboardUtils from '../utils/clipboardUtils.js';
 import { useKittyKeyboardProtocol } from '../hooks/useKittyKeyboardProtocol.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import stripAnsi from 'strip-ansi';
-import chalk from 'chalk';
 import { StreamingState } from '../types.js';
 import { terminalCapabilityManager } from '../utils/terminalCapabilityManager.js';
-import type { UIState } from '../contexts/UIStateContext.js';
-import { isLowColorDepth } from '../utils/terminalUtils.js';
 import { cpLen } from '../utils/textUtils.js';
 import { defaultKeyMatchers, Command } from '../key/keyMatchers.js';
 import { useKeypress, type Key } from '../hooks/useKeypress.js';
@@ -78,9 +75,6 @@ vi.mock('../hooks/useReverseSearchCompletion.js');
 vi.mock('clipboardy');
 vi.mock('../utils/clipboardUtils.js');
 vi.mock('../hooks/useKittyKeyboardProtocol.js');
-vi.mock('../utils/terminalUtils.js', () => ({
-  isLowColorDepth: vi.fn(() => false),
-}));
 
 // Mock ink BEFORE importing components that use it to intercept terminalCursorPosition
 vi.mock('ink', async (importOriginal) => {
@@ -1912,172 +1906,6 @@ describe('InputPrompt', () => {
       expect(props.setBannerVisible).toHaveBeenCalledWith(false);
     });
     unmount();
-  });
-
-  describe('Background Color Styles', () => {
-    beforeEach(() => {
-      vi.mocked(isLowColorDepth).mockReturnValue(false);
-    });
-
-    afterEach(() => {
-      vi.restoreAllMocks();
-    });
-
-    it('should render with background color by default', async () => {
-      const { stdout, unmount } = await renderWithProviders(
-        <TestInputPrompt {...props} />,
-      );
-
-      await waitFor(() => {
-        const frame = stdout.lastFrameRaw();
-        expect(frame).toContain('▀');
-        expect(frame).toContain('▄');
-      });
-      unmount();
-    });
-
-    it.each([
-      { color: 'black', name: 'black' },
-      { color: '#000000', name: '#000000' },
-      { color: '#000', name: '#000' },
-      { color: 'white', name: 'white' },
-      { color: '#ffffff', name: '#ffffff' },
-      { color: '#fff', name: '#fff' },
-    ])(
-      'should render with safe grey background but NO side borders in 8-bit mode when background is $name',
-      async ({ color }) => {
-        vi.mocked(isLowColorDepth).mockReturnValue(true);
-
-        const { stdout, unmount } = await renderWithProviders(
-          <TestInputPrompt {...props} />,
-          {
-            uiState: {
-              terminalBackgroundColor: color,
-            } as Partial<UIState>,
-          },
-        );
-
-        const isWhite =
-          color === 'white' || color === '#ffffff' || color === '#fff';
-        const expectedBgColor = isWhite ? '#eeeeee' : '#1c1c1c';
-
-        await waitFor(() => {
-          const frame = stdout.lastFrameRaw();
-
-          // Use chalk to get the expected background color escape sequence
-          const bgCheck = chalk.bgHex(expectedBgColor)(' ');
-          const bgCode = bgCheck.substring(0, bgCheck.indexOf(' '));
-
-          // Background color code should be present
-          expect(frame).toContain(bgCode);
-          // Background characters should be rendered
-          expect(frame).toContain('▀');
-          expect(frame).toContain('▄');
-          // Side borders should STILL be removed
-          expect(frame).not.toContain('│');
-        });
-
-        unmount();
-      },
-    );
-
-    it('should NOT render with background color but SHOULD render horizontal lines when color depth is < 24 and background is NOT black', async () => {
-      vi.mocked(isLowColorDepth).mockReturnValue(true);
-
-      const { stdout, unmount } = await renderWithProviders(
-        <TestInputPrompt {...props} />,
-        {
-          uiState: {
-            terminalBackgroundColor: '#333333',
-          } as Partial<UIState>,
-        },
-      );
-
-      await waitFor(() => {
-        const frame = stdout.lastFrameRaw();
-        expect(frame).not.toContain('▀');
-        expect(frame).not.toContain('▄');
-        // It SHOULD have horizontal fallback lines
-        expect(frame).toContain('─');
-        // It SHOULD NOT have vertical side borders (standard Box borders have │)
-        expect(frame).not.toContain('│');
-      });
-      unmount();
-    });
-    it('should handle 4-bit color mode (16 colors) as low color depth', async () => {
-      vi.mocked(isLowColorDepth).mockReturnValue(true);
-
-      const { stdout, unmount } = await renderWithProviders(
-        <TestInputPrompt {...props} />,
-        {
-          uiState: {
-            terminalBackgroundColor: 'black',
-          } as Partial<UIState>,
-        },
-      );
-
-      await waitFor(() => {
-        const frame = stdout.lastFrameRaw();
-
-        expect(frame).toContain('▀');
-
-        expect(frame).not.toContain('│');
-      });
-
-      unmount();
-    });
-
-    it('should render horizontal lines (but NO background) in 8-bit mode when background is blue', async () => {
-      vi.mocked(isLowColorDepth).mockReturnValue(true);
-
-      const { stdout, unmount } = await renderWithProviders(
-        <TestInputPrompt {...props} />,
-
-        {
-          uiState: {
-            terminalBackgroundColor: 'blue',
-          } as Partial<UIState>,
-        },
-      );
-
-      await waitFor(() => {
-        const frame = stdout.lastFrameRaw();
-
-        // Should NOT have background characters
-
-        expect(frame).not.toContain('▀');
-
-        expect(frame).not.toContain('▄');
-
-        // Should HAVE horizontal lines from the fallback Box borders
-
-        // Box style "round" uses these for top/bottom
-
-        expect(frame).toContain('─');
-
-        // Should NOT have vertical side borders
-
-        expect(frame).not.toContain('│');
-      });
-
-      unmount();
-    });
-
-    it('should render with plain borders when useBackgroundColor is false', async () => {
-      props.config.getUseBackgroundColor = () => false;
-      const { stdout, unmount } = await renderWithProviders(
-        <TestInputPrompt {...props} />,
-      );
-
-      await waitFor(() => {
-        const frame = stdout.lastFrameRaw();
-        expect(frame).not.toContain('▀');
-        expect(frame).not.toContain('▄');
-        // Check for Box borders (round style uses unicode box chars)
-        expect(frame).toMatch(/[─│┐└┘┌]/);
-      });
-      unmount();
-    });
   });
 
   describe('cursor-based completion trigger', () => {
@@ -4007,9 +3835,9 @@ describe('InputPrompt', () => {
         expect(stdout.lastFrame()).toContain('hello world');
       });
 
-      // With plain borders: 1(border) + 1(padding) + 2(prompt) = 4 offset (x=4, col=5)
+      // With plain borders offset
       await act(async () => {
-        stdin.write(`\x1b[<0;5;2M`); // Click at col 5, row 2
+        stdin.write(`\x1b[<0;4;2M`); // Click at col 4, row 2
       });
 
       await waitFor(() => {
