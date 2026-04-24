@@ -371,6 +371,8 @@ for planned features and priorities.
 
 ## 📖 Resources
 
+- **[Free Course](https://learn.deeplearning.ai/courses/gemini-cli-code-and-create-with-an-open-source-agent/information)** -
+  Learn the basics.
 - **[Official Roadmap](./ROADMAP.md)** - See what's coming next.
 - **[Changelog](https://www.geminicli.com/docs/changelogs)** - See recent
   notable updates.
