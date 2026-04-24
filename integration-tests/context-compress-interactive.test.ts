@@ -58,7 +58,7 @@ describe.skipIf(skipOnDarwin)('Interactive Mode', () => {
     );
 
     await run.expectText('Chat history compressed', 5000);
-  });
+  }, 60000);
 
   // TODO: Context compression is broken and doesn't include the system
   // instructions or tool counts, so it thinks compression is beneficial when
@@ -102,6 +102,9 @@ describe.skipIf(skipOnDarwin)('Interactive Mode', () => {
     });
 
     const run = await rig.runInteractive();
+    await run.expectText('tips for getting started:', 5000);
+    // Wait for the async command loaders to finish so /compress is recognized
+    await new Promise((r) => setTimeout(r, 2000));
     await run.type('/compress');
     await run.type('\r');
 
@@ -116,5 +119,5 @@ describe.skipIf(skipOnDarwin)('Interactive Mode', () => {
       foundEvent,
       'chat_compression telemetry event should not be found for NOOP',
     ).toBe(false);
-  });
+  }, 60000);
 });

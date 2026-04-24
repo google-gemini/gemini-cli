@@ -24,7 +24,7 @@ import type {
   TokenStorageInitializationEvent,
 } from './types.js';
 import { AuthType } from '../core/contentGenerator.js';
-import { getCommonAttributes } from './telemetryAttributes.js';
+import { getCommonMetricAttributes } from './telemetryAttributes.js';
 import { sanitizeHookName } from './sanitize.js';
 
 const EVENT_CHAT_COMPRESSION = 'gemini_cli.chat_compression';
@@ -104,7 +104,7 @@ const EXIT_FAIL_COUNT = 'gemini_cli.exit.fail.count';
 const PLAN_EXECUTION_COUNT = 'gemini_cli.plan.execution.count';
 
 const baseMetricDefinition = {
-  getCommonAttributes,
+  getCommonAttributes: getCommonMetricAttributes,
 };
 
 const COUNTER_DEFINITIONS = {
