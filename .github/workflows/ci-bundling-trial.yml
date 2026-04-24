@@ -318,6 +318,9 @@ jobs:
       - name: 'Install dependencies'
         run: 'npm ci'
 
+      - name: 'Build project'
+        run: 'npm run build'
+
       - name: 'Build Bundle'
         run: 'npm run bundle'
 
