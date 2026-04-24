@@ -23,7 +23,6 @@ if (!existsSync(join(root, 'node_modules'))) {
 const workspaces = [
   '@google/gemini-cli-test-utils',
   '@google/gemini-cli-core',
-  '@google/gemini-cli-a2a-server',
   '@google/gemini-cli',
   'gemini-cli-vscode-ide-companion',
 ];
