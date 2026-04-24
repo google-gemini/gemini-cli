@@ -646,18 +646,8 @@ export class ClearcutLogger {
         value: event.debug_enabled.toString(),
       },
       {
-        gemini_cli_key:
-          EventMetadataKey.GEMINI_CLI_START_SESSION_VERTEX_API_ENABLED,
-        value: event.vertex_ai_enabled.toString(),
-      },
-      {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_START_SESSION_MCP_SERVERS,
         value: event.mcp_servers,
-      },
-      {
-        gemini_cli_key:
-          EventMetadataKey.GEMINI_CLI_START_SESSION_VERTEX_API_ENABLED,
-        value: event.vertex_ai_enabled.toString(),
       },
       {
         gemini_cli_key:
