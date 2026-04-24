@@ -15,7 +15,7 @@ describe('footerItems', () => {
   describe('deriveItemsFromLegacySettings', () => {
     it('returns defaults when no legacy settings are customized', () => {
       const settings = createMockSettings({
-        ui: { footer: { hideContextPercentage: true } },
+        ui: { footer: { showContextPercentage: false } },
       }).merged;
       const items = deriveItemsFromLegacySettings(settings);
       expect(items).toEqual([
@@ -27,27 +27,27 @@ describe('footerItems', () => {
       ]);
     });
 
-    it('removes workspace when hideCWD is true', () => {
+    it('removes workspace when showCWD is false', () => {
       const settings = createMockSettings({
-        ui: { footer: { hideCWD: true, hideContextPercentage: true } },
+        ui: { footer: { showCWD: false, showContextPercentage: false } },
       }).merged;
       const items = deriveItemsFromLegacySettings(settings);
       expect(items).not.toContain('workspace');
     });
 
-    it('removes sandbox when hideSandboxStatus is true', () => {
+    it('removes sandbox when showSandboxStatus is false', () => {
       const settings = createMockSettings({
         ui: {
-          footer: { hideSandboxStatus: true, hideContextPercentage: true },
+          footer: { showSandboxStatus: false, showContextPercentage: false },
         },
       }).merged;
       const items = deriveItemsFromLegacySettings(settings);
       expect(items).not.toContain('sandbox');
     });
 
-    it('removes model-name, context-used, and quota when hideModelInfo is true', () => {
+    it('removes model-name, context-used, and quota when showModelInfo is false', () => {
       const settings = createMockSettings({
-        ui: { footer: { hideModelInfo: true, hideContextPercentage: true } },
+        ui: { footer: { showModelInfo: false, showContextPercentage: false } },
       }).merged;
       const items = deriveItemsFromLegacySettings(settings);
       expect(items).not.toContain('model-name');
@@ -55,9 +55,9 @@ describe('footerItems', () => {
       expect(items).not.toContain('quota');
     });
 
-    it('includes context-used when hideContextPercentage is false', () => {
+    it('includes context-used when showContextPercentage is true', () => {
       const settings = createMockSettings({
-        ui: { footer: { hideContextPercentage: false } },
+        ui: { footer: { showContextPercentage: true } },
       }).merged;
       const items = deriveItemsFromLegacySettings(settings);
       expect(items).toContain('context-used');
@@ -69,7 +69,7 @@ describe('footerItems', () => {
 
     it('includes memory-usage when showMemoryUsage is true', () => {
       const settings = createMockSettings({
-        ui: { showMemoryUsage: true, footer: { hideContextPercentage: true } },
+        ui: { showMemoryUsage: true, footer: { showContextPercentage: false } },
       }).merged;
       const items = deriveItemsFromLegacySettings(settings);
       expect(items).toContain('memory-usage');
@@ -80,9 +80,9 @@ describe('footerItems', () => {
         ui: {
           showMemoryUsage: true,
           footer: {
-            hideCWD: true,
-            hideModelInfo: true,
-            hideContextPercentage: false,
+            showCWD: false,
+            showModelInfo: false,
+            showContextPercentage: true,
           },
         },
       }).merged;
@@ -154,11 +154,11 @@ describe('footerItems', () => {
       expect(state.selectedIds.has('auth')).toBe(true);
     });
 
-    it('includes context-used in selectedIds when hideContextPercentage is false and items is undefined', () => {
+    it('includes context-used in selectedIds when showContextPercentage is true and items is undefined', () => {
       const settings = createMockSettings({
         ui: {
           footer: {
-            hideContextPercentage: false,
+            showContextPercentage: true,
           },
         },
       }).merged;
@@ -168,11 +168,11 @@ describe('footerItems', () => {
       expect(state.orderedIds).toContain('context-used');
     });
 
-    it('does not include context-used in selectedIds when hideContextPercentage is true (default)', () => {
+    it('does not include context-used in selectedIds when showContextPercentage is false (default)', () => {
       const settings = createMockSettings({
         ui: {
           footer: {
-            hideContextPercentage: true,
+            showContextPercentage: false,
           },
         },
       }).merged;
@@ -183,12 +183,12 @@ describe('footerItems', () => {
       expect(state.orderedIds).toContain('context-used');
     });
 
-    it('persisted items array takes precedence over hideContextPercentage', () => {
+    it('persisted items array takes precedence over showContextPercentage', () => {
       const settings = createMockSettings({
         ui: {
           footer: {
             items: ['workspace', 'model-name'],
-            hideContextPercentage: false,
+            showContextPercentage: true,
           },
         },
       }).merged;

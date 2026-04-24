@@ -1114,7 +1114,7 @@ describe('BrowserManager', () => {
           },
           browser: {
             headless: false,
-            disableUserInput: true,
+            enableUserInput: false,
           },
         },
       });
@@ -1136,7 +1136,7 @@ describe('BrowserManager', () => {
           },
           browser: {
             headless: false,
-            disableUserInput: true,
+            enableUserInput: false,
           },
         },
       });
@@ -1158,7 +1158,7 @@ describe('BrowserManager', () => {
           },
           browser: {
             headless: false,
-            disableUserInput: true,
+            enableUserInput: false,
           },
         },
       });
@@ -1236,7 +1236,7 @@ describe('BrowserManager', () => {
           },
           browser: {
             headless: false,
-            disableUserInput: true,
+            enableUserInput: false,
           },
         },
       });

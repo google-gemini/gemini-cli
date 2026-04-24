@@ -271,7 +271,7 @@ describe('<AppHeader />', () => {
     unmount();
   });
 
-  it('should NOT render Tips when ui.hideTips is true', async () => {
+  it('should NOT render Tips when ui.showTips is false', async () => {
     const mockConfig = makeFakeConfig();
     const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <AppHeader version="1.0.0" />,
@@ -279,7 +279,7 @@ describe('<AppHeader />', () => {
         config: mockConfig,
         settings: {
           merged: {
-            ui: { hideTips: true },
+            ui: { showTips: false },
           },
         } as unknown as LoadedSettings,
       },

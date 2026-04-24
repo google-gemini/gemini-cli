@@ -524,19 +524,19 @@ describe('Settings Loading and Merging', () => {
       const userSettingsContent = {
         security: {
           disableYoloMode: false,
-          disableAlwaysAllow: false,
+          enableAlwaysAllow: true,
         },
       };
       const workspaceSettingsContent = {
         security: {
           disableYoloMode: false, // This should be ignored
-          disableAlwaysAllow: false, // This should be ignored
+          enableAlwaysAllow: true, // This should be ignored
         },
       };
       const systemSettingsContent = {
         security: {
           disableYoloMode: true,
-          disableAlwaysAllow: true,
+          enableAlwaysAllow: false,
         },
       };
 
@@ -554,7 +554,7 @@ describe('Settings Loading and Merging', () => {
 
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
       expect(settings.merged.security?.disableYoloMode).toBe(true); // System setting should be used
-      expect(settings.merged.security?.disableAlwaysAllow).toBe(true); // System setting should be used
+      expect(settings.merged.security?.enableAlwaysAllow).toBe(false); // System setting should be used
     });
 
     it.each([
@@ -2081,6 +2081,129 @@ describe('Settings Loading and Merging', () => {
       migrateDeprecatedSettings(loadedSettings, true);
 
       expect(setValueSpy).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['hideWindowTitle', 'showWindowTitle'],
+      ['hideTips', 'showTips'],
+      ['hideBanner', 'showBanner'],
+      ['hideContextSummary', 'showContextSummary'],
+      ['hideFooter', 'showFooter'],
+    ])(
+      'should migrate ui.%s to ui.%s with inverted value',
+      (oldKey, newKey) => {
+        const userSettingsContent = { ui: { [oldKey]: true } };
+
+        (fs.readFileSync as Mock).mockImplementation(
+          (p: fs.PathOrFileDescriptor) => {
+            if (normalizePath(p) === normalizePath(USER_SETTINGS_PATH))
+              return JSON.stringify(userSettingsContent);
+            return '{}';
+          },
+        );
+
+        const setValueSpy = vi.spyOn(LoadedSettings.prototype, 'setValue');
+        const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
+
+        migrateDeprecatedSettings(loadedSettings, true);
+
+        expect(setValueSpy).toHaveBeenCalledWith(
+          SettingScope.User,
+          'ui',
+          expect.objectContaining({ [newKey]: false }),
+        );
+      },
+    );
+
+    it.each([
+      ['hideCWD', 'showCWD'],
+      ['hideSandboxStatus', 'showSandboxStatus'],
+      ['hideModelInfo', 'showModelInfo'],
+      ['hideContextPercentage', 'showContextPercentage'],
+    ])(
+      'should migrate ui.footer.%s to ui.footer.%s with inverted value',
+      (oldKey, newKey) => {
+        const userSettingsContent = { ui: { footer: { [oldKey]: true } } };
+
+        (fs.readFileSync as Mock).mockImplementation(
+          (p: fs.PathOrFileDescriptor) => {
+            if (normalizePath(p) === normalizePath(USER_SETTINGS_PATH))
+              return JSON.stringify(userSettingsContent);
+            return '{}';
+          },
+        );
+
+        const setValueSpy = vi.spyOn(LoadedSettings.prototype, 'setValue');
+        const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
+
+        migrateDeprecatedSettings(loadedSettings, true);
+
+        expect(setValueSpy).toHaveBeenCalledWith(
+          SettingScope.User,
+          'ui',
+          expect.objectContaining({
+            footer: expect.objectContaining({ [newKey]: false }),
+          }),
+        );
+      },
+    );
+
+    it.each([
+      ['model', 'disableLoopDetection', 'enableLoopDetection'],
+      ['model', 'skipNextSpeakerCheck', 'enableNextSpeakerCheck'],
+      ['security', 'disableAlwaysAllow', 'enableAlwaysAllow'],
+      ['tools', 'disableLLMCorrection', 'enableLLMCorrection'],
+    ])(
+      'should migrate %s.%s to %s.%s with inverted value',
+      (section, oldKey, newKey) => {
+        const userSettingsContent = { [section]: { [oldKey]: true } };
+
+        (fs.readFileSync as Mock).mockImplementation(
+          (p: fs.PathOrFileDescriptor) => {
+            if (normalizePath(p) === normalizePath(USER_SETTINGS_PATH))
+              return JSON.stringify(userSettingsContent);
+            return '{}';
+          },
+        );
+
+        const setValueSpy = vi.spyOn(LoadedSettings.prototype, 'setValue');
+        const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
+
+        migrateDeprecatedSettings(loadedSettings, true);
+
+        expect(setValueSpy).toHaveBeenCalledWith(
+          SettingScope.User,
+          section,
+          expect.objectContaining({ [newKey]: false }),
+        );
+      },
+    );
+
+    it('should migrate agents.browser.disableUserInput to agents.browser.enableUserInput with inverted value', () => {
+      const userSettingsContent = {
+        agents: { browser: { disableUserInput: true } },
+      };
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (normalizePath(p) === normalizePath(USER_SETTINGS_PATH))
+            return JSON.stringify(userSettingsContent);
+          return '{}';
+        },
+      );
+
+      const setValueSpy = vi.spyOn(LoadedSettings.prototype, 'setValue');
+      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      migrateDeprecatedSettings(loadedSettings, true);
+
+      expect(setValueSpy).toHaveBeenCalledWith(
+        SettingScope.User,
+        'agents',
+        expect.objectContaining({
+          browser: expect.objectContaining({ enableUserInput: false }),
+        }),
+      );
     });
 
     it('should migrate general.disableAutoUpdate to general.enableAutoUpdate with inverted value', () => {

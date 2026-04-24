@@ -518,13 +518,13 @@ const SETTINGS_SCHEMA = {
           ref: 'CustomTheme',
         },
       },
-      hideWindowTitle: {
+      showWindowTitle: {
         type: 'boolean',
-        label: 'Hide Window Title',
+        label: 'Show Window Title',
         category: 'UI',
         requiresRestart: true,
-        default: false,
-        description: 'Hide the window title bar',
+        default: true,
+        description: 'Show the window title bar',
         showInDialog: true,
       },
       inlineThinkingMode: {
@@ -579,13 +579,13 @@ const SETTINGS_SCHEMA = {
         description: 'Show warnings about terminal or OS compatibility issues.',
         showInDialog: true,
       },
-      hideTips: {
+      showTips: {
         type: 'boolean',
-        label: 'Hide Tips',
+        label: 'Show Tips',
         category: 'UI',
         requiresRestart: false,
-        default: false,
-        description: 'Hide helpful tips in the UI',
+        default: true,
+        description: 'Show helpful tips in the UI',
         showInDialog: true,
       },
       escapePastedAtSymbols: {
@@ -617,23 +617,23 @@ const SETTINGS_SCHEMA = {
           'Display tool outputs (like directory listings and file reads) in a compact, structured format.',
         showInDialog: true,
       },
-      hideBanner: {
+      showBanner: {
         type: 'boolean',
-        label: 'Hide Banner',
+        label: 'Show Banner',
         category: 'UI',
         requiresRestart: false,
-        default: false,
-        description: 'Hide the application banner',
+        default: true,
+        description: 'Show the application banner',
         showInDialog: true,
       },
-      hideContextSummary: {
+      showContextSummary: {
         type: 'boolean',
-        label: 'Hide Context Summary',
+        label: 'Show Context Summary',
         category: 'UI',
         requiresRestart: false,
-        default: false,
+        default: true,
         description:
-          'Hide the context summary (GEMINI.md, MCP servers) above the input.',
+          'Show the context summary (GEMINI.md, MCP servers) above the input.',
         showInDialog: true,
       },
       footer: {
@@ -666,51 +666,51 @@ const SETTINGS_SCHEMA = {
               'Display a second line above the footer items with descriptive headers (e.g., /model).',
             showInDialog: false,
           },
-          hideCWD: {
+          showCWD: {
             type: 'boolean',
-            label: 'Hide CWD',
-            category: 'UI',
-            requiresRestart: false,
-            default: false,
-            description: 'Hide the current working directory in the footer.',
-            showInDialog: true,
-          },
-          hideSandboxStatus: {
-            type: 'boolean',
-            label: 'Hide Sandbox Status',
-            category: 'UI',
-            requiresRestart: false,
-            default: false,
-            description: 'Hide the sandbox status indicator in the footer.',
-            showInDialog: true,
-          },
-          hideModelInfo: {
-            type: 'boolean',
-            label: 'Hide Model Info',
-            category: 'UI',
-            requiresRestart: false,
-            default: false,
-            description: 'Hide the model name and context usage in the footer.',
-            showInDialog: true,
-          },
-          hideContextPercentage: {
-            type: 'boolean',
-            label: 'Hide Context Window Percentage',
+            label: 'Show CWD',
             category: 'UI',
             requiresRestart: false,
             default: true,
-            description: 'Hides the context window usage percentage.',
+            description: 'Show the current working directory in the footer.',
+            showInDialog: true,
+          },
+          showSandboxStatus: {
+            type: 'boolean',
+            label: 'Show Sandbox Status',
+            category: 'UI',
+            requiresRestart: false,
+            default: true,
+            description: 'Show the sandbox status indicator in the footer.',
+            showInDialog: true,
+          },
+          showModelInfo: {
+            type: 'boolean',
+            label: 'Show Model Info',
+            category: 'UI',
+            requiresRestart: false,
+            default: true,
+            description: 'Show the model name and context usage in the footer.',
+            showInDialog: true,
+          },
+          showContextPercentage: {
+            type: 'boolean',
+            label: 'Show Context Window Percentage',
+            category: 'UI',
+            requiresRestart: false,
+            default: false,
+            description: 'Show the context window usage percentage.',
             showInDialog: true,
           },
         },
       },
-      hideFooter: {
+      showFooter: {
         type: 'boolean',
-        label: 'Hide Footer',
+        label: 'Show Footer',
         category: 'UI',
         requiresRestart: false,
-        default: false,
-        description: 'Hide the footer from the UI',
+        default: true,
+        description: 'Show the footer in the UI',
         showInDialog: true,
       },
       collapseDrawerDuringApproval: {
@@ -1093,23 +1093,23 @@ const SETTINGS_SCHEMA = {
         showInDialog: true,
         unit: '%',
       },
-      disableLoopDetection: {
+      enableLoopDetection: {
         type: 'boolean',
-        label: 'Disable Loop Detection',
+        label: 'Enable Loop Detection',
         category: 'Model',
         requiresRestart: true,
-        default: false,
+        default: true,
         description:
-          'Disable automatic detection and prevention of infinite loops.',
+          'Enable automatic detection and prevention of infinite loops.',
         showInDialog: true,
       },
-      skipNextSpeakerCheck: {
+      enableNextSpeakerCheck: {
         type: 'boolean',
-        label: 'Skip Next Speaker Check',
+        label: 'Enable Next Speaker Check',
         category: 'Model',
         requiresRestart: false,
-        default: true,
-        description: 'Skip the next speaker check.',
+        default: false,
+        description: 'Enable the next speaker check.',
         showInDialog: true,
       },
     },
@@ -1312,14 +1312,14 @@ const SETTINGS_SCHEMA = {
             showInDialog: false,
             items: { type: 'string' },
           },
-          disableUserInput: {
+          enableUserInput: {
             type: 'boolean',
-            label: 'Disable User Input',
+            label: 'Enable User Input',
             category: 'Advanced',
             requiresRestart: false,
-            default: true,
+            default: false,
             description:
-              'Disable user input on browser window during automation.',
+              'Enable user input on browser window during automation.',
             showInDialog: false,
           },
           maxActionsPerTask: {
@@ -1732,15 +1732,15 @@ const SETTINGS_SCHEMA = {
           'Maximum characters to show when truncating large tool outputs. Set to 0 or negative to disable truncation.',
         showInDialog: true,
       },
-      disableLLMCorrection: {
+      enableLLMCorrection: {
         type: 'boolean',
-        label: 'Disable LLM Correction',
+        label: 'Enable LLM Correction',
         category: 'Tools',
         requiresRestart: true,
-        default: true,
+        default: false,
         description: oneLine`
-          Disable LLM-based error correction for edit tools.
-          When enabled, tools will fail immediately if exact string matches are not found, instead of attempting to self-correct.
+          Enable LLM-based error correction for edit tools.
+          When disabled, tools will fail immediately if exact string matches are not found, instead of attempting to self-correct.
         `,
         showInDialog: true,
       },
@@ -1825,14 +1825,14 @@ const SETTINGS_SCHEMA = {
         description: 'Disable YOLO mode, even if enabled by a flag.',
         showInDialog: true,
       },
-      disableAlwaysAllow: {
+      enableAlwaysAllow: {
         type: 'boolean',
-        label: 'Disable Always Allow',
+        label: 'Enable Always Allow',
         category: 'Security',
         requiresRestart: true,
-        default: false,
+        default: true,
         description:
-          'Disable "Always allow" options in tool confirmation dialogs.',
+          'Enable "Always allow" options in tool confirmation dialogs.',
         showInDialog: true,
       },
       enablePermanentToolApproval: {
