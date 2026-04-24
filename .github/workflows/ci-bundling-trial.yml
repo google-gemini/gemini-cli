@@ -321,6 +321,9 @@ jobs:
       - name: 'Install dependencies'
         run: 'npm ci'
 
+      - name: 'Build project'
+        run: 'npm run build'
+
       - name: 'Run Integration Tests'
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
@@ -351,6 +354,9 @@ jobs:
 
       - name: 'Install dependencies'
         run: 'npm ci'
+
+      - name: 'Build project'
+        run: 'npm run build'
 
       - name: 'Fix rollup optional dependencies on macOS'
         run: 'npm cache clean --force'
@@ -386,6 +392,10 @@ jobs:
 
       - name: 'Install targeted test dependencies'
         run: 'npm install vitest node-pty --no-save'
+        shell: 'pwsh'
+
+      - name: 'Build project'
+        run: 'npm run build'
         shell: 'pwsh'
 
       - name: 'Run Integration Tests'
