@@ -20,7 +20,10 @@ import {
 import type { FunctionCall } from '@google/genai';
 import { SafetyCheckDecision } from '../safety/protocol.js';
 import type { CheckerRunner } from '../safety/checker-runner.js';
-import { initializeShellParsers } from '../utils/shell-utils.js';
+import {
+  initializeShellParsers,
+  parseCommandDetails,
+} from '../utils/shell-utils.js';
 import { buildArgsPatterns } from './utils.js';
 import {
   NoopSandboxManager,
@@ -475,6 +478,77 @@ describe('PolicyEngine', () => {
 
       // Priority 20 (DENY) should win over priority 10 (ASK_USER)
       const { decision } = await engine.check({ name: 'test-tool' }, undefined);
+      expect(decision).toBe(PolicyDecision.DENY);
+    });
+
+    it('should fail closed in YOLO mode when shell parsing fails for restricted rule', async () => {
+      const originalMock = vi
+        .mocked(parseCommandDetails)
+        .getMockImplementation();
+      vi.mocked(parseCommandDetails).mockImplementationOnce(
+        (command: string) => {
+          if (command === 'echo bypass') {
+            return { details: [], hasError: true };
+          }
+          return originalMock!(command);
+        },
+      );
+
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'run_shell_command',
+          decision: PolicyDecision.ALLOW,
+          argsPattern: /"command":"echo/,
+        },
+      ];
+
+      engine = new PolicyEngine({
+        rules,
+        approvalMode: ApprovalMode.YOLO,
+      });
+
+      const { decision } = await engine.check(
+        { name: 'run_shell_command', args: { command: 'echo bypass' } },
+        undefined,
+      );
+
+      expect(decision).toBe(PolicyDecision.DENY);
+    });
+
+    it('should fail closed in YOLO mode when shell parsing has errors for restricted rule', async () => {
+      const originalMock = vi
+        .mocked(parseCommandDetails)
+        .getMockImplementation();
+      vi.mocked(parseCommandDetails).mockImplementationOnce(
+        (command: string) => {
+          if (command === 'echo bypass') {
+            return {
+              details: [{ name: 'echo', text: 'echo bypass', startIndex: 0 }],
+              hasError: true,
+            };
+          }
+          return originalMock!(command);
+        },
+      );
+
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'run_shell_command',
+          decision: PolicyDecision.ALLOW,
+          argsPattern: /"command":"echo/,
+        },
+      ];
+
+      engine = new PolicyEngine({
+        rules,
+        approvalMode: ApprovalMode.YOLO,
+      });
+
+      const { decision } = await engine.check(
+        { name: 'run_shell_command', args: { command: 'echo bypass' } },
+        undefined,
+      );
+
       expect(decision).toBe(PolicyDecision.DENY);
     });
   });
