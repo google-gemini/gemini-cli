@@ -6,6 +6,7 @@
 
 import {
   GenerateContentResponse,
+  type GenerateContentConfig,
   type CountTokensResponse,
   type GenerateContentParameters,
   type CountTokensParameters,
@@ -83,6 +84,8 @@ export class FakeContentGenerator implements ContentGenerator {
     _userPromptId: string,
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     role: LlmRole,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    config?: GenerateContentConfig,
   ): Promise<GenerateContentResponse> {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-return
     return Object.setPrototypeOf(
@@ -96,6 +99,8 @@ export class FakeContentGenerator implements ContentGenerator {
     _userPromptId: string,
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     role: LlmRole,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    config?: GenerateContentConfig,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
     const responses = this.getNextResponse('generateContentStream', request);
     async function* stream() {

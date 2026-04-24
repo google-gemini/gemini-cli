@@ -87,6 +87,7 @@ interface SlashCommandProcessorActions {
   toggleBackgroundTasks: () => void;
   toggleShortcutsHelp: () => void;
   setText: (text: string) => void;
+  toggleVoice: () => void;
 }
 
 /**
@@ -173,6 +174,20 @@ export const useSlashCommandProcessor = (
           type: 'help',
           timestamp: message.timestamp,
         };
+      } else if (message.type === MessageType.VOICE_HELP) {
+        historyItemContent = {
+          type: 'voice_help',
+          timestamp: message.timestamp,
+        };
+      } else if (message.type === MessageType.VOICE_STATUS) {
+        historyItemContent = {
+          type: 'voice_status',
+          timestamp: message.timestamp,
+          enabled: message.enabled,
+          provider: message.provider,
+          sensitivityLabel: message.sensitivityLabel,
+          whisperPath: message.whisperPath,
+        };
       } else if (message.type === MessageType.STATS) {
         historyItemContent = {
           type: 'stats',
@@ -244,6 +259,7 @@ export const useSlashCommandProcessor = (
         removeComponent: () => setCustomDialog(null),
         toggleBackgroundTasks: actions.toggleBackgroundTasks,
         toggleShortcutsHelp: actions.toggleShortcutsHelp,
+        toggleVoice: actions.toggleVoice,
       },
       session: {
         stats: session.stats,

@@ -8,6 +8,7 @@ import type {
   CountTokensResponse,
   GenerateContentParameters,
   GenerateContentResponse,
+  GenerateContentConfig,
   CountTokensParameters,
   EmbedContentResponse,
   EmbedContentParameters,
@@ -43,11 +44,13 @@ export class RecordingContentGenerator implements ContentGenerator {
     request: GenerateContentParameters,
     userPromptId: string,
     role: LlmRole,
+    config?: GenerateContentConfig,
   ): Promise<GenerateContentResponse> {
     const response = await this.realGenerator.generateContent(
       request,
       userPromptId,
       role,
+      config,
     );
     const recordedResponse: FakeResponse = {
       method: 'generateContent',
@@ -65,6 +68,7 @@ export class RecordingContentGenerator implements ContentGenerator {
     request: GenerateContentParameters,
     userPromptId: string,
     role: LlmRole,
+    config?: GenerateContentConfig,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
     const recordedResponse: FakeResponse = {
       method: 'generateContentStream',
@@ -75,6 +79,7 @@ export class RecordingContentGenerator implements ContentGenerator {
       request,
       userPromptId,
       role,
+      config,
     );
 
     async function* stream(filePath: string) {

@@ -20,7 +20,7 @@ export function createNonInteractiveUI(): CommandContext['ui'] {
           process.stderr.write(`Error: ${item.text}\n`);
         } else if (item.type === 'warning') {
           process.stderr.write(`Warning: ${item.text}\n`);
-        } else if (item.type === 'info') {
+        } else {
           process.stdout.write(`${item.text}\n`);
         }
       }
@@ -43,5 +43,6 @@ export function createNonInteractiveUI(): CommandContext['ui'] {
     removeComponent: () => {},
     toggleBackgroundTasks: () => {},
     toggleShortcutsHelp: () => {},
+    toggleVoice: () => {},
   };
 }

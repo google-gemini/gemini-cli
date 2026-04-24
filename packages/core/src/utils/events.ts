@@ -203,6 +203,7 @@ export enum CoreEvent {
   QuotaChanged = 'quota-changed',
   TelemetryKeychainAvailability = 'telemetry-keychain-availability',
   TelemetryTokenStorageType = 'telemetry-token-storage-type',
+  VoiceTranscript = 'voice-transcript',
 }
 
 /**
@@ -211,7 +212,6 @@ export enum CoreEvent {
 export interface EditorSelectedPayload {
   editor?: EditorType;
 }
-
 export interface CoreEvents extends ExtensionEvents {
   [CoreEvent.UserFeedback]: [UserFeedbackPayload];
   [CoreEvent.ModelChanged]: [ModelChangedPayload];
@@ -237,6 +237,7 @@ export interface CoreEvents extends ExtensionEvents {
   [CoreEvent.SlashCommandConflicts]: [SlashCommandConflictsPayload];
   [CoreEvent.TelemetryKeychainAvailability]: [KeychainAvailabilityEvent];
   [CoreEvent.TelemetryTokenStorageType]: [TokenStorageInitializationEvent];
+  [CoreEvent.VoiceTranscript]: [string];
 }
 
 type EventBacklogItem = {
@@ -445,6 +446,10 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
 
   emitTelemetryTokenStorageType(event: TokenStorageInitializationEvent): void {
     this._emitOrQueue(CoreEvent.TelemetryTokenStorageType, event);
+  }
+
+  emitVoiceTranscript(transcript: string): void {
+    this.emit(CoreEvent.VoiceTranscript, transcript);
   }
 }
 

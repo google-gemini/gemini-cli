@@ -102,9 +102,17 @@ describe('KeyBinding', () => {
 
 describe('keyBindings config', () => {
   it('should have bindings for all commands', () => {
+    const commandsWithoutStaticBindings = new Set([Command.VOICE_INPUT]);
+
     for (const command of Object.values(Command)) {
       expect(defaultKeyBindingConfig.has(command)).toBe(true);
-      expect(defaultKeyBindingConfig.get(command)?.length).toBeGreaterThan(0);
+      const bindings = defaultKeyBindingConfig.get(command);
+
+      if (commandsWithoutStaticBindings.has(command)) {
+        expect(bindings).toHaveLength(0);
+      } else {
+        expect(bindings?.length).toBeGreaterThan(0);
+      }
     }
   });
 

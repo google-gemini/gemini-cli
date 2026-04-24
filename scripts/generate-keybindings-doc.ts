@@ -8,7 +8,10 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { readFile, writeFile } from 'node:fs/promises';
 
-import type { KeyBinding } from '../packages/cli/src/ui/key/keyBindings.js';
+import {
+  Command,
+  type KeyBinding,
+} from '../packages/cli/src/ui/key/keyBindings.js';
 import {
   commandCategories,
   commandDescriptions,
@@ -79,14 +82,20 @@ export async function main(argv = process.argv.slice(2)) {
 }
 
 export function buildDefaultDocSections(): readonly KeybindingDocSection[] {
-  return commandCategories.map((category) => ({
-    title: category.title,
-    commands: category.commands.map((command) => ({
-      command: command,
-      description: commandDescriptions[command],
-      bindings: defaultKeyBindingConfig.get(command) ?? [],
-    })),
-  }));
+  const commandsExcludedFromAutogen = new Set([Command.VOICE_INPUT]);
+
+  return commandCategories
+    .map((category) => ({
+      title: category.title,
+      commands: category.commands
+        .filter((command) => !commandsExcludedFromAutogen.has(command))
+        .map((command) => ({
+          command,
+          description: commandDescriptions[command],
+          bindings: defaultKeyBindingConfig.get(command) ?? [],
+        })),
+    }))
+    .filter((category) => category.commands.length > 0);
 }
 
 export function renderDocumentation(

@@ -122,7 +122,6 @@ export * from './utils/extensionLoader.js';
 export * from './utils/package.js';
 export * from './utils/version.js';
 export * from './utils/checkpointUtils.js';
-export * from './utils/secure-browser-launcher.js';
 export * from './utils/apiConversionUtils.js';
 export * from './utils/channel.js';
 export * from './utils/constants.js';
@@ -277,9 +276,6 @@ export * from './hooks/index.js';
 // Export hook types
 export * from './hooks/types.js';
 
-// Export agent types
-export * from './agents/types.js';
-
 // Export stdio utils
 export * from './utils/stdio.js';
 export * from './utils/terminal.js';
@@ -290,6 +286,10 @@ export * from './voice/responseFormatter.js';
 
 // Export types from @google/genai
 export type { Content, Part, FunctionCall } from '@google/genai';
+// Voice services
+export * from './services/voice/types.js';
+export { GeminiRestBackend } from './services/voice/GeminiRestBackend.js';
+export { LocalWhisperBackend } from './services/voice/LocalWhisperBackend.js';
 
 // Export context types and profiles
 export * from './context/types.js';
