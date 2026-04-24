@@ -29,9 +29,9 @@ async function removeMcpServer(
     return;
   }
 
-  (mcpServers as Record<string, unknown>)[name] = undefined;
+const updatedMcpServers = { ...mcpServers, [name]: undefined };
 
-  settings.setValue(settingsScope, 'mcpServers', mcpServers);
+settings.setValue(settingsScope, 'mcpServers', updatedMcpServers);
 
   debugLogger.log(`Server "${name}" removed from ${scope} settings.`);
 }
