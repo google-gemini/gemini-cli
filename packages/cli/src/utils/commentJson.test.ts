@@ -204,7 +204,7 @@ describe('commentJson', () => {
       expect(updatedContent).not.toContain('"server2"');
     });
 
-    it('should sync nested objects, removing omitted fields', () => {
+    it('should preserve nested objects when omitted (Bug #23138)', () => {
       const originalContent = `{
         // Configuration
         "model": "gemini-2.5-pro",
@@ -222,18 +222,41 @@ describe('commentJson', () => {
         ui: {
           theme: 'light',
         },
-        preservedField: 'keep me',
       });
 
       const updatedContent = fs.readFileSync(testFilePath, 'utf-8');
       expect(updatedContent).toContain('// Configuration');
       expect(updatedContent).toContain('"model": "gemini-2.5-flash"');
       expect(updatedContent).toContain('"theme": "light"');
-      expect(updatedContent).not.toContain('"existingSetting": "value"');
+      // These should now be preserved
+      expect(updatedContent).toContain('"existingSetting": "value"');
       expect(updatedContent).toContain('"preservedField": "keep me"');
     });
 
-    it('should handle mcpServers field deletion properly', () => {
+    it('should delete keys when explicitly set to undefined', () => {
+      const originalContent = `{
+        "model": "gemini-2.5-pro",
+        "ui": {
+          "theme": "dark",
+          "deleteMe": "remove"
+        }
+      }`;
+
+      fs.writeFileSync(testFilePath, originalContent, 'utf-8');
+
+      updateSettingsFilePreservingFormat(testFilePath, {
+        ui: {
+          theme: 'light',
+          deleteMe: undefined,
+        },
+      });
+
+      const updatedContent = fs.readFileSync(testFilePath, 'utf-8');
+      expect(updatedContent).toContain('"theme": "light"');
+      expect(updatedContent).not.toContain('"deleteMe"');
+    });
+
+    it('should handle mcpServers field deletion using explicit undefined', () => {
       const originalContent = `{
         "model": "gemini-2.5-pro",
         "mcpServers": {
@@ -259,6 +282,7 @@ describe('commentJson', () => {
             command: 'node',
             args: ['server.js'],
           },
+          oldServer: undefined,
         },
       });
 
@@ -270,7 +294,7 @@ describe('commentJson', () => {
       expect(updatedContent).toContain('// Server to remove');
     });
 
-    it('preserves sibling-level commented-out blocks when removing another key', () => {
+    it('preserves sibling-level commented-out blocks when removing another key with undefined', () => {
       const originalContent = `{
         "mcpServers": {
           // "sleep": {
@@ -294,7 +318,9 @@ describe('commentJson', () => {
       fs.writeFileSync(testFilePath, originalContent, 'utf-8');
 
       updateSettingsFilePreservingFormat(testFilePath, {
-        mcpServers: {},
+        mcpServers: {
+          playwright: undefined,
+        },
       });
 
       const updatedContent = fs.readFileSync(testFilePath, 'utf-8');
@@ -322,7 +348,7 @@ describe('commentJson', () => {
       expect(updatedContent).toContain('"item2"');
     });
 
-    it('should remove both nested and non-nested objects when omitted', () => {
+    it('should preserve both nested and non-nested objects when omitted', () => {
       const originalContent = `{
         // Top-level config
         "topLevelObject": {
@@ -356,10 +382,8 @@ describe('commentJson', () => {
 
       const updatedContent = fs.readFileSync(testFilePath, 'utf-8');
 
-      expect(updatedContent).not.toContain('"topLevelObject"');
-
-      expect(updatedContent).not.toContain('"nestedObject"');
-
+      expect(updatedContent).toContain('"topLevelObject"');
+      expect(updatedContent).toContain('"nestedObject"');
       expect(updatedContent).toContain('"keepThis": "value"');
       expect(updatedContent).toContain('"preservedObject"');
       expect(updatedContent).toContain('"data": "keep"');

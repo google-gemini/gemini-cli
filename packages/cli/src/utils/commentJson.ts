@@ -116,15 +116,17 @@ function applyKeyDiff(
   base: Record<string, unknown>,
   desired: Record<string, unknown>,
 ): void {
-  for (const existingKey of Object.getOwnPropertyNames(base)) {
-    if (!Object.prototype.hasOwnProperty.call(desired, existingKey)) {
-      preserveCommentsOnPropertyDeletion(base, existingKey);
-      delete base[existingKey];
-    }
-  }
-
   for (const nextKey of Object.getOwnPropertyNames(desired)) {
     const nextVal = desired[nextKey];
+
+    if (nextVal === undefined) {
+      if (Object.prototype.hasOwnProperty.call(base, nextKey)) {
+        preserveCommentsOnPropertyDeletion(base, nextKey);
+        delete base[nextKey];
+      }
+      continue;
+    }
+
     const baseVal = base[nextKey];
 
     const isObj =

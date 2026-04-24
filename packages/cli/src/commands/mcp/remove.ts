@@ -29,7 +29,7 @@ async function removeMcpServer(
     return;
   }
 
-  delete mcpServers[name];
+  (mcpServers as Record<string, unknown>)[name] = undefined;
 
   settings.setValue(settingsScope, 'mcpServers', mcpServers);
 

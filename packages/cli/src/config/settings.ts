@@ -868,14 +868,14 @@ export function migrateDeprecatedSettings(
       if (typeof newValue === 'boolean') {
         // Both exist, trust the new one
         if (removeDeprecated) {
-          delete settings[oldKey];
+          settings[oldKey] = undefined;
           modified = true;
         }
       } else {
         // Only old exists, migrate to new (inverted)
         settings[newKey] = !oldValue;
         if (removeDeprecated) {
-          delete settings[oldKey];
+          settings[oldKey] = undefined;
         }
         modified = true;
       }
@@ -1017,8 +1017,7 @@ export function migrateDeprecatedSettings(
         }
 
         if (removeDeprecated) {
-          const newTools = { ...toolsSettings };
-          delete newTools['approvalMode'];
+          const newTools = { ...toolsSettings, approvalMode: undefined };
           loadedSettings.setValue(scope, 'tools', newTools);
           if (!settingsFile.readOnly) {
             anyModified = true;
@@ -1229,10 +1228,12 @@ function migrateExperimentalSettings(
       loadedSettings.setValue(scope, 'agents', agentsSettings);
 
       if (removeDeprecated) {
-        const newExperimental = { ...experimentalSettings };
-        delete newExperimental['codebaseInvestigatorSettings'];
-        delete newExperimental['cliHelpAgentSettings'];
-        delete newExperimental['plan'];
+        const newExperimental = {
+          ...experimentalSettings,
+          codebaseInvestigatorSettings: undefined,
+          cliHelpAgentSettings: undefined,
+          plan: undefined,
+        };
         loadedSettings.setValue(scope, 'experimental', newExperimental);
       }
       return true;
