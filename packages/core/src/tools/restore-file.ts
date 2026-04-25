@@ -30,6 +30,8 @@ import {
 import { isNodeError } from '../utils/errors.js';
 import { DEFAULT_DIFF_OPTIONS } from './diffOptions.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { correctPath } from '../utils/pathCorrector.js';
+import { resolveAndValidatePlanPath } from '../utils/planUtils.js';
 import {
   RESTORE_FILE_TOOL_NAME,
   RESTORE_FILE_DISPLAY_NAME,
@@ -68,10 +70,33 @@ class RestoreFileToolInvocation extends BaseToolInvocation<
       true,
       () => this.config.getApprovalMode(),
     );
-    this.resolvedPath = path.resolve(
-      this.config.getTargetDir(),
-      this.params.file_path,
-    );
+    if (this.config.isPlanMode()) {
+      try {
+        this.resolvedPath = resolveAndValidatePlanPath(
+          this.params.file_path,
+          this.config.storage.getPlansDir(),
+          this.config.getProjectRoot(),
+        );
+      } catch (e) {
+        debugLogger.error(
+          'Failed to resolve plan path during RestoreFileTool invocation setup',
+          e,
+        );
+        this.resolvedPath = this.params.file_path;
+      }
+    } else if (!path.isAbsolute(this.params.file_path)) {
+      const result = correctPath(this.params.file_path, this.config);
+      if (result.success) {
+        this.resolvedPath = result.correctedPath;
+      } else {
+        this.resolvedPath = path.resolve(
+          this.config.getTargetDir(),
+          this.params.file_path,
+        );
+      }
+    } else {
+      this.resolvedPath = this.params.file_path;
+    }
   }
 
   override toolLocations(): ToolLocation[] {
