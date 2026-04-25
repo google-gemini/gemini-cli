@@ -14,6 +14,7 @@ import { type GeminiCLIExtension } from '../config/config.js';
 import { loadSkillsFromDir, type SkillDefinition } from './skillLoader.js';
 import { coreEvents } from '../utils/events.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import * as paths from '../utils/paths.js';
 
 vi.mock('./skillLoader.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./skillLoader.js')>();
@@ -316,6 +317,148 @@ description: project-desc
     service.setAdminSettings(false);
 
     expect(service.isAdminEnabled()).toBe(false);
+  });
+
+  it('should include extension discovery reports in slow-load detection', async () => {
+    const storage = new Storage('/dummy');
+    vi.spyOn(Storage, 'getUserSkillsDir').mockReturnValue('/non-existent');
+    vi.spyOn(Storage, 'getUserAgentSkillsDir').mockReturnValue(
+      '/non-existent-user-agent',
+    );
+    vi.spyOn(storage, 'getProjectSkillsDir').mockReturnValue('/non-existent');
+    vi.spyOn(storage, 'getProjectAgentSkillsDir').mockReturnValue(
+      '/non-existent-project-agent',
+    );
+
+    const extension: GeminiCLIExtension = {
+      name: 'timed-ext',
+      version: '1.0.0',
+      isActive: true,
+      path: '/ext',
+      contextFiles: [],
+      id: 'timed-ext-id',
+      skills: [
+        {
+          name: 'slow-extension-skill',
+          description: 'slow skill',
+          location: '/ext/skills/slow/SKILL.md',
+          body: 'body',
+          loadMetadata: {
+            name: 'slow-extension-skill',
+            location: '/ext/skills/slow/SKILL.md',
+            duration_ms: 250,
+            cache_status: 'bypass',
+            parse_result: 'loaded',
+          },
+        },
+      ],
+      skillsDiscoveryReport: {
+        source_dir: '/ext/skills',
+        total_duration_ms: 260,
+        glob_duration_ms: 10,
+        skill_count: 1,
+        invalid_count: 0,
+        skill_metrics: [
+          {
+            name: 'slow-extension-skill',
+            location: '/ext/skills/slow/SKILL.md',
+            duration_ms: 250,
+            cache_status: 'bypass',
+            parse_result: 'loaded',
+          },
+        ],
+      },
+    };
+
+    const service = new SkillManager();
+    // @ts-expect-error accessing private method for testing
+    vi.spyOn(service, 'discoverBuiltinSkills').mockResolvedValue(undefined);
+
+    await service.discoverSkills(storage, [extension], false);
+
+    expect(service.getSlowestSkillLoadTime()).toBe(250);
+    expect(service.getLatestDiscoveryReport()).toContainEqual(
+      extension.skillsDiscoveryReport,
+    );
+  });
+
+  it('should prefer the longest matching discovery report for a skill location', () => {
+    const service = new SkillManager();
+
+    // @ts-expect-error accessing private property for testing
+    service.latestDiscoveryReport = [
+      {
+        source_dir: '/skills',
+        total_duration_ms: 10,
+        glob_duration_ms: 2,
+        skill_count: 1,
+        invalid_count: 0,
+        skill_metrics: [],
+      },
+      {
+        source_dir: '/skills/network',
+        total_duration_ms: 25,
+        glob_duration_ms: 5,
+        skill_count: 1,
+        invalid_count: 0,
+        skill_metrics: [],
+      },
+    ];
+
+    expect(
+      service.getDiscoveryReportForSkill('/skills/network/tool/SKILL.md'),
+    ).toEqual(
+      // @ts-expect-error accessing private property for testing
+      service.latestDiscoveryReport[1],
+    );
+  });
+
+  it('should not match sibling paths that only share a string prefix', () => {
+    const service = new SkillManager();
+
+    // @ts-expect-error accessing private property for testing
+    service.latestDiscoveryReport = [
+      {
+        source_dir: '/skills/foo',
+        total_duration_ms: 10,
+        glob_duration_ms: 2,
+        skill_count: 1,
+        invalid_count: 0,
+        skill_metrics: [],
+      },
+    ];
+
+    expect(
+      service.getDiscoveryReportForSkill('/skills/foobar/SKILL.md'),
+    ).toBeUndefined();
+  });
+
+  it('should reuse the cached discovery report for an exact skill location', () => {
+    const service = new SkillManager();
+    const realpathSpy = vi.spyOn(paths, 'resolveToRealPath');
+    const report = {
+      source_dir: '/skills',
+      total_duration_ms: 10,
+      glob_duration_ms: 2,
+      skill_count: 1,
+      invalid_count: 0,
+      skill_metrics: [],
+    };
+
+    // @ts-expect-error accessing private method for testing
+    service.trackDiscoveryReport(report, [
+      {
+        name: 'skill-a',
+        description: 'desc',
+        location: '/skills/skill-a/SKILL.md',
+        body: 'body',
+      },
+    ]);
+
+    expect(
+      service.getDiscoveryReportForSkill('/skills/skill-a/SKILL.md'),
+    ).toEqual(report);
+    expect(realpathSpy).not.toHaveBeenCalled();
   });
 
   describe('Conflict Detection', () => {

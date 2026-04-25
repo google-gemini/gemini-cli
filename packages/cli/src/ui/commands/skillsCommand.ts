@@ -13,6 +13,7 @@ import {
 import {
   type HistoryItemInfo,
   type HistoryItemSkillsList,
+  type SkillListItem,
   MessageType,
 } from '../types.js';
 import { disableSkill, enableSkill } from '../../utils/skillSettings.js';
@@ -27,7 +28,6 @@ import {
   requestConsentInteractive,
   skillsConsentString,
 } from '../../config/extensions/consent.js';
-
 async function listAction(
   context: CommandContext,
   args: string,
@@ -37,12 +37,15 @@ async function listAction(
   // Default to SHOWING descriptions. The user can hide them with 'nodesc'.
   let useShowDescriptions = true;
   let showAll = false;
+  let showVerbose = false;
 
   for (const arg of subArgs) {
     if (arg === 'nodesc' || arg === '--nodesc') {
       useShowDescriptions = false;
     } else if (arg === 'all' || arg === '--all') {
       showAll = true;
+    } else if (arg === 'verbose' || arg === '--verbose') {
+      showVerbose = true;
     }
   }
 
@@ -58,18 +61,16 @@ async function listAction(
   const skills = showAll
     ? skillManager.getAllSkills()
     : skillManager.getAllSkills().filter((s) => !s.isBuiltin);
+  const skillsWithReports: SkillListItem[] = skills.map((skill) => ({
+    ...skill,
+    loadDiscoveryReport: skillManager.getDiscoveryReportForSkill(skill.location),
+  }));
 
   const skillsListItem: HistoryItemSkillsList = {
     type: MessageType.SKILLS_LIST,
-    skills: skills.map((skill) => ({
-      name: skill.name,
-      description: skill.description,
-      disabled: skill.disabled,
-      location: skill.location,
-      body: skill.body,
-      isBuiltin: skill.isBuiltin,
-    })),
+    skills: skillsWithReports,
     showDescriptions: useShowDescriptions,
+    showVerbose,
   };
 
   context.ui.addItem(skillsListItem);
@@ -312,6 +313,11 @@ async function reloadAction(
     if (details.length > 0) {
       successText += ` ${details.join(' and ')}.`;
     }
+    const slowestSkillLoadTime = skillManager.getSlowestSkillLoadTime();
+    if (slowestSkillLoadTime !== null) {
+      successText +=
+        ' Run "/skills list verbose" to inspect skill load timings.';
+    }
 
     context.ui.addItem({
       type: 'info',
@@ -371,7 +377,7 @@ export const skillsCommand: SlashCommand = {
     {
       name: 'list',
       description:
-        'List available agent skills. Usage: /skills list [nodesc] [all]',
+        'List available agent skills. Usage: /skills list [nodesc] [all] [verbose]',
       kind: CommandKind.BUILT_IN,
       action: listAction,
     },

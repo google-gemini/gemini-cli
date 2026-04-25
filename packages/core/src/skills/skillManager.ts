@@ -7,7 +7,11 @@
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Storage } from '../config/storage.js';
-import { type SkillDefinition, loadSkillsFromDir } from './skillLoader.js';
+import {
+  type SkillDefinition,
+  type SkillDiscoveryReport,
+  loadSkillsFromDirWithReport,
+} from './skillLoader.js';
 import type { GeminiCLIExtension } from '../config/config.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { coreEvents } from '../utils/events.js';
@@ -18,12 +22,16 @@ export class SkillManager {
   private skills: SkillDefinition[] = [];
   private activeSkillNames: Set<string> = new Set();
   private adminSkillsEnabled = true;
+  private latestDiscoveryReport: SkillDiscoveryReport[] = [];
+  private discoveryReportBySkillLocation = new Map<string, SkillDiscoveryReport>();
 
   /**
    * Clears all discovered skills.
    */
   clearSkills(): void {
     this.skills = [];
+    this.latestDiscoveryReport = [];
+    this.discoveryReportBySkillLocation.clear();
   }
 
   /**
@@ -57,16 +65,24 @@ export class SkillManager {
     // 2. Extension skills
     for (const extension of extensions) {
       if (extension.isActive && extension.skills) {
+        if (extension.skillsDiscoveryReport) {
+          this.trackDiscoveryReport(
+            extension.skillsDiscoveryReport,
+            extension.skills,
+          );
+        }
         this.addSkillsWithPrecedence(extension.skills);
       }
     }
 
     // 3. User skills
-    const userSkills = await loadSkillsFromDir(Storage.getUserSkillsDir());
+    const userSkills = await this.loadAndTrackSkills(
+      Storage.getUserSkillsDir(),
+    );
     this.addSkillsWithPrecedence(userSkills);
 
     // 3.1 User agent skills alias (.agents/skills)
-    const userAgentSkills = await loadSkillsFromDir(
+    const userAgentSkills = await this.loadAndTrackSkills(
       Storage.getUserAgentSkillsDir(),
     );
     this.addSkillsWithPrecedence(userAgentSkills);
@@ -79,13 +95,13 @@ export class SkillManager {
       return;
     }
 
-    const projectSkills = await loadSkillsFromDir(
+    const projectSkills = await this.loadAndTrackSkills(
       storage.getProjectSkillsDir(),
     );
     this.addSkillsWithPrecedence(projectSkills);
 
     // 4.1 Workspace agent skills alias (.agents/skills)
-    const projectAgentSkills = await loadSkillsFromDir(
+    const projectAgentSkills = await this.loadAndTrackSkills(
       storage.getProjectAgentSkillsDir(),
     );
     this.addSkillsWithPrecedence(projectAgentSkills);
@@ -98,7 +114,7 @@ export class SkillManager {
     const __dirname = path.dirname(fileURLToPath(import.meta.url));
     const builtinDir = path.join(__dirname, 'builtin');
 
-    const builtinSkills = await loadSkillsFromDir(builtinDir);
+    const builtinSkills = await this.loadAndTrackSkills(builtinDir);
 
     for (const skill of builtinSkills) {
       skill.isBuiltin = true;
@@ -202,5 +218,67 @@ export class SkillManager {
    */
   isSkillActive(name: string): boolean {
     return this.activeSkillNames.has(name);
+  }
+
+  getLatestDiscoveryReport(): SkillDiscoveryReport[] {
+    return this.latestDiscoveryReport;
+  }
+
+  getDiscoveryReportForSkill(
+    location: string,
+  ): SkillDiscoveryReport | undefined {
+    const directReport = this.discoveryReportBySkillLocation.get(location);
+    if (directReport) {
+      return directReport;
+    }
+
+    return this.latestDiscoveryReport
+      .filter((report) => {
+        const resolvedLocation = path.resolve(location);
+        const resolvedSourceDir = path.resolve(report.source_dir);
+        return (
+          resolvedLocation === resolvedSourceDir ||
+          this.isSubpath(resolvedSourceDir, resolvedLocation)
+        );
+      })
+      .sort((a, b) => b.source_dir.length - a.source_dir.length)[0];
+  }
+
+  getSlowestSkillLoadTime(thresholdMs = 100): number | null {
+    const durations = this.latestDiscoveryReport
+      .flatMap((report) => report.skill_metrics)
+      .filter((metric) => metric.parse_result === 'loaded')
+      .map((metric) => metric.duration_ms)
+      .filter((duration) => duration >= thresholdMs);
+
+    if (durations.length === 0) {
+      return null;
+    }
+
+    return Math.max(...durations);
+  }
+
+  private async loadAndTrackSkills(dir: string): Promise<SkillDefinition[]> {
+    const { skills, report } = await loadSkillsFromDirWithReport(dir);
+    this.trackDiscoveryReport(report, skills);
+    return skills;
+  }
+
+  private trackDiscoveryReport(
+    report: SkillDiscoveryReport,
+    skills: readonly SkillDefinition[],
+  ): void {
+    this.latestDiscoveryReport.push(report);
+    for (const skill of skills) {
+      this.discoveryReportBySkillLocation.set(skill.location, report);
+    }
+  }
+
+  private isSubpath(parentPath: string, childPath: string): boolean {
+    const relative = path.relative(parentPath, childPath);
+    return (
+      relative === '' ||
+      (!relative.startsWith('..') && !path.isAbsolute(relative))
+    );
   }
 }
