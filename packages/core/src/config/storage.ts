@@ -33,7 +33,7 @@ export class Storage {
   private projectIdentifier: string | undefined;
   private initPromise: Promise<void> | undefined;
   private customPlansDir: string | undefined;
-  private cachedBackupDir: string | undefined;
+  private backupDirCache = new LruCache<string, string>({ max: 10 });
 
   constructor(targetDir: string, sessionId?: string) {
     this.targetDir = targetDir;
