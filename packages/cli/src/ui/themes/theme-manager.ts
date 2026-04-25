@@ -655,6 +655,13 @@ class ThemeManager {
       return this.fileThemes.get(themeName);
     }
 
+    // Support looking up a file-loaded theme by its internal name
+    for (const theme of this.fileThemes.values()) {
+      if (theme.name === themeName) {
+        return theme;
+      }
+    }
+
     // If it's not a built-in, not in cache, and not a valid file path,
     // it's not a valid theme.
     return undefined;
