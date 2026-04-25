@@ -49,7 +49,7 @@ export function useSessionResume({
   useEffect(() => {
     historyManagerRef.current = historyManager;
     refreshStaticRef.current = refreshStatic;
-  });
+  }, [historyManager, refreshStatic]);
 
   const loadHistoryForResume = useCallback(
     async (

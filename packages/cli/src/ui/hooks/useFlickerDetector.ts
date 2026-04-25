@@ -39,5 +39,5 @@ export function useFlickerDetector(
         appEvents.emit(AppEvent.Flicker);
       }
     }
-  });
+  }, [rootUiRef, terminalHeight, config, constrainHeight]);
 }
