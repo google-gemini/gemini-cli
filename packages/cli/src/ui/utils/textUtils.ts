@@ -174,7 +174,31 @@ const stringWidthCache = new LRUCache<string, number>(
 );
 
 /**
- * Cached version of stringWidth function for better performance
+ * Count Thai SARA AM (U+0E33) and Lao SARA AM (U+0EB3) characters that
+ * are preceded by another character. Intl.Segmenter merges these with the
+ * preceding character into a single grapheme cluster, and string-width
+ * then reports width 1 for the cluster. Terminals render the cluster as
+ * 2 columns. Each such SARA AM needs +1 compensation.
+ *
+ * Standalone SARA AM (at position 0 with no preceding character) correctly
+ * gets width 1 from string-width, matching terminal behavior.
+ *
+ * See: https://github.com/google-gemini/gemini-cli/issues/25369
+ */
+function saraAmCompensation(str: string): number {
+  let count = 0;
+  for (let i = 1; i < str.length; i++) {
+    const code = str.charCodeAt(i);
+    if (code === 0x0e33 || code === 0x0eb3) {
+      count++;
+    }
+  }
+  return count;
+}
+
+/**
+ * Cached version of stringWidth function for better performance.
+ * Includes compensation for Thai/Lao SARA AM width mismatch.
  */
 export const getCachedStringWidth = (str: string): number => {
   // ASCII printable chars (32-126) have width 1.
@@ -192,12 +216,15 @@ export const getCachedStringWidth = (str: string): number => {
   }
 
   let width: number;
+  // TODO(#25369): Remove saraAmCompensation once string-width > 8.1.0
+  // fixes Intl.Segmenter-based width for Thai/Lao SARA AM clusters.
+  const compensation = saraAmCompensation(str);
   try {
-    width = stringWidth(str);
+    width = stringWidth(str) + compensation;
   } catch {
     // Fallback for characters that cause string-width to crash (e.g. U+0602)
     // See: https://github.com/google-gemini/gemini-cli/issues/16418
-    width = toCodePoints(stripAnsi(str)).length;
+    width = toCodePoints(stripAnsi(str)).length + compensation;
   }
 
   stringWidthCache.set(str, width);
