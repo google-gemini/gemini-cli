@@ -74,12 +74,14 @@ describe('SkillExtractionAgent', () => {
 
     expect(query).toContain(existingSkillsSummary);
     expect(query).toContain(sessionIndex);
+    expect(query).toContain('optional workflow hint');
     expect(query).toContain(
-      'The summary is a user-intent summary, not a workflow summary.',
+      'workflow hints alone is never enough evidence for a reusable skill.',
     );
     expect(query).toContain(
-      'The session summaries describe user intent, not workflow details.',
+      'Session summaries describe user intent; optional workflow hints describe likely procedural traces.',
     );
+    expect(query).toContain('Use workflow hints for routing');
     expect(query).toContain(
       'Only write a skill if the evidence shows a durable, recurring workflow',
     );

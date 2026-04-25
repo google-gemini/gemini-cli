@@ -303,10 +303,11 @@ export const SkillExtractionAgent = (
         '# Session Index',
         '',
         'Below is an index of past conversation sessions. Each line shows:',
-        '[NEW] or [old] status, a 1-line summary, message count, and the file path.',
+        '[NEW] or [old] status, a 1-line user-intent summary, optional workflow hint, message count, and the file path.',
         '',
-        'The summary is a user-intent summary, not a workflow summary.',
-        'Matching summary text alone is never enough evidence for a reusable skill.',
+        'Some lines may include "| workflow: ..."; this is a compact workflow hint from session metadata.',
+        'Use workflow hints to prioritize which sessions to read and to group likely recurring workflows.',
+        'Matching summary text or workflow hints alone is never enough evidence for a reusable skill.',
         '',
         '[NEW] = not yet processed for skill extraction (focus on these)',
         '[old] = previously processed (read only if a [NEW] session hints at a repeated pattern)',
@@ -326,7 +327,7 @@ export const SkillExtractionAgent = (
 
     return {
       systemPrompt: buildSystemPrompt(skillsDir),
-      query: `${initialContext}\n\nAnalyze the session index above. The session summaries describe user intent, not workflow details. Read sessions that suggest repeated workflows using read_file. Only write a skill if the evidence shows a durable, recurring workflow or a stable recurring repo procedure. If recurrence or future reuse is unclear, create no skill and explain why.`,
+      query: `${initialContext}\n\nAnalyze the session index above. Session summaries describe user intent; optional workflow hints describe likely procedural traces. Use workflow hints for routing, then read sessions that suggest repeated workflows using read_file to verify recurrence from transcript evidence. Only write a skill if the evidence shows a durable, recurring workflow or a stable recurring repo procedure. If recurrence or future reuse is unclear, create no skill and explain why.`,
     };
   },
   runConfig: {
