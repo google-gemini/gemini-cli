@@ -45,7 +45,7 @@ export class Storage {
    * Uses mkdtempSync to mitigate symlink attacks in shared locations like /tmp.
    */
   getProjectBackupDir(): string {
-    const cached = this.backupDirCache.get(this.sessionId);
+    const cached = this.backupDirCache.get(this.sessionId ?? 'default');
     if (cached) {
       return cached; }
 
