@@ -18,6 +18,7 @@ import {
 } from '@google/gemini-cli-core';
 import { ConsoleSummaryDisplay } from './ConsoleSummaryDisplay.js';
 import process from 'node:process';
+import { hostname } from 'node:os';
 import { MemoryUsageDisplay } from './MemoryUsageDisplay.js';
 import { ContextUsageDisplay } from './ContextUsageDisplay.js';
 import { QuotaDisplay } from './QuotaDisplay.js';
@@ -34,6 +35,8 @@ import {
   deriveItemsFromLegacySettings,
 } from '../../config/footerItems.js';
 import { isDevelopment } from '../../utils/installationInfo.js';
+
+const SYSTEM_HOSTNAME = hostname();
 
 interface CwdIndicatorProps {
   targetDir: string;
@@ -317,6 +320,17 @@ export const Footer: React.FC = () => {
           () => <SandboxIndicator isTrustedFolder={isTrustedFolder} />,
           str.length,
         );
+        break;
+      }
+      case 'hostname': {
+        if (SYSTEM_HOSTNAME) {
+          addCol(
+            id,
+            header,
+            () => <Text color={itemColor}>{SYSTEM_HOSTNAME}</Text>,
+            SYSTEM_HOSTNAME.length,
+          );
+        }
         break;
       }
       case 'model-name': {
