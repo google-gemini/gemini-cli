@@ -168,6 +168,54 @@ describe('useIdeTrustListener', () => {
     await unmount();
   });
 
+  it('should NOT set needsRestart when IDE connects with different trust than local config (#25032)', async () => {
+    vi.mocked(mockIdeClient.getConnectionStatus).mockReturnValue({
+      status: IDEConnectionStatus.Disconnected,
+    });
+    vi.mocked(trustedFolders.isWorkspaceTrusted).mockReturnValue({
+      isTrusted: false,
+      source: 'file',
+    });
+
+    const { result, unmount } = await renderTrustListenerHook();
+
+    await act(async () => {
+      statusChangeCallback({ status: IDEConnectionStatus.Disconnected });
+    });
+
+    expect(result.current.needsRestart).toBe(false);
+
+    await act(async () => {
+      vi.mocked(trustedFolders.isWorkspaceTrusted).mockReturnValue({
+        isTrusted: true,
+        source: 'ide',
+      });
+      vi.mocked(ideContextStore.get).mockReturnValue({
+        workspaceState: { isTrusted: true },
+      });
+      statusChangeCallback({ status: IDEConnectionStatus.Connected });
+      trustChangeCallback(true);
+    });
+
+    expect(result.current.isIdeTrusted).toBe(true);
+    expect(result.current.needsRestart).toBe(false);
+
+    await act(async () => {
+      vi.mocked(trustedFolders.isWorkspaceTrusted).mockReturnValue({
+        isTrusted: false,
+        source: 'ide',
+      });
+      vi.mocked(ideContextStore.get).mockReturnValue({
+        workspaceState: { isTrusted: false },
+      });
+      trustChangeCallback(false);
+    });
+
+    expect(result.current.needsRestart).toBe(true);
+    expect(result.current.restartReason).toBe('TRUST_CHANGE');
+    await unmount();
+  });
+
   it('should set needsRestart when IDE trust changes', async () => {
     vi.mocked(mockIdeClient.getConnectionStatus).mockReturnValue({
       status: IDEConnectionStatus.Connected,
