@@ -779,6 +779,8 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         return {
           result: finalResult || 'Task completed.',
           terminate_reason: terminateReason,
+          turn_count: turnCounter,
+          duration_ms: Date.now() - startTime,
         };
       }
 
@@ -786,6 +788,8 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         result:
           finalResult || 'Agent execution was terminated before completion.',
         terminate_reason: terminateReason,
+        turn_count: turnCounter,
+        duration_ms: Date.now() - startTime,
       };
     } catch (error) {
       // Check if the error is an AbortError caused by our internal timeout.
@@ -826,6 +830,8 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
             return {
               result: finalResult,
               terminate_reason: terminateReason,
+              turn_count: turnCounter,
+              duration_ms: Date.now() - startTime,
             };
           }
         }
@@ -840,6 +846,8 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         return {
           result: finalResult,
           terminate_reason: terminateReason,
+          turn_count: turnCounter,
+          duration_ms: Date.now() - startTime,
         };
       }
 
