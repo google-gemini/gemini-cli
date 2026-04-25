@@ -1,0 +1,394 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import fsPromises from 'node:fs/promises';
+import path from 'node:path';
+import { Readable } from 'node:stream';
+import {
+  createPreWriteBackup,
+  listBackupVersions,
+  fnv1a64hex,
+} from './file-backup.js';
+import { debugLogger } from '../utils/debugLogger.js';
+
+vi.mock('node:fs/promises');
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
+  return {
+    ...actual,
+    createReadStream: vi.fn(),
+  };
+});
+import { createReadStream } from 'node:fs';
+
+vi.mock('../utils/debugLogger.js', () => ({
+  debugLogger: { warn: vi.fn() },
+}));
+
+const FILE_PATH = '/workspace/foo.ts';
+const SESSION_ID = 'test-session';
+const TEMP_DIR = '/tmp/project';
+const HASH = fnv1a64hex(FILE_PATH);
+const BACKUP_DIR = path.join(TEMP_DIR, 'backups', `${SESSION_ID}-random`);
+
+const makeError = (code: string, message = code): NodeJS.ErrnoException =>
+  Object.assign(new Error(message), { code });
+
+const makeDirent = (name: string, isFile: boolean): unknown => ({
+  isFile: () => isFile,
+  name,
+});
+
+function mockStream(content: string) {
+  return Readable.from([Buffer.from(content)]);
+}
+
+describe('createPreWriteBackup', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(fsPromises.mkdir).mockResolvedValue(
+      undefined as unknown as string,
+    );
+    vi.mocked(fsPromises.readdir).mockResolvedValue(
+      [] as unknown as ReturnType<typeof fsPromises.readdir> extends Promise<
+        infer T
+      >
+        ? T
+        : never,
+    );
+    vi.mocked(fsPromises.copyFile).mockResolvedValue(undefined);
+    vi.mocked(fsPromises.stat).mockResolvedValue({
+      size: 100,
+    } as unknown as Awaited<ReturnType<typeof fsPromises.stat>>);
+    vi.mocked(createReadStream).mockImplementation(
+      () =>
+        mockStream('file content') as unknown as ReturnType<
+          typeof createReadStream
+        >,
+    );
+  });
+
+  it('loops through 8 EEXIST collisions and claims the 9th slot', async () => {
+    const eexist = makeError('EEXIST');
+    vi.mocked(fsPromises.copyFile)
+      .mockRejectedValueOnce(eexist)
+      .mockRejectedValueOnce(eexist)
+      .mockRejectedValueOnce(eexist)
+      .mockRejectedValueOnce(eexist)
+      .mockRejectedValueOnce(eexist)
+      .mockRejectedValueOnce(eexist)
+      .mockRejectedValueOnce(eexist)
+      .mockRejectedValueOnce(eexist)
+      .mockResolvedValueOnce(undefined);
+
+    vi.mocked(fsPromises.readdir)
+      .mockResolvedValueOnce(
+        [] as unknown as ReturnType<typeof fsPromises.readdir> extends Promise<
+          infer T
+        >
+          ? T
+          : never,
+      )
+      .mockResolvedValueOnce([
+        makeDirent(`${HASH}_9`, true),
+      ] as unknown as ReturnType<typeof fsPromises.readdir> extends Promise<
+        infer T
+      >
+        ? T
+        : never);
+
+    const result = await createPreWriteBackup(FILE_PATH, BACKUP_DIR);
+
+    expect(result).toEqual({
+      ok: true,
+      version: 9,
+      backupPath: path.join(BACKUP_DIR, `${HASH}_9`),
+    });
+    expect(vi.mocked(fsPromises.copyFile)).toHaveBeenCalledTimes(9);
+  });
+
+  it('claims the 50th slot after 49 EEXIST collisions', async () => {
+    const eexist = makeError('EEXIST');
+    const mocks = Array(49).fill(vi.fn().mockRejectedValue(eexist));
+    mocks.push(vi.fn().mockResolvedValue(undefined));
+
+    const copyFileSpy = vi.mocked(fsPromises.copyFile);
+    copyFileSpy.mockReset();
+    for (const m of mocks) {
+      copyFileSpy.mockImplementationOnce(m);
+    }
+
+    const result = await createPreWriteBackup(FILE_PATH, BACKUP_DIR);
+
+    expect(result).toEqual({
+      ok: true,
+      version: 50,
+      backupPath: path.join(BACKUP_DIR, `${HASH}_50`),
+    });
+    expect(copyFileSpy).toHaveBeenCalledTimes(50);
+  });
+
+  it('fails after 100 EEXIST collisions', async () => {
+    const eexist = makeError('EEXIST');
+    vi.mocked(fsPromises.copyFile).mockRejectedValue(eexist);
+
+    const result = await createPreWriteBackup(FILE_PATH, BACKUP_DIR);
+
+    expect(result).toEqual({ ok: false, newFile: false });
+    expect(vi.mocked(fsPromises.copyFile)).toHaveBeenCalledTimes(100);
+    expect(vi.mocked(debugLogger.warn)).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'Failed to claim a backup version slot after 100 attempts',
+      ),
+    );
+  });
+
+  it('returns { ok: false, newFile: false } and logs a warning on EACCES', async () => {
+    // If existingVersions is empty, readFile is skipped and copyFile is used directly.
+    vi.mocked(fsPromises.copyFile).mockRejectedValueOnce(
+      makeError('EACCES', 'Permission denied'),
+    );
+
+    const result = await createPreWriteBackup(FILE_PATH, BACKUP_DIR);
+
+    expect(result).toEqual({ ok: false, newFile: false });
+    expect(vi.mocked(debugLogger.warn)).toHaveBeenCalledExactlyOnceWith(
+      expect.stringContaining('Failed to create backup'),
+      expect.anything(),
+    );
+  });
+
+  it('returns { ok: false, newFile: true } on ENOENT without logging', async () => {
+    // If existingVersions is empty, readFile is skipped and copyFile is used directly.
+    vi.mocked(fsPromises.copyFile).mockRejectedValueOnce(
+      makeError('ENOENT', 'No such file'),
+    );
+
+    const result = await createPreWriteBackup(FILE_PATH, BACKUP_DIR);
+
+    expect(result).toEqual({ ok: false, newFile: true });
+    expect(vi.mocked(debugLogger.warn)).not.toHaveBeenCalled();
+  });
+
+  it('logs EPERM errors during GC but still returns a successful backup result', async () => {
+    const existingDirents = Array.from({ length: 22 }, (_, i) =>
+      makeDirent(`${HASH}_${i + 1}`, true),
+    );
+    const allDirents = Array.from({ length: 23 }, (_, i) =>
+      makeDirent(`${HASH}_${i + 1}`, true),
+    );
+
+    vi.mocked(fsPromises.readdir)
+      .mockResolvedValueOnce(
+        existingDirents as unknown as ReturnType<
+          typeof fsPromises.readdir
+        > extends Promise<infer T>
+          ? T
+          : never,
+      )
+      .mockResolvedValueOnce(
+        allDirents as unknown as ReturnType<
+          typeof fsPromises.readdir
+        > extends Promise<infer T>
+          ? T
+          : never,
+      );
+
+    vi.mocked(createReadStream)
+      .mockImplementationOnce(
+        () =>
+          mockStream('new content') as unknown as ReturnType<
+            typeof createReadStream
+          >,
+      )
+      .mockImplementationOnce(
+        () =>
+          mockStream('old content') as unknown as ReturnType<
+            typeof createReadStream
+          >,
+      );
+
+    vi.mocked(fsPromises.copyFile).mockResolvedValueOnce(undefined);
+
+    const eperm = makeError('EPERM', 'Operation not permitted');
+    vi.mocked(fsPromises.unlink)
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(eperm)
+      .mockResolvedValueOnce(undefined);
+
+    const result = await createPreWriteBackup(FILE_PATH, BACKUP_DIR);
+
+    expect(result).toEqual({
+      ok: true,
+      version: 23,
+      backupPath: path.join(BACKUP_DIR, `${HASH}_23`),
+    });
+    expect(vi.mocked(fsPromises.unlink)).toHaveBeenCalledTimes(3);
+    expect(vi.mocked(debugLogger.warn)).toHaveBeenCalledWith(
+      expect.stringContaining('version 2'),
+      eperm,
+    );
+  });
+
+  it('skips disk read for filePath if diskContent is provided and existingVersions.length > 0', async () => {
+    const existingDirents = [makeDirent(`${HASH}_1`, true)];
+    vi.mocked(fsPromises.readdir).mockResolvedValue(
+      existingDirents as unknown as ReturnType<
+        typeof fsPromises.readdir
+      > extends Promise<infer T>
+        ? T
+        : never,
+    );
+
+    vi.mocked(createReadStream).mockImplementation(
+      () =>
+        mockStream('old content') as unknown as ReturnType<
+          typeof createReadStream
+        >,
+    );
+
+    const result = await createPreWriteBackup(
+      FILE_PATH,
+      BACKUP_DIR,
+      'new content',
+    );
+
+    expect(result.ok).toBe(true);
+    expect(vi.mocked(createReadStream)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(createReadStream)).not.toHaveBeenCalledWith(
+      FILE_PATH,
+      expect.anything(),
+    );
+  });
+
+  it('performs deduplication if diskContent matches latest backup', async () => {
+    const existingDirents = [makeDirent(`${HASH}_1`, true)];
+    vi.mocked(fsPromises.readdir).mockResolvedValue(
+      existingDirents as unknown as ReturnType<
+        typeof fsPromises.readdir
+      > extends Promise<infer T>
+        ? T
+        : never,
+    );
+
+    vi.mocked(createReadStream).mockImplementation(
+      () =>
+        mockStream('same content') as unknown as ReturnType<
+          typeof createReadStream
+        >,
+    );
+
+    const result = await createPreWriteBackup(
+      FILE_PATH,
+      BACKUP_DIR,
+      'same content',
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      version: 1,
+      backupPath: path.join(BACKUP_DIR, `${HASH}_1`),
+    });
+    expect(vi.mocked(fsPromises.copyFile)).not.toHaveBeenCalled();
+  });
+
+  it('performs deduplication when file sizes differ due to line endings (within 2x)', async () => {
+    const existingDirents = [makeDirent(`${HASH}_1`, true)];
+    vi.mocked(fsPromises.readdir).mockResolvedValue(
+      existingDirents as unknown as ReturnType<
+        typeof fsPromises.readdir
+      > extends Promise<infer T>
+        ? T
+        : never,
+    );
+
+    // Mock sizes: backup is 150 bytes, file is 100 bytes (e.g. CRLF vs LF)
+    vi.mocked(fsPromises.stat)
+      .mockResolvedValueOnce({
+        size: 100,
+      } as unknown as Awaited<ReturnType<typeof fsPromises.stat>>)
+      .mockResolvedValueOnce({
+        size: 150,
+      } as unknown as Awaited<ReturnType<typeof fsPromises.stat>>);
+
+    vi.mocked(createReadStream).mockImplementation(
+      () =>
+        mockStream('same normalized content') as unknown as ReturnType<
+          typeof createReadStream
+        >,
+    );
+
+    const result = await createPreWriteBackup(FILE_PATH, BACKUP_DIR);
+
+    expect(result).toEqual({
+      ok: true,
+      version: 1,
+      backupPath: path.join(BACKUP_DIR, `${HASH}_1`),
+    });
+    expect(vi.mocked(createReadStream)).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(fsPromises.copyFile)).not.toHaveBeenCalled();
+  });
+});
+
+describe('listBackupVersions', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('filters out non-files, corrupted suffixes, and wrong hashes', async () => {
+    const otherHash = fnv1a64hex('/workspace/other.ts');
+    vi.mocked(fsPromises.readdir).mockResolvedValueOnce([
+      makeDirent(`${HASH}_1`, true),
+      makeDirent(`${HASH}_2`, false),
+      makeDirent(`${HASH}_Gulasch`, true),
+      makeDirent(`${otherHash}_3`, true),
+    ] as unknown as ReturnType<typeof fsPromises.readdir> extends Promise<
+      infer T
+    >
+      ? T
+      : never);
+
+    const result = await listBackupVersions(FILE_PATH, BACKUP_DIR);
+
+    expect(result).toEqual([1]);
+  });
+
+  it('returns an empty array when the backup directory does not exist', async () => {
+    vi.mocked(fsPromises.readdir).mockRejectedValueOnce(makeError('ENOENT'));
+
+    const result = await listBackupVersions(FILE_PATH, BACKUP_DIR);
+
+    expect(result).toEqual([]);
+    expect(vi.mocked(debugLogger.warn)).not.toHaveBeenCalled();
+  });
+
+  it('logs a warning and returns an empty array on unexpected readdir errors', async () => {
+    vi.mocked(fsPromises.readdir).mockRejectedValueOnce(makeError('EACCES'));
+
+    const result = await listBackupVersions(FILE_PATH, BACKUP_DIR);
+
+    expect(result).toEqual([]);
+    expect(vi.mocked(debugLogger.warn)).toHaveBeenCalledOnce();
+  });
+});
+
+describe('fnv1a64hex', () => {
+  it('produces consistent 16-character hex strings', () => {
+    const h1 = fnv1a64hex('foo');
+    const h2 = fnv1a64hex('bar');
+    expect(h1).toHaveLength(16);
+    expect(h2).toHaveLength(16);
+    expect(h1).not.toBe(h2);
+  });
+
+  it('handles non-ASCII characters by hashing UTF-8 bytes', () => {
+    // '🚀' is U+1F680. In UTF-16 it's [0xD83D, 0xDE80]. In UTF-8 it's [0xF0, 0x9F, 0x9A, 0x80].
+    // Hashes the 4 UTF-8 bytes instead of UTF-16 code units.
+    const h = fnv1a64hex('🚀');
+    expect(h).toBe('ff06d33875097bda');
+  });
+});

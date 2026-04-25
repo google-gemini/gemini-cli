@@ -19,6 +19,7 @@ vi.mock('fs', async (importOriginal) => {
   return {
     ...actual,
     mkdirSync: vi.fn(),
+    mkdtempSync: vi.fn(),
     realpathSync: vi.fn(actual.realpathSync),
   };
 });
@@ -209,6 +210,43 @@ describe('Storage – additional helpers', () => {
     const tempDir = storageWithSession.getProjectTempDir();
     const expected = path.join(tempDir, sessionId, 'tracker');
     expect(storageWithSession.getProjectTempTrackerDir()).toBe(expected);
+  });
+
+  it('getProjectBackupDir creates and returns a secure session-specific directory', async () => {
+    const sessionId = 'test-session-id';
+    const storageWithSession = new Storage(projectRoot, sessionId);
+    ProjectRegistry.prototype.getShortId = vi
+      .fn()
+      .mockReturnValue(PROJECT_SLUG);
+    await storageWithSession.initialize();
+
+    const expectedRoot = path.join(
+      os.homedir(),
+      GEMINI_DIR,
+      'tmp',
+      PROJECT_SLUG,
+      'backups',
+    );
+    const mockSecurePath = path.join(expectedRoot, `${sessionId}-random`);
+
+    vi.mocked(fs.mkdtempSync).mockReturnValue(mockSecurePath);
+
+    const result = storageWithSession.getProjectBackupDir();
+
+    expect(vi.mocked(fs.mkdirSync)).toHaveBeenCalledWith(
+      expectedRoot,
+      expect.objectContaining({ recursive: true }),
+    );
+    expect(vi.mocked(fs.mkdtempSync)).toHaveBeenCalledWith(
+      expect.stringContaining(path.join(expectedRoot, `${sessionId}-`)),
+    );
+    expect(result).toBe(mockSecurePath);
+
+    // Verify caching: second call should NOT trigger mkdtempSync again
+    vi.mocked(fs.mkdtempSync).mockClear();
+    const result2 = storageWithSession.getProjectBackupDir();
+    expect(result2).toBe(mockSecurePath);
+    expect(vi.mocked(fs.mkdtempSync)).not.toHaveBeenCalled();
   });
 
   it('updates session-scoped directories when the sessionId changes', async () => {
