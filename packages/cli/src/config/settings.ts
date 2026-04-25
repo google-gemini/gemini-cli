@@ -1164,9 +1164,14 @@ export function migrateDeprecatedSettings(
       }
     }
 
-    // Migrate tools settings
+    // Migrate tools settings. All tools.* migrations operate on a single
+    // newTools clone and are written back via one setValue, so independent
+    // migrations cannot overwrite each other.
     const toolsSettings = settings.tools as Record<string, unknown> | undefined;
     if (toolsSettings) {
+      const newTools = { ...toolsSettings };
+      let toolsModified = false;
+
       if (toolsSettings['approvalMode'] !== undefined) {
         foundDeprecated.push('tools.approvalMode');
 
@@ -1184,25 +1189,21 @@ export function migrateDeprecatedSettings(
         }
 
         if (removeDeprecated) {
-          const newTools = { ...toolsSettings };
           delete newTools['approvalMode'];
-          loadedSettings.setValue(scope, 'tools', newTools);
-          if (!settingsFile.readOnly) {
-            anyModified = true;
-          }
+          toolsModified = true;
         }
       }
 
-      const newTools = { ...toolsSettings };
-      if (
+      toolsModified =
         migrateBoolean(
           newTools,
           'disableLLMCorrection',
           'enableLLMCorrection',
           'tools',
           foundDeprecated,
-        )
-      ) {
+        ) || toolsModified;
+
+      if (toolsModified) {
         loadedSettings.setValue(scope, 'tools', newTools);
         if (!settingsFile.readOnly) {
           anyModified = true;
