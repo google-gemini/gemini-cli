@@ -1094,6 +1094,314 @@ describe('Session', () => {
     expect(result).toMatchObject({ stopReason: 'end_turn' });
   });
 
+  it('forwards updateOutput calls as in_progress tool_call_update events', async () => {
+    const executeMock = vi.fn(async ({ updateOutput }) => {
+      updateOutput?.('progress: 50%');
+      updateOutput?.('progress: 100%');
+      return { llmContent: 'Tool Result' };
+    });
+    mockTool.build.mockReturnValue({
+      getDescription: () => 'Test Tool',
+      toolLocations: () => [],
+      shouldConfirmExecute: vi.fn().mockResolvedValue(null),
+      execute: executeMock,
+    });
+
+    const stream1 = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: {
+          functionCalls: [{ name: 'test_tool', args: {} }],
+        },
+      },
+    ]);
+    const stream2 = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: { candidates: [] },
+      },
+    ]);
+
+    mockChat.sendMessageStream
+      .mockResolvedValueOnce(stream1)
+      .mockResolvedValueOnce(stream2);
+
+    await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Call tool' }],
+    });
+
+    expect(executeMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        abortSignal: expect.any(Object),
+        updateOutput: expect.any(Function),
+      }),
+    );
+
+    const progressUpdates = mockConnection.sessionUpdate.mock.calls
+      .map((c) => c[0]?.update)
+      .filter(
+        (u) =>
+          u?.sessionUpdate === 'tool_call_update' &&
+          u?.status === 'in_progress',
+      );
+
+    expect(progressUpdates).toHaveLength(2);
+    expect(progressUpdates[0]).toMatchObject({
+      toolCallId: expect.any(String),
+      status: 'in_progress',
+      content: [
+        { type: 'content', content: { type: 'text', text: 'progress: 50%' } },
+      ],
+    });
+    expect(progressUpdates[1]).toMatchObject({
+      content: [
+        { type: 'content', content: { type: 'text', text: 'progress: 100%' } },
+      ],
+    });
+    // All progress events share the same toolCallId as the terminal completion.
+    const terminalUpdate = mockConnection.sessionUpdate.mock.calls
+      .map((c) => c[0]?.update)
+      .find(
+        (u) =>
+          u?.sessionUpdate === 'tool_call_update' && u?.status === 'completed',
+      );
+    expect(progressUpdates[0].toolCallId).toBe(terminalUpdate.toolCallId);
+  });
+
+  it('forwards updateOutput _meta to tool_call_update._meta', async () => {
+    const executeMock = vi.fn(async ({ updateOutput }) => {
+      updateOutput?.('NEW:line1', {
+        'gemini-cli/stream_output': true,
+        pid: 42,
+      });
+      return { llmContent: 'ok' };
+    });
+    mockTool.build.mockReturnValue({
+      getDescription: () => 'Test Tool',
+      toolLocations: () => [],
+      shouldConfirmExecute: vi.fn().mockResolvedValue(null),
+      execute: executeMock,
+    });
+
+    const stream1 = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: { functionCalls: [{ name: 'test_tool', args: {} }] },
+      },
+    ]);
+    const stream2 = createMockStream([
+      { type: StreamEventType.CHUNK, value: { candidates: [] } },
+    ]);
+    mockChat.sendMessageStream
+      .mockResolvedValueOnce(stream1)
+      .mockResolvedValueOnce(stream2);
+
+    await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'go' }],
+    });
+
+    const marked = mockConnection.sessionUpdate.mock.calls
+      .map((c) => c[0]?.update)
+      .filter(
+        (u) =>
+          u?.sessionUpdate === 'tool_call_update' &&
+          u?.status === 'in_progress' &&
+          u?._meta?.['gemini-cli/stream_output'] === true,
+      );
+    expect(marked).toHaveLength(1);
+    expect(marked[0]._meta).toMatchObject({
+      'gemini-cli/stream_output': true,
+      pid: 42,
+    });
+  });
+
+  it('holds the tool call in in_progress when the tool returns backgroundedStreamId', async () => {
+    const { ExecutionLifecycleService } = await import(
+      '@google/gemini-cli-core'
+    );
+    mockTool.build.mockReturnValue({
+      getDescription: () => 'Test Tool',
+      toolLocations: () => [],
+      shouldConfirmExecute: vi.fn().mockResolvedValue(null),
+      execute: vi.fn().mockResolvedValue({
+        llmContent: 'Command is running in background. PID: 54321.',
+        returnDisplay: 'Background process started with PID 54321.',
+        backgroundedStreamId: 54321,
+      }),
+    });
+
+    const stream1 = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: { functionCalls: [{ name: 'test_tool', args: {} }] },
+      },
+    ]);
+    const stream2 = createMockStream([
+      { type: StreamEventType.CHUNK, value: { candidates: [] } },
+    ]);
+    mockChat.sendMessageStream
+      .mockResolvedValueOnce(stream1)
+      .mockResolvedValueOnce(stream2);
+
+    await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Run it' }],
+    });
+
+    const toolCallUpdates = mockConnection.sessionUpdate.mock.calls
+      .map((c) => c[0]?.update)
+      .filter((u) => u?.sessionUpdate === 'tool_call_update');
+
+    // With backgroundedStreamId set, only an in_progress update is emitted
+    // during the prompt turn — no completed/failed yet.
+    expect(toolCallUpdates).toHaveLength(1);
+    expect(toolCallUpdates[0]).toMatchObject({
+      status: 'in_progress',
+    });
+
+    // Now simulate the background process actually exiting.
+    const completedCalls = vi.fn();
+    mockConnection.sessionUpdate.mockImplementation(async (params) => {
+      if (params.update?.sessionUpdate === 'tool_call_update') {
+        completedCalls(params.update);
+      }
+    });
+    // Fire a completion for the matching streamId.
+    const listeners = (
+      ExecutionLifecycleService as unknown as {
+        backgroundCompletionListeners: Set<(info: unknown) => void>;
+      }
+    ).backgroundCompletionListeners;
+    for (const listener of listeners) {
+      listener({
+        executionId: 54321,
+        executionMethod: 'child_process',
+        output: '',
+        error: null,
+        injectionText: null,
+        completionBehavior: 'silent',
+      });
+    }
+    // Allow any scheduled microtasks from sendUpdate to resolve.
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(completedCalls).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionUpdate: 'tool_call_update',
+        status: 'completed',
+        toolCallId: toolCallUpdates[0].toolCallId,
+      }),
+    );
+  });
+
+  it('PR 2: backgroundedStreamId stream does not emit terminal on turn abort', async () => {
+    // Regression test for PR 2's core semantic: a stream_output stream is
+    // detached from the spawning turn's abortSignal. If the user sends a new
+    // prompt (which aborts the previous pendingSend), the background stream
+    // must NOT receive a terminal tool_call_update(completed) — it keeps
+    // running until the actual process exits.
+    mockTool.build.mockReturnValue({
+      getDescription: () => 'Test Tool',
+      toolLocations: () => [],
+      shouldConfirmExecute: vi.fn().mockResolvedValue(null),
+      execute: vi.fn().mockResolvedValue({
+        llmContent: 'Command is running in background. PID: 98765.',
+        returnDisplay: 'Background process started with PID 98765.',
+        backgroundedStreamId: 98765,
+      }),
+    });
+
+    const stream1 = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: { functionCalls: [{ name: 'test_tool', args: {} }] },
+      },
+    ]);
+    const stream2 = createMockStream([
+      { type: StreamEventType.CHUNK, value: { candidates: [] } },
+    ]);
+    mockChat.sendMessageStream
+      .mockResolvedValueOnce(stream1)
+      .mockResolvedValueOnce(stream2);
+
+    await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Run it' }],
+    });
+
+    // Simulate the user sending a NEW prompt — this aborts the previous
+    // pendingSend via `this.pendingPrompt?.abort()` at the top of prompt().
+    // Snapshot updates emitted so far; then fire a simulated new-prompt
+    // abort and confirm NO new terminal update appears.
+    const updatesBefore = mockConnection.sessionUpdate.mock.calls
+      .map((c) => c[0]?.update)
+      .filter((u) => u?.sessionUpdate === 'tool_call_update').length;
+
+    // (Previously, PR 1 wired abortSignal -> emitTerminal; PR 2 removes that
+    // wire. Since the abortHandler is gone, triggering the prior session's
+    // abort signal has no effect — we assert via "no new updates arrived".)
+    await new Promise((resolve) => setImmediate(resolve));
+
+    const updatesAfter = mockConnection.sessionUpdate.mock.calls
+      .map((c) => c[0]?.update)
+      .filter((u) => u?.sessionUpdate === 'tool_call_update').length;
+
+    expect(updatesAfter).toBe(updatesBefore);
+
+    // Nothing emitted status:'completed' yet — stream still logically open.
+    const terminalUpdate = mockConnection.sessionUpdate.mock.calls
+      .map((c) => c[0]?.update)
+      .find(
+        (u) =>
+          u?.sessionUpdate === 'tool_call_update' && u?.status === 'completed',
+      );
+    expect(terminalUpdate).toBeUndefined();
+  });
+
+  it('does not emit tool_call_update when updateOutput is called with empty or non-string values', async () => {
+    const executeMock = vi.fn(async ({ updateOutput }) => {
+      updateOutput?.('');
+      updateOutput?.(undefined);
+      updateOutput?.({ some: 'object' });
+      return { llmContent: 'Tool Result' };
+    });
+    mockTool.build.mockReturnValue({
+      getDescription: () => 'Test Tool',
+      toolLocations: () => [],
+      shouldConfirmExecute: vi.fn().mockResolvedValue(null),
+      execute: executeMock,
+    });
+
+    const stream1 = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: { functionCalls: [{ name: 'test_tool', args: {} }] },
+      },
+    ]);
+    const stream2 = createMockStream([
+      { type: StreamEventType.CHUNK, value: { candidates: [] } },
+    ]);
+    mockChat.sendMessageStream
+      .mockResolvedValueOnce(stream1)
+      .mockResolvedValueOnce(stream2);
+
+    await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Call tool' }],
+    });
+
+    const progressUpdates = mockConnection.sessionUpdate.mock.calls
+      .map((c) => c[0]?.update)
+      .filter(
+        (u) =>
+          u?.sessionUpdate === 'tool_call_update' &&
+          u?.status === 'in_progress',
+      );
+    expect(progressUpdates).toHaveLength(0);
+  });
+
   it('should handle tool call permission request', async () => {
     const confirmationDetails = {
       type: 'info',

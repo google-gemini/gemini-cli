@@ -52,6 +52,8 @@ import {
   InvalidStreamError,
   type AgentLoopContext,
   updatePolicy,
+  ExecutionLifecycleService,
+  type BackgroundCompletionInfo,
 } from '@google/gemini-cli-core';
 import * as acp from '@agentclientprotocol/sdk';
 import { AcpFileSystemService } from './fileSystemService.js';
@@ -1132,22 +1134,112 @@ export class Session {
         });
       }
 
+      const updateOutput = (
+        output: unknown,
+        _meta?: Record<string, unknown>,
+      ) => {
+        if (typeof output !== 'string' || output.length === 0) {
+          return;
+        }
+        this.sendUpdate({
+          sessionUpdate: 'tool_call_update',
+          toolCallId: callId,
+          status: 'in_progress',
+          title: displayTitle,
+          content: [
+            { type: 'content', content: { type: 'text', text: output } },
+          ],
+          locations: invocation.toolLocations(),
+          kind: toAcpToolKind(tool.kind),
+          ...(_meta ? { _meta } : {}),
+        }).catch((err) => {
+          debugLogger.error(
+            `Failed to forward tool incremental update for call ${callId}: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        });
+      };
+
       const toolResult: ToolResult = await invocation.execute({
         abortSignal,
+        updateOutput,
       });
       const content = toToolCallContent(toolResult);
 
       const updateContent: acp.ToolCallContent[] = content ? [content] : [];
 
-      await this.sendUpdate({
-        sessionUpdate: 'tool_call_update',
-        toolCallId: callId,
-        status: 'completed',
-        title: displayTitle,
-        content: updateContent,
-        locations: invocation.toolLocations(),
-        kind: toAcpToolKind(tool.kind),
-      });
+      if (toolResult.backgroundedStreamId !== undefined) {
+        // The tool handed off to a long-running background stream. Hold the
+        // ACP tool call in `in_progress` so subsequent stdout lines can still
+        // be forwarded as `tool_call_update`s; emit the terminal `completed`
+        // only when the process actually exits or the turn is aborted
+        // (whichever happens first).
+        await this.sendUpdate({
+          sessionUpdate: 'tool_call_update',
+          toolCallId: callId,
+          status: 'in_progress',
+          title: displayTitle,
+          content: updateContent,
+          locations: invocation.toolLocations(),
+          kind: toAcpToolKind(tool.kind),
+        });
+
+        const streamId = toolResult.backgroundedStreamId;
+        let terminalEmitted = false;
+        let completionListener:
+          | ((info: BackgroundCompletionInfo) => void)
+          | null = null;
+
+        const emitTerminal = (failed: boolean) => {
+          if (terminalEmitted) return;
+          terminalEmitted = true;
+          if (completionListener) {
+            ExecutionLifecycleService.offBackgroundComplete(completionListener);
+          }
+          this.sendUpdate({
+            sessionUpdate: 'tool_call_update',
+            toolCallId: callId,
+            status: failed ? 'failed' : 'completed',
+            title: displayTitle,
+            content: updateContent,
+            locations: invocation.toolLocations(),
+            kind: toAcpToolKind(tool.kind),
+          }).catch((err) => {
+            debugLogger.error(
+              `Failed to emit terminal tool_call_update for call ${callId}: ${err instanceof Error ? err.message : String(err)}`,
+            );
+          });
+        };
+
+        completionListener = (info: BackgroundCompletionInfo) => {
+          if (info.executionId !== streamId) return;
+          // Defer one turn of the event loop so any pending flush from the
+          // stream_output LineBuffer (triggered synchronously from the same
+          // ExecutionLifecycleService exit notification) can land its final
+          // tool_call_update(in_progress) BEFORE our terminal status arrives
+          // — otherwise strict ACP clients may drop updates that arrive
+          // after status:'completed'.
+          const failed = info.error !== null;
+          setImmediate(() => emitTerminal(failed));
+        };
+
+        // The stream deliberately outlives the current turn: we do NOT wire
+        // the turn's abortSignal to emitTerminal. The terminal status lands
+        // only when the process actually exits (via onBackgroundComplete)
+        // or the ACP session ends — otherwise a new prompt or user cancel
+        // would prematurely close a stream whose process is still producing
+        // output the model may care about in future turns.
+        ExecutionLifecycleService.onBackgroundComplete(completionListener);
+      } else {
+        await this.sendUpdate({
+          sessionUpdate: 'tool_call_update',
+          toolCallId: callId,
+          status: 'completed',
+          title: displayTitle,
+          content: updateContent,
+          locations: invocation.toolLocations(),
+          kind: toAcpToolKind(tool.kind),
+        });
+      }
 
       const durationMs = Date.now() - startTime;
       logToolCall(
