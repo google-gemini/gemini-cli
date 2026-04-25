@@ -10,7 +10,9 @@ import type {
   SlashCommand,
 } from './types.js';
 import { CommandKind } from './types.js';
-import { chatResumeSubCommands } from './chatCommand.js';
+import { createResumeSubCommands } from './chatCommand.js';
+
+const resumeSubCommands = createResumeSubCommands();
 
 export const resumeCommand: SlashCommand = {
   name: 'resume',
@@ -24,5 +26,5 @@ export const resumeCommand: SlashCommand = {
     type: 'dialog',
     dialog: 'sessionBrowser',
   }),
-  subCommands: chatResumeSubCommands,
+  subCommands: resumeSubCommands,
 };
