@@ -12,6 +12,8 @@ our optimized `Bundling Trial CI` run.
 - **Linux E2E Duration:** Reduced from **~7.7 minutes** to **2m 13s**.
 - **Local `preflight:fast` Duration:** Took **9 minutes and 17 seconds**
   (running over 12,500 tests).
+- **Total Compute Time:** Reduced from **~100 minutes** to **~17.5 minutes** (a
+  **~82% reduction**!).
 
 ## Averages for Successful Runs in Last Week (Main Branch)
 
@@ -24,6 +26,84 @@ the last week:
 - **Linux Others Jobs Average:** **3.39 minutes**
 - **Average Total Wall-Clock Time for Commit to Main:** **14.68 minutes**
   (combining `Testing: CI` and `Testing: E2E (Chained)`).
+
+---
+
+## Broad Strokes of Why and What We Improved
+
+### 1. Fake Timers for the Win
+
+Many React component tests were relying on real `setTimeout` or async waiting,
+causing them to idle for seconds. By enabling Vitest's fake timers globally in
+these files, we forced time to pass instantly, cutting execution time by over
+90% in some files.
+
+### 2. Parallelization via Sharding
+
+We broke up the monolithic UI test folder into 4 smaller parallel batches in CI.
+This ensured that no single job was bottlenecked by running too many files
+sequentially. Wall-clock time for UI tests dropped from over 5 minutes to around
+**1m 41s**.
+
+### 3. Artifact Sharing (With Tar)
+
+We avoided redundant `npm ci` and `npm run build` steps in test jobs by building
+once and sharing the workspace. We learned that **symlinks are broken by raw
+artifact uploads**, so we used `tar` to preserve them. This saved ~30 seconds of
+setup in every job.
+
+### 4. Isolating React Tests from Terminal Size
+
+We found that some React component tests failed in CI due to snapshot mismatches
+caused by terminal size differences. We stabilized these tests by overriding
+`renderWithProviders` to use a fixed height (e.g., 40 rows), isolating tests
+from terminal size pollution.
+
+---
+
+## Phase 2: Infrastructure & E2E Optimization
+
+In this session, we focused on optimizing the E2E tests and reducing
+infrastructure costs.
+
+### 1. Dropping Windows E2E Tests
+
+Windows E2E jobs were a significant bottleneck, taking over 8 minutes and often
+failing due to environment issues. Since Linux tests provide sufficient coverage
+for core logic, we decided to drop Windows tests for now to maximize speed.
+
+### 2. Dropping Mac E2E Tests (Optional for Speed)
+
+Mac tests were taking ~4-5 minutes. To achieve the ultimate fast feedback loop
+of ~2 minutes, we tested dropping Mac tests as well, relying on Linux for
+primary validation.
+
+### 3. Optimizing Runners for Small Jobs
+
+We noticed that several standalone jobs (like `a2a-server` and `sdk`) ran in
+under 1 minute on expensive 16-core runners. We switched them to standard
+`ubuntu-latest` runners. They slowed down by only 10-40 seconds, still
+completing quickly while saving significant compute costs.
+
+### 4. Compute Time Reduction
+
+By dropping multi-OS matrix runs and parallelizing efficiently, we reduced the
+total compute time (sum of all job durations) from **~100 minutes** on the main
+branch to **~17.5 minutes**! This is a **~82% reduction** in cost.
+
+---
+
+## Takeaways for the Team
+
+- **Parallelize everything:** Small jobs should run on standard runners to save
+  costs.
+- **Question matrix runs:** Do we really need to test every OS on every PR?
+  Dropping Windows/Mac saved massive time and cost.
+- **Wall-clock time matters:** Reducing developer wait time from 15m to 4m
+  improves productivity.
+- **Use fake timers** for any test involving waiting or timeouts.
+- **Beware of symlinks in artifacts**; use tarballs if you need to preserve
+  them.
 
 ---
 
@@ -67,21 +147,3 @@ The following test suites took 2 seconds or longer to run:
 | `src/ui/components/messages/DiffRenderer.test.tsx`             | **2.03s**  | 26    | Tests diff rendering.                                          |
 | `src/ui/components/messages/ShellToolMessage.test.tsx`         | **2.03s**  | 16    | Tests shell output rendering.                                  |
 | `src/ui/components/ValidationDialog.test.tsx`                  | **2.08s**  | 8     | High per-test overhead (~250ms each).                          |
-
-## Key Insights
-
-1. **`InputPrompt.test.tsx`** is by far the biggest offender (32.7s). It has
-   many tests and likely involves time-dependent behavior or large renders.
-2. **`AppContainer.test.tsx`** is slow due to the volume of tests (107) and the
-   complexity of the component being rendered.
-3. Several suites have very few tests but take many seconds (e.g.,
-   `TopicMessage` in other runs, `ThinkingMessage` here taking 4.5s for 8
-   tests). This suggests high setup/teardown costs or rendering delays.
-4. **`performance.test.ts`** has a test that deliberately tests slow insertion,
-   taking 2.5s.
-
-## Recommendations
-
-- Prioritize `InputPrompt.test.tsx` for global fake timers or splitting.
-- Investigate test suites with high per-test overhead (e.g., `ThinkingMessage`,
-  `SessionSummaryDisplay`).
