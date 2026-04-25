@@ -91,9 +91,9 @@ export function convertSessionToClientHistory(
 
         const functionResponseParts: Part[] = [];
         for (const toolCall of msg.toolCalls!) {
-          if (toolCall.result) {
-            let responseData: Part;
+          let responseData: Part;
 
+          if (toolCall.result) {
             if (typeof toolCall.result === 'string') {
               responseData = {
                 functionResponse: {
@@ -105,14 +105,31 @@ export function convertSessionToClientHistory(
                 },
               };
             } else if (Array.isArray(toolCall.result)) {
-              functionResponseParts.push(...ensurePartArray(toolCall.result));
-              continue;
+              // Ensure we only take the first part if it's an array,
+              // or handle multimodal nesting if present.
+              // Our fixed convertToFunctionResponse now returns [part].
+              const parts = ensurePartArray(toolCall.result);
+              responseData = parts[0];
+
+              // If for some reason there were siblings in old data, we must ignore them
+              // to maintain the 1:1 part count.
             } else {
               responseData = toolCall.result;
             }
-
-            functionResponseParts.push(responseData);
+          } else {
+            // Provide a placeholder if result is missing to preserve part count
+            responseData = {
+              functionResponse: {
+                id: toolCall.id,
+                name: toolCall.name,
+                response: {
+                  error: 'Tool execution result not recorded.',
+                },
+              },
+            };
           }
+
+          functionResponseParts.push(responseData);
         }
 
         if (functionResponseParts.length > 0) {

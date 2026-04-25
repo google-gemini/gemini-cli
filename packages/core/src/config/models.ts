@@ -433,7 +433,11 @@ export function supportsMultimodalFunctionResponse(
         ?.multimodalToolUse === true
     );
   }
-  return model.startsWith('gemini-3-');
+  return (
+    model.startsWith('gemini-2.0-') ||
+    model.startsWith('gemini-2.5-') ||
+    model.startsWith('gemini-3-')
+  );
 }
 
 /**
