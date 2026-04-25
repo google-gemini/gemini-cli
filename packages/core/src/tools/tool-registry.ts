@@ -18,7 +18,7 @@ import type { Config } from '../config/config.js';
 import { ApprovalMode } from '../policy/types.js';
 import { spawn } from 'node:child_process';
 import { StringDecoder } from 'node:string_decoder';
-import { DiscoveredMCPTool } from './mcp-tool.js';
+import { DiscoveredMCPTool, MCP_TOOL_PREFIX } from './mcp-tool.js';
 import { parse } from 'shell-quote';
 import { ToolErrorType } from './tool-error.js';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
@@ -800,9 +800,65 @@ export class ToolRegistry {
       }
     }
 
+    // Fallback for MCP tools whose registered names contain hyphens. Models
+    // sometimes return the function name with hyphens normalized to
+    // underscores (snake_case), causing a literal lookup miss. Try a
+    // hyphen/underscore-tolerant match against registered MCP tool names,
+    // but only if it resolves to a single registered tool.
+    if (!tool && name.startsWith(MCP_TOOL_PREFIX)) {
+      const resolved = this.resolveMcpToolNameLoose(name);
+      if (resolved) {
+        debugLogger.debug(
+          `Resolved hyphen-insensitive MCP tool name "${name}" to "${resolved.name}"`,
+        );
+        tool = resolved;
+      }
+    }
+
     if (tool && this.isActiveTool(tool)) {
       return tool;
     }
     return;
   }
+
+  /**
+   * Looks up an MCP tool by collapsing hyphens and underscores in the name
+   * past the `mcp_` prefix. Returns the registered tool when exactly one
+   * registered MCP tool name matches; returns undefined on no match or on
+   * ambiguity (multiple registered names collapse to the same key).
+   *
+   * This recovers from a known model behavior where the model emits the
+   * tool name with hyphens replaced by underscores (e.g.
+   * `mcp_my-server_my-tool` -> `mcp_my_server_my_tool`).
+   */
+  private resolveMcpToolNameLoose(
+    name: string,
+  ): AnyDeclarativeTool | undefined {
+    const target = collapseMcpSeparators(name);
+    let match: AnyDeclarativeTool | undefined;
+    for (const [registeredName, registeredTool] of this.allKnownTools) {
+      if (
+        registeredTool instanceof DiscoveredMCPTool &&
+        collapseMcpSeparators(registeredName) === target
+      ) {
+        if (match) {
+          // Ambiguous: refuse to guess.
+          return undefined;
+        }
+        match = registeredTool;
+      }
+    }
+    return match;
+  }
+}
+
+/**
+ * Normalizes both `-` and `_` to a single sentinel after the `mcp_` prefix
+ * so that callers can compare names tolerant to hyphen/underscore swaps.
+ */
+function collapseMcpSeparators(name: string): string {
+  if (!name.startsWith(MCP_TOOL_PREFIX)) {
+    return name;
+  }
+  return MCP_TOOL_PREFIX + name.slice(MCP_TOOL_PREFIX.length).replace(/-/g, '_');
 }
