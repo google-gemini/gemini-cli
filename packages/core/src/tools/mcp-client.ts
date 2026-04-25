@@ -2274,9 +2274,13 @@ export async function createTransport(
       }
     }
 
+    const expandedArgs = (mcpServerConfig.args || []).map((arg) =>
+      expandEnvVars(arg, expansionEnv),
+    );
+
     let transport: Transport = new StdioClientTransport({
       command: mcpServerConfig.command,
-      args: mcpServerConfig.args || [],
+      args: expandedArgs,
       env: finalEnv,
       cwd: mcpServerConfig.cwd,
       stderr: 'pipe',
@@ -2286,7 +2290,7 @@ export async function createTransport(
     // It returns JSON in `content` instead of `structuredContent`
     if (
       mcpServerConfig.command === 'xcrun' &&
-      mcpServerConfig.args?.includes('mcpbridge')
+      expandedArgs.includes('mcpbridge')
     ) {
       transport = new XcodeMcpBridgeFixTransport(transport);
     }

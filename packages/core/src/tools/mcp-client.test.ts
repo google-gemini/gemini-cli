@@ -2157,6 +2157,39 @@ describe('mcp-client', () => {
       }
     });
 
+    it('should expand environment variables in mcpServerConfig.args before spawn', async () => {
+      const mockedTransport = vi
+        .spyOn(SdkClientStdioLib, 'StdioClientTransport')
+        .mockReturnValue({} as SdkClientStdioLib.StdioClientTransport);
+
+      const originalEnv = process.env;
+      process.env = {
+        ...originalEnv,
+        DISCORD_TOKEN: 'real-discord-token',
+      };
+
+      try {
+        await createTransport(
+          'test-server',
+          {
+            command: 'docker',
+            args: ['run', '--env', 'DISCORD_TOKEN=${DISCORD_TOKEN}'],
+          },
+          false,
+          MOCK_CONTEXT,
+        );
+
+        const callArgs = mockedTransport.mock.calls[0][0];
+        expect(callArgs.args).toEqual([
+          'run',
+          '--env',
+          'DISCORD_TOKEN=real-discord-token',
+        ]);
+      } finally {
+        process.env = originalEnv;
+      }
+    });
+
     describe('useGoogleCredentialProvider', () => {
       beforeEach(() => {
         // Mock GoogleAuth client
