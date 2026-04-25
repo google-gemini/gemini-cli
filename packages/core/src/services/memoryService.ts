@@ -14,6 +14,7 @@ import {
   SESSION_FILE_PREFIX,
   loadConversationRecord,
   type ConversationRecord,
+  type MemoryScratchpad,
 } from './chatRecordingService.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { coreEvents } from '../utils/events.js';
@@ -22,7 +23,10 @@ import { FRONTMATTER_REGEX, parseFrontmatter } from '../skills/skillLoader.js';
 import { LocalAgentExecutor } from '../agents/local-executor.js';
 import { SkillExtractionAgent } from '../agents/skill-extraction-agent.js';
 import { getModelConfigAlias } from '../agents/registry.js';
-import type { SubagentActivityEvent } from '../agents/types.js';
+import {
+  isToolActivityError,
+  type SubagentActivityEvent,
+} from '../agents/types.js';
 import { ExecutionLifecycleService } from './executionLifecycleService.js';
 import { PromptRegistry } from '../prompts/prompt-registry.js';
 import { ResourceRegistry } from '../resources/resource-registry.js';
@@ -36,6 +40,7 @@ import {
   applyParsedSkillPatches,
   hasParsedPatchHunks,
 } from './memoryPatchUtils.js';
+import { sanitizeWorkflowSummaryForScratchpad } from './sessionScratchpadUtils.js';
 
 const LOCK_FILENAME = '.extraction.lock';
 const STATE_FILENAME = '.extraction-state.json';
@@ -53,20 +58,6 @@ interface LockInfo {
   startedAt: string;
 }
 
-function hasProperty<T extends string>(
-  obj: unknown,
-  prop: T,
-): obj is { [key in T]: unknown } {
-  return obj !== null && typeof obj === 'object' && prop in obj;
-}
-
-function isStringProperty<T extends string>(
-  obj: unknown,
-  prop: T,
-): obj is { [key in T]: string } {
-  return hasProperty(obj, prop) && typeof obj[prop] === 'string';
-}
-
 interface SessionVersion {
   sessionId: string;
   lastUpdated: string;
@@ -75,6 +66,7 @@ interface SessionVersion {
 interface IndexedSession extends SessionVersion {
   filePath: string;
   summary?: string;
+  memoryScratchpad?: MemoryScratchpad;
   userMessageCount: number;
 }
 
@@ -87,6 +79,9 @@ export interface ExtractionRun {
   candidateSessions?: SessionVersion[];
   processedSessions?: SessionVersion[];
   skillsCreated: string[];
+  turnCount?: number;
+  durationMs?: number;
+  terminateReason?: string;
 }
 
 /**
@@ -153,12 +148,25 @@ function normalizeStringArray(value: unknown): string[] {
   return value.filter((item): item is string => typeof item === 'string');
 }
 
+function normalizeOptionalNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value)
+    ? value
+    : undefined;
+}
+
+function normalizeOptionalString(value: unknown): string | undefined {
+  return typeof value === 'string' ? value : undefined;
+}
+
 function isExtractionRunLike(value: unknown): value is {
   runAt: string;
   sessionIds?: unknown;
   candidateSessions?: unknown;
   processedSessions?: unknown;
   skillsCreated: unknown;
+  turnCount?: unknown;
+  durationMs?: unknown;
+  terminateReason?: unknown;
 } {
   return (
     typeof value === 'object' &&
@@ -198,6 +206,9 @@ function buildExtractionRun(value: unknown): ExtractionRun | null {
     processedSessions:
       processedSessions.length > 0 ? processedSessions : undefined,
     skillsCreated: normalizeStringArray(value.skillsCreated),
+    turnCount: normalizeOptionalNumber(value.turnCount),
+    durationMs: normalizeOptionalNumber(value.durationMs),
+    terminateReason: normalizeOptionalString(value.terminateReason),
   };
 }
 
@@ -291,7 +302,7 @@ function shouldReplaceIndexedSession(
   return compareIndexedSessions(candidate, existing) < 0;
 }
 
-function isReadFileStartActivity(
+function isReadFileActivity(
   activity: SubagentActivityEvent,
 ): activity is SubagentActivityEvent & {
   data: { name: string; args?: { file_path?: unknown }; callId?: unknown };
@@ -302,11 +313,36 @@ function isReadFileStartActivity(
   );
 }
 
-function getResolvedReadFilePath(
+function getReadFileCallId(activity: SubagentActivityEvent): string | null {
+  if (isReadFileActivity(activity)) {
+    const { callId } = activity.data;
+    return typeof callId === 'string' ? callId : null;
+  }
+
+  if (
+    activity.type === 'TOOL_CALL_END' &&
+    activity.data['name'] === READ_FILE_TOOL_NAME
+  ) {
+    const id = activity.data['id'];
+    return typeof id === 'string' ? id : null;
+  }
+
+  if (
+    activity.type === 'ERROR' &&
+    activity.data['name'] === READ_FILE_TOOL_NAME
+  ) {
+    const callId = activity.data['callId'];
+    return typeof callId === 'string' ? callId : null;
+  }
+
+  return null;
+}
+
+function getResolvedActivityFilePath(
   config: Config,
   activity: SubagentActivityEvent,
 ): string | null {
-  if (!isReadFileStartActivity(activity)) {
+  if (!isReadFileActivity(activity)) {
     return null;
   }
 
@@ -320,48 +356,11 @@ function getResolvedReadFilePath(
     return null;
   }
 
-  return path.resolve(config.getTargetDir(), args.file_path);
-}
-
-function getReadFileStartCallId(
-  activity: SubagentActivityEvent,
-): string | null {
-  if (
-    !isReadFileStartActivity(activity) ||
-    !isStringProperty(activity.data, 'callId')
-  ) {
-    return null;
-  }
-
-  return activity.data.callId;
-}
-
-function getCompletedReadFileCallId(
-  activity: SubagentActivityEvent,
-): string | null {
-  if (
-    activity.type !== 'TOOL_CALL_END' ||
-    activity.data['name'] !== READ_FILE_TOOL_NAME ||
-    !isStringProperty(activity.data, 'id')
-  ) {
-    return null;
-  }
-
-  return activity.data['id'];
-}
-
-function getFailedReadFileCallId(
-  activity: SubagentActivityEvent,
-): string | null {
-  if (
-    activity.type !== 'ERROR' ||
-    activity.data['name'] !== READ_FILE_TOOL_NAME ||
-    !isStringProperty(activity.data, 'callId')
-  ) {
-    return null;
-  }
-
-  return activity.data['callId'];
+  const targetDir =
+    'getTargetDir' in config && typeof config.getTargetDir === 'function'
+      ? config.getTargetDir()
+      : process.cwd();
+  return path.resolve(targetDir, args.file_path);
 }
 
 function getUserMessageCount(
@@ -580,6 +579,10 @@ async function scanEligibleSessions(
         lastUpdated: conversation.lastUpdated,
         filePath,
         summary: conversation.summary,
+        memoryScratchpad:
+          conversation.memoryScratchpadIsStale === true
+            ? undefined
+            : conversation.memoryScratchpad,
         userMessageCount: getUserMessageCount(conversation),
       };
 
@@ -593,6 +596,28 @@ async function scanEligibleSessions(
   }
 
   return Array.from(latestBySessionId.values()).sort(compareIndexedSessions);
+}
+
+function formatSessionHeadline(session: IndexedSession): string {
+  const rawWorkflowSummary = session.memoryScratchpad?.workflowSummary;
+  const sanitizedWorkflowSummary =
+    typeof rawWorkflowSummary === 'string'
+      ? sanitizeWorkflowSummaryForScratchpad(rawWorkflowSummary)
+      : undefined;
+  const workflowSummary = sanitizedWorkflowSummary?.trim()
+    ? sanitizedWorkflowSummary
+    : undefined;
+  const summary = session.summary ?? workflowSummary ?? '(no summary)';
+
+  if (
+    session.summary &&
+    workflowSummary &&
+    workflowSummary !== session.summary
+  ) {
+    return `${summary} | workflow: ${workflowSummary}`;
+  }
+
+  return summary;
 }
 
 /**
@@ -651,8 +676,7 @@ export async function buildSessionIndex(
       const status = candidateSessionIds.has(getSessionVersionKey(session))
         ? '[NEW]'
         : '[old]';
-      const summary = session.summary ?? '(no summary)';
-      return `${status} ${summary} (${session.userMessageCount} user msgs) — ${session.filePath}`;
+      return `${status} ${formatSessionHeadline(session)} (${session.userMessageCount} user msgs) — ${session.filePath}`;
     },
   );
 
@@ -999,18 +1023,19 @@ export async function startMemoryService(config: Config): Promise<void> {
         session,
       ]),
     );
+    const pendingReadFileSessions = new Map<string, SessionVersion>();
     const processedSessionKeys = new Set<string>();
-    const pendingReadFileSessions = new Map<string, string>();
 
     // Create and run the extraction agent
     const executor = await LocalAgentExecutor.create(
       agentDefinition,
       context,
       (activity) => {
-        const readFileCallId = getReadFileStartCallId(activity);
-        if (readFileCallId) {
-          const resolvedPath = getResolvedReadFilePath(config, activity);
-          if (!resolvedPath) {
+        const readFileCallId = getReadFileCallId(activity);
+
+        if (activity.type === 'TOOL_CALL_START') {
+          const resolvedPath = getResolvedActivityFilePath(config, activity);
+          if (!resolvedPath || !readFileCallId) {
             return;
           }
 
@@ -1019,35 +1044,31 @@ export async function startMemoryService(config: Config): Promise<void> {
             return;
           }
 
-          pendingReadFileSessions.set(
-            readFileCallId,
-            getSessionVersionKey(session),
-          );
+          pendingReadFileSessions.set(readFileCallId, session);
           return;
         }
 
-        const completedReadFileCallId = getCompletedReadFileCallId(activity);
-        if (completedReadFileCallId) {
-          const sessionKey = pendingReadFileSessions.get(
-            completedReadFileCallId,
-          );
-          if (!sessionKey) {
-            return;
-          }
-
-          processedSessionKeys.add(sessionKey);
-          pendingReadFileSessions.delete(completedReadFileCallId);
+        if (!readFileCallId) {
           return;
         }
 
-        const failedReadFileCallId = getFailedReadFileCallId(activity);
-        if (failedReadFileCallId) {
-          pendingReadFileSessions.delete(failedReadFileCallId);
+        const session = pendingReadFileSessions.get(readFileCallId);
+        if (!session) {
+          return;
+        }
+
+        pendingReadFileSessions.delete(readFileCallId);
+
+        if (
+          activity.type === 'TOOL_CALL_END' &&
+          !isToolActivityError(activity.data['data'])
+        ) {
+          processedSessionKeys.add(getSessionVersionKey(session));
         }
       },
     );
 
-    await executor.run(
+    const executorResult = await executor.run(
       { request: 'Extract skills from the provided sessions.' },
       abortController.signal,
     );
@@ -1107,6 +1128,11 @@ export async function startMemoryService(config: Config): Promise<void> {
       })),
       processedSessions,
       skillsCreated,
+      turnCount: normalizeOptionalNumber(executorResult?.turn_count),
+      durationMs: normalizeOptionalNumber(executorResult?.duration_ms),
+      terminateReason: normalizeOptionalString(
+        executorResult?.terminate_reason,
+      ),
     };
     const updatedState: ExtractionState = {
       runs: [...state.runs, run],
