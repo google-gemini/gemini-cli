@@ -164,9 +164,12 @@ export async function createPreWriteBackup(
       ]);
 
       if (stats && backupStats) {
-        // Skip streaming hash if sizes indicate the files are definitively different.
+        // Normalization (\r\n -> \n) can reduce file size by at most 50%.
+        // Allow a size difference of up to a factor of 2 to account for
+        // differing line-ending conventions between the file and its backup.
         const likelyDifferent =
-          backupStats.size > stats.size || backupStats.size < stats.size / 2;
+          backupStats.size > stats.size * 2 ||
+          backupStats.size < stats.size / 2;
 
         if (!likelyDifferent) {
           const [contentHash, latestHash] = await Promise.all([

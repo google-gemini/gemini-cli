@@ -297,6 +297,43 @@ describe('createPreWriteBackup', () => {
     });
     expect(vi.mocked(fsPromises.copyFile)).not.toHaveBeenCalled();
   });
+
+  it('performs deduplication when file sizes differ due to line endings (within 2x)', async () => {
+    const existingDirents = [makeDirent(`${HASH}_1`, true)];
+    vi.mocked(fsPromises.readdir).mockResolvedValue(
+      existingDirents as unknown as ReturnType<
+        typeof fsPromises.readdir
+      > extends Promise<infer T>
+        ? T
+        : never,
+    );
+
+    // Mock sizes: backup is 150 bytes, file is 100 bytes (e.g. CRLF vs LF)
+    vi.mocked(fsPromises.stat)
+      .mockResolvedValueOnce({
+        size: 100,
+      } as unknown as ReturnType<typeof fsPromises.stat>)
+      .mockResolvedValueOnce({
+        size: 150,
+      } as unknown as ReturnType<typeof fsPromises.stat>);
+
+    vi.mocked(createReadStream).mockImplementation(
+      () =>
+        mockStream('same normalized content') as unknown as ReturnType<
+          typeof createReadStream
+        >,
+    );
+
+    const result = await createPreWriteBackup(FILE_PATH, BACKUP_DIR);
+
+    expect(result).toEqual({
+      ok: true,
+      version: 1,
+      backupPath: path.join(BACKUP_DIR, `${HASH}_1`),
+    });
+    expect(vi.mocked(createReadStream)).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(fsPromises.copyFile)).not.toHaveBeenCalled();
+  });
 });
 
 describe('listBackupVersions', () => {
