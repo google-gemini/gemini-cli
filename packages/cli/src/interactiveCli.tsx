@@ -242,6 +242,8 @@ function setWindowTitle(title: string, settings: LoadedSettings) {
       folderName: title,
       showThoughts: !!settings.merged.ui.showStatusInTitle,
       useDynamicTitle: settings.merged.ui.dynamicWindowTitle,
+      terminalTitleMaxLen: settings.merged.ui.terminalTitleMaxLen as number,
+      padWindowTitle: !!settings.merged.ui.padWindowTitle,
     });
     writeToStdout(`\x1b]0;${windowTitle}\x07`);
 

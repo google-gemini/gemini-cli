@@ -14,6 +14,8 @@ export interface TerminalTitleOptions {
   folderName: string;
   showThoughts: boolean;
   useDynamicTitle: boolean;
+  terminalTitleMaxLen?: number;
+  padWindowTitle?: boolean;
 }
 
 function truncate(text: string, maxLen: number): string {
@@ -27,7 +29,7 @@ function truncate(text: string, maxLen: number): string {
  * Computes the dynamic terminal window title based on the current CLI state.
  *
  * @param options - The current state of the CLI and environment context
- * @returns A formatted string padded to 80 characters for the terminal title
+ * @returns A formatted string optionally padded to the specified length for the terminal title
  */
 export function computeTerminalTitle({
   streamingState,
@@ -37,18 +39,19 @@ export function computeTerminalTitle({
   folderName,
   showThoughts,
   useDynamicTitle,
+  terminalTitleMaxLen = 80,
+  padWindowTitle = true,
 }: TerminalTitleOptions): string {
-  const MAX_LEN = 80;
-
   // Use CLI_TITLE env var if available, otherwise use the provided folder name
   let displayContext = process.env['CLI_TITLE'] || folderName;
 
   if (!useDynamicTitle) {
     const base = 'Gemini CLI ';
     // Max context length is 80 - base.length - 2 (for brackets)
-    const maxContextLen = MAX_LEN - base.length - 2;
+    const maxContextLen = terminalTitleMaxLen - base.length - 2;
     displayContext = truncate(displayContext, maxContextLen);
-    return `${base}(${displayContext})`.padEnd(MAX_LEN, ' ');
+    const title = `${base}(${displayContext})`;
+    return padWindowTitle ? title.padEnd(terminalTitleMaxLen, ' ') : title;
   }
 
   // Pre-calculate suffix but keep it flexible
@@ -61,19 +64,19 @@ export function computeTerminalTitle({
   ) {
     const base = '✋  Action Required';
     // Max context length is 80 - base.length - 3 (for ' (' and ')')
-    const maxContextLen = MAX_LEN - base.length - 3;
+    const maxContextLen = terminalTitleMaxLen - base.length - 3;
     const context = truncate(displayContext, maxContextLen);
     title = `${base}${getSuffix(context)}`;
   } else if (isSilentWorking) {
     const base = '⏲  Working…';
     // Max context length is 80 - base.length - 3 (for ' (' and ')')
-    const maxContextLen = MAX_LEN - base.length - 3;
+    const maxContextLen = terminalTitleMaxLen - base.length - 3;
     const context = truncate(displayContext, maxContextLen);
     title = `${base}${getSuffix(context)}`;
   } else if (streamingState === StreamingState.Idle) {
     const base = '◇  Ready';
     // Max context length is 80 - base.length - 3 (for ' (' and ')')
-    const maxContextLen = MAX_LEN - base.length - 3;
+    const maxContextLen = terminalTitleMaxLen - base.length - 3;
     const context = truncate(displayContext, maxContextLen);
     title = `${base}${getSuffix(context)}`;
   } else {
@@ -87,11 +90,11 @@ export function computeTerminalTitle({
     const suffix = getSuffix(displayContext);
     const suffixLen = suffix.length;
     const canFitThoughtWithSuffix = cleanSubject
-      ? cleanSubject.length + suffixLen + 3 <= MAX_LEN
+      ? cleanSubject.length + suffixLen + 3 <= terminalTitleMaxLen
       : true;
 
     let activeSuffix = '';
-    let maxStatusLen = MAX_LEN - 3; // Subtract icon prefix "✦  " (3 chars)
+    let maxStatusLen = terminalTitleMaxLen - 3; // Subtract icon prefix "✦  " (3 chars)
 
     if (!cleanSubject || canFitThoughtWithSuffix) {
       activeSuffix = suffix;
@@ -110,6 +113,9 @@ export function computeTerminalTitle({
   const safeTitle = title.replace(/[\x00-\x1F\x7F]/g, '');
 
   // Pad the title to a fixed width to prevent taskbar icon resizing/jitter.
-  // We also slice it to ensure it NEVER exceeds MAX_LEN.
-  return safeTitle.padEnd(MAX_LEN, ' ').substring(0, MAX_LEN);
+  // We also slice it to ensure it NEVER exceeds terminalTitleMaxLen.
+  const finalTitle = padWindowTitle
+    ? safeTitle.padEnd(terminalTitleMaxLen, ' ')
+    : safeTitle;
+  return finalTitle.substring(0, terminalTitleMaxLen);
 }
