@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -12,16 +12,6 @@ import { debugLogger } from '../utils/debugLogger.js';
 
 const MAX_BACKUP_VERSIONS = 20;
 
-/**
- * FNV-1a 64-bit hash of a string, returned as a 16-character hex string.
- *
- * FNV-1a is the standard algorithm for non-cryptographic string hashing:
- * designed for lookup tables, not security. It processes each byte with a
- * single XOR + multiply, so every output bit is used — unlike truncating
- * SHA-256 where 240 of 256 bits are discarded. At 64 bits the birthday-bound
- * collision probability is negligible for any realistic number of source files
- * (< 1 in 10^9 even at 10 000 unique paths).
- */
 export function fnv1a64hex(str: string): string {
   const FNV_PRIME = 1099511628211n;
   const OFFSET_BASIS = 14695981039346656037n;
