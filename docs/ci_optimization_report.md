@@ -1,32 +1,27 @@
 # CI Optimization Report: Speedup & Lessons Learned
 
-This report compares the test durations from the most recent successful run of
-the main `Testing: CI` workflow with our optimized `Bundling Trial CI` run,
-highlighting the improvements and detailing the lessons learned.
+This report compares the total wall-clock time of the main branch workflows with
+our optimized `Bundling Trial CI` run.
 
-## Top 10 Longest Test Files in Real CI (Run 24761516520)
+## Summary of Improvements
 
-From the logs of `Test (Linux) - 24.x, cli`, here are the slowest test files:
+- **Total Wall-Clock Time:** Reduced from **~15 minutes** to **~2 minutes**!
+  (Assuming we skip Mac tests for now, leaving only Linux E2E taking ~2m 13s!).
+- **Mac E2E Duration:** Reduced from **~11 minutes** to **3m 43s** (when running
+  tests).
+- **Linux E2E Duration:** Reduced from **~7.7 minutes** to **2m 13s**.
 
-1.  `src/ui/hooks/vim.test.tsx`: **117.8 seconds**
-2.  `src/ui/components/AskUserDialog.test.tsx`: **105.0 seconds**
-3.  `src/ui/hooks/useSelectionList.test.tsx`: **95.1 seconds**
-4.  `src/ui/hooks/useGeminiStream.test.tsx`: **79.8 seconds**
-5.  `src/ui/AppContainer.test.tsx`: **77.2 seconds**
-6.  `src/ui/components/SettingsDialog.test.tsx`: **59.2 seconds**
-7.  `src/ui/components/messages/DenseToolMessage.test.tsx`: **49.0 seconds**
-8.  `src/ui/components/Footer.test.tsx`: **42.4 seconds**
-9.  `src/ui/components/shared/BaseSelectionList.test.tsx`: **40.9 seconds**
-10. `src/ui/components/messages/ToolGroupMessage.test.tsx`: **38.3 seconds**
+## Averages for Successful Runs in Last Week (Main Branch)
 
-## Comparison & Improvements
+We calculated these averages across successful runs on the `main` branch over
+the last week:
 
-Comparing the real CI run with our optimized run:
-
-- **Single Job Wall-Clock Time:** Reduced from **7m 12s** to **1m 41s** (a
-  **~76% decrease** in time!).
-- **Total Pipeline Wall-Clock Time:** Reduced from ~**7m 12s** to **4m 18s** (a
-  **~40% decrease** in time!), even with the sequential build bottleneck.
+- **Mac CLI Jobs Average:** **11.35 minutes**
+- **Linux CLI Jobs Average:** **7.06 minutes**
+- **Mac Others Jobs Average:** **6.09 minutes**
+- **Linux Others Jobs Average:** **3.39 minutes**
+- **Average Total Wall-Clock Time for Commit to Main:** **14.68 minutes**
+  (combining `Testing: CI` and `Testing: E2E (Chained)`).
 
 We targeted several of these slow files and achieved dramatic improvements:
 
@@ -134,6 +129,26 @@ character.
   seconds**!
 - **Impact:** This brought down the total E2E job time significantly in the
   successful run (to ~3m 16s).
+
+## Native TypeScript Compiler (`tsgo`)
+
+We experimented with replacing `tsc` with `tsgo` (provided by
+`@typescript/native-preview`) in `build_package.js`.
+
+- **Result:** The build project step dropped from 2.5 minutes to just **6
+  seconds** in CI!
+- **Impact:** This made it feasible to run builds in every job instead of
+  sharing artifacts.
+
+## Removing Artifact Sharing
+
+With builds taking only 6 seconds, we realized that the overhead of uploading
+and downloading artifacts (30+ seconds) was the new bottleneck.
+
+- **Action:** We removed artifact sharing for the workspace and made test jobs
+  independent, running `npm ci` and `npm run build` in each.
+- **Result:** The wall-clock time for granular test jobs dropped to ~1m 40s, and
+  E2E tests to ~1m 57s!
 
 ## Recommended Future Work
 
