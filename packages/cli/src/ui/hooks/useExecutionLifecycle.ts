@@ -366,6 +366,7 @@ export const useExecutionLifecycle = (
         let cumulativeStdout: string | AnsiOutput = '';
         let isBinaryStream = false;
         let binaryBytesReceived = 0;
+        let lastTextUpdateTime = 0;
 
         const initialToolDisplay: IndividualToolCallDisplay = {
           callId,
@@ -438,7 +439,13 @@ export const useExecutionLifecycle = (
                       // AnsiOutput (PTY) is always the full state
                       cumulativeStdout = event.chunk;
                     }
-                    shouldUpdate = true;
+                    if (
+                      Date.now() - lastTextUpdateTime >
+                      OUTPUT_UPDATE_INTERVAL_MS
+                    ) {
+                      shouldUpdate = true;
+                      lastTextUpdateTime = Date.now();
+                    }
                     break;
                   case 'binary_detected':
                     isBinaryStream = true;
@@ -447,7 +454,13 @@ export const useExecutionLifecycle = (
                   case 'binary_progress':
                     isBinaryStream = true;
                     binaryBytesReceived = event.bytesReceived;
-                    shouldUpdate = true;
+                    if (
+                      Date.now() - lastTextUpdateTime >
+                      OUTPUT_UPDATE_INTERVAL_MS
+                    ) {
+                      shouldUpdate = true;
+                      lastTextUpdateTime = Date.now();
+                    }
                     break;
                   case 'exit':
                     // No action needed for exit event during streaming
