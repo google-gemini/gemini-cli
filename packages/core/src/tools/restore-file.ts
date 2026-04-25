@@ -22,11 +22,7 @@ import {
   type ExecuteOptions,
 } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
-import {
-  makeRelative,
-  shortenPath,
-  resolveToRealPath,
-} from '../utils/paths.js';
+import { makeRelative, shortenPath } from '../utils/paths.js';
 import { isNodeError } from '../utils/errors.js';
 import { DEFAULT_DIFF_OPTIONS } from './diffOptions.js';
 import { debugLogger } from '../utils/debugLogger.js';
@@ -342,9 +338,7 @@ export class RestoreFileTool extends BaseDeclarativeTool<
     ) {
       return 'version must be a non-negative integer';
     }
-    const resolvedPath = resolveToRealPath(
-      path.resolve(this.config.getTargetDir(), filePath),
-    );
+    const resolvedPath = path.resolve(this.config.getTargetDir(), filePath);
     return this.config.validatePathAccess(resolvedPath);
   }
 
