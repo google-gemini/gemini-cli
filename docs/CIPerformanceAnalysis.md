@@ -10,6 +10,8 @@ our optimized `Bundling Trial CI` run.
 - **Mac E2E Duration:** Reduced from **~11 minutes** to **3m 43s** (when running
   tests).
 - **Linux E2E Duration:** Reduced from **~7.7 minutes** to **2m 13s**.
+- **Local `preflight:fast` Duration:** Took **9 minutes and 17 seconds**
+  (running over 12,500 tests).
 
 ## Averages for Successful Runs in Last Week (Main Branch)
 
