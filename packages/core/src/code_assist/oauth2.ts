@@ -18,7 +18,7 @@ import url from 'node:url';
 import crypto from 'node:crypto';
 import * as net from 'node:net';
 import { EventEmitter } from 'node:events';
-import open from 'open';
+import { openBrowserSecurely } from '../utils/secure-browser-launcher.js';
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
 import type { Config } from '../config/config.js';
@@ -289,7 +289,41 @@ async function initOauthClient(
       }
     }
 
-    const webLogin = await authWithWeb(client);
+    // Set up an AbortController for timeout and cancellation before opening the
+    // browser so the CLI remains responsive to Ctrl+C throughout.
+    // The signal is propagated into authWithWeb so it closes the callback
+    // server on abort, preventing resource leaks.
+    const abortController = new AbortController();
+    const { signal } = abortController;
+
+    const authTimeout = 5 * 60 * 1000; // 5 minutes
+    const timeoutId = setTimeout(() => {
+      abortController.abort(
+        new FatalAuthenticationError(
+          'Authentication timed out after 5 minutes. The browser tab may have gotten stuck in a loading state. ' +
+            'Please try again or use NO_BROWSER=true for manual authentication.',
+        ),
+      );
+    }, authTimeout);
+
+    const sigIntHandler = () =>
+      abortController.abort(
+        new FatalCancellationError('Authentication cancelled by user.'),
+      );
+    process.on('SIGINT', sigIntHandler);
+
+    // Note that SIGINT might not get raised on Ctrl+C in raw mode
+    // so we also need to look for Ctrl+C directly in stdin.
+    const stdinHandler = (data: Buffer) => {
+      if (data.includes(0x03)) {
+        abortController.abort(
+          new FatalCancellationError('Authentication cancelled by user.'),
+        );
+      }
+    };
+    process.stdin.on('data', stdinHandler);
+
+    const webLogin = await authWithWeb(client, signal);
 
     coreEvents.emit(CoreEvent.UserFeedback, {
       severity: 'info',
@@ -297,91 +331,29 @@ async function initOauthClient(
         `\n\nAttempting to open authentication page in your browser.\n` +
         `Otherwise navigate to:\n\n${webLogin.authUrl}\n\n\n`,
     });
-    try {
-      // Attempt to open the authentication URL in the default browser.
-      // We do not use the `wait` option here because the main script's execution
-      // is already paused by `loginCompletePromise`, which awaits the server callback.
-      const childProcess = await open(webLogin.authUrl);
 
-      // IMPORTANT: Attach an error handler to the returned child process.
-      // Without this, if `open` fails to spawn a process (e.g., `xdg-open` is not found
-      // in a minimal Docker container), it will emit an unhandled 'error' event,
-      // causing the entire Node.js process to crash.
-      childProcess.on('error', (error) => {
-        coreEvents.emit(CoreEvent.UserFeedback, {
-          severity: 'error',
-          message:
-            `Failed to open browser with error: ${getErrorMessage(error)}\n` +
-            `Please try running again with NO_BROWSER=true set.`,
-        });
-      });
-    } catch (err) {
+    // Fire-and-forget: don't await so that the Ctrl+C handler above is already
+    // active while the browser is launching.
+    openBrowserSecurely(webLogin.authUrl).catch((err) => {
       coreEvents.emit(CoreEvent.UserFeedback, {
         severity: 'error',
         message:
           `Failed to open browser with error: ${getErrorMessage(err)}\n` +
           `Please try running again with NO_BROWSER=true set.`,
       });
-      throw new FatalAuthenticationError(
-        `Failed to open browser: ${getErrorMessage(err)}`,
-      );
-    }
+    });
+
     coreEvents.emit(CoreEvent.UserFeedback, {
       severity: 'info',
       message: 'Waiting for authentication...\n',
     });
 
-    // Add timeout to prevent infinite waiting when browser tab gets stuck
-    const authTimeout = 5 * 60 * 1000; // 5 minutes timeout
-    let timeoutId: NodeJS.Timeout | undefined;
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      timeoutId = setTimeout(() => {
-        reject(
-          new FatalAuthenticationError(
-            'Authentication timed out after 5 minutes. The browser tab may have gotten stuck in a loading state. ' +
-              'Please try again or use NO_BROWSER=true for manual authentication.',
-          ),
-        );
-      }, authTimeout);
-    });
-
-    // Listen for SIGINT to stop waiting for auth so the terminal doesn't hang
-    // if the user chooses not to auth.
-    let sigIntHandler: (() => void) | undefined;
-    let stdinHandler: ((data: Buffer) => void) | undefined;
-    const cancellationPromise = new Promise<never>((_, reject) => {
-      sigIntHandler = () =>
-        reject(new FatalCancellationError('Authentication cancelled by user.'));
-      process.on('SIGINT', sigIntHandler);
-
-      // Note that SIGINT might not get raised on Ctrl+C in raw mode
-      // so we also need to look for Ctrl+C directly in stdin.
-      stdinHandler = (data: Buffer) => {
-        if (data.includes(0x03)) {
-          reject(
-            new FatalCancellationError('Authentication cancelled by user.'),
-          );
-        }
-      };
-      process.stdin.on('data', stdinHandler);
-    });
-
     try {
-      await Promise.race([
-        webLogin.loginCompletePromise,
-        timeoutPromise,
-        cancellationPromise,
-      ]);
+      await webLogin.loginCompletePromise;
     } finally {
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
-      if (sigIntHandler) {
-        process.removeListener('SIGINT', sigIntHandler);
-      }
-      if (stdinHandler) {
-        process.stdin.removeListener('data', stdinHandler);
-      }
+      clearTimeout(timeoutId);
+      process.removeListener('SIGINT', sigIntHandler);
+      process.stdin.removeListener('data', stdinHandler);
     }
 
     coreEvents.emit(CoreEvent.UserFeedback, {
@@ -499,7 +471,10 @@ async function authWithUserCode(client: OAuth2Client): Promise<boolean> {
   }
 }
 
-async function authWithWeb(client: OAuth2Client): Promise<OauthWebLogin> {
+async function authWithWeb(
+  client: OAuth2Client,
+  signal: AbortSignal,
+): Promise<OauthWebLogin> {
   const port = await getAvailablePort();
   // The hostname used for the HTTP server binding (e.g., '0.0.0.0' in Docker).
   const host = process.env['OAUTH_CALLBACK_HOST'] || '127.0.0.1';
@@ -604,6 +579,19 @@ async function authWithWeb(client: OAuth2Client): Promise<OauthWebLogin> {
         server.close();
       }
     });
+
+    // Close the server and reject if the signal is aborted (timeout or
+    // user cancellation).  This prevents the server from leaking when
+    // loginCompletePromise is abandoned.
+    const onAbort = () => {
+      server.close();
+      reject(signal.reason);
+    };
+    if (signal.aborted) {
+      onAbort();
+      return;
+    }
+    signal.addEventListener('abort', onAbort, { once: true });
 
     server.listen(port, host, () => {
       // Server started successfully
