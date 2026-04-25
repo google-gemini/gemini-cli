@@ -23,6 +23,11 @@ import {
   Storage,
   generalistProfile,
   type ContextManagementConfig,
+  PolicyDecision,
+  createPolicyEngineConfig,
+  loadServerHierarchicalMemory,
+  type Config,
+  TelemetryTarget,
 } from '@google/gemini-cli-core';
 import { loadCliConfig, parseArguments, type CliArgs } from './config.js';
 import {
@@ -30,7 +35,6 @@ import {
   type MergedSettings,
   createTestMergedSettings,
 } from './settings.js';
-import * as ServerConfig from '@google/gemini-cli-core';
 
 import { isWorkspaceTrusted } from './trustedFolders.js';
 import { ExtensionManager } from './extension-manager.js';
@@ -150,9 +154,9 @@ vi.mock('@google/gemini-cli-core', async () => {
         rules: [],
         checkers: [],
         defaultDecision: interactive
-          ? ServerConfig.PolicyDecision.ASK_USER
-          : ServerConfig.PolicyDecision.DENY,
-        approvalMode: approvalMode ?? ServerConfig.ApprovalMode.DEFAULT,
+          ? PolicyDecision.ASK_USER
+          : PolicyDecision.DENY,
+        approvalMode: approvalMode ?? ApprovalMode.DEFAULT,
         nonInteractive: !interactive,
       }),
     ),
@@ -986,7 +990,7 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
     ]);
     const argv = await parseArguments(createTestMergedSettings());
     await loadCliConfig(settings, 'session-id', argv);
-    expect(ServerConfig.loadServerHierarchicalMemory).toHaveBeenCalledWith(
+    expect(loadServerHierarchicalMemory).toHaveBeenCalledWith(
       expect.any(String),
       [],
       expect.any(Object),
@@ -1016,7 +1020,7 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
     const argv = await parseArguments(settings);
     await loadCliConfig(settings, 'session-id', argv);
 
-    expect(ServerConfig.loadServerHierarchicalMemory).toHaveBeenCalledWith(
+    expect(loadServerHierarchicalMemory).toHaveBeenCalledWith(
       expect.any(String),
       [includeDir],
       expect.any(Object),
@@ -1045,7 +1049,7 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
     const argv = await parseArguments(settings);
     await loadCliConfig(settings, 'session-id', argv);
 
-    expect(ServerConfig.loadServerHierarchicalMemory).toHaveBeenCalledWith(
+    expect(loadServerHierarchicalMemory).toHaveBeenCalledWith(
       expect.any(String),
       [],
       expect.any(Object),
@@ -2746,7 +2750,7 @@ describe('loadCliConfig approval mode', () => {
       'test-session',
       argv,
     );
-    expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.DEFAULT);
+    expect(config.getApprovalMode()).toBe(ApprovalMode.DEFAULT);
   });
 
   it('should set YOLO approval mode when --yolo flag is used', async () => {
@@ -2757,7 +2761,7 @@ describe('loadCliConfig approval mode', () => {
       'test-session',
       argv,
     );
-    expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.YOLO);
+    expect(config.getApprovalMode()).toBe(ApprovalMode.YOLO);
   });
 
   it('should set YOLO approval mode when -y flag is used', async () => {
@@ -2768,7 +2772,7 @@ describe('loadCliConfig approval mode', () => {
       'test-session',
       argv,
     );
-    expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.YOLO);
+    expect(config.getApprovalMode()).toBe(ApprovalMode.YOLO);
   });
 
   it('should set DEFAULT approval mode when --approval-mode=default', async () => {
@@ -2779,7 +2783,7 @@ describe('loadCliConfig approval mode', () => {
       'test-session',
       argv,
     );
-    expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.DEFAULT);
+    expect(config.getApprovalMode()).toBe(ApprovalMode.DEFAULT);
   });
 
   it('should set AUTO_EDIT approval mode when --approval-mode=auto_edit', async () => {
@@ -2790,7 +2794,7 @@ describe('loadCliConfig approval mode', () => {
       'test-session',
       argv,
     );
-    expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.AUTO_EDIT);
+    expect(config.getApprovalMode()).toBe(ApprovalMode.AUTO_EDIT);
   });
 
   it('should set YOLO approval mode when --approval-mode=yolo', async () => {
@@ -2801,7 +2805,7 @@ describe('loadCliConfig approval mode', () => {
       'test-session',
       argv,
     );
-    expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.YOLO);
+    expect(config.getApprovalMode()).toBe(ApprovalMode.YOLO);
   });
 
   it('should prioritize --approval-mode over --yolo when both would be valid (but validation prevents this)', async () => {
@@ -2816,7 +2820,7 @@ describe('loadCliConfig approval mode', () => {
       'test-session',
       argv,
     );
-    expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.DEFAULT);
+    expect(config.getApprovalMode()).toBe(ApprovalMode.DEFAULT);
   });
 
   it('should fall back to --yolo behavior when --approval-mode is not set', async () => {
@@ -2827,7 +2831,7 @@ describe('loadCliConfig approval mode', () => {
       'test-session',
       argv,
     );
-    expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.YOLO);
+    expect(config.getApprovalMode()).toBe(ApprovalMode.YOLO);
   });
 
   it('should set Plan approval mode when --approval-mode=plan is used and plan is enabled', async () => {
@@ -2839,7 +2843,7 @@ describe('loadCliConfig approval mode', () => {
       },
     });
     const config = await loadCliConfig(settings, 'test-session', argv);
-    expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.PLAN);
+    expect(config.getApprovalMode()).toBe(ApprovalMode.PLAN);
   });
 
   it('should ignore "yolo" in settings.tools.approvalMode and fall back to DEFAULT', async () => {
@@ -2852,7 +2856,7 @@ describe('loadCliConfig approval mode', () => {
     });
     const argv = await parseArguments(settings);
     const config = await loadCliConfig(settings, 'test-session', argv);
-    expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.DEFAULT);
+    expect(config.getApprovalMode()).toBe(ApprovalMode.DEFAULT);
   });
 
   it('should throw error when --approval-mode=plan is used but plan is disabled', async () => {
@@ -2909,7 +2913,7 @@ describe('loadCliConfig approval mode', () => {
         'test-session',
         argv,
       );
-      expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.DEFAULT);
+      expect(config.getApprovalMode()).toBe(ApprovalMode.DEFAULT);
     });
 
     it('should override --approval-mode=auto_edit to DEFAULT', async () => {
@@ -2920,7 +2924,7 @@ describe('loadCliConfig approval mode', () => {
         'test-session',
         argv,
       );
-      expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.DEFAULT);
+      expect(config.getApprovalMode()).toBe(ApprovalMode.DEFAULT);
     });
 
     it('should override --yolo flag to DEFAULT', async () => {
@@ -2931,7 +2935,7 @@ describe('loadCliConfig approval mode', () => {
         'test-session',
         argv,
       );
-      expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.DEFAULT);
+      expect(config.getApprovalMode()).toBe(ApprovalMode.DEFAULT);
     });
 
     it('should remain DEFAULT when --approval-mode=default', async () => {
@@ -2942,7 +2946,7 @@ describe('loadCliConfig approval mode', () => {
         'test-session',
         argv,
       );
-      expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.DEFAULT);
+      expect(config.getApprovalMode()).toBe(ApprovalMode.DEFAULT);
     });
   });
 
@@ -2954,9 +2958,7 @@ describe('loadCliConfig approval mode', () => {
       });
       const argv = await parseArguments(settings);
       const config = await loadCliConfig(settings, 'test-session', argv);
-      expect(config.getApprovalMode()).toBe(
-        ServerConfig.ApprovalMode.AUTO_EDIT,
-      );
+      expect(config.getApprovalMode()).toBe(ApprovalMode.AUTO_EDIT);
     });
 
     it('should prioritize --approval-mode flag over settings', async () => {
@@ -2966,9 +2968,7 @@ describe('loadCliConfig approval mode', () => {
       });
       const argv = await parseArguments(settings);
       const config = await loadCliConfig(settings, 'test-session', argv);
-      expect(config.getApprovalMode()).toBe(
-        ServerConfig.ApprovalMode.AUTO_EDIT,
-      );
+      expect(config.getApprovalMode()).toBe(ApprovalMode.AUTO_EDIT);
     });
 
     it('should prioritize --yolo flag over settings', async () => {
@@ -2978,7 +2978,7 @@ describe('loadCliConfig approval mode', () => {
       });
       const argv = await parseArguments(settings);
       const config = await loadCliConfig(settings, 'test-session', argv);
-      expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.YOLO);
+      expect(config.getApprovalMode()).toBe(ApprovalMode.YOLO);
     });
 
     it('should respect plan mode from settings when plan is enabled', async () => {
@@ -2991,7 +2991,7 @@ describe('loadCliConfig approval mode', () => {
       });
       const argv = await parseArguments(settings);
       const config = await loadCliConfig(settings, 'test-session', argv);
-      expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.PLAN);
+      expect(config.getApprovalMode()).toBe(ApprovalMode.PLAN);
     });
 
     it('should fall back to default if plan mode is in settings but disabled', async () => {
@@ -3109,7 +3109,7 @@ describe('loadCliConfig fileFiltering', () => {
   >;
   const testCases: Array<{
     property: keyof FileFilteringSettings;
-    getter: (config: ServerConfig.Config) => boolean;
+    getter: (config: Config) => boolean;
     value: boolean;
   }> = [
     {
@@ -3353,7 +3353,7 @@ describe('Telemetry configuration via environment variables', () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments(createTestMergedSettings());
     const settings = createTestMergedSettings({
-      telemetry: { target: ServerConfig.TelemetryTarget.LOCAL },
+      telemetry: { target: TelemetryTarget.LOCAL },
     });
     const config = await loadCliConfig(settings, 'test-session', argv);
     expect(config.getTelemetryTarget()).toBe('gcp');
@@ -3364,7 +3364,7 @@ describe('Telemetry configuration via environment variables', () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments(createTestMergedSettings());
     const settings = createTestMergedSettings({
-      telemetry: { target: ServerConfig.TelemetryTarget.GCP },
+      telemetry: { target: TelemetryTarget.GCP },
     });
     await expect(loadCliConfig(settings, 'test-session', argv)).rejects.toThrow(
       /Invalid telemetry configuration: .*Invalid telemetry target/i,
@@ -3442,7 +3442,7 @@ describe('Telemetry configuration via environment variables', () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments(createTestMergedSettings());
     const settings = createTestMergedSettings({
-      telemetry: { target: ServerConfig.TelemetryTarget.LOCAL },
+      telemetry: { target: TelemetryTarget.LOCAL },
     });
     const config = await loadCliConfig(settings, 'test-session', argv);
     expect(config.getTelemetryTarget()).toBe('local');
@@ -3566,7 +3566,7 @@ describe('Policy Engine Integration in loadCliConfig', () => {
 
     await loadCliConfig(settings, 'test-session', argv);
 
-    expect(ServerConfig.createPolicyEngineConfig).toHaveBeenCalledWith(
+    expect(createPolicyEngineConfig).toHaveBeenCalledWith(
       expect.objectContaining({
         tools: expect.objectContaining({
           allowed: expect.arrayContaining(['cli-tool']),
@@ -3589,7 +3589,7 @@ describe('Policy Engine Integration in loadCliConfig', () => {
     await loadCliConfig(settings, 'test-session', argv);
 
     // In non-interactive mode, only ask_user is excluded by default
-    expect(ServerConfig.createPolicyEngineConfig).toHaveBeenCalledWith(
+    expect(createPolicyEngineConfig).toHaveBeenCalledWith(
       expect.objectContaining({
         tools: expect.objectContaining({
           exclude: expect.arrayContaining([ASK_USER_TOOL_NAME]),
@@ -3613,7 +3613,7 @@ describe('Policy Engine Integration in loadCliConfig', () => {
 
     await loadCliConfig(settings, 'test-session', argv);
 
-    expect(ServerConfig.createPolicyEngineConfig).toHaveBeenCalledWith(
+    expect(createPolicyEngineConfig).toHaveBeenCalledWith(
       expect.objectContaining({
         policyPaths: [
           path.normalize('/path/to/policy1.toml'),

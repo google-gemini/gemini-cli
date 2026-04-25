@@ -78,3 +78,52 @@ This skill guides the agent in conducting thorough code reviews.
   use it.
 - **Body**: The Markdown body of the file contains the instructions that guide
   the agent's behavior when the skill is active.
+
+## Packaging and Distribution
+
+To share a skill or distribute it as a standalone archive, you can package the
+skill directory into a `.skill` file. This is essentially a ZIP archive that the
+`gemini skills install` command can process.
+
+### Using the `skill-creator` toolchain
+
+The built-in `skill-creator` skill includes a packaging script that validates
+your skill (checking for missing frontmatter, unresolved TODOs, etc.) before
+creating the archive.
+
+To package a skill:
+
+1.  **Activate** the `skill-creator` skill in a Gemini session.
+2.  **Ask** the agent to "package my skill located at `./path/to/skill`".
+
+The agent will run the necessary validation and create a `.skill` file in your
+specified output directory.
+
+### Manual Packaging
+
+If you prefer to package manually, you can simply create a ZIP archive of the
+skill's root directory (ensuring `SKILL.md` is at the top level) and rename the
+extension to `.skill`.
+
+```bash
+# Example: Package 'my-skill' directory into 'my-skill.skill'
+(cd my-skill/ && zip -r ../my-skill.skill .)
+```
+
+## Installing a Packaged Skill
+
+Once you have a `.skill` file, you can install it using the `gemini` CLI.
+
+```bash
+# Install to the user scope (global)
+gemini skills install ./my-skill.skill
+
+# Install to the workspace scope (local repository)
+gemini skills install ./my-skill.skill --scope workspace
+```
+
+After installation, remember to reload your session to pick up the new
+expertise:
+
+1.  In an interactive session, run `/skills reload`.
+2.  Verify the installation with `/skills list`.

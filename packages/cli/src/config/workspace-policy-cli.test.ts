@@ -6,9 +6,13 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as path from 'node:path';
+import {
+  isHeadlessMode,
+  Storage,
+  createPolicyEngineConfig,
+} from '@google/gemini-cli-core';
 import { loadCliConfig, type CliArgs } from './config.js';
 import { createTestMergedSettings } from './settings.js';
-import * as ServerConfig from '@google/gemini-cli-core';
 import { isWorkspaceTrusted } from './trustedFolders.js';
 import * as Policy from './policy.js';
 
@@ -21,9 +25,9 @@ const mockCheckIntegrity = vi.fn();
 const mockAcceptIntegrity = vi.fn();
 
 vi.mock('@google/gemini-cli-core', async () => {
-  const actual = await vi.importActual<typeof ServerConfig>(
-    '@google/gemini-cli-core',
-  );
+  const actual = await vi.importActual<
+    typeof import('@google/gemini-cli-core')
+  >('@google/gemini-cli-core');
   return {
     ...actual,
     loadServerHierarchicalMemory: vi.fn().mockResolvedValue({
@@ -61,11 +65,11 @@ describe('Workspace-Level Policy CLI Integration', () => {
       hash: 'test-hash',
       fileCount: 1,
     });
-    vi.mocked(ServerConfig.isHeadlessMode).mockReturnValue(false);
+    vi.mocked(isHeadlessMode).mockReturnValue(false);
   });
 
   it('should have getWorkspacePoliciesDir on Storage class', () => {
-    const storage = new ServerConfig.Storage(MOCK_CWD);
+    const storage = new Storage(MOCK_CWD);
     expect(storage.getWorkspacePoliciesDir).toBeDefined();
     expect(typeof storage.getWorkspacePoliciesDir).toBe('function');
   });
@@ -81,7 +85,7 @@ describe('Workspace-Level Policy CLI Integration', () => {
 
     await loadCliConfig(settings, 'test-session', argv, { cwd: MOCK_CWD });
 
-    expect(ServerConfig.createPolicyEngineConfig).toHaveBeenCalledWith(
+    expect(createPolicyEngineConfig).toHaveBeenCalledWith(
       expect.objectContaining({
         workspacePoliciesDir: expect.stringContaining(
           path.join('.gemini', 'policies'),
@@ -104,7 +108,7 @@ describe('Workspace-Level Policy CLI Integration', () => {
 
     await loadCliConfig(settings, 'test-session', argv, { cwd: MOCK_CWD });
 
-    expect(ServerConfig.createPolicyEngineConfig).toHaveBeenCalledWith(
+    expect(createPolicyEngineConfig).toHaveBeenCalledWith(
       expect.objectContaining({
         workspacePoliciesDir: undefined,
       }),
@@ -130,7 +134,7 @@ describe('Workspace-Level Policy CLI Integration', () => {
 
     await loadCliConfig(settings, 'test-session', argv, { cwd: MOCK_CWD });
 
-    expect(ServerConfig.createPolicyEngineConfig).toHaveBeenCalledWith(
+    expect(createPolicyEngineConfig).toHaveBeenCalledWith(
       expect.objectContaining({
         workspacePoliciesDir: undefined,
       }),
@@ -150,7 +154,7 @@ describe('Workspace-Level Policy CLI Integration', () => {
       hash: 'new-hash',
       fileCount: 1,
     });
-    vi.mocked(ServerConfig.isHeadlessMode).mockReturnValue(true); // Non-interactive
+    vi.mocked(isHeadlessMode).mockReturnValue(true); // Non-interactive
 
     const settings = createTestMergedSettings();
     const argv = { prompt: 'do something' } as unknown as CliArgs;
@@ -162,7 +166,7 @@ describe('Workspace-Level Policy CLI Integration', () => {
       MOCK_CWD,
       'new-hash',
     );
-    expect(ServerConfig.createPolicyEngineConfig).toHaveBeenCalledWith(
+    expect(createPolicyEngineConfig).toHaveBeenCalledWith(
       expect.objectContaining({
         workspacePoliciesDir: expect.stringContaining(
           path.join('.gemini', 'policies'),
@@ -184,7 +188,7 @@ describe('Workspace-Level Policy CLI Integration', () => {
       hash: 'new-hash',
       fileCount: 1,
     });
-    vi.mocked(ServerConfig.isHeadlessMode).mockReturnValue(false); // Interactive
+    vi.mocked(isHeadlessMode).mockReturnValue(false); // Interactive
 
     const settings = createTestMergedSettings();
     const argv = {
@@ -202,7 +206,7 @@ describe('Workspace-Level Policy CLI Integration', () => {
       MOCK_CWD,
       'new-hash',
     );
-    expect(ServerConfig.createPolicyEngineConfig).toHaveBeenCalledWith(
+    expect(createPolicyEngineConfig).toHaveBeenCalledWith(
       expect.objectContaining({
         workspacePoliciesDir: expect.stringContaining(
           path.join('.gemini', 'policies'),
@@ -224,7 +228,7 @@ describe('Workspace-Level Policy CLI Integration', () => {
       hash: 'new-hash',
       fileCount: 5,
     });
-    vi.mocked(ServerConfig.isHeadlessMode).mockReturnValue(false); // Interactive
+    vi.mocked(isHeadlessMode).mockReturnValue(false); // Interactive
 
     const settings = createTestMergedSettings();
     const argv = { query: 'test' } as unknown as CliArgs;
@@ -240,7 +244,7 @@ describe('Workspace-Level Policy CLI Integration', () => {
       'new-hash',
     );
 
-    expect(ServerConfig.createPolicyEngineConfig).toHaveBeenCalledWith(
+    expect(createPolicyEngineConfig).toHaveBeenCalledWith(
       expect.objectContaining({
         workspacePoliciesDir: expect.stringContaining(
           path.join('.gemini', 'policies'),
@@ -267,7 +271,7 @@ describe('Workspace-Level Policy CLI Integration', () => {
         hash: 'new-hash',
         fileCount: 1,
       });
-      vi.mocked(ServerConfig.isHeadlessMode).mockReturnValue(false); // Interactive
+      vi.mocked(isHeadlessMode).mockReturnValue(false); // Interactive
 
       const settings = createTestMergedSettings();
       const argv = {
@@ -285,7 +289,7 @@ describe('Workspace-Level Policy CLI Integration', () => {
         policyDir: expect.stringContaining(path.join('.gemini', 'policies')),
         newHash: 'new-hash',
       });
-      expect(ServerConfig.createPolicyEngineConfig).toHaveBeenCalledWith(
+      expect(createPolicyEngineConfig).toHaveBeenCalledWith(
         expect.objectContaining({
           workspacePoliciesDir: undefined,
         }),

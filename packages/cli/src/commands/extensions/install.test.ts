@@ -15,7 +15,7 @@ import {
 } from 'vitest';
 import { handleInstall, installCommand } from './install.js';
 import yargs from 'yargs';
-import * as core from '@google/gemini-cli-core';
+import { debugLogger } from '@google/gemini-cli-core';
 import type { Stats } from 'node:fs';
 import * as path from 'node:path';
 import { promptForSetting } from '../../config/extensions/extensionSettings.js';
@@ -116,12 +116,8 @@ describe('handleInstall', () => {
   let processSpy: MockInstance;
 
   beforeEach(() => {
-    debugLogSpy = vi
-      .spyOn(core.debugLogger, 'log')
-      .mockImplementation(() => {});
-    debugErrorSpy = vi
-      .spyOn(core.debugLogger, 'error')
-      .mockImplementation(() => {});
+    debugLogSpy = vi.spyOn(debugLogger, 'log').mockImplementation(() => {});
+    debugErrorSpy = vi.spyOn(debugLogger, 'error').mockImplementation(() => {});
     processSpy = vi
       .spyOn(process, 'exit')
       .mockImplementation(() => undefined as never);

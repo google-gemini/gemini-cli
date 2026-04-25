@@ -106,6 +106,18 @@ gemini skills enable my-expertise
 gemini skills disable my-expertise --scope workspace
 ```
 
+### Activation and Reloading
+
+After installing or linking a new skill, it is not automatically available in
+currently active sessions. To pick up the new expertise:
+
+1.  **In an interactive session**: Run the `/skills reload` slash command. This
+    refreshes the list of discovered skills from all tiers and scopes.
+2.  **Verify**: Run `/skills list` to confirm the new skill is discovered and
+    enabled.
+3.  **Automatic Discovery**: New sessions will automatically discover all
+    available skills during startup.
+
 ## How it Works
 
 1.  **Discovery**: At the start of a session, Gemini CLI scans the discovery
