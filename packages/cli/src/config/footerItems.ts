@@ -97,15 +97,15 @@ export function deriveItemsFromLegacySettings(
     if (idx !== -1) arr.splice(idx, 1);
   };
 
-  if (settings.ui.footer.hideCWD) remove(items, 'workspace');
-  if (settings.ui.footer.hideSandboxStatus) remove(items, 'sandbox');
-  if (settings.ui.footer.hideModelInfo) {
+  if (!settings.ui.footer.showCWD) remove(items, 'workspace');
+  if (!settings.ui.footer.showSandboxStatus) remove(items, 'sandbox');
+  if (!settings.ui.footer.showModelInfo) {
     remove(items, 'model-name');
     remove(items, 'context-used');
     remove(items, 'quota');
   }
   if (
-    !settings.ui.footer.hideContextPercentage &&
+    settings.ui.footer.showContextPercentage &&
     !items.includes('context-used')
   ) {
     const modelIdx = items.indexOf('model-name');

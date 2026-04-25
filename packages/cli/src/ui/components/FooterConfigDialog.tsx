@@ -143,7 +143,7 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
     const currentSetting = settings.merged.ui?.footer?.items;
     // When items haven't been explicitly set yet (legacy mode), compare against
     // the legacy-derived items to avoid persisting items and silently overriding
-    // legacy boolean settings like hideContextPercentage.
+    // legacy boolean settings like showContextPercentage.
     const effectiveCurrent =
       currentSetting ?? deriveItemsFromLegacySettings(settings.merged);
     if (JSON.stringify(finalItems) !== JSON.stringify(effectiveCurrent)) {

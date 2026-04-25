@@ -925,6 +925,91 @@ export function migrateDeprecatedSettings(
     const uiSettings = settings.ui as Record<string, unknown> | undefined;
     if (uiSettings) {
       const newUi = { ...uiSettings };
+      let uiModified = false;
+
+      // Top-level ui hide* → show* renames (polarity is inverted by migrateBoolean).
+      uiModified =
+        migrateBoolean(
+          newUi,
+          'hideWindowTitle',
+          'showWindowTitle',
+          'ui',
+          foundDeprecated,
+        ) || uiModified;
+      uiModified =
+        migrateBoolean(newUi, 'hideTips', 'showTips', 'ui', foundDeprecated) ||
+        uiModified;
+      uiModified =
+        migrateBoolean(
+          newUi,
+          'hideBanner',
+          'showBanner',
+          'ui',
+          foundDeprecated,
+        ) || uiModified;
+      uiModified =
+        migrateBoolean(
+          newUi,
+          'hideContextSummary',
+          'showContextSummary',
+          'ui',
+          foundDeprecated,
+        ) || uiModified;
+      uiModified =
+        migrateBoolean(
+          newUi,
+          'hideFooter',
+          'showFooter',
+          'ui',
+          foundDeprecated,
+        ) || uiModified;
+
+      // ui.footer.hide* → ui.footer.show* renames.
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      const footerSettings = newUi['footer'] as
+        | Record<string, unknown>
+        | undefined;
+      if (footerSettings) {
+        const newFooter = { ...footerSettings };
+        let footerModified = false;
+        footerModified =
+          migrateBoolean(
+            newFooter,
+            'hideCWD',
+            'showCWD',
+            'ui.footer',
+            foundDeprecated,
+          ) || footerModified;
+        footerModified =
+          migrateBoolean(
+            newFooter,
+            'hideSandboxStatus',
+            'showSandboxStatus',
+            'ui.footer',
+            foundDeprecated,
+          ) || footerModified;
+        footerModified =
+          migrateBoolean(
+            newFooter,
+            'hideModelInfo',
+            'showModelInfo',
+            'ui.footer',
+            foundDeprecated,
+          ) || footerModified;
+        footerModified =
+          migrateBoolean(
+            newFooter,
+            'hideContextPercentage',
+            'showContextPercentage',
+            'ui.footer',
+            foundDeprecated,
+          ) || footerModified;
+        if (footerModified) {
+          newUi['footer'] = newFooter;
+          uiModified = true;
+        }
+      }
+
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const accessibilitySettings = newUi['accessibility'] as
         | Record<string, unknown>
@@ -942,10 +1027,7 @@ export function migrateDeprecatedSettings(
           )
         ) {
           newUi['accessibility'] = newAccessibility;
-          loadedSettings.setValue(scope, 'ui', newUi);
-          if (!settingsFile.readOnly) {
-            anyModified = true;
-          }
+          uiModified = true;
         }
 
         // Migrate enableLoadingPhrases: false → loadingPhrases: 'off'
@@ -956,12 +1038,97 @@ export function migrateDeprecatedSettings(
         ) {
           if (!enableLP) {
             newUi['loadingPhrases'] = 'off';
-            loadedSettings.setValue(scope, 'ui', newUi);
-            if (!settingsFile.readOnly) {
-              anyModified = true;
-            }
+            uiModified = true;
           }
           foundDeprecated.push('ui.accessibility.enableLoadingPhrases');
+        }
+      }
+
+      if (uiModified) {
+        loadedSettings.setValue(scope, 'ui', newUi);
+        if (!settingsFile.readOnly) {
+          anyModified = true;
+        }
+      }
+    }
+
+    // Migrate model settings
+    const modelSettings = settings.model as Record<string, unknown> | undefined;
+    if (modelSettings) {
+      const newModel = { ...modelSettings };
+      let modelModified = false;
+      modelModified =
+        migrateBoolean(
+          newModel,
+          'disableLoopDetection',
+          'enableLoopDetection',
+          'model',
+          foundDeprecated,
+        ) || modelModified;
+      modelModified =
+        migrateBoolean(
+          newModel,
+          'skipNextSpeakerCheck',
+          'enableNextSpeakerCheck',
+          'model',
+          foundDeprecated,
+        ) || modelModified;
+      if (modelModified) {
+        loadedSettings.setValue(scope, 'model', newModel);
+        if (!settingsFile.readOnly) {
+          anyModified = true;
+        }
+      }
+    }
+
+    // Migrate security settings
+    const securitySettings = settings.security as
+      | Record<string, unknown>
+      | undefined;
+    if (securitySettings) {
+      const newSecurity = { ...securitySettings };
+      if (
+        migrateBoolean(
+          newSecurity,
+          'disableAlwaysAllow',
+          'enableAlwaysAllow',
+          'security',
+          foundDeprecated,
+        )
+      ) {
+        loadedSettings.setValue(scope, 'security', newSecurity);
+        if (!settingsFile.readOnly) {
+          anyModified = true;
+        }
+      }
+    }
+
+    // Migrate agents.browser settings
+    const agentsSettings = settings.agents as
+      | Record<string, unknown>
+      | undefined;
+    if (agentsSettings) {
+      const newAgents = { ...agentsSettings };
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      const browserSettings = newAgents['browser'] as
+        | Record<string, unknown>
+        | undefined;
+      if (browserSettings) {
+        const newBrowser = { ...browserSettings };
+        if (
+          migrateBoolean(
+            newBrowser,
+            'disableUserInput',
+            'enableUserInput',
+            'agents.browser',
+            foundDeprecated,
+          )
+        ) {
+          newAgents['browser'] = newBrowser;
+          loadedSettings.setValue(scope, 'agents', newAgents);
+          if (!settingsFile.readOnly) {
+            anyModified = true;
+          }
         }
       }
     }
@@ -997,9 +1164,14 @@ export function migrateDeprecatedSettings(
       }
     }
 
-    // Migrate tools settings
+    // Migrate tools settings. All tools.* migrations operate on a single
+    // newTools clone and are written back via one setValue, so independent
+    // migrations cannot overwrite each other.
     const toolsSettings = settings.tools as Record<string, unknown> | undefined;
     if (toolsSettings) {
+      const newTools = { ...toolsSettings };
+      let toolsModified = false;
+
       if (toolsSettings['approvalMode'] !== undefined) {
         foundDeprecated.push('tools.approvalMode');
 
@@ -1017,12 +1189,24 @@ export function migrateDeprecatedSettings(
         }
 
         if (removeDeprecated) {
-          const newTools = { ...toolsSettings };
           delete newTools['approvalMode'];
-          loadedSettings.setValue(scope, 'tools', newTools);
-          if (!settingsFile.readOnly) {
-            anyModified = true;
-          }
+          toolsModified = true;
+        }
+      }
+
+      toolsModified =
+        migrateBoolean(
+          newTools,
+          'disableLLMCorrection',
+          'enableLLMCorrection',
+          'tools',
+          foundDeprecated,
+        ) || toolsModified;
+
+      if (toolsModified) {
+        loadedSettings.setValue(scope, 'tools', newTools);
+        if (!settingsFile.readOnly) {
+          anyModified = true;
         }
       }
     }

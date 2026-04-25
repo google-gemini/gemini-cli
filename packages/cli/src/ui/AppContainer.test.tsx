@@ -499,14 +499,14 @@ describe('AppContainer State Management', () => {
 
     // Mock LoadedSettings
     mockSettings = createMockSettings({
-      hideBanner: false,
-      hideTips: false,
-      hideFooter: false,
+      showBanner: true,
+      showTips: true,
+      showFooter: true,
       showMemoryUsage: false,
       theme: 'default',
       ui: {
         showStatusInTitle: false,
-        hideWindowTitle: false,
+        showWindowTitle: true,
         useAlternateBuffer: false,
       },
     });
@@ -921,9 +921,9 @@ describe('AppContainer State Management', () => {
   describe('Settings Integration', () => {
     it('handles settings with all display options disabled', async () => {
       const settingsAllHidden = createMockSettings({
-        hideBanner: true,
-        hideTips: true,
-        hideFooter: true,
+        showBanner: false,
+        showTips: false,
+        showFooter: false,
         showMemoryUsage: false,
       });
 
@@ -1381,7 +1381,7 @@ describe('AppContainer State Management', () => {
       const mockSettingsWithShowStatusFalse = createMockSettings({
         ui: {
           showStatusInTitle: false,
-          hideWindowTitle: false,
+          showWindowTitle: true,
         },
       });
 
@@ -1416,7 +1416,7 @@ describe('AppContainer State Management', () => {
       const mockSettingsWithDynamicTitleFalse = createMockSettings({
         ui: {
           dynamicWindowTitle: false,
-          hideWindowTitle: false,
+          showWindowTitle: true,
         },
       });
 
@@ -1446,19 +1446,19 @@ describe('AppContainer State Management', () => {
       unmount();
     });
 
-    it('should not update terminal title when hideWindowTitle is true', async () => {
-      // Arrange: Set up mock settings with hideWindowTitle enabled
-      const mockSettingsWithHideTitleTrue = createMockSettings({
+    it('should not update terminal title when showWindowTitle is false', async () => {
+      // Arrange: Set up mock settings with showWindowTitle disabled
+      const mockSettingsWithShowTitleFalse = createMockSettings({
         ui: {
           showStatusInTitle: true,
-          hideWindowTitle: true,
+          showWindowTitle: false,
         },
       });
 
       // Act: Render the container
       const { unmount } = await act(async () =>
         renderAppContainer({
-          settings: mockSettingsWithHideTitleTrue,
+          settings: mockSettingsWithShowTitleFalse,
         }),
       );
 
@@ -1476,7 +1476,7 @@ describe('AppContainer State Management', () => {
       const mockSettingsWithTitleEnabled = createMockSettings({
         ui: {
           showStatusInTitle: true,
-          hideWindowTitle: false,
+          showWindowTitle: true,
         },
       });
 
@@ -1512,7 +1512,7 @@ describe('AppContainer State Management', () => {
       const mockSettingsWithTitleEnabled = createMockSettings({
         ui: {
           showStatusInTitle: true,
-          hideWindowTitle: false,
+          showWindowTitle: true,
         },
       });
 
@@ -1543,7 +1543,7 @@ describe('AppContainer State Management', () => {
       const mockSettingsWithTitleEnabled = createMockSettings({
         ui: {
           showStatusInTitle: true,
-          hideWindowTitle: false,
+          showWindowTitle: true,
         },
       });
 
@@ -1598,7 +1598,7 @@ describe('AppContainer State Management', () => {
         const mockSettingsWithTitleEnabled = createMockSettings({
           ui: {
             showStatusInTitle: true,
-            hideWindowTitle: false,
+            showWindowTitle: true,
           },
         });
 
@@ -1654,7 +1654,7 @@ describe('AppContainer State Management', () => {
         const mockSettingsWithTitleEnabled = createMockSettings({
           ui: {
             showStatusInTitle: true,
-            hideWindowTitle: false,
+            showWindowTitle: true,
           },
         });
 
@@ -1721,7 +1721,7 @@ describe('AppContainer State Management', () => {
         const mockSettingsWithTitleEnabled = createMockSettings({
           ui: {
             showStatusInTitle: true,
-            hideWindowTitle: false,
+            showWindowTitle: true,
           },
         });
 
@@ -1768,7 +1768,7 @@ describe('AppContainer State Management', () => {
         const mockSettingsWithTitleEnabled = createMockSettings({
           ui: {
             showStatusInTitle: true,
-            hideWindowTitle: false,
+            showWindowTitle: true,
           },
         });
 
@@ -1849,7 +1849,7 @@ describe('AppContainer State Management', () => {
       const mockSettingsWithTitleEnabled = createMockSettings({
         ui: {
           showStatusInTitle: true,
-          hideWindowTitle: false,
+          showWindowTitle: true,
         },
       });
 
@@ -1886,7 +1886,7 @@ describe('AppContainer State Management', () => {
       const mockSettingsWithTitleEnabled = createMockSettings({
         ui: {
           showStatusInTitle: true,
-          hideWindowTitle: false,
+          showWindowTitle: true,
         },
       });
 
@@ -1921,7 +1921,7 @@ describe('AppContainer State Management', () => {
       const mockSettingsWithTitleDisabled = createMockSettings({
         ui: {
           showStatusInTitle: false,
-          hideWindowTitle: false,
+          showWindowTitle: true,
         },
       });
 
