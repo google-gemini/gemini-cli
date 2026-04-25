@@ -60,17 +60,20 @@ jobs:
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
         run: |
           RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          COMMENT_BODY="### 🛑 Action Required: Evaluation Approval
-
-          Steering changes have been detected in this PR. To prevent regressions, a maintainer must approve the evaluation run before this PR can be merged.
-
+          COMMENT_BODY="### [SECURITY WARNING]: Evaluation Approval Required
+          
+          Steering changes have been detected in this PR. 
+          
+          [CRITICAL]: Approving this run will execute code from the fork on Google infrastructure with access to the \`GEMINI_API_KEY\` secret. 
+          **DO NOT APPROVE** unless you have fully reviewed all changes in this PR (including \`package.json\`, scripts, and all source code) and verified they are safe. A malicious PR can steal the API key or compromise the CI environment.
+          
           **Maintainers:**
           1. Go to the [**Workflow Run Summary**]($RUN_URL).
           2. Click the yellow **'Review deployments'** button.
           3. Select the **'eval-gate'** environment and click **'Approve'**.
-
+          
           Once approved, the evaluation results will be posted here automatically.
-
+          
           <!-- eval-approval-notification -->"
 
           # Check if comment already exists to avoid spamming
