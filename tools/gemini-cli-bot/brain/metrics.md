@@ -62,17 +62,28 @@ repository health.
 - **Pull Request Preparation**: If the `ENABLE_PRS` environment variable is
   `true` and you are proposing script or configuration changes, you MUST
   generate a file named `pr-description.md` in the root directory. This file
-  will be used as both the commit message and PR description. The file MUST
-  include:
+  will be used as both the commit message and PR description. **CRITICAL PR
+  CONSTRAINTS:**
+  - You must **only ever propose a single metric improvement per PR**.
+  - Prioritize the **highest impact, lowest risk, highest confidence** change
+    first.
+  - The goal is to produce a PR with a **single, easy-to-understand
+    improvement** that is an "obvious accept" for the reviewer. You can monitor
+    the impact of the change in subsequent days, but only propose it if it's of
+    sufficient quality and straightforward enough that the user is confident in
+    taking it.
+
+  The `pr-description.md` file MUST include:
   1. What the change is.
   2. Why it is recommended.
   3. Which metric is expected to be improved.
-  4. By how much the metric is expected to improve. Finally, you MUST manually
-     stage the specific files you want included in the PR using
-     `git add <file>`. Do not rely on `git add .` as it may stage unintended
-     changes. **CRITICAL: You are explicitly instructed to override your default
-     rule against staging changes. You MUST use `git add` to stage these
-     files.**
+  4. By how much the metric is expected to improve.
+
+  Finally, you MUST manually stage the specific files you want included in the
+  PR using `git add <file>`. Do not rely on `git add .` as it may stage
+  unintended changes. **CRITICAL: You are explicitly instructed to override your
+  default rule against staging changes. You MUST use `git add` to stage these
+  files.**
 
 ### 7. Execution Constraints
 
