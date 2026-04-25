@@ -12,6 +12,31 @@ To use the rewind feature, simply type `/rewind` into the input prompt and press
 
 Alternatively, you can use the keyboard shortcut: **Press `Esc` twice**.
 
+### Non-interactive usage
+
+You can also rewind directly to a specific user message by passing an index:
+
+```
+/rewind <index>
+```
+
+The index is **0-based** and supports **negative indexing** (Python-style):
+
+| Command      | Effect                                      |
+| ------------ | ------------------------------------------- |
+| `/rewind 0`  | Rewind to before the first user message     |
+| `/rewind 1`  | Rewind to before the second user message    |
+| `/rewind -1` | Rewind to before the last user message      |
+| `/rewind -2` | Rewind to before the second-to-last message |
+
+This is useful for **stdin-driven orchestrators** and automated workflows where
+navigating the interactive TUI is not practical. The rewound message's prompt
+text is restored into the input buffer, matching the behavior of the interactive
+TUI.
+
+> **Note:** Non-interactive rewind only rewinds the conversation history. To
+> revert file changes, use the interactive TUI (`/rewind` without arguments).
+
 ## Interface
 
 When you trigger a rewind, an interactive list of your previous interactions

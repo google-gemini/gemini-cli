@@ -7,6 +7,8 @@
 import {
   REFERENCE_CONTENT_START,
   REFERENCE_CONTENT_END,
+  type MessageRecord,
+  partToString,
 } from '@google/gemini-cli-core';
 
 export const formatBytes = (bytes: number): string => {
@@ -152,4 +154,15 @@ export const formatResetTime = (
   }).format(resetDate);
 
   return `${duration} at ${timeStr}`;
+};
+
+/**
+ * Extracts the cleaned prompt text from a user message.
+ */
+export const getCleanedRewindText = (userMessage: MessageRecord): string => {
+  const contentToUse = userMessage.displayContent || userMessage.content;
+  const originalUserText = contentToUse ? partToString(contentToUse) : '';
+  return userMessage.displayContent
+    ? originalUserText
+    : stripReferenceContent(originalUserText);
 };
