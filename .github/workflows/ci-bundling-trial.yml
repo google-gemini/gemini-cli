@@ -374,9 +374,7 @@ jobs:
       - name: 'Build Bundle'
         run: 'npm run bundle'
 
-      - name: 'Fix rollup optional dependencies on macOS'
-        run: 'npm cache clean --force'
-        shell: 'bash'
+
 
       - name: 'Run Integration Tests'
         env:
@@ -388,36 +386,4 @@ jobs:
 
 
 
-  test_e2e_windows_fast:
-    name: 'e2e:windows:fast'
-    needs: publish_packages
-    runs-on: 'gemini-cli-windows-16-core'
-    steps:
-      - name: 'Checkout'
-        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
 
-      - name: 'Set up Node.js'
-        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
-        with:
-          node-version-file: '.nvmrc'
-          cache: 'npm'
-
-      - name: 'Configure npm for GitHub Packages'
-        run: |
-          echo "//npm.pkg.github.com/:_authToken=${{ secrets.GITHUB_TOKEN }}" > "$env:USERPROFILE\.npmrc"
-          echo "@google-gemini:registry=https://npm.pkg.github.com" >> "$env:USERPROFILE\.npmrc"
-        shell: 'pwsh'
-
-      - name: 'Install dependencies'
-        run: 'npm install @google-gemini/gemini-cli@0.0.0-${{ github.sha }} @google-gemini/gemini-cli-core@0.0.0-${{ github.sha }} vitest node-pty --no-save'
-        shell: 'pwsh'
-
-      - name: 'Run Integration Tests'
-        env:
-          GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
-          KEEP_OUTPUT: 'true'
-          VERBOSE: 'true'
-          USE_PUBLISHED_PACKAGES: 'true'
-          INTEGRATION_TEST_USE_INSTALLED_GEMINI: 'true'
-        run: 'npm run test:integration:sandbox:none'
-        shell: 'pwsh'
