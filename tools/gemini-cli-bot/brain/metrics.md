@@ -67,7 +67,10 @@ repository health.
   1. What the change is.
   2. Why it is recommended.
   3. Which metric is expected to be improved.
-  4. By how much the metric is expected to improve.
+  4. By how much the metric is expected to improve. Finally, you MUST manually
+     stage the specific files you want included in the PR using
+     `git add <file>`. Do not rely on `git add .` as it may stage unintended
+     changes.
 
 ### 7. Execution Constraints
 
