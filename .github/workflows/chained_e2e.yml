@@ -337,6 +337,7 @@ jobs:
         if: "${{ steps.check_evals.outputs.should_run == 'true' }}"
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+          GEMINI_CLI_TRUST_WORKSPACE: true
           GEMINI_MODEL: 'gemini-3-pro-preview'
           # Only run always passes behavioral tests.
           EVAL_SUITE_TYPE: 'behavioral'
