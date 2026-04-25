@@ -729,6 +729,7 @@ export class TestRig {
       cwd: this.testDir!,
       stdio: 'pipe',
       env: this._getCleanEnv(options.env),
+      shell: os.platform() === 'win32',
     });
     this._spawnedProcesses.push(child);
 
