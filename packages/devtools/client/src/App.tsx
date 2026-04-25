@@ -4,8 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { useDevToolsData, type ConsoleLog, type NetworkLog } from './hooks';
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useMemo,
+  useCallback,
+} from 'react';
+import { useDevToolsData, type ConsoleLog, type NetworkLog } from './hooks.js';
 
 type ThemeMode = 'light' | 'dark' | null; // null means follow system
 
@@ -25,12 +31,244 @@ interface ThemeColors {
   warnText: string;
 }
 
+// --- Search & Filtering Logic ---
+
+interface SearchState {
+  searchText: string;
+  useRegex: boolean;
+  caseSensitive: boolean;
+  invertFilter: boolean;
+}
+
+function useSearch() {
+  const [state, setState] = useState<SearchState>({
+    searchText: '',
+    useRegex: false,
+    caseSensitive: false,
+    invertFilter: false,
+  });
+
+  const setSearchText = useCallback((text: string) => {
+    setState((prev) => ({ ...prev, searchText: text }));
+  }, []);
+
+  const toggleRegex = useCallback(() => {
+    setState((prev) => ({ ...prev, useRegex: !prev.useRegex }));
+  }, []);
+
+  const toggleCaseSensitive = useCallback(() => {
+    setState((prev) => ({ ...prev, caseSensitive: !prev.caseSensitive }));
+  }, []);
+
+  const toggleInvertFilter = useCallback(() => {
+    setState((prev) => ({ ...prev, invertFilter: !prev.invertFilter }));
+  }, []);
+
+  const compiledRegex = useMemo(() => {
+    if (!state.searchText) return null;
+    try {
+      const flags = state.caseSensitive ? 'g' : 'gi';
+      const pattern = state.useRegex
+        ? `(${state.searchText})`
+        : `(${state.searchText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`;
+      return new RegExp(pattern, flags);
+    } catch {
+      return null;
+    }
+  }, [state.searchText, state.useRegex, state.caseSensitive]);
+
+  const filterItems = useCallback(
+    <T,>(items: T[], getSearchableText: (item: T) => string): T[] => {
+      if (!state.searchText) return items;
+      if (!compiledRegex) return state.useRegex ? [] : items;
+
+      return items.filter((item) => {
+        const text = getSearchableText(item);
+        const match = compiledRegex.test(text);
+        compiledRegex.lastIndex = 0;
+        return state.invertFilter ? !match : match;
+      });
+    },
+    [state.searchText, state.useRegex, state.invertFilter, compiledRegex],
+  );
+
+  const isRegexValid = useMemo(() => {
+    if (!state.useRegex || !state.searchText) return true;
+    return compiledRegex !== null;
+  }, [state.useRegex, state.searchText, compiledRegex]);
+
+  return {
+    ...state,
+    setSearchText,
+    toggleRegex,
+    toggleCaseSensitive,
+    toggleInvertFilter,
+    filterItems,
+    isRegexValid,
+    compiledRegex,
+  };
+}
+
+function FilterBar({
+  search,
+  inputRef,
+  placeholder = 'Filter...',
+  children,
+  t,
+  matchCount,
+  totalCount,
+}: {
+  search: ReturnType<typeof useSearch>;
+  inputRef: React.RefObject<HTMLInputElement | null>;
+  placeholder?: string;
+  children?: React.ReactNode;
+  t: ThemeColors;
+  matchCount?: number;
+  totalCount?: number;
+}) {
+  return (
+    <div
+      style={{
+        padding: '6px',
+        background: t.bgSecondary,
+        borderBottom: `1px solid ${t.border}`,
+        display: 'flex',
+        gap: '6px',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+      }}
+    >
+      <div style={{ position: 'relative', flex: 1, display: 'flex' }}>
+        <input
+          ref={inputRef}
+          type="text"
+          placeholder={placeholder}
+          value={search.searchText}
+          onChange={(e) => search.setSearchText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              search.setSearchText('');
+              (e.target as HTMLInputElement).blur();
+            }
+          }}
+          style={{
+            flex: 1,
+            boxSizing: 'border-box',
+            padding: '4px 10px',
+            paddingRight: search.searchText ? '24px' : '10px',
+            background: t.bg,
+            color: t.text,
+            border: `1px solid ${search.isRegexValid ? t.border : t.errorText}`,
+            borderRadius: '4px',
+            fontSize: '12px',
+            outline: 'none',
+            minWidth: '100px',
+          }}
+        />
+        {search.searchText && (
+          <button
+            onClick={() => search.setSearchText('')}
+            type="button"
+            aria-label="Clear filter"
+            style={{
+              position: 'absolute',
+              right: '8px',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              cursor: 'pointer',
+              color: t.textSecondary,
+              fontSize: '14px',
+              userSelect: 'none',
+              border: 'none',
+              background: 'none',
+              padding: 0,
+              lineHeight: 1,
+            }}
+            title="Clear filter"
+          >
+            ×
+          </button>
+        )}
+      </div>
+
+      <button
+        onClick={search.toggleRegex}
+        style={{
+          background: search.useRegex ? t.accent : t.bg,
+          color: search.useRegex ? '#fff' : t.text,
+          border: `1px solid ${t.border}`,
+          borderRadius: '4px',
+          cursor: 'pointer',
+          fontSize: '11px',
+          padding: '2px 8px',
+          fontWeight: 600,
+          fontFamily: 'monospace',
+        }}
+        title="Toggle regex mode"
+      >
+        .*
+      </button>
+      <button
+        onClick={search.toggleCaseSensitive}
+        style={{
+          background: search.caseSensitive ? t.accent : t.bg,
+          color: search.caseSensitive ? '#fff' : t.text,
+          border: `1px solid ${t.border}`,
+          borderRadius: '4px',
+          cursor: 'pointer',
+          fontSize: '11px',
+          padding: '2px 8px',
+          fontWeight: 600,
+        }}
+        title="Toggle case sensitivity"
+      >
+        Aa
+      </button>
+      <button
+        onClick={search.toggleInvertFilter}
+        style={{
+          background: search.invertFilter ? t.accent : t.bg,
+          color: search.invertFilter ? '#fff' : t.text,
+          border: `1px solid ${t.border}`,
+          borderRadius: '4px',
+          cursor: 'pointer',
+          fontSize: '11px',
+          padding: '2px 8px',
+          fontWeight: 600,
+        }}
+        title="Invert filter"
+      >
+        !
+      </button>
+
+      {search.searchText &&
+        matchCount !== undefined &&
+        totalCount !== undefined && (
+          <span
+            style={{
+              fontSize: '11px',
+              color: t.textSecondary,
+              whiteSpace: 'nowrap',
+              marginLeft: '4px',
+            }}
+          >
+            {matchCount} / {totalCount}
+          </span>
+        )}
+
+      {children}
+    </div>
+  );
+}
+
 export default function App() {
   const [activeTab, setActiveTab] = useState<'console' | 'network'>('console');
   const { networkLogs, consoleLogs, connectedSessions } = useDevToolsData();
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(
     null,
   );
+  const consoleFilterRef = useRef<HTMLInputElement>(null);
+  const networkFilterRef = useRef<HTMLInputElement>(null);
   const [importedLogs, setImportedLogs] = useState<{
     network: NetworkLog[];
     console: ConsoleLog[];
@@ -73,6 +311,20 @@ export default function App() {
   }, []);
 
   const isDark = themeMode === null ? systemIsDark : themeMode === 'dark';
+
+  // Keyboard Shortcut: Ctrl+F / Cmd+F → focus filter
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+        e.preventDefault();
+        const ref =
+          activeTab === 'console' ? consoleFilterRef : networkFilterRef;
+        ref.current?.focus();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [activeTab]);
 
   const t = useMemo(
     () => ({
@@ -507,7 +759,11 @@ export default function App() {
                 height: '100%',
               }}
             >
-              <ConsoleView logs={filteredConsoleLogs} t={t} />
+              <ConsoleView
+                logs={filteredConsoleLogs}
+                t={t}
+                filterInputRef={consoleFilterRef}
+              />
             </div>
             <div
               style={{
@@ -515,7 +771,12 @@ export default function App() {
                 height: '100%',
               }}
             >
-              <NetworkView logs={filteredNetworkLogs} t={t} isDark={isDark} />
+              <NetworkView
+                logs={filteredNetworkLogs}
+                t={t}
+                isDark={isDark}
+                filterInputRef={networkFilterRef}
+              />
             </div>
           </>
         ) : (
@@ -607,7 +868,73 @@ function TabButton({
 
 // --- Console Components ---
 
-function ConsoleLogEntry({ log, t }: { log: ConsoleLog; t: ThemeColors }) {
+const ALL_LOG_LEVELS = ['error', 'warn', 'log', 'info', 'debug'] as const;
+
+const LEVEL_META: Record<string, { icon: string; label: string }> = {
+  error: { icon: '❌', label: 'Errors' },
+  warn: { icon: '⚠️', label: 'Warnings' },
+  log: { icon: ' ', label: 'Logs' },
+  info: { icon: 'ℹ️', label: 'Info' },
+  debug: { icon: '🐛', label: 'Debug' },
+};
+
+function loadSavedLevels(): Record<string, boolean> {
+  try {
+    const saved = localStorage.getItem('devtools-console-levels');
+    if (saved) {
+      const parsed = JSON.parse(saved) as Record<string, boolean>;
+      // Validate shape: must have all known levels
+      const result: Record<string, boolean> = {};
+      for (const level of ALL_LOG_LEVELS) {
+        result[level] =
+          typeof parsed[level] === 'boolean' ? parsed[level] : true;
+      }
+      return result;
+    }
+  } catch {
+    // Corrupt localStorage, ignore
+  }
+  return Object.fromEntries(ALL_LOG_LEVELS.map((l) => [l, true]));
+}
+
+// Returns the original text if searchText is empty or no matches found.
+
+function highlightMatches(text: string, regex: RegExp | null): React.ReactNode {
+  if (!regex || !text) return text;
+
+  const result: React.ReactNode[] = [];
+  let lastIndex = 0;
+  for (const match of text.matchAll(regex)) {
+    const index = match.index;
+    result.push(text.slice(lastIndex, index));
+    result.push(
+      <mark
+        key={index}
+        style={{
+          background: 'rgba(255, 213, 79, 0.35)',
+          color: 'inherit',
+          borderRadius: '2px',
+          padding: '0 1px',
+        }}
+      >
+        {match[0]}
+      </mark>,
+    );
+    lastIndex = index + match[0].length;
+  }
+  result.push(text.slice(lastIndex));
+  return result.length > 0 ? result : text;
+}
+
+const ConsoleLogEntry = React.memo(function ConsoleLogEntry({
+  log,
+  t,
+  compiledRegex,
+}: {
+  log: ConsoleLog;
+  t: ThemeColors;
+  compiledRegex: RegExp | null;
+}) {
   const [isExpanded, setIsExpanded] = useState(false);
   const content = log.content || '';
   const lines = content.split('\n');
@@ -622,7 +949,7 @@ function ConsoleLogEntry({ log, t }: { log: ConsoleLog; t: ThemeColors }) {
   const isWarn = log.type === 'warn';
   const bg = isError ? t.errorBg : isWarn ? t.warnBg : 'transparent';
   const color = isError ? t.errorText : isWarn ? t.warnText : t.text;
-  const icon = isError ? '❌' : isWarn ? '⚠️' : ' ';
+  const icon = LEVEL_META[log.type]?.icon ?? ' ';
 
   let displayContent = content;
   if (needsCollapse && !isExpanded) {
@@ -633,32 +960,25 @@ function ConsoleLogEntry({ log, t }: { log: ConsoleLog; t: ThemeColors }) {
     }
   }
 
+  const renderedContent = highlightMatches(displayContent, compiledRegex);
+
   return (
     <div
       style={{
         display: 'flex',
-
         borderBottom: `1px solid ${t.rowBorder}`,
-
         padding: '4px 12px',
-
         backgroundColor: bg,
-
         alignItems: 'flex-start',
-
         gap: '8px',
       }}
     >
       <div
         style={{
           width: '16px',
-
           textAlign: 'center',
-
           flexShrink: 0,
-
           fontSize: '10px',
-
           marginTop: '2px',
         }}
       >
@@ -668,37 +988,28 @@ function ConsoleLogEntry({ log, t }: { log: ConsoleLog; t: ThemeColors }) {
       <div
         style={{
           flex: 1,
-
           display: 'flex',
-
           flexDirection: 'column',
         }}
       >
         <div
           style={{
             whiteSpace: 'pre-wrap',
-
             wordBreak: 'break-all',
-
             color: color,
-
             lineHeight: '1.5',
-
             fontSize: '11px',
           }}
         >
-          {displayContent}
+          {renderedContent}
         </div>
       </div>
 
       <div
         style={{
           display: 'flex',
-
           alignItems: 'center',
-
           gap: '8px',
-
           flexShrink: 0,
         }}
       >
@@ -707,31 +1018,18 @@ function ConsoleLogEntry({ log, t }: { log: ConsoleLog; t: ThemeColors }) {
             onClick={() => setIsExpanded(!isExpanded)}
             style={{
               fontSize: '12px',
-
               color: t.text,
-
               cursor: 'pointer',
-
               fontWeight: 'bold',
-
               userSelect: 'none',
-
               width: '20px',
-
               height: '20px',
-
               display: 'flex',
-
               alignItems: 'center',
-
               justifyContent: 'center',
-
               borderRadius: '4px',
-
               border: `1px solid ${t.border}`,
-
               background: t.bgSecondary,
-
               transition: 'all 0.1s',
             }}
             onMouseOver={(e) => {
@@ -750,78 +1048,182 @@ function ConsoleLogEntry({ log, t }: { log: ConsoleLog; t: ThemeColors }) {
         <div
           style={{
             color: t.textSecondary,
-
             fontSize: '10px',
-
             userSelect: 'none',
-
             textAlign: 'right',
-
             minWidth: '70px',
           }}
         >
           {new Date(log.timestamp).toLocaleTimeString([], {
             hour12: false,
-
             hour: '2-digit',
-
             minute: '2-digit',
-
             second: '2-digit',
           })}
         </div>
       </div>
     </div>
   );
-}
+});
 
-function ConsoleView({ logs, t }: { logs: ConsoleLog[]; t: ThemeColors }) {
+function ConsoleView({
+  logs,
+  t,
+  filterInputRef,
+}: {
+  logs: ConsoleLog[];
+  t: ThemeColors;
+  filterInputRef: React.RefObject<HTMLInputElement | null>;
+}) {
   const bottomRef = useRef<HTMLDivElement>(null);
+  const search = useSearch();
+  const [enabledLevels, setEnabledLevels] =
+    useState<Record<string, boolean>>(loadSavedLevels);
+
+  // Persist level toggle state
+  const updateLevels = useCallback(
+    (updater: (prev: Record<string, boolean>) => Record<string, boolean>) => {
+      setEnabledLevels((prev) => updater(prev));
+    },
+    [],
+  );
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [logs.length]);
-
-  if (logs.length === 0) {
-    return (
-      <div
-        style={{
-          padding: '20px',
-
-          color: t.textSecondary,
-
-          fontSize: '11px',
-
-          textAlign: 'center',
-
-          flex: 1,
-        }}
-      >
-        No console logs in this session
-      </div>
+    localStorage.setItem(
+      'devtools-console-levels',
+      JSON.stringify(enabledLevels),
     );
-  }
+  }, [enabledLevels]);
+
+  // Count logs per level from the full (unfiltered) set
+  const levelCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const level of ALL_LOG_LEVELS) counts[level] = 0;
+    for (const log of logs) {
+      if (counts[log.type] !== undefined) counts[log.type]++;
+    }
+    return counts;
+  }, [logs]);
+
+  const displayLogs = useMemo(() => {
+    // 1. Level filter
+    const levelFiltered = logs.filter(
+      (log) => enabledLevels[log.type] !== false,
+    );
+
+    // 2. Text filter
+    return search.filterItems(levelFiltered, (log) => log.content || '');
+  }, [logs, enabledLevels, search]);
+
+  useEffect(() => {
+    if (!search.searchText) {
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [logs.length, search.searchText]);
 
   return (
     <div
       style={{
         flex: 1,
-
-        overflowY: 'auto',
-
-        fontFamily:
-          'SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace',
-
+        display: 'flex',
+        flexDirection: 'column',
         background: t.consoleBg,
-
-        fontSize: '12px',
       }}
     >
-      {logs.map((log) => (
-        <ConsoleLogEntry key={log.id} log={log} t={t} />
-      ))}
+      <FilterBar
+        search={search}
+        inputRef={filterInputRef}
+        t={t}
+        matchCount={displayLogs.length}
+        totalCount={logs.length}
+      >
+        <div
+          style={{
+            width: '1px',
+            height: '16px',
+            background: t.border,
+            flexShrink: 0,
+          }}
+        />
 
-      <div ref={bottomRef} />
+        {ALL_LOG_LEVELS.map((level) => {
+          const active = enabledLevels[level] !== false;
+          const count = levelCounts[level];
+          if (count === 0 && level !== 'error' && level !== 'warn') return null;
+          return (
+            <button
+              key={level}
+              onClick={() =>
+                updateLevels((prev) => ({
+                  ...prev,
+                  [level]: !prev[level],
+                }))
+              }
+              style={{
+                background: active ? t.accent : t.bg,
+                color: active ? '#fff' : t.textSecondary,
+                border: `1px solid ${t.border}`,
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '11px',
+                padding: '2px 8px',
+                fontWeight: 600,
+                whiteSpace: 'nowrap',
+                opacity: count === 0 ? 0.5 : 1,
+              }}
+              title={`${active ? 'Hide' : 'Show'} ${LEVEL_META[level].label}`}
+            >
+              {LEVEL_META[level].label} {count}
+            </button>
+          );
+        })}
+      </FilterBar>
+
+      {logs.length === 0 ? (
+        <div
+          style={{
+            padding: '20px',
+            color: t.textSecondary,
+            fontSize: '11px',
+            textAlign: 'center',
+            flex: 1,
+          }}
+        >
+          No console logs in this session
+        </div>
+      ) : displayLogs.length === 0 ? (
+        <div
+          style={{
+            padding: '20px',
+            color: t.textSecondary,
+            fontSize: '11px',
+            textAlign: 'center',
+            flex: 1,
+          }}
+        >
+          No logs match the current filter
+        </div>
+      ) : (
+        <div
+          style={{
+            flex: 1,
+            overflowY: 'auto',
+            fontFamily:
+              'SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace',
+            fontSize: '12px',
+          }}
+        >
+          {displayLogs.map((log) => (
+            <ConsoleLogEntry
+              key={log.id}
+              log={log}
+              t={t}
+              compiledRegex={search.compiledRegex}
+            />
+          ))}
+          <div ref={bottomRef} />
+        </div>
+      )}
     </div>
   );
 }
@@ -832,19 +1234,80 @@ function NetworkView({
   logs,
   t,
   isDark,
+  filterInputRef,
 }: {
   logs: NetworkLog[];
   t: ThemeColors;
   isDark: boolean;
+  filterInputRef: React.RefObject<HTMLInputElement | null>;
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [filter, setFilter] = useState('');
+  const search = useSearch();
   const [groupByDomain, setGroupByDomain] = useState(true);
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(
     {},
   );
   const [sidebarWidth, setSidebarWidth] = useState(400);
   const isResizing = useRef(false);
+  const [enabledMethods, setEnabledMethods] = useState<Set<string> | null>(
+    null,
+  );
+  const [enabledStatuses, setEnabledStatuses] = useState<Set<string> | null>(
+    null,
+  );
+
+  // Compute observed methods and status classes
+  const { observedMethods, observedStatuses } = useMemo(() => {
+    const methods = new Set<string>();
+    const statuses = new Set<string>();
+    for (const log of logs) {
+      methods.add(log.method);
+      if (log.pending) {
+        statuses.add('pending');
+      } else if (log.error && !log.response) {
+        statuses.add('error');
+      } else if (log.response) {
+        const cls = `${Math.floor(log.response.status / 100)}xx`;
+        statuses.add(cls);
+      }
+    }
+    return {
+      observedMethods: Array.from(methods).sort(),
+      observedStatuses: Array.from(statuses).sort(),
+    };
+  }, [logs]);
+
+  const toggleMethod = useCallback((method: string) => {
+    setEnabledMethods((prev) => {
+      if (prev === null) {
+        // First click: activate only this method
+        return new Set([method]);
+      }
+      const next = new Set(prev);
+      if (next.has(method)) {
+        next.delete(method);
+      } else {
+        next.add(method);
+      }
+      // If nothing selected, go back to "all"
+      return next.size === 0 ? null : next;
+    });
+  }, []);
+
+  const toggleStatus = useCallback((status: string) => {
+    setEnabledStatuses((prev) => {
+      if (prev === null) {
+        return new Set([status]);
+      }
+      const next = new Set(prev);
+      if (next.has(status)) {
+        next.delete(status);
+      } else {
+        next.add(status);
+      }
+      return next.size === 0 ? null : next;
+    });
+  }, []);
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
@@ -875,13 +1338,29 @@ function NetworkView({
   };
 
   const filteredLogs = useMemo(() => {
-    let result = logs;
-    if (filter) {
-      const lower = filter.toLowerCase();
-      result = logs.filter((l) => l.url.toLowerCase().includes(lower));
+    // 1. Text/Regex filter
+    let result = search.filterItems(logs, (l) => l.url);
+
+    // 2. Method filter
+    if (enabledMethods !== null) {
+      result = result.filter((l) => enabledMethods.has(l.method));
     }
+
+    // 3. Status class filter
+    if (enabledStatuses !== null) {
+      result = result.filter((l) => {
+        if (l.pending) return enabledStatuses.has('pending');
+        if (l.error && !l.response) return enabledStatuses.has('error');
+        if (l.response) {
+          const cls = `${Math.floor(l.response.status / 100)}xx`;
+          return enabledStatuses.has(cls);
+        }
+        return true;
+      });
+    }
+
     return result;
-  }, [logs, filter]);
+  }, [logs, search, enabledMethods, enabledStatuses]);
 
   const groupedLogs = useMemo(() => {
     if (!groupByDomain) return null;
@@ -949,6 +1428,8 @@ function NetworkView({
 
     const isSelected = log.id === selectedId;
 
+    const renderedName = highlightMatches(name, search.compiledRegex);
+
     return (
       <div
         key={log.id}
@@ -988,7 +1469,7 @@ function NetworkView({
             }}
             title={log.url}
           >
-            {name}
+            {renderedName}
           </span>
           <span
             style={{
@@ -1035,31 +1516,13 @@ function NetworkView({
           background: t.bg,
         }}
       >
-        <div
-          style={{
-            padding: '6px',
-            background: t.bgSecondary,
-            borderBottom: `1px solid ${t.border}`,
-            display: 'flex',
-            gap: '6px',
-          }}
+        <FilterBar
+          search={search}
+          inputRef={filterInputRef}
+          t={t}
+          matchCount={filteredLogs.length}
+          totalCount={logs.length}
         >
-          <input
-            type="text"
-            placeholder="Filter..."
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            style={{
-              flex: 1,
-              boxSizing: 'border-box',
-              padding: '4px 10px',
-              background: t.bg,
-              color: t.text,
-              border: `1px solid ${t.border}`,
-              borderRadius: '4px',
-              fontSize: '12px',
-            }}
-          />
           <button
             onClick={() => setGroupByDomain(!groupByDomain)}
             style={{
@@ -1075,7 +1538,81 @@ function NetworkView({
           >
             📂
           </button>
-        </div>
+
+          {observedMethods.length > 1 && (
+            <>
+              <div style={{ width: '100%', height: '0px' }} />
+              {observedMethods.map((method) => {
+                const active =
+                  enabledMethods === null || enabledMethods.has(method);
+                return (
+                  <button
+                    key={method}
+                    onClick={() => toggleMethod(method)}
+                    style={{
+                      background:
+                        enabledMethods !== null && active ? t.accent : t.bg,
+                      color:
+                        enabledMethods !== null && active
+                          ? '#fff'
+                          : t.textSecondary,
+                      border: `1px solid ${t.border}`,
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '11px',
+                      padding: '2px 6px',
+                      fontWeight: 600,
+                    }}
+                    title={`Filter by ${method}`}
+                  >
+                    {method}
+                  </button>
+                );
+              })}
+            </>
+          )}
+
+          {/* Status class filter toggles */}
+          {observedStatuses.length > 1 && (
+            <>
+              <div
+                style={{
+                  width: '1px',
+                  height: '16px',
+                  background: t.border,
+                  flexShrink: 0,
+                }}
+              />
+              {observedStatuses.map((status) => {
+                const active =
+                  enabledStatuses === null || enabledStatuses.has(status);
+                return (
+                  <button
+                    key={status}
+                    onClick={() => toggleStatus(status)}
+                    style={{
+                      background:
+                        enabledStatuses !== null && active ? t.accent : t.bg,
+                      color:
+                        enabledStatuses !== null && active
+                          ? '#fff'
+                          : t.textSecondary,
+                      border: `1px solid ${t.border}`,
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '11px',
+                      padding: '2px 6px',
+                      fontWeight: 600,
+                    }}
+                    title={`Filter by ${status}`}
+                  >
+                    {status}
+                  </button>
+                );
+              })}
+            </>
+          )}
+        </FilterBar>
         <div style={{ flex: 1, overflowY: 'auto' }}>
           {groupByDomain && groupedLogs
             ? Object.keys(groupedLogs).map((groupKey) => (
@@ -1384,7 +1921,8 @@ function Pair({
       style={{
         display: 'flex',
         fontSize: '12px',
-        fontFamily: 'monospace',
+        fontFamily:
+          'SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace',
         marginBottom: '4px',
         lineHeight: '1.4',
       }}
