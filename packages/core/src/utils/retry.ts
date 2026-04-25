@@ -347,7 +347,10 @@ export async function retryWithBackoff<T>(
           debugLogger.warn(
             `Attempt ${attempt} failed${errorMessage ? `: ${errorMessage}` : ''}. Max attempts reached`,
           );
-          if (onPersistent429) {
+          if (
+            onPersistent429 &&
+            classifiedError instanceof RetryableQuotaError
+          ) {
             try {
               const fallbackModel = await onPersistent429(
                 authType,
