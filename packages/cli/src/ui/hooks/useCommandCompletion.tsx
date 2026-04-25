@@ -201,13 +201,29 @@ export function useCommandCompletion({
       };
     }
 
+    if (forceShowShellSuggestions) {
+      return {
+        completionMode: CompletionMode.SHELL,
+        query: null,
+        completionStart: -1,
+        completionEnd: -1,
+      };
+    }
+
     return {
       completionMode: CompletionMode.IDLE,
       query: null,
       completionStart: -1,
       completionEnd: -1,
     };
-  }, [cursorRow, cursorCol, buffer.lines, buffer.text, shellModeActive]);
+  }, [
+    cursorRow,
+    cursorCol,
+    buffer.lines,
+    buffer.text,
+    shellModeActive,
+    forceShowShellSuggestions,
+  ]);
 
   useAtCompletion({
     enabled: active && completionMode === CompletionMode.AT,
@@ -236,6 +252,7 @@ export function useCommandCompletion({
     cwd,
     setSuggestions,
     setIsLoadingSuggestions,
+    suppressCommandSuggestions: !shellModeActive,
   });
 
   const query =

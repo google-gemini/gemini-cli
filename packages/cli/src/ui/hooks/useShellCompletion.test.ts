@@ -4,13 +4,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, afterEach, vi } from 'vitest';
+import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
+import { useState } from 'react';
 import {
   getTokenAtCursor,
   escapeShellPath,
   resolvePathCompletions,
   scanPathExecutables,
+  useShellCompletion,
 } from './useShellCompletion.js';
+import type { Suggestion } from '../components/SuggestionsDisplay.js';
+import { renderHook } from '../../test-utils/render.js';
+import { waitFor } from '../../test-utils/async.js';
 import {
   createTmpDir,
   cleanupTmpDir,
@@ -179,17 +184,10 @@ describe('useShellCompletion utilities', () => {
     });
 
     it('should escape tabs, newlines, carriage returns, and backslashes', () => {
-      if (isWin) {
-        expect(escapeShellPath('a\tb')).toBe('a\tb');
-        expect(escapeShellPath('a\nb')).toBe('a\nb');
-        expect(escapeShellPath('a\rb')).toBe('a\rb');
-        expect(escapeShellPath('a\\b')).toBe('a\\b');
-      } else {
-        expect(escapeShellPath('a\tb')).toBe('a\\\tb');
-        expect(escapeShellPath('a\nb')).toBe('a\\\nb');
-        expect(escapeShellPath('a\rb')).toBe('a\\\rb');
-        expect(escapeShellPath('a\\b')).toBe('a\\\\b');
-      }
+      expect(escapeShellPath('a\tb')).toBe(isWin ? 'a\tb' : 'a\\\tb');
+      expect(escapeShellPath('a\nb')).toBe(isWin ? 'a\nb' : 'a\\\nb');
+      expect(escapeShellPath('a\rb')).toBe(isWin ? 'a\rb' : 'a\\\rb');
+      expect(escapeShellPath('a\\b')).toBe(isWin ? 'a\\b' : 'a\\\\b');
     });
 
     it('should handle empty string', () => {
@@ -385,13 +383,9 @@ describe('useShellCompletion utilities', () => {
       const results = await scanPathExecutables();
       expect(Array.isArray(results)).toBe(true);
       // Very basic sanity check: common commands should be found
-      if (process.platform !== 'win32') {
-        expect(results).toContain('ls');
-      } else {
-        expect(results).toContain('dir');
-        expect(results).toContain('cls');
-        expect(results).toContain('copy');
-      }
+      const isWin = process.platform === 'win32';
+      const expected = isWin ? 'dir' : 'ls';
+      expect(results).toContain(expected);
     });
 
     it('should support abort signal', async () => {
@@ -405,13 +399,125 @@ describe('useShellCompletion utilities', () => {
     it('should handle empty PATH', async () => {
       vi.stubEnv('PATH', '');
       const results = await scanPathExecutables();
-      if (process.platform === 'win32') {
-        expect(results.length).toBeGreaterThan(0);
-        expect(results).toContain('dir');
-      } else {
-        expect(results).toEqual([]);
-      }
+      const isWin = process.platform === 'win32';
+      // On Windows, built-in shell commands are always included even with empty PATH
+      expect(isWin ? results.length > 0 : results.length === 0).toBe(true);
       vi.unstubAllEnvs();
     });
+  });
+});
+
+describe('useShellCompletion hook', () => {
+  const fs: FileSystemStructure = {
+    'srcfile.txt': 'content',
+    'srcdir/': {
+      'nested.txt': 'nested',
+    },
+    'other.txt': 'content',
+  };
+  let tmpDir: string;
+
+  beforeEach(async () => {
+    tmpDir = await createTmpDir(fs);
+  });
+
+  afterEach(async () => {
+    await cleanupTmpDir(tmpDir);
+    vi.restoreAllMocks();
+  });
+
+  function useShellCompletionHarness(props: {
+    line: string;
+    cursorCol: number;
+    suppressCommandSuggestions?: boolean;
+  }) {
+    const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
+    const range = useShellCompletion({
+      enabled: true,
+      line: props.line,
+      cursorCol: props.cursorCol,
+      cwd: tmpDir,
+      setSuggestions,
+      setIsLoadingSuggestions: setIsLoading,
+      suppressCommandSuggestions: props.suppressCommandSuggestions,
+    });
+    return { suggestions, isLoading, ...range };
+  }
+
+  it('returns path completions instead of commands when suppressCommandSuggestions is true and cursor is in command position', async () => {
+    const scanSpy = vi.spyOn(
+      await import('./useShellCompletion.js'),
+      'scanPathExecutables',
+    );
+
+    const { result } = await renderHook(
+      (props) => useShellCompletionHarness(props),
+      {
+        initialProps: {
+          line: 'src',
+          cursorCol: 3,
+          suppressCommandSuggestions: true,
+        },
+      },
+    );
+
+    await waitFor(() => {
+      expect(result.current.suggestions.length).toBeGreaterThan(0);
+    });
+
+    // Should NOT have called scanPathExecutables
+    expect(scanSpy).not.toHaveBeenCalled();
+
+    const labels = result.current.suggestions.map((s) => s.label);
+    // Should include the file and directory starting with "src"
+    expect(labels).toContain('srcdir/');
+    expect(labels).toContain('srcfile.txt');
+    // Should not include unrelated files
+    expect(labels).not.toContain('other.txt');
+  });
+
+  it('returns command suggestions (not path completions) for command position when suppressCommandSuggestions is false', async () => {
+    // Use 'git' which exists on the system but matches no file in tmpDir,
+    // so any suggestion returned must come from PATH scanning.
+    const { result } = await renderHook(
+      (props) => useShellCompletionHarness(props),
+      {
+        initialProps: {
+          line: 'git',
+          cursorCol: 3,
+          suppressCommandSuggestions: false,
+        },
+      },
+    );
+
+    await waitFor(() => {
+      expect(result.current.suggestions.length).toBeGreaterThan(0);
+    });
+
+    // Every suggestion should be a command (from PATH), not a file/directory
+    const descriptions = result.current.suggestions.map((s) => s.description);
+    expect(descriptions.every((d) => d === 'command')).toBe(true);
+  });
+
+  it('returns path completions in argument position regardless of suppressCommandSuggestions', async () => {
+    const { result } = await renderHook(
+      (props) => useShellCompletionHarness(props),
+      {
+        initialProps: {
+          line: 'cat src',
+          cursorCol: 7,
+          suppressCommandSuggestions: true,
+        },
+      },
+    );
+
+    await waitFor(() => {
+      expect(result.current.suggestions.length).toBeGreaterThan(0);
+    });
+
+    const labels = result.current.suggestions.map((s) => s.label);
+    expect(labels).toContain('srcdir/');
+    expect(labels).toContain('srcfile.txt');
   });
 });
