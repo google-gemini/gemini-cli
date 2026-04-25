@@ -152,6 +152,20 @@ describe('ThemeManager', () => {
       );
     });
 
+    it('should find a file-loaded theme by its internal name', () => {
+      vi.spyOn(fs, 'existsSync').mockReturnValue(true);
+      vi.spyOn(fs, 'readFileSync').mockReturnValue(JSON.stringify(mockTheme));
+
+      // First load the theme via path
+      themeManager.setActiveTheme('/home/user/my-theme.json');
+
+      // Then try to find it by its internal name
+      const foundTheme = themeManager.findThemeByName('My File Theme');
+
+      expect(foundTheme).toBeDefined();
+      expect(foundTheme?.name).toBe('My File Theme');
+    });
+
     it('should not load a theme if the file does not exist', () => {
       vi.spyOn(fs, 'existsSync').mockReturnValue(false);
 
