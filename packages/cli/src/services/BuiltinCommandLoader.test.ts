@@ -71,6 +71,9 @@ vi.mock('../ui/commands/agentsCommand.js', () => ({
   agentsCommand: { name: 'agents' },
 }));
 vi.mock('../ui/commands/bugCommand.js', () => ({ bugCommand: {} }));
+vi.mock('../ui/commands/bugMemoryCommand.js', () => ({
+  bugMemoryCommand: { name: 'bug-memory' },
+}));
 vi.mock('../ui/commands/chatCommand.js', () => ({
   chatCommand: {
     name: 'chat',
