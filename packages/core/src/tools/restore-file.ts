@@ -109,8 +109,7 @@ class RestoreFileToolInvocation extends BaseToolInvocation<
     return getBackupPath(
       this.resolvedPath,
       this.params.version,
-      this.config.getSessionId(),
-      this.config.storage.getProjectTempDir(),
+      this.config.storage.getProjectBackupDir(),
     );
   }
 
@@ -171,8 +170,7 @@ class RestoreFileToolInvocation extends BaseToolInvocation<
   private async listAvailableVersions(): Promise<number[]> {
     return listBackupVersions(
       this.resolvedPath,
-      this.config.getSessionId(),
-      this.config.storage.getProjectTempDir(),
+      this.config.storage.getProjectBackupDir(),
     );
   }
 
@@ -235,8 +233,7 @@ class RestoreFileToolInvocation extends BaseToolInvocation<
 
     const preRestoreBackup = await createPreWriteBackup(
       this.resolvedPath,
-      this.config.getSessionId(),
-      this.config.storage.getProjectTempDir(),
+      this.config.storage.getProjectBackupDir(),
     );
     if (!preRestoreBackup.ok && !preRestoreBackup.newFile) {
       const msg = `Cannot back up current state of ${path.basename(this.resolvedPath)} before restoring. Aborting to prevent data loss.`;

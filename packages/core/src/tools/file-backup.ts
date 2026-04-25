@@ -50,23 +50,12 @@ export function fnv1a64hex(str: string): string {
   return hash.toString(16).padStart(16, '0');
 }
 
-export function getBackupDir(
-  sessionId: string,
-  projectTempDir: string,
-): string {
-  return path.join(projectTempDir, 'backups', sessionId);
-}
-
 export function getBackupPath(
   filePath: string,
   version: number,
-  sessionId: string,
-  projectTempDir: string,
+  backupDir: string,
 ): string {
-  return path.join(
-    getBackupDir(sessionId, projectTempDir),
-    `${fnv1a64hex(filePath)}_${version}`,
-  );
+  return path.join(backupDir, `${fnv1a64hex(filePath)}_${version}`);
 }
 
 /**
@@ -75,10 +64,8 @@ export function getBackupPath(
  */
 export async function listBackupVersions(
   filePath: string,
-  sessionId: string,
-  projectTempDir: string,
+  backupDir: string,
 ): Promise<number[]> {
-  const backupDir = getBackupDir(sessionId, projectTempDir);
   const prefix = `${fnv1a64hex(filePath)}_`;
   try {
     const entries = await fsPromises.readdir(backupDir, {
@@ -114,15 +101,10 @@ export type BackupResult =
  */
 export async function createPreWriteBackup(
   filePath: string,
-  sessionId: string,
-  projectTempDir: string,
+  backupDir: string,
   diskContent?: string,
 ): Promise<BackupResult> {
-  const existingVersions = await listBackupVersions(
-    filePath,
-    sessionId,
-    projectTempDir,
-  );
+  const existingVersions = await listBackupVersions(filePath, backupDir);
 
   let content = diskContent;
 
@@ -140,12 +122,7 @@ export async function createPreWriteBackup(
     }
 
     const latestVersion = existingVersions[existingVersions.length - 1];
-    const latestPath = getBackupPath(
-      filePath,
-      latestVersion,
-      sessionId,
-      projectTempDir,
-    );
+    const latestPath = getBackupPath(filePath, latestVersion, backupDir);
     try {
       const latestContent = await fsPromises.readFile(latestPath, 'utf8');
       if (contentsEqualNormalized(latestContent, content)) {
@@ -158,11 +135,14 @@ export async function createPreWriteBackup(
     }
   }
 
-  const backupDir = getBackupDir(sessionId, projectTempDir);
+  // The backup directory is expected to be created securely by the caller
+  // (e.g. via Storage.getProjectBackupDir using mkdtempSync).
+  // We call mkdir here as a safety measure for other callers, but it will
+  // likely be a no-op for most.
   try {
     await fsPromises.mkdir(backupDir, { recursive: true, mode: 0o700 });
   } catch (e) {
-    debugLogger.warn('Failed to create backup directory:', e);
+    debugLogger.warn('Failed to ensure backup directory exists:', e);
     return { ok: false, newFile: false };
   }
 
@@ -174,7 +154,7 @@ export async function createPreWriteBackup(
   let claimedVersion: number | null = null;
   let backupPath: string | null = null;
   for (let v = startVersion; v < startVersion + 100; v++) {
-    const candidatePath = getBackupPath(filePath, v, sessionId, projectTempDir);
+    const candidatePath = getBackupPath(filePath, v, backupDir);
     try {
       await fsPromises.copyFile(
         filePath,
@@ -201,11 +181,7 @@ export async function createPreWriteBackup(
     return { ok: false, newFile: false };
   }
 
-  const allVersions = await listBackupVersions(
-    filePath,
-    sessionId,
-    projectTempDir,
-  );
+  const allVersions = await listBackupVersions(filePath, backupDir);
   if (allVersions.length > MAX_BACKUP_VERSIONS) {
     const toDelete = allVersions.slice(
       0,
@@ -213,7 +189,7 @@ export async function createPreWriteBackup(
     );
     await Promise.all(
       toDelete.map(async (v) => {
-        const oldPath = getBackupPath(filePath, v, sessionId, projectTempDir);
+        const oldPath = getBackupPath(filePath, v, backupDir);
         try {
           await fsPromises.unlink(oldPath);
         } catch (e) {
@@ -247,10 +223,11 @@ export async function handlePreWriteBackup(
     return { backupVersion: null };
   }
 
+  const backupDir = config.storage.getProjectBackupDir();
+
   const backupResult = await createPreWriteBackup(
     resolvedPath,
-    config.getSessionId(),
-    config.storage.getProjectTempDir(),
+    backupDir,
     diskContent,
   );
 

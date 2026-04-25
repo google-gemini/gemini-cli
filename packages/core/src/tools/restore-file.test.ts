@@ -29,7 +29,7 @@ const TARGET_DIR = '/workspace';
 const FILE_PATH = 'foo.ts';
 const RESOLVED_PATH = path.join(TARGET_DIR, FILE_PATH);
 const HASH = fnv1a64hex(RESOLVED_PATH);
-const BACKUP_DIR = path.join(TEMP_DIR, 'backups', SESSION_ID);
+const BACKUP_DIR = path.join(TEMP_DIR, 'backups', `${SESSION_ID}-random`);
 const BACKUP_VERSION = 3;
 const BACKUP_PATH = path.join(BACKUP_DIR, `${HASH}_${BACKUP_VERSION}`);
 
@@ -43,6 +43,7 @@ const mockConfig = {
   isPlanMode: vi.fn().mockReturnValue(false),
   storage: {
     getProjectTempDir: vi.fn().mockReturnValue(TEMP_DIR),
+    getProjectBackupDir: vi.fn().mockReturnValue(BACKUP_DIR),
     getPlansDir: vi.fn().mockReturnValue('/tmp/plans'),
   },
   getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),

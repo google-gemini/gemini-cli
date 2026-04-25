@@ -87,7 +87,7 @@ describe('createPreWriteBackup', () => {
         ? T
         : never);
 
-    const result = await createPreWriteBackup(FILE_PATH, SESSION_ID, TEMP_DIR);
+    const result = await createPreWriteBackup(FILE_PATH, BACKUP_DIR);
 
     expect(result).toEqual({
       ok: true,
@@ -108,7 +108,7 @@ describe('createPreWriteBackup', () => {
       copyFileSpy.mockImplementationOnce(m);
     }
 
-    const result = await createPreWriteBackup(FILE_PATH, SESSION_ID, TEMP_DIR);
+    const result = await createPreWriteBackup(FILE_PATH, BACKUP_DIR);
 
     expect(result).toEqual({
       ok: true,
@@ -122,7 +122,7 @@ describe('createPreWriteBackup', () => {
     const eexist = makeError('EEXIST');
     vi.mocked(fsPromises.copyFile).mockRejectedValue(eexist);
 
-    const result = await createPreWriteBackup(FILE_PATH, SESSION_ID, TEMP_DIR);
+    const result = await createPreWriteBackup(FILE_PATH, BACKUP_DIR);
 
     expect(result).toEqual({ ok: false, newFile: false });
     expect(vi.mocked(fsPromises.copyFile)).toHaveBeenCalledTimes(100);
@@ -139,7 +139,7 @@ describe('createPreWriteBackup', () => {
       makeError('EACCES', 'Permission denied'),
     );
 
-    const result = await createPreWriteBackup(FILE_PATH, SESSION_ID, TEMP_DIR);
+    const result = await createPreWriteBackup(FILE_PATH, BACKUP_DIR);
 
     expect(result).toEqual({ ok: false, newFile: false });
     expect(vi.mocked(debugLogger.warn)).toHaveBeenCalledExactlyOnceWith(
@@ -154,7 +154,7 @@ describe('createPreWriteBackup', () => {
       makeError('ENOENT', 'No such file'),
     );
 
-    const result = await createPreWriteBackup(FILE_PATH, SESSION_ID, TEMP_DIR);
+    const result = await createPreWriteBackup(FILE_PATH, BACKUP_DIR);
 
     expect(result).toEqual({ ok: false, newFile: true });
     expect(vi.mocked(debugLogger.warn)).not.toHaveBeenCalled();
@@ -205,7 +205,7 @@ describe('createPreWriteBackup', () => {
       .mockRejectedValueOnce(eperm)
       .mockResolvedValueOnce(undefined);
 
-    const result = await createPreWriteBackup(FILE_PATH, SESSION_ID, TEMP_DIR);
+    const result = await createPreWriteBackup(FILE_PATH, BACKUP_DIR);
 
     expect(result).toEqual({
       ok: true,
@@ -238,8 +238,7 @@ describe('createPreWriteBackup', () => {
 
     const result = await createPreWriteBackup(
       FILE_PATH,
-      SESSION_ID,
-      TEMP_DIR,
+      BACKUP_DIR,
       'new content',
     );
 
@@ -271,8 +270,7 @@ describe('createPreWriteBackup', () => {
 
     const result = await createPreWriteBackup(
       FILE_PATH,
-      SESSION_ID,
-      TEMP_DIR,
+      BACKUP_DIR,
       'same content',
     );
 
@@ -303,7 +301,7 @@ describe('listBackupVersions', () => {
       ? T
       : never);
 
-    const result = await listBackupVersions(FILE_PATH, SESSION_ID, TEMP_DIR);
+    const result = await listBackupVersions(FILE_PATH, BACKUP_DIR);
 
     expect(result).toEqual([1]);
   });
@@ -311,7 +309,7 @@ describe('listBackupVersions', () => {
   it('returns an empty array when the backup directory does not exist', async () => {
     vi.mocked(fsPromises.readdir).mockRejectedValueOnce(makeError('ENOENT'));
 
-    const result = await listBackupVersions(FILE_PATH, SESSION_ID, TEMP_DIR);
+    const result = await listBackupVersions(FILE_PATH, BACKUP_DIR);
 
     expect(result).toEqual([]);
     expect(vi.mocked(debugLogger.warn)).not.toHaveBeenCalled();
@@ -320,7 +318,7 @@ describe('listBackupVersions', () => {
   it('logs a warning and returns an empty array on unexpected readdir errors', async () => {
     vi.mocked(fsPromises.readdir).mockRejectedValueOnce(makeError('EACCES'));
 
-    const result = await listBackupVersions(FILE_PATH, SESSION_ID, TEMP_DIR);
+    const result = await listBackupVersions(FILE_PATH, BACKUP_DIR);
 
     expect(result).toEqual([]);
     expect(vi.mocked(debugLogger.warn)).toHaveBeenCalledOnce();

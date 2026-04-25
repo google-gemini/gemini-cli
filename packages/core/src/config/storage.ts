@@ -33,10 +33,35 @@ export class Storage {
   private projectIdentifier: string | undefined;
   private initPromise: Promise<void> | undefined;
   private customPlansDir: string | undefined;
+  private cachedBackupDir: string | undefined;
 
   constructor(targetDir: string, sessionId?: string) {
     this.targetDir = targetDir;
     this.sessionId = sessionId;
+  }
+
+  /**
+   * Returns a securely created directory for backups in the project's temp storage.
+   * Uses mkdtempSync to mitigate symlink attacks in shared locations like /tmp.
+   */
+  getProjectBackupDir(): string {
+    if (this.cachedBackupDir) {
+      return this.cachedBackupDir;
+    }
+
+    const base = this.getProjectTempDir();
+    const backupsRoot = path.join(base, 'backups');
+
+    // Ensure the backups root exists.
+    fs.mkdirSync(backupsRoot, { recursive: true });
+
+    // mkdtempSync creates a NEW directory with 0700 permissions and a random suffix.
+    // The prefix is the sessionId if available.
+    this.cachedBackupDir = fs.mkdtempSync(
+      path.join(backupsRoot, `${this.sessionId ?? 'session'}-`),
+    );
+
+    return this.cachedBackupDir;
   }
 
   setCustomPlansDir(dir: string | undefined): void {
