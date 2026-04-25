@@ -88,7 +88,7 @@ jobs:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           GEMINI_MODEL: 'gemini-3-flash-preview'
           ENABLE_PRS: "${{ github.event.inputs.enable_prs || 'false' }}"
-        run: 'node bundle/gemini.js --policy tools/gemini-cli-bot/ci-policy.toml tools/gemini-cli-bot/brain/metrics.md'
+        run: 'node bundle/gemini.js --policy tools/gemini-cli-bot/ci-policy.toml -p "$(cat tools/gemini-cli-bot/brain/metrics.md)"'
 
       - name: 'Run Critique Phase'
         if: "${{ github.event.inputs.enable_prs == 'true' }}"
@@ -102,10 +102,11 @@ jobs:
              echo "No changes staged. Skipping critique."
              echo "[APPROVED]" > critique_result.txt
           else
-             node bundle/gemini.js --policy tools/gemini-cli-bot/ci-policy.toml tools/gemini-cli-bot/brain/critique.md > critique_output.log 2>&1
-             cat critique_output.log
-             if grep -q "\[REJECTED\]" critique_output.log; then
-               echo "Critique Rejected changes. Skipping PR creation."
+             node bundle/gemini.js --policy tools/gemini-cli-bot/ci-policy.toml -p "$(cat tools/gemini-cli-bot/brain/critique.md)" 2>&1 | tee critique_output.log
+             
+             # PIPESTATUS[0] captures the exit code of the node command before the pipe
+             if [ ${PIPESTATUS[0]} -ne 0 ] || grep -q "\[REJECTED\]" critique_output.log; then
+               echo "Critique failed or rejected changes. Skipping PR creation."
                echo "[REJECTED]" > critique_result.txt
              else
                echo "[APPROVED]" > critique_result.txt
