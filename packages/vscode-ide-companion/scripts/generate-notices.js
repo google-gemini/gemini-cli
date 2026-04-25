@@ -14,6 +14,11 @@ const projectRoot = path.resolve(
 const packagePath = path.join(projectRoot, 'packages', 'vscode-ide-companion');
 const noticeFilePath = path.join(packagePath, 'NOTICES.txt');
 
+console.log(`Debug: projectRoot=${projectRoot}`);
+console.log(`Debug: packagePath=${packagePath}`);
+console.log(`Debug: noticeFilePath=${noticeFilePath}`);
+console.log('NOTICES.txt generation started');
+
 async function getDependencyLicense(depName, depVersion) {
   let depPackageJsonPath;
   let licenseContent = 'License text not found.';

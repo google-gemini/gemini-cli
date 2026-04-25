@@ -111,7 +111,7 @@
     "build:dev": "node esbuild.js",
     "build:prod": "node esbuild.js --production",
     "generate:notices": "node ./scripts/generate-notices.js",
-    "prepare": "npm run generate:notices",
+    "prepare": "node ./scripts/generate-notices.js",
     "check-types": "tsc --noEmit",
     "lint": "eslint src",
     "watch": "npm-run-all2 -p watch:*",
