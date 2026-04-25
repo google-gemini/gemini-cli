@@ -99,7 +99,7 @@ import { type LoadedSettings } from '../config/settings.js';
 import { createMockSettings } from '../test-utils/settings.js';
 import type { InitializationResult } from '../core/initializer.js';
 import { useQuotaAndFallback } from './hooks/useQuotaAndFallback.js';
-import { StreamingState } from './types.js';
+import { StreamingState, MessageType } from './types.js';
 import { UIStateContext, type UIState } from './contexts/UIStateContext.js';
 import {
   UIActionsContext,
@@ -3568,6 +3568,50 @@ describe('AppContainer State Management', () => {
 
       expect(capturedUIState).toBeTruthy();
       expect(capturedUIState.allowPlanMode).toBe(false);
+      unmount();
+    });
+  });
+
+  describe('Hook Events', () => {
+    it('handles HookSystemMessage events and adds them to history', async () => {
+      const mockAddItem = vi.fn();
+      mockedUseHistory.mockReturnValue({
+        history: [],
+        addItem: mockAddItem,
+        updateItem: vi.fn(),
+        clearItems: vi.fn(),
+        loadHistory: vi.fn(),
+      });
+
+      // Find the handler registration call
+      const onSpy = mockCoreEvents.on;
+
+      const { unmount } = await act(async () => renderAppContainer());
+
+      const hookSystemMessageHandler = onSpy.mock.calls.find(
+        (call) => call[0] === CoreEvent.HookSystemMessage,
+      )?.[1];
+
+      expect(hookSystemMessageHandler).toBeDefined();
+
+      // Trigger the event
+      act(() => {
+        hookSystemMessageHandler({
+          hookName: 'test-hook',
+          eventName: 'SessionStart',
+          message: 'Test hook message',
+        });
+      });
+
+      expect(mockAddItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: 'Test hook message',
+          source: 'test-hook',
+        }),
+        expect.any(Number),
+      );
+
       unmount();
     });
   });
