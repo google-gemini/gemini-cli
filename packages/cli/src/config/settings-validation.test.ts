@@ -273,6 +273,36 @@ describe('settings-validation', () => {
     });
 
     it('should validate complex nested customThemes configuration', () => {
+      const validSettings = {
+        ui: {
+          customThemes: {
+            'my-theme': {
+              type: 'custom' as const,
+              name: 'My Theme',
+              text: {
+                primary: '#ffffff',
+                secondary: '#cccccc',
+                link: '#0000ff',
+                accent: '#ff00ff',
+                response: '#00ff00',
+              },
+              ui: {
+                comment: '#888888',
+                symbol: '#ffffff',
+                active: '#0000ff',
+                focus: '#00ff00',
+                gradient: ['#000000', '#ffffff'],
+              },
+            },
+          },
+        },
+      };
+
+      const result = validateSettings(validSettings);
+      expect(result.success).toBe(true);
+    });
+
+    it('should reject invalid customThemes configuration', () => {
       const invalidSettings = {
         ui: {
           customThemes: {
