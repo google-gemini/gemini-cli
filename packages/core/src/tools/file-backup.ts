@@ -126,7 +126,8 @@ export async function createPreWriteBackup(
     );
     try {
       const latestContent = await fsPromises.readFile(latestPath, 'utf8');
-      if (latestContent === originalContent) {
+      const normalize = (s: string) => s.replace(/\r\n/g, '\n');
+      if (normalize(latestContent) === normalize(originalContent)) {
         return { ok: true, version: latestVersion, backupPath: latestPath };
       }
     } catch (e) {
