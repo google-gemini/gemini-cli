@@ -19,7 +19,7 @@ import { CommandKind } from '../ui/commands/types.js';
  * block per command name to avoid UI clutter during startup or incremental loading.
  */
 export class SlashCommandConflictHandler {
-  private notifiedConflicts = new Set<string>();
+  private activeConflicts = new Set<string>();
   private pendingConflicts: SlashCommandConflict[] = [];
   private flushTimeout: ReturnType<typeof setTimeout> | null = null;
 
@@ -33,6 +33,8 @@ export class SlashCommandConflictHandler {
 
   stop() {
     coreEvents.off(CoreEvent.SlashCommandConflicts, this.handleConflicts);
+    this.activeConflicts.clear();
+    this.pendingConflicts = [];
     if (this.flushTimeout) {
       clearTimeout(this.flushTimeout);
       this.flushTimeout = null;
@@ -40,22 +42,28 @@ export class SlashCommandConflictHandler {
   }
 
   private handleConflicts(payload: SlashCommandConflictsPayload) {
+    const nextActiveConflicts = new Set<string>();
     const newConflicts = payload.conflicts.filter((c) => {
-      // Use a unique key to prevent duplicate notifications for the same conflict
-      const sourceId =
-        c.loserExtensionName || c.loserMcpServerName || c.loserKind;
-      const key = `${c.name}:${sourceId}:${c.renamedTo}`;
-      if (this.notifiedConflicts.has(key)) {
-        return false;
-      }
-      this.notifiedConflicts.add(key);
-      return true;
+      const key = this.getConflictKey(c);
+      const isNew =
+        !this.activeConflicts.has(key) && !nextActiveConflicts.has(key);
+      nextActiveConflicts.add(key);
+      return isNew;
     });
+    this.activeConflicts = nextActiveConflicts;
 
     if (newConflicts.length > 0) {
       this.pendingConflicts.push(...newConflicts);
       this.scheduleFlush();
     }
+  }
+
+  private getConflictKey(conflict: SlashCommandConflict): string {
+    const sourceId =
+      conflict.loserExtensionName ||
+      conflict.loserMcpServerName ||
+      conflict.loserKind;
+    return `${conflict.name}:${sourceId}:${conflict.renamedTo}`;
   }
 
   private scheduleFlush() {
