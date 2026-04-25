@@ -107,6 +107,7 @@ describe('EditTool', () => {
       getGeminiClient: vi.fn().mockReturnValue(geminiClient),
       getBaseLlmClient: vi.fn().mockReturnValue(baseLlmClient),
       getTargetDir: () => rootDir,
+      getProjectRoot: () => rootDir,
       getApprovalMode: vi.fn(),
       setApprovalMode: vi.fn(),
       getWorkspaceContext: () => createMockWorkspaceContext(rootDir),
@@ -695,9 +696,9 @@ function doIt() {
           throw abortError;
         });
 
-      await expect(invocation.execute(abortController.signal)).rejects.toBe(
-        abortError,
-      );
+      await expect(
+        invocation.execute({ abortSignal: abortController.signal }),
+      ).rejects.toBe(abortError);
 
       calculateSpy.mockRestore();
     });
@@ -714,7 +715,9 @@ function doIt() {
       };
 
       const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
 
       expect(result.llmContent).toMatch(/Successfully modified file/);
       expect(fs.readFileSync(filePath, 'utf8')).toBe(newContent);
@@ -737,7 +740,9 @@ function doIt() {
         new_string: 'replacement',
       };
       const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
       expect(result.llmContent).toMatch(/0 occurrences found for old_string/);
       expect(result.returnDisplay).toMatch(
         /Failed to edit, could not find the string to replace./,
@@ -768,7 +773,9 @@ function doIt() {
       });
 
       const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
 
       expect(result.error).toBeUndefined();
       expect(result.llmContent).toMatch(/Successfully modified file/);
@@ -788,7 +795,7 @@ function doIt() {
       };
 
       const invocation = tool.build(params);
-      await invocation.execute(new AbortController().signal);
+      await invocation.execute({ abortSignal: new AbortController().signal });
 
       const finalContent = fs.readFileSync(filePath, 'utf8');
       expect(finalContent).toBe(newContent);
@@ -804,7 +811,7 @@ function doIt() {
       };
 
       const invocation = tool.build(params);
-      await invocation.execute(new AbortController().signal);
+      await invocation.execute({ abortSignal: new AbortController().signal });
 
       const finalContent = fs.readFileSync(filePath, 'utf8');
       expect(finalContent).toBe(newContentWithCRLF);
@@ -832,7 +839,9 @@ function doIt() {
       });
 
       const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
 
       expect(result.error?.type).toBe(
         ToolErrorType.EDIT_NO_CHANGE_LLM_JUDGEMENT,
@@ -876,7 +885,7 @@ function doIt() {
         .mockResolvedValueOnce(externallyModifiedContent); // Second call in `attemptSelfCorrection`
 
       const invocation = tool.build(params);
-      await invocation.execute(new AbortController().signal);
+      await invocation.execute({ abortSignal: new AbortController().signal });
 
       // Assert that the file was read twice (initial read, then re-read for hash comparison).
       expect(readTextFileSpy).toHaveBeenCalledTimes(2);
@@ -938,7 +947,9 @@ function doIt() {
           instruction: 'test',
           ...params,
         });
-        const result = await invocation.execute(new AbortController().signal);
+        const result = await invocation.execute({
+          abortSignal: new AbortController().signal,
+        });
         expect(result.error?.type).toBe(expectedError);
       },
     );
@@ -1020,7 +1031,9 @@ function doIt() {
           ...(allow_multiple !== undefined && { allow_multiple }),
         };
         const invocation = tool.build(params);
-        const result = await invocation.execute(new AbortController().signal);
+        const result = await invocation.execute({
+          abortSignal: new AbortController().signal,
+        });
 
         if (shouldSucceed) {
           expect(result.error).toBeUndefined();
@@ -1162,7 +1175,9 @@ function doIt() {
           ai_proposed_content: '',
         };
         const invocation = tool.build(params);
-        const result = await invocation.execute(new AbortController().signal);
+        const result = await invocation.execute({
+          abortSignal: new AbortController().signal,
+        });
 
         if (
           result.returnDisplay &&
@@ -1215,7 +1230,9 @@ function doIt() {
       };
 
       const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
 
       expect(result.error?.type).toBe(ToolErrorType.EDIT_NO_OCCURRENCE_FOUND);
       expect(mockFixLLMEditWithInstruction).not.toHaveBeenCalled();
@@ -1236,7 +1253,7 @@ function doIt() {
       };
 
       const invocation = tool.build(params);
-      await invocation.execute(new AbortController().signal);
+      await invocation.execute({ abortSignal: new AbortController().signal });
 
       expect(mockFixLLMEditWithInstruction).toHaveBeenCalled();
     });
@@ -1265,7 +1282,9 @@ function doIt() {
       };
 
       const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
 
       expect(discoverJitContext).toHaveBeenCalled();
       expect(result.llmContent).toContain('Newly Discovered Project Context');
@@ -1294,7 +1313,9 @@ function doIt() {
       };
 
       const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
 
       expect(result.llmContent).not.toContain(
         'Newly Discovered Project Context',
@@ -1316,8 +1337,8 @@ function doIt() {
       vi.mocked(mockConfig.isPlanMode).mockReturnValue(true);
       vi.mocked(mockConfig.storage.getPlansDir).mockReturnValue(plansDir);
 
-      const filePath = path.join(rootDir, 'test-file.txt');
-      const planFilePath = path.join(plansDir, 'test-file.txt');
+      const filePath = 'test-file.txt';
+      const planFilePath = path.join(plansDir, filePath);
       const initialContent = 'some initial content';
       fs.writeFileSync(planFilePath, initialContent, 'utf8');
 
@@ -1329,7 +1350,9 @@ function doIt() {
       };
 
       const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
 
       expect(result.llmContent).toMatch(/Successfully modified file/);
 

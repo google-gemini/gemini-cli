@@ -13,6 +13,7 @@ import { mcpCommand } from '../commands/mcp.js';
 import { extensionsCommand } from '../commands/extensions.js';
 import { skillsCommand } from '../commands/skills.js';
 import { hooksCommand } from '../commands/hooks.js';
+import { gemmaCommand } from '../commands/gemma.js';
 import {
   setGeminiMdFilename as setServerGeminiMdFilename,
   getCurrentGeminiMdFilename,
@@ -23,6 +24,7 @@ import {
   FileDiscoveryService,
   resolveTelemetrySettings,
   FatalConfigError,
+  getErrorMessage,
   getPty,
   debugLogger,
   loadServerHierarchicalMemory,
@@ -59,6 +61,7 @@ import {
 
 import { loadSandboxConfig } from './sandboxConfig.js';
 import { resolvePath } from '../utils/resolvePath.js';
+import { isRecord } from '../utils/settingsUtils.js';
 import { RESUME_LATEST } from '../utils/sessionUtils.js';
 
 import { isWorkspaceTrusted } from './trustedFolders.js';
@@ -105,6 +108,7 @@ export interface CliArgs {
   startupMessages?: string[];
   rawOutput: boolean | undefined;
   acceptRawOutputRisk: boolean | undefined;
+  skipTrust: boolean | undefined;
   isCommand: boolean | undefined;
 }
 
@@ -181,6 +185,7 @@ export async function parseArguments(
         extensionsCommand,
         skillsCommand,
         hooksCommand,
+        gemmaCommand,
       ];
 
       const subcommands = commandModules.flatMap((mod) => {
@@ -260,6 +265,7 @@ export async function parseArguments(
   yargsInstance.command(extensionsCommand);
   yargsInstance.command(skillsCommand);
   yargsInstance.command(hooksCommand);
+  yargsInstance.command(gemmaCommand);
 
   yargsInstance
     .command('$0 [query..]', 'Launch Gemini CLI', (yargsInstance) =>
@@ -287,6 +293,11 @@ export async function parseArguments(
           nargs: 1,
           description:
             'Execute the provided prompt and continue in interactive mode',
+        })
+        .option('skip-trust', {
+          type: 'boolean',
+          description: 'Trust the current workspace for this session.',
+          default: false,
         })
         .option('worktree', {
           alias: 'w',
@@ -456,9 +467,16 @@ export async function parseArguments(
   yargsInstance.wrap(yargsInstance.terminalWidth());
   let result;
   try {
-    result = await yargsInstance.parse();
+    const parsed = await yargsInstance.parse();
+    if (!isRecord(parsed)) {
+      throw new Error('Failed to parse arguments');
+    }
+    result = parsed;
+    if (result['skip-trust']) {
+      process.env['GEMINI_CLI_TRUST_WORKSPACE'] = 'true';
+    }
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
+    const msg = getErrorMessage(e);
     debugLogger.error(msg);
     yargsInstance.showHelp();
     await runExitCleanup();
@@ -472,11 +490,13 @@ export async function parseArguments(
   }
 
   // Normalize query args: handle both quoted "@path file" and unquoted @path file
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-  const queryArg = (result as { query?: string | string[] | undefined }).query;
-  const q: string | undefined = Array.isArray(queryArg)
-    ? queryArg.join(' ')
-    : queryArg;
+  const queryArg = result['query'];
+  let q: string | undefined;
+  if (Array.isArray(queryArg)) {
+    q = queryArg.join(' ');
+  } else if (typeof queryArg === 'string') {
+    q = queryArg;
+  }
 
   // -p/--prompt forces non-interactive mode; positional args default to interactive in TTY
   if (q && !result['prompt']) {
@@ -491,8 +511,8 @@ export async function parseArguments(
   }
 
   // Keep CliArgs.query as a string for downstream typing
-  (result as Record<string, unknown>)['query'] = q || undefined;
-  (result as Record<string, unknown>)['startupMessages'] = startupMessages;
+  result['query'] = q || undefined;
+  result['startupMessages'] = startupMessages;
 
   // The import format is now only controlled by settings.memoryImportFormat
   // We no longer accept it as a CLI argument
@@ -544,7 +564,7 @@ export async function loadCliConfig(
       ? false
       : (settings.security?.folderTrust?.enabled ?? false);
   const trustedFolder =
-    isWorkspaceTrusted(settings, cwd, undefined, {
+    isWorkspaceTrusted(settings, cwd, {
       prompt: argv.prompt,
       query: argv.query,
     })?.isTrusted ?? false;
@@ -590,7 +610,7 @@ export async function loadCliConfig(
         return resolveToRealPath(trimmedPath) !== realCwd;
       } catch (e) {
         debugLogger.debug(
-          `[IDE] Skipping inaccessible workspace folder: ${trimmedPath} (${e instanceof Error ? e.message : String(e)})`,
+          `[IDE] Skipping inaccessible workspace folder: ${trimmedPath} (${getErrorMessage(e)})`,
         );
         return false;
       }
@@ -614,7 +634,7 @@ export async function loadCliConfig(
     .getExtensions()
     .find((ext) => ext.isActive && ext.plan?.directory)?.plan;
 
-  const experimentalJitContext = settings.experimental.jitContext;
+  const experimentalJitContext = settings.experimental.jitContext ?? true;
 
   let extensionRegistryURI =
     process.env['GEMINI_CLI_EXTENSION_REGISTRY_URI'] ??
@@ -980,6 +1000,7 @@ export async function loadCliConfig(
     enableExtensionReloading: settings.experimental?.extensionReloading,
     enableAgents: settings.experimental?.enableAgents,
     plan: settings.general?.plan?.enabled ?? true,
+    voiceMode: settings.experimental?.voiceMode,
     tracker: settings.experimental?.taskTracker,
     directWebFetch: settings.experimental?.directWebFetch,
     planSettings: settings.general?.plan?.directory
@@ -988,11 +1009,15 @@ export async function loadCliConfig(
     enableEventDrivenScheduler: true,
     skillsSupport: settings.skills?.enabled ?? true,
     disabledSkills: settings.skills?.disabled,
-    experimentalJitContext: settings.experimental?.jitContext,
-    experimentalMemoryManager: settings.experimental?.memoryManager,
+    experimentalJitContext,
+    experimentalMemoryV2: settings.experimental?.memoryV2,
+    experimentalAutoMemory: settings.experimental?.autoMemory,
+    experimentalGemma: settings.experimental?.gemma,
     contextManagement,
     modelSteering: settings.experimental?.modelSteering,
-    topicUpdateNarration: settings.experimental?.topicUpdateNarration,
+    topicUpdateNarration:
+      settings.general?.topicUpdateNarration ??
+      settings.experimental?.topicUpdateNarration,
     noBrowser: !!process.env['NO_BROWSER'],
     summarizeToolOutput: settings.model?.summarizeToolOutput,
     ideMode,
@@ -1026,6 +1051,7 @@ export async function loadCliConfig(
     recordResponses: argv.recordResponses,
     retryFetchErrors: settings.general?.retryFetchErrors,
     billing: settings.billing,
+    vertexAiRouting: settings.billing?.vertexAi,
     maxAttempts: settings.general?.maxAttempts,
     ptyInfo: ptyInfo?.name,
     disableLLMCorrection: settings.tools?.disableLLMCorrection,
@@ -1092,7 +1118,7 @@ async function resolveWorktreeSettings(
     worktreeBaseSha = stdout.trim();
   } catch (e: unknown) {
     debugLogger.debug(
-      `Failed to resolve worktree base SHA at ${worktreePath}: ${e instanceof Error ? e.message : String(e)}`,
+      `Failed to resolve worktree base SHA at ${worktreePath}: ${getErrorMessage(e)}`,
     );
   }
 

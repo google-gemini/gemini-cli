@@ -93,7 +93,7 @@ describe('getVersion', () => {
       vi.mocked(execSync).mockImplementation(mockExecSync);
       const result = getVersion({ type: 'nightly' });
       // Note: The base version now comes from package.json, not the previous nightly tag.
-      expect(result.releaseVersion).toBe('0.8.0-nightly.20250917.d3bf8a3d');
+      expect(result.releaseVersion).toBe('0.8.0-nightly.20250917.gd3bf8a3d');
       expect(result.npmTag).toBe('nightly');
       expect(result.previousReleaseTag).toBe('v0.8.0-nightly.20250916.abcdef');
     });
@@ -190,6 +190,20 @@ describe('getVersion', () => {
       });
       // Should have skipped preview.0 and landed on preview.1
       expect(result.releaseVersion).toBe('0.8.0-preview.1');
+    });
+
+    it('should preserve a git hash with a leading zero via the g prefix', () => {
+      const mockWithLeadingZeroHash = (command) => {
+        // Return an all-numeric hash with a leading zero
+        if (command.includes('git rev-parse --short HEAD')) return '017972622';
+        return mockExecSync(command);
+      };
+      vi.mocked(execSync).mockImplementation(mockWithLeadingZeroHash);
+
+      const result = getVersion({ type: 'nightly' });
+      // The 'g' prefix forces semver to treat this as an alphanumeric
+      // identifier, preventing it from stripping the leading zero.
+      expect(result.releaseVersion).toBe('0.8.0-nightly.20250917.g017972622');
     });
   });
 });

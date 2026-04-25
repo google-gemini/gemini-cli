@@ -1,0 +1,279 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`System Lifecycle Golden Tests > Scenario 1: Organic Growth with Huge Tool Output & Images 1`] = `
+{
+  "finalProjection": [
+    {
+      "parts": [
+        {
+          "text": "System Instructions",
+        },
+      ],
+      "role": "user",
+    },
+    {
+      "parts": [
+        {
+          "text": "Ack.",
+        },
+      ],
+      "role": "model",
+    },
+    {
+      "parts": [
+        {
+          "text": "Hello!",
+        },
+      ],
+      "role": "user",
+    },
+    {
+      "parts": [
+        {
+          "text": "Hi, how can I help?",
+        },
+      ],
+      "role": "model",
+    },
+    {
+      "parts": [
+        {
+          "text": "Read the logs.",
+        },
+      ],
+      "role": "user",
+    },
+    {
+      "parts": [
+        {
+          "functionCall": {
+            "args": {},
+            "id": "<UUID>",
+            "name": "run_shell_command",
+          },
+        },
+      ],
+      "role": "model",
+    },
+    {
+      "parts": [
+        {
+          "functionResponse": {
+            "id": "<UUID>",
+            "name": "run_shell_command",
+            "response": {
+              "output": "LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG LOG ",
+            },
+          },
+        },
+      ],
+      "role": "user",
+    },
+    {
+      "parts": [
+        {
+          "text": "The logs are very long.",
+        },
+      ],
+      "role": "model",
+    },
+    {
+      "parts": [
+        {
+          "text": "Look at this architecture diagram:",
+        },
+        {
+          "inlineData": {
+            "data": "fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_fake_base64_data_",
+            "mimeType": "image/png",
+          },
+        },
+      ],
+      "role": "user",
+    },
+    {
+      "parts": [
+        {
+          "text": "Nice diagram.",
+        },
+      ],
+      "role": "model",
+    },
+    {
+      "parts": [
+        {
+          "text": "Can we refactor?",
+        },
+      ],
+      "role": "user",
+    },
+    {
+      "parts": [
+        {
+          "text": "Yes we can.",
+        },
+        {
+          "text": "Yield",
+        },
+      ],
+      "role": "model",
+    },
+  ],
+  "tokenTrajectory": [
+    {
+      "tokensAfterBackground": 34,
+      "tokensBeforeBackground": 34,
+      "turnIndex": 0,
+    },
+    {
+      "tokensAfterBackground": 64,
+      "tokensBeforeBackground": 64,
+      "turnIndex": 1,
+    },
+    {
+      "tokensAfterBackground": 25358,
+      "tokensBeforeBackground": 25358,
+      "turnIndex": 2,
+    },
+    {
+      "tokensAfterBackground": 28674,
+      "tokensBeforeBackground": 28674,
+      "turnIndex": 3,
+    },
+    {
+      "tokensAfterBackground": 28707,
+      "tokensBeforeBackground": 28707,
+      "turnIndex": 4,
+    },
+  ],
+}
+`;
+
+exports[`System Lifecycle Golden Tests > Scenario 2: Under Budget (No Modifications) 1`] = `
+{
+  "finalProjection": [
+    {
+      "parts": [
+        {
+          "text": "System Instructions",
+        },
+      ],
+      "role": "user",
+    },
+    {
+      "parts": [
+        {
+          "text": "Ack.",
+        },
+      ],
+      "role": "model",
+    },
+    {
+      "parts": [
+        {
+          "text": "Hello!",
+        },
+      ],
+      "role": "user",
+    },
+    {
+      "parts": [
+        {
+          "text": "Hi, how can I help?",
+        },
+        {
+          "text": "Yield",
+        },
+      ],
+      "role": "model",
+    },
+  ],
+  "tokenTrajectory": [
+    {
+      "tokensAfterBackground": 34,
+      "tokensBeforeBackground": 34,
+      "turnIndex": 0,
+    },
+    {
+      "tokensAfterBackground": 64,
+      "tokensBeforeBackground": 64,
+      "turnIndex": 1,
+    },
+  ],
+}
+`;
+
+exports[`System Lifecycle Golden Tests > Scenario 3: Async-Driven Background GC 1`] = `
+{
+  "finalProjection": [
+    {
+      "parts": [
+        {
+          "text": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        },
+      ],
+      "role": "user",
+    },
+    {
+      "parts": [
+        {
+          "text": "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+        },
+      ],
+      "role": "model",
+    },
+    {
+      "parts": [
+        {
+          "text": "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC",
+        },
+      ],
+      "role": "user",
+    },
+    {
+      "parts": [
+        {
+          "text": "DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD",
+        },
+      ],
+      "role": "model",
+    },
+    {
+      "parts": [
+        {
+          "text": "EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE",
+        },
+      ],
+      "role": "user",
+    },
+    {
+      "parts": [
+        {
+          "text": "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
+        },
+        {
+          "text": "Yield",
+        },
+      ],
+      "role": "model",
+    },
+  ],
+  "tokenTrajectory": [
+    {
+      "tokensAfterBackground": 130,
+      "tokensBeforeBackground": 130,
+      "turnIndex": 0,
+    },
+    {
+      "tokensAfterBackground": 254,
+      "tokensBeforeBackground": 254,
+      "turnIndex": 1,
+    },
+    {
+      "tokensAfterBackground": 378,
+      "tokensBeforeBackground": 378,
+      "turnIndex": 2,
+    },
+  ],
+}
+`;

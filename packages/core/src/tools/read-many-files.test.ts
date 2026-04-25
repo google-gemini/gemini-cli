@@ -272,7 +272,9 @@ describe('ReadManyFilesTool', () => {
       createFile('file1.txt', 'Content of file1');
       const params = { include: ['file1.txt'] };
       const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
       const expectedPath = path.join(tempRootDir, 'file1.txt');
       expect(result.llmContent).toEqual([
         `--- ${expectedPath} ---\n\nContent of file1\n\n`,
@@ -288,7 +290,9 @@ describe('ReadManyFilesTool', () => {
       createFile('subdir/file2.js', 'Content2');
       const params = { include: ['file1.txt', 'subdir/file2.js'] };
       const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
       const content = result.llmContent as string[];
       const expectedPath1 = path.join(tempRootDir, 'file1.txt');
       const expectedPath2 = path.join(tempRootDir, 'subdir/file2.js');
@@ -313,7 +317,9 @@ describe('ReadManyFilesTool', () => {
       createFile('sub/data.json', '{}');
       const params = { include: ['*.txt'] };
       const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
       const content = result.llmContent as string[];
       const expectedPath1 = path.join(tempRootDir, 'file.txt');
       const expectedPath2 = path.join(tempRootDir, 'another.txt');
@@ -338,7 +344,9 @@ describe('ReadManyFilesTool', () => {
       createFile('src/main.test.ts', 'Test content');
       const params = { include: ['src/**/*.ts'], exclude: ['**/*.test.ts'] };
       const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
       const content = result.llmContent as string[];
       const expectedPath = path.join(tempRootDir, 'src/main.ts');
       expect(content).toEqual([
@@ -356,7 +364,9 @@ describe('ReadManyFilesTool', () => {
     it('should handle nonexistent specific files gracefully', async () => {
       const params = { include: ['nonexistent-file.txt'] };
       const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
       expect(result.llmContent).toEqual([
         'No files matching the criteria were found or all were skipped.',
       ]);
@@ -370,7 +380,9 @@ describe('ReadManyFilesTool', () => {
       createFile('src/app.js', 'app code');
       const params = { include: ['**/*.js'] };
       const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
       const content = result.llmContent as string[];
       const expectedPath = path.join(tempRootDir, 'src/app.js');
       expect(content).toEqual([
@@ -390,7 +402,9 @@ describe('ReadManyFilesTool', () => {
       createFile('src/app.js', 'app code');
       const params = { include: ['**/*.js'], useDefaultExcludes: false };
       const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
       const content = result.llmContent as string[];
       const expectedPath1 = path.join(
         tempRootDir,
@@ -419,7 +433,9 @@ describe('ReadManyFilesTool', () => {
       );
       const params = { include: ['*.png'] }; // Explicitly requesting .png
       const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
       expect(result.llmContent).toEqual([
         {
           inlineData: {
@@ -443,7 +459,9 @@ describe('ReadManyFilesTool', () => {
       );
       const params = { include: ['myExactImage.png'] }; // Explicitly requesting by full name
       const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
       expect(result.llmContent).toEqual([
         {
           inlineData: {
@@ -462,7 +480,9 @@ describe('ReadManyFilesTool', () => {
       createFile('notes.txt', 'text notes');
       const params = { include: ['*'] }; // Generic glob, not specific to .pdf
       const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
       const content = result.llmContent as string[];
       const expectedPath = path.join(tempRootDir, 'notes.txt');
       expect(
@@ -484,7 +504,9 @@ describe('ReadManyFilesTool', () => {
       createBinaryFile('important.pdf', Buffer.from('%PDF-1.4...'));
       const params = { include: ['*.pdf'] }; // Explicitly requesting .pdf files
       const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
       expect(result.llmContent).toEqual([
         {
           inlineData: {
@@ -500,7 +522,9 @@ describe('ReadManyFilesTool', () => {
       createBinaryFile('report-final.pdf', Buffer.from('%PDF-1.4...'));
       const params = { include: ['report-final.pdf'] };
       const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
       expect(result.llmContent).toEqual([
         {
           inlineData: {
@@ -518,7 +542,9 @@ describe('ReadManyFilesTool', () => {
       createFile('foo.quux', '');
       const params = { include: ['foo.bar', 'bar.ts', 'foo.quux'] };
       const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
       expect((result.returnDisplay as ReadManyFilesResult).files).not.toContain(
         'foo.bar',
       );
@@ -585,7 +611,9 @@ describe('ReadManyFilesTool', () => {
 
       const params = { include: ['*.txt'] };
       const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
       const content = result.llmContent as string[];
       if (!Array.isArray(content)) {
         throw new Error(`llmContent is not an array: ${content}`);
@@ -621,7 +649,9 @@ describe('ReadManyFilesTool', () => {
 
       const params = { include: ['*.txt'] };
       const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
       const content = result.llmContent as string[];
 
       const normalFileContent = content.find((c) => c.includes('file1.txt'));
@@ -645,7 +675,9 @@ describe('ReadManyFilesTool', () => {
       createFile(filePath, 'Content of receive-detail');
       const params = { include: [filePath] };
       const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
       const expectedPath = path.join(tempRootDir, filePath);
       expect(result.llmContent).toEqual([
         `--- ${expectedPath} ---
@@ -664,7 +696,9 @@ Content of receive-detail
       createFile('file[1].txt', 'Content of file[1]');
       const params = { include: ['file[1].txt'] };
       const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
       const expectedPath = path.join(tempRootDir, 'file[1].txt');
       expect(result.llmContent).toEqual([
         `--- ${expectedPath} ---
@@ -692,7 +726,9 @@ Content of file[1]
       vi.mocked(glob.glob).mockRejectedValue(new Error('Glob failed'));
       const params = { include: ['*.txt'] };
       const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
       expect(result.error?.type).toBe(
         ToolErrorType.READ_MANY_FILES_SEARCH_ERROR,
       );
@@ -738,7 +774,9 @@ Content of file[1]
 
       const params = { include: files };
       const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
 
       // Verify all files were processed. The content should have fileCount
       // entries + 1 for the output terminator.
@@ -768,7 +806,9 @@ Content of file[1]
       };
 
       const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
       const content = result.llmContent as string[];
 
       // Should successfully process valid files despite one failure
@@ -808,7 +848,7 @@ Content of file[1]
       });
 
       const invocation = tool.build({ include: files });
-      await invocation.execute(new AbortController().signal);
+      await invocation.execute({ abortSignal: new AbortController().signal });
 
       // Verify concurrent execution pattern
       // In parallel execution: all "start:" events should come before all "end:" events
@@ -843,7 +883,9 @@ Content of file[1]
       );
 
       const invocation = tool.build({ include: ['jit-test.ts'] });
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
 
       expect(discoverJitContext).toHaveBeenCalled();
       const llmContent = Array.isArray(result.llmContent)
@@ -864,7 +906,9 @@ Content of file[1]
       );
 
       const invocation = tool.build({ include: ['jit-disabled-test.ts'] });
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
 
       const llmContent = Array.isArray(result.llmContent)
         ? result.llmContent.join('')
@@ -906,7 +950,9 @@ Content of file[1]
       );
 
       const invocation = tool.build({ include: ['subA/a.ts', 'subB/b.ts'] });
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
 
       // Verify both directories were discovered (order depends on Set iteration)
       expect(callOrder).toHaveLength(2);

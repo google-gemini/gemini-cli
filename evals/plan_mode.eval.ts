@@ -33,6 +33,8 @@ describe('plan_mode', () => {
       .filter(Boolean);
 
   evalTest('ALWAYS_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should refuse file modification when in plan mode',
     approvalMode: ApprovalMode.PLAN,
     params: {
@@ -68,6 +70,8 @@ describe('plan_mode', () => {
   });
 
   evalTest('ALWAYS_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should refuse saving new documentation to the repo when in plan mode',
     approvalMode: ApprovalMode.PLAN,
     params: {
@@ -105,6 +109,8 @@ describe('plan_mode', () => {
   });
 
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should enter plan mode when asked to create a plan',
     approvalMode: ApprovalMode.DEFAULT,
     params: {
@@ -122,6 +128,8 @@ describe('plan_mode', () => {
   });
 
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should exit plan mode when plan is complete and implementation is requested',
     approvalMode: ApprovalMode.PLAN,
     params: {
@@ -169,6 +177,8 @@ describe('plan_mode', () => {
   });
 
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should allow file modification in plans directory when in plan mode',
     approvalMode: ApprovalMode.PLAN,
     params: {
@@ -201,6 +211,8 @@ describe('plan_mode', () => {
   });
 
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should create a plan in plan mode and implement it for a refactoring task',
     params: {
       settings,
@@ -286,12 +298,14 @@ describe('plan_mode', () => {
   });
 
   evalTest('ALWAYS_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should transition from plan mode to normal execution and create a plan file from scratch',
     params: {
       settings,
     },
     prompt:
-      'Enter plan mode and plan to create a new module called foo. The plan should be saved as foo-plan.md. Then, exit plan mode.',
+      'I agree with your strategy. Please enter plan mode and draft the plan to create a new module called foo. The plan should be saved as foo-plan.md. Then, exit plan mode.',
     assert: async (rig, result) => {
       const enterPlanCalled = await rig.waitForToolCall('enter_plan_mode');
       expect(
@@ -321,7 +335,7 @@ describe('plan_mode', () => {
 
       expect(
         planWrite?.toolRequest.success,
-        `Expected write_file to succeed, but got error: ${planWrite?.toolRequest.error}`,
+        `Expected write_file to succeed, but got error: ${(planWrite?.toolRequest as any).error}`,
       ).toBe(true);
 
       assertModelHasOutput(result);
@@ -329,6 +343,8 @@ describe('plan_mode', () => {
   });
 
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should not exit plan mode or draft before informal agreement',
     approvalMode: ApprovalMode.PLAN,
     params: {
@@ -356,6 +372,50 @@ describe('plan_mode', () => {
         planWrite,
         'Should NOT draft the plan file before informal agreement',
       ).toBeUndefined();
+
+      assertModelHasOutput(result);
+    },
+  });
+
+  evalTest('USUALLY_PASSES', {
+    name: 'should handle nested plan directories correctly',
+    suiteName: 'plan_mode',
+    suiteType: 'behavioral',
+    approvalMode: ApprovalMode.PLAN,
+    params: {
+      settings,
+    },
+    prompt:
+      'Please create a new architectural plan in a nested folder called "architecture/frontend-v2.md" within the plans directory. The plan should contain the text "# Frontend V2 Plan". Then, exit plan mode',
+    assert: async (rig, result) => {
+      await rig.waitForTelemetryReady();
+      const toolLogs = rig.readToolLogs();
+
+      const writeCalls = toolLogs.filter((log) =>
+        ['write_file', 'replace'].includes(log.toolRequest.name),
+      );
+
+      const wroteToNestedPath = writeCalls.some((log) => {
+        try {
+          const args = JSON.parse(log.toolRequest.args);
+          if (!args.file_path) return false;
+          // In plan mode, paths can be passed as relative (architecture/frontend-v2.md)
+          // or they might be resolved as absolute by the tool depending on the exact mock state.
+          // We strictly ensure it ends exactly with the expected nested path and doesn't contain extra nesting.
+          const normalizedPath = args.file_path.replace(/\\/g, '/');
+          return (
+            normalizedPath === 'architecture/frontend-v2.md' ||
+            normalizedPath.endsWith('/plans/architecture/frontend-v2.md')
+          );
+        } catch {
+          return false;
+        }
+      });
+
+      expect(
+        wroteToNestedPath,
+        'Expected model to successfully target the nested plan file path',
+      ).toBe(true);
 
       assertModelHasOutput(result);
     },

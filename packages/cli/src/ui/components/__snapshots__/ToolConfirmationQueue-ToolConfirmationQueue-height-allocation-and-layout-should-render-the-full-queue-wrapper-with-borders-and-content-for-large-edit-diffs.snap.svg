@@ -6,7 +6,8 @@
   <g transform="translate(10, 10)">
     <text x="0" y="2" fill="#333333" textLength="720" lengthAdjust="spacingAndGlyphs">╭──────────────────────────────────────────────────────────────────────────────╮</text>
     <text x="0" y="19" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="18" y="19" fill="#ffffaf" textLength="81" lengthAdjust="spacingAndGlyphs" font-weight="bold">? replace</text>
+    <text x="18" y="19" fill="#ffffaf" textLength="99" lengthAdjust="spacingAndGlyphs" font-weight="bold">? replace  </text>
+    <text x="117" y="19" fill="#ffffff" textLength="234" lengthAdjust="spacingAndGlyphs">Replaces content in a file</text>
     <text x="711" y="19" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="36" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="18" y="36" fill="#333333" textLength="684" lengthAdjust="spacingAndGlyphs">╭──────────────────────────────────────────────────────────────────────────╮</text>

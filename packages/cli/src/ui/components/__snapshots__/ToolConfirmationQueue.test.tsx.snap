@@ -2,7 +2,7 @@
 
 exports[`ToolConfirmationQueue > calculates availableContentHeight based on availableTerminalHeight from UI state 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
-│ ? replace                                                                    │
+│ ? replace  edit file                                                         │
 │ ╭──────────────────────────────────────────────────────────────────────────╮ │
 │ ╰─... 48 hidden (Ctrl+O) ...───────────────────────────────────────────────╯ │
 │ Apply this change?                                                           │
@@ -17,7 +17,7 @@ exports[`ToolConfirmationQueue > calculates availableContentHeight based on avai
 
 exports[`ToolConfirmationQueue > does not render expansion hint when constrainHeight is false 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
-│ ? replace                                                                    │
+│ ? replace  edit file                                                         │
 │ ╭──────────────────────────────────────────────────────────────────────────╮ │
 │ │                                                                          │ │
 │ │  No changes detected.                                                    │ │
@@ -63,7 +63,7 @@ exports[`ToolConfirmationQueue > height allocation and layout > should handle se
 
 exports[`ToolConfirmationQueue > height allocation and layout > should render the full queue wrapper with borders and content for large edit diffs 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
-│ ? replace                                                                    │
+│ ? replace  Replaces content in a file                                        │
 │ ╭──────────────────────────────────────────────────────────────────────────╮ │
 │ │ ... 13 hidden (Ctrl+O) ...                                               │ │
 │ │  7 + const newLine7 = true;                                              │ │

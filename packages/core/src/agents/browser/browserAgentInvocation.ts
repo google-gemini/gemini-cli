@@ -22,7 +22,7 @@ import { LocalAgentExecutor } from '../local-executor.js';
 import {
   BaseToolInvocation,
   type ToolResult,
-  type ToolLiveOutput,
+  type ExecuteOptions,
 } from '../../tools/tools.js';
 import { ToolErrorType } from '../../tools/tool-error.js';
 import {
@@ -107,10 +107,8 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
    * 3. Runs the agent via LocalAgentExecutor
    * 4. Cleans up browser resources
    */
-  async execute(
-    signal: AbortSignal,
-    updateOutput?: (output: ToolLiveOutput) => void,
-  ): Promise<ToolResult> {
+  async execute(options: ExecuteOptions): Promise<ToolResult> {
+    const { abortSignal: signal, updateOutput } = options;
     const invocationStartMs = Date.now();
     let browserManager;
     let recentActivity: SubagentActivityItem[] = [];

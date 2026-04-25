@@ -80,44 +80,34 @@ priority = 40
 modes = ["plan"]
 denyMessage = "You are in Plan Mode with access to read-only tools. Execution of scripts (including those from skills) is blocked."
 
-# Explicitly Allow Read-Only Tools in Plan mode.
+# Explicitly allowed tools in Plan Mode (interactive: ask user, non-interactive: deny)
+# Priority 50 overrides the catch-all (40) and also ensures we override default tier ALLOW rules (e.g. from read-only.toml).
+
 [[rule]]
-toolName = ["activate_skill"]
+toolName = "*"
+mcpName = "*"
+toolAnnotations = { readOnlyHint = true }
+decision = "ask_user"
+priority = 50
+modes = ["plan"]
+interactive = true
+
+# Allow specific subagents in Plan mode.
+# We use argsPattern to match the agent_name argument for invoke_agent.
+[[rule]]
+name = "Allow specific subagents in Plan mode"
+toolName = "invoke_agent"
+argsPattern = "\"agent_name\":\\s*\"(codebase_investigator|cli_help)\""
 decision = "allow"
 priority = 50
 modes = ["plan"]
 
 [[rule]]
-toolName = "*"
-mcpName = "*"
-toolAnnotations = { readOnlyHint = true }
+toolName = ["ask_user", "save_memory", "web_fetch", "activate_skill"]
 decision = "ask_user"
 priority = 50
 modes = ["plan"]
 interactive = true
-
-[[rule]]
-toolName = "*"
-mcpName = "*"
-toolAnnotations = { readOnlyHint = true }
-decision = "deny"
-priority = 50
-modes = ["plan"]
-interactive = false
-
-[[rule]]
-toolName = ["ask_user", "save_memory", "web_fetch"]
-decision = "ask_user"
-priority = 50
-modes = ["plan"]
-interactive = true
-
-[[rule]]
-toolName = ["ask_user", "save_memory", "web_fetch"]
-decision = "deny"
-priority = 50
-modes = ["plan"]
-interactive = false
 
 # Allow write_file and replace for .md files in the plans directory (cross-platform)
 # We split this into two rules to avoid ReDoS checker issues with nested optional segments.
