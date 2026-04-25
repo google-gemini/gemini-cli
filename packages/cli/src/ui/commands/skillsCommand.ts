@@ -59,6 +59,22 @@ async function listAction(
     ? skillManager.getAllSkills()
     : skillManager.getAllSkills().filter((s) => !s.isBuiltin);
 
+  if (skills.length === 0) {
+    context.ui.addItem({
+      type: MessageType.INFO,
+      text: [
+        'No agent skills are currently available.',
+        '',
+        'To get started with agent skills:',
+        '  1. Create a skill in your workspace (e.g. .gemini/skills/<name>/SKILL.md), or',
+        '  2. Install/link a skill using "/skills link <path>".',
+        '',
+        'You can learn more at https://geminicli.com/docs/cli/skills/.',
+      ].join('
+'),
+    });
+  }
+
   const skillsListItem: HistoryItemSkillsList = {
     type: MessageType.SKILLS_LIST,
     skills: skills.map((skill) => ({
