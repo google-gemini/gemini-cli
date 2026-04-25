@@ -2274,15 +2274,22 @@ export async function createTransport(
       }
     }
 
+    const expandedCommand = expandEnvVars(
+      mcpServerConfig.command,
+      sanitizedEnv,
+    );
     const expandedArgs = (mcpServerConfig.args || []).map((arg) =>
       expandEnvVars(arg, sanitizedEnv),
     );
+    const expandedCwd = mcpServerConfig.cwd
+      ? expandEnvVars(mcpServerConfig.cwd, sanitizedEnv)
+      : undefined;
 
     let transport: Transport = new StdioClientTransport({
-      command: mcpServerConfig.command,
+      command: expandedCommand,
       args: expandedArgs,
       env: finalEnv,
-      cwd: mcpServerConfig.cwd,
+      cwd: expandedCwd,
       stderr: 'pipe',
     });
 
