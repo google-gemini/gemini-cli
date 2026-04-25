@@ -109,6 +109,11 @@ exports[`DenseToolMessage > renders correctly for grep results 1`] = `
 "
 `;
 
+exports[`DenseToolMessage > renders correctly for grep results 2`] = `
+"  ✓  test-tool  Test description → Found 2 matches
+"
+`;
+
 exports[`DenseToolMessage > renders correctly for ls results 1`] = `
 "  ✓  test-tool  Test description → Listed 2 files. (1 ignored)
 "

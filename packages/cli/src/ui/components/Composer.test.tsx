@@ -311,18 +311,18 @@ describe('Composer', () => {
   });
 
   describe('Footer Display Settings', () => {
-    it('renders Footer by default when hideFooter is false', async () => {
+    it('renders Footer by default when showFooter is true', async () => {
       const uiState = createMockUIState();
-      const settings = createMockSettings({ ui: { hideFooter: false } });
+      const settings = createMockSettings({ ui: { showFooter: true } });
 
       const { lastFrame } = await renderComposer(uiState, settings);
 
       expect(lastFrame()).toContain('Footer');
     });
 
-    it('does NOT render Footer when hideFooter is true', async () => {
+    it('does NOT render Footer when showFooter is false', async () => {
       const uiState = createMockUIState();
-      const settings = createMockSettings({ ui: { hideFooter: true } });
+      const settings = createMockSettings({ ui: { showFooter: false } });
 
       const { lastFrame } = await renderComposer(uiState, settings);
 
@@ -355,7 +355,7 @@ describe('Composer', () => {
       });
       const settings = createMockSettings({
         ui: {
-          hideFooter: false,
+          showFooter: true,
           showMemoryUsage: true,
         },
       });
@@ -782,7 +782,7 @@ describe('Composer', () => {
       });
       const settings = createMockSettings({
         ui: {
-          footer: { hideContextPercentage: false },
+          footer: { showContextPercentage: true },
         },
       });
 
