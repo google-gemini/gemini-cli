@@ -904,7 +904,6 @@ class EditToolInvocation
       if (!editData.isNewFile) {
         const backupResult = await createPreWriteBackup(
           this.resolvedPath,
-          editData.currentContent!,
           this.config.getSessionId(),
           this.config.storage.getProjectTempDir(),
         );

@@ -345,7 +345,6 @@ class WriteFileToolInvocation extends BaseToolInvocation<
       if (!isNewFile) {
         const backupResult = await createPreWriteBackup(
           this.resolvedPath,
-          originalContent,
           this.config.getSessionId(),
           this.config.storage.getProjectTempDir(),
         );

@@ -214,40 +214,18 @@ class RestoreFileToolInvocation extends BaseToolInvocation<
       };
     }
 
-    let currentContent = '';
-    let fileCurrentlyExists = true;
-    try {
-      currentContent = await fsPromises.readFile(this.resolvedPath, 'utf8');
-    } catch (e) {
-      if (isNodeError(e) && e.code === 'ENOENT') {
-        fileCurrentlyExists = false;
-      } else {
-        const msg = isNodeError(e)
-          ? `Cannot read ${path.basename(this.resolvedPath)} before restoring: ${e.message} (${e.code})`
-          : `Cannot read ${path.basename(this.resolvedPath)} before restoring: ${String(e)}`;
-        return {
-          llmContent: msg,
-          returnDisplay: msg,
-          error: { message: msg, type: ToolErrorType.FILE_WRITE_FAILURE },
-        };
-      }
-    }
-
-    if (fileCurrentlyExists) {
-      const preRestoreBackup = await createPreWriteBackup(
-        this.resolvedPath,
-        currentContent,
-        this.config.getSessionId(),
-        this.config.storage.getProjectTempDir(),
-      );
-      if (!preRestoreBackup.ok && !preRestoreBackup.newFile) {
-        const msg = `Cannot back up current state of ${path.basename(this.resolvedPath)} before restoring. Aborting to prevent data loss.`;
-        return {
-          llmContent: msg,
-          returnDisplay: msg,
-          error: { message: msg, type: ToolErrorType.FILE_WRITE_FAILURE },
-        };
-      }
+    const preRestoreBackup = await createPreWriteBackup(
+      this.resolvedPath,
+      this.config.getSessionId(),
+      this.config.storage.getProjectTempDir(),
+    );
+    if (!preRestoreBackup.ok && !preRestoreBackup.newFile) {
+      const msg = `Cannot back up current state of ${path.basename(this.resolvedPath)} before restoring. Aborting to prevent data loss.`;
+      return {
+        llmContent: msg,
+        returnDisplay: msg,
+        error: { message: msg, type: ToolErrorType.FILE_WRITE_FAILURE },
+      };
     }
 
     try {

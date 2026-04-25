@@ -109,17 +109,17 @@ export type BackupResult =
  */
 export async function createPreWriteBackup(
   filePath: string,
-  originalContent: string,
   sessionId: string,
   projectTempDir: string,
 ): Promise<BackupResult> {
+  let diskContent: string;
   try {
-    await fsPromises.access(filePath);
+    diskContent = await fsPromises.readFile(filePath, 'utf8');
   } catch (e) {
     if (isNodeError(e) && e.code === 'ENOENT') {
       return { ok: false, newFile: true };
     }
-    debugLogger.warn('Failed to access file for backup:', e);
+    debugLogger.warn('Failed to read file for backup:', e);
     return { ok: false, newFile: false };
   }
 
@@ -147,7 +147,7 @@ export async function createPreWriteBackup(
     );
     try {
       const latestContent = await fsPromises.readFile(latestPath, 'utf8');
-      if (contentsEqualNormalized(latestContent, originalContent)) {
+      if (contentsEqualNormalized(latestContent, diskContent)) {
         return { ok: true, version: latestVersion, backupPath: latestPath };
       }
     } catch (e) {
