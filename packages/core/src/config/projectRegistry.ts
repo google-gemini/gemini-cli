@@ -179,6 +179,12 @@ export class ProjectRegistry {
         retries: Math.floor(LOCK_TIMEOUT_MS / LOCK_RETRY_DELAY_MS),
         minTimeout: LOCK_RETRY_DELAY_MS,
       },
+      onCompromised: (err) => {
+        debugLogger.debug(
+          'Project registry lock was compromised (likely released concurrently):',
+          err,
+        );
+      },
     });
 
     try {
