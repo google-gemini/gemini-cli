@@ -9,7 +9,7 @@ import {
   ExtensionUpdateState,
   type ExtensionUpdateStatus,
 } from '../../ui/state/extensions.js';
-import { loadInstallMetadata } from '../extension.js';
+import { formatVersion, loadInstallMetadata } from '../extension.js';
 import { checkForExtensionUpdate } from './github.js';
 import {
   debugLogger,
@@ -97,7 +97,10 @@ export async function updateExtension(
     }
   }
 
-  const originalVersion = extension.version;
+  const originalVersion = formatVersion(
+    extension.version,
+    extension.packageVersion,
+  );
 
   const tempDir = await ExtensionStorage.createTmpDir();
   try {
@@ -119,7 +122,10 @@ export async function updateExtension(
         `Updated extension not found after installation, got error:\n${e}`,
       );
     }
-    const updatedVersion = updatedExtension.version;
+    const updatedVersion = formatVersion(
+      updatedExtension.version,
+      updatedExtension.packageVersion,
+    );
     dispatchExtensionStateUpdate({
       type: 'SET_STATE',
       payload: {
