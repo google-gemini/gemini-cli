@@ -348,6 +348,7 @@ class WriteFileToolInvocation extends BaseToolInvocation<
         this.config,
         this.resolvedPath,
         isNewFile,
+        originalContent,
       );
       if ('errorResult' in backupOutcome) {
         return backupOutcome.errorResult;

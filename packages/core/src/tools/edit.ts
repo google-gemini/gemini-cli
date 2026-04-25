@@ -907,6 +907,7 @@ class EditToolInvocation
         this.config,
         this.resolvedPath,
         editData.isNewFile,
+        editData.currentContent ?? undefined,
       );
       if ('errorResult' in backupOutcome) {
         return backupOutcome.errorResult;

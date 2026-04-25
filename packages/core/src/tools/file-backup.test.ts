@@ -98,29 +98,22 @@ describe('createPreWriteBackup', () => {
   });
 
   it('returns { ok: false, newFile: false } and logs a warning on EACCES', async () => {
-    vi.mocked(
-      fsPromises.readFile as (
-        path: string,
-        encoding: string,
-      ) => Promise<string>,
-    ).mockRejectedValueOnce(makeError('EACCES', 'Permission denied'));
+    // If existingVersions is empty, readFile is skipped and copyFile is used directly.
+    vi.mocked(fsPromises.copyFile).mockRejectedValueOnce(
+      makeError('EACCES', 'Permission denied'),
+    );
 
     const result = await createPreWriteBackup(FILE_PATH, SESSION_ID, TEMP_DIR);
 
     expect(result).toEqual({ ok: false, newFile: false });
-    expect(vi.mocked(debugLogger.warn)).toHaveBeenCalledOnce();
-    expect(vi.mocked(debugLogger.warn)).not.toHaveBeenCalledWith(
-      expect.stringContaining('newFile'),
-    );
+    expect(vi.mocked(debugLogger.warn)).toHaveBeenCalledExactlyOnceWith(expect.stringContaining('Failed to create backup'), expect.anything());
   });
 
   it('returns { ok: false, newFile: true } on ENOENT without logging', async () => {
-    vi.mocked(
-      fsPromises.readFile as (
-        path: string,
-        encoding: string,
-      ) => Promise<string>,
-    ).mockRejectedValueOnce(makeError('ENOENT', 'No such file'));
+    // If existingVersions is empty, readFile is skipped and copyFile is used directly.
+    vi.mocked(fsPromises.copyFile).mockRejectedValueOnce(
+      makeError('ENOENT', 'No such file'),
+    );
 
     const result = await createPreWriteBackup(FILE_PATH, SESSION_ID, TEMP_DIR);
 
@@ -132,6 +125,8 @@ describe('createPreWriteBackup', () => {
     const existingDirents = Array.from({ length: 22 }, (_, i) =>
       makeDirent(`${HASH}_${i + 1}`, true),
     );
+    // listBackupVersions is called twice: once at the start and once for GC.
+    // The second call (GC) should see the newly created version 23.
     const allDirents = Array.from({ length: 23 }, (_, i) =>
       makeDirent(`${HASH}_${i + 1}`, true),
     );
@@ -158,7 +153,9 @@ describe('createPreWriteBackup', () => {
         encoding: string,
       ) => Promise<string>,
     )
+      // Since existingVersions.length > 0, readFile is called for diskContent (if not provided)
       .mockResolvedValueOnce('new content') // disk read
+      // and for the deduplication check
       .mockResolvedValueOnce('old content'); // last backup dedup check
 
     vi.mocked(fsPromises.copyFile).mockResolvedValueOnce(undefined);
@@ -181,6 +178,71 @@ describe('createPreWriteBackup', () => {
       expect.stringContaining('version 2'),
       eperm,
     );
+  });
+
+  it('skips disk read if diskContent is provided and existingVersions.length > 0', async () => {
+    const existingDirents = [makeDirent(`${HASH}_1`, true)];
+    vi.mocked(fsPromises.readdir).mockResolvedValue(
+      existingDirents as unknown as ReturnType<
+        typeof fsPromises.readdir
+      > extends Promise<infer T>
+        ? T
+        : never,
+    );
+
+    vi.mocked(
+      fsPromises.readFile as (
+        path: string,
+        encoding: string,
+      ) => Promise<string>,
+    ).mockResolvedValue('old content');
+
+    const result = await createPreWriteBackup(
+      FILE_PATH,
+      SESSION_ID,
+      TEMP_DIR,
+      'new content',
+    );
+
+    expect(result.ok).toBe(true);
+    // Should NOT have called readFile for diskContent
+    expect(vi.mocked(fsPromises.readFile)).toHaveBeenCalledTimes(1); // Only for latest backup
+    expect(vi.mocked(fsPromises.readFile)).not.toHaveBeenCalledWith(
+      FILE_PATH,
+      'utf8',
+    );
+  });
+
+  it('performs deduplication if diskContent matches latest backup', async () => {
+    const existingDirents = [makeDirent(`${HASH}_1`, true)];
+    vi.mocked(fsPromises.readdir).mockResolvedValue(
+      existingDirents as unknown as ReturnType<
+        typeof fsPromises.readdir
+      > extends Promise<infer T>
+        ? T
+        : never,
+    );
+
+    vi.mocked(
+      fsPromises.readFile as (
+        path: string,
+        encoding: string,
+      ) => Promise<string>,
+    ).mockResolvedValue('same content');
+
+    const result = await createPreWriteBackup(
+      FILE_PATH,
+      SESSION_ID,
+      TEMP_DIR,
+      'same content',
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      version: 1,
+      backupPath: path.join(BACKUP_DIR, `${HASH}_1`),
+    });
+    expect(vi.mocked(fsPromises.copyFile)).not.toHaveBeenCalled();
   });
 });
 

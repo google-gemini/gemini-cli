@@ -115,33 +115,29 @@ export async function createPreWriteBackup(
   filePath: string,
   sessionId: string,
   projectTempDir: string,
+  diskContent?: string,
 ): Promise<BackupResult> {
-  let diskContent: string;
-  try {
-    diskContent = await fsPromises.readFile(filePath, 'utf8');
-  } catch (e) {
-    if (isNodeError(e) && e.code === 'ENOENT') {
-      return { ok: false, newFile: true };
-    }
-    debugLogger.warn('Failed to read file for backup:', e);
-    return { ok: false, newFile: false };
-  }
-
-  const backupDir = getBackupDir(sessionId, projectTempDir);
-  try {
-    await fsPromises.mkdir(backupDir, { recursive: true, mode: 0o700 });
-  } catch (e) {
-    debugLogger.warn('Failed to create backup directory:', e);
-    return { ok: false, newFile: false };
-  }
-
   const existingVersions = await listBackupVersions(
     filePath,
     sessionId,
     projectTempDir,
   );
 
+  let content = diskContent;
+
   if (existingVersions.length > 0) {
+    if (content === undefined) {
+      try {
+        content = await fsPromises.readFile(filePath, 'utf8');
+      } catch (e) {
+        if (isNodeError(e) && e.code === 'ENOENT') {
+          return { ok: false, newFile: true };
+        }
+        debugLogger.warn('Failed to read file for backup:', e);
+        return { ok: false, newFile: false };
+      }
+    }
+
     const latestVersion = existingVersions[existingVersions.length - 1];
     const latestPath = getBackupPath(
       filePath,
@@ -151,7 +147,7 @@ export async function createPreWriteBackup(
     );
     try {
       const latestContent = await fsPromises.readFile(latestPath, 'utf8');
-      if (contentsEqualNormalized(latestContent, diskContent)) {
+      if (contentsEqualNormalized(latestContent, content)) {
         return { ok: true, version: latestVersion, backupPath: latestPath };
       }
     } catch (e) {
@@ -159,6 +155,14 @@ export async function createPreWriteBackup(
         debugLogger.warn('Failed to read last backup for dedup check:', e);
       }
     }
+  }
+
+  const backupDir = getBackupDir(sessionId, projectTempDir);
+  try {
+    await fsPromises.mkdir(backupDir, { recursive: true, mode: 0o700 });
+  } catch (e) {
+    debugLogger.warn('Failed to create backup directory:', e);
+    return { ok: false, newFile: false };
   }
 
   const startVersion =
@@ -181,6 +185,9 @@ export async function createPreWriteBackup(
       break;
     } catch (e) {
       if (isNodeError(e) && e.code === 'EEXIST') continue;
+      if (isNodeError(e) && e.code === 'ENOENT') {
+        return { ok: false, newFile: true };
+      }
       debugLogger.warn('Failed to create backup:', e);
       return { ok: false, newFile: false };
     }
@@ -233,6 +240,7 @@ export async function handlePreWriteBackup(
   config: Config,
   resolvedPath: string,
   isNewFile: boolean,
+  diskContent?: string,
 ): Promise<PreWriteBackupOutcome> {
   if (isNewFile) {
     return { backupVersion: null };
@@ -242,6 +250,7 @@ export async function handlePreWriteBackup(
     resolvedPath,
     config.getSessionId(),
     config.storage.getProjectTempDir(),
+    diskContent,
   );
 
   if (backupResult.ok) {
