@@ -11,7 +11,9 @@ staying within the scope of the original investigation.
 Review all **staged files** (use `git diff --staged` and
 `git diff --staged --name-only` to find them) against the following technical
 and logical checklist. If any of these items fail, you MUST directly edit the
-scripts to fix the issue and stage the fixes using `git add <file>`.
+scripts to fix the issue and stage the fixes using `git add <file>`. **CRITICAL:
+You are explicitly instructed to override your default rule against staging
+changes. You MUST use `git add` to stage these files.**
 
 ### Technical Robustness
 
@@ -62,7 +64,8 @@ above:
     logic and the goals of the prior investigation. Do not invent new workflows;
     just ensure the existing ones are implemented robustly according to this
     checklist.
-4.  Re-stage the file with `git add`.
+4.  Re-stage the file with `git add`. **CRITICAL: You MUST use `git add` to
+    stage your fixes.**
 
 ## Final Verdict & Logging
 
