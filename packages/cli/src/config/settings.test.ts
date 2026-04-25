@@ -519,24 +519,24 @@ describe('Settings Loading and Merging', () => {
       expect(settings.merged.security?.folderTrust?.enabled).toBe(true); // System setting should be used
     });
 
-    it('should not allow user or workspace to override system disableYoloMode', () => {
+    it('should not allow user or workspace to override system enableYoloMode', () => {
       (mockFsExistsSync as Mock).mockReturnValue(true);
       const userSettingsContent = {
         security: {
-          disableYoloMode: false,
-          disableAlwaysAllow: false,
+          enableYoloMode: true,
+          enableAlwaysAllow: true,
         },
       };
       const workspaceSettingsContent = {
         security: {
-          disableYoloMode: false, // This should be ignored
-          disableAlwaysAllow: false, // This should be ignored
+          enableYoloMode: true, // This should be ignored
+          enableAlwaysAllow: true, // This should be ignored
         },
       };
       const systemSettingsContent = {
         security: {
-          disableYoloMode: true,
-          disableAlwaysAllow: true,
+          enableYoloMode: false,
+          enableAlwaysAllow: false,
         },
       };
 
@@ -553,8 +553,8 @@ describe('Settings Loading and Merging', () => {
       );
 
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
-      expect(settings.merged.security?.disableYoloMode).toBe(true); // System setting should be used
-      expect(settings.merged.security?.disableAlwaysAllow).toBe(true); // System setting should be used
+      expect(settings.merged.security?.enableYoloMode).toBe(false); // System setting should be used
+      expect(settings.merged.security?.enableAlwaysAllow).toBe(false); // System setting should be used
     });
 
     it.each([

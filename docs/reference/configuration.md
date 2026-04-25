@@ -236,9 +236,9 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Custom theme definitions.
   - **Default:** `{}`
 
-- **`ui.hideWindowTitle`** (boolean):
-  - **Description:** Hide the window title bar
-  - **Default:** `false`
+- **`ui.showWindowTitle`** (boolean):
+  - **Description:** Show the window title bar.
+  - **Default:** `true`
   - **Requires restart:** Yes
 
 - **`ui.inlineThinkingMode`** (enum):
@@ -267,9 +267,9 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `true`
   - **Requires restart:** Yes
 
-- **`ui.hideTips`** (boolean):
-  - **Description:** Hide helpful tips in the UI
-  - **Default:** `false`
+- **`ui.showTips`** (boolean):
+  - **Description:** Show helpful tips in the UI.
+  - **Default:** `true`
 
 - **`ui.escapePastedAtSymbols`** (boolean):
   - **Description:** When enabled, @ symbols in pasted text are escaped to
@@ -285,14 +285,14 @@ their corresponding top-level category object in your `settings.json` file.
     reads) in a compact, structured format.
   - **Default:** `true`
 
-- **`ui.hideBanner`** (boolean):
-  - **Description:** Hide the application banner
-  - **Default:** `false`
+- **`ui.showBanner`** (boolean):
+  - **Description:** Show the application banner.
+  - **Default:** `true`
 
-- **`ui.hideContextSummary`** (boolean):
-  - **Description:** Hide the context summary (GEMINI.md, MCP servers) above the
+- **`ui.showContextSummary`** (boolean):
+  - **Description:** Show the context summary (GEMINI.md, MCP servers) above the
     input.
-  - **Default:** `false`
+  - **Default:** `true`
 
 - **`ui.footer.items`** (array):
   - **Description:** List of item IDs to display in the footer. Rendered in
@@ -304,25 +304,25 @@ their corresponding top-level category object in your `settings.json` file.
     descriptive headers (e.g., /model).
   - **Default:** `true`
 
-- **`ui.footer.hideCWD`** (boolean):
-  - **Description:** Hide the current working directory in the footer.
-  - **Default:** `false`
-
-- **`ui.footer.hideSandboxStatus`** (boolean):
-  - **Description:** Hide the sandbox status indicator in the footer.
-  - **Default:** `false`
-
-- **`ui.footer.hideModelInfo`** (boolean):
-  - **Description:** Hide the model name and context usage in the footer.
-  - **Default:** `false`
-
-- **`ui.footer.hideContextPercentage`** (boolean):
-  - **Description:** Hides the context window usage percentage.
+- **`ui.footer.showCWD`** (boolean):
+  - **Description:** Show the current working directory in the footer.
   - **Default:** `true`
 
-- **`ui.hideFooter`** (boolean):
-  - **Description:** Hide the footer from the UI
+- **`ui.footer.showSandboxStatus`** (boolean):
+  - **Description:** Show the sandbox status indicator in the footer.
+  - **Default:** `true`
+
+- **`ui.footer.showModelInfo`** (boolean):
+  - **Description:** Show the model name and context usage in the footer.
+  - **Default:** `true`
+
+- **`ui.footer.showContextPercentage`** (boolean):
+  - **Description:** Show the context window usage percentage.
   - **Default:** `false`
+
+- **`ui.showFooter`** (boolean):
+  - **Description:** Show the footer in the UI.
+  - **Default:** `true`
 
 - **`ui.collapseDrawerDuringApproval`** (boolean):
   - **Description:** Whether to collapse the UI drawer when a tool is awaiting
@@ -1579,15 +1579,14 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
-- **`security.disableYoloMode`** (boolean):
-  - **Description:** Disable YOLO mode, even if enabled by a flag.
-  - **Default:** `false`
+- **`security.enableYoloMode`** (boolean):
+  - **Description:** Allow YOLO mode when enabled by a flag.
+  - **Default:** `true`
   - **Requires restart:** Yes
 
-- **`security.disableAlwaysAllow`** (boolean):
-  - **Description:** Disable "Always allow" options in tool confirmation
-    dialogs.
-  - **Default:** `false`
+- **`security.enableAlwaysAllow`** (boolean):
+  - **Description:** Show "Always allow" options in tool confirmation dialogs.
+  - **Default:** `true`
   - **Requires restart:** Yes
 
 - **`security.enablePermanentToolApproval`** (boolean):

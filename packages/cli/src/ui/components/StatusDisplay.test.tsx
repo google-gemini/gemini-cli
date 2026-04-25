@@ -148,7 +148,7 @@ describe('StatusDisplay', () => {
 
   it('hides ContextSummaryDisplay if configured in settings', async () => {
     const settings = createMockSettings({
-      ui: { hideContextSummary: true },
+      ui: { showContextSummary: false },
     });
     const { lastFrame, unmount } = await renderStatusDisplay(
       { hideContextSummary: false },

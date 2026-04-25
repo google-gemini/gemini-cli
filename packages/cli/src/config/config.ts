@@ -711,8 +711,11 @@ export async function loadCliConfig(
     approvalMode = ApprovalMode.DEFAULT;
   }
 
-  // Override approval mode if disableYoloMode is set.
-  if (settings.security?.disableYoloMode || settings.admin?.secureModeEnabled) {
+  // Override approval mode if YOLO mode is disabled.
+  if (
+    settings.security?.enableYoloMode === false ||
+    settings.admin?.secureModeEnabled
+  ) {
     if (approvalMode === ApprovalMode.YOLO) {
       if (settings.admin?.secureModeEnabled) {
         debugLogger.error(
@@ -967,9 +970,10 @@ export async function loadCliConfig(
     geminiMdFilePaths: filePaths,
     approvalMode,
     disableYoloMode:
-      settings.security?.disableYoloMode || settings.admin?.secureModeEnabled,
+      settings.security?.enableYoloMode === false ||
+      settings.admin?.secureModeEnabled,
     disableAlwaysAllow:
-      settings.security?.disableAlwaysAllow ||
+      settings.security?.enableAlwaysAllow === false ||
       settings.admin?.secureModeEnabled,
     showMemoryUsage: settings.ui?.showMemoryUsage || false,
     accessibility: {

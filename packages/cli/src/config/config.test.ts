@@ -1452,12 +1452,12 @@ describe('Approval mode tool exclusion logic', () => {
     expect(excludedTools).toContain(ASK_USER_TOOL_NAME);
   });
 
-  it('should throw an error if YOLO mode is attempted when disableYoloMode is true', async () => {
+  it('should throw an error if YOLO mode is attempted when enableYoloMode is false', async () => {
     process.argv = ['node', 'script.js', '--yolo'];
     const argv = await parseArguments(createTestMergedSettings());
     const settings = createTestMergedSettings({
       security: {
-        disableYoloMode: true,
+        enableYoloMode: false,
       },
     });
 
@@ -3627,7 +3627,7 @@ describe('Policy Engine Integration in loadCliConfig', () => {
   });
 });
 
-describe('loadCliConfig disableYoloMode', () => {
+describe('loadCliConfig enableYoloMode', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
@@ -3648,17 +3648,17 @@ describe('loadCliConfig disableYoloMode', () => {
     process.argv = ['node', 'script.js', '--approval-mode=auto_edit'];
     const argv = await parseArguments(createTestMergedSettings());
     const settings = createTestMergedSettings({
-      security: { disableYoloMode: true },
+      security: { enableYoloMode: false },
     });
     const config = await loadCliConfig(settings, 'test-session', argv);
     expect(config.getApprovalMode()).toBe(ApprovalMode.AUTO_EDIT);
   });
 
-  it('should throw if YOLO mode is attempted when disableYoloMode is true', async () => {
+  it('should throw if YOLO mode is attempted when enableYoloMode is false', async () => {
     process.argv = ['node', 'script.js', '--yolo'];
     const argv = await parseArguments(createTestMergedSettings());
     const settings = createTestMergedSettings({
-      security: { disableYoloMode: true },
+      security: { enableYoloMode: false },
     });
     await expect(loadCliConfig(settings, 'test-session', argv)).rejects.toThrow(
       'YOLO mode is disabled by your administrator. To enable it, please request an update to the settings at: https://goo.gle/manage-gemini-cli',
@@ -3711,7 +3711,7 @@ describe('loadCliConfig secureModeEnabled', () => {
     );
   });
 
-  it('should set disableYoloMode to true when secureModeEnabled is true', async () => {
+  it('should disable YOLO mode when secureModeEnabled is true', async () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments(createTestMergedSettings());
     const settings = createTestMergedSettings({

@@ -282,11 +282,11 @@
             "$ref": "#/$defs/CustomTheme"
           }
         },
-        "hideWindowTitle": {
-          "title": "Hide Window Title",
-          "description": "Hide the window title bar",
-          "markdownDescription": "Hide the window title bar\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `false`",
-          "default": false,
+        "showWindowTitle": {
+          "title": "Show Window Title",
+          "description": "Show the window title bar.",
+          "markdownDescription": "Show the window title bar.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
           "type": "boolean"
         },
         "inlineThinkingMode": {
@@ -325,11 +325,11 @@
           "default": true,
           "type": "boolean"
         },
-        "hideTips": {
-          "title": "Hide Tips",
-          "description": "Hide helpful tips in the UI",
-          "markdownDescription": "Hide helpful tips in the UI\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
-          "default": false,
+        "showTips": {
+          "title": "Show Tips",
+          "description": "Show helpful tips in the UI.",
+          "markdownDescription": "Show helpful tips in the UI.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
           "type": "boolean"
         },
         "escapePastedAtSymbols": {
@@ -353,18 +353,18 @@
           "default": true,
           "type": "boolean"
         },
-        "hideBanner": {
-          "title": "Hide Banner",
-          "description": "Hide the application banner",
-          "markdownDescription": "Hide the application banner\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
-          "default": false,
+        "showBanner": {
+          "title": "Show Banner",
+          "description": "Show the application banner.",
+          "markdownDescription": "Show the application banner.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
           "type": "boolean"
         },
-        "hideContextSummary": {
-          "title": "Hide Context Summary",
-          "description": "Hide the context summary (GEMINI.md, MCP servers) above the input.",
-          "markdownDescription": "Hide the context summary (GEMINI.md, MCP servers) above the input.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
-          "default": false,
+        "showContextSummary": {
+          "title": "Show Context Summary",
+          "description": "Show the context summary (GEMINI.md, MCP servers) above the input.",
+          "markdownDescription": "Show the context summary (GEMINI.md, MCP servers) above the input.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
           "type": "boolean"
         },
         "footer": {
@@ -390,42 +390,42 @@
               "default": true,
               "type": "boolean"
             },
-            "hideCWD": {
-              "title": "Hide CWD",
-              "description": "Hide the current working directory in the footer.",
-              "markdownDescription": "Hide the current working directory in the footer.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
-              "default": false,
-              "type": "boolean"
-            },
-            "hideSandboxStatus": {
-              "title": "Hide Sandbox Status",
-              "description": "Hide the sandbox status indicator in the footer.",
-              "markdownDescription": "Hide the sandbox status indicator in the footer.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
-              "default": false,
-              "type": "boolean"
-            },
-            "hideModelInfo": {
-              "title": "Hide Model Info",
-              "description": "Hide the model name and context usage in the footer.",
-              "markdownDescription": "Hide the model name and context usage in the footer.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
-              "default": false,
-              "type": "boolean"
-            },
-            "hideContextPercentage": {
-              "title": "Hide Context Window Percentage",
-              "description": "Hides the context window usage percentage.",
-              "markdownDescription": "Hides the context window usage percentage.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+            "showCWD": {
+              "title": "Show CWD",
+              "description": "Show the current working directory in the footer.",
+              "markdownDescription": "Show the current working directory in the footer.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
               "default": true,
+              "type": "boolean"
+            },
+            "showSandboxStatus": {
+              "title": "Show Sandbox Status",
+              "description": "Show the sandbox status indicator in the footer.",
+              "markdownDescription": "Show the sandbox status indicator in the footer.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+              "default": true,
+              "type": "boolean"
+            },
+            "showModelInfo": {
+              "title": "Show Model Info",
+              "description": "Show the model name and context usage in the footer.",
+              "markdownDescription": "Show the model name and context usage in the footer.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+              "default": true,
+              "type": "boolean"
+            },
+            "showContextPercentage": {
+              "title": "Show Context Window Percentage",
+              "description": "Show the context window usage percentage.",
+              "markdownDescription": "Show the context window usage percentage.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
+              "default": false,
               "type": "boolean"
             }
           },
           "additionalProperties": false
         },
-        "hideFooter": {
-          "title": "Hide Footer",
-          "description": "Hide the footer from the UI",
-          "markdownDescription": "Hide the footer from the UI\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
-          "default": false,
+        "showFooter": {
+          "title": "Show Footer",
+          "description": "Show the footer in the UI.",
+          "markdownDescription": "Show the footer in the UI.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
           "type": "boolean"
         },
         "collapseDrawerDuringApproval": {
@@ -2720,18 +2720,18 @@
           "default": false,
           "type": "boolean"
         },
-        "disableYoloMode": {
-          "title": "Disable YOLO Mode",
-          "description": "Disable YOLO mode, even if enabled by a flag.",
-          "markdownDescription": "Disable YOLO mode, even if enabled by a flag.\n\n- Category: `Security`\n- Requires restart: `yes`\n- Default: `false`",
-          "default": false,
+        "enableYoloMode": {
+          "title": "Enable YOLO Mode",
+          "description": "Allow YOLO mode when enabled by a flag.",
+          "markdownDescription": "Allow YOLO mode when enabled by a flag.\n\n- Category: `Security`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
           "type": "boolean"
         },
-        "disableAlwaysAllow": {
-          "title": "Disable Always Allow",
-          "description": "Disable \"Always allow\" options in tool confirmation dialogs.",
-          "markdownDescription": "Disable \"Always allow\" options in tool confirmation dialogs.\n\n- Category: `Security`\n- Requires restart: `yes`\n- Default: `false`",
-          "default": false,
+        "enableAlwaysAllow": {
+          "title": "Enable Always Allow",
+          "description": "Show \"Always allow\" options in tool confirmation dialogs.",
+          "markdownDescription": "Show \"Always allow\" options in tool confirmation dialogs.\n\n- Category: `Security`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
           "type": "boolean"
         },
         "enablePermanentToolApproval": {

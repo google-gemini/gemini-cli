@@ -27,7 +27,7 @@ export const StatusDisplay: React.FC<StatusDisplayProps> = ({
     return <Text color={theme.status.error}>|⌐■_■|</Text>;
   }
 
-  if (!settings.merged.ui.hideContextSummary && !hideContextSummary) {
+  if (settings.merged.ui.showContextSummary !== false && !hideContextSummary) {
     return (
       <ContextSummaryDisplay
         ideContext={uiState.ideContextState}

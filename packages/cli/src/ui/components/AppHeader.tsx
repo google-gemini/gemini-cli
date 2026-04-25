@@ -75,7 +75,7 @@ export const AppHeader = ({ version, showDetails = true }: AppHeaderProps) => {
   const loggedOut = isConfigInitialized && !isAuthenticating && !authType;
 
   const showHeader = !(
-    settings.merged.ui.hideBanner || config.getScreenReader()
+    settings.merged.ui.showBanner === false || config.getScreenReader()
   );
 
   const ICON = isAppleTerminal() ? MAC_TERMINAL_ICON : DEFAULT_ICON;
@@ -166,7 +166,7 @@ export const AppHeader = ({ version, showDetails = true }: AppHeaderProps) => {
         />
       )}
 
-      {!(settings.merged.ui.hideTips || config.getScreenReader()) &&
+      {!(settings.merged.ui.showTips === false || config.getScreenReader()) &&
         showTips && <Tips config={config} />}
     </Box>
   );
