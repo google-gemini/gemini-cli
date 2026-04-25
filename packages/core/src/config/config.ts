@@ -702,6 +702,7 @@ export interface ConfigParameters {
   ptyInfo?: string;
   disableYoloMode?: boolean;
   disableAlwaysAllow?: boolean;
+  voiceMode?: boolean;
   rawOutput?: boolean;
   acceptRawOutputRisk?: boolean;
   dynamicModelConfiguration?: boolean;
@@ -977,6 +978,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly topicUpdateNarration: boolean;
   private readonly disableLLMCorrection: boolean;
   private readonly planEnabled: boolean;
+  private readonly voiceMode: boolean;
   private readonly trackerEnabled: boolean;
   private readonly planModeRoutingEnabled: boolean;
   private readonly modelSteering: boolean;
@@ -1131,6 +1133,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.agents = params.agents ?? {};
     this.disableLLMCorrection = params.disableLLMCorrection ?? true;
     this.planEnabled = params.plan ?? true;
+    this.voiceMode = params.voiceMode ?? false;
     this.trackerEnabled = params.tracker ?? false;
     this.planModeRoutingEnabled = params.planSettings?.modelRouting ?? true;
     this.enableEventDrivenScheduler = params.enableEventDrivenScheduler ?? true;
@@ -3001,6 +3004,10 @@ export class Config implements McpContext, AgentLoopContext {
 
   isPlanEnabled(): boolean {
     return this.planEnabled;
+  }
+
+  isVoiceModeEnabled(): boolean {
+    return this.voiceMode;
   }
 
   isTrackerEnabled(): boolean {
