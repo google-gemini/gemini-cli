@@ -733,6 +733,70 @@ describe('ChatRecordingService', () => {
         chatRecordingService.deleteSession('non-existent'),
       ).resolves.not.toThrow();
     });
+
+    // Regression tests for #21568: artifact cleanup must work even when the
+    // chat file's first line is unusable (empty file, missing sessionId
+    // metadata, etc.) — the caller passes the session UUID explicitly.
+    it('should clean tool outputs and logs when caller passes the UUID and the chat file is empty', async () => {
+      const sessionId = 'test-session-id';
+      const shortId = '12345678';
+      const chatsDir = path.join(testTempDir, 'chats');
+      const logsDir = path.join(testTempDir, 'logs');
+      const toolOutputsDir = path.join(testTempDir, 'tool-outputs');
+      fs.mkdirSync(chatsDir, { recursive: true });
+      fs.mkdirSync(logsDir, { recursive: true });
+      fs.mkdirSync(toolOutputsDir, { recursive: true });
+
+      // Empty chat file (e.g. process crashed before metadata was written).
+      const sessionFile = path.join(
+        chatsDir,
+        `session-2023-01-01T00-00-${shortId}.jsonl`,
+      );
+      fs.writeFileSync(sessionFile, '');
+
+      const logFile = path.join(logsDir, `session-${sessionId}.jsonl`);
+      fs.writeFileSync(logFile, '{}');
+      const toolOutputDir = path.join(toolOutputsDir, `session-${sessionId}`);
+      fs.mkdirSync(toolOutputDir, { recursive: true });
+
+      await chatRecordingService.deleteSession(shortId, sessionId);
+
+      expect(fs.existsSync(sessionFile)).toBe(false);
+      expect(fs.existsSync(logFile)).toBe(false);
+      expect(fs.existsSync(toolOutputDir)).toBe(false);
+    });
+
+    it('should clean tool outputs and logs when caller passes the UUID and the chat file lacks sessionId metadata', async () => {
+      const sessionId = 'test-session-id';
+      const shortId = '12345678';
+      const chatsDir = path.join(testTempDir, 'chats');
+      const logsDir = path.join(testTempDir, 'logs');
+      const toolOutputsDir = path.join(testTempDir, 'tool-outputs');
+      fs.mkdirSync(chatsDir, { recursive: true });
+      fs.mkdirSync(logsDir, { recursive: true });
+      fs.mkdirSync(toolOutputsDir, { recursive: true });
+
+      // First line is valid JSON but does not include a sessionId field.
+      const sessionFile = path.join(
+        chatsDir,
+        `session-2023-01-01T00-00-${shortId}.jsonl`,
+      );
+      fs.writeFileSync(
+        sessionFile,
+        JSON.stringify({ kind: 'chat', startTime: 't' }) + '\n',
+      );
+
+      const logFile = path.join(logsDir, `session-${sessionId}.jsonl`);
+      fs.writeFileSync(logFile, '{}');
+      const toolOutputDir = path.join(toolOutputsDir, `session-${sessionId}`);
+      fs.mkdirSync(toolOutputDir, { recursive: true });
+
+      await chatRecordingService.deleteSession(shortId, sessionId);
+
+      expect(fs.existsSync(sessionFile)).toBe(false);
+      expect(fs.existsSync(logFile)).toBe(false);
+      expect(fs.existsSync(toolOutputDir)).toBe(false);
+    });
   });
 
   describe('recordDirectories', () => {

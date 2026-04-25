@@ -680,7 +680,10 @@ export class ChatRecordingService {
    *
    * @throws {Error} If shortId validation fails.
    */
-  async deleteSession(sessionIdOrBasename: string): Promise<void> {
+  async deleteSession(
+    sessionIdOrBasename: string,
+    sessionUUID?: string,
+  ): Promise<void> {
     try {
       const tempDir = this.context.config.storage.getProjectTempDir();
       const chatsDir = path.join(tempDir, 'chats');
@@ -696,7 +699,12 @@ export class ChatRecordingService {
         shortId,
       );
       for (const file of matchingFiles) {
-        await this.deleteSessionAndArtifacts(chatsDir, file, tempDir);
+        await this.deleteSessionAndArtifacts(
+          chatsDir,
+          file,
+          tempDir,
+          sessionUUID,
+        );
       }
     } catch (error) {
       debugLogger.error('Error deleting session file.', error);
@@ -737,46 +745,32 @@ export class ChatRecordingService {
 
   /**
    * Deletes a single session file and its associated logs, tool-outputs, and directory.
+   *
+   * If `knownSessionUUID` is provided, it is used directly to clean up
+   * artifacts. Otherwise the UUID is read from the chat file's first JSON
+   * line. Passing it explicitly keeps the cleanup correct for chat files
+   * that are empty, missing the sessionId metadata line, or have a
+   * corrupted first line — see issue #21568.
    */
   private async deleteSessionAndArtifacts(
     chatsDir: string,
     file: string,
     tempDir: string,
+    knownSessionUUID?: string,
   ): Promise<void> {
     const filePath = path.join(chatsDir, file);
     try {
-      const CHUNK_SIZE = 4096;
-      const buffer = Buffer.alloc(CHUNK_SIZE);
-      let firstLine: string;
-      let fd: fs.promises.FileHandle | undefined;
-      try {
-        fd = await fs.promises.open(filePath, 'r');
-        const { bytesRead } = await fd.read(buffer, 0, CHUNK_SIZE, 0);
-        if (bytesRead === 0) {
-          await fd.close();
-          await fs.promises.unlink(filePath);
-          return;
-        }
-        const contentChunk = buffer.toString('utf8', 0, bytesRead);
-        const newlineIndex = contentChunk.indexOf('\n');
-        firstLine =
-          newlineIndex !== -1
-            ? contentChunk.substring(0, newlineIndex)
-            : contentChunk;
-      } finally {
-        if (fd !== undefined) {
-          await fd.close();
-        }
-      }
-      const content = JSON.parse(firstLine) as unknown;
+      let fullSessionId: string | undefined = knownSessionUUID;
 
-      let fullSessionId: string | undefined;
-      if (isSessionIdRecord(content)) {
-        fullSessionId = content['sessionId'];
+      if (!fullSessionId) {
+        fullSessionId = await this.readSessionIdFromFile(filePath);
       }
 
-      // Delete the session file
-      await fs.promises.unlink(filePath);
+      // Delete the session file (if it still exists — readSessionIdFromFile
+      // may have already unlinked an empty file).
+      await fs.promises.unlink(filePath).catch((err: NodeJS.ErrnoException) => {
+        if (err.code !== 'ENOENT') throw err;
+      });
 
       if (fullSessionId) {
         // Delegate to shared utility!
@@ -789,6 +783,40 @@ export class ChatRecordingService {
       }
     } catch (error) {
       debugLogger.error(`Error deleting associated file ${file}:`, error);
+    }
+  }
+
+  /**
+   * Reads the sessionId from a chat file's first JSONL record. Returns
+   * undefined if the file is empty, the first line isn't valid JSON, or
+   * the record doesn't contain a sessionId field.
+   */
+  private async readSessionIdFromFile(
+    filePath: string,
+  ): Promise<string | undefined> {
+    const CHUNK_SIZE = 4096;
+    const buffer = Buffer.alloc(CHUNK_SIZE);
+    let fd: fs.promises.FileHandle | undefined;
+    try {
+      fd = await fs.promises.open(filePath, 'r');
+      const { bytesRead } = await fd.read(buffer, 0, CHUNK_SIZE, 0);
+      if (bytesRead === 0) {
+        return undefined;
+      }
+      const contentChunk = buffer.toString('utf8', 0, bytesRead);
+      const newlineIndex = contentChunk.indexOf('\n');
+      const firstLine =
+        newlineIndex !== -1
+          ? contentChunk.substring(0, newlineIndex)
+          : contentChunk;
+      const content = JSON.parse(firstLine) as unknown;
+      return isSessionIdRecord(content) ? content['sessionId'] : undefined;
+    } catch {
+      return undefined;
+    } finally {
+      if (fd !== undefined) {
+        await fd.close();
+      }
     }
   }
 

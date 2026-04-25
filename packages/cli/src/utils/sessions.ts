@@ -95,9 +95,14 @@ export async function deleteSession(
   }
 
   try {
-    // Use ChatRecordingService to delete the session
+    // Use ChatRecordingService to delete the session. Pass the session UUID
+    // explicitly so artifact cleanup (logs, tool outputs, session dir) works
+    // even if the chat file is empty or missing its sessionId metadata line.
     const chatRecordingService = new ChatRecordingService(config);
-    await chatRecordingService.deleteSession(sessionToDelete.file);
+    await chatRecordingService.deleteSession(
+      sessionToDelete.file,
+      sessionToDelete.id,
+    );
 
     const time = formatRelativeTime(sessionToDelete.lastUpdated);
     writeToStdout(

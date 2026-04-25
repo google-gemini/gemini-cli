@@ -101,15 +101,17 @@ export const useSessionBrowser = (
     handleDeleteSession: useCallback(
       async (session: SessionInfo) => {
         // Note: Chat sessions are stored on disk using a filename derived from
-        // the session, e.g. "session-<timestamp>-<sessionIdPrefix>.json".
-        // The ChatRecordingService.deleteSession API expects this file basename
-        // (without the ".json" extension), not the full session UUID.
+        // the session, e.g. "session-<timestamp>-<sessionIdPrefix>.json". The
+        // ChatRecordingService.deleteSession API takes the file basename to
+        // locate the chat file, plus the full session UUID so artifact cleanup
+        // (logs, tool outputs, session dir) still works when the chat file is
+        // empty or missing its sessionId metadata line.
         try {
           const chatRecordingService = config
             .getGeminiClient()
             ?.getChatRecordingService();
           if (chatRecordingService) {
-            await chatRecordingService.deleteSession(session.file);
+            await chatRecordingService.deleteSession(session.file, session.id);
           }
         } catch (error) {
           coreEvents.emitFeedback('error', 'Error deleting session:', error);
