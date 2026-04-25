@@ -314,6 +314,107 @@ describe('relaunchAppInChildProcess', () => {
       // Should default to exit code 1
       expect(processExitSpy).toHaveBeenCalledWith(1);
     });
+    it('should forward SIGTERM to the child process', async () => {
+      process.argv = ['/usr/bin/node', '/app/cli.js'];
+
+      const mockChild = createMockChildProcess(0, false);
+      mockedSpawn.mockImplementation(() => mockChild);
+
+      const promise = relaunchAppInChildProcess([], []);
+
+      // can't emit real signals without nuking the vitest worker,
+      // so we grab our handler off process and call it directly
+      const listeners = process.listeners('SIGTERM');
+      const forwarder = listeners[listeners.length - 1];
+      expect(forwarder).toBeDefined();
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
+      (forwarder as Function)('SIGTERM');
+
+      expect(mockChild.kill).toHaveBeenCalledWith('SIGTERM');
+
+      mockChild.emit('close', 0);
+      await expect(promise).rejects.toThrow('PROCESS_EXIT_CALLED');
+    });
+
+    it('should register signal forwarders on spawn', async () => {
+      process.argv = ['/usr/bin/node', '/app/cli.js'];
+
+      // count SIGTERM listeners before
+      const beforeCount = process.listenerCount('SIGTERM');
+
+      const mockChild = createMockChildProcess(0, false);
+      mockedSpawn.mockImplementation(() => mockChild);
+
+      const promise = relaunchAppInChildProcess([], []);
+
+      // our module should have added listeners for SIGTERM, SIGHUP, SIGINT
+      expect(process.listenerCount('SIGTERM')).toBeGreaterThan(beforeCount);
+      expect(process.listenerCount('SIGHUP')).toBeGreaterThan(0);
+
+      mockChild.emit('close', 0);
+      await expect(promise).rejects.toThrow('PROCESS_EXIT_CALLED');
+    });
+
+    it('should remove signal forwarders after child closes', async () => {
+      process.argv = ['/usr/bin/node', '/app/cli.js'];
+
+      const beforeSigterm = process.listenerCount('SIGTERM');
+      const beforeSighup = process.listenerCount('SIGHUP');
+
+      const mockChild = createMockChildProcess(0, false);
+      mockedSpawn.mockImplementation(() => mockChild);
+
+      const promise = relaunchAppInChildProcess([], []);
+
+      // forwarders were added
+      expect(process.listenerCount('SIGTERM')).toBeGreaterThan(beforeSigterm);
+
+      mockChild.emit('close', 0);
+      await expect(promise).rejects.toThrow('PROCESS_EXIT_CALLED');
+
+      // after close, forwarders should be cleaned up
+      expect(process.listenerCount('SIGTERM')).toBe(beforeSigterm);
+      expect(process.listenerCount('SIGHUP')).toBe(beforeSighup);
+    });
+
+    it('should allow signal escalation even after child.kill() was called', async () => {
+      process.argv = ['/usr/bin/node', '/app/cli.js'];
+
+      const mockChild = createMockChildProcess(0, false);
+      // Simulate child.killed becoming true after first kill() call,
+      // as Node.js sets this flag immediately upon child.kill().
+      let killCallCount = 0;
+      (mockChild.kill as ReturnType<typeof vi.fn>).mockImplementation(() => {
+        killCallCount++;
+        Object.defineProperty(mockChild, 'killed', {
+          value: true,
+          writable: true,
+        });
+        return true;
+      });
+      mockedSpawn.mockImplementation(() => mockChild);
+
+      const promise = relaunchAppInChildProcess([], []);
+
+      // First signal: SIGINT
+      const sigintListeners = process.listeners('SIGINT');
+      const sigintHandler = sigintListeners[sigintListeners.length - 1];
+      expect(sigintHandler).toBeDefined();
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
+      (sigintHandler as Function)('SIGINT');
+      expect(killCallCount).toBe(1);
+
+      // Second signal: SIGTERM — should still be forwarded for escalation
+      const sigtermListeners = process.listeners('SIGTERM');
+      const sigtermHandler = sigtermListeners[sigtermListeners.length - 1];
+      expect(sigtermHandler).toBeDefined();
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
+      (sigtermHandler as Function)('SIGTERM');
+      expect(killCallCount).toBe(2);
+
+      mockChild.emit('close', 143);
+      await expect(promise).rejects.toThrow('PROCESS_EXIT_CALLED');
+    });
   });
 });
 
