@@ -42,8 +42,9 @@ export function fnv1a64hex(str: string): string {
   const OFFSET_BASIS = 14695981039346656037n;
   const MASK64 = 0xffffffffffffffffn;
   let hash = OFFSET_BASIS;
-  for (let i = 0; i < str.length; i++) {
-    hash ^= BigInt(str.charCodeAt(i));
+  const bytes = new TextEncoder().encode(str);
+  for (const byte of bytes) {
+    hash ^= BigInt(byte);
     hash = (hash * FNV_PRIME) & MASK64;
   }
   return hash.toString(16).padStart(16, '0');

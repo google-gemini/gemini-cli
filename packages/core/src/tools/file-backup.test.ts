@@ -326,3 +326,20 @@ describe('listBackupVersions', () => {
     expect(vi.mocked(debugLogger.warn)).toHaveBeenCalledOnce();
   });
 });
+
+describe('fnv1a64hex', () => {
+  it('produces consistent 16-character hex strings', () => {
+    const h1 = fnv1a64hex('foo');
+    const h2 = fnv1a64hex('bar');
+    expect(h1).toHaveLength(16);
+    expect(h2).toHaveLength(16);
+    expect(h1).not.toBe(h2);
+  });
+
+  it('handles non-ASCII characters by hashing UTF-8 bytes', () => {
+    // '🚀' is U+1F680. In UTF-16 it's [0xD83D, 0xDE80]. In UTF-8 it's [0xF0, 0x9F, 0x9A, 0x80].
+    // Our new implementation hashes the 4 UTF-8 bytes.
+    const h = fnv1a64hex('🚀');
+    expect(h).toBe('ff06d33875097bda');
+  });
+});
