@@ -14,14 +14,43 @@ import {
   useCallback,
   memo,
   useEffect,
+  createContext,
 } from 'react';
 import type React from 'react';
 import { theme } from '../../semantic-colors.js';
 import { useBatchedScroll } from '../../hooks/useBatchedScroll.js';
 
-import { type DOMElement, Box, ResizeObserver, StaticRender } from 'ink';
+import {
+  type DOMElement,
+  Box,
+  ResizeObserver,
+  StaticRender,
+  getBoundingBox,
+  getScrollTop as getInkScrollTop,
+} from 'ink';
+import {
+  useMouse,
+  useMouseContext,
+  type MouseEvent,
+} from '../../contexts/MouseContext.js';
+
+import { debugLogger } from '@google/gemini-cli-core';
 
 export const SCROLL_TO_ITEM_END = Number.MAX_SAFE_INTEGER;
+
+export interface VirtualizedListContextValue {
+  registerInteractivity: (
+    itemKey: string,
+    options: { scroll?: boolean; click?: boolean },
+  ) => void;
+  setItemState: (itemKey: string, stateKey: string, value: unknown) => void;
+  getItemState: (itemKey: string, stateKey: string) => unknown;
+  isItemToggled: (itemKey: string) => boolean;
+  toggleItem: (itemKey: string) => void;
+}
+
+export const VirtualizedListContext =
+  createContext<VirtualizedListContextValue | null>(null);
 
 export type VirtualizedListProps<T> = {
   data: T[];
@@ -212,6 +241,51 @@ function VirtualizedList<T>(
   const [containerHeight, setContainerHeight] = useState(0);
   const [containerWidth, setContainerWidth] = useState(0);
   const [measurementVersion, setMeasurementVersion] = useState(0);
+
+  const interactiveKeys = useRef(
+    new Map<string, { scroll?: boolean; click?: boolean }>(),
+  );
+  const itemStates = useRef(new Map<string, Map<string, unknown>>());
+  const [toggledKeys, setToggledKeys] = useState(() => new Set<string>());
+  const [temporarilyInteractiveIndexes, setTemporarilyInteractiveIndexes] =
+    useState(() => new Set<number>());
+  const renderedAsStatic = useRef<boolean[]>([]);
+  const maxRenderRangeEnd = useRef(0);
+  const [pendingReplayEvent, setPendingReplayEvent] = useState<{
+    index: number;
+    event: MouseEvent;
+  } | null>(null);
+
+  const virtualizedListContextValue = useMemo<VirtualizedListContextValue>(
+    () => ({
+      registerInteractivity: (itemKey, options) => {
+        interactiveKeys.current.set(itemKey, options);
+      },
+      setItemState: (itemKey, stateKey, value) => {
+        let stateMap = itemStates.current.get(itemKey);
+        if (!stateMap) {
+          stateMap = new Map();
+          itemStates.current.set(itemKey, stateMap);
+        }
+        stateMap.set(stateKey, value);
+      },
+      getItemState: (itemKey, stateKey) =>
+        itemStates.current.get(itemKey)?.get(stateKey),
+      isItemToggled: (itemKey) => toggledKeys.has(itemKey),
+      toggleItem: (itemKey) => {
+        setToggledKeys((prev) => {
+          const next = new Set(prev);
+          if (next.has(itemKey)) {
+            next.delete(itemKey);
+          } else {
+            next.add(itemKey);
+          }
+          return next;
+        });
+      },
+    }),
+    [toggledKeys],
+  );
 
   const state = useRef<VirtualizedListInternalState>({
     container: null,
@@ -602,6 +676,21 @@ function VirtualizedList<T>(
       ? data.length - 1
       : Math.min(data.length - 1, endIndexOffset);
 
+  useEffect(() => {
+    setTemporarilyInteractiveIndexes((prev) => {
+      if (prev.size === 0) return prev;
+      let changed = false;
+      const next = new Set(prev);
+      for (const index of prev) {
+        if (index > endIndex) {
+          next.delete(index);
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [endIndex]);
+
   const renderRangeStart = useMemo(() => {
     if (overflowToBackbuffer) {
       if (typeof maxScrollbackLength === 'number' && maxScrollbackLength > 0) {
@@ -624,10 +713,32 @@ function VirtualizedList<T>(
   ]);
 
   const topSpacerHeight = offsets[renderRangeStart];
-  const bottomSpacerHeight =
-    totalHeight - (offsets[endIndex + 1] ?? totalHeight);
 
-  const renderRangeEnd = endIndex;
+  let renderRangeEnd = endIndex;
+  if (maxRenderRangeEnd.current > endIndex) {
+    let allStatic = true;
+    const currentMax = Math.min(
+      maxRenderRangeEnd.current,
+      data.length > 0 ? data.length - 1 : 0,
+    );
+    for (let i = endIndex + 1; i <= currentMax; i++) {
+      const item = data[i];
+      if (!item) continue;
+      const isStaticByDefault =
+        renderStatic === true || isStaticItem?.(item, i) === true;
+      if (!isStaticByDefault) {
+        allStatic = false;
+        break;
+      }
+    }
+    if (allStatic) {
+      renderRangeEnd = currentMax;
+    }
+  }
+  maxRenderRangeEnd.current = renderRangeEnd;
+
+  const bottomSpacerHeight =
+    totalHeight - (offsets[renderRangeEnd + 1] ?? totalHeight);
 
   // Always evaluate shouldBeStatic, width, etc. if we have a known width from the prop.
   // If containerHeight or containerWidth is 0 we defer rendering unless a static render or defined width overrides.
@@ -650,9 +761,14 @@ function VirtualizedList<T>(
       const item = data[i];
       if (item) {
         const isOutsideViewport = i < startIndex || i > endIndex;
-        const shouldBeStatic =
+        const isStaticByDefault =
           (renderStatic === true && isOutsideViewport) ||
           isStaticItem?.(item, i) === true;
+
+        const isTemporarilyInteractive =
+          temporarilyInteractiveIndexes.has(i) && i <= endIndex;
+        const shouldBeStatic = isStaticByDefault && !isTemporarilyInteractive;
+        renderedAsStatic.current[i] = shouldBeStatic;
 
         const content = renderItem({ item, index: i });
         const key = keyExtractor(item, i);
@@ -712,9 +828,102 @@ function VirtualizedList<T>(
     containerWidth,
     onSetRef,
     estimatedItemHeight,
+    temporarilyInteractiveIndexes,
   ]);
 
   const { getScrollTop, setPendingScrollTop } = useBatchedScroll(scrollTop);
+
+  const { broadcast } = useMouseContext();
+
+  useLayoutEffect(() => {
+    if (pendingReplayEvent) {
+      const { index, event } = pendingReplayEvent;
+      // Replay if the item has been mounted
+      if (state.current.itemRefs[index]) {
+        setTimeout(() => {
+          debugLogger.log(`[Mouse] Replaying event index=${index}`);
+          broadcast(event);
+        }, 150); // Allow Ink's Yoga engine time to calculate bounding boxes
+        setPendingReplayEvent(null);
+      }
+    }
+  }, [pendingReplayEvent, broadcast]);
+
+  const handleMouse = useCallback(
+    (event: MouseEvent) => {
+      if (!state.current.container) return;
+
+      const isClick = event.name === 'left-press';
+      const isScroll =
+        event.name === 'scroll-up' || event.name === 'scroll-down';
+      if (!isClick && !isScroll) return;
+
+      const { x, y, width, height } = getBoundingBox(state.current.container);
+      const mouseX = event.col - 1;
+      const mouseY = event.row - 1;
+
+      const relativeX = mouseX - x;
+      const relativeY = mouseY - y;
+
+      if (
+        relativeX >= 0 &&
+        relativeX < width &&
+        relativeY >= 0 &&
+        relativeY < height
+      ) {
+        // getScrollTop() might return MAX_SAFE_INTEGER if stuck to bottom.
+        // We need the true rendered layout scroll top which ink exposes directly via getScrollTop.
+        const trueScrollTop = getInkScrollTop(state.current.container);
+        const absoluteY = trueScrollTop + relativeY;
+
+        const index = findLastIndex(offsets, (offset) => offset <= absoluteY);
+
+        // DEBUG LOGGING
+        debugLogger.log(
+          `[Mouse] event=${event.name} index=${index} static=${renderedAsStatic.current[index]}`,
+        );
+
+        if (index !== -1) {
+          const item = data[index];
+          if (item) {
+            const itemKey = keyExtractor(item, index);
+            const options = interactiveKeys.current.get(itemKey);
+
+            debugLogger.log(
+              `[Mouse] itemKey=${itemKey} options=${JSON.stringify(options)}`,
+            );
+            if (options) {
+              // Determine if the click was exactly on the first line of the item
+              const itemStartY = offsets[index];
+              const isFirstLineClick = isClick && absoluteY === itemStartY;
+
+              if (isFirstLineClick && options.click) {
+                debugLogger.log(
+                  `[Mouse] First line click detected. Toggling itemKey=${itemKey}.`,
+                );
+                virtualizedListContextValue.toggleItem(itemKey);
+              } else if (
+                renderedAsStatic.current[index] &&
+                isScroll &&
+                options.scroll
+              ) {
+                // Only wake up the item for scroll events
+                setTemporarilyInteractiveIndexes((prev) => {
+                  const next = new Set(prev);
+                  next.add(index);
+                  return next;
+                });
+                setPendingReplayEvent({ index, event });
+              }
+            }
+          }
+        }
+      }
+    },
+    [offsets, data, keyExtractor, virtualizedListContextValue],
+  );
+
+  useMouse(handleMouse, { isActive: true });
 
   useImperativeHandle(
     ref,
@@ -870,31 +1079,33 @@ function VirtualizedList<T>(
   );
 
   return (
-    <Box
-      ref={containerRefCallback}
-      overflowY="scroll"
-      overflowX="hidden"
-      scrollTop={scrollTop}
-      scrollbarThumbColor={props.scrollbarThumbColor ?? theme.text.secondary}
-      backgroundColor={props.backgroundColor}
-      width="100%"
-      height="100%"
-      flexDirection="column"
-      paddingRight={1}
-      overflowToBackbuffer={overflowToBackbuffer}
-      scrollbar={scrollbar}
-      stableScrollback={stableScrollback}
-    >
-      <Box flexShrink={0} width="100%" flexDirection="column">
-        {topSpacerHeight > 0 ? (
-          <Box height={topSpacerHeight} flexShrink={0} />
-        ) : null}
-        {renderedItems}
-        {bottomSpacerHeight > 0 ? (
-          <Box height={bottomSpacerHeight} flexShrink={0} />
-        ) : null}
+    <VirtualizedListContext.Provider value={virtualizedListContextValue}>
+      <Box
+        ref={containerRefCallback}
+        overflowY="scroll"
+        overflowX="hidden"
+        scrollTop={scrollTop}
+        scrollbarThumbColor={props.scrollbarThumbColor ?? theme.text.secondary}
+        backgroundColor={props.backgroundColor}
+        width="100%"
+        height="100%"
+        flexDirection="column"
+        paddingRight={1}
+        overflowToBackbuffer={overflowToBackbuffer}
+        scrollbar={scrollbar}
+        stableScrollback={stableScrollback}
+      >
+        <Box flexShrink={0} width="100%" flexDirection="column">
+          {topSpacerHeight > 0 ? (
+            <Box height={topSpacerHeight} flexShrink={0} />
+          ) : null}
+          {renderedItems}
+          {bottomSpacerHeight > 0 ? (
+            <Box height={bottomSpacerHeight} flexShrink={0} />
+          ) : null}
+        </Box>
       </Box>
-    </Box>
+    </VirtualizedListContext.Provider>
   );
 }
 

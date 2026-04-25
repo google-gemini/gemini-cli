@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { useMemo, Fragment } from 'react';
+import { useMemo, Fragment, useContext } from 'react';
 import { Box, Text } from 'ink';
 import type {
   HistoryItem,
@@ -43,6 +43,7 @@ import {
   TOOL_RESULT_STATIC_HEIGHT,
   TOOL_RESULT_STANDARD_RESERVED_LINE_COUNT,
 } from '../../utils/toolLayoutUtils.js';
+import { VirtualizedListContext } from '../shared/VirtualizedList.js';
 
 const COMPACT_OUTPUT_ALLOWLIST = new Set([
   EDIT_DISPLAY_NAME,
@@ -94,6 +95,7 @@ export const hasDensePayload = (tool: IndividualToolCallDisplay): boolean => {
 };
 
 interface ToolGroupMessageProps {
+  itemKey?: string;
   item: HistoryItem | HistoryItemWithoutId;
   toolCalls: IndividualToolCallDisplay[];
   availableTerminalHeight?: number;
@@ -108,6 +110,7 @@ interface ToolGroupMessageProps {
 const TOOL_MESSAGE_HORIZONTAL_MARGIN = 4;
 
 export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
+  itemKey,
   item,
   toolCalls: allToolCalls,
   availableTerminalHeight,
@@ -141,6 +144,11 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   } = useUIState();
 
   const config = useConfig();
+  const { registerInteractivity } = useContext(VirtualizedListContext) ?? {};
+
+  if (itemKey && registerInteractivity) {
+    registerInteractivity(itemKey, { click: true, scroll: true });
+  }
 
   const { borderColor, borderDimColor } = useMemo(
     () =>
@@ -425,9 +433,13 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
 
         const tool = group;
         const isShellToolCall = isShellTool(tool.name);
+        const uniqueItemKey = itemKey
+          ? `${itemKey}-tool-${tool.callId}`
+          : undefined;
 
         const commonProps = {
           ...tool,
+          itemKey: uniqueItemKey,
           availableTerminalHeight: availableTerminalHeightPerToolMessage,
           terminalWidth: contentWidth,
           emphasis: 'medium' as const,

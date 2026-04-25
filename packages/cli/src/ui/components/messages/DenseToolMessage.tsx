@@ -5,8 +5,8 @@
  */
 
 import type React from 'react';
-import { useMemo, useState, useRef } from 'react';
-import { Box, Text, type DOMElement } from 'ink';
+import { useMemo, useContext } from 'react';
+import { Box, Text } from 'ink';
 import {
   CoreToolCallStatus,
   type FileDiff,
@@ -32,13 +32,13 @@ import {
   isNewFile,
   parseDiffWithLineNumbers,
 } from './DiffRenderer.js';
-import { useMouseClick } from '../../hooks/useMouseClick.js';
 import { ScrollableList } from '../shared/ScrollableList.js';
 import { COMPACT_TOOL_SUBVIEW_MAX_LINES } from '../../constants.js';
 import { useSettings } from '../../contexts/SettingsContext.js';
 import { colorizeCode } from '../../utils/CodeColorizer.js';
 import { useToolActions } from '../../contexts/ToolActionsContext.js';
 import { getFileExtension } from '../../utils/fileUtils.js';
+import { VirtualizedListContext } from '../shared/VirtualizedList.js';
 
 const PAYLOAD_MARGIN_LEFT = 6;
 const PAYLOAD_BORDER_CHROME_WIDTH = 4; // paddingX=1 (2 cols) + borders (2 cols)
@@ -46,6 +46,7 @@ const PAYLOAD_SCROLL_GUTTER = 4;
 const PAYLOAD_MAX_WIDTH = 120 + PAYLOAD_SCROLL_GUTTER;
 
 interface DenseToolMessageProps extends IndividualToolCallDisplay {
+  itemKey?: string;
   terminalWidth: number;
   availableTerminalHeight?: number;
 }
@@ -260,6 +261,7 @@ function getGenericSuccessData(
 
 export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
   const {
+    itemKey,
     callId,
     name,
     status,
@@ -273,16 +275,16 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
 
   const settings = useSettings();
   const isAlternateBuffer = useAlternateBuffer();
-  const { isExpanded: isExpandedInContext, toggleExpansion } = useToolActions();
+  const { isExpanded: isExpandedInContext } = useToolActions();
+  const virtualizedListContext = useContext(VirtualizedListContext);
 
-  // Handle optional context members
-  const [localIsExpanded, setLocalIsExpanded] = useState(false);
-  const isExpanded = isExpandedInContext
-    ? isExpandedInContext(callId)
-    : localIsExpanded;
-
-  const [isFocused, setIsFocused] = useState(false);
-  const toggleRef = useRef<DOMElement>(null);
+  // Determine expansion state based on list context or fallback to tool actions
+  const isExpanded = useMemo(() => {
+    if (itemKey && virtualizedListContext) {
+      return virtualizedListContext.isItemToggled(itemKey);
+    }
+    return isExpandedInContext ? isExpandedInContext(callId) : false;
+  }, [itemKey, virtualizedListContext, isExpandedInContext, callId]);
 
   // Unified File Data Extraction (Safely bridge resultDisplay and confirmationDetails)
   const diff = useMemo((): FileDiff | undefined => {
@@ -300,25 +302,6 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
     }
     return undefined;
   }, [resultDisplay, confirmationDetails]);
-
-  const handleToggle = () => {
-    const next = !isExpanded;
-    if (!next) {
-      setIsFocused(false);
-    } else {
-      setIsFocused(true);
-    }
-
-    if (toggleExpansion) {
-      toggleExpansion(callId);
-    } else {
-      setLocalIsExpanded(next);
-    }
-  };
-
-  useMouseClick(toggleRef, handleToggle, {
-    isActive: isAlternateBuffer && !!diff,
-  });
 
   // State-to-View Coordination
   const viewParts = useMemo((): ViewParts => {
@@ -463,12 +446,7 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
         </Box>
 
         {summary && (
-          <Box
-            key="tool-summary"
-            ref={isAlternateBuffer && diff ? toggleRef : undefined}
-            marginLeft={1}
-            flexGrow={0}
-          >
+          <Box key="tool-summary" marginLeft={1} flexGrow={0}>
             {summary}
           </Box>
         )}
@@ -494,11 +472,12 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
           )}
         >
           <ScrollableList
+            itemKey={itemKey}
             data={diffLines}
             renderItem={renderItem}
             keyExtractor={keyExtractor}
             estimatedItemHeight={() => 1}
-            hasFocus={isFocused}
+            hasFocus={false}
             width={Math.min(
               PAYLOAD_MAX_WIDTH,
               terminalWidth -

@@ -116,6 +116,7 @@ export const MainContent = () => {
           isToolGroupBoundary,
         }) => (
           <MemoizedHistoryItemDisplay
+            itemKey={item.id.toString()}
             terminalWidth={mainAreaWidth}
             availableTerminalHeight={
               uiState.constrainHeight || !isExpandable
@@ -251,7 +252,7 @@ export const MainContent = () => {
   // interactive. Gemini messages and Tool results that are not scrollable,
   // collapsible, or clickable should also be tagged as static in the future.
   const isStaticItem = useCallback(
-    (item: (typeof virtualizedData)[number]) => item.type === 'header',
+    (item: (typeof virtualizedData)[number]) => item.type !== 'pending',
     [],
   );
 

@@ -11,6 +11,8 @@ import {
   useCallback,
   useMemo,
   useLayoutEffect,
+  useEffect,
+  useContext,
 } from 'react';
 import type React from 'react';
 import {
@@ -26,10 +28,12 @@ import { useKeypress, type Key } from '../../hooks/useKeypress.js';
 import { Command } from '../../key/keyMatchers.js';
 import { useKeyMatchers } from '../../hooks/useKeyMatchers.js';
 import { useSettings } from '../../contexts/SettingsContext.js';
+import { VirtualizedListContext } from './VirtualizedList.js';
 
 const ANIMATION_FRAME_DURATION_MS = 33;
 
 interface ScrollableListProps<T> extends VirtualizedListProps<T> {
+  itemKey?: string;
   hasFocus: boolean;
   width?: string | number;
   scrollbar?: boolean;
@@ -49,9 +53,41 @@ function ScrollableList<T>(
   const keyMatchers = useKeyMatchers();
   const settings = useSettings();
   const maxScrollbackLength = settings.merged.ui?.maxScrollbackLength;
-  const { hasFocus, width, scrollbar = true, stableScrollback } = props;
+  const {
+    hasFocus,
+    width,
+    scrollbar = true,
+    stableScrollback,
+    itemKey,
+  } = props;
   const virtualizedListRef = useRef<VirtualizedListRef<T>>(null);
   const containerRef = useRef<DOMElement>(null);
+
+  const virtualizedListContext = useContext(VirtualizedListContext);
+
+  useLayoutEffect(() => {
+    if (itemKey && virtualizedListContext) {
+      const restoredTop = virtualizedListContext.getItemState(
+        itemKey,
+        'scrollTop',
+      );
+      if (typeof restoredTop === 'number') {
+        virtualizedListRef.current?.scrollTo(restoredTop);
+      }
+    }
+  }, [itemKey, virtualizedListContext]);
+
+  useEffect(
+    () => () => {
+      if (itemKey && virtualizedListContext) {
+        const top = virtualizedListRef.current?.getScrollState().scrollTop;
+        if (top !== undefined) {
+          virtualizedListContext.setItemState(itemKey, 'scrollTop', top);
+        }
+      }
+    },
+    [itemKey, virtualizedListContext],
+  );
 
   useImperativeHandle(
     ref,

@@ -29,6 +29,7 @@ import { calculateToolContentMaxLines } from '../../utils/toolLayoutUtils.js';
 import { SubagentProgressDisplay } from './SubagentProgressDisplay.js';
 
 export interface ToolResultDisplayProps {
+  itemKey?: string;
   resultDisplay: string | object | undefined;
   availableTerminalHeight?: number;
   terminalWidth: number;
@@ -44,6 +45,7 @@ interface FileDiffResult {
 }
 
 export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
+  itemKey,
   resultDisplay,
   availableTerminalHeight,
   terminalWidth,
@@ -194,6 +196,7 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
 
       return (
         <Scrollable
+          itemKey={itemKey}
           width={childWidth}
           maxHeight={effectiveMaxHeight}
           hasFocus={hasFocus} // Allow scrolling via keyboard (Shift+Up/Down)
@@ -227,6 +230,7 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
       return (
         <Box width={childWidth} flexDirection="column" maxHeight={listHeight}>
           <FixedScrollableList
+            itemKey={itemKey}
             width={childWidth}
             maxHeight={listHeight}
             data={data}
