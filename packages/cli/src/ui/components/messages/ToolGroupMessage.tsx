@@ -65,7 +65,7 @@ export const isCompactTool = (
   const displayStatus = mapCoreStatusToDisplayStatus(tool.status);
   const hasCompactOutputSupport =
     (COMPACT_OUTPUT_ALLOWLIST.has(tool.name) ||
-      isMcpToolName(tool.functionName ?? tool.name)) &&
+      isMcpToolName(tool.functionName ?? '')) &&
     !(
       displayStatus === ToolCallStatus.Executing && tool.progress !== undefined
     );
