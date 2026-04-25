@@ -13,6 +13,7 @@ exports[`ShortcutsHelp > renders correctly in 'narrow' mode on 'linux' 1`] = `
  Alt+M raw markdown mode
  Ctrl+R reverse-search history
  Ctrl+G open external editor
+ Alt+E enhance prompt
 "
 `;
 
@@ -29,6 +30,7 @@ exports[`ShortcutsHelp > renders correctly in 'narrow' mode on 'mac' 1`] = `
  Option+M raw markdown mode
  Ctrl+R reverse-search history
  Ctrl+G open external editor
+ Option+E enhance prompt
 "
 `;
 

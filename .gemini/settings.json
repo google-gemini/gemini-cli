@@ -9,6 +9,12 @@
     "voiceMode": true
   },
   "general": {
-    "devtools": true
+    "devtools": true,
+    "plan": {
+      "enabled": true
+    }
+  },
+  "agents": {
+    "overrides": {}
   }
 }
