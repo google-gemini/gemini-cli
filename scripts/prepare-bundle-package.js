@@ -39,8 +39,22 @@ updatePackageJson('packages/cli/package.json', (pkg) => {
     gemini: 'bundle/gemini.js',
   };
 
-  // Remove fields that are not relevant to the bundled package.
-  delete pkg.dependencies;
+  // Keep only external dependencies
+  const external = [
+    '@lydell/node-pty',
+    'node-pty',
+    '@github/keytar',
+    '@google/gemini-cli-devtools',
+  ];
+  if (pkg.dependencies) {
+    for (const dep in pkg.dependencies) {
+      if (!external.includes(dep)) {
+        delete pkg.dependencies[dep];
+      }
+    }
+  }
+
+  // Remove other fields that are not relevant to the bundled package.
   delete pkg.devDependencies;
   delete pkg.scripts;
   delete pkg.main;
