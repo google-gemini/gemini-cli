@@ -1361,6 +1361,112 @@ included directory memory
     });
   });
 
+  describe('workspaceRootOverride (--workspace flag)', () => {
+    it('should not traverse above the workspace root even when a parent has .git', async () => {
+      // Layout:
+      //   testRootDir/
+      //     parent/          ← has .git, GEMINI.md (should NOT be picked up)
+      //       workspace/     ← the --workspace dir, has GEMINI.md (should be picked up)
+      //         src/         ← cwd
+      const parent = await createEmptyDir(path.join(testRootDir, 'parent'));
+      await createEmptyDir(path.join(parent, '.git'));
+      const workspace = await createEmptyDir(path.join(parent, 'workspace'));
+      const src = await createEmptyDir(path.join(workspace, 'src'));
+
+      const parentMemory = await createTestFile(
+        path.join(parent, DEFAULT_CONTEXT_FILENAME),
+        'Parent memory — should NOT appear',
+      );
+      const workspaceMemory = await createTestFile(
+        path.join(workspace, DEFAULT_CONTEXT_FILENAME),
+        'Workspace memory — should appear',
+      );
+
+      const result = flattenResult(
+        await loadServerHierarchicalMemory(
+          src,
+          [],
+          new FileDiscoveryService(workspace),
+          new SimpleExtensionLoader([]),
+          true,
+          'tree',
+          undefined,
+          200,
+          ['.git'],
+          workspace, // workspaceRootOverride
+        ),
+      );
+
+      expect(result.filePaths).toContain(normalizePath(workspaceMemory));
+      expect(result.filePaths).not.toContain(normalizePath(parentMemory));
+    });
+
+    it('should include GEMINI.md files inside the workspace (downward scan)', async () => {
+      // Layout:
+      //   workspace/
+      //     GEMINI.md        ← picked up
+      //     src/
+      //       GEMINI.md      ← picked up (downward scan)
+      const workspace = await createEmptyDir(
+        path.join(testRootDir, 'workspace_down'),
+      );
+      const src = await createEmptyDir(path.join(workspace, 'src'));
+
+      const wsMemory = await createTestFile(
+        path.join(workspace, DEFAULT_CONTEXT_FILENAME),
+        'Workspace root memory',
+      );
+      const srcMemory = await createTestFile(
+        path.join(src, DEFAULT_CONTEXT_FILENAME),
+        'Src memory',
+      );
+
+      const result = flattenResult(
+        await loadServerHierarchicalMemory(
+          workspace,
+          [],
+          new FileDiscoveryService(workspace),
+          new SimpleExtensionLoader([]),
+          true,
+          'tree',
+          undefined,
+          200,
+          ['.git'],
+          workspace, // workspaceRootOverride
+        ),
+      );
+
+      expect(result.filePaths).toContain(normalizePath(wsMemory));
+      expect(result.filePaths).toContain(normalizePath(srcMemory));
+    });
+
+    it('should behave identically to the default when no override is given', async () => {
+      // Verify the new optional parameter does not alter behaviour when absent.
+      await createEmptyDir(path.join(projectRoot, '.git'));
+      const projMemory = await createTestFile(
+        path.join(projectRoot, DEFAULT_CONTEXT_FILENAME),
+        'Project memory',
+      );
+      const cwdMemory = await createTestFile(
+        path.join(cwd, DEFAULT_CONTEXT_FILENAME),
+        'CWD memory',
+      );
+
+      const withoutOverride = flattenResult(
+        await loadServerHierarchicalMemory(
+          cwd,
+          [],
+          new FileDiscoveryService(projectRoot),
+          new SimpleExtensionLoader([]),
+          true,
+        ),
+      );
+
+      expect(withoutOverride.filePaths).toContain(normalizePath(projMemory));
+      expect(withoutOverride.filePaths).toContain(normalizePath(cwdMemory));
+    });
+  });
+
   it('refreshServerHierarchicalMemory should refresh memory and update config', async () => {
     const extensionLoader = new SimpleExtensionLoader([]);
     const config = new Config({
