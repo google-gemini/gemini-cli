@@ -127,6 +127,7 @@ describe('useSlashCommandProcessor', () => {
   const mockOpenAuthDialog = vi.fn();
   const mockOpenModelDialog = vi.fn();
   const mockSetQuittingMessages = vi.fn();
+  const mockSetUpdateInfo = vi.fn();
 
   const mockConfig = makeFakeConfig({});
   const mockSettings = {} as LoadedSettings;
@@ -223,6 +224,7 @@ describe('useSlashCommandProcessor', () => {
           true, // isConfigInitialized
           vi.fn(), // setBannerVisible
           vi.fn(), // setCustomDialog
+          mockSetUpdateInfo,
         ),
       );
       result = hook.result;
@@ -286,6 +288,26 @@ describe('useSlashCommandProcessor', () => {
       });
 
       expect(mockClearItems).toHaveBeenCalled();
+    });
+  });
+
+  describe('Update banner dismissal', () => {
+    it('dismisses the update banner when ui.clear() is invoked', async () => {
+      const clearCommand = createTestCommand({
+        name: 'clear',
+        action: async (context) => {
+          context.ui.clear();
+        },
+      });
+      const result = await setupProcessorHook({
+        builtinCommands: [clearCommand],
+      });
+
+      await act(async () => {
+        await result.current.handleSlashCommand('/clear');
+      });
+
+      expect(mockSetUpdateInfo).toHaveBeenCalledWith(null);
     });
   });
 
