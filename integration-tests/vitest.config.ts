@@ -5,6 +5,7 @@
  */
 
 import { defineConfig } from 'vitest/config';
+import path from 'node:path';
 
 export default defineConfig({
   test: {
@@ -17,7 +18,10 @@ export default defineConfig({
     alias:
       process.env.USE_PUBLISHED_PACKAGES === 'true'
         ? {
-            '@google/gemini-cli-core': '@google-gemini/gemini-cli-core',
+            '@google/gemini-cli-core': path.resolve(
+              __dirname,
+              '../node_modules/@google-gemini/gemini-cli-core',
+            ),
           }
         : {},
     reporters: ['default'],
