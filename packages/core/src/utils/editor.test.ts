@@ -28,6 +28,33 @@ import { coreEvents, CoreEvent } from './events.js';
 import { exec, execSync, spawn, spawnSync } from 'node:child_process';
 import { debugLogger } from './debugLogger.js';
 
+const JETBRAINS_EDITORS: EditorType[] = [
+  'intellij',
+  'webstorm',
+  'pycharm',
+  'goland',
+  'androidstudio',
+  'clion',
+  'rustrover',
+  'datagrip',
+  'phpstorm',
+  'rubymine',
+];
+
+const GUI_EDITORS: EditorType[] = [
+  'vscode',
+  'vscodium',
+  'windsurf',
+  'cursor',
+  'zed',
+  'antigravity',
+  ...JETBRAINS_EDITORS,
+];
+
+// Helper function to determine if editor is a JetBrains IDE
+const isJetBrainsIde = (editor: EditorType): boolean =>
+  JETBRAINS_EDITORS.includes(editor);
+
 vi.mock('child_process', () => ({
   exec: vi.fn(),
   execSync: vi.fn(),
@@ -84,6 +111,57 @@ describe('editor utils', () => {
         win32Commands: ['agy.cmd', 'antigravity.cmd', 'antigravity'],
       },
       { editor: 'hx', commands: ['hx'], win32Commands: ['hx'] },
+      // JetBrains IDEs
+      {
+        editor: 'intellij',
+        commands: ['idea', 'idea.sh'],
+        win32Commands: ['idea64.exe'],
+      },
+      {
+        editor: 'webstorm',
+        commands: ['webstorm', 'webstorm.sh'],
+        win32Commands: ['webstorm64.exe'],
+      },
+      {
+        editor: 'pycharm',
+        commands: ['pycharm', 'pycharm.sh'],
+        win32Commands: ['pycharm64.exe'],
+      },
+      {
+        editor: 'goland',
+        commands: ['goland', 'goland.sh'],
+        win32Commands: ['goland64.exe'],
+      },
+      {
+        editor: 'androidstudio',
+        commands: ['studio', 'studio.sh'],
+        win32Commands: ['studio64.exe'],
+      },
+      {
+        editor: 'clion',
+        commands: ['clion', 'clion.sh'],
+        win32Commands: ['clion64.exe'],
+      },
+      {
+        editor: 'rustrover',
+        commands: ['rustrover', 'rustrover.sh'],
+        win32Commands: ['rustrover64.exe'],
+      },
+      {
+        editor: 'datagrip',
+        commands: ['datagrip', 'datagrip.sh'],
+        win32Commands: ['datagrip64.exe'],
+      },
+      {
+        editor: 'phpstorm',
+        commands: ['phpstorm', 'phpstorm.sh'],
+        win32Commands: ['phpstorm64.exe'],
+      },
+      {
+        editor: 'rubymine',
+        commands: ['rubymine', 'rubymine.sh'],
+        win32Commands: ['rubymine64.exe'],
+      },
     ];
 
     for (const { editor, commands, win32Commands } of testCases) {
@@ -188,6 +266,57 @@ describe('editor utils', () => {
         commands: ['agy', 'antigravity'],
         win32Commands: ['agy.cmd', 'antigravity.cmd', 'antigravity'],
       },
+      // JetBrains IDEs - note: these use different diff arguments
+      {
+        editor: 'intellij',
+        commands: ['idea', 'idea.sh'],
+        win32Commands: ['idea64.exe'],
+      },
+      {
+        editor: 'webstorm',
+        commands: ['webstorm', 'webstorm.sh'],
+        win32Commands: ['webstorm64.exe'],
+      },
+      {
+        editor: 'pycharm',
+        commands: ['pycharm', 'pycharm.sh'],
+        win32Commands: ['pycharm64.exe'],
+      },
+      {
+        editor: 'goland',
+        commands: ['goland', 'goland.sh'],
+        win32Commands: ['goland64.exe'],
+      },
+      {
+        editor: 'androidstudio',
+        commands: ['studio', 'studio.sh'],
+        win32Commands: ['studio64.exe'],
+      },
+      {
+        editor: 'clion',
+        commands: ['clion', 'clion.sh'],
+        win32Commands: ['clion64.exe'],
+      },
+      {
+        editor: 'rustrover',
+        commands: ['rustrover', 'rustrover.sh'],
+        win32Commands: ['rustrover64.exe'],
+      },
+      {
+        editor: 'datagrip',
+        commands: ['datagrip', 'datagrip.sh'],
+        win32Commands: ['datagrip64.exe'],
+      },
+      {
+        editor: 'phpstorm',
+        commands: ['phpstorm', 'phpstorm.sh'],
+        win32Commands: ['phpstorm64.exe'],
+      },
+      {
+        editor: 'rubymine',
+        commands: ['rubymine', 'rubymine.sh'],
+        win32Commands: ['rubymine64.exe'],
+      },
     ];
 
     for (const { editor, commands, win32Commands } of guiEditors) {
@@ -198,9 +327,15 @@ describe('editor utils', () => {
           Buffer.from(`/usr/bin/${commands[0]}`),
         );
         const diffCommand = getDiffCommand('old.txt', 'new.txt', editor);
+
+        // JetBrains IDEs use different diff arguments
+        const expectedArgs = isJetBrainsIde(editor)
+          ? ['diff', 'old.txt', 'new.txt']
+          : ['--wait', '--diff', 'old.txt', 'new.txt'];
+
         expect(diffCommand).toEqual({
           command: commands[0],
-          args: ['--wait', '--diff', 'old.txt', 'new.txt'],
+          args: expectedArgs,
         });
       });
 
@@ -214,9 +349,15 @@ describe('editor utils', () => {
             .mockReturnValueOnce(Buffer.from(`/usr/bin/${commands[1]}`)); // second command found
 
           const diffCommand = getDiffCommand('old.txt', 'new.txt', editor);
+
+          // JetBrains IDEs use different diff arguments
+          const expectedArgs = isJetBrainsIde(editor)
+            ? ['diff', 'old.txt', 'new.txt']
+            : ['--wait', '--diff', 'old.txt', 'new.txt'];
+
           expect(diffCommand).toEqual({
             command: commands[1],
-            args: ['--wait', '--diff', 'old.txt', 'new.txt'],
+            args: expectedArgs,
           });
         });
       }
@@ -228,9 +369,15 @@ describe('editor utils', () => {
         });
 
         const diffCommand = getDiffCommand('old.txt', 'new.txt', editor);
+
+        // JetBrains IDEs use different diff arguments
+        const expectedArgs = isJetBrainsIde(editor)
+          ? ['diff', 'old.txt', 'new.txt']
+          : ['--wait', '--diff', 'old.txt', 'new.txt'];
+
         expect(diffCommand).toEqual({
           command: commands[commands.length - 1],
-          args: ['--wait', '--diff', 'old.txt', 'new.txt'],
+          args: expectedArgs,
         });
       });
 
@@ -241,9 +388,15 @@ describe('editor utils', () => {
           Buffer.from(`C:\\Program Files\\...\\${win32Commands[0]}`),
         );
         const diffCommand = getDiffCommand('old.txt', 'new.txt', editor);
+
+        // JetBrains IDEs use different diff arguments
+        const expectedArgs = isJetBrainsIde(editor)
+          ? ['diff', 'old.txt', 'new.txt']
+          : ['--wait', '--diff', 'old.txt', 'new.txt'];
+
         expect(diffCommand).toEqual({
           command: win32Commands[0],
-          args: ['--wait', '--diff', 'old.txt', 'new.txt'],
+          args: expectedArgs,
         });
       });
 
@@ -259,9 +412,15 @@ describe('editor utils', () => {
             ); // second command found
 
           const diffCommand = getDiffCommand('old.txt', 'new.txt', editor);
+
+          // JetBrains IDEs use different diff arguments
+          const expectedArgs = isJetBrainsIde(editor)
+            ? ['diff', 'old.txt', 'new.txt']
+            : ['--wait', '--diff', 'old.txt', 'new.txt'];
+
           expect(diffCommand).toEqual({
             command: win32Commands[1],
-            args: ['--wait', '--diff', 'old.txt', 'new.txt'],
+            args: expectedArgs,
           });
         });
       }
@@ -273,9 +432,15 @@ describe('editor utils', () => {
         });
 
         const diffCommand = getDiffCommand('old.txt', 'new.txt', editor);
+
+        // JetBrains IDEs use different diff arguments
+        const expectedArgs = isJetBrainsIde(editor)
+          ? ['diff', 'old.txt', 'new.txt']
+          : ['--wait', '--diff', 'old.txt', 'new.txt'];
+
         expect(diffCommand).toEqual({
           command: win32Commands[win32Commands.length - 1],
-          args: ['--wait', '--diff', 'old.txt', 'new.txt'],
+          args: expectedArgs,
         });
       });
     }
@@ -347,15 +512,7 @@ describe('editor utils', () => {
   });
 
   describe('openDiff', () => {
-    const guiEditors: EditorType[] = [
-      'vscode',
-      'vscodium',
-      'windsurf',
-      'cursor',
-      'zed',
-    ];
-
-    for (const editor of guiEditors) {
+    for (const editor of GUI_EDITORS) {
       it(`should call spawn for ${editor}`, async () => {
         const mockSpawnOn = vi.fn((event, cb) => {
           if (event === 'close') {
@@ -538,14 +695,7 @@ describe('editor utils', () => {
       expect(allowEditorTypeInSandbox('hx')).toBe(true);
     });
 
-    const guiEditors: EditorType[] = [
-      'vscode',
-      'vscodium',
-      'windsurf',
-      'cursor',
-      'zed',
-    ];
-    for (const editor of guiEditors) {
+    for (const editor of GUI_EDITORS) {
       it(`should not allow ${editor} in sandbox mode`, () => {
         vi.stubEnv('SANDBOX', 'sandbox');
         expect(allowEditorTypeInSandbox(editor)).toBe(false);
