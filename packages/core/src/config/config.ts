@@ -390,6 +390,13 @@ export interface BrowserAgentCustomConfig {
 export interface GeminiCLIExtension {
   name: string;
   version: string;
+  /**
+   * Version declared in the extension's `package.json`, if one is present and
+   * has a string `version` field. Captured once at load time so display code
+   * can show meaningful info when the config version is a generic tag like
+   * `latest`.
+   */
+  packageVersion?: string;
   isActive: boolean;
   path: string;
   installMetadata?: ExtensionInstallMetadata;

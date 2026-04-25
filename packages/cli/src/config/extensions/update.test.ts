@@ -42,6 +42,11 @@ vi.mock('./github.js', () => ({
 
 vi.mock('../extension.js', () => ({
   loadInstallMetadata: vi.fn(),
+  formatVersion: vi.fn((configVersion: string, packageVersion?: string) =>
+    packageVersion && packageVersion !== configVersion
+      ? `${configVersion} (${packageVersion})`
+      : configVersion,
+  ),
 }));
 
 vi.mock('node:fs', async (importOriginal) => {
@@ -193,6 +198,34 @@ describe('Extension Update Logic', () => {
       expect(fs.promises.rm).toHaveBeenCalledWith('/tmp/mock-dir', {
         recursive: true,
         force: true,
+      });
+    });
+
+    it('should surface package.json versions alongside the config version when present', async () => {
+      const extensionWithPackageVersion: GeminiCLIExtension = {
+        ...mockExtension,
+        version: 'latest',
+        packageVersion: '0.20.2',
+      } as GeminiCLIExtension;
+      vi.mocked(
+        mockExtensionManager.installOrUpdateExtension,
+      ).mockResolvedValue({
+        ...extensionWithPackageVersion,
+        version: 'latest',
+        packageVersion: '0.20.4',
+      });
+
+      const result = await updateExtension(
+        extensionWithPackageVersion,
+        mockExtensionManager,
+        ExtensionUpdateState.UPDATE_AVAILABLE,
+        mockDispatch,
+      );
+
+      expect(result).toEqual({
+        name: 'test-extension',
+        originalVersion: 'latest (0.20.2)',
+        updatedVersion: 'latest (0.20.4)',
       });
     });
 
