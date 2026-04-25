@@ -35,6 +35,16 @@ function getConfirmationHeader(
   return headers[details.type] ?? 'Action Required';
 }
 
+function hasCodeSnippet(
+  details: SerializableConfirmationDetails | undefined,
+): boolean {
+  if (!details) return false;
+
+  if (details.type === 'ask_user') {
+    return details.questions.some((q) => q.question.includes('```'));
+  }
+
+  return false;
 function getConfirmationLabel(
   toolName: string,
   details: SerializableConfirmationDetails | undefined,
@@ -72,6 +82,12 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
       ? Math.max(uiAvailableHeight, 4)
       : Math.floor(terminalHeight * 0.5);
 
+  const isRoutine =
+    tool.confirmationDetails?.type === 'ask_user' ||
+    tool.confirmationDetails?.type === 'exit_plan_mode';
+  const borderColor = isRoutine ? theme.status.success : theme.status.warning;
+  const hideToolIdentity = isRoutine;
+  const hideSideBorders = hasCodeSnippet(tool.confirmationDetails);
   const isShell = isShellTool(tool.name);
   const isEdit = tool.confirmationDetails?.type === 'edit';
 
@@ -82,6 +98,31 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
       ? Math.max(maxHeight - 3, 4)
       : undefined;
 
+  const content = (
+    <>
+      <Box flexDirection="column" width={mainAreaWidth} flexShrink={0}>
+        <StickyHeader
+          width={mainAreaWidth}
+          isFirst={true}
+          borderColor={borderColor}
+          borderDimColor={false}
+          hideSideBorders={hideSideBorders}
+        >
+          <Box flexDirection="column" width={mainAreaWidth - 4}>
+            {/* Header */}
+            <Box
+              marginBottom={hideToolIdentity ? 0 : 1}
+              justifyContent="space-between"
+            >
+              <Text color={borderColor} bold>
+                {getConfirmationHeader(tool.confirmationDetails)}
+              </Text>
+              {total > 1 && (
+                <Text color={theme.text.secondary}>
+                  {index} of {total}
+                </Text>
+              )}
+            </Box>
     const toolLabel = getConfirmationLabel(tool.name, tool.confirmationDetails);
 
     return (
@@ -108,6 +149,24 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
               </Box>
             )}
           </Box>
+        </StickyHeader>
+
+        <Box
+          width={mainAreaWidth}
+          borderStyle="round"
+          borderColor={borderColor}
+          borderTop={false}
+          borderBottom={false}
+          borderLeft={!hideSideBorders}
+          borderRight={!hideSideBorders}
+          paddingX={hideSideBorders ? 2 : 1}
+          flexDirection="column"
+        >
+          {/* Interactive Area */}
+          {/*
+            Note: We force isFocused={true} because if this component is rendered,
+            it effectively acts as a modal over the shell/composer.
+          */}
           {total > 1 && (
             <Text color={theme.text.secondary}>
               {index} of {total}
@@ -128,6 +187,15 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
             isFocused={true}
           />
         </Box>
+        <Box
+          height={1}
+          width={mainAreaWidth}
+          borderLeft={!hideSideBorders}
+          borderRight={!hideSideBorders}
+          borderTop={false}
+          borderBottom={true}
+          borderColor={borderColor}
+          borderStyle="round"
       </Box>
     );
   }
