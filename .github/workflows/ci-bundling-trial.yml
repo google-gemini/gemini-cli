@@ -26,10 +26,7 @@ jobs:
           cache: 'npm'
 
       - name: 'Install dependencies'
-        run: 'npm ci --ignore-scripts'
-
-      - name: 'Generate commit info'
-        run: 'npm run generate'
+        run: 'npm ci'
 
       - name: 'Build project'
         run: 'npm run build'
@@ -58,10 +55,7 @@ jobs:
           cache: 'npm'
 
       - name: 'Install dependencies'
-        run: 'npm ci --ignore-scripts'
-
-      - name: 'Generate commit info'
-        run: 'npm run generate'
+        run: 'npm ci'
 
       - name: 'Build project'
         run: 'npm run build'
@@ -90,10 +84,7 @@ jobs:
           cache: 'npm'
 
       - name: 'Install dependencies'
-        run: 'npm ci --ignore-scripts'
-
-      - name: 'Generate commit info'
-        run: 'npm run generate'
+        run: 'npm ci'
 
       - name: 'Build project'
         run: 'npm run build'
@@ -122,10 +113,7 @@ jobs:
           cache: 'npm'
 
       - name: 'Install dependencies'
-        run: 'npm ci --ignore-scripts'
-
-      - name: 'Generate commit info'
-        run: 'npm run generate'
+        run: 'npm ci'
 
       - name: 'Build project'
         run: 'npm run build'
@@ -154,10 +142,7 @@ jobs:
           cache: 'npm'
 
       - name: 'Install dependencies'
-        run: 'npm ci --ignore-scripts'
-
-      - name: 'Generate commit info'
-        run: 'npm run generate'
+        run: 'npm ci'
 
       - name: 'Build project'
         run: 'npm run build'
@@ -186,10 +171,7 @@ jobs:
           cache: 'npm'
 
       - name: 'Install dependencies'
-        run: 'npm ci --ignore-scripts'
-
-      - name: 'Generate commit info'
-        run: 'npm run generate'
+        run: 'npm ci'
 
       - name: 'Build project'
         run: 'npm run build'
@@ -218,10 +200,7 @@ jobs:
           cache: 'npm'
 
       - name: 'Install dependencies'
-        run: 'npm ci --ignore-scripts'
-
-      - name: 'Generate commit info'
-        run: 'npm run generate'
+        run: 'npm ci'
 
       - name: 'Build project'
         run: 'npm run build'
@@ -250,10 +229,7 @@ jobs:
           cache: 'npm'
 
       - name: 'Install dependencies'
-        run: 'npm ci --ignore-scripts'
-
-      - name: 'Generate commit info'
-        run: 'npm run generate'
+        run: 'npm ci'
 
       - name: 'Build project'
         run: 'npm run build'
@@ -284,10 +260,7 @@ jobs:
           cache: 'npm'
 
       - name: 'Install dependencies'
-        run: 'npm ci --ignore-scripts'
-
-      - name: 'Generate commit info'
-        run: 'npm run generate'
+        run: 'npm ci'
 
       - name: 'Build project'
         run: 'npm run build'
@@ -316,10 +289,7 @@ jobs:
           cache: 'npm'
 
       - name: 'Install dependencies'
-        run: 'npm ci --ignore-scripts'
-
-      - name: 'Generate commit info'
-        run: 'npm run generate'
+        run: 'npm ci'
 
       - name: 'Build project'
         run: 'npm run build'
@@ -349,10 +319,7 @@ jobs:
           cache: 'npm'
 
       - name: 'Install dependencies'
-        run: 'npm ci --ignore-scripts'
-
-      - name: 'Generate commit info'
-        run: 'npm run generate'
+        run: 'npm ci'
 
       - name: 'Build project'
         run: 'npm run build'
