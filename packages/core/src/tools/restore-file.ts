@@ -332,6 +332,13 @@ export class RestoreFileTool extends BaseDeclarativeTool<
     if (!filePath) {
       return 'file_path is required';
     }
+    if (
+      typeof params.version !== 'number' ||
+      !Number.isSafeInteger(params.version) ||
+      params.version < 0
+    ) {
+      return 'version must be a non-negative integer';
+    }
     const resolvedPath = resolveToRealPath(
       path.resolve(this.config.getTargetDir(), filePath),
     );
