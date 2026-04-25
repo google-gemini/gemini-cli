@@ -125,7 +125,7 @@ export async function createPreWriteBackup(
 
   const backupDir = getBackupDir(sessionId, projectTempDir);
   try {
-    await fsPromises.mkdir(backupDir, { recursive: true });
+    await fsPromises.mkdir(backupDir, { recursive: true, mode: 0o700 });
   } catch (e) {
     debugLogger.warn('Failed to create backup directory:', e);
     return { ok: false, newFile: false };
