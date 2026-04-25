@@ -188,9 +188,20 @@ export async function checkPermissions(
     const pathName = part.content.substring(1);
     if (!pathName) continue;
 
-    const resolvedPathName = resolveToRealPath(
-      path.resolve(config.getTargetDir(), pathName),
-    );
+    let resolvedPathName: string;
+    try {
+      resolvedPathName = resolveToRealPath(
+        path.resolve(config.getTargetDir(), pathName),
+      );
+    } catch {
+      // The @-command regex is greedy and can capture pasted content (e.g.
+      // a JSON blob) that is not actually a path. Resolving such content
+      // through fs.realpathSync throws ENAMETOOLONG / EINVAL, which would
+      // otherwise propagate as an unhandled rejection and crash the CLI.
+      // Skip the entry — downstream rendering will surface a clearer error
+      // if the user really meant to reference a file.
+      continue;
+    }
 
     if (config.validatePathAccess(resolvedPathName, 'read')) {
       if (await fileExists(resolvedPathName)) {
