@@ -31,12 +31,47 @@ the last week:
 
 ## Broad Strokes of Why and What We Improved
 
-### 1. Fake Timers for the Win
+### 1. The Power of Fake Timers: Eliminating Idle Time
 
-Many React component tests were relying on real `setTimeout` or async waiting,
-causing them to idle for seconds. By enabling Vitest's fake timers globally in
-these files, we forced time to pass instantly, cutting execution time by over
-90% in some files.
+One of the most impactful changes we made was the aggressive adoption of
+**Vitest's fake timers** in tests that involved waiting, timeouts, or polling.
+
+#### The Problem: Real Time in Tests
+
+Many of our React component tests (especially those testing interactive features
+or streaming responses) were relying on real time. They used `setTimeout` or
+awaited promises with delays to verify that state updated correctly after a
+certain period.
+
+- **The Cost:** If a test waits for even 1 second for a state change, and you
+  have 60 tests in a file, that file takes at least 60 seconds just idling!
+- **The Symptom:** Files like `vim.test.tsx` and `useGeminiStream.test.tsx` were
+  taking over 80-100 seconds each.
+
+#### The Solution: Mocking the Clock
+
+We enabled Vitest's fake timers globally in these files using
+`vi.useFakeTimers()`. This allows the test to control the passage of time
+programmatically without actually waiting.
+
+- **How it works:** Instead of waiting for a 1-second timeout to fire, the test
+  calls `vi.advanceTimersByTime(1000)`. Vitest instantly triggers all timers
+  scheduled within that window.
+- **The Result:** Idle time dropped to near zero.
+
+#### Case Study: `vim.test.tsx`
+
+- **Before:** Took **117.8 seconds** in real CI because it simulated complex Vim
+  keybindings with real delays.
+- **After:** Reduced to **~4.3 seconds**! A **~96% speedup** by simply allowing
+  the clock to be mocked.
+
+#### Takeaways for the Team
+
+- **Never use real delays** in tests if a fake timer can achieve the same
+  result.
+- **Be careful with async testing:** Ensure that you cleanup timers after tests
+  to avoid leaking them to other files.
 
 ### 2. Parallelization via Sharding
 
