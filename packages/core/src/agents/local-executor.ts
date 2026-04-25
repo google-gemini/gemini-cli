@@ -7,6 +7,7 @@
 import { type AgentLoopContext } from '../config/agent-loop-context.js';
 import { reportError } from '../utils/errorReporting.js';
 import { GeminiChat, StreamEventType } from '../core/geminiChat.js';
+import { setMaxListeners } from 'node:events';
 import {
   type Content,
   type Part,
@@ -84,11 +85,13 @@ import {
   ACTIVATE_SKILL_TOOL_NAME,
   UPDATE_TOPIC_TOOL_NAME,
 } from '../tools/definitions/base-declarations.js';
+import { AGENT_TOOL_NAME } from '../tools/tool-names.js';
 
 /** A callback function to report on agent activity. */
 export type ActivityCallback = (activity: SubagentActivityEvent) => void;
 
 const GRACE_PERIOD_MS = 60 * 1000; // 1 min
+const MAX_SUBAGENT_DEPTH = 3;
 
 /** The possible outcomes of a single agent turn. */
 type AgentTurnResult =
@@ -130,6 +133,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       config: this.context.config,
       promptId: this.agentId,
       parentSessionId: this.context.parentSessionId || this.context.promptId, // Always preserve the main agent session ID
+      depth: (this.context.depth ?? 0) + 1,
       geminiClient: this.context.geminiClient,
       sandboxManager: this.context.sandboxManager,
       toolRegistry: this.toolRegistry,
@@ -185,8 +189,12 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 
     const registerToolInstance = (tool: AnyDeclarativeTool) => {
       // Check if the tool is an agent tool to prevent recursion.
-      // We do not allow agents to call other agents.
-      if (tool.kind === Kind.Agent) {
+      // We allow a limited amount of nesting for coordinator agents.
+      if (
+        tool.kind === Kind.Agent &&
+        (tool.name !== AGENT_TOOL_NAME ||
+          (context.depth ?? 0) >= MAX_SUBAGENT_DEPTH)
+      ) {
         return;
       }
 
@@ -573,6 +581,14 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     };
 
     // Combine the external signal with the internal timeout signal.
+    // We increase the limit on the parent signal to accommodate multiple concurrent subagents.
+    if (signal instanceof EventTarget) {
+      try {
+        setMaxListeners(100, signal);
+      } catch {
+        // Ignore if not supported in the environment
+      }
+    }
     const combinedSignal = AbortSignal.any([signal, deadlineTimer.signal]);
 
     logAgentStart(

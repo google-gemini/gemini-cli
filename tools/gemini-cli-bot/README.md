@@ -31,10 +31,9 @@ long-term strategic optimization.
 - `metrics/`: Contains the deterministic runner (`index.ts`) and individual
   TypeScript scripts (`scripts/`) that use the GitHub CLI to track metrics like
   open issues, PR latency, throughput, and reviewer domain expertise.
-- `processes/scripts/`: Placeholder directory for future deterministic triage
-  and routing scripts.
-- `investigations/`: Placeholder directory for agentic root-cause analysis
-  phases.
+- `reflexes/scripts/`: Placeholder directory for future deterministic triage and
+  routing scripts.
+- `brain/`: Placeholder directory for the Brain's root-cause analysis phases.
 - `critique/`: Placeholder directory for policy evaluation.
 - `history/`: Storage for downloaded metrics artifacts from previous runs.
 
