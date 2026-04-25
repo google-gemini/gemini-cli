@@ -1046,6 +1046,10 @@ export async function loadCliConfig(
       format: (argv.outputFormat ?? settings.output?.format) as OutputFormat,
     },
     gemmaModelRouter: settings.experimental?.gemmaModelRouter,
+     
+    ollamaCompress: trustedFolder ? (settings.experimental?.ollamaCompress as
+      | { host: string; model: string; numCtx?: number }
+      | undefined) : undefined,
     adk: settings.experimental?.adk,
     fakeResponses: argv.fakeResponses,
     recordResponses: argv.recordResponses,
