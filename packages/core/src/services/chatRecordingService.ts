@@ -674,10 +674,23 @@ export class ChatRecordingService {
   }
 
   /**
-   * Deletes a session file by sessionId, filename, or basename.
-   * Derives an 8-character shortId to find and delete all associated files
-   * (parent and subagents).
+   * Deletes a session file and its associated artifacts (logs, tool outputs,
+   * session directory). An 8-character shortId is derived from the input
+   * to locate the chat file plus any subagent files that belong to it.
    *
+   * Per-file artifact cleanup uses the UUID stored inside each chat file's
+   * own metadata. The optional `sessionUUID` is forwarded as a fallback for
+   * chat files that are empty, missing the sessionId metadata line, or have
+   * a corrupted first line — see issue #21568. When the caller already has
+   * the session UUID separately from the file basename (as both
+   * `--delete-session` and the interactive session browser do), passing it
+   * here keeps cleanup correct in those degraded-file cases.
+   *
+   * @param sessionIdOrBasename - Full session UUID, chat file basename, or
+   *   chat file basename with extension. The 8-character shortId is taken
+   *   from this value to locate the chat file on disk.
+   * @param sessionUUID - Optional full session UUID, used as a fallback when
+   *   the chat file's own metadata cannot supply one.
    * @throws {Error} If shortId validation fails.
    */
   async deleteSession(
