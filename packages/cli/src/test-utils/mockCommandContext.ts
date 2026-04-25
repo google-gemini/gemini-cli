@@ -85,6 +85,8 @@ export const createMockCommandContext = (
           },
         },
       } as SessionStatsState,
+      activeCheckpointTag: undefined,
+      setActiveCheckpointTag: vi.fn(),
     },
   };
 

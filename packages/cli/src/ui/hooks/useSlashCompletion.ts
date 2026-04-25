@@ -330,6 +330,7 @@ function useCommandSuggestions(
 
           const isTopLevelChatOrResumeContext = !!(
             leafCommand &&
+            partial === '' &&
             (leafCommand.name === 'chat' || leafCommand.name === 'resume') &&
             (commandPathParts.length === 0 ||
               (commandPathParts.length === 1 &&
