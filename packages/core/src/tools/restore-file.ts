@@ -146,8 +146,7 @@ class RestoreFileToolInvocation extends BaseToolInvocation<
   }
 
   private formatVersions(versions: number[]): string {
-    if (versions.length < 3) return versions.join(', ');
-    return `${versions[0]} .. ${versions[versions.length - 1]}`;
+    return versions.join(', ');
   }
 
   private async listAvailableVersions(): Promise<number[]> {
