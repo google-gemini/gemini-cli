@@ -36,7 +36,7 @@ import os from 'node:os';
 import { GeminiClient } from '../core/client.js';
 import type { BaseLlmClient } from '../core/baseLlmClient.js';
 import { ensureCorrectFileContent } from '../utils/editCorrector.js';
-import { createPreWriteBackup } from './file-backup.js';
+import { handlePreWriteBackup } from './file-backup.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
 import { IdeClient, type DiffUpdateResult } from '../ide/ide-client.js';
 import { WorkspaceContext } from '../utils/workspaceContext.js';
@@ -128,7 +128,13 @@ vi.mock('./jit-context.js', () => ({
 }));
 
 vi.mock('./file-backup.js', () => ({
-  createPreWriteBackup: vi.fn(),
+  handlePreWriteBackup: vi.fn(),
+  makeBackupVersionMessage: vi
+    .fn()
+    .mockImplementation(
+      (version: number, resolvedPath: string) =>
+        `Backed up as version ${version} — restore_file("${resolvedPath}", ${version}) to revert.`,
+    ),
 }));
 
 // --- END MOCKS ---
@@ -211,12 +217,8 @@ describe('WriteFileTool', () => {
     mockConfigInternal.getApprovalMode.mockReturnValue(ApprovalMode.DEFAULT);
     mockConfigInternal.setApprovalMode.mockClear();
     mockEnsureCorrectFileContent.mockReset();
-    vi.mocked(createPreWriteBackup).mockReset();
-    vi.mocked(createPreWriteBackup).mockResolvedValue({
-      ok: true,
-      version: 1,
-      backupPath: '/mock/backup/test.v1',
-    });
+    vi.mocked(handlePreWriteBackup).mockReset();
+    vi.mocked(handlePreWriteBackup).mockResolvedValue({ backupVersion: 1 });
 
     // Default mock implementations that return valid structures
     mockEnsureCorrectFileContent.mockImplementation(
@@ -914,9 +916,18 @@ describe('WriteFileTool', () => {
 
         const newContent = 'new content attempting to replace';
         mockEnsureCorrectFileContent.mockResolvedValue(newContent);
-        vi.mocked(createPreWriteBackup).mockResolvedValue({
-          ok: false,
-          newFile: false,
+        vi.mocked(handlePreWriteBackup).mockResolvedValue({
+          errorResult: {
+            llmContent:
+              'Cannot back up before writing. Write aborted to prevent data loss.',
+            returnDisplay:
+              'Cannot back up before writing. Write aborted to prevent data loss.',
+            error: {
+              message:
+                'Cannot back up before writing. Write aborted to prevent data loss.',
+              type: ToolErrorType.FILE_WRITE_FAILURE,
+            },
+          },
         });
         const writeFileSpy = vi.spyOn(fsService, 'writeTextFile');
 
@@ -938,11 +949,7 @@ describe('WriteFileTool', () => {
 
         const newContent = 'replaced content';
         mockEnsureCorrectFileContent.mockResolvedValue(newContent);
-        vi.mocked(createPreWriteBackup).mockResolvedValue({
-          ok: true,
-          version: 7,
-          backupPath: '/mock/backup/test.v7',
-        });
+        vi.mocked(handlePreWriteBackup).mockResolvedValue({ backupVersion: 7 });
 
         const params = { file_path: filePath, content: newContent };
         const invocation = tool.build(params);
@@ -954,7 +961,7 @@ describe('WriteFileTool', () => {
         expect(result.llmContent).toContain('7) to revert');
       });
 
-      it('should not call createPreWriteBackup when writing a new file', async () => {
+      it('should call handlePreWriteBackup with isNewFile=true when writing a new file', async () => {
         const filePath = path.join(rootDir, 'brand_new_no_backup.txt');
         const content = 'brand new file content';
         mockEnsureCorrectFileContent.mockResolvedValue(content);
@@ -964,7 +971,11 @@ describe('WriteFileTool', () => {
         const result = await invocation.execute({ abortSignal });
 
         expect(result.error).toBeUndefined();
-        expect(vi.mocked(createPreWriteBackup)).not.toHaveBeenCalled();
+        expect(vi.mocked(handlePreWriteBackup)).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.any(String),
+          true,
+        );
       });
     });
   });

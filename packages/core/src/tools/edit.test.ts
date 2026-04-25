@@ -9,7 +9,15 @@
 const mockFixLLMEditWithInstruction = vi.hoisted(() => vi.fn());
 const mockGenerateJson = vi.hoisted(() => vi.fn());
 const mockOpenDiff = vi.hoisted(() => vi.fn());
-const mockCreatePreWriteBackup = vi.hoisted(() => vi.fn());
+const mockHandlePreWriteBackup = vi.hoisted(() => vi.fn());
+const mockMakeBackupVersionMessage = vi.hoisted(() =>
+  vi
+    .fn()
+    .mockImplementation(
+      (version: number, resolvedPath: string) =>
+        `Backed up as version ${version} — restore_file("${resolvedPath}", ${version}) to revert.`,
+    ),
+);
 
 import { IdeClient } from '../ide/ide-client.js';
 
@@ -35,7 +43,8 @@ vi.mock('../utils/editor.js', () => ({
 }));
 
 vi.mock('./file-backup.js', () => ({
-  createPreWriteBackup: mockCreatePreWriteBackup,
+  handlePreWriteBackup: mockHandlePreWriteBackup,
+  makeBackupVersionMessage: mockMakeBackupVersionMessage,
 }));
 
 vi.mock('./jit-context.js', () => ({
@@ -166,12 +175,12 @@ describe('EditTool', () => {
     (mockConfig.getApprovalMode as Mock).mockReturnValue(ApprovalMode.DEFAULT);
 
     mockFixLLMEditWithInstruction.mockReset();
-    mockCreatePreWriteBackup.mockReset();
-    mockCreatePreWriteBackup.mockResolvedValue({
-      ok: true,
-      version: 1,
-      backupPath: '/mock/backup/test.v1',
-    });
+    mockHandlePreWriteBackup.mockReset();
+    mockHandlePreWriteBackup.mockResolvedValue({ backupVersion: 1 });
+    mockMakeBackupVersionMessage.mockImplementation(
+      (version: number, resolvedPath: string) =>
+        `Backed up as version ${version} — restore_file("${resolvedPath}", ${version}) to revert.`,
+    );
     mockFixLLMEditWithInstruction.mockResolvedValue({
       noChangesRequired: false,
       search: '',
@@ -869,9 +878,18 @@ function doIt() {
         const initialContent = 'initial content to protect';
         fs.writeFileSync(filePath, initialContent, 'utf8');
 
-        mockCreatePreWriteBackup.mockResolvedValueOnce({
-          ok: false,
-          newFile: false,
+        mockHandlePreWriteBackup.mockResolvedValueOnce({
+          errorResult: {
+            llmContent:
+              'Cannot back up before writing. Write aborted to prevent data loss.',
+            returnDisplay:
+              'Cannot back up before writing. Write aborted to prevent data loss.',
+            error: {
+              message:
+                'Cannot back up before writing. Write aborted to prevent data loss.',
+              type: ToolErrorType.FILE_WRITE_FAILURE,
+            },
+          },
         });
         const writeFileSpy = vi.spyOn(fileSystemService, 'writeTextFile');
 
@@ -900,11 +918,7 @@ function doIt() {
         const initialContent = 'some existing content here';
         fs.writeFileSync(filePath, initialContent, 'utf8');
 
-        mockCreatePreWriteBackup.mockResolvedValueOnce({
-          ok: true,
-          version: 5,
-          backupPath: '/mock/backup/test.v5',
-        });
+        mockHandlePreWriteBackup.mockResolvedValueOnce({ backupVersion: 5 });
 
         const params: EditToolParams = {
           file_path: filePath,
@@ -924,7 +938,7 @@ function doIt() {
         expect(result.llmContent).toContain('5) to revert');
       });
 
-      it('should not call createPreWriteBackup when creating a new file', async () => {
+      it('should call handlePreWriteBackup with isNewFile=true when creating a new file', async () => {
         const filePath = path.join(rootDir, 'new_file_no_backup.txt');
 
         const params: EditToolParams = {
@@ -937,7 +951,11 @@ function doIt() {
         const invocation = tool.build(params);
         await invocation.execute({ abortSignal: new AbortController().signal });
 
-        expect(mockCreatePreWriteBackup).not.toHaveBeenCalled();
+        expect(mockHandlePreWriteBackup).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.any(String),
+          true,
+        );
       });
     });
   });

@@ -52,7 +52,10 @@ import { detectOmissionPlaceholders } from './omissionPlaceholderDetector.js';
 import { resolveAndValidatePlanPath } from '../utils/planUtils.js';
 import { isGemini3Model } from '../config/models.js';
 import { discoverJitContext, appendJitContext } from './jit-context.js';
-import { createPreWriteBackup } from './file-backup.js';
+import {
+  handlePreWriteBackup,
+  makeBackupVersionMessage,
+} from './file-backup.js';
 
 /**
  * Parameters for the WriteFile tool
@@ -341,30 +344,15 @@ class WriteFileToolInvocation extends BaseToolInvocation<
         finalContent = finalContent.replace(/\r?\n/g, '\r\n');
       }
 
-      let backupVersion: number | null = null;
-      if (!isNewFile) {
-        const backupResult = await createPreWriteBackup(
-          this.resolvedPath,
-          this.config.getSessionId(),
-          this.config.storage.getProjectTempDir(),
-        );
-        if (!backupResult.ok) {
-          if (!backupResult.newFile) {
-            const rel = makeRelative(
-              this.resolvedPath,
-              this.config.getTargetDir(),
-            );
-            const msg = `Cannot back up ${shortenPath(rel)} before writing. Write aborted to prevent data loss.`;
-            return {
-              llmContent: msg,
-              returnDisplay: msg,
-              error: { message: msg, type: ToolErrorType.FILE_WRITE_FAILURE },
-            };
-          }
-        } else {
-          backupVersion = backupResult.version;
-        }
+      const backupOutcome = await handlePreWriteBackup(
+        this.config,
+        this.resolvedPath,
+        isNewFile,
+      );
+      if ('errorResult' in backupOutcome) {
+        return backupOutcome.errorResult;
       }
+      const backupVersion = backupOutcome.backupVersion;
 
       await this.config
         .getFileSystemService()
@@ -417,12 +405,12 @@ class WriteFileToolInvocation extends BaseToolInvocation<
       llmSuccessMessageParts.push(`Here is the updated code:\n${snippet}`);
 
       if (backupVersion !== null) {
-        const relativePath = makeRelative(
-          this.resolvedPath,
-          this.config.getTargetDir(),
-        );
         llmSuccessMessageParts.push(
-          `Backed up as version ${backupVersion} — restore_file("${relativePath}", ${backupVersion}) to revert.`,
+          makeBackupVersionMessage(
+            backupVersion,
+            this.resolvedPath,
+            this.config,
+          ),
         );
       }
 

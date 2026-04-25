@@ -9,6 +9,10 @@ import fsPromises from 'node:fs/promises';
 import path from 'node:path';
 import { isNodeError } from '../utils/errors.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import type { Config } from '../config/config.js';
+import type { ToolResult } from './tools.js';
+import { ToolErrorType } from './tool-error.js';
+import { makeRelative, shortenPath } from '../utils/paths.js';
 
 const MAX_BACKUP_VERSIONS = 20;
 
@@ -214,4 +218,56 @@ export async function createPreWriteBackup(
   }
 
   return { ok: true, version: claimedVersion, backupPath };
+}
+
+export type PreWriteBackupOutcome =
+  | { backupVersion: number | null }
+  | { errorResult: ToolResult };
+
+/**
+ * Shared pre-write backup handler used by edit and write-file tools.
+ * Returns `{ backupVersion }` on success (null when the file is new), or
+ * `{ errorResult }` when the backup failed and the write must be aborted.
+ */
+export async function handlePreWriteBackup(
+  config: Config,
+  resolvedPath: string,
+  isNewFile: boolean,
+): Promise<PreWriteBackupOutcome> {
+  if (isNewFile) {
+    return { backupVersion: null };
+  }
+
+  const backupResult = await createPreWriteBackup(
+    resolvedPath,
+    config.getSessionId(),
+    config.storage.getProjectTempDir(),
+  );
+
+  if (backupResult.ok) {
+    return { backupVersion: backupResult.version };
+  }
+
+  if (!backupResult.newFile) {
+    const rel = makeRelative(resolvedPath, config.getTargetDir());
+    const msg = `Cannot back up ${shortenPath(rel)} before writing. Write aborted to prevent data loss.`;
+    return {
+      errorResult: {
+        llmContent: msg,
+        returnDisplay: msg,
+        error: { message: msg, type: ToolErrorType.FILE_WRITE_FAILURE },
+      },
+    };
+  }
+
+  return { backupVersion: null };
+}
+
+export function makeBackupVersionMessage(
+  backupVersion: number,
+  resolvedPath: string,
+  config: Config,
+): string {
+  const relativePath = makeRelative(resolvedPath, config.getTargetDir());
+  return `Backed up as version ${backupVersion} — restore_file("${relativePath}", ${backupVersion}) to revert.`;
 }
