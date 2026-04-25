@@ -418,5 +418,6 @@ jobs:
           KEEP_OUTPUT: 'true'
           VERBOSE: 'true'
           USE_PUBLISHED_PACKAGES: 'true'
+          INTEGRATION_TEST_USE_INSTALLED_GEMINI: 'true'
         run: 'npm run test:integration:sandbox:none'
         shell: 'pwsh'
