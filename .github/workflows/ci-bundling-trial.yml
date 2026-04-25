@@ -10,54 +10,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  publish_packages:
-    name: 'Publish Packages to GitHub'
-    runs-on: 'gemini-cli-ubuntu-16-core'
-    permissions:
-      packages: write
-      contents: read
-    steps:
-      - name: 'Checkout'
-        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
 
-      - name: 'Set up Node.js'
-        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
-        with:
-          node-version-file: '.nvmrc'
-          cache: 'npm'
-
-      - name: 'Install dependencies'
-        run: 'npm ci'
-
-      - name: 'Build project'
-        run: 'npm run build'
-
-      - name: 'Bundle'
-        run: 'npm run bundle'
-        shell: 'bash'
-
-      - name: 'Set version with SHA'
-        run: |
-          npm version 0.0.0-${{ github.sha }} --no-git-tag-version --workspaces
-        shell: 'bash'
-
-      - name: 'Prepare Packages for Bundled Release'
-        run: 'node scripts/prepare-bundle-package.js'
-        shell: 'bash'
-
-      - name: 'Configure npm for GitHub Packages'
-        run: |
-          rm -f .npmrc
-          echo ""@google-gemini:registry=https://npm.pkg.github.com"" > ~/.npmrc
-          echo ""//npm.pkg.github.com/:_authToken=\${{ secrets.GITHUB_TOKEN }}"" >> ~/.npmrc
-          echo ""@google:registry=https://wombat-dressing-room.appspot.com"" >> ~/.npmrc
-        shell: 'bash'
-
-      - name: 'Publish Packages'
-        run: |
-          npm publish --workspace @google-gemini/gemini-cli-core --registry=https://npm.pkg.github.com
-          npm publish --workspace @google-gemini/gemini-cli --registry=https://npm.pkg.github.com
-        shell: 'bash'
 
   test_ui_messages:
     name: 'cli:ui/messages'
