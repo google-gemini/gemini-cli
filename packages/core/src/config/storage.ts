@@ -57,9 +57,9 @@ export class Storage {
 
     // mkdtempSync creates a NEW directory with 0700 permissions and a random suffix.
     // The prefix is the sessionId if available.
-    this.cachedBackupDir = fs.mkdtempSync(
-      path.join(backupsRoot, `${this.sessionId ?? 'session'}-`),
-    );
+    const newDir = fs.mkdtempSync(path.join(backupsRoot, `${this.sessionId ?? 'session'}-`));
+    this.backupDirCache.set(this.sessionId, newDir);
+    return newDir;
 
     return this.cachedBackupDir;
   }
