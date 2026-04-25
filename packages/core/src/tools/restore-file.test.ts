@@ -164,12 +164,16 @@ describe('RestoreFileTool.execute — nuclear restore', () => {
 
   it('aborts with an error when mkdir for the parent directory fails', async () => {
     vi.mocked(fsPromises.access).mockResolvedValueOnce(undefined);
-    vi.mocked(
-      fsPromises.readFile as (
-        path: string,
-        encoding: string,
-      ) => Promise<string>,
-    ).mockRejectedValueOnce(makeError('ENOENT'));
+    // listBackupVersions call
+    vi.mocked(fsPromises.readdir).mockResolvedValueOnce([]);
+    // First mkdir call: inside createPreWriteBackup for the backup directory
+    vi.mocked(fsPromises.mkdir).mockResolvedValueOnce(
+      undefined as unknown as string,
+    );
+    // copyFile fails with ENOENT inside createPreWriteBackup
+    vi.mocked(fsPromises.copyFile).mockRejectedValueOnce(makeError('ENOENT'));
+
+    // Second mkdir call: inside RestoreFileTool.execute for the parent directory
     vi.mocked(fsPromises.mkdir).mockRejectedValueOnce(
       makeError('EACCES', 'Permission denied'),
     );
@@ -186,6 +190,6 @@ describe('RestoreFileTool.execute — nuclear restore', () => {
 
     expect(result.error).toBeDefined();
     expect(result.llmContent).toContain('Cannot create parent directory');
-    expect(vi.mocked(fsPromises.copyFile)).not.toHaveBeenCalled();
+    expect(vi.mocked(fsPromises.copyFile)).toHaveBeenCalledTimes(1); // One attempt inside createPreWriteBackup
   });
 });
