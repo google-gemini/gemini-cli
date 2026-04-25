@@ -129,6 +129,13 @@ export function getNodeMemoryArgs(isDebugMode: boolean): string[] {
     return [];
   }
 
+  const isSea =
+    'sea' in process &&
+    typeof (process as { sea: unknown }).sea !== 'undefined';
+  if (isSea) {
+    return [];
+  }
+
   const args: string[] = [];
 
   // Automatically expand the V8 External Pointer Table to 256MB to prevent

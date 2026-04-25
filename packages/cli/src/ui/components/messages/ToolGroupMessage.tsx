@@ -17,6 +17,7 @@ import { ToolMessage } from './ToolMessage.js';
 import { ShellToolMessage } from './ShellToolMessage.js';
 import { TopicMessage, isTopicTool } from './TopicMessage.js';
 import { SubagentGroupDisplay } from './SubagentGroupDisplay.js';
+import { MempalaceGroupDisplay } from './MempalaceGroupDisplay.js';
 import { DenseToolMessage } from './DenseToolMessage.js';
 import { theme } from '../../semantic-colors.js';
 import { useConfig } from '../../contexts/ConfigContext.js';
@@ -43,6 +44,7 @@ import {
   TOOL_RESULT_STATIC_HEIGHT,
   TOOL_RESULT_STANDARD_RESERVED_LINE_COUNT,
 } from '../../utils/toolLayoutUtils.js';
+import { isRecord } from '../../../utils/settingsUtils.js';
 
 const COMPACT_OUTPUT_ALLOWLIST = new Set([
   EDIT_DISPLAY_NAME,
@@ -107,6 +109,12 @@ interface ToolGroupMessageProps {
 // Main component renders the border and maps the tools using ToolMessage
 const TOOL_MESSAGE_HORIZONTAL_MARGIN = 4;
 
+type MempalaceGroup = { type: 'mempalace'; tools: IndividualToolCallDisplay[] };
+
+function isMempalaceGroup(group: unknown): group is MempalaceGroup {
+  return isRecord(group) && 'type' in group && group['type'] === 'mempalace';
+}
+
 export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   item,
   toolCalls: allToolCalls,
@@ -162,7 +170,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
 
   const groupedTools = useMemo(() => {
     const groups: Array<
-      IndividualToolCallDisplay | IndividualToolCallDisplay[]
+      IndividualToolCallDisplay | IndividualToolCallDisplay[] | MempalaceGroup
     > = [];
     for (const tool of visibleToolCalls) {
       if (tool.kind === Kind.Agent) {
@@ -171,6 +179,13 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
           lastGroup.push(tool);
         } else {
           groups.push([tool]);
+        }
+      } else if (tool.name.startsWith('mempalace_')) {
+        const lastGroup = groups[groups.length - 1];
+        if (isMempalaceGroup(lastGroup)) {
+          lastGroup.tools.push(tool);
+        } else {
+          groups.push({ type: 'mempalace', tools: [tool] });
         }
       } else {
         groups.push(tool);
@@ -187,24 +202,47 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
       const isLast = i === groupedTools.length - 1;
 
       const prevGroup = i > 0 ? groupedTools[i - 1] : null;
+      const prevIsMempalace = isMempalaceGroup(prevGroup);
       const prevIsCompact =
         prevGroup &&
         !Array.isArray(prevGroup) &&
-        isCompactTool(prevGroup, isCompactModeEnabled);
+        !prevIsMempalace &&
+         
+        isCompactTool(
+          prevGroup,
+          isCompactModeEnabled,
+        );
 
       const nextGroup = !isLast ? groupedTools[i + 1] : null;
+      const nextIsMempalace = isMempalaceGroup(nextGroup);
       const nextIsCompact =
         nextGroup &&
         !Array.isArray(nextGroup) &&
-        isCompactTool(nextGroup, isCompactModeEnabled);
+        !nextIsMempalace &&
+         
+        isCompactTool(
+          nextGroup,
+          isCompactModeEnabled,
+        );
 
       const nextIsTopicToolCall =
-        nextGroup && !Array.isArray(nextGroup) && isTopicTool(nextGroup.name);
+        nextGroup &&
+        !Array.isArray(nextGroup) &&
+        !nextIsMempalace &&
+        isTopicTool((nextGroup).name);
 
       const isAgentGroup = Array.isArray(group);
+      const isMempalace = isMempalaceGroup(group);
       const isCompact =
-        !isAgentGroup && isCompactTool(group, isCompactModeEnabled);
-      const isTopicToolCall = !isAgentGroup && isTopicTool(group.name);
+        !isAgentGroup &&
+        !isMempalace &&
+         
+        isCompactTool(group, isCompactModeEnabled);
+      const isTopicToolCall =
+        !isAgentGroup &&
+        !isMempalace &&
+         
+        isTopicTool((group).name);
 
       // Align isFirst logic with rendering
       let isFirst = i === 0;
@@ -213,9 +251,11 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
         let allPreviousTopics = true;
         for (let j = 0; j < i; j++) {
           const prevGroupItem = groupedTools[j];
+          const isPrevMempalace = isMempalaceGroup(prevGroupItem);
           if (
             Array.isArray(prevGroupItem) ||
-            !isTopicTool(prevGroupItem.name)
+            isPrevMempalace ||
+            !isTopicTool((prevGroupItem).name)
           ) {
             allPreviousTopics = false;
             break;
@@ -244,6 +284,13 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
           1 +
           group.length +
           (showClosingBorder ? 1 : 0);
+      } else if (isMempalace) {
+        // Mempalace Group Spacing Breakdown:
+        // 1. Top Boundary (0 or 1)
+        // 2. Header Content (1): "≡ Memory: ..."
+        // 3. Summary Line (1): "X memory operation(s) filed away..."
+        // 4. Closing Border (1)
+        height += (isFirstProp ? 1 : 0) + 1 + 1 + (showClosingBorder ? 1 : 0);
       } else if (isTopicToolCall) {
         // Topic Message Spacing Breakdown:
         // 1. Topic Content (1).
@@ -348,7 +395,12 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
           let allPreviousWereTopics = true;
           for (let i = 0; i < index; i++) {
             const prevGroup = groupedTools[i];
-            if (Array.isArray(prevGroup) || !isTopicTool(prevGroup.name)) {
+            const isPrevMempalace = isMempalaceGroup(prevGroup);
+            if (
+              Array.isArray(prevGroup) ||
+              isPrevMempalace ||
+              !isTopicTool((prevGroup).name)
+            ) {
               allPreviousWereTopics = false;
               break;
             }
@@ -359,23 +411,49 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
         const isLast = index === groupedTools.length - 1;
 
         const prevGroup = index > 0 ? groupedTools[index - 1] : null;
+        const prevIsMempalace = isMempalaceGroup(prevGroup);
         const prevIsCompact =
           prevGroup &&
           !Array.isArray(prevGroup) &&
-          isCompactTool(prevGroup, isCompactModeEnabled);
+          !prevIsMempalace &&
+           
+          isCompactTool(
+            prevGroup,
+            isCompactModeEnabled,
+          );
 
         const nextGroup = !isLast ? groupedTools[index + 1] : null;
+        const nextIsMempalace = isMempalaceGroup(nextGroup);
         const nextIsCompact =
           nextGroup &&
           !Array.isArray(nextGroup) &&
-          isCompactTool(nextGroup, isCompactModeEnabled);
+          !nextIsMempalace &&
+           
+          isCompactTool(
+            nextGroup,
+            isCompactModeEnabled,
+          );
         const nextIsTopicToolCall =
-          nextGroup && !Array.isArray(nextGroup) && isTopicTool(nextGroup.name);
+          nextGroup &&
+          !Array.isArray(nextGroup) &&
+          !nextIsMempalace &&
+          isTopicTool((nextGroup).name);
 
         const isAgentGroup = Array.isArray(group);
+        const isMempalace = isMempalaceGroup(group);
         const isCompact =
-          !isAgentGroup && isCompactTool(group, isCompactModeEnabled);
-        const isTopicToolCall = !isAgentGroup && isTopicTool(group.name);
+          !isAgentGroup &&
+          !isMempalace &&
+           
+          isCompactTool(
+            group,
+            isCompactModeEnabled,
+          );
+        const isTopicToolCall =
+          !isAgentGroup &&
+          !isMempalace &&
+           
+          isTopicTool((group).name);
 
         const isFirstProp = !!(isFirst
           ? (borderTopOverride ?? true)
@@ -395,6 +473,38 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
             >
               <SubagentGroupDisplay
                 toolCalls={group}
+                availableTerminalHeight={availableTerminalHeight}
+                terminalWidth={contentWidth}
+                borderColor={borderColor}
+                borderDimColor={borderDimColor}
+                isFirst={isFirstProp}
+                isExpandable={isExpandable}
+              />
+              {showClosingBorder && (
+                <Box
+                  width={contentWidth}
+                  borderLeft={true}
+                  borderRight={true}
+                  borderTop={false}
+                  borderBottom={isLast ? (borderBottomOverride ?? true) : true}
+                  borderColor={borderColor}
+                  borderDimColor={borderDimColor}
+                  borderStyle="round"
+                />
+              )}
+            </Box>
+          );
+        }
+
+        if (isMempalace) {
+          return (
+            <Box
+              key={group.tools[0].callId}
+              flexDirection="column"
+              width={contentWidth}
+            >
+              <MempalaceGroupDisplay
+                toolCalls={group.tools}
                 availableTerminalHeight={availableTerminalHeight}
                 terminalWidth={contentWidth}
                 borderColor={borderColor}

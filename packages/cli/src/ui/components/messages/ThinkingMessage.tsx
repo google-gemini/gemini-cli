@@ -5,19 +5,18 @@
  */
 
 import type React from 'react';
-import { useMemo } from 'react';
+import { useMemo, useEffect, useId } from 'react';
 import { Box, Text } from 'ink';
 import type { ThoughtSummary } from '@google/gemini-cli-core';
 import { theme } from '../../semantic-colors.js';
 import { normalizeEscapedNewlines } from '../../utils/textUtils.js';
+import { useOverflowActions } from '../../contexts/OverflowContext.js';
 
 interface ThinkingMessageProps {
   thought: ThoughtSummary;
   terminalWidth: number;
-  isFirstThinking?: boolean;
+  availableTerminalHeight?: number;
 }
-
-const THINKING_LEFT_PADDING = 1;
 
 function normalizeThoughtLines(thought: ThoughtSummary): string[] {
   const subject = normalizeEscapedNewlines(thought.subject).trim();
@@ -52,45 +51,70 @@ function normalizeThoughtLines(thought: ThoughtSummary): string[] {
 export const ThinkingMessage: React.FC<ThinkingMessageProps> = ({
   thought,
   terminalWidth,
-  isFirstThinking,
+  availableTerminalHeight,
 }) => {
   const fullLines = useMemo(() => normalizeThoughtLines(thought), [thought]);
+  const isExpanded = availableTerminalHeight === undefined;
+  const overflowActions = useOverflowActions();
+  const uniqueId = useId();
+  const overflowId = `thinking-${uniqueId}`;
+
+  useEffect(() => {
+    if (overflowActions) {
+      overflowActions.addOverflowingId(overflowId);
+    }
+    return () => {
+      if (overflowActions) {
+        overflowActions.removeOverflowingId(overflowId);
+      }
+    };
+  }, [overflowActions, overflowId]);
 
   if (fullLines.length === 0) {
     return null;
   }
 
+  const toggleText = `(ctrl+o to ${isExpanded ? 'collapse' : 'expand'})`;
+
   return (
     <Box width={terminalWidth} flexDirection="column">
-      {isFirstThinking && (
-        <Text color={theme.text.primary} italic>
-          {' '}
-          Thinking...{' '}
-        </Text>
-      )}
-
       <Box
-        marginLeft={THINKING_LEFT_PADDING}
-        paddingLeft={1}
-        borderStyle="single"
-        borderLeft={true}
-        borderRight={false}
-        borderTop={false}
-        borderBottom={false}
-        borderColor={theme.text.secondary}
         flexDirection="column"
+        width={terminalWidth}
+        borderLeft={true}
+        borderRight={true}
+        borderTop={true}
+        borderBottom={true}
+        borderColor={theme.text.secondary}
+        borderStyle="round"
+        paddingLeft={1}
       >
-        <Text> </Text>
-        {fullLines.length > 0 && (
-          <Text color={theme.text.primary} bold italic>
-            {fullLines[0]}
+        <Box flexDirection="row" gap={1}>
+          <Text color={theme.text.secondary}>≡</Text>
+          <Text bold color={theme.text.primary} italic>
+            Thinking...
           </Text>
+          <Text color={theme.text.secondary}>{toggleText}</Text>
+        </Box>
+
+        {isExpanded && (
+          <Box flexDirection="column" marginTop={1}>
+            {fullLines.length > 0 && (
+              <Text color={theme.text.primary} bold italic>
+                {fullLines[0]}
+              </Text>
+            )}
+            {fullLines.slice(1).map((line, index) => (
+              <Text
+                key={`body-line-${index}`}
+                color={theme.text.secondary}
+                italic
+              >
+                {line}
+              </Text>
+            ))}
+          </Box>
         )}
-        {fullLines.slice(1).map((line, index) => (
-          <Text key={`body-line-${index}`} color={theme.text.secondary} italic>
-            {line}
-          </Text>
-        ))}
       </Box>
     </Box>
   );

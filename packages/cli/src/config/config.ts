@@ -179,6 +179,16 @@ export async function parseArguments(
       description: 'Run in debug mode (open debug console with F12)',
       default: false,
     })
+    .option('max-old-space-size', {
+      type: 'number',
+      hidden: true,
+      description: 'Internal Node.js flag handled during relaunch',
+    })
+    .option('max-external-pointer-table-size', {
+      type: 'number',
+      hidden: true,
+      description: 'Internal Node.js flag handled during relaunch',
+    })
     .middleware((argv) => {
       const commandModules = [
         mcpCommand,
