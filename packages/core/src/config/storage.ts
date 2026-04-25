@@ -8,6 +8,7 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
+import { LRUCache } from 'mnemonist';
 import {
   GEMINI_DIR,
   homedir,
@@ -33,7 +34,7 @@ export class Storage {
   private projectIdentifier: string | undefined;
   private initPromise: Promise<void> | undefined;
   private customPlansDir: string | undefined;
-  private backupDirCache = new LruCache<string, string>({ max: 10 });
+  private backupDirCache = new LRUCache<string, string>(10);
 
   constructor(targetDir: string, sessionId?: string) {
     this.targetDir = targetDir;
@@ -45,9 +46,11 @@ export class Storage {
    * Uses mkdtempSync to mitigate symlink attacks in shared locations like /tmp.
    */
   getProjectBackupDir(): string {
-    const cached = this.backupDirCache.get(this.sessionId ?? 'default');
+    const cacheKey = this.sessionId ?? 'default';
+    const cached = this.backupDirCache.get(cacheKey);
     if (cached) {
-      return cached; }
+      return cached;
+    }
 
     const base = this.getProjectTempDir();
     const backupsRoot = path.join(base, 'backups');
@@ -57,11 +60,11 @@ export class Storage {
 
     // mkdtempSync creates a NEW directory with 0700 permissions and a random suffix.
     // The prefix is the sessionId if available.
-    const newDir = fs.mkdtempSync(path.join(backupsRoot, `${this.sessionId ?? 'session'}-`));
-    this.backupDirCache.set(this.sessionId, newDir);
+    const newDir = fs.mkdtempSync(
+      path.join(backupsRoot, `${this.sessionId ?? 'session'}-`),
+    );
+    this.backupDirCache.set(cacheKey, newDir);
     return newDir;
-
-    return this.cachedBackupDir;
   }
 
   setCustomPlansDir(dir: string | undefined): void {

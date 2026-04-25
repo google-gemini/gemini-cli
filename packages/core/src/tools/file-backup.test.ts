@@ -63,9 +63,7 @@ describe('createPreWriteBackup', () => {
     vi.mocked(fsPromises.copyFile).mockResolvedValue(undefined);
     vi.mocked(fsPromises.stat).mockResolvedValue({
       size: 100,
-    } as unknown as ReturnType<typeof fsPromises.stat> extends Promise<infer T>
-      ? T
-      : never);
+    } as unknown as Awaited<ReturnType<typeof fsPromises.stat>>);
     vi.mocked(createReadStream).mockImplementation(
       () =>
         mockStream('file content') as unknown as ReturnType<
@@ -312,10 +310,10 @@ describe('createPreWriteBackup', () => {
     vi.mocked(fsPromises.stat)
       .mockResolvedValueOnce({
         size: 100,
-      } as unknown as ReturnType<typeof fsPromises.stat>)
+      } as unknown as Awaited<ReturnType<typeof fsPromises.stat>>)
       .mockResolvedValueOnce({
         size: 150,
-      } as unknown as ReturnType<typeof fsPromises.stat>);
+      } as unknown as Awaited<ReturnType<typeof fsPromises.stat>>);
 
     vi.mocked(createReadStream).mockImplementation(
       () =>
