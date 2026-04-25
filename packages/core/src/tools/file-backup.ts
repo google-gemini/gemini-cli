@@ -12,6 +12,27 @@ import { debugLogger } from '../utils/debugLogger.js';
 
 const MAX_BACKUP_VERSIONS = 20;
 
+function contentsEqualNormalized(a: string, b: string): boolean {
+  let ai = 0;
+  let bi = 0;
+  while (ai < a.length && bi < b.length) {
+    let ac = a[ai];
+    let bc = b[bi];
+    if (ac === '\r' && a[ai + 1] === '\n') {
+      ac = '\n';
+      ai++;
+    }
+    if (bc === '\r' && b[bi + 1] === '\n') {
+      bc = '\n';
+      bi++;
+    }
+    if (ac !== bc) return false;
+    ai++;
+    bi++;
+  }
+  return ai === a.length && bi === b.length;
+}
+
 export function fnv1a64hex(str: string): string {
   const FNV_PRIME = 1099511628211n;
   const OFFSET_BASIS = 14695981039346656037n;
@@ -126,8 +147,7 @@ export async function createPreWriteBackup(
     );
     try {
       const latestContent = await fsPromises.readFile(latestPath, 'utf8');
-      const normalize = (s: string) => s.replace(/\r\n/g, '\n');
-      if (normalize(latestContent) === normalize(originalContent)) {
+      if (contentsEqualNormalized(latestContent, originalContent)) {
         return { ok: true, version: latestVersion, backupPath: latestPath };
       }
     } catch (e) {
