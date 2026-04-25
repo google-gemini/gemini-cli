@@ -2128,11 +2128,10 @@ describe('mcp-client', () => {
         .spyOn(SdkClientStdioLib, 'StdioClientTransport')
         .mockReturnValue({} as SdkClientStdioLib.StdioClientTransport);
 
-      const originalEnv = process.env;
-      process.env = {
-        ...originalEnv,
-        GEMINI_TEST_VAR: 'expanded-value',
-      };
+      MOCK_CONTEXT.sanitizationConfig.allowedEnvironmentVariables = [
+        'GEMINI_TEST_VAR',
+      ];
+      vi.stubEnv('GEMINI_TEST_VAR', 'expanded-value');
 
       try {
         await createTransport(
@@ -2153,7 +2152,45 @@ describe('mcp-client', () => {
         expect(callArgs.env!['TEST_EXPANDED']).toBe('Value is expanded-value');
         expect(callArgs.env!['SECRET_KEY']).toBe('intentional-secret-123');
       } finally {
-        process.env = originalEnv;
+        vi.unstubAllEnvs();
+      }
+    });
+
+    it('should expand environment variables in args', async () => {
+      const mockedTransport = vi
+        .spyOn(SdkClientStdioLib, 'StdioClientTransport')
+        .mockReturnValue({} as SdkClientStdioLib.StdioClientTransport);
+
+      MOCK_CONTEXT.sanitizationConfig.allowedEnvironmentVariables = [
+        'GEMINI_TEST_VAR',
+      ];
+      vi.stubEnv('GEMINI_TEST_VAR', 'expanded-value');
+
+      try {
+        await createTransport(
+          'test-server',
+          {
+            command: 'test-command',
+            args: [
+              '--arg1',
+              '$GEMINI_TEST_VAR',
+              '--arg2=value-$GEMINI_TEST_VAR',
+            ],
+            env: {},
+          },
+          false,
+          MOCK_CONTEXT,
+        );
+
+        const callArgs = mockedTransport.mock.calls[0][0];
+        expect(callArgs.args).toBeDefined();
+        expect(callArgs.args).toEqual([
+          '--arg1',
+          'expanded-value',
+          '--arg2=value-expanded-value',
+        ]);
+      } finally {
+        vi.unstubAllEnvs();
       }
     });
 
