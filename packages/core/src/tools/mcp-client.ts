@@ -2270,15 +2270,26 @@ export async function createTransport(
     // Expand and merge explicit environment variables from the MCP configuration.
     if (mcpServerConfig.env) {
       for (const [key, value] of Object.entries(mcpServerConfig.env)) {
-        finalEnv[key] = expandEnvVars(value, expansionEnv);
+        finalEnv[key] = expandEnvVars(value, sanitizedEnv);
       }
     }
 
+    const expandedCommand = expandEnvVars(
+      mcpServerConfig.command,
+      sanitizedEnv,
+    );
+    const expandedArgs = (mcpServerConfig.args || []).map((arg) =>
+      expandEnvVars(arg, sanitizedEnv),
+    );
+    const expandedCwd = mcpServerConfig.cwd
+      ? expandEnvVars(mcpServerConfig.cwd, sanitizedEnv)
+      : undefined;
+
     let transport: Transport = new StdioClientTransport({
-      command: mcpServerConfig.command,
-      args: mcpServerConfig.args || [],
+      command: expandedCommand,
+      args: expandedArgs,
       env: finalEnv,
-      cwd: mcpServerConfig.cwd,
+      cwd: expandedCwd,
       stderr: 'pipe',
     });
 
