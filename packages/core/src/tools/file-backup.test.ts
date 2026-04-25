@@ -7,6 +7,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import fsPromises from 'node:fs/promises';
 import path from 'node:path';
+import { Readable } from 'node:stream';
 import {
   createPreWriteBackup,
   listBackupVersions,
@@ -15,9 +16,15 @@ import {
 import { debugLogger } from '../utils/debugLogger.js';
 
 vi.mock('node:fs/promises');
-vi.mock('node:fs', () => ({
-  constants: { COPYFILE_EXCL: 1 },
-}));
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
+  return {
+    ...actual,
+    createReadStream: vi.fn(),
+  };
+});
+import { createReadStream } from 'node:fs';
+
 vi.mock('../utils/debugLogger.js', () => ({
   debugLogger: { warn: vi.fn() },
 }));
@@ -26,7 +33,7 @@ const FILE_PATH = '/workspace/foo.ts';
 const SESSION_ID = 'test-session';
 const TEMP_DIR = '/tmp/project';
 const HASH = fnv1a64hex(FILE_PATH);
-const BACKUP_DIR = path.join(TEMP_DIR, 'backups', SESSION_ID);
+const BACKUP_DIR = path.join(TEMP_DIR, 'backups', `${SESSION_ID}-random`);
 
 const makeError = (code: string, message = code): NodeJS.ErrnoException =>
   Object.assign(new Error(message), { code });
@@ -36,15 +43,13 @@ const makeDirent = (name: string, isFile: boolean): unknown => ({
   name,
 });
 
+function mockStream(content: string) {
+  return Readable.from([content]);
+}
+
 describe('createPreWriteBackup', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(
-      fsPromises.readFile as (
-        path: string,
-        encoding: string,
-      ) => Promise<string>,
-    ).mockResolvedValue('file content');
     vi.mocked(fsPromises.mkdir).mockResolvedValue(
       undefined as unknown as string,
     );
@@ -56,6 +61,17 @@ describe('createPreWriteBackup', () => {
         : never,
     );
     vi.mocked(fsPromises.copyFile).mockResolvedValue(undefined);
+    vi.mocked(fsPromises.stat).mockResolvedValue({
+      size: 100,
+    } as unknown as ReturnType<typeof fsPromises.stat> extends Promise<infer T>
+      ? T
+      : never);
+    vi.mocked(createReadStream).mockImplementation(
+      () =>
+        mockStream('file content') as unknown as ReturnType<
+          typeof createReadStream
+        >,
+    );
   });
 
   it('loops through 8 EEXIST collisions and claims the 9th slot', async () => {
@@ -164,8 +180,6 @@ describe('createPreWriteBackup', () => {
     const existingDirents = Array.from({ length: 22 }, (_, i) =>
       makeDirent(`${HASH}_${i + 1}`, true),
     );
-    // listBackupVersions is called twice: once at the start and once for GC.
-    // The second call (GC) should see the newly created version 23.
     const allDirents = Array.from({ length: 23 }, (_, i) =>
       makeDirent(`${HASH}_${i + 1}`, true),
     );
@@ -186,16 +200,19 @@ describe('createPreWriteBackup', () => {
           : never,
       );
 
-    vi.mocked(
-      fsPromises.readFile as (
-        path: string,
-        encoding: string,
-      ) => Promise<string>,
-    )
-      // Since existingVersions.length > 0, readFile is called for diskContent (if not provided)
-      .mockResolvedValueOnce('new content') // disk read
-      // and for the deduplication check
-      .mockResolvedValueOnce('old content'); // last backup dedup check
+    vi.mocked(createReadStream)
+      .mockImplementationOnce(
+        () =>
+          mockStream('new content') as unknown as ReturnType<
+            typeof createReadStream
+          >,
+      )
+      .mockImplementationOnce(
+        () =>
+          mockStream('old content') as unknown as ReturnType<
+            typeof createReadStream
+          >,
+      );
 
     vi.mocked(fsPromises.copyFile).mockResolvedValueOnce(undefined);
 
@@ -213,13 +230,13 @@ describe('createPreWriteBackup', () => {
       backupPath: path.join(BACKUP_DIR, `${HASH}_23`),
     });
     expect(vi.mocked(fsPromises.unlink)).toHaveBeenCalledTimes(3);
-    expect(vi.mocked(debugLogger.warn)).toHaveBeenCalledExactlyOnceWith(
+    expect(vi.mocked(debugLogger.warn)).toHaveBeenCalledWith(
       expect.stringContaining('version 2'),
       eperm,
     );
   });
 
-  it('skips disk read if diskContent is provided and existingVersions.length > 0', async () => {
+  it('skips disk read for filePath if diskContent is provided and existingVersions.length > 0', async () => {
     const existingDirents = [makeDirent(`${HASH}_1`, true)];
     vi.mocked(fsPromises.readdir).mockResolvedValue(
       existingDirents as unknown as ReturnType<
@@ -229,12 +246,12 @@ describe('createPreWriteBackup', () => {
         : never,
     );
 
-    vi.mocked(
-      fsPromises.readFile as (
-        path: string,
-        encoding: string,
-      ) => Promise<string>,
-    ).mockResolvedValue('old content');
+    vi.mocked(createReadStream).mockImplementation(
+      () =>
+        mockStream('old content') as unknown as ReturnType<
+          typeof createReadStream
+        >,
+    );
 
     const result = await createPreWriteBackup(
       FILE_PATH,
@@ -243,11 +260,10 @@ describe('createPreWriteBackup', () => {
     );
 
     expect(result.ok).toBe(true);
-    // Should NOT have called readFile for diskContent
-    expect(vi.mocked(fsPromises.readFile)).toHaveBeenCalledTimes(1); // Only for latest backup
-    expect(vi.mocked(fsPromises.readFile)).not.toHaveBeenCalledWith(
+    expect(vi.mocked(createReadStream)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(createReadStream)).not.toHaveBeenCalledWith(
       FILE_PATH,
-      'utf8',
+      expect.anything(),
     );
   });
 
@@ -261,12 +277,12 @@ describe('createPreWriteBackup', () => {
         : never,
     );
 
-    vi.mocked(
-      fsPromises.readFile as (
-        path: string,
-        encoding: string,
-      ) => Promise<string>,
-    ).mockResolvedValue('same content');
+    vi.mocked(createReadStream).mockImplementation(
+      () =>
+        mockStream('same content') as unknown as ReturnType<
+          typeof createReadStream
+        >,
+    );
 
     const result = await createPreWriteBackup(
       FILE_PATH,

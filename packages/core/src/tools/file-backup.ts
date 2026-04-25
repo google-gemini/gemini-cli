@@ -4,9 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { constants } from 'node:fs';
+import { constants, createReadStream } from 'node:fs';
 import fsPromises from 'node:fs/promises';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 import { isNodeError } from '../utils/errors.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { Config } from '../config/config.js';
@@ -16,25 +17,69 @@ import { makeRelative, shortenPath } from '../utils/paths.js';
 
 const MAX_BACKUP_VERSIONS = 20;
 
-function contentsEqualNormalized(a: string, b: string): boolean {
-  let ai = 0;
-  let bi = 0;
-  while (ai < a.length && bi < b.length) {
-    let ac = a[ai];
-    let bc = b[bi];
-    if (ac === '\r' && a[ai + 1] === '\n') {
-      ac = '\n';
-      ai++;
+/**
+ * Calculates a SHA256 hash of a string after normalizing line endings (\r\n -> \n).
+ * Processes the string in chunks to bound memory usage.
+ */
+function getNormalizedStringHash(str: string): string {
+  const hash = createHash('sha256');
+  let normalizedBatch = '';
+  for (let i = 0; i < str.length; i++) {
+    let char = str[i];
+    if (char === '\r' && str[i + 1] === '\n') {
+      char = '\n';
+      i++;
     }
-    if (bc === '\r' && b[bi + 1] === '\n') {
-      bc = '\n';
-      bi++;
+    normalizedBatch += char;
+    if (normalizedBatch.length >= 8192) {
+      hash.update(normalizedBatch, 'utf8');
+      normalizedBatch = '';
     }
-    if (ac !== bc) return false;
-    ai++;
-    bi++;
   }
-  return ai === a.length && bi === b.length;
+  if (normalizedBatch) {
+    hash.update(normalizedBatch, 'utf8');
+  }
+  return hash.digest('hex');
+}
+
+/**
+ * Calculates a SHA256 hash of a file's content after normalizing line endings (\r\n -> \n).
+ * Processes the file as a stream to ensure constant memory overhead regardless of file size.
+ */
+async function getNormalizedFileHash(filePath: string): Promise<string> {
+  const hash = createHash('sha256');
+  const stream = createReadStream(filePath, { encoding: 'utf8' });
+  let carryOver = false;
+
+  for await (const chunk of stream as AsyncIterable<string>) {
+    let normalized = '';
+    for (let i = 0; i < chunk.length; i++) {
+      const char = chunk[i];
+      if (carryOver) {
+        carryOver = false;
+        if (char === '\n') {
+          normalized += '\n';
+          continue;
+        } else {
+          normalized += '\r';
+        }
+      }
+      if (char === '\r') {
+        carryOver = true;
+      } else {
+        normalized += char;
+      }
+    }
+    if (normalized) {
+      hash.update(normalized, 'utf8');
+    }
+  }
+
+  if (carryOver) {
+    hash.update('\r', 'utf8');
+  }
+
+  return hash.digest('hex');
 }
 
 export function fnv1a64hex(str: string): string {
@@ -106,39 +151,48 @@ export async function createPreWriteBackup(
 ): Promise<BackupResult> {
   const existingVersions = await listBackupVersions(filePath, backupDir);
 
-  let content = diskContent;
-
   if (existingVersions.length > 0) {
-    if (content === undefined) {
-      try {
-        content = await fsPromises.readFile(filePath, 'utf8');
-      } catch (e) {
-        if (isNodeError(e) && e.code === 'ENOENT') {
-          return { ok: false, newFile: true };
-        }
-        debugLogger.warn('Failed to read file for backup:', e);
-        return { ok: false, newFile: false };
-      }
-    }
-
     const latestVersion = existingVersions[existingVersions.length - 1];
     const latestPath = getBackupPath(filePath, latestVersion, backupDir);
     try {
-      const latestContent = await fsPromises.readFile(latestPath, 'utf8');
-      if (contentsEqualNormalized(latestContent, content)) {
-        return { ok: true, version: latestVersion, backupPath: latestPath };
+      // Normalization (\r\n -> \n) can only reduce file size.
+      // A strict size comparison is not possible due to potential normalization deltas.
+      // Comparison proceeds if file sizes are within a range that suggests content identity.
+      const [stats, backupStats] = await Promise.all([
+        fsPromises.stat(filePath).catch(() => null),
+        fsPromises.stat(latestPath).catch(() => null),
+      ]);
+
+      if (stats && backupStats) {
+        // Skip streaming hash if sizes indicate the files are definitively different.
+        const likelyDifferent =
+          backupStats.size > stats.size || backupStats.size < stats.size / 2;
+
+        if (!likelyDifferent) {
+          const [contentHash, latestHash] = await Promise.all([
+            diskContent !== undefined
+              ? getNormalizedStringHash(diskContent)
+              : getNormalizedFileHash(filePath),
+            getNormalizedFileHash(latestPath),
+          ]);
+
+          if (contentHash === latestHash) {
+            return { ok: true, version: latestVersion, backupPath: latestPath };
+          }
+        }
       }
     } catch (e) {
+      if (isNodeError(e) && e.code === 'ENOENT') {
+        return { ok: false, newFile: true };
+      }
       if (!isNodeError(e) || e.code !== 'ENOENT') {
-        debugLogger.warn('Failed to read last backup for dedup check:', e);
+        debugLogger.warn('Failed to perform dedup check:', e);
       }
     }
   }
 
-  // The backup directory is expected to be created securely by the caller
-  // (e.g. via Storage.getProjectBackupDir using mkdtempSync).
-  // We call mkdir here as a safety measure for other callers, but it will
-  // likely be a no-op for most.
+  // Ensure the backup directory exists. Callers are expected to provide a
+  // securely created directory (e.g. via Storage.getProjectBackupDir).
   try {
     await fsPromises.mkdir(backupDir, { recursive: true, mode: 0o700 });
   } catch (e) {
