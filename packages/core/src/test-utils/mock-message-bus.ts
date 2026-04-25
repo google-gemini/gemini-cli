@@ -62,6 +62,7 @@ export class MockMessageBus {
       if (!this.subscriptions.has(type)) {
         this.subscriptions.set(type, new Set());
       }
+
       this.subscriptions.get(type)!.add(listener as (message: Message) => void);
     },
   );

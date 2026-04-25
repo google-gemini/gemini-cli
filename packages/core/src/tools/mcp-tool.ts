@@ -106,13 +106,12 @@ export interface McpToolAnnotation extends Record<string, unknown> {
 export function isMcpToolAnnotation(
   annotation: unknown,
 ): annotation is McpToolAnnotation {
-  if (typeof annotation !== 'object' || annotation === null) {
-    return false;
-  }
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-  const record = annotation as Record<string, unknown>;
-  const serverName = record['_serverName'];
-  return typeof serverName === 'string';
+  return (
+    typeof annotation === 'object' &&
+    annotation !== null &&
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    typeof (annotation as Record<string, unknown>)['_serverName'] === 'string'
+  );
 }
 
 type ToolParams = Record<string, unknown>;
