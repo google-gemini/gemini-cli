@@ -17,6 +17,7 @@ vi.mock('node:fs/promises');
 vi.mock('node:fs', () => ({
   constants: { COPYFILE_EXCL: 1 },
   realpathSync: (p: string) => p,
+  existsSync: vi.fn().mockReturnValue(true),
 }));
 vi.mock('../utils/debugLogger.js', () => ({
   debugLogger: { warn: vi.fn() },
@@ -39,8 +40,10 @@ const mockConfig = {
   validatePathAccess: vi.fn().mockReturnValue(null),
   getTargetDir: vi.fn().mockReturnValue(TARGET_DIR),
   getSessionId: vi.fn().mockReturnValue(SESSION_ID),
+  isPlanMode: vi.fn().mockReturnValue(false),
   storage: {
     getProjectTempDir: vi.fn().mockReturnValue(TEMP_DIR),
+    getPlansDir: vi.fn().mockReturnValue('/tmp/plans'),
   },
   getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
 };
