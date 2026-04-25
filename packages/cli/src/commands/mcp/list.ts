@@ -17,9 +17,11 @@ import {
   debugLogger,
   applyAdminAllowlist,
   getAdminBlockedMcpServersMessage,
+  MCP_DEFAULT_TIMEOUT_MSEC,
 } from '@google/gemini-cli-core';
 import type { MCPServerConfig } from '@google/gemini-cli-core';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { ExtensionManager } from '../../config/extension-manager.js';
 import {
   canLoadServer,
@@ -128,10 +130,22 @@ async function testMCPConnection(
 
   try {
     // Attempt actual MCP connection with short timeout
-    await client.connect(transport, { timeout: 5000 }); // 5s timeout
+    await client.connect(transport, {
+      timeout: config.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
+    });
 
-    // Test basic MCP protocol by pinging the server
-    await client.ping();
+    // A successful initialize handshake is sufficient to consider the
+    // server reachable. Ping is best-effort because some MCP servers do not
+    // implement it and return MethodNotFound.
+    try {
+      await client.ping();
+    } catch (error) {
+      if (
+        !(error instanceof McpError && error.code === ErrorCode.MethodNotFound)
+      ) {
+        throw error;
+      }
+    }
 
     await client.close();
     return MCPServerStatus.CONNECTED;
