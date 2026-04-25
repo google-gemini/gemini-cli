@@ -97,6 +97,42 @@ describe('createPreWriteBackup', () => {
     expect(vi.mocked(fsPromises.copyFile)).toHaveBeenCalledTimes(9);
   });
 
+  it('claims the 50th slot after 49 EEXIST collisions', async () => {
+    const eexist = makeError('EEXIST');
+    const mocks = Array(49).fill(vi.fn().mockRejectedValue(eexist));
+    mocks.push(vi.fn().mockResolvedValue(undefined));
+
+    const copyFileSpy = vi.mocked(fsPromises.copyFile);
+    copyFileSpy.mockReset();
+    for (const m of mocks) {
+      copyFileSpy.mockImplementationOnce(m);
+    }
+
+    const result = await createPreWriteBackup(FILE_PATH, SESSION_ID, TEMP_DIR);
+
+    expect(result).toEqual({
+      ok: true,
+      version: 50,
+      backupPath: path.join(BACKUP_DIR, `${HASH}_50`),
+    });
+    expect(copyFileSpy).toHaveBeenCalledTimes(50);
+  });
+
+  it('fails after 100 EEXIST collisions', async () => {
+    const eexist = makeError('EEXIST');
+    vi.mocked(fsPromises.copyFile).mockRejectedValue(eexist);
+
+    const result = await createPreWriteBackup(FILE_PATH, SESSION_ID, TEMP_DIR);
+
+    expect(result).toEqual({ ok: false, newFile: false });
+    expect(vi.mocked(fsPromises.copyFile)).toHaveBeenCalledTimes(100);
+    expect(vi.mocked(debugLogger.warn)).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'Failed to claim a backup version slot after 100 attempts',
+      ),
+    );
+  });
+
   it('returns { ok: false, newFile: false } and logs a warning on EACCES', async () => {
     // If existingVersions is empty, readFile is skipped and copyFile is used directly.
     vi.mocked(fsPromises.copyFile).mockRejectedValueOnce(
@@ -106,7 +142,10 @@ describe('createPreWriteBackup', () => {
     const result = await createPreWriteBackup(FILE_PATH, SESSION_ID, TEMP_DIR);
 
     expect(result).toEqual({ ok: false, newFile: false });
-    expect(vi.mocked(debugLogger.warn)).toHaveBeenCalledExactlyOnceWith(expect.stringContaining('Failed to create backup'), expect.anything());
+    expect(vi.mocked(debugLogger.warn)).toHaveBeenCalledExactlyOnceWith(
+      expect.stringContaining('Failed to create backup'),
+      expect.anything(),
+    );
   });
 
   it('returns { ok: false, newFile: true } on ENOENT without logging', async () => {

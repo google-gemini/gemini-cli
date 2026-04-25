@@ -172,7 +172,7 @@ export async function createPreWriteBackup(
 
   let claimedVersion: number | null = null;
   let backupPath: string | null = null;
-  for (let v = startVersion; v < startVersion + 10; v++) {
+  for (let v = startVersion; v < startVersion + 100; v++) {
     const candidatePath = getBackupPath(filePath, v, sessionId, projectTempDir);
     try {
       await fsPromises.copyFile(
@@ -195,7 +195,7 @@ export async function createPreWriteBackup(
 
   if (claimedVersion === null || backupPath === null) {
     debugLogger.warn(
-      'Failed to claim a backup version slot after 10 attempts.',
+      'Failed to claim a backup version slot after 100 attempts.',
     );
     return { ok: false, newFile: false };
   }
