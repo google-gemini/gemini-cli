@@ -473,7 +473,7 @@ describe('memoryCommand', () => {
 
       const mockConfig = {
         reloadSkills: vi.fn(),
-        isMemoryManagerEnabled: vi.fn().mockReturnValue(true),
+        isAutoMemoryEnabled: vi.fn().mockReturnValue(true),
       };
       const context = createMockCommandContext({
         services: {
@@ -491,11 +491,11 @@ describe('memoryCommand', () => {
       expect(result).toHaveProperty('component');
     });
 
-    it('should return info message when memory manager is disabled', () => {
+    it('should return info message when auto memory is disabled', () => {
       if (!inboxCommand.action) throw new Error('Command has no action');
 
       const mockConfig = {
-        isMemoryManagerEnabled: vi.fn().mockReturnValue(false),
+        isAutoMemoryEnabled: vi.fn().mockReturnValue(false),
       };
       const context = createMockCommandContext({
         services: {
@@ -509,7 +509,7 @@ describe('memoryCommand', () => {
         type: 'message',
         messageType: 'info',
         content:
-          'The memory inbox requires the experimental memory manager. Enable it with: experimental.memoryManager = true in settings.',
+          'The memory inbox requires Auto Memory. Enable it with: experimental.autoMemory = true in settings.',
       });
     });
 

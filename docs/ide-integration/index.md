@@ -132,7 +132,7 @@ editor.
 **To accept a diff**, you can perform any of the following actions:
 
 - Click the **checkmark icon** in the diff editor's title bar.
-- Save the file (e.g., with `Cmd+S` or `Ctrl+S`).
+- Save the file (for example, with `Cmd+S` or `Ctrl+S`).
 - Open the Command Palette and run **Gemini CLI: Accept Diff**.
 - Respond with `yes` in the CLI when prompted.
 
@@ -208,7 +208,7 @@ directly through their in-built registry features.
 
 ## Using with sandboxing
 
-If you are using Gemini CLI within a sandbox, please be aware of the following:
+If you are using Gemini CLI within a sandbox, be aware of the following:
 
 - **On macOS:** The IDE integration requires network access to communicate with
   the IDE companion extension. You must use a Seatbelt profile that allows
@@ -299,5 +299,5 @@ to connect using the provided PID.
 
 ### ACP integration errors
 
-For issues related to ACP integration, please refer to the debugging and
-telemetry section in the [ACP Mode](../cli/acp-mode.md) documentation.
+For issues related to ACP integration, refer to the debugging and telemetry
+section in the [ACP Mode](../cli/acp-mode.md) documentation.

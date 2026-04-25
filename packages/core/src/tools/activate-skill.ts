@@ -15,6 +15,7 @@ import {
   type ToolCallConfirmationDetails,
   type ToolInvocation,
   type ToolConfirmationOutcome,
+  type ExecuteOptions,
 } from './tools.js';
 import type { Config } from '../config/config.js';
 import { ACTIVATE_SKILL_TOOL_NAME } from './tool-names.js';
@@ -107,7 +108,7 @@ ${folderStructure}`,
     return confirmationDetails;
   }
 
-  async execute(_signal: AbortSignal): Promise<ToolResult> {
+  async execute({ abortSignal: _signal }: ExecuteOptions): Promise<ToolResult> {
     const skillName = this.params.name;
     const skillManager = this.config.getSkillManager();
     const skill = skillManager.getSkill(skillName);

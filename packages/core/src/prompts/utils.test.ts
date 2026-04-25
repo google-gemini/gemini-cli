@@ -220,6 +220,7 @@ describe('applySubstitutions', () => {
       },
       getAgentRegistry: vi.fn().mockReturnValue({
         getAllDefinitions: vi.fn().mockReturnValue([]),
+        getDefinition: vi.fn().mockReturnValue(undefined),
       }),
       getToolRegistry: vi.fn().mockReturnValue({
         getAllToolNames: vi.fn().mockReturnValue([]),

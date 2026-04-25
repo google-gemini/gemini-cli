@@ -12,6 +12,7 @@ import {
   type AnyDeclarativeTool,
   type ToolResult,
   type ToolInvocation,
+  type ExecuteOptions,
 } from './tools.js';
 import type { Config } from '../config/config.js';
 import { ApprovalMode } from '../policy/types.js';
@@ -33,6 +34,8 @@ import {
   UPDATE_TOPIC_TOOL_NAME,
   ENTER_PLAN_MODE_TOOL_NAME,
   EXIT_PLAN_MODE_TOOL_NAME,
+  READ_MCP_RESOURCE_TOOL_NAME,
+  LIST_MCP_RESOURCES_TOOL_NAME,
 } from './tool-names.js';
 
 type ToolParams = Record<string, unknown>;
@@ -55,10 +58,10 @@ class DiscoveredToolInvocation extends BaseToolInvocation<
     return safeJsonStringify(this.params);
   }
 
-  async execute(
-    _signal: AbortSignal,
-    _updateOutput?: (output: string) => void,
-  ): Promise<ToolResult> {
+  async execute({
+    abortSignal: _signal,
+    updateOutput: _updateOutput,
+  }: ExecuteOptions): Promise<ToolResult> {
     const callCommand = this.config.getToolCallCommand()!;
     const args = [this.originalToolName];
 
@@ -597,6 +600,16 @@ export class ToolRegistry {
 
     if (tool.name === UPDATE_TOPIC_TOOL_NAME) {
       if (!this.config.isTopicUpdateNarrationEnabled()) {
+        return false;
+      }
+    }
+
+    if (
+      tool.name === READ_MCP_RESOURCE_TOOL_NAME ||
+      tool.name === LIST_MCP_RESOURCES_TOOL_NAME
+    ) {
+      const mcpManager = this.config.getMcpClientManager();
+      if (!mcpManager || mcpManager.getAllResources().length === 0) {
         return false;
       }
     }

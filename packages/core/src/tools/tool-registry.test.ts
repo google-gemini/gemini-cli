@@ -605,7 +605,9 @@ describe('ToolRegistry', () => {
       );
 
       const invocation = (discoveredTool as DiscoveredTool).build({});
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
 
       expect(result.error?.type).toBe(
         ToolErrorType.DISCOVERED_TOOL_EXECUTION_ERROR,

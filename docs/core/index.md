@@ -29,7 +29,7 @@ While the `packages/cli` portion of Gemini CLI provides the user interface,
   potentially incorporating conversation history, tool definitions, and
   instructional context from `GEMINI.md` files.
 - **Tool management & orchestration:**
-  - Registering available tools (e.g., file system tools, shell command
+  - Registering available tools (for example, file system tools, shell command
     execution).
   - Interpreting tool use requests from the Gemini model.
   - Executing the requested tools with the provided arguments.
@@ -45,7 +45,7 @@ The core plays a vital role in security:
 
 - **API key management:** It handles the `GEMINI_API_KEY` and ensures it's used
   securely when communicating with the Gemini API.
-- **Tool execution:** When tools interact with the local system (e.g.,
+- **Tool execution:** When tools interact with the local system (for example,
   `run_shell_command`), the core (and its underlying tool implementations) must
   do so with appropriate caution, often involving sandboxing mechanisms to
   prevent unintended modifications.
@@ -70,7 +70,7 @@ to use the CLI even if the default "pro" model is rate-limited.
 
 If you are using the default "pro" model and the CLI detects that you are being
 rate-limited, it automatically switches to the "flash" model for the current
-session. This allows you to continue working without interruption.
+session. This lets you continue working without interruption.
 
 Internal utility calls that use `gemini-2.5-flash-lite` (for example, prompt
 completion and classification) silently fall back to `gemini-2.5-flash` and
@@ -90,9 +90,8 @@ in a hierarchical manner, starting from the current working directory and moving
 up to the project root and the user's home directory. It also searches in
 subdirectories.
 
-This allows you to have global, project-level, and component-level context
-files, which are all combined to provide the model with the most relevant
-information.
+This lets you have global, project-level, and component-level context files,
+which are all combined to provide the model with the most relevant information.
 
 You can use the [`/memory` command](../reference/commands.md) to `show`, `add`,
 and `refresh` the content of loaded `GEMINI.md` files.

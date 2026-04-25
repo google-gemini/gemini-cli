@@ -109,6 +109,7 @@ import {
   ToolConfirmationOutcome,
   type AnyDeclarativeTool,
   type AnyToolInvocation,
+  Kind,
 } from '../tools/tools.js';
 import {
   type ToolCallRequestInfo,
@@ -140,6 +141,7 @@ vi.mock('../core/geminiChat.js', () => ({
     CHUNK: 'chunk',
   },
   GeminiChat: vi.fn().mockImplementation(() => ({
+    initialize: vi.fn(),
     sendMessageStream: mockSendMessageStream,
     getHistory: vi.fn((_curated?: boolean) => [...mockChatHistory]),
     setHistory: mockSetHistory,
@@ -433,6 +435,7 @@ describe('LocalAgentExecutor', () => {
     MockedGeminiChat.mockImplementation(
       () =>
         ({
+          initialize: vi.fn(),
           sendMessageStream: mockSendMessageStream,
           setSystemInstruction: mockSetSystemInstruction,
           getHistory: vi.fn((_curated?: boolean) => [...mockChatHistory]),
@@ -749,7 +752,9 @@ describe('LocalAgentExecutor', () => {
     it('should filter out subagent tools to prevent recursion', async () => {
       const subAgentName = 'recursive-agent';
       // Register a mock tool that simulates a subagent
-      parentToolRegistry.registerTool(new MockTool({ name: subAgentName }));
+      parentToolRegistry.registerTool(
+        new MockTool({ name: subAgentName, kind: Kind.Agent }),
+      );
 
       // Mock the agent registry to return the subagent name
       vi.spyOn(
@@ -778,7 +783,9 @@ describe('LocalAgentExecutor', () => {
       // LS_TOOL_NAME is already registered in beforeEach
       const otherTool = new MockTool({ name: 'other-tool' });
       parentToolRegistry.registerTool(otherTool);
-      parentToolRegistry.registerTool(new MockTool({ name: subAgentName }));
+      parentToolRegistry.registerTool(
+        new MockTool({ name: subAgentName, kind: Kind.Agent }),
+      );
 
       // Mock the agent registry to return the subagent name
       vi.spyOn(
