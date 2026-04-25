@@ -201,7 +201,7 @@ class RestoreFileToolInvocation extends BaseToolInvocation<
       const msg =
         versions.length > 0
           ? `Backup versions for ${shortenPath(relativePath)}: ${this.formatVersions(versions)}.`
-          : `No backups for ${shortenPath(relativePath)} in this session.`;
+          : `No backups available for ${shortenPath(relativePath)}.`;
       return { llmContent: msg, returnDisplay: msg };
     }
 

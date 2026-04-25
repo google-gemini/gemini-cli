@@ -240,8 +240,7 @@ async function calculateRegexReplacement(
   const normalizedSearch = old_string.replace(/\r\n/g, '\n');
   const normalizedReplace = new_string.replace(/\r\n/g, '\n');
 
-  // This logic is ported from your Python implementation.
-  // It builds a flexible, multi-line regex from a search string.
+  // Build a flexible, multi-line regex from a search string.
   const delimiters = ['(', ')', ':', '[', ']', '{', '}', '>', '<', '='];
 
   let processedString = normalizedSearch;
@@ -519,7 +518,7 @@ class EditToolInvocation
     abortSignal: AbortSignal,
     originalLineEnding: '\r\n' | '\n',
   ): Promise<CalculatedEdit> {
-    // In order to keep from clobbering edits made outside our system,
+    // In order to keep from clobbering edits made outside the system,
     // check if the file has been modified since we first read it.
     let errorForLlmEditFixer = initialError.raw;
     let contentForLlmEditFixer = currentContent;
@@ -982,8 +981,8 @@ class EditToolInvocation
           : `Successfully modified file: ${this.resolvedPath} (${editData.occurrences} replacements).`,
       ];
 
-      // Return a diff of the file before and after the write so that the agent
-      // can avoid the need to spend a turn doing a verification read.
+      // Return a diff of the file before and after the write to allow
+      // avoiding a redundant verification read.
       const snippet = getDiffContextSnippet(
         editData.currentContent ?? '',
         finalContent,
@@ -1264,7 +1263,7 @@ async function calculateFuzzyReplacement(
 
   // Limit the scope of the fuzzy match to reduce impact on responsivesness.
   // Each comparison takes roughly O(L^2) time.
-  // We perform sourceLines.length comparisons (sliding window).
+  // Performs sourceLines.length comparisons (sliding window).
   // Total complexity proxy: sourceLines.length * old_string.length^2
   // Limit to 4e8 for < 1 second.
   if (sourceLines.length * Math.pow(old_string.length, 2) > 400_000_000) {

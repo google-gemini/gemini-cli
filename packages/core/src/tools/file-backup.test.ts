@@ -338,7 +338,7 @@ describe('fnv1a64hex', () => {
 
   it('handles non-ASCII characters by hashing UTF-8 bytes', () => {
     // '🚀' is U+1F680. In UTF-16 it's [0xD83D, 0xDE80]. In UTF-8 it's [0xF0, 0x9F, 0x9A, 0x80].
-    // Our new implementation hashes the 4 UTF-8 bytes.
+    // Hashes the 4 UTF-8 bytes instead of UTF-16 code units.
     const h = fnv1a64hex('🚀');
     expect(h).toBe('ff06d33875097bda');
   });
