@@ -3055,6 +3055,18 @@ describe('loadCliConfig gemmaModelRouter', () => {
     expect(gemmaSettings.classifier?.model).toBe('custom-gemma');
   });
 
+  it('should load experimental.gemma setting from merged settings', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const settings = createTestMergedSettings({
+      experimental: {
+        gemma: true,
+      },
+    });
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.getExperimentalGemma()).toBe(true);
+  });
+
   it('should handle partial gemmaModelRouter settings', async () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments(createTestMergedSettings());

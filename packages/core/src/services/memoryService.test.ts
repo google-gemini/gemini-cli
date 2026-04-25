@@ -127,6 +127,7 @@ async function writeConversationJsonl(
     startTime: conversation.startTime,
     lastUpdated: conversation.lastUpdated,
     summary: conversation.summary,
+    memoryScratchpad: conversation.memoryScratchpad,
     directories: conversation.directories,
     kind: conversation.kind,
   };
@@ -565,7 +566,7 @@ describe('memoryService', () => {
       );
     });
 
-    it('records only sessions whose read_file calls succeed as processed', async () => {
+    it('records only sessions whose read_file completed successfully as processed', async () => {
       const { startMemoryService, readExtractionState } = await import(
         './memoryService.js'
       );
@@ -595,17 +596,69 @@ describe('memoryService', () => {
         messageCount: 20,
         lastUpdated: '2025-01-01T01:00:00Z',
       });
+      const failedConversation = createConversation({
+        sessionId: 'failed-session',
+        summary: 'read_file errors on this one',
+        messageCount: 20,
+        lastUpdated: '2025-01-03T01:00:00Z',
+      });
+      const rejectedConversation = createConversation({
+        sessionId: 'rejected-session',
+        summary: 'read_file was rejected for this one',
+        messageCount: 20,
+        lastUpdated: '2025-01-02T02:00:00Z',
+      });
+      const mismatchedEndConversation = createConversation({
+        sessionId: 'mismatched-end-session',
+        summary: 'read_file start with a mismatched tool end',
+        messageCount: 20,
+        lastUpdated: '2025-01-02T03:00:00Z',
+      });
+      const mismatchedErrorConversation = createConversation({
+        sessionId: 'mismatched-error-session',
+        summary: 'read_file recovers after a mismatched tool error',
+        messageCount: 20,
+        lastUpdated: '2025-01-02T04:00:00Z',
+      });
 
       const openedPath = path.join(
         chatsDir,
         `${SESSION_FILE_PREFIX}2025-01-02T00-00-opened.jsonl`,
       );
-      const skippedPath = path.join(
+      const failedPath = path.join(
         chatsDir,
-        `${SESSION_FILE_PREFIX}2025-01-01T00-00-skipped.jsonl`,
+        `${SESSION_FILE_PREFIX}2025-01-03T00-00-failed.jsonl`,
+      );
+      const rejectedPath = path.join(
+        chatsDir,
+        `${SESSION_FILE_PREFIX}2025-01-02T00-00-rejected.jsonl`,
+      );
+      const mismatchedEndPath = path.join(
+        chatsDir,
+        `${SESSION_FILE_PREFIX}2025-01-02T00-00-mismatched-end.jsonl`,
+      );
+      const mismatchedErrorPath = path.join(
+        chatsDir,
+        `${SESSION_FILE_PREFIX}2025-01-02T00-00-mismatched-error.jsonl`,
       );
       await writeConversationJsonl(openedPath, openedConversation);
-      await writeConversationJsonl(skippedPath, skippedConversation);
+      await writeConversationJsonl(failedPath, failedConversation);
+      await writeConversationJsonl(rejectedPath, rejectedConversation);
+      await writeConversationJsonl(
+        mismatchedEndPath,
+        mismatchedEndConversation,
+      );
+      await writeConversationJsonl(
+        mismatchedErrorPath,
+        mismatchedErrorConversation,
+      );
+      await writeConversationJsonl(
+        path.join(
+          chatsDir,
+          `${SESSION_FILE_PREFIX}2025-01-01T00-00-skipped.jsonl`,
+        ),
+        skippedConversation,
+      );
 
       vi.mocked(LocalAgentExecutor.create).mockImplementationOnce(
         async (_definition, _context, onActivity) =>
@@ -624,21 +677,21 @@ describe('memoryService', () => {
               onActivity?.({
                 isSubagentActivityEvent: true,
                 agentName: 'Skill Extractor',
-                type: 'TOOL_CALL_START',
+                type: 'TOOL_CALL_END',
                 data: {
                   name: 'read_file',
-                  args: { file_path: skippedPath },
-                  callId: 'call-skipped',
+                  id: 'call-opened',
+                  data: {},
                 },
               });
               onActivity?.({
                 isSubagentActivityEvent: true,
                 agentName: 'Skill Extractor',
-                type: 'ERROR',
+                type: 'TOOL_CALL_START',
                 data: {
                   name: 'read_file',
-                  callId: 'call-skipped',
-                  error: 'access denied',
+                  args: { file_path: failedPath },
+                  callId: 'call-failed',
                 },
               });
               onActivity?.({
@@ -647,8 +700,28 @@ describe('memoryService', () => {
                 type: 'TOOL_CALL_END',
                 data: {
                   name: 'read_file',
-                  id: 'call-opened',
-                  data: { content: 'Read this one' },
+                  id: 'call-failed',
+                  data: { isError: true },
+                },
+              });
+              onActivity?.({
+                isSubagentActivityEvent: true,
+                agentName: 'Skill Extractor',
+                type: 'TOOL_CALL_START',
+                data: {
+                  name: 'read_file',
+                  args: { file_path: rejectedPath },
+                  callId: 'call-rejected',
+                },
+              });
+              onActivity?.({
+                isSubagentActivityEvent: true,
+                agentName: 'Skill Extractor',
+                type: 'ERROR',
+                data: {
+                  name: 'read_file',
+                  callId: 'call-rejected',
+                  error: 'User rejected this operation.',
                 },
               });
               onActivity?.({
@@ -659,6 +732,56 @@ describe('memoryService', () => {
                   name: 'read_file',
                   args: { file_path: path.join(chatsDir, 'unrelated.jsonl') },
                   callId: 'call-unrelated',
+                },
+              });
+              onActivity?.({
+                isSubagentActivityEvent: true,
+                agentName: 'Skill Extractor',
+                type: 'TOOL_CALL_START',
+                data: {
+                  name: 'read_file',
+                  args: { file_path: mismatchedEndPath },
+                  callId: 'call-mismatched-end',
+                },
+              });
+              onActivity?.({
+                isSubagentActivityEvent: true,
+                agentName: 'Skill Extractor',
+                type: 'TOOL_CALL_END',
+                data: {
+                  name: 'write_file',
+                  id: 'call-mismatched-end',
+                  data: {},
+                },
+              });
+              onActivity?.({
+                isSubagentActivityEvent: true,
+                agentName: 'Skill Extractor',
+                type: 'TOOL_CALL_START',
+                data: {
+                  name: 'read_file',
+                  args: { file_path: mismatchedErrorPath },
+                  callId: 'call-mismatched-error',
+                },
+              });
+              onActivity?.({
+                isSubagentActivityEvent: true,
+                agentName: 'Skill Extractor',
+                type: 'ERROR',
+                data: {
+                  name: 'write_file',
+                  callId: 'call-mismatched-error',
+                  error: 'Different tool failed.',
+                },
+              });
+              onActivity?.({
+                isSubagentActivityEvent: true,
+                agentName: 'Skill Extractor',
+                type: 'TOOL_CALL_END',
+                data: {
+                  name: 'read_file',
+                  id: 'call-mismatched-error',
+                  data: {},
                 },
               });
               return undefined;
@@ -692,6 +815,22 @@ describe('memoryService', () => {
       expect(state.runs).toHaveLength(1);
       expect(state.runs[0].candidateSessions).toEqual([
         {
+          sessionId: 'failed-session',
+          lastUpdated: '2025-01-03T01:00:00Z',
+        },
+        {
+          sessionId: 'mismatched-error-session',
+          lastUpdated: '2025-01-02T04:00:00Z',
+        },
+        {
+          sessionId: 'mismatched-end-session',
+          lastUpdated: '2025-01-02T03:00:00Z',
+        },
+        {
+          sessionId: 'rejected-session',
+          lastUpdated: '2025-01-02T02:00:00Z',
+        },
+        {
           sessionId: 'opened-session',
           lastUpdated: '2025-01-02T01:00:00Z',
         },
@@ -702,11 +841,18 @@ describe('memoryService', () => {
       ]);
       expect(state.runs[0].processedSessions).toEqual([
         {
+          sessionId: 'mismatched-error-session',
+          lastUpdated: '2025-01-02T04:00:00Z',
+        },
+        {
           sessionId: 'opened-session',
           lastUpdated: '2025-01-02T01:00:00Z',
         },
       ]);
-      expect(state.runs[0].sessionIds).toEqual(['opened-session']);
+      expect(state.runs[0].sessionIds).toEqual([
+        'mismatched-error-session',
+        'opened-session',
+      ]);
     });
   });
 
@@ -900,6 +1046,178 @@ describe('memoryService', () => {
 
       expect(result.sessionIndex).toContain('Debugging the login flow');
       expect(result.sessionIndex).toContain(path.join(chatsDir, fileName));
+    });
+
+    it('falls back to scratchpad workflow summary when summary is missing', async () => {
+      const { buildSessionIndex } = await import('./memoryService.js');
+
+      const conversation = createConversation({
+        sessionId: 'scratchpad-only',
+        summary: undefined,
+        memoryScratchpad: {
+          version: 1,
+          workflowSummary:
+            'read_file -> edit | paths packages/core/src/services/memoryService.ts | validated',
+        },
+        messageCount: 20,
+      });
+      await writeConversationJsonl(
+        path.join(
+          chatsDir,
+          `${SESSION_FILE_PREFIX}2025-01-01T00-00-scratch01.jsonl`,
+        ),
+        conversation,
+      );
+
+      const result = await buildSessionIndex(chatsDir, { runs: [] });
+
+      expect(result.sessionIndex).toContain('read_file -> edit');
+      expect(result.sessionIndex).not.toContain('(no summary)');
+    });
+
+    it('ignores malformed scratchpad workflow summaries while indexing sessions', async () => {
+      const { buildSessionIndex } = await import('./memoryService.js');
+
+      const malformedConversation = createConversation({
+        sessionId: 'malformed-scratchpad',
+        summary: undefined,
+        memoryScratchpad: {
+          version: 1,
+          workflowSummary: 123,
+        } as unknown as ConversationRecord['memoryScratchpad'],
+        messageCount: 20,
+      });
+      await writeConversationJsonl(
+        path.join(
+          chatsDir,
+          `${SESSION_FILE_PREFIX}2025-01-01T00-00-badpad.jsonl`,
+        ),
+        malformedConversation,
+      );
+
+      const validConversation = createConversation({
+        sessionId: 'valid-session',
+        summary: 'Still indexes other sessions',
+        messageCount: 20,
+      });
+      await writeConversationJsonl(
+        path.join(
+          chatsDir,
+          `${SESSION_FILE_PREFIX}2025-01-01T00-00-valid.jsonl`,
+        ),
+        validConversation,
+      );
+
+      const result = await buildSessionIndex(chatsDir, { runs: [] });
+
+      expect(result.sessionIndex).toContain('(no summary)');
+      expect(result.sessionIndex).toContain('Still indexes other sessions');
+      expect(result.sessionIndex).not.toContain('123');
+    });
+
+    it('appends workflow summary when both summary and scratchpad are present', async () => {
+      const { buildSessionIndex } = await import('./memoryService.js');
+
+      const conversation = createConversation({
+        sessionId: 'summary-and-scratchpad',
+        summary: 'Fix session scanning',
+        memoryScratchpad: {
+          version: 1,
+          workflowSummary:
+            'read_file -> edit | paths packages/core/src/services/sessionSummaryUtils.ts',
+        },
+        messageCount: 20,
+      });
+      await writeConversationJsonl(
+        path.join(
+          chatsDir,
+          `${SESSION_FILE_PREFIX}2025-01-01T00-00-scratch02.jsonl`,
+        ),
+        conversation,
+      );
+
+      const result = await buildSessionIndex(chatsDir, { runs: [] });
+
+      expect(result.sessionIndex).toContain('Fix session scanning | workflow:');
+      expect(result.sessionIndex).toContain('sessionSummaryUtils.ts');
+    });
+
+    it('omits stale scratchpad workflow summaries from resumed JSONL sessions', async () => {
+      const { buildSessionIndex } = await import('./memoryService.js');
+
+      const conversation = createConversation({
+        sessionId: 'stale-scratchpad',
+        summary: 'Resume memory work',
+        messageCount: 20,
+        lastUpdated: '2025-01-01T01:00:00Z',
+      });
+      const filePath = path.join(
+        chatsDir,
+        `${SESSION_FILE_PREFIX}2025-01-01T00-00-stale001.jsonl`,
+      );
+      await writeConversationJsonl(filePath, conversation);
+      await fs.appendFile(
+        filePath,
+        `${JSON.stringify({
+          $set: {
+            memoryScratchpad: {
+              version: 1,
+              workflowSummary: 'stale_workflow | paths stale.ts',
+            },
+          },
+        })}\n`,
+      );
+      await fs.appendFile(
+        filePath,
+        [
+          JSON.stringify({
+            id: 'resumed-user-message',
+            timestamp: '2025-01-02T01:00:00Z',
+            type: 'user',
+            content: [{ text: 'Continue after the scratchpad was written' }],
+          }),
+          JSON.stringify({
+            $set: { lastUpdated: '2025-01-02T01:00:01Z' },
+          }),
+        ].join('\n') + '\n',
+      );
+
+      const result = await buildSessionIndex(chatsDir, { runs: [] });
+
+      expect(result.sessionIndex).toContain('Resume memory work');
+      expect(result.sessionIndex).not.toContain('stale_workflow');
+      expect(result.sessionIndex).not.toContain('stale.ts');
+    });
+
+    it('sanitizes shell command workflow summaries before indexing sessions', async () => {
+      const { buildSessionIndex } = await import('./memoryService.js');
+
+      const conversation = createConversation({
+        sessionId: 'raw-shell-scratchpad',
+        summary: 'Investigate API migration',
+        memoryScratchpad: {
+          version: 1,
+          workflowSummary:
+            'run_shell_command: curl https://api.example.com -H "Authorization: Bearer sk-secret-token" -> read_file | paths package.json',
+        },
+        messageCount: 20,
+      });
+      await writeConversationJsonl(
+        path.join(
+          chatsDir,
+          `${SESSION_FILE_PREFIX}2025-01-01T00-00-shellraw.jsonl`,
+        ),
+        conversation,
+      );
+
+      const result = await buildSessionIndex(chatsDir, { runs: [] });
+
+      expect(result.sessionIndex).toContain(
+        'workflow: run_shell_command: curl -> read_file | paths package.json',
+      );
+      expect(result.sessionIndex).not.toContain('Authorization');
+      expect(result.sessionIndex).not.toContain('sk-secret-token');
+      expect(result.sessionIndex).not.toContain('https://api.example.com');
     });
 
     it('filters out subagent sessions', async () => {
@@ -1176,6 +1494,9 @@ describe('memoryService', () => {
               },
             ],
             skillsCreated: ['debug-helper', 'test-gen'],
+            turnCount: 4,
+            durationMs: 1875,
+            terminateReason: 'GOAL',
           },
         ],
       };
@@ -1202,6 +1523,9 @@ describe('memoryService', () => {
       ]);
       expect(result.runs[0].sessionIds).toEqual(['s1']);
       expect(result.runs[0].runAt).toBe('2025-06-01T00:00:00Z');
+      expect(result.runs[0].turnCount).toBe(4);
+      expect(result.runs[0].durationMs).toBe(1875);
+      expect(result.runs[0].terminateReason).toBe('GOAL');
     });
 
     it('writeExtractionState + readExtractionState roundtrips runs correctly', async () => {
@@ -1235,11 +1559,17 @@ describe('memoryService', () => {
             },
           ],
           skillsCreated: ['skill-x'],
+          turnCount: 3,
+          durationMs: 2400,
+          terminateReason: 'GOAL',
         },
         {
           runAt: '2025-01-02T00:00:00Z',
           sessionIds: ['c'],
           skillsCreated: [],
+          turnCount: 1,
+          durationMs: 900,
+          terminateReason: 'GOAL',
         },
       ];
       const state: ExtractionState = { runs };
