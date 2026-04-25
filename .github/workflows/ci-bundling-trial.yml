@@ -275,6 +275,82 @@ jobs:
         run: 'npx vitest run --pool=threads packages/core/src --exclude "**/*.integration.test.ts"'
         shell: 'bash'
 
+  test_a2a_server:
+    name: 'a2a-server'
+    runs-on: 'gemini-cli-ubuntu-16-core'
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
+      - name: 'Set up Node.js'
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+      - name: 'Install dependencies'
+        run: 'npm ci'
+      - name: 'Build project'
+        run: 'npm run build'
+      - name: 'Run All A2A Server Tests'
+        run: 'npx vitest run --project @google/gemini-cli-a2a-server'
+        shell: 'bash'
+
+  test_devtools:
+    name: 'devtools'
+    runs-on: 'gemini-cli-ubuntu-16-core'
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
+      - name: 'Set up Node.js'
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+      - name: 'Install dependencies'
+        run: 'npm ci'
+      - name: 'Build project'
+        run: 'npm run build'
+      - name: 'Run All DevTools Tests'
+        run: 'npx vitest run --project @google/gemini-cli-devtools'
+        shell: 'bash'
+
+  test_sdk:
+    name: 'sdk'
+    runs-on: 'gemini-cli-ubuntu-16-core'
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
+      - name: 'Set up Node.js'
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+      - name: 'Install dependencies'
+        run: 'npm ci'
+      - name: 'Build project'
+        run: 'npm run build'
+      - name: 'Run All SDK Tests'
+        run: 'npx vitest run --project @google/gemini-cli-sdk'
+        shell: 'bash'
+
+  test_test_utils:
+    name: 'test-utils'
+    runs-on: 'gemini-cli-ubuntu-16-core'
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
+      - name: 'Set up Node.js'
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+      - name: 'Install dependencies'
+        run: 'npm ci'
+      - name: 'Build project'
+        run: 'npm run build'
+      - name: 'Run All Test Utils Tests'
+        run: 'npx vitest run --project @google/gemini-cli-test-utils'
+        shell: 'bash'
+
   test_e2e:
     name: 'e2e:linux'
     runs-on: 'gemini-cli-ubuntu-16-core'
