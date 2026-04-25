@@ -167,7 +167,7 @@ jobs:
             git config user.name "github-actions[bot]"
             git config user.email "github-actions[bot]@users.noreply.github.com"
             
-            BRANCH_NAME="bot/productivity-updates-$(date +'%Y%m%d%H%M%S')"
+            BRANCH_NAME="bot/productivity-updates-$(date +'%Y%m%d%H%M%S')-${{ github.run_id }}-${{ github.run_attempt }}"
             git checkout -b "$BRANCH_NAME"
             
             git apply temp_outputs/bot-changes.patch
