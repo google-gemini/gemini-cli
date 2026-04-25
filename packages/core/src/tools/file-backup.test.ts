@@ -44,7 +44,7 @@ const makeDirent = (name: string, isFile: boolean): unknown => ({
 });
 
 function mockStream(content: string) {
-  return Readable.from([content]);
+  return Readable.from([Buffer.from(content)]);
 }
 
 describe('createPreWriteBackup', () => {

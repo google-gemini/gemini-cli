@@ -19,7 +19,8 @@ const MAX_BACKUP_VERSIONS = 20;
 
 /**
  * Calculates a SHA256 hash of a string after normalizing line endings (\r\n -> \n).
- * Processes the string in chunks to bound memory usage.
+ * Processes the string in chunks to bound memory usage and ensures that
+ * surrogate pairs are not split across hash updates.
  */
 function getNormalizedStringHash(str: string): string {
   const hash = createHash('sha256');
@@ -32,8 +33,17 @@ function getNormalizedStringHash(str: string): string {
     }
     normalizedBatch += char;
     if (normalizedBatch.length >= 8192) {
-      hash.update(normalizedBatch, 'utf8');
-      normalizedBatch = '';
+      // Ensure surrogate pairs are not split at the batch boundary.
+      const lastCodeUnit = normalizedBatch.charCodeAt(
+        normalizedBatch.length - 1,
+      );
+      if (lastCodeUnit >= 0xd800 && lastCodeUnit <= 0xdbff) {
+        hash.update(normalizedBatch.slice(0, -1), 'utf8');
+        normalizedBatch = normalizedBatch.slice(-1);
+      } else {
+        hash.update(normalizedBatch, 'utf8');
+        normalizedBatch = '';
+      }
     }
   }
   if (normalizedBatch) {
@@ -44,39 +54,43 @@ function getNormalizedStringHash(str: string): string {
 
 /**
  * Calculates a SHA256 hash of a file's content after normalizing line endings (\r\n -> \n).
- * Processes the file as a stream to ensure constant memory overhead regardless of file size.
+ * Processes the file as a raw byte stream to ensure constant memory overhead
+ * and robustness against binary data or non-UTF-8 encodings.
  */
 async function getNormalizedFileHash(filePath: string): Promise<string> {
   const hash = createHash('sha256');
-  const stream = createReadStream(filePath, { encoding: 'utf8' });
+  const stream = createReadStream(filePath);
   let carryOver = false;
 
-  for await (const chunk of stream as AsyncIterable<string>) {
-    let normalized = '';
+  for await (const chunk of stream as AsyncIterable<Buffer>) {
+    const normalized = Buffer.allocUnsafe(chunk.length);
+    let normalizedIdx = 0;
     for (let i = 0; i < chunk.length; i++) {
-      const char = chunk[i];
+      const byte = chunk[i];
       if (carryOver) {
         carryOver = false;
-        if (char === '\n') {
-          normalized += '\n';
+        if (byte === 0x0a) {
+          // \n
+          normalized[normalizedIdx++] = 0x0a;
           continue;
         } else {
-          normalized += '\r';
+          normalized[normalizedIdx++] = 0x0d; // \r
         }
       }
-      if (char === '\r') {
+      if (byte === 0x0d) {
+        // \r
         carryOver = true;
       } else {
-        normalized += char;
+        normalized[normalizedIdx++] = byte;
       }
     }
-    if (normalized) {
-      hash.update(normalized, 'utf8');
+    if (normalizedIdx > 0) {
+      hash.update(normalized.subarray(0, normalizedIdx));
     }
   }
 
   if (carryOver) {
-    hash.update('\r', 'utf8');
+    hash.update(Buffer.from([0x0d]));
   }
 
   return hash.digest('hex');
