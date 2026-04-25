@@ -66,10 +66,11 @@ class RestoreFileToolInvocation extends BaseToolInvocation<
       true,
       () => this.config.getApprovalMode(),
     );
+    const filePath = this.params.file_path?.trim() ?? '';
     if (this.config.isPlanMode()) {
       try {
         this.resolvedPath = resolveAndValidatePlanPath(
-          this.params.file_path,
+          filePath,
           this.config.storage.getPlansDir(),
           this.config.getProjectRoot(),
         );
@@ -78,20 +79,17 @@ class RestoreFileToolInvocation extends BaseToolInvocation<
           'Failed to resolve plan path during RestoreFileTool invocation setup',
           e,
         );
-        this.resolvedPath = this.params.file_path;
+        this.resolvedPath = filePath;
       }
-    } else if (!path.isAbsolute(this.params.file_path)) {
-      const result = correctPath(this.params.file_path, this.config);
+    } else if (!path.isAbsolute(filePath)) {
+      const result = correctPath(filePath, this.config);
       if (result.success) {
         this.resolvedPath = result.correctedPath;
       } else {
-        this.resolvedPath = path.resolve(
-          this.config.getTargetDir(),
-          this.params.file_path,
-        );
+        this.resolvedPath = path.resolve(this.config.getTargetDir(), filePath);
       }
     } else {
-      this.resolvedPath = this.params.file_path;
+      this.resolvedPath = filePath;
     }
   }
 
