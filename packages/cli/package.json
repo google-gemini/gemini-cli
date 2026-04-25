@@ -21,7 +21,7 @@
     "test": "vitest run",
     "test:ci": "vitest run",
     "posttest": "npm run build",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsgo --noEmit"
   },
   "files": [
     "dist"
@@ -81,8 +81,8 @@
     "@types/shell-quote": "^1.7.5",
     "@types/ws": "^8.5.10",
     "@types/yargs": "^17.0.32",
+    "@typescript/native-preview": "^7.0.0-dev.20260412.1",
     "@xterm/headless": "^5.5.0",
-    "typescript": "^5.3.3",
     "vitest": "^3.1.1"
   },
   "engines": {

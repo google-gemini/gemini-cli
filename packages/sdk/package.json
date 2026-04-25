@@ -16,7 +16,7 @@
     "format": "prettier --write .",
     "test": "vitest run",
     "test:ci": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsgo --noEmit"
   },
   "files": [
     "dist"
@@ -27,7 +27,7 @@
     "zod-to-json-schema": "^3.23.1"
   },
   "devDependencies": {
-    "typescript": "^5.3.3",
+    "@typescript/native-preview": "^7.0.0-dev.20260412.1",
     "vitest": "^3.1.1"
   },
   "engines": {
