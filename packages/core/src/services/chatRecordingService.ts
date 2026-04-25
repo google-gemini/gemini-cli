@@ -746,9 +746,11 @@ export class ChatRecordingService {
   /**
    * Deletes a single session file and its associated logs, tool-outputs, and directory.
    *
-   * If `knownSessionUUID` is provided, it is used directly to clean up
-   * artifacts. Otherwise the UUID is read from the chat file's first JSON
-   * line. Passing it explicitly keeps the cleanup correct for chat files
+   * The UUID stored inside the chat file's first JSON line is the source of
+   * truth — `getMatchingSessionFiles` can return more than one file for a
+   * given short ID (legacy flat subagents, short-ID collisions), and each
+   * file's own metadata is the only correct UUID for its artifacts. The
+   * caller-supplied `knownSessionUUID` is used as a fallback for chat files
    * that are empty, missing the sessionId metadata line, or have a
    * corrupted first line — see issue #21568.
    */
@@ -760,14 +762,12 @@ export class ChatRecordingService {
   ): Promise<void> {
     const filePath = path.join(chatsDir, file);
     try {
-      let fullSessionId: string | undefined = knownSessionUUID;
-
+      let fullSessionId = await this.readSessionIdFromFile(filePath);
       if (!fullSessionId) {
-        fullSessionId = await this.readSessionIdFromFile(filePath);
+        fullSessionId = knownSessionUUID;
       }
 
-      // Delete the session file (if it still exists — readSessionIdFromFile
-      // may have already unlinked an empty file).
+      // Delete the session file.
       await fs.promises.unlink(filePath).catch((err: NodeJS.ErrnoException) => {
         if (err.code !== 'ENOENT') throw err;
       });
