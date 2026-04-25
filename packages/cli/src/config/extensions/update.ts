@@ -101,24 +101,14 @@ export async function updateExtension(
 
   const tempDir = await ExtensionStorage.createTmpDir();
   try {
+    await copyExtension(extension.path, tempDir);
     const previousExtensionConfig = await extensionManager.loadExtensionConfig(
       extension.path,
     );
-    let updatedExtension: GeminiCLIExtension;
-    try {
-      updatedExtension = await extensionManager.installOrUpdateExtension(
-        installMetadata,
-        previousExtensionConfig,
-      );
-    } catch (e) {
-      dispatchExtensionStateUpdate({
-        type: 'SET_STATE',
-        payload: { name: extension.name, state: ExtensionUpdateState.ERROR },
-      });
-      throw new Error(
-        `Updated extension not found after installation, got error:\n${e}`,
-      );
-    }
+    const updatedExtension = await extensionManager.installOrUpdateExtension(
+      installMetadata,
+      previousExtensionConfig,
+    );
     const updatedVersion = updatedExtension.version;
     dispatchExtensionStateUpdate({
       type: 'SET_STATE',
@@ -143,7 +133,9 @@ export async function updateExtension(
       payload: { name: extension.name, state: ExtensionUpdateState.ERROR },
     });
     await copyExtension(tempDir, extension.path);
-    throw e;
+    throw new Error(
+      `Failed to update extension ${extension.name}: ${getErrorMessage(e)}`,
+    );
   } finally {
     await fs.promises.rm(tempDir, { recursive: true, force: true });
   }

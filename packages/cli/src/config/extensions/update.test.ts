@@ -190,6 +190,10 @@ describe('Extension Update Logic', () => {
         originalVersion: '1.0.0',
         updatedVersion: '1.1.0',
       });
+      expect(copyExtension).toHaveBeenCalledWith(
+        mockExtension.path,
+        '/tmp/mock-dir',
+      );
       expect(fs.promises.rm).toHaveBeenCalledWith('/tmp/mock-dir', {
         recursive: true,
         force: true,
@@ -293,8 +297,14 @@ describe('Extension Update Logic', () => {
           ExtensionUpdateState.UPDATE_AVAILABLE,
           mockDispatch,
         ),
-      ).rejects.toThrow('Updated extension not found after installation');
+      ).rejects.toThrow(
+        'Failed to update extension test-extension: Install failed',
+      );
 
+      expect(copyExtension).toHaveBeenCalledWith(
+        mockExtension.path,
+        '/tmp/mock-dir',
+      );
       expect(copyExtension).toHaveBeenCalledWith(
         '/tmp/mock-dir',
         mockExtension.path,
