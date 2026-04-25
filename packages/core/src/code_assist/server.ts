@@ -264,10 +264,29 @@ export class CodeAssistServer implements ContentGenerator {
     req: LoadCodeAssistRequest,
   ): Promise<LoadCodeAssistResponse> {
     try {
-      return await this.requestPost<LoadCodeAssistResponse>(
+      const res = await this.requestPost<LoadCodeAssistResponse>(
         'loadCodeAssist',
         req,
       );
+
+      /**
+       * FIX: Prevent automatic project hijacking for personal users.
+       * For Google One AI Premium subscribers, the backend may return a
+       * "shadow" project ID (e.g., master-impulse-jrkws) in
+       * cloudaicompanionProject. If adopted, this forces the CLI to route
+       * through the Enterprise endpoint (cloudcode-pa.googleapis.com),
+       * which rejects personal OAuth tokens with 403 PERMISSION_DENIED.
+       *
+       * By stripping this field when no explicit projectId was provided,
+       * we preserve the Personal/Standard flow routing.
+       * See: https://github.com/google-gemini/gemini-cli/issues/25189
+       * See: https://github.com/google-gemini/gemini-cli/issues/24517
+       */
+      if (res.cloudaicompanionProject && !this.projectId) {
+        delete res.cloudaicompanionProject;
+      }
+
+      return res;
     } catch (e) {
       if (isVpcScAffectedUser(e)) {
         return {
@@ -508,6 +527,18 @@ export class CodeAssistServer implements ContentGenerator {
   }
 
   private getBaseUrl(): string {
+    /**
+     * FIX: Endpoint fallback logic.
+     * If no explicit projectId is provided via CLI flags or config, default
+     * to the standard Generative Language API. This prevents accidental
+     * routing to the Enterprise Cloud Code PA endpoint for personal users.
+     * See: https://github.com/google-gemini/gemini-cli/issues/25189
+     * See: https://github.com/google-gemini/gemini-cli/issues/24517
+     */
+    if (!this.projectId) {
+      return 'https://generativelanguage.googleapis.com/v1beta';
+    }
+
     const endpoint =
       process.env['CODE_ASSIST_ENDPOINT'] ?? CODE_ASSIST_ENDPOINT;
     const version =
