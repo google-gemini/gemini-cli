@@ -117,6 +117,13 @@ describe('<Header />', () => {
         success: '',
         warning: '',
       },
+      logLevels: {
+        log: '',
+        info: '',
+        warn: '',
+        error: '',
+        debug: '',
+      },
     });
     const Gradient = await import('ink-gradient');
     await render(<Header version="1.0.0" nightly={false} />);

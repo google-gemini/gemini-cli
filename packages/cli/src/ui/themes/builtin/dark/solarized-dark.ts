@@ -61,6 +61,13 @@ const semanticColors: SemanticColors = {
     warning: '#d0b000',
     error: '#dc322f',
   },
+  logLevels: {
+    log: '#839496',
+    info: '#268bd2',
+    warn: '#d0b000',
+    error: '#dc322f',
+    debug: '#20B2AA',
+  },
 };
 
 export const SolarizedDark: Theme = new Theme(

@@ -47,6 +47,13 @@ describe('ColorsDisplay', () => {
         success: '#00ff00',
         warning: '#ffff00',
       },
+      logLevels: {
+        log: '#ffffff',
+        info: '#0000ff',
+        warn: '#ffff00',
+        error: '#ff0000',
+        debug: '#cccccc',
+      },
     });
 
     vi.spyOn(themeManager, 'getActiveTheme').mockReturnValue({
@@ -85,6 +92,13 @@ describe('ColorsDisplay', () => {
           error: '#ff0000',
           success: '#00ff00',
           warning: '#ffff00',
+        },
+        logLevels: {
+          log: '#ffffff',
+          info: '#0000ff',
+          warning: '#ffff00',
+          error: '#ff0000',
+          debug: '#cccccc',
         },
       } as unknown as SemanticColors,
     } as unknown as Theme);
