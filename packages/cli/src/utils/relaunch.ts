@@ -80,12 +80,20 @@ export async function relaunchAppInChildProcess(
         }
       };
       signalHandlers.set(sig, handler);
-      process.on(sig, handler);
+      try {
+        process.on(sig, handler);
+      } catch (e) {
+        // Some signals might not be supported on all platforms (e.g. Windows)
+      }
     });
 
     const removeForwarders = () => {
       signalHandlers.forEach((handler, sig) => {
-        process.off(sig, handler);
+        try {
+          process.off(sig, handler);
+        } catch (e) {
+          // Ignore removal errors
+        }
       });
     };
 
@@ -100,7 +108,10 @@ export async function relaunchAppInChildProcess(
     });
 
     return new Promise<number>((resolve, reject) => {
-      child.on('error', reject);
+      child.on('error', (err) => {
+        removeForwarders();
+        reject(err);
+      });
       child.on('close', (code) => {
         removeForwarders();
         // Resume stdin before the parent process exits.
