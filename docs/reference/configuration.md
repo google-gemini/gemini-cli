@@ -563,6 +563,18 @@ their corresponding top-level category object in your `settings.json` file.
           "model": "gemini-2.5-flash-lite"
         }
       },
+      "gemma-4-31b-it": {
+        "extends": "chat-base-3",
+        "modelConfig": {
+          "model": "gemma-4-31b-it"
+        }
+      },
+      "gemma-4-26b-a4b-it": {
+        "extends": "chat-base-3",
+        "modelConfig": {
+          "model": "gemma-4-26b-a4b-it"
+        }
+      },
       "gemini-2.5-flash-base": {
         "extends": "base",
         "modelConfig": {
@@ -834,6 +846,28 @@ their corresponding top-level category object in your `settings.json` file.
           "multimodalToolUse": false
         }
       },
+      "gemma-4-31b-it": {
+        "displayName": "gemma-4-31b-it",
+        "tier": "custom",
+        "family": "gemma-4",
+        "isPreview": false,
+        "isVisible": true,
+        "features": {
+          "thinking": true,
+          "multimodalToolUse": false
+        }
+      },
+      "gemma-4-26b-a4b-it": {
+        "displayName": "gemma-4-26b-a4b-it",
+        "tier": "custom",
+        "family": "gemma-4",
+        "isPreview": false,
+        "isVisible": true,
+        "features": {
+          "thinking": true,
+          "multimodalToolUse": false
+        }
+      },
       "auto": {
         "tier": "auto",
         "isPreview": true,
@@ -904,6 +938,12 @@ their corresponding top-level category object in your `settings.json` file.
 
     ```json
     {
+      "gemma-4-31b-it": {
+        "default": "gemma-4-31b-it"
+      },
+      "gemma-4-26b-a4b-it": {
+        "default": "gemma-4-26b-a4b-it"
+      },
       "gemini-3.1-pro-preview": {
         "default": "gemini-3.1-pro-preview",
         "contexts": [
@@ -1467,6 +1507,12 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `undefined`
   - **Requires restart:** Yes
 
+- **`tools.confirmationRequired`** (array):
+  - **Description:** Tool names that always require user confirmation. Takes
+    precedence over allowed tools and core tool allowlists.
+  - **Default:** `undefined`
+  - **Requires restart:** Yes
+
 - **`tools.exclude`** (array):
   - **Description:** Tool names to exclude from discovery.
   - **Default:** `undefined`
@@ -1639,6 +1685,37 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `undefined`
 
 #### `experimental`
+
+- **`experimental.gemma`** (boolean):
+  - **Description:** Enable access to Gemma 4 models (experimental).
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
+- **`experimental.voiceMode`** (boolean):
+  - **Description:** Enable experimental voice dictation and commands (/voice,
+    /voice model).
+  - **Default:** `false`
+
+- **`experimental.voice.activationMode`** (enum):
+  - **Description:** How to trigger voice recording with the Space key.
+  - **Default:** `"push-to-talk"`
+  - **Values:** `"push-to-talk"`, `"toggle"`
+
+- **`experimental.voice.backend`** (enum):
+  - **Description:** The backend to use for voice transcription.
+  - **Default:** `"gemini-live"`
+  - **Values:** `"gemini-live"`, `"whisper"`
+
+- **`experimental.voice.whisperModel`** (enum):
+  - **Description:** The Whisper model to use for local transcription.
+  - **Default:** `"ggml-base.en.bin"`
+  - **Values:** `"ggml-tiny.en.bin"`, `"ggml-base.en.bin"`,
+    `"ggml-large-v3-turbo-q5_0.bin"`, `"ggml-large-v3-turbo-q8_0.bin"`
+
+- **`experimental.voice.stopGracePeriodMs`** (number):
+  - **Description:** How long to wait for final transcription after stopping
+    recording.
+  - **Default:** `1000`
 
 - **`experimental.adk.agentSessionNoninteractiveEnabled`** (boolean):
   - **Description:** Enable non-interactive agent sessions.
@@ -2156,6 +2233,14 @@ the `advanced.excludedEnvVars` setting in your `settings.json` file.
   - Overrides the hardcoded default
   - Example: `export GEMINI_MODEL="gemini-3-flash-preview"` (Windows PowerShell:
     `$env:GEMINI_MODEL="gemini-3-flash-preview"`)
+- **`GEMINI_CLI_TRUST_WORKSPACE`**:
+  - If set to `"true"`, trusts the current workspace for the duration of the
+    session, bypassing the folder trust check.
+  - Useful for headless environments (for example, CI/CD pipelines).
+- **`GEMINI_CLI_TRUSTED_FOLDERS_PATH`**:
+  - Overrides the default location for the `trustedFolders.json` file.
+  - Useful if you want to store this configuration in a custom location instead
+    of the default `~/.gemini/`.
 - **`GEMINI_CLI_IDE_PID`**:
   - Manually specifies the PID of the IDE process to use for integration. This
     is useful when running Gemini CLI in a standalone terminal while still
