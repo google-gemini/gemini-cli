@@ -10,4 +10,10 @@ code_review:
     summary: true
     code_review: true
     include_drafts: false
-ignore_patterns: []
+ignore_patterns:
+  - 'package-lock.json'
+  - '**/dist/**'
+  - '**/node_modules/**'
+  - '**/__snapshots__/**'
+  - 'docs/changelogs/**'
+  - 'packages/vscode-ide-companion/NOTICES.txt'
