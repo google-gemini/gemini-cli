@@ -43,18 +43,33 @@ export async function relaunchAppInChildProcess(
   let latestAdminSettings = remoteAdminSettings;
 
   const runner = () => {
-    // process.argv is [node, script, ...args]
-    // We want to construct [ ...nodeArgs, script, ...scriptArgs]
-    const script = process.argv[1];
-    const scriptArgs = process.argv.slice(2);
+    const isSea =
+      'sea' in process &&
+      typeof (process as { sea: unknown }).sea !== 'undefined';
 
-    const nodeArgs = [
-      ...process.execArgv,
-      ...additionalNodeArgs,
-      script,
-      ...additionalScriptArgs,
-      ...scriptArgs,
-    ];
+    let nodeArgs: string[];
+    if (isSea) {
+      // In SEA, process.argv[1] is the binary path again. We want to skip it
+      // and only include the actual user arguments.
+      nodeArgs = [
+        ...additionalNodeArgs,
+        ...additionalScriptArgs,
+        ...process.argv.slice(2),
+      ];
+    } else {
+      // process.argv is [node, script, ...args]
+      // We want to construct [ ...nodeArgs, script, ...scriptArgs]
+      const script = process.argv[1];
+      const scriptArgs = process.argv.slice(2);
+
+      nodeArgs = [
+        ...process.execArgv,
+        ...additionalNodeArgs,
+        script,
+        ...additionalScriptArgs,
+        ...scriptArgs,
+      ];
+    }
     const newEnv = { ...process.env, GEMINI_CLI_NO_RELAUNCH: 'true' };
 
     // The parent process should not be reading from stdin while the child is running.

@@ -132,7 +132,10 @@ const coerceCommaSeparated = (values: string[]): string[] => {
  * Used for early setup before full argument parsing with settings.
  */
 export function getWorktreeArg(argv: string[]): string | undefined {
-  const result = yargs(hideBin(argv))
+  const isSea =
+    'sea' in process &&
+    typeof (process as { sea: unknown }).sea !== 'undefined';
+  const result = yargs(isSea ? argv.slice(2) : hideBin(argv))
     .help(false)
     .version(false)
     .option('worktree', { alias: 'w', type: 'string' })
@@ -160,7 +163,10 @@ export function getRequestedWorktreeName(
 export async function parseArguments(
   settings: MergedSettings,
 ): Promise<CliArgs> {
-  const rawArgv = hideBin(process.argv);
+  const isSea =
+    'sea' in process &&
+    typeof (process as { sea: unknown }).sea !== 'undefined';
+  const rawArgv = isSea ? process.argv.slice(2) : hideBin(process.argv);
   const startupMessages: string[] = [];
   const yargsInstance = yargs(rawArgv)
     .locale('en')
