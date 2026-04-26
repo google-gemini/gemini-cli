@@ -26,25 +26,17 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, '..');
 
 function getWorkspaces() {
-  const packagesDir = join(root, 'packages');
-  const entries = readdirSync(packagesDir, { withFileTypes: true });
-  const workspaces = [];
-  for (const entry of entries) {
-    if (entry.isDirectory()) {
-      const pkgPath = join(packagesDir, entry.name, 'package.json');
-      if (existsSync(pkgPath)) {
-        try {
-          const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
-          if (pkg.name) {
-            workspaces.push(pkg.name);
-          }
-        } catch {
-          // skip
-        }
-      }
-    }
+  try {
+    const workspacesJson = execSync('npm query .workspace', {
+      encoding: 'utf-8',
+      cwd: root,
+    });
+    const workspaces = JSON.parse(workspacesJson);
+    return workspaces.map((pkg) => pkg.name);
+  } catch (e) {
+    console.error('Error finding workspaces:', e.message);
+    return [];
   }
-  return workspaces;
 }
 
 // npm install if node_modules was removed (e.g. via npm run clean or scripts/clean.js)

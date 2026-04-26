@@ -269,7 +269,7 @@ export class LegacyAgentProtocol implements AgentProtocol {
           );
           this._emit([continuationMessage]);
 
-          currentParts = [...currentParts, { text: continuationPrompt }];
+          currentParts = [{ text: continuationPrompt }];
           continue;
         }
 
