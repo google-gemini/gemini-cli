@@ -84,6 +84,29 @@ your new skill.
 
 You should see `api-auditor` in the list of available skills.
 
+### If your skill doesn't appear
+
+If `/skills list` doesn't show your skill, run through this checklist:
+
+1.  **The folder must be trusted (workspace skills only).** Skills under
+    `<workspace>/.gemini/skills/` are only loaded when the workspace folder is
+    marked as trusted. Run `/trust` and restart the session if needed. Skills
+    under `~/.gemini/skills/` (user scope) are not affected by trust.
+2.  **Check the path layout.** `SKILL.md` must live exactly one directory deep,
+    like `.gemini/skills/<skill-name>/SKILL.md`. Files placed directly in
+    `.gemini/skills/SKILL.md`, or nested more than one directory deep, are not
+    discovered.
+3.  **The filename must be `SKILL.md` exactly.** Capitalization matters on
+    case-sensitive filesystems (Linux, and macOS when configured as such):
+    `skill.md` or `Skill.md` will be ignored.
+4.  **Frontmatter must include both `name:` and `description:`.** A `SKILL.md`
+    is silently skipped if either field is missing or if the frontmatter
+    delimiters (`---` on their own lines) are absent.
+5.  **The skill name comes from the `name:` field, not the directory name.** If
+    your frontmatter says `name: foo`, the skill appears as `foo` in
+    `/skills list` regardless of what its parent directory is called. The
+    characters `: \ / < > * ? " |` in the name are replaced with `-`.
+
 ## How to use the skill
 
 Now, try it out. Start a new session and ask a question that triggers the
