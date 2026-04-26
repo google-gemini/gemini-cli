@@ -11,7 +11,6 @@ import * as os from 'node:os';
 import {
   PARENT_PROCESS_TLS_ENV_ALLOWLIST,
   parseSimpleEnv,
-  findProjectGeminiEnvFile,
   loadTlsEnvFromGemini,
 } from './index.js';
 
@@ -75,115 +74,57 @@ describe('parseSimpleEnv', () => {
   });
 });
 
-describe('findProjectGeminiEnvFile', () => {
-  let tmpRoot: string;
-  beforeEach(() => {
-    tmpRoot = fs.realpathSync(
-      fs.mkdtempSync(path.join(os.tmpdir(), 'gemini-cli-find-env-')),
-    );
-  });
-  afterEach(() => {
-    fs.rmSync(tmpRoot, { recursive: true, force: true });
-  });
-
-  it('returns the file when .gemini/.env exists in the start dir', () => {
-    const geminiDir = path.join(tmpRoot, '.gemini');
-    fs.mkdirSync(geminiDir);
-    const envPath = path.join(geminiDir, '.env');
-    fs.writeFileSync(envPath, 'FOO=bar\n');
-    const found = findProjectGeminiEnvFile(tmpRoot, fs, path);
-    expect(found).toBe(envPath);
-  });
-
-  it('walks up to parent directories to find .gemini/.env', () => {
-    const parentGemini = path.join(tmpRoot, '.gemini');
-    fs.mkdirSync(parentGemini);
-    const envPath = path.join(parentGemini, '.env');
-    fs.writeFileSync(envPath, '');
-    const child = path.join(tmpRoot, 'a', 'b', 'c');
-    fs.mkdirSync(child, { recursive: true });
-    const found = findProjectGeminiEnvFile(child, fs, path);
-    expect(found).toBe(envPath);
-  });
-
-  it('does not match anything inside tmpRoot when no .env is written', () => {
-    const deep = path.join(tmpRoot, 'deep', 'empty');
-    fs.mkdirSync(deep, { recursive: true });
-    const found = findProjectGeminiEnvFile(deep, fs, path);
-    // A parent dir *outside* tmpRoot may have its own .gemini/.env on this
-    // host; we only assert that nothing inside tmpRoot was picked up.
-    if (found !== null) {
-      expect(found.startsWith(tmpRoot)).toBe(false);
-    }
-  });
-});
-
 describe('loadTlsEnvFromGemini', () => {
   let tmpRoot: string;
   let fakeHome: string;
-  let fakeCwd: string;
 
   beforeEach(() => {
     tmpRoot = fs.realpathSync(
       fs.mkdtempSync(path.join(os.tmpdir(), 'gemini-cli-tls-env-')),
     );
     fakeHome = path.join(tmpRoot, 'home');
-    fakeCwd = path.join(tmpRoot, 'project');
     fs.mkdirSync(fakeHome, { recursive: true });
-    fs.mkdirSync(fakeCwd, { recursive: true });
   });
   afterEach(() => {
     fs.rmSync(tmpRoot, { recursive: true, force: true });
   });
 
-  function writeEnv(dir: string, contents: string) {
-    const geminiDir = path.join(dir, '.gemini');
+  function writeHomeEnv(contents: string) {
+    const geminiDir = path.join(fakeHome, '.gemini');
     fs.mkdirSync(geminiDir, { recursive: true });
     fs.writeFileSync(path.join(geminiDir, '.env'), contents);
   }
 
   it('reads NODE_EXTRA_CA_CERTS from $HOME/.gemini/.env', async () => {
-    writeEnv(fakeHome, 'NODE_EXTRA_CA_CERTS=/corp/ca.pem\n');
-    const injected = await loadTlsEnvFromGemini(
-      {},
-      { cwd: fakeCwd, homeDir: fakeHome },
-    );
+    writeHomeEnv('NODE_EXTRA_CA_CERTS=/corp/ca.pem\n');
+    const injected = await loadTlsEnvFromGemini({}, { homeDir: fakeHome });
     expect(injected).toEqual({ NODE_EXTRA_CA_CERTS: '/corp/ca.pem' });
   });
 
-  it('prefers project .gemini/.env over home', async () => {
-    writeEnv(fakeHome, 'NODE_EXTRA_CA_CERTS=/home/ca.pem\n');
-    writeEnv(fakeCwd, 'NODE_EXTRA_CA_CERTS=/project/ca.pem\n');
-    const injected = await loadTlsEnvFromGemini(
-      {},
-      { cwd: fakeCwd, homeDir: fakeHome },
+  it('reads multiple allowlisted vars from the same file', async () => {
+    writeHomeEnv(
+      [
+        'NODE_EXTRA_CA_CERTS=/corp/ca.pem',
+        'HTTPS_PROXY=http://proxy.example:8080',
+        '',
+      ].join('\n'),
     );
-    expect(injected.NODE_EXTRA_CA_CERTS).toBe('/project/ca.pem');
-  });
-
-  it('falls back to home for keys missing in project file', async () => {
-    writeEnv(fakeHome, 'HTTPS_PROXY=http://home-proxy:8080\n');
-    writeEnv(fakeCwd, 'NODE_EXTRA_CA_CERTS=/project/ca.pem\n');
-    const injected = await loadTlsEnvFromGemini(
-      {},
-      { cwd: fakeCwd, homeDir: fakeHome },
-    );
-    expect(injected.NODE_EXTRA_CA_CERTS).toBe('/project/ca.pem');
-    expect(injected.HTTPS_PROXY).toBe('http://home-proxy:8080');
+    const injected = await loadTlsEnvFromGemini({}, { homeDir: fakeHome });
+    expect(injected.NODE_EXTRA_CA_CERTS).toBe('/corp/ca.pem');
+    expect(injected.HTTPS_PROXY).toBe('http://proxy.example:8080');
   });
 
   it('does NOT override keys already set in currentEnv (shell wins)', async () => {
-    writeEnv(fakeHome, 'NODE_EXTRA_CA_CERTS=/home/ca.pem\n');
+    writeHomeEnv('NODE_EXTRA_CA_CERTS=/home/ca.pem\n');
     const injected = await loadTlsEnvFromGemini(
       { NODE_EXTRA_CA_CERTS: '/shell/ca.pem' },
-      { cwd: fakeCwd, homeDir: fakeHome },
+      { homeDir: fakeHome },
     );
     expect(injected).toEqual({});
   });
 
-  it('skips non-allowlisted keys', async () => {
-    writeEnv(
-      fakeHome,
+  it('skips non-allowlisted keys (e.g. GEMINI_API_KEY, FOO)', async () => {
+    writeHomeEnv(
       [
         'NODE_EXTRA_CA_CERTS=/corp/ca.pem',
         'FOO=bar',
@@ -191,41 +132,51 @@ describe('loadTlsEnvFromGemini', () => {
         '',
       ].join('\n'),
     );
-    const injected = await loadTlsEnvFromGemini(
-      {},
-      { cwd: fakeCwd, homeDir: fakeHome },
-    );
+    const injected = await loadTlsEnvFromGemini({}, { homeDir: fakeHome });
     expect(injected).toEqual({ NODE_EXTRA_CA_CERTS: '/corp/ca.pem' });
     expect(injected).not.toHaveProperty('FOO');
     expect(injected).not.toHaveProperty('GEMINI_API_KEY');
   });
 
-  it('returns empty object when no .env files exist', async () => {
-    const injected = await loadTlsEnvFromGemini(
-      {},
-      { cwd: fakeCwd, homeDir: fakeHome },
-    );
+  it('returns empty object when no home .env file exists', async () => {
+    const injected = await loadTlsEnvFromGemini({}, { homeDir: fakeHome });
     expect(injected).toEqual({});
   });
 
+  it('does NOT read project-local .gemini/.env (trust-gated; child handles it)', async () => {
+    // Create a project .gemini/.env with a TLS var; the parent must NOT
+    // load it (because the parent cannot cheaply verify workspace trust).
+    // The child's loadEnvironment() picks up project files under its full
+    // trust model — we only assert the parent helper stays HOME-only.
+    const fakeCwd = path.join(tmpRoot, 'project');
+    fs.mkdirSync(path.join(fakeCwd, '.gemini'), { recursive: true });
+    fs.writeFileSync(
+      path.join(fakeCwd, '.gemini', '.env'),
+      'NODE_EXTRA_CA_CERTS=/project/ca.pem\n',
+    );
+    const previousCwd = process.cwd();
+    try {
+      process.chdir(fakeCwd);
+      const injected = await loadTlsEnvFromGemini({}, { homeDir: fakeHome });
+      expect(injected).toEqual({});
+    } finally {
+      process.chdir(previousCwd);
+    }
+  });
+
   it('tolerates malformed .env content without throwing', async () => {
-    writeEnv(
-      fakeHome,
+    writeHomeEnv(
       'this is not valid dotenv content !@#$\nNODE_EXTRA_CA_CERTS=/corp/ca.pem\n',
     );
-    const injected = await loadTlsEnvFromGemini(
-      {},
-      { cwd: fakeCwd, homeDir: fakeHome },
-    );
+    const injected = await loadTlsEnvFromGemini({}, { homeDir: fakeHome });
     expect(injected.NODE_EXTRA_CA_CERTS).toBe('/corp/ca.pem');
   });
 
-  it('supports custom allowlist for injecting other keys', async () => {
-    writeEnv(fakeHome, 'CUSTOM_KEY=custom_value\nFOO=bar\n');
+  it('supports custom allowlist', async () => {
+    writeHomeEnv('CUSTOM_KEY=custom_value\nFOO=bar\n');
     const injected = await loadTlsEnvFromGemini(
       {},
       {
-        cwd: fakeCwd,
         homeDir: fakeHome,
         allowlist: ['CUSTOM_KEY'],
       },
@@ -237,11 +188,8 @@ describe('loadTlsEnvFromGemini', () => {
     const lines = PARENT_PROCESS_TLS_ENV_ALLOWLIST.map(
       (k) => `${k}=value_for_${k}`,
     );
-    writeEnv(fakeHome, lines.join('\n') + '\n');
-    const injected = await loadTlsEnvFromGemini(
-      {},
-      { cwd: fakeCwd, homeDir: fakeHome },
-    );
+    writeHomeEnv(lines.join('\n') + '\n');
+    const injected = await loadTlsEnvFromGemini({}, { homeDir: fakeHome });
     for (const key of PARENT_PROCESS_TLS_ENV_ALLOWLIST) {
       expect(injected[key]).toBe(`value_for_${key}`);
     }

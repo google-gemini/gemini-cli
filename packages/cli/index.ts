@@ -76,37 +76,25 @@ export function parseSimpleEnv(content: string): Record<string, string> {
 }
 
 /**
- * Walk up from `startDir` looking for `<dir>/.gemini/.env`. Returns the first
- * hit, or `null` if none is found before the filesystem root.
- */
-export function findProjectGeminiEnvFile(
-  startDir: string,
-  fsImpl: { existsSync: (p: string) => boolean },
-  pathImpl: {
-    resolve: (p: string) => string;
-    join: (...parts: string[]) => string;
-    dirname: (p: string) => string;
-  },
-): string | null {
-  let currentDir = pathImpl.resolve(startDir);
-  for (;;) {
-    const candidate = pathImpl.join(currentDir, GEMINI_DIR_NAME, ENV_FILE_NAME);
-    if (fsImpl.existsSync(candidate)) return candidate;
-    const parent = pathImpl.dirname(currentDir);
-    if (!parent || parent === currentDir) return null;
-    currentDir = parent;
-  }
-}
-
-/**
- * Read TLS-init-critical environment variables from `.gemini/.env` (project
- * first, then home) and return the subset that is both in the allowlist and
- * NOT already set in `currentEnv`. Never throws.
+ * Read TLS-init-critical environment variables from the user's
+ * `$HOME/.gemini/.env` and return the subset that is both in the allowlist
+ * and NOT already set in `currentEnv`. Never throws.
+ *
+ * This is deliberately scoped to the HOME-level file only. Project-local
+ * `<cwd>/.gemini/.env` is gated by the child's full workspace-trust check
+ * in `loadEnvironment()`, and reproducing that trust logic in the
+ * lightweight parent process would require either duplicating the
+ * longest-match + TRUST_PARENT resolution or importing heavy modules
+ * (which defeats the purpose of PR #24667). Extending this helper to
+ * project-local files after factoring the trust check into a shared
+ * standalone helper is a planned follow-up.
+ *
+ * The reporter's use case on #25987 (enterprise CA cert for an entire
+ * machine) is satisfied by the HOME-level path.
  */
 export async function loadTlsEnvFromGemini(
   currentEnv: NodeJS.ProcessEnv,
   options?: {
-    cwd?: string;
     homeDir?: string;
     allowlist?: readonly string[];
   },
@@ -116,43 +104,22 @@ export async function loadTlsEnvFromGemini(
     const { readFileSync, existsSync } = await import('node:fs');
     const pathMod = await import('node:path');
     const allowlist = options?.allowlist ?? PARENT_PROCESS_TLS_ENV_ALLOWLIST;
-    const cwd = options?.cwd ?? process.cwd();
     const homeDir = options?.homeDir ?? os.homedir();
 
-    const candidates: string[] = [];
-    const projectFile = findProjectGeminiEnvFile(
-      cwd,
-      { existsSync },
-      {
-        resolve: pathMod.resolve,
-        join: pathMod.join,
-        dirname: pathMod.dirname,
-      },
-    );
-    if (projectFile) candidates.push(projectFile);
-
     const homeFile = pathMod.join(homeDir, GEMINI_DIR_NAME, ENV_FILE_NAME);
-    if (homeFile !== projectFile && existsSync(homeFile)) {
-      candidates.push(homeFile);
-    }
+    if (!existsSync(homeFile)) return injected;
 
-    for (const file of candidates) {
-      let parsed: Record<string, string>;
-      try {
-        const content = readFileSync(file, 'utf-8');
-        parsed = parseSimpleEnv(content);
-      } catch {
-        // Ignore unreadable files (EACCES, ENOENT after race, etc.)
-        continue;
-      }
-      for (const key of allowlist) {
-        if (
-          Object.hasOwn(parsed, key) &&
-          !Object.hasOwn(injected, key) &&
-          !Object.hasOwn(currentEnv, key)
-        ) {
-          injected[key] = parsed[key];
-        }
+    let parsed: Record<string, string>;
+    try {
+      const content = readFileSync(homeFile, 'utf-8');
+      parsed = parseSimpleEnv(content);
+    } catch {
+      // Unreadable (EACCES, race on ENOENT, etc.) — silently skip.
+      return injected;
+    }
+    for (const key of allowlist) {
+      if (Object.hasOwn(parsed, key) && !Object.hasOwn(currentEnv, key)) {
+        injected[key] = parsed[key];
       }
     }
   } catch {
