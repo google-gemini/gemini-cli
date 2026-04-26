@@ -998,6 +998,7 @@ export async function loadCliConfig(
     extensionLoader: extensionManager,
     extensionRegistryURI,
     enableExtensionReloading: settings.experimental?.extensionReloading,
+    enableWindowsBash: settings.experimental?.windowsBash,
     enableAgents: settings.experimental?.enableAgents,
     plan: settings.general?.plan?.enabled ?? true,
     voiceMode: settings.experimental?.voiceMode,

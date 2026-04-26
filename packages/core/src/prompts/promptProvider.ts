@@ -228,6 +228,7 @@ export class PromptProvider {
             interactiveShellEnabled: context.config.isInteractiveShellEnabled(),
             topicUpdateNarration: isTopicUpdateNarrationEnabled,
             memoryV2Enabled: context.config.isMemoryV2Enabled(),
+            windowsBashActive: context.config.getEnableWindowsBash(),
             userProjectMemoryPath: context.config.isMemoryV2Enabled()
               ? getProjectMemoryIndexFilePath(context.config.storage)
               : undefined,

@@ -75,6 +75,7 @@ export interface OperationalGuidelinesOptions {
   interactiveShellEnabled: boolean;
   topicUpdateNarration?: boolean;
   memoryV2Enabled: boolean;
+  windowsBashActive?: boolean;
   /**
    * Absolute path to the user's per-project private memory index. See
    * snippets.ts for full semantics.
@@ -284,7 +285,7 @@ export function renderOperationalGuidelines(
   return `
 # Operational Guidelines
 
-${shellEfficiencyGuidelines(options.enableShellEfficiency)}
+${shellEfficiencyGuidelines(options.enableShellEfficiency, options.windowsBashActive)}
 
 ## Tone and Style (CLI Interaction)
 - **Concise & Direct:** Adopt a professional, direct, and concise tone suitable for a CLI environment.
@@ -655,12 +656,17 @@ function planningPhaseSuggestion(options: PrimaryWorkflowsOptions): string {
   return '';
 }
 
-function shellEfficiencyGuidelines(enabled: boolean): string {
+function shellEfficiencyGuidelines(
+  enabled: boolean,
+  windowsBashActive?: boolean,
+): string {
   if (!enabled) return '';
-  const isWindows = process.platform === 'win32';
-  const inspectExample = isWindows
-    ? "using commands like 'type' or 'findstr' (on CMD) and 'Get-Content' or 'Select-String' (on PowerShell)"
-    : "using commands like 'grep', 'tail', 'head'";
+  const usePosixShell =
+    process.platform !== 'win32' ||
+    (process.platform === 'win32' && windowsBashActive);
+  const inspectExample = usePosixShell
+    ? "using commands like 'grep', 'tail', 'head'"
+    : "using commands like 'type' or 'findstr' (on CMD) and 'Get-Content' or 'Select-String' (on PowerShell)";
   return `
 ## Shell tool output token efficiency:
 

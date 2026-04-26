@@ -17,6 +17,7 @@ import { getCachedEncodingForBuffer } from '../utils/systemEncoding.js';
 import {
   getShellConfiguration,
   resolveExecutable,
+  resolveBashOnPath,
   type ShellType,
 } from '../utils/shell-utils.js';
 import { isBinary, truncateString } from '../utils/textUtils.js';
@@ -105,6 +106,7 @@ export interface ShellExecutionConfig {
   backgroundCompletionBehavior?: 'inject' | 'notify' | 'silent';
   originalCommand?: string;
   sessionId?: string;
+  enableWindowsBash?: boolean;
 }
 
 /**
@@ -408,6 +410,25 @@ export class ShellExecutionService {
       !shellExecutionConfig.sandboxConfig?.networkAccess;
 
     let { executable, argsPrefix, shell } = getShellConfiguration();
+
+    if (
+      shellExecutionConfig.enableWindowsBash &&
+      isWindows &&
+      !isStrictSandbox
+    ) {
+      const bashOnPath = await resolveBashOnPath();
+      if (bashOnPath) {
+        executable = bashOnPath;
+        argsPrefix = ['-c'];
+        shell = 'bash';
+      } else {
+        debugLogger.warn(
+          '[shell] experimental.windowsBash is enabled but bash was not found ' +
+            'on PATH. Falling back to PowerShell.',
+        );
+      }
+    }
+
     if (isStrictSandbox) {
       shell = 'cmd';
       argsPrefix = ['/c'];

@@ -2287,6 +2287,21 @@ const SETTINGS_SCHEMA = {
           'Enable model steering (user hints) to guide the model during tool execution.',
         showInDialog: true,
       },
+      windowsBash: {
+        type: 'boolean',
+        label: 'Windows Bash',
+        category: 'Experimental',
+        requiresRestart: false,
+        default: false,
+        description:
+          'On Windows, route all shell commands through a bash binary on PATH so ' +
+          'the model can use Unix syntax (&&, ||, /dev/null, rm -rf, …) without ' +
+          'translation. Requires Git for Windows (recommended): ' +
+          'https://git-scm.com/download/win. Other bash variants on PATH (WSL, ' +
+          'MSYS2, Cygwin) also work. No-op on non-Windows. Falls back to ' +
+          'PowerShell with a warning if no bash is found on PATH.',
+        showInDialog: true,
+      },
       directWebFetch: {
         type: 'boolean',
         label: 'Direct Web Fetch',

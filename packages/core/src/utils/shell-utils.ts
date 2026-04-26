@@ -13,6 +13,7 @@ import {
   spawnSync,
   type SpawnOptionsWithoutStdio,
 } from 'node:child_process';
+import type { Config } from '../config/config.js';
 
 /**
  * Extracts the primary command name from a potentially wrapped shell command.
@@ -679,6 +680,24 @@ export function getShellConfiguration(): ShellConfiguration {
  * Export the platform detection constant for use in process management (e.g., killing processes).
  */
 export const isWindows = () => os.platform() === 'win32';
+
+let cachedBashPath: string | null | undefined;
+
+export async function resolveBashOnPath(): Promise<string | undefined> {
+  if (cachedBashPath !== undefined) return cachedBashPath ?? undefined;
+  const found = await resolveExecutable('bash');
+  cachedBashPath = found ?? null;
+  return found;
+}
+
+export function clearBashPathCache(): void {
+  cachedBashPath = undefined;
+}
+
+export function isPosixShellEffective(config: Config): boolean {
+  if (!isWindows()) return true;
+  return config.getEnableWindowsBash() && !!cachedBashPath;
+}
 
 /**
  * Escapes a string so that it can be safely used as a single argument

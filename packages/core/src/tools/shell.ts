@@ -600,6 +600,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
             backgroundCompletionBehavior:
               this.context.config.getShellBackgroundCompletionBehavior(),
             originalCommand: strippedCommand,
+            enableWindowsBash: this.context.config.getEnableWindowsBash(),
           },
         );
 

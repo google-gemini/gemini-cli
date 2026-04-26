@@ -643,6 +643,7 @@ export interface ConfigParameters {
   extensionLoader?: ExtensionLoader;
   enabledExtensions?: string[];
   enableExtensionReloading?: boolean;
+  enableWindowsBash?: boolean;
   allowedMcpServers?: string[];
   blockedMcpServers?: string[];
   allowedEnvironmentVariables?: string[];
@@ -835,6 +836,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly _extensionLoader: ExtensionLoader;
   private readonly _enabledExtensions: string[];
   private readonly enableExtensionReloading: boolean;
+  private readonly enableWindowsBash: boolean;
   fallbackModelHandler?: FallbackModelHandler;
   validationHandler?: ValidationHandler;
   private quotaErrorOccurred: boolean = false;
@@ -1296,6 +1298,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.extensionManagement = params.extensionManagement ?? true;
     this.extensionRegistryURI = params.extensionRegistryURI;
     this.enableExtensionReloading = params.enableExtensionReloading ?? false;
+    this.enableWindowsBash = params.enableWindowsBash ?? false;
     this.storage = new Storage(this.targetDir, this._sessionId);
     this.storage.setCustomPlansDir(params.planSettings?.directory);
 
@@ -2962,6 +2965,10 @@ export class Config implements McpContext, AgentLoopContext {
 
   getEnableExtensionReloading(): boolean {
     return this.enableExtensionReloading;
+  }
+
+  getEnableWindowsBash(): boolean {
+    return this.enableWindowsBash;
   }
 
   getDisableLLMCorrection(): boolean {
