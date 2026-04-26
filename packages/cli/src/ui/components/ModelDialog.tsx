@@ -14,6 +14,8 @@ import {
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
+  GEMMA_4_31B_IT_MODEL,
+  GEMMA_4_26B_A4B_IT_MODEL,
   ModelSlashCommandEvent,
   logModelSlashCommand,
   getDisplayString,
@@ -181,6 +183,124 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
         title: `${option.displayName}${favoriteModels.has(option.modelId) ? ' ★' : ''}`,
         key: option.modelId,
       })), [availableModelOptions, favoriteModels]);
+  }, [
+    config,
+    shouldShowPreviewModels,
+    manualModelSelected,
+    useGemini31,
+    useGemini31FlashLite,
+    useCustomToolModel,
+    hasAccessToProModel,
+  ]);
+
+  const manualOptions = useMemo(() => {
+    // --- DYNAMIC PATH ---
+    if (
+      config?.getExperimentalDynamicModelConfiguration?.() === true &&
+      config.getModelConfigService
+    ) {
+      const allOptions = config
+        .getModelConfigService()
+        .getAvailableModelOptions({
+          useGemini3_1: useGemini31,
+          useGemini3_1FlashLite: useGemini31FlashLite,
+          useCustomTools: useCustomToolModel,
+          hasAccessToPreview: shouldShowPreviewModels,
+          hasAccessToProModel,
+        });
+
+      return allOptions
+        .filter((o) => o.tier !== 'auto')
+        .map((o) => ({
+          value: o.modelId,
+          title: o.name,
+          key: o.modelId,
+        }));
+    }
+
+    // --- LEGACY PATH ---
+    const showGemmaModels = config?.getExperimentalGemma() ?? false;
+
+    const options = [
+      {
+        value: DEFAULT_GEMINI_MODEL,
+        title: getDisplayString(DEFAULT_GEMINI_MODEL),
+        key: DEFAULT_GEMINI_MODEL,
+      },
+      {
+        value: DEFAULT_GEMINI_FLASH_MODEL,
+        title: getDisplayString(DEFAULT_GEMINI_FLASH_MODEL),
+        key: DEFAULT_GEMINI_FLASH_MODEL,
+      },
+      {
+        value: DEFAULT_GEMINI_FLASH_LITE_MODEL,
+        title: getDisplayString(DEFAULT_GEMINI_FLASH_LITE_MODEL),
+        key: DEFAULT_GEMINI_FLASH_LITE_MODEL,
+      },
+    ];
+
+    if (showGemmaModels) {
+      options.push(
+        {
+          value: GEMMA_4_31B_IT_MODEL,
+          title: getDisplayString(GEMMA_4_31B_IT_MODEL),
+          key: GEMMA_4_31B_IT_MODEL,
+        },
+        {
+          value: GEMMA_4_26B_A4B_IT_MODEL,
+          title: getDisplayString(GEMMA_4_26B_A4B_IT_MODEL),
+          key: GEMMA_4_26B_A4B_IT_MODEL,
+        },
+      );
+    }
+
+    if (shouldShowPreviewModels) {
+      const previewProModel = useGemini31
+        ? PREVIEW_GEMINI_3_1_MODEL
+        : PREVIEW_GEMINI_MODEL;
+
+      const previewProValue = useCustomToolModel
+        ? PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL
+        : previewProModel;
+
+      const previewOptions = [
+        {
+          value: previewProValue,
+          title: getDisplayString(previewProModel),
+          key: previewProModel,
+        },
+        {
+          value: PREVIEW_GEMINI_FLASH_MODEL,
+          title: getDisplayString(PREVIEW_GEMINI_FLASH_MODEL),
+          key: PREVIEW_GEMINI_FLASH_MODEL,
+        },
+      ];
+
+      if (useGemini31FlashLite) {
+        previewOptions.push({
+          value: PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL,
+          title: getDisplayString(PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL),
+          key: PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL,
+        });
+      }
+
+      options.unshift(...previewOptions);
+    }
+
+    if (!hasAccessToProModel) {
+      // Filter out all Pro models for free tier
+      return options.filter((option) => !isProModel(option.value));
+    }
+
+    return options;
+  }, [
+    shouldShowPreviewModels,
+    useGemini31,
+    useGemini31FlashLite,
+    useCustomToolModel,
+    hasAccessToProModel,
+    config,
+  ]);
 
   const options = view === 'main' ? mainOptions : manualOptions;
 
