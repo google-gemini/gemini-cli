@@ -362,14 +362,55 @@ function createDataListener(keypressHandler: KeypressHandler) {
   let timeoutId: NodeJS.Timeout;
   return (data: string) => {
     clearTimeout(timeoutId);
-    for (const char of data) {
-      parser.next(char);
+
+    // Optimize: Batch printable characters to avoid thousands of generator yields
+    // for large raw pastes.
+    let i = 0;
+    while (i < data.length) {
+      const ch = data[i]!;
+      if (ch < ' ' || ch === ESC || ch === '\x7f') {
+        // Control character or escape sequence, must go through the generator
+        // parser to handle correctly (e.g. TAB for completion, ESC sequences).
+        parser.next(ch);
+        i++;
+      } else {
+        // Collect as many printable (non-control) characters as possible
+        let batch = '';
+        while (
+          i < data.length &&
+          data[i]! >= ' ' &&
+          data[i] !== ESC &&
+          data[i] !== '\x7f'
+        ) {
+          batch += data[i];
+          i++;
+        }
+
+        if (batch.length > 1) {
+          // If we have more than one char, emit it as a 'paste' event
+          // to bypass individual keypress logic and re-renders.
+          keypressHandler({
+            name: 'paste',
+            shift: false,
+            alt: false,
+            ctrl: false,
+            cmd: false,
+            insertable: true,
+            sequence: batch,
+          });
+        } else if (batch.length === 1) {
+          // Single character, use standard parser
+          parser.next(batch);
+        }
+      }
     }
+
     if (data.length !== 0) {
       timeoutId = setTimeout(() => parser.next(''), ESC_TIMEOUT);
     }
   };
 }
+
 
 /**
  * Translates raw keypress characters into key events.
