@@ -486,7 +486,7 @@ describe('getShellConfiguration', () => {
     });
 
     it('should prefer pwsh.exe over powershell.exe when pwsh is available in PATH', () => {
-      const pwshDir = path.resolve('/Program Files/PowerShell/7');
+      const pwshDir = path.resolve('C:\\Program Files\\PowerShell\\7');
       const pwshPath = path.join(pwshDir, 'pwsh.exe');
       vi.stubEnv('PATH', pwshDir);
       mockAccessSync.mockImplementation((p: string) => {
