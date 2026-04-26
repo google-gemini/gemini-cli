@@ -6,7 +6,7 @@
 
 import { Text } from 'ink';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render } from '../../test-utils/render.js';
+import { renderWithProviders as render } from '../../test-utils/render.js';
 import { act } from 'react';
 import { ConsentPrompt } from './ConsentPrompt.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
@@ -126,6 +126,25 @@ describe('ConsentPrompt', () => {
       }),
       undefined,
     );
+    unmount();
+  });
+
+  it('calls onConfirm with false when ESC is pressed', async () => {
+    const prompt = 'Are you sure?';
+    const { stdin, waitUntilReady, unmount } = await render(
+      <ConsentPrompt
+        prompt={prompt}
+        onConfirm={onConfirm}
+        terminalWidth={terminalWidth}
+      />,
+    );
+
+    await act(async () => {
+      stdin.write('\x1b'); // ESC key
+    });
+    await waitUntilReady();
+
+    expect(onConfirm).toHaveBeenCalledWith(false);
     unmount();
   });
 });

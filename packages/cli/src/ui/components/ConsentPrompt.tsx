@@ -10,6 +10,9 @@ import { theme } from '../semantic-colors.js';
 import { MarkdownDisplay } from '../utils/MarkdownDisplay.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import { DialogFooter } from './shared/DialogFooter.js';
+import { useKeypress } from '../hooks/useKeypress.js';
+import { Command } from '../key/keyMatchers.js';
+import { useKeyMatchers } from '../hooks/useKeyMatchers.js';
 
 type ConsentPromptProps = {
   // If a simple string is given, it will render using markdown by default.
@@ -20,6 +23,18 @@ type ConsentPromptProps = {
 
 export const ConsentPrompt = (props: ConsentPromptProps) => {
   const { prompt, onConfirm, terminalWidth } = props;
+  const keyMatchers = useKeyMatchers();
+
+  useKeypress(
+    (key) => {
+      if (keyMatchers[Command.ESCAPE](key)) {
+        onConfirm(false);
+        return true;
+      }
+      return false;
+    },
+    { isActive: true },
+  );
 
   return (
     <Box
