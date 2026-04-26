@@ -38,6 +38,7 @@ export interface CoreToolSet {
     enableInteractiveShell: boolean,
     enableEfficiency: boolean,
     enableToolSandboxing: boolean,
+    enableWindowsBash?: boolean,
   ) => FunctionDeclaration;
   replace: FunctionDeclaration;
   google_web_search: FunctionDeclaration;

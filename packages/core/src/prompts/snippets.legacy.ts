@@ -278,6 +278,13 @@ ${newApplicationSteps(options)}
 `.trim();
 }
 
+function shellEnvironmentNote(windowsBashActive?: boolean): string {
+  if (!windowsBashActive) return '';
+  return `## Shell Environment
+Shell: bash (Git for Windows / MSYS2 / WSL). Use Unix syntax for all shell commands: \`&&\`, \`||\`, pipes, \`/dev/null\`, \`grep\`, \`awk\`, \`sed\`, \`find\`, etc. Do not use PowerShell syntax or cmdlets.
+`;
+}
+
 export function renderOperationalGuidelines(
   options?: OperationalGuidelinesOptions,
 ): string {
@@ -285,7 +292,7 @@ export function renderOperationalGuidelines(
   return `
 # Operational Guidelines
 
-${shellEfficiencyGuidelines(options.enableShellEfficiency, options.windowsBashActive)}
+${shellEnvironmentNote(options.windowsBashActive)}${shellEfficiencyGuidelines(options.enableShellEfficiency, options.windowsBashActive)}
 
 ## Tone and Style (CLI Interaction)
 - **Concise & Direct:** Adopt a professional, direct, and concise tone suitable for a CLI environment.

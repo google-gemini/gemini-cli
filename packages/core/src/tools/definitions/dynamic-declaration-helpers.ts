@@ -36,6 +36,7 @@ import {
 export function getShellToolDescription(
   enableInteractiveShell: boolean,
   enableEfficiency: boolean,
+  enableWindowsBash: boolean = false,
 ): string {
   const efficiencyGuidelines = enableEfficiency
     ? `
@@ -56,7 +57,7 @@ export function getShellToolDescription(
       Background PIDs: Only included if background processes were started.
       Process Group PGID: Only included if available.`;
 
-  if (os.platform() === 'win32') {
+  if (os.platform() === 'win32' && !enableWindowsBash) {
     const backgroundInstructions = enableInteractiveShell
       ? `To run a command in the background, set the \`${SHELL_PARAM_IS_BACKGROUND}\` parameter to true. Do NOT use PowerShell background constructs.`
       : 'Command can start background processes using PowerShell constructs such as `Start-Process -NoNewWindow` or `Start-Job`.';
@@ -72,8 +73,10 @@ export function getShellToolDescription(
 /**
  * Returns the platform-specific description for the 'command' parameter.
  */
-export function getCommandDescription(): string {
-  if (os.platform() === 'win32') {
+export function getCommandDescription(
+  enableWindowsBash: boolean = false,
+): string {
+  if (os.platform() === 'win32' && !enableWindowsBash) {
     return 'Exact command to execute as `powershell.exe -NoProfile -Command <command>`';
   }
   return 'Exact bash command to execute as `bash -c <command>`';
@@ -86,19 +89,21 @@ export function getShellDeclaration(
   enableInteractiveShell: boolean,
   enableEfficiency: boolean,
   enableToolSandboxing: boolean = false,
+  enableWindowsBash: boolean = false,
 ): FunctionDeclaration {
   return {
     name: SHELL_TOOL_NAME,
     description: getShellToolDescription(
       enableInteractiveShell,
       enableEfficiency,
+      enableWindowsBash,
     ),
     parametersJsonSchema: {
       type: 'object',
       properties: {
         [SHELL_PARAM_COMMAND]: {
           type: 'string',
-          description: getCommandDescription(),
+          description: getCommandDescription(enableWindowsBash),
         },
         [PARAM_DESCRIPTION]: {
           type: 'string',

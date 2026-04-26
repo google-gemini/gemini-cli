@@ -339,11 +339,13 @@ export const DEFAULT_LEGACY_SET: CoreToolSet = {
     enableInteractiveShell,
     enableEfficiency,
     enableToolSandboxing,
+    enableWindowsBash,
   ) =>
     getShellDeclaration(
       enableInteractiveShell,
       enableEfficiency,
       enableToolSandboxing,
+      enableWindowsBash,
     ),
 
   replace: {

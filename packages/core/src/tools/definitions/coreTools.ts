@@ -251,18 +251,21 @@ export function getShellDefinition(
   enableInteractiveShell: boolean,
   enableEfficiency: boolean,
   enableToolSandboxing: boolean = false,
+  enableWindowsBash: boolean = false,
 ): ToolDefinition {
   return {
     base: getShellDeclaration(
       enableInteractiveShell,
       enableEfficiency,
       enableToolSandboxing,
+      enableWindowsBash,
     ),
     overrides: (modelId) =>
       getToolSet(modelId).run_shell_command(
         enableInteractiveShell,
         enableEfficiency,
         enableToolSandboxing,
+        enableWindowsBash,
       ),
   };
 }

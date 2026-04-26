@@ -683,11 +683,71 @@ export const isWindows = () => os.platform() === 'win32';
 
 let cachedBashPath: string | null | undefined;
 
+function resolveGitForWindowsBash(): string | undefined {
+  if (os.platform() !== 'win32') return undefined;
+
+  // Registry probe: Git for Windows always writes its install path here, even
+  // when the installer is configured not to add bash to PATH.
+  try {
+    const result = spawnSync(
+      'reg',
+      ['query', 'HKLM\\SOFTWARE\\GitForWindows', '/v', 'InstallPath'],
+      { encoding: 'utf8', windowsHide: true, timeout: 3000 },
+    );
+    if (result.status === 0 && result.stdout) {
+      const match = /InstallPath\s+REG_SZ\s+(.+)/i.exec(result.stdout);
+      if (match) {
+        const candidate = path.join(match[1].trim(), 'bin', 'bash.exe');
+        if (fs.existsSync(candidate)) return candidate;
+      }
+    }
+  } catch {
+    // Registry unavailable; fall through to filesystem probes.
+  }
+
+  // Filesystem probes for well-known default install locations.
+  const probes = [
+    path.join(
+      process.env['ProgramFiles'] ?? 'C:\\Program Files',
+      'Git',
+      'bin',
+      'bash.exe',
+    ),
+    path.join(
+      process.env['ProgramFiles(x86)'] ?? 'C:\\Program Files (x86)',
+      'Git',
+      'bin',
+      'bash.exe',
+    ),
+    path.join(
+      process.env['LOCALAPPDATA'] ?? '',
+      'Programs',
+      'Git',
+      'bin',
+      'bash.exe',
+    ),
+  ];
+  for (const candidate of probes) {
+    if (candidate && fs.existsSync(candidate)) return candidate;
+  }
+
+  return undefined;
+}
+
 export async function resolveBashOnPath(): Promise<string | undefined> {
   if (cachedBashPath !== undefined) return cachedBashPath ?? undefined;
+
+  // 1. PATH search.
   const found = await resolveExecutable('bash');
-  cachedBashPath = found ?? null;
-  return found;
+  if (found) {
+    cachedBashPath = found;
+    return found;
+  }
+
+  // 2. Windows-specific: registry + filesystem probes.
+  const gitBash = resolveGitForWindowsBash();
+  cachedBashPath = gitBash ?? null;
+  return gitBash;
 }
 
 export function clearBashPathCache(): void {

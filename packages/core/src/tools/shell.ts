@@ -988,6 +988,7 @@ export class ShellTool extends BaseDeclarativeTool<
       context.config.getEnableInteractiveShell(),
       context.config.getEnableShellOutputEfficiency(),
       context.config.getSandboxEnabled(),
+      context.config.getEnableWindowsBash(),
     );
     super(
       ShellTool.Name,
@@ -1038,6 +1039,7 @@ export class ShellTool extends BaseDeclarativeTool<
       this.context.config.getEnableInteractiveShell(),
       this.context.config.getEnableShellOutputEfficiency(),
       this.context.config.getSandboxEnabled(),
+      this.context.config.getEnableWindowsBash(),
     );
     return resolveToolDeclaration(definition, modelId);
   }

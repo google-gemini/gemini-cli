@@ -84,6 +84,7 @@ export interface OperationalGuidelinesOptions {
   interactiveShellEnabled: boolean;
   topicUpdateNarration: boolean;
   memoryV2Enabled: boolean;
+  windowsBashActive?: boolean;
   /**
    * Absolute path to the user's per-project private memory index
    * (e.g. ~/.gemini/tmp/<project-hash>/memory/MEMORY.md). Surfaced to the
@@ -378,6 +379,13 @@ ${newApplicationSteps(options)}
 `.trim();
 }
 
+function shellEnvironmentNote(windowsBashActive?: boolean): string {
+  if (!windowsBashActive) return '';
+  return `## Shell Environment
+Shell: bash (Git for Windows / MSYS2 / WSL). Use Unix syntax for all shell commands: \`&&\`, \`||\`, pipes, \`/dev/null\`, \`grep\`, \`awk\`, \`sed\`, \`find\`, etc. Do not use PowerShell syntax or cmdlets.
+`;
+}
+
 export function renderOperationalGuidelines(
   options?: OperationalGuidelinesOptions,
 ): string {
@@ -385,7 +393,7 @@ export function renderOperationalGuidelines(
   return `
 # Operational Guidelines
 
-## Tone and Style
+${shellEnvironmentNote(options.windowsBashActive)}## Tone and Style
 
 - **Role:** A senior software engineer and collaborative peer programmer.
 - **High-Signal Output:** Focus exclusively on **intent** and **technical rationale**. Avoid conversational filler, apologies, and ${

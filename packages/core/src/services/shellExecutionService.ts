@@ -256,6 +256,7 @@ export type BackgroundProcessRecord = Omit<BackgroundProcess, 'pid'> & {
 export class ShellExecutionService {
   private static activePtys = new Map<number, ActivePty>();
   private static activeChildProcesses = new Map<number, ActiveChildProcess>();
+  private static windowsBashNotFoundWarned = false;
   private static backgroundLogPids = new Set<number>();
   private static backgroundLogStreams = new Map<number, fs.WriteStream>();
   private static backgroundProcessHistory = new Map<
@@ -422,9 +423,16 @@ export class ShellExecutionService {
         argsPrefix = ['-c'];
         shell = 'bash';
       } else {
+        if (!ShellExecutionService.windowsBashNotFoundWarned) {
+          ShellExecutionService.windowsBashNotFoundWarned = true;
+          process.stderr.write(
+            'Warning: experimental.windowsBash is enabled but no bash binary was found.\n' +
+              'Install Git for Windows (https://git-scm.com/download/win) or add bash to PATH.\n' +
+              'Falling back to PowerShell for this session.\n',
+          );
+        }
         debugLogger.warn(
-          '[shell] experimental.windowsBash is enabled but bash was not found ' +
-            'on PATH. Falling back to PowerShell.',
+          '[shell] experimental.windowsBash is enabled but bash was not found. Falling back to PowerShell.',
         );
       }
     }
@@ -470,6 +478,12 @@ export class ShellExecutionService {
       PAGER: shellExecutionConfig.pager ?? 'cat',
       GIT_PAGER: shellExecutionConfig.pager ?? 'cat',
     };
+
+    if (shell === 'bash' && isWindows) {
+      if (!baseEnv['MSYS_NO_PATHCONV']) baseEnv['MSYS_NO_PATHCONV'] = '1';
+      if (!baseEnv['LANG']) baseEnv['LANG'] = 'C.UTF-8';
+      if (!baseEnv['LC_ALL']) baseEnv['LC_ALL'] = 'C.UTF-8';
+    }
 
     if (!isInteractive) {
       // Ensure all GIT_CONFIG_* variables are preserved even if they were redacted
