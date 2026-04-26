@@ -12,6 +12,7 @@ import {
   Kind,
   type ToolInfoConfirmationDetails,
   ToolConfirmationOutcome,
+  type ExecuteOptions,
 } from './tools.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { Config } from '../config/config.js';
@@ -114,7 +115,7 @@ export class EnterPlanModeInvocation extends BaseToolInvocation<
     };
   }
 
-  async execute(_signal: AbortSignal): Promise<ToolResult> {
+  async execute({ abortSignal: _signal }: ExecuteOptions): Promise<ToolResult> {
     if (this.confirmationOutcome === ToolConfirmationOutcome.Cancel) {
       return {
         llmContent: 'User cancelled entering Plan Mode.',

@@ -15,6 +15,8 @@ describe('Frugal reads eval', () => {
    * nearby ranges into a single contiguous read to save tool calls.
    */
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should use ranged read when nearby lines are targeted',
     files: {
       'package.json': JSON.stringify({
@@ -135,6 +137,8 @@ describe('Frugal reads eval', () => {
    * apart to avoid the need to read the whole file.
    */
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should use ranged read when targets are far apart',
     files: {
       'package.json': JSON.stringify({
@@ -204,6 +208,8 @@ describe('Frugal reads eval', () => {
    * (e.g.: 10), as it's more efficient than many small ranged reads.
    */
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should read the entire file when there are many matches',
     files: {
       'package.json': JSON.stringify({

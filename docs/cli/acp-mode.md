@@ -44,8 +44,8 @@ and Gemini CLI (the server).
 
 - **Communication:** The entire communication happens over standard input/output
   (stdio) using the JSON-RPC 2.0 protocol.
-- **Client's role:** The client is responsible for sending requests (e.g.,
-  prompts) and handling responses and notifications from Gemini CLI.
+- **Client's role:** The client is responsible for sending requests (for
+  example, prompts) and handling responses and notifications from Gemini CLI.
 - **Gemini CLI's role:** In ACP mode, Gemini CLI listens for incoming JSON-RPC
   requests, processes them, and sends back responses.
 
@@ -72,8 +72,8 @@ leverage the IDE's capabilities to perform tasks. The MCP client logic is in
 
 ## Capabilities and supported methods
 
-The ACP protocol exposes a number of methods for ACP clients (e.g. IDEs) to
-control Gemini CLI.
+The ACP protocol exposes a number of methods for ACP clients (for example IDEs)
+to control Gemini CLI.
 
 ### Core methods
 
@@ -87,8 +87,8 @@ control Gemini CLI.
 
 ### Session control
 
-- `setSessionMode`: Allows changing the approval level for tool calls (e.g., to
-  `auto-approve`).
+- `setSessionMode`: Allows changing the approval level for tool calls (for
+  example, to `auto-approve`).
 - `unstable_setSessionModel`: Changes the model for the current session.
 
 ### File system proxy

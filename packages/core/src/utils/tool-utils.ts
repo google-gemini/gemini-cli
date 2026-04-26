@@ -11,16 +11,7 @@ import {
 } from '../index.js';
 import { SHELL_TOOL_NAMES } from './shell-utils.js';
 import levenshtein from 'fast-levenshtein';
-import { ApprovalMode } from '../policy/types.js';
-import {
-  CoreToolCallStatus,
-  type ToolCallResponseInfo,
-} from '../scheduler/types.js';
-import {
-  ASK_USER_DISPLAY_NAME,
-  WRITE_FILE_DISPLAY_NAME,
-  EDIT_DISPLAY_NAME,
-} from '../tools/tool-names.js';
+import type { ToolCallResponseInfo } from '../scheduler/types.js';
 
 /**
  * Validates if an object is a ToolCallResponseInfo.
@@ -34,62 +25,6 @@ export function isToolCallResponseInfo(
     'callId' in data &&
     'responseParts' in data
   );
-}
-
-/**
- * Options for determining if a tool call should be hidden in the CLI history.
- */
-export interface ShouldHideToolCallParams {
-  /** The display name of the tool. */
-  displayName: string;
-  /** The current status of the tool call. */
-  status: CoreToolCallStatus;
-  /** The approval mode active when the tool was called. */
-  approvalMode?: ApprovalMode;
-  /** Whether the tool has produced a result for display. */
-  hasResultDisplay: boolean;
-  /** The ID of the parent tool call, if any. */
-  parentCallId?: string;
-}
-
-/**
- * Determines if a tool call should be hidden from the standard tool history UI.
- *
- * We hide tools in several cases:
- * 1. Tool calls that have a parent, as they are "internal" to another tool (e.g. subagent).
- * 2. Ask User tools that are in progress, displayed via specialized UI.
- * 3. Ask User tools that errored without result display, typically param
- *    validation errors that the agent automatically recovers from.
- * 4. WriteFile and Edit tools when in Plan Mode, redundant because the
- *    resulting plans are displayed separately upon exiting plan mode.
- */
-export function shouldHideToolCall(params: ShouldHideToolCallParams): boolean {
-  const { displayName, status, approvalMode, hasResultDisplay, parentCallId } =
-    params;
-
-  if (parentCallId) {
-    return true;
-  }
-
-  switch (displayName) {
-    case ASK_USER_DISPLAY_NAME:
-      switch (status) {
-        case CoreToolCallStatus.Scheduled:
-        case CoreToolCallStatus.Validating:
-        case CoreToolCallStatus.Executing:
-        case CoreToolCallStatus.AwaitingApproval:
-          return true;
-        case CoreToolCallStatus.Error:
-          return !hasResultDisplay;
-        default:
-          return false;
-      }
-    case WRITE_FILE_DISPLAY_NAME:
-    case EDIT_DISPLAY_NAME:
-      return approvalMode === ApprovalMode.PLAN;
-    default:
-      return false;
-  }
 }
 
 /**

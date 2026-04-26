@@ -489,9 +489,10 @@ describe('LegacyAgentSession', () => {
       expect(toolResp?.content).toEqual([
         { type: 'text', text: 'Permission denied' },
       ]);
-      expect(toolResp?.displayContent).toEqual([
-        { type: 'text', text: 'Error display' },
-      ]);
+      expect(toolResp?.display?.result).toEqual({
+        type: 'text',
+        text: 'Error display',
+      });
     });
 
     it('stops on STOP_EXECUTION tool error', async () => {
