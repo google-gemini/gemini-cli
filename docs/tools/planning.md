@@ -11,7 +11,9 @@ by the agent when you ask it to "start a plan" using natural language. In this
 mode, the agent is restricted to read-only tools to allow for safe exploration
 and planning.
 
-> **Note:** This tool is not available when the CLI is in YOLO mode.
+<!-- prettier-ignore -->
+> [!NOTE]
+> This tool is not available when the CLI is in YOLO mode.
 
 - **Tool name:** `enter_plan_mode`
 - **Display name:** Enter Plan Mode
@@ -30,7 +32,9 @@ and planning.
 ## 2. `exit_plan_mode` (ExitPlanMode)
 
 `exit_plan_mode` signals that the planning phase is complete. It presents the
-finalized plan to the user and requests approval to start the implementation.
+finalized plan to the user and requests formal approval to start the
+implementation. The agent MUST reach an informal agreement with the user in the
+chat regarding the proposed strategy BEFORE calling this tool.
 
 - **Tool name:** `exit_plan_mode`
 - **Display name:** Exit Plan Mode
@@ -42,7 +46,7 @@ finalized plan to the user and requests approval to start the implementation.
 - **Behavior:**
   - Validates that the `plan_path` is within the allowed directory and that the
     file exists and has content.
-  - Presents the plan to the user for review.
+  - Presents the plan to the user for formal review.
   - If the user approves the plan:
     - Switches the CLI's approval mode to the user's chosen approval mode (
       `DEFAULT` or `AUTO_EDIT`).
@@ -54,5 +58,5 @@ finalized plan to the user and requests approval to start the implementation.
   - On approval: A message indicating the plan was approved and the new approval
     mode.
   - On rejection: A message containing the user's feedback.
-- **Confirmation:** Yes. Shows the finalized plan and asks for user approval to
-  proceed with implementation.
+- **Confirmation:** Yes. Shows the finalized plan and asks for user formal
+  approval to proceed with implementation.

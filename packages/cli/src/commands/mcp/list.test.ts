@@ -14,11 +14,16 @@ import {
   type Mock,
 } from 'vitest';
 import { listMcpServers } from './list.js';
-import { loadSettings, mergeSettings } from '../../config/settings.js';
+import {
+  loadSettings,
+  mergeSettings,
+  type LoadedSettings,
+} from '../../config/settings.js';
 import { createTransport, debugLogger } from '@google/gemini-cli-core';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { ExtensionStorage } from '../../config/extensions/storage.js';
 import { ExtensionManager } from '../../config/extension-manager.js';
+import { McpServerEnablementManager } from '../../config/mcp/index.js';
 
 vi.mock('../../config/settings.js', async (importOriginal) => {
   const actual =
@@ -45,6 +50,8 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
       CONNECTED: 'CONNECTED',
       CONNECTING: 'CONNECTING',
       DISCONNECTED: 'DISCONNECTED',
+      BLOCKED: 'BLOCKED',
+      DISABLED: 'DISABLED',
     },
     Storage: Object.assign(
       vi.fn().mockImplementation((_cwd: string) => ({
@@ -54,6 +61,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
       })),
       {
         getGlobalSettingsPath: () => '/tmp/gemini/settings.json',
+        getGlobalGeminiDir: () => '/tmp/gemini',
       },
     ),
     GEMINI_DIR: '.gemini',
@@ -96,6 +104,12 @@ describe('mcp list command', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     vi.spyOn(debugLogger, 'log').mockImplementation(() => {});
+    McpServerEnablementManager.resetInstance();
+    // Use a mock for isFileEnabled to avoid reading real files
+    vi.spyOn(
+      McpServerEnablementManager.prototype,
+      'isFileEnabled',
+    ).mockResolvedValue(true);
 
     mockTransport = { close: vi.fn() };
     mockClient = {
@@ -250,6 +264,7 @@ describe('mcp list command', () => {
         config: {
           'allowed-server': { url: 'http://allowed' },
         },
+        requiredConfig: {},
       },
     };
 
@@ -265,7 +280,10 @@ describe('mcp list command', () => {
     mockClient.connect.mockResolvedValue(undefined);
     mockClient.ping.mockResolvedValue(undefined);
 
-    await listMcpServers(settingsWithAllowlist);
+    await listMcpServers({
+      merged: settingsWithAllowlist,
+      isTrusted: true,
+    } as unknown as LoadedSettings);
 
     expect(debugLogger.log).toHaveBeenCalledWith(
       expect.stringContaining('allowed-server'),
@@ -303,5 +321,57 @@ describe('mcp list command', () => {
         'test-server: /test/server  (stdio) - Disconnected',
       ),
     );
+  });
+
+  it('should display blocked status for servers in excluded list', async () => {
+    const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
+    mockedLoadSettings.mockReturnValue({
+      merged: {
+        ...defaultMergedSettings,
+        mcp: {
+          excluded: ['blocked-server'],
+        },
+        mcpServers: {
+          'blocked-server': { command: '/test/server' },
+        },
+      },
+      isTrusted: true,
+    });
+
+    await listMcpServers();
+
+    expect(debugLogger.log).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'blocked-server: /test/server  (stdio) - Blocked',
+      ),
+    );
+    expect(mockedCreateTransport).not.toHaveBeenCalled();
+  });
+
+  it('should display disabled status for servers disabled via enablement manager', async () => {
+    const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
+    mockedLoadSettings.mockReturnValue({
+      merged: {
+        ...defaultMergedSettings,
+        mcpServers: {
+          'disabled-server': { command: '/test/server' },
+        },
+      },
+      isTrusted: true,
+    });
+
+    vi.spyOn(
+      McpServerEnablementManager.prototype,
+      'isFileEnabled',
+    ).mockResolvedValue(false);
+
+    await listMcpServers();
+
+    expect(debugLogger.log).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'disabled-server: /test/server  (stdio) - Disabled',
+      ),
+    );
+    expect(mockedCreateTransport).not.toHaveBeenCalled();
   });
 });

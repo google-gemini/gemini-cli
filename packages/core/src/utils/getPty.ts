@@ -27,14 +27,14 @@ export const getPty = async (): Promise<PtyImplementation> => {
     const module = await import(lydell);
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     return { module, name: 'lydell-node-pty' };
-  } catch (_e) {
+  } catch {
     try {
       const nodePty = 'node-pty';
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const module = await import(nodePty);
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       return { module, name: 'node-pty' };
-    } catch (_e2) {
+    } catch {
       return null;
     }
   }

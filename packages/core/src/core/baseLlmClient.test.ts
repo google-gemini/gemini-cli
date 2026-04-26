@@ -102,6 +102,7 @@ describe('BaseLlmClient', () => {
     );
 
     mockConfig = {
+      getRequestTimeoutMs: vi.fn().mockReturnValue(undefined),
       getSessionId: vi.fn().mockReturnValue('test-session-id'),
       getContentGeneratorConfig: vi
         .fn()
@@ -118,6 +119,8 @@ describe('BaseLlmClient', () => {
         .mockReturnValue(createAvailabilityServiceMock()),
       setActiveModel: vi.fn(),
       getUserTier: vi.fn().mockReturnValue(undefined),
+      getRetryFetchErrors: vi.fn().mockReturnValue(true),
+      getMaxAttempts: vi.fn().mockReturnValue(3),
       getModel: vi.fn().mockReturnValue('test-model'),
       getActiveModel: vi.fn().mockReturnValue('test-model'),
     } as unknown as Mocked<Config>;

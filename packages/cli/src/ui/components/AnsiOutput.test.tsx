@@ -16,6 +16,7 @@ const createAnsiToken = (overrides: Partial<AnsiToken>): AnsiToken => ({
   underline: false,
   dim: false,
   inverse: false,
+  isUninitialized: false,
   fg: '#ffffff',
   bg: '#000000',
   ...overrides,
@@ -29,10 +30,9 @@ describe('<AnsiOutputText />', () => {
         createAnsiToken({ text: 'world!' }),
       ],
     ];
-    const { lastFrame, waitUntilReady, unmount } = render(
+    const { lastFrame, unmount } = await render(
       <AnsiOutputText data={data} width={80} />,
     );
-    await waitUntilReady();
     expect(lastFrame().trim()).toBe('Hello, world!');
     unmount();
   });
@@ -47,10 +47,9 @@ describe('<AnsiOutputText />', () => {
     { style: { inverse: true }, text: 'Inverse' },
   ])('correctly applies style $text', async ({ style, text }) => {
     const data: AnsiOutput = [[createAnsiToken({ text, ...style })]];
-    const { lastFrame, waitUntilReady, unmount } = render(
+    const { lastFrame, unmount } = await render(
       <AnsiOutputText data={data} width={80} />,
     );
-    await waitUntilReady();
     expect(lastFrame().trim()).toBe(text);
     unmount();
   });
@@ -61,10 +60,9 @@ describe('<AnsiOutputText />', () => {
     { color: { fg: '#00ff00', bg: '#ff00ff' }, text: 'Green FG Magenta BG' },
   ])('correctly applies color $text', async ({ color, text }) => {
     const data: AnsiOutput = [[createAnsiToken({ text, ...color })]];
-    const { lastFrame, waitUntilReady, unmount } = render(
+    const { lastFrame, unmount } = await render(
       <AnsiOutputText data={data} width={80} />,
     );
-    await waitUntilReady();
     expect(lastFrame().trim()).toBe(text);
     unmount();
   });
@@ -76,10 +74,9 @@ describe('<AnsiOutputText />', () => {
       [createAnsiToken({ text: 'Third line' })],
       [createAnsiToken({ text: '' })],
     ];
-    const { lastFrame, waitUntilReady, unmount } = render(
+    const { lastFrame, unmount } = await render(
       <AnsiOutputText data={data} width={80} />,
     );
-    await waitUntilReady();
     const output = lastFrame();
     expect(output).toBeDefined();
     const lines = output.split('\n');
@@ -96,10 +93,9 @@ describe('<AnsiOutputText />', () => {
       [createAnsiToken({ text: 'Line 3' })],
       [createAnsiToken({ text: 'Line 4' })],
     ];
-    const { lastFrame, waitUntilReady, unmount } = render(
+    const { lastFrame, unmount } = await render(
       <AnsiOutputText data={data} availableTerminalHeight={2} width={80} />,
     );
-    await waitUntilReady();
     const output = lastFrame();
     expect(output).not.toContain('Line 1');
     expect(output).not.toContain('Line 2');
@@ -115,10 +111,9 @@ describe('<AnsiOutputText />', () => {
       [createAnsiToken({ text: 'Line 3' })],
       [createAnsiToken({ text: 'Line 4' })],
     ];
-    const { lastFrame, waitUntilReady, unmount } = render(
+    const { lastFrame, unmount } = await render(
       <AnsiOutputText data={data} maxLines={2} width={80} />,
     );
-    await waitUntilReady();
     const output = lastFrame();
     expect(output).not.toContain('Line 1');
     expect(output).not.toContain('Line 2');
@@ -135,7 +130,7 @@ describe('<AnsiOutputText />', () => {
       [createAnsiToken({ text: 'Line 4' })],
     ];
     // availableTerminalHeight=3, maxLines=2 => show 2 lines
-    const { lastFrame, waitUntilReady, unmount } = render(
+    const { lastFrame, unmount } = await render(
       <AnsiOutputText
         data={data}
         availableTerminalHeight={3}
@@ -143,7 +138,6 @@ describe('<AnsiOutputText />', () => {
         width={80}
       />,
     );
-    await waitUntilReady();
     const output = lastFrame();
     expect(output).not.toContain('Line 2');
     expect(output).toContain('Line 3');
@@ -156,12 +150,37 @@ describe('<AnsiOutputText />', () => {
     for (let i = 0; i < 1000; i++) {
       largeData.push([createAnsiToken({ text: `Line ${i}` })]);
     }
-    const { lastFrame, waitUntilReady, unmount } = render(
+    const { lastFrame, unmount } = await render(
       <AnsiOutputText data={largeData} width={80} />,
     );
-    await waitUntilReady();
     // We are just checking that it renders something without crashing.
     expect(lastFrame()).toBeDefined();
     unmount();
+  });
+
+  describe('robustness', () => {
+    it('does NOT crash when data is undefined', async () => {
+      const { lastFrame, unmount } = await render(
+        <AnsiOutputText
+          data={undefined as unknown as AnsiOutput}
+          width={80}
+          disableTruncation={true}
+        />,
+      );
+      expect(lastFrame({ allowEmpty: true }).trim()).toBe('');
+      unmount();
+    });
+
+    it('does NOT crash when data is an object but not an array', async () => {
+      const { lastFrame, unmount } = await render(
+        <AnsiOutputText
+          data={{ summary: 'test' } as unknown as AnsiOutput}
+          width={80}
+          disableTruncation={true}
+        />,
+      );
+      expect(lastFrame({ allowEmpty: true }).trim()).toBe('');
+      unmount();
+    });
   });
 });

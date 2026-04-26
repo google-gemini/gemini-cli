@@ -4,11 +4,6 @@ exports[`<ShellToolMessage /> > Height Constraints > defaults to ACTIVE_SHELL_MA
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │ ⊶  Shell Command A shell command                                             │
 │                                                                              │
-│ Line 86                                                                      │
-│ Line 87                                                                      │
-│ Line 88                                                                      │
-│ Line 89                                                                      │
-│ Line 90                                                                      │
 │ Line 91                                                                      │
 │ Line 92                                                                      │
 │ Line 93                                                                      │
@@ -16,8 +11,8 @@ exports[`<ShellToolMessage /> > Height Constraints > defaults to ACTIVE_SHELL_MA
 │ Line 95                                                                      │
 │ Line 96                                                                      │
 │ Line 97                                                                      │
-│ Line 98                                                                    ▄ │
-│ Line 99                                                                    █ │
+│ Line 98                                                                      │
+│ Line 99                                                                      │
 │ Line 100                                                                   █ │
 "
 `;
@@ -133,8 +128,6 @@ exports[`<ShellToolMessage /> > Height Constraints > respects availableTerminalH
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │ ⊶  Shell Command A shell command                                             │
 │                                                                              │
-│ Line 93                                                                      │
-│ Line 94                                                                      │
 │ Line 95                                                                      │
 │ Line 96                                                                      │
 │ Line 97                                                                      │
@@ -148,11 +141,6 @@ exports[`<ShellToolMessage /> > Height Constraints > stays constrained in altern
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │ ✓  Shell Command A shell command                                             │
 │                                                                              │
-│ Line 86                                                                      │
-│ Line 87                                                                      │
-│ Line 88                                                                      │
-│ Line 89                                                                      │
-│ Line 90                                                                      │
 │ Line 91                                                                      │
 │ Line 92                                                                      │
 │ Line 93                                                                      │
@@ -160,8 +148,8 @@ exports[`<ShellToolMessage /> > Height Constraints > stays constrained in altern
 │ Line 95                                                                      │
 │ Line 96                                                                      │
 │ Line 97                                                                      │
-│ Line 98                                                                    ▄ │
-│ Line 99                                                                    █ │
+│ Line 98                                                                      │
+│ Line 99                                                                      │
 │ Line 100                                                                   █ │
 "
 `;
@@ -170,11 +158,6 @@ exports[`<ShellToolMessage /> > Height Constraints > uses ACTIVE_SHELL_MAX_LINES
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │ ⊶  Shell Command A shell command                                             │
 │                                                                              │
-│ Line 86                                                                      │
-│ Line 87                                                                      │
-│ Line 88                                                                      │
-│ Line 89                                                                      │
-│ Line 90                                                                      │
 │ Line 91                                                                      │
 │ Line 92                                                                      │
 │ Line 93                                                                      │
@@ -182,8 +165,8 @@ exports[`<ShellToolMessage /> > Height Constraints > uses ACTIVE_SHELL_MAX_LINES
 │ Line 95                                                                      │
 │ Line 96                                                                      │
 │ Line 97                                                                      │
-│ Line 98                                                                    ▄ │
-│ Line 99                                                                    █ │
+│ Line 98                                                                      │
+│ Line 99                                                                      │
 │ Line 100                                                                   █ │
 "
 `;
@@ -192,12 +175,10 @@ exports[`<ShellToolMessage /> > Height Constraints > uses full availableTerminal
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │ ⊶  Shell Command A shell command                      (Shift+Tab to unfocus) │
 │                                                                              │
-│ Line 3                                                                       │
-│ Line 4                                                                       │
-│ Line 5                                                                     █ │
-│ Line 6                                                                     █ │
-│ Line 7                                                                     █ │
-│ Line 8                                                                     █ │
+│ Line 5                                                                       │
+│ Line 6                                                                       │
+│ Line 7                                                                       │
+│ Line 8                                                                       │
 │ Line 9                                                                     █ │
 │ Line 10                                                                    █ │
 │ Line 11                                                                    █ │

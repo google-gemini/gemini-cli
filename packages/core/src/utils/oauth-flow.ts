@@ -116,6 +116,8 @@ export function startCallbackServer(
     portReject = reject;
   });
 
+  let timeoutId: NodeJS.Timeout | undefined;
+
   const responsePromise = new Promise<OAuthAuthorizationResponse>(
     (resolve, reject) => {
       let serverPort: number;
@@ -221,18 +223,31 @@ export function startCallbackServer(
         portResolve(serverPort); // Resolve port promise immediately
       });
 
-      // Timeout after 5 minutes
-      setTimeout(
+      const abortController = new AbortController();
+      timeoutId = setTimeout(
         () => {
-          server.close();
-          reject(new Error('OAuth callback timeout'));
+          abortController.abort(new Error('OAuth callback timeout'));
         },
         5 * 60 * 1000,
       );
+      timeoutId.unref();
+
+      const onAbort = () => {
+        server.close();
+        reject(abortController.signal.reason);
+      };
+      abortController.signal.addEventListener('abort', onAbort, { once: true });
+
+      server.on('close', () => {
+        abortController.signal.removeEventListener('abort', onAbort);
+      });
     },
   );
 
-  return { port: portPromise, response: responsePromise };
+  return {
+    port: portPromise,
+    response: responsePromise,
+  };
 }
 
 /**
@@ -361,19 +376,24 @@ async function parseTokenEndpointResponse(
       data &&
       typeof data === 'object' &&
       'access_token' in data &&
+      // eslint-disable-next-line no-restricted-syntax
       typeof (data as Record<string, unknown>)['access_token'] === 'string'
     ) {
       const obj = data as Record<string, unknown>;
       const result: OAuthTokenResponse = {
         access_token: String(obj['access_token']),
         token_type:
+          // eslint-disable-next-line no-restricted-syntax
           typeof obj['token_type'] === 'string' ? obj['token_type'] : 'Bearer',
         expires_in:
+          // eslint-disable-next-line no-restricted-syntax
           typeof obj['expires_in'] === 'number' ? obj['expires_in'] : undefined,
         refresh_token:
+          // eslint-disable-next-line no-restricted-syntax
           typeof obj['refresh_token'] === 'string'
             ? obj['refresh_token']
             : undefined,
+        // eslint-disable-next-line no-restricted-syntax
         scope: typeof obj['scope'] === 'string' ? obj['scope'] : undefined,
       };
       return result;

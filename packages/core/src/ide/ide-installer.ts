@@ -186,7 +186,7 @@ class VsCodeInstaller implements IdeInstaller {
         success: true,
         message: `${this.ideInfo.displayName} companion extension was installed successfully.`,
       };
-    } catch (_error) {
+    } catch {
       return {
         success: false,
         message: `Failed to install ${this.ideInfo.displayName} companion extension. Please try installing '${GEMINI_CLI_COMPANION_EXTENSION_NAME}' manually from the ${this.ideInfo.displayName} extension marketplace.`,
@@ -236,7 +236,7 @@ class PositronInstaller implements IdeInstaller {
         success: true,
         message: `${this.ideInfo.displayName} companion extension was installed successfully.`,
       };
-    } catch (_error) {
+    } catch {
       return {
         success: false,
         message: `Failed to install ${this.ideInfo.displayName} companion extension. Please try installing '${GEMINI_CLI_COMPANION_EXTENSION_NAME}' manually from the ${this.ideInfo.displayName} extension marketplace.`,
@@ -252,19 +252,36 @@ class AntigravityInstaller implements IdeInstaller {
   ) {}
 
   async install(): Promise<InstallResult> {
-    const command = process.env['ANTIGRAVITY_CLI_ALIAS'];
-    if (!command) {
-      return {
-        success: false,
-        message: 'ANTIGRAVITY_CLI_ALIAS environment variable not set.',
-      };
+    const envCommand = process.env['ANTIGRAVITY_CLI_ALIAS'];
+    const safeCommandPattern = /^[a-zA-Z0-9.\-_/\\]+$/;
+    const sanitizedEnvCommand =
+      envCommand && safeCommandPattern.test(envCommand)
+        ? envCommand
+        : undefined;
+    const fallbackCommands =
+      this.platform === 'win32'
+        ? ['agy.cmd', 'antigravity.cmd']
+        : ['agy', 'antigravity'];
+    const commands = [
+      ...(sanitizedEnvCommand ? [sanitizedEnvCommand] : []),
+      ...fallbackCommands,
+    ].filter(
+      (command, index, allCommands) => allCommands.indexOf(command) === index,
+    );
+
+    let commandPath: string | null = null;
+    for (const command of commands) {
+      commandPath = await findCommand(command, this.platform);
+      if (commandPath) {
+        break;
+      }
     }
 
-    const commandPath = await findCommand(command, this.platform);
     if (!commandPath) {
+      const supportedCommands = fallbackCommands.join(', ');
       return {
         success: false,
-        message: `${command} not found. Please ensure it is in your system's PATH.`,
+        message: `Antigravity CLI not found. Please ensure one of these commands is in your system's PATH: ${supportedCommands}.`,
       };
     }
 
@@ -289,7 +306,7 @@ class AntigravityInstaller implements IdeInstaller {
         success: true,
         message: `${this.ideInfo.displayName} companion extension was installed successfully.`,
       };
-    } catch (_error) {
+    } catch {
       return {
         success: false,
         message: `Failed to install ${this.ideInfo.displayName} companion extension. Please try installing '${GEMINI_CLI_COMPANION_EXTENSION_NAME}' manually from the ${this.ideInfo.displayName} extension marketplace.`,

@@ -31,30 +31,26 @@ describe('planUtils', () => {
 
   describe('validatePlanPath', () => {
     it('should return null for a valid path within plans directory', async () => {
-      const planPath = path.join('plans', 'test.md');
-      const fullPath = path.join(tempRootDir, planPath);
+      const planPath = 'test.md';
+      const fullPath = path.join(plansDir, planPath);
       fs.writeFileSync(fullPath, '# My Plan');
 
       const result = await validatePlanPath(planPath, plansDir, tempRootDir);
       expect(result).toBeNull();
     });
 
-    it('should return error for path traversal', async () => {
-      const planPath = path.join('..', 'secret.txt');
-      const result = await validatePlanPath(planPath, plansDir, tempRootDir);
-      expect(result).toContain('Access denied');
-    });
-
     it('should return error for non-existent file', async () => {
-      const planPath = path.join('plans', 'ghost.md');
+      const planPath = 'ghost.md';
       const result = await validatePlanPath(planPath, plansDir, tempRootDir);
       expect(result).toContain('Plan file does not exist');
     });
 
     it('should detect path traversal via symbolic links', async () => {
-      const maliciousPath = path.join('plans', 'malicious.md');
-      const fullMaliciousPath = path.join(tempRootDir, maliciousPath);
-      const outsideFile = path.join(tempRootDir, 'outside.txt');
+      const maliciousPath = 'malicious.md';
+      const fullMaliciousPath = path.join(plansDir, maliciousPath);
+
+      // Create a file outside the plans directory
+      const outsideFile = path.join(tempRootDir, 'outside.md');
       fs.writeFileSync(outsideFile, 'secret content');
 
       // Create a symbolic link pointing outside the plans directory

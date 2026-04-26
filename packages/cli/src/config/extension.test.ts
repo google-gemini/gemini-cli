@@ -26,11 +26,13 @@ import {
   loadAgentsFromDirectory,
   loadSkillsFromDir,
   getRealPath,
+  normalizePath,
 } from '@google/gemini-cli-core';
 import {
   loadSettings,
   createTestMergedSettings,
   SettingScope,
+  resetSettingsCacheForTesting,
 } from './settings.js';
 import {
   isWorkspaceTrusted,
@@ -102,6 +104,10 @@ const mockLogExtensionInstallEvent = vi.hoisted(() => vi.fn());
 const mockLogExtensionUninstall = vi.hoisted(() => vi.fn());
 const mockLogExtensionUpdateEvent = vi.hoisted(() => vi.fn());
 const mockLogExtensionDisable = vi.hoisted(() => vi.fn());
+const mockIntegrityManager = vi.hoisted(() => ({
+  verify: vi.fn().mockResolvedValue('verified'),
+  store: vi.fn().mockResolvedValue(undefined),
+}));
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
     await importOriginal<typeof import('@google/gemini-cli-core')>();
@@ -117,6 +123,9 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     ExtensionInstallEvent: vi.fn(),
     ExtensionUninstallEvent: vi.fn(),
     ExtensionDisableEvent: vi.fn(),
+    ExtensionIntegrityManager: vi
+      .fn()
+      .mockImplementation(() => mockIntegrityManager),
     KeychainTokenStorage: vi.fn().mockImplementation(() => ({
       getSecret: vi.fn(),
       setSecret: vi.fn(),
@@ -161,6 +170,7 @@ describe('extension tests', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    resetSettingsCacheForTesting();
     keychainData = {};
     mockKeychainStorage = {
       getSecret: vi
@@ -212,6 +222,7 @@ describe('extension tests', () => {
       requestConsent: mockRequestConsent,
       requestSetting: mockPromptForSettings,
       settings,
+      integrityManager: mockIntegrityManager,
     });
     resetTrustedFoldersForTesting();
   });
@@ -239,7 +250,7 @@ describe('extension tests', () => {
       expect(extensions[0].name).toBe('test-extension');
     });
 
-    it('should throw an error if a context file path is outside the extension directory', async () => {
+    it('should skip the extension if a context file path is outside the extension directory and log an error', async () => {
       const consoleSpy = vi
         .spyOn(console, 'error')
         .mockImplementation(() => {});
@@ -652,7 +663,7 @@ name = "yolo-checker"
       expect(serverConfig.env!['MISSING_VAR_BRACES']).toBe('${ALSO_UNDEFINED}');
     });
 
-    it('should skip extensions with invalid JSON and log a warning', async () => {
+    it('should skip an extension with invalid JSON config and log an error', async () => {
       const consoleSpy = vi
         .spyOn(console, 'error')
         .mockImplementation(() => {});
@@ -683,7 +694,7 @@ name = "yolo-checker"
       consoleSpy.mockRestore();
     });
 
-    it('should skip extensions with missing name and log a warning', async () => {
+    it('should skip an extension with missing "name" in config and log an error', async () => {
       const consoleSpy = vi
         .spyOn(console, 'error')
         .mockImplementation(() => {});
@@ -733,7 +744,7 @@ name = "yolo-checker"
       expect(extensions[0].mcpServers?.['test-server'].trust).toBeUndefined();
     });
 
-    it('should throw an error for invalid extension names', async () => {
+    it('should log an error for invalid extension names during loading', async () => {
       const consoleSpy = vi
         .spyOn(console, 'error')
         .mockImplementation(() => {});
@@ -752,7 +763,7 @@ name = "yolo-checker"
       consoleSpy.mockRestore();
     });
 
-    it('should not load github extensions if blockGitExtensions is set', async () => {
+    it('should not load github extensions and log a warning if blockGitExtensions is set', async () => {
       const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       createExtension({
         extensionsDir: userExtensionsDir,
@@ -772,6 +783,7 @@ name = "yolo-checker"
         requestConsent: mockRequestConsent,
         requestSetting: mockPromptForSettings,
         settings: blockGitExtensionsSetting,
+        integrityManager: mockIntegrityManager,
       });
       const extensions = await extensionManager.loadExtensions();
       const extension = extensions.find((e) => e.name === 'my-ext');
@@ -805,6 +817,7 @@ name = "yolo-checker"
         requestConsent: mockRequestConsent,
         requestSetting: mockPromptForSettings,
         settings: extensionAllowlistSetting,
+        integrityManager: mockIntegrityManager,
       });
       const extensions = await extensionManager.loadExtensions();
 
@@ -812,7 +825,7 @@ name = "yolo-checker"
       expect(extensions[0].name).toBe('my-ext');
     });
 
-    it('should not load disallowed extensions if the allowlist is set.', async () => {
+    it('should not load disallowed extensions and log a warning if the allowlist is set.', async () => {
       const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       createExtension({
         extensionsDir: userExtensionsDir,
@@ -833,6 +846,7 @@ name = "yolo-checker"
         requestConsent: mockRequestConsent,
         requestSetting: mockPromptForSettings,
         settings: extensionAllowlistSetting,
+        integrityManager: mockIntegrityManager,
       });
       const extensions = await extensionManager.loadExtensions();
       const extension = extensions.find((e) => e.name === 'my-ext');
@@ -860,6 +874,7 @@ name = "yolo-checker"
         requestConsent: mockRequestConsent,
         requestSetting: mockPromptForSettings,
         settings: loadedSettings,
+        integrityManager: mockIntegrityManager,
       });
 
       const extensions = await extensionManager.loadExtensions();
@@ -883,6 +898,7 @@ name = "yolo-checker"
         requestConsent: mockRequestConsent,
         requestSetting: mockPromptForSettings,
         settings: loadedSettings,
+        integrityManager: mockIntegrityManager,
       });
 
       const extensions = await extensionManager.loadExtensions();
@@ -907,6 +923,7 @@ name = "yolo-checker"
         requestConsent: mockRequestConsent,
         requestSetting: mockPromptForSettings,
         settings: loadedSettings,
+        integrityManager: mockIntegrityManager,
       });
 
       const extensions = await extensionManager.loadExtensions();
@@ -1045,6 +1062,7 @@ name = "yolo-checker"
           requestConsent: mockRequestConsent,
           requestSetting: mockPromptForSettings,
           settings,
+          integrityManager: mockIntegrityManager,
         });
 
         const extensions = await extensionManager.loadExtensions();
@@ -1080,6 +1098,7 @@ name = "yolo-checker"
           requestConsent: mockRequestConsent,
           requestSetting: mockPromptForSettings,
           settings,
+          integrityManager: mockIntegrityManager,
         });
 
         const extensions = await extensionManager.loadExtensions();
@@ -1304,6 +1323,7 @@ name = "yolo-checker"
         requestConsent: mockRequestConsent,
         requestSetting: mockPromptForSettings,
         settings: blockGitExtensionsSetting,
+        integrityManager: mockIntegrityManager,
       });
       await extensionManager.loadExtensions();
       await expect(
@@ -1328,6 +1348,7 @@ name = "yolo-checker"
         requestConsent: mockRequestConsent,
         requestSetting: mockPromptForSettings,
         settings: allowedExtensionsSetting,
+        integrityManager: mockIntegrityManager,
       });
       await extensionManager.loadExtensions();
       await expect(
@@ -1400,6 +1421,7 @@ name = "yolo-checker"
         '.gemini',
         'trustedFolders.json',
       );
+      vi.stubEnv('GEMINI_CLI_TRUSTED_FOLDERS_PATH', trustedFoldersPath);
       vi.mocked(isWorkspaceTrusted).mockReturnValue({
         isTrusted: false,
         source: undefined,
@@ -1418,7 +1440,9 @@ name = "yolo-checker"
       const trustedFolders = JSON.parse(
         fs.readFileSync(trustedFoldersPath, 'utf-8'),
       );
-      expect(trustedFolders[tempWorkspaceDir]).toBe('TRUST_FOLDER');
+      expect(trustedFolders[normalizePath(tempWorkspaceDir)]).toBe(
+        'TRUST_FOLDER',
+      );
     });
 
     describe.each([true, false])(
@@ -1675,6 +1699,7 @@ ${INSTALL_WARNING_MESSAGE}`,
         requestConsent: mockRequestConsent,
         requestSetting: null,
         settings: loadSettings(tempWorkspaceDir).merged,
+        integrityManager: mockIntegrityManager,
       });
 
       await extensionManager.loadExtensions();

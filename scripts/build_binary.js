@@ -179,6 +179,27 @@ try {
   process.exit(1);
 }
 
+// 2b. Copy host-platform ripgrep binary into the bundle for the SEA.
+// (npm tarballs omit these to stay under the registry upload limit.)
+const ripgrepVendorSrc = join(root, 'packages/core/vendor/ripgrep');
+const ripgrepVendorDest = join(bundleDir, 'vendor', 'ripgrep');
+if (existsSync(ripgrepVendorSrc)) {
+  const rgBinName = `rg-${process.platform}-${process.arch}${
+    process.platform === 'win32' ? '.exe' : ''
+  }`;
+  const rgSrc = join(ripgrepVendorSrc, rgBinName);
+  if (existsSync(rgSrc)) {
+    mkdirSync(ripgrepVendorDest, { recursive: true });
+    cpSync(rgSrc, join(ripgrepVendorDest, rgBinName), { dereference: true });
+    console.log(`Copied ${rgBinName} to bundle/vendor/ripgrep/`);
+  } else {
+    console.warn(
+      `Warning: bundled ripgrep binary not found for ${process.platform}/${process.arch} at ${rgSrc}. ` +
+        `The SEA will fall back to system grep at runtime.`,
+    );
+  }
+}
+
 // 3. Stage & Sign Native Modules
 const includeNativeModules = process.env.BUNDLE_NATIVE_MODULES !== 'false';
 console.log(`Include Native Modules: ${includeNativeModules}`);
@@ -228,22 +249,34 @@ const packageJson = JSON.parse(
 // Helper to calc hash
 const sha256 = (content) => createHash('sha256').update(content).digest('hex');
 
-// Read Main Bundle
-const geminiBundlePath = join(root, 'bundle/gemini.js');
-const geminiContent = readFileSync(geminiBundlePath);
-const geminiHash = sha256(geminiContent);
-
 const assets = {
-  'gemini.mjs': geminiBundlePath, // Use .js source but map to .mjs for runtime ESM
   'manifest.json': 'bundle/manifest.json',
 };
 
 const manifest = {
   main: 'gemini.mjs',
-  mainHash: geminiHash,
+  mainHash: '',
   version: packageJson.version,
   files: [],
 };
+
+// Add all javascript chunks from the bundle directory
+const jsFiles = globSync('*.js', { cwd: bundleDir });
+for (const jsFile of jsFiles) {
+  const fsPath = join(bundleDir, jsFile);
+  const content = readFileSync(fsPath);
+  const hash = sha256(content);
+
+  // Node SEA requires the main entry point to be explicitly mapped
+  if (jsFile === 'gemini.js') {
+    assets['gemini.mjs'] = fsPath;
+    manifest.mainHash = hash;
+  } else {
+    // Other chunks need to be mapped exactly as they are named so dynamic imports find them
+    assets[jsFile] = fsPath;
+    manifest.files.push({ key: jsFile, path: jsFile, hash: hash });
+  }
+}
 
 // Helper to recursively find files from STAGING
 function addAssetsFromDir(baseDir, runtimePrefix) {
@@ -287,6 +320,23 @@ if (existsSync(policyDir)) {
     // Use a unique key to avoid collision if filenames overlap (though unlikely here)
     // But sea-launch writes to 'path', so key is just for lookup.
     const assetKey = `policies:${policyFile}`;
+    assets[assetKey] = fsPath;
+    manifest.files.push({ key: assetKey, path: relativePath, hash: hash });
+  }
+}
+
+// Add ripgrep binary (copied in step 2b). Must be registered here so that
+// sea-launch.cjs extracts it to runtimeDir/vendor/ripgrep/ on startup; the
+// runtime resolver in packages/core/src/tools/ripGrep.ts uses __dirname-
+// relative paths to find it.
+if (existsSync(ripgrepVendorDest)) {
+  const rgFiles = globSync('*', { cwd: ripgrepVendorDest, nodir: true });
+  for (const rgFile of rgFiles) {
+    const fsPath = join(ripgrepVendorDest, rgFile);
+    const relativePath = join('vendor', 'ripgrep', rgFile);
+    const content = readFileSync(fsPath);
+    const hash = sha256(content);
+    const assetKey = `vendor:${rgFile}`;
     assets[assetKey] = fsPath;
     manifest.files.push({ key: assetKey, path: relativePath, hash: hash });
   }
@@ -346,6 +396,22 @@ const targetBinaryPath = join(targetDir, binaryName);
 console.log(`Copying node binary from ${nodeBinary} to ${targetBinaryPath}...`);
 copyFileSync(nodeBinary, targetBinaryPath);
 
+if (platform === 'darwin') {
+  console.log(`Thinning universal binary for ${arch}...`);
+  try {
+    // Attempt to thin the binary. Will fail safely if it's not a fat binary.
+    runCommand('lipo', [
+      targetBinaryPath,
+      '-thin',
+      arch,
+      '-output',
+      targetBinaryPath,
+    ]);
+  } catch (e) {
+    console.log(`Skipping lipo thinning: ${e.message}`);
+  }
+}
+
 // Remove existing signature using helper
 removeSignature(targetBinaryPath);
 
@@ -357,9 +423,7 @@ if (existsSync(bundleDir)) {
 
 // Clean up source JS files from output (we only want embedded)
 const filesToRemove = [
-  'gemini.js',
   'gemini.mjs',
-  'gemini.js.map',
   'gemini.mjs.map',
   'gemini-sea.cjs',
   'sea-launch.cjs',
@@ -372,6 +436,12 @@ filesToRemove.forEach((f) => {
   const p = join(targetDir, f);
   if (existsSync(p)) rmSync(p, { recursive: true, force: true });
 });
+
+// Remove all chunk and entry .js/.js.map files
+const jsFilesToRemove = globSync('*.{js,js.map}', { cwd: targetDir });
+for (const f of jsFilesToRemove) {
+  rmSync(join(targetDir, f));
+}
 
 // Remove .sb files from targetDir
 const sbFilesToRemove = globSync('sandbox-macos-*.sb', { cwd: targetDir });

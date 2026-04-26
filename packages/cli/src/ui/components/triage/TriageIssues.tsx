@@ -7,12 +7,17 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Box, Text } from 'ink';
 import Spinner from 'ink-spinner';
-import type { Config } from '@google/gemini-cli-core';
-import { debugLogger, spawnAsync, LlmRole } from '@google/gemini-cli-core';
+import {
+  debugLogger,
+  spawnAsync,
+  LlmRole,
+  type Config,
+} from '@google/gemini-cli-core';
 import { useKeypress } from '../../hooks/useKeypress.js';
-import { keyMatchers, Command } from '../../keyMatchers.js';
+import { Command } from '../../key/keyMatchers.js';
 import { TextInput } from '../shared/TextInput.js';
 import { useTextBuffer } from '../shared/text-buffer.js';
+import { useKeyMatchers } from '../../hooks/useKeyMatchers.js';
 
 interface Issue {
   number: number;
@@ -69,6 +74,7 @@ export const TriageIssues = ({
   initialLimit?: number;
   until?: string;
 }) => {
+  const keyMatchers = useKeyMatchers();
   const [state, setState] = useState<TriageState>({
     status: 'loading',
     issues: [],

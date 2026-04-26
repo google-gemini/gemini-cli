@@ -1,0 +1,45 @@
+name: '🧠 Gemini CLI Bot: Brain'
+
+on:
+  schedule:
+    - cron: '0 0 * * *' # Every 24 hours
+  workflow_dispatch:
+
+concurrency:
+  group: '${{ github.workflow }}-${{ github.ref }}'
+  cancel-in-progress: true
+
+permissions:
+  contents: 'write'
+  issues: 'write'
+  pull-requests: 'write'
+
+jobs:
+  brain:
+    name: 'Brain (Reasoning Layer)'
+    runs-on: 'ubuntu-latest'
+    if: "github.repository == 'google-gemini/gemini-cli'"
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: 'Setup Node.js'
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: 'Install dependencies'
+        run: 'npm ci'
+
+      - name: 'Build Gemini CLI'
+        run: 'npm run bundle'
+
+      - name: 'Download Previous Metrics'
+        uses: 'actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093' # ratchet:actions/download-artifact@v4
+        with:
+          name: 'metrics-before'
+          path: 'tools/gemini-cli-bot/history/'
+        continue-on-error: true

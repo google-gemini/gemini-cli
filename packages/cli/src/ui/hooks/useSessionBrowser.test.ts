@@ -11,7 +11,6 @@ import {
   useSessionBrowser,
   convertSessionToHistoryFormats,
 } from './useSessionBrowser.js';
-import * as fs from 'node:fs/promises';
 import path from 'node:path';
 import { getSessionFiles, type SessionInfo } from '../../utils/sessionUtils.js';
 import {
@@ -19,10 +18,12 @@ import {
   type ConversationRecord,
   type MessageRecord,
   CoreToolCallStatus,
+  loadConversationRecord,
 } from '@google/gemini-cli-core';
 import {
   coreEvents,
   convertSessionToClientHistory,
+  uiTelemetryService,
 } from '@google/gemini-cli-core';
 
 // Mock modules
@@ -36,6 +37,18 @@ vi.mock('../../utils/sessionUtils.js', async (importOriginal) => {
     getSessionFiles: vi.fn(),
   };
 });
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...actual,
+    uiTelemetryService: {
+      clear: vi.fn(),
+      hydrate: vi.fn(),
+    },
+    loadConversationRecord: vi.fn(),
+  };
+});
 
 const MOCKED_PROJECT_TEMP_DIR = '/test/project/temp';
 const MOCKED_CHATS_DIR = '/test/project/temp/chats';
@@ -43,7 +56,6 @@ const MOCKED_SESSION_ID = 'test-session-123';
 const MOCKED_CURRENT_SESSION_ID = 'current-session-id';
 
 describe('useSessionBrowser', () => {
-  const mockedFs = vi.mocked(fs);
   const mockedPath = vi.mocked(path);
   const mockedGetSessionFiles = vi.mocked(getSessionFiles);
 
@@ -86,22 +98,22 @@ describe('useSessionBrowser', () => {
       fileName: MOCKED_FILENAME,
     } as SessionInfo;
     mockedGetSessionFiles.mockResolvedValue([mockSession]);
-    mockedFs.readFile.mockResolvedValue(JSON.stringify(mockConversation));
+    vi.mocked(loadConversationRecord).mockResolvedValue(mockConversation);
 
-    const { result } = renderHook(() =>
+    const { result } = await renderHook(() =>
       useSessionBrowser(mockConfig, mockOnLoadHistory),
     );
 
     await act(async () => {
       await result.current.handleResumeSession(mockSession);
     });
-    expect(mockedFs.readFile).toHaveBeenCalledWith(
+    expect(loadConversationRecord).toHaveBeenCalledWith(
       `${MOCKED_CHATS_DIR}/${MOCKED_FILENAME}`,
-      'utf8',
     );
     expect(mockConfig.setSessionId).toHaveBeenCalledWith(
       'existing-session-456',
     );
+    expect(uiTelemetryService.hydrate).toHaveBeenCalledWith(mockConversation);
     expect(result.current.isSessionBrowserOpen).toBe(false);
     expect(mockOnLoadHistory).toHaveBeenCalled();
   });
@@ -112,9 +124,11 @@ describe('useSessionBrowser', () => {
       id: MOCKED_SESSION_ID,
       fileName: MOCKED_FILENAME,
     } as SessionInfo;
-    mockedFs.readFile.mockRejectedValue(new Error('File not found'));
+    vi.mocked(loadConversationRecord).mockRejectedValue(
+      new Error('File not found'),
+    );
 
-    const { result } = renderHook(() =>
+    const { result } = await renderHook(() =>
       useSessionBrowser(mockConfig, mockOnLoadHistory),
     );
 
@@ -136,9 +150,9 @@ describe('useSessionBrowser', () => {
       id: MOCKED_SESSION_ID,
       fileName: MOCKED_FILENAME,
     } as SessionInfo;
-    mockedFs.readFile.mockResolvedValue('invalid json');
+    vi.mocked(loadConversationRecord).mockResolvedValue(null);
 
-    const { result } = renderHook(() =>
+    const { result } = await renderHook(() =>
       useSessionBrowser(mockConfig, mockOnLoadHistory),
     );
 
@@ -187,6 +201,37 @@ describe('convertSessionToHistoryFormats', () => {
     expect(clientHistory[1]).toEqual({
       role: 'model',
       parts: [{ text: 'Hi there' }],
+    });
+  });
+
+  it('should convert thinking tokens (thoughts) to thinking history items', () => {
+    const messages: MessageRecord[] = [
+      {
+        type: 'gemini',
+        content: 'Hi there',
+        thoughts: [
+          {
+            subject: 'Thinking...',
+            description: 'I should say hello.',
+            timestamp: new Date().toISOString(),
+          },
+        ],
+      } as MessageRecord,
+    ];
+
+    const result = convertSessionToHistoryFormats(messages);
+
+    expect(result.uiHistory).toHaveLength(2);
+    expect(result.uiHistory[0]).toMatchObject({
+      type: 'thinking',
+      thought: {
+        subject: 'Thinking...',
+        description: 'I should say hello.',
+      },
+    });
+    expect(result.uiHistory[1]).toMatchObject({
+      type: 'gemini',
+      text: 'Hi there',
     });
   });
 

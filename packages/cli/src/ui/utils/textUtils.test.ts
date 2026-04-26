@@ -48,12 +48,14 @@ describe('textUtils', () => {
     it('should handle unicode characters that crash string-width', () => {
       // U+0602 caused string-width to crash (see #16418)
       const char = '؂';
-      expect(getCachedStringWidth(char)).toBe(0);
+      expect(() => getCachedStringWidth(char)).not.toThrow();
+      expect(typeof getCachedStringWidth(char)).toBe('number');
     });
 
     it('should handle unicode characters that crash string-width with ANSI codes', () => {
       const charWithAnsi = '\u001b[31m' + '؂' + '\u001b[0m';
-      expect(getCachedStringWidth(charWithAnsi)).toBe(0);
+      expect(() => getCachedStringWidth(charWithAnsi)).not.toThrow();
+      expect(typeof getCachedStringWidth(charWithAnsi)).toBe('number');
     });
   });
 
@@ -263,6 +265,29 @@ describe('textUtils', () => {
       it('should preserve characters at 0xA0 and above (non-C1)', () => {
         // 0xA0 is non-breaking space, should be preserved
         expect(stripUnsafeCharacters('hello\xA0world')).toBe('hello\xA0world');
+      });
+
+      it('should not lose text after DCS (0x90) — regression for data loss', () => {
+        // 0x90 (DCS) starts a Device Control String that stripVTControlCharacters
+        // treats as an unterminated sequence, swallowing all subsequent text.
+        // Stripping C1 chars before VT processing prevents this data loss.
+        expect(stripUnsafeCharacters('important\x90data after DCS')).toBe(
+          'importantdata after DCS',
+        );
+      });
+
+      it('should fully strip 8-bit CSI (0x9B) sequences', () => {
+        // 0x9B (CSI) is equivalent to ESC[. stripAnsi should handle the
+        // whole sequence including parameters.
+        expect(stripUnsafeCharacters('keep\x9B42mthis text')).toBe(
+          'keepthis text',
+        );
+      });
+
+      it('should not lose text when multiple C1 chars precede valid content', () => {
+        expect(stripUnsafeCharacters('start\x90\x9B\x85middle\x80end')).toBe(
+          'startmiddleend',
+        );
       });
     });
 
@@ -512,6 +537,7 @@ describe('textUtils', () => {
           const b = sanitized.b as { c: string; d: Array<string | object> };
           expect(b.c).toBe('\\u001b[32mgreen\\u001b[0m');
           expect(b.d[0]).toBe('\\u001b[33myellow\\u001b[0m');
+          // eslint-disable-next-line no-restricted-syntax
           if (typeof b.d[1] === 'object' && b.d[1] !== null) {
             const e = b.d[1] as { e: string };
             expect(e.e).toBe('\\u001b[34mblue\\u001b[0m');

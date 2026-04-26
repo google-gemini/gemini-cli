@@ -25,11 +25,12 @@ import {
 } from '../../utils/textUtils.js';
 import { parsePastedPaths } from '../../utils/clipboardUtils.js';
 import type { Key } from '../../contexts/KeypressContext.js';
-import { keyMatchers, Command } from '../../keyMatchers.js';
+import { Command } from '../../key/keyMatchers.js';
 import type { VimAction } from './vim-buffer-actions.js';
 import { handleVimAction } from './vim-buffer-actions.js';
 import { LRU_BUFFER_PERF_CACHE_LIMIT } from '../../constants.js';
 import { openFileInEditor } from '../../utils/editorUtils.js';
+import { useKeyMatchers } from '../../hooks/useKeyMatchers.js';
 
 export const LARGE_PASTE_LINE_THRESHOLD = 5;
 export const LARGE_PASTE_CHAR_THRESHOLD = 500;
@@ -37,6 +38,17 @@ export const LARGE_PASTE_CHAR_THRESHOLD = 500;
 // Regex to match paste placeholders like [Pasted Text: 6 lines] or [Pasted Text: 501 chars #2]
 export const PASTED_TEXT_PLACEHOLDER_REGEX =
   /\[Pasted Text: \d+ (?:lines|chars)(?: #\d+)?\]/g;
+
+// Replace paste placeholder strings with their actual pasted content.
+export function expandPastePlaceholders(
+  text: string,
+  pastedContent: Record<string, string>,
+): string {
+  return text.replace(
+    PASTED_TEXT_PLACEHOLDER_REGEX,
+    (match) => pastedContent[match] || match,
+  );
+}
 
 export type Direction =
   | 'left'
@@ -1556,6 +1568,7 @@ export interface TextBufferState {
   visualLayout: VisualLayout;
   pastedContent: Record<string, string>;
   expandedPaste: ExpandedPasteInfo | null;
+  yankRegister: { text: string; linewise: boolean } | null;
 }
 
 const historyLimit = 100;
@@ -1594,6 +1607,47 @@ function generatePastedTextId(
     suffix++;
   }
   return id;
+}
+
+function collectPlaceholderIdsFromLines(lines: string[]): Set<string> {
+  const ids = new Set<string>();
+  const pasteRegex = new RegExp(PASTED_TEXT_PLACEHOLDER_REGEX.source, 'g');
+  for (const line of lines) {
+    if (!line) continue;
+    for (const match of line.matchAll(pasteRegex)) {
+      const placeholderId = match[0];
+      if (placeholderId) {
+        ids.add(placeholderId);
+      }
+    }
+  }
+  return ids;
+}
+
+function pruneOrphanedPastedContent(
+  pastedContent: Record<string, string>,
+  expandedPasteId: string | null,
+  beforeChangedLines: string[],
+  allLines: string[],
+): Record<string, string> {
+  if (Object.keys(pastedContent).length === 0) return pastedContent;
+
+  const beforeIds = collectPlaceholderIdsFromLines(beforeChangedLines);
+  if (beforeIds.size === 0) return pastedContent;
+
+  const afterIds = collectPlaceholderIdsFromLines(allLines);
+  const removedIds = [...beforeIds].filter(
+    (id) => !afterIds.has(id) && id !== expandedPasteId,
+  );
+  if (removedIds.length === 0) return pastedContent;
+
+  const pruned = { ...pastedContent };
+  for (const id of removedIds) {
+    if (pruned[id]) {
+      delete pruned[id];
+    }
+  }
+  return pruned;
 }
 
 export type TextBufferAction =
@@ -1691,6 +1745,33 @@ export type TextBufferAction =
   | { type: 'vim_change_to_first_nonwhitespace' }
   | { type: 'vim_delete_to_first_line'; payload: { count: number } }
   | { type: 'vim_delete_to_last_line'; payload: { count: number } }
+  | { type: 'vim_delete_char_before'; payload: { count: number } }
+  | { type: 'vim_toggle_case'; payload: { count: number } }
+  | { type: 'vim_replace_char'; payload: { char: string; count: number } }
+  | {
+      type: 'vim_find_char_forward';
+      payload: { char: string; count: number; till: boolean };
+    }
+  | {
+      type: 'vim_find_char_backward';
+      payload: { char: string; count: number; till: boolean };
+    }
+  | {
+      type: 'vim_delete_to_char_forward';
+      payload: { char: string; count: number; till: boolean };
+    }
+  | {
+      type: 'vim_delete_to_char_backward';
+      payload: { char: string; count: number; till: boolean };
+    }
+  | { type: 'vim_yank_line'; payload: { count: number } }
+  | { type: 'vim_yank_word_forward'; payload: { count: number } }
+  | { type: 'vim_yank_big_word_forward'; payload: { count: number } }
+  | { type: 'vim_yank_word_end'; payload: { count: number } }
+  | { type: 'vim_yank_big_word_end'; payload: { count: number } }
+  | { type: 'vim_yank_to_end_of_line'; payload: { count: number } }
+  | { type: 'vim_paste_after'; payload: { count: number } }
+  | { type: 'vim_paste_before'; payload: { count: number } }
   | {
       type: 'toggle_paste_expansion';
       payload: { id: string; row: number; col: number };
@@ -2220,9 +2301,11 @@ function textBufferReducerLogic(
       const newLines = [...nextState.lines];
       let newCursorRow = cursorRow;
       let newCursorCol = cursorCol;
+      let beforeChangedLines: string[] = [];
 
       if (newCursorCol > 0) {
         const lineContent = currentLine(newCursorRow);
+        beforeChangedLines = [lineContent];
         const prevWordStart = findPrevWordStartInLine(
           lineContent,
           newCursorCol,
@@ -2235,6 +2318,7 @@ function textBufferReducerLogic(
         // Act as a backspace
         const prevLineContent = currentLine(cursorRow - 1);
         const currentLineContentVal = currentLine(cursorRow);
+        beforeChangedLines = [prevLineContent, currentLineContentVal];
         const newCol = cpLen(prevLineContent);
         newLines[cursorRow - 1] = prevLineContent + currentLineContentVal;
         newLines.splice(cursorRow, 1);
@@ -2242,12 +2326,20 @@ function textBufferReducerLogic(
         newCursorCol = newCol;
       }
 
+      const newPastedContent = pruneOrphanedPastedContent(
+        nextState.pastedContent,
+        nextState.expandedPaste?.id ?? null,
+        beforeChangedLines,
+        newLines,
+      );
+
       return {
         ...nextState,
         lines: newLines,
         cursorRow: newCursorRow,
         cursorCol: newCursorCol,
         preferredCol: null,
+        pastedContent: newPastedContent,
       };
     }
 
@@ -2264,23 +2356,34 @@ function textBufferReducerLogic(
 
       const nextState = currentState;
       const newLines = [...nextState.lines];
+      let beforeChangedLines: string[] = [];
 
       if (cursorCol >= lineLen) {
         // Act as a delete, joining with the next line
         const nextLineContent = currentLine(cursorRow + 1);
+        beforeChangedLines = [lineContent, nextLineContent];
         newLines[cursorRow] = lineContent + nextLineContent;
         newLines.splice(cursorRow + 1, 1);
       } else {
+        beforeChangedLines = [lineContent];
         const nextWordStart = findNextWordStartInLine(lineContent, cursorCol);
         const end = nextWordStart === null ? lineLen : nextWordStart;
         newLines[cursorRow] =
           cpSlice(lineContent, 0, cursorCol) + cpSlice(lineContent, end);
       }
 
+      const newPastedContent = pruneOrphanedPastedContent(
+        nextState.pastedContent,
+        nextState.expandedPaste?.id ?? null,
+        beforeChangedLines,
+        newLines,
+      );
+
       return {
         ...nextState,
         lines: newLines,
         preferredCol: null,
+        pastedContent: newPastedContent,
       };
     }
 
@@ -2292,22 +2395,39 @@ function textBufferReducerLogic(
       if (cursorCol < currentLineLen(cursorRow)) {
         const nextState = currentState;
         const newLines = [...nextState.lines];
+        const beforeChangedLines = [lineContent];
         newLines[cursorRow] = cpSlice(lineContent, 0, cursorCol);
+        const newPastedContent = pruneOrphanedPastedContent(
+          nextState.pastedContent,
+          nextState.expandedPaste?.id ?? null,
+          beforeChangedLines,
+          newLines,
+        );
         return {
           ...nextState,
           lines: newLines,
+          preferredCol: null,
+          pastedContent: newPastedContent,
         };
       } else if (cursorRow < lines.length - 1) {
         // Act as a delete
         const nextState = currentState;
         const nextLineContent = currentLine(cursorRow + 1);
         const newLines = [...nextState.lines];
+        const beforeChangedLines = [lineContent, nextLineContent];
         newLines[cursorRow] = lineContent + nextLineContent;
         newLines.splice(cursorRow + 1, 1);
+        const newPastedContent = pruneOrphanedPastedContent(
+          nextState.pastedContent,
+          nextState.expandedPaste?.id ?? null,
+          beforeChangedLines,
+          newLines,
+        );
         return {
           ...nextState,
           lines: newLines,
           preferredCol: null,
+          pastedContent: newPastedContent,
         };
       }
       return currentState;
@@ -2321,12 +2441,20 @@ function textBufferReducerLogic(
         const nextState = currentState;
         const lineContent = currentLine(cursorRow);
         const newLines = [...nextState.lines];
+        const beforeChangedLines = [lineContent];
         newLines[cursorRow] = cpSlice(lineContent, cursorCol);
+        const newPastedContent = pruneOrphanedPastedContent(
+          nextState.pastedContent,
+          nextState.expandedPaste?.id ?? null,
+          beforeChangedLines,
+          newLines,
+        );
         return {
           ...nextState,
           lines: newLines,
           cursorCol: 0,
           preferredCol: null,
+          pastedContent: newPastedContent,
         };
       }
       return currentState;
@@ -2472,6 +2600,21 @@ function textBufferReducerLogic(
     case 'vim_change_to_first_nonwhitespace':
     case 'vim_delete_to_first_line':
     case 'vim_delete_to_last_line':
+    case 'vim_delete_char_before':
+    case 'vim_toggle_case':
+    case 'vim_replace_char':
+    case 'vim_find_char_forward':
+    case 'vim_find_char_backward':
+    case 'vim_delete_to_char_forward':
+    case 'vim_delete_to_char_backward':
+    case 'vim_yank_line':
+    case 'vim_yank_word_forward':
+    case 'vim_yank_big_word_forward':
+    case 'vim_yank_word_end':
+    case 'vim_yank_big_word_end':
+    case 'vim_yank_to_end_of_line':
+    case 'vim_paste_after':
+    case 'vim_paste_before':
       return handleVimAction(state, action as VimAction);
 
     case 'toggle_paste_expansion': {
@@ -2697,6 +2840,7 @@ export function useTextBuffer({
   singleLine = false,
   getPreferredEditor,
 }: UseTextBufferProps): TextBuffer {
+  const keyMatchers = useKeyMatchers();
   const initialState = useMemo((): TextBufferState => {
     const lines = initialText.split('\n');
     const [initialCursorRow, initialCursorCol] = calculateInitialCursorPosition(
@@ -2726,6 +2870,7 @@ export function useTextBuffer({
       visualLayout,
       pastedContent: {},
       expandedPaste: null,
+      yankRegister: null,
     };
   }, [initialText, initialCursorOffset, viewport.width, viewport.height]);
 
@@ -2762,6 +2907,25 @@ export function useTextBuffer({
 
   const [scrollRowState, setScrollRowState] = useState<number>(0);
 
+  const { height } = viewport;
+  const totalVisualLines = visualLines.length;
+  const maxScrollStart = Math.max(0, totalVisualLines - height);
+  let newVisualScrollRow = scrollRowState;
+
+  if (visualCursor[0] < scrollRowState) {
+    newVisualScrollRow = visualCursor[0];
+  } else if (visualCursor[0] >= scrollRowState + height) {
+    newVisualScrollRow = visualCursor[0] - height + 1;
+  }
+
+  newVisualScrollRow = clamp(newVisualScrollRow, 0, maxScrollStart);
+
+  if (newVisualScrollRow !== scrollRowState) {
+    setScrollRowState(newVisualScrollRow);
+  }
+
+  const actualScrollRowState = newVisualScrollRow;
+
   useEffect(() => {
     if (onChange) {
       onChange(text);
@@ -2774,28 +2938,6 @@ export function useTextBuffer({
       payload: { width: viewport.width, height: viewport.height },
     });
   }, [viewport.width, viewport.height]);
-
-  // Update visual scroll (vertical)
-  useEffect(() => {
-    const { height } = viewport;
-    const totalVisualLines = visualLines.length;
-    const maxScrollStart = Math.max(0, totalVisualLines - height);
-    let newVisualScrollRow = scrollRowState;
-
-    if (visualCursor[0] < scrollRowState) {
-      newVisualScrollRow = visualCursor[0];
-    } else if (visualCursor[0] >= scrollRowState + height) {
-      newVisualScrollRow = visualCursor[0] - height + 1;
-    }
-
-    // When the number of visual lines shrinks (e.g., after widening the viewport),
-    // ensure scroll never starts beyond the last valid start so we can render a full window.
-    newVisualScrollRow = clamp(newVisualScrollRow, 0, maxScrollStart);
-
-    if (newVisualScrollRow !== scrollRowState) {
-      setScrollRowState(newVisualScrollRow);
-    }
-  }, [visualCursor, scrollRowState, viewport, visualLines.length]);
 
   const insert = useCallback(
     (ch: string, { paste = false }: { paste?: boolean } = {}): void => {
@@ -3030,6 +3172,58 @@ export function useTextBuffer({
     dispatch({ type: 'vim_delete_char', payload: { count } });
   }, []);
 
+  const vimDeleteCharBefore = useCallback((count: number): void => {
+    dispatch({ type: 'vim_delete_char_before', payload: { count } });
+  }, []);
+
+  const vimToggleCase = useCallback((count: number): void => {
+    dispatch({ type: 'vim_toggle_case', payload: { count } });
+  }, []);
+
+  const vimReplaceChar = useCallback((char: string, count: number): void => {
+    dispatch({ type: 'vim_replace_char', payload: { char, count } });
+  }, []);
+
+  const vimFindCharForward = useCallback(
+    (char: string, count: number, till: boolean): void => {
+      dispatch({
+        type: 'vim_find_char_forward',
+        payload: { char, count, till },
+      });
+    },
+    [],
+  );
+
+  const vimFindCharBackward = useCallback(
+    (char: string, count: number, till: boolean): void => {
+      dispatch({
+        type: 'vim_find_char_backward',
+        payload: { char, count, till },
+      });
+    },
+    [],
+  );
+
+  const vimDeleteToCharForward = useCallback(
+    (char: string, count: number, till: boolean): void => {
+      dispatch({
+        type: 'vim_delete_to_char_forward',
+        payload: { char, count, till },
+      });
+    },
+    [],
+  );
+
+  const vimDeleteToCharBackward = useCallback(
+    (char: string, count: number, till: boolean): void => {
+      dispatch({
+        type: 'vim_delete_to_char_backward',
+        payload: { char, count, till },
+      });
+    },
+    [],
+  );
+
   const vimInsertAtCursor = useCallback((): void => {
     dispatch({ type: 'vim_insert_at_cursor' });
   }, []);
@@ -3082,14 +3276,43 @@ export function useTextBuffer({
     dispatch({ type: 'vim_escape_insert_mode' });
   }, []);
 
+  const vimYankLine = useCallback((count: number): void => {
+    dispatch({ type: 'vim_yank_line', payload: { count } });
+  }, []);
+
+  const vimYankWordForward = useCallback((count: number): void => {
+    dispatch({ type: 'vim_yank_word_forward', payload: { count } });
+  }, []);
+
+  const vimYankBigWordForward = useCallback((count: number): void => {
+    dispatch({ type: 'vim_yank_big_word_forward', payload: { count } });
+  }, []);
+
+  const vimYankWordEnd = useCallback((count: number): void => {
+    dispatch({ type: 'vim_yank_word_end', payload: { count } });
+  }, []);
+
+  const vimYankBigWordEnd = useCallback((count: number): void => {
+    dispatch({ type: 'vim_yank_big_word_end', payload: { count } });
+  }, []);
+
+  const vimYankToEndOfLine = useCallback((count: number): void => {
+    dispatch({ type: 'vim_yank_to_end_of_line', payload: { count } });
+  }, []);
+
+  const vimPasteAfter = useCallback((count: number): void => {
+    dispatch({ type: 'vim_paste_after', payload: { count } });
+  }, []);
+
+  const vimPasteBefore = useCallback((count: number): void => {
+    dispatch({ type: 'vim_paste_before', payload: { count } });
+  }, []);
+
   const openInExternalEditor = useCallback(async (): Promise<void> => {
     const tmpDir = fs.mkdtempSync(pathMod.join(os.tmpdir(), 'gemini-edit-'));
     const filePath = pathMod.join(tmpDir, 'buffer.txt');
     // Expand paste placeholders so user sees full content in editor
-    const expandedText = text.replace(
-      PASTED_TEXT_PLACEHOLDER_REGEX,
-      (match) => pastedContent[match] || match,
-    );
+    const expandedText = expandPastePlaceholders(text, pastedContent);
     fs.writeFileSync(filePath, expandedText, 'utf8');
 
     dispatch({ type: 'create_undo_snapshot' });
@@ -3262,16 +3485,17 @@ export function useTextBuffer({
       text,
       visualCursor,
       visualLines,
+      keyMatchers,
     ],
   );
 
   const visualScrollRow = useMemo(() => {
     const totalVisualLines = visualLines.length;
     return Math.min(
-      scrollRowState,
+      actualScrollRowState,
       Math.max(0, totalVisualLines - viewport.height),
     );
-  }, [visualLines.length, scrollRowState, viewport.height]);
+  }, [visualLines.length, actualScrollRowState, viewport.height]);
 
   const renderedVisualLines = useMemo(
     () => visualLines.slice(visualScrollRow, visualScrollRow + viewport.height),
@@ -3467,6 +3691,7 @@ export function useTextBuffer({
       viewportVisualLines: renderedVisualLines,
       visualCursor,
       visualScrollRow,
+      viewportHeight: viewport.height,
       visualToLogicalMap,
       transformedToLogicalMaps,
       visualToTransformedMap,
@@ -3531,6 +3756,13 @@ export function useTextBuffer({
       vimMoveBigWordBackward,
       vimMoveBigWordEnd,
       vimDeleteChar,
+      vimDeleteCharBefore,
+      vimToggleCase,
+      vimReplaceChar,
+      vimFindCharForward,
+      vimFindCharBackward,
+      vimDeleteToCharForward,
+      vimDeleteToCharBackward,
       vimInsertAtCursor,
       vimAppendAtCursor,
       vimOpenLineBelow,
@@ -3544,6 +3776,14 @@ export function useTextBuffer({
       vimMoveToLastLine,
       vimMoveToLine,
       vimEscapeInsertMode,
+      vimYankLine,
+      vimYankWordForward,
+      vimYankBigWordForward,
+      vimYankWordEnd,
+      vimYankBigWordEnd,
+      vimYankToEndOfLine,
+      vimPasteAfter,
+      vimPasteBefore,
     }),
     [
       lines,
@@ -3557,6 +3797,7 @@ export function useTextBuffer({
       renderedVisualLines,
       visualCursor,
       visualScrollRow,
+      viewport.height,
       visualToLogicalMap,
       transformedToLogicalMaps,
       visualToTransformedMap,
@@ -3619,6 +3860,13 @@ export function useTextBuffer({
       vimMoveBigWordBackward,
       vimMoveBigWordEnd,
       vimDeleteChar,
+      vimDeleteCharBefore,
+      vimToggleCase,
+      vimReplaceChar,
+      vimFindCharForward,
+      vimFindCharBackward,
+      vimDeleteToCharForward,
+      vimDeleteToCharBackward,
       vimInsertAtCursor,
       vimAppendAtCursor,
       vimOpenLineBelow,
@@ -3632,6 +3880,14 @@ export function useTextBuffer({
       vimMoveToLastLine,
       vimMoveToLine,
       vimEscapeInsertMode,
+      vimYankLine,
+      vimYankWordForward,
+      vimYankBigWordForward,
+      vimYankWordEnd,
+      vimYankBigWordEnd,
+      vimYankToEndOfLine,
+      vimPasteAfter,
+      vimPasteBefore,
     ],
   );
   return returnValue;
@@ -3657,6 +3913,7 @@ export interface TextBuffer {
   viewportVisualLines: string[]; // The subset of visual lines to be rendered based on visualScrollRow and viewport.height
   visualCursor: [number, number]; // Visual cursor [row, col] relative to the start of all visualLines
   visualScrollRow: number; // Scroll position for visual lines (index of the first visible visual line)
+  viewportHeight: number; // The maximum height of the viewport
   /**
    * For each visual line (by absolute index in allVisualLines) provides a tuple
    * [logicalLineIndex, startColInLogical] that maps where that visual line
@@ -3926,6 +4183,20 @@ export interface TextBuffer {
    * Delete N characters at cursor (vim 'x' command)
    */
   vimDeleteChar: (count: number) => void;
+  /** Delete N characters before cursor (vim 'X') */
+  vimDeleteCharBefore: (count: number) => void;
+  /** Toggle case of N characters at cursor (vim '~') */
+  vimToggleCase: (count: number) => void;
+  /** Replace N characters at cursor with char, stay in NORMAL mode (vim 'r') */
+  vimReplaceChar: (char: string, count: number) => void;
+  /** Move to Nth occurrence of char forward on line; till=true stops before it (vim 'f'/'t') */
+  vimFindCharForward: (char: string, count: number, till: boolean) => void;
+  /** Move to Nth occurrence of char backward on line; till=true stops after it (vim 'F'/'T') */
+  vimFindCharBackward: (char: string, count: number, till: boolean) => void;
+  /** Delete from cursor to Nth occurrence of char forward; till=true excludes the char (vim 'df'/'dt') */
+  vimDeleteToCharForward: (char: string, count: number, till: boolean) => void;
+  /** Delete from Nth occurrence of char backward to cursor; till=true excludes the char (vim 'dF'/'dT') */
+  vimDeleteToCharBackward: (char: string, count: number, till: boolean) => void;
   /**
    * Enter insert mode at cursor (vim 'i' command)
    */
@@ -3978,4 +4249,20 @@ export interface TextBuffer {
    * Handle escape from insert mode (moves cursor left if not at line start)
    */
   vimEscapeInsertMode: () => void;
+  /** Yank N lines into the unnamed register (vim 'yy' / 'Nyy') */
+  vimYankLine: (count: number) => void;
+  /** Yank forward N words into the unnamed register (vim 'yw') */
+  vimYankWordForward: (count: number) => void;
+  /** Yank forward N big words into the unnamed register (vim 'yW') */
+  vimYankBigWordForward: (count: number) => void;
+  /** Yank to end of N words into the unnamed register (vim 'ye') */
+  vimYankWordEnd: (count: number) => void;
+  /** Yank to end of N big words into the unnamed register (vim 'yE') */
+  vimYankBigWordEnd: (count: number) => void;
+  /** Yank from cursor to end of line into the unnamed register (vim 'y$') */
+  vimYankToEndOfLine: (count: number) => void;
+  /** Paste the unnamed register after cursor (vim 'p') */
+  vimPasteAfter: (count: number) => void;
+  /** Paste the unnamed register before cursor (vim 'P') */
+  vimPasteBefore: (count: number) => void;
 }

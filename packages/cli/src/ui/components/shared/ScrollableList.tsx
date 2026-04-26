@@ -16,28 +16,29 @@ import type React from 'react';
 import {
   VirtualizedList,
   type VirtualizedListRef,
+  type VirtualizedListProps,
   SCROLL_TO_ITEM_END,
 } from './VirtualizedList.js';
 import { useScrollable } from '../../contexts/ScrollProvider.js';
 import { Box, type DOMElement } from 'ink';
 import { useAnimatedScrollbar } from '../../hooks/useAnimatedScrollbar.js';
 import { useKeypress, type Key } from '../../hooks/useKeypress.js';
-import { keyMatchers, Command } from '../../keyMatchers.js';
+import { Command } from '../../key/keyMatchers.js';
+import { useKeyMatchers } from '../../hooks/useKeyMatchers.js';
 
 const ANIMATION_FRAME_DURATION_MS = 33;
-
-type VirtualizedListProps<T> = {
-  data: T[];
-  renderItem: (info: { item: T; index: number }) => React.ReactElement;
-  estimatedItemHeight: (index: number) => number;
-  keyExtractor: (item: T, index: number) => string;
-  initialScrollIndex?: number;
-  initialScrollOffsetInIndex?: number;
-};
 
 interface ScrollableListProps<T> extends VirtualizedListProps<T> {
   hasFocus: boolean;
   width?: string | number;
+  scrollbar?: boolean;
+  stableScrollback?: boolean;
+  copyModeEnabled?: boolean;
+  isStatic?: boolean;
+  fixedItemHeight?: boolean;
+  targetScrollIndex?: number;
+  containerHeight?: number;
+  scrollbarThumbColor?: string;
 }
 
 export type ScrollableListRef<T> = VirtualizedListRef<T>;
@@ -46,7 +47,8 @@ function ScrollableList<T>(
   props: ScrollableListProps<T>,
   ref: React.Ref<ScrollableListRef<T>>,
 ) {
-  const { hasFocus, width } = props;
+  const keyMatchers = useKeyMatchers();
+  const { hasFocus, width, scrollbar = true, stableScrollback } = props;
   const virtualizedListRef = useRef<VirtualizedListRef<T>>(null);
   const containerRef = useRef<DOMElement>(null);
 
@@ -256,17 +258,13 @@ function ScrollableList<T>(
   useScrollable(scrollableEntry, true);
 
   return (
-    <Box
-      ref={containerRef}
-      flexGrow={1}
-      flexDirection="column"
-      overflow="hidden"
-      width={width}
-    >
+    <Box ref={containerRef} flexGrow={1} flexDirection="column" width={width}>
       <VirtualizedList
         ref={virtualizedListRef}
         {...props}
+        scrollbar={scrollbar}
         scrollbarThumbColor={scrollbarColor}
+        stableScrollback={stableScrollback}
       />
     </Box>
   );

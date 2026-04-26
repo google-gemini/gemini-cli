@@ -37,6 +37,7 @@ describe('conseca-logger', () => {
       getTelemetryEnabled: vi.fn().mockReturnValue(true),
       getSessionId: vi.fn().mockReturnValue('test-session-id'),
       getTelemetryLogPromptsEnabled: vi.fn().mockReturnValue(true),
+      getTelemetryTracesEnabled: vi.fn().mockReturnValue(false),
       isInteractive: vi.fn().mockReturnValue(true),
       getExperiments: vi.fn().mockReturnValue({ experimentIds: [] }),
       getContentGeneratorConfig: vi.fn().mockReturnValue({ authType: 'oauth' }),
@@ -112,7 +113,7 @@ describe('conseca-logger', () => {
       'user prompt',
       'policy',
       'tool call',
-      'ALLOW',
+      'allow',
       'rationale',
     );
 
@@ -122,7 +123,7 @@ describe('conseca-logger', () => {
     expect(logs.getLogger).toHaveBeenCalled();
     expect(mockLogger.emit).toHaveBeenCalledWith(
       expect.objectContaining({
-        body: 'Conseca Verdict: ALLOW.',
+        body: 'Conseca Verdict: allow.',
         attributes: expect.objectContaining({
           'event.name': EVENT_CONSECA_VERDICT,
         }),
