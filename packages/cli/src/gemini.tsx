@@ -358,8 +358,8 @@ export async function main() {
 
   const isDebugMode = cliConfig.isDebugMode(argv);
   const consolePatcher = new ConsolePatcher({
-    stderr: true,
-    interactive: isHeadlessMode() ? false : true,
+    stderr: argv.isCommand ? false : true,
+    interactive: isHeadlessMode() && !argv.isCommand ? false : true,
     debugMode: isDebugMode,
     onNewMessage: (msg) => {
       coreEvents.emitConsoleLog(msg.type, msg.content);
@@ -786,20 +786,16 @@ export function initializeOutputListenersAndFlush() {
     if (coreEvents.listenerCount(CoreEvent.ConsoleLog) === 0) {
       coreEvents.on(CoreEvent.ConsoleLog, (payload: ConsoleLogPayload) => {
         if (payload.type === 'error' || payload.type === 'warn') {
-          writeToStderr(payload.content);
+          writeToStderr(payload.content + '\n');
         } else {
-          writeToStdout(payload.content);
+          writeToStderr(payload.content + '\n');
         }
       });
     }
 
     if (coreEvents.listenerCount(CoreEvent.UserFeedback) === 0) {
       coreEvents.on(CoreEvent.UserFeedback, (payload: UserFeedbackPayload) => {
-        if (payload.severity === 'error' || payload.severity === 'warning') {
-          writeToStderr(payload.message);
-        } else {
-          writeToStdout(payload.message);
-        }
+        writeToStderr(payload.message + '\n');
       });
     }
   }
