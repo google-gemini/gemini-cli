@@ -212,40 +212,42 @@ describe('ListCheckpointsCommand', () => {
       'cp2.json',
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ] as any);
-    vi.mocked(fs.readFile).mockImplementation(async (filePath) => {
-      if (typeof filePath === 'string' && filePath.endsWith('cp1.json')) {
-        return JSON.stringify({ toolCall: { name: 'tool1' } });
-      }
-      if (typeof filePath === 'string' && filePath.endsWith('cp2.json')) {
-        return JSON.stringify({ toolCall: { name: 'tool2' } });
-      }
-      return '{}';
-    });
     vi.mocked(getCheckpointInfoList).mockReturnValue([
-      { messageId: 'id1', checkpoint: 'cp1' },
-      { messageId: 'id2', checkpoint: 'cp2' },
-    ] as unknown as ReturnType<typeof getCheckpointInfoList>);
+      {
+        fileName: 'cp1.json',
+        toolName: 'tool1',
+        status: 'success',
+        timestamp: 1000,
+      },
+      {
+        fileName: 'cp2.json',
+        toolName: 'tool2',
+        status: 'error',
+        timestamp: 2000,
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ] as any);
 
     const response = await listCommand.execute(context);
 
     expect(response.data).toContain('Available Checkpoints:');
-    expect(response.data).toContain('- **cp1**: tool1 (ID: id1)');
-    expect(response.data).toContain('- **cp2**: tool2 (ID: id2)');
+    expect(response.data).toContain('- **cp1.json**: tool1 (Status: success)');
+    expect(response.data).toContain('- **cp2.json**: tool2 (Status: error)');
   });
 
-  it('handles checkpoints with missing tool name', async () => {
+  it('handles checkpoints with missing metadata', async () => {
     vi.mocked(fs.readdir).mockResolvedValue([
-      'missing_tool.json',
+      'missing_meta.json',
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ] as any);
-    vi.mocked(fs.readFile).mockResolvedValue('{}');
     vi.mocked(getCheckpointInfoList).mockReturnValue([
-      { messageId: 'id3', checkpoint: 'missing_tool' },
-    ] as unknown as ReturnType<typeof getCheckpointInfoList>);
+      {}, // Empty info
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ] as any);
 
     const response = await listCommand.execute(context);
 
-    expect(response.data).toContain('- **missing_tool**: Unknown (ID: id3)');
+    expect(response.data).toContain('- **Unknown**: Unknown (Status: Unknown)');
   });
 
   it('returns generic unexpected error message on failures', async () => {

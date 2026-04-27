@@ -12,7 +12,6 @@ import {
 } from '@google/gemini-cli-core';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import { z } from 'zod';
 import type {
   Command,
   CommandContext,
@@ -66,7 +65,8 @@ export class RestoreCommand implements Command {
         throw error;
       }
 
-      const toolCallData: unknown = JSON.parse(data);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      const toolCallData = JSON.parse(data);
       const ToolCallDataSchema = getToolCallDataSchema();
       const parseResult = ToolCallDataSchema.safeParse(toolCallData);
 
@@ -152,27 +152,16 @@ export class ListCheckpointsCommand implements Command {
 
       const formatted = checkpointInfoList
         .map((info) => {
-          const content = checkpointFiles.get(`${info.checkpoint}.json`);
-          let toolName = 'Unknown';
-          if (content) {
-            try {
-              const parsed: unknown = JSON.parse(content);
-              const result = z
-                .object({
-                  toolCall: z
-                    .object({ name: z.string().optional() })
-                    .optional(),
-                })
-                .passthrough()
-                .safeParse(parsed);
-              if (result.success && result.data.toolCall?.name) {
-                toolName = result.data.toolCall.name;
-              }
-            } catch {
-              // Ignore
-            }
-          }
-          return `- **${info.checkpoint}**: ${toolName} (ID: ${info.messageId})`;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const i = info as Record<string, any>;
+          const fileName = String(i['fileName'] || 'Unknown');
+          const toolName = String(i['toolName'] || 'Unknown');
+          const status = String(i['status'] || 'Unknown');
+          const timestamp = new Date(
+            Number(i['timestamp']) || 0,
+          ).toLocaleString();
+
+          return `- **${fileName}**: ${toolName} (Status: ${status}) [${timestamp}]`;
         })
         .join('\n');
 
