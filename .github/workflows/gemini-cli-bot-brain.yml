@@ -161,11 +161,12 @@ jobs:
       - name: 'Create PR from Patch'
         if: "${{ github.event.inputs.enable_prs == 'true' }}"
         env:
-          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          GH_TOKEN: '${{ secrets.GEMINI_CLI_ROBOT_GITHUB_PAT }}'
         run: |
           if [ -s "${{ runner.temp }}/brain-outputs/bot-changes.patch" ]; then
-            git config user.name "Gemini CLI"
-            git config user.email "gemini-cli@google.com"
+            git config user.name "gemini-cli-robot"
+            git config user.email "gemini-cli-robot@google.com"
+            git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
             
             BRANCH_NAME="bot/productivity-updates-$(date +'%Y%m%d%H%M%S')-${{ github.run_id }}-${{ github.run_attempt }}"
             git checkout -b "$BRANCH_NAME"
