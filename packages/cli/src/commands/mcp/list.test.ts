@@ -67,6 +67,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     GEMINI_DIR: '.gemini',
     getErrorMessage: (e: unknown) =>
       e instanceof Error ? e.message : String(e),
+    MCP_DEFAULT_TIMEOUT_MSEC: 600000,
   };
 });
 vi.mock('@modelcontextprotocol/sdk/client/index.js');
@@ -214,6 +215,72 @@ describe('mcp list command', () => {
       expect.stringContaining(
         'test-server: /test/server  (stdio) - Disconnected',
       ),
+    );
+  });
+
+  it('should display connected status even if ping fails', async () => {
+    const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
+    mockedLoadSettings.mockReturnValue({
+      merged: {
+        ...defaultMergedSettings,
+        mcpServers: {
+          'test-server': { command: '/test/server' },
+        },
+      },
+      isTrusted: true,
+    });
+
+    mockClient.connect.mockResolvedValue(undefined);
+    mockClient.ping.mockRejectedValue(new Error('Ping failed'));
+
+    await listMcpServers();
+
+    expect(debugLogger.log).toHaveBeenCalledWith(
+      expect.stringContaining('test-server: /test/server  (stdio) - Connected'),
+    );
+  });
+
+  it('should use configured timeout for connection', async () => {
+    const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
+    mockedLoadSettings.mockReturnValue({
+      merged: {
+        ...defaultMergedSettings,
+        mcpServers: {
+          'test-server': { command: '/test/server', timeout: 12345 },
+        },
+      },
+      isTrusted: true,
+    });
+
+    mockClient.connect.mockResolvedValue(undefined);
+
+    await listMcpServers();
+
+    expect(mockClient.connect).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ timeout: 12345 }),
+    );
+  });
+
+  it('should use default timeout for connection when not configured', async () => {
+    const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
+    mockedLoadSettings.mockReturnValue({
+      merged: {
+        ...defaultMergedSettings,
+        mcpServers: {
+          'test-server': { command: '/test/server' },
+        },
+      },
+      isTrusted: true,
+    });
+
+    mockClient.connect.mockResolvedValue(undefined);
+
+    await listMcpServers();
+
+    expect(mockClient.connect).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ timeout: 600000 }),
     );
   });
 
