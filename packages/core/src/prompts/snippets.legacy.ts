@@ -369,7 +369,6 @@ export function renderGitRepo(options?: GitRepoOptions): string {
     - \`git diff --staged\` to review only staged changes when a partial commit makes sense or was requested by the user.
   - \`git log -n 3\` to review recent commit messages and match their style (verbosity, formatting, signature line, etc.)
 - Do not use \`git add .\` or \`git add -A\` unprompted as this can stage unwanted or untracked files. Instead, stage only the specific files that were changed or created as part of the task.
-- Combine shell commands whenever possible to save time/steps, e.g. \`git status && git diff HEAD && git log -n 3\`.
 - Always propose a draft commit message. Never just ask the user to give you the full commit message.
 - Prefer commit messages that are clear, concise, and focused more on "why" and less on "what".${gitRepoKeepUserInformed(options.interactive)}
 - After each commit, confirm that it was successful by running \`git status\`.
