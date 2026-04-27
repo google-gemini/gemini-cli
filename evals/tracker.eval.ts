@@ -136,6 +136,8 @@ describe('tracker_mode', () => {
   });
 
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should update the tracker in the same turn as the task completion to save turns',
     params: {
       settings: { experimental: { taskTracker: true } },
