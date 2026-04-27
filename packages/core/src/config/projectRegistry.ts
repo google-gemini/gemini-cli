@@ -97,9 +97,6 @@ export class ProjectRegistry {
     let savedSuccessfully = false;
 
     try {
-      // Unconditionally ensure the directory exists; recursive ignores EEXIST.
-      await fs.promises.mkdir(dir, { recursive: true, mode: 0o700 });
-
       const content = JSON.stringify(data, null, 2);
       await fs.promises.writeFile(tmpPath, content, {
         encoding: 'utf8',
