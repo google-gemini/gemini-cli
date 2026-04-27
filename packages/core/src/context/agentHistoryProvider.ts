@@ -259,7 +259,7 @@ export class AgentHistoryProvider {
             ?.filter((p) => p.functionCall)
             .map((p) => p.functionCall!.name) || [],
       )
-      .join(' → ');
+      .join(' ￫ ');
 
     const summaryParts = [
       '### [System Note: Conversation History Truncated]',
@@ -355,7 +355,7 @@ export class AgentHistoryProvider {
             ?.filter((p) => p.functionCall)
             .map((p) => p.functionCall!.name) || [],
       )
-      .join(' → ');
+      .join(' ￫ ');
 
     const prompt = `### State Update: Agent Continuity
 

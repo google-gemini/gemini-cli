@@ -948,7 +948,7 @@ export function migrateDeprecatedSettings(
           }
         }
 
-        // Migrate enableLoadingPhrases: false → loadingPhrases: 'off'
+        // Migrate enableLoadingPhrases: false ￫ loadingPhrases: 'off'
         const enableLP = newAccessibility['enableLoadingPhrases'];
         if (
           typeof enableLP === 'boolean' &&

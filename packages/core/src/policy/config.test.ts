@@ -561,7 +561,7 @@ describe('createPolicyEngineConfig', () => {
         r.decision === PolicyDecision.ALLOW,
     );
     expect(rule).toBeDefined();
-    // Priority 150 in default tier → 1.150
+    // Priority 150 in default tier ￫ 1.150
     expect(rule?.priority).toBeCloseTo(1.15, 5);
     expect(rule?.argsPattern).toBeInstanceOf(RegExp);
     expect(rule?.argsPattern?.test('{"command":"git status"}')).toBe(true);

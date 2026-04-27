@@ -139,8 +139,8 @@ export class A2AClientManager {
     }
 
     // TODO: Remove normalizeAgentCard once @a2a-js/sdk handles
-    // proto field name aliases (supportedInterfaces → additionalInterfaces,
-    // protocolBinding → transport).
+    // proto field name aliases (supportedInterfaces ￫ additionalInterfaces,
+    // protocolBinding ￫ transport).
     const agentCard = normalizeAgentCard(rawCard);
 
     const grpcUrl =

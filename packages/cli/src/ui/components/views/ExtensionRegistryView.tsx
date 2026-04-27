@@ -151,7 +151,7 @@ export function ExtensionRegistryView({
               <Text
                 color={isActive ? theme.status.success : theme.text.secondary}
               >
-                {isActive ? '● ' : '  '}
+                {isActive ? '∙ ' : '  '}
               </Text>
             </Box>
             <Box flexShrink={0}>

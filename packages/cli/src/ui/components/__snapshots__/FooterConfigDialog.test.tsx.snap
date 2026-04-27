@@ -34,7 +34,7 @@ exports[`<FooterConfigDialog /> > highlights the active item in the preview 1`] 
 │    Reset to default footer                                                                       │
 │                                                                                                  │
 │                                                                                                  │
-│  Enter to select · ↑/↓ to navigate · ←/→ to reorder · Esc to close                               │
+│  Enter to select · ￪/￬ to navigate · ￩/￫ to reorder · Esc to close                               │
 │                                                                                                  │
 │  ┌────────────────────────────────────────────────────────────────────────────────────────────┐  │
 │  │ Preview:                                                                                   │  │
@@ -79,7 +79,7 @@ exports[`<FooterConfigDialog /> > renders correctly with default settings 1`] = 
 │    Reset to default footer                                                                       │
 │                                                                                                  │
 │                                                                                                  │
-│  Enter to select · ↑/↓ to navigate · ←/→ to reorder · Esc to close                               │
+│  Enter to select · ￪/￬ to navigate · ￩/￫ to reorder · Esc to close                               │
 │                                                                                                  │
 │  ┌────────────────────────────────────────────────────────────────────────────────────────────┐  │
 │  │ Preview:                                                                                   │  │
@@ -125,7 +125,7 @@ exports[`<FooterConfigDialog /> > renders correctly with default settings 2`] = 
 │    Reset to default footer                                                                       │
 │                                                                                                  │
 │                                                                                                  │
-│  Enter to select · ↑/↓ to navigate · ←/→ to reorder · Esc to close                               │
+│  Enter to select · ￪/￬ to navigate · ￩/￫ to reorder · Esc to close                               │
 │                                                                                                  │
 │  ┌────────────────────────────────────────────────────────────────────────────────────────────┐  │
 │  │ Preview:                                                                                   │  │
@@ -170,7 +170,7 @@ exports[`<FooterConfigDialog /> > updates the preview when Show footer labels is
 │    Reset to default footer                                                                       │
 │                                                                                                  │
 │                                                                                                  │
-│  Enter to select · ↑/↓ to navigate · ←/→ to reorder · Esc to close                               │
+│  Enter to select · ￪/￬ to navigate · ￩/￫ to reorder · Esc to close                               │
 │                                                                                                  │
 │  ┌────────────────────────────────────────────────────────────────────────────────────────────┐  │
 │  │ Preview:                                                                                   │  │

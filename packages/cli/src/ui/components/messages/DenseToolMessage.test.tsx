@@ -64,7 +64,7 @@ describe('DenseToolMessage', () => {
     const output = lastFrame();
     expect(output).toContain('test-tool');
     expect(output).toContain('Test description');
-    expect(output).toContain('→ Success result');
+    expect(output).toContain('￫ Success result');
     expect(output).toMatchSnapshot();
   });
 
@@ -92,7 +92,7 @@ describe('DenseToolMessage', () => {
     );
     await waitUntilReady();
     const output = lastFrame();
-    expect(output).toContain('→ Line 1 Line 2');
+    expect(output).toContain('￫ Line 1 Line 2');
     expect(output).toMatchSnapshot();
   });
 
@@ -127,7 +127,7 @@ describe('DenseToolMessage', () => {
     );
     await waitFor(() => expect(lastFrame()).toContain('test-tool'));
     await waitFor(() =>
-      expect(lastFrame()).toContain('test.ts → Accepted (+15, -6)'),
+      expect(lastFrame()).toContain('test.ts ￫ Accepted (+15, -6)'),
     );
     const output = lastFrame();
     expect(output).toMatchSnapshot();
@@ -160,7 +160,7 @@ describe('DenseToolMessage', () => {
     const output = lastFrame();
     expect(output).toContain('Edit');
     expect(output).toContain('styles.scss');
-    expect(output).toContain('→ Confirming');
+    expect(output).toContain('￫ Confirming');
     expect(output).toMatchSnapshot();
   });
 
@@ -194,7 +194,7 @@ describe('DenseToolMessage', () => {
     await waitUntilReady();
     const output = lastFrame();
     expect(output).toContain('Edit');
-    expect(output).toContain('styles.scss → Rejected (+1, -1)');
+    expect(output).toContain('styles.scss ￫ Rejected (+1, -1)');
     expect(output).toMatchSnapshot();
   });
 
@@ -234,7 +234,7 @@ describe('DenseToolMessage', () => {
     await waitUntilReady();
     const output = lastFrame();
     expect(output).toContain('Edit');
-    expect(output).toContain('styles.scss → Rejected (+1, -1)');
+    expect(output).toContain('styles.scss ￫ Rejected (+1, -1)');
     expect(output).toMatchSnapshot();
   });
 
@@ -268,7 +268,7 @@ describe('DenseToolMessage', () => {
     await waitUntilReady();
     const output = lastFrame();
     expect(output).toContain('WriteFile');
-    expect(output).toContain('config.json → Accepted (+1, -1)');
+    expect(output).toContain('config.json ￫ Accepted (+1, -1)');
     expect(output).toMatchSnapshot();
   });
 
@@ -293,7 +293,7 @@ describe('DenseToolMessage', () => {
     const output = lastFrame();
     expect(output).toContain('WriteFile');
     expect(output).toContain('config.json');
-    expect(output).toContain('→ Rejected');
+    expect(output).toContain('￫ Rejected');
     expect(output).toMatchSnapshot();
   });
 
@@ -326,7 +326,7 @@ describe('DenseToolMessage', () => {
     await waitUntilReady();
     const output = lastFrame();
     expect(output).toContain('Edit');
-    expect(output).toContain('styles.scss → Failed (+1, -1)');
+    expect(output).toContain('styles.scss ￫ Failed (+1, -1)');
     expect(output).toMatchSnapshot();
   });
 
@@ -356,7 +356,7 @@ describe('DenseToolMessage', () => {
     );
     await waitUntilReady();
     const output = lastFrame();
-    expect(output).toContain('→ Found 2 matches');
+    expect(output).toContain('￫ Found 2 matches');
     // Matches should no longer be rendered in dense mode to keep it compact
     expect(output).not.toContain('file1.ts:10: match 1');
     expect(output).toMatchSnapshot();
@@ -375,7 +375,7 @@ describe('DenseToolMessage', () => {
     );
     await waitUntilReady();
     const output = lastFrame();
-    expect(output).toContain('→ Listed 2 files. (1 ignored)');
+    expect(output).toContain('￫ Listed 2 files. (1 ignored)');
     // Directory listings should not have a payload in dense mode
     expect(output).not.toContain('file1.ts');
     expect(output).not.toContain('dir1');
@@ -398,7 +398,7 @@ describe('DenseToolMessage', () => {
     await waitUntilReady();
     const output = lastFrame();
     expect(output).toContain('Attempting to read files from **/*.ts');
-    expect(output).toContain('→ Read 3 file(s) (1 ignored)');
+    expect(output).toContain('￫ Read 3 file(s) (1 ignored)');
     // File lists should no longer be rendered in dense mode
     expect(output).not.toContain('file1.ts');
     expect(output).toMatchSnapshot();
@@ -416,7 +416,7 @@ describe('DenseToolMessage', () => {
     );
     await waitUntilReady();
     const output = lastFrame();
-    expect(output).toContain('→ Todos updated');
+    expect(output).toContain('￫ Todos updated');
     expect(output).toMatchSnapshot();
   });
 
@@ -429,7 +429,7 @@ describe('DenseToolMessage', () => {
     );
     await waitUntilReady();
     const output = lastFrame();
-    expect(output).toContain('→ Returned (possible empty result)');
+    expect(output).toContain('￫ Returned (possible empty result)');
     expect(output).toMatchSnapshot();
   });
 
@@ -443,7 +443,7 @@ describe('DenseToolMessage', () => {
     );
     await waitUntilReady();
     const output = lastFrame();
-    expect(output).toContain('→ Error occurred');
+    expect(output).toContain('￫ Error occurred');
     expect(output).toMatchSnapshot();
   });
 
@@ -457,7 +457,7 @@ describe('DenseToolMessage', () => {
     );
     await waitUntilReady();
     const output = lastFrame();
-    expect(output).toContain('→ Failed');
+    expect(output).toContain('￫ Failed');
     expect(output).toMatchSnapshot();
   });
 
@@ -471,7 +471,7 @@ describe('DenseToolMessage', () => {
     );
     await waitUntilReady();
     const output = lastFrame();
-    expect(output).not.toContain('→');
+    expect(output).not.toContain('￫');
     expect(output).toMatchSnapshot();
   });
 

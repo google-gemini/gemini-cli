@@ -473,7 +473,7 @@ export function BaseSettingsDialog({
           <>
             {showScrollUp && (
               <Box marginX={1}>
-                <Text color={theme.text.secondary}>▲</Text>
+                <Text color={theme.text.secondary}>▴</Text>
               </Box>
             )}
             {visibleItems.map((item, idx) => {
@@ -523,7 +523,7 @@ export function BaseSettingsDialog({
                       <Text
                         color={isActive ? theme.ui.focus : theme.text.secondary}
                       >
-                        {isActive ? '●' : ''}
+                        {isActive ? '∙' : ''}
                       </Text>
                     </Box>
                     <Box

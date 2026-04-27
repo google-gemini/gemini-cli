@@ -76,7 +76,7 @@ export async function checkForUpdates(
       const bestUpdate = getBestAvailableUpdate(nightlyUpdate, latestUpdate);
 
       if (bestUpdate && semver.gt(bestUpdate, currentVersion)) {
-        const message = `A new version of Gemini CLI is available! ${currentVersion} → ${bestUpdate}`;
+        const message = `A new version of Gemini CLI is available! ${currentVersion} ￫ ${bestUpdate}`;
         const type = semver.diff(bestUpdate, currentVersion) || undefined;
         return {
           message,
@@ -92,7 +92,7 @@ export async function checkForUpdates(
       const latestUpdate = await latestVersion(name);
 
       if (latestUpdate && semver.gt(latestUpdate, currentVersion)) {
-        const message = `Gemini CLI update available! ${currentVersion} → ${latestUpdate}`;
+        const message = `Gemini CLI update available! ${currentVersion} ￫ ${latestUpdate}`;
         const type = semver.diff(latestUpdate, currentVersion) || undefined;
         return {
           message,

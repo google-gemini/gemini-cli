@@ -48,7 +48,7 @@ export const ConsentPrompt = (props: ConsentPromptProps) => {
         />
         <DialogFooter
           primaryAction="Enter to select"
-          navigationActions="↑/↓ to navigate"
+          navigationActions="￪/￬ to navigate"
         />
       </Box>
     </Box>

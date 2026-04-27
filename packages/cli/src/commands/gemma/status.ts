@@ -128,7 +128,7 @@ export function formatGemmaStatus(status: GemmaStatusResult): string {
     lines.push('');
     lines.push(
       chalk.dim(
-        '  Simple requests → Flash (fast) | Complex requests → Pro (powerful)',
+        '  Simple requests ￫ Flash (fast) | Complex requests ￫ Pro (powerful)',
       ),
     );
     lines.push(chalk.dim('  This happens automatically on every request.'));

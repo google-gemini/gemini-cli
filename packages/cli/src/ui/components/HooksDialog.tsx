@@ -167,7 +167,7 @@ export const HooksDialog: React.FC<HooksDialogProps> = ({
           {/* Scroll up indicator */}
           {showScrollUp && (
             <Box paddingLeft={2} minWidth={0}>
-              <Text color={theme.text.secondary}>▲</Text>
+              <Text color={theme.text.secondary}>▴</Text>
             </Box>
           )}
 

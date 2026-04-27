@@ -391,7 +391,7 @@ export class MCPOAuthProvider {
           throw new Error('Cannot perform dynamic registration without issuer');
         }
 
-        debugLogger.debug('→ Attempting dynamic client registration...');
+        debugLogger.debug('￫ Attempting dynamic client registration...');
         const { metadata: authServerMetadata } =
           await this.discoverAuthServerMetadataForRegistration(config.issuer);
         registrationUrl = authServerMetadata.registration_endpoint;
@@ -452,7 +452,7 @@ export class MCPOAuthProvider {
       throw new FatalCancellationError('Authentication cancelled by user.');
     }
 
-    displayMessage(`→ Opening your browser for OAuth sign-in...
+    displayMessage(`￫ Opening your browser for OAuth sign-in...
 
 If the browser does not open, copy and paste this URL into your browser:
 ${authUrl}

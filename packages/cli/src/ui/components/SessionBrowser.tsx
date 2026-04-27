@@ -130,7 +130,7 @@ const SessionTableHeader = ({
   state: SessionBrowserState;
 }): React.JSX.Element => (
   <Box flexDirection="row" marginTop={1}>
-    <Text>{state.scrollOffset > 0 ? <Text>▲ </Text> : '  '}</Text>
+    <Text>{state.scrollOffset > 0 ? <Text>▴ </Text> : '  '}</Text>
 
     <Box width={5} flexShrink={0}>
       <Text color={Colors.Gray} bold>

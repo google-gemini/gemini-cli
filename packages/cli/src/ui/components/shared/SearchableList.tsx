@@ -176,7 +176,7 @@ export function SearchableList<T extends GenericListItem>({
     <Box flexDirection="row" alignItems="flex-start">
       <Box minWidth={2} flexShrink={0}>
         <Text color={isActive ? theme.status.success : theme.text.secondary}>
-          {isActive ? '●' : ''}
+          {isActive ? '∙' : ''}
         </Text>
       </Box>
       <Box flexDirection="column" flexGrow={1} minWidth={0}>
@@ -228,7 +228,7 @@ export function SearchableList<T extends GenericListItem>({
           <>
             {filteredItems.length > maxItemsToShow && (
               <Box marginX={1}>
-                <Text color={theme.text.secondary}>▲</Text>
+                <Text color={theme.text.secondary}>▴</Text>
               </Box>
             )}
             {visibleItems.map((item, index) => {

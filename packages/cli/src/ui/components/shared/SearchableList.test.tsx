@@ -118,7 +118,7 @@ describe('SearchableList', () => {
 
     await waitFor(() => {
       const frame = lastFrame();
-      expect(frame).toContain('● Item Two');
+      expect(frame).toContain('∙ Item Two');
     });
     expect(lastFrame()).toMatchSnapshot();
 
@@ -141,8 +141,8 @@ describe('SearchableList', () => {
     await waitFor(() => {
       const frame = lastFrame();
       expect(frame).toContain('Item Two');
-      expect(frame).toContain('● Item One');
-      expect(frame).not.toContain('● Item Two');
+      expect(frame).toContain('∙ Item One');
+      expect(frame).not.toContain('∙ Item Two');
     });
     expect(lastFrame()).toMatchSnapshot();
   });

@@ -199,7 +199,7 @@ describe('AgentConfigDialog', () => {
         await renderDialog(settings);
 
       // Initially first item (Enabled) should be active
-      expect(lastFrame()).toContain('●');
+      expect(lastFrame()).toContain('∙');
 
       // Press down arrow
       await act(async () => {

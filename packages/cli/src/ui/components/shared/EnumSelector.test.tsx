@@ -142,8 +142,8 @@ describe('<EnumSelector />', () => {
         onValueChange={async () => {}}
       />,
     );
-    expect(lastFrame()).toContain('←');
-    expect(lastFrame()).toContain('→');
+    expect(lastFrame()).toContain('￩');
+    expect(lastFrame()).toContain('￫');
     unmount();
   });
 
@@ -159,8 +159,8 @@ describe('<EnumSelector />', () => {
         onValueChange={async () => {}}
       />,
     );
-    expect(lastFrame()).not.toContain('←');
-    expect(lastFrame()).not.toContain('→');
+    expect(lastFrame()).not.toContain('￩');
+    expect(lastFrame()).not.toContain('￫');
     unmount();
   });
 });

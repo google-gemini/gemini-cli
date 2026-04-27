@@ -21,7 +21,7 @@ const Kbd = ({ name, shortcut }: { name: string; shortcut: string }) => (
 export const NavigationHelpDisplay = (): React.JSX.Element => (
   <Box flexDirection="column">
     <Text color={Colors.Gray}>
-      <Kbd name="Navigate" shortcut="↑/↓" />
+      <Kbd name="Navigate" shortcut="￪/￬" />
       {'   '}
       <Kbd name="Resume" shortcut="Enter" />
       {'   '}

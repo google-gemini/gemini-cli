@@ -101,7 +101,7 @@ exports[`InputPrompt > command search (Ctrl+R when not in shell) > expands and c
 "▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
  (r:)    Type your message or @path/to/file                                                         
 ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
- lllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllll → 
+ lllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllll ￫ 
  lllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllll   
  ...                                                                           
 "
@@ -111,7 +111,7 @@ exports[`InputPrompt > command search (Ctrl+R when not in shell) > expands and c
 "▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
  (r:)    Type your message or @path/to/file                                                         
 ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
- lllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllll ← 
+ lllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllll ￩ 
  lllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllll   
  llllllllllllllllllllllllllllllllllllllllllllllllll                            
 "

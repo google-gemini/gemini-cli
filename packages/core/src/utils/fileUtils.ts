@@ -169,7 +169,7 @@ export async function readFileWithEncoding(filePath: string): Promise<string> {
 
   const bom = detectBOM(full);
   if (!bom) {
-    // No BOM → treat as UTF‑8
+    // No BOM ￫ treat as UTF‑8
     return full.toString('utf8');
   }
 

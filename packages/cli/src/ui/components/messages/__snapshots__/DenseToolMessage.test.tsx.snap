@@ -1,12 +1,12 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`DenseToolMessage > Toggleable Diff View (Alternate Buffer) > hides diff content by default when in alternate buffer mode 1`] = `
-"  ✓  test-tool  test.ts → Accepted
+"  ✓  test-tool  test.ts ￫ Accepted
 "
 `;
 
 exports[`DenseToolMessage > Toggleable Diff View (Alternate Buffer) > shows diff content by default when NOT in alternate buffer mode 1`] = `
-"  ✓  test-tool  test.ts → Accepted
+"  ✓  test-tool  test.ts ￫ Accepted
 
       1 - old line
       1 + new line
@@ -16,7 +16,7 @@ exports[`DenseToolMessage > Toggleable Diff View (Alternate Buffer) > shows diff
 exports[`DenseToolMessage > Visual Regression > matches SVG snapshot for a Rejected tool call 1`] = `"  -  read_file  Reading important.txt"`;
 
 exports[`DenseToolMessage > Visual Regression > matches SVG snapshot for an Accepted file edit with diff stats 1`] = `
-"  ✓  edit  test.ts → Accepted (+1, -1)
+"  ✓  edit  test.ts ￫ Accepted (+1, -1)
 
       1 - old
       1 + new
@@ -29,12 +29,12 @@ exports[`DenseToolMessage > does not render result arrow if resultDisplay is mis
 `;
 
 exports[`DenseToolMessage > flattens newlines in string results 1`] = `
-"  ✓  test-tool  Test description → Line 1 Line 2
+"  ✓  test-tool  Test description ￫ Line 1 Line 2
 "
 `;
 
 exports[`DenseToolMessage > renders correctly for Edit tool using confirmationDetails 1`] = `
-"  ?  Edit  styles.scss → Confirming
+"  ?  Edit  styles.scss ￫ Confirming
 
       1 - body { color: blue; }
       1 + body { color: red; }
@@ -42,7 +42,7 @@ exports[`DenseToolMessage > renders correctly for Edit tool using confirmationDe
 `;
 
 exports[`DenseToolMessage > renders correctly for Errored Edit tool 1`] = `
-"  x  Edit  styles.scss → Failed (+1, -1)
+"  x  Edit  styles.scss ￫ Failed (+1, -1)
 
       1 - old line
       1 + new line
@@ -50,12 +50,12 @@ exports[`DenseToolMessage > renders correctly for Errored Edit tool 1`] = `
 `;
 
 exports[`DenseToolMessage > renders correctly for ReadManyFiles results 1`] = `
-"  ✓  test-tool  Attempting to read files from **/*.ts → Read 3 file(s) (1 ignored)
+"  ✓  test-tool  Attempting to read files from **/*.ts ￫ Read 3 file(s) (1 ignored)
 "
 `;
 
 exports[`DenseToolMessage > renders correctly for Rejected Edit tool 1`] = `
-"  -  Edit  styles.scss → Rejected (+1, -1)
+"  -  Edit  styles.scss ￫ Rejected (+1, -1)
 
       1 - old line
       1 + new line
@@ -63,7 +63,7 @@ exports[`DenseToolMessage > renders correctly for Rejected Edit tool 1`] = `
 `;
 
 exports[`DenseToolMessage > renders correctly for Rejected Edit tool with confirmationDetails and diffStat 1`] = `
-"  -  Edit  styles.scss → Rejected (+1, -1)
+"  -  Edit  styles.scss ￫ Rejected (+1, -1)
 
       1 - body { color: blue; }
       1 + body { color: red; }
@@ -71,7 +71,7 @@ exports[`DenseToolMessage > renders correctly for Rejected Edit tool with confir
 `;
 
 exports[`DenseToolMessage > renders correctly for Rejected WriteFile tool 1`] = `
-"  -  WriteFile  config.json → Rejected
+"  -  WriteFile  config.json ￫ Rejected
 
       1 - old content
       1 + new content
@@ -79,7 +79,7 @@ exports[`DenseToolMessage > renders correctly for Rejected WriteFile tool 1`] = 
 `;
 
 exports[`DenseToolMessage > renders correctly for WriteFile tool 1`] = `
-"  ✓  WriteFile  config.json → Accepted (+1, -1)
+"  ✓  WriteFile  config.json ￫ Accepted (+1, -1)
 
       1 - old content
       1 + new content
@@ -87,17 +87,17 @@ exports[`DenseToolMessage > renders correctly for WriteFile tool 1`] = `
 `;
 
 exports[`DenseToolMessage > renders correctly for a successful string result 1`] = `
-"  ✓  test-tool  Test description → Success result
+"  ✓  test-tool  Test description ￫ Success result
 "
 `;
 
 exports[`DenseToolMessage > renders correctly for error status with string message 1`] = `
-"  x  test-tool  Test description → Error occurred
+"  x  test-tool  Test description ￫ Error occurred
 "
 `;
 
 exports[`DenseToolMessage > renders correctly for file diff results with stats 1`] = `
-"  ✓  test-tool  test.ts → Accepted (+15, -6)
+"  ✓  test-tool  test.ts ￫ Accepted (+15, -6)
 
       1 - old line
       1 + diff content
@@ -105,38 +105,38 @@ exports[`DenseToolMessage > renders correctly for file diff results with stats 1
 `;
 
 exports[`DenseToolMessage > renders correctly for grep results 1`] = `
-"  ✓  test-tool  Test description → Found 2 matches
+"  ✓  test-tool  Test description ￫ Found 2 matches
 "
 `;
 
 exports[`DenseToolMessage > renders correctly for ls results 1`] = `
-"  ✓  test-tool  Test description → Listed 2 files. (1 ignored)
+"  ✓  test-tool  Test description ￫ Listed 2 files. (1 ignored)
 "
 `;
 
 exports[`DenseToolMessage > renders correctly for todo updates 1`] = `
-"  ✓  test-tool  Test description → Todos updated
+"  ✓  test-tool  Test description ￫ Todos updated
 "
 `;
 
 exports[`DenseToolMessage > renders generic failure message for error status without string message 1`] = `
-"  x  test-tool  Test description → Failed
+"  x  test-tool  Test description ￫ Failed
 "
 `;
 
 exports[`DenseToolMessage > renders generic output message for unknown object results 1`] = `
-"  ✓  test-tool  Test description → Returned (possible empty result)
+"  ✓  test-tool  Test description ￫ Returned (possible empty result)
 "
 `;
 
 exports[`DenseToolMessage > truncates long description but preserves tool name (< 25 chars) 1`] = `
 "  ✓  tool-name-is-24-chars-!!  This is a very long description that should definitely be truncated …
-   → Success result
+   ￫ Success result
 "
 `;
 
 exports[`DenseToolMessage > truncates long string results 1`] = `
 "  ✓  test-tool  Test description
-   → AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA…
+   ￫ AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA…
 "
 `;

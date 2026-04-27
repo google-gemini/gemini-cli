@@ -151,7 +151,7 @@ export async function listInboxSkills(config: Config): Promise<InboxSkill[]> {
   const statePath = path.join(memoryDir, '.extraction-state.json');
   const state = await readExtractionState(statePath);
 
-  // Build a map: skillDirName → extractedAt
+  // Build a map: skillDirName ￫ extractedAt
   const skillDateMap = new Map<string, string>();
   for (const run of state.runs) {
     for (const skillName of run.skillsCreated) {

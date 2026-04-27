@@ -2908,7 +2908,7 @@ describe('PolicyEngine', () => {
             priority: 70,
           },
           {
-            // Simulates plan.toml: mcpName="*" → toolName="mcp_*"
+            // Simulates plan.toml: mcpName="*" ￫ toolName="mcp_*"
             toolName: 'mcp_*',
             toolAnnotations: { readOnlyHint: true },
             decision: PolicyDecision.ASK_USER,

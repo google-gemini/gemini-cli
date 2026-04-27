@@ -25,7 +25,7 @@ const COMMAND_TIMEOUT_MS = 60_000;
  */
 export async function resolveAuthValue(value: string): Promise<string> {
   // Support escaping with double prefix (e.g. $$ or !!).
-  // Strips one prefix char: $$FOO → $FOO, !!cmd → !cmd (literal, not resolved).
+  // Strips one prefix char: $$FOO ￫ $FOO, !!cmd ￫ !cmd (literal, not resolved).
   if (value.startsWith('$$') || value.startsWith('!!')) {
     return value.slice(1);
   }

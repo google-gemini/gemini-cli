@@ -186,7 +186,7 @@ export class AskUserInvocation extends BaseToolInvocation<
           .map(([index, answer]) => {
             const question = this.params.questions[parseInt(index, 10)];
             const category = question?.header ?? `Q${index}`;
-            const prefix = `  ${category} → `;
+            const prefix = `  ${category} ￫ `;
             const indent = ' '.repeat(prefix.length);
 
             const lines = answer.split('\n');

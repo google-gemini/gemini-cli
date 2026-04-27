@@ -177,7 +177,7 @@ async function handleSetup(argv: SetupArgs): Promise<number> {
     );
     return 1;
   }
-  log(chalk.dim(`  Platform: ${platform.key} → ${platform.binaryName}`));
+  log(chalk.dim(`  Platform: ${platform.key} ￫ ${platform.binaryName}`));
 
   if (!argv.consent) {
     log('');

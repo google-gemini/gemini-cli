@@ -225,7 +225,7 @@ describe('AgentHistoryProvider', () => {
     const prompt = callArgs.contents[0].parts[0].text;
 
     expect(prompt).toContain('The Action Path:');
-    expect(prompt).toContain('tool_a → tool_b');
+    expect(prompt).toContain('tool_a ￫ tool_b');
   });
 
   describe('Tiered Normalization Logic', () => {

@@ -389,7 +389,7 @@ export class PerfTestHarness {
       }
 
       lines.push(
-        `  Samples: ${result.samples.length} → ${result.filteredSamples.length} after IQR filter`,
+        `  Samples: ${result.samples.length} ￫ ${result.filteredSamples.length} after IQR filter`,
       );
     }
     lines.push('');
@@ -422,7 +422,7 @@ export class PerfTestHarness {
           }
 
           const labels = result.filteredSamples.map((s) => s.label);
-          lines.push('  ' + labels.join(' → '));
+          lines.push('  ' + labels.join(' ￫ '));
           lines.push('');
         }
       }

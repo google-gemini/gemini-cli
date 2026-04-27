@@ -379,11 +379,11 @@ export async function createPolicyEngineConfig(
   // - Rules are evaluated in order of priority (highest first)
   //
   // Priority bands (tiers):
-  // - Default policies (TOML): 1 + priority/1000 (e.g., priority 100 → 1.100)
-  // - Extension policies (TOML): 2 + priority/1000 (e.g., priority 100 → 2.100)
-  // - Workspace policies (TOML): 3 + priority/1000 (e.g., priority 100 → 3.100)
-  // - User policies (TOML): 4 + priority/1000 (e.g., priority 100 → 4.100)
-  // - Admin policies (TOML): 5 + priority/1000 (e.g., priority 100 → 5.100)
+  // - Default policies (TOML): 1 + priority/1000 (e.g., priority 100 ￫ 1.100)
+  // - Extension policies (TOML): 2 + priority/1000 (e.g., priority 100 ￫ 2.100)
+  // - Workspace policies (TOML): 3 + priority/1000 (e.g., priority 100 ￫ 3.100)
+  // - User policies (TOML): 4 + priority/1000 (e.g., priority 100 ￫ 4.100)
+  // - Admin policies (TOML): 5 + priority/1000 (e.g., priority 100 ￫ 5.100)
   //
   // This ensures Admin > User > Workspace > Extension > Default hierarchy is always preserved,
   // while allowing user-specified priorities to work within each tier.

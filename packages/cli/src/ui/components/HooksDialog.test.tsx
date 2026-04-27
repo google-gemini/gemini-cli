@@ -135,7 +135,7 @@ describe('HooksDialog', () => {
         <HooksDialog hooks={hooks} onClose={vi.fn()} maxVisibleHooks={10} />,
       );
 
-      expect(lastFrame()).not.toContain('▲');
+      expect(lastFrame()).not.toContain('▴');
       expect(lastFrame()).not.toContain('▼');
       unmount();
     });
@@ -158,7 +158,7 @@ describe('HooksDialog', () => {
         );
 
       // Initially should not show up indicator
-      expect(lastFrame()).not.toContain('▲');
+      expect(lastFrame()).not.toContain('▴');
 
       act(() => {
         stdin.write('\u001b[B');
@@ -166,7 +166,7 @@ describe('HooksDialog', () => {
       await waitUntilReady();
 
       // Should now show up indicator after scrolling down
-      expect(lastFrame()).toContain('▲');
+      expect(lastFrame()).toContain('▴');
       unmount();
     });
 
@@ -184,7 +184,7 @@ describe('HooksDialog', () => {
       });
       await waitUntilReady();
 
-      expect(lastFrame()).toContain('▲');
+      expect(lastFrame()).toContain('▴');
 
       // Scroll up once
       act(() => {
@@ -193,7 +193,7 @@ describe('HooksDialog', () => {
       await waitUntilReady();
 
       // Should still show up indicator (scrolled down once)
-      expect(lastFrame()).toContain('▲');
+      expect(lastFrame()).toContain('▴');
       unmount();
     });
 
@@ -213,7 +213,7 @@ describe('HooksDialog', () => {
       await waitUntilReady();
 
       const frame = lastFrame();
-      expect(frame).toContain('▲');
+      expect(frame).toContain('▴');
       // At the end, down indicator should be hidden
       expect(frame).not.toContain('▼');
       unmount();
@@ -232,7 +232,7 @@ describe('HooksDialog', () => {
       });
       await waitUntilReady();
 
-      expect(lastFrame()).not.toContain('▲');
+      expect(lastFrame()).not.toContain('▴');
       expect(lastFrame()).toContain('▼');
       unmount();
     });

@@ -146,7 +146,7 @@ export function getCompatibilityWarnings(options?: {
     warnings.push({
       id: 'jetbrains-terminal',
       message:
-        'Warning: JetBrains terminal detected — alternate buffer mode may cause scroll wheel issues and rendering artifacts. If you experience problems, disable it in /settings → "Use Alternate Screen Buffer".',
+        'Warning: JetBrains terminal detected — alternate buffer mode may cause scroll wheel issues and rendering artifacts. If you experience problems, disable it in /settings ￫ "Use Alternate Screen Buffer".',
       priority: WarningPriority.High,
     });
   }

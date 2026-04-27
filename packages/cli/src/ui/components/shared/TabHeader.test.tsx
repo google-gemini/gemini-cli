@@ -58,8 +58,8 @@ describe('TabHeader', () => {
         <TabHeader tabs={MOCK_TABS} currentIndex={0} />,
       );
       const frame = lastFrame();
-      expect(frame).toContain('←');
-      expect(frame).toContain('→');
+      expect(frame).toContain('￩');
+      expect(frame).toContain('￫');
       expect(frame).toMatchSnapshot();
       unmount();
     });
@@ -69,8 +69,8 @@ describe('TabHeader', () => {
         <TabHeader tabs={MOCK_TABS} currentIndex={0} showArrows={false} />,
       );
       const frame = lastFrame();
-      expect(frame).not.toContain('←');
-      expect(frame).not.toContain('→');
+      expect(frame).not.toContain('￩');
+      expect(frame).not.toContain('￫');
       expect(frame).toMatchSnapshot();
       unmount();
     });

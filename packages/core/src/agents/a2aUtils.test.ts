@@ -278,7 +278,7 @@ describe('a2aUtils', () => {
       expect(normalized.defaultInputModes).toBeUndefined();
     });
 
-    it('should map supportedInterfaces to additionalInterfaces with protocolBinding → transport', () => {
+    it('should map supportedInterfaces to additionalInterfaces with protocolBinding ￫ transport', () => {
       const raw = {
         name: 'test',
         supportedInterfaces: [

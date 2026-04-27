@@ -297,6 +297,6 @@ export const McpProgressIndicator: React.FC<McpProgressIndicatorProps> = ({
 export const TrailingIndicator: React.FC = () => (
   <Text color={theme.text.primary} wrap="truncate">
     {' '}
-    ←
+    ￩
   </Text>
 );
