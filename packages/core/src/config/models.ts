@@ -111,16 +111,13 @@ export function resolveModel(
 ): string {
   // Defensive check against non-string inputs at runtime
   const normalizedModel = Array.isArray(requestedModel)
-    ? (String(requestedModel.at(-1) ?? '').trim() || '')
+    ? String(requestedModel.at(-1) ?? '').trim() || ''
     : typeof requestedModel !== 'string'
-      ? (String(requestedModel ?? '').trim() || '')
-      : (requestedModel.trim() || '');
+      ? String(requestedModel ?? '').trim() || ''
+      : requestedModel.trim() || '';
 
   if (config?.getExperimentalDynamicModelConfiguration?.() === true) {
     const resolved = config.modelConfigService.resolveModelId(normalizedModel, {
-
-  if (config?.getExperimentalDynamicModelConfiguration?.() === true) {
-    const resolved = config.modelConfigService.resolveModelId(requestedModel, {
       useGemini3_1,
       useGemini3_1FlashLite,
       useCustomTools: useCustomToolModel,
