@@ -2108,6 +2108,7 @@ describe('Settings Loading and Merging', () => {
         SettingScope.User,
         'general',
         expect.objectContaining({ enableAutoUpdate: false }),
+        expect.anything(),
       );
     });
 
@@ -2135,6 +2136,7 @@ describe('Settings Loading and Merging', () => {
         SettingScope.User,
         'general',
         expect.objectContaining({ defaultApprovalMode: 'plan' }),
+        expect.anything(),
       );
 
       // Verify removal
@@ -2142,6 +2144,7 @@ describe('Settings Loading and Merging', () => {
         SettingScope.User,
         'tools',
         expect.not.objectContaining({ approvalMode: 'plan' }),
+        expect.anything(),
       );
     });
 
@@ -2181,11 +2184,13 @@ describe('Settings Loading and Merging', () => {
         SettingScope.User,
         'general',
         expect.objectContaining({ enableAutoUpdate: true }),
+        expect.anything(),
       );
       expect(setValueSpy).toHaveBeenCalledWith(
         SettingScope.User,
         'general',
         expect.objectContaining({ enableAutoUpdateNotification: false }),
+        expect.anything(),
       );
 
       // Check context.fileFiltering was migrated
@@ -2195,6 +2200,7 @@ describe('Settings Loading and Merging', () => {
         expect.objectContaining({
           fileFiltering: expect.objectContaining({ enableFuzzySearch: true }),
         }),
+        expect.anything(),
       );
 
       // Check ui.accessibility was migrated
@@ -2206,6 +2212,7 @@ describe('Settings Loading and Merging', () => {
             enableLoadingPhrases: false,
           }),
         }),
+        expect.anything(),
       );
 
       // Check that enableLoadingPhrases: false was further migrated to loadingPhrases: 'off'
@@ -2215,6 +2222,7 @@ describe('Settings Loading and Merging', () => {
         expect.objectContaining({
           loadingPhrases: 'off',
         }),
+        expect.anything(),
       );
     });
 
@@ -2238,6 +2246,7 @@ describe('Settings Loading and Merging', () => {
         expect.objectContaining({
           loadingPhrases: 'off',
         }),
+        expect.anything(),
       );
     });
 
@@ -2309,14 +2318,24 @@ describe('Settings Loading and Merging', () => {
       migrateDeprecatedSettings(loadedSettings);
 
       // Should remove disableAutoUpdate and trust enableAutoUpdate: true
-      expect(setValueSpy).toHaveBeenCalledWith(SettingScope.User, 'general', {
-        enableAutoUpdate: true,
-      });
+      expect(setValueSpy).toHaveBeenCalledWith(
+        SettingScope.User,
+        'general',
+        {
+          enableAutoUpdate: true,
+        },
+        expect.anything(),
+      );
 
       // Should remove disableFuzzySearch and trust enableFuzzySearch: false
-      expect(setValueSpy).toHaveBeenCalledWith(SettingScope.User, 'context', {
-        fileFiltering: { enableFuzzySearch: false },
-      });
+      expect(setValueSpy).toHaveBeenCalledWith(
+        SettingScope.User,
+        'context',
+        {
+          fileFiltering: { enableFuzzySearch: false },
+        },
+        expect.anything(),
+      );
     });
 
     it('should preserve deprecated settings when removeDeprecated is explicitly false', () => {
