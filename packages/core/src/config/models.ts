@@ -110,11 +110,14 @@ export function resolveModel(
   config?: ModelCapabilityContext,
 ): string {
   // Defensive check against non-string inputs at runtime
-  if (Array.isArray(requestedModel)) {
-    requestedModel = String(requestedModel[requestedModel.length - 1] ?? '');
-  } else if (typeof requestedModel !== 'string') {
-    requestedModel = String(requestedModel ?? '');
-  }
+  const normalizedModel = Array.isArray(requestedModel)
+    ? (String(requestedModel.at(-1) ?? '').trim() || '')
+    : typeof requestedModel !== 'string'
+      ? (String(requestedModel ?? '').trim() || '')
+      : (requestedModel.trim() || '');
+
+  if (config?.getExperimentalDynamicModelConfiguration?.() === true) {
+    const resolved = config.modelConfigService.resolveModelId(normalizedModel, {
 
   if (config?.getExperimentalDynamicModelConfiguration?.() === true) {
     const resolved = config.modelConfigService.resolveModelId(requestedModel, {
