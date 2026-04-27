@@ -85,7 +85,6 @@ import { relaunchOnExitCode } from './utils/relaunch.js';
 import { loadSandboxConfig } from './config/sandboxConfig.js';
 import { deleteSession, listSessions } from './utils/sessions.js';
 import { createPolicyUpdater } from './config/policy.js';
-import { isAlternateBufferEnabled } from './ui/hooks/useAlternateBuffer.js';
 
 import { setupTerminalAndTheme } from './utils/terminalTheme.js';
 import { runDeferredCommand } from './deferred.js';
@@ -644,7 +643,7 @@ export async function main() {
 
     let input = config.getQuestion();
     const useAlternateBuffer = shouldEnterAlternateScreen(
-      isAlternateBufferEnabled(config),
+      config.getUseAlternateBuffer(),
       config.getScreenReader(),
     );
     const rawStartupWarnings = await rawStartupWarningsPromise;
