@@ -29,17 +29,7 @@ export class ContextGraphMapper {
       );
     }
 
-    if (event.type === 'CLEAR') {
-      this.builder.clear();
-      return [];
-    }
-
-    if (event.type === 'SYNC_FULL') {
-      this.builder.clear();
-    }
-
-    this.builder.processHistory(event.payload);
-    return this.builder.getNodes();
+    return this.builder.processHistory(event.payload);
   }
 
   fromGraph(nodes: readonly ConcreteNode[]): Content[] {

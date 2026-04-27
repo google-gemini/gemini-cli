@@ -40,27 +40,21 @@ function isCompleteEpisode(ep: Partial<Episode>): ep is Episode {
 }
 
 export class ContextGraphBuilder {
-  private episodes: Episode[] = [];
-  private currentEpisode: Partial<Episode> | null = null;
-  private pendingCallParts: Map<string, Part> = new Map();
-
   constructor(
     private readonly tokenCalculator: ContextTokenCalculator,
     private readonly nodeIdentityMap: WeakMap<object, string> = new WeakMap(),
   ) {}
 
-  clear() {
-    this.episodes = [];
-    this.currentEpisode = null;
-    this.pendingCallParts.clear();
-  }
+  processHistory(history: readonly Content[]): ConcreteNode[] {
+    const episodes: Episode[] = [];
+    let currentEpisode: Partial<Episode> | null = null;
+    const pendingCallParts = new Map<string, Part>();
 
-  processHistory(history: readonly Content[]) {
     const finalizeEpisode = () => {
-      if (this.currentEpisode && isCompleteEpisode(this.currentEpisode)) {
-        this.episodes.push(this.currentEpisode);
+      if (currentEpisode && isCompleteEpisode(currentEpisode)) {
+        episodes.push(currentEpisode);
       }
-      this.currentEpisode = null;
+      currentEpisode = null;
     };
 
     for (const msg of history) {
@@ -73,10 +67,10 @@ export class ContextGraphBuilder {
         );
 
         if (hasToolResponses) {
-          this.currentEpisode = parseToolResponses(
+          currentEpisode = parseToolResponses(
             msg,
-            this.currentEpisode,
-            this.pendingCallParts,
+            currentEpisode,
+            pendingCallParts,
             this.tokenCalculator,
             this.nodeIdentityMap,
           );
@@ -84,25 +78,23 @@ export class ContextGraphBuilder {
 
         if (hasUserParts) {
           finalizeEpisode();
-          this.currentEpisode = parseUserParts(msg, this.nodeIdentityMap);
+          currentEpisode = parseUserParts(msg, this.nodeIdentityMap);
         }
       } else if (msg.role === 'model') {
-        this.currentEpisode = parseModelParts(
+        currentEpisode = parseModelParts(
           msg,
-          this.currentEpisode,
-          this.pendingCallParts,
+          currentEpisode,
+          pendingCallParts,
           this.nodeIdentityMap,
         );
       }
     }
-  }
 
-  getNodes(): ConcreteNode[] {
-    const copy = [...this.episodes];
-    if (this.currentEpisode) {
+    const copy = [...episodes];
+    if (currentEpisode) {
       const activeEp = {
-        ...this.currentEpisode,
-        concreteNodes: [...(this.currentEpisode.concreteNodes || [])],
+        ...currentEpisode,
+        concreteNodes: [...(currentEpisode.concreteNodes || [])],
       };
       finalizeYield(activeEp);
       if (isCompleteEpisode(activeEp)) {
