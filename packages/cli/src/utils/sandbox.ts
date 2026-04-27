@@ -752,7 +752,9 @@ export async function start_sandbox(
       stopProxy = () => {
         debugLogger.log('stopping proxy container ...');
         try {
-          execSync(`${command} rm -f ${SANDBOX_PROXY_NAME}`);
+          spawnSync(command, ['rm', '-f', SANDBOX_PROXY_NAME], {
+            stdio: 'ignore',
+          });
         } catch {
           // ignore
         }
