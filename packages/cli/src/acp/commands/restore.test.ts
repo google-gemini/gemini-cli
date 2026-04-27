@@ -44,6 +44,7 @@ describe('RestoreCommand', () => {
             getProjectTempCheckpointsDir: vi
               .fn()
               .mockReturnValue('/tmp/checkpoints'),
+            ensureProjectTempDirExists: vi.fn(),
           },
         },
       },
@@ -169,6 +170,7 @@ describe('ListCheckpointsCommand', () => {
             getProjectTempCheckpointsDir: vi
               .fn()
               .mockReturnValue('/tmp/checkpoints'),
+            ensureProjectTempDirExists: vi.fn(),
           },
         },
       },

@@ -75,6 +75,7 @@ export function createMockConfig(
     storage: {
       getProjectTempDir: () => tmpDir,
       getProjectTempCheckpointsDir: () => path.join(tmpDir, 'checkpoints'),
+      ensureProjectTempDirExists: () => {},
     } as Storage,
     getTruncateToolOutputThreshold: () =>
       DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,

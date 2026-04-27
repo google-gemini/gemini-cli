@@ -37,6 +37,8 @@ import {
   processRestorableToolCalls,
   MessageBusType,
   type ToolCallsUpdateMessage,
+  SECURE_DIR_MODE,
+  SECURE_FILE_MODE,
 } from '@google/gemini-cli-core';
 import {
   type ExecutionEventBus,
@@ -687,10 +689,16 @@ export class Task {
         if (checkpointsToWrite.size > 0) {
           const checkpointDir =
             this.config.storage.getProjectTempCheckpointsDir();
-          await fs.mkdir(checkpointDir, { recursive: true });
+          // Pre-create projectTempDir at SECURE_DIR_MODE so the parent of
+          // checkpointDir is locked down even if it doesn't exist yet.
+          this.config.storage.ensureProjectTempDirExists();
+          await fs.mkdir(checkpointDir, {
+            recursive: true,
+            mode: SECURE_DIR_MODE,
+          });
           for (const [fileName, content] of checkpointsToWrite) {
             const filePath = path.join(checkpointDir, fileName);
-            await fs.writeFile(filePath, content);
+            await fs.writeFile(filePath, content, { mode: SECURE_FILE_MODE });
           }
         }
 

@@ -14,6 +14,7 @@ import {
   getTruncatedCheckpointNames,
   performRestore,
   type ToolCallData,
+  SECURE_DIR_MODE,
 } from '@google/gemini-cli-core';
 import {
   type CommandContext,
@@ -52,8 +53,9 @@ async function restoreAction(
   }
 
   try {
-    // Ensure the directory exists before trying to read it.
-    await fs.mkdir(checkpointDir, { recursive: true });
+    // Ensure the directory exists before trying to read it (locked-down).
+    agentContext?.config.storage.ensureProjectTempDirExists();
+    await fs.mkdir(checkpointDir, { recursive: true, mode: SECURE_DIR_MODE });
     const files = await fs.readdir(checkpointDir);
     const jsonFiles = files.filter((file) => file.endsWith('.json'));
 

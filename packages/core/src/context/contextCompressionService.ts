@@ -95,6 +95,9 @@ export class ContextCompressionService {
       for (const [k, v] of this.state.entries()) {
         obj[k] = v;
       }
+      // Pre-create the project temp dir at 0o700 so the parent of
+      // compression_state.json is locked down even if it doesn't exist yet.
+      this.config.storage.ensureProjectTempDirExists();
       await fs.writeFile(this.stateFilePath, JSON.stringify(obj, null, 2), {
         encoding: 'utf-8',
         mode: 0o600,
