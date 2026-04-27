@@ -13,24 +13,28 @@ long-term strategic optimization.
 - **Purpose**: High-frequency, deterministic maintenance and data collection.
 - **Frequency**: 30-minute cron (`.github/workflows/gemini-cli-bot-pulse.yml`).
 - **Implementation**: Pure TypeScript/JavaScript scripts.
+- **Classification**: Optionally utilizes Gemini CLI for high-confidence
+  semantic classification (e.g., triage, labeling, sentiment) while preferring
+  deterministic logic for equivalent tasks.
 - **Phases**:
   - **Metrics Collection**: Executes scripts in `metrics/scripts/` to track
     repository health (Open issues, PR latency, throughput, etc.).
-  - **Reflex Execution**: Runs deterministic triage, routing, and automated
-    maintenance scripts in `reflexes/scripts/`.
+  - **Reflex Execution**: Runs triage, routing, and automated maintenance
+    scripts in `reflexes/scripts/`.
 - **Output**: Real-time action execution and `metrics-before.csv` artifact
   generation.
 
 ### 2. System 2: The Brain (Reasoning Layer)
 
-- **Purpose**: Strategic investigation, policy refinement, and
+- **Purpose**: Strategic investigation, policy refinement, and proactive
   self-optimization.
 - **Frequency**: 24-hour cron (`.github/workflows/gemini-cli-bot-brain.yml`).
 - **Implementation**: Agentic Gemini CLI phases.
 - **Phases**:
   - **Phase 1: Reasoning (Metrics & Root-Cause Analysis)**: Analyzes time-series
-    metric trends in `history/metrics-timeseries.csv`, tests hypotheses, and
-    proposes script or configuration changes to improve repository health.
+    metric trends and repository state to identify bottlenecks or productivity
+    gaps, tests hypotheses, and proposes script or configuration changes to
+    improve repository health and maintainability.
   - **Phase 2: Critique**: A technical and logical validation layer that reviews
     proposed changes for robustness, actor-awareness, and anti-spam protocols.
   - **Phase 3: Publish**: Automatically promotes approved changes to Pull
