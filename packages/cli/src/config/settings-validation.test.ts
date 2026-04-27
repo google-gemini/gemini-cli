@@ -298,6 +298,33 @@ describe('settings-validation', () => {
         expect(issue).toBeDefined();
       }
     });
+
+    it('should accept customThemes with text.response color override', () => {
+      // Regression test for #25610: `response` is a documented and
+      // implemented color override for model responses (see
+      // packages/cli/src/ui/themes/theme.ts and semantic-tokens.ts),
+      // but was missing from the CustomTheme validation schema.
+      const validSettings = {
+        ui: {
+          theme: 'LimeWhite',
+          customThemes: {
+            LimeWhite: {
+              type: 'custom',
+              name: 'LimeWhite',
+              text: {
+                primary: '#00FF00',
+                response: '#FFFFFF',
+                secondary: '#a0a0a0',
+                accent: '#00FF00',
+              },
+            },
+          },
+        },
+      };
+
+      const result = validateSettings(validSettings);
+      expect(result.success).toBe(true);
+    });
   });
 
   describe('formatValidationError', () => {
