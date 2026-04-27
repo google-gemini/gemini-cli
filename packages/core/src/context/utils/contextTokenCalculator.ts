@@ -5,7 +5,7 @@
  */
 
 import type { Part } from '@google/genai';
-import { estimateTokenCountSync as baseEstimate } from '../../utils/tokenCalculation.js';
+import { estimateTokenCountSync } from '../../utils/tokenCalculation.js';
 import type { ConcreteNode } from '../graph/types.js';
 import type { NodeBehaviorRegistry } from '../graph/behaviorRegistry.js';
 
@@ -84,24 +84,27 @@ export class ContextTokenCalculator {
     }
     return tokens;
   }
+
   /**
    * Slower, precise estimation for a Gemini Content/Part graph.
    * Deeply inspects the nested structure and uses the base tokenization math.
    */
-  estimateTokensForParts(parts: Part[], depth: number = 0): number {
-    let totalTokens = 0;
+  private readonly partTokenCache = new WeakMap<object, number>();
+
+  estimateTokensForParts(parts: Part[]): number {
+    let total = 0;
     for (const part of parts) {
-      if (typeof part.text === 'string') {
-        totalTokens += Math.ceil(part.text.length / this.charsPerToken);
-      } else if (part.inlineData !== undefined || part.fileData !== undefined) {
-        totalTokens += 258;
+      if (part !== null && typeof part === 'object') {
+        let cost = this.partTokenCache.get(part);
+        if (cost === undefined) {
+          cost = estimateTokenCountSync([part], 0, this.charsPerToken);
+          this.partTokenCache.set(part, cost);
+        }
+        total += cost;
       } else {
-        totalTokens += Math.ceil(
-          JSON.stringify(part).length / this.charsPerToken,
-        );
+        total += estimateTokenCountSync([part], 0, this.charsPerToken);
       }
     }
-    // Also include structural overhead
-    return totalTokens + baseEstimate(parts, depth);
+    return total;
   }
 }

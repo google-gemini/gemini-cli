@@ -3,9 +3,10 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+import type { ConcreteNode } from './types.js';
+import { ContextGraphBuilder } from './toGraph.js';
 import type { Content } from '@google/genai';
-import type { Episode, ConcreteNode } from './types.js';
-import { toGraph } from './toGraph.js';
+import type { HistoryEvent } from '../../core/agentChatHistory.js';
 import { fromGraph } from './fromGraph.js';
 import type { ContextTokenCalculator } from '../utils/contextTokenCalculator.js';
 import type { NodeBehaviorRegistry } from './behaviorRegistry.js';
@@ -15,11 +16,30 @@ export class ContextGraphMapper {
 
   constructor(private readonly registry: NodeBehaviorRegistry) {}
 
-  toGraph(
-    history: readonly Content[],
+  private builder?: ContextGraphBuilder;
+
+  applyEvent(
+    event: HistoryEvent,
     tokenCalculator: ContextTokenCalculator,
-  ): Episode[] {
-    return toGraph(history, tokenCalculator, this.nodeIdentityMap);
+  ): ConcreteNode[] {
+    if (!this.builder) {
+      this.builder = new ContextGraphBuilder(
+        tokenCalculator,
+        this.nodeIdentityMap,
+      );
+    }
+
+    if (event.type === 'CLEAR') {
+      this.builder.clear();
+      return [];
+    }
+
+    if (event.type === 'SYNC_FULL') {
+      this.builder.clear();
+    }
+
+    this.builder.processHistory(event.payload);
+    return this.builder.getNodes();
   }
 
   fromGraph(nodes: readonly ConcreteNode[]): Content[] {
