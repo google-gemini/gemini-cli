@@ -23,7 +23,13 @@ const SYNC_SCRIPT = join(
   'history',
   'sync.ts',
 );
-const OUTPUT_FILE = join(process.cwd(), 'metrics-before.csv');
+const OUTPUT_FILE = join(
+  process.cwd(),
+  'tools',
+  'gemini-cli-bot',
+  'history',
+  'metrics-before.csv',
+);
 const TIMESERIES_FILE = join(
   process.cwd(),
   'tools',
