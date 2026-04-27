@@ -364,14 +364,22 @@ export class PolicyEngine {
     const parsed = parseCommandDetails(command);
     const subCommands = parsed?.details ?? [];
 
-    if (subCommands.length === 0) {
+    // Handle parser failures or syntax errors
+    if (subCommands.length === 0 || parsed?.hasError) {
       // If the matched rule says DENY, we should respect it immediately even if parsing fails.
       if (ruleDecision === PolicyDecision.DENY) {
         return { decision: PolicyDecision.DENY, rule };
       }
 
-      // In YOLO mode, we should proceed anyway even if we can't parse the command.
       if (this.approvalMode === ApprovalMode.YOLO) {
+        // Block execution if arguments cannot be validated
+        if (rule?.argsPattern) {
+          debugLogger.debug(
+            `[PolicyEngine.check] Parsing failed for restricted rule, forcing DENY: ${command}`,
+          );
+          return { decision: PolicyDecision.DENY, rule };
+        }
+        // Allow if no argument restrictions apply
         return {
           decision: PolicyDecision.ALLOW,
           rule,
