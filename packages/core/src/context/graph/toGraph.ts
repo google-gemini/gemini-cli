@@ -18,6 +18,8 @@ import type { ContextTokenCalculator } from '../utils/contextTokenCalculator.js'
 import { randomUUID } from 'node:crypto';
 import { isRecord } from '../../utils/markdownUtils.js';
 
+import { debugLogger } from '../../utils/debugLogger.js';
+
 // We remove the global nodeIdentityMap and instead rely on one passed from ContextGraphMapper
 export function getStableId(
   obj: object,
@@ -46,12 +48,18 @@ export class ContextGraphBuilder {
   ) {}
 
   processHistory(history: readonly Content[]): ConcreteNode[] {
+    debugLogger.log(
+      `[ContextGraphBuilder] Processing history with ${history.length} items`,
+    );
     const episodes: Episode[] = [];
     let currentEpisode: Partial<Episode> | null = null;
     const pendingCallParts = new Map<string, Part>();
 
     const finalizeEpisode = () => {
       if (currentEpisode && isCompleteEpisode(currentEpisode)) {
+        debugLogger.log(
+          `[ContextGraphBuilder] Finalizing episode ${currentEpisode.id} with ${currentEpisode.concreteNodes.length} nodes`,
+        );
         episodes.push(currentEpisode);
       }
       currentEpisode = null;
@@ -110,6 +118,9 @@ export class ContextGraphBuilder {
         }
       }
     }
+    debugLogger.log(
+      `[ContextGraphBuilder] Finished processing. Generated ${nodes.length} nodes from ${copy.length} episodes.`,
+    );
     return nodes;
   }
 }
@@ -136,9 +147,12 @@ function parseToolResponses(
       const matchingCall = pendingCallParts.get(callId);
 
       if (!matchingCall) {
-        // eslint-disable-next-line no-console
-        console.error(
-          `[ContextGraphBuilder] CRITICAL: No matching functionCall found for response with id='${callId}' and name='${part.functionResponse.name}'. This will lead to empty intent in the graph.`,
+        debugLogger.error(
+          `[ContextGraphBuilder] MISSING_CALL: No matching functionCall for id='${callId}' name='${part.functionResponse.name}'`,
+        );
+      } else {
+        debugLogger.log(
+          `[ContextGraphBuilder] MATCH_SUCCESS: Found call for id='${callId}'`,
         );
       }
 
@@ -232,6 +246,9 @@ function parseModelParts(
     if (part.functionCall) {
       const callId = part.functionCall.id || '';
       if (callId) {
+        debugLogger.log(
+          `[ContextGraphBuilder] RECORD_CALL: id='${callId}' name='${part.functionCall.name}'`,
+        );
         pendingCallParts.set(callId, part);
       }
     } else if (part.text) {

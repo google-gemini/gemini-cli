@@ -10,6 +10,8 @@ import type {
   NodeBehaviorRegistry,
 } from './behaviorRegistry.js';
 
+import { debugLogger } from '../../utils/debugLogger.js';
+
 class NodeSerializer implements NodeSerializationWriter {
   private history: Content[] = [];
   private currentModelParts: Part[] = [];
@@ -45,10 +47,17 @@ export function fromGraph(
   nodes: readonly ConcreteNode[],
   registry: NodeBehaviorRegistry,
 ): Content[] {
+  debugLogger.log(`[fromGraph] Serializing ${nodes.length} nodes`);
   const writer = new NodeSerializer();
   for (const node of nodes) {
     const behavior = registry.get(node.type);
+    if (!behavior) {
+      debugLogger.error(`[fromGraph] NO BEHAVIOR FOUND for node type: ${node.type}`);
+      continue;
+    }
     behavior.serialize(node, writer);
   }
-  return writer.getContents();
+  const result = writer.getContents();
+  debugLogger.log(`[fromGraph] Generated ${result.length} contents`);
+  return result;
 }

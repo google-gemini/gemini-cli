@@ -57,6 +57,7 @@ import {
 } from '../availability/policyHelpers.js';
 import { coreEvents } from '../utils/events.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 export enum StreamEventType {
   /** A regular content chunk from the API. */
@@ -914,6 +915,9 @@ export class GeminiChat {
             if (callKey !== lastCallKey) {
               lastCallKey = callKey;
               lastAssignedId = `synth_${this.context.promptId}_${this.callCounter++}`;
+              debugLogger.log(
+                `[GeminiChat] Assigned synthetic ID: ${lastAssignedId} to tool: ${fnCall.name}`,
+              );
             }
             fnCall.id = lastAssignedId;
           }
@@ -978,6 +982,9 @@ export class GeminiChat {
     const finalFunctionCalls = Array.from(finalFunctionCallsMap.values());
 
     if (this.context.config.isContextManagementEnabled()) {
+      debugLogger.log(
+        `[GeminiChat] Starting consolidation for ${modelResponseParts.length} raw parts and ${finalFunctionCalls.length} assembled function calls.`,
+      );
       for (const part of modelResponseParts) {
         if (part.functionCall) {
           // Skip partial functionCall stream chunks! We will replace them
