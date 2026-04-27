@@ -178,7 +178,7 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
   ]);
 
   const handleResetToDefaults = useCallback(() => {
-    const legacySettings = {
+    const defaultFootersettings = {
       ...settings.merged,
       ui: {
         ...settings.merged.ui,
@@ -188,7 +188,7 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
         },
       },
     };
-    const defaultState = resolveFooterState(legacySettings);
+    const defaultState = resolveFooterState(defaultFootersettings);
     dispatch({
       type: 'RESET',
       payload: {
