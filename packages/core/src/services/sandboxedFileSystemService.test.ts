@@ -24,6 +24,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import type { Writable } from 'node:stream';
 import path from 'node:path';
+import { promises as fsp } from 'node:fs';
 
 vi.mock('node:child_process', () => ({
   spawn: vi.fn(),
@@ -208,6 +209,76 @@ describe('SandboxedFileSystemService', () => {
       // @ts-expect-error - Checking message and code on unknown error
       expect(err.code).toBe('ENOENT');
     }
+  });
+
+  it('awaits chmod before resolving when mode option is provided', async () => {
+    const mockChild = new EventEmitter() as unknown as ChildProcess;
+    const mockStdin = new EventEmitter();
+    Object.assign(mockStdin, {
+      write: vi.fn(),
+      end: vi.fn(),
+    });
+    Object.assign(mockChild, {
+      stdin: mockStdin as unknown as Writable,
+      stderr: new EventEmitter(),
+    });
+
+    vi.mocked(spawn).mockReturnValue(mockChild);
+
+    let chmodResolved = false;
+    const chmodSpy = vi.spyOn(fsp, 'chmod').mockImplementation(
+      () =>
+        new Promise<void>((resolve) =>
+          setImmediate(() => {
+            chmodResolved = true;
+            resolve();
+          }),
+        ),
+    );
+
+    const testFile = path.resolve('/test/cwd/secure.txt');
+    const writePromise = service.writeTextFile(testFile, 'data', {
+      mode: 0o600,
+    });
+
+    setImmediate(() => {
+      mockChild.emit('close', 0);
+    });
+
+    await writePromise;
+
+    expect(chmodSpy).toHaveBeenCalledWith(testFile, 0o600);
+    // The await is meaningful: by the time writeTextFile resolves, chmod
+    // must have completed (rather than being scheduled fire-and-forget).
+    expect(chmodResolved).toBe(true);
+  });
+
+  it('still resolves writeTextFile when chmod fails (best-effort)', async () => {
+    const mockChild = new EventEmitter() as unknown as ChildProcess;
+    const mockStdin = new EventEmitter();
+    Object.assign(mockStdin, {
+      write: vi.fn(),
+      end: vi.fn(),
+    });
+    Object.assign(mockChild, {
+      stdin: mockStdin as unknown as Writable,
+      stderr: new EventEmitter(),
+    });
+
+    vi.mocked(spawn).mockReturnValue(mockChild);
+
+    vi.spyOn(fsp, 'chmod').mockRejectedValue(new Error('EPERM'));
+
+    const testFile = path.resolve('/test/cwd/secure.txt');
+    const writePromise = service.writeTextFile(testFile, 'data', {
+      mode: 0o600,
+    });
+
+    setImmediate(() => {
+      mockChild.emit('close', 0);
+    });
+
+    await expect(writePromise).resolves.toBeUndefined();
   });
 
   it('should set ENOENT code when file does not exist on Windows', async () => {

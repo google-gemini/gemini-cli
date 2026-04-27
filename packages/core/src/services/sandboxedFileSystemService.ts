@@ -162,21 +162,25 @@ export class SandboxedFileSystemService implements FileSystemService {
           error += data.toString();
         });
 
-        child.on('close', (code) => {
+        child.on('close', async (code) => {
           if (code === 0) {
             // Best-effort post-write chmod when caller requested a mode.
             // Sandbox `__write` does not currently propagate the mode option,
             // so we apply it from the parent process. This works when the
             // parent owns the file (typical case); silently ignored otherwise
             // — the file already exists with the sandbox's default mode.
+            // Awaited so `writeTextFile`'s promise does not resolve until
+            // the chmod attempt has completed.
             if (options?.mode !== undefined) {
-              fsp.chmod(safePath, options.mode).catch((err) => {
+              try {
+                await fsp.chmod(safePath, options.mode);
+              } catch (err) {
                 debugLogger.error(
                   `Sandbox post-write chmod failed for '${filePath}' (mode=${options.mode?.toString(8)}): ${
                     err instanceof Error ? err.message : String(err)
                   }`,
                 );
-              });
+              }
             }
             resolve();
           } else {

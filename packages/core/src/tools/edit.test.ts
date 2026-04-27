@@ -136,6 +136,7 @@ describe('EditTool', () => {
       storage: {
         getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
         getPlansDir: vi.fn().mockReturnValue('/tmp/plans'),
+        ensureProjectTempDirExists: vi.fn(),
       },
       isPathAllowed(this: Config, absolutePath: string): boolean {
         const workspaceContext = this.getWorkspaceContext();
@@ -143,6 +144,10 @@ describe('EditTool', () => {
           return true;
         }
 
+        const projectTempDir = this.storage.getProjectTempDir();
+        return isSubpath(path.resolve(projectTempDir), absolutePath);
+      },
+      isSecureWritePath(this: Config, absolutePath: string): boolean {
         const projectTempDir = this.storage.getProjectTempDir();
         return isSubpath(path.resolve(projectTempDir), absolutePath);
       },
@@ -1360,6 +1365,57 @@ function doIt() {
       expect(fs.readFileSync(planFilePath, 'utf8')).toBe('some new content');
 
       fs.rmSync(plansDir, { recursive: true, force: true });
+    });
+  });
+
+  describe('secure write mode for ~/.gemini/ paths', () => {
+    let secureTempDir: string;
+
+    beforeEach(() => {
+      secureTempDir = fs.mkdtempSync(
+        path.join(os.tmpdir(), 'edit-secure-test-'),
+      );
+      vi.mocked(mockConfig.storage.getProjectTempDir).mockReturnValue(
+        secureTempDir,
+      );
+    });
+
+    afterEach(() => {
+      fs.rmSync(secureTempDir, { recursive: true, force: true });
+    });
+
+    it('passes mode 0o600 when editing a path under projectTempDir', async () => {
+      const writeSpy = vi.spyOn(fileSystemService, 'writeTextFile');
+      const filePath = path.join(secureTempDir, 'secure.txt');
+      fs.writeFileSync(filePath, 'old content', 'utf8');
+
+      const invocation = tool.build({
+        file_path: filePath,
+        instruction: 'replace',
+        old_string: 'old',
+        new_string: 'new',
+      });
+      await invocation.execute({ abortSignal: new AbortController().signal });
+
+      expect(writeSpy).toHaveBeenCalledWith(filePath, 'new content', {
+        mode: 0o600,
+      });
+    });
+
+    it('does NOT pass mode for workspace paths', async () => {
+      const writeSpy = vi.spyOn(fileSystemService, 'writeTextFile');
+      const filePath = path.join(rootDir, 'workspace.txt');
+      fs.writeFileSync(filePath, 'old content', 'utf8');
+
+      const invocation = tool.build({
+        file_path: filePath,
+        instruction: 'replace',
+        old_string: 'old',
+        new_string: 'new',
+      });
+      await invocation.execute({ abortSignal: new AbortController().signal });
+
+      expect(writeSpy).toHaveBeenCalledWith(filePath, 'new content', undefined);
     });
   });
 });

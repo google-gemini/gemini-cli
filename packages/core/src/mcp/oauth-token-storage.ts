@@ -19,6 +19,7 @@ import {
   DEFAULT_SERVICE_NAME,
   FORCE_ENCRYPTED_FILE_ENV_VAR,
 } from './token-storage/index.js';
+import { SECURE_DIR_MODE } from '../utils/permissions.js';
 
 /**
  * Class for managing OAuth token storage and retrieval.
@@ -53,7 +54,7 @@ export class MCPOAuthTokenStorage implements TokenStorage {
    */
   private async ensureConfigDir(): Promise<void> {
     const configDir = path.dirname(this.getTokenFilePath());
-    await fs.mkdir(configDir, { recursive: true });
+    await fs.mkdir(configDir, { recursive: true, mode: SECURE_DIR_MODE });
   }
 
   /**

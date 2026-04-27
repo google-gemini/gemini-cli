@@ -48,6 +48,7 @@ import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { WRITE_FILE_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
+import { SECURE_DIR_MODE, SECURE_FILE_MODE } from '../utils/permissions.js';
 import { detectOmissionPlaceholders } from './omissionPlaceholderDetector.js';
 import { resolveAndValidatePlanPath } from '../utils/planUtils.js';
 import { isGemini3Model } from '../config/models.js';
@@ -323,11 +324,21 @@ class WriteFileToolInvocation extends BaseToolInvocation<
         !correctedContentResult.fileExists);
 
     try {
+      const secure = this.config.isSecureWritePath(this.resolvedPath);
+      if (secure) {
+        this.config.storage.ensureProjectTempDirExists();
+      }
+
       const dirName = path.dirname(this.resolvedPath);
       try {
         await fsPromises.access(dirName);
       } catch {
-        await fsPromises.mkdir(dirName, { recursive: true });
+        await fsPromises.mkdir(
+          dirName,
+          secure
+            ? { recursive: true, mode: SECURE_DIR_MODE }
+            : { recursive: true },
+        );
       }
 
       let finalContent = fileContent;
@@ -342,7 +353,11 @@ class WriteFileToolInvocation extends BaseToolInvocation<
 
       await this.config
         .getFileSystemService()
-        .writeTextFile(this.resolvedPath, finalContent);
+        .writeTextFile(
+          this.resolvedPath,
+          finalContent,
+          secure ? { mode: SECURE_FILE_MODE } : undefined,
+        );
 
       // Generate diff for display result
       const fileName = path.basename(this.resolvedPath);

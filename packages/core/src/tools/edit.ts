@@ -59,6 +59,7 @@ import { resolveToolDeclaration } from './definitions/resolver.js';
 import { detectOmissionPlaceholders } from './omissionPlaceholderDetector.js';
 import { discoverJitContext, appendJitContext } from './jit-context.js';
 import { resolveAndValidatePlanPath } from '../utils/planUtils.js';
+import { SECURE_DIR_MODE, SECURE_FILE_MODE } from '../utils/permissions.js';
 
 const ENABLE_FUZZY_MATCH_RECOVERY = true;
 const FUZZY_MATCH_THRESHOLD = 0.1; // Allow up to 10% weighted difference
@@ -887,7 +888,11 @@ class EditToolInvocation
     }
 
     try {
-      await this.ensureParentDirectoriesExistAsync(this.resolvedPath);
+      const secure = this.config.isSecureWritePath(this.resolvedPath);
+      if (secure) {
+        this.config.storage.ensureProjectTempDirExists();
+      }
+      await this.ensureParentDirectoriesExistAsync(this.resolvedPath, secure);
       let finalContent = editData.newContent;
 
       // Restore original line endings if they were CRLF, or use OS default for new files
@@ -900,7 +905,11 @@ class EditToolInvocation
       }
       await this.config
         .getFileSystemService()
-        .writeTextFile(this.resolvedPath, finalContent);
+        .writeTextFile(
+          this.resolvedPath,
+          finalContent,
+          secure ? { mode: SECURE_FILE_MODE } : undefined,
+        );
 
       let displayResult: ToolResultDisplay;
       if (editData.isNewFile) {
@@ -1017,12 +1026,18 @@ ${snippet}`);
    */
   private async ensureParentDirectoriesExistAsync(
     filePath: string,
+    secure = false,
   ): Promise<void> {
     const dirName = path.dirname(filePath);
     try {
       await fsPromises.access(dirName);
     } catch {
-      await fsPromises.mkdir(dirName, { recursive: true });
+      await fsPromises.mkdir(
+        dirName,
+        secure
+          ? { recursive: true, mode: SECURE_DIR_MODE }
+          : { recursive: true },
+      );
     }
   }
 }

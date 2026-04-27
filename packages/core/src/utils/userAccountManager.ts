@@ -8,6 +8,7 @@ import path from 'node:path';
 import { promises as fsp, readFileSync } from 'node:fs';
 import { Storage } from '../config/storage.js';
 import { debugLogger } from './debugLogger.js';
+import { SECURE_DIR_MODE, SECURE_FILE_MODE } from './permissions.js';
 
 interface UserAccounts {
   active: string | null;
@@ -99,7 +100,10 @@ export class UserAccountManager {
 
   async cacheGoogleAccount(email: string): Promise<void> {
     const filePath = this.getGoogleAccountsCachePath();
-    await fsp.mkdir(path.dirname(filePath), { recursive: true });
+    await fsp.mkdir(path.dirname(filePath), {
+      recursive: true,
+      mode: SECURE_DIR_MODE,
+    });
 
     const accounts = await this.readAccounts(filePath);
 
@@ -113,7 +117,10 @@ export class UserAccountManager {
     accounts.old = accounts.old.filter((oldEmail) => oldEmail !== email);
 
     accounts.active = email;
-    await fsp.writeFile(filePath, JSON.stringify(accounts, null, 2), 'utf-8');
+    await fsp.writeFile(filePath, JSON.stringify(accounts, null, 2), {
+      encoding: 'utf-8',
+      mode: SECURE_FILE_MODE,
+    });
   }
 
   getCachedGoogleAccount(): string | null {
@@ -143,6 +150,9 @@ export class UserAccountManager {
       accounts.active = null;
     }
 
-    await fsp.writeFile(filePath, JSON.stringify(accounts, null, 2), 'utf-8');
+    await fsp.writeFile(filePath, JSON.stringify(accounts, null, 2), {
+      encoding: 'utf-8',
+      mode: SECURE_FILE_MODE,
+    });
   }
 }

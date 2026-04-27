@@ -3096,6 +3096,28 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   /**
+   * Returns `true` iff a write to `absolutePath` should land under `~/.gemini/`
+   * with restrictive permissions (`0o700`/`0o600`). True for any path under
+   * the project temp tree and for the surgically-allowlisted global
+   * `~/.gemini/<GEMINI.md>` file. The set is intentionally a strict subset of
+   * `isPathAllowed` — workspace writes (the user's source code) keep the
+   * user's umask.
+   */
+  isSecureWritePath(absolutePath: string): boolean {
+    const resolvedPath = resolveToRealPath(absolutePath);
+
+    const resolvedTempDir = resolveToRealPath(this.storage.getProjectTempDir());
+    if (isSubpath(resolvedTempDir, resolvedPath)) {
+      return true;
+    }
+
+    const resolvedGlobalMemoryFilePath = resolveToRealPath(
+      path.join(Storage.getGlobalGeminiDir(), getCurrentGeminiMdFilename()),
+    );
+    return resolvedPath === resolvedGlobalMemoryFilePath;
+  }
+
+  /**
    * Validates if a path is allowed and returns a detailed error message if not.
    *
    * @param absolutePath The absolute path to validate.
