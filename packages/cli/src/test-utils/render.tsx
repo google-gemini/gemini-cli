@@ -542,8 +542,8 @@ export const mockAppState: AppState = {
   startupWarnings: [],
 };
 
-const mockVoiceReturn: VoiceInputReturn = {
-  isEnabled: true,
+export const mockVoiceReturn: VoiceInputReturn = {
+  isEnabled: false,
   state: {
     isRecording: false,
     isTranscribing: false,
@@ -567,6 +567,8 @@ const mockUIActions: UIActions = {
   exitPrivacyNotice: vi.fn(),
   closeSettingsDialog: vi.fn(),
   closeModelDialog: vi.fn(),
+  openVoiceModelDialog: vi.fn(),
+  closeVoiceModelDialog: vi.fn(),
   openAgentConfigDialog: vi.fn(),
   closeAgentConfigDialog: vi.fn(),
   openPermissionsDialog: vi.fn(),
@@ -613,6 +615,7 @@ const mockUIActions: UIActions = {
   handleNewAgentsSelect: vi.fn(),
   getPreferredEditor: vi.fn(),
   clearAccountSuspension: vi.fn(),
+  setVoiceModeEnabled: vi.fn(),
 };
 
 import { type TextBuffer } from '../ui/components/shared/text-buffer.js';

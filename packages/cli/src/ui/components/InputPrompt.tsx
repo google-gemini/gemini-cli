@@ -56,6 +56,8 @@ import {
   debugLogger,
   type Config,
 } from '@google/gemini-cli-core';
+import { useVoiceMode } from '../hooks/useVoiceMode.js';
+import { useVoiceContext } from '../contexts/VoiceContext.js';
 import {
   parseInputForHighlighting,
   parseSegmentsFromTokens,
@@ -87,11 +89,6 @@ import { useMouseClick } from '../hooks/useMouseClick.js';
 import { useMouse, type MouseEvent } from '../contexts/MouseContext.js';
 import { useUIActions } from '../contexts/UIActionsContext.js';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
-import {
-  useVoiceContext,
-  onVoiceTranscript,
-} from '../contexts/VoiceContext.js';
-import Spinner from 'ink-spinner';
 import { useIsHelpDismissKey } from '../utils/shortcutsHelp.js';
 import { useRepeatedKeyPress } from '../hooks/useRepeatedKeyPress.js';
 import { useKeyMatchers } from '../hooks/useKeyMatchers.js';
@@ -164,7 +161,6 @@ export function isLargePaste(text: string): boolean {
 }
 
 const DOUBLE_TAB_CLEAN_UI_TOGGLE_WINDOW_MS = 350;
-
 /**
  * Attempt to toggle expansion of a paste placeholder in the buffer.
  * Returns true if a toggle action was performed or hint was shown, false otherwise.
@@ -243,6 +239,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     setEmbeddedShellFocused,
     setShortcutsHelpVisible,
     toggleCleanUiDetailsVisible,
+    setVoiceModeEnabled,
   } = useUIActions();
   const {
     terminalWidth,
@@ -251,6 +248,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     backgroundTasks,
     backgroundTaskHeight,
     shortcutsHelpVisible,
+    isVoiceModeEnabled,
   } = useUIState();
   const [suppressCompletion, setSuppressCompletion] = useState(false);
   const { handlePress: registerPlainTabPress, resetCount: resetPlainTabPress } =
@@ -268,6 +266,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           resetEscapeState();
           if (buffer.text.length > 0) {
             buffer.setText('');
+            resetTurnBaseline();
             resetCompletionState();
           } else if (history.length > 0) {
             onSubmit('/rewind');
@@ -284,9 +283,24 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const pasteTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const innerBoxRef = useRef<DOMElement>(null);
   const hasUserNavigatedSuggestions = useRef(false);
-  // Double-space voice trigger: track last space press time (only fires on empty input)
-  const lastSpacePressRef = useRef<number>(0);
   const listRef = useRef<ScrollableListRef<ScrollableItem>>(null);
+
+  const {
+    isEnabled: voiceEnabled,
+    state: voiceState,
+    toggleRecording,
+    cancelRecording,
+  } = useVoiceContext();
+
+  const { isRecording, handleVoiceInput, resetTurnBaseline } = useVoiceMode({
+    buffer,
+    config,
+    settings,
+    setQueueErrorMessage,
+    isVoiceModeEnabled,
+    setVoiceModeEnabled,
+    keyMatchers,
+  });
 
   const [reverseSearchActive, setReverseSearchActive] = useState(false);
   const [commandSearchActive, setCommandSearchActive] = useState(false);
@@ -378,24 +392,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     [],
   );
 
-  // Voice input hook - MUST be before handleSubmit
-  // NOTE: Transcript is delivered via events, not context, to avoid infinite render loops
-  const {
-    isEnabled: voiceEnabled,
-    state: voiceState,
-    toggleRecording,
-    cancelRecording,
-  } = useVoiceContext();
-  // Handle voice transcript via event listener (not context) to avoid re-renders
-  useEffect(() => {
-    const handleTranscript = (transcript: string) => {
-      // Insert transcribed text at cursor position with trailing space for next input
-      buffer.insert(transcript + ' ');
-    };
-
-    return onVoiceTranscript(handleTranscript);
-  }, [buffer]);
-
   const handleSubmitAndClear = useCallback(
     (submittedValue: string) => {
       let processedValue = submittedValue;
@@ -412,6 +408,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       // Clear the buffer *before* calling onSubmit to prevent potential re-submission
       // if onSubmit triggers a re-render while the buffer still holds the old value.
       buffer.setText('');
+      resetTurnBaseline();
       onSubmit(processedValue);
       resetCompletionState();
       resetReverseSearchCompletionState();
@@ -423,6 +420,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       shellModeActive,
       shellHistory,
       resetReverseSearchCompletionState,
+      resetTurnBaseline,
     ],
   );
 
@@ -672,6 +670,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   const handleInput = useCallback(
     (key: Key) => {
+      if (handleVoiceInput(key)) return true;
+
       // Determine if this keypress is a history navigation command
       const isHistoryUp =
         !shellModeActive &&
@@ -739,19 +739,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         streamingState === StreamingState.Responding ||
         streamingState === StreamingState.WaitingForConfirmation;
 
-      // Hide the shortcuts panel if voice is active or if other keys are pressed
-      if (shortcutsHelpVisible) {
-        setShortcutsHelpVisible(false);
-      }
-
-      // Cancel active voice transcription if escape is hit
-      if (key.name === 'escape') {
-        if (voiceState.isRecording || voiceState.isTranscribing) {
-          void cancelRecording();
-          resetEscapeState();
-          return true;
-        }
-      }
       const isQueueMessageKey = keyMatchers[Command.QUEUE_MESSAGE](key);
       const isPlainTab =
         key.name === 'tab' && !key.shift && !key.alt && !key.ctrl && !key.cmd;
@@ -812,6 +799,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       } else {
         resetPlainTabPress();
       }
+
       if (key.name === 'paste') {
         if (shortcutsHelpVisible) {
           setShortcutsHelpVisible(false);
@@ -910,15 +898,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       ) {
         setShellModeActive(!shellModeActive);
         buffer.setText(''); // Clear the '!' from input
+        resetTurnBaseline();
         return true;
       }
-
       if (keyMatchers[Command.ESCAPE](key)) {
-        if (voiceState.isRecording) {
-          void cancelRecording();
-          return true;
-        }
-
         const cancelSearch = (
           setActive: (active: boolean) => void,
           resetCompletion: () => void,
@@ -973,55 +956,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return true;
       }
 
-      if (keyMatchers[Command.QUIT](key)) {
-        if (voiceState.isRecording) {
-          void cancelRecording();
-          return true;
-        }
-      }
-
       if (keyMatchers[Command.CLEAR_SCREEN](key)) {
         setBannerVisible(false);
         onClearScreen();
-        return true;
-      }
-
-      // Reset double-space timer on any non-space key
-      if (key.sequence !== ' ') {
-        lastSpacePressRef.current = 0;
-      }
-
-      // Double-space triggers voice recording.
-      if (voiceEnabled && key.sequence === ' ') {
-        const now = Date.now();
-        const delta = now - lastSpacePressRef.current;
-
-        // If they are just holding down the spacebar, the OS will send repeated keys
-        // very quickly (e.g. every 30ms). We don't want to trigger voice on continuous hold.
-        if (delta > 50 && delta < 300) {
-          lastSpacePressRef.current = 0;
-
-          // The first space was already inserted into the buffer on the previous keypress
-          // (because we let it pass through to keep typing feeling responsive).
-          // We must manually delete that first space now before starting recording.
-          if (buffer.text.length > 0 && buffer.text.endsWith(' ')) {
-            buffer.setText(buffer.text.slice(0, -1));
-          }
-
-          void toggleRecording();
-          return true; // Consume the second space
-        }
-
-        lastSpacePressRef.current = now;
-
-        // Consume the first space only if the buffer is empty to avoid leading whitespace.
-        // If not empty, let it through so normal typing isn't delayed.
-        if (buffer.text.length === 0) {
-          return true;
-        }
-      }
-      if (voiceEnabled && keyMatchers[Command.VOICE_INPUT](key)) {
-        void toggleRecording();
         return true;
       }
 
@@ -1389,6 +1326,45 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return false;
       }
 
+      // Double-space triggers voice recording.
+      if (!isVoiceModeEnabled && voiceEnabled && key.sequence === ' ') {
+        const now = Date.now();
+        const delta = now - lastSpacePressRef.current;
+
+        // If they are just holding down the spacebar, the OS will send repeated keys
+        // very quickly (e.g. every 30ms). We don't want to trigger voice on continuous hold.
+        if (delta > 50 && delta < 300) {
+          lastSpacePressRef.current = 0;
+
+          // The first space was already inserted into the buffer on the previous keypress
+          // (because we let it pass through to keep typing feeling responsive).
+          // We must manually delete that first space now before starting recording.
+          if (buffer.text.length > 0 && buffer.text.endsWith(' ')) {
+            buffer.setText(buffer.text.slice(0, -1));
+          }
+
+          void toggleRecording();
+          return true; // Consume the second space
+        }
+
+        lastSpacePressRef.current = now;
+
+        // Consume the first space only if the buffer is empty to avoid leading whitespace.
+        // If not empty, let it through so normal typing isn't delayed.
+        if (buffer.text.length === 0) {
+          return true;
+        }
+      }
+
+      if (
+        !isVoiceModeEnabled &&
+        voiceEnabled &&
+        keyMatchers[Command.VOICE_INPUT](key)
+      ) {
+        void toggleRecording();
+        return true;
+      }
+
       // Fall back to the text buffer's default input handling for all other keys
       const handled = buffer.handleInput(key);
 
@@ -1448,23 +1424,22 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       backgroundTaskHeight,
       streamingState,
       handleEscPress,
+      resetTurnBaseline,
       registerPlainTabPress,
       resetPlainTabPress,
       toggleCleanUiDetailsVisible,
       shouldShowSuggestions,
       isShellSuggestionsVisible,
       forceShowShellSuggestions,
-      voiceEnabled,
-      toggleRecording,
-      cancelRecording,
-      voiceState.isRecording,
-      voiceState.isTranscribing,
       keyMatchers,
       isHelpDismissKey,
       settings,
+      handleVoiceInput,
+      voiceEnabled,
+      toggleRecording,
+      isVoiceModeEnabled,
     ],
   );
-
   useKeypress(handleInput, {
     isActive: !isEmbeddedShellFocused && !copyModeEnabled,
     priority: true,
@@ -1472,6 +1447,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   const [cursorVisualRowAbsolute, cursorVisualColAbsolute] =
     buffer.visualCursor;
+
+  const effectivePlaceholder = voiceState.isRecording
+    ? 'Recording...'
+    : voiceState.isTranscribing
+      ? 'Transcribing...'
+      : placeholder;
 
   const getGhostTextLines = useCallback(() => {
     if (
@@ -1809,24 +1790,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     statusText = 'Accepting edits';
   }
 
-  // Voice input status
-  // ⚠️ Voice state intentionally overrides mode indicators
-  // (recording must always be visible regardless of approval mode)
-  if (voiceState.isRecording) {
-    statusColor = theme.status.error;
-    statusText = 'Recording... (Space Space or Esc to stop)';
-  } else if (voiceState.isTranscribing) {
-    statusColor = theme.status.warning;
-    statusText = 'Transcribing...';
-  }
-
-  // Dynamic placeholder reflecting voice state
-  const effectivePlaceholder = voiceState.isRecording
-    ? 'Speak now...'
-    : voiceState.isTranscribing
-      ? 'Transcribing your speech...'
-      : placeholder;
-
   const suggestionsNode = shouldShowSuggestions ? (
     <Box paddingRight={2}>
       <SuggestionsDisplay
@@ -1883,13 +1846,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             color={statusColor ?? theme.text.accent}
             aria-label={statusText || undefined}
           >
-            {voiceState.isRecording ? (
-              '● '
-            ) : voiceState.isTranscribing ? (
-              <>
-                <Spinner type="dots" />{' '}
-              </>
-            ) : shellModeActive ? (
+            {shellModeActive ? (
               reverseSearchActive ? (
                 <Text
                   color={theme.text.link}
@@ -1898,17 +1855,34 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                   (r:){' '}
                 </Text>
               ) : (
-                '! '
+                '!'
               )
             ) : commandSearchActive ? (
               <Text color={theme.text.accent}>(r:) </Text>
             ) : showYoloStyling ? (
-              '* '
+              '*'
             ) : (
-              '> '
-            )}
+              '>'
+            )}{' '}
           </Text>
           <Box flexGrow={1} flexDirection="column" ref={innerBoxRef}>
+            {isRecording && (
+              <Box flexDirection="row" marginBottom={0}>
+                <Text color={theme.status.success}>🎙️ Listening...</Text>
+              </Box>
+            )}
+            {isVoiceModeEnabled && !isRecording && (
+              <Box flexDirection="row" marginBottom={0}>
+                <Text color={theme.text.secondary}>
+                  &gt; Voice mode:{' '}
+                  {(settings.experimental.voice?.activationMode ??
+                    'push-to-talk') === 'push-to-talk'
+                    ? 'Hold Space to record'
+                    : 'Space to start/stop recording'}{' '}
+                  (Esc to exit)
+                </Text>
+              </Box>
+            )}
             {buffer.text.length === 0 && effectivePlaceholder ? (
               showCursor ? (
                 <Text

@@ -181,6 +181,7 @@ describe('gemini.tsx main function cleanup', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env['GEMINI_CLI_NO_RELAUNCH'] = 'true';
+    vi.stubEnv('GEMINI_CLI_TRUST_WORKSPACE', 'true');
   });
 
   afterEach(() => {
@@ -305,6 +306,7 @@ describe('gemini.tsx main function cleanup', () => {
       getMessageBus: () => ({ subscribe: vi.fn() }),
       getEnableHooks: vi.fn(() => true),
       getHookSystem: vi.fn(() => undefined),
+      getExperimentalGemma: vi.fn(() => false),
       initialize: vi.fn(),
       storage: { initialize: vi.fn().mockResolvedValue(undefined) },
       getContentGeneratorConfig: vi.fn(),

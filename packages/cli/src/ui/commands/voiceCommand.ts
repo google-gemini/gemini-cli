@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -20,14 +20,13 @@ const voiceHelpCommand: SlashCommand = {
     const item: Omit<HistoryItemVoiceHelp, 'id'> = {
       type: MessageType.VOICE_HELP,
       timestamp: new Date(),
-      text: 'Voice Input Help:\n- Space Space (on empty prompt): Start/Stop recording\n- Esc (while recording): Cancel\n- /voice: Show current settings',
+      text: 'Voice Input Help:\n- Space Space (on empty prompt): Start/Stop recording\n- Esc (while recording): Cancel\n- /voice status: Show current settings',
     };
     context.ui.addItem(item);
   },
 };
 
 const voiceEnableCommand: SlashCommand = {
-  // ... existing voiceEnableCommand ...
   name: 'enable',
   description: 'Enable voice input (double-tap Space on empty input to record)',
   kind: CommandKind.BUILT_IN,
@@ -47,7 +46,6 @@ const voiceEnableCommand: SlashCommand = {
 };
 
 const voiceDisableCommand: SlashCommand = {
-  // ... existing voiceDisableCommand ...
   name: 'disable',
   description: 'Disable voice input',
   kind: CommandKind.BUILT_IN,
@@ -66,7 +64,6 @@ const voiceDisableCommand: SlashCommand = {
 };
 
 const voiceProviderCommand: SlashCommand = {
-  // ... existing voiceProviderCommand ...
   name: 'provider',
   description: 'Set transcription backend: gemini (default) or whisper',
   kind: CommandKind.BUILT_IN,
@@ -93,7 +90,6 @@ const voiceProviderCommand: SlashCommand = {
 };
 
 const voiceSensitivityCommand: SlashCommand = {
-  // ... existing voiceSensitivityCommand ...
   name: 'sensitivity',
   description: 'Set silence threshold (0=off, 80=default, 300+=loud only)',
   kind: CommandKind.BUILT_IN,
@@ -159,34 +155,11 @@ const voiceSetPathCommand: SlashCommand = {
   },
 };
 
-export const voiceCommand: SlashCommand = {
-  name: 'voice',
-  description: 'Configure voice input settings',
+const voiceStatusCommand: SlashCommand = {
+  name: 'status',
+  description: 'Show current voice settings status',
   kind: CommandKind.BUILT_IN,
-  subCommands: [
-    voiceHelpCommand,
-    voiceEnableCommand,
-    voiceDisableCommand,
-    voiceProviderCommand,
-    voiceSensitivityCommand,
-    voiceSetPathCommand,
-  ],
-  action: async (context, args) => {
-    const trimmedArgs = args?.trim() || '';
-    if (trimmedArgs) {
-      const parts = trimmedArgs.split(/\s+/);
-      const subCommandName = parts[0]?.toLowerCase();
-      const subCommandArgs = trimmedArgs.slice(parts[0].length).trim();
-
-      const subCommand = voiceCommand.subCommands?.find(
-        (sc) => sc.name === subCommandName,
-      );
-      if (subCommand?.action) {
-        return subCommand.action(context, subCommandArgs);
-      }
-    }
-
-    // Default: show current voice settings status
+  action: async (context) => {
     const voiceSettings = context.services.settings.merged.voice ?? {};
     const enabled = voiceSettings.enabled ?? false;
     const provider = voiceSettings.provider ?? 'gemini';
@@ -218,6 +191,50 @@ export const voiceCommand: SlashCommand = {
       text: statusText,
     };
     context.ui.addItem(statusItem);
-    return;
   },
+};
+
+export const voiceCommand: SlashCommand = {
+  name: 'voice',
+  altNames: [],
+  description: 'Manage voice input and dictation mode',
+  kind: CommandKind.BUILT_IN,
+  autoExecute: true,
+  action: async (context, args) => {
+    const trimmedArgs = args?.trim() || '';
+    if (trimmedArgs) {
+      const parts = trimmedArgs.split(/\s+/);
+      const subCommandName = parts[0]?.toLowerCase();
+      const subCommandArgs = trimmedArgs.slice(parts[0].length).trim();
+
+      const subCommand = voiceCommand.subCommands?.find(
+        (sc) => sc.name === subCommandName,
+      );
+      if (subCommand?.action) {
+        return subCommand.action(context, subCommandArgs);
+      }
+    }
+
+    // Default: toggle voice mode (upstream behavior)
+    context.ui.toggleVoiceMode();
+  },
+  subCommands: [
+    voiceHelpCommand,
+    voiceEnableCommand,
+    voiceDisableCommand,
+    voiceProviderCommand,
+    voiceSensitivityCommand,
+    voiceSetPathCommand,
+    voiceStatusCommand,
+    {
+      name: 'model',
+      description: 'Manage voice transcription models',
+      kind: CommandKind.BUILT_IN,
+      autoExecute: true,
+      action: async () => ({
+        type: 'dialog',
+        dialog: 'voice-model',
+      }),
+    },
+  ],
 };
