@@ -690,7 +690,7 @@ function setupFileLogging(
 
   const logsDir = path.dirname(logFile);
   if (!fs.existsSync(logsDir)) {
-    fs.mkdirSync(logsDir, { recursive: true });
+    fs.mkdirSync(logsDir, { recursive: true, mode: 0o700 });
   }
 
   const writeToLog = (type: 'console' | 'network', payload: unknown) => {
@@ -703,7 +703,7 @@ function setupFileLogging(
           timestamp: Date.now(),
         }) + '\n';
 
-      fs.promises.appendFile(logFile, entry).catch((err) => {
+      fs.promises.appendFile(logFile, entry, { mode: 0o600 }).catch((err) => {
         debugLogger.error('Failed to write to activity log:', err);
       });
     } catch (err) {

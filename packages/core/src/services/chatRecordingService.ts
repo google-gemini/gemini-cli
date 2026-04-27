@@ -386,7 +386,7 @@ export class ChatRecordingService {
           chatsDir = path.join(chatsDir, safeParentId);
         }
 
-        fs.mkdirSync(chatsDir, { recursive: true });
+        fs.mkdirSync(chatsDir, { recursive: true, mode: 0o700 });
 
         const timestamp = new Date()
           .toISOString()
@@ -452,8 +452,11 @@ export class ChatRecordingService {
     if (!this.conversationFile) return;
     try {
       const line = JSON.stringify(record) + '\n';
-      fs.mkdirSync(path.dirname(this.conversationFile), { recursive: true });
-      fs.appendFileSync(this.conversationFile, line);
+      fs.mkdirSync(path.dirname(this.conversationFile), {
+        recursive: true,
+        mode: 0o700,
+      });
+      fs.appendFileSync(this.conversationFile, line, { mode: 0o600 });
     } catch (error) {
       if (isNodeError(error) && error.code === 'ENOSPC') {
         this.conversationFile = null;
