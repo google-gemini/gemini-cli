@@ -97,6 +97,7 @@ export interface CliArgs {
   extensions: string[] | undefined;
   listExtensions: boolean | undefined;
   resume: string | typeof RESUME_LATEST | undefined;
+  sessionId: string | undefined;
   listSessions: boolean | undefined;
   deleteSession: string | undefined;
   includeDirectories: string[] | undefined;
@@ -237,6 +238,10 @@ export async function parseArguments(
       const hasPositionalQuery = Array.isArray(query)
         ? query.length > 0
         : !!query;
+
+      if (argv['resume'] !== undefined && argv['session-id'] !== undefined) {
+        return 'Cannot use both --resume (-r) and --session-id together';
+      }
 
       if (argv['prompt'] && hasPositionalQuery) {
         return 'Cannot use both a positional prompt and the --prompt (-p) flag together';
@@ -406,6 +411,10 @@ export async function parseArguments(
             }
             return trimmed;
           },
+        })
+        .option('session-id', {
+          type: 'string',
+          description: 'Manually provide a specific session UUID.',
         })
         .option('list-sessions', {
           type: 'boolean',

@@ -191,12 +191,15 @@ ${reason.stack}`
   });
 }
 
-export async function resolveSessionId(resumeArg: string | undefined): Promise<{
+export async function resolveSessionId(
+  resumeArg: string | undefined,
+  sessionIdArg?: string | undefined,
+): Promise<{
   sessionId: string;
   resumedSessionData?: ResumedSessionData;
 }> {
   if (!resumeArg) {
-    return { sessionId: createSessionId() };
+    return { sessionId: sessionIdArg || createSessionId() };
   }
 
   const storage = new Storage(process.cwd());
@@ -319,7 +322,10 @@ export async function main() {
 
   const argv = await argvPromise;
 
-  const { sessionId, resumedSessionData } = await resolveSessionId(argv.resume);
+  const { sessionId, resumedSessionData } = await resolveSessionId(
+    argv.resume,
+    argv.sessionId,
+  );
 
   if (
     (argv.allowedTools && argv.allowedTools.length > 0) ||

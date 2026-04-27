@@ -233,6 +233,44 @@ afterEach(() => {
 });
 
 describe('parseArguments', () => {
+  it('should fail if both --resume and --session-id are provided', async () => {
+    process.argv = [
+      'node',
+      'script.js',
+      '--resume',
+      '--session-id',
+      'test-uuid-1234',
+    ];
+    const mockConsoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+    const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit called');
+    });
+
+    await expect(parseArguments(createTestMergedSettings())).rejects.toThrow(
+      'process.exit called',
+    );
+
+    expect(mockConsoleError).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'Cannot use both --resume (-r) and --session-id together',
+      ),
+    );
+    mockExit.mockRestore();
+  });
+
+  it('should parse --session-id option correctly', async () => {
+    process.argv = ['node', 'script.js', '--session-id', 'test-uuid-1234'];
+    const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit called');
+    });
+
+    const parsedArgs = await parseArguments(createTestMergedSettings());
+    expect(parsedArgs.sessionId).toBe('test-uuid-1234');
+    mockExit.mockRestore();
+  });
+
   describe('worktree', () => {
     it('should parse --worktree flag when provided with a name', async () => {
       process.argv = ['node', 'script.js', '--worktree', 'my-feature'];
