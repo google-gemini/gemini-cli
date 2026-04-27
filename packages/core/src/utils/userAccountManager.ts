@@ -141,6 +141,14 @@ export class UserAccountManager {
 
   async clearCachedGoogleAccount(): Promise<void> {
     const filePath = this.getGoogleAccountsCachePath();
+    // Mirror cacheGoogleAccount(): if clear is called without the cache dir
+    // existing yet (e.g. an OAuth failure path that runs clear before any
+    // successful cache write), the writeFile would otherwise ENOENT.
+    await fsp.mkdir(path.dirname(filePath), {
+      recursive: true,
+      mode: SECURE_DIR_MODE,
+    });
+
     const accounts = await this.readAccounts(filePath);
 
     if (accounts.active) {
