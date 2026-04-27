@@ -230,7 +230,9 @@ describe('getUserStartupWarnings', () => {
         isAlternateBuffer: true,
       });
 
-      await getUserStartupWarnings({}, projectDir, { isAlternateBuffer: false });
+      await getUserStartupWarnings({}, projectDir, {
+        isAlternateBuffer: false,
+      });
       expect(getCompatibilityWarnings).toHaveBeenCalledWith({
         isAlternateBuffer: false,
       });
