@@ -188,7 +188,7 @@ describe('ListCheckpointsCommand', () => {
   it('returns "No checkpoints found." when no .json checkpoints exist', async () => {
     vi.mocked(fs.readdir).mockResolvedValue([
       'not-a-checkpoint.txt',
-    ] as unknown as string[]);
+    ] as unknown[] as string[]);
 
     const response = await listCommand.execute(context);
 
@@ -209,42 +209,40 @@ describe('ListCheckpointsCommand', () => {
     vi.mocked(fs.readdir).mockResolvedValue([
       'cp1.json',
       'cp2.json',
-    ] as unknown as string[]);
-    vi.mocked(fs.readFile).mockResolvedValue('{}');
+    ] as unknown[] as string[]);
+    vi.mocked(fs.readFile).mockImplementation(async (filePath) => {
+      if (typeof filePath === 'string' && filePath.endsWith('cp1.json')) {
+        return JSON.stringify({ toolCall: { name: 'tool1' } });
+      }
+      if (typeof filePath === 'string' && filePath.endsWith('cp2.json')) {
+        return JSON.stringify({ toolCall: { name: 'tool2' } });
+      }
+      return '{}';
+    });
     vi.mocked(getCheckpointInfoList).mockReturnValue([
-      {
-        fileName: 'cp1.json',
-        toolName: 'tool1',
-        status: 'success',
-        timestamp: 1000,
-      },
-      {
-        fileName: 'cp2.json',
-        toolName: 'tool2',
-        status: 'error',
-        timestamp: 2000,
-      },
+      { messageId: 'id1', checkpoint: 'cp1' },
+      { messageId: 'id2', checkpoint: 'cp2' },
     ] as unknown as ReturnType<typeof getCheckpointInfoList>);
 
     const response = await listCommand.execute(context);
 
     expect(response.data).toContain('Available Checkpoints:');
-    expect(response.data).toContain('- **cp1.json**: tool1 (Status: success)');
-    expect(response.data).toContain('- **cp2.json**: tool2 (Status: error)');
+    expect(response.data).toContain('- **cp1**: tool1 (ID: id1)');
+    expect(response.data).toContain('- **cp2**: tool2 (ID: id2)');
   });
 
-  it('handles checkpoints with missing metadata', async () => {
+  it('handles checkpoints with missing tool name', async () => {
     vi.mocked(fs.readdir).mockResolvedValue([
-      'missing_meta.json',
-    ] as unknown as string[]);
+      'missing_tool.json',
+    ] as unknown[] as string[]);
     vi.mocked(fs.readFile).mockResolvedValue('{}');
     vi.mocked(getCheckpointInfoList).mockReturnValue([
-      {}, // Empty info
+      { messageId: 'id3', checkpoint: 'missing_tool' },
     ] as unknown as ReturnType<typeof getCheckpointInfoList>);
 
     const response = await listCommand.execute(context);
 
-    expect(response.data).toContain('- **Unknown**: Unknown (Status: Unknown)');
+    expect(response.data).toContain('- **missing_tool**: Unknown (ID: id3)');
   });
 
   it('returns generic unexpected error message on failures', async () => {

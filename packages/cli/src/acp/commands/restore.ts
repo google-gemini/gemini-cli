@@ -152,16 +152,20 @@ export class ListCheckpointsCommand implements Command {
 
       const formatted = checkpointInfoList
         .map((info) => {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const i = info as Record<string, any>;
-          const fileName = String(i['fileName'] || 'Unknown');
-          const toolName = String(i['toolName'] || 'Unknown');
-          const status = String(i['status'] || 'Unknown');
-          const timestamp = new Date(
-            Number(i['timestamp']) || 0,
-          ).toLocaleString();
-
-          return `- **${fileName}**: ${toolName} (Status: ${status}) [${timestamp}]`;
+          const content = checkpointFiles.get(`${info.checkpoint}.json`);
+          let toolName = 'Unknown';
+          if (content) {
+            try {
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+              const parsed = JSON.parse(content) as {
+                toolCall?: { name?: string };
+              };
+              toolName = String(parsed?.toolCall?.name || 'Unknown');
+            } catch {
+              // Ignore
+            }
+          }
+          return `- **${info.checkpoint}**: ${toolName} (ID: ${info.messageId})`;
         })
         .join('\n');
 
