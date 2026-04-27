@@ -47,6 +47,7 @@ import type {
 } from '../types.js';
 import { MessageType } from '../types.js';
 import type { LoadedSettings } from '../../config/settings.js';
+import { persistentState } from '../../utils/persistentState.js';
 import { type CommandContext, type SlashCommand } from '../commands/types.js';
 import { CommandService } from '../../services/CommandService.js';
 import { BuiltinCommandLoader } from '../../services/BuiltinCommandLoader.js';
@@ -441,6 +442,10 @@ export const useSlashCommandProcessor = (
                 ]),
               };
             }
+
+            // Prototype: Increment feature usage for personalization
+            persistentState.incrementFeatureUsage(commandToExecute.name);
+
             const result = await commandToExecute.action(
               fullCommandContext,
               args,

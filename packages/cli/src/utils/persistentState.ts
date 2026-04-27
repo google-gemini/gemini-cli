@@ -17,6 +17,8 @@ interface PersistentStateData {
   hasSeenScreenReaderNudge?: boolean;
   focusUiEnabled?: boolean;
   startupWarningCounts?: Record<string, number>;
+  // Per-feature usage counters persisted in state.json as { [featureName]: count }.
+  featureUsageCounts?: Record<string, number>;
   // Add other persistent state keys here as needed
 }
 
@@ -79,6 +81,13 @@ export class PersistentState {
     this.load(); // ensure loaded
     this.cache![key] = value;
     this.save();
+  }
+
+  // Call this at the feature entry point to persist one usage against that feature name.
+  incrementFeatureUsage(featureName: string): void {
+    const counts = { ...(this.get('featureUsageCounts') || {}) };
+    counts[featureName] = (counts[featureName] || 0) + 1;
+    this.set('featureUsageCounts', counts);
   }
 }
 

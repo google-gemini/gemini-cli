@@ -7,6 +7,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { INFORMATIVE_TIPS } from '../constants/tips.js';
 import { WITTY_LOADING_PHRASES } from '../constants/wittyPhrases.js';
+import { persistentState } from '../../utils/persistentState.js';
 
 export const PHRASE_CHANGE_INTERVAL_MS = 10000;
 export const WITTY_PHRASE_CHANGE_INTERVAL_MS = 5000;
@@ -97,13 +98,39 @@ export const usePhraseCycler = (
 
       const filteredTips =
         maxLength !== undefined
-          ? INFORMATIVE_TIPS.filter((p) => p.length <= maxLength)
+          ? INFORMATIVE_TIPS.filter((tip) => tip.text.length <= maxLength)
           : INFORMATIVE_TIPS;
 
       if (filteredTips.length > 0) {
-        // codeql[js/insecure-randomness] false positive: used for non-sensitive UI flavor text (tips)
-        const selected =
-          filteredTips[Math.floor(Math.random() * filteredTips.length)];
+        // Weighted selection logic based on feature usage
+        const usageCounts = persistentState.get('featureUsageCounts') || {};
+
+        const weightedTips = filteredTips.map((tip) => {
+          let weight = tip.weight ?? 1;
+          if (tip.relatedFeature) {
+            const usage = usageCounts[tip.relatedFeature] || 0;
+            // Higher weight if usage is low, lower if usage is high
+            // Heuristic: weight = base_weight * (10 / (usage + 1))
+            weight *= Math.max(0.1, 10 / (usage + 1));
+          }
+          return { text: tip.text, weight };
+        });
+
+        const totalWeight = weightedTips.reduce(
+          (acc, curr) => acc + curr.weight,
+          0,
+        );
+        let random = Math.random() * totalWeight;
+
+        let selected = filteredTips[0].text;
+        for (const item of weightedTips) {
+          if (random < item.weight) {
+            selected = item.text;
+            break;
+          }
+          random -= item.weight;
+        }
+
         setCurrentTipState(selected);
         lastSelectedTipRef.current = selected;
         lastTipChangeTimeRef.current = now;

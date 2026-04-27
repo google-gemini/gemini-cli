@@ -30,6 +30,7 @@ import path from 'node:path';
 import os from 'node:os';
 import fs from 'node:fs';
 import { themeManager } from '../../ui/themes/theme-manager.js';
+import { persistentState } from '../../utils/persistentState.js';
 import {
   shellReducer,
   initialState,
@@ -349,6 +350,9 @@ export const useExecutionLifecycle = (
       if (typeof rawQuery !== 'string' || rawQuery.trim() === '') {
         return false;
       }
+
+      // Prototype: Increment feature usage for personalization
+      persistentState.incrementFeatureUsage('shell');
 
       const userMessageTimestamp = Date.now();
       const callId = `shell-${userMessageTimestamp}`;

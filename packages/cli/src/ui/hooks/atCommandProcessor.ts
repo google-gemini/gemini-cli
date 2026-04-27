@@ -26,6 +26,7 @@ import type {
   IndividualToolCallDisplay,
 } from '../types.js';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
+import { persistentState } from '../../utils/persistentState.js';
 
 const REF_CONTENT_HEADER = `\n${REFERENCE_CONTENT_START}`;
 const REF_CONTENT_FOOTER = `\n${REFERENCE_CONTENT_END}`;
@@ -694,6 +695,9 @@ export async function handleAtCommand({
     );
     return { processedQuery: [{ text: query }] };
   }
+
+  // Prototype: Increment feature usage for personalization
+  persistentState.incrementFeatureUsage('at_mention');
 
   const initialQueryText = constructInitialQuery(commandParts, resolvedFiles);
 
