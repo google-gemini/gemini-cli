@@ -719,6 +719,65 @@ describe('sandbox', () => {
       expect(entrypointCmd).toContain('su -p gemini');
     });
 
+    it('should register and unregister proxy exit handlers', async () => {
+      vi.stubEnv('GEMINI_SANDBOX_PROXY_COMMAND', 'some-proxy-cmd');
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'docker',
+        image: 'gemini-cli-sandbox',
+      });
+
+      const onSpy = vi.spyOn(process, 'on');
+      const offSpy = vi.spyOn(process, 'off');
+
+      interface MockProcessWithStdout extends EventEmitter {
+        stdout: EventEmitter;
+      }
+
+      vi.mocked(spawn).mockImplementation((cmd, args) => {
+        const a = args as string[];
+        if (cmd === 'docker' && a && a[0] === 'images') {
+          const mockImageCheckProcess =
+            new EventEmitter() as MockProcessWithStdout;
+          mockImageCheckProcess.stdout = new EventEmitter();
+          setTimeout(() => {
+            mockImageCheckProcess.stdout.emit('data', Buffer.from('image-id'));
+            mockImageCheckProcess.emit('close', 0);
+          }, 1);
+          return mockImageCheckProcess as unknown as ReturnType<typeof spawn>;
+        }
+        if (cmd === 'docker' && a && a[0] === 'run') {
+          const mockSpawnProcess = new EventEmitter() as unknown as ReturnType<
+            typeof spawn
+          >;
+          mockSpawnProcess.on = vi.fn().mockImplementation((event, cb) => {
+            if (event === 'close') {
+              if (a.includes('gemini-cli-sandbox-proxy')) {
+                // Proxy container shouldn't exit during the test
+              } else {
+                setTimeout(() => cb(0), 10);
+              }
+            }
+            return mockSpawnProcess;
+          });
+          return mockSpawnProcess;
+        }
+        return new EventEmitter() as unknown as ReturnType<typeof spawn>;
+      });
+
+      await start_sandbox(config);
+
+      expect(onSpy).toHaveBeenCalledWith('exit', expect.any(Function));
+      expect(onSpy).toHaveBeenCalledWith('SIGINT', expect.any(Function));
+      expect(onSpy).toHaveBeenCalledWith('SIGTERM', expect.any(Function));
+
+      expect(offSpy).toHaveBeenCalledWith('exit', expect.any(Function));
+      expect(offSpy).toHaveBeenCalledWith('SIGINT', expect.any(Function));
+      expect(offSpy).toHaveBeenCalledWith('SIGTERM', expect.any(Function));
+
+      onSpy.mockRestore();
+      offSpy.mockRestore();
+    });
+
     describe('LXC sandbox', () => {
       const LXC_RUNNING = JSON.stringify([
         { name: 'gemini-sandbox', status: 'Running' },
