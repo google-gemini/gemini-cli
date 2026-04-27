@@ -15,6 +15,8 @@ import type { PipelineOrchestrator } from './pipeline/orchestrator.js';
 import { HistoryObserver } from './historyObserver.js';
 import { render } from './graph/render.js';
 import { ContextWorkingBufferImpl } from './pipeline/contextWorkingBuffer.js';
+import { debugLogger } from '../utils/debugLogger.js';
+import { hardenHistory } from './historyHardening.js';
 
 export class ContextManager {
   // The master state containing the pristine graph and current active graph.
@@ -173,6 +175,25 @@ export class ContextManager {
 
     this.tracer.logEvent('ContextManager', 'Finished rendering');
 
-    return finalHistory;
+    const summary = finalHistory.map((c) => {
+      const parts = c.parts || [];
+      const calls = parts
+        .filter((p) => p.functionCall)
+        .map((p) => p.functionCall!.id);
+      const responses = parts
+        .filter((p) => p.functionResponse)
+        .map((p) => p.functionResponse!.id);
+      return {
+        role: c.role,
+        calls: calls.length > 0 ? calls : undefined,
+        responses: responses.length > 0 ? responses : undefined,
+      };
+    });
+
+    debugLogger.log(
+      `[ContextManager] Rendered history for LLM request: ${JSON.stringify(summary, null, 2)}`,
+    );
+
+    return hardenHistory(finalHistory);
   }
 }

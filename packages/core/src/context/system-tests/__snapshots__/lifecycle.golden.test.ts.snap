@@ -6,6 +6,14 @@ exports[`System Lifecycle Golden Tests > Scenario 1: Organic Growth with Huge To
     {
       "parts": [
         {
+          "text": "[Continuing from previous context...]",
+        },
+      ],
+      "role": "user",
+    },
+    {
+      "parts": [
+        {
           "text": "Nice diagram.",
         },
       ],
@@ -26,6 +34,14 @@ exports[`System Lifecycle Golden Tests > Scenario 1: Organic Growth with Huge To
         },
       ],
       "role": "model",
+    },
+    {
+      "parts": [
+        {
+          "text": "Please continue.",
+        },
+      ],
+      "role": "user",
     },
   ],
   "tokenTrajectory": [
@@ -93,6 +109,14 @@ exports[`System Lifecycle Golden Tests > Scenario 2: Under Budget (No Modificati
       ],
       "role": "model",
     },
+    {
+      "parts": [
+        {
+          "text": "Please continue.",
+        },
+      ],
+      "role": "user",
+    },
   ],
   "tokenTrajectory": [
     {
@@ -159,6 +183,14 @@ exports[`System Lifecycle Golden Tests > Scenario 3: Async-Driven Background GC 
         },
       ],
       "role": "model",
+    },
+    {
+      "parts": [
+        {
+          "text": "Please continue.",
+        },
+      ],
+      "role": "user",
     },
   ],
   "tokenTrajectory": [

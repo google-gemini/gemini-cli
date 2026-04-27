@@ -70,8 +70,14 @@ describe('ContextManager Sync Pressure Barrier Tests', () => {
     );
 
     // Verify the latest turn is perfectly preserved at the back
-    const lastUser = contentNodes[contentNodes.length - 2];
-    const lastModel = contentNodes[contentNodes.length - 1];
+    // Note: The HistoryHardener appends a "Please continue." user turn if we end on model,
+    // so we look at the turns before the sentinel.
+    const lastSentinel = contentNodes[contentNodes.length - 1];
+    const lastModel = contentNodes[contentNodes.length - 2];
+    const lastUser = contentNodes[contentNodes.length - 3];
+
+    expect(lastSentinel.role).toBe('user');
+    expect(lastSentinel.parts![0].text).toBe('Please continue.');
 
     expect(lastUser.role).toBe('user');
     expect(lastUser.parts![0].text).toBe('Final question.');
