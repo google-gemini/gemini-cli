@@ -169,6 +169,7 @@ function parseToolResponses(
         intent: isRecord(matchingCall?.functionCall?.args)
           ? matchingCall.functionCall.args
           : {},
+        thoughtSignature: matchingCall?.thoughtSignature,
         observation: isRecord(part.functionResponse.response)
           ? part.functionResponse.response
           : {},

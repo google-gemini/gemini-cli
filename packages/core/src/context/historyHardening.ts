@@ -7,6 +7,8 @@
 import type { Content, Part } from '@google/genai';
 import { debugLogger } from '../utils/debugLogger.js';
 
+export const SYNTHETIC_THOUGHT_SIGNATURE = 'skip_thought_signature_validator';
+
 /**
  * Hardens a chat history to ensure it strictly adheres to Gemini API invariants.
  * This is a defensive post-processing pass that patches violations using
@@ -55,13 +57,32 @@ export function hardenHistory(history: Content[]): Content[] {
     });
   }
 
-  // 4. Pair Tool Calls and Responses
+  // 4. Pair Tool Calls and Responses & Enforce Signatures
   const hardened: Content[] = [];
   for (let i = 0; i < coalesced.length; i++) {
     const turn = coalesced[i];
 
     if (turn.role === 'model') {
-      const callParts = turn.parts?.filter((p) => !!p.functionCall) || [];
+      const parts = turn.parts || [];
+
+      // A. Enforce Thought Signatures (Required for Gemini-3 models)
+      // The first function call in a model turn must have a signature.
+      let foundCall = false;
+      for (let j = 0; j < parts.length; j++) {
+        const p = parts[j];
+        if (p.functionCall) {
+          if (!foundCall && !p.thoughtSignature) {
+            debugLogger.warn(
+              `[HistoryHardener] Missing thought signature on first function call in model turn. Injecting synthetic signature.`,
+            );
+            parts[j] = { ...p, thoughtSignature: SYNTHETIC_THOUGHT_SIGNATURE };
+          }
+          foundCall = true;
+        }
+      }
+
+      // B. Pair Tool Calls and Responses
+      const callParts = parts.filter((p) => !!p.functionCall) || [];
       if (callParts.length > 0) {
         // We have tool calls. The NEXT turn MUST be a user turn with responses.
         const nextTurn = coalesced[i + 1];

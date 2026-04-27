@@ -106,6 +106,7 @@ export interface ToolExecution extends BaseConcreteNode {
   readonly type: 'TOOL_EXECUTION';
   readonly toolName: string;
   readonly intent: Record<string, unknown>;
+  readonly thoughtSignature?: string;
   readonly observation: string | Record<string, unknown>;
   readonly tokens: {
     readonly intent: number;
@@ -117,6 +118,7 @@ export interface MaskedTool extends BaseConcreteNode {
   readonly type: 'MASKED_TOOL';
   readonly toolName: string;
   readonly intent?: Record<string, unknown>;
+  readonly thoughtSignature?: string;
   readonly observation?: string | Record<string, unknown>;
   readonly tokens: {
     readonly intent: number;

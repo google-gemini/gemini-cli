@@ -65,7 +65,14 @@ export const ToolExecutionBehavior: NodeBehavior<ToolExecution> = {
   type: 'TOOL_EXECUTION',
   getEstimatableParts(tool) {
     return [
-      { functionCall: { id: tool.id, name: tool.toolName, args: tool.intent } },
+      {
+        functionCall: {
+          id: tool.id,
+          name: tool.toolName,
+          args: tool.intent,
+        },
+        thoughtSignature: tool.thoughtSignature,
+      },
       {
         functionResponse: {
           id: tool.id,
@@ -96,6 +103,7 @@ export const MaskedToolBehavior: NodeBehavior<MaskedTool> = {
           name: tool.toolName,
           args: tool.intent ?? {},
         },
+        thoughtSignature: tool.thoughtSignature,
       },
       {
         functionResponse: {
