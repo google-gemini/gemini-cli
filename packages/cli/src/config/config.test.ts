@@ -780,6 +780,90 @@ describe('loadCliConfig', () => {
     vi.restoreAllMocks();
   });
 
+  describe('Model resolution', () => {
+    it('should handle multiple --model flags by taking the last one', async () => {
+      const argv: CliArgs = {
+        query: undefined,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        model: ['gemini-1.5-pro', 'gemini-2.0-flash'] as any,
+        sandbox: undefined,
+        debug: false,
+        prompt: undefined,
+        promptInteractive: undefined,
+        yolo: undefined,
+        approvalMode: undefined,
+        policy: undefined,
+        adminPolicy: undefined,
+        allowedMcpServerNames: undefined,
+        allowedTools: undefined,
+        extensions: undefined,
+        listExtensions: false,
+        listSessions: false,
+        deleteSession: undefined,
+        screenReader: undefined,
+        isCommand: false,
+        rawOutput: false,
+        acceptRawOutputRisk: false,
+        startupMessages: [],
+        resume: undefined,
+        includeDirectories: [],
+        useWriteTodos: false,
+        outputFormat: undefined,
+        fakeResponses: undefined,
+        recordResponses: undefined,
+        skipTrust: false,
+      };
+
+      const settings = createTestMergedSettings();
+      const config = await loadCliConfig(settings, 'test-session', argv, {
+        cwd: process.cwd(),
+      });
+
+      expect(config.getModel()).toBe('gemini-2.0-flash');
+    });
+
+    it('should handle non-string model flags by coercing to string', async () => {
+      const argv: CliArgs = {
+        query: undefined,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        model: true as any,
+        sandbox: undefined,
+        debug: false,
+        prompt: undefined,
+        promptInteractive: undefined,
+        yolo: undefined,
+        approvalMode: undefined,
+        policy: undefined,
+        adminPolicy: undefined,
+        allowedMcpServerNames: undefined,
+        allowedTools: undefined,
+        extensions: undefined,
+        listExtensions: false,
+        listSessions: false,
+        deleteSession: undefined,
+        screenReader: undefined,
+        isCommand: false,
+        rawOutput: false,
+        acceptRawOutputRisk: false,
+        startupMessages: [],
+        resume: undefined,
+        includeDirectories: [],
+        useWriteTodos: false,
+        outputFormat: undefined,
+        fakeResponses: undefined,
+        recordResponses: undefined,
+        skipTrust: false,
+      };
+
+      const settings = createTestMergedSettings();
+      const config = await loadCliConfig(settings, 'test-session', argv, {
+        cwd: process.cwd(),
+      });
+
+      expect(config.getModel()).toBe('true');
+    });
+  });
+
   describe('Proxy configuration', () => {
     const originalProxyEnv: { [key: string]: string | undefined } = {};
     const proxyEnvVars = [

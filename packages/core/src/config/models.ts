@@ -109,6 +109,13 @@ export function resolveModel(
   hasAccessToPreview: boolean = true,
   config?: ModelCapabilityContext,
 ): string {
+  // Defensive check against non-string inputs at runtime
+  if (Array.isArray(requestedModel)) {
+    requestedModel = String(requestedModel[requestedModel.length - 1] ?? '');
+  } else if (typeof requestedModel !== 'string') {
+    requestedModel = String(requestedModel ?? '');
+  }
+
   if (config?.getExperimentalDynamicModelConfiguration?.() === true) {
     const resolved = config.modelConfigService.resolveModelId(requestedModel, {
       useGemini3_1,
