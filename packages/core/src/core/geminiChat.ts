@@ -884,6 +884,7 @@ export class GeminiChat {
     streamResponse: AsyncGenerator<GenerateContentResponse>,
     originalRequest: GenerateContentParameters,
   ): AsyncGenerator<GenerateContentResponse> {
+    this.callCounter = 0;
     const modelResponseParts: Part[] = [];
 
     let hasToolCall = false;
@@ -891,7 +892,11 @@ export class GeminiChat {
     let finishReason: FinishReason | undefined;
 
     // The SDK provides fully assembled FunctionCall objects in chunk.functionCalls
-    const finalFunctionCalls: FunctionCall[] = [];
+    // We use a Map to ensure we only keep the latest version of each call (by ID)
+    const finalFunctionCallsMap = new Map<string, FunctionCall>();
+
+    let lastCallKey: string | undefined;
+    let lastAssignedId: string | undefined;
 
     for await (const chunk of streamResponse) {
       const candidateWithReason = chunk?.candidates?.find(
@@ -903,7 +908,17 @@ export class GeminiChat {
       }
 
       if (chunk.functionCalls && chunk.functionCalls.length > 0) {
-        finalFunctionCalls.push(...chunk.functionCalls);
+        for (const fnCall of chunk.functionCalls) {
+          if (!fnCall.id) {
+            const callKey = `${fnCall.name}:${JSON.stringify(fnCall.args || {})}`;
+            if (callKey !== lastCallKey) {
+              lastCallKey = callKey;
+              lastAssignedId = `synth_${this.context.promptId}_${this.callCounter++}`;
+            }
+            fnCall.id = lastAssignedId;
+          }
+          finalFunctionCallsMap.set(fnCall.id!, fnCall);
+        }
       }
 
       if (isValidResponse(chunk)) {
@@ -960,6 +975,7 @@ export class GeminiChat {
 
     // String thoughts and consolidate text parts.
     const consolidatedParts: Part[] = [];
+    const finalFunctionCalls = Array.from(finalFunctionCallsMap.values());
 
     if (this.context.config.isContextManagementEnabled()) {
       for (const part of modelResponseParts) {
@@ -1002,15 +1018,7 @@ export class GeminiChat {
         let callIndex = 0;
         for (const part of consolidatedParts) {
           if (part.functionCall && callIndex < finalFunctionCalls.length) {
-            const assembledCall = finalFunctionCalls[callIndex];
-            // If the SDK didn't provide an ID, we inject a synthetic one
-            // so the history ledger is always explicit and linkable.
-            // We use a counter-based approach to ensure it matches what Turn.ts will generate.
-            if (!assembledCall.id) {
-              const name = assembledCall.name || 'undefined_tool_name';
-              assembledCall.id = `${name}_${Date.now()}_${this.callCounter++}`;
-            }
-            part.functionCall = assembledCall;
+            part.functionCall = finalFunctionCalls[callIndex];
             callIndex++;
           }
         }
