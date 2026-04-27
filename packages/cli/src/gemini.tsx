@@ -198,17 +198,32 @@ export async function resolveSessionId(
   sessionId: string;
   resumedSessionData?: ResumedSessionData;
 }> {
-  if (!resumeArg) {
-    return { sessionId: sessionIdArg || createSessionId() };
+  if (!resumeArg && !sessionIdArg) {
+    return { sessionId: createSessionId() };
   }
 
   const storage = new Storage(process.cwd());
   await storage.initialize();
 
+  const sessionSelector = new SessionSelector(storage);
+
+  if (sessionIdArg) {
+    const sessions = await sessionSelector.listSessions();
+    if (sessions.some((s) => s.id === sessionIdArg)) {
+      coreEvents.emitFeedback(
+        'error',
+        `Error starting session: Session ID "${sessionIdArg}" already exists. Use --resume to resume it, or provide a different ID.`,
+      );
+      await runExitCleanup();
+      process.exit(ExitCodes.FATAL_INPUT_ERROR);
+    }
+    return { sessionId: sessionIdArg };
+  }
+
   try {
-    const { sessionData, sessionPath } = await new SessionSelector(
-      storage,
-    ).resolveSession(resumeArg);
+    const { sessionData, sessionPath } = await sessionSelector.resolveSession(
+      resumeArg!,
+    );
     return {
       sessionId: sessionData.sessionId,
       resumedSessionData: { conversation: sessionData, filePath: sessionPath },

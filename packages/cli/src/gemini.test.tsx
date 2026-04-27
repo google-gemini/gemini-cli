@@ -47,6 +47,7 @@ import {
   debugLogger,
   coreEvents,
   AuthType,
+  ExitCodes,
 } from '@google/gemini-cli-core';
 import { act } from 'react';
 import { type InitializationResult } from './core/initializer.js';
@@ -1055,6 +1056,71 @@ describe('gemini.tsx main function kitty protocol', () => {
     expect(terminalNotificationMocks.notifyViaTerminal).not.toHaveBeenCalled();
     expect(processExitSpy).toHaveBeenCalledWith(0);
     processExitSpy.mockRestore();
+  });
+});
+
+describe('resolveSessionId', () => {
+  it('should return a new session ID when neither resume nor sessionId is provided', async () => {
+    const { resolveSessionId } = await import('./gemini.js');
+    const { sessionId, resumedSessionData } = await resolveSessionId(
+      undefined,
+      undefined,
+    );
+    expect(sessionId).toBeDefined();
+    expect(resumedSessionData).toBeUndefined();
+  });
+
+  it('should exit with FATAL_INPUT_ERROR when sessionId already exists', async () => {
+    const { resolveSessionId } = await import('./gemini.js');
+    const { SessionSelector } = await import('./utils/sessionUtils.js');
+
+    vi.mocked(SessionSelector).mockImplementation(
+      () =>
+        ({
+          listSessions: vi.fn().mockResolvedValue([{ id: 'existing-id' }]),
+        }) as unknown as InstanceType<typeof SessionSelector>,
+    );
+
+    const emitFeedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
+    const processExitSpy = vi
+      .spyOn(process, 'exit')
+      .mockImplementation((code) => {
+        throw new MockProcessExitError(code);
+      });
+
+    try {
+      await resolveSessionId(undefined, 'existing-id');
+    } catch (e) {
+      if (!(e instanceof MockProcessExitError)) throw e;
+    }
+
+    expect(emitFeedbackSpy).toHaveBeenCalledWith(
+      'error',
+      expect.stringContaining('Session ID "existing-id" already exists'),
+    );
+    expect(processExitSpy).toHaveBeenCalledWith(ExitCodes.FATAL_INPUT_ERROR);
+
+    emitFeedbackSpy.mockRestore();
+    processExitSpy.mockRestore();
+  });
+
+  it('should return provided sessionId when it does not exist', async () => {
+    const { resolveSessionId } = await import('./gemini.js');
+    const { SessionSelector } = await import('./utils/sessionUtils.js');
+
+    vi.mocked(SessionSelector).mockImplementation(
+      () =>
+        ({
+          listSessions: vi.fn().mockResolvedValue([{ id: 'different-id' }]),
+        }) as unknown as InstanceType<typeof SessionSelector>,
+    );
+
+    const { sessionId, resumedSessionData } = await resolveSessionId(
+      undefined,
+      'new-id',
+    );
+    expect(sessionId).toBe('new-id');
+    expect(resumedSessionData).toBeUndefined();
   });
 });
 
