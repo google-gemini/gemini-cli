@@ -189,11 +189,6 @@ function parseToolResponses(
         },
       };
 
-      // eslint-disable-next-line no-console
-      console.error(
-        `[CM_DEBUG] Mapping Tool Execution: name='${step.toolName}', matchingCallId='${matchingCall?.functionCall?.id}', args=${JSON.stringify(step.intent)}`,
-      );
-
       currentEpisode.concreteNodes = [
         ...(currentEpisode.concreteNodes || []),
         step,
@@ -267,10 +262,10 @@ function parseModelParts(
       } else {
         const lastIdx = pendingCallPartsWithoutId.length - 1;
         const lastPart = pendingCallPartsWithoutId[lastIdx];
-        
+
         if (
-          lastPart && 
-          lastPart.functionCall && 
+          lastPart &&
+          lastPart.functionCall &&
           lastPart.functionCall.name === part.functionCall.name
         ) {
           // Replace the previous chunk with the more complete one
