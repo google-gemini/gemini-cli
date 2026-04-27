@@ -23,6 +23,7 @@ import {
   createContentGeneratorConfig,
   type ContentGenerator,
   type ContentGeneratorConfig,
+  type VertexAiRoutingConfig,
 } from '../core/contentGenerator.js';
 import type { OverageStrategy } from '../billing/billing.js';
 import { PromptRegistry } from '../prompts/prompt-registry.js';
@@ -40,7 +41,11 @@ import { EditTool } from '../tools/edit.js';
 import { ShellTool } from '../tools/shell.js';
 import { WriteFileTool } from '../tools/write-file.js';
 import { WebFetchTool } from '../tools/web-fetch.js';
-import { MemoryTool, setGeminiMdFilename } from '../tools/memoryTool.js';
+import {
+  MemoryTool,
+  setGeminiMdFilename,
+  getCurrentGeminiMdFilename,
+} from '../tools/memoryTool.js';
 import { WebSearchTool } from '../tools/web-search.js';
 import { AskUserTool } from '../tools/ask-user.js';
 import { UpdateTopicTool } from '../tools/topicTool.js';
@@ -204,6 +209,7 @@ export interface PlanSettings {
 
 export interface TelemetrySettings {
   enabled?: boolean;
+  traces?: boolean;
   target?: TelemetryTarget;
   otlpEndpoint?: string;
   otlpProtocol?: 'grpc' | 'http';
@@ -219,6 +225,8 @@ export interface OutputSettings {
 
 export interface GemmaModelRouterSettings {
   enabled?: boolean;
+  autoStartServer?: boolean;
+  binaryPath?: string;
   classifier?: {
     host?: string;
     model?: string;
@@ -612,6 +620,7 @@ export interface ConfigParameters {
   fileFiltering?: {
     respectGitIgnore?: boolean;
     respectGeminiIgnore?: boolean;
+    enableFileWatcher?: boolean;
     enableRecursiveFileSearch?: boolean;
     enableFuzzySearch?: boolean;
     maxFileCount?: number;
@@ -682,6 +691,7 @@ export interface ConfigParameters {
   ptyInfo?: string;
   disableYoloMode?: boolean;
   disableAlwaysAllow?: boolean;
+  voiceMode?: boolean;
   rawOutput?: boolean;
   acceptRawOutputRisk?: boolean;
   dynamicModelConfiguration?: boolean;
@@ -700,7 +710,9 @@ export interface ConfigParameters {
   adminSkillsEnabled?: boolean;
   experimentalJitContext?: boolean;
   autoDistillation?: boolean;
-  experimentalMemoryManager?: boolean;
+  experimentalMemoryV2?: boolean;
+  experimentalAutoMemory?: boolean;
+  experimentalGemma?: boolean;
   experimentalContextManagementConfig?: string;
   experimentalAgentHistoryTruncation?: boolean;
   experimentalAgentHistoryTruncationThreshold?: number;
@@ -728,6 +740,7 @@ export interface ConfigParameters {
   billing?: {
     overageStrategy?: OverageStrategy;
   };
+  vertexAiRouting?: VertexAiRoutingConfig;
 }
 
 export class Config implements McpContext, AgentLoopContext {
@@ -793,6 +806,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly fileFiltering: {
     respectGitIgnore: boolean;
     respectGeminiIgnore: boolean;
+    enableFileWatcher: boolean;
     enableRecursiveFileSearch: boolean;
     enableFuzzySearch: boolean;
     maxFileCount: number;
@@ -933,6 +947,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly billing: {
     overageStrategy: OverageStrategy;
   };
+  private readonly vertexAiRouting: VertexAiRoutingConfig | undefined;
 
   private readonly enableAgents: boolean;
   private agents: AgentSettings;
@@ -941,12 +956,15 @@ export class Config implements McpContext, AgentLoopContext {
   private disabledSkills: string[];
   private readonly adminSkillsEnabled: boolean;
   private readonly experimentalJitContext: boolean;
-  private readonly experimentalMemoryManager: boolean;
+  private readonly experimentalMemoryV2: boolean;
+  private readonly experimentalAutoMemory: boolean;
+  private readonly experimentalGemma: boolean;
   private readonly experimentalContextManagementConfig?: string;
   private readonly memoryBoundaryMarkers: readonly string[];
   private readonly topicUpdateNarration: boolean;
   private readonly disableLLMCorrection: boolean;
   private readonly planEnabled: boolean;
+  private readonly voiceMode: boolean;
   private readonly trackerEnabled: boolean;
   private readonly planModeRoutingEnabled: boolean;
   private readonly modelSteering: boolean;
@@ -1054,6 +1072,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.accessibility = params.accessibility ?? {};
     this.telemetrySettings = {
       enabled: params.telemetry?.enabled ?? false,
+      traces: params.telemetry?.traces ?? false,
       target: params.telemetry?.target ?? DEFAULT_TELEMETRY_TARGET,
       otlpEndpoint: params.telemetry?.otlpEndpoint ?? DEFAULT_OTLP_ENDPOINT,
       otlpProtocol: params.telemetry?.otlpProtocol,
@@ -1071,6 +1090,10 @@ export class Config implements McpContext, AgentLoopContext {
       respectGeminiIgnore:
         params.fileFiltering?.respectGeminiIgnore ??
         DEFAULT_FILE_FILTERING_OPTIONS.respectGeminiIgnore,
+      enableFileWatcher:
+        params.fileFiltering?.enableFileWatcher ??
+        DEFAULT_FILE_FILTERING_OPTIONS.enableFileWatcher ??
+        true,
       enableRecursiveFileSearch:
         params.fileFiltering?.enableRecursiveFileSearch ?? true,
       enableFuzzySearch: params.fileFiltering?.enableFuzzySearch ?? true,
@@ -1096,6 +1119,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.agents = params.agents ?? {};
     this.disableLLMCorrection = params.disableLLMCorrection ?? true;
     this.planEnabled = params.plan ?? true;
+    this.voiceMode = params.voiceMode ?? false;
     this.trackerEnabled = params.tracker ?? false;
     this.planModeRoutingEnabled = params.planSettings?.modelRouting ?? true;
     this.enableEventDrivenScheduler = params.enableEventDrivenScheduler ?? true;
@@ -1152,8 +1176,10 @@ export class Config implements McpContext, AgentLoopContext {
       modelConfigServiceConfig ?? DEFAULT_MODEL_CONFIGS,
     );
 
-    this.experimentalJitContext = params.experimentalJitContext ?? false;
-    this.experimentalMemoryManager = params.experimentalMemoryManager ?? false;
+    this.experimentalJitContext = params.experimentalJitContext ?? true;
+    this.experimentalMemoryV2 = params.experimentalMemoryV2 ?? true;
+    this.experimentalAutoMemory = params.experimentalAutoMemory ?? false;
+    this.experimentalGemma = params.experimentalGemma ?? false;
     this.experimentalContextManagementConfig =
       params.experimentalContextManagementConfig;
     this.memoryBoundaryMarkers = params.memoryBoundaryMarkers ?? ['.git'];
@@ -1196,7 +1222,7 @@ export class Config implements McpContext, AgentLoopContext {
         },
       },
     };
-    this.topicUpdateNarration = params.topicUpdateNarration ?? false;
+    this.topicUpdateNarration = params.topicUpdateNarration ?? true;
     this.modelSteering = params.modelSteering ?? false;
     this.injectionService = new InjectionService(() =>
       this.isModelSteeringEnabled(),
@@ -1320,6 +1346,8 @@ export class Config implements McpContext, AgentLoopContext {
     };
     this.gemmaModelRouter = {
       enabled: params.gemmaModelRouter?.enabled ?? false,
+      autoStartServer: params.gemmaModelRouter?.autoStartServer ?? true,
+      binaryPath: params.gemmaModelRouter?.binaryPath ?? '',
       classifier: {
         host:
           params.gemmaModelRouter?.classifier?.host ?? 'http://localhost:9379',
@@ -1355,6 +1383,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.billing = {
       overageStrategy: params.billing?.overageStrategy ?? 'ask',
     };
+    this.vertexAiRouting = params.vertexAiRouting;
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -1542,6 +1571,7 @@ export class Config implements McpContext, AgentLoopContext {
       apiKey,
       baseUrl,
       customHeaders,
+      this.vertexAiRouting,
     );
     this.contentGenerator = await createContentGenerator(
       newContentGeneratorConfig,
@@ -1566,8 +1596,12 @@ export class Config implements McpContext, AgentLoopContext {
         return undefined;
       });
 
-    // Fetch experiments and update timeouts before continuing initialization
-    const experiments = await this.experimentsPromise;
+    const [experiments] = await Promise.all([
+      this.experimentsPromise,
+      quotaPromise.catch((e) => {
+        debugLogger.error('Failed to fetch user quota', e);
+      }),
+    ]);
 
     const requestTimeoutMs = this.getRequestTimeoutMs();
     if (requestTimeoutMs !== undefined) {
@@ -1576,8 +1610,6 @@ export class Config implements McpContext, AgentLoopContext {
 
     // Initialize BaseLlmClient now that the ContentGenerator and experiments are available
     this.baseLlmClient = new BaseLlmClient(this.contentGenerator, this);
-
-    await quotaPromise;
 
     const authType = this.contentGeneratorConfig.authType;
     if (
@@ -1599,16 +1631,21 @@ export class Config implements McpContext, AgentLoopContext {
     const adminControlsEnabled =
       experiments?.flags[ExperimentFlags.ENABLE_ADMIN_CONTROLS]?.boolValue ??
       false;
-    const adminControls = await fetchAdminControls(
-      codeAssistServer,
-      this.getRemoteAdminSettings(),
-      adminControlsEnabled,
-      (newSettings: AdminControlsSettings) => {
-        this.setRemoteAdminSettings(newSettings);
-        coreEvents.emitAdminSettingsChanged();
-      },
-    );
-    this.setRemoteAdminSettings(adminControls);
+
+    try {
+      const adminControls = await fetchAdminControls(
+        codeAssistServer,
+        this.getRemoteAdminSettings(),
+        adminControlsEnabled,
+        (newSettings: AdminControlsSettings) => {
+          this.setRemoteAdminSettings(newSettings);
+          coreEvents.emitAdminSettingsChanged();
+        },
+      );
+      this.setRemoteAdminSettings(adminControls);
+    } catch (e) {
+      debugLogger.error('Failed to fetch admin controls', e);
+    }
 
     if ((await this.getProModelNoAccess()) && isAutoModel(this.model)) {
       this.setModel(PREVIEW_GEMINI_FLASH_MODEL);
@@ -2482,8 +2519,16 @@ export class Config implements McpContext, AgentLoopContext {
     return this.memoryBoundaryMarkers;
   }
 
-  isMemoryManagerEnabled(): boolean {
-    return this.experimentalMemoryManager;
+  isMemoryV2Enabled(): boolean {
+    return this.experimentalMemoryV2;
+  }
+
+  isAutoMemoryEnabled(): boolean {
+    return this.experimentalAutoMemory;
+  }
+
+  getExperimentalGemma(): boolean {
+    return this.experimentalGemma;
   }
 
   getExperimentalContextManagementConfig(): string | undefined {
@@ -2716,6 +2761,10 @@ export class Config implements McpContext, AgentLoopContext {
     return this.telemetrySettings.enabled ?? false;
   }
 
+  getTelemetryTracesEnabled(): boolean {
+    return this.telemetrySettings.traces ?? false;
+  }
+
   getTelemetryLogPromptsEnabled(): boolean {
     return this.telemetrySettings.logPrompts ?? true;
   }
@@ -2809,6 +2858,7 @@ export class Config implements McpContext, AgentLoopContext {
     return {
       respectGitIgnore: this.fileFiltering.respectGitIgnore,
       respectGeminiIgnore: this.fileFiltering.respectGeminiIgnore,
+      enableFileWatcher: this.fileFiltering.enableFileWatcher,
       maxFileCount: this.fileFiltering.maxFileCount,
       searchTimeout: this.fileFiltering.searchTimeout,
       customIgnoreFilePaths: this.fileFiltering.customIgnoreFilePaths,
@@ -2922,6 +2972,10 @@ export class Config implements McpContext, AgentLoopContext {
     return this.planEnabled;
   }
 
+  isVoiceModeEnabled(): boolean {
+    return this.voiceMode;
+  }
+
   isTrackerEnabled(): boolean {
     return this.trackerEnabled;
   }
@@ -3002,7 +3056,10 @@ export class Config implements McpContext, AgentLoopContext {
 
   /**
    * Checks if a given absolute path is allowed for file system operations.
-   * A path is allowed if it's within the workspace context or the project's temporary directory.
+   * A path is allowed if it's within the workspace context, the project's
+   * temporary directory, or is exactly the global personal `~/.gemini/GEMINI.md`
+   * file (the latter is the only file under `~/.gemini/` that is reachable —
+   * settings, credentials, keybindings, etc. remain disallowed).
    *
    * @param absolutePath The absolute path to check.
    * @returns true if the path is allowed, false otherwise.
@@ -3017,8 +3074,25 @@ export class Config implements McpContext, AgentLoopContext {
 
     const projectTempDir = this.storage.getProjectTempDir();
     const resolvedTempDir = resolveToRealPath(projectTempDir);
+    if (isSubpath(resolvedTempDir, resolvedPath)) {
+      return true;
+    }
 
-    return isSubpath(resolvedTempDir, resolvedPath);
+    // Surgical allowlist: the global personal GEMINI.md file (and ONLY that
+    // file) is reachable so the prompt-driven memory flow can persist
+    // cross-project personal preferences. This deliberately does NOT
+    // allowlist the rest of `~/.gemini/`.
+    const globalMemoryFilePath = path.join(
+      Storage.getGlobalGeminiDir(),
+      getCurrentGeminiMdFilename(),
+    );
+    const resolvedGlobalMemoryFilePath =
+      resolveToRealPath(globalMemoryFilePath);
+    if (resolvedPath === resolvedGlobalMemoryFilePath) {
+      return true;
+    }
+
+    return false;
   }
 
   /**
@@ -3153,7 +3227,10 @@ export class Config implements McpContext, AgentLoopContext {
    * Note: This method should only be called after startup, once experiments have been loaded.
    */
   getProModelNoAccessSync(): boolean {
-    if (this.contentGeneratorConfig?.authType !== AuthType.LOGIN_WITH_GOOGLE) {
+    if (
+      this.contentGeneratorConfig?.authType !== AuthType.LOGIN_WITH_GOOGLE &&
+      this.contentGeneratorConfig?.authType !== AuthType.COMPUTE_ADC
+    ) {
       return false;
     }
     return (
@@ -3396,20 +3473,23 @@ export class Config implements McpContext, AgentLoopContext {
     return this.shellExecutionConfig;
   }
 
-  setShellExecutionConfig(config: ShellExecutionConfig): void {
+  setShellExecutionConfig(config: Partial<ShellExecutionConfig>): void {
+    const definedConfig: Partial<ShellExecutionConfig> = {};
+    for (const [k, v] of Object.entries(config)) {
+      // Only merge properties explicitly provided with a concrete value.
+      // Filtering out `null` and `undefined` ensures existing system defaults
+      // are preserved when an extension doesn't want to override them.
+      if (v != null) {
+        Object.assign(definedConfig, { [k]: v });
+      }
+    }
+
+    // Note: This performs a shallow merge. If the incoming config provides a nested
+    // object (e.g., sandboxConfig), it will completely overwrite the existing
+    // nested object rather than merging its individual properties.
     this.shellExecutionConfig = {
       ...this.shellExecutionConfig,
-      terminalWidth:
-        config.terminalWidth ?? this.shellExecutionConfig.terminalWidth,
-      terminalHeight:
-        config.terminalHeight ?? this.shellExecutionConfig.terminalHeight,
-      showColor: config.showColor ?? this.shellExecutionConfig.showColor,
-      pager: config.pager ?? this.shellExecutionConfig.pager,
-      sanitizationConfig:
-        config.sanitizationConfig ??
-        this.shellExecutionConfig.sanitizationConfig,
-      sandboxManager:
-        config.sandboxManager ?? this.shellExecutionConfig.sandboxManager,
+      ...definedConfig,
     };
   }
   getScreenReader(): boolean {
@@ -3646,7 +3726,7 @@ export class Config implements McpContext, AgentLoopContext {
         new ReadBackgroundOutputTool(this, this.messageBus),
       ),
     );
-    if (!this.isMemoryManagerEnabled()) {
+    if (!this.isMemoryV2Enabled()) {
       maybeRegister(MemoryTool, () =>
         registry.registerTool(new MemoryTool(this.messageBus, this.storage)),
       );
@@ -3794,8 +3874,6 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   private onAgentsRefreshed = async () => {
-    await this.agentRegistry.initialize();
-
     // Propagate updates to the active chat session
     const client = this.geminiClient;
     if (client?.isInitialized()) {

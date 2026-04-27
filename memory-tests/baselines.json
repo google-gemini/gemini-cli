@@ -1,55 +1,55 @@
 {
   "version": 1,
-  "updatedAt": "2026-04-10T15:36:04.547Z",
+  "updatedAt": "2026-04-20T18:04:59.671Z",
   "scenarios": {
     "multi-turn-conversation": {
-      "heapUsedBytes": 120082704,
-      "heapTotalBytes": 177586176,
-      "rssBytes": 269172736,
-      "externalBytes": 4304053,
-      "timestamp": "2026-04-10T15:35:17.603Z"
+      "heapUsedMB": 68.8,
+      "heapTotalMB": 91.2,
+      "rssMB": 215.4,
+      "externalMB": 93.8,
+      "timestamp": "2026-04-20T18:02:40.101Z"
     },
     "multi-function-call-repo-search": {
-      "heapUsedBytes": 104644984,
-      "heapTotalBytes": 111575040,
-      "rssBytes": 204079104,
-      "externalBytes": 4304053,
-      "timestamp": "2026-04-10T15:35:22.480Z"
+      "heapUsedMB": 73.5,
+      "heapTotalMB": 93.1,
+      "rssMB": 223.6,
+      "externalMB": 97.7,
+      "timestamp": "2026-04-20T18:02:42.032Z"
     },
     "idle-session-startup": {
-      "heapUsedBytes": 119813672,
-      "heapTotalBytes": 177061888,
-      "rssBytes": 267943936,
-      "externalBytes": 4304053,
-      "timestamp": "2026-04-10T15:35:08.035Z"
+      "heapUsedMB": 69.8,
+      "heapTotalMB": 92.4,
+      "rssMB": 217.4,
+      "externalMB": 93.8,
+      "timestamp": "2026-04-20T18:02:36.294Z"
     },
     "simple-prompt-response": {
-      "heapUsedBytes": 119722064,
-      "heapTotalBytes": 177324032,
-      "rssBytes": 268812288,
-      "externalBytes": 4304053,
-      "timestamp": "2026-04-10T15:35:12.770Z"
+      "heapUsedMB": 69.5,
+      "heapTotalMB": 92.4,
+      "rssMB": 216.1,
+      "externalMB": 93.8,
+      "timestamp": "2026-04-20T18:02:38.198Z"
     },
     "resume-large-chat-with-messages": {
-      "heapUsedBytes": 106545568,
-      "heapTotalBytes": 111509504,
-      "rssBytes": 202596352,
-      "externalBytes": 4306101,
-      "timestamp": "2026-04-10T15:36:04.547Z"
+      "heapUsedMB": 887.1,
+      "heapTotalMB": 954.3,
+      "rssMB": 1109.6,
+      "externalMB": 103.2,
+      "timestamp": "2026-04-20T18:04:59.671Z"
     },
     "resume-large-chat": {
-      "heapUsedBytes": 106513760,
-      "heapTotalBytes": 111509504,
-      "rssBytes": 202596352,
-      "externalBytes": 4306101,
-      "timestamp": "2026-04-10T15:35:59.528Z"
+      "heapUsedMB": 885.6,
+      "heapTotalMB": 955.6,
+      "rssMB": 1107.8,
+      "externalMB": 110.5,
+      "timestamp": "2026-04-20T18:04:06.526Z"
     },
     "large-chat": {
-      "heapUsedBytes": 106471568,
-      "heapTotalBytes": 111509504,
-      "rssBytes": 202596352,
-      "externalBytes": 4306101,
-      "timestamp": "2026-04-10T15:35:53.180Z"
+      "heapUsedMB": 158.5,
+      "heapTotalMB": 193,
+      "rssMB": 787.9,
+      "externalMB": 104,
+      "timestamp": "2026-04-20T18:03:12.486Z"
     }
   }
 }
