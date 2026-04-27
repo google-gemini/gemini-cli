@@ -261,4 +261,77 @@ describe('<FooterConfigDialog />', () => {
 
     await expect(renderResult).toMatchSvgSnapshot();
   });
+
+  it('reset to default works on first press (no double-press needed)', async () => {
+    const settings = createMockSettings({
+      ui: {
+        footer: {
+          items: ['git-branch', 'sandbox', 'model-name'], // workspace unchecked
+        },
+      },
+    });
+    const { lastFrame, stdin } = await renderWithProviders(
+      <FooterConfigDialog onClose={mockOnClose} />,
+      { settings },
+    );
+
+    // Initial state: workspace unchecked (user's saved state)
+    // Focus should be on git-branch (first item in their saved list)
+    expect(lastFrame()).toContain('] git-branch');
+    expect(lastFrame()).toContain('[ ] workspace');
+
+    // Navigate to "Reset to default" (last item)
+    for (let i = 0; i < 12; i++) {
+      act(() => {
+        stdin.write('\u001b[B'); // Down arrow
+      });
+    }
+
+    await waitFor(() => {
+      expect(lastFrame()).toMatch(/> \[ \] Reset to default footer/);
+    });
+
+    // Press Enter on "Reset to default" - should work on FIRST press
+    act(() => {
+      stdin.write('\r');
+    });
+
+    // Verify reset worked - workspace should now be checked (back to defaults)
+    await waitFor(() => {
+      expect(lastFrame()).toContain('[✓] workspace');
+    });
+  });
+
+  it('active index moves to first item after reset', async () => {
+    const settings = createMockSettings({
+      ui: {
+        footer: {
+          items: ['git-branch', 'sandbox', 'model-name'], // workspace unchecked
+        },
+      },
+    });
+    const { lastFrame, stdin } = await renderWithProviders(
+      <FooterConfigDialog onClose={mockOnClose} />,
+      { settings },
+    );
+
+    // Initial: focus on git-branch (first item of user's list)
+    expect(lastFrame()).toContain('> [ ] git-branch');
+
+    // Navigate to "Reset to default" and trigger it
+    for (let i = 0; i < 12; i++) {
+      act(() => {
+        stdin.write('\u001b[B');
+      });
+    }
+
+    act(() => {
+      stdin.write('\r');
+    });
+
+    // After reset, active item should be on workspace (new first item)
+    await waitFor(() => {
+      expect(lastFrame()).toMatch(/> \[✓\] workspace/);
+    });
+  });
 });

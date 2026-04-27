@@ -213,8 +213,11 @@ function selectionListReducer(
 
     case 'INITIALIZE': {
       const { initialIndex, items, wrapAround } = action.payload;
+      // Only preserve the old active key if items haven't actually changed
+      // When items change (e.g., after a reset), don't try to preserve old position
+      const itemsActuallyChanged = !areBaseItemsEqual(state.items, items);
       const activeKey =
-        initialIndex === state.initialIndex
+        !itemsActuallyChanged && initialIndex === state.initialIndex
           ? state.items[state.activeIndex]?.key
           : undefined;
 

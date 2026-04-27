@@ -831,6 +831,33 @@ describe('useSelectionList', () => {
       await waitUntilReady();
       expect(result.current.activeIndex).toBe(3);
     });
+
+    it('should respect focusKey even when items change (regression test for reset bug)', async () => {
+      const { result, rerender, waitUntilReady } =
+        await renderSelectionListHook({
+          items,
+          onSelect: mockOnSelect,
+          focusKey: 'C', // Start focused on C at index 2
+        });
+      expect(result.current.activeIndex).toBe(2);
+
+      // Simulate a reset scenario: items change and a new item is added at the start
+      // In FooterConfigDialog, this happens when "workspace" is added back to the list
+      const newItems = [
+        { value: 'NEW', key: 'NEW' }, // New item added at start
+        { value: 'A', key: 'A' },
+        { value: 'B', key: 'B' },
+        { value: 'C', key: 'C' }, // C moved from index 2 to index 3
+        { value: 'D', key: 'D' },
+      ];
+
+      // Pass focusKey='C' to ensure focus follows C to its new position
+      await rerender({ items: newItems, focusKey: 'C' });
+      await waitUntilReady();
+
+      // Active index should be C's NEW position (index 3), not the old position
+      expect(result.current.activeIndex).toBe(3);
+    });
   });
 
   describe('Reactivity (Dynamic Updates)', () => {

@@ -44,7 +44,7 @@ interface FooterConfigState {
 type FooterConfigAction =
   | { type: 'MOVE_ITEM'; id: string; direction: number }
   | { type: 'TOGGLE_ITEM'; id: string }
-  | { type: 'SET_STATE'; payload: Partial<FooterConfigState> };
+  | { type: 'RESET'; payload: FooterConfigState };
 
 function footerConfigReducer(
   state: FooterConfigState,
@@ -77,8 +77,8 @@ function footerConfigReducer(
       }
       return { ...state, selectedIds: nextSelected };
     }
-    case 'SET_STATE':
-      return { ...state, ...action.payload };
+    case 'RESET':
+      return action.payload;
     default:
       return state;
   }
@@ -153,11 +153,20 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
   }, [orderedIds, selectedIds, setSetting, settings.merged, onClose]);
 
   const handleResetToDefaults = useCallback(() => {
-    setSetting(SettingScope.User, 'ui.footer.items', undefined);
-    const newState = resolveFooterState(settings.merged);
-    dispatch({ type: 'SET_STATE', payload: newState });
-    setFocusKey(newState.orderedIds[0]);
-  }, [setSetting, settings.merged]);
+    const legacySettings = {
+      ...settings.merged,
+      ui: {
+        ...settings.merged.ui,
+        footer: {
+          ...settings.merged.ui.footer,
+          items: undefined,
+        },
+      },
+    };
+    const defaultState = resolveFooterState(legacySettings);
+    dispatch({ type: 'RESET', payload: defaultState });
+    setFocusKey(defaultState.orderedIds[0]);
+  }, [settings.merged]);
 
   const handleToggleLabels = useCallback(() => {
     const current = settings.merged.ui.footer.showLabels !== false;
