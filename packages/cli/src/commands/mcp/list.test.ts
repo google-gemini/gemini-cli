@@ -67,7 +67,6 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     GEMINI_DIR: '.gemini',
     getErrorMessage: (e: unknown) =>
       e instanceof Error ? e.message : String(e),
-    MCP_DEFAULT_TIMEOUT_MSEC: 600000,
   };
 });
 vi.mock('@modelcontextprotocol/sdk/client/index.js');
@@ -283,10 +282,10 @@ describe('mcp list command', () => {
 
     expect(mockClient.connect).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ timeout: 600000 }),
+      expect.objectContaining({ timeout: 5000 }),
     );
     expect(mockClient.ping).toHaveBeenCalledWith(
-      expect.objectContaining({ timeout: 600000 }),
+      expect.objectContaining({ timeout: 5000 }),
     );
   });
 

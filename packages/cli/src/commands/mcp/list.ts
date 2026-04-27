@@ -17,7 +17,6 @@ import {
   debugLogger,
   applyAdminAllowlist,
   getAdminBlockedMcpServersMessage,
-  MCP_DEFAULT_TIMEOUT_MSEC,
 } from '@google/gemini-cli-core';
 import type { MCPServerConfig } from '@google/gemini-cli-core';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -67,6 +66,8 @@ export async function getMcpServersFromConfig(
 
   return filteredResult;
 }
+
+const MCP_LIST_DEFAULT_TIMEOUT_MSEC = 5000;
 
 async function testMCPConnection(
   serverName: string,
@@ -128,8 +129,9 @@ async function testMCPConnection(
   }
 
   try {
-    // Attempt actual MCP connection with timeout from config or default
-    const timeout = config.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC;
+    // Attempt actual MCP connection with timeout from config or default to 5s.
+    // We use a short default for the list command to keep it responsive.
+    const timeout = config.timeout ?? MCP_LIST_DEFAULT_TIMEOUT_MSEC;
     await client.connect(transport, { timeout });
 
     // Test basic MCP protocol by pinging the server.
