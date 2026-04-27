@@ -133,7 +133,7 @@ async function run() {
   writeFileSync(OUTPUT_FILE, results.join('\n'));
   console.log(`Saved metrics to ${OUTPUT_FILE}`);
 
-  // Update timeseries with rolling window (keep last 5000 lines)
+  // Update timeseries with rolling window (keep last 100 lines)
   const timestamp = new Date().toISOString();
   let timeseriesLines: string[] = [];
   if (existsSync(TIMESERIES_FILE)) {
