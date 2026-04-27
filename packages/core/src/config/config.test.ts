@@ -3615,7 +3615,9 @@ describe('Config JIT Initialization', () => {
         config.isPathAllowed(path.join(globalDir, 'oauth_creds.json')),
       ).toBe(false);
     });
+  });
 
+  describe('write path classification', () => {
     it('isPathAllowed and isSecureWritePath agree on the four classification cases', async () => {
       // Pin the matrix that the shared classifyWritePath helper produces.
       // This ensures the two predicates can never drift if one of them is
@@ -3633,11 +3635,14 @@ describe('Config JIT Initialization', () => {
         debugMode: false,
         model: 'test-model',
         cwd: '/tmp/test',
-        experimentalMemoryV2: true,
       };
 
       config = new Config(params);
-      await config.initialize();
+      // Storage init alone is enough for classifyWritePath: it only needs
+      // workspaceContext + storage.getProjectTempDir() + the global
+      // GEMINI.md path. Skipping the full Config.initialize() avoids the
+      // unrelated telemetry/tool-registry/memory boot cost.
+      await config.storage.initialize();
 
       const workspacePath = path.join('/tmp/test', 'src/index.ts');
       const tempPath = path.join(
