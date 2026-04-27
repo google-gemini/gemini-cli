@@ -24,6 +24,7 @@ import type {
   ModifyContext,
 } from './modifiable-tool.js';
 import { ToolErrorType } from './tool-error.js';
+import { SECURE_DIR_MODE, SECURE_FILE_MODE } from '../utils/permissions.js';
 import { MEMORY_TOOL_NAME } from './tool-names.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { MEMORY_DEFINITION } from './definitions/coreTools.js';
@@ -309,8 +310,12 @@ class MemoryToolInvocation extends BaseToolInvocation<
 
       await fs.mkdir(path.dirname(memoryFilePath), {
         recursive: true,
+        mode: SECURE_DIR_MODE,
       });
-      await fs.writeFile(memoryFilePath, contentToWrite, 'utf-8');
+      await fs.writeFile(memoryFilePath, contentToWrite, {
+        encoding: 'utf-8',
+        mode: SECURE_FILE_MODE,
+      });
 
       return {
         llmContent: JSON.stringify({

@@ -76,6 +76,7 @@ export * from './utils/schemaValidator.js';
 export * from './utils/errors.js';
 export * from './utils/fsErrorMessages.js';
 export * from './utils/exitCodes.js';
+export * from './utils/permissions.js';
 export * from './utils/getFolderStructure.js';
 export * from './utils/memoryDiscovery.js';
 export * from './utils/getPty.js';

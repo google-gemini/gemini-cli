@@ -21,6 +21,7 @@ import { ApprovalMode } from '../policy/types.js';
 import { ENTER_PLAN_MODE_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { SECURE_DIR_MODE } from '../utils/permissions.js';
 
 export interface EnterPlanModeParams {
   reason?: string;
@@ -131,7 +132,21 @@ export class EnterPlanModeInvocation extends BaseToolInvocation<
     const plansDir = this.config.storage.getPlansDir();
     if (!fs.existsSync(plansDir)) {
       try {
-        fs.mkdirSync(plansDir, { recursive: true });
+        // Tighten permissions only when the plans directory is the default
+        // path under the project temp tree. A custom plans dir resolved
+        // inside the user's workspace is left at the default umask so the
+        // user's other tooling can read those files normally.
+        const projectTempDir = this.config.storage.getProjectTempDir();
+        const isInsideTempTree =
+          plansDir === projectTempDir ||
+          plansDir.startsWith(projectTempDir + '/') ||
+          plansDir.startsWith(projectTempDir + '\\');
+        if (isInsideTempTree) {
+          this.config.storage.ensureProjectTempDirExists();
+          fs.mkdirSync(plansDir, { recursive: true, mode: SECURE_DIR_MODE });
+        } else {
+          fs.mkdirSync(plansDir, { recursive: true });
+        }
       } catch (e) {
         // Log error but don't fail; write_file will try again later
         debugLogger.error(`Failed to create plans directory: ${plansDir}`, e);

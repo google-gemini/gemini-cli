@@ -9,6 +9,7 @@ import path from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { debugLogger } from '../utils/debugLogger.js';
 import { coreEvents } from '../utils/events.js';
+import { SECURE_DIR_MODE, SECURE_FILE_MODE } from '../utils/permissions.js';
 import {
   TrackerTaskSchema,
   TaskStatus,
@@ -27,7 +28,10 @@ export class TrackerService {
 
   private async ensureInitialized(): Promise<void> {
     if (!this.initialized) {
-      await fs.mkdir(this.tasksDir, { recursive: true });
+      await fs.mkdir(this.tasksDir, {
+        recursive: true,
+        mode: SECURE_DIR_MODE,
+      });
       this.initialized = true;
     }
   }
@@ -179,7 +183,10 @@ export class TrackerService {
    */
   private async saveTask(task: TrackerTask): Promise<void> {
     const taskPath = path.join(this.tasksDir, `${task.id}.json`);
-    await fs.writeFile(taskPath, JSON.stringify(task, null, 2), 'utf8');
+    await fs.writeFile(taskPath, JSON.stringify(task, null, 2), {
+      encoding: 'utf8',
+      mode: SECURE_FILE_MODE,
+    });
   }
 
   /**

@@ -170,6 +170,7 @@ describe('AcpFileSystemService', () => {
           expect(mockFallback.writeTextFile).toHaveBeenCalledWith(
             '/path/to/file',
             'content',
+            undefined,
           );
           expect(mockConnection.writeTextFile).not.toHaveBeenCalled();
         },
@@ -182,6 +183,7 @@ describe('AcpFileSystemService', () => {
           expect(mockFallback.writeTextFile).toHaveBeenCalledWith(
             '/outside/file',
             'content',
+            undefined,
           );
           expect(mockConnection.writeTextFile).not.toHaveBeenCalled();
         },
@@ -195,6 +197,7 @@ describe('AcpFileSystemService', () => {
           expect(mockFallback.writeTextFile).toHaveBeenCalledWith(
             '/home/user/.gemini/tmp/file.md',
             'content',
+            undefined,
           );
           expect(mockConnection.writeTextFile).not.toHaveBeenCalled();
         },

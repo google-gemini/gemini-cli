@@ -153,11 +153,15 @@ describe('MemoryTool', () => {
 
       expect(fs.mkdir).toHaveBeenCalledWith(path.dirname(expectedFilePath), {
         recursive: true,
+        mode: 0o700,
       });
       expect(fs.writeFile).toHaveBeenCalledWith(
         expectedFilePath,
         expectedContent,
-        'utf-8',
+        {
+          encoding: 'utf-8',
+          mode: 0o600,
+        },
       );
 
       const successMessage = `Okay, I've remembered that: "the sky is blue"`;
@@ -183,7 +187,7 @@ describe('MemoryTool', () => {
       expect(fs.writeFile).toHaveBeenCalledWith(
         expect.any(String),
         expectedFileContent,
-        'utf-8',
+        { encoding: 'utf-8', mode: 0o600 },
       );
 
       const successMessage = `Okay, I've remembered that: "${expectedSanitizedText}"`;
@@ -211,7 +215,7 @@ describe('MemoryTool', () => {
       expect(fs.writeFile).toHaveBeenCalledWith(
         expect.any(String),
         expectedFileContent,
-        'utf-8',
+        { encoding: 'utf-8', mode: 0o600 },
       );
 
       const successMessage = `Okay, I've remembered that: "${expectedSanitizedText}"`;
@@ -238,7 +242,7 @@ describe('MemoryTool', () => {
       expect(fs.writeFile).toHaveBeenCalledWith(
         expect.any(String),
         proposedContent,
-        'utf-8',
+        { encoding: 'utf-8', mode: 0o600 },
       );
     });
 
@@ -454,7 +458,7 @@ describe('MemoryTool', () => {
       expect(fs.writeFile).toHaveBeenCalledWith(
         expectedFilePath,
         expect.any(String),
-        'utf-8',
+        { encoding: 'utf-8', mode: 0o600 },
       );
     });
 
@@ -475,16 +479,17 @@ describe('MemoryTool', () => {
       );
       expect(fs.mkdir).toHaveBeenCalledWith(mockProjectMemoryDir, {
         recursive: true,
+        mode: 0o700,
       });
       expect(fs.writeFile).toHaveBeenCalledWith(
         expectedFilePath,
         expect.stringContaining('- project-specific fact'),
-        'utf-8',
+        { encoding: 'utf-8', mode: 0o600 },
       );
       expect(fs.writeFile).not.toHaveBeenCalledWith(
         expectedFilePath,
         expect.stringContaining(MEMORY_SECTION_HEADER),
-        'utf-8',
+        { encoding: 'utf-8', mode: 0o600 },
       );
     });
 

@@ -41,6 +41,8 @@ describe('EnterPlanModeTool', () => {
       setApprovalMode: vi.fn(),
       storage: {
         getPlansDir: vi.fn().mockReturnValue('/mock/plans/dir'),
+        getProjectTempDir: vi.fn().mockReturnValue('/mock/tmp'),
+        ensureProjectTempDirExists: vi.fn(),
       } as unknown as Config['storage'],
     };
     tool = new EnterPlanModeTool(
@@ -132,7 +134,10 @@ describe('EnterPlanModeTool', () => {
       expect(result.returnDisplay).toBe('Switching to Plan mode');
     });
 
-    it('should create plans directory if it does not exist', async () => {
+    it('should create custom plans directory (workspace) without mode flag', async () => {
+      // Default mockConfig: plansDir '/mock/plans/dir' is NOT under
+      // projectTempDir '/mock/tmp', so it's treated as a custom workspace
+      // path — the user's umask is preserved.
       const invocation = tool.build({});
       vi.mocked(fs.existsSync).mockReturnValue(false);
 
@@ -140,6 +145,26 @@ describe('EnterPlanModeTool', () => {
 
       expect(fs.mkdirSync).toHaveBeenCalledWith('/mock/plans/dir', {
         recursive: true,
+      });
+      expect(
+        mockConfig.storage!.ensureProjectTempDirExists,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('should create default plans directory (under tmp) with mode 0o700', async () => {
+      // Re-mock so plansDir is inside projectTempDir → security path applies.
+      vi.mocked(mockConfig.storage!.getPlansDir).mockReturnValue(
+        '/mock/tmp/plans',
+      );
+      const invocation = tool.build({});
+      vi.mocked(fs.existsSync).mockReturnValue(false);
+
+      await invocation.execute({ abortSignal: new AbortController().signal });
+
+      expect(mockConfig.storage!.ensureProjectTempDirExists).toHaveBeenCalled();
+      expect(fs.mkdirSync).toHaveBeenCalledWith('/mock/tmp/plans', {
+        recursive: true,
+        mode: 0o700,
       });
     });
 

@@ -7,7 +7,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import { debugLogger, isNodeError, Storage } from '@google/gemini-cli-core';
+import {
+  debugLogger,
+  isNodeError,
+  Storage,
+  SECURE_DIR_MODE,
+  SECURE_FILE_MODE,
+} from '@google/gemini-cli-core';
 
 const MAX_HISTORY_LENGTH = 100;
 
@@ -63,8 +69,13 @@ async function writeHistoryFile(
   history: string[],
 ): Promise<void> {
   try {
-    await fs.mkdir(path.dirname(filePath), { recursive: true });
-    await fs.writeFile(filePath, history.join('\n'));
+    await fs.mkdir(path.dirname(filePath), {
+      recursive: true,
+      mode: SECURE_DIR_MODE,
+    });
+    await fs.writeFile(filePath, history.join('\n'), {
+      mode: SECURE_FILE_MODE,
+    });
   } catch (error) {
     debugLogger.error('Error writing shell history:', error);
   }
