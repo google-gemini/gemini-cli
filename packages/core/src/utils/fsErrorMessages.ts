@@ -50,6 +50,8 @@ const errorMessageGenerators: Record<string, (path?: string) => string> = {
     'Too many open files in system. Close some unused files or applications.',
   ECONNRESET: () =>
     'Connection reset by peer. The network connection was unexpectedly closed.',
+  ETIMEDOUT: () =>
+    'Operation timed out. The network connection or filesystem operation took too long.',
 };
 
 /**

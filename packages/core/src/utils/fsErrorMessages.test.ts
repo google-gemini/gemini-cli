@@ -146,6 +146,12 @@ describe('getFsErrorMessage', () => {
         expected:
           'Connection reset by peer. The network connection was unexpectedly closed.',
       },
+      {
+        code: 'ETIMEDOUT',
+        message: 'ETIMEDOUT: operation timed out',
+        expected:
+          'Operation timed out. The network connection or filesystem operation took too long.',
+      },
     ];
 
     it.each(testCases)(
