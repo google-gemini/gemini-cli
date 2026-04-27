@@ -76,9 +76,13 @@ above:
 After applying any necessary fixes, you must evaluate the overall quality and
 impact of the modified scripts.
 
-- You MUST record your decision and your reasoning in the
-  `tools/gemini-cli-bot/lessons-learned.md` log. This is critical for future
-  iterations if the PR is rejected.
+- **Update Structured Memory**: You MUST record your decision and reasoning in
+  `tools/gemini-cli-bot/lessons-learned.md` using the **Structured Markdown**
+  format (Task Ledger, Decision Log).
+- **Update Task Ledger**: Update the status of the task you are critiquing
+  (e.g., from `TODO` to `SUBMITTED` if approved, or `FAILED` if rejected).
+- **Append to Decision Log**: Add a brief entry describing your technical
+  evaluation and any critical fixes you applied.
 - **Reject if unsure:** If you are even slightly unsure the solution is good
   enough, if the changes are too annoying, spammy, or degrade the developer
   experience and cannot be easily fixed, you must output the exact magic string

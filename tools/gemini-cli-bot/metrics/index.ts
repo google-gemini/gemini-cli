@@ -132,20 +132,27 @@ async function run() {
   writeFileSync(OUTPUT_FILE, results.join('\n'));
   console.log(`Saved metrics to ${OUTPUT_FILE}`);
 
-  // Update timeseries
+  // Update timeseries with rolling window (keep last 5000 lines)
   const timestamp = new Date().toISOString();
-  let timeseriesContent = '';
+  let timeseriesLines: string[] = [];
   if (existsSync(TIMESERIES_FILE)) {
-    timeseriesContent = readFileSync(TIMESERIES_FILE, 'utf-8').trim();
+    timeseriesLines = readFileSync(TIMESERIES_FILE, 'utf-8').trim().split('\n');
   } else {
-    timeseriesContent = 'timestamp,metric,value';
+    timeseriesLines = ['timestamp,metric,value'];
   }
 
   const newRows = results.slice(1).map((row) => `${timestamp},${row}`);
   if (newRows.length > 0) {
-    timeseriesContent += '\n' + newRows.join('\n');
-    writeFileSync(TIMESERIES_FILE, timeseriesContent + '\n');
-    console.log(`Updated timeseries at ${TIMESERIES_FILE}`);
+    timeseriesLines.push(...newRows);
+
+    // Keep header + last 100 data rows
+    if (timeseriesLines.length > 101) {
+      const header = timeseriesLines[0];
+      timeseriesLines = [header, ...timeseriesLines.slice(-100)];
+    }
+
+    writeFileSync(TIMESERIES_FILE, timeseriesLines.join('\n') + '\n');
+    console.log(`Updated timeseries at ${TIMESERIES_FILE} (rolling window)`);
   }
 }
 

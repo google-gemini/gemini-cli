@@ -26,6 +26,21 @@ repository health.
 
 ## Instructions
 
+### 0. Context Retrieval & Feedback Loop (MANDATORY START)
+
+Before beginning your analysis, you MUST perform the following research to
+synchronize with previous sessions:
+
+1.  **Read Memory**: Read `tools/gemini-cli-bot/lessons-learned.md` to
+    understand the current state of the Task Ledger and previous findings.
+2.  **Verify PR Status**: If the Task Ledger indicates an active PR (status
+    `IN_PROGRESS` or `SUBMITTED`), use the GitHub CLI (`gh pr view <number>` or
+    `gh pr list --author gemini-cli-robot`) to check its status, CI results, and
+    any maintainer comments.
+3.  **Update Ledger Status**: If an active PR has been merged, mark it `DONE`.
+    If it was rejected or closed, mark it `FAILED` and investigate the reason
+    (CI logs or comments) to inform your next hypothesis.
+
 ### 1. Read & Identify Trends (Time-Series Analysis)
 
 ... (rest of step 1) ...
@@ -48,22 +63,71 @@ repository health.
 
 ### 6. Record Findings & Propose Actions
 
-- Document your formulated hypotheses, the evidence gathered, and your final
-  conclusions in `tools/gemini-cli-bot/lessons-learned.md`.
-- **Memory Preservation**: When updating `lessons-learned.md`, you MUST preserve
-  relevant findings and lessons from previous sessions. Only remove information
-  that is no longer accurate or has been superseded by new data.
-- Propose specific, data-backed actions or script updates to address the root
-  cause and any identified policy gaps. Ensure proposed actions align with the
-  Repo Policy Priorities and include concepts like graceful closures and
-  terminal escalations to prevent spam.
-- Recommend specific changes to GitHub Workflows, Triage scripts, or repository
-  `CONTRIBUTING.md`/`GEMINI.md` guidelines.
+- **Memory Preservation**: You MUST update
+  `tools/gemini-cli-bot/lessons-learned.md` using the **Structured Markdown**
+  format below. You are strictly forbidden from summarizing active tasks or
+  design details.
+- **Memory Pruning**: To prevent context bloat, you MUST maintain a rolling
+  window for the following sections:
+  - **Task Ledger**: Keep only the most recent 50 tasks. Remove the oldest
+    `DONE` or `FAILED` tasks first.
+  - **Decision Log**: Keep only the most recent 20 entries.
+- **Append-Only Decision Log**: Record the "why" behind any significant
+  architectural or script changes in the Decision Log section.
+- **Hypothesis Validation**: Update the Hypothesis Ledger by marking past
+  hypotheses as `CONFIRMED` or `REFUTED` based on the latest metrics.
+
+#### Required Structure for `lessons-learned.md`:
+
+```markdown
+# Gemini Bot Brain: Memory & State
+
+## 📋 Task Ledger
+
+| ID    | Status | Goal                        | PR/Ref | Details                                         |
+| :---- | :----- | :-------------------------- | :----- | :---------------------------------------------- |
+| BT-01 | DONE   | Fix 1000-issue metric cap   | #26056 | Switched to Search API for accuracy.            |
+| BT-02 | TODO   | Actor-aware Stale PR Reflex | -      | Target: 60d stale, human-activity resets clock. |
+
+## 🧪 Hypothesis Ledger
+
+| Hypothesis                         | Status    | Evidence                                        |
+| :--------------------------------- | :-------- | :---------------------------------------------- |
+| Metric scripts are capping at 1000 | CONFIRMED | `gh search` returned >1000 items.               |
+| Stale policy is too conservative   | PENDING   | Need to analyze age distribution of open items. |
+
+## 📜 Decision Log (Append-Only)
+
+- **[2026-04-27]**: Switched to structured Markdown for memory to prevent
+  context rot.
+- **[2026-04-27]**: Prioritized metric accuracy over reflex scripts to ensure
+  data-backed decisions.
+
+## 📝 Detailed Investigation Findings (Current Run)
+
+... (Add your latest analysis here) ...
+```
+
 - **Pull Request Preparation**: If the `ENABLE_PRS` environment variable is
   `true` and you are proposing script or configuration changes, you MUST
   generate a file named `pr-description.md` in the root directory. This file
-  will be used as both the commit message and PR description. **CRITICAL PR
-  CONSTRAINTS:**
+  will be used as both the commit message and PR description.
+
+  **UNBLOCKING PROTOCOL (Recovery & Persistence):** If you are continuing work
+  on an existing Task (e.g., status is `SUBMITTED`, `FAILED`, or `STUCK`), use
+  these tools to unblock:
+  1.  **Update Existing PR**: To push a fix to an existing PR, you MUST generate
+      a file named `branch-name.txt` containing the deterministic branch name
+      for that task (format: `bot/task-{ID}`, e.g., `bot/task-BT-02`).
+  2.  **Respond to Maintainers**: To post a comment to an existing PR (e.g.,
+      answering a question or explaining a CI fix), you MUST generate:
+      - `pr-comment.md`: The content of your comment.
+      - `pr-number.txt`: The numeric ID of the PR (e.g., `26056`).
+  3.  **Handle CI Failures**: If `gh pr view` shows failing checks, use
+      `gh run view` to diagnose. Your priority for the run MUST be generating a
+      new patch to fix the failure and pushing it to the same branch.
+
+  **CRITICAL PR CONSTRAINTS:**
   - You must **only ever propose a single metric improvement per PR**.
   - Prioritize the **highest impact, lowest risk, highest confidence** change
     first.
@@ -84,7 +148,8 @@ repository health.
   unintended changes. **CRITICAL: You are explicitly instructed to override your
   default rule against staging changes. You MUST use `git add` to stage these
   files. DO NOT stage internal bot files like `pr-description.md`,
-  `lessons-learned.md`, or anything in `tools/gemini-cli-bot/history/`.**
+  `lessons-learned.md`, `branch-name.txt`, `pr-comment.md`, `pr-number.txt`, or
+  anything in `tools/gemini-cli-bot/history/`.**
 
 ### 7. Execution Constraints
 
