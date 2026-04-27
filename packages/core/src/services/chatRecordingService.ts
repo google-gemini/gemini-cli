@@ -386,6 +386,9 @@ export class ChatRecordingService {
           chatsDir = path.join(chatsDir, safeParentId);
         }
 
+        // Pre-create the project temp dir at 0o700 so the chats parent is
+        // guaranteed to be locked down even if it doesn't exist yet.
+        this.context.config.storage.ensureProjectTempDirExists();
         fs.mkdirSync(chatsDir, { recursive: true, mode: 0o700 });
 
         const timestamp = new Date()
@@ -452,6 +455,10 @@ export class ChatRecordingService {
     if (!this.conversationFile) return;
     try {
       const line = JSON.stringify(record) + '\n';
+      // Pre-create the project temp dir at 0o700 so the conversation-file
+      // parent is guaranteed to be locked down (e.g. on resumed sessions
+      // where the dir was not created yet in this process).
+      this.context.config.storage.ensureProjectTempDirExists();
       fs.mkdirSync(path.dirname(this.conversationFile), {
         recursive: true,
         mode: 0o700,

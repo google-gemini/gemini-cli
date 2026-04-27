@@ -114,6 +114,10 @@ export function createToolMaskingProcessor(
         nodeType: string,
       ): Promise<string> => {
         if (!directoryCreated) {
+          // Pre-create projectTempDir at 0o700 first; recursive mkdir below
+          // would otherwise leave the parent at the umask default if it
+          // didn't already exist.
+          await fs.mkdir(env.projectTempDir, { recursive: true, mode: 0o700 });
           await fs.mkdir(toolOutputsDir, { recursive: true, mode: 0o700 });
           directoryCreated = true;
         }

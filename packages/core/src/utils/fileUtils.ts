@@ -702,6 +702,9 @@ export async function saveTruncatedToolOutput(
   }
   const outputFile = path.join(toolOutputDir, fileName);
 
+  // Pre-create projectTempDir at 0o700 first; recursive mkdir below would
+  // otherwise leave the parent at the umask default if it didn't already exist.
+  await fsPromises.mkdir(projectTempDir, { recursive: true, mode: 0o700 });
   await fsPromises.mkdir(toolOutputDir, { recursive: true, mode: 0o700 });
   await fsPromises.writeFile(outputFile, content, { mode: 0o600 });
 

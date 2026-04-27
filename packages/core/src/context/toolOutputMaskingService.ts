@@ -171,6 +171,9 @@ export class ToolOutputMaskingService {
       const safeSessionId = sanitizeFilenamePart(sessionId);
       toolOutputsDir = path.join(toolOutputsDir, `session-${safeSessionId}`);
     }
+    // Pre-create the project temp dir at 0o700 so the tool-outputs parent
+    // is guaranteed to be locked down even if it doesn't exist yet.
+    config.storage.ensureProjectTempDirExists();
     await fsPromises.mkdir(toolOutputsDir, {
       recursive: true,
       mode: 0o700,

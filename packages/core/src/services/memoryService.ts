@@ -913,6 +913,9 @@ export async function startMemoryService(config: Config): Promise<void> {
   const statePath = path.join(memoryDir, STATE_FILENAME);
   const chatsDir = path.join(config.storage.getProjectTempDir(), 'chats');
 
+  // Pre-create the project temp dir at 0o700 so the memory parent is
+  // guaranteed to be locked down even if it doesn't exist yet.
+  config.storage.ensureProjectTempDirExists();
   // Ensure directories exist
   await fs.mkdir(skillsDir, { recursive: true, mode: 0o700 });
 

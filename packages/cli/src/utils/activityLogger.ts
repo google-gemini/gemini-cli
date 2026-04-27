@@ -690,6 +690,9 @@ function setupFileLogging(
 
   const logsDir = path.dirname(logFile);
   if (!fs.existsSync(logsDir)) {
+    // Pre-create the project temp dir at 0o700 so the parent of logsDir is
+    // guaranteed to be locked down even if it doesn't already exist.
+    config.storage.ensureProjectTempDirExists();
     fs.mkdirSync(logsDir, { recursive: true, mode: 0o700 });
   }
 
