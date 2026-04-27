@@ -52,6 +52,10 @@ changes. You MUST use `git add` to stage these files.**
 10. **Targeted Mitigation:** Do the script actions tangibly drive the target
     metric toward the goal (e.g., actually closing or routing, not just
     passively adding a label)?
+11. **Surgical Changes:** Are ONLY the necessary script, workflow, or
+    configuration files staged? Ensure that internal bot files like
+    `pr-description.md`, `lessons-learned.md`, or metrics CSVs are NOT staged.
+    If they are staged, you MUST unstage them using `git reset <file>`.
 
 ## Implementation Mandate
 

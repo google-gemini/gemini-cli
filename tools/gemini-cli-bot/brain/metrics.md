@@ -83,7 +83,8 @@ repository health.
   PR using `git add <file>`. Do not rely on `git add .` as it may stage
   unintended changes. **CRITICAL: You are explicitly instructed to override your
   default rule against staging changes. You MUST use `git add` to stage these
-  files.**
+  files. DO NOT stage internal bot files like `pr-description.md`,
+  `lessons-learned.md`, or anything in `tools/gemini-cli-bot/history/`.**
 
 ### 7. Execution Constraints
 
