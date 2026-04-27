@@ -188,7 +188,7 @@ describe('ListCheckpointsCommand', () => {
   it('returns "No checkpoints found." when no .json checkpoints exist', async () => {
     vi.mocked(fs.readdir).mockResolvedValue([
       'not-a-checkpoint.txt',
-    ] as unknown[] as string[]);
+    ] as unknown as string[]);
 
     const response = await listCommand.execute(context);
 
@@ -209,7 +209,7 @@ describe('ListCheckpointsCommand', () => {
     vi.mocked(fs.readdir).mockResolvedValue([
       'cp1.json',
       'cp2.json',
-    ] as unknown[] as string[]);
+    ] as unknown as string[]);
     vi.mocked(fs.readFile).mockImplementation(async (filePath) => {
       if (typeof filePath === 'string' && filePath.endsWith('cp1.json')) {
         return JSON.stringify({ toolCall: { name: 'tool1' } });
@@ -234,7 +234,7 @@ describe('ListCheckpointsCommand', () => {
   it('handles checkpoints with missing tool name', async () => {
     vi.mocked(fs.readdir).mockResolvedValue([
       'missing_tool.json',
-    ] as unknown[] as string[]);
+    ] as unknown as string[]);
     vi.mocked(fs.readFile).mockResolvedValue('{}');
     vi.mocked(getCheckpointInfoList).mockReturnValue([
       { messageId: 'id3', checkpoint: 'missing_tool' },
