@@ -414,7 +414,7 @@ export async function parseArguments(
         })
         .option('session-id', {
           type: 'string',
-          description: 'Manually provide a specific session UUID.',
+          description: 'Start a new session with a manually provided UUID.',
         })
         .option('list-sessions', {
           type: 'boolean',
