@@ -371,7 +371,7 @@ export interface BrowserAgentCustomConfig {
   visualModel?: string;
   /** List of allowed domains for the browser agent (e.g., ["github.com", "*.google.com"]). */
   allowedDomains?: string[];
-  /** Disable user input on the browser window during automation. Default: true in non-headless mode */
+  /** Disable user input on the browser window during automation. Default: false in non-headless mode */
   disableUserInput?: boolean;
   /** Maximum number of actions (tool calls) allowed per task. Default: 100 */
   maxActionsPerTask?: number;
@@ -3617,7 +3617,7 @@ export class Config implements McpContext, AgentLoopContext {
   shouldDisableBrowserUserInput(): boolean {
     const browserConfig = this.getBrowserAgentConfig();
     return (
-      browserConfig.customConfig?.disableUserInput !== false &&
+      browserConfig.customConfig?.disableUserInput === true &&
       !browserConfig.customConfig?.headless
     );
   }
