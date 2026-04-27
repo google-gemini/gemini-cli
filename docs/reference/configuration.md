@@ -483,6 +483,20 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Skip the next speaker check.
   - **Default:** `true`
 
+- **`model.autoRouting.bestEffortPro`** (boolean):
+  - **Description:** Always prefer the Pro model unless it is unavailable (e.g.,
+    due to timeouts or quota), ignoring other routing hints.
+  - **Default:** `false`
+
+- **`model.autoRouting.proTimeoutMinutes`** (number):
+  - **Description:** If a Pro request takes longer than this many minutes, it
+    will be marked as temporarily unavailable and fallback to Flash.
+  - **Default:** `5`
+
+- **`model.autoRouting.proTimeoutFallbackDurationMinutes`** (number):
+  - **Description:** How long to route to Flash after Pro times out.
+  - **Default:** `60`
+
 #### `modelConfigs`
 
 - **`modelConfigs.aliases`** (object):

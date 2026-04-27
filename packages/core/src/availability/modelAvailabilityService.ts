@@ -8,13 +8,15 @@ export type ModelId = string;
 
 type TerminalUnavailabilityReason = 'quota' | 'capacity';
 export type TurnUnavailabilityReason = 'retry_once_per_turn';
+export type TemporaryUnavailabilityReason = 'timeout';
 
 export type UnavailabilityReason =
   | TerminalUnavailabilityReason
   | TurnUnavailabilityReason
+  | TemporaryUnavailabilityReason
   | 'unknown';
 
-export type ModelHealthStatus = 'terminal' | 'sticky_retry';
+export type ModelHealthStatus = 'terminal' | 'sticky_retry' | 'temporary';
 
 type HealthState =
   | { status: 'terminal'; reason: TerminalUnavailabilityReason }
@@ -22,6 +24,11 @@ type HealthState =
       status: 'sticky_retry';
       reason: TurnUnavailabilityReason;
       consumed: boolean;
+    }
+  | {
+      status: 'temporary';
+      reason: TemporaryUnavailabilityReason;
+      untilMs: number;
     };
 
 export interface ModelAvailabilitySnapshot {
@@ -45,6 +52,18 @@ export class ModelAvailabilityService {
     this.setState(model, {
       status: 'terminal',
       reason,
+    });
+  }
+
+  markTemporarilyUnavailable(
+    model: ModelId,
+    reason: TemporaryUnavailabilityReason,
+    durationMs: number,
+  ) {
+    this.setState(model, {
+      status: 'temporary',
+      reason,
+      untilMs: Date.now() + durationMs,
     });
   }
 
@@ -93,6 +112,15 @@ export class ModelAvailabilityService {
 
     if (state.status === 'sticky_retry' && state.consumed) {
       return { available: false, reason: state.reason };
+    }
+
+    if (state.status === 'temporary') {
+      if (Date.now() < state.untilMs) {
+        return { available: false, reason: state.reason };
+      } else {
+        this.clearState(model);
+        return { available: true };
+      }
     }
 
     return { available: true };
