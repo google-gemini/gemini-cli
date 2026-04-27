@@ -55,6 +55,8 @@ export async function start_sandbox(
   });
   patcher.patch();
 
+  let stopProxy: (() => void) | undefined = undefined;
+
   try {
     if (config.command === 'sandbox-exec') {
       // disallow BUILD_SANDBOX
@@ -188,17 +190,18 @@ export async function start_sandbox(
           detached: true,
         });
         // install handlers to stop proxy on exit/signal
-        const stopProxy = () => {
+        stopProxy = () => {
           debugLogger.log('stopping proxy ...');
           if (proxyProcess?.pid) {
-            process.kill(-proxyProcess.pid, 'SIGTERM');
+            try {
+              process.kill(-proxyProcess.pid, 'SIGTERM');
+            } catch {
+              // ignore
+            }
           }
         };
-        process.off('exit', stopProxy);
         process.on('exit', stopProxy);
-        process.off('SIGINT', stopProxy);
         process.on('SIGINT', stopProxy);
-        process.off('SIGTERM', stopProxy);
         process.on('SIGTERM', stopProxy);
 
         // commented out as it disrupts ink rendering
@@ -746,15 +749,18 @@ export async function start_sandbox(
         detached: true,
       });
       // install handlers to stop proxy on exit/signal
-      const stopProxy = () => {
+      stopProxy = () => {
         debugLogger.log('stopping proxy container ...');
-        execSync(`${command} rm -f ${SANDBOX_PROXY_NAME}`);
+        try {
+          spawnSync(command, ['rm', '-f', SANDBOX_PROXY_NAME], {
+            stdio: 'ignore',
+          });
+        } catch {
+          // ignore
+        }
       };
-      process.off('exit', stopProxy);
       process.on('exit', stopProxy);
-      process.off('SIGINT', stopProxy);
       process.on('SIGINT', stopProxy);
-      process.off('SIGTERM', stopProxy);
       process.on('SIGTERM', stopProxy);
 
       // commented out as it disrupts ink rendering
@@ -806,6 +812,12 @@ export async function start_sandbox(
       });
     });
   } finally {
+    if (stopProxy) {
+      stopProxy();
+      process.off('exit', stopProxy);
+      process.off('SIGINT', stopProxy);
+      process.off('SIGTERM', stopProxy);
+    }
     patcher.cleanup();
   }
 }
