@@ -260,6 +260,9 @@ describe('mcp list command', () => {
       expect.anything(),
       expect.objectContaining({ timeout: 12345 }),
     );
+    expect(mockClient.ping).toHaveBeenCalledWith(
+      expect.objectContaining({ timeout: 12345 }),
+    );
   });
 
   it('should use default timeout for connection when not configured', async () => {
@@ -280,6 +283,9 @@ describe('mcp list command', () => {
 
     expect(mockClient.connect).toHaveBeenCalledWith(
       expect.anything(),
+      expect.objectContaining({ timeout: 600000 }),
+    );
+    expect(mockClient.ping).toHaveBeenCalledWith(
       expect.objectContaining({ timeout: 600000 }),
     );
   });

@@ -136,10 +136,11 @@ async function testMCPConnection(
     // Ping is optional per MCP spec - some servers (e.g. Google first-party)
     // don't implement it. A successful connect() is sufficient proof of connectivity.
     try {
-      await client.ping();
+      await client.ping({ timeout });
     } catch (e) {
       debugLogger.debug(
-        `MCP ping failed for ${serverName}, but connect succeeded: ${e}`,
+        `MCP ping failed for ${serverName}, but connect succeeded:`,
+        e,
       );
     }
 
