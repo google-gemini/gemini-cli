@@ -414,9 +414,28 @@ export class SessionSelector {
   async sessionExists(id: string): Promise<boolean> {
     const chatsDir = path.join(this.storage.getProjectTempDir(), 'chats');
     const files = await fs.readdir(chatsDir).catch(() => []);
-    return files.some((file) =>
-      file.startsWith(SESSION_FILE_PREFIX + id + '-'),
+
+    // The filename format is `session-<TIMESTAMP>-<ID_SLICE(0,8)>.jsonl`
+    const shortId = id.slice(0, 8);
+    const candidateFiles = files.filter(
+      (f) =>
+        f.startsWith(SESSION_FILE_PREFIX) &&
+        (f.endsWith(`-${shortId}.json`) || f.endsWith(`-${shortId}.jsonl`)),
     );
+
+    for (const fileName of candidateFiles) {
+      try {
+        const sessionPath = path.join(chatsDir, fileName);
+        const sessionData = await loadConversationRecord(sessionPath);
+        if (sessionData && sessionData.sessionId === id) {
+          return true;
+        }
+      } catch {
+        // Ignore unparseable files
+      }
+    }
+
+    return false;
   }
 
   /**

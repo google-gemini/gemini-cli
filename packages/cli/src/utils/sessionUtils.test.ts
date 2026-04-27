@@ -53,8 +53,11 @@ describe('SessionSelector', () => {
       const chatsDir = path.join(tmpDir, 'chats');
       await fs.mkdir(chatsDir, { recursive: true });
       await fs.writeFile(
-        path.join(chatsDir, `session-${sessionId}-20240101.jsonl`),
-        '{}',
+        path.join(
+          chatsDir,
+          `session-20240101T000000-${sessionId.slice(0, 8)}.jsonl`,
+        ),
+        JSON.stringify({ sessionId }),
       );
 
       const selector = new SessionSelector(storage);
