@@ -409,6 +409,17 @@ export class SessionSelector {
   constructor(private storage: Storage) {}
 
   /**
+   * Checks if a session with the given ID already exists on disk.
+   */
+  async sessionExists(id: string): Promise<boolean> {
+    const chatsDir = path.join(this.storage.getProjectTempDir(), 'chats');
+    const files = await fs.readdir(chatsDir).catch(() => []);
+    return files.some((file) =>
+      file.startsWith(SESSION_FILE_PREFIX + id + '-'),
+    );
+  }
+
+  /**
    * Lists all available sessions for the current project.
    */
   async listSessions(): Promise<SessionInfo[]> {

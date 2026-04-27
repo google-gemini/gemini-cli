@@ -1072,7 +1072,7 @@ describe('resolveSessionId', () => {
     vi.mocked(SessionSelector).mockImplementation(
       () =>
         ({
-          listSessions: vi.fn().mockResolvedValue([{ id: 'existing-id' }]),
+          sessionExists: vi.fn().mockResolvedValue(true),
         }) as unknown as InstanceType<typeof SessionSelector>,
     );
 
@@ -1103,7 +1103,7 @@ describe('resolveSessionId', () => {
     vi.mocked(SessionSelector).mockImplementation(
       () =>
         ({
-          listSessions: vi.fn().mockResolvedValue([{ id: 'different-id' }]),
+          sessionExists: vi.fn().mockResolvedValue(false),
         }) as unknown as InstanceType<typeof SessionSelector>,
     );
     const { sessionId, resumedSessionData } = await resolveSessionId(

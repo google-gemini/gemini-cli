@@ -421,11 +421,11 @@ export async function parseArguments(
             if (!trimmed) {
               throw new Error('The --session-id option cannot be empty.');
             }
-            if (/[/\\..]/.test(trimmed)) {
+            if (!/^[a-zA-Z0-9-_]+$/.test(trimmed)) {
               throw new Error(
                 'Invalid session ID "' +
                   trimmed +
-                  '": Path traversal characters (/ \\ ..) are not allowed.',
+                  '": Only alphanumeric characters, dashes, and underscores are allowed.',
               );
             }
             return trimmed;
