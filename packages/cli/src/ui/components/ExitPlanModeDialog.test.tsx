@@ -158,6 +158,8 @@ Implement a comprehensive authentication system with multiple providers.
           getIdeMode: () => false,
           isTrustedFolder: () => true,
           getPreferredEditor: () => undefined,
+          getSessionId: () => 'test-session-id',
+          getProjectRoot: () => mockTargetDir,
           storage: {
             getPlansDir: () => mockPlansDir,
           },
@@ -464,6 +466,8 @@ Implement a comprehensive authentication system with multiple providers.
                 getTargetDir: () => mockTargetDir,
                 getIdeMode: () => false,
                 isTrustedFolder: () => true,
+                getSessionId: () => 'test-session-id',
+                getProjectRoot: () => mockTargetDir,
                 storage: {
                   getPlansDir: () => mockPlansDir,
                 },

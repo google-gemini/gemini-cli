@@ -117,8 +117,9 @@ for your users.
 Follow [Semantic Versioning (SemVer)](https://semver.org/) to communicate
 changes clearly.
 
-- **Major:** Breaking changes (e.g., renaming tools or changing arguments).
-- **Minor:** New features (e.g., adding new tools or commands).
+- **Major:** Breaking changes (for example, renaming tools or changing
+  arguments).
+- **Minor:** New features (for example, adding new tools or commands).
 - **Patch:** Bug fixes and performance improvements.
 
 ### Release channels
@@ -182,7 +183,7 @@ If your tools aren't working as expected:
 If a custom command isn't responding:
 
 - **Check precedence:** Remember that user and project commands take precedence
-  over extension commands. Use the prefixed name (e.g., `/extension.command`) to
-  verify the extension's version.
+  over extension commands. Use the prefixed name (for example,
+  `/extension.command`) to verify the extension's version.
 - **Help command:** Run `/help` to see a list of all available commands and
   their sources.

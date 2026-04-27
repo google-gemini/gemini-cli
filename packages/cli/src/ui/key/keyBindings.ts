@@ -97,6 +97,7 @@ export enum Command {
   RESTART_APP = 'app.restart',
   SUSPEND_APP = 'app.suspend',
   SHOW_SHELL_INPUT_UNFOCUS_WARNING = 'app.showShellUnfocusWarning',
+  VOICE_MODE_PTT = 'app.voiceModePTT',
 
   // Background Shell Controls
   BACKGROUND_SHELL_ESCAPE = 'background.escape',
@@ -376,7 +377,10 @@ export const defaultKeyBindingConfig: KeyBindingConfig = new Map([
       new KeyBinding('ctrl+j'),
     ],
   ],
-  [Command.OPEN_EXTERNAL_EDITOR, [new KeyBinding('ctrl+g')]],
+  [
+    Command.OPEN_EXTERNAL_EDITOR,
+    [new KeyBinding('ctrl+g'), new KeyBinding('ctrl+shift+g')],
+  ],
   [Command.DEPRECATED_OPEN_EXTERNAL_EDITOR, [new KeyBinding('ctrl+x')]],
   [
     Command.PASTE_CLIPBOARD,
@@ -404,9 +408,7 @@ export const defaultKeyBindingConfig: KeyBindingConfig = new Map([
   [Command.RESTART_APP, [new KeyBinding('r'), new KeyBinding('shift+r')]],
   [Command.SUSPEND_APP, [new KeyBinding('ctrl+z')]],
   [Command.SHOW_SHELL_INPUT_UNFOCUS_WARNING, [new KeyBinding('tab')]],
-  [Command.DUMP_FRAME, [new KeyBinding('f8')]],
-  [Command.START_RECORDING, [new KeyBinding('f6')]],
-  [Command.STOP_RECORDING, [new KeyBinding('f7')]],
+  [Command.VOICE_MODE_PTT, [new KeyBinding('space')]],
 
   // Background Shell Controls
   [Command.BACKGROUND_SHELL_ESCAPE, [new KeyBinding('escape')]],
@@ -421,6 +423,10 @@ export const defaultKeyBindingConfig: KeyBindingConfig = new Map([
   // Extension Controls
   [Command.UPDATE_EXTENSION, [new KeyBinding('i')]],
   [Command.LINK_EXTENSION, [new KeyBinding('l')]],
+
+  [Command.DUMP_FRAME, [new KeyBinding('f8')]],
+  [Command.START_RECORDING, [new KeyBinding('f6')]],
+  [Command.STOP_RECORDING, [new KeyBinding('f7')]],
 ]);
 
 interface CommandCategory {
@@ -535,6 +541,7 @@ export const commandCategories: readonly CommandCategory[] = [
       Command.RESTART_APP,
       Command.SUSPEND_APP,
       Command.SHOW_SHELL_INPUT_UNFOCUS_WARNING,
+      Command.VOICE_MODE_PTT,
     ],
   },
   {
@@ -634,7 +641,8 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.PASTE_CLIPBOARD]: 'Paste from the clipboard.',
 
   // App Controls
-  [Command.SHOW_ERROR_DETAILS]: 'Toggle detailed error information.',
+  [Command.SHOW_ERROR_DETAILS]:
+    'Toggle the debug console for detailed error information.',
   [Command.SHOW_FULL_TODOS]: 'Toggle the full TODO list.',
   [Command.SHOW_IDE_CONTEXT_DETAIL]: 'Show IDE context details.',
   [Command.TOGGLE_MARKDOWN]: 'Toggle Markdown rendering.',
@@ -654,6 +662,7 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.SUSPEND_APP]: 'Suspend the CLI and move it to the background.',
   [Command.SHOW_SHELL_INPUT_UNFOCUS_WARNING]:
     'Show warning when trying to move focus away from shell input.',
+  [Command.VOICE_MODE_PTT]: 'Hold to speak in Voice Mode.',
 
   // Background Shell Controls
   [Command.BACKGROUND_SHELL_ESCAPE]: 'Dismiss background shell list.',

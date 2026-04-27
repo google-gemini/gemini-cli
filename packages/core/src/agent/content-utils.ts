@@ -102,24 +102,6 @@ export function contentPartsToGeminiParts(content: ContentPart[]): Part[] {
 }
 
 /**
- * Converts a ToolCallResponseInfo.resultDisplay value into ContentPart[].
- * Handles string, object-valued (FileDiff, SubagentProgress, etc.),
- * and undefined resultDisplay consistently.
- */
-export function toolResultDisplayToContentParts(
-  resultDisplay: unknown,
-): ContentPart[] | undefined {
-  if (resultDisplay === undefined || resultDisplay === null) {
-    return undefined;
-  }
-  const text =
-    typeof resultDisplay === 'string'
-      ? resultDisplay
-      : JSON.stringify(resultDisplay);
-  return [{ type: 'text', text }];
-}
-
-/**
  * Builds the data record for a tool_response AgentEvent, preserving
  * all available metadata from the ToolCallResponseInfo.
  */

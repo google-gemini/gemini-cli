@@ -8,8 +8,13 @@ import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { spawn, exec, execFile, execSync } from 'node:child_process';
 import os from 'node:os';
 import fs from 'node:fs';
+import path from 'node:path';
 import { start_sandbox } from './sandbox.js';
-import { FatalSandboxError, type SandboxConfig } from '@google/gemini-cli-core';
+import {
+  FatalSandboxError,
+  homedir,
+  type SandboxConfig,
+} from '@google/gemini-cli-core';
 import { createMockSandboxConfig } from '@google/gemini-cli-test-utils';
 import { EventEmitter } from 'node:events';
 
@@ -133,6 +138,7 @@ describe('sandbox', () => {
   afterEach(() => {
     process.env = originalEnv;
     process.argv = originalArgv;
+    vi.unstubAllEnvs();
   });
 
   describe('start_sandbox', () => {
@@ -169,6 +175,105 @@ describe('sandbox', () => {
         ]),
         expect.objectContaining({ stdio: 'inherit' }),
       );
+    });
+
+    it('should resolve custom seatbelt profile from user home directory', async () => {
+      vi.mocked(os.platform).mockReturnValue('darwin');
+      vi.stubEnv('SEATBELT_PROFILE', 'custom-test');
+      vi.mocked(fs.existsSync).mockImplementation((p) =>
+        String(p).includes(
+          path.join(homedir(), '.gemini', 'sandbox-macos-custom-test.sb'),
+        ),
+      );
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'sandbox-exec',
+        image: 'some-image',
+      });
+
+      interface MockProcess extends EventEmitter {
+        stdout: EventEmitter;
+        stderr: EventEmitter;
+      }
+      const mockSpawnProcess = new EventEmitter() as MockProcess;
+      mockSpawnProcess.stdout = new EventEmitter();
+      mockSpawnProcess.stderr = new EventEmitter();
+      vi.mocked(spawn).mockReturnValue(
+        mockSpawnProcess as unknown as ReturnType<typeof spawn>,
+      );
+
+      const promise = start_sandbox(config, [], undefined, ['arg1']);
+
+      setTimeout(() => {
+        mockSpawnProcess.emit('close', 0);
+      }, 10);
+
+      await expect(promise).resolves.toBe(0);
+      expect(spawn).toHaveBeenCalledWith(
+        'sandbox-exec',
+        expect.any(Array),
+        expect.objectContaining({ stdio: 'inherit' }),
+      );
+      const spawnArgs = vi.mocked(spawn).mock.calls[0]?.[1];
+      expect(spawnArgs).toEqual(
+        expect.arrayContaining(['-f', expect.any(String)]),
+      );
+      const profileArg = spawnArgs?.[spawnArgs.indexOf('-f') + 1];
+      expect(profileArg).toEqual(
+        expect.stringContaining(
+          path.join(homedir(), '.gemini', 'sandbox-macos-custom-test.sb'),
+        ),
+      );
+    });
+
+    it('should fall back to project .gemini directory when user profile is missing', async () => {
+      vi.mocked(os.platform).mockReturnValue('darwin');
+      vi.stubEnv('SEATBELT_PROFILE', 'custom-test');
+      vi.mocked(fs.existsSync).mockImplementation((p) => {
+        const s = String(p);
+        return (
+          s.includes(path.join('.gemini', 'sandbox-macos-custom-test.sb')) &&
+          !s.includes(path.join(homedir(), '.gemini'))
+        );
+      });
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'sandbox-exec',
+        image: 'some-image',
+      });
+
+      interface MockProcess extends EventEmitter {
+        stdout: EventEmitter;
+        stderr: EventEmitter;
+      }
+      const mockSpawnProcess = new EventEmitter() as MockProcess;
+      mockSpawnProcess.stdout = new EventEmitter();
+      mockSpawnProcess.stderr = new EventEmitter();
+      vi.mocked(spawn).mockReturnValue(
+        mockSpawnProcess as unknown as ReturnType<typeof spawn>,
+      );
+
+      const promise = start_sandbox(config, [], undefined, ['arg1']);
+
+      setTimeout(() => {
+        mockSpawnProcess.emit('close', 0);
+      }, 10);
+
+      await expect(promise).resolves.toBe(0);
+      expect(spawn).toHaveBeenCalledWith(
+        'sandbox-exec',
+        expect.any(Array),
+        expect.objectContaining({ stdio: 'inherit' }),
+      );
+      const spawnArgs = vi.mocked(spawn).mock.calls[0]?.[1];
+      expect(spawnArgs).toEqual(
+        expect.arrayContaining(['-f', expect.any(String)]),
+      );
+      const profileArg = spawnArgs?.[spawnArgs.indexOf('-f') + 1];
+      expect(profileArg).toEqual(
+        expect.stringContaining(
+          path.join('.gemini', 'sandbox-macos-custom-test.sb'),
+        ),
+      );
+      expect(profileArg).not.toContain(homedir());
     });
 
     it('should throw FatalSandboxError if seatbelt profile is missing', async () => {

@@ -139,7 +139,7 @@ describe('mcpToolWrapper', () => {
       );
 
       const invocation = tools[1].build({ uid: 'elem-123' });
-      await invocation.execute(new AbortController().signal);
+      await invocation.execute({ abortSignal: new AbortController().signal });
 
       expect(mockBrowserManager.callTool).toHaveBeenCalledWith(
         'click',
@@ -158,7 +158,9 @@ describe('mcpToolWrapper', () => {
       );
 
       const invocation = tools[0].build({ verbose: true });
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
 
       expect(result.llmContent).toBe('Tool result');
       expect(result.error).toBeUndefined();
@@ -177,7 +179,9 @@ describe('mcpToolWrapper', () => {
       );
 
       const invocation = tools[1].build({ uid: 'invalid' });
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
 
       expect(result.error).toBeDefined();
       expect(result.error?.message).toBe('Element not found');
@@ -195,7 +199,9 @@ describe('mcpToolWrapper', () => {
       );
 
       const invocation = tools[0].build({});
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
 
       expect(result.error).toBeDefined();
       expect(result.error?.message).toBe('Connection lost');
@@ -212,7 +218,7 @@ describe('mcpToolWrapper', () => {
 
       const clickTool = tools.find((t) => t.name === 'click')!;
       const invocation = clickTool.build({ uid: 'elem-42' });
-      await invocation.execute(new AbortController().signal);
+      await invocation.execute({ abortSignal: new AbortController().signal });
 
       // callTool: suspend blocker + click + resume blocker
       expect(mockBrowserManager.callTool).toHaveBeenCalledTimes(3);
@@ -257,7 +263,7 @@ describe('mcpToolWrapper', () => {
 
       const snapshotTool = tools.find((t) => t.name === 'take_snapshot')!;
       const invocation = snapshotTool.build({});
-      await invocation.execute(new AbortController().signal);
+      await invocation.execute({ abortSignal: new AbortController().signal });
 
       // callTool should only be called once for take_snapshot — no suspend/resume
       expect(mockBrowserManager.callTool).toHaveBeenCalledTimes(1);
@@ -277,7 +283,7 @@ describe('mcpToolWrapper', () => {
 
       const clickTool = tools.find((t) => t.name === 'click')!;
       const invocation = clickTool.build({ uid: 'elem-42' });
-      await invocation.execute(new AbortController().signal);
+      await invocation.execute({ abortSignal: new AbortController().signal });
 
       // callTool should only be called once for click — no suspend/resume
       expect(mockBrowserManager.callTool).toHaveBeenCalledTimes(1);
@@ -297,7 +303,9 @@ describe('mcpToolWrapper', () => {
 
       const clickTool = tools.find((t) => t.name === 'click')!;
       const invocation = clickTool.build({ uid: 'bad-elem' });
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
 
       // Should return error, not throw
       expect(result.error).toBeDefined();
@@ -328,7 +336,9 @@ describe('mcpToolWrapper', () => {
 
       const uploadTool = tools.find((t) => t.name === 'upload_file')!;
       const invocation = uploadTool.build({ path: 'test.txt' });
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
 
       expect(result.error).toBeDefined();
       expect(result.llmContent).toContain('File uploads are blocked');
@@ -345,7 +355,9 @@ describe('mcpToolWrapper', () => {
 
       const uploadTool = tools.find((t) => t.name === 'upload_file')!;
       const invocation = uploadTool.build({ path: 'test.txt' });
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
 
       expect(result.error).toBeUndefined();
       expect(result.llmContent).toBe('Tool result');

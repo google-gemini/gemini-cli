@@ -49,6 +49,8 @@ describe('evalTest reliability logic', () => {
 
     // Execute the test function directly
     await internalEvalTest({
+      suiteName: 'test',
+      suiteType: 'behavioral',
       name: 'test-api-failure',
       prompt: 'do something',
       assert: async () => {},
@@ -83,6 +85,8 @@ describe('evalTest reliability logic', () => {
     // Expect the test function to throw immediately
     await expect(
       internalEvalTest({
+        suiteName: 'test',
+        suiteType: 'behavioral',
         name: 'test-logic-failure',
         prompt: 'do something',
         assert: async () => {
@@ -108,6 +112,8 @@ describe('evalTest reliability logic', () => {
       .mockResolvedValueOnce('Success');
 
     await internalEvalTest({
+      suiteName: 'test',
+      suiteType: 'behavioral',
       name: 'test-recovery',
       prompt: 'do something',
       assert: async () => {},
@@ -135,6 +141,8 @@ describe('evalTest reliability logic', () => {
     );
 
     await internalEvalTest({
+      suiteName: 'test',
+      suiteType: 'behavioral',
       name: 'test-api-503',
       prompt: 'do something',
       assert: async () => {},
@@ -162,6 +170,8 @@ describe('evalTest reliability logic', () => {
     try {
       await expect(
         internalEvalTest({
+          suiteName: 'test',
+          suiteType: 'behavioral',
           name: 'test-absolute-path',
           prompt: 'do something',
           files: {
@@ -190,6 +200,8 @@ describe('evalTest reliability logic', () => {
     try {
       await expect(
         internalEvalTest({
+          suiteName: 'test',
+          suiteType: 'behavioral',
           name: 'test-traversal',
           prompt: 'do something',
           files: {
