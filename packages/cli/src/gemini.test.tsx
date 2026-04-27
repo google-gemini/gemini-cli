@@ -825,7 +825,6 @@ describe('gemini.tsx main function kitty protocol', () => {
   });
 
   it('should handle session selector error', async () => {
-    const { SessionSelector } = await import('./utils/sessionUtils.js');
     vi.mocked(SessionSelector).mockImplementation(
       () =>
         ({
@@ -1061,7 +1060,6 @@ describe('gemini.tsx main function kitty protocol', () => {
 
 describe('resolveSessionId', () => {
   it('should return a new session ID when neither resume nor sessionId is provided', async () => {
-    const { resolveSessionId } = await import('./gemini.js');
     const { sessionId, resumedSessionData } = await resolveSessionId(
       undefined,
       undefined,
@@ -1071,9 +1069,6 @@ describe('resolveSessionId', () => {
   });
 
   it('should exit with FATAL_INPUT_ERROR when sessionId already exists', async () => {
-    const { resolveSessionId } = await import('./gemini.js');
-    const { SessionSelector } = await import('./utils/sessionUtils.js');
-
     vi.mocked(SessionSelector).mockImplementation(
       () =>
         ({
@@ -1105,9 +1100,6 @@ describe('resolveSessionId', () => {
   });
 
   it('should return provided sessionId when it does not exist', async () => {
-    const { resolveSessionId } = await import('./gemini.js');
-    const { SessionSelector } = await import('./utils/sessionUtils.js');
-
     vi.mocked(SessionSelector).mockImplementation(
       () =>
         ({
