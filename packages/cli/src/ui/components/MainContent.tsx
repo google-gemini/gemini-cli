@@ -9,6 +9,7 @@ import { HistoryItemDisplay } from './HistoryItemDisplay.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { useAppContext } from '../contexts/AppContext.js';
 import { AppHeader } from './AppHeader.js';
+import { useInputState } from '../contexts/InputContext.js';
 
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 import { useConfig } from '../contexts/ConfigContext.js';
@@ -33,6 +34,7 @@ const MemoizedAppHeader = memo(AppHeader);
 export const MainContent = () => {
   const { version } = useAppContext();
   const uiState = useUIState();
+  const inputState = useInputState();
   const isAlternateBufferOrTerminalBuffer = useAlternateBuffer();
   const config = useConfig();
   const useTerminalBuffer = config.getUseTerminalBuffer();
@@ -202,8 +204,17 @@ export const MainContent = () => {
     ],
   );
 
-  const virtualizedData = useMemo(
-    () => [
+  const virtualizedData = useMemo(() => {
+    const data: Array<
+      | { type: 'header' }
+      | {
+          type: 'history';
+          item: (typeof augmentedHistory)[number]['item'];
+          element: React.ReactNode;
+        }
+      | { type: 'pending' }
+      | { type: 'active_prompt' }
+    > = [
       { type: 'header' as const },
       ...augmentedHistory.map((data, index) => ({
         type: 'history' as const,
@@ -211,9 +222,14 @@ export const MainContent = () => {
         element: historyItems[index],
       })),
       { type: 'pending' as const },
-    ],
-    [augmentedHistory, historyItems],
-  );
+    ];
+
+    if (inputState.copyModeEnabled) {
+      data.push({ type: 'active_prompt' as const });
+    }
+
+    return data;
+  }, [augmentedHistory, historyItems, inputState.copyModeEnabled]);
 
   const renderItem = useCallback(
     ({ item }: { item: (typeof virtualizedData)[number] }) => {
@@ -227,11 +243,32 @@ export const MainContent = () => {
         );
       } else if (item.type === 'history') {
         return item.element;
+      } else if (item.type === 'active_prompt') {
+        return (
+          <HistoryItemDisplay
+            key="active-prompt"
+            terminalWidth={mainAreaWidth}
+            item={{
+              id: 'active-prompt',
+              type: inputState.shellModeActive ? 'user_shell' : 'user',
+              text: inputState.buffer.text,
+              timestamp: Date.now(),
+            }}
+            isPending={false}
+          />
+        );
       } else {
         return pendingItems;
       }
     },
-    [showHeaderDetails, version, pendingItems],
+    [
+      showHeaderDetails,
+      version,
+      pendingItems,
+      mainAreaWidth,
+      inputState.shellModeActive,
+      inputState.buffer.text,
+    ],
   );
 
   const estimatedItemHeight = useCallback(() => 100, []);
@@ -240,6 +277,7 @@ export const MainContent = () => {
     (item: (typeof virtualizedData)[number], _index: number) => {
       if (item.type === 'header') return 'header';
       if (item.type === 'history') return item.item.id.toString();
+      if (item.type === 'active_prompt') return 'active-prompt';
       return 'pending';
     },
     [],
