@@ -228,6 +228,11 @@ Before proposing an intervention, accurately identify the blocker:
     the impact of the change in subsequent days, but only propose it if it's of
     sufficient quality and straightforward enough that the user is confident in
     taking it.
+  - **Metrics Output Format**: When modifying scripts in
+    `tools/gemini-cli-bot/metrics/scripts/`, you MUST NEVER change the output
+    format. The scripts must continue to output comma-separated values to stdout
+    (e.g., `console.log('metric_name,123')`). Do NOT change the output to JSON
+    or any other format.
 
   The `pr-description.md` file MUST include:
   1. What the change is.

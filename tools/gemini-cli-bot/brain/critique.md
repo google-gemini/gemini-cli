@@ -33,6 +33,9 @@ changes. You MUST use `git add` to stage these files.**
 5. **Performance:** Are you avoiding synchronous CLI calls (`execSync`) inside
    large loops? Are you using asynchronous execution (`exec` or `spawn` with
    `Promise.all` or concurrency limits) where appropriate?
+6. **Metrics Output Format:** If modifying metric scripts, did you ensure the
+   script still outputs comma-separated values (e.g.,
+   `console.log('metric_name,123')`) and NOT JSON or other formats?
 
 ### Logical & Workflow Integrity
 

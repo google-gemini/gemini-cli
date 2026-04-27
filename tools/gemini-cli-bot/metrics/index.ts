@@ -6,7 +6,7 @@
 
 import { readdirSync, writeFileSync, existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { execSync } from 'node:child_process';
+import { execSync, execFileSync } from 'node:child_process';
 import { getHistoricalAverage } from './history-helper.js';
 
 const SCRIPTS_DIR = join(
