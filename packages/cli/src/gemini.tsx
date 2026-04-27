@@ -208,6 +208,15 @@ export async function resolveSessionId(
   const sessionSelector = new SessionSelector(storage);
 
   if (sessionIdArg) {
+    if (!/^[a-zA-Z0-9-_]+$/.test(sessionIdArg)) {
+      coreEvents.emitFeedback(
+        'error',
+        `Error starting session: Invalid session ID "${sessionIdArg}". Only alphanumeric characters, dashes, and underscores are allowed.`,
+      );
+      await runExitCleanup();
+      process.exit(ExitCodes.FATAL_INPUT_ERROR);
+    }
+
     const sessions = await sessionSelector.listSessions();
     if (sessions.some((s) => s.id === sessionIdArg)) {
       coreEvents.emitFeedback(

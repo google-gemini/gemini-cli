@@ -1114,7 +1114,6 @@ describe('resolveSessionId', () => {
           listSessions: vi.fn().mockResolvedValue([{ id: 'different-id' }]),
         }) as unknown as InstanceType<typeof SessionSelector>,
     );
-
     const { sessionId, resumedSessionData } = await resolveSessionId(
       undefined,
       'new-id',

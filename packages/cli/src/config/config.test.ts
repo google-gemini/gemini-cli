@@ -233,6 +233,9 @@ afterEach(() => {
 });
 
 describe('parseArguments', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
   it('should fail if both --resume and --session-id are provided', async () => {
     process.argv = [
       'node',
@@ -244,7 +247,7 @@ describe('parseArguments', () => {
     const mockConsoleError = vi
       .spyOn(console, 'error')
       .mockImplementation(() => {});
-    const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+    vi.spyOn(process, 'exit').mockImplementation(() => {
       throw new Error('process.exit called');
     });
 
@@ -257,18 +260,16 @@ describe('parseArguments', () => {
         'Cannot use both --resume (-r) and --session-id together',
       ),
     );
-    mockExit.mockRestore();
   });
 
   it('should parse --session-id option correctly', async () => {
     process.argv = ['node', 'script.js', '--session-id', 'test-uuid-1234'];
-    const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+    vi.spyOn(process, 'exit').mockImplementation(() => {
       throw new Error('process.exit called');
     });
 
     const parsedArgs = await parseArguments(createTestMergedSettings());
     expect(parsedArgs.sessionId).toBe('test-uuid-1234');
-    mockExit.mockRestore();
   });
 
   describe('worktree', () => {
@@ -295,7 +296,7 @@ describe('parseArguments', () => {
       const settings = createTestMergedSettings();
       settings.experimental.worktrees = false;
 
-      const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+      vi.spyOn(process, 'exit').mockImplementation(() => {
         throw new Error('process.exit called');
       });
       const mockConsoleError = vi
@@ -310,9 +311,6 @@ describe('parseArguments', () => {
           'The --worktree flag is only available when experimental.worktrees is enabled in your settings.',
         ),
       );
-
-      mockExit.mockRestore();
-      mockConsoleError.mockRestore();
     });
   });
 
@@ -344,7 +342,7 @@ describe('parseArguments', () => {
     async ({ argv }) => {
       process.argv = argv;
 
-      const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+      vi.spyOn(process, 'exit').mockImplementation(() => {
         throw new Error('process.exit called');
       });
 
@@ -361,9 +359,6 @@ describe('parseArguments', () => {
           'Cannot use both --prompt (-p) and --prompt-interactive (-i) together',
         ),
       );
-
-      mockExit.mockRestore();
-      mockConsoleError.mockRestore();
     },
   );
 
@@ -600,7 +595,7 @@ describe('parseArguments', () => {
     async ({ argv }) => {
       process.argv = argv;
 
-      const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+      vi.spyOn(process, 'exit').mockImplementation(() => {
         throw new Error('process.exit called');
       });
 
@@ -617,9 +612,6 @@ describe('parseArguments', () => {
           'Cannot use both --yolo (-y) and --approval-mode together. Use --approval-mode=yolo instead.',
         ),
       );
-
-      mockExit.mockRestore();
-      mockConsoleError.mockRestore();
     },
   );
 
@@ -644,7 +636,7 @@ describe('parseArguments', () => {
   it('should reject invalid --approval-mode values', async () => {
     process.argv = ['node', 'script.js', '--approval-mode', 'invalid'];
 
-    const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+    vi.spyOn(process, 'exit').mockImplementation(() => {
       throw new Error('process.exit called');
     });
 
@@ -663,10 +655,6 @@ describe('parseArguments', () => {
       expect.stringContaining('Invalid values:'),
     );
     expect(mockConsoleError).toHaveBeenCalled();
-
-    mockExit.mockRestore();
-    mockConsoleError.mockRestore();
-    debugErrorSpy.mockRestore();
   });
 
   it('should allow resuming a session without prompt argument in non-interactive mode (expecting stdin)', async () => {
@@ -910,16 +898,14 @@ describe('loadCliConfig', () => {
   });
 
   it('should skip inaccessible workspace folders from GEMINI_CLI_IDE_WORKSPACE_PATH', async () => {
-    const resolveToRealPathSpy = vi
-      .spyOn(ServerConfig, 'resolveToRealPath')
-      .mockImplementation((p) => {
-        if (p.toString().includes('restricted')) {
-          const err = new Error('EACCES: permission denied');
-          (err as NodeJS.ErrnoException).code = 'EACCES';
-          throw err;
-        }
-        return p.toString();
-      });
+    vi.spyOn(ServerConfig, 'resolveToRealPath').mockImplementation((p) => {
+      if (p.toString().includes('restricted')) {
+        const err = new Error('EACCES: permission denied');
+        (err as NodeJS.ErrnoException).code = 'EACCES';
+        throw err;
+      }
+      return p.toString();
+    });
     vi.stubEnv(
       'GEMINI_CLI_IDE_WORKSPACE_PATH',
       ['/project/folderA', '/nonexistent/restricted/folder'].join(
@@ -933,8 +919,6 @@ describe('loadCliConfig', () => {
     const dirs = config.getPendingIncludeDirectories();
     expect(dirs).toContain('/project/folderA');
     expect(dirs).not.toContain('/nonexistent/restricted/folder');
-
-    resolveToRealPathSpy.mockRestore();
   });
 
   it('should use default fileFilter options when unconfigured', async () => {
@@ -3263,7 +3247,7 @@ describe('Output format', () => {
   it('should error on invalid --output-format argument', async () => {
     process.argv = ['node', 'script.js', '--output-format', 'invalid'];
 
-    const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+    vi.spyOn(process, 'exit').mockImplementation(() => {
       throw new Error('process.exit called');
     });
 
@@ -3281,10 +3265,6 @@ describe('Output format', () => {
       expect.stringContaining('Invalid values:'),
     );
     expect(mockConsoleError).toHaveBeenCalled();
-
-    mockExit.mockRestore();
-    mockConsoleError.mockRestore();
-    debugErrorSpy.mockRestore();
   });
 });
 
@@ -3315,13 +3295,11 @@ describe('parseArguments with positional prompt', () => {
       'test prompt',
     ];
 
-    const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+    vi.spyOn(process, 'exit').mockImplementation(() => {
       throw new Error('process.exit called');
     });
 
-    const mockConsoleError = vi
-      .spyOn(console, 'error')
-      .mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
     const debugErrorSpy = vi
       .spyOn(debugLogger, 'error')
       .mockImplementation(() => {});
@@ -3335,10 +3313,6 @@ describe('parseArguments with positional prompt', () => {
         'Cannot use both a positional prompt and the --prompt (-p) flag together',
       ),
     );
-
-    mockExit.mockRestore();
-    mockConsoleError.mockRestore();
-    debugErrorSpy.mockRestore();
   });
 
   it('should correctly parse a positional prompt to query field', async () => {
