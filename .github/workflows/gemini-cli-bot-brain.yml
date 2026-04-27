@@ -36,6 +36,7 @@ jobs:
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: 'Setup Node.js'
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions/setup-node@v4
@@ -153,6 +154,7 @@ jobs:
         with:
           ref: 'main'
           fetch-depth: 0
+          persist-credentials: false
 
       - name: 'Download Brain Data'
         uses: 'actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093' # ratchet:actions/download-artifact@v4
