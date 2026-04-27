@@ -17,6 +17,7 @@ import {
   type PartListUnion,
   type GenerateContentConfig,
   type GenerateContentParameters,
+  type FunctionCall,
 } from '@google/genai';
 import { AgentChatHistory } from './agentChatHistory.js';
 import { toParts } from '../code_assist/converter.js';
@@ -889,7 +890,7 @@ export class GeminiChat {
     let finishReason: FinishReason | undefined;
 
     // The SDK provides fully assembled FunctionCall objects in chunk.functionCalls
-    const finalFunctionCalls: import('@google/genai').FunctionCall[] = [];
+    const finalFunctionCalls: FunctionCall[] = [];
 
     for await (const chunk of streamResponse) {
       const candidateWithReason = chunk?.candidates?.find(

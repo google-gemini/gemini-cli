@@ -161,10 +161,6 @@ export class ContextManager {
   ): Promise<Content[]> {
     this.tracer.logEvent('ContextManager', 'Starting rendering of LLM context');
 
-    // --- DEBUG ---
-    // console.error(`[ContextManager:renderHistory] IN: buffer nodes length: ${this.buffer.nodes.length}`);
-    // -------------
-
     // Apply final GC Backstop pressure barrier synchronously before mapping
     const finalHistory = await render(
       this.buffer.nodes,
@@ -174,17 +170,6 @@ export class ContextManager {
       this.env,
       activeTaskIds,
     );
-
-    // --- DEBUG ---
-    // eslint-disable-next-line no-console
-    console.error(
-      `[ContextManager:renderHistory] OUT: finalHistory length: ${finalHistory.length}`,
-    );
-    if (finalHistory.length < 5 && this.buffer.nodes.length > 5) {
-      // eslint-disable-next-line no-console
-      console.error(`[ContextManager:renderHistory] WARNING: graph collapsed!`);
-    }
-    // -------------
 
     this.tracer.logEvent('ContextManager', 'Finished rendering');
 

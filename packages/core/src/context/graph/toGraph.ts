@@ -111,13 +111,6 @@ export class ContextGraphBuilder {
       finalizeYield(activeEp);
       if (isCompleteEpisode(activeEp)) {
         copy.push(activeEp);
-      } else {
-        // --- DEBUG ---
-        // eslint-disable-next-line no-console
-        console.error(
-          `[ContextGraphBuilder] WARNING: active episode dropped because isCompleteEpisode is false!`,
-        );
-        // -------------
       }
     }
 
