@@ -70,9 +70,13 @@ async function sync() {
 
   // Download previous metrics-before.csv
   try {
-    execSync(`gh run download ${runId} -n metrics-before -D ${tempDir}`, {
-      stdio: 'ignore',
-    });
+    execFileSync(
+      'gh',
+      ['run', 'download', runId, '-n', 'metrics-before', '-D', tempDir],
+      {
+        stdio: 'ignore',
+      },
+    );
     const mbFile = join(tempDir, 'metrics-before.csv');
     if (existsSync(mbFile)) {
       writeFileSync(

@@ -116,8 +116,9 @@ async function run() {
     console.log(`Running metric script: ${script}`);
     try {
       const scriptPath = join(SCRIPTS_DIR, script);
-      const output = execSync(`npx tsx ${JSON.stringify(scriptPath)}`, {
+      const output = execFileSync('npx', ['tsx', scriptPath], {
         encoding: 'utf-8',
+        shell: process.platform === 'win32',
       });
 
       const lines = output.trim().split('\n');
