@@ -149,7 +149,7 @@ export class Logger {
     this.logFilePath = path.join(this.geminiDir, LOG_FILE_NAME);
 
     try {
-      await fs.mkdir(this.geminiDir, { recursive: true });
+      await fs.mkdir(this.geminiDir, { recursive: true, mode: 0o700 });
       let fileExisted = true;
       try {
         await fs.access(this.logFilePath);
@@ -158,7 +158,10 @@ export class Logger {
       }
       this.logs = await this._readLogFile();
       if (!fileExisted && this.logs.length === 0) {
-        await fs.writeFile(this.logFilePath, '[]', 'utf-8');
+        await fs.writeFile(this.logFilePath, '[]', {
+          encoding: 'utf-8',
+          mode: 0o600,
+        });
       }
       const sessionLogs = this.logs.filter(
         (entry) => entry.sessionId === this.sessionId,
@@ -230,7 +233,7 @@ export class Logger {
       await fs.writeFile(
         this.logFilePath,
         JSON.stringify(currentLogsOnDisk, null, 2),
-        'utf-8',
+        { encoding: 'utf-8', mode: 0o600 },
       );
       this.logs = currentLogsOnDisk;
       return entryToAppend; // Return the successfully appended entry
@@ -336,7 +339,10 @@ export class Logger {
     // Always save with the new encoded path.
     const path = this._checkpointPath(tag);
     try {
-      await fs.writeFile(path, JSON.stringify(checkpoint, null, 2), 'utf-8');
+      await fs.writeFile(path, JSON.stringify(checkpoint, null, 2), {
+        encoding: 'utf-8',
+        mode: 0o600,
+      });
     } catch (error) {
       debugLogger.error('Error writing to checkpoint file:', error);
     }

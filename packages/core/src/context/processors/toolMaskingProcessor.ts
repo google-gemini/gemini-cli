@@ -114,14 +114,14 @@ export function createToolMaskingProcessor(
         nodeType: string,
       ): Promise<string> => {
         if (!directoryCreated) {
-          await fs.mkdir(toolOutputsDir, { recursive: true });
+          await fs.mkdir(toolOutputsDir, { recursive: true, mode: 0o700 });
           directoryCreated = true;
         }
 
         const fileName = `${sanitizeFilenamePart(toolName).toLowerCase()}_${sanitizeFilenamePart(callId).toLowerCase()}_${nodeType}_${randomUUID()}.txt`;
         const filePath = path.join(toolOutputsDir, fileName);
 
-        await fs.writeFile(filePath, content);
+        await fs.writeFile(filePath, content, { mode: 0o600 });
 
         const fileSizeMB = (
           Buffer.byteLength(content, 'utf8') /

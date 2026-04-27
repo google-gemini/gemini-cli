@@ -171,7 +171,10 @@ export class ToolOutputMaskingService {
       const safeSessionId = sanitizeFilenamePart(sessionId);
       toolOutputsDir = path.join(toolOutputsDir, `session-${safeSessionId}`);
     }
-    await fsPromises.mkdir(toolOutputsDir, { recursive: true });
+    await fsPromises.mkdir(toolOutputsDir, {
+      recursive: true,
+      mode: 0o700,
+    });
 
     for (const item of prunableParts) {
       const { contentIndex, partIndex, content, tokens } = item;
@@ -189,7 +192,10 @@ export class ToolOutputMaskingService {
         .substring(7)}.txt`;
       const filePath = path.join(toolOutputsDir, fileName);
 
-      await fsPromises.writeFile(filePath, content, 'utf-8');
+      await fsPromises.writeFile(filePath, content, {
+        encoding: 'utf-8',
+        mode: 0o600,
+      });
 
       const originalResponse =
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion

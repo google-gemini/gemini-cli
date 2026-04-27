@@ -397,6 +397,7 @@ export async function tryAcquireLock(
     const fd = await fs.open(
       lockPath,
       fsConstants.O_CREAT | fsConstants.O_EXCL | fsConstants.O_WRONLY,
+      0o600,
     );
     try {
       await fd.writeFile(JSON.stringify(lockInfo));
@@ -508,7 +509,7 @@ export async function writeExtractionState(
   state: ExtractionState,
 ): Promise<void> {
   const tmpPath = `${statePath}.tmp`;
-  await fs.writeFile(tmpPath, JSON.stringify(state, null, 2));
+  await fs.writeFile(tmpPath, JSON.stringify(state, null, 2), { mode: 0o600 });
   await fs.rename(tmpPath, statePath);
 }
 
@@ -913,7 +914,7 @@ export async function startMemoryService(config: Config): Promise<void> {
   const chatsDir = path.join(config.storage.getProjectTempDir(), 'chats');
 
   // Ensure directories exist
-  await fs.mkdir(skillsDir, { recursive: true });
+  await fs.mkdir(skillsDir, { recursive: true, mode: 0o700 });
 
   debugLogger.log(`[MemoryService] Starting. Skills dir: ${skillsDir}`);
 

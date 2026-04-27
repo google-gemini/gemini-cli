@@ -95,11 +95,10 @@ export class ContextCompressionService {
       for (const [k, v] of this.state.entries()) {
         obj[k] = v;
       }
-      await fs.writeFile(
-        this.stateFilePath,
-        JSON.stringify(obj, null, 2),
-        'utf-8',
-      );
+      await fs.writeFile(this.stateFilePath, JSON.stringify(obj, null, 2), {
+        encoding: 'utf-8',
+        mode: 0o600,
+      });
     } catch (e) {
       debugLogger.warn(`Failed to save compression state: ${e}`);
     }

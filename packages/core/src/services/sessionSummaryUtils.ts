@@ -432,6 +432,7 @@ async function generateAndSaveSummary(
     await fs.appendFile(
       sessionPath,
       `${JSON.stringify({ $set: metadataUpdate })}\n`,
+      { mode: 0o600 },
     );
   } else {
     const lastUpdated = freshConversation.lastUpdated;
@@ -446,6 +447,7 @@ async function generateAndSaveSummary(
         null,
         2,
       ),
+      { mode: 0o600 },
     );
   }
   debugLogger.debug(
