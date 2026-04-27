@@ -2388,6 +2388,17 @@ const SETTINGS_SCHEMA = {
           'Disable the built-in save_memory tool and let the main agent persist project context by editing markdown files directly with edit/write_file. Route facts across four tiers: team-shared conventions go to project GEMINI.md files, project-specific personal notes go to the per-project private memory folder (MEMORY.md as index + sibling .md files for detail), and cross-project personal preferences go to the global ~/.gemini/GEMINI.md (the only file under ~/.gemini/ that the agent can edit — settings, credentials, etc. remain off-limits). Set to false to fall back to the legacy save_memory tool.',
         showInDialog: true,
       },
+      stressTestProfile: {
+        type: 'boolean',
+        label:
+          'Use the stress test profile to aggressively trigger context management.',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Significantly lowers token limits to force early garbage collection and distillation for testing purposes.',
+        showInDialog: false,
+      },
       autoMemory: {
         type: 'boolean',
         label: 'Auto Memory',

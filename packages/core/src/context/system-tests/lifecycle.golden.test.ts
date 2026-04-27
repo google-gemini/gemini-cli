@@ -5,6 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
+import fs from 'node:fs';
 import { SimulationHarness } from './simulationHarness.js';
 import { createMockLlmClient } from '../testing/contextTestUtils.js';
 import type { ContextProfile } from '../config/profiles.js';
@@ -28,6 +29,11 @@ expect.addSnapshotSerializer({
 });
 
 describe('System Lifecycle Golden Tests', () => {
+  afterAll(async () => {
+    fs.rmSync('/tmp/sim', { recursive: true, force: true });
+    fs.rmSync('mock', { recursive: true, force: true });
+  });
+
   beforeAll(() => {
     vi.spyOn(Math, 'random').mockReturnValue(0.5);
   });

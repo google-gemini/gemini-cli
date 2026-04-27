@@ -22,6 +22,7 @@ describe('ContextTracer (Real FS & Mock ID Gen)', () => {
   let tmpDir: string;
 
   beforeEach(async () => {
+    vi.stubEnv('GEMINI_CONTEXT_TRACE_DIR', '');
     tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'gemini-tracer-test-'));
 
     vi.useFakeTimers();
@@ -29,6 +30,7 @@ describe('ContextTracer (Real FS & Mock ID Gen)', () => {
   });
 
   afterEach(async () => {
+    vi.unstubAllEnvs();
     vi.useRealTimers();
     await fs.rm(tmpDir, { recursive: true, force: true });
   });
@@ -45,7 +47,9 @@ describe('ContextTracer (Real FS & Mock ID Gen)', () => {
     // Verify Initialization
     const traceLogPath = path.join(
       tmpDir,
-      '.gemini/context_trace/test-session/trace.log',
+      'context_trace',
+      'test-session',
+      'trace.log',
     );
     const initTraceLog = readFileSync(traceLogPath, 'utf-8');
     expect(initTraceLog).toContain('[SYSTEM] Context Tracer Initialized');
@@ -65,7 +69,10 @@ describe('ContextTracer (Real FS & Mock ID Gen)', () => {
 
     const expectedAssetPath = path.join(
       tmpDir,
-      '.gemini/context_trace/test-session/assets/1767268800020-mock-uuid-1-largeKey.json',
+      'context_trace',
+      'test-session',
+      'assets',
+      '1767268800020-mock-uuid-1-largeKey.json',
     );
     expect(existsSync(expectedAssetPath)).toBe(true);
 

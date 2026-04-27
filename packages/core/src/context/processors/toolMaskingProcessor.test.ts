@@ -65,4 +65,34 @@ describe('ToolMaskingProcessor', () => {
     // Returned the exact same object reference
     expect(result[0]).toBe(toolStep);
   });
+  it('should strictly preserve the original intent args when only the observation is masked', async () => {
+    const env = createMockEnvironment();
+
+    const processor = createToolMaskingProcessor('ToolMaskingProcessor', env, {
+      stringLengthThresholdTokens: 10,
+    });
+
+    const originalIntent = { command: 'ls -R', dir: '/tmp' };
+    const longString = 'A'.repeat(500);
+
+    const toolStep = createDummyToolNode('ep1', 50, 500, {
+      intent: originalIntent,
+      observation: {
+        result: longString,
+      },
+    });
+
+    const result = await processor.process(createMockProcessArgs([toolStep]));
+
+    expect(result.length).toBe(1);
+    const masked = result[0] as ToolExecution;
+
+    expect(masked.id).not.toBe(toolStep.id);
+
+    const obs = masked.observation as { result: string };
+    expect(obs.result).toContain('<tool_output_masked>');
+
+    // The intent MUST be perfectly preserved and not fall back to {} or undefined incorrectly
+    expect(masked.intent).toEqual(originalIntent);
+  });
 });

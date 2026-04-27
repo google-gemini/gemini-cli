@@ -183,6 +183,7 @@ describe('GeminiChat', () => {
       getRetryFetchErrors: vi.fn().mockReturnValue(false),
       getMaxAttempts: vi.fn().mockReturnValue(10),
       getUserTier: vi.fn().mockReturnValue(undefined),
+      isContextManagementEnabled: vi.fn().mockReturnValue(false),
       modelConfigService: {
         getResolvedConfig: vi.fn().mockImplementation((modelConfigKey) => {
           const model = modelConfigKey.model ?? mockConfig.getModel();

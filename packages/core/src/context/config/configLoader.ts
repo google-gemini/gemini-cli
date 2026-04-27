@@ -4,11 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Config } from '../../config/config.js';
 import * as fsSync from 'node:fs';
 import * as fs from 'node:fs/promises';
 import type { ContextManagementConfig } from './types.js';
-import { defaultContextProfile, type ContextProfile } from './profiles.js';
+import {
+  generalistProfile,
+  stressTestProfile,
+  type ContextProfile,
+} from './profiles.js';
 import { SchemaValidator } from '../../utils/schemaValidator.js';
 import { getContextManagementConfigSchema } from './schema.js';
 import type { ContextProcessorRegistry } from './registry.js';
@@ -54,9 +57,9 @@ async function loadConfigFromFile(
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const validConfig = parsed as ContextManagementConfig;
   return {
-    ...defaultContextProfile,
+    ...generalistProfile,
     config: {
-      ...defaultContextProfile.config,
+      ...generalistProfile.config,
       ...(validConfig.budget ? { budget: validConfig.budget } : {}),
       ...(validConfig.processorOptions
         ? { processorOptions: validConfig.processorOptions }
@@ -70,21 +73,27 @@ async function loadConfigFromFile(
  * If a config file is present but invalid, this will THROW to prevent silent misconfiguration.
  */
 export async function loadContextManagementConfig(
-  config: Config,
+  sidecarPath: string | undefined,
   registry: ContextProcessorRegistry,
 ): Promise<ContextProfile> {
-  const sidecarPath = config.getExperimentalContextManagementConfig();
+  if (sidecarPath === 'stressTestProfile') {
+    return stressTestProfile;
+  }
+
+  if (sidecarPath === 'generalistProfile') {
+    return generalistProfile;
+  }
 
   if (sidecarPath && fsSync.existsSync(sidecarPath)) {
     const size = fsSync.statSync(sidecarPath).size;
     // If the file exists but is completely empty (0 bytes), it's safe to fallback.
     if (size === 0) {
-      return defaultContextProfile;
+      return generalistProfile;
     }
 
     // If the file has content, enforce strict validation and throw on failure.
     return loadConfigFromFile(sidecarPath, registry);
   }
 
-  return defaultContextProfile;
+  return generalistProfile;
 }

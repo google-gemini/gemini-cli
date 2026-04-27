@@ -121,6 +121,7 @@ describe('GeminiChat Network Retries', () => {
           generateContentConfig: { temperature: 0 },
         })),
       },
+      isContextManagementEnabled: vi.fn().mockReturnValue(false),
       getEnableHooks: vi.fn().mockReturnValue(false),
       getModelAvailabilityService: vi
         .fn()
