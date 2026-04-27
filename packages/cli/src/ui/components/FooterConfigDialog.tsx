@@ -39,11 +39,13 @@ interface FooterConfigItem {
 interface FooterConfigState {
   orderedIds: string[];
   selectedIds: Set<string>;
+  showLabels: boolean;
 }
 
 type FooterConfigAction =
   | { type: 'MOVE_ITEM'; id: string; direction: number }
   | { type: 'TOGGLE_ITEM'; id: string }
+  | { type: 'TOGGLE_LABELS' }
   | { type: 'RESET'; payload: FooterConfigState };
 
 function footerConfigReducer(
@@ -77,6 +79,9 @@ function footerConfigReducer(
       }
       return { ...state, selectedIds: nextSelected };
     }
+    case 'TOGGLE_LABELS': {
+      return { ...state, showLabels: !state.showLabels };
+    }
     case 'RESET':
       return action.payload;
     default:
@@ -90,11 +95,17 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
   const keyMatchers = useKeyMatchers();
   const { settings, setSetting } = useSettingsStore();
   const { constrainHeight, terminalHeight, staticExtraHeight } = useUIState();
-  const [state, dispatch] = useReducer(footerConfigReducer, undefined, () =>
-    resolveFooterState(settings.merged),
-  );
+  const initialState = useMemo(() => {
+    const footerState = resolveFooterState(settings.merged);
+    return {
+      ...footerState,
+      showLabels: settings.merged.ui.footer.showLabels !== false,
+    };
+  }, [settings.merged]);
 
-  const { orderedIds, selectedIds } = state;
+  const [state, dispatch] = useReducer(footerConfigReducer, initialState);
+
+  const { orderedIds, selectedIds, showLabels } = state;
   const [focusKey, setFocusKey] = useState<string | undefined>(orderedIds[0]);
 
   const listItems = useMemo((): Array<SelectionListItem<FooterConfigItem>> => {
@@ -149,8 +160,22 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
     if (JSON.stringify(finalItems) !== JSON.stringify(effectiveCurrent)) {
       setSetting(SettingScope.User, 'ui.footer.items', finalItems);
     }
+
+    // Write showLabels if changed
+    const currentShowLabels = settings.merged.ui.footer.showLabels !== false;
+    if (state.showLabels !== currentShowLabels) {
+      setSetting(SettingScope.User, 'ui.footer.showLabels', state.showLabels);
+    }
+
     onClose?.();
-  }, [orderedIds, selectedIds, setSetting, settings.merged, onClose]);
+  }, [
+    orderedIds,
+    selectedIds,
+    state.showLabels,
+    setSetting,
+    settings.merged,
+    onClose,
+  ]);
 
   const handleResetToDefaults = useCallback(() => {
     const legacySettings = {
@@ -164,14 +189,19 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
       },
     };
     const defaultState = resolveFooterState(legacySettings);
-    dispatch({ type: 'RESET', payload: defaultState });
+    dispatch({
+      type: 'RESET',
+      payload: {
+        ...defaultState,
+        showLabels: settings.merged.ui.footer.showLabels !== false,
+      },
+    });
     setFocusKey(defaultState.orderedIds[0]);
   }, [settings.merged]);
 
   const handleToggleLabels = useCallback(() => {
-    const current = settings.merged.ui.footer.showLabels !== false;
-    setSetting(SettingScope.User, 'ui.footer.showLabels', !current);
-  }, [setSetting, settings.merged.ui.footer.showLabels]);
+    dispatch({ type: 'TOGGLE_LABELS' });
+  }, []);
 
   const handleSelect = useCallback(
     (item: FooterConfigItem) => {
@@ -215,8 +245,6 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
     },
     { isActive: true, priority: true },
   );
-
-  const showLabels = settings.merged.ui.footer.showLabels !== false;
 
   // Preview logic
   const previewContent = useMemo(() => {
