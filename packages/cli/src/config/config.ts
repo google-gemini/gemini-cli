@@ -414,7 +414,22 @@ export async function parseArguments(
         })
         .option('session-id', {
           type: 'string',
+          nargs: 1,
           description: 'Start a new session with a manually provided UUID.',
+          coerce: (value: string): string => {
+            const trimmed = value.trim();
+            if (!trimmed) {
+              throw new Error('The --session-id option cannot be empty.');
+            }
+            if (/[/\\..]/.test(trimmed)) {
+              throw new Error(
+                'Invalid session ID "' +
+                  trimmed +
+                  '": Path traversal characters (/ \\ ..) are not allowed.',
+              );
+            }
+            return trimmed;
+          },
         })
         .option('list-sessions', {
           type: 'boolean',
