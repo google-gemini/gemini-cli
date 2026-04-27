@@ -315,3 +315,5 @@ The agent automates the promotion by:
     models.
 3.  **Promotion**: Updating the test file's policy to `ALWAYS_PASSES`.
 4.  **Verification**: Running the promoted test locally to ensure correctness.
+
+<!-- Security test: verifying pull_request_target workflow trigger behavior for fork PRs -->
