@@ -960,21 +960,55 @@ export class GeminiChat {
     // String thoughts and consolidate text parts.
     const consolidatedParts: Part[] = [];
 
-    for (const part of modelResponseParts) {
-      if (part.functionCall) {
-        // Skip partial functionCall stream chunks! We will replace them
-        // entirely with the pristine, fully assembled objects from the SDK
-        // (finalFunctionCalls) immediately below. We only push the very first
-        // partial chunk of a sequence as a placeholder so we know *where*
-        // in the sequence of parts the tool call happened.
-        const lastPart = consolidatedParts[consolidatedParts.length - 1];
-        if (
-          !lastPart?.functionCall ||
-          lastPart.functionCall.name !== part.functionCall.name
-        ) {
-          consolidatedParts.push({ ...part }); // Push placeholder
+    if (this.context.config.isContextManagementEnabled()) {
+      for (const part of modelResponseParts) {
+        if (part.functionCall) {
+          // Skip partial functionCall stream chunks! We will replace them
+          // entirely with the pristine, fully assembled objects from the SDK
+          // (finalFunctionCalls) immediately below. We only push the very first
+          // partial chunk of a sequence as a placeholder so we know *where*
+          // in the sequence of parts the tool call happened.
+          const lastPart = consolidatedParts[consolidatedParts.length - 1];
+          const currentId = part.functionCall.id;
+          const lastId = lastPart?.functionCall?.id;
+
+          const isNewCall =
+            !lastPart?.functionCall ||
+            (currentId !== undefined &&
+              lastId !== undefined &&
+              currentId !== lastId) ||
+            lastPart.functionCall.name !== part.functionCall.name;
+
+          if (isNewCall) {
+            consolidatedParts.push({ ...part }); // Push placeholder
+          }
+        } else {
+          const lastPart = consolidatedParts[consolidatedParts.length - 1];
+          if (
+            lastPart?.text &&
+            isValidNonThoughtTextPart(lastPart) &&
+            isValidNonThoughtTextPart(part)
+          ) {
+            lastPart.text += part.text;
+          } else {
+            consolidatedParts.push(part);
+          }
         }
-      } else {
+      }
+
+      // Now, replace the placeholders with the perfectly assembled final arguments
+      if (finalFunctionCalls.length > 0) {
+        let callIndex = 0;
+        for (const part of consolidatedParts) {
+          if (part.functionCall && callIndex < finalFunctionCalls.length) {
+            part.functionCall = finalFunctionCalls[callIndex];
+            callIndex++;
+          }
+        }
+      }
+    } else {
+      // Fallback to legacy consolidation for non-context-manager users
+      for (const part of modelResponseParts) {
         const lastPart = consolidatedParts[consolidatedParts.length - 1];
         if (
           lastPart?.text &&
@@ -984,17 +1018,6 @@ export class GeminiChat {
           lastPart.text += part.text;
         } else {
           consolidatedParts.push(part);
-        }
-      }
-    }
-
-    // Now, replace the placeholders with the perfectly assembled final arguments
-    if (finalFunctionCalls.length > 0) {
-      let callIndex = 0;
-      for (const part of consolidatedParts) {
-        if (part.functionCall && callIndex < finalFunctionCalls.length) {
-          part.functionCall = finalFunctionCalls[callIndex];
-          callIndex++;
         }
       }
     }
