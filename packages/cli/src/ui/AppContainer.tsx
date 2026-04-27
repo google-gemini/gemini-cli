@@ -2175,6 +2175,24 @@ Logging in with Google... Restarting Gemini CLI to continue.
     };
   }, [historyManager]);
 
+  // Ensure terminal protocols are enabled when the CLI is idle.
+  // This helps recover if a tool or Gemini output accidentally reset them.
+  useEffect(() => {
+    if (streamingState === StreamingState.Idle) {
+      // Small timeout to ensure Ink has finished its final frame render
+      // for the turn completion before we try to re-enable protocols.
+      const timeoutId = setTimeout(() => {
+        terminalCapabilityManager.enableSupportedModes();
+        setRawMode(true);
+        process.stdin.setEncoding('utf8');
+        // Re-enable focus reporting because it's lost on RIS/terminal reset.
+        stdout.write('\x1b[?1004h');
+      }, 50);
+      return () => clearTimeout(timeoutId);
+    }
+    return undefined;
+  }, [streamingState, setRawMode, stdout]);
+
   const nightly = props.version.includes('nightly');
 
   const dialogsVisible =
