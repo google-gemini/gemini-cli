@@ -210,7 +210,7 @@ export const MainContent = () => {
       | {
           type: 'history';
           item: (typeof augmentedHistory)[number]['item'];
-          element: React.ReactNode;
+          element: React.ReactElement;
         }
       | { type: 'pending' }
       | { type: 'active_prompt' }
@@ -249,10 +249,9 @@ export const MainContent = () => {
             key="active-prompt"
             terminalWidth={mainAreaWidth}
             item={{
-              id: 'active-prompt',
+              id: 999999,
               type: inputState.shellModeActive ? 'user_shell' : 'user',
               text: inputState.buffer.text,
-              timestamp: Date.now(),
             }}
             isPending={false}
           />
