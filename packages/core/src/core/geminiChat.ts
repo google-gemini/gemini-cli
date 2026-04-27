@@ -250,6 +250,7 @@ export class GeminiChat {
   private sendPromise: Promise<void> = Promise.resolve();
   private readonly chatRecordingService: ChatRecordingService;
   private lastPromptTokenCount: number;
+  private callCounter = 0;
   agentHistory: AgentChatHistory;
 
   constructor(
@@ -1001,7 +1002,15 @@ export class GeminiChat {
         let callIndex = 0;
         for (const part of consolidatedParts) {
           if (part.functionCall && callIndex < finalFunctionCalls.length) {
-            part.functionCall = finalFunctionCalls[callIndex];
+            const assembledCall = finalFunctionCalls[callIndex];
+            // If the SDK didn't provide an ID, we inject a synthetic one
+            // so the history ledger is always explicit and linkable.
+            // We use a counter-based approach to ensure it matches what Turn.ts will generate.
+            if (!assembledCall.id) {
+              const name = assembledCall.name || 'undefined_tool_name';
+              assembledCall.id = `${name}_${Date.now()}_${this.callCounter++}`;
+            }
+            part.functionCall = assembledCall;
             callIndex++;
           }
         }

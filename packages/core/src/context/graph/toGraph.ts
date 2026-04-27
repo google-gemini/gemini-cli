@@ -43,7 +43,6 @@ export class ContextGraphBuilder {
   private episodes: Episode[] = [];
   private currentEpisode: Partial<Episode> | null = null;
   private pendingCallParts: Map<string, Part> = new Map();
-  private pendingCallPartsWithoutId: Part[] = [];
 
   constructor(
     private readonly tokenCalculator: ContextTokenCalculator,
@@ -54,7 +53,6 @@ export class ContextGraphBuilder {
     this.episodes = [];
     this.currentEpisode = null;
     this.pendingCallParts.clear();
-    this.pendingCallPartsWithoutId = [];
   }
 
   processHistory(history: readonly Content[]) {
@@ -79,7 +77,6 @@ export class ContextGraphBuilder {
             msg,
             this.currentEpisode,
             this.pendingCallParts,
-            this.pendingCallPartsWithoutId,
             this.tokenCalculator,
             this.nodeIdentityMap,
           );
@@ -94,7 +91,6 @@ export class ContextGraphBuilder {
           msg,
           this.currentEpisode,
           this.pendingCallParts,
-          this.pendingCallPartsWithoutId,
           this.nodeIdentityMap,
         );
       }
@@ -130,7 +126,6 @@ function parseToolResponses(
   msg: Content,
   currentEpisode: Partial<Episode> | null,
   pendingCallParts: Map<string, Part>,
-  pendingCallPartsWithoutId: Part[],
   tokenCalculator: ContextTokenCalculator,
   nodeIdentityMap: WeakMap<object, string>,
 ): Partial<Episode> {
@@ -146,18 +141,13 @@ function parseToolResponses(
   for (const part of parts) {
     if (part.functionResponse) {
       const callId = part.functionResponse.id || '';
-      let matchingCall = pendingCallParts.get(callId);
+      const matchingCall = pendingCallParts.get(callId);
 
-      if (!matchingCall && pendingCallPartsWithoutId.length > 0) {
-        const idx = pendingCallPartsWithoutId.findIndex(
-          (p) => p.functionCall?.name === part.functionResponse!.name,
+      if (!matchingCall) {
+        // eslint-disable-next-line no-console
+        console.error(
+          `[ContextGraphBuilder] CRITICAL: No matching functionCall found for response with id='${callId}' and name='${part.functionResponse.name}'. This will lead to empty intent in the graph.`,
         );
-        if (idx !== -1) {
-          matchingCall = pendingCallPartsWithoutId[idx];
-          pendingCallPartsWithoutId.splice(idx, 1);
-        } else {
-          matchingCall = pendingCallPartsWithoutId.shift();
-        }
       }
 
       const intentTokens = matchingCall
@@ -235,7 +225,6 @@ function parseModelParts(
   msg: Content,
   currentEpisode: Partial<Episode> | null,
   pendingCallParts: Map<string, Part>,
-  pendingCallPartsWithoutId: Part[],
   nodeIdentityMap: WeakMap<object, string>,
 ): Partial<Episode> {
   if (!currentEpisode) {
@@ -252,20 +241,6 @@ function parseModelParts(
       const callId = part.functionCall.id || '';
       if (callId) {
         pendingCallParts.set(callId, part);
-      } else {
-        const lastIdx = pendingCallPartsWithoutId.length - 1;
-        const lastPart = pendingCallPartsWithoutId[lastIdx];
-
-        if (
-          lastPart &&
-          lastPart.functionCall &&
-          lastPart.functionCall.name === part.functionCall.name
-        ) {
-          // Replace the previous chunk with the more complete one
-          pendingCallPartsWithoutId[lastIdx] = part;
-        } else {
-          pendingCallPartsWithoutId.push(part);
-        }
       }
     } else if (part.text) {
       const thought: AgentThought = {
