@@ -6,7 +6,7 @@
 
 import { readdirSync, writeFileSync, existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { execSync, execFileSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { getHistoricalAverage } from './history-helper.js';
 
 const SCRIPTS_DIR = join(
@@ -101,7 +101,7 @@ async function run() {
   // Sync history first
   console.log('Syncing history...');
   try {
-    execSync(`npx tsx ${JSON.stringify(SYNC_SCRIPT)}`, { stdio: 'inherit' });
+    execFileSync('npx', ['tsx', SYNC_SCRIPT], { stdio: 'inherit' });
   } catch (error) {
     console.error('History sync failed, continuing without history:', error);
   }
@@ -133,7 +133,7 @@ async function run() {
   writeFileSync(OUTPUT_FILE, results.join('\n'));
   console.log(`Saved metrics to ${OUTPUT_FILE}`);
 
-  // Update timeseries with rolling window (keep last 100 lines)
+  // Update timeseries with rolling window (keep last 5000 lines)
   const timestamp = new Date().toISOString();
   let timeseriesLines: string[] = [];
   if (existsSync(TIMESERIES_FILE)) {

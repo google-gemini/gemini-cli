@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import {
   writeFileSync,
   readFileSync,
@@ -17,9 +17,9 @@ import { join } from 'node:path';
 const HISTORY_DIR = join(process.cwd(), 'tools', 'gemini-cli-bot', 'history');
 const WORKFLOW = 'gemini-cli-bot-pulse.yml';
 
-function runCommand(command: string): string {
+function runCommand(cmd: string, args: string[]): string {
   try {
-    return execSync(command, {
+    return execFileSync(cmd, args, {
       encoding: 'utf-8',
       stdio: ['ignore', 'pipe', 'ignore'],
     }).trim();
@@ -34,9 +34,20 @@ async function sync() {
   }
 
   console.log('Searching for previous successful Pulse run...');
-  const runId = runCommand(
-    `gh run list --workflow ${WORKFLOW} --status success --limit 1 --json databaseId --jq '.[0].databaseId'`,
-  );
+  const runId = runCommand('gh', [
+    'run',
+    'list',
+    '--workflow',
+    WORKFLOW,
+    '--status',
+    'success',
+    '--limit',
+    '1',
+    '--json',
+    'databaseId',
+    '--jq',
+    '.[0].databaseId',
+  ]);
 
   if (!runId) {
     console.log('No previous successful run found.');
@@ -53,9 +64,13 @@ async function sync() {
 
   // Download metrics-timeseries if it exists
   try {
-    execSync(`gh run download ${runId} -n metrics-timeseries -D ${tempDir}`, {
-      stdio: 'ignore',
-    });
+    execFileSync(
+      'gh',
+      ['run', 'download', runId, '-n', 'metrics-timeseries', '-D', tempDir],
+      {
+        stdio: 'ignore',
+      },
+    );
     const tsFile = join(tempDir, 'metrics-timeseries.csv');
     if (existsSync(tsFile)) {
       writeFileSync(
