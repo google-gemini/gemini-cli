@@ -806,7 +806,7 @@ describe('loadCliConfig', () => {
 
   describe('Model resolution', () => {
     it('should handle multiple --model flags by taking the last one', async () => {
-      const argv: CliArgs = {
+      const argv = {
         query: undefined,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         model: ['gemini-1.5-pro', 'gemini-2.0-flash'] as any,
@@ -839,15 +839,20 @@ describe('loadCliConfig', () => {
       };
 
       const settings = createTestMergedSettings();
-      const config = await loadCliConfig(settings, 'test-session', argv, {
-        cwd: process.cwd(),
-      });
+      const config = await loadCliConfig(
+        settings,
+        'test-session',
+        argv as unknown as CliArgs,
+        {
+          cwd: process.cwd(),
+        },
+      );
 
       expect(config.getModel()).toBe('gemini-2.0-flash');
     });
 
     it('should handle non-string model flags by coercing to string', async () => {
-      const argv: CliArgs = {
+      const argv = {
         query: undefined,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         model: true as any,
@@ -880,9 +885,14 @@ describe('loadCliConfig', () => {
       };
 
       const settings = createTestMergedSettings();
-      const config = await loadCliConfig(settings, 'test-session', argv, {
-        cwd: process.cwd(),
-      });
+      const config = await loadCliConfig(
+        settings,
+        'test-session',
+        argv as unknown as CliArgs,
+        {
+          cwd: process.cwd(),
+        },
+      );
 
       expect(config.getModel()).toBe('true');
     });
