@@ -6,7 +6,7 @@
  * @license
  */
 
-import { GITHUB_OWNER, GITHUB_REPO, MetricOutput } from '../types.js';
+import { GITHUB_OWNER, GITHUB_REPO, type MetricOutput } from '../types.js';
 import { execSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
