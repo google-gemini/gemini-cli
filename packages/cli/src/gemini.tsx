@@ -411,10 +411,6 @@ export async function main() {
     projectHooks: settings.workspace.settings.hooks,
   });
 
-  if (!partialConfig.getAcpMode()) {
-    registerCleanup(consolePatcher.cleanup);
-  }
-
   adminControlsListner.setConfig(partialConfig);
 
   // Refresh auth to fetch remote admin settings from CCPA and before entering
@@ -571,6 +567,12 @@ export async function main() {
     registerCleanup(async () => {
       await config.getHookSystem()?.fireSessionEndEvent(SessionEndReason.Exit);
     });
+
+    // Register ConsolePatcher cleanup last to ensure logs from shutdown hooks
+    // are correctly redirected to stderr (especially for non-interactive JSON output).
+    if (!config.getAcpMode()) {
+      registerCleanup(consolePatcher.cleanup);
+    }
 
     // Launch cleanup expired sessions as a background task
     cleanupExpiredSessions(config, settings.merged).catch((e) => {
