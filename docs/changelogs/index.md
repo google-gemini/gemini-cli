@@ -18,6 +18,45 @@ on GitHub.
 | [Preview](preview.md) | Experimental features ready for early feedback. |
 | [Stable](latest.md)   | Stable, recommended for general use.            |
 
+## Announcements: v0.39.0 - 2026-04-23
+
+- **Skill Management:** Added a new `/memory` inbox command for reviewing and
+  patching skills extracted during sessions
+  ([#24544](https://github.com/google-gemini/gemini-cli/pull/24544) by
+  @SandyTao520, [#25148](https://github.com/google-gemini/gemini-cli/pull/25148)
+  by @SandyTao520).
+- **Improved Transparency:** Plan Mode now requires confirmation for skill
+  activation and allows plan inspection
+  ([#24946](https://github.com/google-gemini/gemini-cli/pull/24946),
+  [#25058](https://github.com/google-gemini/gemini-cli/pull/25058) by
+  @ruomengz).
+- **Architecture & Reliability:** Introduced a decoupled `ContextManager`
+  architecture and resolved several critical memory leaks and PTY exhaustion
+  issues ([#24752](https://github.com/google-gemini/gemini-cli/pull/24752) by
+  @joshualitt, [#25079](https://github.com/google-gemini/gemini-cli/pull/25079)
+  by @spencer426).
+
+## Announcements: v0.38.0 - 2026-04-14
+
+- **Chapters Narrative Flow:** Group agent interactions into "Chapters" based on
+  intent and tool usage for better session structure
+  ([#23150](https://github.com/google-gemini/gemini-cli/pull/23150) by
+  @Abhijit-2592,
+  [#24079](https://github.com/google-gemini/gemini-cli/pull/24079) by
+  @gundermanc).
+- **Context Compression Service:** Advanced context management to efficiently
+  distill conversation history
+  ([#24483](https://github.com/google-gemini/gemini-cli/pull/24483) by
+  @joshualitt).
+- **UI Flicker & UX Enhancements:** Solved rendering flicker with "Terminal
+  Buffer" mode and introduced selective topic expansion
+  ([#24512](https://github.com/google-gemini/gemini-cli/pull/24512) by
+  @jacob314, [#24793](https://github.com/google-gemini/gemini-cli/pull/24793) by
+  @Abhijit-2592).
+- **Persistent Policy Approvals:** Implemented context-aware persistent
+  approvals for tool execution
+  ([#23257](https://github.com/google-gemini/gemini-cli/pull/23257) by @jerop).
+
 ## Announcements: v0.37.0 - 2026-04-08
 
 - **Dynamic Sandbox Expansion:** Implemented dynamic sandbox expansion and

@@ -13,7 +13,8 @@ import {
   useReducer,
   useContext,
 } from 'react';
-import { Box, Text } from 'ink';
+import { Box, Text, type DOMElement } from 'ink';
+import { useMouseClick } from '../hooks/useMouseClick.js';
 import { theme } from '../semantic-colors.js';
 import { checkExhaustive, type Question } from '@google/gemini-cli-core';
 import { BaseSelectionList } from './shared/BaseSelectionList.js';
@@ -84,6 +85,24 @@ function autoBoldIfPlain(text: string): string {
   }
   return text;
 }
+
+const ClickableCheckbox: React.FC<{
+  isChecked: boolean;
+  onClick: () => void;
+}> = ({ isChecked, onClick }) => {
+  const ref = useRef<DOMElement>(null);
+  useMouseClick(ref, () => {
+    onClick();
+  });
+
+  return (
+    <Box ref={ref}>
+      <Text color={isChecked ? theme.status.success : theme.text.secondary}>
+        [{isChecked ? 'x' : ' '}]
+      </Text>
+    </Box>
+  );
+};
 
 interface AskUserDialogState {
   answers: { [key: string]: string };
@@ -919,13 +938,14 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
             return (
               <Box flexDirection="row">
                 {showCheck && (
-                  <Text
-                    color={
-                      isChecked ? theme.status.success : theme.text.secondary
-                    }
-                  >
-                    [{isChecked ? 'x' : ' '}]
-                  </Text>
+                  <ClickableCheckbox
+                    isChecked={isChecked}
+                    onClick={() => {
+                      if (!context.isSelected) {
+                        handleSelect(optionItem);
+                      }
+                    }}
+                  />
                 )}
                 <Text color={theme.text.primary}> </Text>
                 <TextInput
@@ -966,13 +986,14 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
             <Box flexDirection="column">
               <Box flexDirection="row">
                 {showCheck && (
-                  <Text
-                    color={
-                      isChecked ? theme.status.success : theme.text.secondary
-                    }
-                  >
-                    [{isChecked ? 'x' : ' '}]
-                  </Text>
+                  <ClickableCheckbox
+                    isChecked={isChecked}
+                    onClick={() => {
+                      if (!context.isSelected) {
+                        handleSelect(optionItem);
+                      }
+                    }}
+                  />
                 )}
                 <Text color={labelColor} bold={optionItem.type === 'done'}>
                   {' '}
