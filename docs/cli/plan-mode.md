@@ -130,7 +130,9 @@ These are the only allowed tools:
   [`cli_help`](../core/subagents.md#cli-help-agent)
 - **Interaction:** [`ask_user`](../tools/ask-user.md)
 - **MCP tools (Read):** Read-only [MCP tools](../tools/mcp-server.md) (for
-  example, `github_read_issue`, `postgres_read_schema`) are allowed.
+  example, `github_read_issue`, `postgres_read_schema`) and core
+  [MCP resource tools](../tools/mcp-resources.md) (`list_mcp_resources`,
+  `read_mcp_resource`) are allowed.
 - **Planning (Write):**
   [`write_file`](../tools/file-system.md#3-write_file-writefile) and
   [`replace`](../tools/file-system.md#6-replace-edit) only allowed for `.md`
@@ -329,7 +331,6 @@ Storage whenever Gemini CLI exits Plan Mode to start the implementation.
 #!/usr/bin/env bash
 # Extract the plan filename from the tool input JSON
 plan_filename=$(jq -r '.tool_input.plan_filename // empty')
-plan_filename=$(basename -- "$plan_filename")
 
 # Construct the absolute path using the GEMINI_PLANS_DIR environment variable
 plan_path="$GEMINI_PLANS_DIR/$plan_filename"
@@ -358,7 +359,7 @@ To register this `AfterTool` hook, add it to your `settings.json`:
           {
             "name": "archive-plan",
             "type": "command",
-            "command": "./.gemini/hooks/archive-plan.sh"
+            "command": "~/.gemini/hooks/archive-plan.sh"
           }
         ]
       }
