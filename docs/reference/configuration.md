@@ -1846,6 +1846,12 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `true`
   - **Requires restart:** Yes
 
+- **`experimental.stressTestProfile`** (boolean):
+  - **Description:** Significantly lowers token limits to force early garbage
+    collection and distillation for testing purposes.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
 - **`experimental.autoMemory`** (boolean):
   - **Description:** Automatically extract reusable skills from past sessions in
     the background. Review results with /memory inbox.
