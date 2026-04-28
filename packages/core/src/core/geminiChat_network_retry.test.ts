@@ -96,6 +96,7 @@ describe('GeminiChat Network Retries', () => {
       promptId: 'test-session-id',
       getSessionId: () => 'test-session-id',
       getTelemetryLogPromptsEnabled: () => true,
+      getTelemetryTracesEnabled: () => false,
       getUsageStatisticsEnabled: () => true,
       getDebugMode: () => false,
       getContentGeneratorConfig: vi.fn().mockReturnValue({
@@ -120,6 +121,7 @@ describe('GeminiChat Network Retries', () => {
           generateContentConfig: { temperature: 0 },
         })),
       },
+      isContextManagementEnabled: vi.fn().mockReturnValue(false),
       getEnableHooks: vi.fn().mockReturnValue(false),
       getModelAvailabilityService: vi
         .fn()

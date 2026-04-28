@@ -385,6 +385,44 @@ describe('createContentGenerator', () => {
     );
   });
 
+  it('should include Vertex AI routing headers for Vertex AI requests', async () => {
+    const mockConfig = {
+      getModel: vi.fn().mockReturnValue('gemini-pro'),
+      getProxy: vi.fn().mockReturnValue(undefined),
+      getUsageStatisticsEnabled: () => false,
+      getClientName: vi.fn().mockReturnValue(undefined),
+    } as unknown as Config;
+
+    const mockGenerator = {
+      models: {},
+    } as unknown as GoogleGenAI;
+    vi.mocked(GoogleGenAI).mockImplementation(() => mockGenerator as never);
+
+    await createContentGenerator(
+      {
+        apiKey: 'test-api-key',
+        vertexai: true,
+        authType: AuthType.USE_VERTEX_AI,
+        vertexAiRouting: {
+          requestType: 'shared',
+          sharedRequestType: 'priority',
+        },
+      },
+      mockConfig,
+    );
+
+    expect(GoogleGenAI).toHaveBeenCalledWith(
+      expect.objectContaining({
+        httpOptions: expect.objectContaining({
+          headers: expect.objectContaining({
+            'X-Vertex-AI-LLM-Request-Type': 'shared',
+            'X-Vertex-AI-LLM-Shared-Request-Type': 'priority',
+          }),
+        }),
+      }),
+    );
+  });
+
   it('should pass api key as Authorization Header when GEMINI_API_KEY_AUTH_MECHANISM is set to bearer', async () => {
     const mockConfig = {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
@@ -885,6 +923,25 @@ describe('createContentGeneratorConfig', () => {
     );
     expect(config.apiKey).toBe('env-google-key');
     expect(config.vertexai).toBe(true);
+  });
+
+  it('should include Vertex AI routing settings in content generator config', async () => {
+    vi.stubEnv('GOOGLE_API_KEY', 'env-google-key');
+    const vertexAiRouting = {
+      requestType: 'shared' as const,
+      sharedRequestType: 'priority' as const,
+    };
+
+    const config = await createContentGeneratorConfig(
+      mockConfig,
+      AuthType.USE_VERTEX_AI,
+      undefined,
+      undefined,
+      undefined,
+      vertexAiRouting,
+    );
+
+    expect(config.vertexAiRouting).toEqual(vertexAiRouting);
   });
 
   it('should configure for Vertex AI using GCP project and location when set', async () => {

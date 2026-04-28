@@ -7,8 +7,10 @@
 import { type FunctionCall } from '@google/genai';
 import {
   SHELL_TOOL_NAMES,
+  REDIRECTION_NAMES,
   initializeShellParsers,
-  splitCommands,
+  parseCommandDetails,
+  stripShellWrapper,
   hasRedirection,
   extractStringFromParseEntry,
 } from '../utils/shell-utils.js';
@@ -359,16 +361,25 @@ export class PolicyEngine {
     }
 
     await initializeShellParsers();
-    const subCommands = splitCommands(command);
+    const parsed = parseCommandDetails(command);
+    const subCommands = parsed?.details ?? [];
 
-    if (subCommands.length === 0) {
+    // Handle parser failures or syntax errors
+    if (subCommands.length === 0 || parsed?.hasError) {
       // If the matched rule says DENY, we should respect it immediately even if parsing fails.
       if (ruleDecision === PolicyDecision.DENY) {
         return { decision: PolicyDecision.DENY, rule };
       }
 
-      // In YOLO mode, we should proceed anyway even if we can't parse the command.
       if (this.approvalMode === ApprovalMode.YOLO) {
+        // Block execution if arguments cannot be validated
+        if (rule?.argsPattern) {
+          debugLogger.debug(
+            `[PolicyEngine.check] Parsing failed for restricted rule, forcing DENY: ${command}`,
+          );
+          return { decision: PolicyDecision.DENY, rule };
+        }
+        // Allow if no argument restrictions apply
         return {
           decision: PolicyDecision.ALLOW,
           rule,
@@ -380,115 +391,109 @@ export class PolicyEngine {
       );
 
       // Parsing logic failed, we can't trust it. Use default decision ASK_USER (or DENY in non-interactive).
-      // We return the rule that matched so the evaluation loop terminates.
       return {
         decision: this.defaultDecision,
         rule,
       };
     }
 
-    // If there are multiple parts, or if we just want to validate the single part against DENY rules
-    if (subCommands.length > 0) {
-      debugLogger.debug(
-        `[PolicyEngine.check] Validating shell command: ${subCommands.length} parts`,
-      );
+    debugLogger.debug(
+      `[PolicyEngine.check] Validating shell command: ${subCommands.length} parts`,
+    );
 
-      if (ruleDecision === PolicyDecision.DENY) {
-        return { decision: PolicyDecision.DENY, rule };
-      }
+    if (ruleDecision === PolicyDecision.DENY) {
+      return { decision: PolicyDecision.DENY, rule };
+    }
 
-      // Start optimistically. If all parts are ALLOW, the whole is ALLOW.
-      // We will downgrade if any part is ASK_USER or DENY.
-      let aggregateDecision = PolicyDecision.ALLOW;
-      let responsibleRule: PolicyRule | undefined;
+    // Start with the decision from the rule or heuristics.
+    // If the tool call was already downgraded (e.g. by heuristics), we start there.
+    let aggregateDecision = ruleDecision;
 
-      // Check for redirection on the full command string
-      if (this.shouldDowngradeForRedirection(command, allowRedirection)) {
+    // If heuristics downgraded the decision, we don't blame the rule.
+    let responsibleRule: PolicyRule | undefined =
+      rule && ruleDecision === rule.decision ? rule : undefined;
+
+    // Check for redirection on the full command string.
+    // Redirection always downgrades ALLOW to ASK_USER (it never upgrades).
+    if (this.shouldDowngradeForRedirection(command, allowRedirection)) {
+      if (aggregateDecision === PolicyDecision.ALLOW) {
         debugLogger.debug(
           `[PolicyEngine.check] Downgrading ALLOW to ASK_USER for redirected command: ${command}`,
         );
         aggregateDecision = PolicyDecision.ASK_USER;
         responsibleRule = undefined; // Inherent policy
       }
+    }
 
-      for (const rawSubCmd of subCommands) {
-        const subCmd = rawSubCmd.trim();
-        // Prevent infinite recursion for the root command
-        if (subCmd === command) {
-          if (this.shouldDowngradeForRedirection(subCmd, allowRedirection)) {
-            debugLogger.debug(
-              `[PolicyEngine.check] Downgrading ALLOW to ASK_USER for redirected command: ${subCmd}`,
-            );
-            // Redirection always downgrades ALLOW to ASK_USER
-            if (aggregateDecision === PolicyDecision.ALLOW) {
-              aggregateDecision = PolicyDecision.ASK_USER;
-              responsibleRule = undefined; // Inherent policy
-            }
+    for (const detail of subCommands) {
+      if (REDIRECTION_NAMES.has(detail.name)) {
+        continue;
+      }
+
+      const subCmd = detail.text.trim();
+      const isAtomic =
+        subCmd === command ||
+        (detail.startIndex === 0 && detail.text.length === command.length);
+
+      // Recursive check for shell wrappers (bash -c, etc.)
+      const stripped = stripShellWrapper(subCmd);
+      if (stripped !== subCmd) {
+        const wrapperResult = await this.check(
+          { name: toolName, args: { command: stripped, dir_path } },
+          serverName,
+          toolAnnotations,
+          subagent,
+          true,
+        );
+
+        if (wrapperResult.decision === PolicyDecision.DENY)
+          return wrapperResult;
+        if (wrapperResult.decision === PolicyDecision.ASK_USER) {
+          if (aggregateDecision === PolicyDecision.ALLOW) {
+            responsibleRule = wrapperResult.rule;
           } else {
-            // Atomic command matching the rule.
-            if (
-              ruleDecision === PolicyDecision.ASK_USER &&
-              aggregateDecision === PolicyDecision.ALLOW
-            ) {
-              aggregateDecision = PolicyDecision.ASK_USER;
-              responsibleRule = rule;
-            }
+            responsibleRule ??= wrapperResult.rule;
           }
-          continue;
+          aggregateDecision = PolicyDecision.ASK_USER;
         }
+      }
 
+      if (!isAtomic) {
         const subResult = await this.check(
           { name: toolName, args: { command: subCmd, dir_path } },
           serverName,
           toolAnnotations,
           subagent,
+          true,
         );
 
-        // subResult.decision is already filtered through applyNonInteractiveMode by this.check()
-        const subDecision = subResult.decision;
+        if (subResult.decision === PolicyDecision.DENY) return subResult;
 
-        // If any part is DENIED, the whole command is DENY
-        if (subDecision === PolicyDecision.DENY) {
-          return {
-            decision: PolicyDecision.DENY,
-            rule: subResult.rule,
-          };
-        }
-
-        // If any part requires ASK_USER, the whole command requires ASK_USER
-        if (subDecision === PolicyDecision.ASK_USER) {
-          aggregateDecision = PolicyDecision.ASK_USER;
-          if (!responsibleRule) {
+        if (subResult.decision === PolicyDecision.ASK_USER) {
+          if (aggregateDecision === PolicyDecision.ALLOW) {
             responsibleRule = subResult.rule;
+          } else {
+            responsibleRule ??= subResult.rule;
           }
+          aggregateDecision = PolicyDecision.ASK_USER;
         }
 
-        // Check for redirection in allowed sub-commands
+        // Downgrade if sub-command has redirection
         if (
-          subDecision === PolicyDecision.ALLOW &&
+          subResult.decision === PolicyDecision.ALLOW &&
           this.shouldDowngradeForRedirection(subCmd, allowRedirection)
         ) {
-          debugLogger.debug(
-            `[PolicyEngine.check] Downgrading ALLOW to ASK_USER for redirected command: ${subCmd}`,
-          );
           if (aggregateDecision === PolicyDecision.ALLOW) {
             aggregateDecision = PolicyDecision.ASK_USER;
             responsibleRule = undefined;
           }
         }
       }
-
-      return {
-        decision: aggregateDecision,
-        // If we stayed at ALLOW, we return the original rule (if any).
-        // If we downgraded, we return the responsible rule (or undefined if implicit).
-        rule: aggregateDecision === ruleDecision ? rule : responsibleRule,
-      };
     }
 
     return {
-      decision: ruleDecision,
-      rule,
+      decision: aggregateDecision,
+      rule: aggregateDecision === ruleDecision ? rule : responsibleRule,
     };
   }
 
@@ -501,6 +506,7 @@ export class PolicyEngine {
     serverName: string | undefined,
     toolAnnotations?: Record<string, unknown>,
     subagent?: string,
+    skipHeuristics = false,
   ): Promise<CheckResult> {
     // Case 1: Metadata injection is the primary and safest way to identify an MCP server.
     // If we have explicit `_serverName` metadata (usually injected by tool-registry for active tools), use it.
@@ -594,6 +600,7 @@ export class PolicyEngine {
 
         let ruleDecision = rule.decision;
         if (
+          !skipHeuristics &&
           isShellCommand &&
           command &&
           !('commandPrefix' in rule) &&
@@ -615,12 +622,10 @@ export class PolicyEngine {
             subagent,
           );
           decision = shellResult.decision;
-          if (shellResult.rule) {
-            matchedRule = shellResult.rule;
-            break;
-          }
+          matchedRule = shellResult.rule;
+          break;
         } else {
-          decision = rule.decision;
+          decision = ruleDecision;
           matchedRule = rule;
           break;
         }
@@ -643,7 +648,7 @@ export class PolicyEngine {
       );
       if (toolName && SHELL_TOOL_NAMES.includes(toolName)) {
         let heuristicDecision = this.defaultDecision;
-        if (command) {
+        if (!skipHeuristics && command) {
           heuristicDecision = await this.applyShellHeuristics(
             command,
             heuristicDecision,
