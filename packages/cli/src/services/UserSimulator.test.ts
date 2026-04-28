@@ -189,4 +189,43 @@ describe('UserSimulator', () => {
     expect(mockMessageBus.unsubscribe).toHaveBeenCalled();
     vi.useRealTimers();
   });
+
+  it('should re-evaluate if internal tool state changes even if screen content is static', async () => {
+    const simulator = new UserSimulator(
+      mockConfig,
+      mockGetScreen,
+      mockStdinBuffer,
+    );
+    mockGetScreen.mockReturnValue('Responding...');
+
+    vi.useFakeTimers();
+    simulator.start();
+
+    // Trigger first tick
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(mockContentGenerator.generateContent).toHaveBeenCalledTimes(1);
+
+    // Trigger second tick with same screen - should skip
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(mockContentGenerator.generateContent).toHaveBeenCalledTimes(1);
+
+    // Simulate tool call update
+    const handler = mockMessageBus.subscribe.mock.calls[0][1];
+    handler({
+      type: MessageBusType.TOOL_CALLS_UPDATE,
+      toolCalls: [
+        {
+          status: CoreToolCallStatus.AwaitingApproval,
+          request: { callId: '123', name: 'test_tool' },
+        },
+      ],
+    });
+
+    // Trigger third tick with same screen but new tool state - should NOT skip
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(mockContentGenerator.generateContent).toHaveBeenCalledTimes(2);
+
+    simulator.stop();
+    vi.useRealTimers();
+  });
 });
