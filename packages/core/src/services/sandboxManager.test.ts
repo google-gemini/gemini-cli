@@ -10,11 +10,9 @@ import fsPromises from 'node:fs/promises';
 import { afterEach, describe, expect, it, vi, beforeEach } from 'vitest';
 import {
   NoopSandboxManager,
-  sanitizePaths,
   findSecretFiles,
   isSecretFile,
   resolveSandboxPaths,
-  getPathIdentity,
   type SandboxRequest,
 } from './sandboxManager.js';
 import { createSandboxManager } from './sandboxManagerFactory.js';
@@ -139,64 +137,6 @@ describe('findSecretFiles', () => {
 describe('SandboxManager', () => {
   afterEach(() => vi.restoreAllMocks());
 
-  describe('sanitizePaths', () => {
-    it('should return an empty array if no paths are provided', () => {
-      expect(sanitizePaths(undefined)).toEqual([]);
-      expect(sanitizePaths(null)).toEqual([]);
-      expect(sanitizePaths([])).toEqual([]);
-    });
-
-    it('should deduplicate paths and return them', () => {
-      const paths = ['/workspace/foo', '/workspace/bar', '/workspace/foo'];
-      expect(sanitizePaths(paths)).toEqual([
-        '/workspace/foo',
-        '/workspace/bar',
-      ]);
-    });
-
-    it('should deduplicate case-insensitively on Windows and macOS', () => {
-      vi.spyOn(os, 'platform').mockReturnValue('win32');
-      const paths = ['/workspace/foo', '/WORKSPACE/FOO'];
-      expect(sanitizePaths(paths)).toEqual(['/workspace/foo']);
-
-      vi.spyOn(os, 'platform').mockReturnValue('darwin');
-      const macPaths = ['/tmp/foo', '/tmp/FOO'];
-      expect(sanitizePaths(macPaths)).toEqual(['/tmp/foo']);
-
-      vi.spyOn(os, 'platform').mockReturnValue('linux');
-      const linuxPaths = ['/tmp/foo', '/tmp/FOO'];
-      expect(sanitizePaths(linuxPaths)).toEqual(['/tmp/foo', '/tmp/FOO']);
-    });
-
-    it('should throw an error if a path is not absolute', () => {
-      const paths = ['/workspace/foo', 'relative/path'];
-      expect(() => sanitizePaths(paths)).toThrow(
-        'Sandbox path must be absolute: relative/path',
-      );
-    });
-  });
-
-  describe('getPathIdentity', () => {
-    it('should normalize slashes and strip trailing slashes', () => {
-      expect(getPathIdentity('/foo/bar//baz/')).toBe(
-        path.normalize('/foo/bar/baz'),
-      );
-    });
-
-    it('should handle case sensitivity correctly per platform', () => {
-      vi.spyOn(os, 'platform').mockReturnValue('win32');
-      expect(getPathIdentity('/Workspace/Foo')).toBe(
-        path.normalize('/workspace/foo'),
-      );
-
-      vi.spyOn(os, 'platform').mockReturnValue('darwin');
-      expect(getPathIdentity('/Tmp/Foo')).toBe(path.normalize('/tmp/foo'));
-
-      vi.spyOn(os, 'platform').mockReturnValue('linux');
-      expect(getPathIdentity('/Tmp/Foo')).toBe(path.normalize('/Tmp/Foo'));
-    });
-  });
-
   describe('resolveSandboxPaths', () => {
     it('should resolve allowed and forbidden paths', async () => {
       const workspace = path.resolve('/workspace');
@@ -268,7 +208,7 @@ describe('SandboxManager', () => {
     });
 
     it('should handle case-insensitive conflicts on supported platforms', async () => {
-      vi.spyOn(os, 'platform').mockReturnValue('darwin');
+      vi.spyOn(process, 'platform', 'get').mockReturnValue('darwin');
       const workspace = path.resolve('/workspace');
       const secretUpper = path.join(workspace, 'SECRET');
       const secretLower = path.join(workspace, 'secret');

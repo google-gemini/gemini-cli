@@ -78,7 +78,12 @@ export function getMergeStrategyForPath(
 
 export const USER_SETTINGS_PATH = Storage.getGlobalSettingsPath();
 export const USER_SETTINGS_DIR = path.dirname(USER_SETTINGS_PATH);
-export const DEFAULT_EXCLUDED_ENV_VARS = ['DEBUG', 'DEBUG_MODE'];
+export const DEFAULT_EXCLUDED_ENV_VARS = [
+  'DEBUG',
+  'DEBUG_MODE',
+  'GEMINI_CLI_IDE_SERVER_STDIO_COMMAND',
+  'GEMINI_CLI_IDE_SERVER_STDIO_ARGS',
+];
 
 const AUTH_ENV_VAR_WHITELIST = [
   'GEMINI_API_KEY',
@@ -494,13 +499,15 @@ export class LoadedSettings {
   }
 }
 
-function findEnvFile(startDir: string): string | null {
+function findEnvFile(startDir: string, isTrusted: boolean): string | null {
   let currentDir = path.resolve(startDir);
   while (true) {
     // prefer gemini-specific .env under GEMINI_DIR
-    const geminiEnvPath = path.join(currentDir, GEMINI_DIR, '.env');
-    if (fs.existsSync(geminiEnvPath)) {
-      return geminiEnvPath;
+    if (isTrusted) {
+      const geminiEnvPath = path.join(currentDir, GEMINI_DIR, '.env');
+      if (fs.existsSync(geminiEnvPath)) {
+        return geminiEnvPath;
+      }
     }
     const envPath = path.join(currentDir, '.env');
     if (fs.existsSync(envPath)) {
@@ -509,9 +516,11 @@ function findEnvFile(startDir: string): string | null {
     const parentDir = path.dirname(currentDir);
     if (parentDir === currentDir || !parentDir) {
       // check .env under home as fallback, again preferring gemini-specific .env
-      const homeGeminiEnvPath = path.join(homedir(), GEMINI_DIR, '.env');
-      if (fs.existsSync(homeGeminiEnvPath)) {
-        return homeGeminiEnvPath;
+      if (isTrusted) {
+        const homeGeminiEnvPath = path.join(homedir(), GEMINI_DIR, '.env');
+        if (fs.existsSync(homeGeminiEnvPath)) {
+          return homeGeminiEnvPath;
+        }
       }
       const homeEnvPath = path.join(homedir(), '.env');
       if (fs.existsSync(homeEnvPath)) {
@@ -554,10 +563,10 @@ export function loadEnvironment(
   workspaceDir: string,
   isWorkspaceTrustedFn = isWorkspaceTrusted,
 ): void {
-  const envFilePath = findEnvFile(workspaceDir);
   const trustResult = isWorkspaceTrustedFn(settings, workspaceDir);
-
   const isTrusted = trustResult.isTrusted ?? false;
+  const envFilePath = findEnvFile(workspaceDir, isTrusted);
+
   // Check settings OR check process.argv directly since this might be called
   // before arguments are fully parsed. This is a best-effort sniffing approach
   // that happens early in the CLI lifecycle. It is designed to detect the
@@ -592,8 +601,8 @@ export function loadEnvironment(
       for (const key in parsedEnv) {
         if (Object.hasOwn(parsedEnv, key)) {
           let value = parsedEnv[key];
-          // If the workspace is untrusted but we are sandboxed, only allow whitelisted variables.
-          if (!isTrusted && isSandboxed) {
+          // If the workspace is untrusted, only allow whitelisted variables.
+          if (!isTrusted) {
             if (!AUTH_ENV_VAR_WHITELIST.includes(key)) {
               continue;
             }
