@@ -143,11 +143,11 @@ export class UserSimulator {
       const prompt = `You are evaluating a CLI agent by simulating a user sitting at the terminal.
 Look carefully at the screen and determine the CLI's current state:
 
-STATE 1: The agent is busy (e.g., streaming a response, showing a spinner, running a tool, or displaying a timer like "7s"). It is actively working and NOT waiting for text input.
+STATE 1: The agent is busy (e.g., streaming a response, executing a tool, or showing a progress message). It is actively working and NOT waiting for text input or user approval.
 - In this case, your action MUST be exactly: <WAIT>
 
-STATE 2: The agent is waiting for you to authorize a tool, confirm an action, or answer a specific multi-choice question (e.g., "Action Required", "Allow execution", numbered options).
-- In this case, your action MUST be the exact raw characters to select the option and submit it (e.g., 1\\r, 2\\r, y\\r, n\\r, or just \\r if the default option is acceptable). Do NOT output <DONE> or "Thank you". You must unblock the agent and allow it to run the tool.
+STATE 2: The agent is waiting for you to authorize a tool, confirm an action, or answer a specific multi-choice question (e.g., "Action Required", "Allow execution", numbered options, "[Y/n]").
+- In this case, your action MUST be the exact raw characters to select the option and submit it (e.g., 1\\r, 2\\r, y\\r, n\\r, or just \\r if the default option is acceptable). Do NOT output <DONE> or "Thank you". You must unblock the agent and allow it to run the tool. This state takes precedence even if timers or background messages are visible.
 
 STATE 3: The agent has finished its current thought process AND is idle, waiting for a NEW general text prompt (usually indicated by a "> Type your message" prompt).
 - First, verify that the ACTUAL task is fully complete based on your original goal. Do not stop at intermediate steps like planning or syntax checking.
@@ -159,7 +159,7 @@ STATE 4: Any other situation where the agent is waiting for text input or needs 
 - Your action should be the raw characters you would type, followed by \\r. For just an Enter key press, output \\r.
 
 CRITICAL RULES:
-- RULE 1: If there is ANY active spinner (e.g., ⠋, ⠙, ⠹, ⠸, ⠼, ⠴, ⠧) or an elapsed time indicator (e.g., "0s", "7s") anywhere on the screen, the agent is STILL WORKING. Your action MUST be <WAIT>. Do NOT issue commands, even if a text prompt is visible below it.
+- RULE 1: If there is a clear confirmation prompt (e.g. "[Y/n]", "1) Allow Once") or an input cursor (">"), YOU MUST RESPOND (State 2 or 3). Detect these states aggressively. Only <WAIT> (Rule 1 fallback) if the agent is truly mid-process with no interactive markers visible.
 - RULE 2: If there is an "Action Required" or confirmation prompt on the screen, YOU MUST HANDLE IT (State 2). This takes precedence over everything else.
 - RULE 3: If prompted to allow execution of a command with options like 'Allow once' and 'Allow for this session', you MUST choose the option for 'Allow for this session' (typically by sending '2\\r').
 - RULE 4: You MUST output a strictly formatted JSON object with no markdown wrappers or extra text.
@@ -319,6 +319,9 @@ ${strippedScreen}
           }
         }
 
+        // Wait a bit to ensure the terminal is ready for input
+        await new Promise((resolve) => setTimeout(resolve, 100));
+
         for (const char of keys) {
           if (char === '\r') {
             // Wait a bit to ensure the previous character is rendered before submitting
@@ -327,7 +330,7 @@ ${strippedScreen}
           this.stdinBuffer.write(char);
           // Small delay to ensure Ink processes each keypress event individually
           // while preventing UI state collisions during long simulated inputs.
-          await new Promise((resolve) => setTimeout(resolve, 5));
+          await new Promise((resolve) => setTimeout(resolve, 10));
         }
         this.lastScreenContent = normalizedScreen;
       } else {

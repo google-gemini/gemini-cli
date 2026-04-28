@@ -94,11 +94,14 @@ export async function startInteractiveUI(
   const version = await getVersion();
   setWindowTitle(basename(workspaceRoot), settings);
 
+  const simulateUser = config.getSimulateUser();
+
   const consolePatcher = new ConsolePatcher({
     onNewMessage: (msg) => {
       coreEvents.emitConsoleLog(msg.type, msg.content);
     },
     debugMode: config.getDebugMode(),
+    interactive: !simulateUser,
   });
   consolePatcher.patch();
 
@@ -144,7 +147,6 @@ export async function startInteractiveUI(
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
 
-  const simulateUser = config.getSimulateUser();
   const simulatedStdin = new PassThrough({ encoding: 'utf8' });
 
   let lastFrame: string | undefined;
@@ -199,16 +201,18 @@ export async function startInteractiveUI(
     registerCleanup(cleanupLineWrapping);
   }
 
-  checkForUpdates(settings)
-    .then((info) => {
-      handleAutoUpdate(info, settings, config.getProjectRoot());
-    })
-    .catch((err) => {
-      // Silently ignore update check errors.
-      if (config.getDebugMode()) {
-        debugLogger.warn('Update check failed:', err);
-      }
-    });
+  if (!simulateUser) {
+    checkForUpdates(settings)
+      .then((info) => {
+        handleAutoUpdate(info, settings, config.getProjectRoot());
+      })
+      .catch((err) => {
+        // Silently ignore update check errors.
+        if (config.getDebugMode()) {
+          debugLogger.warn('Update check failed:', err);
+        }
+      });
+  }
 
   if (simulateUser) {
     const simulator = new UserSimulator(
