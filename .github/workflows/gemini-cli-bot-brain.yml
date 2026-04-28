@@ -76,12 +76,6 @@ jobs:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
         run: 'npx tsx tools/gemini-cli-bot/metrics/index.ts'
 
-      - name: 'Prepare Metrics'
-        run: |
-          if [ -f "tools/gemini-cli-bot/history/metrics-before.csv" ]; then
-            mv tools/gemini-cli-bot/history/metrics-before.csv tools/gemini-cli-bot/history/metrics-before-prev.csv
-          fi
-
       - name: 'Run Brain Phases'
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'

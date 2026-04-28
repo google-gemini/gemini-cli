@@ -15,7 +15,7 @@ import {
 import { join } from 'node:path';
 
 const HISTORY_DIR = join(process.cwd(), 'tools', 'gemini-cli-bot', 'history');
-const WORKFLOW = 'gemini-cli-bot-pulse.yml';
+const WORKFLOW = 'gemini-cli-bot-brain.yml';
 
 function runCommand(cmd: string, args: string[]): string {
   try {
@@ -33,7 +33,7 @@ async function sync() {
     mkdirSync(HISTORY_DIR, { recursive: true });
   }
 
-  console.log('Searching for previous successful Pulse run...');
+  console.log('Searching for previous successful Brain run...');
   const runId = runCommand('gh', [
     'run',
     'list',
@@ -54,7 +54,7 @@ async function sync() {
     return;
   }
 
-  console.log(`Found run ${runId}. Downloading artifacts...`);
+  console.log(`Found run ${runId}. Downloading brain-data artifact...`);
 
   const tempDir = join(HISTORY_DIR, 'temp_dl');
   if (existsSync(tempDir)) {
@@ -62,48 +62,51 @@ async function sync() {
   }
   mkdirSync(tempDir, { recursive: true });
 
-  // Download metrics-timeseries if it exists
+  // Download brain-data artifact
   try {
     execFileSync(
       'gh',
-      ['run', 'download', runId, '-n', 'metrics-timeseries', '-D', tempDir],
+      ['run', 'download', runId, '-n', 'brain-data', '-D', tempDir],
       {
         stdio: 'ignore',
       },
     );
-    const tsFile = join(tempDir, 'metrics-timeseries.csv');
+
+    // Sync metrics-timeseries.csv
+    const tsFile = join(
+      tempDir,
+      'tools',
+      'gemini-cli-bot',
+      'history',
+      'metrics-timeseries.csv',
+    );
     if (existsSync(tsFile)) {
       writeFileSync(
         join(HISTORY_DIR, 'metrics-timeseries.csv'),
         readFileSync(tsFile),
       );
-      console.log('Downloaded metrics-timeseries.csv');
+      console.log('Synchronized metrics-timeseries.csv');
     }
-  } catch {
-    console.log('metrics-timeseries artifact not found in previous run.');
-  }
 
-  // Download previous metrics-before.csv
-  try {
-    execFileSync(
-      'gh',
-      ['run', 'download', runId, '-n', 'metrics-before', '-D', tempDir],
-      {
-        stdio: 'ignore',
-      },
+    // Sync previous metrics-before.csv as metrics-before-prev.csv
+    const mbFile = join(
+      tempDir,
+      'tools',
+      'gemini-cli-bot',
+      'history',
+      'metrics-before.csv',
     );
-    const mbFile = join(tempDir, 'metrics-before.csv');
     if (existsSync(mbFile)) {
       writeFileSync(
         join(HISTORY_DIR, 'metrics-before-prev.csv'),
         readFileSync(mbFile),
       );
       console.log(
-        'Downloaded previous metrics-before.csv as metrics-before-prev.csv',
+        'Synchronized previous metrics-before.csv as metrics-before-prev.csv',
       );
     }
-  } catch {
-    console.log('metrics-before artifact not found in previous run.');
+  } catch (error) {
+    console.log('Failed to sync from brain-data:', error);
   }
 
   // Clean up

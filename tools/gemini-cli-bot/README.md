@@ -10,19 +10,16 @@ long-term strategic optimization.
 
 ### 1. System 1: The Pulse (Reflex Layer)
 
-- **Purpose**: High-frequency, deterministic maintenance and data collection.
+- **Purpose**: High-frequency, deterministic maintenance.
 - **Frequency**: 30-minute cron (`.github/workflows/gemini-cli-bot-pulse.yml`).
 - **Implementation**: Pure TypeScript/JavaScript scripts.
 - **Classification**: Optionally utilizes Gemini CLI for high-confidence
   semantic classification (e.g., triage, labeling, sentiment) while preferring
   deterministic logic for equivalent tasks.
 - **Phases**:
-  - **Metrics Collection**: Executes scripts in `metrics/scripts/` to track
-    repository health (Open issues, PR latency, throughput, etc.).
   - **Reflex Execution**: Runs triage, routing, and automated maintenance
     scripts in `reflexes/scripts/`.
-- **Output**: Real-time action execution and `metrics-before.csv` artifact
-  generation.
+- **Output**: Real-time action execution.
 
 ### 2. System 2: The Brain (Reasoning Layer)
 
@@ -31,6 +28,8 @@ long-term strategic optimization.
 - **Frequency**: 24-hour cron (`.github/workflows/gemini-cli-bot-brain.yml`).
 - **Implementation**: Agentic Gemini CLI phases.
 - **Phases**:
+  - **Metrics Collection**: Executes scripts in `metrics/scripts/` to track
+    repository health (Open issues, PR latency, throughput, etc.).
   - **Phase 1: Reasoning (Metrics & Root-Cause Analysis)**: Analyzes time-series
     metric trends and repository state to identify bottlenecks or productivity
     gaps, tests hypotheses, and proposes script or configuration changes to
@@ -64,7 +63,7 @@ npx tsx tools/gemini-cli-bot/metrics/index.ts
 ```
 
 This will execute all scripts within `metrics/scripts/` and output the results
-to a `metrics-before.csv` file in the root directory.
+to `tools/gemini-cli-bot/history/metrics-before.csv`.
 
 ### Development
 
