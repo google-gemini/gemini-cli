@@ -3147,6 +3147,13 @@
           "default": true,
           "type": "boolean"
         },
+        "stressTestProfile": {
+          "title": "Use the stress test profile to aggressively trigger context management.",
+          "description": "Significantly lowers token limits to force early garbage collection and distillation for testing purposes.",
+          "markdownDescription": "Significantly lowers token limits to force early garbage collection and distillation for testing purposes.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "autoMemory": {
           "title": "Auto Memory",
           "description": "Automatically extract reusable skills from past sessions in the background. Review results with /memory inbox.",
@@ -3879,6 +3886,9 @@
               "type": "string"
             },
             "accent": {
+              "type": "string"
+            },
+            "response": {
               "type": "string"
             }
           }
