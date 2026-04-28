@@ -378,7 +378,7 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
 
       <DialogFooter
         primaryAction="Enter to select"
-        navigationActions="↑/↓ to navigate · ←/→ to reorder"
+        navigationActions="￪/￬ to navigate · ￩/￫ to reorder"
         cancelAction="Esc to close"
       />
 

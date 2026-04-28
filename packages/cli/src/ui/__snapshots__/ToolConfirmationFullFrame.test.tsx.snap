@@ -33,7 +33,7 @@ exports[`Full Terminal Tool Confirmation Snapshot > renders tool confirmation bo
 │ ╰─────────────────────────────────────────────────────────────────────────────────────────────╯ │█
 │ Apply this change?                                                                              │█
 │                                                                                                 │█
-│ ● 1. Allow once                                                                                 │█
+│ ∙ 1. Allow once                                                                                 │█
 │   2. Allow for this session                                                                     │█
 │   3. Allow for this file in all future sessions ~/.gemini/policies/auto-saved.toml              │█
 │   4. Modify with external editor                                                                │█

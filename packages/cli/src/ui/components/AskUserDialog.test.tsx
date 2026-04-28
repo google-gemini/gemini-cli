@@ -323,12 +323,12 @@ describe('AskUserDialog', () => {
         await waitFor(async () => {
           if (expectedArrows) {
             await waitUntilReady();
-            expect(lastFrame()).toContain('▲');
+            expect(lastFrame()).toContain('▴');
             await waitUntilReady();
             expect(lastFrame()).toContain('▼');
           } else {
             await waitUntilReady();
-            expect(lastFrame()).not.toContain('▲');
+            expect(lastFrame()).not.toContain('▴');
             await waitUntilReady();
             expect(lastFrame()).not.toContain('▼');
           }
@@ -1293,9 +1293,9 @@ describe('AskUserDialog', () => {
       },
     );
 
-    // With height 5 and alternate buffer disabled, it should show scroll arrows (▲)
+    // With height 5 and alternate buffer disabled, it should show scroll arrows (▴)
     await waitUntilReady();
-    expect(lastFrame()).toContain('▲');
+    expect(lastFrame()).toContain('▴');
     await waitUntilReady();
     expect(lastFrame()).toContain('▼');
   });

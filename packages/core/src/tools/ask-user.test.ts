@@ -415,7 +415,7 @@ describe('AskUserTool', () => {
       });
       expect(result.returnDisplay).toContain('User answered:');
       expect(result.returnDisplay).toContain(
-        '  Approach → Quick fix (Recommended)',
+        '  Approach ￫ Quick fix (Recommended)',
       );
       expect(JSON.parse(result.llmContent as string)).toEqual({
         answers: { '0': 'Quick fix (Recommended)' },

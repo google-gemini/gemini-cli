@@ -64,7 +64,7 @@ export const DefaultAppLayout: React.FC = () => {
         flexShrink={0}
         flexGrow={0}
         width={uiState.terminalWidth}
-        height={copyModeEnabled ? uiState.stableControlsHeight : undefined}
+        height={undefined}
       >
         <Notifications />
         <CopyModeWarning />
@@ -76,9 +76,9 @@ export const DefaultAppLayout: React.FC = () => {
             terminalWidth={uiState.terminalWidth}
             addItem={uiState.historyManager.addItem}
           />
-        ) : (
+        ) : !copyModeEnabled ? (
           <Composer isFocused={true} />
-        )}
+        ) : null}
 
         <ExitWarning />
       </Box>

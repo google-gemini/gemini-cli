@@ -375,7 +375,7 @@ export class MemoryTestHarness {
 
           // Label the x-axis with snapshot labels
           const labels = result.snapshots.map((s) => s.label);
-          lines.push('  ' + labels.join(' → '));
+          lines.push('  ' + labels.join(' ￫ '));
           lines.push('');
         }
       }

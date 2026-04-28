@@ -323,7 +323,7 @@ export const StatusRow: React.FC<StatusRowProps> = ({
                 {!showUiDetails && showRow2Minimal && modeContentObj && (
                   <Box>
                     <Text color={modeContentObj.color}>
-                      ● {modeContentObj.text}
+                      ∙ {modeContentObj.text}
                     </Text>
                   </Box>
                 )}
@@ -416,7 +416,7 @@ export const StatusRow: React.FC<StatusRowProps> = ({
               showRow2Minimal &&
               modeContentObj && (
                 <Text color={modeContentObj.color}>
-                  ● {modeContentObj.text}
+                  ∙ {modeContentObj.text}
                 </Text>
               )
             )}

@@ -195,7 +195,7 @@ describe('SkillInboxDialog', () => {
       expect(lastFrame()).toContain('Inbox Skill');
     });
 
-    // Select skill → lands on preview
+    // Select skill ￫ lands on preview
     await act(async () => {
       stdin.write('\r');
       await waitUntilReady();
@@ -205,7 +205,7 @@ describe('SkillInboxDialog', () => {
       expect(lastFrame()).toContain('Review new skill');
     });
 
-    // Select "Move" → lands on destination chooser
+    // Select "Move" ￫ lands on destination chooser
     await act(async () => {
       stdin.write('\r');
       await waitUntilReady();
@@ -240,19 +240,19 @@ describe('SkillInboxDialog', () => {
       expect(lastFrame()).toContain('Inbox Skill');
     });
 
-    // Select skill → preview
+    // Select skill ￫ preview
     await act(async () => {
       stdin.write('\r');
       await waitUntilReady();
     });
 
-    // Select "Move" → destination chooser
+    // Select "Move" ￫ destination chooser
     await act(async () => {
       stdin.write('\r');
       await waitUntilReady();
     });
 
-    // Select "Global" → triggers move
+    // Select "Global" ￫ triggers move
     await act(async () => {
       stdin.write('\r');
       await waitUntilReady();
@@ -288,19 +288,19 @@ describe('SkillInboxDialog', () => {
       expect(lastFrame()).toContain('Inbox Skill');
     });
 
-    // Select skill → preview
+    // Select skill ￫ preview
     await act(async () => {
       stdin.write('\r');
       await waitUntilReady();
     });
 
-    // Select "Move" → destination chooser
+    // Select "Move" ￫ destination chooser
     await act(async () => {
       stdin.write('\r');
       await waitUntilReady();
     });
 
-    // Select "Global" → triggers move
+    // Select "Global" ￫ triggers move
     await act(async () => {
       stdin.write('\r');
       await waitUntilReady();

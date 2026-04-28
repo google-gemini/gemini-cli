@@ -698,11 +698,11 @@ describe('Composer', () => {
     });
 
     it.each([
-      { mode: ApprovalMode.YOLO, label: '● YOLO' },
-      { mode: ApprovalMode.PLAN, label: '● plan' },
+      { mode: ApprovalMode.YOLO, label: '∙ YOLO' },
+      { mode: ApprovalMode.PLAN, label: '∙ plan' },
       {
         mode: ApprovalMode.AUTO_EDIT,
-        label: '● auto edit',
+        label: '∙ auto edit',
       },
     ])(
       'shows minimal mode badge "$mode" when clean UI details are hidden',

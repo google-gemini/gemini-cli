@@ -129,7 +129,7 @@ describe('partUtils', () => {
     });
 
     it('should show size for inlineData with non-empty base64 data', () => {
-      // 4 base64 chars → ceil(4*3/4) = 3 bytes → 3/1024 ≈ 0.0 KB
+      // 4 base64 chars ￫ ceil(4*3/4) = 3 bytes ￫ 3/1024 ≈ 0.0 KB
       const part = {
         inlineData: { mimeType: 'audio/mp3', data: 'AAAA' },
       } as Part;

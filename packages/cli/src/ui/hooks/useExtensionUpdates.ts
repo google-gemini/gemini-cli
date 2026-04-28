@@ -176,7 +176,7 @@ export const useExtensionUpdates = (
             addItem(
               {
                 type: MessageType.INFO,
-                text: `Extension "${extension.name}" successfully updated: ${result.originalVersion} → ${result.updatedVersion}.`,
+                text: `Extension "${extension.name}" successfully updated: ${result.originalVersion} ￫ ${result.updatedVersion}.`,
               },
               Date.now(),
             );

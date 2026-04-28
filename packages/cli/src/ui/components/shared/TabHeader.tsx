@@ -50,7 +50,7 @@ export interface TabHeaderProps {
 /**
  * A header component that displays tab indicators for multi-tab interfaces.
  *
- * Renders in the format: `← Tab1 │ Tab2 │ Tab3 →`
+ * Renders in the format: `￩ Tab1 │ Tab2 │ Tab3 ￫`
  *
  * Features:
  * - Shows completion status (✓ or □) per tab
@@ -87,7 +87,7 @@ export function TabHeader({
 
   return (
     <Box flexDirection="row" marginBottom={1} aria-role="tablist">
-      {showArrows && <Text color={theme.text.secondary}>{'← '}</Text>}
+      {showArrows && <Text color={theme.text.secondary}>{'￩ '}</Text>}
       {tabs.map((tab, i) => (
         <React.Fragment key={tab.key}>
           {i > 0 && <Text color={theme.text.secondary}>{' │ '}</Text>}
@@ -109,7 +109,7 @@ export function TabHeader({
           </Box>
         </React.Fragment>
       ))}
-      {showArrows && <Text color={theme.text.secondary}>{' →'}</Text>}
+      {showArrows && <Text color={theme.text.secondary}>{' ￫'}</Text>}
     </Box>
   );
 }

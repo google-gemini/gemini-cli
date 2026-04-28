@@ -878,7 +878,7 @@ describe('BaseSettingsDialog', () => {
       const frame = lastFrame();
       // Shows both scroll indicators when the list is truncated by height
       expect(frame).toContain('▼');
-      expect(frame).toContain('▲');
+      expect(frame).toContain('▴');
       unmount();
     });
   });

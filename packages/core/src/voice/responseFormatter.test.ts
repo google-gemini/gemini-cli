@@ -127,7 +127,7 @@ describe('formatForSpeech', () => {
     });
 
     it('should not summarise a tiny JSON value', () => {
-      // Below the default 80-char threshold → keep as-is
+      // Below the default 80-char threshold ￫ keep as-is
       const result = formatForSpeech('```json\n{"a":1}\n```', {
         jsonThreshold: 80,
       });

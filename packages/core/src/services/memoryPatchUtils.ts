@@ -109,7 +109,7 @@ function stripGitDiffPrefix(fileName: string): string {
   if (GIT_DIFF_PREFIX_RE.test(fileName)) {
     const stripped = fileName.replace(GIT_DIFF_PREFIX_RE, '');
     debugLogger.warn(
-      `[memoryPatchUtils] Stripped git diff prefix from patch header: "${fileName}" → "${stripped}"`,
+      `[memoryPatchUtils] Stripped git diff prefix from patch header: "${fileName}" ￫ "${stripped}"`,
     );
     return stripped;
   }

@@ -42,7 +42,7 @@ export interface TranslationState {
   streamStartEmitted: boolean;
   model: string | undefined;
   eventCounter: number;
-  /** Tracks callId → tool name from requests so responses can reference the name. */
+  /** Tracks callId ￫ tool name from requests so responses can reference the name. */
   pendingToolNames: Map<string, string>;
 }
 

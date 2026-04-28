@@ -273,7 +273,7 @@ describe('GeminiAgent Session Resume', () => {
         }),
       );
 
-      // Successful tool call → 'completed'
+      // Successful tool call ￫ 'completed'
       expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
         expect.objectContaining({
           update: expect.objectContaining({
@@ -292,7 +292,7 @@ describe('GeminiAgent Session Resume', () => {
         }),
       );
 
-      // Failed tool call → 'failed'
+      // Failed tool call ￫ 'failed'
       expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
         expect.objectContaining({
           update: expect.objectContaining({

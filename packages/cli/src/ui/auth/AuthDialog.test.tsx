@@ -305,7 +305,7 @@ describe('AuthDialog', () => {
     it('always shows API key dialog on re-auth even if env var is present', async () => {
       mockedValidateAuthMethod.mockReturnValue(null);
       vi.stubEnv('GEMINI_API_KEY', 'test-key-from-env');
-      // Simulate switching from a different auth method (e.g., Google Login → API key)
+      // Simulate switching from a different auth method (e.g., Google Login ￫ API key)
       props.settings.merged.security.auth.selectedType =
         AuthType.LOGIN_WITH_GOOGLE;
 

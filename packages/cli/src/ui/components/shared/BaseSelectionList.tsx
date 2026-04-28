@@ -181,7 +181,7 @@ export function BaseSelectionList<
   wrapAround = true,
   focusKey,
   priority,
-  selectedIndicator = '●',
+  selectedIndicator = '∙',
   renderItem,
 }: BaseSelectionListProps<T, TItem>): React.JSX.Element {
   const { activeIndex, setActiveIndex } = useSelectionList({
@@ -234,7 +234,7 @@ export function BaseSelectionList<
               : theme.text.secondary
           }
         >
-          ▲
+          ▴
         </Text>
       )}
 

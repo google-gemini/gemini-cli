@@ -19,7 +19,7 @@ exports[`<BackgroundTaskDisplay /> > keeps exit code status color even when sele
 │                                                                              │
 │   1. npm start (PID: 1001)                                                   │
 │   2. tail -f log.txt (PID: 1002)                                             │
-│ ● 3. exit 0 (PID: 1003) (Exit Code: 0)                                       │
+│ ∙ 3. exit 0 (PID: 1003) (Exit Code: 0)                                       │
 │ Log: ~/.gemini/tmp/background-processes/background-1003.log                  │
 └──────────────────────────────────────────────────────────────────────────────┘
 "
@@ -50,7 +50,7 @@ exports[`<BackgroundTaskDisplay /> > renders the process list when isListOpenPro
 │                                                                              │
 │ Select Process (Enter to select, Ctrl+K to kill, Esc to cancel):             │
 │                                                                              │
-│ ● 1. npm start (PID: 1001)                                                   │
+│ ∙ 1. npm start (PID: 1001)                                                   │
 │   2. tail -f log.txt (PID: 1002)                                             │
 │ Log: ~/.gemini/tmp/background-processes/background-1001.log                  │
 └──────────────────────────────────────────────────────────────────────────────┘
@@ -65,7 +65,7 @@ exports[`<BackgroundTaskDisplay /> > scrolls to active shell when list opens 1`]
 │ Select Process (Enter to select, Ctrl+K to kill, Esc to cancel):             │
 │                                                                              │
 │   1. npm start (PID: 1001)                                                   │
-│ ● 2. tail -f log.txt (PID: 1002)                                             │
+│ ∙ 2. tail -f log.txt (PID: 1002)                                             │
 │ Log: ~/.gemini/tmp/background-processes/background-1002.log                  │
 └──────────────────────────────────────────────────────────────────────────────┘
 "

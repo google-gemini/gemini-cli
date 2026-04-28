@@ -133,7 +133,7 @@ function getFileOpData(
     <Box flexDirection="row">
       {resultSummary && (
         <Text color={resultColor} wrap="truncate-end">
-          →{' '}
+          ￫{' '}
           <Text underline={isClickable}>
             {resultSummary.replace(/\n/g, ' ')}
           </Text>
@@ -178,7 +178,7 @@ function getReadManyFilesData(result: ReadManyFilesResult): ViewParts {
   const summaryStr = `Read ${result.files.length} file(s)${
     skippedCount > 0 ? ` (${skippedCount} ignored)` : ''
   }`;
-  const summary = <Text color={theme.text.accent}>→ {summaryStr}</Text>;
+  const summary = <Text color={theme.text.accent}>￫ {summaryStr}</Text>;
 
   return { description, summary, payload: undefined };
 }
@@ -192,7 +192,7 @@ function getListDirectoryData(
       {originalDescription}
     </Text>
   ) : undefined;
-  const summary = <Text color={theme.text.accent}>→ {result.summary}</Text>;
+  const summary = <Text color={theme.text.accent}>￫ {result.summary}</Text>;
 
   // For directory listings, we want NO payload in dense mode
   return { description, summary, payload: undefined };
@@ -225,23 +225,23 @@ function getGenericSuccessData(
     const flattened = resultDisplay.replace(/\n/g, ' ').trim();
     summary = (
       <Text color={theme.text.accent} wrap="truncate-end">
-        → {flattened}
+        ￫ {flattened}
       </Text>
     );
   } else if (isGrepResult(resultDisplay)) {
     summary = (
       <Text color={theme.text.accent} wrap="truncate-end">
-        → {resultDisplay.summary}
+        ￫ {resultDisplay.summary}
       </Text>
     );
   } else if (isTodoList(resultDisplay)) {
     summary = (
       <Text color={theme.text.accent} wrap="wrap">
-        → Todos updated
+        ￫ Todos updated
       </Text>
     );
   } else if (hasPayload(resultDisplay)) {
-    summary = <Text color={theme.text.accent}>→ {resultDisplay.summary}</Text>;
+    summary = <Text color={theme.text.accent}>￫ {resultDisplay.summary}</Text>;
     payload = (
       <Box marginLeft={2}>
         <Text color={theme.text.secondary}>{resultDisplay.payload}</Text>
@@ -250,7 +250,7 @@ function getGenericSuccessData(
   } else {
     summary = (
       <Text color={theme.text.accent} wrap="wrap">
-        → Returned (possible empty result)
+        ￫ Returned (possible empty result)
       </Text>
     );
   }
@@ -350,7 +350,7 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
           : 'Failed';
       const errorSummary = (
         <Text color={theme.status.error} wrap="truncate-end">
-          → {text}
+          ￫ {text}
         </Text>
       );
       const descriptionText = originalDescription ? (

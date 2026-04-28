@@ -7,7 +7,7 @@ exports[`PolicyUpdateDialog > renders correctly and matches snapshot 1`] = `
  │ Location: /test/workspace/.gemini/policies                                                     │
  │ Do you want to accept and load these policies?                                                 │
  │                                                                                                │
- │ ● 1. Accept and Load                                                                           │
+ │ ∙ 1. Accept and Load                                                                           │
  │   2. Ignore (Use Default Policies)                                                             │
  │                                                                                                │
  ╰────────────────────────────────────────────────────────────────────────────────────────────────╯

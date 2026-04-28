@@ -264,7 +264,7 @@ export function normalizeAgentCard(card: unknown): AgentCard {
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const result = { ...card } as unknown as AgentCard;
 
-  // Map supportedInterfaces → additionalInterfaces if needed
+  // Map supportedInterfaces ￫ additionalInterfaces if needed
   if (!result.additionalInterfaces) {
     const raw = card;
     if (Array.isArray(raw['supportedInterfaces'])) {
@@ -275,7 +275,7 @@ export function normalizeAgentCard(card: unknown): AgentCard {
     }
   }
 
-  // Map protocolBinding → transport on each interface
+  // Map protocolBinding ￫ transport on each interface
   for (const intf of result.additionalInterfaces ?? []) {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const raw = intf as unknown as Record<string, unknown>;

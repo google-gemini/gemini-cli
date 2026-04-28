@@ -89,7 +89,7 @@ export class OAuth2AuthProvider extends BaseA2AAuthProvider {
    * Refreshes or triggers interactive auth as needed.
    */
   override async headers(): Promise<HttpHeaders> {
-    // 1. Valid cached token → return immediately.
+    // 1. Valid cached token ￫ return immediately.
     if (
       this.cachedToken &&
       !this.tokenStorage.isTokenExpired(this.cachedToken)
@@ -97,7 +97,7 @@ export class OAuth2AuthProvider extends BaseA2AAuthProvider {
       return { Authorization: `Bearer ${this.cachedToken.accessToken}` };
     }
 
-    // 2. Expired but has refresh token → attempt silent refresh.
+    // 2. Expired but has refresh token ￫ attempt silent refresh.
     if (
       this.cachedToken?.refreshToken &&
       this.tokenUrl &&
@@ -129,7 +129,7 @@ export class OAuth2AuthProvider extends BaseA2AAuthProvider {
       }
     }
 
-    // 3. No valid token → interactive browser-based auth.
+    // 3. No valid token ￫ interactive browser-based auth.
     this.cachedToken = await this.authenticateInteractively();
     return { Authorization: `Bearer ${this.cachedToken.accessToken}` };
   }
@@ -251,7 +251,7 @@ export class OAuth2AuthProvider extends BaseA2AAuthProvider {
 
     coreEvents.emitFeedback(
       'info',
-      `→ Opening your browser for OAuth sign-in...
+      `￫ Opening your browser for OAuth sign-in...
 
 ` +
         `If the browser does not open, copy and paste this URL into your browser:

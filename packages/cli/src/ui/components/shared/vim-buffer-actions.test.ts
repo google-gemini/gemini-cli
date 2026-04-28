@@ -684,7 +684,7 @@ describe('vim-buffer-actions', () => {
       });
 
       it('should clamp cursor when dW removes the last word leaving only a trailing space', () => {
-        // cursor on 'w' in 'hello world'; dW deletes 'world' → 'hello '
+        // cursor on 'w' in 'hello world'; dW deletes 'world' ￫ 'hello '
         const state = createTestState(['hello world'], 0, 6);
         const result = handleVimAction(state, {
           type: 'vim_delete_big_word_forward' as const,
@@ -698,7 +698,7 @@ describe('vim-buffer-actions', () => {
 
     describe('vim_delete_word_end', () => {
       it('should clamp cursor when de removes the last word on a line', () => {
-        // cursor on 'w' in 'hello world'; de deletes through 'd' → 'hello '
+        // cursor on 'w' in 'hello world'; de deletes through 'd' ￫ 'hello '
         const state = createTestState(['hello world'], 0, 6);
         const result = handleVimAction(state, {
           type: 'vim_delete_word_end' as const,
@@ -722,7 +722,7 @@ describe('vim-buffer-actions', () => {
       });
 
       it('should clamp cursor when dE removes the last WORD on a line', () => {
-        // cursor on 'w' in 'hello world'; dE deletes through 'd' → 'hello '
+        // cursor on 'w' in 'hello world'; dE deletes through 'd' ￫ 'hello '
         const state = createTestState(['hello world'], 0, 6);
         const result = handleVimAction(state, {
           type: 'vim_delete_big_word_end' as const,
@@ -2093,7 +2093,7 @@ describe('vim-buffer-actions', () => {
         type: 'vim_delete_to_char_forward' as const,
         payload: { char: 'é', count: 1, till: false },
       });
-      // Deletes 'caf' + 'é' → ' world' remains
+      // Deletes 'caf' + 'é' ￫ ' world' remains
       expect(result.lines[0]).toBe(' world');
       expect(result.cursorCol).toBe(0);
     });
@@ -2161,7 +2161,7 @@ describe('vim-buffer-actions', () => {
     });
 
     it('df: clamps cursor when deleting through the last char on the line', () => {
-      // cursor at 1 in 'hello'; dfo finds 'o' at col 4 and deletes [1,4] → 'h'
+      // cursor at 1 in 'hello'; dfo finds 'o' at col 4 and deletes [1,4] ￫ 'h'
       const state = createTestState(['hello'], 0, 1);
       const result = handleVimAction(state, {
         type: 'vim_delete_to_char_forward' as const,
@@ -2181,7 +2181,7 @@ describe('vim-buffer-actions', () => {
         payload: { char: 'o', count: 1, till: false },
       });
       // cursor at 7 ('o' in world), dFo finds 'o' at col 4
-      // delete [4, 8) — both ends inclusive → 'hell' + 'rld'
+      // delete [4, 8) — both ends inclusive ￫ 'hell' + 'rld'
       expect(result.lines[0]).toBe('hellrld');
       expect(result.cursorCol).toBe(4);
     });
@@ -2192,7 +2192,7 @@ describe('vim-buffer-actions', () => {
         type: 'vim_delete_to_char_backward' as const,
         payload: { char: 'o', count: 1, till: true },
       });
-      // dTo finds 'o' at col 4, deletes [5, 8) → 'hello' + 'rld'
+      // dTo finds 'o' at col 4, deletes [5, 8) ￫ 'hello' + 'rld'
       expect(result.lines[0]).toBe('hellorld');
       expect(result.cursorCol).toBe(5);
     });
@@ -2218,7 +2218,7 @@ describe('vim-buffer-actions', () => {
 
     it('dF: clamps cursor when deletion removes chars up to end of line', () => {
       // 'hello', cursor on last char 'o' (col 4), dFe finds 'e' at col 1
-      // deletes [1, 5) → 'h'; without clamp cursor would be at col 1 (past end)
+      // deletes [1, 5) ￫ 'h'; without clamp cursor would be at col 1 (past end)
       const state = createTestState(['hello'], 0, 4);
       const result = handleVimAction(state, {
         type: 'vim_delete_to_char_backward' as const,

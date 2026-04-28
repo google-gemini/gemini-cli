@@ -81,7 +81,7 @@ function abbreviatePath(
     segments.length > depth ? `\u2026/${kept.join('/')}` : full;
 
   if (!suffix) return abbreviated;
-  // Convert ":142" → " line 142", ":142:7" → " line 142"
+  // Convert ":142" ￫ " line 142", ":142:7" ￫ " line 142"
   const lineNum = suffix.split(':').filter(Boolean)[0];
   return `${abbreviated} line ${lineNum}`;
 }

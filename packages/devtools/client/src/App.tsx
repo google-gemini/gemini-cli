@@ -1718,7 +1718,7 @@ function highlightLine(text: string, t: ThemeColors): React.ReactNode {
     } else if (str) {
       // Unescape JSON string escapes so \n renders as actual newlines.
       // Use JSON.parse to handle all escape sequences correctly in one pass
-      // (manual chained .replace() can double-unescape e.g. \\n → \<newline>).
+      // (manual chained .replace() can double-unescape e.g. \\n ￫ \<newline>).
       let unescaped: string;
       try {
         unescaped = JSON.parse(full) as string;
@@ -1816,7 +1816,7 @@ function CollapsibleString({
             }}
           >
             {expanded
-              ? '▲ collapse'
+              ? '▴ collapse'
               : `... ${lines.length - STRING_LINE_THRESHOLD} more lines`}
           </span>
         </>
