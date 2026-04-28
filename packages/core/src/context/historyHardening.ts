@@ -86,16 +86,24 @@ export function hardenHistory(history: Content[]): Content[] {
       if (callParts.length > 0) {
         // We have tool calls. The NEXT turn MUST be a user turn with responses.
         const nextTurn = coalesced[i + 1];
-        const missingIds: string[] = [];
+        const missingIds: Array<{ id: string; name: string }> = [];
 
         for (const call of callParts) {
-          const id = call.functionCall!.id;
+          const id = call.functionCall!.id || 'undefined';
+          const name = call.functionCall!.name || 'unknown';
           const hasResponse =
             nextTurn?.role === 'user' &&
-            nextTurn.parts?.some((p) => p.functionResponse?.id === id);
+            nextTurn.parts?.some(
+              (p) =>
+                p.functionResponse?.id === id &&
+                p.functionResponse?.name === name,
+            );
 
           if (!hasResponse) {
-            missingIds.push(id || 'undefined');
+            debugLogger.warn(
+              `[HistoryHardener] Call id='${id}' (name='${name}') has no matching response in next turn.`,
+            );
+            missingIds.push({ id, name });
           }
         }
 
@@ -113,12 +121,12 @@ export function hardenHistory(history: Content[]): Content[] {
             coalesced.splice(i + 1, 0, targetUserTurn);
           }
 
-          for (const id of missingIds) {
+          for (const miss of missingIds) {
             targetUserTurn.parts = targetUserTurn.parts || [];
             targetUserTurn.parts.push({
               functionResponse: {
-                name: 'unknown_tool',
-                id,
+                name: miss.name,
+                id: miss.id,
                 response: {
                   error:
                     'The tool execution result was lost due to context management truncation.',
@@ -140,15 +148,18 @@ export function hardenHistory(history: Content[]): Content[] {
 
         for (const resp of responseParts) {
           const id = resp.functionResponse!.id;
+          const name = resp.functionResponse!.name;
           const hasCall =
             prevTurn?.role === 'model' &&
-            prevTurn.parts?.some((p) => p.functionCall?.id === id);
+            prevTurn.parts?.some(
+              (p) => p.functionCall?.id === id && p.functionCall?.name === name,
+            );
 
           if (hasCall) {
             validParts.push(resp);
           } else {
             debugLogger.warn(
-              `[HistoryHardener] Dropping orphaned functionResponse for id='${id}'`,
+              `[HistoryHardener] Dropping orphaned functionResponse id='${id}' (name='${name}')`,
             );
           }
         }
