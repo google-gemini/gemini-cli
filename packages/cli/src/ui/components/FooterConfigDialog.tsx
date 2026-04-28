@@ -23,6 +23,7 @@ import { BaseSelectionList } from './shared/BaseSelectionList.js';
 import type { SelectionListItem } from '../hooks/useSelectionList.js';
 import { DialogFooter } from './shared/DialogFooter.js';
 import { useKeyMatchers } from '../hooks/useKeyMatchers.js';
+import { getDefaultValue } from '../../utils/settingsUtils.js';
 
 interface FooterConfigDialogProps {
   onClose?: () => void;
@@ -178,7 +179,7 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
   ]);
 
   const handleResetToDefaults = useCallback(() => {
-    const defaultFootersettings = {
+    const defaultFooterSettings = {
       ...settings.merged,
       ui: {
         ...settings.merged.ui,
@@ -188,12 +189,12 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
         },
       },
     };
-    const defaultState = resolveFooterState(defaultFootersettings);
+    const defaultState = resolveFooterState(defaultFooterSettings);
     dispatch({
       type: 'RESET',
       payload: {
         ...defaultState,
-        showLabels: settings.merged.ui.footer.showLabels !== false,
+        showLabels: getDefaultValue('ui.footer.showLabels') !== false,
       },
     });
     setFocusKey(defaultState.orderedIds[0]);
