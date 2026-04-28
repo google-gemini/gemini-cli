@@ -18,6 +18,7 @@ import {
 } from '../utils/paths.js';
 import { ProjectRegistry } from './projectRegistry.js';
 import { StorageMigration } from './storageMigration.js';
+import { RUNTIME_STATUS_FILENAME } from '../utils/runtimeStatus.js';
 
 export const OAUTH_FILE = 'oauth_creds.json';
 export const TRUSTED_FOLDERS_FILENAME = 'trustedFolders.json';
@@ -361,6 +362,37 @@ export class Storage {
       return path.join(this.getProjectTempDir(), this.sessionId, 'tasks');
     }
     return path.join(this.getProjectTempDir(), 'tasks');
+  }
+
+  /**
+   * Returns the per-session scratch directory under the project's temp
+   * area: `<project-temp>/<sessionId>/`.
+   *
+   * This is the natural home for per-session sidecar files (e.g.
+   * `runtime.json`) and parallels the existing per-session subdirectories
+   * for plans, tracker, and tasks.
+   *
+   * Throws if the storage was constructed (or had `setSessionId` called)
+   * without a session id.
+   */
+  getSessionTempDir(): string {
+    if (!this.sessionId) {
+      throw new Error(
+        'getSessionTempDir requires a session id; call setSessionId first.',
+      );
+    }
+    return path.join(this.getProjectTempDir(), this.sessionId);
+  }
+
+  /**
+   * Returns the absolute path to the runtime status sidecar file for the
+   * current session: `<project-temp>/<sessionId>/runtime.json`.
+   *
+   * External tools can scan `<global-temp>/<project>/<session>/runtime.json`
+   * to discover live Gemini CLI sessions and verify their PID liveness.
+   */
+  getSessionRuntimeStatusPath(): string {
+    return path.join(this.getSessionTempDir(), RUNTIME_STATUS_FILENAME);
   }
 
   async listProjectChatFiles(): Promise<
