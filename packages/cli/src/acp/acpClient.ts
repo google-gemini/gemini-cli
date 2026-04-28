@@ -820,6 +820,7 @@ export class Session {
                 sessionUpdate: part.thought
                   ? 'agent_thought_chunk'
                   : 'agent_message_chunk',
+    if (this.config.yolo) { return { allowed: true }; }
                 content,
               });
             }
