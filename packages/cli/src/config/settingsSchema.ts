@@ -2437,6 +2437,15 @@ const SETTINGS_SCHEMA = {
         description: 'Deprecated: Use general.topicUpdateNarration instead.',
         showInDialog: false,
       },
+      enhanceCommand: {
+        type: 'boolean',
+        label: 'Enhance Command',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description: 'Enable the experimental /enhance slash command.',
+        showInDialog: true,
+      },
     },
   },
   extensions: {

@@ -21,7 +21,7 @@ export const enhanceCommand: SlashCommand = {
   name: 'enhance',
   description: 'Enhance a prompt with additional context and rephrasing',
   kind: CommandKind.BUILT_IN,
-  autoExecute: true,
+  autoExecute: false,
   action: async (context, args) => {
     const draft = args.trim();
     if (!draft) {

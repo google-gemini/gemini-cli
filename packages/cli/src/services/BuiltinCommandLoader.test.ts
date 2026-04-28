@@ -171,6 +171,7 @@ describe('BuiltinCommandLoader', () => {
         isAdminEnabled: vi.fn().mockReturnValue(true),
       }),
       isVoiceModeEnabled: vi.fn().mockReturnValue(true),
+      isEnhanceCommandEnabled: vi.fn().mockReturnValue(true),
       getContentGeneratorConfig: vi.fn().mockReturnValue({
         authType: 'other',
       }),
@@ -310,6 +311,22 @@ describe('BuiltinCommandLoader', () => {
     expect(agentsCmd).toBeUndefined();
   });
 
+  it('should include enhance command when experimental enhance command is enabled', async () => {
+    (mockConfig.isEnhanceCommandEnabled as Mock).mockReturnValue(true);
+    const loader = new BuiltinCommandLoader(mockConfig);
+    const commands = await loader.loadCommands(new AbortController().signal);
+    const enhanceCmd = commands.find((c) => c.name === 'enhance');
+    expect(enhanceCmd).toBeDefined();
+  });
+
+  it('should exclude enhance command when experimental enhance command is disabled', async () => {
+    (mockConfig.isEnhanceCommandEnabled as Mock).mockReturnValue(false);
+    const loader = new BuiltinCommandLoader(mockConfig);
+    const commands = await loader.loadCommands(new AbortController().signal);
+    const enhanceCmd = commands.find((c) => c.name === 'enhance');
+    expect(enhanceCmd).toBeUndefined();
+  });
+
   describe('chat debug command', () => {
     it('should NOT add debug subcommand to chat/resume commands if not a nightly build', async () => {
       vi.mocked(isNightly).mockResolvedValue(false);
@@ -398,6 +415,7 @@ describe('BuiltinCommandLoader profile', () => {
         isAdminEnabled: vi.fn().mockReturnValue(true),
       }),
       isVoiceModeEnabled: vi.fn().mockReturnValue(true),
+      isEnhanceCommandEnabled: vi.fn().mockReturnValue(true),
       getContentGeneratorConfig: vi.fn().mockReturnValue({
         authType: 'other',
       }),

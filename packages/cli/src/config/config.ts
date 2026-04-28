@@ -1035,6 +1035,7 @@ export async function loadCliConfig(
     extensionRegistryURI,
     enableExtensionReloading: settings.experimental?.extensionReloading,
     enableAgents: settings.experimental?.enableAgents,
+    enableEnhanceCommand: settings.experimental?.enhanceCommand ?? false,
     plan: settings.general?.plan?.enabled ?? true,
     voiceMode: settings.experimental?.voiceMode,
     tracker: settings.experimental?.taskTracker,

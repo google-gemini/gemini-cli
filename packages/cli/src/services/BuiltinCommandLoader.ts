@@ -136,7 +136,7 @@ export class BuiltinCommandLoader implements ICommandLoader {
       docsCommand,
       directoryCommand,
       editorCommand,
-      enhanceCommand,
+      ...(this.config?.isEnhanceCommandEnabled() ? [enhanceCommand] : []),
       ...(this.config?.getExtensionsEnabled() === false
         ? [
             {
