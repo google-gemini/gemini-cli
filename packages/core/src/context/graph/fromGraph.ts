@@ -14,10 +14,25 @@ import { debugLogger } from '../../utils/debugLogger.js';
 export function fromGraph(nodes: readonly ConcreteNode[]): Content[] {
   debugLogger.log(`[fromGraph] Flattening ${nodes.length} nodes`);
 
+  const seenIds = new Set<string>();
+  const uniqueNodes: ConcreteNode[] = [];
+  for (const node of nodes) {
+    if (!seenIds.has(node.id)) {
+      seenIds.add(node.id);
+      uniqueNodes.push(node);
+    }
+  }
+
+  if (uniqueNodes.length < nodes.length) {
+    debugLogger.warn(
+      `[fromGraph] Filtered ${nodes.length - uniqueNodes.length} duplicate nodes`,
+    );
+  }
+
   const history: Content[] = [];
   let currentTurn: Content | null = null;
 
-  for (const node of nodes) {
+  for (const node of uniqueNodes) {
     if (!currentTurn || currentTurn.role !== node.role) {
       currentTurn = { role: node.role, parts: [node.payload] };
       history.push(currentTurn);

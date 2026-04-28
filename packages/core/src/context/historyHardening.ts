@@ -138,6 +138,37 @@ export function hardenHistory(history: Content[]): Content[] {
       }
     }
 
+    // Final check for orphaned responses (responses without a preceding model turn with calls)
+    if (turn.role === 'user') {
+      const parts = turn.parts || [];
+      const prevTurn = hardened[hardened.length - 1];
+      const validParts: Part[] = [];
+
+      for (const p of parts) {
+        if (p.functionResponse) {
+          const id = p.functionResponse.id;
+          const name = p.functionResponse.name;
+          const hasCall =
+            prevTurn?.role === 'model' &&
+            prevTurn.parts?.some(
+              (cp) =>
+                cp.functionCall?.id === id && cp.functionCall?.name === name,
+            );
+
+          if (hasCall) {
+            validParts.push(p);
+          } else {
+            debugLogger.warn(
+              `[HistoryHardener] Dropping orphaned functionResponse id='${id}' (name='${name}')`,
+            );
+          }
+        } else {
+          validParts.push(p);
+        }
+      }
+      turn.parts = validParts;
+    }
+
     // Only push if we didn't empty the turn during coalescing
     if (turn.parts && turn.parts.length > 0) {
       hardened.push(turn);
