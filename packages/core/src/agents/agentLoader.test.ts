@@ -939,6 +939,12 @@ auth:
     - profile
   authorization_url: https://auth.example.com/authorize
   token_url: https://auth.example.com/token
+  issuer: https://auth.example.com
+  audiences:
+    - audience1
+  redirect_uri: http://localhost:8080/callback
+  token_param_name: access_token
+  registration_url: https://auth.example.com/register
 ---
 `);
       const result = await parseAgentMarkdown(filePath);
@@ -953,6 +959,11 @@ auth:
           scopes: ['openid', 'profile'],
           authorization_url: 'https://auth.example.com/authorize',
           token_url: 'https://auth.example.com/token',
+          issuer: 'https://auth.example.com',
+          audiences: ['audience1'],
+          redirect_uri: 'http://localhost:8080/callback',
+          token_param_name: 'access_token',
+          registration_url: 'https://auth.example.com/register',
         },
       });
     });
