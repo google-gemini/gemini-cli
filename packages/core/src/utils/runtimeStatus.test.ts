@@ -245,6 +245,31 @@ describe('runtimeStatus', () => {
     expect(readRuntimeStatus(tmp)).toBeNull();
   });
 
+  it('cleans up the .tmp file when the underlying rename raises', async () => {
+    // Pre-place a non-empty directory at the target path. The atomic
+    // rename of `runtime.json.tmp.<uuid>` over an existing non-empty
+    // directory fails on every supported platform (EISDIR / ENOTEMPTY /
+    // EACCES), exercising the catch-block tmp-cleanup path. A failed
+    // write must never leave a `.tmp.*` leftover on disk.
+    const targetPath = path.join(tmp, RUNTIME_STATUS_FILENAME);
+    fs.mkdirSync(targetPath);
+    fs.writeFileSync(path.join(targetPath, 'placeholder'), 'block');
+
+    await expect(
+      writeRuntimeStatus(tmp, {
+        sessionId: 'abc',
+        workDir: '/w',
+        pid: 1,
+      }),
+    ).rejects.toThrow();
+
+    const leftovers = fs.readdirSync(tmp).filter((f) => f.includes('.tmp'));
+    expect(leftovers).toEqual([]);
+    // The pre-existing directory must still be there — we never partially
+    // succeeded.
+    expect(fs.statSync(targetPath).isDirectory()).toBe(true);
+  });
+
   it('atomically overwrites the previous PID on resume', async () => {
     await writeRuntimeStatus(tmp, {
       sessionId: 'abc',

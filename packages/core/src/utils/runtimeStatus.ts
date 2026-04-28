@@ -123,7 +123,11 @@ export async function writeRuntimeStatus(
 
   let fd: number | undefined;
   try {
-    fd = fs.openSync(tempPath, 'w', 0o600);
+    // 'wx' = O_CREAT | O_EXCL — fail if `tempPath` already exists. The
+    // random suffix already makes collision astronomically unlikely; the
+    // exclusive open adds defense-in-depth against a pre-placed file or
+    // symlink at the temp path (which 'w' would silently follow).
+    fd = fs.openSync(tempPath, 'wx', 0o600);
     fs.writeSync(fd, content, 0, 'utf8');
     fs.fsyncSync(fd);
     fs.closeSync(fd);
