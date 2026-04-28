@@ -9,6 +9,7 @@ import * as path from 'node:path';
 import { Storage } from '../config/storage.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { getErrorMessage, isNodeError } from '../utils/errors.js';
+import { SECURE_DIR_MODE, SECURE_FILE_MODE } from '../utils/permissions.js';
 
 export interface AcknowledgedAgentsMap {
   // Project Path -> Agent Name -> Agent Hash
@@ -46,11 +47,11 @@ export class AcknowledgedAgentsService {
     const filePath = Storage.getAcknowledgedAgentsPath();
     try {
       const dir = path.dirname(filePath);
-      await fs.mkdir(dir, { recursive: true });
+      await fs.mkdir(dir, { recursive: true, mode: SECURE_DIR_MODE });
       await fs.writeFile(
         filePath,
         JSON.stringify(this.acknowledgedAgents, null, 2),
-        'utf-8',
+        { encoding: 'utf-8', mode: SECURE_FILE_MODE },
       );
     } catch (error) {
       debugLogger.error(

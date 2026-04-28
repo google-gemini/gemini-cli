@@ -14,6 +14,7 @@ import {
   type HookEventName,
 } from './types.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { SECURE_DIR_MODE, SECURE_FILE_MODE } from '../utils/permissions.js';
 
 interface TrustedHooksConfig {
   [projectPath: string]: string[]; // Array of trusted hook keys (name:command)
@@ -48,11 +49,12 @@ export class TrustedHooksManager {
     try {
       const dir = path.dirname(this.configPath);
       if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
+        fs.mkdirSync(dir, { recursive: true, mode: SECURE_DIR_MODE });
       }
       fs.writeFileSync(
         this.configPath,
         JSON.stringify(this.trustedHooks, null, 2),
+        { mode: SECURE_FILE_MODE },
       );
     } catch (error) {
       debugLogger.warn('Failed to save trusted hooks config', error);
