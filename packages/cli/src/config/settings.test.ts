@@ -561,8 +561,8 @@ describe('Settings Loading and Merging', () => {
       expect(settings.errors[0].message).toContain(
         'Expected number, received string',
       );
-      // Should fall back to the expanded string value
-      expect(settings.merged.model.maxSessionTurns).toBe('not-a-number');
+      // Should fall back to the schema default (since we return {} on validation failure for that scope)
+      expect(settings.merged.model.maxSessionTurns).toBe(-1);
     });
 
     it('should use system folderTrust over user setting', () => {

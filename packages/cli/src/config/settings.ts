@@ -726,37 +726,67 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
   const userOriginalSettings = structuredClone(userResult.settings);
   const workspaceOriginalSettings = structuredClone(workspaceResult.settings);
 
-    // Environment variables for runtime use
+  // Environment variables for runtime use
   systemSettings = resolveEnvVarsInObject(systemResult.settings);
   systemDefaultSettings = resolveEnvVarsInObject(systemDefaultsResult.settings);
   userSettings = resolveEnvVarsInObject(userResult.settings);
   workspaceSettings = resolveEnvVarsInObject(workspaceResult.settings);
 
-  // Validate settings structure with Zod after environment variable expansion
-  const validateAndRecordErrors = (settings: Settings, filePath: string): Settings => {
-    if (Object.keys(settings).length === 0) return settings;
+  // Validate settings structure with Zod after environment variable expansion.
+  // We use a functional approach to avoid mutating outer state, and "fail closed"
+  // by returning an empty object if validation fails to prevent insecure configurations.
+  const validate = (
+    settings: Settings,
+    filePath: string,
+  ): { settings: Settings; errors: SettingsError[] } => {
+    if (Object.keys(settings).length === 0) return { settings, errors: [] };
     const validationResult = validateSettings(settings);
     if (!validationResult.success && validationResult.error) {
       const errorMessage = formatValidationError(
         validationResult.error,
         filePath,
       );
-      settingsErrors.push({
-        message: errorMessage,
-        path: filePath,
-        severity: 'warning',
-      });
-      return settings;
+      return {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        settings: {} as unknown as Settings,
+        errors: [
+          {
+            message: errorMessage,
+            path: filePath,
+            severity: 'warning',
+          },
+        ],
+      };
     }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    return (validationResult.data as Settings) ?? settings;
+    return {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      settings: (validationResult.data as Settings) ?? settings,
+      errors: [],
+    };
   };
 
-  systemSettings = validateAndRecordErrors(systemSettings, systemSettingsPath);
-  systemDefaultSettings = validateAndRecordErrors(systemDefaultSettings, systemDefaultsPath);
-  userSettings = validateAndRecordErrors(userSettings, USER_SETTINGS_PATH);
+  const systemValidation = validate(systemSettings, systemSettingsPath);
+  systemSettings = systemValidation.settings;
+  settingsErrors.push(...systemValidation.errors);
+
+  const systemDefaultsValidation = validate(
+    systemDefaultSettings,
+    systemDefaultsPath,
+  );
+  systemDefaultSettings = systemDefaultsValidation.settings;
+  settingsErrors.push(...systemDefaultsValidation.errors);
+
+  const userValidation = validate(userSettings, USER_SETTINGS_PATH);
+  userSettings = userValidation.settings;
+  settingsErrors.push(...userValidation.errors);
+
   if (!storage.isWorkspaceHomeDir()) {
-    workspaceSettings = validateAndRecordErrors(workspaceSettings, workspaceSettingsPath);
+    const workspaceValidation = validate(
+      workspaceSettings,
+      workspaceSettingsPath,
+    );
+    workspaceSettings = workspaceValidation.settings;
+    settingsErrors.push(...workspaceValidation.errors);
   }
 
   // Support legacy theme names
