@@ -56,6 +56,7 @@ import {
   debugLogger,
   type Config,
 } from '@google/gemini-cli-core';
+import { useVoiceMode } from '../hooks/useVoiceMode.js';
 import {
   parseInputForHighlighting,
   parseSegmentsFromTokens,
@@ -73,8 +74,6 @@ import {
 import { parseSlashCommand } from '../../utils/commands.js';
 import * as path from 'node:path';
 import { SCREEN_READER_USER_PREFIX } from '../textConstants.js';
-import { getSafeLowColorBackground } from '../themes/color-utils.js';
-import { isLowColorDepth } from '../utils/terminalUtils.js';
 import { useShellFocusState } from '../contexts/ShellFocusContext.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { useInputState } from '../contexts/InputContext.js';
@@ -161,7 +160,6 @@ export function isLargePaste(text: string): boolean {
 }
 
 const DOUBLE_TAB_CLEAN_UI_TOGGLE_WINDOW_MS = 350;
-
 /**
  * Attempt to toggle expansion of a paste placeholder in the buffer.
  * Returns true if a toggle action was performed or hint was shown, false otherwise.
@@ -240,6 +238,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     setEmbeddedShellFocused,
     setShortcutsHelpVisible,
     toggleCleanUiDetailsVisible,
+    setVoiceModeEnabled,
   } = useUIActions();
   const {
     terminalWidth,
@@ -248,6 +247,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     backgroundTasks,
     backgroundTaskHeight,
     shortcutsHelpVisible,
+    isVoiceModeEnabled,
   } = useUIState();
   const [suppressCompletion, setSuppressCompletion] = useState(false);
   const { handlePress: registerPlainTabPress, resetCount: resetPlainTabPress } =
@@ -265,6 +265,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           resetEscapeState();
           if (buffer.text.length > 0) {
             buffer.setText('');
+            resetTurnBaseline();
             resetCompletionState();
           } else if (history.length > 0) {
             onSubmit('/rewind');
@@ -282,6 +283,16 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const innerBoxRef = useRef<DOMElement>(null);
   const hasUserNavigatedSuggestions = useRef(false);
   const listRef = useRef<ScrollableListRef<ScrollableItem>>(null);
+
+  const { isRecording, handleVoiceInput, resetTurnBaseline } = useVoiceMode({
+    buffer,
+    config,
+    settings,
+    setQueueErrorMessage,
+    isVoiceModeEnabled,
+    setVoiceModeEnabled,
+    keyMatchers,
+  });
 
   const [reverseSearchActive, setReverseSearchActive] = useState(false);
   const [commandSearchActive, setCommandSearchActive] = useState(false);
@@ -389,6 +400,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       // Clear the buffer *before* calling onSubmit to prevent potential re-submission
       // if onSubmit triggers a re-render while the buffer still holds the old value.
       buffer.setText('');
+      resetTurnBaseline();
       onSubmit(processedValue);
       resetCompletionState();
       resetReverseSearchCompletionState();
@@ -400,6 +412,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       shellModeActive,
       shellHistory,
       resetReverseSearchCompletionState,
+      resetTurnBaseline,
     ],
   );
 
@@ -649,6 +662,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   const handleInput = useCallback(
     (key: Key) => {
+      if (handleVoiceInput(key)) return true;
+
       // Determine if this keypress is a history navigation command
       const isHistoryUp =
         !shellModeActive &&
@@ -875,9 +890,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       ) {
         setShellModeActive(!shellModeActive);
         buffer.setText(''); // Clear the '!' from input
+        resetTurnBaseline();
         return true;
       }
-
       if (keyMatchers[Command.ESCAPE](key)) {
         const cancelSearch = (
           setActive: (active: boolean) => void,
@@ -1362,6 +1377,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       backgroundTaskHeight,
       streamingState,
       handleEscPress,
+      resetTurnBaseline,
       registerPlainTabPress,
       resetPlainTabPress,
       toggleCleanUiDetailsVisible,
@@ -1371,9 +1387,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       keyMatchers,
       isHelpDismissKey,
       settings,
+      handleVoiceInput,
     ],
   );
-
   useKeypress(handleInput, {
     isActive: !isEmbeddedShellFocused && !copyModeEnabled,
     priority: true,
@@ -1645,21 +1661,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   );
 
   const useBackgroundColor = config.getUseBackgroundColor();
-  const isLowColor = isLowColorDepth();
-  const terminalBg = theme.background.primary || 'black';
-
-  // We should fallback to lines if the background color is disabled OR if it is
-  // enabled but we are in a low color depth terminal where we don't have a safe
-  // background color to use.
-  const useLineFallback = useMemo(() => {
-    if (!useBackgroundColor) {
-      return true;
-    }
-    if (isLowColor) {
-      return !getSafeLowColorBackground(terminalBg);
-    }
-    return false;
-  }, [useBackgroundColor, isLowColor, terminalBg]);
 
   const prevCursorRef = useRef(buffer.visualCursor);
   const prevTextRef = useRef(buffer.text);
@@ -1698,8 +1699,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     }
   }, [buffer.visualCursor, buffer.text, focus]);
 
-  const listBackgroundColor =
-    useLineFallback || !useBackgroundColor ? undefined : theme.background.input;
+  const listBackgroundColor = !useBackgroundColor
+    ? undefined
+    : theme.background.input;
+
+  const useLineFallback = !!process.env['NO_COLOR'];
 
   useEffect(() => {
     if (onSuggestionsVisibilityChange) {
@@ -1762,7 +1766,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   return (
     <>
       {suggestionsPosition === 'above' && suggestionsNode}
-      {useLineFallback ? (
+      {useLineFallback || !useBackgroundColor ? (
         <Box
           borderStyle="round"
           borderTop={true}
@@ -1781,17 +1785,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         backgroundOpacity={1}
         useBackgroundColor={useBackgroundColor}
       >
-        <Box
-          flexGrow={1}
-          flexDirection="row"
-          paddingX={1}
-          borderColor={borderColor}
-          borderStyle={useLineFallback ? 'round' : undefined}
-          borderTop={false}
-          borderBottom={false}
-          borderLeft={!useBackgroundColor}
-          borderRight={!useBackgroundColor}
-        >
+        <Box flexGrow={1} flexDirection="row" paddingX={1}>
           <Text
             color={statusColor ?? theme.text.accent}
             aria-label={statusText || undefined}
@@ -1816,27 +1810,46 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             )}{' '}
           </Text>
           <Box flexGrow={1} flexDirection="column" ref={innerBoxRef}>
-            {buffer.text.length === 0 && placeholder ? (
-              showCursor ? (
-                <Text
-                  terminalCursorFocus={showCursor}
-                  terminalCursorPosition={0}
-                >
-                  {chalk.inverse(placeholder.slice(0, 1))}
-                  <Text color={theme.text.secondary}>
-                    {placeholder.slice(1)}
-                  </Text>
+            {isRecording && (
+              <Box flexDirection="row" marginBottom={0}>
+                <Text color={theme.status.success}>🎙️ Listening...</Text>
+              </Box>
+            )}
+            {isVoiceModeEnabled && !isRecording && (
+              <Box flexDirection="row" marginBottom={0}>
+                <Text color={theme.text.secondary}>
+                  &gt; Voice mode:{' '}
+                  {(settings.experimental.voice?.activationMode ??
+                    'push-to-talk') === 'push-to-talk'
+                    ? 'Hold Space to record'
+                    : 'Space to start/stop recording'}{' '}
+                  (Esc to exit)
                 </Text>
-              ) : (
-                <Text color={theme.text.secondary}>{placeholder}</Text>
-              )
+              </Box>
+            )}
+            {buffer.text.length === 0 && !isRecording ? (
+              !isVoiceModeEnabled && placeholder ? (
+                showCursor ? (
+                  <Text
+                    terminalCursorFocus={showCursor}
+                    terminalCursorPosition={0}
+                  >
+                    {chalk.inverse(placeholder.slice(0, 1))}
+                    <Text color={theme.text.secondary}>
+                      {placeholder.slice(1)}
+                    </Text>
+                  </Text>
+                ) : (
+                  <Text color={theme.text.secondary}>{placeholder}</Text>
+                )
+              ) : null
             ) : (
               <Box
                 flexDirection="column"
                 height={Math.min(buffer.viewportHeight, scrollableData.length)}
                 width="100%"
               >
-                {isAlternateBuffer ? (
+                {config.getUseTerminalBuffer() ? (
                   <ScrollableList
                     ref={listRef}
                     hasFocus={focus}
@@ -1880,7 +1893,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           </Box>
         </Box>
       </HalfLinePaddedBox>
-      {useLineFallback ? (
+      {useLineFallback || !useBackgroundColor ? (
         <Box
           borderStyle="round"
           borderTop={false}

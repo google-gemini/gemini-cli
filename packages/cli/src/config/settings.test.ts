@@ -479,6 +479,137 @@ describe('Settings Loading and Merging', () => {
       expect(settings.merged.security?.folderTrust?.enabled).toBe(false); // Workspace setting should be used
     });
 
+    it('should resolve environment variables and cast them to correct types before validation', () => {
+      vi.stubEnv('TEST_AUTO_THEME', 'false');
+      vi.stubEnv('TEST_MAX_TURNS', '15');
+
+      (mockFsExistsSync as Mock).mockImplementation(
+        (p: fs.PathLike) =>
+          path.normalize(p.toString()) === path.normalize(USER_SETTINGS_PATH),
+      );
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (
+            path.normalize(p.toString()) === path.normalize(USER_SETTINGS_PATH)
+          ) {
+            return JSON.stringify({
+              ui: { autoThemeSwitching: '$TEST_AUTO_THEME' },
+              model: { maxSessionTurns: '$TEST_MAX_TURNS' },
+            });
+          }
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      expect(settings.merged.ui.autoThemeSwitching).toBe(false);
+      expect(settings.merged.model.maxSessionTurns).toBe(15);
+      expect(settings.errors).toHaveLength(0);
+    });
+
+    it('should use default values from environment variable placeholders', () => {
+      vi.stubEnv('TEST_AUTO_THEME', ''); // Should trigger default
+      delete process.env['TEST_AUTO_THEME'];
+
+      (mockFsExistsSync as Mock).mockImplementation(
+        (p: fs.PathLike) =>
+          path.normalize(p.toString()) === path.normalize(USER_SETTINGS_PATH),
+      );
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (
+            path.normalize(p.toString()) === path.normalize(USER_SETTINGS_PATH)
+          ) {
+            return JSON.stringify({
+              ui: { autoThemeSwitching: '${TEST_AUTO_THEME:-true}' },
+            });
+          }
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      expect(settings.merged.ui.autoThemeSwitching).toBe(true);
+      expect(settings.errors).toHaveLength(0);
+    });
+
+    it('should record validation errors if expansion result is invalid', () => {
+      vi.stubEnv('TEST_MAX_TURNS', 'not-a-number');
+
+      (mockFsExistsSync as Mock).mockImplementation(
+        (p: fs.PathLike) =>
+          path.normalize(p.toString()) === path.normalize(USER_SETTINGS_PATH),
+      );
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (
+            path.normalize(p.toString()) === path.normalize(USER_SETTINGS_PATH)
+          ) {
+            return JSON.stringify({
+              model: { maxSessionTurns: '$TEST_MAX_TURNS' },
+            });
+          }
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      expect(settings.errors.length).toBeGreaterThan(0);
+      expect(settings.errors[0].message).toContain(
+        'Expected number, received string',
+      );
+      // Should fall back to the expanded string value
+      expect(settings.merged.model.maxSessionTurns).toBe('not-a-number');
+    });
+
+    it('should preserve environment variable placeholders on save', () => {
+      vi.stubEnv('TEST_AUTO_THEME', 'true');
+      const placeholder = '${TEST_AUTO_THEME:-false}';
+
+      (mockFsExistsSync as Mock).mockImplementation(
+        (p: fs.PathLike) =>
+          path.normalize(p.toString()) === path.normalize(USER_SETTINGS_PATH),
+      );
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (
+            path.normalize(p.toString()) === path.normalize(USER_SETTINGS_PATH)
+          ) {
+            return JSON.stringify({
+              ui: { autoThemeSwitching: placeholder },
+            });
+          }
+          return '{}';
+        },
+      );
+
+      // Load settings - this will expand the placeholder for runtime use
+      const loaded = loadSettings(MOCK_WORKSPACE_DIR);
+      expect(loaded.merged.ui.autoThemeSwitching).toBe(true);
+
+      // Verify that the original settings for the user scope still have the placeholder
+      const userFile = loaded.forScope(SettingScope.User);
+      expect(userFile.originalSettings.ui?.autoThemeSwitching).toBe(
+        placeholder,
+      );
+
+      // Save settings - this should use the originalSettings (with placeholders)
+      const mockUpdate = vi.mocked(updateSettingsFilePreservingFormat);
+      saveSettings(userFile);
+
+      expect(mockUpdate).toHaveBeenCalledWith(
+        USER_SETTINGS_PATH,
+        expect.objectContaining({
+          ui: expect.objectContaining({
+            autoThemeSwitching: placeholder,
+          }),
+        }),
+      );
+    });
+
     it('should use system folderTrust over user setting', () => {
       (mockFsExistsSync as Mock).mockReturnValue(true);
       const userSettingsContent = {
@@ -1912,6 +2043,9 @@ describe('Settings Loading and Merging', () => {
       const geminiEnvPath = path.resolve(
         path.join(MOCK_WORKSPACE_DIR, GEMINI_DIR, '.env'),
       );
+      const workspaceEnvPath = path.resolve(
+        path.join(MOCK_WORKSPACE_DIR, '.env'),
+      );
 
       vi.spyOn(trustedFolders, 'isWorkspaceTrusted').mockReturnValue({
         isTrusted: isWorkspaceTrustedValue,
@@ -1919,9 +2053,11 @@ describe('Settings Loading and Merging', () => {
       });
       (mockFsExistsSync as Mock).mockImplementation((p: fs.PathLike) => {
         const normalizedP = path.resolve(p.toString());
-        return [path.resolve(USER_SETTINGS_PATH), geminiEnvPath].includes(
-          normalizedP,
-        );
+        return [
+          path.resolve(USER_SETTINGS_PATH),
+          geminiEnvPath,
+          workspaceEnvPath,
+        ].includes(normalizedP);
       });
       const userSettingsContent: Settings = {
         ui: {
@@ -1941,7 +2077,7 @@ describe('Settings Loading and Merging', () => {
           const normalizedP = path.resolve(p.toString());
           if (normalizedP === path.resolve(USER_SETTINGS_PATH))
             return JSON.stringify(userSettingsContent);
-          if (normalizedP === geminiEnvPath)
+          if (normalizedP === geminiEnvPath || normalizedP === workspaceEnvPath)
             return 'TESTTEST=1234\nGEMINI_API_KEY=test-key';
           return '{}';
         },
@@ -1970,7 +2106,7 @@ describe('Settings Loading and Merging', () => {
       expect(process.env['TESTTEST']).not.toEqual('1234');
     });
 
-    it('does load env files from untrusted spaces when NOT sandboxed', () => {
+    it('does NOT load non-whitelisted env files from untrusted spaces even when NOT sandboxed', () => {
       setup({ isFolderTrustEnabled: true, isWorkspaceTrustedValue: false });
       const settings = {
         security: { folderTrust: { enabled: true } },
@@ -1978,7 +2114,8 @@ describe('Settings Loading and Merging', () => {
       } as Settings;
       loadEnvironment(settings, MOCK_WORKSPACE_DIR, isWorkspaceTrusted);
 
-      expect(process.env['TESTTEST']).toEqual('1234');
+      expect(process.env['TESTTEST']).not.toEqual('1234');
+      expect(process.env['GEMINI_API_KEY']).toEqual('test-key');
     });
 
     it('does not load env files when trust is undefined and sandboxed', () => {
