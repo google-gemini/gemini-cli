@@ -406,7 +406,10 @@ export const defaultKeyBindingConfig: KeyBindingConfig = new Map([
   [Command.SHOW_MORE_LINES, [new KeyBinding('ctrl+o')]],
   [Command.EXPAND_PASTE, [new KeyBinding('ctrl+o')]],
   [Command.FOCUS_SHELL_INPUT, [new KeyBinding('tab')]],
-  [Command.UNFOCUS_SHELL_INPUT, [new KeyBinding('shift+tab')]],
+  [
+    Command.UNFOCUS_SHELL_INPUT,
+    [new KeyBinding('shift+tab'), new KeyBinding('f10')],
+  ],
   [Command.CLEAR_SCREEN, [new KeyBinding('ctrl+l')]],
   [Command.RESTART_APP, [new KeyBinding('r'), new KeyBinding('shift+r')]],
   [Command.SUSPEND_APP, [new KeyBinding('ctrl+z')]],
@@ -419,7 +422,10 @@ export const defaultKeyBindingConfig: KeyBindingConfig = new Map([
   [Command.TOGGLE_BACKGROUND_SHELL, [new KeyBinding('ctrl+b')]],
   [Command.TOGGLE_BACKGROUND_SHELL_LIST, [new KeyBinding('ctrl+l')]],
   [Command.KILL_BACKGROUND_SHELL, [new KeyBinding('ctrl+k')]],
-  [Command.UNFOCUS_BACKGROUND_SHELL, [new KeyBinding('shift+tab')]],
+  [
+    Command.UNFOCUS_BACKGROUND_SHELL,
+    [new KeyBinding('shift+tab'), new KeyBinding('f10')],
+  ],
   [Command.UNFOCUS_BACKGROUND_SHELL_LIST, [new KeyBinding('tab')]],
   [Command.SHOW_BACKGROUND_SHELL_UNFOCUS_WARNING, [new KeyBinding('tab')]],
 
