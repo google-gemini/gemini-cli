@@ -44,6 +44,15 @@ describe('EnterPlanModeTool', () => {
         getProjectTempDir: vi.fn().mockReturnValue('/mock/tmp'),
         ensureProjectTempDirExists: vi.fn(),
       } as unknown as Config['storage'],
+      // Mirrors the real Config.classifyWritePath: true iff the path is
+      // under getProjectTempDir() (the matrix test in config.test.ts pins
+      // the full classifier semantics).
+      isSecureWritePath: vi.fn((p: string) => {
+        const temp = '/mock/tmp';
+        return (
+          p === temp || p.startsWith(temp + '/') || p.startsWith(temp + '\\')
+        );
+      }),
     };
     tool = new EnterPlanModeTool(
       mockConfig as Config,

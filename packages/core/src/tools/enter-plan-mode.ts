@@ -133,15 +133,14 @@ export class EnterPlanModeInvocation extends BaseToolInvocation<
     if (!fs.existsSync(plansDir)) {
       try {
         // Tighten permissions only when the plans directory is the default
-        // path under the project temp tree. A custom plans dir resolved
-        // inside the user's workspace is left at the default umask so the
-        // user's other tooling can read those files normally.
-        const projectTempDir = this.config.storage.getProjectTempDir();
-        const isInsideTempTree =
-          plansDir === projectTempDir ||
-          plansDir.startsWith(projectTempDir + '/') ||
-          plansDir.startsWith(projectTempDir + '\\');
-        if (isInsideTempTree) {
+        // path under the project temp tree (or, in principle, the global
+        // GEMINI.md — irrelevant here but kept for consistency). A custom
+        // plans dir resolved inside the user's workspace is left at the
+        // default umask so the user's other tooling can read those files
+        // normally. Defer the classification to Config.isSecureWritePath
+        // so this site shares the same resolveToRealPath + isSubpath
+        // logic as write_file/edit and the Config allowlist.
+        if (this.config.isSecureWritePath(plansDir)) {
           this.config.storage.ensureProjectTempDirExists();
           fs.mkdirSync(plansDir, { recursive: true, mode: SECURE_DIR_MODE });
         } else {
