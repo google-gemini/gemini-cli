@@ -734,7 +734,7 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
 
   // Validate settings structure with Zod after environment variable expansion.
   // We use a functional approach to avoid mutating outer state, and "fail closed"
-  // by returning an empty object if validation fails to prevent insecure configurations.
+  // by marking errors as 'error' (fatal) if validation fails to prevent insecure configurations.
   const validate = (
     settings: Settings,
     filePath: string,
@@ -747,13 +747,15 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
         filePath,
       );
       return {
+        // If validation fails, we return an empty object for this layer.
+        // Since we also return a fatal 'error', the app will stop anyway.
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         settings: {} as unknown as Settings,
         errors: [
           {
             message: errorMessage,
             path: filePath,
-            severity: 'warning',
+            severity: 'error',
           },
         ],
       };

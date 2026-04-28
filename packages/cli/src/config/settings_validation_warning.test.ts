@@ -80,7 +80,6 @@ vi.mock('fs', async (importOriginal) => {
 import {
   loadSettings,
   USER_SETTINGS_PATH,
-  type LoadedSettings,
   resetSettingsCacheForTesting,
 } from './settings.js';
 
@@ -94,20 +93,14 @@ describe('Settings Validation Warning', () => {
     (fs.existsSync as Mock).mockReturnValue(false);
   });
 
-  it('should emit a warning and NOT throw when settings are invalid', () => {
+  it('should throw a fatal error when settings have invalid types (fail-closed)', () => {
     (fs.existsSync as Mock).mockImplementation(
       (p: string) => p === USER_SETTINGS_PATH,
     );
 
     const invalidSettingsContent = {
       ui: {
-        customThemes: {
-          terafox: {
-            name: 'terafox',
-            type: 'custom',
-            DiffModified: '#ffffff', // Invalid key
-          },
-        },
+        autoThemeSwitching: 'not-a-boolean',
       },
     };
 
@@ -117,18 +110,10 @@ describe('Settings Validation Warning', () => {
       return '{}';
     });
 
-    // Should NOT throw
-    let settings: LoadedSettings | undefined;
+    // Should throw FatalConfigError
     expect(() => {
-      settings = loadSettings(MOCK_WORKSPACE_DIR);
-    }).not.toThrow();
-
-    // Should have recorded a warning in the settings object
-    expect(
-      settings?.errors.some((e) =>
-        e.message.includes("Unrecognized key(s) in object: 'DiffModified'"),
-      ),
-    ).toBe(true);
+      loadSettings(MOCK_WORKSPACE_DIR);
+    }).toThrow(/Expected boolean, received string/);
   });
 
   it('should throw a fatal error when settings file is not a valid JSON object', () => {

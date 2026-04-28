@@ -535,7 +535,7 @@ describe('Settings Loading and Merging', () => {
       expect(settings.errors).toHaveLength(0);
     });
 
-    it('should record validation errors if expansion result is invalid', () => {
+    it('should throw FatalConfigError if expansion result is invalid', () => {
       vi.stubEnv('TEST_MAX_TURNS', 'not-a-number');
 
       (mockFsExistsSync as Mock).mockImplementation(
@@ -555,14 +555,9 @@ describe('Settings Loading and Merging', () => {
         },
       );
 
-      const settings = loadSettings(MOCK_WORKSPACE_DIR);
-
-      expect(settings.errors.length).toBeGreaterThan(0);
-      expect(settings.errors[0].message).toContain(
-        'Expected number, received string',
+      expect(() => loadSettings(MOCK_WORKSPACE_DIR)).toThrow(
+        /Expected number, received string/,
       );
-      // Should fall back to the schema default (since we return {} on validation failure for that scope)
-      expect(settings.merged.model.maxSessionTurns).toBe(-1);
     });
 
     it('should use system folderTrust over user setting', () => {
