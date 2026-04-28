@@ -80,6 +80,7 @@ vi.mock('fs', async (importOriginal) => {
 import {
   loadSettings,
   USER_SETTINGS_PATH,
+  type LoadedSettings,
   resetSettingsCacheForTesting,
 } from './settings.js';
 
@@ -93,14 +94,20 @@ describe('Settings Validation Warning', () => {
     (fs.existsSync as Mock).mockReturnValue(false);
   });
 
-  it('should throw a fatal error when settings have invalid types (fail-closed)', () => {
+  it('should emit a warning and NOT throw when settings are invalid', () => {
     (fs.existsSync as Mock).mockImplementation(
       (p: string) => p === USER_SETTINGS_PATH,
     );
 
     const invalidSettingsContent = {
       ui: {
-        autoThemeSwitching: 'not-a-boolean',
+        customThemes: {
+          terafox: {
+            name: 'terafox',
+            type: 'custom',
+            DiffModified: '#ffffff', // Invalid key
+          },
+        },
       },
     };
 
@@ -110,10 +117,19 @@ describe('Settings Validation Warning', () => {
       return '{}';
     });
 
-    // Should throw FatalConfigError
+    // Should NOT throw
+    let settings: LoadedSettings | undefined;
     expect(() => {
-      loadSettings(MOCK_WORKSPACE_DIR);
-    }).toThrow(/Expected boolean, received string/);
+      settings = loadSettings(MOCK_WORKSPACE_DIR);
+    }).not.toThrow();
+
+    // Should have recorded a warning in the settings object
+    expect(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      settings?.errors.some((e: any) =>
+        e.message.includes("Unrecognized key(s) in object: 'DiffModified'"),
+      ),
+    ).toBe(true);
   });
 
   it('should throw a fatal error when settings file is not a valid JSON object', () => {

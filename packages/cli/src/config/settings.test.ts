@@ -535,7 +535,7 @@ describe('Settings Loading and Merging', () => {
       expect(settings.errors).toHaveLength(0);
     });
 
-    it('should throw FatalConfigError if expansion result is invalid', () => {
+    it('should record validation errors if expansion result is invalid', () => {
       vi.stubEnv('TEST_MAX_TURNS', 'not-a-number');
 
       (mockFsExistsSync as Mock).mockImplementation(
@@ -555,14 +555,14 @@ describe('Settings Loading and Merging', () => {
         },
       );
 
-      // Should throw FatalConfigError
-      expect(() => loadSettings(MOCK_WORKSPACE_DIR)).toThrow(
-        /Expected number, received string/,
-      );
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
 
-      // Verify that if we bypass the throw (internal check), we still have the original values
-      // This is a bit tricky since loadSettings is cached and throws.
-      // But we can clear cache and use a non-throwing mock for coreEvents if needed.
+      expect(settings.errors.length).toBeGreaterThan(0);
+      expect(settings.errors[0].message).toContain(
+        'Expected number, received string',
+      );
+      // Should fall back to the expanded string value
+      expect(settings.merged.model.maxSessionTurns).toBe('not-a-number');
     });
 
     it('should use system folderTrust over user setting', () => {

@@ -733,8 +733,9 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
   workspaceSettings = resolveEnvVarsInObject(workspaceResult.settings);
 
   // Validate settings structure with Zod after environment variable expansion.
-  // We use a functional approach to avoid mutating outer state, and "fail closed"
-  // by marking errors as 'error' (fatal) if validation fails to prevent insecure configurations.
+  // We use a functional approach to avoid mutating outer state.
+  // If validation fails, we mark it as a 'warning' and return the original settings
+  // (instead of an empty object) to avoid "ignoring" the file (fail-open).
   const validate = (
     settings: Settings,
     filePath: string,
@@ -747,14 +748,14 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
         filePath,
       );
       return {
-        // If validation fails, we return the original settings.
-        // Since we also return a fatal 'error', the app will stop anyway.
+        // If validation fails, we return the original settings (unvalidated/uncast).
+        // This ensures the file is NOT ignored during merging, while still reporting the error.
         settings,
         errors: [
           {
             message: errorMessage,
             path: filePath,
-            severity: 'error',
+            severity: 'warning',
           },
         ],
       };
