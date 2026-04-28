@@ -152,6 +152,19 @@ describe('getFsErrorMessage', () => {
         expected:
           'Operation timed out. The network connection or filesystem operation took too long.',
       },
+      {
+        code: 'ENOTDIR',
+        message: 'ENOTDIR: not a directory',
+        path: '/some/file.txt/inner',
+        expected:
+          "Not a directory: '/some/file.txt/inner'. Check if the path is correct and that all parent components are directories.",
+      },
+      {
+        code: 'ENOTDIR',
+        message: 'ENOTDIR: not a directory',
+        expected:
+          'Not a directory. Check if the path is correct and that all parent components are directories.',
+      },
     ];
 
     it.each(testCases)(
