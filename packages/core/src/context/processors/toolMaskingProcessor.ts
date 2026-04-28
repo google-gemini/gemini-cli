@@ -129,7 +129,10 @@ export function createToolMaskingProcessor(
           1024
         ).toFixed(2);
         const totalLines = content.split('\n').length;
-        return `<tool_output_masked>\n[Tool ${nodeType} string (${fileSizeMB}MB, ${totalLines} lines) masked to preserve context window. Full string saved to: ${filePath}]\n</tool_output_masked>`;
+
+        // Ensure consistent path separators for LLM tokenization and deterministic tests across OSes
+        const normalizedPath = filePath.split(path.sep).join('/');
+        return `<tool_output_masked>\n[Tool ${nodeType} string (${fileSizeMB}MB, ${totalLines} lines) masked to preserve context window. Full string saved to: ${normalizedPath}]\n</tool_output_masked>`;
       };
 
       const returnedNodes: ConcreteNode[] = [];
@@ -199,6 +202,13 @@ export function createToolMaskingProcessor(
               const maskedIntent = isMaskableRecord(intentRes.masked)
                 ? (intentRes.masked as Record<string, unknown>)
                 : undefined;
+              // Ensure we strictly preserve the original intent if it was unchanged and is a record
+              const finalIntent = intentRes.changed
+                ? maskedIntent
+                : isMaskableRecord(rawIntent)
+                  ? (rawIntent as Record<string, unknown>)
+                  : undefined;
+
               // Handle observation explicitly as string vs object
               const maskedObs =
                 typeof obsRes.masked === 'string'
@@ -206,13 +216,21 @@ export function createToolMaskingProcessor(
                   : isMaskableRecord(obsRes.masked)
                     ? (obsRes.masked as Record<string, unknown>)
                     : undefined;
+              // Ensure we strictly preserve the original observation if it was unchanged
+              const finalObs = obsRes.changed
+                ? maskedObs
+                : typeof rawObs === 'string'
+                  ? ({ message: rawObs } as Record<string, unknown>)
+                  : isMaskableRecord(rawObs)
+                    ? (rawObs as Record<string, unknown>)
+                    : undefined;
 
               const newIntentTokens =
                 env.tokenCalculator.estimateTokensForParts([
                   {
                     functionCall: {
                       name: toolName || 'unknown',
-                      args: maskedIntent,
+                      args: finalIntent,
                       id: callId,
                     },
                   },
@@ -223,7 +241,7 @@ export function createToolMaskingProcessor(
                 obsPart = {
                   functionResponse: {
                     name: toolName || 'unknown',
-                    response: maskedObs,
+                    response: finalObs,
                     id: callId,
                   },
                 };
@@ -241,8 +259,8 @@ export function createToolMaskingProcessor(
                 const maskedNode: ToolExecution = {
                   ...node,
                   id: randomUUID(), // Modified, so generate new ID
-                  intent: maskedIntent ?? node.intent,
-                  observation: maskedObs ?? node.observation,
+                  intent: finalIntent ?? node.intent,
+                  observation: finalObs ?? node.observation,
                   tokens: {
                     intent: newIntentTokens,
                     observation: newObsTokens,
