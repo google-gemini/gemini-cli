@@ -94,6 +94,7 @@ const KEY_INFO_MAP: Record<
   OE: { name: 'clear' },
   OF: { name: 'end' },
   OH: { name: 'home' },
+  OM: { name: 'enter' },
   OP: { name: 'f1' },
   OQ: { name: 'f2' },
   OR: { name: 'f3' },
