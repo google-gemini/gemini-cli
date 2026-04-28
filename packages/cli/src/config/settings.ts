@@ -717,6 +717,8 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
 
         // Return the successfully cast and validated data
         return {
+          // Since we've successfully validated expandedSettings against settingsZodSchema,
+          // it's safe to cast the resulting data to the Settings type.
           // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           settings: (validationResult.data as Settings) ?? expandedSettings,
           rawJson: content,

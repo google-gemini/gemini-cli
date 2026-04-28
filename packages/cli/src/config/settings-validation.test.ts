@@ -13,6 +13,7 @@ import {
   settingsZodSchema,
 } from './settings-validation.js';
 import { z } from 'zod';
+import { type Settings } from './settingsSchema.js';
 
 describe('settings-validation', () => {
   describe('validateSettings', () => {
@@ -337,10 +338,9 @@ describe('settings-validation', () => {
 
         const result = validateSettings(settings);
         expect(result.success).toBe(true);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const data = result.data as any;
-        expect(data.ui.autoThemeSwitching).toBe(true);
-        expect(data.ui.hideWindowTitle).toBe(false);
+        const data = result.data as Settings;
+        expect(data.ui?.autoThemeSwitching).toBe(true);
+        expect(data.ui?.hideWindowTitle).toBe(false);
       });
 
       it('should cast boolean strings case-insensitively', () => {
@@ -353,10 +353,9 @@ describe('settings-validation', () => {
 
         const result = validateSettings(settings);
         expect(result.success).toBe(true);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const data = result.data as any;
-        expect(data.ui.autoThemeSwitching).toBe(true);
-        expect(data.ui.hideWindowTitle).toBe(false);
+        const data = result.data as Settings;
+        expect(data.ui?.autoThemeSwitching).toBe(true);
+        expect(data.ui?.hideWindowTitle).toBe(false);
       });
 
       it('should cast numeric strings to numbers', () => {
@@ -369,10 +368,9 @@ describe('settings-validation', () => {
 
         const result = validateSettings(settings);
         expect(result.success).toBe(true);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const data = result.data as any;
-        expect(data.model.maxSessionTurns).toBe(42);
-        expect(data.model.compressionThreshold).toBe(0.5);
+        const data = result.data as Settings;
+        expect(data.model?.maxSessionTurns).toBe(42);
+        expect(data.model?.compressionThreshold).toBe(0.5);
       });
 
       it('should reject invalid castable strings', () => {
