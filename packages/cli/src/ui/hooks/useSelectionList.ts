@@ -213,11 +213,8 @@ function selectionListReducer(
 
     case 'INITIALIZE': {
       const { initialIndex, items, wrapAround } = action.payload;
-      // Only preserve the old active key if items haven't actually changed
-      // When items change (e.g., after a reset), don't try to preserve old position
-      const itemsActuallyChanged = !areBaseItemsEqual(state.items, items);
       const activeKey =
-        !itemsActuallyChanged && initialIndex === state.initialIndex
+        initialIndex === state.initialIndex
           ? state.items[state.activeIndex]?.key
           : undefined;
 
@@ -313,25 +310,10 @@ export function useSelectionList<T>({
   const prevWrapAroundRef = useRef(wrapAround);
   const lastProcessedFocusKeyRef = useRef<string | undefined>(undefined);
 
-  // Handle programmatic focus changes via focusKey
-  useEffect(() => {
-    if (focusKey === undefined) {
-      lastProcessedFocusKeyRef.current = undefined;
-      return;
-    }
-
-    if (focusKey === lastProcessedFocusKeyRef.current) return;
-
-    const index = items.findIndex(
-      (item) => item.key === focusKey && !item.disabled,
-    );
-    if (index !== -1) {
-      lastProcessedFocusKeyRef.current = focusKey;
-      dispatch({ type: 'SET_ACTIVE_INDEX', payload: { index } });
-    }
-  }, [focusKey, items]);
-
-  // Initialize/synchronize state when initialIndex or items change
+  // Initialize/synchronize state when initialIndex or items change.
+  // IMPORTANT: This effect must run BEFORE the focusKey effect below so that
+  // when both items and focusKey change simultaneously (e.g., after a reset),
+  // focusKey's SET_ACTIVE_INDEX runs last and wins.
   useEffect(() => {
     const baseItemsChanged = !areBaseItemsEqual(
       prevBaseItemsRef.current,
@@ -350,6 +332,26 @@ export function useSelectionList<T>({
       prevWrapAroundRef.current = wrapAround;
     }
   });
+
+  // Handle programmatic focus changes via focusKey.
+  // IMPORTANT: This effect must run AFTER the INITIALIZE effect above so that
+  // focusKey takes priority when both items and focusKey change in the same render.
+  useEffect(() => {
+    if (focusKey === undefined) {
+      lastProcessedFocusKeyRef.current = undefined;
+      return;
+    }
+
+    if (focusKey === lastProcessedFocusKeyRef.current) return;
+
+    const index = items.findIndex(
+      (item) => item.key === focusKey && !item.disabled,
+    );
+    if (index !== -1) {
+      lastProcessedFocusKeyRef.current = focusKey;
+      dispatch({ type: 'SET_ACTIVE_INDEX', payload: { index } });
+    }
+  }, [focusKey, items]);
 
   // Handle side effects based on state changes
   useEffect(() => {

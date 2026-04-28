@@ -288,7 +288,7 @@ describe('<FooterConfigDialog />', () => {
     }
 
     await waitFor(() => {
-      expect(lastFrame()).toMatch(/> \[ \] Reset to default footer/);
+      expect(lastFrame()).toMatch(/> Reset to default footer/);
     });
 
     // Press Enter on "Reset to default" - should work on FIRST press
@@ -315,8 +315,8 @@ describe('<FooterConfigDialog />', () => {
       { settings },
     );
 
-    // Initial: focus on git-branch (first item of user's list)
-    expect(lastFrame()).toContain('> [ ] git-branch');
+    // Initial: focus on git-branch (first item of user's list, which is checked)
+    expect(lastFrame()).toContain('> [✓] git-branch');
 
     // Navigate to "Reset to default" and trigger it
     for (let i = 0; i < 12; i++) {
