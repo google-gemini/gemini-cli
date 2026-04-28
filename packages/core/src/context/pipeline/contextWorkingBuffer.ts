@@ -66,14 +66,21 @@ export class ContextWorkingBufferImpl implements ContextWorkingBuffer {
 
     const newPristineMap = new Map<string, ConcreteNode>(this.pristineNodesMap);
     const newProvenanceMap = new Map(this.provenanceMap);
+    const existingIds = new Set(this.nodes.map((n) => n.id));
 
+    const nodesToAdd: ConcreteNode[] = [];
     for (const node of newNodes) {
-      newPristineMap.set(node.id, node);
-      newProvenanceMap.set(node.id, new Set([node.id]));
+      if (!existingIds.has(node.id)) {
+        newPristineMap.set(node.id, node);
+        newProvenanceMap.set(node.id, new Set([node.id]));
+        nodesToAdd.push(node);
+      }
     }
 
+    if (nodesToAdd.length === 0) return this;
+
     return new ContextWorkingBufferImpl(
-      [...this.nodes, ...newNodes],
+      [...this.nodes, ...nodesToAdd],
       newPristineMap,
       newProvenanceMap,
       [...this.history],

@@ -4,23 +4,100 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Content } from '@google/genai';
+import type { Content, Part } from '@google/genai';
 import type { ConcreteNode, Episode } from './types.js';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createHash } from 'node:crypto';
 import { debugLogger } from '../../utils/debugLogger.js';
+
+interface PartWithSynthId extends Part {
+  _synthId?: string;
+}
+
+function isTextPart(part: Part): part is Part & { text: string } {
+  return typeof part.text === 'string';
+}
+
+function isInlineDataPart(
+  part: Part,
+): part is Part & { inlineData: { data: string } } {
+  return (
+    typeof part.inlineData === 'object' &&
+    part.inlineData !== null &&
+    typeof part.inlineData.data === 'string'
+  );
+}
+
+function isFileDataPart(
+  part: Part,
+): part is Part & { fileData: { fileUri: string } } {
+  return (
+    typeof part.fileData === 'object' &&
+    part.fileData !== null &&
+    typeof part.fileData.fileUri === 'string'
+  );
+}
+
+function isFunctionCallPart(
+  part: Part,
+): part is Part & { functionCall: { id: string; name: string } } {
+  return (
+    typeof part.functionCall === 'object' &&
+    part.functionCall !== null &&
+    typeof part.functionCall.name === 'string'
+  );
+}
+
+function isFunctionResponsePart(
+  part: Part,
+): part is Part & { functionResponse: { id: string; name: string } } {
+  return (
+    typeof part.functionResponse === 'object' &&
+    part.functionResponse !== null &&
+    typeof part.functionResponse.name === 'string'
+  );
+}
 
 /**
  * Generates a stable ID for an object reference using a WeakMap.
+ * Falls back to content-based hashing for Part-like objects to ensure
+ * stability across object re-creations (e.g. during history mapping).
  */
 export function getStableId(
   obj: object,
   nodeIdentityMap: WeakMap<object, string>,
+  turnIdx: number = 0,
+  partIdx: number = 0,
 ): string {
   let id = nodeIdentityMap.get(obj);
+  if (id) return id;
+
+  const part = obj as PartWithSynthId;
+  // If the object already has a synthetic ID property, use it.
+  if (typeof part._synthId === 'string') {
+    id = part._synthId;
+  } else if (isTextPart(part)) {
+    // Content-based ID for text parts, salted with indices for uniqueness
+    const hash = createHash('md5')
+      .update(`${turnIdx}:${partIdx}:${part.text}`)
+      .digest('hex');
+    id = `text_${hash}`;
+  } else if (isInlineDataPart(part)) {
+    // Content-based ID for inline media
+    const hash = createHash('md5')
+      .update(`${turnIdx}:${partIdx}:${part.inlineData.data}`)
+      .digest('hex');
+    id = `media_${hash}`;
+  } else if (isFileDataPart(part)) {
+    id = `file_${turnIdx}_${partIdx}_${createHash('md5')
+      .update(part.fileData.fileUri)
+      .digest('hex')}`;
+  }
+
   if (!id) {
     id = randomUUID();
-    nodeIdentityMap.set(obj, id);
   }
+
+  nodeIdentityMap.set(obj, id);
   return id;
 }
 
@@ -56,7 +133,8 @@ export class ContextGraphBuilder {
 
     const nodes: ConcreteNode[] = [];
 
-    for (const msg of history) {
+    for (let turnIdx = 0; turnIdx < history.length; turnIdx++) {
+      const msg = history[turnIdx];
       if (!msg.parts) continue;
 
       if (msg.role === 'user') {
@@ -67,21 +145,29 @@ export class ContextGraphBuilder {
         // A user text message starts a new logical episode
         if (hasUserParts) {
           finalizeEpisode();
-          currentEpisodeId = getStableId(msg, this.nodeIdentityMap);
+          currentEpisodeId = getStableId(msg, this.nodeIdentityMap, turnIdx, 0);
           currentEpisode = {
             id: currentEpisodeId,
             concreteNodes: [],
           };
         }
 
-        for (const part of msg.parts) {
-          const apiId = part.functionResponse?.id || part.functionCall?.id;
-          const id = apiId || getStableId(part, this.nodeIdentityMap);
+        for (let partIdx = 0; partIdx < msg.parts.length; partIdx++) {
+          const part = msg.parts[partIdx];
+          const apiId = isFunctionResponsePart(part)
+            ? part.functionResponse.id
+            : isFunctionCallPart(part)
+              ? part.functionCall.id
+              : undefined;
+          const id =
+            apiId || getStableId(part, this.nodeIdentityMap, turnIdx, partIdx);
 
           const node: ConcreteNode = {
             id,
             timestamp: Date.now(),
-            type: part.functionResponse ? 'TOOL_EXECUTION' : 'USER_PROMPT',
+            type: isFunctionResponsePart(part)
+              ? 'TOOL_EXECUTION'
+              : 'USER_PROMPT',
             role: 'user',
             payload: part,
             logicalParentId: currentEpisodeId,
@@ -97,21 +183,25 @@ export class ContextGraphBuilder {
       } else if (msg.role === 'model') {
         // Model turns belong to the current episode (if one exists) or start a new one
         if (!currentEpisode) {
-          currentEpisodeId = getStableId(msg, this.nodeIdentityMap);
+          currentEpisodeId = getStableId(msg, this.nodeIdentityMap, turnIdx, 0);
           currentEpisode = {
             id: currentEpisodeId,
             concreteNodes: [],
           };
         }
 
-        for (const part of msg.parts) {
-          const apiId = part.functionCall?.id;
-          const id = apiId || getStableId(part, this.nodeIdentityMap);
+        for (let partIdx = 0; partIdx < msg.parts.length; partIdx++) {
+          const part = msg.parts[partIdx];
+          const apiId = isFunctionCallPart(part)
+            ? part.functionCall.id
+            : undefined;
+          const id =
+            apiId || getStableId(part, this.nodeIdentityMap, turnIdx, partIdx);
 
           const node: ConcreteNode = {
             id,
             timestamp: Date.now(),
-            type: part.functionCall ? 'TOOL_EXECUTION' : 'AGENT_THOUGHT',
+            type: isFunctionCallPart(part) ? 'TOOL_EXECUTION' : 'AGENT_THOUGHT',
             role: 'model',
             payload: part,
             logicalParentId: currentEpisodeId,

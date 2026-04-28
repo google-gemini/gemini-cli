@@ -79,8 +79,12 @@ export class ContextTokenCalculator {
    */
   calculateConcreteListTokens(nodes: readonly ConcreteNode[]): number {
     let tokens = 0;
+    const seenIds = new Set<string>();
     for (const node of nodes) {
-      tokens += this.getTokenCost(node);
+      if (!seenIds.has(node.id)) {
+        seenIds.add(node.id);
+        tokens += this.getTokenCost(node);
+      }
     }
     return tokens;
   }
