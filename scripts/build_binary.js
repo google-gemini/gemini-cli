@@ -179,6 +179,27 @@ try {
   process.exit(1);
 }
 
+// 2b. Copy host-platform ripgrep binary into the bundle for the SEA.
+// (npm tarballs omit these to stay under the registry upload limit.)
+const ripgrepVendorSrc = join(root, 'packages/core/vendor/ripgrep');
+const ripgrepVendorDest = join(bundleDir, 'vendor', 'ripgrep');
+if (existsSync(ripgrepVendorSrc)) {
+  const rgBinName = `rg-${process.platform}-${process.arch}${
+    process.platform === 'win32' ? '.exe' : ''
+  }`;
+  const rgSrc = join(ripgrepVendorSrc, rgBinName);
+  if (existsSync(rgSrc)) {
+    mkdirSync(ripgrepVendorDest, { recursive: true });
+    cpSync(rgSrc, join(ripgrepVendorDest, rgBinName), { dereference: true });
+    console.log(`Copied ${rgBinName} to bundle/vendor/ripgrep/`);
+  } else {
+    console.warn(
+      `Warning: bundled ripgrep binary not found for ${process.platform}/${process.arch} at ${rgSrc}. ` +
+        `The SEA will fall back to system grep at runtime.`,
+    );
+  }
+}
+
 // 3. Stage & Sign Native Modules
 const includeNativeModules = process.env.BUNDLE_NATIVE_MODULES !== 'false';
 console.log(`Include Native Modules: ${includeNativeModules}`);
@@ -299,6 +320,23 @@ if (existsSync(policyDir)) {
     // Use a unique key to avoid collision if filenames overlap (though unlikely here)
     // But sea-launch writes to 'path', so key is just for lookup.
     const assetKey = `policies:${policyFile}`;
+    assets[assetKey] = fsPath;
+    manifest.files.push({ key: assetKey, path: relativePath, hash: hash });
+  }
+}
+
+// Add ripgrep binary (copied in step 2b). Must be registered here so that
+// sea-launch.cjs extracts it to runtimeDir/vendor/ripgrep/ on startup; the
+// runtime resolver in packages/core/src/tools/ripGrep.ts uses __dirname-
+// relative paths to find it.
+if (existsSync(ripgrepVendorDest)) {
+  const rgFiles = globSync('*', { cwd: ripgrepVendorDest, nodir: true });
+  for (const rgFile of rgFiles) {
+    const fsPath = join(ripgrepVendorDest, rgFile);
+    const relativePath = join('vendor', 'ripgrep', rgFile);
+    const content = readFileSync(fsPath);
+    const hash = sha256(content);
+    const assetKey = `vendor:${rgFile}`;
     assets[assetKey] = fsPath;
     manifest.files.push({ key: assetKey, path: relativePath, hash: hash });
   }
