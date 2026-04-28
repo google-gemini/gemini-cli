@@ -2910,6 +2910,59 @@
           "default": false,
           "type": "boolean"
         },
+        "voiceMode": {
+          "title": "Voice Mode",
+          "description": "Enable experimental voice dictation and commands (/voice, /voice model).",
+          "markdownDescription": "Enable experimental voice dictation and commands (/voice, /voice model).\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "voice": {
+          "title": "Voice",
+          "description": "Settings for voice mode and transcription.",
+          "markdownDescription": "Settings for voice mode and transcription.\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "properties": {
+            "activationMode": {
+              "title": "Voice Activation Mode",
+              "description": "How to trigger voice recording with the Space key.",
+              "markdownDescription": "How to trigger voice recording with the Space key.\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `push-to-talk`",
+              "default": "push-to-talk",
+              "type": "string",
+              "enum": ["push-to-talk", "toggle"]
+            },
+            "backend": {
+              "title": "Voice Transcription Backend",
+              "description": "The backend to use for voice transcription.",
+              "markdownDescription": "The backend to use for voice transcription.\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `gemini-live`",
+              "default": "gemini-live",
+              "type": "string",
+              "enum": ["gemini-live", "whisper"]
+            },
+            "whisperModel": {
+              "title": "Whisper Model",
+              "description": "The Whisper model to use for local transcription.",
+              "markdownDescription": "The Whisper model to use for local transcription.\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `ggml-base.en.bin`",
+              "default": "ggml-base.en.bin",
+              "type": "string",
+              "enum": [
+                "ggml-tiny.en.bin",
+                "ggml-base.en.bin",
+                "ggml-large-v3-turbo-q5_0.bin",
+                "ggml-large-v3-turbo-q8_0.bin"
+              ]
+            },
+            "stopGracePeriodMs": {
+              "title": "Voice Stop Grace Period (ms)",
+              "description": "How long to wait for final transcription after stopping recording.",
+              "markdownDescription": "How long to wait for final transcription after stopping recording.\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `1000`",
+              "default": 1000,
+              "type": "number"
+            }
+          },
+          "additionalProperties": false
+        },
         "adk": {
           "title": "ADK",
           "description": "Settings for the Agent Development Kit (ADK).",
@@ -3092,6 +3145,13 @@
           "description": "Disable the built-in save_memory tool and let the main agent persist project context by editing markdown files directly with edit/write_file. Route facts across four tiers: team-shared conventions go to project GEMINI.md files, project-specific personal notes go to the per-project private memory folder (MEMORY.md as index + sibling .md files for detail), and cross-project personal preferences go to the global ~/.gemini/GEMINI.md (the only file under ~/.gemini/ that the agent can edit — settings, credentials, etc. remain off-limits). Set to false to fall back to the legacy save_memory tool.",
           "markdownDescription": "Disable the built-in save_memory tool and let the main agent persist project context by editing markdown files directly with edit/write_file. Route facts across four tiers: team-shared conventions go to project GEMINI.md files, project-specific personal notes go to the per-project private memory folder (MEMORY.md as index + sibling .md files for detail), and cross-project personal preferences go to the global ~/.gemini/GEMINI.md (the only file under ~/.gemini/ that the agent can edit — settings, credentials, etc. remain off-limits). Set to false to fall back to the legacy save_memory tool.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `true`",
           "default": true,
+          "type": "boolean"
+        },
+        "stressTestProfile": {
+          "title": "Use the stress test profile to aggressively trigger context management.",
+          "description": "Significantly lowers token limits to force early garbage collection and distillation for testing purposes.",
+          "markdownDescription": "Significantly lowers token limits to force early garbage collection and distillation for testing purposes.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
           "type": "boolean"
         },
         "autoMemory": {
@@ -3826,6 +3886,9 @@
               "type": "string"
             },
             "accent": {
+              "type": "string"
+            },
+            "response": {
               "type": "string"
             }
           }
