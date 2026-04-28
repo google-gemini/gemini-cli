@@ -8,6 +8,7 @@ import { Box, Text, useIsScreenReaderEnabled } from 'ink';
 import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { useAppContext } from '../contexts/AppContext.js';
 import { useUIState } from '../contexts/UIStateContext.js';
+import { useConfig } from '../contexts/ConfigContext.js';
 import { theme } from '../semantic-colors.js';
 import { StreamingState } from '../types.js';
 import { UpdateNotification } from './UpdateNotification.js';
@@ -35,10 +36,12 @@ const screenReaderNudgeFilePath = path.join(
 const MAX_STARTUP_WARNING_SHOW_COUNT = 3;
 
 export const Notifications = () => {
+  const config = useConfig();
   const { startupWarnings } = useAppContext();
   const { initError, streamingState, updateInfo } = useUIState();
 
   const isScreenReaderEnabled = useIsScreenReaderEnabled();
+
   const showInitError =
     initError && streamingState !== StreamingState.Responding;
 
@@ -128,10 +131,11 @@ export const Notifications = () => {
   }, [showScreenReaderNudge]);
 
   if (
-    !showStartupWarnings &&
-    !showInitError &&
-    !updateInfo &&
-    !showScreenReaderNudge
+    config.getSimulateUser() ||
+    (!showStartupWarnings &&
+      !showInitError &&
+      !updateInfo &&
+      !showScreenReaderNudge)
   ) {
     return null;
   }

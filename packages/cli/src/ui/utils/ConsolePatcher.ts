@@ -53,7 +53,13 @@ export class ConsolePatcher {
       // When it is non interactive mode, do not show info logging unless
       // it is debug mode. default to true if it is undefined.
       if (this.params.interactive === false) {
-        if ((type === 'info' || type === 'log') && !this.params.debugMode) {
+        if (
+          (type === 'info' ||
+            type === 'log' ||
+            type === 'warn' ||
+            type === 'error') &&
+          !this.params.debugMode
+        ) {
           return;
         }
       }

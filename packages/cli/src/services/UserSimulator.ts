@@ -3,12 +3,16 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import type { Config } from '@google/gemini-cli-core';
 import {
   debugLogger,
   LlmRole,
   PREVIEW_GEMINI_FLASH_MODEL,
   resolveModel,
+  MessageBusType,
+  CoreToolCallStatus,
+  type Config,
+  type ToolCall,
+  type ToolCallsUpdateMessage,
 } from '@google/gemini-cli-core';
 import type { Writable } from 'node:stream';
 import * as fs from 'node:fs';
@@ -31,6 +35,9 @@ export class UserSimulator {
   private knowledgeBase = '';
   private editableKnowledgeFile: string | null = null;
   private actionHistory: string[] = [];
+  private pendingToolCalls: ToolCall[] = [];
+  private messageBusHandler: ((msg: ToolCallsUpdateMessage) => void) | null =
+    null;
 
   constructor(
     private readonly config: Config,
@@ -42,6 +49,16 @@ export class UserSimulator {
     if (!this.config.getSimulateUser()) {
       return;
     }
+
+    this.messageBusHandler = (msg: ToolCallsUpdateMessage) => {
+      this.pendingToolCalls = msg.toolCalls.filter(
+        (tc) => tc.status === CoreToolCallStatus.AwaitingApproval,
+      );
+    };
+    this.config
+      .getMessageBus()
+      .subscribe(MessageBusType.TOOL_CALLS_UPDATE, this.messageBusHandler);
+
     const source = this.config.getKnowledgeSource?.();
     if (source) {
       if (!fs.existsSync(source)) {
@@ -65,6 +82,12 @@ export class UserSimulator {
     if (this.timer) {
       clearInterval(this.timer);
       this.timer = null;
+    }
+    if (this.messageBusHandler) {
+      this.config
+        .getMessageBus()
+        .unsubscribe(MessageBusType.TOOL_CALLS_UPDATE, this.messageBusHandler);
+      this.messageBusHandler = null;
     }
     debugLogger.log('User simulator stopped');
   }
@@ -140,6 +163,12 @@ export class UserSimulator {
               .join('\n')}\n`
           : '';
 
+      const pendingToolInstruction =
+        this.pendingToolCalls.length > 0
+          ? `\nINTERNAL SYSTEM STATE: The system is currently BLOCKED awaiting user approval for the following tool(s): ${this.pendingToolCalls.map((tc) => tc.request.name).join(', ')}.
+Ignore any 'Responding' indicators, spinners, or timers. You MUST provide a response (e.g., 'y\\r', '2\\r') to unblock the tool execution NOW.\n`
+          : '';
+
       const prompt = `You are evaluating a CLI agent by simulating a user sitting at the terminal.
 Look carefully at the screen and determine the CLI's current state:
 
@@ -170,7 +199,7 @@ JSON FORMAT:
   "used_knowledge": <true if you used the User Knowledge Base below to answer this prompt, false otherwise>,
   "new_rule": "<If used_knowledge is false and action is not <WAIT> or <DONE>, formulate a single, clear, reusable one-line rule combining the question and your answer without using option numbers (e.g. 1, 2) that might change. For example: 'If asked to allow pip execution, always allow it.' or 'Automatically accept edits for snake game implementation.'>"
 }
-${goalInstruction}${knowledgeInstruction}${historyInstruction}
+${goalInstruction}${knowledgeInstruction}${historyInstruction}${pendingToolInstruction}
 
 Here is the current terminal screen output:
 
@@ -332,6 +361,10 @@ ${strippedScreen}
           // while preventing UI state collisions during long simulated inputs.
           await new Promise((resolve) => setTimeout(resolve, 10));
         }
+
+        // Wait a bit to ensure Ink has processed the full input
+        await new Promise((resolve) => setTimeout(resolve, 100));
+
         this.lastScreenContent = normalizedScreen;
       } else {
         debugLogger.log('[SIMULATOR] Skipping (empty response)');

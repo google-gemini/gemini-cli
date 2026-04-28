@@ -9,6 +9,7 @@ import { Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { useUIState, type UIState } from '../contexts/UIStateContext.js';
 import { useInputState, type InputState } from '../contexts/InputContext.js';
+import { useConfig } from '../contexts/ConfigContext.js';
 import { TransientMessageType } from '../../utils/events.js';
 
 export function shouldShowToast(
@@ -29,6 +30,11 @@ export function shouldShowToast(
 export const ToastDisplay: React.FC = () => {
   const uiState = useUIState();
   const inputState = useInputState();
+  const config = useConfig();
+
+  if (config.getSimulateUser()) {
+    return null;
+  }
 
   if (uiState.ctrlCPressedOnce) {
     return (
