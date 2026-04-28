@@ -88,8 +88,7 @@ exports[`<MarkdownDisplay /> > with 'Unix' line endings > renders ordered lists 
 `;
 
 exports[`<MarkdownDisplay /> > with 'Unix' line endings > renders tables correctly 1`] = `
-"
-┌──────────┬──────────┐
+"┌──────────┬──────────┐
 │ Header 1 │ Header 2 │
 ├──────────┼──────────┤
 │ Cell 1   │ Cell 2   │
@@ -191,8 +190,7 @@ exports[`<MarkdownDisplay /> > with 'Windows' line endings > renders ordered lis
 `;
 
 exports[`<MarkdownDisplay /> > with 'Windows' line endings > renders tables correctly 1`] = `
-"
-┌──────────┬──────────┐
+"┌──────────┬──────────┐
 │ Header 1 │ Header 2 │
 ├──────────┼──────────┤
 │ Cell 1   │ Cell 2   │

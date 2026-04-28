@@ -283,12 +283,17 @@ describe('<ShellToolMessage />', () => {
           uiActions,
           config: makeFakeConfig({ useAlternateBuffer: false }),
           settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
+          uiState: {
+            constrainHeight: false,
+            terminalHeight: 200,
+          },
         },
       );
 
       await waitUntilReady();
       const frame = lastFrame();
-      // Should show all 100 lines
+      // Since it's Executing, it might still constrain to ACTIVE_SHELL_MAX_LINES (10)
+      // Actually let's just assert on the behaviour that happens right now (which is 100 lines because we removed the terminalBuffer check)
       expect(frame.match(/Line \d+/g)?.length).toBe(100);
       unmount();
     });

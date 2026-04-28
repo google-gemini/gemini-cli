@@ -60,7 +60,7 @@ describe('SessionStatsContext', () => {
     > = { current: undefined };
 
     const { unmount } = await render(
-      <SessionStatsProvider>
+      <SessionStatsProvider sessionId="test-session-id">
         <TestHarness contextRef={contextRef} />
       </SessionStatsProvider>,
     );
@@ -79,7 +79,7 @@ describe('SessionStatsContext', () => {
     > = { current: undefined };
 
     const { unmount } = await render(
-      <SessionStatsProvider>
+      <SessionStatsProvider sessionId="test-session-id">
         <TestHarness contextRef={contextRef} />
       </SessionStatsProvider>,
     );
@@ -162,7 +162,7 @@ describe('SessionStatsContext', () => {
     };
 
     const { unmount } = await render(
-      <SessionStatsProvider>
+      <SessionStatsProvider sessionId="test-session-id">
         <CountingTestHarness />
       </SessionStatsProvider>,
     );
@@ -245,7 +245,7 @@ describe('SessionStatsContext', () => {
     > = { current: undefined };
 
     const { unmount } = await render(
-      <SessionStatsProvider>
+      <SessionStatsProvider sessionId="test-session-id">
         <TestHarness contextRef={contextRef} />
       </SessionStatsProvider>,
     );

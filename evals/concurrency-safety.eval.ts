@@ -20,6 +20,8 @@ You are the mutation agent. Do the mutation requested.
 
 describe('concurrency safety eval test cases', () => {
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'mutation agents are run in parallel when explicitly requested',
     params: {
       settings: {

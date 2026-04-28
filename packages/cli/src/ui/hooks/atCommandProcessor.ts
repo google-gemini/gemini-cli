@@ -533,7 +533,7 @@ async function readLocalFiles(
   let invocation: AnyToolInvocation | undefined = undefined;
   try {
     invocation = readManyFilesTool.build(toolArgs);
-    const result = await invocation.execute(signal);
+    const result = await invocation.execute({ abortSignal: signal });
     const display: IndividualToolCallDisplay = {
       callId: `client-read-${userMessageTimestamp}`,
       name: readManyFilesTool.displayName,

@@ -207,7 +207,6 @@ export async function injectInputBlocker(
       signal,
       true,
     );
-    debugLogger.log('Input blocker injected successfully');
   } catch (error) {
     // Log but don't throw - input blocker is a UX enhancement, not critical functionality
     debugLogger.warn(
@@ -235,7 +234,6 @@ export async function removeInputBlocker(
       signal,
       true,
     );
-    debugLogger.log('Input blocker removed successfully');
   } catch (error) {
     // Log but don't throw - removal failure is not critical
     debugLogger.warn(

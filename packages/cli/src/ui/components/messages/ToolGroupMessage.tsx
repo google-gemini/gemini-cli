@@ -22,8 +22,7 @@ import { theme } from '../../semantic-colors.js';
 import { useConfig } from '../../contexts/ConfigContext.js';
 import { isShellTool } from './ToolShared.js';
 import {
-  shouldHideToolCall,
-  CoreToolCallStatus,
+  isVisibleInToolGroup,
   Kind,
   EDIT_DISPLAY_NAME,
   GLOB_DISPLAY_NAME,
@@ -35,9 +34,8 @@ import {
   WRITE_FILE_DISPLAY_NAME,
   READ_MANY_FILES_DISPLAY_NAME,
   isFileDiff,
-  isGrepResult,
-  isListResult,
 } from '@google/gemini-cli-core';
+import { buildToolVisibilityContextFromDisplay } from '../../utils/historyUtils.js';
 import { useUIState } from '../../contexts/UIStateContext.js';
 import { getToolGroupBorderAppearance } from '../../utils/borderStyles.js';
 import { useSettings } from '../../contexts/SettingsContext.js';
@@ -81,15 +79,6 @@ export const hasDensePayload = (tool: IndividualToolCallDisplay): boolean => {
   // TODO(24053): Usage of type guards makes this class too aware of internals
   if (isFileDiff(res)) return true;
   if (tool.confirmationDetails?.type === 'edit') return true;
-  if (isGrepResult(res) && res.matches.length > 0) return true;
-
-  // ReadManyFilesResult check (has 'include' and 'files')
-  if (isListResult(res) && 'include' in res) {
-    const includeProp = (res as { include?: unknown }).include;
-    if (Array.isArray(includeProp) && res.files.length > 0) {
-      return true;
-    }
-  }
 
   // Generic summary/payload pattern
   if (
@@ -134,40 +123,13 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   // Filter out tool calls that should be hidden (e.g. in-progress Ask User, or Plan Mode operations).
   const visibleToolCalls = useMemo(
     () =>
-      allToolCalls.filter((t) => {
-        // Hide internal errors unless full verbosity
-        if (
-          isLowErrorVerbosity &&
-          t.status === CoreToolCallStatus.Error &&
-          !t.isClientInitiated
-        ) {
-          return false;
-        }
-        // Standard hiding logic (e.g. Plan Mode internal edits)
-        if (
-          shouldHideToolCall({
-            displayName: t.name,
-            status: t.status,
-            approvalMode: t.approvalMode,
-            hasResultDisplay: !!t.resultDisplay,
-            parentCallId: t.parentCallId,
-          })
-        ) {
-          return false;
-        }
-
-        // We HIDE tools that are still in pre-execution states (Confirming, Pending)
-        // from the History log. They live in the Global Queue or wait for their turn.
-        // Only show tools that are actually running or finished.
-        const displayStatus = mapCoreStatusToDisplayStatus(t.status);
-
-        // We hide Confirming tools from the history log because they are
-        // currently being rendered in the interactive ToolConfirmationQueue.
-        // We show everything else, including Pending (waiting to run) and
-        // Canceled (rejected by user), to ensure the history is complete
-        // and to avoid tools "vanishing" after approval.
-        return displayStatus !== ToolCallStatus.Confirming;
-      }),
+      allToolCalls.filter((t) =>
+        // Use the unified visibility utility
+        isVisibleInToolGroup(
+          buildToolVisibilityContextFromDisplay(t),
+          isLowErrorVerbosity ? 'low' : 'full',
+        ),
+      ),
     [allToolCalls, isLowErrorVerbosity],
   );
 
@@ -219,10 +181,11 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
 
   const staticHeight = useMemo(() => {
     let height = 0;
+
     for (let i = 0; i < groupedTools.length; i++) {
       const group = groupedTools[i];
-      const isFirst = i === 0;
       const isLast = i === groupedTools.length - 1;
+
       const prevGroup = i > 0 ? groupedTools[i - 1] : null;
       const prevIsCompact =
         prevGroup &&
@@ -235,38 +198,75 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
         !Array.isArray(nextGroup) &&
         isCompactTool(nextGroup, isCompactModeEnabled);
 
+      const nextIsTopicToolCall =
+        nextGroup && !Array.isArray(nextGroup) && isTopicTool(nextGroup.name);
+
       const isAgentGroup = Array.isArray(group);
       const isCompact =
         !isAgentGroup && isCompactTool(group, isCompactModeEnabled);
+      const isTopicToolCall = !isAgentGroup && isTopicTool(group.name);
 
-      const showClosingBorder = !isCompact && (nextIsCompact || isLast);
-
-      if (isFirst) {
-        height += borderTopOverride ? 1 : 0;
-      } else if (isCompact !== prevIsCompact) {
-        // Add a 1-line gap when transitioning between compact and standard tools (or vice versa)
-        height += 1;
+      // Align isFirst logic with rendering
+      let isFirst = i === 0;
+      if (!isFirst) {
+        // Check if all previous tools were topics (matches rendering logic exactly)
+        let allPreviousTopics = true;
+        for (let j = 0; j < i; j++) {
+          const prevGroupItem = groupedTools[j];
+          if (
+            Array.isArray(prevGroupItem) ||
+            !isTopicTool(prevGroupItem.name)
+          ) {
+            allPreviousTopics = false;
+            break;
+          }
+        }
+        isFirst = allPreviousTopics;
       }
 
       const isFirstProp = !!(isFirst
         ? (borderTopOverride ?? true)
         : prevIsCompact);
 
+      const showClosingBorder =
+        !isCompact &&
+        !isTopicToolCall &&
+        (nextIsCompact || nextIsTopicToolCall || isLast);
+
       if (isAgentGroup) {
-        // Agent group
-        height += 1; // Header
-        height += group.length; // 1 line per agent
-        if (isFirstProp) height += 1; // Top border
-        if (showClosingBorder) height += 1; // Bottom border
+        // Agent Group Spacing Breakdown:
+        // 1. Top Boundary (0 or 1): Only present via borderTop if isFirstProp is true.
+        // 2. Header Content (1): The "≡ Running Agent..." status text.
+        // 3. Agent List (group.length lines): One line per agent in the group.
+        // 4. Closing Border (1): Added if transition logic (showClosingBorder) requires it.
+        height +=
+          (isFirstProp ? 1 : 0) +
+          1 +
+          group.length +
+          (showClosingBorder ? 1 : 0);
+      } else if (isTopicToolCall) {
+        // Topic Message Spacing Breakdown:
+        // 1. Topic Content (1).
+        // 2. Bottom Margin (1): Always present around TopicMessage for breathing room.
+        // 3. Closing Border (1): Added if transition logic (showClosingBorder) requires it.
+        height += 1 + 1 + (showClosingBorder ? 1 : 0);
+      } else if (isCompact) {
+        // Compact Tool: Always renders as a single dense line.
+        height += 1;
       } else {
-        if (isCompact) {
-          height += 1; // Base height for compact tool
-        } else {
-          // Static overhead for standard tool header:
-          height +=
-            TOOL_RESULT_STATIC_HEIGHT +
-            TOOL_RESULT_STANDARD_RESERVED_LINE_COUNT;
-        }
+        // Standard Tool (ToolMessage / ShellToolMessage) Spacing Breakdown:
+        // 1. TOOL_RESULT_STANDARD_RESERVED_LINE_COUNT (4) accounts for the top boundary,
+        // internal separator, header padding, and the group closing border.
+        // (Subtract 1 to isolate the group-level closing border.)
+        // 2. Header Content (1): TOOL_RESULT_STATIC_HEIGHT (the tool name/status).
+        // 3. Output File Message (1): (conditional) if outputFile is present.
+        // 4. Group Closing Border (1): (conditional) if transition logic (showClosingBorder) requires it.
+        height +=
+          TOOL_RESULT_STANDARD_RESERVED_LINE_COUNT -
+          1 +
+          TOOL_RESULT_STATIC_HEIGHT +
+          (group.outputFile ? 1 : 0) +
+          (showClosingBorder ? 1 : 0);
       }
     }
     return height;
@@ -325,9 +325,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
     */
       width={terminalWidth}
       paddingRight={TOOL_MESSAGE_HORIZONTAL_MARGIN}
-      // When border will be present, add margin of 1 to create spacing from the
-      // previous message.
-      marginBottom={(borderBottomOverride ?? true) ? 1 : 0}
+      marginBottom={0}
     >
       {visibleToolCalls.length === 0 &&
         isExplicitClosingSlice &&
@@ -371,41 +369,27 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
           nextGroup &&
           !Array.isArray(nextGroup) &&
           isCompactTool(nextGroup, isCompactModeEnabled);
+        const nextIsTopicToolCall =
+          nextGroup && !Array.isArray(nextGroup) && isTopicTool(nextGroup.name);
 
         const isAgentGroup = Array.isArray(group);
         const isCompact =
           !isAgentGroup && isCompactTool(group, isCompactModeEnabled);
         const isTopicToolCall = !isAgentGroup && isTopicTool(group.name);
 
-        // When border is present, add margin of 1 to create spacing from the
-        // previous message.
-        let marginTop = 0;
-        if (isFirst) {
-          marginTop = (borderTopOverride ?? false) ? 1 : 0;
-        } else if (isCompact && prevIsCompact) {
-          marginTop = 0;
-        } else if (isCompact || prevIsCompact) {
-          marginTop = 1;
-        } else {
-          // For subsequent standard tools scenarios, the ToolMessage and
-          // ShellToolMessage components manage their own top spacing by passing
-          // `isFirst=false` to their internal StickyHeader which then applies
-          // a paddingTop=1 to create desired gap between standard tool outputs.
-          marginTop = 0;
-        }
-
         const isFirstProp = !!(isFirst
           ? (borderTopOverride ?? true)
           : prevIsCompact);
 
         const showClosingBorder =
-          !isCompact && !isTopicToolCall && (nextIsCompact || isLast);
+          !isCompact &&
+          !isTopicToolCall &&
+          (nextIsCompact || nextIsTopicToolCall || isLast);
 
         if (isAgentGroup) {
           return (
             <Box
               key={group[0].callId}
-              marginTop={marginTop}
               flexDirection="column"
               width={contentWidth}
             >
@@ -450,16 +434,13 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
 
         return (
           <Fragment key={tool.callId}>
-            <Box
-              flexDirection="column"
-              minHeight={1}
-              width={contentWidth}
-              marginTop={marginTop}
-            >
+            <Box flexDirection="column" minHeight={1} width={contentWidth}>
               {isCompact ? (
                 <DenseToolMessage {...commonProps} />
               ) : isTopicToolCall ? (
-                <TopicMessage {...commonProps} />
+                <Box marginBottom={1}>
+                  <TopicMessage {...commonProps} />
+                </Box>
               ) : isShellToolCall ? (
                 <ShellToolMessage {...commonProps} config={config} />
               ) : (

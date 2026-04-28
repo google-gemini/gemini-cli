@@ -7,6 +7,7 @@
 import { ToolErrorType } from '../tools/tool-error.js';
 import {
   ApprovalMode,
+  MODES_BY_PERMISSIVENESS,
   PolicyDecision,
   type CheckResult,
   type PolicyRule,
@@ -118,14 +119,31 @@ export async function updatePolicy(
   messageBus: MessageBus,
   toolInvocation?: AnyToolInvocation,
 ): Promise<void> {
+  const currentMode = context.config.getApprovalMode();
+
   // Mode Transitions (AUTO_EDIT)
   if (isAutoEditTransition(tool, outcome)) {
     context.config.setApprovalMode(ApprovalMode.AUTO_EDIT);
-    return;
   }
 
   // Determine persist scope if we are persisting.
   let persistScope: 'workspace' | 'user' | undefined;
+  let modes: ApprovalMode[] | undefined;
+
+  // If this is an 'Always Allow' selection, we restrict it to the current mode
+  // and more permissive modes.
+  if (
+    outcome === ToolConfirmationOutcome.ProceedAlways ||
+    outcome === ToolConfirmationOutcome.ProceedAlwaysTool ||
+    outcome === ToolConfirmationOutcome.ProceedAlwaysServer ||
+    outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave
+  ) {
+    const modeIndex = MODES_BY_PERMISSIVENESS.indexOf(currentMode);
+    if (modeIndex !== -1) {
+      modes = MODES_BY_PERMISSIVENESS.slice(modeIndex);
+    }
+  }
+
   if (outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave) {
     // If folder is trusted and workspace policies are enabled, we prefer workspace scope.
     if (
@@ -147,6 +165,7 @@ export async function updatePolicy(
       confirmationDetails,
       messageBus,
       persistScope,
+      modes,
     );
     return;
   }
@@ -160,6 +179,7 @@ export async function updatePolicy(
     persistScope,
     toolInvocation,
     context.config,
+    modes,
   );
 }
 
@@ -192,6 +212,7 @@ async function handleStandardPolicyUpdate(
   persistScope?: 'workspace' | 'user',
   toolInvocation?: AnyToolInvocation,
   config?: Config,
+  modes?: ApprovalMode[],
 ): Promise<void> {
   if (
     outcome === ToolConfirmationOutcome.ProceedAlways ||
@@ -214,6 +235,7 @@ async function handleStandardPolicyUpdate(
       toolName: tool.name,
       persist: outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave,
       persistScope,
+      modes,
       ...options,
     });
   }
@@ -232,6 +254,7 @@ async function handleMcpPolicyUpdate(
   >,
   messageBus: MessageBus,
   persistScope?: 'workspace' | 'user',
+  modes?: ApprovalMode[],
 ): Promise<void> {
   const isMcpAlways =
     outcome === ToolConfirmationOutcome.ProceedAlways ||
@@ -257,5 +280,6 @@ async function handleMcpPolicyUpdate(
     mcpName: confirmationDetails.serverName,
     persist,
     persistScope,
+    modes,
   });
 }

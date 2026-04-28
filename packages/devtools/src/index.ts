@@ -124,7 +124,7 @@ export class DevTools extends EventEmitter {
         chunks: payload.chunk ? [payload.chunk] : undefined,
       } as NetworkLog;
       this.logs.push(entry);
-      if (this.logs.length > 2000) this.logs.shift();
+      if (this.logs.length > 10) this.logs.shift();
       this.emit('update', entry);
     }
   }
@@ -206,7 +206,7 @@ export class DevTools extends EventEmitter {
                 res.writeHead(404, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ error: 'Session not found' }));
               }
-            } catch (_err) {
+            } catch {
               res.writeHead(400, { 'Content-Type': 'application/json' });
               res.end(JSON.stringify({ error: 'Invalid request' }));
             }

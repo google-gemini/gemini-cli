@@ -4,20 +4,36 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { updateGlobalFetchTimeouts } from './fetch.js';
 import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
-import {
-  isPrivateIp,
-  isPrivateIpAsync,
-  isAddressPrivate,
-  fetchWithTimeout,
-} from './fetch.js';
 import * as dnsPromises from 'node:dns/promises';
 import type { LookupAddress, LookupAllOptions } from 'node:dns';
 import ipaddr from 'ipaddr.js';
 
+const { setGlobalDispatcher, Agent, ProxyAgent } = vi.hoisted(() => ({
+  setGlobalDispatcher: vi.fn(),
+  Agent: vi.fn(),
+  ProxyAgent: vi.fn(),
+}));
+
+vi.mock('undici', () => ({
+  setGlobalDispatcher,
+  Agent,
+  ProxyAgent,
+}));
+
 vi.mock('node:dns/promises', () => ({
   lookup: vi.fn(),
 }));
+
+// Import after mocks are established
+const {
+  isPrivateIp,
+  isPrivateIpAsync,
+  isAddressPrivate,
+  fetchWithTimeout,
+  setGlobalProxy,
+} = await import('./fetch.js');
 
 // Mock global fetch
 const originalFetch = global.fetch;
@@ -181,6 +197,21 @@ describe('fetch utils', () => {
       await expect(fetchWithTimeout('http://example.com', 50)).rejects.toThrow(
         'Request timed out after 50ms',
       );
+    });
+  });
+
+  describe('setGlobalProxy', () => {
+    it('should configure ProxyAgent with experiment flag timeout', () => {
+      const proxyUrl = 'http://proxy.example.com';
+      updateGlobalFetchTimeouts(45773134);
+      setGlobalProxy(proxyUrl);
+
+      expect(ProxyAgent).toHaveBeenCalledWith({
+        uri: proxyUrl,
+        headersTimeout: 45773134,
+        bodyTimeout: 45773134,
+      });
+      expect(setGlobalDispatcher).toHaveBeenCalled();
     });
   });
 });

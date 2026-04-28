@@ -16,6 +16,7 @@ const createAnsiToken = (overrides: Partial<AnsiToken>): AnsiToken => ({
   underline: false,
   dim: false,
   inverse: false,
+  isUninitialized: false,
   fg: '#ffffff',
   bg: '#000000',
   ...overrides,
@@ -155,5 +156,31 @@ describe('<AnsiOutputText />', () => {
     // We are just checking that it renders something without crashing.
     expect(lastFrame()).toBeDefined();
     unmount();
+  });
+
+  describe('robustness', () => {
+    it('does NOT crash when data is undefined', async () => {
+      const { lastFrame, unmount } = await render(
+        <AnsiOutputText
+          data={undefined as unknown as AnsiOutput}
+          width={80}
+          disableTruncation={true}
+        />,
+      );
+      expect(lastFrame({ allowEmpty: true }).trim()).toBe('');
+      unmount();
+    });
+
+    it('does NOT crash when data is an object but not an array', async () => {
+      const { lastFrame, unmount } = await render(
+        <AnsiOutputText
+          data={{ summary: 'test' } as unknown as AnsiOutput}
+          width={80}
+          disableTruncation={true}
+        />,
+      );
+      expect(lastFrame({ allowEmpty: true }).trim()).toBe('');
+      unmount();
+    });
   });
 });
