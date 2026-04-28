@@ -85,7 +85,6 @@ import { relaunchOnExitCode } from './utils/relaunch.js';
 import { loadSandboxConfig } from './config/sandboxConfig.js';
 import { deleteSession, listSessions } from './utils/sessions.js';
 import { createPolicyUpdater } from './config/policy.js';
-import { isAlternateBufferEnabled } from './ui/hooks/useAlternateBuffer.js';
 
 import { setupTerminalAndTheme } from './utils/terminalTheme.js';
 import { runDeferredCommand } from './deferred.js';
@@ -191,21 +190,38 @@ ${reason.stack}`
   });
 }
 
-export async function resolveSessionId(resumeArg: string | undefined): Promise<{
+export async function resolveSessionId(
+  resumeArg: string | undefined,
+  sessionIdArg?: string | undefined,
+): Promise<{
   sessionId: string;
   resumedSessionData?: ResumedSessionData;
 }> {
-  if (!resumeArg) {
+  if (!resumeArg && !sessionIdArg) {
     return { sessionId: createSessionId() };
   }
 
   const storage = new Storage(process.cwd());
   await storage.initialize();
 
+  const sessionSelector = new SessionSelector(storage);
+
+  if (sessionIdArg) {
+    if (await sessionSelector.sessionExists(sessionIdArg)) {
+      coreEvents.emitFeedback(
+        'error',
+        `Error starting session: Session ID "${sessionIdArg}" already exists. Use --resume to resume it, or provide a different ID.`,
+      );
+      await runExitCleanup();
+      process.exit(ExitCodes.FATAL_INPUT_ERROR);
+    }
+    return { sessionId: sessionIdArg };
+  }
+
   try {
-    const { sessionData, sessionPath } = await new SessionSelector(
-      storage,
-    ).resolveSession(resumeArg);
+    const { sessionData, sessionPath } = await sessionSelector.resolveSession(
+      resumeArg!,
+    );
     return {
       sessionId: sessionData.sessionId,
       resumedSessionData: { conversation: sessionData, filePath: sessionPath },
@@ -319,7 +335,10 @@ export async function main() {
 
   const argv = await argvPromise;
 
-  const { sessionId, resumedSessionData } = await resolveSessionId(argv.resume);
+  const { sessionId, resumedSessionData } = await resolveSessionId(
+    argv.resume,
+    argv.sessionId,
+  );
 
   if (
     (argv.allowedTools && argv.allowedTools.length > 0) ||
@@ -358,8 +377,8 @@ export async function main() {
 
   const isDebugMode = cliConfig.isDebugMode(argv);
   const consolePatcher = new ConsolePatcher({
-    stderr: true,
-    interactive: isHeadlessMode() ? false : true,
+    stderr: argv.isCommand ? false : true,
+    interactive: isHeadlessMode() && !argv.isCommand ? false : true,
     debugMode: isDebugMode,
     onNewMessage: (msg) => {
       coreEvents.emitConsoleLog(msg.type, msg.content);
@@ -532,7 +551,7 @@ export async function main() {
       const { setupInitialActivityLogger } = await import(
         './utils/devtoolsService.js'
       );
-      await setupInitialActivityLogger(config);
+      setupInitialActivityLogger(config);
     }
 
     // Register config for telemetry shutdown
@@ -644,7 +663,7 @@ export async function main() {
 
     let input = config.getQuestion();
     const useAlternateBuffer = shouldEnterAlternateScreen(
-      isAlternateBufferEnabled(config),
+      config.getUseAlternateBuffer(),
       config.getScreenReader(),
     );
     const rawStartupWarnings = await rawStartupWarningsPromise;
@@ -660,6 +679,12 @@ export async function main() {
     ];
 
     cliStartupHandle?.end();
+
+    if (!config.isInteractive()) {
+      for (const warning of startupWarnings) {
+        writeToStderr(warning.message + '\n');
+      }
+    }
 
     // Render UI, passing necessary config values. Check that there is no command line question.
     if (config.isInteractive()) {
@@ -780,20 +805,16 @@ export function initializeOutputListenersAndFlush() {
     if (coreEvents.listenerCount(CoreEvent.ConsoleLog) === 0) {
       coreEvents.on(CoreEvent.ConsoleLog, (payload: ConsoleLogPayload) => {
         if (payload.type === 'error' || payload.type === 'warn') {
-          writeToStderr(payload.content);
+          writeToStderr(payload.content + '\n');
         } else {
-          writeToStdout(payload.content);
+          writeToStderr(payload.content + '\n');
         }
       });
     }
 
     if (coreEvents.listenerCount(CoreEvent.UserFeedback) === 0) {
       coreEvents.on(CoreEvent.UserFeedback, (payload: UserFeedbackPayload) => {
-        if (payload.severity === 'error' || payload.severity === 'warning') {
-          writeToStderr(payload.message);
-        } else {
-          writeToStdout(payload.message);
-        }
+        writeToStderr(payload.message + '\n');
       });
     }
   }
