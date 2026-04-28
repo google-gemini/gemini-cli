@@ -695,7 +695,32 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         const settingsObject = rawSettings as Record<string, unknown>;
 
-        return { settings: settingsObject as Settings, rawJson: content };
+        // Expand environment variables
+        const expandedSettings = resolveEnvVarsInObject(
+          settingsObject as Settings,
+        );
+
+        // Validate settings structure with Zod after environment variable expansion
+        const validationResult = validateSettings(expandedSettings);
+        if (!validationResult.success && validationResult.error) {
+          const errorMessage = formatValidationError(
+            validationResult.error,
+            filePath,
+          );
+          settingsErrors.push({
+            message: errorMessage,
+            path: filePath,
+            severity: 'warning',
+          });
+          return { settings: expandedSettings, rawJson: content };
+        }
+
+        // Return the successfully cast and validated data
+        return {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          settings: (validationResult.data as Settings) ?? expandedSettings,
+          rawJson: content,
+        };
       }
     } catch (error: unknown) {
       settingsErrors.push({
@@ -726,70 +751,11 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
   const userOriginalSettings = structuredClone(userResult.settings);
   const workspaceOriginalSettings = structuredClone(workspaceResult.settings);
 
-  // Environment variables for runtime use
-  systemSettings = resolveEnvVarsInObject(systemResult.settings);
-  systemDefaultSettings = resolveEnvVarsInObject(systemDefaultsResult.settings);
-  userSettings = resolveEnvVarsInObject(userResult.settings);
-  workspaceSettings = resolveEnvVarsInObject(workspaceResult.settings);
-
-  // Validate settings structure with Zod after environment variable expansion.
-  // We use a functional approach to avoid mutating outer state.
-  // If validation fails, we mark it as a 'warning' and return the original settings
-  // (instead of an empty object) to avoid "ignoring" the file (fail-open).
-  const validate = (
-    settings: Settings,
-    filePath: string,
-  ): { settings: Settings; errors: SettingsError[] } => {
-    if (Object.keys(settings).length === 0) return { settings, errors: [] };
-    const validationResult = validateSettings(settings);
-    if (!validationResult.success && validationResult.error) {
-      const errorMessage = formatValidationError(
-        validationResult.error,
-        filePath,
-      );
-      return {
-        // If validation fails, we return the original settings (unvalidated/uncast).
-        // This ensures the file is NOT ignored during merging, while still reporting the error.
-        settings,
-        errors: [
-          {
-            message: errorMessage,
-            path: filePath,
-            severity: 'warning',
-          },
-        ],
-      };
-    }
-    return {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      settings: (validationResult.data as Settings) ?? settings,
-      errors: [],
-    };
-  };
-
-  const systemValidation = validate(systemSettings, systemSettingsPath);
-  systemSettings = systemValidation.settings;
-  settingsErrors.push(...systemValidation.errors);
-
-  const systemDefaultsValidation = validate(
-    systemDefaultSettings,
-    systemDefaultsPath,
-  );
-  systemDefaultSettings = systemDefaultsValidation.settings;
-  settingsErrors.push(...systemDefaultsValidation.errors);
-
-  const userValidation = validate(userSettings, USER_SETTINGS_PATH);
-  userSettings = userValidation.settings;
-  settingsErrors.push(...userValidation.errors);
-
-  if (!storage.isWorkspaceHomeDir()) {
-    const workspaceValidation = validate(
-      workspaceSettings,
-      workspaceSettingsPath,
-    );
-    workspaceSettings = workspaceValidation.settings;
-    settingsErrors.push(...workspaceValidation.errors);
-  }
+  // Environment variables for runtime use are already resolved and validated in load()
+  systemSettings = systemResult.settings;
+  systemDefaultSettings = systemDefaultsResult.settings;
+  userSettings = userResult.settings;
+  workspaceSettings = workspaceResult.settings;
 
   // Support legacy theme names
   if (userSettings.ui?.theme === 'VS') {
