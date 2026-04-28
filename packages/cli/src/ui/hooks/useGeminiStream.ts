@@ -879,6 +879,7 @@ export const useGeminiStream = (
 
     onCancelSubmit(false);
     setShellInputFocused(false);
+    consumeUserHint?.();
   }, [
     streamingState,
     addItem,
@@ -890,6 +891,7 @@ export const useGeminiStream = (
     toolCalls,
     activeShellPtyId,
     setIsResponding,
+    consumeUserHint,
   ]);
 
   useKeypress(

@@ -43,6 +43,7 @@ export interface UseAgentStreamOptions {
   onCancelSubmit: (shouldRestorePrompt?: boolean) => void;
   isShellFocused?: boolean;
   logger?: Logger | null;
+  consumeUserHint?: () => string | null;
 }
 
 /**
@@ -55,6 +56,7 @@ export const useAgentStream = ({
   onCancelSubmit,
   isShellFocused,
   logger,
+  consumeUserHint,
 }: UseAgentStreamOptions) => {
   const [initError] = useState<string | null>(null);
   const [retryStatus] = useState<RetryAttemptPayload | null>(null);
@@ -125,8 +127,9 @@ export const useAgentStream = ({
       await agent.abort();
       setStreamingState(StreamingState.Idle);
       onCancelSubmit(false);
+      consumeUserHint?.();
     }
-  }, [agent, onCancelSubmit]);
+  }, [agent, onCancelSubmit, consumeUserHint]);
 
   // TODO: Support native handleApprovalModeChange for Plan Mode
   const handleApprovalModeChange = useCallback(
