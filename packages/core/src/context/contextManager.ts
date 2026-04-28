@@ -201,6 +201,11 @@ export class ContextManager {
   ): Promise<Content[]> {
     this.tracer.logEvent('ContextManager', 'Starting rendering of LLM context');
 
+    const protectedIds = new Set([
+      ...activeTaskIds,
+      ...this.getProtectedNodeIds(),
+    ]);
+
     // Apply final GC Backstop pressure barrier synchronously before mapping
     const finalHistory = await render(
       this.buffer.nodes,
@@ -208,7 +213,7 @@ export class ContextManager {
       this.sidecar,
       this.tracer,
       this.env,
-      activeTaskIds,
+      protectedIds,
     );
 
     this.tracer.logEvent('ContextManager', 'Finished rendering');
