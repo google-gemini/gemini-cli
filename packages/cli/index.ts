@@ -6,11 +6,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { spawn } from 'node:child_process';
+import { spawn, execSync } from 'node:child_process';
 import os from 'node:os';
 import v8 from 'node:v8';
 
 // --- Global Entry Point ---
+
+// Set terminal code page to UTF-8 on Windows
+if (process.platform === 'win32') {
+  try {
+    execSync('chcp 65001', { stdio: 'ignore' });
+  } catch {
+    // Ignore errors if chcp is not available
+  }
+}
 
 // Suppress known race condition error in node-pty on Windows
 // Tracking bug: https://github.com/microsoft/node-pty/issues/827

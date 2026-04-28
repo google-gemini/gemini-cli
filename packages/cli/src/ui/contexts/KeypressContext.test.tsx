@@ -463,7 +463,7 @@ describe('KeypressContext', () => {
       );
     });
 
-    it('should treat \\b as ctrl when WT_SESSION IS present (even if not Windows_NT)', async () => {
+    it('should NOT treat \\b as ctrl when WT_SESSION IS present (even if not Windows_NT)', async () => {
       vi.stubEnv('WT_SESSION', 'some-id');
       vi.stubEnv('OS', 'Linux');
       const { keyHandler } = await setupKeypressTest();
@@ -475,12 +475,12 @@ describe('KeypressContext', () => {
       expect(keyHandler).toHaveBeenCalledWith(
         expect.objectContaining({
           name: 'backspace',
-          ctrl: true,
+          ctrl: false,
         }),
       );
     });
 
-    it('should treat \\b as ctrl when OS is Windows_NT', async () => {
+    it('should NOT treat \\b as ctrl when OS is Windows_NT', async () => {
       vi.stubEnv('WT_SESSION', '');
       vi.stubEnv('OS', 'Windows_NT');
       const { keyHandler } = await setupKeypressTest();
@@ -492,7 +492,7 @@ describe('KeypressContext', () => {
       expect(keyHandler).toHaveBeenCalledWith(
         expect.objectContaining({
           name: 'backspace',
-          ctrl: true,
+          ctrl: false,
         }),
       );
     });
