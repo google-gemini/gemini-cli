@@ -83,7 +83,25 @@ export interface OperationalGuidelinesOptions {
   interactive: boolean;
   interactiveShellEnabled: boolean;
   topicUpdateNarration: boolean;
-  memoryManagerEnabled: boolean;
+  memoryV2Enabled: boolean;
+  /**
+   * Absolute path to the user's per-project private memory index
+   * (e.g. ~/.gemini/tmp/<project-hash>/memory/MEMORY.md). Surfaced to the
+   * model when memoryV2Enabled is true so the prompt-driven memory flow
+   * can route project-specific personal notes there instead of the committed
+   * project GEMINI.md.
+   */
+  userProjectMemoryPath?: string;
+  /**
+   * Absolute path to the user's global personal memory file
+   * (e.g. ~/.gemini/GEMINI.md). Surfaced to the model when memoryV2Enabled
+   * is true so the prompt-driven memory flow can route cross-project personal
+   * preferences (preferences that follow the user across all workspaces) there
+   * instead of the project-scoped tiers. Config.isPathAllowed surgically
+   * allowlists this exact file (only this file, not the rest of `~/.gemini/`)
+   * so the agent can edit it directly.
+   */
+  globalMemoryPath?: string;
 }
 
 export type SandboxMode = 'macos-seatbelt' | 'generic' | 'outside';
@@ -525,7 +543,7 @@ ${trimmed}
   }
   if (memory.userProjectMemory?.trim()) {
     sections.push(
-      `<user_project_memory>\n--- User's Project Memory (private, not committed to repo) ---\n${memory.userProjectMemory.trim()}\n--- End User's Project Memory ---\n</user_project_memory>`,
+      `<user_project_memory>\n--- Private Project Memory Index (private, not committed to repo) ---\n${memory.userProjectMemory.trim()}\n--- End Private Project Memory Index ---\n</user_project_memory>`,
     );
   }
   if (memory.extension?.trim()) {
@@ -559,7 +577,8 @@ You are operating with a persistent file-based task tracking system located at \
 5.  **VERIFICATION**: Before marking a task as complete, verify the work is actually done (e.g., run the test, check the file existence).
 6.  **STATE OVER CHAT**: If the user says "I think we finished that," but the tool says it is 'pending', trust the tool--or verify explicitly before updating.
 7.  **DEPENDENCY MANAGEMENT**: Respect task topology. Never attempt to execute a task if its dependencies are not marked as 'closed'. If you are blocked, focus only on the leaf nodes of the task graph.
-8.  **DETAILED TASKS**: Ensure that the tasks created have highly detailed titles and descriptions. The description MUST provide significantly more specific details and technical context than the title.`.trim();
+8.  **DETAILED TASKS**: Ensure that the tasks created have highly detailed titles and descriptions. The description MUST provide significantly more specific details and technical context than the title.
+9.  **TURN EFFICIENCY**: Update the tracker immediately when a step is completed. Combine ${trackerUpdate} calls with other tool calls in the same turn to save turns.`.trim();
 }
 
 export function renderPlanningWorkflow(
@@ -586,6 +605,7 @@ ${options.planModeToolsList}
    - **Directives:** If the request is a **Directive** (e.g., "Fix bug Y"), follow the workflow below.
 5. **Plan Storage:** Save plans as Markdown (.md) using descriptive filenames.
 6. **Direct Modification:** If asked to modify code, explain you are in Plan Mode and use ${formatToolName(EXIT_PLAN_MODE_TOOL_NAME)} to request approval.
+7. **Presenting Plan:** When seeking informal agreement on a plan, or any time the user asks to see the plan, you MUST output the full content of the plan in the chat response. This overrides the "Minimal Output" guideline.
 
 ## Planning Workflow
 Plan Mode uses an adaptive planning workflow where the research depth, plan structure, and consultation level are proportional to the task's complexity.
@@ -605,7 +625,7 @@ The depth of your consultation should be proportional to the task's complexity. 
 Write the implementation plan to \`${options.plansDir}/\`. The plan's structure adapts to the task:
 - **Simple Tasks:** Include a bulleted list of specific **Changes** and **Verification** steps.
 - **Standard Tasks:** Include an **Objective**, **Key Files & Context**, **Implementation Steps**, and **Verification & Testing**.
-- **Complex Tasks:** Include **Background & Motivation**, **Scope & Impact**, **Proposed Solution**, **Alternatives Considered**, a phased **Implementation Plan**, **Verification**, and **Migration & Rollback** strategies.
+- **Complex Tasks:** Include **Background & Motivation**, **Scope & Impact**, **Proposed Solution**, **Alternatives Considered**, a phased **Implementation Plan**, **Verification**, and **Migration & Rollback** strategies.${options.interactive ? '\n- **Alignment Check:** After drafting the plan, you MUST present it to the user in the chat (adhering to Rule 7 for presenting plans) to ensure alignment on the specific details. Ask for feedback or confirmation, and proceed to Step 4 (Review & Approval) once the user agrees with the detailed plan.' : ''}
 
 ### 4. Review & Approval
 ONLY use the ${formatToolName(EXIT_PLAN_MODE_TOOL_NAME)} tool to present the plan for formal approval AFTER you have reached an informal agreement with the user in the chat regarding the proposed strategy. When called, this tool will present the plan and ${options.interactive ? 'formally request approval.' : 'begin implementation.'}
@@ -809,9 +829,30 @@ function toolUsageInteractive(
 function toolUsageRememberingFacts(
   options: OperationalGuidelinesOptions,
 ): string {
-  if (options.memoryManagerEnabled) {
+  if (options.memoryV2Enabled) {
+    const userProjectBullet = options.userProjectMemoryPath
+      ? `
+  - **Private Project Memory** (\`${options.userProjectMemoryPath}\`): Personal-to-the-user, project-specific notes that must **NOT** be committed to the repo. Keep this file concise: it is the private index for this workspace. Store richer detail in sibling \`*.md\` files in the same folder and use \`MEMORY.md\` to point to them.`
+      : '';
+    const globalMemoryBullet = options.globalMemoryPath
+      ? `
+  - **Global Personal Memory** (\`${options.globalMemoryPath}\`): Cross-project personal preferences and facts about the user that should follow them into every workspace (e.g. preferred testing framework across all projects, language preferences, coding-style defaults). Loaded automatically in every session. Keep entries concise and durable — never workspace-specific.`
+      : '';
+    const globalRoutingRule = options.globalMemoryPath
+      ? `
+  - When the user states a **cross-project personal preference** that should follow them into every workspace ("I always prefer X", "across all my projects", "my personal coding style is Y", "in general I like Z"), update the global personal memory file. Do **not** also write it into a \`GEMINI.md\` file or the private memory folder.`
+      : '';
     return `
-- **Memory Tool:** You MUST use the '${AGENT_TOOL_NAME}' tool with the 'save_memory' agent to proactively record facts, preferences, and workflows that apply across all sessions. Whenever the user explicitly tells you to "remember" something, or when they state a preference or workflow (like "always lint after editing"), you MUST immediately call the save_memory subagent. Never save transient session state. Do not use memory to store summaries of code changes, bug fixes, or findings discovered during a task; this tool is strictly for persistent general knowledge.`;
+- **Instruction and Memory Files:** You persist long-lived project context by editing markdown files directly with ${formatToolName(EDIT_TOOL_NAME)} or ${formatToolName(WRITE_FILE_TOOL_NAME)}. There is no \`save_memory\` tool. The current contents of all loaded \`GEMINI.md\` files and the private project \`MEMORY.md\` index are already in your context — do not re-read them before editing.
+  - **Project Instructions** (\`./GEMINI.md\`): Team-shared architecture, conventions, workflows, and other repo guidance. **Committed to the repo and shared with the team.**
+  - **Subdirectory Instructions** (e.g. \`./src/GEMINI.md\`): Scoped instructions for one part of the project. Reference them from \`./GEMINI.md\` so they remain discoverable.${userProjectBullet}${globalMemoryBullet}
+  **Routing rules — pick exactly one tier per fact:**
+  - When the user states a **team-shared convention, architecture rule, or repo-wide workflow** ("our project uses X", "the team always Y", "for this repo, always Z"), update the relevant \`GEMINI.md\` file. Do **not** also write it into the private memory folder or the global personal memory file.
+  - When the user states a **personal-to-them local setup, machine-specific note, or private workflow** for this codebase ("on my machine", "my local setup", "do not commit this"), save it under the private project memory folder. Do **not** also write it into a \`GEMINI.md\` file or the global personal memory file.${globalRoutingRule}
+  - If a fact could plausibly belong to more than one tier, **ask the user** which tier they want before writing.
+  **Never duplicate or mirror the same fact across tiers** — each fact lives in exactly one file across all four tiers (project \`GEMINI.md\`, subdirectory \`GEMINI.md\`, private project memory, global personal memory). Do not add cross-references between any of them.
+  **Inside the private memory folder:** \`MEMORY.md\` is the index for its sibling \`*.md\` notes **in that same folder only** — never use it to point at, summarize, or duplicate content from any \`GEMINI.md\` file. For brief facts, write the entry directly into \`MEMORY.md\`. When a note has substantial detail (multiple sections, procedures, or fields), put the detail in a sibling \`*.md\` file in the same folder and add a one-line pointer entry in \`MEMORY.md\`.
+  Never save transient session state, summaries of code changes, bug fixes, or task-specific findings — these files are loaded into every session and must stay lean.`;
   }
   const base = `
 - **Memory Tool:** Use ${formatToolName(MEMORY_TOOL_NAME)} to persist facts across sessions. It supports two scopes via the \`scope\` parameter:
