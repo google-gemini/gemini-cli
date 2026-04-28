@@ -13,6 +13,7 @@ import {
   copyFileSync,
   writeFileSync,
   readFileSync,
+  chmodSync,
 } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -454,6 +455,7 @@ console.log('Injecting SEA blob...');
 const sentinelFuse = 'NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2';
 
 try {
+  chmodSync(targetBinaryPath, 0o755);
   const args = [
     'postject',
     targetBinaryPath,
@@ -467,7 +469,7 @@ try {
     args.push('--macho-segment-name', 'NODE_SEA');
   }
 
-  runCommand('npx', args);
+  runCommand('npx', ['--yes', ...args]);
   console.log('Injection successful.');
 } catch (e) {
   console.error('Postject failed:', e.message);
