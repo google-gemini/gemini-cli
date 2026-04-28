@@ -96,6 +96,7 @@ export interface CliArgs {
   extensions: string[] | undefined;
   listExtensions: boolean | undefined;
   resume: string | typeof RESUME_LATEST | undefined;
+  sessionId: string | undefined;
   listSessions: boolean | undefined;
   deleteSession: string | undefined;
   includeDirectories: string[] | undefined;
@@ -236,6 +237,10 @@ export async function parseArguments(
       const hasPositionalQuery = Array.isArray(query)
         ? query.length > 0
         : !!query;
+
+      if (argv['resume'] !== undefined && argv['session-id'] !== undefined) {
+        return 'Cannot use both --resume (-r) and --session-id together';
+      }
 
       if (argv['prompt'] && hasPositionalQuery) {
         return 'Cannot use both a positional prompt and the --prompt (-p) flag together';
@@ -402,6 +407,25 @@ export async function parseArguments(
             const trimmed = value.trim();
             if (trimmed === '') {
               return RESUME_LATEST;
+            }
+            return trimmed;
+          },
+        })
+        .option('session-id', {
+          type: 'string',
+          nargs: 1,
+          description: 'Start a new session with a manually provided UUID.',
+          coerce: (value: string): string => {
+            const trimmed = value.trim();
+            if (!trimmed) {
+              throw new Error('The --session-id option cannot be empty.');
+            }
+            if (!/^[a-zA-Z0-9-_]+$/.test(trimmed)) {
+              throw new Error(
+                'Invalid session ID "' +
+                  trimmed +
+                  '": Only alphanumeric characters, dashes, and underscores are allowed.',
+              );
             }
             return trimmed;
           },
@@ -817,8 +841,15 @@ export async function loadCliConfig(
   );
 
   const defaultModel = PREVIEW_GEMINI_MODEL_AUTO;
-  const specifiedModel =
+  const rawModel =
     argv.model || process.env['GEMINI_MODEL'] || settings.model?.name;
+
+  // Ensure specifiedModel is a string (e.g. if yargs parsed multiple --model as an array)
+  const specifiedModel = Array.isArray(rawModel)
+    ? String(rawModel.at(-1) ?? '').trim() || ''
+    : rawModel === undefined
+      ? undefined
+      : String(rawModel ?? '').trim() || '';
 
   const resolvedModel =
     specifiedModel === GEMINI_MODEL_ALIAS_AUTO
