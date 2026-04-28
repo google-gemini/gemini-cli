@@ -337,6 +337,7 @@ describe('settings-validation', () => {
 
         const result = validateSettings(settings);
         expect(result.success).toBe(true);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const data = result.data as any;
         expect(data.ui.autoThemeSwitching).toBe(true);
         expect(data.ui.hideWindowTitle).toBe(false);
@@ -352,6 +353,7 @@ describe('settings-validation', () => {
 
         const result = validateSettings(settings);
         expect(result.success).toBe(true);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const data = result.data as any;
         expect(data.ui.autoThemeSwitching).toBe(true);
         expect(data.ui.hideWindowTitle).toBe(false);
@@ -367,6 +369,7 @@ describe('settings-validation', () => {
 
         const result = validateSettings(settings);
         expect(result.success).toBe(true);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const data = result.data as any;
         expect(data.model.maxSessionTurns).toBe(42);
         expect(data.model.compressionThreshold).toBe(0.5);

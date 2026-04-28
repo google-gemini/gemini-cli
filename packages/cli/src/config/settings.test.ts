@@ -489,7 +489,9 @@ describe('Settings Loading and Merging', () => {
       );
       (fs.readFileSync as Mock).mockImplementation(
         (p: fs.PathOrFileDescriptor) => {
-          if (path.normalize(p.toString()) === path.normalize(USER_SETTINGS_PATH)) {
+          if (
+            path.normalize(p.toString()) === path.normalize(USER_SETTINGS_PATH)
+          ) {
             return JSON.stringify({
               ui: { autoThemeSwitching: '$TEST_AUTO_THEME' },
               model: { maxSessionTurns: '$TEST_MAX_TURNS' },
@@ -508,7 +510,7 @@ describe('Settings Loading and Merging', () => {
 
     it('should use default values from environment variable placeholders', () => {
       vi.stubEnv('TEST_AUTO_THEME', ''); // Should trigger default
-      delete process.env.TEST_AUTO_THEME;
+      delete process.env['TEST_AUTO_THEME'];
 
       (mockFsExistsSync as Mock).mockImplementation(
         (p: fs.PathLike) =>
@@ -516,7 +518,9 @@ describe('Settings Loading and Merging', () => {
       );
       (fs.readFileSync as Mock).mockImplementation(
         (p: fs.PathOrFileDescriptor) => {
-          if (path.normalize(p.toString()) === path.normalize(USER_SETTINGS_PATH)) {
+          if (
+            path.normalize(p.toString()) === path.normalize(USER_SETTINGS_PATH)
+          ) {
             return JSON.stringify({
               ui: { autoThemeSwitching: '${TEST_AUTO_THEME:-true}' },
             });
@@ -540,7 +544,9 @@ describe('Settings Loading and Merging', () => {
       );
       (fs.readFileSync as Mock).mockImplementation(
         (p: fs.PathOrFileDescriptor) => {
-          if (path.normalize(p.toString()) === path.normalize(USER_SETTINGS_PATH)) {
+          if (
+            path.normalize(p.toString()) === path.normalize(USER_SETTINGS_PATH)
+          ) {
             return JSON.stringify({
               model: { maxSessionTurns: '$TEST_MAX_TURNS' },
             });
@@ -552,7 +558,9 @@ describe('Settings Loading and Merging', () => {
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
 
       expect(settings.errors.length).toBeGreaterThan(0);
-      expect(settings.errors[0].message).toContain('Expected number, received string');
+      expect(settings.errors[0].message).toContain(
+        'Expected number, received string',
+      );
       // Should fall back to the expanded string value
       expect(settings.merged.model.maxSessionTurns).toBe('not-a-number');
     });
