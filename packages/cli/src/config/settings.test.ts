@@ -555,9 +555,14 @@ describe('Settings Loading and Merging', () => {
         },
       );
 
+      // Should throw FatalConfigError
       expect(() => loadSettings(MOCK_WORKSPACE_DIR)).toThrow(
         /Expected number, received string/,
       );
+
+      // Verify that if we bypass the throw (internal check), we still have the original values
+      // This is a bit tricky since loadSettings is cached and throws.
+      // But we can clear cache and use a non-throwing mock for coreEvents if needed.
     });
 
     it('should use system folderTrust over user setting', () => {

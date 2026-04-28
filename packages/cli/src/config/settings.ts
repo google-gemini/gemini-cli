@@ -747,10 +747,9 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
         filePath,
       );
       return {
-        // If validation fails, we return an empty object for this layer.
+        // If validation fails, we return the original settings.
         // Since we also return a fatal 'error', the app will stop anyway.
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        settings: {} as unknown as Settings,
+        settings,
         errors: [
           {
             message: errorMessage,
