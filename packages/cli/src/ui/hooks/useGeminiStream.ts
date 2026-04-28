@@ -880,6 +880,9 @@ export const useGeminiStream = (
     onCancelSubmit(false);
     setShellInputFocused(false);
     consumeUserHint?.();
+    onCancelSubmit(false);
+    setShellInputFocused(false);
+  }, [
   }, [
     streamingState,
     addItem,
