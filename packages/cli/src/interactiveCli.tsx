@@ -94,11 +94,14 @@ export async function startInteractiveUI(
   const version = await getVersion();
   setWindowTitle(basename(workspaceRoot), settings);
 
+  const simulateUser = config.getSimulateUser();
+
   const consolePatcher = new ConsolePatcher({
     onNewMessage: (msg) => {
       coreEvents.emitConsoleLog(msg.type, msg.content);
     },
     debugMode: config.getDebugMode(),
+    interactive: !simulateUser,
   });
   consolePatcher.patch();
 
@@ -198,21 +201,23 @@ export async function startInteractiveUI(
     registerCleanup(cleanupLineWrapping);
   }
 
-  checkForUpdates(settings)
-    .then((info) => {
-      handleAutoUpdate(
-        info,
-        settings,
-        config.getProjectRoot(),
-        config.getSandboxEnabled(),
-      );
-    })
-    .catch((err) => {
-      // Silently ignore update check errors.
-      if (config.getDebugMode()) {
-        debugLogger.warn('Update check failed:', err);
-      }
-    });
+  if (!simulateUser) {
+    checkForUpdates(settings)
+      .then((info) => {
+        handleAutoUpdate(
+          info,
+          settings,
+          config.getProjectRoot(),
+          config.getSandboxEnabled(),
+        );
+      })
+      .catch((err) => {
+        // Silently ignore update check errors.
+        if (config.getDebugMode()) {
+          debugLogger.warn('Update check failed:', err);
+        }
+      });
+  }
 
   const cleanupUnmount = () => instance.unmount();
   registerCleanup(cleanupUnmount);
