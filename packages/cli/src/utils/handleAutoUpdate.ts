@@ -148,7 +148,7 @@ export function handleAutoUpdate(
       });
     } else {
       updateEventEmitter.emit('update-failed', {
-        message: `Automatic update failed. Please try updating manually. (command: ${updateCommand})`,
+        message: `Automatic update failed. Please try updating manually:\n\n${updateCommand}`,
       });
     }
   });
@@ -156,7 +156,7 @@ export function handleAutoUpdate(
   updateProcess.on('error', (err) => {
     _updateInProgress = false;
     updateEventEmitter.emit('update-failed', {
-      message: `Automatic update failed. Please try updating manually. (error: ${err.message})`,
+      message: `Automatic update failed. Please try updating manually. (error: ${err.message})\n\n${updateCommand}`,
     });
   });
   return updateProcess;
@@ -184,12 +184,14 @@ export function setUpdateHandler(
     }, 60000);
   };
 
-  const handleUpdateFailed = () => {
+  const handleUpdateFailed = (data?: { message: string }) => {
     setUpdateInfo(null);
     addItem(
       {
         type: MessageType.ERROR,
-        text: `Automatic update failed. Please try updating manually`,
+        text:
+          data?.message ||
+          `Automatic update failed. Please try updating manually`,
       },
       Date.now(),
     );
