@@ -385,10 +385,6 @@ export async function main() {
     },
   });
   consolePatcher.patch();
-  const isAcpMode = !!argv.acp || !!argv.experimentalAcp;
-  if (!isAcpMode) {
-    registerCleanup(consolePatcher.cleanup);
-  }
 
   dns.setDefaultResultOrder(
     validateDnsResolutionOrder(settings.merged.advanced.dnsResolutionOrder),
@@ -414,6 +410,11 @@ export async function main() {
   const partialConfig = await loadCliConfig(settings.merged, sessionId, argv, {
     projectHooks: settings.workspace.settings.hooks,
   });
+
+  if (!partialConfig.getAcpMode()) {
+    registerCleanup(consolePatcher.cleanup);
+  }
+
   adminControlsListner.setConfig(partialConfig);
 
   // Refresh auth to fetch remote admin settings from CCPA and before entering
