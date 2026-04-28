@@ -11,7 +11,10 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { env } from 'node:process';
 import { setTimeout as sleep } from 'node:timers/promises';
-import { PREVIEW_GEMINI_MODEL, GEMINI_DIR } from '@google/gemini-cli-core';
+import {
+  PREVIEW_GEMINI_FLASH_MODEL,
+  GEMINI_DIR,
+} from '@google/gemini-cli-core';
 export { GEMINI_DIR };
 import * as pty from '@lydell/node-pty';
 import stripAnsi from 'strip-ansi';
@@ -193,6 +196,28 @@ export function checkModelOutputContent(
   return isValid;
 }
 
+export interface MetricDataPoint {
+  attributes?: Record<string, unknown>;
+  value?: {
+    sum?: number;
+    min?: number;
+    max?: number;
+    count?: number;
+  };
+  startTime?: [number, number];
+  endTime?: string;
+}
+
+export interface TelemetryMetric {
+  descriptor: {
+    name: string;
+    type?: string;
+    description?: string;
+    unit?: string;
+  };
+  dataPoints: MetricDataPoint[];
+}
+
 export interface ParsedLog {
   attributes?: {
     'event.name'?: string;
@@ -213,11 +238,7 @@ export interface ParsedLog {
     prompt_id?: string;
   };
   scopeMetrics?: {
-    metrics: {
-      descriptor: {
-        name: string;
-      };
-    }[];
+    metrics: TelemetryMetric[];
   }[];
 }
 
@@ -457,7 +478,7 @@ export class TestRig {
         ...(env['GEMINI_TEST_TYPE'] === 'integration'
           ? {
               model: {
-                name: PREVIEW_GEMINI_MODEL,
+                name: PREVIEW_GEMINI_FLASH_MODEL,
               },
             }
           : {}),
@@ -659,6 +680,7 @@ export class TestRig {
         key !== 'GEMINI_DEBUG' &&
         key !== 'GEMINI_CLI_TEST_VAR' &&
         key !== 'GEMINI_CLI_INTEGRATION_TEST' &&
+        key !== 'GOOGLE_GEMINI_BASE_URL' &&
         !key.startsWith('GEMINI_CLI_ACTIVITY_LOG')
       ) {
         delete cleanEnv[key];
@@ -1297,6 +1319,10 @@ export class TestRig {
     return logs;
   }
 
+  readTelemetryLogs(): ParsedLog[] {
+    return this._readAndParseTelemetryLog();
+  }
+
   private _readAndParseTelemetryLog(): ParsedLog[] {
     // Telemetry is always written to the test directory
     const logFilePath = join(this.homeDir!, 'telemetry.log');
@@ -1450,10 +1476,10 @@ export class TestRig {
     );
   }
 
-  readMetric(metricName: string): Record<string, unknown> | null {
+  readMetric(metricName: string): TelemetryMetric | null {
     const logs = this._readAndParseTelemetryLog();
     for (const logData of logs) {
-      if (logData.scopeMetrics) {
+      if (logData && logData.scopeMetrics) {
         for (const scopeMetric of logData.scopeMetrics) {
           for (const metric of scopeMetric.metrics) {
             if (metric.descriptor.name === `gemini_cli.${metricName}`) {
@@ -1464,6 +1490,133 @@ export class TestRig {
       }
     }
     return null;
+  }
+
+  readMemoryMetrics(strategy: 'peak' | 'last' = 'peak'): {
+    timestamp: number;
+    heapUsed: number;
+    heapTotal: number;
+    rss: number;
+    external: number;
+  } {
+    const snapshots = this._getMemorySnapshots();
+    if (snapshots.length === 0) {
+      return {
+        timestamp: Date.now(),
+        heapUsed: 0,
+        heapTotal: 0,
+        rss: 0,
+        external: 0,
+      };
+    }
+
+    if (strategy === 'last') {
+      const last = snapshots[snapshots.length - 1];
+      return {
+        timestamp: last.timestamp,
+        heapUsed: last.heapUsed,
+        heapTotal: last.heapTotal,
+        rss: last.rss,
+        external: last.external,
+      };
+    }
+
+    // Find the snapshot with the highest RSS
+    let peak = snapshots[0];
+    for (const snapshot of snapshots) {
+      if (snapshot.rss > peak.rss) {
+        peak = snapshot;
+      }
+    }
+
+    // Fallback: if we didn't find any RSS but found heap, use the max heap
+    if (peak.rss === 0) {
+      for (const snapshot of snapshots) {
+        if (snapshot.heapUsed > peak.heapUsed) {
+          peak = snapshot;
+        }
+      }
+    }
+
+    return {
+      timestamp: peak.timestamp,
+      heapUsed: peak.heapUsed,
+      heapTotal: peak.heapTotal,
+      rss: peak.rss,
+      external: peak.external,
+    };
+  }
+
+  readAllMemorySnapshots(): {
+    timestamp: number;
+    heapUsed: number;
+    heapTotal: number;
+    rss: number;
+    external: number;
+  }[] {
+    return this._getMemorySnapshots();
+  }
+
+  private _getMemorySnapshots(): {
+    timestamp: number;
+    heapUsed: number;
+    heapTotal: number;
+    rss: number;
+    external: number;
+  }[] {
+    const snapshots: Record<
+      string,
+      {
+        timestamp: number;
+        heapUsed: number;
+        heapTotal: number;
+        rss: number;
+        external: number;
+      }
+    > = {};
+
+    const logs = this._readAndParseTelemetryLog();
+    for (const logData of logs) {
+      if (logData && logData.scopeMetrics) {
+        for (const scopeMetric of logData.scopeMetrics) {
+          for (const metric of scopeMetric.metrics) {
+            if (metric.descriptor.name === 'gemini_cli.memory.usage') {
+              for (const dp of metric.dataPoints) {
+                const sessionId =
+                  (dp.attributes?.['session.id'] as string) || 'unknown';
+                const component =
+                  (dp.attributes?.['component'] as string) || 'unknown';
+                const seconds = dp.startTime?.[0] || 0;
+                const nanos = dp.startTime?.[1] || 0;
+                const timeKey = `${sessionId}-${component}-${seconds}-${nanos}`;
+
+                if (!snapshots[timeKey]) {
+                  snapshots[timeKey] = {
+                    timestamp: seconds * 1000 + Math.floor(nanos / 1000000),
+                    rss: 0,
+                    heapUsed: 0,
+                    heapTotal: 0,
+                    external: 0,
+                  };
+                }
+
+                const type = dp.attributes?.['memory_type'];
+                const value = dp.value?.max ?? dp.value?.sum ?? 0;
+
+                if (type === 'heap_used') snapshots[timeKey].heapUsed = value;
+                else if (type === 'heap_total')
+                  snapshots[timeKey].heapTotal = value;
+                else if (type === 'rss') snapshots[timeKey].rss = value;
+                else if (type === 'external')
+                  snapshots[timeKey].external = value;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    return Object.values(snapshots).sort((a, b) => a.timestamp - b.timestamp);
   }
 
   async runInteractive(options?: {

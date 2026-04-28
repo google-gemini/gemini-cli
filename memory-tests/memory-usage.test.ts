@@ -8,14 +8,29 @@ import { describe, it, beforeAll, afterAll, afterEach } from 'vitest';
 import { TestRig, MemoryTestHarness } from '@google/gemini-cli-test-utils';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  createWriteStream,
+  copyFileSync,
+  readFileSync,
+  existsSync,
+  mkdirSync,
+  rmSync,
+} from 'node:fs';
+import { randomUUID, createHash } from 'node:crypto';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const BASELINES_PATH = join(__dirname, 'baselines.json');
 const UPDATE_BASELINES = process.env['UPDATE_MEMORY_BASELINES'] === 'true';
+function getProjectHash(projectRoot: string): string {
+  return createHash('sha256').update(projectRoot).digest('hex');
+}
 const TOLERANCE_PERCENT = 10;
 
 // Fake API key for tests using fake responses
-const TEST_ENV = { GEMINI_API_KEY: 'fake-memory-test-key' };
+const TEST_ENV = {
+  GEMINI_API_KEY: 'fake-memory-test-key',
+  GEMINI_MEMORY_MONITOR_INTERVAL: '100',
+};
 
 describe('Memory Usage Tests', () => {
   let harness: MemoryTestHarness;
@@ -47,6 +62,7 @@ describe('Memory Usage Tests', () => {
     });
 
     const result = await harness.runScenario(
+      rig,
       'idle-session-startup',
       async (recordSnapshot) => {
         await rig.run({
@@ -76,6 +92,7 @@ describe('Memory Usage Tests', () => {
     });
 
     const result = await harness.runScenario(
+      rig,
       'simple-prompt-response',
       async (recordSnapshot) => {
         await rig.run({
@@ -113,6 +130,7 @@ describe('Memory Usage Tests', () => {
     ];
 
     const result = await harness.runScenario(
+      rig,
       'multi-turn-conversation',
       async (recordSnapshot) => {
         // Run through all turns as a piped sequence
@@ -135,6 +153,9 @@ describe('Memory Usage Tests', () => {
       );
     } else {
       harness.assertWithinBaseline(result);
+      harness.assertMemoryReturnsToBaseline(result.snapshots, 20);
+      const { leaked, message } = harness.analyzeSnapshots(result.snapshots);
+      if (leaked) console.warn(`⚠ ${message}`);
     }
   });
 
@@ -159,6 +180,7 @@ describe('Memory Usage Tests', () => {
     );
 
     const result = await harness.runScenario(
+      rig,
       'multi-function-call-repo-search',
       async (recordSnapshot) => {
         await rig.run({
@@ -180,6 +202,327 @@ describe('Memory Usage Tests', () => {
       );
     } else {
       harness.assertWithinBaseline(result);
+      harness.assertMemoryReturnsToBaseline(result.snapshots, 20);
     }
   });
+
+  describe('Large Chat Scenarios', () => {
+    let sharedResumeResponsesPath: string;
+    let sharedActiveResponsesPath: string;
+    let sharedHistoryPath: string;
+    let sharedPrompts: string;
+    let tempDir: string;
+
+    beforeAll(async () => {
+      tempDir = join(__dirname, `large-chat-tmp-${randomUUID()}`);
+      mkdirSync(tempDir, { recursive: true });
+
+      const { resumeResponsesPath, activeResponsesPath, historyPath, prompts } =
+        await generateSharedLargeChatData(tempDir);
+      sharedActiveResponsesPath = activeResponsesPath;
+      sharedResumeResponsesPath = resumeResponsesPath;
+      sharedHistoryPath = historyPath;
+      sharedPrompts = prompts;
+    }, 60000);
+
+    afterAll(() => {
+      if (existsSync(tempDir)) {
+        rmSync(tempDir, { recursive: true, force: true });
+      }
+    });
+
+    afterEach(async () => {
+      await rig.cleanup();
+    });
+
+    it('large-chat: memory usage within baseline', async () => {
+      rig = new TestRig();
+      rig.setup('memory-large-chat', {
+        fakeResponsesPath: sharedActiveResponsesPath,
+      });
+
+      const result = await harness.runScenario(
+        rig,
+        'large-chat',
+        async (recordSnapshot) => {
+          await rig.run({
+            stdin: sharedPrompts,
+            timeout: 600000,
+            env: TEST_ENV,
+          });
+
+          await recordSnapshot('after-large-chat');
+        },
+      );
+
+      if (UPDATE_BASELINES) {
+        harness.updateScenarioBaseline(result);
+        console.log(
+          `Updated baseline for large-chat: ${(result.finalHeapUsed / (1024 * 1024)).toFixed(1)} MB`,
+        );
+      } else {
+        harness.assertWithinBaseline(result);
+      }
+    });
+
+    it('resume-large-chat: memory usage within baseline', async () => {
+      rig = new TestRig();
+      rig.setup('memory-resume-large-chat', {
+        fakeResponsesPath: sharedResumeResponsesPath,
+      });
+
+      const result = await harness.runScenario(
+        rig,
+        'resume-large-chat',
+        async (recordSnapshot) => {
+          // Ensure the history file is linked
+          const targetChatsDir = join(
+            rig.homeDir!,
+            '.gemini',
+            'tmp',
+            getProjectHash(rig.testDir!),
+            'chats',
+          );
+          mkdirSync(targetChatsDir, { recursive: true });
+          const targetHistoryPath = join(
+            targetChatsDir,
+            'session-large-chat.json',
+          );
+          if (existsSync(targetHistoryPath)) rmSync(targetHistoryPath);
+          copyFileSync(sharedHistoryPath, targetHistoryPath);
+
+          await rig.run({
+            // add a prompt to make sure it does not hang there and exits immediately
+            args: ['--resume', 'latest', '--prompt', 'hello'],
+            timeout: 600000,
+            env: TEST_ENV,
+          });
+
+          await recordSnapshot('after-resume-large-chat');
+        },
+      );
+
+      if (UPDATE_BASELINES) {
+        harness.updateScenarioBaseline(result);
+        console.log(
+          `Updated baseline for resume-large-chat: ${(result.finalHeapUsed / (1024 * 1024)).toFixed(1)} MB`,
+        );
+      } else {
+        harness.assertWithinBaseline(result);
+      }
+    });
+
+    it('resume-large-chat-with-messages: memory usage within baseline', async () => {
+      rig = new TestRig();
+      rig.setup('memory-resume-large-chat-msgs', {
+        fakeResponsesPath: sharedResumeResponsesPath,
+      });
+
+      const result = await harness.runScenario(
+        rig,
+        'resume-large-chat-with-messages',
+        async (recordSnapshot) => {
+          // Ensure the history file is linked
+          const targetChatsDir = join(
+            rig.homeDir!,
+            '.gemini',
+            'tmp',
+            getProjectHash(rig.testDir!),
+            'chats',
+          );
+          mkdirSync(targetChatsDir, { recursive: true });
+          const targetHistoryPath = join(
+            targetChatsDir,
+            'session-large-chat.json',
+          );
+          if (existsSync(targetHistoryPath)) rmSync(targetHistoryPath);
+          copyFileSync(sharedHistoryPath, targetHistoryPath);
+
+          const stdinContent = 'new prompt 1\nnew prompt 2\n';
+
+          await rig.run({
+            args: ['--resume', 'latest'],
+            stdin: stdinContent,
+            timeout: 600000,
+            env: TEST_ENV,
+          });
+
+          await recordSnapshot('after-resume-and-append');
+        },
+      );
+
+      if (UPDATE_BASELINES) {
+        harness.updateScenarioBaseline(result);
+        console.log(
+          `Updated baseline for resume-large-chat-with-messages: ${(result.finalHeapUsed / (1024 * 1024)).toFixed(1)} MB`,
+        );
+      } else {
+        harness.assertWithinBaseline(result);
+      }
+    });
+  });
 });
+
+async function generateSharedLargeChatData(tempDir: string) {
+  const resumeResponsesPath = join(tempDir, 'large-chat-resume-chat.responses');
+  const activeResponsesPath = join(tempDir, 'large-chat-active-chat.responses');
+  const historyPath = join(tempDir, 'large-chat-history.json');
+  const sourceSessionPath = join(__dirname, 'large-chat-session.json');
+
+  const session = JSON.parse(readFileSync(sourceSessionPath, 'utf8'));
+  const messages = session.messages;
+
+  copyFileSync(sourceSessionPath, historyPath);
+
+  // Generate fake responses for active chat
+  const promptsList: string[] = [];
+  const activeResponsesStream = createWriteStream(activeResponsesPath);
+  const complexityResponse = {
+    method: 'generateContent',
+    response: {
+      candidates: [
+        {
+          content: {
+            parts: [
+              {
+                text: '{"complexity_reasoning":"simple","complexity_score":1}',
+              },
+            ],
+            role: 'model',
+          },
+          finishReason: 'STOP',
+          index: 0,
+        },
+      ],
+    },
+  };
+  const summaryResponse = {
+    method: 'generateContent',
+    response: {
+      candidates: [
+        {
+          content: {
+            parts: [
+              { text: '{"originalSummary":"large chat summary","events":[]}' },
+            ],
+            role: 'model',
+          },
+          finishReason: 'STOP',
+          index: 0,
+        },
+      ],
+    },
+  };
+
+  for (let i = 0; i < messages.length; i++) {
+    const msg = messages[i];
+    if (msg.type === 'user') {
+      promptsList.push(msg.content[0].text);
+
+      // Start of a new turn
+      activeResponsesStream.write(JSON.stringify(complexityResponse) + '\n');
+
+      // Find all subsequent gemini messages until the next user message
+      let j = i + 1;
+      while (j < messages.length && messages[j].type === 'gemini') {
+        const geminiMsg = messages[j];
+        const parts = [];
+        if (geminiMsg.content) {
+          parts.push({ text: geminiMsg.content });
+        }
+        if (geminiMsg.toolCalls) {
+          for (const tc of geminiMsg.toolCalls) {
+            parts.push({
+              functionCall: {
+                name: tc.name,
+                args: tc.args,
+              },
+            });
+          }
+        }
+
+        activeResponsesStream.write(
+          JSON.stringify({
+            method: 'generateContentStream',
+            response: [
+              {
+                candidates: [
+                  {
+                    content: { parts, role: 'model' },
+                    finishReason: 'STOP',
+                    index: 0,
+                  },
+                ],
+                usageMetadata: {
+                  promptTokenCount: 100,
+                  candidatesTokenCount: 100,
+                  totalTokenCount: 200,
+                  promptTokensDetails: [{ modality: 'TEXT', tokenCount: 100 }],
+                },
+              },
+            ],
+          }) + '\n',
+        );
+        j++;
+      }
+      // End of turn
+      activeResponsesStream.write(JSON.stringify(summaryResponse) + '\n');
+      // Skip the gemini messages we just processed
+      i = j - 1;
+    }
+  }
+  activeResponsesStream.end();
+
+  // Generate responses for resumed chat
+  const resumeResponsesStream = createWriteStream(resumeResponsesPath);
+  for (let i = 0; i < 5; i++) {
+    // Doubling up on non-streaming responses to satisfy classifier and complexity checks
+    resumeResponsesStream.write(JSON.stringify(complexityResponse) + '\n');
+    resumeResponsesStream.write(JSON.stringify(summaryResponse) + '\n');
+    resumeResponsesStream.write(JSON.stringify(complexityResponse) + '\n');
+    resumeResponsesStream.write(
+      JSON.stringify({
+        method: 'generateContentStream',
+        response: [
+          {
+            candidates: [
+              {
+                content: {
+                  parts: [{ text: `Resume response ${i}` }],
+                  role: 'model',
+                },
+                finishReason: 'STOP',
+                index: 0,
+              },
+            ],
+            usageMetadata: {
+              promptTokenCount: 10,
+              candidatesTokenCount: 10,
+              totalTokenCount: 20,
+              promptTokensDetails: [{ modality: 'TEXT', tokenCount: 10 }],
+            },
+          },
+        ],
+      }) + '\n',
+    );
+    resumeResponsesStream.write(JSON.stringify(summaryResponse) + '\n');
+  }
+  resumeResponsesStream.end();
+
+  // Wait for streams to finish
+  await Promise.all([
+    new Promise((res) =>
+      activeResponsesStream.on('finish', () => res(undefined)),
+    ),
+    new Promise((res) =>
+      resumeResponsesStream.on('finish', () => res(undefined)),
+    ),
+  ]);
+
+  return {
+    resumeResponsesPath,
+    activeResponsesPath,
+    historyPath,
+    prompts: promptsList.join('\n'),
+  };
+}

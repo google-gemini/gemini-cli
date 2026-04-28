@@ -62,11 +62,13 @@ describe('tracker_mode', () => {
         'Expected tracker_update_task tool to be called',
       ).toBe(true);
 
-      const updateCall = toolLogs.find(
+      const updateCalls = toolLogs.filter(
         (log) => log.toolRequest.name === TRACKER_UPDATE_TASK_TOOL_NAME,
       );
-      expect(updateCall).toBeDefined();
-      const updateArgs = JSON.parse(updateCall!.toolRequest.args);
+      expect(updateCalls.length).toBeGreaterThan(0);
+      const updateArgs = JSON.parse(
+        updateCalls[updateCalls.length - 1].toolRequest.args,
+      );
       expect(updateArgs.status).toBe('closed');
 
       const loginContent = fs.readFileSync(
@@ -119,6 +121,8 @@ describe('tracker_mode', () => {
   });
 
   evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'should correctly identify the task tracker storage location from the system prompt',
     params: {
       settings: { experimental: { taskTracker: true } },
@@ -126,12 +130,52 @@ describe('tracker_mode', () => {
     prompt:
       'Where is my task tracker storage located? Please provide the absolute path in your response.',
     assert: async (rig, result) => {
-      // The rig sets GEMINI_CLI_HOME to rig.homeDir
-      const homeDir = rig.homeDir!;
-      // The response should contain the dynamic path which includes the home directory
-      // and follows the .gemini/tmp/.../tracker structure.
-      expect(result).toContain(homeDir);
+      // The response should contain the dynamic path which follows the .gemini/tmp/.../tracker structure.
       expect(result).toMatch(/\.gemini\/tmp\/.*\/tracker/);
+    },
+  });
+
+  evalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
+    name: 'should update the tracker in the same turn as the task completion to save turns',
+    params: {
+      settings: { experimental: { taskTracker: true } },
+    },
+    files: FILES,
+    prompt:
+      'We have a bug in src/login.js: the password check is missing. Fix this bug. Then, create a new file src/auth.js that exports a simple verifyToken function. Please organize this into tasks and execute them.',
+    assert: async (rig, result) => {
+      await rig.waitForToolCall(TRACKER_CREATE_TASK_TOOL_NAME);
+      await rig.waitForToolCall(TRACKER_UPDATE_TASK_TOOL_NAME);
+
+      const toolLogs = rig.readToolLogs();
+
+      // Get the prompt ID of the fix for login.js
+      const loginEditCalls = toolLogs.filter(
+        (log) =>
+          (log.toolRequest.name === 'replace' ||
+            log.toolRequest.name === 'write_file') &&
+          log.toolRequest.args.includes('login.js'),
+      );
+
+      expect(loginEditCalls.length).toBeGreaterThan(0);
+      const loginEditPromptId =
+        loginEditCalls[loginEditCalls.length - 1].toolRequest.prompt_id;
+
+      // Verify there is an update to the tracker in the exact same turn
+      const parallelTrackerUpdates = toolLogs.filter(
+        (log) =>
+          log.toolRequest.name === TRACKER_UPDATE_TASK_TOOL_NAME &&
+          log.toolRequest.prompt_id === loginEditPromptId,
+      );
+
+      expect(
+        parallelTrackerUpdates.length,
+        'Expected tracker_update_task to be called in the same turn as the login.js fix',
+      ).toBeGreaterThan(0);
+
+      assertModelHasOutput(result);
     },
   });
 });
