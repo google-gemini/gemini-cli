@@ -75,7 +75,9 @@ export class ContextGraphBuilder {
         }
 
         for (const part of msg.parts) {
-          const id = getStableId(part, this.nodeIdentityMap);
+          const apiId = part.functionResponse?.id || part.functionCall?.id;
+          const id = apiId || getStableId(part, this.nodeIdentityMap);
+
           const node: ConcreteNode = {
             id,
             timestamp: Date.now(),
@@ -103,7 +105,9 @@ export class ContextGraphBuilder {
         }
 
         for (const part of msg.parts) {
-          const id = getStableId(part, this.nodeIdentityMap);
+          const apiId = part.functionCall?.id;
+          const id = apiId || getStableId(part, this.nodeIdentityMap);
+
           const node: ConcreteNode = {
             id,
             timestamp: Date.now(),

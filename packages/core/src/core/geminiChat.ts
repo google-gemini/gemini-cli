@@ -885,7 +885,6 @@ export class GeminiChat {
     streamResponse: AsyncGenerator<GenerateContentResponse>,
     originalRequest: GenerateContentParameters,
   ): AsyncGenerator<GenerateContentResponse> {
-    this.callCounter = 0;
     const modelResponseParts: Part[] = [];
 
     let hasToolCall = false;
@@ -909,12 +908,13 @@ export class GeminiChat {
       }
 
       if (chunk.functionCalls && chunk.functionCalls.length > 0) {
+        const turnTimestamp = Date.now();
         for (const fnCall of chunk.functionCalls) {
           if (!fnCall.id) {
             const callKey = `${fnCall.name}:${JSON.stringify(fnCall.args || {})}`;
             if (callKey !== lastCallKey) {
               lastCallKey = callKey;
-              lastAssignedId = `synth_${this.context.promptId}_${this.callCounter++}`;
+              lastAssignedId = `synth_${this.context.promptId}_${turnTimestamp}_${this.callCounter++}`;
               debugLogger.log(
                 `[GeminiChat] Assigned synthetic ID: ${lastAssignedId} to tool: ${fnCall.name}`,
               );
@@ -924,7 +924,6 @@ export class GeminiChat {
           finalFunctionCallsMap.set(fnCall.id!, fnCall);
         }
       }
-
       if (isValidResponse(chunk)) {
         const content = chunk.candidates?.[0]?.content;
         if (content?.parts) {

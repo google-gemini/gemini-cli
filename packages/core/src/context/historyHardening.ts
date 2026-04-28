@@ -118,7 +118,7 @@ function pairToolsAndEnforceSignatures(history: Content[]): Content[] {
             );
 
           if (!hasResponse) {
-            debugLogger.warn(
+            debugLogger.log(
               `[HistoryHardener] Call id='${id}' (name='${name}') has no matching response in next turn.`,
             );
             missing.push({ id, name });
@@ -126,7 +126,7 @@ function pairToolsAndEnforceSignatures(history: Content[]): Content[] {
         }
 
         if (missing.length > 0) {
-          debugLogger.error(
+          debugLogger.log(
             `[HistoryHardener] Detected ${missing.length} tool calls without responses. Injecting sentinel responses.`,
           );
 
@@ -174,7 +174,7 @@ function pairToolsAndEnforceSignatures(history: Content[]): Content[] {
           if (hasCall) {
             validParts.push(p);
           } else {
-            debugLogger.warn(
+            debugLogger.log(
               `[HistoryHardener] Dropping orphaned functionResponse id='${id}' (name='${name}')`,
             );
           }
@@ -207,7 +207,7 @@ function enforceRoleConstraints(history: Content[]): Content[] {
 
   // 1. Ensure starts with user
   if (result[0].role === 'model') {
-    debugLogger.warn(
+    debugLogger.log(
       '[HistoryHardener] Final history starts with model role. Prepending sentinel user turn.',
     );
     result.unshift({
@@ -218,7 +218,7 @@ function enforceRoleConstraints(history: Content[]): Content[] {
 
   // 2. Ensure ends with user
   if (result[result.length - 1].role === 'model') {
-    debugLogger.warn(
+    debugLogger.log(
       '[HistoryHardener] Final history ends with model role. Appending sentinel user turn.',
     );
     result.push({
