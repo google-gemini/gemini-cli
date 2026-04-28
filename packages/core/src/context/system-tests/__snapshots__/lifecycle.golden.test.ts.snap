@@ -6,7 +6,7 @@ exports[`System Lifecycle Golden Tests > Scenario 1: Organic Growth with Huge To
     {
       "parts": [
         {
-          "text": "[Continuing from previous context...]",
+          "text": "[Continuing from previous AI thoughts...]",
         },
       ],
       "role": "user",

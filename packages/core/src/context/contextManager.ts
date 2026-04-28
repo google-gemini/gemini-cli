@@ -6,7 +6,7 @@
 
 import type { Content } from '@google/genai';
 import type { AgentChatHistory } from '../core/agentChatHistory.js';
-import type { ConcreteNode } from './graph/types.js';
+import { isToolExecution, type ConcreteNode } from './graph/types.js';
 import type { ContextEventBus } from './eventBus.js';
 import type { ContextTracer } from './tracer.js';
 import type { ContextEnvironment } from './pipeline/environment.js';
@@ -99,6 +99,15 @@ export class ContextManager {
     if (currentTokens > this.sidecar.config.budget.retainedTokens) {
       const agedOutNodes = new Set<string>();
       let rollingTokens = 0;
+
+      // Identify active tool calls that must NEVER be truncated
+      const protectedIds = this.getProtectedNodeIds();
+      if (protectedIds.size > 0) {
+        debugLogger.log(
+          `[ContextManager] Pinning ${protectedIds.size} active tool call nodes to prevent truncation.`,
+        );
+      }
+
       // Walk backwards finding nodes that fall out of the retained budget
       for (let i = this.buffer.nodes.length - 1; i >= 0; i--) {
         const node = this.buffer.nodes[i];
@@ -106,7 +115,10 @@ export class ContextManager {
           node,
         ]);
         if (rollingTokens > this.sidecar.config.budget.retainedTokens) {
-          agedOutNodes.add(node.id);
+          // Only age out if not protected
+          if (!protectedIds.has(node.id)) {
+            agedOutNodes.add(node.id);
+          }
         }
       }
 
@@ -122,6 +134,33 @@ export class ContextManager {
         });
       }
     }
+  }
+
+  /**
+   * Identifies 'pinned' nodes that should not be truncated.
+   * This includes active tool calls (calls without responses in the graph).
+   */
+  private getProtectedNodeIds(): Set<string> {
+    const protectedIds = new Set<string>();
+    const nodes = this.buffer.nodes;
+
+    const calls = nodes.filter((n) => isToolExecution(n) && n.role === 'model');
+    const responses = new Set(
+      nodes
+        .filter((n) => isToolExecution(n) && n.role === 'user')
+        .map((n) => n.payload.functionResponse?.id)
+        .filter((id): id is string => !!id),
+    );
+
+    for (const call of calls) {
+      const id = call.payload.functionCall?.id;
+      // If we have a call but no response in the current graph, it's 'in flight'
+      if (id && !responses.has(id)) {
+        protectedIds.add(call.id);
+      }
+    }
+
+    return protectedIds;
   }
 
   /**
