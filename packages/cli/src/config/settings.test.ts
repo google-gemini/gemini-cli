@@ -565,6 +565,51 @@ describe('Settings Loading and Merging', () => {
       expect(settings.merged.model.maxSessionTurns).toBe('not-a-number');
     });
 
+    it('should preserve environment variable placeholders on save', () => {
+      vi.stubEnv('TEST_AUTO_THEME', 'true');
+      const placeholder = '${TEST_AUTO_THEME:-false}';
+
+      (mockFsExistsSync as Mock).mockImplementation(
+        (p: fs.PathLike) =>
+          path.normalize(p.toString()) === path.normalize(USER_SETTINGS_PATH),
+      );
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (
+            path.normalize(p.toString()) === path.normalize(USER_SETTINGS_PATH)
+          ) {
+            return JSON.stringify({
+              ui: { autoThemeSwitching: placeholder },
+            });
+          }
+          return '{}';
+        },
+      );
+
+      // Load settings - this will expand the placeholder for runtime use
+      const loaded = loadSettings(MOCK_WORKSPACE_DIR);
+      expect(loaded.merged.ui.autoThemeSwitching).toBe(true);
+
+      // Verify that the original settings for the user scope still have the placeholder
+      const userFile = loaded.forScope(SettingScope.User);
+      expect(userFile.originalSettings.ui?.autoThemeSwitching).toBe(
+        placeholder,
+      );
+
+      // Save settings - this should use the originalSettings (with placeholders)
+      const mockUpdate = vi.mocked(updateSettingsFilePreservingFormat);
+      saveSettings(userFile);
+
+      expect(mockUpdate).toHaveBeenCalledWith(
+        USER_SETTINGS_PATH,
+        expect.objectContaining({
+          ui: expect.objectContaining({
+            autoThemeSwitching: placeholder,
+          }),
+        }),
+      );
+    });
+
     it('should use system folderTrust over user setting', () => {
       (mockFsExistsSync as Mock).mockReturnValue(true);
       const userSettingsContent = {

@@ -673,7 +673,9 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
   const storage = new Storage(workspaceDir);
   const workspaceSettingsPath = storage.getWorkspaceSettingsPath();
 
-  const load = (filePath: string): { settings: Settings; rawJson?: string } => {
+  const load = (
+    filePath: string,
+  ): { settings: Settings; rawSettings: Settings; rawJson?: string } => {
     try {
       if (fs.existsSync(filePath)) {
         const content = fs.readFileSync(filePath, 'utf-8');
@@ -689,7 +691,7 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
             path: filePath,
             severity: 'error',
           });
-          return { settings: {} };
+          return { settings: {}, rawSettings: {} };
         }
 
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
@@ -712,7 +714,11 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
             path: filePath,
             severity: 'warning',
           });
-          return { settings: expandedSettings, rawJson: content };
+          return {
+            settings: expandedSettings,
+            rawSettings: settingsObject as Settings,
+            rawJson: content,
+          };
         }
 
         // Return the successfully cast and validated data
@@ -721,6 +727,7 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
           // it's safe to cast the resulting data to the Settings type.
           // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           settings: (validationResult.data as Settings) ?? expandedSettings,
+          rawSettings: settingsObject as Settings,
           rawJson: content,
         };
       }
@@ -731,27 +738,34 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
         severity: 'error',
       });
     }
-    return { settings: {} };
+    return { settings: {}, rawSettings: {} };
   };
 
   const systemResult = load(systemSettingsPath);
   const systemDefaultsResult = load(systemDefaultsPath);
   const userResult = load(USER_SETTINGS_PATH);
 
-  let workspaceResult: { settings: Settings; rawJson?: string } = {
+  let workspaceResult: {
+    settings: Settings;
+    rawSettings: Settings;
+    rawJson?: string;
+  } = {
     settings: {} as Settings,
+    rawSettings: {} as Settings,
     rawJson: undefined,
   };
   if (!storage.isWorkspaceHomeDir()) {
     workspaceResult = load(workspaceSettingsPath);
   }
 
-  const systemOriginalSettings = structuredClone(systemResult.settings);
+  const systemOriginalSettings = structuredClone(systemResult.rawSettings);
   const systemDefaultsOriginalSettings = structuredClone(
-    systemDefaultsResult.settings,
+    systemDefaultsResult.rawSettings,
   );
-  const userOriginalSettings = structuredClone(userResult.settings);
-  const workspaceOriginalSettings = structuredClone(workspaceResult.settings);
+  const userOriginalSettings = structuredClone(userResult.rawSettings);
+  const workspaceOriginalSettings = structuredClone(
+    workspaceResult.rawSettings,
+  );
 
   // Environment variables for runtime use are already resolved and validated in load()
   systemSettings = systemResult.settings;

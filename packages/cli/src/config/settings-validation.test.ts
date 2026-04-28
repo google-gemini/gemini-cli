@@ -386,6 +386,28 @@ describe('settings-validation', () => {
         const result = validateSettings(settings);
         expect(result.success).toBe(false);
         expect(result.error?.issues).toHaveLength(2);
+        expect(result.error?.issues[0].message).toContain(
+          'Expected boolean, received string',
+        );
+        expect(result.error?.issues[1].message).toContain(
+          'Expected number, received string',
+        );
+      });
+
+      it('should cast strings to booleans/numbers in shared definitions (refs)', () => {
+        const settings = {
+          mcpServers: {
+            'test-server': {
+              command: 'node',
+              trust: 'true', // from boolean ref
+            },
+          },
+        };
+
+        const result = validateSettings(settings);
+        expect(result.success).toBe(true);
+        const data = result.data as Settings;
+        expect(data.mcpServers?.['test-server'].trust).toBe(true);
       });
     });
   });
