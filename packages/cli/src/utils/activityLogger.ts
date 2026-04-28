@@ -307,25 +307,23 @@ export class ActivityLogger extends EventEmitter {
         typeof input === 'object' && 'method' in input
           ? input.method
           : undefined;
-      const method = (init?.method || inputMethod || 'GET').toUpperCase();
-
-      const newInit = { ...init };
-      newInit.method = method;
       const inputHeaders =
         typeof input === 'object' && 'headers' in input
           ? input.headers
           : undefined;
-      const headers = new Headers(inputHeaders || {});
-      if (init?.headers) {
-        new Headers(init.headers).forEach((value, key) => {
-          headers.set(key, value);
-        });
-      }
+
+      const method = (init?.method ?? inputMethod ?? 'GET').toUpperCase();
+      const headers = new Headers(init?.headers ?? inputHeaders ?? {});
       headers.set(ACTIVITY_ID_HEADER, id);
-      newInit.headers = headers;
+
+      const newInit = {
+        ...init,
+        method,
+        headers,
+      };
 
       let reqBody = '';
-      const body = init?.body;
+      const body = newInit.body;
       if (body) {
         if (typeof body === 'string') reqBody = body;
         else if (body instanceof URLSearchParams) reqBody = body.toString();
