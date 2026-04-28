@@ -9,6 +9,10 @@ import { evalTest } from './test-helper.js';
 
 describe('Automated tool use', () => {
   /**
+   * Tests that the agent always utilizes --fix when calling eslint.
+   * We provide a 'lint' script in the package.json, which helps elicit
+   * a repro by guiding the agent into using the existing deficient script.
+   *
    * @group Core
    * @scenario tool-use
    * @maintainer agent-team
@@ -100,6 +104,9 @@ describe('Automated tool use', () => {
   });
 
   /**
+   * Tests that the agent uses prettier --write to fix formatting issues in files
+   * instead of trying to edit the files itself.
+   *
    * @group Core
    * @scenario tool-use
    * @maintainer agent-team
