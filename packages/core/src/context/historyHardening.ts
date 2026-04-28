@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Content, Part } from '@google/genai';
+import type { Content } from '@google/genai';
 import { debugLogger } from '../utils/debugLogger.js';
 
 export const SYNTHETIC_THOUGHT_SIGNATURE = 'skip_thought_signature_validator';
@@ -138,40 +138,7 @@ export function hardenHistory(history: Content[]): Content[] {
       }
     }
 
-    // Final check for orphaned responses (responses without a preceding model turn with calls)
-    if (turn.role === 'user') {
-      const responseParts =
-        turn.parts?.filter((p) => !!p.functionResponse) || [];
-      if (responseParts.length > 0) {
-        const prevTurn = hardened[hardened.length - 1];
-        const validParts: Part[] = [];
-
-        for (const resp of responseParts) {
-          const id = resp.functionResponse!.id;
-          const name = resp.functionResponse!.name;
-          const hasCall =
-            prevTurn?.role === 'model' &&
-            prevTurn.parts?.some(
-              (p) => p.functionCall?.id === id && p.functionCall?.name === name,
-            );
-
-          if (hasCall) {
-            validParts.push(resp);
-          } else {
-            debugLogger.warn(
-              `[HistoryHardener] Dropping orphaned functionResponse id='${id}' (name='${name}')`,
-            );
-          }
-        }
-
-        // Add back non-response parts (text, etc.)
-        const nonResponseParts =
-          turn.parts?.filter((p) => !p.functionResponse) || [];
-        turn.parts = [...validParts, ...nonResponseParts];
-      }
-    }
-
-    // Only push if we didn't empty the turn during orphaned response removal
+    // Only push if we didn't empty the turn during coalescing
     if (turn.parts && turn.parts.length > 0) {
       hardened.push(turn);
     }
