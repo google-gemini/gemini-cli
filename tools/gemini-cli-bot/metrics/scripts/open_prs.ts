@@ -5,16 +5,29 @@
  */
 
 import { execSync } from 'node:child_process';
+import { GITHUB_OWNER, GITHUB_REPO, type MetricOutput } from '../types.js';
 
 try {
+  const repo = process.env.GITHUB_REPOSITORY || `${GITHUB_OWNER}/${GITHUB_REPO}`;
   const count = execSync(
-    'gh pr list --state open --limit 1000 --json number --jq length',
+    `gh api "search/issues?q=repo:${repo}+is:pr+is:open" --jq .total_count`,
     {
       encoding: 'utf-8',
     },
   ).trim();
-  console.log(`open_prs,${count}`);
-} catch {
-  // Fallback if gh fails or no PRs found
-  console.log('open_prs,0');
+
+  const metric: MetricOutput = {
+    metric: 'open_prs',
+    value: parseInt(count, 10) || 0,
+    timestamp: new Date().toISOString(),
+  };
+  process.stdout.write(JSON.stringify(metric) + '\n');
+} catch (err) {
+  process.stderr.write(`Error fetching open PRs: ${err instanceof Error ? err.message : String(err)}\n`);
+  const fallback: MetricOutput = {
+    metric: 'open_prs',
+    value: 0,
+    timestamp: new Date().toISOString(),
+  };
+  process.stdout.write(JSON.stringify(fallback) + '\n');
 }
