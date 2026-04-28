@@ -385,7 +385,10 @@ export async function main() {
     },
   });
   consolePatcher.patch();
-  registerCleanup(consolePatcher.cleanup);
+  const isAcpMode = !!argv.acp || !!argv.experimentalAcp;
+  if (!isAcpMode) {
+    registerCleanup(consolePatcher.cleanup);
+  }
 
   dns.setDefaultResultOrder(
     validateDnsResolutionOrder(settings.merged.advanced.dnsResolutionOrder),
