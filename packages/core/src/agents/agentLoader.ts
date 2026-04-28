@@ -79,6 +79,11 @@ const mcpServerSchema = z.object({
         scopes: z.array(z.string()).optional(),
         authorization_url: z.string().url().optional(),
         token_url: z.string().url().optional(),
+        issuer: z.string().optional(),
+        audiences: z.array(z.string()).optional(),
+        redirect_uri: z.string().optional(),
+        token_param_name: z.string().optional(),
+        registration_url: z.string().optional(),
       }),
     ])
     .optional(),
@@ -552,6 +557,11 @@ export function markdownToAgentDefinition(
             scopes: config.auth.scopes,
             authorizationUrl: config.auth.authorization_url,
             tokenUrl: config.auth.token_url,
+            issuer: config.auth.issuer,
+            audiences: config.auth.audiences,
+            redirectUri: config.auth.redirect_uri,
+            tokenParamName: config.auth.token_param_name,
+            registrationUrl: config.auth.registration_url,
           };
         }
       }
