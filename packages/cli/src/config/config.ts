@@ -823,10 +823,10 @@ export async function loadCliConfig(
 
   // Ensure specifiedModel is a string (e.g. if yargs parsed multiple --model as an array)
   const specifiedModel = Array.isArray(rawModel)
-    ? (String(rawModel.at(-1) ?? '').trim() || '')
+    ? String(rawModel.at(-1) ?? '').trim() || ''
     : rawModel === undefined
       ? undefined
-      : (String(rawModel ?? '').trim() || '');
+      : String(rawModel ?? '').trim() || '';
 
   const resolvedModel =
     specifiedModel === GEMINI_MODEL_ALIAS_AUTO

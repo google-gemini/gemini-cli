@@ -139,7 +139,7 @@ export function resolveModel(
   }
 
   let resolved: string;
-  switch (requestedModel) {
+  switch (normalizedModel) {
     case PREVIEW_GEMINI_MODEL:
     case PREVIEW_GEMINI_MODEL_AUTO:
     case GEMINI_MODEL_ALIAS_AUTO:
@@ -168,7 +168,7 @@ export function resolveModel(
       break;
     }
     default: {
-      resolved = requestedModel;
+      resolved = normalizedModel;
       break;
     }
   }
