@@ -28,7 +28,7 @@ interface SimulatorResponse {
 export class UserSimulator {
   private isRunning = false;
   private timer: NodeJS.Timeout | null = null;
-  private lastScreenContent = '';
+  private lastStateKey = '';
   private isProcessing = false;
   private interactionsFile: string | null = null;
 
@@ -131,7 +131,16 @@ export class UserSimulator {
         .replace(/\(\s*\)/g, '')
         .trim();
 
-      if (normalizedScreen === this.lastScreenContent) return;
+      // Create a composite key representing the full state (Vision + Internal State)
+      const pendingIds = this.pendingToolCalls
+        .map((tc) => tc.request.callId)
+        .join(',');
+      const currentStateKey = `${normalizedScreen}::${pendingIds}`;
+
+      if (currentStateKey === this.lastStateKey) {
+        return;
+      }
+      this.lastStateKey = currentStateKey;
 
       debugLogger.log(
         `[SIMULATOR] Screen Content Seen:\n---\n${strippedScreen}\n---`,
@@ -304,7 +313,6 @@ ${strippedScreen}
             `[LOG] [SIMULATOR] Action History updated with: "<WAIT>"\n\n`,
           );
         }
-        this.lastScreenContent = normalizedScreen;
         return;
       }
 
@@ -364,8 +372,6 @@ ${strippedScreen}
 
         // Wait a bit to ensure Ink has processed the full input
         await new Promise((resolve) => setTimeout(resolve, 100));
-
-        this.lastScreenContent = normalizedScreen;
       } else {
         debugLogger.log('[SIMULATOR] Skipping (empty response)');
 
@@ -376,8 +382,6 @@ ${strippedScreen}
             `[LOG] [SIMULATOR] Action History updated with: "<EMPTY>"\n\n`,
           );
         }
-
-        this.lastScreenContent = normalizedScreen;
       }
     } catch (e: unknown) {
       debugLogger.error('UserSimulator tick failed', e);
