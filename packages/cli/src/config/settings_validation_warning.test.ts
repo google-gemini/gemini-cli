@@ -125,8 +125,7 @@ describe('Settings Validation Warning', () => {
 
     // Should have recorded a warning in the settings object
     expect(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      settings?.errors.some((e: any) =>
+      settings?.errors.some((e) =>
         e.message.includes("Unrecognized key(s) in object: 'DiffModified'"),
       ),
     ).toBe(true);
