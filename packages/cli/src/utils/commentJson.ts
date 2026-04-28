@@ -136,6 +136,13 @@ function applyKeyDiff(
   }
 
   for (const nextKey of Object.getOwnPropertyNames(desired)) {
+    if (
+      nextKey === '__proto__' ||
+      nextKey === 'constructor' ||
+      nextKey === 'prototype'
+    ) {
+      continue;
+    }
     const nextVal = desired[nextKey];
     const baseVal = base[nextKey];
 

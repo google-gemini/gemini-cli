@@ -458,7 +458,12 @@ export class LoadedSettings {
         ? structuredClone(value)
         : value;
 
-    setNestedProperty(settingsFile.settings, key, valueToSet);
+    // Update resolved settings for runtime use
+    setNestedProperty(
+      settingsFile.settings,
+      key,
+      resolveEnvVarsInObject(valueToSet),
+    );
 
     if (this.isPersistable(settingsFile)) {
       // Use a fresh clone for originalSettings to ensure total independence
@@ -905,7 +910,7 @@ export function migrateDeprecatedSettings(
 
   const processScope = (scope: LoadableSettingScope) => {
     const settingsFile = loadedSettings.forScope(scope);
-    const settings = settingsFile.settings;
+    const settings = settingsFile.originalSettings;
     const foundDeprecated: string[] = [];
 
     // Migrate general settings
