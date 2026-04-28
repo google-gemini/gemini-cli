@@ -40,6 +40,7 @@ import { FORCE_ENCRYPTED_FILE_ENV_VAR } from '../mcp/token-storage/index.js';
 import { GEMINI_DIR, homedir as pathsHomedir } from '../utils/paths.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { writeToStdout } from '../utils/stdio.js';
+import { enableLineWrapping, enterAlternateScreen } from '../utils/terminal.js';
 import {
   FatalCancellationError,
   FatalAuthenticationError,
@@ -82,6 +83,9 @@ vi.mock('../utils/stdio.js', () => ({
     stdout: process.stdout,
     stderr: process.stderr,
   })),
+}));
+
+vi.mock('../utils/terminal.js', () => ({
   enterAlternateScreen: vi.fn(),
   exitAlternateScreen: vi.fn(),
   enableLineWrapping: vi.fn(),
@@ -391,6 +395,9 @@ describe('oauth2', () => {
       );
 
       expect(client).toBe(mockOAuth2Client);
+
+      expect(vi.mocked(enterAlternateScreen)).not.toHaveBeenCalled();
+      expect(vi.mocked(enableLineWrapping)).toHaveBeenCalled();
 
       // Verify the auth flow
       expect(mockGenerateCodeVerifierAsync).toHaveBeenCalled();

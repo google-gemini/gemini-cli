@@ -43,8 +43,6 @@ import {
   enableLineWrapping,
   disableMouseEvents,
   disableKittyKeyboardProtocol,
-  enterAlternateScreen,
-  exitAlternateScreen,
 } from '../utils/terminal.js';
 import { coreEvents, CoreEvent } from '../utils/events.js';
 import { getConsentForOauth } from '../utils/authConsent.js';
@@ -236,10 +234,7 @@ async function initOauthClient(
     }
     let success = false;
     const maxRetries = 2;
-    // Enter alternate buffer
-    enterAlternateScreen();
     // Clear screen and move cursor to top-left.
-    writeToStdout('\u001B[2J\u001B[H');
     disableMouseEvents();
     disableKittyKeyboardProtocol();
     enableLineWrapping();
@@ -255,7 +250,6 @@ async function initOauthClient(
         }
       }
     } finally {
-      exitAlternateScreen();
       // If this was triggered from an active Gemini CLI TUI this event ensures
       // the TUI will re-initialize the terminal state just like it will when
       // another editor like VIM may have modified the buffer of settings.

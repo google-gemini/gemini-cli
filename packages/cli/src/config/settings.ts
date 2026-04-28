@@ -444,7 +444,12 @@ export class LoadedSettings {
     return !settingsFile.readOnly;
   }
 
-  setValue(scope: LoadableSettingScope, key: string, value: unknown): void {
+  setValue(
+    scope: LoadableSettingScope,
+    key: string,
+    value: unknown,
+    options?: { skipSave?: boolean },
+  ): void {
     const settingsFile = this.forScope(scope);
 
     // Clone value to prevent reference sharing
@@ -462,12 +467,24 @@ export class LoadedSettings {
         key,
         structuredClone(valueToSet),
       );
-      saveSettings(settingsFile);
+      if (!options?.skipSave) {
+        saveSettings(settingsFile);
+      }
     }
 
     this._merged = this.computeMergedSettings();
     this._snapshot = this.computeSnapshot();
     coreEvents.emitSettingsChanged();
+  }
+
+  /**
+   * Persists settings for the given scope to disk.
+   */
+  save(scope: LoadableSettingScope): void {
+    const settingsFile = this.forScope(scope);
+    if (this.isPersistable(settingsFile)) {
+      saveSettings(settingsFile);
+    }
   }
 
   setRemoteAdminSettings(remoteSettings: AdminControlsSettings): void {
@@ -828,7 +845,10 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
   );
 
   // Automatically migrate deprecated settings when loading.
-  migrateDeprecatedSettings(loadedSettings);
+  const modifiedScopes = migrateDeprecatedSettings(loadedSettings);
+  for (const scope of modifiedScopes) {
+    loadedSettings.save(scope);
+  }
 
   return loadedSettings;
 }
@@ -843,8 +863,8 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
 export function migrateDeprecatedSettings(
   loadedSettings: LoadedSettings,
   removeDeprecated = true,
-): boolean {
-  let anyModified = false;
+): LoadableSettingScope[] {
+  const modifiedScopes: Set<LoadableSettingScope> = new Set();
   const systemWarnings: Map<LoadableSettingScope, string[]> = new Map();
 
   /**
@@ -914,9 +934,11 @@ export function migrateDeprecatedSettings(
         ) || modified;
 
       if (modified) {
-        loadedSettings.setValue(scope, 'general', newGeneral);
+        loadedSettings.setValue(scope, 'general', newGeneral, {
+          skipSave: true,
+        });
         if (!settingsFile.readOnly) {
-          anyModified = true;
+          modifiedScopes.add(scope);
         }
       }
     }
@@ -942,13 +964,13 @@ export function migrateDeprecatedSettings(
           )
         ) {
           newUi['accessibility'] = newAccessibility;
-          loadedSettings.setValue(scope, 'ui', newUi);
+          loadedSettings.setValue(scope, 'ui', newUi, { skipSave: true });
           if (!settingsFile.readOnly) {
-            anyModified = true;
+            modifiedScopes.add(scope);
           }
         }
 
-        // Migrate enableLoadingPhrases: false → loadingPhrases: 'off'
+        // Migrate enableLoadingPhrases: false ￫ loadingPhrases: 'off'
         const enableLP = newAccessibility['enableLoadingPhrases'];
         if (
           typeof enableLP === 'boolean' &&
@@ -956,9 +978,9 @@ export function migrateDeprecatedSettings(
         ) {
           if (!enableLP) {
             newUi['loadingPhrases'] = 'off';
-            loadedSettings.setValue(scope, 'ui', newUi);
+            loadedSettings.setValue(scope, 'ui', newUi, { skipSave: true });
             if (!settingsFile.readOnly) {
-              anyModified = true;
+              modifiedScopes.add(scope);
             }
           }
           foundDeprecated.push('ui.accessibility.enableLoadingPhrases');
@@ -989,9 +1011,11 @@ export function migrateDeprecatedSettings(
           )
         ) {
           newContext['fileFiltering'] = newFileFiltering;
-          loadedSettings.setValue(scope, 'context', newContext);
+          loadedSettings.setValue(scope, 'context', newContext, {
+            skipSave: true,
+          });
           if (!settingsFile.readOnly) {
-            anyModified = true;
+            modifiedScopes.add(scope);
           }
         }
       }
@@ -1010,18 +1034,22 @@ export function migrateDeprecatedSettings(
         // Only set defaultApprovalMode if it's not already set
         if (newGeneral['defaultApprovalMode'] === undefined) {
           newGeneral['defaultApprovalMode'] = toolsSettings['approvalMode'];
-          loadedSettings.setValue(scope, 'general', newGeneral);
+          loadedSettings.setValue(scope, 'general', newGeneral, {
+            skipSave: true,
+          });
           if (!settingsFile.readOnly) {
-            anyModified = true;
+            modifiedScopes.add(scope);
           }
         }
 
         if (removeDeprecated) {
           const newTools = { ...toolsSettings };
           delete newTools['approvalMode'];
-          loadedSettings.setValue(scope, 'tools', newTools);
+          loadedSettings.setValue(scope, 'tools', newTools, {
+            skipSave: true,
+          });
           if (!settingsFile.readOnly) {
-            anyModified = true;
+            modifiedScopes.add(scope);
           }
         }
       }
@@ -1038,7 +1066,7 @@ export function migrateDeprecatedSettings(
 
     if (experimentalModified) {
       if (!settingsFile.readOnly) {
-        anyModified = true;
+        modifiedScopes.add(scope);
       }
     }
 
@@ -1065,7 +1093,7 @@ export function migrateDeprecatedSettings(
     }
   }
 
-  return anyModified;
+  return Array.from(modifiedScopes);
 }
 
 export function saveSettings(settingsFile: SettingsFile): void {
