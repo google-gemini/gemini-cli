@@ -841,8 +841,15 @@ export async function loadCliConfig(
   );
 
   const defaultModel = PREVIEW_GEMINI_MODEL_AUTO;
-  const specifiedModel =
+  const rawModel =
     argv.model || process.env['GEMINI_MODEL'] || settings.model?.name;
+
+  // Ensure specifiedModel is a string (e.g. if yargs parsed multiple --model as an array)
+  const specifiedModel = Array.isArray(rawModel)
+    ? String(rawModel.at(-1) ?? '').trim() || ''
+    : rawModel === undefined
+      ? undefined
+      : String(rawModel ?? '').trim() || '';
 
   const resolvedModel =
     specifiedModel === GEMINI_MODEL_ALIAS_AUTO

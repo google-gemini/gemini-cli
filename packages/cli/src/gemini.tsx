@@ -385,7 +385,6 @@ export async function main() {
     },
   });
   consolePatcher.patch();
-  registerCleanup(consolePatcher.cleanup);
 
   dns.setDefaultResultOrder(
     validateDnsResolutionOrder(settings.merged.advanced.dnsResolutionOrder),
@@ -411,6 +410,7 @@ export async function main() {
   const partialConfig = await loadCliConfig(settings.merged, sessionId, argv, {
     projectHooks: settings.workspace.settings.hooks,
   });
+
   adminControlsListner.setConfig(partialConfig);
 
   // Refresh auth to fetch remote admin settings from CCPA and before entering
@@ -567,6 +567,12 @@ export async function main() {
     registerCleanup(async () => {
       await config.getHookSystem()?.fireSessionEndEvent(SessionEndReason.Exit);
     });
+
+    // Register ConsolePatcher cleanup last to ensure logs from shutdown hooks
+    // are correctly redirected to stderr (especially for non-interactive JSON output).
+    if (!config.getAcpMode()) {
+      registerCleanup(consolePatcher.cleanup);
+    }
 
     // Launch cleanup expired sessions as a background task
     cleanupExpiredSessions(config, settings.merged).catch((e) => {
