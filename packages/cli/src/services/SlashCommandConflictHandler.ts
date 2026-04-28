@@ -19,6 +19,12 @@ import { CommandKind } from '../ui/commands/types.js';
  * block per command name to avoid UI clutter during startup or incremental loading.
  */
 export class SlashCommandConflictHandler {
+  /**
+   * Keys of conflicts the user has already been notified about and that are
+   * still active in the most recent payload. A conflict that disappears from
+   * the payload is treated as resolved and dropped here, so a fresh
+   * notification fires when the same conflict reappears later.
+   */
   private notifiedConflicts = new Set<string>();
   private pendingConflicts: SlashCommandConflict[] = [];
   private flushTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -40,22 +46,36 @@ export class SlashCommandConflictHandler {
   }
 
   private handleConflicts(payload: SlashCommandConflictsPayload) {
-    const newConflicts = payload.conflicts.filter((c) => {
-      // Use a unique key to prevent duplicate notifications for the same conflict
-      const sourceId =
-        c.loserExtensionName || c.loserMcpServerName || c.loserKind;
-      const key = `${c.name}:${sourceId}:${c.renamedTo}`;
-      if (this.notifiedConflicts.has(key)) {
-        return false;
+    const activeKeys = new Set<string>();
+    const newConflicts: SlashCommandConflict[] = [];
+
+    for (const c of payload.conflicts) {
+      const key = this.getConflictKey(c);
+      activeKeys.add(key);
+      if (!this.notifiedConflicts.has(key)) {
+        newConflicts.push(c);
       }
-      this.notifiedConflicts.add(key);
-      return true;
-    });
+    }
+
+    // Replace dedup state with the current snapshot. Conflicts no longer in
+    // the payload (resolved) are dropped so they re-trigger a notification if
+    // they reappear; conflicts still present remain deduped to avoid spam.
+    this.notifiedConflicts = activeKeys;
+
+    this.pendingConflicts = this.pendingConflicts.filter((c) =>
+      activeKeys.has(this.getConflictKey(c)),
+    );
 
     if (newConflicts.length > 0) {
       this.pendingConflicts.push(...newConflicts);
       this.scheduleFlush();
     }
+  }
+
+  private getConflictKey(c: SlashCommandConflict): string {
+    const sourceId =
+      c.loserExtensionName || c.loserMcpServerName || c.loserKind;
+    return `${c.name}:${sourceId}:${c.renamedTo}`;
   }
 
   private scheduleFlush() {

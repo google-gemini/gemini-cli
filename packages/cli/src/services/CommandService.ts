@@ -49,9 +49,11 @@ export class CommandService {
     const { finalCommands, conflicts } =
       SlashCommandResolver.resolve(allCommands);
 
-    if (conflicts.length > 0) {
-      this.emitConflictEvents(conflicts);
-    }
+    // Always emit, even with no conflicts: the handler treats each event as
+    // the current conflict snapshot and uses absence to detect resolution.
+    // Skipping empty emissions would leave stale dedup state that suppresses
+    // legitimate notifications when a conflict reappears (issue #24333).
+    this.emitConflictEvents(conflicts);
 
     return new CommandService(
       Object.freeze(finalCommands),
