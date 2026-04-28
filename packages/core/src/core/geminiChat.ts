@@ -649,6 +649,9 @@ export class GeminiChat {
 
       if (this.onModelChanged) {
         this.tools = await this.onModelChanged(modelToUse);
+        // CRITICAL: Update the request config with the fresh tools
+        // to ensure mode-switches (like exit_plan_mode) are reflected immediately.
+        config.tools = this.tools;
       }
 
       // Track final request parameters for AfterModel hooks
