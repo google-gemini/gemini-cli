@@ -50,6 +50,7 @@ import { handleFallback } from '../fallback/handler.js';
 import { isFunctionResponse } from '../utils/messageInspectors.js';
 import { partListUnionToString } from './geminiRequest.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
+import { debugLogger } from '../utils/debugLogger.js';
 import { estimateTokenCountSync } from '../utils/tokenCalculation.js';
 import {
   applyModelSelection,
@@ -648,6 +649,49 @@ export class GeminiChat {
         ) {
           // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           config.tools = toolSelectionResult.tools as Tool[];
+        }
+      }
+
+      // Enforce 128 tool limit for Gemini API.
+      const MAX_TOOLS = 128;
+      if (config.tools && config.tools.length > 0) {
+        let totalTools = 0;
+        for (const tool of config.tools) {
+          if (
+            'functionDeclarations' in tool &&
+            Array.isArray(tool.functionDeclarations)
+          ) {
+            totalTools += tool.functionDeclarations.length;
+          }
+        }
+
+        if (totalTools > MAX_TOOLS) {
+          debugLogger.warn(
+            `Total tools exceed Gemini API limit of ${MAX_TOOLS} (found ${totalTools}). Truncating.`,
+          );
+          // Truncate function declarations to fit within the limit.
+          let remainingSlots = MAX_TOOLS;
+          const limitedTools: Tool[] = [];
+          for (const tool of config.tools) {
+            if (
+              'functionDeclarations' in tool &&
+              Array.isArray(tool.functionDeclarations)
+            ) {
+              const declarations = tool.functionDeclarations.slice(
+                0,
+                remainingSlots,
+              );
+              if (declarations.length > 0) {
+                limitedTools.push({ functionDeclarations: declarations });
+              }
+              remainingSlots -= declarations.length;
+            } else {
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+              limitedTools.push(tool as Tool);
+            }
+            if (remainingSlots <= 0) break;
+          }
+          config.tools = limitedTools;
         }
       }
 

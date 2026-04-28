@@ -1150,6 +1150,54 @@ describe('GeminiChat', () => {
     });
   });
 
+  describe('tool limiting safety net', () => {
+    it('should truncate tools to 128 as a safety net in generateContent', async () => {
+      const tools = Array.from({ length: 150 }, (_, i) => ({
+        functionDeclarations: [{ name: `tool_${i}`, description: `tool ${i}` }],
+      }));
+
+      chat.setTools(tools);
+
+      // We need to mock the generator response to avoid actual API calls
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        (async function* () {
+          yield {
+            candidates: [
+              {
+                content: { parts: [{ text: 'Response' }] },
+                finishReason: 'STOP',
+              },
+            ],
+          } as any;
+        })(),
+      );
+
+      const stream = await chat.sendMessageStream(
+        { model: 'test-model' },
+        'hello',
+        'test-id',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+      for await (const _ of stream) {
+        // consume stream
+      }
+
+      const lastCall =
+        vi.mocked(mockContentGenerator.generateContentStream).mock.calls[0];
+      const callConfig = lastCall?.[0]?.config;
+
+      let totalFunctions = 0;
+      for (const t of callConfig?.tools ?? []) {
+        if ('functionDeclarations' in t && t.functionDeclarations) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+          totalFunctions += (t.functionDeclarations as any).length;
+        }
+      }
+      expect(totalFunctions).toBe(128);
+    });
+  });
+
   describe('sendMessageStream with retries', () => {
     it('should yield a RETRY event when an invalid stream is encountered', async () => {
       // ARRANGE: Mock the stream to fail once, then succeed.
