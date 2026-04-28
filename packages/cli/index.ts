@@ -12,6 +12,122 @@ import v8 from 'node:v8';
 
 // --- Global Entry Point ---
 
+/**
+ * Whitelist of environment variables that Node.js and libcurl read during
+ * process initialization (before user JS code runs), and therefore must be
+ * present in the child process's initial environment for its TLS / proxy /
+ * certificate-trust layer to pick them up. See:
+ *   - https://nodejs.org/api/cli.html#node_extra_ca_certsfile
+ *   - https://nodejs.org/api/cli.html#node_tls_reject_unauthorizedvalue
+ *   - https://curl.se/docs/manpage.html (SSL_CERT_FILE, SSL_CERT_DIR)
+ *
+ * Any other variables defined in .gemini/.env continue to be loaded by the
+ * child via loadEnvironment() in src/config/settings.ts, which applies the
+ * full workspace-trust and exclusion logic.
+ */
+export const PARENT_PROCESS_TLS_ENV_ALLOWLIST: readonly string[] = [
+  'NODE_EXTRA_CA_CERTS',
+  'NODE_TLS_REJECT_UNAUTHORIZED',
+  'SSL_CERT_FILE',
+  'SSL_CERT_DIR',
+  'HTTPS_PROXY',
+  'HTTP_PROXY',
+  'NO_PROXY',
+];
+
+const GEMINI_DIR_NAME = '.gemini';
+const ENV_FILE_NAME = '.env';
+
+/**
+ * Minimal KEY=VALUE parser used only by the lightweight parent process.
+ * Deliberately avoids importing `dotenv` (which would pull heavy deps into
+ * the parent and defeat the purpose of PR #24667). Supports:
+ *   - KEY=value
+ *   - KEY="value" / KEY='value' (quotes stripped if balanced)
+ *   - blank lines and `#` comments (including inline, when value is unquoted)
+ *   - optional `export ` prefix
+ * Malformed lines are silently ignored.
+ */
+export function parseSimpleEnv(content: string): Record<string, string> {
+  const result: Record<string, string> = {};
+  const lines = content.split(/\r?\n/);
+  for (const raw of lines) {
+    let line = raw.trim();
+    if (!line || line.startsWith('#')) continue;
+    if (line.startsWith('export ')) line = line.slice(7).trimStart();
+    const eq = line.indexOf('=');
+    if (eq <= 0) continue;
+    const key = line.slice(0, eq).trim();
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) continue;
+    let value = line.slice(eq + 1).trim();
+    const isQuoted =
+      value.length >= 2 &&
+      ((value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'")));
+    if (!isQuoted) {
+      const hashIdx = value.indexOf(' #');
+      if (hashIdx !== -1) value = value.slice(0, hashIdx).trimEnd();
+    } else {
+      value = value.slice(1, -1);
+    }
+    result[key] = value;
+  }
+  return result;
+}
+
+/**
+ * Read TLS-init-critical environment variables from the user's
+ * `$HOME/.gemini/.env` and return the subset that is both in the allowlist
+ * and NOT already set in `currentEnv`. Never throws.
+ *
+ * This is deliberately scoped to the HOME-level file only. Project-local
+ * `<cwd>/.gemini/.env` is gated by the child's full workspace-trust check
+ * in `loadEnvironment()`, and reproducing that trust logic in the
+ * lightweight parent process would require either duplicating the
+ * longest-match + TRUST_PARENT resolution or importing heavy modules
+ * (which defeats the purpose of PR #24667). Extending this helper to
+ * project-local files after factoring the trust check into a shared
+ * standalone helper is a planned follow-up.
+ *
+ * The reporter's use case on #25987 (enterprise CA cert for an entire
+ * machine) is satisfied by the HOME-level path.
+ */
+export async function loadTlsEnvFromGemini(
+  currentEnv: NodeJS.ProcessEnv,
+  options?: {
+    homeDir?: string;
+    allowlist?: readonly string[];
+  },
+): Promise<Record<string, string>> {
+  const injected: Record<string, string> = {};
+  try {
+    const { readFileSync, existsSync } = await import('node:fs');
+    const pathMod = await import('node:path');
+    const allowlist = options?.allowlist ?? PARENT_PROCESS_TLS_ENV_ALLOWLIST;
+    const homeDir = options?.homeDir ?? os.homedir();
+
+    const homeFile = pathMod.join(homeDir, GEMINI_DIR_NAME, ENV_FILE_NAME);
+    if (!existsSync(homeFile)) return injected;
+
+    let parsed: Record<string, string>;
+    try {
+      const content = readFileSync(homeFile, 'utf-8');
+      parsed = parseSimpleEnv(content);
+    } catch {
+      // Unreadable (EACCES, race on ENOENT, etc.) — silently skip.
+      return injected;
+    }
+    for (const key of allowlist) {
+      if (Object.hasOwn(parsed, key) && !Object.hasOwn(currentEnv, key)) {
+        injected[key] = parsed[key];
+      }
+    }
+  } catch {
+    // Defensive: never block startup on a parent-env helper failure.
+  }
+  return injected;
+}
+
 // Suppress known race condition error in node-pty on Windows
 // Tracking bug: https://github.com/microsoft/node-pty/issues/827
 process.on('uncaughtException', (error) => {
@@ -84,7 +200,18 @@ async function run() {
     nodeArgs.push(script);
     nodeArgs.push(...scriptArgs);
 
-    const newEnv = { ...process.env, GEMINI_CLI_NO_RELAUNCH: 'true' };
+    // Propagate TLS-initialization env vars from `.gemini/.env` into the
+    // child's initial environment. Node reads these once at process start
+    // (before any JS runs), so they must be set on the spawn env rather
+    // than loaded later by the child's loadEnvironment(). Fixes #25987.
+    // Keys already present in process.env take precedence — matching the
+    // "shell env wins" rule enforced in loadEnvironment().
+    const tlsEnvFromFile = await loadTlsEnvFromGemini(process.env);
+    const newEnv = {
+      ...tlsEnvFromFile,
+      ...process.env,
+      GEMINI_CLI_NO_RELAUNCH: 'true',
+    };
     const RELAUNCH_EXIT_CODE = 199;
     let latestAdminSettings: unknown = undefined;
 
@@ -186,4 +313,23 @@ async function run() {
   }
 }
 
-run();
+// Only bootstrap when this module is the executed entrypoint. This lets
+// unit tests import the helpers above without triggering a child spawn.
+// Uses the standard Node ESM "is-main-module" idiom: compare the script
+// path Node was launched with (process.argv[1]) against this module's URL.
+async function isEntrypointModule(): Promise<boolean> {
+  try {
+    const entry = process.argv[1];
+    if (!entry) return false;
+    const { pathToFileURL } = await import('node:url');
+    return pathToFileURL(entry).href === import.meta.url;
+  } catch {
+    // On any failure, preserve historical behavior and run — the CLI
+    // binary must start even if this check misbehaves.
+    return true;
+  }
+}
+
+if (await isEntrypointModule()) {
+  await run();
+}
