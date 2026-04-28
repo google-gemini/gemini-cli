@@ -4,17 +4,25 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import { UserSimulator } from './UserSimulator.js';
 import { Writable } from 'node:stream';
-import type { Config } from '@google/gemini-cli-core';
+import {
+  type Config,
+  MessageBusType,
+  CoreToolCallStatus,
+} from '@google/gemini-cli-core';
 
 describe('UserSimulator', () => {
   let mockConfig: Config;
-  let mockGetScreen: vi.Mock<() => string | undefined>;
+  let mockGetScreen: Mock<() => string | undefined>;
   let mockStdinBuffer: Writable;
   let mockContentGenerator: {
-    generateContent: vi.Mock;
+    generateContent: Mock;
+  };
+  let mockMessageBus: {
+    subscribe: Mock;
+    unsubscribe: Mock;
   };
 
   beforeEach(() => {
@@ -24,12 +32,18 @@ describe('UserSimulator', () => {
         .mockResolvedValue({ text: JSON.stringify({ action: 'y\r' }) }),
     };
 
+    mockMessageBus = {
+      subscribe: vi.fn(),
+      unsubscribe: vi.fn(),
+    };
+
     mockConfig = {
       getContentGenerator: () => mockContentGenerator,
       getSimulateUser: () => true,
       getQuestion: () => 'test goal',
       getKnowledgeSource: () => undefined,
       getHasAccessToPreviewModel: () => true,
+      getMessageBus: () => mockMessageBus,
     } as unknown as Config;
 
     mockGetScreen = vi.fn();
@@ -52,10 +66,6 @@ describe('UserSimulator', () => {
     mockGetScreen.mockReturnValue(
       'Thinking... (0s)\n\nAction Required: Allow pip execution? [Y/n]',
     );
-
-    // We need to trigger the private tick method. Since it's private and run on an interval,
-    // we can use a hack or just test the prompt construction if we refactor,
-    // but for now let's use the interval.
 
     vi.useFakeTimers();
     simulator.start();
@@ -122,7 +132,7 @@ describe('UserSimulator', () => {
     await vi.advanceTimersByTimeAsync(2000);
 
     // Wait for the async key submission loop to finish
-    // Initial delay 100ms + (3 chars * 10ms) = 130ms minimum
+    // Initial delay 100ms + (3 chars * 10ms) + 100ms settle = 230ms minimum
     await vi.advanceTimersByTimeAsync(500);
 
     expect(mockStdinBuffer.write).toHaveBeenCalledWith('a');
@@ -130,6 +140,53 @@ describe('UserSimulator', () => {
     expect(mockStdinBuffer.write).toHaveBeenCalledWith('c');
 
     simulator.stop();
+    vi.useRealTimers();
+  });
+
+  it('should inject internal tool state into the prompt', async () => {
+    const simulator = new UserSimulator(
+      mockConfig,
+      mockGetScreen,
+      mockStdinBuffer,
+    );
+    mockGetScreen.mockReturnValue('Responding...');
+
+    vi.useFakeTimers();
+    simulator.start();
+
+    // Verify subscription
+    expect(mockMessageBus.subscribe).toHaveBeenCalledWith(
+      MessageBusType.TOOL_CALLS_UPDATE,
+      expect.any(Function),
+    );
+
+    // Simulate tool call update
+    const handler = mockMessageBus.subscribe.mock.calls[0][1];
+    handler({
+      type: MessageBusType.TOOL_CALLS_UPDATE,
+      toolCalls: [
+        {
+          status: CoreToolCallStatus.AwaitingApproval,
+          request: { name: 'test_tool' },
+        },
+      ],
+    });
+
+    // Trigger tick
+    await vi.advanceTimersByTimeAsync(2000);
+
+    expect(mockContentGenerator.generateContent).toHaveBeenCalled();
+    const lastCall = mockContentGenerator.generateContent.mock.calls[0];
+    const prompt = lastCall[0].contents[0].parts[0].text;
+
+    expect(prompt).toContain(
+      'INTERNAL SYSTEM STATE: The system is currently BLOCKED',
+    );
+    expect(prompt).toContain('test_tool');
+    expect(prompt).toContain("Ignore any 'Responding' indicators");
+
+    simulator.stop();
+    expect(mockMessageBus.unsubscribe).toHaveBeenCalled();
     vi.useRealTimers();
   });
 });
