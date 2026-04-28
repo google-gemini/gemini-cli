@@ -164,3 +164,23 @@ export function batchAddDirectories(
 
   return { added: result.added, errors };
 }
+
+export interface BatchRemoveResult {
+  removed: string[];
+  notFound: string[];
+}
+
+/**
+ * Helper to batch remove directories from the workspace context.
+ * Handles expansion and result formatting.
+ */
+export function batchRemoveDirectories(
+  workspaceContext: WorkspaceContext,
+  paths: string[],
+): BatchRemoveResult {
+  const result = workspaceContext.removeDirectories(
+    paths.map((p) => expandHomeDir(p.trim())),
+  );
+
+  return { removed: result.removed, notFound: result.notFound };
+}
