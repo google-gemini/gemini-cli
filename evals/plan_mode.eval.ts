@@ -32,6 +32,11 @@ describe('plan_mode', () => {
       })
       .filter(Boolean);
 
+  /**
+   * @group Planning
+   * @scenario plan-mode
+   * @maintainer agent-team
+   */
   evalTest('ALWAYS_PASSES', {
     suiteName: 'default',
     suiteType: 'behavioral',
@@ -69,6 +74,11 @@ describe('plan_mode', () => {
     },
   });
 
+  /**
+   * @group Planning
+   * @scenario plan-mode
+   * @maintainer agent-team
+   */
   evalTest('ALWAYS_PASSES', {
     suiteName: 'default',
     suiteType: 'behavioral',
@@ -108,6 +118,11 @@ describe('plan_mode', () => {
     },
   });
 
+  /**
+   * @group Planning
+   * @scenario plan-mode
+   * @maintainer agent-team
+   */
   evalTest('USUALLY_PASSES', {
     suiteName: 'default',
     suiteType: 'behavioral',
@@ -127,6 +142,11 @@ describe('plan_mode', () => {
     },
   });
 
+  /**
+   * @group Planning
+   * @scenario plan-mode
+   * @maintainer agent-team
+   */
   evalTest('USUALLY_PASSES', {
     suiteName: 'default',
     suiteType: 'behavioral',
@@ -176,6 +196,11 @@ describe('plan_mode', () => {
     },
   });
 
+  /**
+   * @group Planning
+   * @scenario plan-mode
+   * @maintainer agent-team
+   */
   evalTest('USUALLY_PASSES', {
     suiteName: 'default',
     suiteType: 'behavioral',
@@ -210,6 +235,11 @@ describe('plan_mode', () => {
     },
   });
 
+  /**
+   * @group Planning
+   * @scenario plan-mode
+   * @maintainer agent-team
+   */
   evalTest('USUALLY_PASSES', {
     suiteName: 'default',
     suiteType: 'behavioral',
@@ -297,6 +327,11 @@ describe('plan_mode', () => {
     },
   });
 
+  /**
+   * @group Planning
+   * @scenario plan-mode
+   * @maintainer agent-team
+   */
   evalTest('ALWAYS_PASSES', {
     suiteName: 'default',
     suiteType: 'behavioral',
@@ -342,6 +377,11 @@ describe('plan_mode', () => {
     },
   });
 
+  /**
+   * @group Planning
+   * @scenario plan-mode
+   * @maintainer agent-team
+   */
   evalTest('USUALLY_PASSES', {
     suiteName: 'default',
     suiteType: 'behavioral',
@@ -377,6 +417,11 @@ describe('plan_mode', () => {
     },
   });
 
+  /**
+   * @group Planning
+   * @scenario plan-mode
+   * @maintainer agent-team
+   */
   evalTest('USUALLY_PASSES', {
     name: 'should handle nested plan directories correctly',
     suiteName: 'plan_mode',
