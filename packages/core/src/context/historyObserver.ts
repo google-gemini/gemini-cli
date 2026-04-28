@@ -9,7 +9,6 @@ import type {
   HistoryEvent,
 } from '../core/agentChatHistory.js';
 import type { ContextGraphMapper } from './graph/mapper.js';
-import type { ContextTokenCalculator } from './utils/contextTokenCalculator.js';
 import type { ContextEventBus } from './eventBus.js';
 import type { ContextTracer } from './tracer.js';
 
@@ -29,7 +28,6 @@ export class HistoryObserver {
     private readonly chatHistory: AgentChatHistory,
     private readonly eventBus: ContextEventBus,
     private readonly tracer: ContextTracer,
-    private readonly tokenCalculator: ContextTokenCalculator,
     private readonly graphMapper: ContextGraphMapper,
   ) {}
 
@@ -40,7 +38,7 @@ export class HistoryObserver {
       this.seenNodeIds.clear();
     }
 
-    nodes = this.graphMapper.applyEvent(event, this.tokenCalculator);
+    nodes = this.graphMapper.applyEvent(event);
 
     const newNodes = new Set<string>();
     for (const node of nodes) {

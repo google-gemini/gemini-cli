@@ -3,7 +3,6 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import type { Part } from '@google/genai';
 import type { NodeBehavior, NodeBehaviorRegistry } from './behaviorRegistry.js';
 import type {
   UserPrompt,
@@ -18,154 +17,66 @@ import type {
 
 export const UserPromptBehavior: NodeBehavior<UserPrompt> = {
   type: 'USER_PROMPT',
-  getEstimatableParts(prompt) {
-    const parts: Part[] = [];
-    for (const sp of prompt.semanticParts) {
-      switch (sp.type) {
-        case 'text':
-          parts.push({ text: sp.text });
-          break;
-        case 'inline_data':
-          parts.push({ inlineData: { mimeType: sp.mimeType, data: sp.data } });
-          break;
-        case 'file_data':
-          parts.push({
-            fileData: { mimeType: sp.mimeType, fileUri: sp.fileUri },
-          });
-          break;
-        case 'raw_part':
-          parts.push(sp.part);
-          break;
-        default:
-          break;
-      }
-    }
-    return parts;
+  getEstimatableParts(node) {
+    return [node.payload];
   },
-  serialize(prompt, writer) {
-    const parts = this.getEstimatableParts(prompt);
-    if (parts.length > 0) {
-      writer.flushModelParts();
-      writer.appendContent({ role: 'user', parts });
-    }
-  },
+  serialize() {}, // fromGraph handles serialization losslessly
 };
 
 export const AgentThoughtBehavior: NodeBehavior<AgentThought> = {
   type: 'AGENT_THOUGHT',
-  getEstimatableParts(thought) {
-    return [{ text: thought.text }];
+  getEstimatableParts(node) {
+    return [node.payload];
   },
-  serialize(thought, writer) {
-    writer.appendModelPart({ text: thought.text });
-  },
+  serialize() {},
 };
 
 export const ToolExecutionBehavior: NodeBehavior<ToolExecution> = {
   type: 'TOOL_EXECUTION',
-  getEstimatableParts(tool) {
-    return [
-      {
-        functionCall: {
-          id: tool.id,
-          name: tool.toolName,
-          args: tool.intent,
-        },
-        thoughtSignature: tool.thoughtSignature,
-      },
-      {
-        functionResponse: {
-          id: tool.id,
-          name: tool.toolName,
-          response:
-            typeof tool.observation === 'string'
-              ? { message: tool.observation }
-              : tool.observation,
-        },
-      },
-    ];
+  getEstimatableParts(node) {
+    return [node.payload];
   },
-  serialize(tool, writer) {
-    const parts = this.getEstimatableParts(tool);
-    writer.appendModelPart(parts[0]);
-    writer.flushModelParts();
-    writer.appendUserPart(parts[1]);
-  },
+  serialize() {},
 };
 
 export const MaskedToolBehavior: NodeBehavior<MaskedTool> = {
   type: 'MASKED_TOOL',
-  getEstimatableParts(tool) {
-    return [
-      {
-        functionCall: {
-          id: tool.id,
-          name: tool.toolName,
-          args: tool.intent ?? {},
-        },
-        thoughtSignature: tool.thoughtSignature,
-      },
-      {
-        functionResponse: {
-          id: tool.id,
-          name: tool.toolName,
-          response:
-            typeof tool.observation === 'string'
-              ? { message: tool.observation }
-              : (tool.observation ?? {}),
-        },
-      },
-    ];
+  getEstimatableParts(node) {
+    return [node.payload];
   },
-  serialize(tool, writer) {
-    const parts = this.getEstimatableParts(tool);
-    writer.appendModelPart(parts[0]);
-    writer.flushModelParts();
-    writer.appendUserPart(parts[1]);
-  },
+  serialize() {},
 };
 
 export const AgentYieldBehavior: NodeBehavior<AgentYield> = {
   type: 'AGENT_YIELD',
-  getEstimatableParts(yieldNode) {
-    return [{ text: yieldNode.text }];
+  getEstimatableParts() {
+    return [];
   },
-  serialize() {
-    // AGENT_YIELD is a synthetic marker node used for internal graph tracking.
-    // We intentionally do NOT serialize it to the LLM to prevent prompt corruption.
-  },
+  serialize() {},
 };
 
 export const SystemEventBehavior: NodeBehavior<SystemEvent> = {
   type: 'SYSTEM_EVENT',
-  getEstimatableParts() {
-    return [];
+  getEstimatableParts(node) {
+    return [node.payload];
   },
-  serialize(node, writer) {
-    writer.flushModelParts();
-  },
+  serialize() {},
 };
 
 export const SnapshotBehavior: NodeBehavior<Snapshot> = {
   type: 'SNAPSHOT',
   getEstimatableParts(node) {
-    return [{ text: node.text }];
+    return [node.payload];
   },
-  serialize(node, writer) {
-    writer.flushModelParts();
-    writer.appendUserPart({ text: node.text });
-  },
+  serialize() {},
 };
 
 export const RollingSummaryBehavior: NodeBehavior<RollingSummary> = {
   type: 'ROLLING_SUMMARY',
   getEstimatableParts(node) {
-    return [{ text: node.text }];
+    return [node.payload];
   },
-  serialize(node, writer) {
-    writer.flushModelParts();
-    writer.appendUserPart({ text: node.text });
-  },
+  serialize() {},
 };
 
 export function registerBuiltInBehaviors(registry: NodeBehaviorRegistry) {

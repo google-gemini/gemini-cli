@@ -43,7 +43,6 @@ export class ContextManager {
       chatHistory,
       this.env.eventBus,
       this.tracer,
-      this.env.tokenCalculator,
       this.env.graphMapper,
     );
 

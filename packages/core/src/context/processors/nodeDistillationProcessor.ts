@@ -9,7 +9,11 @@ import type { ContextProcessor, ProcessArgs } from '../pipeline.js';
 import type { ConcreteNode } from '../graph/types.js';
 import type { ContextEnvironment } from '../pipeline/environment.js';
 import { debugLogger } from '../../utils/debugLogger.js';
-import { getResponseText } from '../../utils/partUtils.js';
+import {
+  getResponseText,
+  updatePart,
+  cloneFunctionResponse,
+} from '../../utils/partUtils.js';
 import { LlmRole } from '../../telemetry/llmRole.js';
 
 export interface NodeDistillationProcessorOptions {
@@ -56,7 +60,7 @@ export function createNodeDistillationProcessor(
         },
       });
       return getResponseText(response) || text;
-    } catch (e) {
+    } catch (e: unknown) {
       debugLogger.warn(
         `NodeDistillationProcessor failed to summarize ${contextInfo}`,
         e,
@@ -77,57 +81,28 @@ export function createNodeDistillationProcessor(
 
       // Scan the target working buffer and unconditionally apply the configured hyperparameter threshold
       for (const node of targets) {
+        const payload = node.payload;
+
         switch (node.type) {
-          case 'USER_PROMPT': {
-            let modified = false;
-            const newParts = [...node.semanticParts];
-
-            for (let j = 0; j < node.semanticParts.length; j++) {
-              const part = node.semanticParts[j];
-              if (part.type !== 'text') continue;
-
-              if (part.text.length > thresholdChars) {
-                const summary = await generateSummary(part.text, 'User Prompt');
-                const newTokens = env.tokenCalculator.estimateTokensForParts([
-                  { text: summary },
-                ]);
-                const oldTokens = env.tokenCalculator.estimateTokensForParts([
-                  { text: part.text },
-                ]);
-
-                if (newTokens < oldTokens) {
-                  newParts[j] = { type: 'text', text: summary };
-                  modified = true;
-                }
-              }
-            }
-
-            if (modified) {
-              returnedNodes.push({
-                ...node,
-                id: randomUUID(),
-                semanticParts: newParts,
-                replacesId: node.id,
-              });
-            } else {
-              returnedNodes.push(node);
-            }
-            break;
-          }
-
+          case 'USER_PROMPT':
           case 'AGENT_THOUGHT': {
-            if (node.text.length > thresholdChars) {
-              const summary = await generateSummary(node.text, 'Agent Thought');
+            const text = payload.text;
+            if (text && text.length > thresholdChars) {
+              const summary = await generateSummary(text, node.type);
               const newTokens = env.tokenCalculator.estimateTokensForParts([
                 { text: summary },
               ]);
-              const oldTokens = env.tokenCalculator.getTokenCost(node);
+              const oldTokens = env.tokenCalculator.estimateTokensForParts([
+                { text },
+              ]);
 
               if (newTokens < oldTokens) {
+                const distilledPayload = updatePart(payload, { text: summary });
+
                 returnedNodes.push({
                   ...node,
                   id: randomUUID(),
-                  text: summary,
+                  payload: distilledPayload,
                   replacesId: node.id,
                 });
                 break;
@@ -138,53 +113,57 @@ export function createNodeDistillationProcessor(
           }
 
           case 'TOOL_EXECUTION': {
-            const rawObs = node.observation;
-
-            let stringifiedObs = '';
-            if (typeof rawObs === 'string') {
-              stringifiedObs = rawObs;
-            } else {
-              try {
-                stringifiedObs = JSON.stringify(rawObs);
-              } catch {
-                stringifiedObs = String(rawObs);
+            if (payload.functionResponse) {
+              const rawObs = payload.functionResponse.response;
+              let stringifiedObs = '';
+              if (typeof rawObs === 'string') {
+                stringifiedObs = rawObs;
+              } else {
+                try {
+                  stringifiedObs = JSON.stringify(rawObs);
+                } catch {
+                  stringifiedObs = String(rawObs);
+                }
               }
-            }
 
-            if (stringifiedObs.length > thresholdChars) {
-              const summary = await generateSummary(
-                stringifiedObs,
-                node.toolName || 'unknown',
-              );
-              const newObsObject = { summary };
+              if (stringifiedObs.length > thresholdChars) {
+                const summary = await generateSummary(
+                  stringifiedObs,
+                  payload.functionResponse.name || 'unknown',
+                );
+                const newObsObject = { summary };
 
-              const newObsTokens = env.tokenCalculator.estimateTokensForParts([
-                {
-                  functionResponse: {
-                    name: node.toolName || 'unknown',
-                    response: newObsObject,
-                    id: node.id,
-                  },
-                },
-              ]);
+                const newFR = cloneFunctionResponse(payload.functionResponse);
+                newFR.response = newObsObject;
 
-              const oldObsTokens =
-                node.tokens?.observation ??
-                env.tokenCalculator.getTokenCost(node);
-              const intentTokens = node.tokens?.intent ?? 0;
+                const newObsTokens = env.tokenCalculator.estimateTokensForParts(
+                  [
+                    {
+                      functionResponse: newFR,
+                    },
+                  ],
+                );
 
-              if (newObsTokens < oldObsTokens) {
-                returnedNodes.push({
-                  ...node,
-                  id: randomUUID(),
-                  observation: newObsObject,
-                  tokens: {
-                    intent: intentTokens,
-                    observation: newObsTokens,
-                  },
-                  replacesId: node.id,
-                });
-                break;
+                const oldObsTokens = env.tokenCalculator.estimateTokensForParts(
+                  [payload],
+                );
+
+                if (newObsTokens < oldObsTokens) {
+                  const newFR = cloneFunctionResponse(payload.functionResponse);
+                  newFR.response = newObsObject;
+
+                  const distilledPayload = updatePart(payload, {
+                    functionResponse: newFR,
+                  });
+
+                  returnedNodes.push({
+                    ...node,
+                    id: randomUUID(),
+                    payload: distilledPayload,
+                    replacesId: node.id,
+                  });
+                  break;
+                }
               }
             }
             returnedNodes.push(node);

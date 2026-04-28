@@ -90,7 +90,8 @@ export function createStateSnapshotProcessor(
               logicalParentId: newId,
               type: 'SNAPSHOT',
               timestamp: Date.now(),
-              text: newText,
+              role: 'user',
+              payload: { text: newText },
               abstractsIds: consumedIds,
             };
 
@@ -156,7 +157,8 @@ export function createStateSnapshotProcessor(
           logicalParentId: newId,
           type: 'SNAPSHOT',
           timestamp: Date.now(),
-          text: snapshotText,
+          role: 'user',
+          payload: { text: snapshotText },
           abstractsIds: nodesToSummarize.map((n) => n.id),
         };
 

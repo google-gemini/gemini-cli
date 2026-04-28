@@ -79,7 +79,8 @@ export function createStateSnapshotAsyncProcessor(
               logicalParentId: '',
               type: 'SNAPSHOT',
               timestamp: latest.timestamp,
-              text: latest.payload.newText,
+              role: 'user',
+              payload: { text: latest.payload.newText },
             };
 
             nodesToSummarize = [previousStateNode, ...targets];

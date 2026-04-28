@@ -6,35 +6,29 @@
 
 import type { Part } from '@google/genai';
 
-export type NodeType =
-  // Organic Concrete Nodes
-  | 'USER_PROMPT'
-  | 'SYSTEM_EVENT'
-  | 'AGENT_THOUGHT'
-  | 'TOOL_EXECUTION'
-  | 'AGENT_YIELD'
-
-  // Synthetic Concrete Nodes
-  | 'SNAPSHOT'
-  | 'ROLLING_SUMMARY'
-  | 'MASKED_TOOL'
-
-  // Logical Nodes
-  | 'TASK'
-  | 'EPISODE';
-
-/** Base interface for all nodes in the Episodic Context Graph */
+/**
+ * Basic Node Interface
+ * Every element in the Context Graph is a Node.
+ */
 export interface Node {
   readonly id: string;
-  readonly type: NodeType;
+  readonly type: string;
 }
 
 /**
  * Concrete Nodes: The atomic, renderable pieces of data.
  * These are the actual "planks" of the Nodes of Theseus.
+ *
+ * Each ConcreteNode is now a 1:1 wrapper around a Gemini Part,
+ * ensuring 100% fidelity during reconstruction.
  */
 export interface BaseConcreteNode extends Node {
   readonly timestamp: number;
+  /** The role of the turn this part belongs to */
+  readonly role: 'user' | 'model';
+  /** The original, high-fidelity Part object from the API */
+  readonly payload: Part;
+
   /** The ID of the Logical Node (e.g., Episode) that structurally owns this node */
   readonly logicalParentId?: string;
 
@@ -46,49 +40,18 @@ export interface BaseConcreteNode extends Node {
 }
 
 /**
- * Semantic Parts for User Prompts
- */
-export interface SemanticTextPart {
-  readonly type: 'text';
-  readonly text: string;
-}
-
-export interface SemanticInlineDataPart {
-  readonly type: 'inline_data';
-  readonly mimeType: string;
-  readonly data: string;
-}
-
-export interface SemanticFileDataPart {
-  readonly type: 'file_data';
-  readonly mimeType: string;
-  readonly fileUri: string;
-}
-
-export interface SemanticRawPart {
-  readonly type: 'raw_part';
-  readonly part: Part;
-}
-
-export type SemanticPart =
-  | SemanticTextPart
-  | SemanticInlineDataPart
-  | SemanticFileDataPart
-  | SemanticRawPart;
-
-/**
  * Trigger Nodes
  * Events that wake the agent up and initiate an Episode.
  */
 export interface UserPrompt extends BaseConcreteNode {
   readonly type: 'USER_PROMPT';
-  readonly semanticParts: readonly SemanticPart[];
+  readonly role: 'user';
 }
 
 export interface SystemEvent extends BaseConcreteNode {
   readonly type: 'SYSTEM_EVENT';
   readonly name: string;
-  readonly payload: Record<string, unknown>;
+  readonly payload: Part; // System events are usually injected as user text parts
 }
 
 export type EpisodeTrigger = UserPrompt | SystemEvent;
@@ -99,31 +62,15 @@ export type EpisodeTrigger = UserPrompt | SystemEvent;
  */
 export interface AgentThought extends BaseConcreteNode {
   readonly type: 'AGENT_THOUGHT';
-  readonly text: string;
+  readonly role: 'model';
 }
 
 export interface ToolExecution extends BaseConcreteNode {
   readonly type: 'TOOL_EXECUTION';
-  readonly toolName: string;
-  readonly intent: Record<string, unknown>;
-  readonly thoughtSignature?: string;
-  readonly observation: string | Record<string, unknown>;
-  readonly tokens: {
-    readonly intent: number;
-    readonly observation: number;
-  };
 }
 
 export interface MaskedTool extends BaseConcreteNode {
   readonly type: 'MASKED_TOOL';
-  readonly toolName: string;
-  readonly intent?: Record<string, unknown>;
-  readonly thoughtSignature?: string;
-  readonly observation?: string | Record<string, unknown>;
-  readonly tokens: {
-    readonly intent: number;
-    readonly observation: number;
-  };
 }
 
 export type EpisodeStep = AgentThought | ToolExecution | MaskedTool;
@@ -134,7 +81,7 @@ export type EpisodeStep = AgentThought | ToolExecution | MaskedTool;
  */
 export interface AgentYield extends BaseConcreteNode {
   readonly type: 'AGENT_YIELD';
-  readonly text: string;
+  readonly role: 'model';
 }
 
 /**
@@ -143,12 +90,10 @@ export interface AgentYield extends BaseConcreteNode {
  */
 export interface Snapshot extends BaseConcreteNode {
   readonly type: 'SNAPSHOT';
-  readonly text: string;
 }
 
 export interface RollingSummary extends BaseConcreteNode {
   readonly type: 'ROLLING_SUMMARY';
-  readonly text: string;
 }
 
 export type SyntheticLeaf = Snapshot | RollingSummary;

@@ -39,55 +39,54 @@ export const createMockGenerateContentResponse = (
 export function createDummyNode(
   logicalParentId: string,
   type: ConcreteNode['type'],
-  tokens = 100,
+  _tokens = 100,
   overrides?: Partial<ConcreteNode>,
   id?: string,
 ): ConcreteNode {
+  const role =
+    type === 'USER_PROMPT' ||
+    type === 'SYSTEM_EVENT' ||
+    type === 'SNAPSHOT' ||
+    type === 'ROLLING_SUMMARY'
+      ? 'user'
+      : 'model';
+
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   return {
     id: id || randomUUID(),
-    episodeId: logicalParentId,
     logicalParentId,
     type,
     timestamp: Date.now(),
-    text: `Dummy ${type}`,
-    name: type === 'SYSTEM_EVENT' ? 'dummy_event' : undefined,
-    payload: type === 'SYSTEM_EVENT' ? {} : undefined,
-    semanticParts: [],
-    metadata: {
-      originalTokens: tokens,
-      currentTokens: tokens,
-      transformations: [],
-    },
+    role,
+    payload: { text: `Dummy ${type}` },
     ...overrides,
   } as unknown as ConcreteNode;
 }
 
 export function createDummyToolNode(
   logicalParentId: string,
-  intentTokens = 100,
-  obsTokens = 200,
+  _intentTokens = 100,
+  _obsTokens = 200,
   overrides?: Partial<ToolExecution>,
   id?: string,
 ): ToolExecution {
+  // We don't distinguish between call and response here, but ToolExecution nodes in 1:1 map to ONE part.
+  // Tests using this usually want to simulate a tool interaction.
+  // For simplicity, we'll make this a 'model' tool call by default.
+
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   return {
     id: id || randomUUID(),
-    episodeId: logicalParentId,
     logicalParentId,
     type: 'TOOL_EXECUTION',
     timestamp: Date.now(),
-    toolName: 'dummy_tool',
-    intent: { action: 'test' },
-    observation: { result: 'ok' },
-    tokens: {
-      intent: intentTokens,
-      observation: obsTokens,
-    },
-    metadata: {
-      originalTokens: intentTokens + obsTokens,
-      currentTokens: intentTokens + obsTokens,
-      transformations: [],
+    role: 'model',
+    payload: {
+      functionCall: {
+        name: 'dummy_tool',
+        args: { action: 'test' },
+        id: id || 'dummy_id',
+      },
     },
     ...overrides,
   } as unknown as ToolExecution;

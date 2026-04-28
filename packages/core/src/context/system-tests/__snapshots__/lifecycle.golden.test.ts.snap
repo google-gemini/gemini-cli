@@ -46,28 +46,28 @@ exports[`System Lifecycle Golden Tests > Scenario 1: Organic Growth with Huge To
   ],
   "tokenTrajectory": [
     {
-      "tokensAfterBackground": 6,
-      "tokensBeforeBackground": 6,
+      "tokensAfterBackground": 5,
+      "tokensBeforeBackground": 5,
       "turnIndex": 0,
-    },
-    {
-      "tokensAfterBackground": 11,
-      "tokensBeforeBackground": 11,
-      "turnIndex": 1,
-    },
-    {
-      "tokensAfterBackground": 436,
-      "tokensBeforeBackground": 20148,
-      "turnIndex": 2,
-    },
-    {
-      "tokensAfterBackground": 61,
-      "tokensBeforeBackground": 3017,
-      "turnIndex": 3,
     },
     {
       "tokensAfterBackground": 10,
       "tokensBeforeBackground": 10,
+      "turnIndex": 1,
+    },
+    {
+      "tokensAfterBackground": 307,
+      "tokensBeforeBackground": 20125,
+      "turnIndex": 2,
+    },
+    {
+      "tokensAfterBackground": 59,
+      "tokensBeforeBackground": 3016,
+      "turnIndex": 3,
+    },
+    {
+      "tokensAfterBackground": 9,
+      "tokensBeforeBackground": 9,
       "turnIndex": 4,
     },
   ],
@@ -120,13 +120,13 @@ exports[`System Lifecycle Golden Tests > Scenario 2: Under Budget (No Modificati
   ],
   "tokenTrajectory": [
     {
-      "tokensAfterBackground": 6,
-      "tokensBeforeBackground": 6,
+      "tokensAfterBackground": 5,
+      "tokensBeforeBackground": 5,
       "turnIndex": 0,
     },
     {
-      "tokensAfterBackground": 11,
-      "tokensBeforeBackground": 11,
+      "tokensAfterBackground": 10,
+      "tokensBeforeBackground": 10,
       "turnIndex": 1,
     },
   ],
@@ -195,18 +195,18 @@ exports[`System Lifecycle Golden Tests > Scenario 3: Async-Driven Background GC 
   ],
   "tokenTrajectory": [
     {
-      "tokensAfterBackground": 25,
-      "tokensBeforeBackground": 25,
+      "tokensAfterBackground": 24,
+      "tokensBeforeBackground": 24,
       "turnIndex": 0,
     },
     {
-      "tokensAfterBackground": 49,
-      "tokensBeforeBackground": 49,
+      "tokensAfterBackground": 48,
+      "tokensBeforeBackground": 48,
       "turnIndex": 1,
     },
     {
-      "tokensAfterBackground": 73,
-      "tokensBeforeBackground": 73,
+      "tokensAfterBackground": 72,
+      "tokensBeforeBackground": 72,
       "turnIndex": 2,
     },
   ],

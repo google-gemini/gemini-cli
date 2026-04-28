@@ -45,11 +45,23 @@ describe('RollingSummaryProcessor', () => {
         'ep1',
         'USER_PROMPT',
         50,
-        { semanticParts: [{ type: 'text', text: text50 }] },
+        { payload: { text: text50 } },
         'id1',
       ),
-      createDummyNode('ep1', 'AGENT_THOUGHT', 50, { text: text50 }, 'id2'),
-      createDummyNode('ep1', 'AGENT_YIELD', 50, { text: text50 }, 'id3'),
+      createDummyNode(
+        'ep1',
+        'AGENT_THOUGHT',
+        50,
+        { payload: { text: text50 } },
+        'id2',
+      ),
+      createDummyNode(
+        'ep1',
+        'AGENT_YIELD',
+        50,
+        { payload: { text: text50 } },
+        'id3',
+      ),
     ];
 
     const result = await processor.process(createMockProcessArgs(targets));
@@ -82,10 +94,16 @@ describe('RollingSummaryProcessor', () => {
         'ep1',
         'USER_PROMPT',
         10,
-        { semanticParts: [{ type: 'text', text: text10 }] },
+        { payload: { text: text10 } },
         'id1',
       ),
-      createDummyNode('ep1', 'AGENT_THOUGHT', 10, { text: text10 }, 'id2'),
+      createDummyNode(
+        'ep1',
+        'AGENT_THOUGHT',
+        10,
+        { payload: { text: text10 } },
+        'id2',
+      ),
     ];
 
     const result = await processor.process(createMockProcessArgs(targets));
