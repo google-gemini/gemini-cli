@@ -31,10 +31,18 @@ try {
   }
   `;
   const output = execSync(
-    `gh api graphql -F owner=${GITHUB_OWNER} -F repo=${GITHUB_REPO} -f query='${query}'`,
-    { encoding: 'utf-8' },
+    'gh api graphql -F owner=$OWNER -F repo=$REPO -f query=@-',
+    {
+      encoding: 'utf-8',
+      input: query,
+      env: { ...process.env, OWNER: GITHUB_OWNER, REPO: GITHUB_REPO },
+    },
   );
-  const data = JSON.parse(output).data.repository;
+  const response = JSON.parse(output);
+  if (response.errors) {
+    throw new Error(response.errors.map((e: any) => e.message).join(', '));
+  }
+  const data = response.data.repository;
 
   const prs = data.pullRequests.nodes.map(
     (p: {
