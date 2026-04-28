@@ -493,6 +493,42 @@ Body`);
       });
     });
 
+    it('should convert mcp_servers with auth block in local agent (google-credentials)', () => {
+      const markdown = {
+        kind: 'local' as const,
+        name: 'spanner-test-agent',
+        description: 'An agent to test Spanner MCP with auth',
+        mcp_servers: {
+          spanner: {
+            url: 'https://spanner.googleapis.com/mcp',
+            type: 'http' as const,
+            auth: {
+              type: 'google-credentials' as const,
+              scopes: ['https://www.googleapis.com/auth/cloud-platform'],
+            },
+            timeout: 30000,
+          },
+        },
+        system_prompt: 'You are a Spanner test agent.',
+      };
+
+      const result = markdownToAgentDefinition(
+        markdown,
+      ) as LocalAgentDefinition;
+      expect(result.kind).toBe('local');
+      expect(result.mcpServers).toBeDefined();
+      expect(result.mcpServers!['spanner']).toMatchObject({
+        url: 'https://spanner.googleapis.com/mcp',
+        type: 'http',
+        authProviderType: 'google_credentials',
+        oauth: {
+          enabled: true,
+          scopes: ['https://www.googleapis.com/auth/cloud-platform'],
+        },
+        timeout: 30000,
+      });
+    });
+
     it('should pass through unknown model names (e.g. auto)', () => {
       const markdown = {
         kind: 'local' as const,

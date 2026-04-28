@@ -511,6 +511,40 @@ describe('retryWithBackoff', () => {
       expect(mockFn).toHaveBeenCalledTimes(2);
     });
 
+    it('should retry on OpenSSL 3.x SSL error code (ERR_SSL_SSL/TLS_ALERT_BAD_RECORD_MAC)', async () => {
+      const error = new Error('SSL error');
+      (error as any).code = 'ERR_SSL_SSL/TLS_ALERT_BAD_RECORD_MAC';
+      const mockFn = vi
+        .fn()
+        .mockRejectedValueOnce(error)
+        .mockResolvedValue('success');
+
+      const promise = retryWithBackoff(mockFn, {
+        initialDelayMs: 1,
+        maxDelayMs: 1,
+      });
+      await vi.runAllTimersAsync();
+      await expect(promise).resolves.toBe('success');
+      expect(mockFn).toHaveBeenCalledTimes(2);
+    });
+
+    it('should retry on unknown SSL BAD_RECORD_MAC variant via substring fallback', async () => {
+      const error = new Error('SSL error');
+      (error as any).code = 'ERR_SSL_SOME_FUTURE_BAD_RECORD_MAC';
+      const mockFn = vi
+        .fn()
+        .mockRejectedValueOnce(error)
+        .mockResolvedValue('success');
+
+      const promise = retryWithBackoff(mockFn, {
+        initialDelayMs: 1,
+        maxDelayMs: 1,
+      });
+      await vi.runAllTimersAsync();
+      await expect(promise).resolves.toBe('success');
+      expect(mockFn).toHaveBeenCalledTimes(2);
+    });
+
     it('should retry on gaxios-style SSL error with code property', async () => {
       // This matches the exact structure from issue #17318
       const error = new Error(
