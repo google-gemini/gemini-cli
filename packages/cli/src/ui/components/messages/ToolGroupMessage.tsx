@@ -102,7 +102,6 @@ interface ToolGroupMessageProps {
   borderTop?: boolean;
   borderBottom?: boolean;
   isExpandable?: boolean;
-  isToolGroupBoundary?: boolean;
 }
 
 // Main component renders the border and maps the tools using ToolMessage
@@ -116,7 +115,6 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   borderTop: borderTopOverride,
   borderBottom: borderBottomOverride,
   isExpandable,
-  isToolGroupBoundary,
 }) => {
   const settings = useSettings();
   const isLowErrorVerbosity = settings.merged.ui?.errorVerbosity !== 'full';
@@ -248,11 +246,10 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
           (showClosingBorder ? 1 : 0);
       } else if (isTopicToolCall) {
         // Topic Message Spacing Breakdown:
-        // 1. Top Margin (1): Present unless it's the very first item following a boundary.
-        // 2. Topic Content (1).
-        // 3. Bottom Margin (1): Always present around TopicMessage for breathing room.
-        const hasTopMargin = !(isFirst && isToolGroupBoundary);
-        height += (hasTopMargin ? 1 : 0) + 1 + 1;
+        // 1. Topic Content (1).
+        // 2. Bottom Margin (1): Always present around TopicMessage for breathing room.
+        // 3. Closing Border (1): Added if transition logic (showClosingBorder) requires it.
+        height += 1 + 1 + (showClosingBorder ? 1 : 0);
       } else if (isCompact) {
         // Compact Tool: Always renders as a single dense line.
         height += 1;
@@ -273,12 +270,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
       }
     }
     return height;
-  }, [
-    groupedTools,
-    isCompactModeEnabled,
-    borderTopOverride,
-    isToolGroupBoundary,
-  ]);
+  }, [groupedTools, isCompactModeEnabled, borderTopOverride]);
 
   let countToolCallsWithResults = 0;
   for (const tool of visibleToolCalls) {
@@ -446,10 +438,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
               {isCompact ? (
                 <DenseToolMessage {...commonProps} />
               ) : isTopicToolCall ? (
-                <Box
-                  marginTop={isFirst && isToolGroupBoundary ? 0 : 1}
-                  marginBottom={1}
-                >
+                <Box marginBottom={1}>
                   <TopicMessage {...commonProps} />
                 </Box>
               ) : isShellToolCall ? (

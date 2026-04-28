@@ -56,7 +56,7 @@ describe('policyCatalog', () => {
   it('marks preview transients as sticky retries', () => {
     const [previewPolicy] = getModelPolicyChain({ previewEnabled: true });
     expect(previewPolicy.model).toBe(PREVIEW_GEMINI_MODEL);
-    expect(previewPolicy.stateTransitions.transient).toBe('terminal');
+    expect(previewPolicy.stateTransitions.transient).toBe('sticky_retry');
   });
 
   it('applies default actions and state transitions for unspecified kinds', () => {
