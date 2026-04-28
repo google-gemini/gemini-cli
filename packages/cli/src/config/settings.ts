@@ -695,20 +695,6 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         const settingsObject = rawSettings as Record<string, unknown>;
 
-        // Validate settings structure with Zod
-        const validationResult = validateSettings(settingsObject);
-        if (!validationResult.success && validationResult.error) {
-          const errorMessage = formatValidationError(
-            validationResult.error,
-            filePath,
-          );
-          settingsErrors.push({
-            message: errorMessage,
-            path: filePath,
-            severity: 'warning',
-          });
-        }
-
         return { settings: settingsObject as Settings, rawJson: content };
       }
     } catch (error: unknown) {
@@ -740,11 +726,38 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
   const userOriginalSettings = structuredClone(userResult.settings);
   const workspaceOriginalSettings = structuredClone(workspaceResult.settings);
 
-  // Environment variables for runtime use
+    // Environment variables for runtime use
   systemSettings = resolveEnvVarsInObject(systemResult.settings);
   systemDefaultSettings = resolveEnvVarsInObject(systemDefaultsResult.settings);
   userSettings = resolveEnvVarsInObject(userResult.settings);
   workspaceSettings = resolveEnvVarsInObject(workspaceResult.settings);
+
+  // Validate settings structure with Zod after environment variable expansion
+  const validateAndRecordErrors = (settings: Settings, filePath: string): Settings => {
+    if (Object.keys(settings).length === 0) return settings;
+    const validationResult = validateSettings(settings);
+    if (!validationResult.success && validationResult.error) {
+      const errorMessage = formatValidationError(
+        validationResult.error,
+        filePath,
+      );
+      settingsErrors.push({
+        message: errorMessage,
+        path: filePath,
+        severity: 'warning',
+      });
+      return settings;
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    return (validationResult.data as Settings) ?? settings;
+  };
+
+  systemSettings = validateAndRecordErrors(systemSettings, systemSettingsPath);
+  systemDefaultSettings = validateAndRecordErrors(systemDefaultSettings, systemDefaultsPath);
+  userSettings = validateAndRecordErrors(userSettings, USER_SETTINGS_PATH);
+  if (!storage.isWorkspaceHomeDir()) {
+    workspaceSettings = validateAndRecordErrors(workspaceSettings, workspaceSettingsPath);
+  }
 
   // Support legacy theme names
   if (userSettings.ui?.theme === 'VS') {

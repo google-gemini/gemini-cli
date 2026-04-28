@@ -133,9 +133,22 @@ function buildPrimitiveSchema(
     case 'string':
       return z.string();
     case 'number':
-      return z.number();
+      return z.preprocess((val) => {
+        if (typeof val === 'string' && val.trim() !== '') {
+          const num = Number(val);
+          if (!isNaN(num)) return num;
+        }
+        return val;
+      }, z.number());
     case 'boolean':
-      return z.boolean();
+      return z.preprocess((val) => {
+        if (typeof val === 'string') {
+          const lower = val.toLowerCase();
+          if (lower === 'true') return true;
+          if (lower === 'false') return false;
+        }
+        return val;
+      }, z.boolean());
     default:
       return z.unknown();
   }
