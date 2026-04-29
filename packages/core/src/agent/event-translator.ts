@@ -12,7 +12,7 @@
  * and mutable TranslationState, returning zero or more AgentEvents.
  */
 
-import type { FinishReason } from '@google/genai';
+import { FinishReason } from '@google/genai';
 import { GeminiEventType } from '../core/turn.js';
 import type {
   ServerGeminiStreamEvent,
@@ -329,24 +329,24 @@ export function mapFinishReason(
   if (!reason) return 'completed';
 
   switch (reason) {
-    case 'STOP':
-    case 'FINISH_REASON_UNSPECIFIED':
+    case FinishReason.STOP:
+    case FinishReason.FINISH_REASON_UNSPECIFIED:
       return 'completed';
-    case 'MAX_TOKENS':
+    case FinishReason.MAX_TOKENS:
       return 'max_budget';
-    case 'SAFETY':
-    case 'RECITATION':
-    case 'LANGUAGE':
-    case 'BLOCKLIST':
-    case 'PROHIBITED_CONTENT':
-    case 'SPII':
-    case 'IMAGE_SAFETY':
-    case 'IMAGE_PROHIBITED_CONTENT':
+    case FinishReason.SAFETY:
+    case FinishReason.RECITATION:
+    case FinishReason.LANGUAGE:
+    case FinishReason.BLOCKLIST:
+    case FinishReason.PROHIBITED_CONTENT:
+    case FinishReason.SPII:
+    case FinishReason.IMAGE_SAFETY:
+    case FinishReason.IMAGE_PROHIBITED_CONTENT:
       return 'refusal';
-    case 'MALFORMED_FUNCTION_CALL':
-    case 'OTHER':
-    case 'UNEXPECTED_TOOL_CALL':
-    case 'NO_IMAGE':
+    case FinishReason.MALFORMED_FUNCTION_CALL:
+    case FinishReason.OTHER:
+    case FinishReason.UNEXPECTED_TOOL_CALL:
+    case FinishReason.NO_IMAGE:
       return 'failed';
     default:
       return 'failed';

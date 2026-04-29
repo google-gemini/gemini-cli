@@ -1520,5 +1520,53 @@ describe('LegacyAgentSession', () => {
       // Should have called sendMessageStream 1 (original) + 3 (continuations) = 4 times
       expect(sendMock).toHaveBeenCalledTimes(4);
     });
+
+    it('continuation is transparent to max turns', async () => {
+      const configMock = deps.config.getMaxSessionTurns as ReturnType<
+        typeof vi.fn
+      >;
+      // Allow only 1 turn
+      configMock.mockReturnValue(1);
+
+      const sendMock = deps.client.sendMessageStream as ReturnType<
+        typeof vi.fn
+      >;
+
+      // First call returns MAX_TOKENS (should NOT count as a full turn for the limit)
+      sendMock.mockReturnValueOnce(
+        makeStream([
+          { type: GeminiEventType.Content, value: 'part 1' },
+          {
+            type: GeminiEventType.Finished,
+            value: {
+              reason: FinishReason.MAX_TOKENS,
+              usageMetadata: undefined,
+            },
+          },
+        ]),
+      );
+
+      // Second call (continuation) returns STOP
+      sendMock.mockReturnValueOnce(
+        makeStream([
+          { type: GeminiEventType.Content, value: 'part 2' },
+          {
+            type: GeminiEventType.Finished,
+            value: { reason: FinishReason.STOP, usageMetadata: undefined },
+          },
+        ]),
+      );
+
+      const session = new LegacyAgentSession(deps);
+      await session.send(makeMessageSend('start'));
+      const events = await collectEvents(session);
+
+      const streamEnd = events.find(
+        (e): e is AgentEvent<'agent_end'> => e.type === 'agent_end',
+      );
+      // It should NOT end with max_turns because the continuation was transparent
+      expect(streamEnd?.reason).toBe('completed');
+      expect(sendMock).toHaveBeenCalledTimes(2);
+    });
   });
 });

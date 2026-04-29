@@ -259,7 +259,7 @@ export class LegacyAgentProtocol implements AgentProtocol {
           );
 
           const continuationPrompt =
-            '[System: Your previous response was truncated due to length. Please continue exactly where you left off.]';
+            'Your previous response was truncated due to length. Please continue exactly where you left off.';
 
           const continuationMessage = this._makeUserMessageEvent(
             [{ type: 'text', text: continuationPrompt }],
@@ -269,6 +269,7 @@ export class LegacyAgentProtocol implements AgentProtocol {
           this._emit([continuationMessage]);
 
           currentParts = [{ text: continuationPrompt }];
+          turnCount--;
           continue;
         }
 
