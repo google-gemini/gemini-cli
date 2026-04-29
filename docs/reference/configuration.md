@@ -1199,6 +1199,7 @@ their corresponding top-level category object in your `settings.json` file.
         {
           "model": "gemini-3-flash-preview",
           "isLastResort": true,
+          "maxAttempts": 10,
           "actions": {
             "terminal": "prompt",
             "transient": "prompt",
@@ -1207,7 +1208,7 @@ their corresponding top-level category object in your `settings.json` file.
           },
           "stateTransitions": {
             "terminal": "terminal",
-            "transient": "sticky_retry",
+            "transient": "terminal",
             "not_found": "terminal",
             "unknown": "terminal"
           }
@@ -1233,6 +1234,7 @@ their corresponding top-level category object in your `settings.json` file.
         {
           "model": "gemini-3-flash-preview",
           "isLastResort": true,
+          "maxAttempts": 10,
           "actions": {
             "terminal": "prompt",
             "transient": "prompt",
@@ -1241,7 +1243,7 @@ their corresponding top-level category object in your `settings.json` file.
           },
           "stateTransitions": {
             "terminal": "terminal",
-            "transient": "terminal",
+            "transient": "sticky_retry",
             "not_found": "terminal",
             "unknown": "terminal"
           }
@@ -1266,6 +1268,7 @@ their corresponding top-level category object in your `settings.json` file.
         {
           "model": "gemini-2.5-flash",
           "isLastResort": true,
+          "maxAttempts": 10,
           "actions": {
             "terminal": "prompt",
             "transient": "prompt",
@@ -1274,7 +1277,7 @@ their corresponding top-level category object in your `settings.json` file.
           },
           "stateTransitions": {
             "terminal": "terminal",
-            "transient": "sticky_retry",
+            "transient": "terminal",
             "not_found": "terminal",
             "unknown": "terminal"
           }
@@ -1300,6 +1303,7 @@ their corresponding top-level category object in your `settings.json` file.
         {
           "model": "gemini-2.5-flash",
           "isLastResort": true,
+          "maxAttempts": 10,
           "actions": {
             "terminal": "prompt",
             "transient": "prompt",
@@ -1308,7 +1312,7 @@ their corresponding top-level category object in your `settings.json` file.
           },
           "stateTransitions": {
             "terminal": "terminal",
-            "transient": "terminal",
+            "transient": "sticky_retry",
             "not_found": "terminal",
             "unknown": "terminal"
           }
