@@ -20,7 +20,10 @@ import {
 import type { FunctionCall } from '@google/genai';
 import { SafetyCheckDecision } from '../safety/protocol.js';
 import type { CheckerRunner } from '../safety/checker-runner.js';
-import { initializeShellParsers } from '../utils/shell-utils.js';
+import {
+  initializeShellParsers,
+  parseCommandDetails,
+} from '../utils/shell-utils.js';
 import { buildArgsPatterns } from './utils.js';
 import {
   NoopSandboxManager,
@@ -42,6 +45,35 @@ vi.mock('../utils/shell-utils.js', async (importOriginal) => {
         return command.split('&&').map((c) => c.trim());
       }
       return [command];
+    }),
+    parseCommandDetails: vi.fn().mockImplementation((command: string) => {
+      // Basic mock implementation for PolicyEngine test needs
+      const commands = command.includes('&&')
+        ? command.split('&&').map((c) => c.trim())
+        : [command.trim()];
+
+      // Detect $(...) or `...` and add as sub-commands for recursion tests
+      const subCommands = [...commands];
+      for (const cmd of commands) {
+        const subMatch = cmd.match(/\$\((.*)\)/) || cmd.match(/`(.*)`/);
+        if (subMatch?.[1]) {
+          subCommands.push(subMatch[1].trim());
+        }
+      }
+
+      return {
+        details: subCommands.map((c, i) => ({
+          name: c.split(' ')[0],
+          text: c,
+          startIndex: i === 0 ? 0 : -1, // Simple root indication
+        })),
+        hasError: false,
+      };
+    }),
+    stripShellWrapper: vi.fn().mockImplementation((command: string) => {
+      // Simple mock for stripping wrappers
+      const match = command.match(/^(?:bash|sh|zsh)\s+-c\s+["'](.*)["']$/i);
+      return match ? match[1] : command;
     }),
     hasRedirection: vi.fn().mockImplementation(
       (command: string) =>
@@ -446,6 +478,77 @@ describe('PolicyEngine', () => {
 
       // Priority 20 (DENY) should win over priority 10 (ASK_USER)
       const { decision } = await engine.check({ name: 'test-tool' }, undefined);
+      expect(decision).toBe(PolicyDecision.DENY);
+    });
+
+    it('should fail closed in YOLO mode when shell parsing fails for restricted rule', async () => {
+      const originalMock = vi
+        .mocked(parseCommandDetails)
+        .getMockImplementation();
+      vi.mocked(parseCommandDetails).mockImplementationOnce(
+        (command: string) => {
+          if (command === 'echo bypass') {
+            return { details: [], hasError: true };
+          }
+          return originalMock!(command);
+        },
+      );
+
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'run_shell_command',
+          decision: PolicyDecision.ALLOW,
+          argsPattern: /"command":"echo/,
+        },
+      ];
+
+      engine = new PolicyEngine({
+        rules,
+        approvalMode: ApprovalMode.YOLO,
+      });
+
+      const { decision } = await engine.check(
+        { name: 'run_shell_command', args: { command: 'echo bypass' } },
+        undefined,
+      );
+
+      expect(decision).toBe(PolicyDecision.DENY);
+    });
+
+    it('should fail closed in YOLO mode when shell parsing has errors for restricted rule', async () => {
+      const originalMock = vi
+        .mocked(parseCommandDetails)
+        .getMockImplementation();
+      vi.mocked(parseCommandDetails).mockImplementationOnce(
+        (command: string) => {
+          if (command === 'echo bypass') {
+            return {
+              details: [{ name: 'echo', text: 'echo bypass', startIndex: 0 }],
+              hasError: true,
+            };
+          }
+          return originalMock!(command);
+        },
+      );
+
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'run_shell_command',
+          decision: PolicyDecision.ALLOW,
+          argsPattern: /"command":"echo/,
+        },
+      ];
+
+      engine = new PolicyEngine({
+        rules,
+        approvalMode: ApprovalMode.YOLO,
+      });
+
+      const { decision } = await engine.check(
+        { name: 'run_shell_command', args: { command: 'echo bypass' } },
+        undefined,
+      );
+
       expect(decision).toBe(PolicyDecision.DENY);
     });
   });
@@ -1862,7 +1965,6 @@ describe('PolicyEngine', () => {
     });
 
     it('should return ASK_USER in non-YOLO mode if shell command parsing fails', async () => {
-      const { splitCommands } = await import('../utils/shell-utils.js');
       const rules: PolicyRule[] = [
         {
           toolName: 'run_shell_command',
@@ -1877,7 +1979,11 @@ describe('PolicyEngine', () => {
       });
 
       // Simulate parsing failure
-      vi.mocked(splitCommands).mockReturnValueOnce([]);
+      const { parseCommandDetails } = await import('../utils/shell-utils.js');
+      vi.mocked(parseCommandDetails).mockReturnValueOnce({
+        details: [],
+        hasError: true,
+      });
 
       const result = await engine.check(
         { name: 'run_shell_command', args: { command: 'complex command' } },
