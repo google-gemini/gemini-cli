@@ -4,7 +4,7 @@ on:
   schedule:
     - cron: '0 0 * * *' # Every 24 hours
   issue_comment:
-    types: [created]
+    types: ['created']
   workflow_dispatch:
     inputs:
       run_interactive:
@@ -101,9 +101,9 @@ jobs:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           GEMINI_MODEL: 'gemini-3-flash-preview'
-          ENABLE_PRS: "${{ github.event.inputs.enable_prs || 'false' }}"
-          TRIGGER_ISSUE_NUMBER: "${{ github.event.issue.number || github.event.inputs.issue_number }}"
-          TRIGGER_COMMENT_ID: "${{ github.event.comment.id || github.event.inputs.comment_id }}"
+          ENABLE_PRS: '${{ github.event.inputs.enable_prs || ''false'' }}'
+          TRIGGER_ISSUE_NUMBER: '${{ github.event.issue.number || github.event.inputs.issue_number }}'
+          TRIGGER_COMMENT_ID: '${{ github.event.comment.id || github.event.inputs.comment_id }}'
         run: |
           PROMPT_PATH="tools/gemini-cli-bot/brain/metrics.md"
           if [ "${{ github.event_name }}" = "issue_comment" ] || [ "${{ github.event.inputs.run_interactive }}" = "true" ]; then
@@ -116,20 +116,20 @@ jobs:
             echo "<untrusted_context>" > trigger_context.md
             echo "# Interactive Trigger Context" >> trigger_context.md
             echo "You were invoked by a user in issue/PR #$TRIGGER_ISSUE_NUMBER." >> trigger_context.md
-            
+
             if [ -n "$TRIGGER_COMMENT_ID" ]; then
               echo "## User Comment" >> trigger_context.md
               gh api "repos/${{ github.repository }}/issues/comments/$TRIGGER_COMMENT_ID" -q '.body' >> trigger_context.md
               echo "" >> trigger_context.md
             fi
-            
+
             echo "## Issue/PR Context" >> trigger_context.md
             gh issue view "$TRIGGER_ISSUE_NUMBER" >> trigger_context.md 2>/dev/null || gh pr view "$TRIGGER_ISSUE_NUMBER" >> trigger_context.md
             echo "</untrusted_context>" >> trigger_context.md
           fi
 
           cat trigger_context.md "$PROMPT_PATH" tools/gemini-cli-bot/brain/common.md > combined_prompt.md
-          
+
           node bundle/gemini.js --policy tools/gemini-cli-bot/ci-policy.toml -p "$(cat combined_prompt.md)"
 
       - name: 'Run Critique Phase'
@@ -249,7 +249,7 @@ jobs:
       - name: 'Post PR/Issue Comment'
         env:
           GH_TOKEN: '${{ secrets.GEMINI_CLI_ROBOT_GITHUB_PAT }}'
-          TRIGGER_ISSUE_NUMBER: "${{ github.event.issue.number || github.event.inputs.issue_number }}"
+          TRIGGER_ISSUE_NUMBER: '${{ github.event.issue.number || github.event.inputs.issue_number }}'
         run: |
           if [ -s "${{ runner.temp }}/brain-data/issue-comment.md" ] && [ -n "$TRIGGER_ISSUE_NUMBER" ]; then
             echo "Posting comment to triggering issue #$TRIGGER_ISSUE_NUMBER"
