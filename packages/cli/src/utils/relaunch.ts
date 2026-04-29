@@ -65,6 +65,35 @@ export async function relaunchAppInChildProcess(
       env: newEnv,
     });
 
+    const signalHandlers = new Map<NodeJS.Signals, () => void>();
+    const signals: NodeJS.Signals[] = [
+      'SIGTERM',
+      'SIGINT',
+      'SIGHUP',
+    ];
+
+    signals.forEach((sig) => {
+      const handler = () => {
+        child.kill(sig);
+      };
+      signalHandlers.set(sig, handler);
+      try {
+        process.on(sig, handler);
+      } catch (e) {
+        // Some signals might not be supported on all platforms (e.g. Windows)
+      }
+    });
+
+    const removeForwarders = () => {
+      signalHandlers.forEach((handler, sig) => {
+        try {
+          process.off(sig, handler);
+        } catch (e) {
+          // Ignore removal errors
+        }
+      });
+    };
+
     if (latestAdminSettings) {
       child.send({ type: 'admin-settings', settings: latestAdminSettings });
     }
@@ -76,8 +105,12 @@ export async function relaunchAppInChildProcess(
     });
 
     return new Promise<number>((resolve, reject) => {
-      child.on('error', reject);
+      child.on('error', (err) => {
+        removeForwarders();
+        reject(err);
+      });
       child.on('close', (code) => {
+        removeForwarders();
         // Resume stdin before the parent process exits.
         process.stdin.resume();
         resolve(code ?? 1);
