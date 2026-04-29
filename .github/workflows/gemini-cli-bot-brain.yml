@@ -220,6 +220,7 @@ jobs:
         if: "${{ github.event.inputs.enable_prs == 'true' || github.event_name == 'issue_comment' || github.event.inputs.run_interactive == 'true' }}"
         env:
           GH_TOKEN: '${{ steps.generate_token.outputs.token }}'
+          FALLBACK_PAT: '${{ secrets.GEMINI_CLI_ROBOT_GITHUB_PAT }}'
         run: |
           if [ -s "${{ runner.temp }}/brain-data/bot-changes.patch" ]; then
             git config user.name "gemini-cli[bot]"
@@ -246,11 +247,16 @@ jobs:
               git commit -m "🤖 Gemini Bot Productivity Optimizations"
             fi
 
-            git push origin "$BRANCH_NAME" --force
-
             PR_TITLE="🤖 Gemini Bot Productivity Optimizations"
             if [ -s "${{ runner.temp }}/brain-data/pr-description.md" ]; then
               PR_TITLE=$(head -n 1 "${{ runner.temp }}/brain-data/pr-description.md")
+            fi
+
+            if ! git push origin "$BRANCH_NAME" --force; then
+              echo "Push failed. Retrying with FALLBACK_PAT..."
+              export GH_TOKEN="$FALLBACK_PAT"
+              git remote set-url origin "https://x-access-token:${FALLBACK_PAT}@github.com/${{ github.repository }}.git"
+              git push origin "$BRANCH_NAME" --force
             fi
 
             if ! gh pr view "$BRANCH_NAME" > /dev/null 2>&1; then

@@ -106,10 +106,6 @@ or configuration changes:
     stage internal bot files like `pr-description.md`, `lessons-learned.md`,
     branch-name.txt, pr-comment.md, pr-number.txt, issue-comment.md, or anything
     in `tools/gemini-cli-bot/history/`.
-5.  **Workflow Constraints**: You are strictly forbidden from modifying files in
-    `.github/workflows/`. The bot lacks the necessary permissions to push
-    changes to workflow files. If a fix requires workflow changes, report it in
-    a comment but do not stage the file.
 
 ### UNBLOCKING PROTOCOL (Recovery & Persistence)
 

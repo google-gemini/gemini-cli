@@ -46,6 +46,10 @@ If your investigation confirms that a code or configuration change is required:
 
 - **Surgical Changes**: Apply the minimal set of changes needed to address the
   issue correctly and safely.
+- **Strict Scope**: You MUST strictly limit your changes to addressing the
+  user's specific request. You are STRICTLY FORBIDDEN from including any
+  unrelated updates (such as metrics updates, backlog triage changes, or
+  background housekeeping) when operating in interactive mode.
 - **Acknowledgment**: Write a brief acknowledgement to `issue-comment.md` (e.g.,
   "I've investigated the request and implemented a fix. A PR will be created
   shortly.").
