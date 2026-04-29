@@ -273,6 +273,16 @@ export class CodeAssistServer implements ContentGenerator {
         return {
           currentTier: { id: UserTierId.STANDARD },
         };
+      } else if (
+        isPermissionDeniedError(e) &&
+        req.cloudaicompanionProject === 'cloudshell-gca'
+      ) {
+        throw new Error(
+          'Access to the default Cloud Shell Gemini project was denied.\n' +
+            'Please set your own Google Cloud project by running:\n' +
+            'gcloud config set project [PROJECT_ID]\n' +
+            'or setting export GOOGLE_CLOUD_PROJECT=...',
+        );
       } else {
         throw e;
       }
@@ -571,4 +581,16 @@ function isVpcScAffectedUser(error: unknown): boolean {
     );
   }
   return false;
+}
+
+function isPermissionDeniedError(error: unknown): boolean {
+  return (
+    !!error &&
+    typeof error === 'object' &&
+    'response' in error &&
+    !!error.response &&
+    typeof error.response === 'object' &&
+    'status' in error.response &&
+    error.response.status === 403
+  );
 }
