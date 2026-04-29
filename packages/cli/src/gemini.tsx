@@ -85,7 +85,6 @@ import { relaunchOnExitCode } from './utils/relaunch.js';
 import { loadSandboxConfig } from './config/sandboxConfig.js';
 import { deleteSession, listSessions } from './utils/sessions.js';
 import { createPolicyUpdater } from './config/policy.js';
-import { isAlternateBufferEnabled } from './ui/hooks/useAlternateBuffer.js';
 
 import { setupTerminalAndTheme } from './utils/terminalTheme.js';
 import { runDeferredCommand } from './deferred.js';
@@ -191,21 +190,38 @@ ${reason.stack}`
   });
 }
 
-export async function resolveSessionId(resumeArg: string | undefined): Promise<{
+export async function resolveSessionId(
+  resumeArg: string | undefined,
+  sessionIdArg?: string | undefined,
+): Promise<{
   sessionId: string;
   resumedSessionData?: ResumedSessionData;
 }> {
-  if (!resumeArg) {
+  if (!resumeArg && !sessionIdArg) {
     return { sessionId: createSessionId() };
   }
 
   const storage = new Storage(process.cwd());
   await storage.initialize();
 
+  const sessionSelector = new SessionSelector(storage);
+
+  if (sessionIdArg) {
+    if (await sessionSelector.sessionExists(sessionIdArg)) {
+      coreEvents.emitFeedback(
+        'error',
+        `Error starting session: Session ID "${sessionIdArg}" already exists. Use --resume to resume it, or provide a different ID.`,
+      );
+      await runExitCleanup();
+      process.exit(ExitCodes.FATAL_INPUT_ERROR);
+    }
+    return { sessionId: sessionIdArg };
+  }
+
   try {
-    const { sessionData, sessionPath } = await new SessionSelector(
-      storage,
-    ).resolveSession(resumeArg);
+    const { sessionData, sessionPath } = await sessionSelector.resolveSession(
+      resumeArg!,
+    );
     return {
       sessionId: sessionData.sessionId,
       resumedSessionData: { conversation: sessionData, filePath: sessionPath },
@@ -319,7 +335,10 @@ export async function main() {
 
   const argv = await argvPromise;
 
-  const { sessionId, resumedSessionData } = await resolveSessionId(argv.resume);
+  const { sessionId, resumedSessionData } = await resolveSessionId(
+    argv.resume,
+    argv.sessionId,
+  );
 
   if (
     (argv.allowedTools && argv.allowedTools.length > 0) ||
@@ -366,7 +385,6 @@ export async function main() {
     },
   });
   consolePatcher.patch();
-  registerCleanup(consolePatcher.cleanup);
 
   dns.setDefaultResultOrder(
     validateDnsResolutionOrder(settings.merged.advanced.dnsResolutionOrder),
@@ -392,6 +410,7 @@ export async function main() {
   const partialConfig = await loadCliConfig(settings.merged, sessionId, argv, {
     projectHooks: settings.workspace.settings.hooks,
   });
+
   adminControlsListner.setConfig(partialConfig);
 
   // Refresh auth to fetch remote admin settings from CCPA and before entering
@@ -549,6 +568,12 @@ export async function main() {
       await config.getHookSystem()?.fireSessionEndEvent(SessionEndReason.Exit);
     });
 
+    // Register ConsolePatcher cleanup last to ensure logs from shutdown hooks
+    // are correctly redirected to stderr (especially for non-interactive JSON output).
+    if (!config.getAcpMode()) {
+      registerCleanup(consolePatcher.cleanup);
+    }
+
     // Launch cleanup expired sessions as a background task
     cleanupExpiredSessions(config, settings.merged).catch((e) => {
       debugLogger.error('Failed to cleanup expired sessions:', e);
@@ -644,7 +669,7 @@ export async function main() {
 
     let input = config.getQuestion();
     const useAlternateBuffer = shouldEnterAlternateScreen(
-      isAlternateBufferEnabled(config),
+      config.getUseAlternateBuffer(),
       config.getScreenReader(),
     );
     const rawStartupWarnings = await rawStartupWarningsPromise;
