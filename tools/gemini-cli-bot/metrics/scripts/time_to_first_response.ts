@@ -49,7 +49,7 @@ try {
   }
   `;
   const output = execSync(
-    'gh api graphql -F owner=$OWNER -F repo=$REPO -f query=@-',
+    'gh api graphql -F owner=$OWNER -F repo=$REPO -F query=@-',
     {
       encoding: 'utf-8',
       input: query,
