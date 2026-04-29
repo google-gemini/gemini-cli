@@ -18,6 +18,8 @@ import {
 } from '@google/gemini-cli-core';
 import { ConsoleSummaryDisplay } from './ConsoleSummaryDisplay.js';
 import process from 'node:process';
+import { hostname } from 'node:os';
+import * as fs from 'node:fs';
 import { MemoryUsageDisplay } from './MemoryUsageDisplay.js';
 import { ContextUsageDisplay } from './ContextUsageDisplay.js';
 import { QuotaDisplay } from './QuotaDisplay.js';
@@ -34,6 +36,8 @@ import {
   deriveItemsFromLegacySettings,
 } from '../../config/footerItems.js';
 import { isDevelopment } from '../../utils/installationInfo.js';
+
+const SYSTEM_HOSTNAME = hostname().split('.')[0];
 
 interface CwdIndicatorProps {
   targetDir: string;
@@ -172,14 +176,22 @@ interface FooterColumn {
   width: number;
   isHighPriority: boolean;
 }
-
 export const Footer: React.FC = () => {
   const uiState = useUIState();
   const quotaState = useQuotaState();
   const { copyModeEnabled } = useInputState();
   const config = useConfig();
   const settings = useSettings();
-  const { vimEnabled, vimMode } = useVimMode();
+  const { vimMode, vimEnabled } = useVimMode();
+
+  const isRemote =
+    process.env['SSH_TTY'] ||
+    process.env['SSH_CONNECTION'] ||
+    process.env['SSH_CLIENT'] ||
+    process.env['CLOUD_SHELL'] === 'true' ||
+    process.env['EDITOR_IN_CLOUD_SHELL'] === 'true' ||
+    process.env['KUBERNETES_SERVICE_HOST'] ||
+    (process.platform === 'linux' && fs.existsSync('/.dockerenv'));
 
   const authType = config.getContentGeneratorConfig()?.authType;
   const [email, setEmail] = useState<string | undefined>();
@@ -317,6 +329,17 @@ export const Footer: React.FC = () => {
           () => <SandboxIndicator isTrustedFolder={isTrustedFolder} />,
           str.length,
         );
+        break;
+      }
+      case 'hostname': {
+        if (isRemote && SYSTEM_HOSTNAME) {
+          addCol(
+            id,
+            header,
+            () => <Text color={itemColor}>{SYSTEM_HOSTNAME}</Text>,
+            SYSTEM_HOSTNAME.length,
+          );
+        }
         break;
       }
       case 'model-name': {
