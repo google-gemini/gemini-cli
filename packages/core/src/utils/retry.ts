@@ -246,7 +246,8 @@ export async function retryWithBackoff<T>(
     ...cleanOptions,
   };
 
-  const getCurrentMaxAttempts = () => getAvailabilityContext?.()?.policy.maxAttempts ?? maxAttempts;
+  const getCurrentMaxAttempts = () =>
+    getAvailabilityContext?.()?.policy.maxAttempts ?? maxAttempts;
 
   let attempt = 0;
   let currentDelay = initialDelayMs;

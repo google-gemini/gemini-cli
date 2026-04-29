@@ -77,12 +77,12 @@ export function resolvePolicyChain(
       chain = config.modelConfigService.resolveChain('lite', context);
     } else if (
       isGemini3Model(resolvedModel, config) ||
-      isAutoModel(preferredModel ?? '', config) ||
-      isAutoModel(configuredModel, config)
+      isAutoPreferred ||
+      isAutoConfigured
     ) {
       // 1. Try to find a chain specifically for the current configured alias
       if (
-        isAutoModel(configuredModel, config) &&
+        isAutoConfigured &&
         config.modelConfigService.getModelChain(configuredModel)
       ) {
         chain = config.modelConfigService.resolveChain(
@@ -92,9 +92,7 @@ export function resolvePolicyChain(
       }
       // 2. Fallback to family-based auto-routing
       if (!chain) {
-        const isAutoSelection =
-          (preferredModel && isAutoModel(preferredModel, config)) ||
-          isAutoModel(configuredModel, config);
+        const isAutoSelection = isAutoPreferred || isAutoConfigured;
         const previewEnabled =
           hasAccessToPreview &&
           (isGemini3Model(resolvedModel, config) ||
