@@ -431,14 +431,6 @@ describe('plan_mode', () => {
         general: {
           plan: { enabled: true },
         },
-        tools: {
-          core: [
-            'run_shell_command',
-            'exit_plan_mode',
-            'write_file',
-            'read_file',
-          ],
-        },
       },
     },
     files: {
