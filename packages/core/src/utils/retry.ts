@@ -55,6 +55,9 @@ const RETRYABLE_NETWORK_CODES = [
   'ECONNREFUSED',
   'ERR_SSL_WRONG_VERSION_NUMBER',
   'EPROTO', // Generic protocol error (often SSL-related)
+  'UND_ERR_HEADERS_TIMEOUT',
+  'UND_ERR_BODY_TIMEOUT',
+  'UND_ERR_CONNECT_TIMEOUT',
 ];
 
 // Node.js builds SSL error codes by prepending ERR_SSL_ to the uppercased
@@ -84,15 +87,7 @@ function getNetworkErrorCode(error: unknown): string | undefined {
     }
     if ('code' in obj && typeof (obj as { code: unknown }).code === 'string') {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const code = (obj as { code: string }).code;
-      if (
-        code === 'UND_ERR_HEADERS_TIMEOUT' ||
-        code === 'UND_ERR_BODY_TIMEOUT' ||
-        code === 'UND_ERR_CONNECT_TIMEOUT'
-      ) {
-        return 'ETIMEDOUT';
-      }
-      return code;
+      return (obj as { code: string }).code;
     }
     return undefined;
   };
