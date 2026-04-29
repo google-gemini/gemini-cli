@@ -875,10 +875,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
     async (apiKey: string) => {
       try {
         onAuthError(null);
-        if (!apiKey.trim() && apiKey.length > 1) {
-          onAuthError(
-            'API key cannot be empty string with length greater than 1.',
-          );
+        if (!apiKey.trim()) {
+          onAuthError('API key cannot be empty or whitespace only.');
           return;
         }
 
