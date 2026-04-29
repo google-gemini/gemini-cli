@@ -71,28 +71,14 @@ try {
     allItems.filter((i) => !isMaintainer(i.association)),
   );
 
-  const timestamp = new Date().toISOString();
-
   process.stdout.write(
-    JSON.stringify(<MetricOutput>{
-      metric: 'user_touches_overall',
-      value: Math.round(overall * 100) / 100,
-      timestamp,
-    }) + '\n',
+    `user_touches_overall,${Math.round(overall * 100) / 100}\n`,
   );
   process.stdout.write(
-    JSON.stringify(<MetricOutput>{
-      metric: 'user_touches_maintainers',
-      value: Math.round(maintainers * 100) / 100,
-      timestamp,
-    }) + '\n',
+    `user_touches_maintainers,${Math.round(maintainers * 100) / 100}\n`,
   );
   process.stdout.write(
-    JSON.stringify(<MetricOutput>{
-      metric: 'user_touches_community',
-      value: Math.round(community * 100) / 100,
-      timestamp,
-    }) + '\n',
+    `user_touches_community,${Math.round(community * 100) / 100}\n`,
   );
 } catch (err) {
   process.stderr.write(err instanceof Error ? err.message : String(err));
