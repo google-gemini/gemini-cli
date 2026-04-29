@@ -6,6 +6,7 @@
 
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import path from 'node:path';
+import fs from 'node:fs/promises';
 import { FileSearchFactory, AbortError, filter } from './fileSearch.js';
 import { createTmpDir, cleanupTmpDir } from '@google/gemini-cli-test-utils';
 import * as crawler from './crawler.js';
@@ -148,6 +149,70 @@ describe('FileSearch', () => {
       'build/public/index.html',
       'src/main.js',
     ]);
+  });
+
+  it('should include newly created directory when watcher is enabled', async () => {
+    tmpDir = await createTmpDir({
+      src: ['main.js'],
+    });
+
+    const fileSearch = FileSearchFactory.create({
+      projectRoot: tmpDir,
+      fileDiscoveryService: new FileDiscoveryService(tmpDir, {
+        respectGitIgnore: false,
+        respectGeminiIgnore: false,
+      }),
+      ignoreDirs: [],
+      cache: false,
+      cacheTtl: 0,
+      enableFileWatcher: true,
+      enableRecursiveFileSearch: true,
+      enableFuzzySearch: true,
+    });
+
+    await fileSearch.initialize();
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    await fs.mkdir(path.join(tmpDir, 'new-folder'));
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+
+    const results = await fileSearch.search('new-folder');
+    expect(results).toContain('new-folder/');
+  });
+
+  it('should include newly created file and remove it after deletion when watcher is enabled', async () => {
+    tmpDir = await createTmpDir({
+      src: ['main.js'],
+    });
+
+    const fileSearch = FileSearchFactory.create({
+      projectRoot: tmpDir,
+      fileDiscoveryService: new FileDiscoveryService(tmpDir, {
+        respectGitIgnore: false,
+        respectGeminiIgnore: false,
+      }),
+      ignoreDirs: [],
+      cache: false,
+      cacheTtl: 0,
+      enableFileWatcher: true,
+      enableRecursiveFileSearch: true,
+      enableFuzzySearch: true,
+    });
+
+    await fileSearch.initialize();
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
+    const filePath = path.join(tmpDir, 'watcher-file.txt');
+    await fs.writeFile(filePath, 'hello');
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+
+    let results = await fileSearch.search('watcher-file');
+    expect(results).toContain('watcher-file.txt');
+
+    await fs.rm(filePath, { force: true });
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+
+    results = await fileSearch.search('watcher-file');
+    expect(results).not.toContain('watcher-file.txt');
   });
 
   it('should filter results with a search pattern', async () => {
