@@ -355,6 +355,19 @@ export interface JsonMcpResource {
   description?: string;
 }
 
+export type HistoryItemGemmaStatus = HistoryItemBase & {
+  type: 'gemma_status';
+  binaryInstalled: boolean;
+  binaryPath: string | null;
+  modelName: string;
+  modelDownloaded: boolean;
+  serverRunning: boolean;
+  serverPid: number | null;
+  serverPort: number;
+  settingsEnabled: boolean;
+  allPassing: boolean;
+};
+
 export type HistoryItemMcpStatus = HistoryItemBase & {
   type: 'mcp_status';
   servers: Record<string, MCPServerConfig>;
@@ -404,6 +417,7 @@ export type HistoryItemWithoutId =
   | HistoryItemSkillsList
   | HistoryItemAgentsList
   | HistoryItemMcpStatus
+  | HistoryItemGemmaStatus
   | HistoryItemChatList
   | HistoryItemThinking
   | HistoryItemHint
@@ -430,6 +444,7 @@ export enum MessageType {
   SKILLS_LIST = 'skills_list',
   AGENTS_LIST = 'agents_list',
   MCP_STATUS = 'mcp_status',
+  GEMMA_STATUS = 'gemma_status',
   CHAT_LIST = 'chat_list',
   HINT = 'hint',
 }
