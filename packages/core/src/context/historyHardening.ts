@@ -35,7 +35,10 @@ export function hardenHistory(history: Content[]): Content[] {
   // This might inject sentinel responses or drop orphaned responses.
   coalesced = pairToolsAndEnforceSignatures(coalesced);
 
-  // Pass 3: Enforce Structural Invariants (Start/End/Alternation)
+  // Pass 3: Structural Refinement (Hoisting & Re-ordering of tool responses)
+  coalesced = refineToolResponses(coalesced);
+
+  // Pass 4: Enforce Structural Invariants (Start/End/Alternation)
   // This MUST run after pairing because pairing can drop/add turns.
   const final = enforceRoleConstraints(coalesced);
 
@@ -191,6 +194,49 @@ function pairToolsAndEnforceSignatures(history: Content[]): Content[] {
   }
 
   return result;
+}
+
+/**
+ * Hoists and re-orders tool responses within user turns to match preceding model turns.
+ */
+function refineToolResponses(history: Content[]): Content[] {
+  for (let i = 1; i < history.length; i++) {
+    const turn = history[i];
+    const prev = history[i - 1];
+
+    if (turn.role === 'user' && prev.role === 'model') {
+      const callOrder =
+        prev.parts
+          ?.filter((p) => !!p.functionCall)
+          .map((p) => p.functionCall!.id) || [];
+
+      if (callOrder.length > 0) {
+        const responseParts =
+          turn.parts?.filter((p) => !!p.functionResponse) || [];
+        const otherParts = turn.parts?.filter((p) => !p.functionResponse) || [];
+
+        if (responseParts.length > 0) {
+          // 1. Re-order: Sort responses to match the model's call order
+          responseParts.sort((a, b) => {
+            const idA = a.functionResponse!.id;
+            const idB = b.functionResponse!.id;
+            const idxA = callOrder.indexOf(idA);
+            const idxB = callOrder.indexOf(idB);
+
+            // If an ID isn't found in the preceding turn (should be rare after pairing),
+            // move it to the end.
+            if (idxA === -1) return 1;
+            if (idxB === -1) return -1;
+            return idxA - idxB;
+          });
+
+          // 2. Hoisting: Place all sorted responses BEFORE text or other parts
+          turn.parts = [...responseParts, ...otherParts];
+        }
+      }
+    }
+  }
+  return history;
 }
 
 /**

@@ -76,30 +76,33 @@ export function getStableId(
   if (typeof part._synthId === 'string') {
     id = part._synthId;
   } else if (isTextPart(part)) {
-    // Content-based ID for text parts, salted with turn-stable salt for uniqueness
-    const hash = createHash('md5')
+    // Content-based ID for text parts, salted with indices for uniqueness.
+    // Using sha256 for robust collision resistance in large histories.
+    const hash = createHash('sha256')
       .update(`${turnSalt}:${partIdx}:${part.text}`)
       .digest('hex');
     id = `text_${hash}`;
   } else if (isInlineDataPart(part)) {
     // Content-based ID for inline media
-    const hash = createHash('md5')
+    const hash = createHash('sha256')
       .update(`${turnSalt}:${partIdx}:${part.inlineData.data}`)
       .digest('hex');
     id = `media_${hash}`;
   } else if (isFileDataPart(part)) {
-    id = `file_${turnSalt}_${partIdx}_${createHash('md5')
+    id = `file_${turnSalt}_${partIdx}_${createHash('sha256')
       .update(part.fileData.fileUri)
       .digest('hex')}`;
   } else if (isFunctionCallPart(part)) {
-    const hash = createHash('md5')
+    // Stable hash for calls without API IDs (e.g. from local history re-construction)
+    const hash = createHash('sha256')
       .update(
         `${turnSalt}:${partIdx}:call:${part.functionCall.name}:${JSON.stringify(part.functionCall.args)}`,
       )
       .digest('hex');
     id = `call_h_${hash}`;
   } else if (isFunctionResponsePart(part)) {
-    const hash = createHash('md5')
+    // Stable hash for responses without API IDs
+    const hash = createHash('sha256')
       .update(
         `${turnSalt}:${partIdx}:resp:${part.functionResponse.name}:${JSON.stringify(part.functionResponse.response)}`,
       )

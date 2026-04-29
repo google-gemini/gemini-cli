@@ -314,6 +314,7 @@ export class GeminiChat {
     signal: AbortSignal,
     role: LlmRole,
     displayContent?: PartListUnion,
+    skipHistoryPush: boolean = false,
   ): Promise<AsyncGenerator<StreamEvent>> {
     await this.sendPromise;
 
@@ -352,8 +353,10 @@ export class GeminiChat {
       });
     }
 
-    // Add user content to history ONCE before any attempts.
-    this.agentHistory.push(userContent);
+    // Add user content to history ONCE before any attempts, unless skipped.
+    if (!skipHistoryPush) {
+      this.agentHistory.push(userContent);
+    }
     const requestContents = this.getHistory(true);
 
     const streamWithRetries = async function* (

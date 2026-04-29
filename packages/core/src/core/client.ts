@@ -58,7 +58,7 @@ import type {
 import {
   ContentRetryFailureEvent,
   NextSpeakerCheckEvent,
-  type LlmRole,
+  LlmRole,
 } from '../telemetry/types.js';
 import { uiTelemetryService } from '../telemetry/uiTelemetry.js';
 import type { IdeContext, File } from '../ide/types.js';
@@ -622,6 +622,10 @@ export class GeminiClient {
       return turn;
     }
 
+    // Adopt the request into history immediately so that context management and
+    // safety checkers see the complete state including the latest tool responses.
+    this.getChat().addHistory(createUserContent(request));
+
     // Check for context window overflow
     const modelForLimitCheck = this._getActiveModelForCurrentTurn();
 
@@ -762,6 +766,8 @@ export class GeminiClient {
       request,
       signal,
       displayContent,
+      LlmRole.MAIN,
+      true, // skipHistoryPush: already added above
     );
     let isError = false;
     let isInvalidStream = false;
