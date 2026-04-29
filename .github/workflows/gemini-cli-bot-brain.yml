@@ -271,10 +271,10 @@ jobs:
 
           if [ -s "${{ runner.temp }}/brain-data/pr-comment.md" ] && [ -f "${{ runner.temp }}/brain-data/pr-number.txt" ]; then
             PR_NUM=$(cat "${{ runner.temp }}/brain-data/pr-number.txt")
-            
+
             # Using GitHub App, so author check is no longer valid against gemini-cli-robot
             # Skipping author validation here to let the app post.
-            
+
             # Use REST API (gh api) for consistency and robot identity
             gh api "repos/${{ github.repository }}/issues/$PR_NUM/comments" -F body=@"${{ runner.temp }}/brain-data/pr-comment.md"
           fi
