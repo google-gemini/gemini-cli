@@ -104,7 +104,7 @@ or configuration changes:
     to `issue-comment.md`.
 4.  **Stage Files**: Use `git add <file>` to stage files for the PR. **DO NOT**
     stage internal bot files like `pr-description.md`, `lessons-learned.md`,
-    `branch-name.txt`, `pr-comment.md`, `pr-number.txt`, or anything in
+    branch-name.txt, pr-comment.md, pr-number.txt, issue-comment.md, or anything in
     `tools/gemini-cli-bot/history/`.
 
 ### UNBLOCKING PROTOCOL (Recovery & Persistence)
