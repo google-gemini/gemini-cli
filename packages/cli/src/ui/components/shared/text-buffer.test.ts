@@ -1926,13 +1926,13 @@ describe('useTextBuffer', () => {
       const redoKey: Key =
         process.platform === 'win32'
           ? {
-              name: 'y',
+              name: 'z',
               ctrl: true,
-              shift: false,
+              shift: true,
               alt: false,
               cmd: false,
               insertable: false,
-              sequence: '\x19',
+              sequence: '\x1a',
             }
           : process.platform === 'darwin'
             ? {
