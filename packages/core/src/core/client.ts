@@ -626,14 +626,20 @@ export class GeminiClient {
     const modelForLimitCheck = this._getActiveModelForCurrentTurn();
 
     if (this.config.getContextManagementConfig().enabled) {
-      const newHistory = this.contextManager
-        ? await this.contextManager.renderHistory()
-        : await this.agentHistoryProvider.manageHistory(
-            this.getHistory(),
-            signal,
-          );
-      if (newHistory.length !== this.getHistory().length) {
-        this.getChat().setHistory(newHistory);
+      if (this.contextManager) {
+        const { history: newHistory, didApplyManagement } =
+          await this.contextManager.renderHistory();
+        if (didApplyManagement) {
+          this.getChat().setHistory(newHistory);
+        }
+      } else {
+        const newHistory = await this.agentHistoryProvider.manageHistory(
+          this.getHistory(),
+          signal,
+        );
+        if (newHistory.length !== this.getHistory().length) {
+          this.getChat().setHistory(newHistory);
+        }
       }
     } else {
       const compressed = await this.tryCompressChat(prompt_id, false, signal);

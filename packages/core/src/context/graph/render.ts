@@ -25,7 +25,7 @@ export async function render(
   tracer: ContextTracer,
   env: ContextEnvironment,
   protectionReasons: Map<string, string>,
-): Promise<Content[]> {
+): Promise<{ history: Content[]; didApplyManagement: boolean }> {
   const protectedIds = new Set(protectionReasons.keys());
 
   if (!sidecar.config.budget) {
@@ -33,7 +33,7 @@ export async function render(
     tracer.logEvent('Render', 'Render Context to LLM (No Budget)', {
       renderedContext: contents,
     });
-    return contents;
+    return { history: contents, didApplyManagement: false };
   }
 
   const maxTokens = sidecar.config.budget.maxTokens;
@@ -95,7 +95,7 @@ export async function render(
     tracer.logEvent('Render', 'Render Context for LLM', {
       renderedContext: contents,
     });
-    return contents;
+    return { history: contents, didApplyManagement: false };
   }
 
   const targetDelta = currentTokens - sidecar.config.budget.retainedTokens;
@@ -157,5 +157,5 @@ export async function render(
   tracer.logEvent('Render', 'Render Sanitized Context for LLM', {
     renderedContextSanitized: contents,
   });
-  return contents;
+  return { history: contents, didApplyManagement: true };
 }

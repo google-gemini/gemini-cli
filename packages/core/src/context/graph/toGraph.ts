@@ -65,7 +65,7 @@ function isFunctionResponsePart(
 export function getStableId(
   obj: object,
   nodeIdentityMap: WeakMap<object, string>,
-  turnIdx: number = 0,
+  turnSalt: string = '',
   partIdx: number = 0,
 ): string {
   let id = nodeIdentityMap.get(obj);
@@ -76,32 +76,32 @@ export function getStableId(
   if (typeof part._synthId === 'string') {
     id = part._synthId;
   } else if (isTextPart(part)) {
-    // Content-based ID for text parts, salted with indices for uniqueness
+    // Content-based ID for text parts, salted with turn-stable salt for uniqueness
     const hash = createHash('md5')
-      .update(`${turnIdx}:${partIdx}:${part.text}`)
+      .update(`${turnSalt}:${partIdx}:${part.text}`)
       .digest('hex');
     id = `text_${hash}`;
   } else if (isInlineDataPart(part)) {
     // Content-based ID for inline media
     const hash = createHash('md5')
-      .update(`${turnIdx}:${partIdx}:${part.inlineData.data}`)
+      .update(`${turnSalt}:${partIdx}:${part.inlineData.data}`)
       .digest('hex');
     id = `media_${hash}`;
   } else if (isFileDataPart(part)) {
-    id = `file_${turnIdx}_${partIdx}_${createHash('md5')
+    id = `file_${turnSalt}_${partIdx}_${createHash('md5')
       .update(part.fileData.fileUri)
       .digest('hex')}`;
   } else if (isFunctionCallPart(part)) {
     const hash = createHash('md5')
       .update(
-        `${turnIdx}:${partIdx}:call:${part.functionCall.name}:${JSON.stringify(part.functionCall.args)}`,
+        `${turnSalt}:${partIdx}:call:${part.functionCall.name}:${JSON.stringify(part.functionCall.args)}`,
       )
       .digest('hex');
     id = `call_h_${hash}`;
   } else if (isFunctionResponsePart(part)) {
     const hash = createHash('md5')
       .update(
-        `${turnIdx}:${partIdx}:resp:${part.functionResponse.name}:${JSON.stringify(part.functionResponse.response)}`,
+        `${turnSalt}:${partIdx}:resp:${part.functionResponse.name}:${JSON.stringify(part.functionResponse.response)}`,
       )
       .digest('hex');
     id = `resp_h_${hash}`;
@@ -147,9 +147,22 @@ export class ContextGraphBuilder {
 
     const nodes: ConcreteNode[] = [];
 
+    // Tracks occurrences of identical turn content to ensure unique stable IDs
+    const seenHashes = new Map<string, number>();
+
     for (let turnIdx = 0; turnIdx < history.length; turnIdx++) {
       const msg = history[turnIdx];
       if (!msg.parts) continue;
+
+      // Generate a stable salt for this turn based on its role and content
+      // This remains stable even if the turn's index in history changes.
+      const turnContent = JSON.stringify(msg.parts);
+      const h = createHash('md5')
+        .update(`${msg.role}:${turnContent}`)
+        .digest('hex');
+      const occurrence = (seenHashes.get(h) || 0) + 1;
+      seenHashes.set(h, occurrence);
+      const turnSalt = `${h}_${occurrence}`;
 
       if (msg.role === 'user') {
         const hasUserParts = msg.parts.some(
@@ -159,7 +172,12 @@ export class ContextGraphBuilder {
         // A user text message starts a new logical episode
         if (hasUserParts) {
           finalizeEpisode();
-          currentEpisodeId = getStableId(msg, this.nodeIdentityMap, turnIdx, 0);
+          currentEpisodeId = getStableId(
+            msg,
+            this.nodeIdentityMap,
+            turnSalt,
+            0,
+          );
           currentEpisode = {
             id: currentEpisodeId,
             concreteNodes: [],
@@ -177,7 +195,7 @@ export class ContextGraphBuilder {
                 ? `call_${part.functionCall.id}`
                 : undefined;
           const id =
-            apiId || getStableId(part, this.nodeIdentityMap, turnIdx, partIdx);
+            apiId || getStableId(part, this.nodeIdentityMap, turnSalt, partIdx);
 
           const node: ConcreteNode = {
             id,
@@ -200,7 +218,12 @@ export class ContextGraphBuilder {
       } else if (msg.role === 'model') {
         // Model turns belong to the current episode (if one exists) or start a new one
         if (!currentEpisode) {
-          currentEpisodeId = getStableId(msg, this.nodeIdentityMap, turnIdx, 0);
+          currentEpisodeId = getStableId(
+            msg,
+            this.nodeIdentityMap,
+            turnSalt,
+            0,
+          );
           currentEpisode = {
             id: currentEpisodeId,
             concreteNodes: [],
@@ -214,7 +237,7 @@ export class ContextGraphBuilder {
               ? `call_${part.functionCall.id}`
               : undefined;
           const id =
-            apiId || getStableId(part, this.nodeIdentityMap, turnIdx, partIdx);
+            apiId || getStableId(part, this.nodeIdentityMap, turnSalt, partIdx);
 
           const node: ConcreteNode = {
             id,

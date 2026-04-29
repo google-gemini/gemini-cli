@@ -198,7 +198,7 @@ export class ContextManager {
    */
   async renderHistory(
     activeTaskIds: Set<string> = new Set(),
-  ): Promise<Content[]> {
+  ): Promise<{ history: Content[]; didApplyManagement: boolean }> {
     this.tracer.logEvent('ContextManager', 'Starting rendering of LLM context');
 
     const protectionReasons = this.getProtectedNodeIds();
@@ -207,7 +207,7 @@ export class ContextManager {
     }
 
     // Apply final GC Backstop pressure barrier synchronously before mapping
-    const finalHistory = await render(
+    const { history: finalHistory, didApplyManagement } = await render(
       this.buffer.nodes,
       this.orchestrator,
       this.sidecar,
@@ -237,6 +237,6 @@ export class ContextManager {
       `[ContextManager] Rendered history for LLM request: ${JSON.stringify(summary, null, 2)}`,
     );
 
-    return hardenHistory(finalHistory);
+    return { history: hardenHistory(finalHistory), didApplyManagement };
   }
 }
