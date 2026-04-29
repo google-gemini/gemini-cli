@@ -93,6 +93,14 @@ describe('clearCommand', () => {
     expect(setDebugMessageOrder).toBeLessThan(resetChatOrder);
     expect(resetChatOrder).toBeLessThan(resetTelemetryOrder);
     expect(resetTelemetryOrder).toBeLessThan(clearOrder);
+
+    // Verify the active checkpoint tag is cleared before the UI is cleared.
+    expect(mockContext.session.setActiveCheckpointTag).toHaveBeenCalledWith(
+      undefined,
+    );
+    const clearTagOrder = (mockContext.session.setActiveCheckpointTag as Mock)
+      .mock.invocationCallOrder[0];
+    expect(clearTagOrder).toBeLessThan(clearOrder);
   });
 
   it('should not attempt to reset chat if config service is not available', async () => {

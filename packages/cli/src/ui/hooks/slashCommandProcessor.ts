@@ -126,6 +126,9 @@ export const useSlashCommandProcessor = (
   const [sessionShellAllowlist, setSessionShellAllowlist] = useState(
     new Set<string>(),
   );
+  const [activeCheckpointTag, setActiveCheckpointTag] = useState<
+    string | undefined
+  >(undefined);
   const gitService = useMemo(() => {
     if (!config?.getProjectRoot()) {
       return;
@@ -251,6 +254,8 @@ export const useSlashCommandProcessor = (
       session: {
         stats: session.stats,
         sessionShellAllowlist,
+        activeCheckpointTag,
+        setActiveCheckpointTag,
       },
     }),
     [
@@ -269,6 +274,7 @@ export const useSlashCommandProcessor = (
       setConfirmationRequest,
       toggleVimEnabled,
       sessionShellAllowlist,
+      activeCheckpointTag,
       reloadCommands,
       extensionsUpdateState,
       setBannerVisible,
