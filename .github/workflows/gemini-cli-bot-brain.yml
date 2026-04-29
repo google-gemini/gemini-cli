@@ -120,7 +120,7 @@ jobs:
 
             if [ -n "$TRIGGER_COMMENT_ID" ]; then
               echo "## User Comment" >> trigger_context.md
-              gh api "repos/${{ github.repository }}/issues/comments/$TRIGGER_COMMENT_ID" -q '.body' >> trigger_context.md
+              gh api "repos/${{ github.repository }}/issues/comments/$TRIGGER_COMMENT_ID" -q '.body' >> trigger_context.md 2>/dev/null || gh api "repos/${{ github.repository }}/pulls/comments/$TRIGGER_COMMENT_ID" -q '.body' >> trigger_context.md
               echo "" >> trigger_context.md
             fi
 
