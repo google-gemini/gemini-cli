@@ -1552,6 +1552,41 @@ ${JSON.stringify(
       expect(mockTurnRunFn).not.toHaveBeenCalled();
     });
 
+    it('should not report negative remaining tokens when the current prompt already exceeds the limit', async () => {
+      const MOCKED_TOKEN_LIMIT = 1000;
+      vi.mocked(tokenLimit).mockReturnValue(MOCKED_TOKEN_LIMIT);
+
+      const mockChat: Partial<GeminiChat> = {
+        getLastPromptTokenCount: vi.fn().mockReturnValue(1200),
+        setTools: vi.fn(),
+        getHistory: vi.fn().mockReturnValue([]),
+      };
+      client['chat'] = mockChat as GeminiChat;
+
+      vi.spyOn(client, 'tryCompressChat').mockResolvedValue({
+        originalTokenCount: 1200,
+        newTokenCount: 1200,
+        compressionStatus: CompressionStatus.NOOP,
+      });
+
+      const request: Part[] = [{ text: 'short request' }];
+      const events = await fromAsync(
+        client.sendMessageStream(
+          request,
+          new AbortController().signal,
+          'prompt-id-overflow-negative-remaining',
+        ),
+      );
+
+      expect(events).toContainEqual({
+        type: GeminiEventType.ContextWindowWillOverflow,
+        value: {
+          estimatedRequestTokenCount: 3,
+          remainingTokenCount: 0,
+        },
+      });
+    });
+
     it("should use the sticky model's token limit for the overflow check", async () => {
       // Arrange
       const STICKY_MODEL = 'gemini-1.5-flash';
