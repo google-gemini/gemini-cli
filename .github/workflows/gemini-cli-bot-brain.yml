@@ -253,7 +253,9 @@ jobs:
         run: |
           if [ -s "${{ runner.temp }}/brain-data/issue-comment.md" ] && [ -n "$TRIGGER_ISSUE_NUMBER" ]; then
             echo "Posting comment to triggering issue #$TRIGGER_ISSUE_NUMBER"
-            gh issue comment "$TRIGGER_ISSUE_NUMBER" -F "${{ runner.temp }}/brain-data/issue-comment.md"
+            # Use REST API (gh api) instead of GraphQL (gh issue comment) to ensure robot identity
+            # while avoiding potential GraphQL-specific authorization hurdles with PATs.
+            gh api "repos/${{ github.repository }}/issues/$TRIGGER_ISSUE_NUMBER/comments" -F body=@"${{ runner.temp }}/brain-data/issue-comment.md"
           fi
 
           if [ -s "${{ runner.temp }}/brain-data/pr-comment.md" ] && [ -f "${{ runner.temp }}/brain-data/pr-number.txt" ]; then
@@ -264,5 +266,6 @@ jobs:
               exit 1
             fi
 
-            gh pr comment "$PR_NUM" -F "${{ runner.temp }}/brain-data/pr-comment.md"
+            # Use REST API (gh api) for consistency and robot identity
+            gh api "repos/${{ github.repository }}/issues/$PR_NUM/comments" -F body=@"${{ runner.temp }}/brain-data/pr-comment.md"
           fi
