@@ -5,7 +5,11 @@
  */
 
 import { spawn } from 'node:child_process';
-import { RELAUNCH_EXIT_CODE } from './processUtils.js';
+import {
+  RELAUNCH_EXIT_CODE,
+  getSpawnConfig,
+  getScriptArgs,
+} from './processUtils.js';
 import {
   writeToStderr,
   type AdminControlsSettings,
@@ -43,24 +47,16 @@ export async function relaunchAppInChildProcess(
   let latestAdminSettings = remoteAdminSettings;
 
   const runner = () => {
-    // process.argv is [node, script, ...args]
-    // We want to construct [ ...nodeArgs, script, ...scriptArgs]
-    const script = process.argv[1];
-    const scriptArgs = process.argv.slice(2);
-
-    const nodeArgs = [
-      ...process.execArgv,
-      ...additionalNodeArgs,
-      script,
+    const scriptArgs = getScriptArgs();
+    const { spawnArgs, env: newEnv } = getSpawnConfig(additionalNodeArgs, [
       ...additionalScriptArgs,
       ...scriptArgs,
-    ];
-    const newEnv = { ...process.env, GEMINI_CLI_NO_RELAUNCH: 'true' };
+    ]);
 
     // The parent process should not be reading from stdin while the child is running.
     process.stdin.pause();
 
-    const child = spawn(process.execPath, nodeArgs, {
+    const child = spawn(process.execPath, spawnArgs, {
       stdio: ['inherit', 'inherit', 'inherit', 'ipc'],
       env: newEnv,
     });
