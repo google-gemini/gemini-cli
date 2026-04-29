@@ -3321,6 +3321,8 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
         properties: {
           comment: { type: 'string' },
           symbol: { type: 'string' },
+          active: { type: 'string' },
+          focus: { type: 'string' },
           gradient: {
             type: 'array',
             items: { type: 'string' },
