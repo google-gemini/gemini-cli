@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -13,7 +13,7 @@ import {
   afterEach,
   type Mocked,
 } from 'vitest';
-import { AcpFileSystemService } from './fileSystemService.js';
+import { AcpFileSystemService } from './acpFileSystemService.js';
 import type { AgentSideConnection } from '@agentclientprotocol/sdk';
 import type { FileSystemService } from '@google/gemini-cli-core';
 import os from 'node:os';
