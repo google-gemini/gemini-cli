@@ -257,6 +257,43 @@ describe('conseca-logger', () => {
     expect(attrs['verdict']).toBe('allow');
   });
 
+  it('should omit sensitive fields from verdict Clearcut when logPrompts is disabled', () => {
+    const configNoPrompts = {
+      getTelemetryEnabled: vi.fn().mockReturnValue(true),
+      getSessionId: vi.fn().mockReturnValue('test-session-id'),
+      getTelemetryLogPromptsEnabled: vi.fn().mockReturnValue(false),
+      getTelemetryTracesEnabled: vi.fn().mockReturnValue(false),
+      isInteractive: vi.fn().mockReturnValue(true),
+      getExperiments: vi.fn().mockReturnValue({ experimentIds: [] }),
+      getContentGeneratorConfig: vi.fn().mockReturnValue({ authType: 'oauth' }),
+    } as unknown as Config;
+
+    const event = new ConsecaVerdictEvent(
+      'sensitive prompt',
+      'sensitive policy',
+      'sensitive tool call',
+      'allow',
+      'sensitive rationale',
+      'some error',
+    );
+
+    logConsecaVerdict(configNoPrompts, event);
+
+    expect(mockClearcutLogger.createLogEvent).toHaveBeenCalledWith(
+      expect.anything(),
+      [
+        {
+          gemini_cli_key: EventMetadataKey.CONSECA_VERDICT_RESULT,
+          value: '"allow"',
+        },
+        {
+          gemini_cli_key: EventMetadataKey.CONSECA_ERROR,
+          value: 'some error',
+        },
+      ],
+    );
+  });
+
   it('should include sensitive fields in verdict OTEL when logPrompts is enabled', () => {
     const event = new ConsecaVerdictEvent(
       'visible prompt',
