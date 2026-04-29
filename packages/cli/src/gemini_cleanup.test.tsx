@@ -157,7 +157,7 @@ vi.mock('./utils/cleanup.js', async (importOriginal) => {
   };
 });
 
-vi.mock('./acp/acpClient.js', () => ({
+vi.mock('./acp/acpStdioTransport.js', () => ({
   runAcpClient: vi.fn().mockResolvedValue(undefined),
 }));
 
