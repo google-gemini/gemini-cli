@@ -133,8 +133,9 @@ const coerceCommaSeparated = (values: string[]): string[] => {
  */
 export function getWorktreeArg(argv: string[]): string | undefined {
   const isSea =
-    'sea' in process &&
-    typeof (process as { sea: unknown }).sea !== 'undefined';
+    ('sea' in process &&
+      typeof (process as { sea: unknown }).sea !== 'undefined') ||
+    process.argv[0] === process.argv[1];
   const result = yargs(isSea ? argv.slice(2) : hideBin(argv))
     .help(false)
     .version(false)
@@ -164,8 +165,9 @@ export async function parseArguments(
   settings: MergedSettings,
 ): Promise<CliArgs> {
   const isSea =
-    'sea' in process &&
-    typeof (process as { sea: unknown }).sea !== 'undefined';
+    ('sea' in process &&
+      typeof (process as { sea: unknown }).sea !== 'undefined') ||
+    process.argv[0] === process.argv[1];
   const rawArgv = isSea ? process.argv.slice(2) : hideBin(process.argv);
   const startupMessages: string[] = [];
   const yargsInstance = yargs(rawArgv)

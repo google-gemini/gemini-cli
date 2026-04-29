@@ -16,6 +16,7 @@ interface ThinkingMessageProps {
   thought: ThoughtSummary;
   terminalWidth: number;
   availableTerminalHeight?: number;
+  isFirstThinking?: boolean;
 }
 
 function normalizeThoughtLines(thought: ThoughtSummary): string[] {

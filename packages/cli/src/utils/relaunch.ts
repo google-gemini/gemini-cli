@@ -43,9 +43,13 @@ export async function relaunchAppInChildProcess(
   let latestAdminSettings = remoteAdminSettings;
 
   const runner = () => {
+    // Robust detection of Single Executable Application (SEA) environment.
+    // 1. Standard Node 20+ process.sea check
+    // 2. Fallback: Check if argv[0] and argv[1] are identical (common heuristic for node-packaged binaries)
     const isSea =
-      'sea' in process &&
-      typeof (process as { sea: unknown }).sea !== 'undefined';
+      ('sea' in process &&
+        typeof (process as { sea: unknown }).sea !== 'undefined') ||
+      process.argv[0] === process.argv[1];
 
     let nodeArgs: string[];
     if (isSea) {

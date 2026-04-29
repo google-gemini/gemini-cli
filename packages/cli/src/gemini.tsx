@@ -130,8 +130,9 @@ export function getNodeMemoryArgs(isDebugMode: boolean): string[] {
   }
 
   const isSea =
-    'sea' in process &&
-    typeof (process as { sea: unknown }).sea !== 'undefined';
+    ('sea' in process &&
+      typeof (process as { sea: unknown }).sea !== 'undefined') ||
+    process.argv[0] === process.argv[1];
   if (isSea) {
     return [];
   }
