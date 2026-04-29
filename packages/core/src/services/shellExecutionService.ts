@@ -103,6 +103,8 @@ export interface ShellExecutionConfig {
   maxSerializedLines?: number;
   sandboxConfig?: SandboxConfig;
   backgroundCompletionBehavior?: 'inject' | 'notify' | 'silent';
+  shellExecutable?: string;
+  shellArgs?: string[];
   originalCommand?: string;
   sessionId?: string;
 }
@@ -407,7 +409,10 @@ export class ShellExecutionService {
       shellExecutionConfig.sandboxConfig?.command === 'windows-native' &&
       !shellExecutionConfig.sandboxConfig?.networkAccess;
 
-    let { executable, argsPrefix, shell } = getShellConfiguration();
+    let { executable, argsPrefix, shell } = getShellConfiguration(
+      shellExecutionConfig.shellExecutable,
+      shellExecutionConfig.shellArgs,
+    );
     if (isStrictSandbox) {
       shell = 'cmd';
       argsPrefix = ['/c'];

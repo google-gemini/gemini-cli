@@ -1637,6 +1637,27 @@ const SETTINGS_SCHEMA = {
               'Enable shell output efficiency optimizations for better performance.',
             showInDialog: false,
           },
+          executable: {
+            type: 'string',
+            label: 'Shell Executable',
+            category: 'Tools',
+            requiresRestart: true,
+            default: undefined as string | undefined,
+            description:
+              'The executable for the shell (e.g., "pwsh", "bash", "zsh"). If not specified, the system default is used.',
+            showInDialog: true,
+          },
+          args: {
+            type: 'array',
+            label: 'Shell Arguments',
+            category: 'Tools',
+            requiresRestart: true,
+            default: [] as string[],
+            description:
+              'Arguments to pass to the shell executable (e.g., ["-c"]).',
+            showInDialog: true,
+            items: { type: 'string' },
+          },
         },
       },
 
