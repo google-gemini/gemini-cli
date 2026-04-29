@@ -110,7 +110,6 @@ export interface VertexAiRoutingConfig {
   sharedRequestType?: VertexAiSharedRequestType;
 }
 
-const LOCAL_HOSTNAMES = ['localhost', '127.0.0.1', '[::1]'];
 const VERTEX_AI_REQUEST_TYPE_HEADER = 'X-Vertex-AI-LLM-Request-Type';
 const VERTEX_AI_SHARED_REQUEST_TYPE_HEADER =
   'X-Vertex-AI-LLM-Shared-Request-Type';
@@ -121,10 +120,6 @@ function validateBaseUrl(baseUrl: string): void {
     url = new URL(baseUrl);
   } catch {
     throw new Error(`Invalid custom base URL: ${baseUrl}`);
-  }
-
-  if (url.protocol !== 'https:' && !LOCAL_HOSTNAMES.includes(url.hostname)) {
-    throw new Error('Custom base URL must use HTTPS unless it is localhost.');
   }
 }
 
