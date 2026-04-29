@@ -27,12 +27,14 @@ import {
 } from './types.js';
 import { ToolErrorType } from '../tools/tool-error.js';
 import { UPDATE_TOPIC_TOOL_NAME } from '../tools/tool-names.js';
+import { debugLogger } from '../utils/debugLogger.js';
 import { PolicyDecision, type ApprovalMode } from '../policy/types.js';
 import {
   ToolConfirmationOutcome,
   type AnyDeclarativeTool,
 } from '../tools/tools.js';
 import { getToolSuggestion } from '../utils/tool-utils.js';
+import { normalizeToolName, getClosestMatch } from '../utils/fuzzy-matcher.js';
 import { runInDevTraceSpan } from '../telemetry/trace.js';
 import { logToolCall } from '../telemetry/loggers.js';
 import { ToolCallEvent } from '../telemetry/types.js';
@@ -313,19 +315,29 @@ export class Scheduler {
 
     try {
       const toolRegistry = this.context.toolRegistry;
+      const allToolNames = toolRegistry.getAllToolNames();
       const newCalls: ToolCall[] = sortedRequests.map((request) => {
         const enrichedRequest: ToolCallRequestInfo = {
           ...request,
           schedulerId: this.schedulerId,
           parentCallId: this.parentCallId,
         };
-        const tool = toolRegistry.getTool(request.name);
+
+        const { tool, repairedName } = this._tryRepairToolName(
+          request.name,
+          allToolNames,
+        );
+        if (repairedName) {
+          enrichedRequest.name = repairedName;
+          enrichedRequest.originalRequestName =
+            enrichedRequest.originalRequestName || request.name;
+        }
 
         if (!tool) {
           return {
             ...this._createToolNotFoundErroredToolCall(
               enrichedRequest,
-              toolRegistry.getAllToolNames(),
+              allToolNames,
             ),
             approvalMode: currentApprovalMode,
           };
@@ -346,6 +358,50 @@ export class Scheduler {
       this.state.clearBatch();
       this._processNextInRequestQueue();
     }
+  }
+
+  private _tryRepairToolName(
+    originalName: string,
+    allToolNames: string[],
+  ): {
+    tool?: AnyDeclarativeTool;
+    repairedName?: string;
+  } {
+    const { toolRegistry } = this.context;
+    let tool = toolRegistry.getTool(originalName);
+    let repairedName: string | undefined;
+
+    if (tool) {
+      return { tool, repairedName };
+    }
+
+    // Attempt normalization: kebab-case to snake_case
+    const normalizedName = normalizeToolName(originalName);
+    if (normalizedName !== originalName) {
+      tool = toolRegistry.getTool(normalizedName);
+      if (tool) {
+        debugLogger.log(
+          `Repaired tool name: ${originalName} -> ${normalizedName} (via normalization)`,
+        );
+        repairedName = normalizedName;
+        return { tool, repairedName };
+      }
+    }
+
+    // Attempt fuzzy matching: Levenshtein distance <= 2
+    // Use the normalized name to avoid casing differences increasing distance
+    const fuzzyResult = getClosestMatch(normalizedName, allToolNames, 2);
+    if (fuzzyResult.repairedName && !fuzzyResult.isAmbiguous) {
+      tool = toolRegistry.getTool(fuzzyResult.repairedName);
+      if (tool) {
+        debugLogger.log(
+          `Repaired tool name: ${originalName} -> ${fuzzyResult.repairedName} (via fuzzy matching, distance: ${fuzzyResult.distance})`,
+        );
+        repairedName = fuzzyResult.repairedName;
+      }
+    }
+
+    return { tool, repairedName };
   }
 
   private _createToolNotFoundErroredToolCall(
@@ -768,11 +824,13 @@ export class Scheduler {
       const originalRequestName =
         result.request.originalRequestName || result.request.name;
 
-      const newTool = this.context.toolRegistry.getTool(tailRequest.name);
+      const allToolNames = this.context.toolRegistry.getAllToolNames();
+      const { tool: newTool, repairedName: repairedTailName } =
+        this._tryRepairToolName(tailRequest.name, allToolNames);
 
       const newRequest: ToolCallRequestInfo = {
         callId: originalCallId,
-        name: tailRequest.name,
+        name: repairedTailName || tailRequest.name,
         args: tailRequest.args,
         originalRequestName,
         originalRequestArgs:
@@ -786,7 +844,7 @@ export class Scheduler {
         // Enqueue an errored tool call
         const errorCall = this._createToolNotFoundErroredToolCall(
           newRequest,
-          this.context.toolRegistry.getAllToolNames(),
+          allToolNames,
         );
         this.state.replaceActiveCallWithTailCall(callId, errorCall);
       } else {
