@@ -1191,7 +1191,7 @@ their corresponding top-level category object in your `settings.json` file.
           },
           "stateTransitions": {
             "terminal": "terminal",
-            "transient": "terminal",
+            "transient": "sticky_retry",
             "not_found": "terminal",
             "unknown": "terminal"
           }
@@ -1207,7 +1207,7 @@ their corresponding top-level category object in your `settings.json` file.
           },
           "stateTransitions": {
             "terminal": "terminal",
-            "transient": "terminal",
+            "transient": "sticky_retry",
             "not_found": "terminal",
             "unknown": "terminal"
           }
@@ -1224,7 +1224,7 @@ their corresponding top-level category object in your `settings.json` file.
           },
           "stateTransitions": {
             "terminal": "terminal",
-            "transient": "terminal",
+            "transient": "sticky_retry",
             "not_found": "terminal",
             "unknown": "terminal"
           }
@@ -1240,7 +1240,7 @@ their corresponding top-level category object in your `settings.json` file.
           },
           "stateTransitions": {
             "terminal": "terminal",
-            "transient": "terminal",
+            "transient": "sticky_retry",
             "not_found": "terminal",
             "unknown": "terminal"
           }
@@ -1257,7 +1257,7 @@ their corresponding top-level category object in your `settings.json` file.
           },
           "stateTransitions": {
             "terminal": "terminal",
-            "transient": "terminal",
+            "transient": "sticky_retry",
             "not_found": "terminal",
             "unknown": "terminal"
           }
@@ -1272,7 +1272,7 @@ their corresponding top-level category object in your `settings.json` file.
           },
           "stateTransitions": {
             "terminal": "terminal",
-            "transient": "terminal",
+            "transient": "sticky_retry",
             "not_found": "terminal",
             "unknown": "terminal"
           }
@@ -1288,7 +1288,7 @@ their corresponding top-level category object in your `settings.json` file.
           },
           "stateTransitions": {
             "terminal": "terminal",
-            "transient": "terminal",
+            "transient": "sticky_retry",
             "not_found": "terminal",
             "unknown": "terminal"
           }
@@ -1844,6 +1844,12 @@ their corresponding top-level category object in your `settings.json` file.
     — settings, credentials, etc. remain off-limits). Set to false to fall back
     to the legacy save_memory tool.
   - **Default:** `true`
+  - **Requires restart:** Yes
+
+- **`experimental.stressTestProfile`** (boolean):
+  - **Description:** Significantly lowers token limits to force early garbage
+    collection and distillation for testing purposes.
+  - **Default:** `false`
   - **Requires restart:** Yes
 
 - **`experimental.autoMemory`** (boolean):
