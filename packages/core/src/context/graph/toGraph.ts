@@ -155,9 +155,9 @@ export class ContextGraphBuilder {
         for (let partIdx = 0; partIdx < msg.parts.length; partIdx++) {
           const part = msg.parts[partIdx];
           const apiId = isFunctionResponsePart(part)
-            ? part.functionResponse.id
+            ? `resp_${part.functionResponse.id}`
             : isFunctionCallPart(part)
-              ? part.functionCall.id
+              ? `call_${part.functionCall.id}`
               : undefined;
           const id =
             apiId || getStableId(part, this.nodeIdentityMap, turnIdx, partIdx);
@@ -193,7 +193,7 @@ export class ContextGraphBuilder {
         for (let partIdx = 0; partIdx < msg.parts.length; partIdx++) {
           const part = msg.parts[partIdx];
           const apiId = isFunctionCallPart(part)
-            ? part.functionCall.id
+            ? `call_${part.functionCall.id}`
             : undefined;
           const id =
             apiId || getStableId(part, this.nodeIdentityMap, turnIdx, partIdx);
