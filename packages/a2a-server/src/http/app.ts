@@ -141,6 +141,17 @@ async function handleExecuteCommand(
       return res.status(400).json({ error: '"args" field must be an array.' });
     }
 
+    if (args) {
+      const shellMetacharPattern = /[;&|`$<>()\n\r\\]/;
+      for (const arg of args as unknown[]) {
+        if (typeof arg !== 'string' || shellMetacharPattern.test(arg)) {
+          return res
+            .status(400)
+            .json({ error: 'Invalid characters in "args".' });
+        }
+      }
+    }
+
     const commandToExecute = commandRegistry.get(command);
 
     if (commandToExecute?.requiresWorkspace) {
