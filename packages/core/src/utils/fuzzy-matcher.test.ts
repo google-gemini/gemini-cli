@@ -57,7 +57,7 @@ describe('fuzzy-matcher', () => {
     it('respects a custom maxDistance', () => {
       const result = getClosestMatch('rd_file', availableTools, 1);
       expect(result.repairedName).toBeUndefined();
-      expect(result.distance).toBe(2);
+      expect(result.distance).toBeGreaterThan(1);
     });
 
     it('is case-insensitive', () => {
@@ -67,10 +67,17 @@ describe('fuzzy-matcher', () => {
     });
 
     it('returns no match if the name is too long (security limit)', () => {
-      const longName = 'a'.repeat(129);
+      const longName = 'a'.repeat(65);
       const result = getClosestMatch(longName, ['a_tool']);
       expect(result.repairedName).toBeUndefined();
       expect(result.distance).toBe(Infinity);
+    });
+
+    it('skips candidates with length difference > maxDistance', () => {
+      // This is primarily for coverage of the optimization branch.
+      // 'abc' vs 'abcdef' has length difference 3, maxDistance 2.
+      const result = getClosestMatch('abc', ['abcdef'], 2);
+      expect(result.repairedName).toBeUndefined();
     });
   });
 });

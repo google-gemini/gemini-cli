@@ -40,9 +40,8 @@ export function getClosestMatch(
   maxDistance = 2,
 ): FuzzyMatchResult {
   // Security: Prevent CPU exhaustion from excessively long tool names.
-  // A standard tool name is unlikely to exceed 128 characters.
-  // Use grapheme cluster counting to correctly handle multi-byte characters.
-  if (Array.from(hallucinatedName).length > 128) {
+  // A standard tool name is unlikely to exceed 64 characters.
+  if (hallucinatedName.length > 64) {
     return { isAmbiguous: false, distance: Infinity };
   }
 
@@ -51,6 +50,16 @@ export function getClosestMatch(
   let matches: string[] = [];
 
   for (const name of availableNames) {
+    // Security: Skip excessively long names to prevent CPU exhaustion.
+    // Optimization: If the length difference is greater than maxDistance,
+    // the Levenshtein distance is guaranteed to exceed maxDistance.
+    if (
+      name.length > 64 ||
+      Math.abs(searchName.length - name.length) > maxDistance
+    ) {
+      continue;
+    }
+
     const distance = levenshtein.get(searchName, name.toLowerCase());
     if (distance < minDistance) {
       minDistance = distance;

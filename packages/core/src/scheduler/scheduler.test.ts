@@ -1596,6 +1596,68 @@ describe('Scheduler (Orchestrator)', () => {
         }),
       ]);
     });
+
+    it('should trim whitespace from tool names', async () => {
+      mockToolRegistry.getTool.mockImplementation((name) => {
+        if (name === 'read_file') return mockTool;
+        return undefined;
+      });
+
+      const schedulerInstance = new Scheduler({
+        context: mockConfig as unknown as AgentLoopContext,
+        getPreferredEditor,
+        schedulerId: ROOT_SCHEDULER_ID,
+      });
+
+      const requests: ToolCallRequestInfo[] = [
+        {
+          callId: 'call-1',
+          name: '  read_file  ',
+          args: {},
+          isClientInitiated: false,
+          prompt_id: 'p1',
+        },
+      ];
+
+      await schedulerInstance.schedule(requests, signal);
+
+      expect(mockStateManager.enqueue).toHaveBeenCalledWith([
+        expect.objectContaining({
+          request: expect.objectContaining({
+            name: 'read_file',
+          }),
+        }),
+      ]);
+    });
+
+    it('should ignore tool names longer than 64 characters', async () => {
+      const schedulerInstance = new Scheduler({
+        context: mockConfig as unknown as AgentLoopContext,
+        getPreferredEditor,
+        schedulerId: ROOT_SCHEDULER_ID,
+      });
+
+      const requests: ToolCallRequestInfo[] = [
+        {
+          callId: 'call-1',
+          name: 'a'.repeat(65),
+          args: {},
+          isClientInitiated: false,
+          prompt_id: 'p1',
+        },
+      ];
+
+      await schedulerInstance.schedule(requests, signal);
+
+      // Should result in a "Tool not found" error early
+      expect(mockStateManager.updateStatus).toHaveBeenCalledWith(
+        'call-1',
+        CoreToolCallStatus.Error,
+        expect.objectContaining({
+          errorType: ToolErrorType.TOOL_NOT_REGISTERED,
+        }),
+      );
+    });
   });
 });
 

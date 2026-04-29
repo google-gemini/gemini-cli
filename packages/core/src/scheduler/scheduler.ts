@@ -367,21 +367,29 @@ export class Scheduler {
     tool?: AnyDeclarativeTool;
     repairedName?: string;
   } {
+    const trimmedName = originalName.trim();
+    if (trimmedName.length === 0 || trimmedName.length > 64) {
+      return { tool: undefined, repairedName: undefined };
+    }
+
     const { toolRegistry } = this.context;
-    let tool = toolRegistry.getTool(originalName);
+    let tool = toolRegistry.getTool(trimmedName);
     let repairedName: string | undefined;
 
     if (tool) {
+      if (trimmedName !== originalName) {
+        repairedName = trimmedName;
+      }
       return { tool, repairedName };
     }
 
     // Attempt normalization: kebab-case to snake_case
-    const normalizedName = normalizeToolName(originalName);
-    if (normalizedName !== originalName) {
+    const normalizedName = normalizeToolName(trimmedName);
+    if (normalizedName !== trimmedName) {
       tool = toolRegistry.getTool(normalizedName);
       if (tool) {
         debugLogger.log(
-          `Repaired tool name: ${originalName} -> ${normalizedName} (via normalization)`,
+          `Repaired tool name: ${trimmedName} -> ${normalizedName} (via normalization)`,
         );
         repairedName = normalizedName;
         return { tool, repairedName };
@@ -398,7 +406,7 @@ export class Scheduler {
         tool = toolRegistry.getTool(fuzzyResult.repairedName);
         if (tool) {
           debugLogger.log(
-            `Repaired tool name: ${originalName} -> ${fuzzyResult.repairedName} (via fuzzy matching, distance: ${fuzzyResult.distance})`,
+            `Repaired tool name: ${trimmedName} -> ${fuzzyResult.repairedName} (via fuzzy matching, distance: ${fuzzyResult.distance})`,
           );
           repairedName = fuzzyResult.repairedName;
         }
