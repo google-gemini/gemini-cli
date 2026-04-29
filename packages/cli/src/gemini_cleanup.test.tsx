@@ -68,11 +68,19 @@ vi.mock('./config/settings.js', async (importOriginal) => {
   };
 });
 
+vi.mock('./ui/utils/ConsolePatcher.js', () => ({
+  ConsolePatcher: vi.fn().mockImplementation(() => ({
+    patch: vi.fn(),
+    cleanup: vi.fn(),
+  })),
+}));
+
 vi.mock('./config/config.js', () => ({
   loadCliConfig: vi.fn().mockResolvedValue({
     getSandbox: vi.fn(() => false),
     getQuestion: vi.fn(() => ''),
     isInteractive: () => false,
+    getSessionId: vi.fn().mockReturnValue('test-session-id'),
     storage: { initialize: vi.fn().mockResolvedValue(undefined) },
   } as unknown as Config),
   parseArguments: vi.fn().mockResolvedValue({}),
@@ -141,11 +149,17 @@ vi.mock('./utils/cleanup.js', async (importOriginal) => {
     ...actual,
     cleanupCheckpoints: vi.fn().mockResolvedValue(undefined),
     registerCleanup: vi.fn(),
+    removeCleanup: vi.fn(),
     registerSyncCleanup: vi.fn(),
+    removeSyncCleanup: vi.fn(),
     registerTelemetryConfig: vi.fn(),
     runExitCleanup: vi.fn().mockResolvedValue(undefined),
   };
 });
+
+vi.mock('./acp/acpStdioTransport.js', () => ({
+  runAcpClient: vi.fn().mockResolvedValue(undefined),
+}));
 
 vi.mock('./zed-integration/zedIntegration.js', () => ({
   runZedIntegration: vi.fn().mockResolvedValue(undefined),
@@ -178,6 +192,7 @@ describe('gemini.tsx main function cleanup', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env['GEMINI_CLI_NO_RELAUNCH'] = 'true';
+    vi.stubEnv('GEMINI_CLI_TRUST_WORKSPACE', 'true');
   });
 
   afterEach(() => {
@@ -213,6 +228,7 @@ describe('gemini.tsx main function cleanup', () => {
       getSandbox: vi.fn(() => false),
       getDebugMode: vi.fn(() => false),
       getPolicyEngine: vi.fn(),
+      getSessionId: vi.fn().mockReturnValue('test-session-id'),
       getMessageBus: () => ({ subscribe: vi.fn() }),
       getEnableHooks: vi.fn(() => false),
       getHookSystem: () => undefined,
@@ -273,6 +289,7 @@ describe('gemini.tsx main function cleanup', () => {
     vi.mocked(loadCliConfig).mockResolvedValue(
       buildMockConfig({
         getHookSystem: vi.fn(() => mockHookSystem),
+        getSessionId: vi.fn().mockReturnValue('test-session-id'),
       }),
     );
 
@@ -290,6 +307,120 @@ describe('gemini.tsx main function cleanup', () => {
     );
   });
 
+  it('should not register ConsolePatcher cleanup in ACP mode', async () => {
+    const { registerCleanup } = await import('./utils/cleanup.js');
+    const { ConsolePatcher } = await import('./ui/utils/ConsolePatcher.js');
+    const { loadCliConfig, parseArguments } = await import(
+      './config/config.js'
+    );
+    const { loadSettings } = await import('./config/settings.js');
+
+    vi.mocked(parseArguments).mockResolvedValue({
+      acp: true,
+      startupMessages: [],
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
+
+    vi.mocked(loadSettings).mockReturnValue({
+      merged: {
+        tools: { allowed: [], exclude: [] },
+        advanced: { dnsResolutionOrder: 'ipv4first' },
+        security: { auth: { selectedType: 'google' } },
+        ui: { theme: 'default' },
+      },
+      workspace: { settings: {} },
+      errors: [],
+      subscribe: vi.fn(),
+      getSnapshot: vi.fn(),
+      setValue: vi.fn(),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
+
+    vi.mocked(loadCliConfig).mockResolvedValue(
+      buildMockConfig({
+        getAcpMode: () => true,
+      }),
+    );
+
+    let capturedCleanup: () => void;
+    vi.mocked(ConsolePatcher).mockImplementation(() => {
+      const instance = {
+        patch: vi.fn(),
+        cleanup: vi.fn(),
+      };
+      capturedCleanup = instance.cleanup;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return instance as any;
+    });
+
+    await main();
+
+    const registeredFunctions = vi
+      .mocked(registerCleanup)
+      .mock.calls.map((call) => call[0]);
+    expect(registeredFunctions).not.toContain(capturedCleanup!);
+  });
+
+  it('should register ConsolePatcher cleanup in non-ACP mode', async () => {
+    const { registerCleanup } = await import('./utils/cleanup.js');
+    const { ConsolePatcher } = await import('./ui/utils/ConsolePatcher.js');
+    const { loadCliConfig, parseArguments } = await import(
+      './config/config.js'
+    );
+    const { loadSettings } = await import('./config/settings.js');
+
+    vi.mocked(parseArguments).mockResolvedValue({
+      acp: false,
+      query: 'test',
+      startupMessages: [],
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
+
+    vi.mocked(loadSettings).mockReturnValue({
+      merged: {
+        tools: { allowed: [], exclude: [] },
+        advanced: { dnsResolutionOrder: 'ipv4first' },
+        security: { auth: { selectedType: 'google' } },
+        ui: { theme: 'default' },
+      },
+      workspace: { settings: {} },
+      errors: [],
+      subscribe: vi.fn(),
+      getSnapshot: vi.fn(),
+      setValue: vi.fn(),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
+
+    vi.mocked(loadCliConfig).mockResolvedValue(
+      buildMockConfig({
+        getAcpMode: () => false,
+        getQuestion: () => 'test',
+      }),
+    );
+
+    let capturedCleanup: () => void;
+    vi.mocked(ConsolePatcher).mockImplementation(() => {
+      const instance = {
+        patch: vi.fn(),
+        cleanup: vi.fn(),
+      };
+      capturedCleanup = instance.cleanup;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return instance as any;
+    });
+
+    try {
+      await main();
+    } catch {
+      // Ignore errors from incomplete mocks in full main() execution
+    }
+
+    const registeredFunctions = vi
+      .mocked(registerCleanup)
+      .mock.calls.map((call) => call[0]);
+    expect(registeredFunctions).toContain(capturedCleanup!);
+  });
+
   function buildMockConfig(overrides: Partial<Config> = {}): Config {
     return {
       isInteractive: vi.fn(() => false),
@@ -300,6 +431,7 @@ describe('gemini.tsx main function cleanup', () => {
       getMessageBus: () => ({ subscribe: vi.fn() }),
       getEnableHooks: vi.fn(() => true),
       getHookSystem: vi.fn(() => undefined),
+      getExperimentalGemma: vi.fn(() => false),
       initialize: vi.fn(),
       storage: { initialize: vi.fn().mockResolvedValue(undefined) },
       getContentGeneratorConfig: vi.fn(),
@@ -312,7 +444,6 @@ describe('gemini.tsx main function cleanup', () => {
       getListExtensions: vi.fn(() => false),
       getListSessions: vi.fn(() => false),
       getDeleteSession: vi.fn(() => undefined),
-      getToolRegistry: vi.fn(),
       getExtensions: vi.fn(() => []),
       getModel: vi.fn(() => 'gemini-pro'),
       getEmbeddingModel: vi.fn(() => 'embedding-001'),
@@ -327,6 +458,7 @@ describe('gemini.tsx main function cleanup', () => {
       refreshAuth: vi.fn(),
       getRemoteAdminSettings: vi.fn(() => undefined),
       getUseAlternateBuffer: vi.fn(() => false),
+      getUseTerminalBuffer: vi.fn(() => false),
       ...overrides,
     } as unknown as Config;
   }

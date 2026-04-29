@@ -20,9 +20,9 @@ Protocol (MCP)**.
 
 - **Protocol:** The server must be a valid MCP server. We recommend using an
   existing MCP SDK for your language of choice if available.
-- **Endpoint:** The server should expose a single endpoint (e.g., `/mcp`) for
-  all MCP communication.
-- **Port:** The server **MUST** listen on a dynamically assigned port (i.e.,
+- **Endpoint:** The server should expose a single endpoint (for example, `/mcp`)
+  for all MCP communication.
+- **Port:** The server **MUST** listen on a dynamically assigned port (that is,
   listen on port `0`).
 
 ### 2. Discovery mechanism: The port file
@@ -68,15 +68,15 @@ creating a "discovery file."
     The CLI will include this token in an `Authorization: Bearer <token>` header
     on all requests.
   - `ideInfo` (object, required): Information about the IDE.
-    - `name` (string, required): A short, lowercase identifier for the IDE
-      (e.g., `vscode`, `jetbrains`).
-    - `displayName` (string, required): A user-friendly name for the IDE (e.g.,
-      `VS Code`, `JetBrains IDE`).
+    - `name` (string, required): A short, lowercase identifier for the IDE (for
+      example, `vscode`, `jetbrains`).
+    - `displayName` (string, required): A user-friendly name for the IDE (for
+      example, `VS Code`, `JetBrains IDE`).
 
 - **Authentication:** To secure the connection, the plugin **MUST** generate a
   unique, secret token and include it in the discovery file. The CLI will then
   include this token in the `Authorization` header for all requests to the MCP
-  server (e.g., `Authorization: Bearer a-very-secret-token`). Your server
+  server (for example, `Authorization: Bearer a-very-secret-token`). Your server
   **MUST** validate this token on every request and reject any that are
   unauthorized.
 - **Tie-breaking with environment variables (recommended):** For the most
@@ -135,7 +135,7 @@ to the CLI whenever the user's context changes.
 <!-- prettier-ignore -->
 > [!NOTE]
 > The `openFiles` list should only include files that exist on disk.
-> Virtual files (e.g., unsaved files without a path, editor settings pages)
+> Virtual files (for example, unsaved files without a path, editor settings pages)
 > **MUST** be excluded.
 
 ### How the CLI uses this context
@@ -188,7 +188,7 @@ The plugin **MUST** register an `openDiff` tool on its MCP server.
   `CallToolResult` to acknowledge the request and report whether the diff view
   was successfully opened.
   - On Success: If the diff view was opened successfully, the response **MUST**
-    contain empty content (i.e., `content: []`).
+    contain empty content (that is, `content: []`).
   - On Failure: If an error prevented the diff view from opening, the response
     **MUST** have `isError: true` and include a `TextContent` block in the
     `content` array describing the error.
@@ -223,9 +223,9 @@ The plugin **MUST** register a `closeDiff` tool on its MCP server.
 
 ### `ide/diffAccepted` notification
 
-When the user accepts the changes in a diff view (e.g., by clicking an "Apply"
-or "Save" button), the plugin **MUST** send an `ide/diffAccepted` notification
-to the CLI.
+When the user accepts the changes in a diff view (for example, by clicking an
+"Apply" or "Save" button), the plugin **MUST** send an `ide/diffAccepted`
+notification to the CLI.
 
 - **Payload:** The notification parameters **MUST** include the file path and
   the final content of the file. The content may differ from the original
@@ -242,7 +242,7 @@ to the CLI.
 
 ### `ide/diffRejected` notification
 
-When the user rejects the changes (e.g., by closing the diff view without
+When the user rejects the changes (for example, by closing the diff view without
 accepting), the plugin **MUST** send an `ide/diffRejected` notification to the
 CLI.
 

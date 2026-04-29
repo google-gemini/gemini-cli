@@ -1,0 +1,10 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`<ModelQuotaDisplay /> > renders quota information when buckets are provided 1`] = `
+"
+────────────────────────────────────────────────────────────────────────────────────────────────────
+Model usage
+
+Pro         ▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬    25%  Resets: 1:30 PM (1h 30m)  
+"
+`;

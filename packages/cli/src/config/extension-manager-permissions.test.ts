@@ -33,7 +33,7 @@ describe('copyExtension permissions', () => {
             makeWritableSync(path.join(p, child)),
           );
         }
-      } catch (_e) {
+      } catch {
         // Ignore errors during cleanup
       }
     };

@@ -85,8 +85,8 @@ The model receives:
 **B. Using arguments in shell commands (inside `!{...}` blocks)**
 
 When you use `{{args}}` inside a shell injection block (`!{...}`), the arguments
-are automatically **shell-escaped** before replacement. This allows you to
-safely pass arguments to shell commands, ensuring the resulting command is
+are automatically **shell-escaped** before replacement. This lets you safely
+pass arguments to shell commands, ensuring the resulting command is
 syntactically correct and secure while preventing command injection
 vulnerabilities.
 
@@ -105,8 +105,8 @@ When you run `/grep-code It's complicated`:
 
 1. The CLI sees `{{args}}` used both outside and inside `!{...}`.
 2. Outside: The first `{{args}}` is replaced raw with `It's complicated`.
-3. Inside: The second `{{args}}` is replaced with the escaped version (e.g., on
-   Linux: `"It\'s complicated"`).
+3. Inside: The second `{{args}}` is replaced with the escaped version (for
+   example, on Linux: `"It\'s complicated"`).
 4. The command executed is `grep -r "It's complicated" .`.
 5. The CLI prompts you to confirm this exact, secure command before execution.
 6. The final prompt is sent.
@@ -116,13 +116,13 @@ When you run `/grep-code It's complicated`:
 If your `prompt` does **not** contain the special placeholder `{{args}}`, the
 CLI uses a default behavior for handling arguments.
 
-If you provide arguments to the command (e.g., `/mycommand arg1`), the CLI will
-append the full command you typed to the end of the prompt, separated by two
-newlines. This allows the model to see both the original instructions and the
-specific arguments you just provided.
+If you provide arguments to the command (for example, `/mycommand arg1`), the
+CLI will append the full command you typed to the end of the prompt, separated
+by two newlines. This allows the model to see both the original instructions and
+the specific arguments you just provided.
 
-If you do **not** provide any arguments (e.g., `/mycommand`), the prompt is sent
-to the model exactly as it is, with nothing appended.
+If you do **not** provide any arguments (for example, `/mycommand`), the prompt
+is sent to the model exactly as it is, with nothing appended.
 
 **Example (`changelog.toml`):**
 
@@ -188,7 +188,7 @@ ensure that only intended commands can be run.
     dialog will appear showing the exact command(s) to be executed.
 5.  **Execution and error reporting:** The command is executed. If the command
     fails, the output injected into the prompt will include the error messages
-    (stderr) followed by a status line, e.g.,
+    (stderr) followed by a status line, for example,
     `[Shell command exited with code 1]`. This helps the model understand the
     context of the failure.
 
@@ -229,9 +229,10 @@ operate on specific files.
 
 - **File injection**: `@{path/to/file.txt}` is replaced by the content of
   `file.txt`.
-- **Multimodal support**: If the path points to a supported image (e.g., PNG,
-  JPEG), PDF, audio, or video file, it will be correctly encoded and injected as
-  multimodal input. Other binary files are handled gracefully and skipped.
+- **Multimodal support**: If the path points to a supported image (for example,
+  PNG, JPEG), PDF, audio, or video file, it will be correctly encoded and
+  injected as multimodal input. Other binary files are handled gracefully and
+  skipped.
 - **Directory listing**: `@{path/to/dir}` is traversed and each file present
   within the directory and all subdirectories is inserted into the prompt. This
   respects `.gitignore` and `.geminiignore` if enabled.

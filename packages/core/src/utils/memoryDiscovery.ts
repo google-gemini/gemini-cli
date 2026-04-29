@@ -8,14 +8,17 @@ import * as fs from 'node:fs/promises';
 import * as fsSync from 'node:fs';
 import * as path from 'node:path';
 import { bfsFileSearch } from './bfsFileSearch.js';
-import { getAllGeminiMdFilenames } from '../tools/memoryTool.js';
+import {
+  getAllGeminiMdFilenames,
+  PROJECT_MEMORY_INDEX_FILENAME,
+} from '../tools/memoryTool.js';
 import type { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { processImports } from './memoryImportProcessor.js';
 import {
   DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
   type FileFilteringOptions,
 } from '../config/constants.js';
-import { GEMINI_DIR, homedir, normalizePath } from './paths.js';
+import { GEMINI_DIR, homedir, normalizePath, isSubpath } from './paths.js';
 import type { ExtensionLoader } from './extensionLoader.js';
 import { debugLogger } from './debugLogger.js';
 import type { Config } from '../config/config.js';
@@ -485,6 +488,47 @@ export async function getGlobalMemoryPaths(): Promise<string[]> {
   );
 }
 
+export async function getUserProjectMemoryPaths(
+  projectMemoryDir: string,
+): Promise<string[]> {
+  const preferredMemoryPath = normalizePath(
+    path.join(projectMemoryDir, PROJECT_MEMORY_INDEX_FILENAME),
+  );
+
+  try {
+    await fs.access(preferredMemoryPath, fsSync.constants.R_OK);
+    debugLogger.debug(
+      '[DEBUG] [MemoryDiscovery] Found user project memory index:',
+      preferredMemoryPath,
+    );
+    return [preferredMemoryPath];
+  } catch {
+    // Fall back to the legacy private GEMINI.md file if the project has not
+    // been migrated to MEMORY.md yet.
+  }
+
+  const geminiMdFilenames = getAllGeminiMdFilenames();
+  const accessChecks = geminiMdFilenames.map(async (filename) => {
+    const legacyMemoryPath = normalizePath(
+      path.join(projectMemoryDir, filename),
+    );
+    try {
+      await fs.access(legacyMemoryPath, fsSync.constants.R_OK);
+      debugLogger.debug(
+        '[DEBUG] [MemoryDiscovery] Found legacy user project memory file:',
+        legacyMemoryPath,
+      );
+      return legacyMemoryPath;
+    } catch {
+      return null;
+    }
+  });
+
+  return (await Promise.all(accessChecks)).filter(
+    (p): p is string => p !== null,
+  );
+}
+
 export function getExtensionMemoryPaths(
   extensionLoader: ExtensionLoader,
 ): string[] {
@@ -526,7 +570,12 @@ export async function getEnvironmentMemoryPaths(
 }
 
 export function categorizeAndConcatenate(
-  paths: { global: string[]; extension: string[]; project: string[] },
+  paths: {
+    global: string[];
+    extension: string[];
+    project: string[];
+    userProjectMemory?: string[];
+  },
   contentsMap: Map<string, GeminiFileContent>,
 ): HierarchicalMemory {
   const getConcatenated = (pList: string[]) =>
@@ -540,6 +589,7 @@ export function categorizeAndConcatenate(
     global: getConcatenated(paths.global),
     extension: getConcatenated(paths.extension),
     project: getConcatenated(paths.project),
+    userProjectMemory: getConcatenated(paths.userProjectMemory ?? []),
   };
 }
 
@@ -761,15 +811,8 @@ export async function loadJitSubdirectoryMemory(
 
   // Find the deepest trusted root that contains the target path
   for (const root of trustedRoots) {
-    const resolvedRoot = normalizePath(root);
-    const resolvedRootWithTrailing = resolvedRoot.endsWith(path.sep)
-      ? resolvedRoot
-      : resolvedRoot + path.sep;
-
-    if (
-      resolvedTarget === resolvedRoot ||
-      resolvedTarget.startsWith(resolvedRootWithTrailing)
-    ) {
+    if (isSubpath(root, targetPath)) {
+      const resolvedRoot = normalizePath(root);
       if (!bestRoot || resolvedRoot.length > bestRoot.length) {
         bestRoot = resolvedRoot;
       }

@@ -13,7 +13,11 @@ import {
   afterEach,
   type Mock,
 } from 'vitest';
-import { GitService } from './gitService.js';
+import {
+  GitService,
+  SHADOW_REPO_AUTHOR_NAME,
+  SHADOW_REPO_AUTHOR_EMAIL,
+} from './gitService.js';
 import { Storage } from '../config/storage.js';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
@@ -192,8 +196,7 @@ describe('GitService', () => {
       const service = new GitService(projectRoot, storage);
       await service.setupShadowGitRepository();
 
-      const expectedConfigContent =
-        '[user]\n  name = Gemini CLI\n  email = gemini-cli@google.com\n[commit]\n  gpgsign = false\n';
+      const expectedConfigContent = `[user]\n  name = ${SHADOW_REPO_AUTHOR_NAME}\n  email = ${SHADOW_REPO_AUTHOR_EMAIL}\n[commit]\n  gpgsign = false\n`;
       const actualConfigContent = await fs.readFile(gitConfigPath, 'utf-8');
       expect(actualConfigContent).toBe(expectedConfigContent);
     });
@@ -288,6 +291,10 @@ describe('GitService', () => {
         expect.objectContaining({
           GIT_CONFIG_GLOBAL: gitConfigPath,
           GIT_CONFIG_SYSTEM: path.join(repoDir, '.gitconfig_system_empty'),
+          GIT_AUTHOR_NAME: SHADOW_REPO_AUTHOR_NAME,
+          GIT_AUTHOR_EMAIL: SHADOW_REPO_AUTHOR_EMAIL,
+          GIT_COMMITTER_NAME: SHADOW_REPO_AUTHOR_NAME,
+          GIT_COMMITTER_EMAIL: SHADOW_REPO_AUTHOR_EMAIL,
         }),
       );
 

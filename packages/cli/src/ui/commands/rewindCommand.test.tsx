@@ -106,7 +106,7 @@ describe('rewindCommand', () => {
           },
           config: {
             getSessionId: () => 'test-session-id',
-            getContextManager: () => ({ refresh: mockResetContext }),
+            getMemoryContextManager: () => ({ refresh: mockResetContext }),
             getProjectRoot: mockGetProjectRoot,
           },
         },

@@ -41,6 +41,10 @@ export {
   ENTER_PLAN_MODE_TOOL_NAME,
   UPDATE_TOPIC_TOOL_NAME,
   UPDATE_TOPIC_DISPLAY_NAME,
+  COMPLETE_TASK_TOOL_NAME,
+  COMPLETE_TASK_DISPLAY_NAME,
+  READ_MCP_RESOURCE_TOOL_NAME,
+  LIST_MCP_RESOURCES_TOOL_NAME,
   // Shared parameter names
   PARAM_FILE_PATH,
   PARAM_DIR_PATH,
@@ -278,3 +282,17 @@ export function getActivateSkillDefinition(
     overrides: (modelId) => getToolSet(modelId).activate_skill(skillNames),
   };
 }
+
+export const READ_MCP_RESOURCE_DEFINITION: ToolDefinition = {
+  get base() {
+    return DEFAULT_LEGACY_SET.read_mcp_resource;
+  },
+  overrides: (modelId) => getToolSet(modelId).read_mcp_resource,
+};
+
+export const LIST_MCP_RESOURCES_DEFINITION: ToolDefinition = {
+  get base() {
+    return DEFAULT_LEGACY_SET.list_mcp_resources;
+  },
+  overrides: (modelId) => getToolSet(modelId).list_mcp_resources,
+};

@@ -53,6 +53,18 @@ export enum ApprovalMode {
 }
 
 /**
+ * The order of permissiveness for approval modes.
+ * Tools allowed in a less permissive mode should also be allowed
+ * in more permissive modes.
+ */
+export const MODES_BY_PERMISSIVENESS = [
+  ApprovalMode.PLAN,
+  ApprovalMode.DEFAULT,
+  ApprovalMode.AUTO_EDIT,
+  ApprovalMode.YOLO,
+];
+
+/**
  * Configuration for the built-in allowed-path checker.
  */
 export interface AllowedPathConfig {
@@ -323,8 +335,10 @@ export interface PolicySettings {
     allowed?: string[];
   };
   tools?: {
+    core?: string[];
     exclude?: string[];
     allowed?: string[];
+    confirmationRequired?: string[];
   };
   mcpServers?: Record<string, { trust?: boolean }>;
   // User provided policies that will replace the USER level policies in ~/.gemini/policies
@@ -342,9 +356,11 @@ export interface CheckResult {
 
 /**
  * Priority for subagent tools (registered dynamically).
- * Effective priority matching Tier 1 (Default) read-only tools.
+ * Effective priority matching Tier 1 (Default) at priority 30.
+ * This ensures they are blocked by Plan Mode (priority 40) while
+ * remaining above directive write tools (priority 10).
  */
-export const PRIORITY_SUBAGENT_TOOL = 1.05;
+export const PRIORITY_SUBAGENT_TOOL = 1.03;
 
 /**
  * The fractional priority of "Always allow" rules (e.g., 950/1000).

@@ -5,6 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import * as path from 'node:path';
 import {
   resolvePathFromEnv,
   isSectionEnabled,
@@ -123,24 +124,25 @@ describe('resolvePathFromEnv', () => {
   });
 
   it('should resolve a regular path', () => {
-    const result = resolvePathFromEnv('/some/absolute/path');
+    const p = path.resolve('/some/absolute/path');
+    const result = resolvePathFromEnv(p);
     expect(result.isSwitch).toBe(false);
-    expect(result.value).toBe('/some/absolute/path');
+    expect(result.value).toBe(p);
     expect(result.isDisabled).toBe(false);
   });
 
   it('should resolve a tilde path to the home directory', () => {
     const result = resolvePathFromEnv('~/my/custom/path');
     expect(result.isSwitch).toBe(false);
-    expect(result.value).toContain('/mock/home');
-    expect(result.value).toContain('my/custom/path');
+    expect(result.value).toContain(path.normalize('/mock/home'));
+    expect(result.value).toContain(path.normalize('my/custom/path'));
     expect(result.isDisabled).toBe(false);
   });
 
   it('should resolve a bare tilde to the home directory', () => {
     const result = resolvePathFromEnv('~');
     expect(result.isSwitch).toBe(false);
-    expect(result.value).toBe('/mock/home');
+    expect(result.value).toBe(path.resolve('/mock/home'));
     expect(result.isDisabled).toBe(false);
   });
 
@@ -218,6 +220,7 @@ describe('applySubstitutions', () => {
       },
       getAgentRegistry: vi.fn().mockReturnValue({
         getAllDefinitions: vi.fn().mockReturnValue([]),
+        getDefinition: vi.fn().mockReturnValue(undefined),
       }),
       getToolRegistry: vi.fn().mockReturnValue({
         getAllToolNames: vi.fn().mockReturnValue([]),

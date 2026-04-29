@@ -17,9 +17,11 @@ import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 import { CopyModeWarning } from '../components/CopyModeWarning.js';
 import { BackgroundTaskDisplay } from '../components/BackgroundTaskDisplay.js';
 import { StreamingState } from '../types.js';
+import { useInputState } from '../contexts/InputContext.js';
 
 export const DefaultAppLayout: React.FC = () => {
   const uiState = useUIState();
+  const { copyModeEnabled } = useInputState();
   const isAlternateBuffer = useAlternateBuffer();
 
   const { rootUiRef, terminalHeight } = uiState;
@@ -34,7 +36,6 @@ export const DefaultAppLayout: React.FC = () => {
       paddingBottom={isAlternateBuffer ? 1 : undefined}
       flexShrink={0}
       flexGrow={0}
-      overflow="hidden"
       ref={uiState.rootUiRef}
     >
       <MainContent />
@@ -63,9 +64,7 @@ export const DefaultAppLayout: React.FC = () => {
         flexShrink={0}
         flexGrow={0}
         width={uiState.terminalWidth}
-        height={
-          uiState.copyModeEnabled ? uiState.stableControlsHeight : undefined
-        }
+        height={copyModeEnabled ? uiState.stableControlsHeight : undefined}
       >
         <Notifications />
         <CopyModeWarning />

@@ -5,6 +5,7 @@
  */
 
 import { type FunctionCall } from '@google/genai';
+import { type ApprovalMode } from '../policy/types.js';
 import type {
   ToolConfirmationOutcome,
   ToolConfirmationPayload,
@@ -12,6 +13,7 @@ import type {
 } from '../tools/tools.js';
 import type { ToolCall } from '../scheduler/types.js';
 import type { SandboxPermissions } from '../services/sandboxManager.js';
+import type { SubagentActivityItem } from '../agents/types.js';
 
 export enum MessageBusType {
   TOOL_CONFIRMATION_REQUEST = 'tool-confirmation-request',
@@ -23,6 +25,7 @@ export enum MessageBusType {
   TOOL_CALLS_UPDATE = 'tool-calls-update',
   ASK_USER_REQUEST = 'ask-user-request',
   ASK_USER_RESPONSE = 'ask-user-response',
+  SUBAGENT_ACTIVITY = 'subagent-activity',
 }
 
 export interface ToolCallsUpdateMessage {
@@ -148,6 +151,7 @@ export interface UpdatePolicy {
   commandPrefix?: string | string[];
   mcpName?: string;
   allowRedirection?: boolean;
+  modes?: ApprovalMode[];
 }
 
 export interface ToolPolicyRejection {
@@ -181,13 +185,13 @@ export enum QuestionType {
 export interface Question {
   question: string;
   header: string;
-  /** Question type: 'choice' renders selectable options, 'text' renders free-form input, 'yesno' renders a binary Yes/No choice. */
+  /** Question type: 'choice' renders selectable options, 'text' renders free-form input, 'yesno' renders a Yes/No choice with an optional 'Other' feedback field. */
   type: QuestionType;
   /** Selectable choices. REQUIRED when type='choice'. IGNORED for 'text' and 'yesno'. */
   options?: QuestionOption[];
   /** Allow multiple selections. Only applies when type='choice'. */
   multiSelect?: boolean;
-  /** Placeholder hint text. For type='text', shown in the input field. For type='choice', shown in the "Other" custom input. */
+  /** Placeholder hint text. For type='text', shown in the input field. For type='choice' and 'yesno', shown in the 'Other' custom input. */
   placeholder?: string;
   /** Allow the question to consume more vertical space instead of being strictly capped. */
   unconstrainedHeight?: boolean;
@@ -207,6 +211,12 @@ export interface AskUserResponse {
   cancelled?: boolean;
 }
 
+export interface SubagentActivityMessage {
+  type: MessageBusType.SUBAGENT_ACTIVITY;
+  subagentName: string;
+  activity: SubagentActivityItem;
+}
+
 export type Message =
   | ToolConfirmationRequest
   | ToolConfirmationResponse
@@ -216,4 +226,5 @@ export type Message =
   | UpdatePolicy
   | AskUserRequest
   | AskUserResponse
-  | ToolCallsUpdateMessage;
+  | ToolCallsUpdateMessage
+  | SubagentActivityMessage;

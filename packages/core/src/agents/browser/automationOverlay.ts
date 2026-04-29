@@ -88,18 +88,15 @@ export async function injectAutomationOverlay(
   signal?: AbortSignal,
 ): Promise<void> {
   try {
-    debugLogger.log('Injecting automation overlay...');
-
     const result = await browserManager.callTool(
       'evaluate_script',
       { function: buildInjectionScript() },
       signal,
+      true,
     );
 
     if (result.isError) {
       debugLogger.warn('Failed to inject automation overlay:', result);
-    } else {
-      debugLogger.log('Automation overlay injected successfully');
     }
   } catch (error) {
     debugLogger.warn('Error injecting automation overlay:', error);
@@ -114,18 +111,15 @@ export async function removeAutomationOverlay(
   signal?: AbortSignal,
 ): Promise<void> {
   try {
-    debugLogger.log('Removing automation overlay...');
-
     const result = await browserManager.callTool(
       'evaluate_script',
       { function: buildRemovalScript() },
       signal,
+      true,
     );
 
     if (result.isError) {
       debugLogger.warn('Failed to remove automation overlay:', result);
-    } else {
-      debugLogger.log('Automation overlay removed successfully');
     }
   } catch (error) {
     debugLogger.warn('Error removing automation overlay:', error);

@@ -6,11 +6,11 @@
 
 import type React from 'react';
 import { Box, Text } from 'ink';
-import { useUIState } from '../contexts/UIStateContext.js';
+import { useInputState } from '../contexts/InputContext.js';
 import { theme } from '../semantic-colors.js';
 
 export const CopyModeWarning: React.FC = () => {
-  const { copyModeEnabled } = useUIState();
+  const { copyModeEnabled } = useInputState();
 
   return (
     <Box height={1}>

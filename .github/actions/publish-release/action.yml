@@ -175,7 +175,9 @@ runs:
           --dry-run="${INPUTS_DRY_RUN}" \
           --workspace="${INPUTS_CORE_PACKAGE_NAME}" \
           --no-tag
-        npm dist-tag rm ${INPUTS_CORE_PACKAGE_NAME} false
+        if [[ "${INPUTS_DRY_RUN}" == "false" ]]; then
+          npm dist-tag rm ${INPUTS_CORE_PACKAGE_NAME} false
+        fi
 
     - name: '🔗 Install latest core package'
       working-directory: '${{ inputs.working-directory }}'
@@ -193,7 +195,7 @@ runs:
         INPUTS_A2A_PACKAGE_NAME: '${{ inputs.a2a-package-name }}'
 
     - name: '📦 Prepare bundled CLI for npm release'
-      if: "inputs.npm-registry-url != 'https://npm.pkg.github.com/' && inputs.npm-tag != 'latest'"
+      if: "inputs.npm-registry-url != 'https://npm.pkg.github.com/'"
       working-directory: '${{ inputs.working-directory }}'
       shell: 'bash'
       run: |
@@ -248,7 +250,9 @@ runs:
           --dry-run="${INPUTS_DRY_RUN}" \
           --workspace="${INPUTS_A2A_PACKAGE_NAME}" \
           --no-tag
-        npm dist-tag rm ${INPUTS_A2A_PACKAGE_NAME} false
+          if [[ "${INPUTS_DRY_RUN}" == "false" ]]; then
+            npm dist-tag rm ${INPUTS_A2A_PACKAGE_NAME} false
+          fi
 
     - name: '🔬 Verify NPM release by version'
       uses: './.github/actions/verify-release'
@@ -287,8 +291,25 @@ runs:
         INPUTS_PREVIOUS_TAG: '${{ inputs.previous-tag }}'
       shell: 'bash'
       run: |
+        rm -f gemini-cli-bundle.zip
+        (cd bundle && chmod +x gemini.js && zip -r ../gemini-cli-bundle.zip .)
+
+        echo "Testing the generated bundle archive..."
+        rm -rf test-bundle
+        mkdir -p test-bundle
+        unzip -q gemini-cli-bundle.zip -d test-bundle
+
+        # Verify it runs and outputs a version
+        BUNDLE_VERSION=$(node test-bundle/gemini.js --version | xargs)
+        echo "Bundle version output: ${BUNDLE_VERSION}"
+        if [[ -z "${BUNDLE_VERSION}" ]]; then
+          echo "Error: Bundle failed to execute or return version."
+          exit 1
+        fi
+        rm -rf test-bundle
+
         gh release create "${INPUTS_RELEASE_TAG}" \
-          bundle/gemini.js \
+          gemini-cli-bundle.zip \
           --target "${STEPS_RELEASE_BRANCH_OUTPUTS_BRANCH_NAME}" \
           --title "Release ${INPUTS_RELEASE_TAG}" \
           --notes-start-tag "${INPUTS_PREVIOUS_TAG}" \

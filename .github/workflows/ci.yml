@@ -102,6 +102,12 @@ jobs:
       - name: 'Run yamllint'
         run: 'node scripts/lint.js --yamllint'
 
+      - name: 'Build project for typecheck'
+        run: 'npm run build'
+
+      - name: 'Run typecheck'
+        run: 'npm run typecheck'
+
       - name: 'Run Prettier'
         run: 'node scripts/lint.js --prettier'
 
@@ -173,12 +179,13 @@ jobs:
       - name: 'Run tests and generate reports'
         env:
           NO_COLOR: true
+          GEMINI_CLI_TRUST_WORKSPACE: true
         run: |
           if [[ "${{ matrix.shard }}" == "cli" ]]; then
-            npm run test:ci --workspace @google/gemini-cli
+            npm run test:ci --workspace "@google/gemini-cli"
           else
             # Explicitly list non-cli packages to ensure they are sharded correctly
-            npm run test:ci --workspace @google/gemini-cli-core --workspace @google/gemini-cli-a2a-server --workspace gemini-cli-vscode-ide-companion --workspace @google/gemini-cli-test-utils --if-present -- --coverage.enabled=false
+            npm run test:ci --workspace "@google/gemini-cli-core" --workspace "@google/gemini-cli-a2a-server" --workspace "gemini-cli-vscode-ide-companion" --workspace "@google/gemini-cli-test-utils" --if-present -- --coverage.enabled=false
             npm run test:scripts
           fi
 
@@ -224,7 +231,7 @@ jobs:
 
   test_mac:
     name: 'Test (Mac) - ${{ matrix.node-version }}, ${{ matrix.shard }}'
-    runs-on: 'macos-latest'
+    runs-on: 'macos-latest-large'
     needs:
       - 'merge_queue_skipper'
     if: "github.repository == 'google-gemini/gemini-cli' && needs.merge_queue_skipper.outputs.skip == 'false'"
@@ -261,12 +268,13 @@ jobs:
       - name: 'Run tests and generate reports'
         env:
           NO_COLOR: true
+          GEMINI_CLI_TRUST_WORKSPACE: true
         run: |
           if [[ "${{ matrix.shard }}" == "cli" ]]; then
-            npm run test:ci --workspace @google/gemini-cli -- --coverage.enabled=false
+            npm run test:ci --workspace "@google/gemini-cli" -- --coverage.enabled=false
           else
             # Explicitly list non-cli packages to ensure they are sharded correctly
-            npm run test:ci --workspace @google/gemini-cli-core --workspace @google/gemini-cli-a2a-server --workspace gemini-cli-vscode-ide-companion --workspace @google/gemini-cli-test-utils --if-present -- --coverage.enabled=false
+            npm run test:ci --workspace "@google/gemini-cli-core" --workspace "@google/gemini-cli-a2a-server" --workspace "gemini-cli-vscode-ide-companion" --workspace "@google/gemini-cli-test-utils" --if-present -- --coverage.enabled=false
             npm run test:scripts
           fi
 
@@ -424,16 +432,20 @@ jobs:
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
           NO_COLOR: true
+          GEMINI_CLI_TRUST_WORKSPACE: true
           NODE_OPTIONS: '--max-old-space-size=32768 --max-semi-space-size=256'
           UV_THREADPOOL_SIZE: '32'
           NODE_ENV: 'test'
         run: |
           if ("${{ matrix.shard }}" -eq "cli") {
-            npm run test:ci --workspace @google/gemini-cli -- --coverage.enabled=false
+            npm run test:ci --workspace "@google/gemini-cli" -- --coverage.enabled=false
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           } else {
             # Explicitly list non-cli packages to ensure they are sharded correctly
-            npm run test:ci --workspace @google/gemini-cli-core --workspace @google/gemini-cli-a2a-server --workspace gemini-cli-vscode-ide-companion --workspace @google/gemini-cli-test-utils --if-present -- --coverage.enabled=false
+            npm run test:ci --workspace "@google/gemini-cli-core" --workspace "@google/gemini-cli-a2a-server" --workspace "gemini-cli-vscode-ide-companion" --workspace "@google/gemini-cli-test-utils" --if-present -- --coverage.enabled=false
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
             npm run test:scripts
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
         shell: 'pwsh'
 

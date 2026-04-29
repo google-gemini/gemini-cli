@@ -9,7 +9,6 @@ import type {
   HistoryItem,
   ThoughtSummary,
   ConfirmationRequest,
-  QuotaStats,
   LoopDetectionConfirmationRequest,
   HistoryItemWithoutId,
   StreamingState,
@@ -17,11 +16,10 @@ import type {
   PermissionConfirmationRequest,
 } from '../types.js';
 import type { CommandContext, SlashCommand } from '../commands/types.js';
-import type { TextBuffer } from '../components/shared/text-buffer.js';
+
 import type {
   IdeContext,
   ApprovalMode,
-  UserTierId,
   IdeInfo,
   AuthType,
   FallbackIntent,
@@ -86,16 +84,6 @@ import { type RestartReason } from '../hooks/useIdeTrustListener.js';
 import type { TerminalBackgroundColor } from '../utils/terminalCapabilityManager.js';
 import type { BackgroundTask } from '../hooks/useExecutionLifecycle.js';
 
-export interface QuotaState {
-  userTier: UserTierId | undefined;
-  stats: QuotaStats | undefined;
-  proQuotaRequest: ProQuotaDialogRequest | null;
-  validationRequest: ValidationDialogRequest | null;
-  // G1 AI Credits overage flow
-  overageMenuRequest: OverageMenuDialogRequest | null;
-  emptyWalletRequest: EmptyWalletDialogRequest | null;
-}
-
 export interface AccountSuspensionInfo {
   message: string;
   appealUrl?: string;
@@ -117,12 +105,14 @@ export interface UIState {
   editorError: string | null;
   isEditorDialogOpen: boolean;
   showPrivacyNotice: boolean;
+  mouseMode: boolean;
   corgiMode: boolean;
   debugMessage: string;
   quittingMessages: HistoryItem[] | null;
   isSettingsDialogOpen: boolean;
   isSessionBrowserOpen: boolean;
   isModelDialogOpen: boolean;
+  isVoiceModelDialogOpen: boolean;
   isAgentConfigDialogOpen: boolean;
   selectedAgentName?: string;
   selectedAgentDisplayName?: string;
@@ -142,12 +132,8 @@ export interface UIState {
   initError: string | null;
   pendingGeminiHistoryItems: HistoryItemWithoutId[];
   thought: ThoughtSummary | null;
-  shellModeActive: boolean;
-  userMessages: string[];
-  buffer: TextBuffer;
-  inputWidth: number;
-  suggestionsWidth: number;
   isInputActive: boolean;
+  isVoiceModeEnabled: boolean;
   isResuming: boolean;
   shouldShowIdePrompt: boolean;
   isFolderTrustDialogOpen: boolean;
@@ -161,7 +147,6 @@ export interface UIState {
   renderMarkdown: boolean;
   ctrlCPressedOnce: boolean;
   ctrlDPressedOnce: boolean;
-  showEscapePrompt: boolean;
   shortcutsHelpVisible: boolean;
   cleanUiDetailsVisible: boolean;
   elapsedTime: number;
@@ -174,8 +159,6 @@ export interface UIState {
   queueErrorMessage: string | null;
   showApprovalModeIndicator: ApprovalMode;
   allowPlanMode: boolean;
-  // Quota-related state
-  quota: QuotaState;
   currentModel: string;
   contextFileNames: string[];
   errorCount: number;
@@ -191,7 +174,7 @@ export interface UIState {
   sessionStats: SessionStatsState;
   terminalWidth: number;
   terminalHeight: number;
-  mainControlsRef: React.RefCallback<DOMElement | null>;
+  mainControlsRef: (node: DOMElement | null) => void;
   // NOTE: This is for performance profiling only.
   rootUiRef: React.MutableRefObject<DOMElement | null>;
   currentIDE: IdeInfo | null;
@@ -206,7 +189,6 @@ export interface UIState {
   embeddedShellFocused: boolean;
   showDebugProfiler: boolean;
   showFullTodos: boolean;
-  copyModeEnabled: boolean;
   bannerData: {
     defaultText: string;
     warningText: string;

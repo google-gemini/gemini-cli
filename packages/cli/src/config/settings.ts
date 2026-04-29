@@ -78,7 +78,12 @@ export function getMergeStrategyForPath(
 
 export const USER_SETTINGS_PATH = Storage.getGlobalSettingsPath();
 export const USER_SETTINGS_DIR = path.dirname(USER_SETTINGS_PATH);
-export const DEFAULT_EXCLUDED_ENV_VARS = ['DEBUG', 'DEBUG_MODE'];
+export const DEFAULT_EXCLUDED_ENV_VARS = [
+  'DEBUG',
+  'DEBUG_MODE',
+  'GEMINI_CLI_IDE_SERVER_STDIO_COMMAND',
+  'GEMINI_CLI_IDE_SERVER_STDIO_ARGS',
+];
 
 const AUTH_ENV_VAR_WHITELIST = [
   'GEMINI_API_KEY',
@@ -494,13 +499,15 @@ export class LoadedSettings {
   }
 }
 
-function findEnvFile(startDir: string): string | null {
+function findEnvFile(startDir: string, isTrusted: boolean): string | null {
   let currentDir = path.resolve(startDir);
   while (true) {
     // prefer gemini-specific .env under GEMINI_DIR
-    const geminiEnvPath = path.join(currentDir, GEMINI_DIR, '.env');
-    if (fs.existsSync(geminiEnvPath)) {
-      return geminiEnvPath;
+    if (isTrusted) {
+      const geminiEnvPath = path.join(currentDir, GEMINI_DIR, '.env');
+      if (fs.existsSync(geminiEnvPath)) {
+        return geminiEnvPath;
+      }
     }
     const envPath = path.join(currentDir, '.env');
     if (fs.existsSync(envPath)) {
@@ -509,9 +516,11 @@ function findEnvFile(startDir: string): string | null {
     const parentDir = path.dirname(currentDir);
     if (parentDir === currentDir || !parentDir) {
       // check .env under home as fallback, again preferring gemini-specific .env
-      const homeGeminiEnvPath = path.join(homedir(), GEMINI_DIR, '.env');
-      if (fs.existsSync(homeGeminiEnvPath)) {
-        return homeGeminiEnvPath;
+      if (isTrusted) {
+        const homeGeminiEnvPath = path.join(homedir(), GEMINI_DIR, '.env');
+        if (fs.existsSync(homeGeminiEnvPath)) {
+          return homeGeminiEnvPath;
+        }
       }
       const homeEnvPath = path.join(homedir(), '.env');
       if (fs.existsSync(homeEnvPath)) {
@@ -554,10 +563,10 @@ export function loadEnvironment(
   workspaceDir: string,
   isWorkspaceTrustedFn = isWorkspaceTrusted,
 ): void {
-  const envFilePath = findEnvFile(workspaceDir);
   const trustResult = isWorkspaceTrustedFn(settings, workspaceDir);
-
   const isTrusted = trustResult.isTrusted ?? false;
+  const envFilePath = findEnvFile(workspaceDir, isTrusted);
+
   // Check settings OR check process.argv directly since this might be called
   // before arguments are fully parsed. This is a best-effort sniffing approach
   // that happens early in the CLI lifecycle. It is designed to detect the
@@ -592,8 +601,8 @@ export function loadEnvironment(
       for (const key in parsedEnv) {
         if (Object.hasOwn(parsedEnv, key)) {
           let value = parsedEnv[key];
-          // If the workspace is untrusted but we are sandboxed, only allow whitelisted variables.
-          if (!isTrusted && isSandboxed) {
+          // If the workspace is untrusted, only allow whitelisted variables.
+          if (!isTrusted) {
             if (!AUTH_ENV_VAR_WHITELIST.includes(key)) {
               continue;
             }
@@ -612,7 +621,7 @@ export function loadEnvironment(
           }
         }
       }
-    } catch (_e) {
+    } catch {
       // Errors are ignored to match the behavior of `dotenv.config({ quiet: true })`.
     }
   }
@@ -664,7 +673,9 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
   const storage = new Storage(workspaceDir);
   const workspaceSettingsPath = storage.getWorkspaceSettingsPath();
 
-  const load = (filePath: string): { settings: Settings; rawJson?: string } => {
+  const load = (
+    filePath: string,
+  ): { settings: Settings; rawSettings: Settings; rawJson?: string } => {
     try {
       if (fs.existsSync(filePath)) {
         const content = fs.readFileSync(filePath, 'utf-8');
@@ -680,14 +691,19 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
             path: filePath,
             severity: 'error',
           });
-          return { settings: {} };
+          return { settings: {}, rawSettings: {} };
         }
 
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         const settingsObject = rawSettings as Record<string, unknown>;
 
-        // Validate settings structure with Zod
-        const validationResult = validateSettings(settingsObject);
+        // Expand environment variables
+        const expandedSettings = resolveEnvVarsInObject(
+          settingsObject as Settings,
+        );
+
+        // Validate settings structure with Zod after environment variable expansion
+        const validationResult = validateSettings(expandedSettings);
         if (!validationResult.success && validationResult.error) {
           const errorMessage = formatValidationError(
             validationResult.error,
@@ -698,9 +714,22 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
             path: filePath,
             severity: 'warning',
           });
+          return {
+            settings: expandedSettings,
+            rawSettings: settingsObject as Settings,
+            rawJson: content,
+          };
         }
 
-        return { settings: settingsObject as Settings, rawJson: content };
+        // Return the successfully cast and validated data
+        return {
+          // Since we've successfully validated expandedSettings against settingsZodSchema,
+          // it's safe to cast the resulting data to the Settings type.
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          settings: (validationResult.data as Settings) ?? expandedSettings,
+          rawSettings: settingsObject as Settings,
+          rawJson: content,
+        };
       }
     } catch (error: unknown) {
       settingsErrors.push({
@@ -709,33 +738,40 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
         severity: 'error',
       });
     }
-    return { settings: {} };
+    return { settings: {}, rawSettings: {} };
   };
 
   const systemResult = load(systemSettingsPath);
   const systemDefaultsResult = load(systemDefaultsPath);
   const userResult = load(USER_SETTINGS_PATH);
 
-  let workspaceResult: { settings: Settings; rawJson?: string } = {
+  let workspaceResult: {
+    settings: Settings;
+    rawSettings: Settings;
+    rawJson?: string;
+  } = {
     settings: {} as Settings,
+    rawSettings: {} as Settings,
     rawJson: undefined,
   };
   if (!storage.isWorkspaceHomeDir()) {
     workspaceResult = load(workspaceSettingsPath);
   }
 
-  const systemOriginalSettings = structuredClone(systemResult.settings);
+  const systemOriginalSettings = structuredClone(systemResult.rawSettings);
   const systemDefaultsOriginalSettings = structuredClone(
-    systemDefaultsResult.settings,
+    systemDefaultsResult.rawSettings,
   );
-  const userOriginalSettings = structuredClone(userResult.settings);
-  const workspaceOriginalSettings = structuredClone(workspaceResult.settings);
+  const userOriginalSettings = structuredClone(userResult.rawSettings);
+  const workspaceOriginalSettings = structuredClone(
+    workspaceResult.rawSettings,
+  );
 
-  // Environment variables for runtime use
-  systemSettings = resolveEnvVarsInObject(systemResult.settings);
-  systemDefaultSettings = resolveEnvVarsInObject(systemDefaultsResult.settings);
-  userSettings = resolveEnvVarsInObject(userResult.settings);
-  workspaceSettings = resolveEnvVarsInObject(workspaceResult.settings);
+  // Environment variables for runtime use are already resolved and validated in load()
+  systemSettings = systemResult.settings;
+  systemDefaultSettings = systemDefaultsResult.settings;
+  userSettings = userResult.settings;
+  workspaceSettings = workspaceResult.settings;
 
   // Support legacy theme names
   if (userSettings.ui?.theme === 'VS') {
@@ -1124,15 +1160,15 @@ function migrateExperimentalSettings(
     };
     let modified = false;
 
-    const migrateExperimental = (
+    const migrateExperimental = <T = Record<string, unknown>>(
       oldKey: string,
-      migrateFn: (oldValue: Record<string, unknown>) => void,
+      migrateFn: (oldValue: T) => void,
     ) => {
       const old = experimentalSettings[oldKey];
-      if (old) {
+      if (old !== undefined) {
         foundDeprecated?.push(`experimental.${oldKey}`);
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        migrateFn(old as Record<string, unknown>);
+        migrateFn(old as T);
         modified = true;
       }
     };
@@ -1197,6 +1233,24 @@ function migrateExperimentalSettings(
       agentsOverrides['cli_help'] = override;
     });
 
+    // Migrate experimental.plan -> general.plan.enabled
+    migrateExperimental<boolean>('plan', (planValue) => {
+      const generalSettings =
+        (settings.general as Record<string, unknown> | undefined) || {};
+      const newGeneral = { ...generalSettings };
+      const planSettings =
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        (newGeneral['plan'] as Record<string, unknown> | undefined) || {};
+      const newPlan = { ...planSettings };
+
+      if (newPlan['enabled'] === undefined) {
+        newPlan['enabled'] = planValue;
+        newGeneral['plan'] = newPlan;
+        loadedSettings.setValue(scope, 'general', newGeneral);
+        modified = true;
+      }
+    });
+
     if (modified) {
       agentsSettings['overrides'] = agentsOverrides;
       loadedSettings.setValue(scope, 'agents', agentsSettings);
@@ -1205,6 +1259,7 @@ function migrateExperimentalSettings(
         const newExperimental = { ...experimentalSettings };
         delete newExperimental['codebaseInvestigatorSettings'];
         delete newExperimental['cliHelpAgentSettings'];
+        delete newExperimental['plan'];
         loadedSettings.setValue(scope, 'experimental', newExperimental);
       }
       return true;
