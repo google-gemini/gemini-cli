@@ -11,7 +11,11 @@ import { updateEventEmitter } from './updateEventEmitter.js';
 import { MessageType, type HistoryItem } from '../ui/types.js';
 import { spawnWrapper } from './spawnWrapper.js';
 import type { spawn } from 'node:child_process';
-import { debugLogger } from '@google/gemini-cli-core';
+import {
+  debugLogger,
+  getChannelFromVersion,
+  RELEASE_CHANNEL_STABILITY,
+} from '@google/gemini-cli-core';
 
 let _updateInProgress = false;
 
@@ -119,6 +123,25 @@ export function handleAutoUpdate(
     isUpdating: true,
   });
   if (_updateInProgress) {
+    return;
+  }
+
+  const currentVersion = info.update.current;
+  if (!currentVersion) {
+    debugLogger.warn(
+      'Update check: current version is missing. Skipping automatic update for safety.',
+    );
+    return;
+  }
+
+  const currentChannel = getChannelFromVersion(currentVersion);
+  const targetChannel = getChannelFromVersion(info.update.latest);
+
+  // Defense-in-depth: prevent updates to a less stable channel
+  if (
+    RELEASE_CHANNEL_STABILITY[targetChannel] <
+    RELEASE_CHANNEL_STABILITY[currentChannel]
+  ) {
     return;
   }
 
