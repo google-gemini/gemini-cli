@@ -12,6 +12,7 @@ import { debugLogger } from '../utils/debugLogger.js';
 import { sanitizeFilenamePart } from '../utils/fileUtils.js';
 import type { Config } from '../config/config.js';
 import { logToolOutputMasking } from '../telemetry/loggers.js';
+import { isRecord } from '../utils/markdownUtils.js';
 import {
   SHELL_TOOL_NAME,
   ACTIVATE_SKILL_TOOL_NAME,
@@ -115,8 +116,20 @@ export class ToolOutputMaskingService {
           continue;
         }
 
+        const response = part.functionResponse.response;
+        // Fast structural check to skip already-masked items without stringifying them.
+        if (isRecord(response)) {
+          const output = response['output'];
+          if (
+            typeof output === 'string' &&
+            output.startsWith(`<${MASKING_INDICATOR_TAG}>`)
+          ) {
+            continue;
+          }
+        }
+
         const toolOutputContent = this.getToolOutputContent(part);
-        if (!toolOutputContent || this.isAlreadyMasked(toolOutputContent)) {
+        if (!toolOutputContent) {
           continue;
         }
 
@@ -273,9 +286,8 @@ export class ToolOutputMaskingService {
 
   private getToolOutputContent(part: Part): string | null {
     if (!part.functionResponse) return null;
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    const response = part.functionResponse.response as Record<string, unknown>;
-    if (!response) return null;
+    const response = part.functionResponse.response;
+    if (typeof response !== 'object' || response === null) return null;
 
     // Stringify the entire response for saving.
     // This handles any tool output schema automatically.
@@ -285,10 +297,6 @@ export class ToolOutputMaskingService {
     // by keeping the original part structure and only replacing the functionResponse content.
 
     return content;
-  }
-
-  private isAlreadyMasked(content: string): boolean {
-    return content.includes(`<${MASKING_INDICATOR_TAG}`);
   }
 
   private formatShellPreview(response: Record<string, unknown>): string {

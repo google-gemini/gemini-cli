@@ -328,11 +328,84 @@ describe('ToolOutputMaskingService', () => {
           },
         ],
       },
+      { role: 'user', parts: [{ text: 'latest' }] },
     ];
-    mockedEstimateTokenCountSync.mockReturnValue(60000);
+
+    const getContentSpy = vi.spyOn(
+      service as unknown as {
+        getToolOutputContent: (part: Part) => string | null;
+      },
+      'getToolOutputContent',
+    );
+    mockedEstimateTokenCountSync.mockImplementation((parts: Part[]) => {
+      if (parts[0].functionResponse?.name === 'tool2') return 60000;
+      return 100;
+    });
 
     const result = await service.mask(history, mockConfig);
-    expect(result.maskedCount).toBe(0); // tool1 skipped, tool2 is the "latest" which is protected
+
+    // tool1 is already masked and should be skipped by the structural check
+    // without ever calling getToolOutputContent.
+    // tool2 is NOT masked but it is scanned.
+
+    expect(getContentSpy).toHaveBeenCalledTimes(1);
+    expect(getContentSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        functionResponse: expect.objectContaining({ name: 'tool2' }),
+      }),
+    );
+    expect(getContentSpy).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        functionResponse: expect.objectContaining({ name: 'tool1' }),
+      }),
+    );
+    expect(result.maskedCount).toBe(0);
+  });
+
+  it('should support masking of tool responses that are arrays', async () => {
+    mockConfig.getToolOutputMaskingConfig = async () => ({
+      enabled: true,
+      protectionThresholdTokens: 50,
+      minPrunableThresholdTokens: 10,
+      protectLatestTurn: true,
+    });
+
+    const arrayHistory: Content[] = [
+      {
+        role: 'user',
+        parts: [
+          {
+            functionResponse: {
+              name: 'array_tool',
+              response: {
+                data: Array.from({ length: 100 }, (_, i) => ({
+                  id: i,
+                  data: 'A'.repeat(100),
+                })),
+              },
+            },
+          },
+        ],
+      },
+      { role: 'user', parts: [{ text: 'latest' }] },
+    ];
+
+    mockedEstimateTokenCountSync.mockImplementation((parts: Part[]) => {
+      const resp = parts[0].functionResponse?.response as Record<
+        string,
+        unknown
+      >;
+      const content = (resp?.['output'] as string) ?? JSON.stringify(resp);
+      if (content.includes(MASKING_INDICATOR_TAG)) return 100;
+      if (parts[0].functionResponse?.name === 'array_tool') return 20000;
+      return 100;
+    });
+
+    const result = await service.mask(arrayHistory, mockConfig);
+    expect(result.maskedCount).toBe(1);
+    expect(getToolResponse(result.newHistory[0].parts?.[0])).toContain(
+      MASKING_INDICATOR_TAG,
+    );
   });
 
   it('should handle different response keys in masked update', async () => {
