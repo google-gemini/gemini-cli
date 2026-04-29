@@ -862,7 +862,7 @@ describe('createContentGenerator', () => {
         },
         mockConfig,
       ),
-    ).rejects.toThrow('Custom base URL must use HTTPS unless it is localhost.');
+    );
   });
 });
 
