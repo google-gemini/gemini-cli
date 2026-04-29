@@ -638,6 +638,14 @@ export async function main() {
         sessionId: config.getSessionId(),
         workDir: config.getTargetDir(),
       });
+      // Mark this Config as the owner of a runtime.json sidecar for the
+      // current PID. From this point on, Config.setSessionId refreshes
+      // the sidecar on every same-PID session swap (`/clear`, session
+      // browser resume, etc.). Non-interactive entry points that never
+      // reach this bootstrap leave sibling sidecars alone, so a short-
+      // lived `gemini --prompt` invocation cannot trample a concurrent
+      // shell's sidecar that happens to share the outgoing session id.
+      config.markRuntimeStatusEnabled();
     } catch (err) {
       debugLogger.debug('Failed to write runtime status sidecar:', err);
     }

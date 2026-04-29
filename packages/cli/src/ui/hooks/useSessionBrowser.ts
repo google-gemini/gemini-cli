@@ -12,8 +12,6 @@ import {
   convertSessionToClientHistory,
   uiTelemetryService,
   loadConversationRecord,
-  clearRuntimeStatus,
-  writeRuntimeStatus,
   type Config,
   type ResumedSessionData,
 } from '@google/gemini-cli-core';
@@ -70,38 +68,11 @@ export const useSessionBrowser = (
           }
 
           // Use the old session's ID to continue it.
+          // Config.setSessionId centrally handles the runtime.json
+          // sidecar swap — gated on the bootstrap-set ownership flag —
+          // so this caller does not need to touch it directly.
           const existingSessionId = conversation.sessionId;
-
-          // Capture the OLD (currently-live) session's runtime.json path
-          // before we switch the storage's session id. This PID is about
-          // to stop serving the live session and start serving the
-          // resumed one, so the previous claim must be dropped.
-          let oldSessionDir: string | undefined;
-          try {
-            oldSessionDir = config.storage.getSessionTempDir();
-          } catch {
-            // No prior session id resolved; nothing to clear.
-          }
-
           config.setSessionId(existingSessionId);
-
-          // Drop the previous session's runtime.json and write a fresh
-          // one for the resumed session. The resumed session may have a
-          // stale runtime.json from a previous (now-dead) PID; the
-          // atomic write supersedes it.
-          if (oldSessionDir !== undefined) {
-            clearRuntimeStatus(oldSessionDir);
-          }
-          try {
-            const newSessionDir = config.storage.getSessionTempDir();
-            await writeRuntimeStatus(newSessionDir, {
-              sessionId: existingSessionId,
-              workDir: config.getTargetDir(),
-            });
-          } catch {
-            // Best-effort; never block resume on observability I/O.
-          }
-
           uiTelemetryService.hydrate(conversation);
 
           const resumedSessionData = {

@@ -10,8 +10,6 @@ import {
   SessionStartSource,
   flushTelemetry,
   resetBrowserSession,
-  clearRuntimeStatus,
-  writeRuntimeStatus,
 } from '@google/gemini-cli-core';
 import { CommandKind, type SlashCommand } from './types.js';
 import { MessageType } from '../types.js';
@@ -39,38 +37,13 @@ export const clearCommand: SlashCommand = {
     // Start a new conversation recording with a new session ID
     // We MUST do this before calling resetChat() so the new ChatRecordingService
     // initialized by GeminiChat picks up the new session ID.
+    // Config.setSessionId (called from resetNewSessionState) handles the
+    // runtime.json sidecar swap centrally — gated on the bootstrap-set
+    // ownership flag — so /clear does not need to touch it directly.
     let newSessionId: string | undefined;
     if (config) {
       newSessionId = randomUUID();
-
-      // Capture the OLD session's runtime.json path before switching the
-      // session id, so we can clear the stale claim on this PID. After
-      // resetNewSessionState the storage points to the NEW session dir.
-      let oldSessionDir: string | undefined;
-      try {
-        oldSessionDir = config.storage.getSessionTempDir();
-      } catch {
-        // No prior session id resolved; nothing to clear.
-      }
-
       config.resetNewSessionState(newSessionId);
-
-      // Drop the previous session's runtime.json (this PID no longer
-      // serves it) and write a fresh one for the new session, so an
-      // external observer's PID-liveness check sees PID -> session as
-      // a 1:1 mapping, not 1:N.
-      if (oldSessionDir !== undefined) {
-        clearRuntimeStatus(oldSessionDir);
-      }
-      try {
-        const newSessionDir = config.storage.getSessionTempDir();
-        await writeRuntimeStatus(newSessionDir, {
-          sessionId: newSessionId,
-          workDir: config.getTargetDir(),
-        });
-      } catch {
-        // Best-effort; failing here must never block /clear.
-      }
     }
 
     if (geminiClient) {
