@@ -660,7 +660,7 @@ export async function loadCliConfig(
 
   const extensionPlanSettings = extensionManager
     ?.getExtensions()
-    .find((ext) => ext.isActive && ext.plan?.directory)?.plan;
+    ?.find((ext) => ext.isActive && ext.plan?.directory)?.plan;
 
   const experimentalJitContext = settings.experimental.jitContext ?? true;
 
