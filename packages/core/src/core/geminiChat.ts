@@ -309,12 +309,11 @@ export class GeminiChat {
    */
   async sendMessageStream(
     modelConfigKey: ModelConfigKey,
-    message: PartListUnion,
+    request: PartListUnion,
     prompt_id: string,
     signal: AbortSignal,
     role: LlmRole,
     displayContent?: PartListUnion,
-    skipHistoryPush: boolean = false,
   ): Promise<AsyncGenerator<StreamEvent>> {
     await this.sendPromise;
 
@@ -353,10 +352,8 @@ export class GeminiChat {
       });
     }
 
-    // Add user content to history ONCE before any attempts, unless skipped.
-    if (!skipHistoryPush) {
-      this.agentHistory.push(userContent);
-    }
+    // Add user content to history ONCE before any attempts.
+    this.agentHistory.push(userContent);
     const requestContents = this.getHistory(true);
 
     const streamWithRetries = async function* (
@@ -766,6 +763,14 @@ export class GeminiChat {
    */
   clearHistory(): void {
     this.agentHistory.clear();
+  }
+
+  /**
+   * Returns a temporary view of the chat history as if the provided content was already added.
+   * This allows context management to process the 'future' state before it is formally committed.
+   */
+  previewHistory(content: Content): readonly Content[] {
+    return [...this.agentHistory.get(), content];
   }
 
   /**

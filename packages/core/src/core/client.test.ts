@@ -1004,7 +1004,6 @@ ${JSON.stringify(
         expect.any(AbortSignal),
         undefined,
         LlmRole.MAIN,
-        false,
       );
     });
 
@@ -1880,7 +1879,6 @@ ${JSON.stringify(
           expect.any(AbortSignal),
           undefined,
           LlmRole.MAIN,
-          false,
         );
       });
 
@@ -1900,7 +1898,6 @@ ${JSON.stringify(
           expect.any(AbortSignal),
           undefined,
           LlmRole.MAIN,
-          false,
         );
 
         // Second turn
@@ -1920,7 +1917,6 @@ ${JSON.stringify(
           expect.any(AbortSignal),
           undefined,
           LlmRole.MAIN,
-          false,
         );
       });
 
@@ -1940,7 +1936,6 @@ ${JSON.stringify(
           expect.any(AbortSignal),
           undefined,
           LlmRole.MAIN,
-          false,
         );
 
         // New prompt
@@ -1964,7 +1959,6 @@ ${JSON.stringify(
           expect.any(AbortSignal),
           undefined,
           LlmRole.MAIN,
-          false,
         );
       });
 
@@ -1994,7 +1988,6 @@ ${JSON.stringify(
           expect.any(AbortSignal),
           undefined,
           LlmRole.MAIN,
-          false,
         );
 
         mockRouterService.route.mockResolvedValue({
@@ -2019,7 +2012,6 @@ ${JSON.stringify(
           expect.any(AbortSignal),
           undefined,
           LlmRole.MAIN,
-          false,
         );
       });
     });
@@ -2130,7 +2122,6 @@ ${JSON.stringify(
         expect.any(AbortSignal),
         undefined,
         LlmRole.MAIN,
-        false,
       );
 
       // Second call with "Please continue."
@@ -2141,7 +2132,6 @@ ${JSON.stringify(
         expect.any(AbortSignal),
         undefined,
         LlmRole.MAIN,
-        false,
       );
     });
 
@@ -2563,7 +2553,6 @@ ${JSON.stringify(
           expect.anything(),
           undefined,
           LlmRole.MAIN,
-          false,
         );
       });
 
@@ -3642,7 +3631,6 @@ ${JSON.stringify(
           expect.anything(),
           undefined,
           LlmRole.MAIN,
-          false,
         );
 
         // First call should have stopHookActive=false, retry should have stopHookActive=true

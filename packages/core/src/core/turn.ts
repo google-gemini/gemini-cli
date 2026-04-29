@@ -256,7 +256,6 @@ export class Turn {
     signal: AbortSignal,
     displayContent?: PartListUnion,
     role: LlmRole = LlmRole.MAIN,
-    skipHistoryPush: boolean = false,
   ): AsyncGenerator<ServerGeminiStreamEvent> {
     try {
       // Note: This assumes `sendMessageStream` yields events like
@@ -268,7 +267,6 @@ export class Turn {
         signal,
         role,
         displayContent,
-        skipHistoryPush,
       );
 
       for await (const streamEvent of responseStream) {

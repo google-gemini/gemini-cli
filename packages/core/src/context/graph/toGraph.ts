@@ -13,6 +13,11 @@ interface PartWithSynthId extends Part {
   _synthId?: string;
 }
 
+// Global WeakMap to cache hashes for Part objects.
+// This optimizes getStableId by avoiding redundant stringify/hash operations
+// on the same object instances across multiple management passes.
+const PART_HASH_CACHE = new WeakMap<object, string>();
+
 function isTextPart(part: Part): part is Part & { text: string } {
   return typeof part.text === 'string';
 }
@@ -71,43 +76,50 @@ export function getStableId(
   let id = nodeIdentityMap.get(obj);
   if (id) return id;
 
+  const cachedHash = PART_HASH_CACHE.get(obj);
+  if (cachedHash) {
+    id = `${cachedHash}_${turnSalt}_${partIdx}`;
+    nodeIdentityMap.set(obj, id);
+    return id;
+  }
+
   const part = obj as PartWithSynthId;
+  let contentHash: string | undefined;
+
   // If the object already has a synthetic ID property, use it.
   if (typeof part._synthId === 'string') {
     id = part._synthId;
   } else if (isTextPart(part)) {
-    // Content-based ID for text parts, salted with indices for uniqueness.
-    // Using sha256 for robust collision resistance in large histories.
-    const hash = createHash('sha256')
-      .update(`${turnSalt}:${partIdx}:${part.text}`)
-      .digest('hex');
-    id = `text_${hash}`;
+    contentHash = createHash('sha256').update(part.text).digest('hex');
+    id = `text_${contentHash}_${turnSalt}_${partIdx}`;
   } else if (isInlineDataPart(part)) {
-    // Content-based ID for inline media
-    const hash = createHash('sha256')
-      .update(`${turnSalt}:${partIdx}:${part.inlineData.data}`)
+    contentHash = createHash('sha256')
+      .update(part.inlineData.data)
       .digest('hex');
-    id = `media_${hash}`;
+    id = `media_${contentHash}_${turnSalt}_${partIdx}`;
   } else if (isFileDataPart(part)) {
-    id = `file_${turnSalt}_${partIdx}_${createHash('sha256')
+    contentHash = createHash('sha256')
       .update(part.fileData.fileUri)
-      .digest('hex')}`;
+      .digest('hex');
+    id = `file_${contentHash}_${turnSalt}_${partIdx}`;
   } else if (isFunctionCallPart(part)) {
-    // Stable hash for calls without API IDs (e.g. from local history re-construction)
-    const hash = createHash('sha256')
+    contentHash = createHash('sha256')
       .update(
-        `${turnSalt}:${partIdx}:call:${part.functionCall.name}:${JSON.stringify(part.functionCall.args)}`,
+        `call:${part.functionCall.name}:${JSON.stringify(part.functionCall.args)}`,
       )
       .digest('hex');
-    id = `call_h_${hash}`;
+    id = `call_h_${contentHash}_${turnSalt}_${partIdx}`;
   } else if (isFunctionResponsePart(part)) {
-    // Stable hash for responses without API IDs
-    const hash = createHash('sha256')
+    contentHash = createHash('sha256')
       .update(
-        `${turnSalt}:${partIdx}:resp:${part.functionResponse.name}:${JSON.stringify(part.functionResponse.response)}`,
+        `resp:${part.functionResponse.name}:${JSON.stringify(part.functionResponse.response)}`,
       )
       .digest('hex');
-    id = `resp_h_${hash}`;
+    id = `resp_h_${contentHash}_${turnSalt}_${partIdx}`;
+  }
+
+  if (contentHash) {
+    PART_HASH_CACHE.set(obj, contentHash);
   }
 
   if (!id) {

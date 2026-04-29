@@ -626,14 +626,15 @@ export class GeminiClient {
     const modelForLimitCheck = this._getActiveModelForCurrentTurn();
 
     if (this.config.getContextManagementConfig().enabled) {
-      // Adopt the request into history before context management rendering
-      // so that it sees the complete state (e.g. latest tool responses).
-      this.getChat().addHistory(createUserContent(request));
-
       if (this.contextManager) {
+        const pendingRequest = createUserContent(request);
         const { history: newHistory, didApplyManagement } =
-          await this.contextManager.renderHistory();
+          await this.contextManager.renderHistory(pendingRequest);
+
         if (didApplyManagement) {
+          // If the manager pruned history, we update the chat before continuing.
+          // Note: we don't include the pendingRequest in this setHistory,
+          // because Turn.run will add it normally.
           this.getChat().setHistory(newHistory, { silent: true });
         }
       } else {
@@ -761,16 +762,12 @@ export class GeminiClient {
     // Update tools with the final modelId to ensure model-dependent descriptions are used.
     await this.setTools(modelToUse);
 
-    const contextManagementEnabled =
-      this.config.getContextManagementConfig().enabled;
-
     const resultStream = turn.run(
       modelConfigKey,
       request,
       signal,
       displayContent,
       LlmRole.MAIN,
-      contextManagementEnabled, // skipHistoryPush: only skip if we already added it above
     );
     let isError = false;
     let isInvalidStream = false;

@@ -17,6 +17,7 @@ import { render } from './graph/render.js';
 import { ContextWorkingBufferImpl } from './pipeline/contextWorkingBuffer.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { hardenHistory } from './historyHardening.js';
+import { checkContextInvariants } from './utils/invariantChecker.js';
 
 export class ContextManager {
   // The master state containing the pristine graph and current active graph.
@@ -114,7 +115,7 @@ export class ContextManager {
       let rollingTokens = 0;
 
       // Identify active tool calls that must NEVER be truncated
-      const protectedIds = this.getProtectedNodeIds();
+      const protectedIds = this.getProtectedNodeIds(this.buffer.nodes);
       if (protectedIds.size > 0) {
         debugLogger.log(
           `[ContextManager] Pinning ${protectedIds.size} active tool call nodes to prevent truncation.`,
@@ -157,10 +158,10 @@ export class ContextManager {
    * 3. Active tool calls (calls without responses in the graph).
    */
   private getProtectedNodeIds(
+    nodes: readonly ConcreteNode[],
     extraProtectedIds: Set<string> = new Set(),
   ): Map<string, string> {
     const protectionMap = new Map<string, string>();
-    const nodes = this.buffer.nodes;
     if (nodes.length === 0) return protectionMap;
 
     // 1. Always protect the entire first logical episode (System Prompt)
@@ -251,6 +252,7 @@ export class ContextManager {
    * This is the primary method called by the agent framework before sending a request.
    */
   async renderHistory(
+    pendingRequest?: Content,
     activeTaskIds: Set<string> = new Set(),
   ): Promise<{ history: Content[]; didApplyManagement: boolean }> {
     this.tracer.logEvent('ContextManager', 'Starting rendering of LLM context');
@@ -259,9 +261,20 @@ export class ContextManager {
     // This ensures that the render sees the results of recent pushes (Anomaly 2).
     await this.orchestrator.waitForPipelines();
 
+    let nodes = this.buffer.nodes;
+
+    // If we have a pending request, we need to build a 'preview' graph for this render.
+    if (pendingRequest) {
+      const previewNodes = this.env.graphMapper.applyEvent({
+        type: 'PUSH',
+        payload: [pendingRequest],
+      });
+      nodes = [...nodes, ...previewNodes];
+    }
+
     // 2. Cache Check (Anomaly 3): If nodes haven't changed, return previous result.
     // We use a simple join of IDs as a cheap "graph hash".
-    const nodesHash = this.buffer.nodes.map((n) => n.id).join('|');
+    const nodesHash = nodes.map((n) => n.id).join('|');
     if (this.lastRenderCache?.nodesHash === nodesHash) {
       debugLogger.log(
         '[ContextManager] Render cache hit. Skipping redundant render.',
@@ -269,14 +282,11 @@ export class ContextManager {
       return this.lastRenderCache.result;
     }
 
-    const protectionReasons = this.getProtectedNodeIds();
-    for (const id of activeTaskIds) {
-      protectionReasons.set(id, 'active_task');
-    }
+    const protectionReasons = this.getProtectedNodeIds(nodes, activeTaskIds);
 
     // Apply final GC Backstop pressure barrier synchronously before mapping
     const { history: finalHistory, didApplyManagement } = await render(
-      this.buffer.nodes,
+      nodes,
       this.orchestrator,
       this.sidecar,
       this.tracer,
@@ -284,34 +294,20 @@ export class ContextManager {
       protectionReasons,
     );
 
+    // Structural validation in debug mode
+    checkContextInvariants(this.buffer.nodes, 'RenderHistory');
+
     this.tracer.logEvent('ContextManager', 'Finished rendering');
 
     const result = {
-      history: hardenHistory(finalHistory),
+      history: hardenHistory(finalHistory, {
+        sentinels: this.sidecar.sentinels,
+      }),
       didApplyManagement,
     };
 
     // Update cache
     this.lastRenderCache = { nodesHash, result };
-
-    const summary = result.history.map((c) => {
-      const parts = c.parts || [];
-      const calls = parts
-        .filter((p) => p.functionCall)
-        .map((p) => p.functionCall!.id);
-      const responses = parts
-        .filter((p) => p.functionResponse)
-        .map((p) => p.functionResponse!.id);
-      return {
-        role: c.role,
-        calls: calls.length > 0 ? calls : undefined,
-        responses: responses.length > 0 ? responses : undefined,
-      };
-    });
-
-    debugLogger.log(
-      `[ContextManager] Rendered history for LLM request: ${JSON.stringify(summary, null, 2)}`,
-    );
 
     return result;
   }

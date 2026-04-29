@@ -47,6 +47,7 @@ function resolveProcessorOptions<T>(
 }
 
 export interface ContextProfile {
+  name: string;
   config: ContextManagementConfig;
   buildPipelines: (
     env: ContextEnvironment,
@@ -56,6 +57,10 @@ export interface ContextProfile {
     env: ContextEnvironment,
     config?: ContextManagementConfig,
   ) => AsyncPipelineDef[];
+  sentinels?: {
+    continuation?: string;
+    lostToolResponse?: string;
+  };
 }
 
 /**
@@ -63,6 +68,12 @@ export interface ContextProfile {
  * Optimized for safety, precision, and reliable summarization.
  */
 export const generalistProfile: ContextProfile = {
+  name: 'Generalist (Default)',
+  sentinels: {
+    continuation: '[Continuing from previous AI thoughts...]',
+    lostToolResponse:
+      'The tool execution result was lost due to context management truncation.',
+  },
   config: {
     budget: {
       retainedTokens: 65000,

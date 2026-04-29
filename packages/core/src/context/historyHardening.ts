@@ -9,6 +9,19 @@ import { debugLogger } from '../utils/debugLogger.js';
 
 export const SYNTHETIC_THOUGHT_SIGNATURE = 'skip_thought_signature_validator';
 
+export interface HardeningOptions {
+  sentinels?: {
+    continuation?: string;
+    lostToolResponse?: string;
+  };
+}
+
+const DEFAULT_SENTINELS = {
+  continuation: '[Continuing from previous AI thoughts...]',
+  lostToolResponse:
+    'The tool execution result was lost due to context management truncation.',
+};
+
 /**
  * Hardens a chat history to ensure it strictly adheres to Gemini API invariants.
  * This is a defensive post-processing pass that patches violations using
@@ -21,8 +34,13 @@ export const SYNTHETIC_THOUGHT_SIGNATURE = 'skip_thought_signature_validator';
  * 4. Tool Pairing: Every model functionCall must be followed by a user functionResponse.
  * 5. Signatures: The first functionCall in a model turn must have a thoughtSignature.
  */
-export function hardenHistory(history: Content[]): Content[] {
+export function hardenHistory(
+  history: Content[],
+  options: HardeningOptions = {},
+): Content[] {
   if (history.length === 0) return history;
+
+  const sentinels = { ...DEFAULT_SENTINELS, ...options.sentinels };
 
   debugLogger.log(
     `[HistoryHardener] Hardening history with ${history.length} turns`,
@@ -33,14 +51,14 @@ export function hardenHistory(history: Content[]): Content[] {
 
   // Pass 2: Tool Pairing & Signatures (The semantic layer)
   // This might inject sentinel responses or drop orphaned responses.
-  coalesced = pairToolsAndEnforceSignatures(coalesced);
+  coalesced = pairToolsAndEnforceSignatures(coalesced, sentinels);
 
   // Pass 3: Structural Refinement (Hoisting & Re-ordering of tool responses)
   coalesced = refineToolResponses(coalesced);
 
   // Pass 4: Enforce Structural Invariants (Start/End/Alternation)
   // This MUST run after pairing because pairing can drop/add turns.
-  const final = enforceRoleConstraints(coalesced);
+  const final = enforceRoleConstraints(coalesced, sentinels);
 
   debugLogger.log(
     `[HistoryHardener] Finished hardening. Final history has ${final.length} turns.`,
@@ -75,7 +93,10 @@ function coalesce(history: Content[]): Content[] {
 /**
  * Ensures tool calls have matching responses and model turns have required signatures.
  */
-function pairToolsAndEnforceSignatures(history: Content[]): Content[] {
+function pairToolsAndEnforceSignatures(
+  history: Content[],
+  sentinels: Required<NonNullable<HardeningOptions['sentinels']>>,
+): Content[] {
   const result: Content[] = [];
 
   // We work on a copy to allow splicing in sentinel turns
@@ -148,8 +169,7 @@ function pairToolsAndEnforceSignatures(history: Content[]): Content[] {
                 name: m.name,
                 id: m.id,
                 response: {
-                  error:
-                    'The tool execution result was lost due to context management truncation.',
+                  error: sentinels.lostToolResponse,
                 },
               },
             });
@@ -242,7 +262,10 @@ function refineToolResponses(history: Content[]): Content[] {
 /**
  * Final pass to ensure start/end roles and alternation are correct.
  */
-function enforceRoleConstraints(history: Content[]): Content[] {
+function enforceRoleConstraints(
+  history: Content[],
+  sentinels: Required<NonNullable<HardeningOptions['sentinels']>>,
+): Content[] {
   if (history.length === 0) return [];
 
   // Re-coalesce first to catch any empty turns or adjacent roles introduced by pairing
@@ -258,7 +281,7 @@ function enforceRoleConstraints(history: Content[]): Content[] {
     );
     result.unshift({
       role: 'user',
-      parts: [{ text: '[Continuing from previous AI thoughts...]' }],
+      parts: [{ text: sentinels.continuation }],
     });
   }
 
