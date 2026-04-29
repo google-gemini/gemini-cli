@@ -357,7 +357,7 @@ describe('confirmation.ts', () => {
       expect(mockState.updateArgs).toHaveBeenCalled();
     });
 
-    it('should pass payload to onConfirm callback (Regression for #22120)', async () => {
+    it('should pass payload to onConfirm callback', async () => {
       const details = {
         type: 'ask_user' as const,
         questions: [],
