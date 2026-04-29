@@ -84,7 +84,15 @@ function getNetworkErrorCode(error: unknown): string | undefined {
     }
     if ('code' in obj && typeof (obj as { code: unknown }).code === 'string') {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      return (obj as { code: string }).code;
+      const code = (obj as { code: string }).code;
+      if (
+        code === 'UND_ERR_HEADERS_TIMEOUT' ||
+        code === 'UND_ERR_BODY_TIMEOUT' ||
+        code === 'UND_ERR_CONNECT_TIMEOUT'
+      ) {
+        return 'ETIMEDOUT';
+      }
+      return code;
     }
     return undefined;
   };
