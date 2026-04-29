@@ -202,7 +202,6 @@ jobs:
           permission-contents: 'write'
           permission-pull-requests: 'write'
           permission-issues: 'write'
-          permission-workflows: 'write'
 
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
