@@ -503,9 +503,8 @@ These shortcuts apply directly to the input prompt for text manipulation.
     **Alt+z** (Linux/WSL) to undo the last action in the input prompt.
 
 - **Redo:**
-  - **Keyboard shortcut:** Press **Ctrl+y** (Windows), **Shift+Cmd+Z** (macOS),
-    or **Shift+Alt+Z** (Linux/WSL) to redo the last undone action in the input
-    prompt.
+  - **Keyboard shortcut:** Press **Shift+Cmd+Z** (macOS), or **Shift+Alt+Z**
+    (Linux/WSL) to redo the last undone action in the input prompt.
 
 ## At commands (`@`)
 

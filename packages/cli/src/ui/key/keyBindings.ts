@@ -798,11 +798,7 @@ export function getPlatformRedoBindings(
   platform: string,
 ): readonly KeyBinding[] {
   if (platform === 'win32') {
-    return [
-      new KeyBinding('ctrl+shift+z'),
-      new KeyBinding('ctrl+y'),
-      new KeyBinding('alt+shift+z'),
-    ];
+    return [new KeyBinding('ctrl+shift+z'), new KeyBinding('alt+shift+z')];
   }
   if (platform === 'darwin') {
     return [
@@ -811,11 +807,10 @@ export function getPlatformRedoBindings(
       new KeyBinding('ctrl+shift+z'),
     ];
   }
-  // Linux / WSL: Prioritize Ctrl+Shift+Z, keep Ctrl+Y as secondary for smart bubbling.
+  // Linux / WSL: Keep only shift-based redo to avoid conflict with YOLO (ctrl+y)
   return [
     new KeyBinding('ctrl+shift+z'),
     new KeyBinding('alt+shift+z'),
     new KeyBinding('cmd+shift+z'),
-    new KeyBinding('ctrl+y'),
   ];
 }

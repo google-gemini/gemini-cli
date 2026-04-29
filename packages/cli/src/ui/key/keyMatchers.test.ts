@@ -166,12 +166,16 @@ describe('keyMatchers', () => {
       command: Command.REDO,
       positive: [
         ...(process.platform === 'win32'
-          ? [createKey('y', { shift: false, ctrl: true })]
+          ? []
           : [createKey('z', { shift: true, cmd: true })]),
         createKey('z', { shift: true, alt: true }),
         createKey('z', { shift: true, ctrl: true }),
       ],
-      negative: [createKey('z'), createKey('z', { shift: false, cmd: true })],
+      negative: [
+        createKey('z'),
+        createKey('z', { shift: false, cmd: true }),
+        createKey('y', { shift: false, ctrl: true }),
+      ],
     },
 
     // Screen control

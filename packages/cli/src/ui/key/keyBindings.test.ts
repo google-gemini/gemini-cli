@@ -127,7 +127,8 @@ describe('keyBindings config', () => {
   it('should have platform-specific REDO bindings', () => {
     const redoBindings = defaultKeyBindingConfig.get(Command.REDO);
     if (process.platform === 'win32') {
-      expect(redoBindings?.[0].name).toBe('y');
+      expect(redoBindings?.[0].name).toBe('z');
+      expect(redoBindings?.[0].shift).toBe(true);
       expect(redoBindings?.[0].ctrl).toBe(true);
     } else if (process.platform === 'darwin') {
       expect(redoBindings?.[0].name).toBe('z');
