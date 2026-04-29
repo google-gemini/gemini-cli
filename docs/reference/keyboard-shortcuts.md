@@ -40,7 +40,7 @@ available combinations.
 | `edit.deleteLeft`      | Delete the character to the left.                | `Backspace`<br />`Ctrl+H`                                              |
 | `edit.deleteRight`     | Delete the character to the right.               | `Delete`<br />`Ctrl+D`                                                 |
 | `edit.undo`            | Undo the most recent text edit.                  | `Ctrl+Z`<br />`Alt+Z`<br />`Cmd/Win+Z`                                 |
-| `edit.redo`            | Redo the most recent undone text edit.           | `Ctrl+Y`<br />`Ctrl+Shift+Z`<br />`Shift+Cmd/Win+Z`<br />`Alt+Shift+Z` |
+| `edit.redo`            | Redo the most recent undone text edit.           | `Ctrl+Y`<br />`Ctrl+Shift+Z`<br />`Alt+Shift+Z`<br />`Shift+Cmd/Win+Z` |
 
 #### Scrolling
 
