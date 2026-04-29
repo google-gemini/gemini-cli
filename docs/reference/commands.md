@@ -259,7 +259,7 @@ Slash commands provide meta-level control over the CLI itself.
 
 - **Description:** Manage voice input configuration and inspect current voice
   settings.
-- **Shortcuts:** Press **Space Space** on an empty prompt to start or stop
+- **Shortcuts:** Press `Space Space` on an empty prompt to start or stop
   recording. Press **Esc** while recording to cancel.
 - **Sub-commands:**
   - **`enable`**:
