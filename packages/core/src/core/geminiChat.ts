@@ -309,7 +309,7 @@ export class GeminiChat {
    */
   async sendMessageStream(
     modelConfigKey: ModelConfigKey,
-    request: PartListUnion,
+    message: PartListUnion,
     prompt_id: string,
     signal: AbortSignal,
     role: LlmRole,
@@ -763,14 +763,6 @@ export class GeminiChat {
    */
   clearHistory(): void {
     this.agentHistory.clear();
-  }
-
-  /**
-   * Returns a temporary view of the chat history as if the provided content was already added.
-   * This allows context management to process the 'future' state before it is formally committed.
-   */
-  previewHistory(content: Content): readonly Content[] {
-    return [...this.agentHistory.get(), content];
   }
 
   /**

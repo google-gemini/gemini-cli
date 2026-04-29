@@ -5,7 +5,10 @@
  */
 
 import type { Part } from '@google/genai';
-import { estimateTokenCountSync } from '../../utils/tokenCalculation.js';
+import {
+  estimateTokenCountSync,
+  MSG_OVERHEAD_TOKENS,
+} from '../../utils/tokenCalculation.js';
 import type { ConcreteNode } from '../graph/types.js';
 import type { NodeBehaviorRegistry } from '../graph/behaviorRegistry.js';
 
@@ -86,10 +89,19 @@ export class ContextTokenCalculator {
   } {
     const breakdown = { total: 0, text: 0, media: 0, tool: 0, overhead: 0 };
     const seenIds = new Set<string>();
+    const seenTurnIds = new Set<string>();
 
     for (const node of nodes) {
       if (seenIds.has(node.id)) continue;
       seenIds.add(node.id);
+
+      if (node.logicalParentId) {
+        if (!seenTurnIds.has(node.logicalParentId)) {
+          seenTurnIds.add(node.logicalParentId);
+          breakdown.overhead += MSG_OVERHEAD_TOKENS;
+          breakdown.total += MSG_OVERHEAD_TOKENS;
+        }
+      }
 
       const cost = this.getTokenCost(node);
       breakdown.total += cost;
@@ -138,10 +150,19 @@ export class ContextTokenCalculator {
   calculateConcreteListTokens(nodes: readonly ConcreteNode[]): number {
     let tokens = 0;
     const seenIds = new Set<string>();
+    const seenTurnIds = new Set<string>();
+
     for (const node of nodes) {
       if (!seenIds.has(node.id)) {
         seenIds.add(node.id);
         tokens += this.getTokenCost(node);
+
+        if (node.logicalParentId) {
+          if (!seenTurnIds.has(node.logicalParentId)) {
+            seenTurnIds.add(node.logicalParentId);
+            tokens += MSG_OVERHEAD_TOKENS;
+          }
+        }
       }
     }
     return tokens;

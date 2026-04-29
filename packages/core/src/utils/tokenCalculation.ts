@@ -9,15 +9,19 @@ import type { ContentGenerator } from '../core/contentGenerator.js';
 import { debugLogger } from './debugLogger.js';
 
 // Token estimation constants
-// ASCII characters (0-127) are roughly 4 chars per token
-export const ASCII_TOKENS_PER_CHAR = 0.25;
+// ASCII characters (0-127) are roughly 3-4 chars per token.
+// We use 0.33 (~3 chars/token) as a conservative baseline for mixed text and code.
+export const ASCII_TOKENS_PER_CHAR = 0.33;
 // Non-ASCII characters (including CJK) are often 1-2 tokens per char.
-// We use 1.3 as a conservative estimate to avoid underestimation.
-export const NON_ASCII_TOKENS_PER_CHAR = 1.3;
-// Fixed token estimate for images (Gemini 1.5 standard)
-const IMAGE_TOKEN_ESTIMATE = 258;
-// Fixed token estimate for PDFs (~10 pages at 258 tokens/page baseline)
-const PDF_TOKEN_ESTIMATE = 2580;
+// We use 1.5 as a conservative estimate to avoid underestimation.
+export const NON_ASCII_TOKENS_PER_CHAR = 1.5;
+// Structural overhead per Content turn (role prefixes, separators).
+export const MSG_OVERHEAD_TOKENS = 5;
+// Fixed token estimate for images
+const IMAGE_TOKEN_ESTIMATE = 3000;
+// Fixed token estimate for PDFs (~100 pages at 258 tokens/page)
+// See: https://ai.google.dev/gemini-api/docs/document-processing
+const PDF_TOKEN_ESTIMATE = 25800;
 
 // Maximum number of characters to process with the full character-by-character heuristic.
 // Above this, we use a faster approximation to avoid performance bottlenecks.
@@ -109,7 +113,7 @@ function estimateFunctionResponseTokens(
 /**
  * Estimates token count for parts synchronously using a heuristic.
  * - Text: character-based heuristic (ASCII vs CJK) for small strings, length/4 for massive ones.
- * - Non-text (Tools, etc): JSON string length / charsPerToken (excluding thoughtSignature).
+ * - Non-text (Tools, etc): JSON string length / charsPerToken.
  */
 export function estimateTokenCountSync(
   parts: Part[],
@@ -133,13 +137,7 @@ export function estimateTokenCountSync(
       } else {
         // Fallback for other non-text parts (e.g., functionCall).
         // Note: JSON.stringify(part) here is safe as these parts are typically small.
-        // We exclude thoughtSignature as it's an opaque blob that doesn't count towards content.
-        if (part.thoughtSignature) {
-          const { thoughtSignature: _, ...estimatablePart } = part;
-          totalTokens += JSON.stringify(estimatablePart).length / charsPerToken;
-        } else {
-          totalTokens += JSON.stringify(part).length / charsPerToken;
-        }
+        totalTokens += JSON.stringify(part).length / charsPerToken;
       }
     }
   }

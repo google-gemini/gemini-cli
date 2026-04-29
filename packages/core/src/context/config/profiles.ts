@@ -169,6 +169,7 @@ export const generalistProfile: ContextProfile = {
  * within a few conversational turns.
  */
 export const stressTestProfile: ContextProfile = {
+  name: 'Stress Test',
   config: {
     budget: {
       retainedTokens: 4000,

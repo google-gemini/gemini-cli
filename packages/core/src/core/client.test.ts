@@ -1003,7 +1003,6 @@ ${JSON.stringify(
         initialRequest,
         expect.any(AbortSignal),
         undefined,
-        LlmRole.MAIN,
       );
     });
 
@@ -1522,7 +1521,7 @@ ${JSON.stringify(
       const longText = 'a'.repeat(404);
       const request: Part[] = [{ text: longText }];
       // estimateTextOnlyLength counts only text content (400 chars), not JSON structure
-      const estimatedRequestTokenCount = Math.floor(longText.length / 4);
+      const estimatedRequestTokenCount = Math.floor(longText.length * 0.33);
       const remainingTokenCount = MOCKED_TOKEN_LIMIT - lastPromptTokenCount;
 
       // Mock tryCompressChat to not compress
@@ -1582,7 +1581,7 @@ ${JSON.stringify(
       const longText = 'a'.repeat(404);
       const request: Part[] = [{ text: longText }];
       // estimateTextOnlyLength counts only text content (400 chars), not JSON structure
-      const estimatedRequestTokenCount = Math.floor(longText.length / 4);
+      const estimatedRequestTokenCount = Math.floor(longText.length * 0.33);
       const remainingTokenCount = STICKY_MODEL_LIMIT - lastPromptTokenCount;
 
       vi.spyOn(client, 'tryCompressChat').mockResolvedValue({
@@ -1875,10 +1874,9 @@ ${JSON.stringify(
         expect(mockRouterService.route).toHaveBeenCalled();
         expect(mockTurnRunFn).toHaveBeenCalledWith(
           { model: 'routed-model', isChatModel: true },
-          expect.anything(),
+          [{ text: 'Hi' }],
           expect.any(AbortSignal),
           undefined,
-          LlmRole.MAIN,
         );
       });
 
@@ -1894,10 +1892,9 @@ ${JSON.stringify(
         expect(mockRouterService.route).toHaveBeenCalledTimes(1);
         expect(mockTurnRunFn).toHaveBeenCalledWith(
           { model: 'routed-model', isChatModel: true },
-          expect.anything(),
+          [{ text: 'Hi' }],
           expect.any(AbortSignal),
           undefined,
-          LlmRole.MAIN,
         );
 
         // Second turn
@@ -1913,10 +1910,9 @@ ${JSON.stringify(
         // Should stick to the first model
         expect(mockTurnRunFn).toHaveBeenCalledWith(
           { model: 'routed-model', isChatModel: true },
-          expect.anything(),
+          [{ text: 'Continue' }],
           expect.any(AbortSignal),
           undefined,
-          LlmRole.MAIN,
         );
       });
 
@@ -1932,10 +1928,9 @@ ${JSON.stringify(
         expect(mockRouterService.route).toHaveBeenCalledTimes(1);
         expect(mockTurnRunFn).toHaveBeenCalledWith(
           { model: 'routed-model', isChatModel: true },
-          expect.anything(),
+          [{ text: 'Hi' }],
           expect.any(AbortSignal),
           undefined,
-          LlmRole.MAIN,
         );
 
         // New prompt
@@ -1955,10 +1950,9 @@ ${JSON.stringify(
         // Should use the newly routed model
         expect(mockTurnRunFn).toHaveBeenCalledWith(
           { model: 'new-routed-model', isChatModel: true },
-          expect.anything(),
+          [{ text: 'A new topic' }],
           expect.any(AbortSignal),
           undefined,
-          LlmRole.MAIN,
         );
       });
 
@@ -1984,10 +1978,9 @@ ${JSON.stringify(
         expect(mockTurnRunFn).toHaveBeenNthCalledWith(
           1,
           { model: 'original-model', isChatModel: true },
-          expect.anything(),
+          [{ text: 'Hi' }],
           expect.any(AbortSignal),
           undefined,
-          LlmRole.MAIN,
         );
 
         mockRouterService.route.mockResolvedValue({
@@ -2008,10 +2001,9 @@ ${JSON.stringify(
         expect(mockTurnRunFn).toHaveBeenNthCalledWith(
           2,
           { model: 'fallback-model', isChatModel: true },
-          expect.anything(),
+          [{ text: 'Continue' }],
           expect.any(AbortSignal),
           undefined,
-          LlmRole.MAIN,
         );
       });
     });
@@ -2121,7 +2113,6 @@ ${JSON.stringify(
         initialRequest,
         expect.any(AbortSignal),
         undefined,
-        LlmRole.MAIN,
       );
 
       // Second call with "Please continue."
@@ -2131,7 +2122,6 @@ ${JSON.stringify(
         [{ text: 'System: Please continue.' }],
         expect.any(AbortSignal),
         undefined,
-        LlmRole.MAIN,
       );
     });
 
@@ -2552,7 +2542,6 @@ ${JSON.stringify(
           expect.anything(),
           expect.anything(),
           undefined,
-          LlmRole.MAIN,
         );
       });
 
@@ -3627,10 +3616,9 @@ ${JSON.stringify(
         expect(mockTurnRunFn).toHaveBeenNthCalledWith(
           2,
           expect.anything(),
-          expect.anything(),
+          [{ text: 'Please explain' }],
           expect.anything(),
           undefined,
-          LlmRole.MAIN,
         );
 
         // First call should have stopHookActive=false, retry should have stopHookActive=true

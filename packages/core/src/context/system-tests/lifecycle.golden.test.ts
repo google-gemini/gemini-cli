@@ -43,6 +43,7 @@ describe('System Lifecycle Golden Tests', () => {
   });
 
   const getAggressiveConfig = (): ContextProfile => ({
+    name: 'Aggressive Test',
     config: {
       budget: { maxTokens: 1000, retainedTokens: 500 }, // Extremely tight limits
     },
@@ -170,6 +171,7 @@ describe('System Lifecycle Golden Tests', () => {
 
   it('Scenario 2: Under Budget (No Modifications)', async () => {
     const generousConfig: ContextProfile = {
+      name: 'Generous Config',
       config: {
         budget: { maxTokens: 100000, retainedTokens: 50000 },
       },
@@ -202,6 +204,7 @@ describe('System Lifecycle Golden Tests', () => {
 
   it('Scenario 3: Async-Driven Background GC', async () => {
     const gcConfig: ContextProfile = {
+      name: 'GC Test Config',
       config: {
         budget: { maxTokens: 200, retainedTokens: 100 },
       },

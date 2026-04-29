@@ -58,7 +58,7 @@ import type {
 import {
   ContentRetryFailureEvent,
   NextSpeakerCheckEvent,
-  LlmRole,
+  type LlmRole,
 } from '../telemetry/types.js';
 import { uiTelemetryService } from '../telemetry/uiTelemetry.js';
 import type { IdeContext, File } from '../ide/types.js';
@@ -767,7 +767,6 @@ export class GeminiClient {
       request,
       signal,
       displayContent,
-      LlmRole.MAIN,
     );
     let isError = false;
     let isInvalidStream = false;
