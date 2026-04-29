@@ -793,6 +793,32 @@ export class ChatRecordingService {
   }
 
   /**
+   * Asynchronously deletes the current session's chat file and tool outputs.
+   * This encapsulates the session ID logic and uses non-blocking I/O to avoid
+   * blocking the event loop on exit.
+   */
+  async deleteCurrentSessionAsync(): Promise<void> {
+    if (!this.conversationFile) {
+      return;
+    }
+
+    try {
+      const tempDir = this.context.config.storage.getProjectTempDir();
+
+      // Delete the conversation file directly using the tracked path.
+      await fs.promises.unlink(this.conversationFile).catch(() => {
+        // File may not exist; ignore.
+      });
+
+      // Delegate tool-output and log cleanup to the shared utility.
+      await deleteSessionArtifactsAsync(this.sessionId, tempDir);
+    } catch (error) {
+      debugLogger.error('Error deleting current session.', error);
+      throw error;
+    }
+  }
+
+  /**
    * Rewinds the conversation to the state just before the specified message ID.
    * All messages from (and including) the specified ID onwards are removed.
    */
