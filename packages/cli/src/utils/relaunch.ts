@@ -70,6 +70,8 @@ export async function relaunchAppInChildProcess(
       'SIGTERM',
       'SIGINT',
       'SIGHUP',
+      'SIGQUIT',
+      'SIGBREAK',
     ];
 
     signals.forEach((sig) => {
