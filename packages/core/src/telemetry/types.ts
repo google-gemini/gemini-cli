@@ -423,8 +423,10 @@ export class ApiRequestEvent implements BaseTelemetryEvent {
       'event.timestamp': this['event.timestamp'],
       model: this.model,
       prompt_id: this.prompt.prompt_id,
-      request_text: this.request_text,
     };
+    if (config.getTelemetryLogPromptsEnabled() && this.request_text) {
+      attributes['request_text'] = this.request_text;
+    }
     if (this.role) {
       attributes['role'] = this.role;
     }
@@ -692,7 +694,7 @@ export class ApiResponseEvent implements BaseTelemetryEvent {
     if (this.role) {
       attributes['role'] = this.role;
     }
-    if (this.response_text) {
+    if (config.getTelemetryLogPromptsEnabled() && this.response_text) {
       attributes['response_text'] = this.response_text;
     }
     if (this.status_code) {

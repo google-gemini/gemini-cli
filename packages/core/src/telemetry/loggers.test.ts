@@ -642,6 +642,54 @@ describe('loggers', () => {
         }),
       });
     });
+    it('should not include response_text when logPrompts is disabled', () => {
+      const mockConfigNoPrompts = {
+        getSessionId: () => 'test-session-id',
+        getTargetDir: () => 'target-dir',
+        getUsageStatisticsEnabled: () => true,
+        getTelemetryEnabled: () => true,
+        getTelemetryLogPromptsEnabled: () => false,
+        getTelemetryTracesEnabled: () => false,
+        isInteractive: () => false,
+        getExperiments: () => undefined,
+        getExperimentsAsync: async () => undefined,
+        getContentGeneratorConfig: () => undefined,
+      } as unknown as Config;
+
+      const event = new ApiResponseEvent(
+        'test-model',
+        100,
+        { prompt_id: 'prompt-id-noprompts', contents: [] },
+        { candidates: [] },
+        AuthType.LOGIN_WITH_GOOGLE,
+        {},
+        'this response should be hidden',
+      );
+
+      logApiResponse(mockConfigNoPrompts, event);
+
+      const firstEmitCall = mockLogger.emit.mock.calls[0][0];
+      expect(firstEmitCall.attributes['response_text']).toBeUndefined();
+    });
+
+    it('should include response_text when logPrompts is enabled', () => {
+      const event = new ApiResponseEvent(
+        'test-model',
+        100,
+        { prompt_id: 'prompt-id-withprompts', contents: [] },
+        { candidates: [] },
+        AuthType.LOGIN_WITH_GOOGLE,
+        {},
+        'this response should be visible',
+      );
+
+      logApiResponse(mockConfig, event);
+
+      const firstEmitCall = mockLogger.emit.mock.calls[0][0];
+      expect(firstEmitCall.attributes['response_text']).toBe(
+        'this response should be visible',
+      );
+    });
   });
 
   describe('logApiError', () => {
@@ -1076,6 +1124,10 @@ describe('loggers', () => {
       expect(attributes['gen_ai.provider.name']).toBe('gcp.vertex_ai');
       // Ensure prompt messages are NOT included
       expect(attributes['gen_ai.input.messages']).toBeUndefined();
+
+      // Ensure request_text is also NOT included in the first (toLogRecord) log
+      const firstLogCall = mockLogger.emit.mock.calls[0][0];
+      expect(firstLogCall.attributes['request_text']).toBeUndefined();
     });
 
     it('should correctly derive model from prompt details if available in semantic log', () => {
