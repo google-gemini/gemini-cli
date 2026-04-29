@@ -546,6 +546,7 @@ export interface AfterToolOutput extends HookOutput {
  */
 export interface BeforeAgentInput extends HookInput {
   prompt: string;
+  agent_name?: string;
 }
 
 /**
@@ -589,6 +590,7 @@ export interface AfterAgentInput extends HookInput {
   prompt: string;
   prompt_response: string;
   stop_hook_active: boolean;
+  agent_name?: string;
 }
 
 /**
