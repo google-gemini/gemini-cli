@@ -87,8 +87,19 @@ describe('ExtensionManager Settings Scope', () => {
     );
   });
 
-  afterEach(() => {
-    // Clean up files if needed, or rely on temp dir cleanup
+  afterEach(async () => {
+    for (const dir of [currentTempHome, tempWorkspace]) {
+      try {
+        if (dir && fs.existsSync(dir)) {
+          if (process.platform === 'win32') {
+            await new Promise((resolve) => setTimeout(resolve, 100));
+          }
+          fs.rmSync(dir, { recursive: true, force: true });
+        }
+      } catch {
+        // ignore
+      }
+    }
     vi.clearAllMocks();
   });
 

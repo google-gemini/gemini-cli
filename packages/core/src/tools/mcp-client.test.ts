@@ -105,7 +105,18 @@ describe('mcp-client', () => {
     workspaceContext = new WorkspaceContext(testWorkspace);
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    try {
+      if (testWorkspace && fs.existsSync(testWorkspace)) {
+        if (process.platform === 'win32') {
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+        fs.rmSync(testWorkspace, { recursive: true, force: true });
+      }
+    } catch {
+      // ignore
+    }
+    workspaceContext = null as unknown as WorkspaceContext;
     vi.restoreAllMocks();
     vi.useRealTimers();
   });
@@ -2410,7 +2421,18 @@ describe('connectToMcpServer with OAuth', () => {
     vi.mocked(MCPOAuthProvider).mockReturnValue(mockAuthProvider);
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    try {
+      if (testWorkspace && fs.existsSync(testWorkspace)) {
+        if (process.platform === 'win32') {
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+        fs.rmSync(testWorkspace, { recursive: true, force: true });
+      }
+    } catch {
+      // ignore
+    }
+    workspaceContext = null as unknown as WorkspaceContext;
     vi.clearAllMocks();
   });
 
@@ -2617,7 +2639,18 @@ describe('connectToMcpServer - HTTP→SSE fallback', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    try {
+      if (testWorkspace && fs.existsSync(testWorkspace)) {
+        if (process.platform === 'win32') {
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+        fs.rmSync(testWorkspace, { recursive: true, force: true });
+      }
+    } catch {
+      // ignore
+    }
+    workspaceContext = null as unknown as WorkspaceContext;
     vi.clearAllMocks();
   });
 
@@ -2780,7 +2813,18 @@ describe('connectToMcpServer - OAuth with transport fallback', () => {
     });
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    try {
+      if (testWorkspace && fs.existsSync(testWorkspace)) {
+        if (process.platform === 'win32') {
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+        fs.rmSync(testWorkspace, { recursive: true, force: true });
+      }
+    } catch {
+      // ignore
+    }
+    workspaceContext = null as unknown as WorkspaceContext;
     vi.clearAllMocks();
     vi.unstubAllGlobals();
   });
