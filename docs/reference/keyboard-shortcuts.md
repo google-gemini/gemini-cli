@@ -30,17 +30,17 @@ available combinations.
 
 #### Editing
 
-| Command                | Action                                           | Keys                                                     |
-| ---------------------- | ------------------------------------------------ | -------------------------------------------------------- |
-| `edit.deleteRightAll`  | Delete from the cursor to the end of the line.   | `Ctrl+K`                                                 |
-| `edit.deleteLeftAll`   | Delete from the cursor to the start of the line. | `Ctrl+U`                                                 |
-| `edit.clear`           | Clear all text in the input field.               | `Ctrl+C`                                                 |
-| `edit.deleteWordLeft`  | Delete the previous word.                        | `Ctrl+Backspace`<br />`Alt+Backspace`<br />`Ctrl+W`      |
-| `edit.deleteWordRight` | Delete the next word.                            | `Ctrl+Delete`<br />`Alt+Delete`<br />`Alt+D`             |
-| `edit.deleteLeft`      | Delete the character to the left.                | `Backspace`<br />`Ctrl+H`                                |
-| `edit.deleteRight`     | Delete the character to the right.               | `Delete`<br />`Ctrl+D`                                   |
-| `edit.undo`            | Undo the most recent text edit.                  | `Ctrl+Z` (Windows)<br />`Cmd+Z` (macOS)<br />`Alt+Z` (Linux/WSL) |
-| `edit.redo`            | Redo the most recent undone text edit.           | `Ctrl+Y` (Windows)<br />`Ctrl+Shift+Z`<br />`Shift+Cmd+Z`<br />`Alt+Shift+Z` |
+| Command                | Action                                           | Keys                                                                   |
+| ---------------------- | ------------------------------------------------ | ---------------------------------------------------------------------- |
+| `edit.deleteRightAll`  | Delete from the cursor to the end of the line.   | `Ctrl+K`                                                               |
+| `edit.deleteLeftAll`   | Delete from the cursor to the start of the line. | `Ctrl+U`                                                               |
+| `edit.clear`           | Clear all text in the input field.               | `Ctrl+C`                                                               |
+| `edit.deleteWordLeft`  | Delete the previous word.                        | `Ctrl+Backspace`<br />`Alt+Backspace`<br />`Ctrl+W`                    |
+| `edit.deleteWordRight` | Delete the next word.                            | `Ctrl+Delete`<br />`Alt+Delete`<br />`Alt+D`                           |
+| `edit.deleteLeft`      | Delete the character to the left.                | `Backspace`<br />`Ctrl+H`                                              |
+| `edit.deleteRight`     | Delete the character to the right.               | `Delete`<br />`Ctrl+D`                                                 |
+| `edit.undo`            | Undo the most recent text edit.                  | `Ctrl+Z`<br />`Alt+Z`<br />`Cmd/Win+Z`                                 |
+| `edit.redo`            | Redo the most recent undone text edit.           | `Ctrl+Y`<br />`Ctrl+Shift+Z`<br />`Shift+Cmd/Win+Z`<br />`Alt+Shift+Z` |
 
 #### Scrolling
 

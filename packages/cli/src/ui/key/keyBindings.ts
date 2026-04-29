@@ -312,22 +312,8 @@ export const defaultKeyBindingConfig: KeyBindingConfig = new Map([
     Command.DELETE_CHAR_RIGHT,
     [new KeyBinding('delete'), new KeyBinding('ctrl+d')],
   ],
-  [
-    Command.UNDO,
-    process.platform === 'win32'
-      ? [new KeyBinding('ctrl+z'), new KeyBinding('alt+z')]
-      : process.platform === 'darwin'
-        ? [new KeyBinding('cmd+z'), new KeyBinding('alt+z')]
-        : [new KeyBinding('alt+z'), new KeyBinding('cmd+z')],
-  ],
-  [
-    Command.REDO,
-    process.platform === 'win32'
-      ? [new KeyBinding('ctrl+y'), new KeyBinding('ctrl+shift+z')]
-      : process.platform === 'darwin'
-        ? [new KeyBinding('cmd+shift+z'), new KeyBinding('alt+shift+z')]
-        : [new KeyBinding('alt+shift+z'), new KeyBinding('cmd+shift+z')],
-  ],
+  [Command.UNDO, getPlatformUndoBindings(process.platform)],
+  [Command.REDO, getPlatformRedoBindings(process.platform)],
 
   // Scrolling
   [Command.SCROLL_UP, [new KeyBinding('shift+up')]],
@@ -788,4 +774,28 @@ export async function loadCustomKeybindings(): Promise<{
   }
 
   return { config, errors };
+}
+
+export function getPlatformUndoBindings(
+  platform: string,
+): readonly KeyBinding[] {
+  if (platform === 'win32') {
+    return [new KeyBinding('ctrl+z'), new KeyBinding('alt+z')];
+  }
+  if (platform === 'darwin') {
+    return [new KeyBinding('cmd+z'), new KeyBinding('alt+z')];
+  }
+  return [new KeyBinding('alt+z'), new KeyBinding('cmd+z')];
+}
+
+export function getPlatformRedoBindings(
+  platform: string,
+): readonly KeyBinding[] {
+  if (platform === 'win32') {
+    return [new KeyBinding('ctrl+y'), new KeyBinding('ctrl+shift+z')];
+  }
+  if (platform === 'darwin') {
+    return [new KeyBinding('cmd+shift+z'), new KeyBinding('alt+shift+z')];
+  }
+  return [new KeyBinding('alt+shift+z'), new KeyBinding('cmd+shift+z')];
 }
