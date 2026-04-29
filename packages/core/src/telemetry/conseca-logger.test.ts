@@ -19,6 +19,7 @@ import {
 import type { Config } from '../config/config.js';
 import * as sdk from './sdk.js';
 import { ClearcutLogger } from './clearcut-logger/clearcut-logger.js';
+import { EventMetadataKey } from './clearcut-logger/event-metadata-key.js';
 
 vi.mock('@opentelemetry/api-logs');
 vi.mock('./sdk.js');
@@ -172,6 +173,37 @@ describe('conseca-logger', () => {
     expect(attrs['trusted_content']).toBeUndefined();
     expect(attrs['policy']).toBeUndefined();
     expect(attrs['event.name']).toBe(EVENT_CONSECA_POLICY_GENERATION);
+  });
+
+  it('should omit user_prompt/trusted_content/policy from Clearcut when logPrompts is disabled', () => {
+    const configNoPrompts = {
+      getTelemetryEnabled: vi.fn().mockReturnValue(true),
+      getSessionId: vi.fn().mockReturnValue('test-session-id'),
+      getTelemetryLogPromptsEnabled: vi.fn().mockReturnValue(false),
+      getTelemetryTracesEnabled: vi.fn().mockReturnValue(false),
+      isInteractive: vi.fn().mockReturnValue(true),
+      getExperiments: vi.fn().mockReturnValue({ experimentIds: [] }),
+      getContentGeneratorConfig: vi.fn().mockReturnValue({ authType: 'oauth' }),
+    } as unknown as Config;
+
+    const event = new ConsecaPolicyGenerationEvent(
+      'sensitive prompt',
+      'sensitive content',
+      'sensitive policy',
+      'some error',
+    );
+
+    logConsecaPolicyGeneration(configNoPrompts, event);
+
+    expect(mockClearcutLogger.createLogEvent).toHaveBeenCalledWith(
+      expect.anything(),
+      [
+        {
+          gemini_cli_key: EventMetadataKey.CONSECA_ERROR,
+          value: 'some error',
+        },
+      ],
+    );
   });
 
   it('should include user_prompt/trusted_content/policy in OTEL when logPrompts is enabled', () => {
