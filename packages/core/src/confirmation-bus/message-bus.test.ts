@@ -10,6 +10,7 @@ import { PolicyEngine } from '../policy/policy-engine.js';
 import { PolicyDecision } from '../policy/types.js';
 import {
   MessageBusType,
+  type Message,
   type ToolConfirmationRequest,
   type ToolConfirmationResponse,
   type ToolPolicyRejection,
@@ -30,8 +31,9 @@ describe('MessageBus', () => {
       const errorHandler = vi.fn();
       messageBus.on('error', errorHandler);
 
-      // @ts-expect-error - Testing invalid message
-      await messageBus.publish({ invalid: 'message' });
+      await expect(
+        messageBus.publish({ invalid: 'message' } as unknown as Message),
+      ).rejects.toThrow('Invalid message structure');
 
       expect(errorHandler).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -44,11 +46,12 @@ describe('MessageBus', () => {
       const errorHandler = vi.fn();
       messageBus.on('error', errorHandler);
 
-      // @ts-expect-error - Testing missing correlationId
-      await messageBus.publish({
-        type: MessageBusType.TOOL_CONFIRMATION_REQUEST,
-        toolCall: { name: 'test' },
-      });
+      await expect(
+        messageBus.publish({
+          type: MessageBusType.TOOL_CONFIRMATION_REQUEST,
+          toolCall: { name: 'test' },
+        } as unknown as Message),
+      ).rejects.toThrow('Invalid message structure');
 
       expect(errorHandler).toHaveBeenCalled();
     });
@@ -251,8 +254,10 @@ describe('MessageBus', () => {
         correlationId: '123',
       };
 
-      // Should not throw
-      await expect(messageBus.publish(request)).resolves.not.toThrow();
+      // Should throw
+      await expect(messageBus.publish(request)).rejects.toThrow(
+        'Policy check failed',
+      );
 
       // Should emit error
       expect(errorHandler).toHaveBeenCalledWith(
@@ -288,11 +293,13 @@ describe('MessageBus', () => {
           MessageBusType.TOOL_CONFIRMATION_REQUEST,
           (msg) => {
             if (msg.subagent === subagentName) {
-              void messageBus.publish({
-                type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
-                correlationId: msg.correlationId,
-                confirmed: true,
-              });
+              void messageBus
+                .publish({
+                  type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+                  correlationId: msg.correlationId,
+                  confirmed: true,
+                })
+                .catch(() => {});
               resolve();
             }
           },
@@ -330,11 +337,13 @@ describe('MessageBus', () => {
           MessageBusType.TOOL_CONFIRMATION_REQUEST,
           (msg) => {
             if (msg.subagent === 'agent1/agent2') {
-              void messageBus.publish({
-                type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
-                correlationId: msg.correlationId,
-                confirmed: true,
-              });
+              void messageBus
+                .publish({
+                  type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+                  correlationId: msg.correlationId,
+                  confirmed: true,
+                })
+                .catch(() => {});
               resolve();
             }
           },

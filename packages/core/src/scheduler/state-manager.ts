@@ -244,11 +244,13 @@ export class SchedulerStateManager {
     const snapshot = this.getSnapshot();
 
     // Fire and forget - The message bus handles the publish and error handling.
-    void this.messageBus.publish({
-      type: MessageBusType.TOOL_CALLS_UPDATE,
-      toolCalls: snapshot,
-      schedulerId: this.schedulerId,
-    });
+    void this.messageBus
+      .publish({
+        type: MessageBusType.TOOL_CALLS_UPDATE,
+        toolCalls: snapshot,
+        schedulerId: this.schedulerId,
+      })
+      .catch(() => {});
   }
 
   private isTerminalCall(call: ToolCall): call is CompletedToolCall {

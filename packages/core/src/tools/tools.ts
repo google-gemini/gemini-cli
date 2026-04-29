@@ -242,12 +242,14 @@ export abstract class BaseToolInvocation<
     ) {
       if (this._toolName) {
         const options = this.getPolicyUpdateOptions(outcome);
-        void this.messageBus.publish({
-          type: MessageBusType.UPDATE_POLICY,
-          toolName: this._toolName,
-          persist: outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave,
-          ...options,
-        });
+        void this.messageBus
+          .publish({
+            type: MessageBusType.UPDATE_POLICY,
+            toolName: this._toolName,
+            persist: outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave,
+            ...options,
+          })
+          .catch(() => {});
       }
     }
   }
@@ -361,12 +363,10 @@ export abstract class BaseToolInvocation<
         );
       };
 
-      try {
-        void this.messageBus.publish(request);
-      } catch {
+      this.messageBus.publish(request).catch(() => {
         cleanup();
         resolve('allow');
-      }
+      });
     });
   }
 

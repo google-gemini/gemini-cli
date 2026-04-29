@@ -90,11 +90,13 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
   }
 
   private publishActivity(activity: SubagentActivityItem): void {
-    void this.messageBus.publish({
-      type: MessageBusType.SUBAGENT_ACTIVITY,
-      subagentName: this.definition.displayName ?? this.definition.name,
-      activity,
-    });
+    void this.messageBus
+      .publish({
+        type: MessageBusType.SUBAGENT_ACTIVITY,
+        subagentName: this.definition.displayName ?? this.definition.name,
+        activity,
+      })
+      .catch(() => {});
   }
 
   /**
