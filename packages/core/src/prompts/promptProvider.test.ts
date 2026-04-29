@@ -358,7 +358,7 @@ describe('PromptProvider', () => {
       const provider = new PromptProvider();
       const prompt = provider.getCoreSystemPrompt(mockConfig);
 
-      expect(prompt).toContain('[Active Topic: Active Chapter]');
+      expect(prompt).toContain('<active_topic>\nActive Chapter\n</active_topic>');
     });
 
     it('should NOT include active topic context when narration is disabled', () => {
@@ -369,7 +369,7 @@ describe('PromptProvider', () => {
       const provider = new PromptProvider();
       const prompt = provider.getCoreSystemPrompt(mockConfig);
 
-      expect(prompt).not.toContain('[Active Topic: Active Chapter]');
+      expect(prompt).not.toContain('<active_topic>\nActive Chapter\n</active_topic>');
     });
 
     it('should filter out update_topic tool when narration is disabled', () => {
