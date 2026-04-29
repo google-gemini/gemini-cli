@@ -8,13 +8,14 @@ and structural integrity.
 
 ### 1. Transactional Tool Integrity
 
-- **Status:** IMPLEMENTED (Re-ordering & Hoisting).
-- **Improvements:**
+- **Status:** FINISHED for current PR.
+- **Implemented:**
   - **Re-ordering:** Function responses in user turns are now sorted to strictly
     match the order of calls in the preceding model turn.
   - **Hoisting:** All `functionResponse` parts are moved to the beginning of
     their turn's `parts` array to satisfy strict schema validation requirements.
-- **Pending:** Atomic splitting of mixed turns.
+- **Note:** Mixed turns (responses + text) are preserved to support hinting and
+  maintain role alternation without synthetic turns.
 
 ### 2. Robust Node Identification
 
