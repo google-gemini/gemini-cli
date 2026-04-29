@@ -190,7 +190,8 @@ describe('Auto Routing Fallback Integration', () => {
 
     // Set a fallback handler that returns 'stop' (simulating user stopping or failing to handle)
     const handler = vi.fn(
-      async (_failed, _fallback, _error): Promise<FallbackIntent | null> => 'stop',
+      async (_failed, _fallback, _error): Promise<FallbackIntent | null> =>
+        'stop',
     );
     configNonAuto.setFallbackModelHandler(handler);
 
@@ -357,9 +358,8 @@ describe('Auto Routing Fallback Integration', () => {
     );
 
     config.setFallbackModelHandler(
-      async (_failed, _fallback, _error): Promise<FallbackIntent | null> => 
-         'retry_always' // Approve switch to Flash
-      ,
+      async (_failed, _fallback, _error): Promise<FallbackIntent | null> =>
+        'retry_always', // Approve switch to Flash
     );
 
     // Call generateContent for Turn 1
