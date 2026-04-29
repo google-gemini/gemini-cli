@@ -655,7 +655,12 @@ function* emitKeys(
     } else if (ch === '\b' || ch === '\x7f') {
       // backspace or ctrl+h
       name = 'backspace';
-      alt = escaped;
+      // On Windows terminals (Git Bash, MSYS2), backspace may be sent as
+      // ESC + \x7f (\x1b\x7f), which would incorrectly set alt=true
+      // and trigger DELETE_WORD_BACKWARD instead of DELETE_CHAR_LEFT.
+      // Only set alt=true for \b with ESC prefix (genuine Alt+Backspace),
+      // not for \x7f which is the standard backspace sequence.
+      alt = escaped && ch === '\b';
     } else if (ch === ESC) {
       // escape key
       name = 'escape';
