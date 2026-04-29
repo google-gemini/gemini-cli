@@ -67,6 +67,8 @@ export async function getMcpServersFromConfig(
   return filteredResult;
 }
 
+const MCP_LIST_DEFAULT_TIMEOUT_MSEC = 5000;
+
 async function testMCPConnection(
   serverName: string,
   config: MCPServerConfig,
@@ -127,11 +129,22 @@ async function testMCPConnection(
   }
 
   try {
-    // Attempt actual MCP connection with short timeout
-    await client.connect(transport, { timeout: 5000 }); // 5s timeout
+    // Attempt actual MCP connection with timeout from config or default to 5s.
+    // We use a short default for the list command to keep it responsive.
+    const timeout = config.timeout ?? MCP_LIST_DEFAULT_TIMEOUT_MSEC;
+    await client.connect(transport, { timeout });
 
-    // Test basic MCP protocol by pinging the server
-    await client.ping();
+    // Test basic MCP protocol by pinging the server.
+    // Ping is optional per MCP spec - some servers (e.g. Google first-party)
+    // don't implement it. A successful connect() is sufficient proof of connectivity.
+    try {
+      await client.ping({ timeout });
+    } catch (e) {
+      debugLogger.debug(
+        `MCP ping failed for ${serverName}, but connect succeeded:`,
+        e,
+      );
+    }
 
     await client.close();
     return MCPServerStatus.CONNECTED;

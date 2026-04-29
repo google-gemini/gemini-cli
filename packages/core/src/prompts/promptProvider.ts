@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import type { HierarchicalMemory } from '../config/memory.js';
-import { GEMINI_DIR } from '../utils/paths.js';
+import { GEMINI_DIR, makeRelative } from '../utils/paths.js';
 import { ApprovalMode } from '../policy/types.js';
 import * as snippets from './snippets.js';
 import * as legacySnippets from './snippets.legacy.js';
@@ -30,7 +30,11 @@ import {
 } from '../tools/tool-names.js';
 import { resolveModel, supportsModernFeatures } from '../config/models.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
-import { getAllGeminiMdFilenames } from '../tools/memoryTool.js';
+import {
+  getAllGeminiMdFilenames,
+  getGlobalMemoryFilePath,
+  getProjectMemoryIndexFilePath,
+} from '../tools/memoryTool.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
 
 /**
@@ -199,8 +203,19 @@ export class PromptProvider {
           () => ({
             interactive: interactiveMode,
             planModeToolsList,
-            plansDir: context.config.storage.getPlansDir(),
-            approvedPlanPath: context.config.getApprovedPlanPath(),
+            plansDir: makeRelative(
+              context.config.storage.getPlansDir(),
+              context.config.getProjectRoot(),
+            ).replaceAll('\\', '/'),
+            approvedPlanPath: (() => {
+              const approvedPath = context.config.getApprovedPlanPath();
+              return approvedPath
+                ? makeRelative(
+                    approvedPath,
+                    context.config.getProjectRoot(),
+                  ).replaceAll('\\', '/')
+                : undefined;
+            })(),
           }),
           isPlanMode,
         ),
@@ -212,7 +227,13 @@ export class PromptProvider {
               context.config.getEnableShellOutputEfficiency(),
             interactiveShellEnabled: context.config.isInteractiveShellEnabled(),
             topicUpdateNarration: isTopicUpdateNarrationEnabled,
-            memoryManagerEnabled: context.config.isMemoryManagerEnabled(),
+            memoryV2Enabled: context.config.isMemoryV2Enabled(),
+            userProjectMemoryPath: context.config.isMemoryV2Enabled()
+              ? getProjectMemoryIndexFilePath(context.config.storage)
+              : undefined,
+            globalMemoryPath: context.config.isMemoryV2Enabled()
+              ? getGlobalMemoryFilePath()
+              : undefined,
           }),
         ),
         sandbox: this.withSection('sandbox', () => ({
