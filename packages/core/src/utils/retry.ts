@@ -249,6 +249,9 @@ export async function retryWithBackoff<T>(
     ...cleanOptions,
   };
 
+  const getCurrentMaxAttempts = () =>
+    getAvailabilityContext?.()?.policy.maxAttempts ?? maxAttempts;
+
   let attempt = 0;
   let currentDelay = initialDelayMs;
   const throwIfAborted = () => {
@@ -257,7 +260,7 @@ export async function retryWithBackoff<T>(
     }
   };
 
-  while (attempt < maxAttempts) {
+  while (attempt < getCurrentMaxAttempts()) {
     if (signal?.aborted) {
       throw createAbortError();
     }
@@ -344,7 +347,7 @@ export async function retryWithBackoff<T>(
         errorCode !== undefined && errorCode >= 500 && errorCode < 600;
 
       if (classifiedError instanceof RetryableQuotaError || is500) {
-        if (attempt >= maxAttempts) {
+        if (attempt >= getCurrentMaxAttempts()) {
           const errorMessage =
             classifiedError instanceof Error ? classifiedError.message : '';
           debugLogger.warn(
@@ -405,7 +408,7 @@ export async function retryWithBackoff<T>(
 
       // Generic retry logic for other errors
       if (
-        attempt >= maxAttempts ||
+        attempt >= getCurrentMaxAttempts() ||
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         !shouldRetryOnError(error as Error, retryFetchErrors)
       ) {
