@@ -695,6 +695,10 @@ export class ChatRecordingService {
         chatsDir,
         shortId,
       );
+      if (matchingFiles.length === 0) {
+        throw new Error(`No session file found for ${sessionIdOrBasename}`);
+      }
+
       for (const file of matchingFiles) {
         await this.deleteSessionAndArtifacts(chatsDir, file, tempDir);
       }
