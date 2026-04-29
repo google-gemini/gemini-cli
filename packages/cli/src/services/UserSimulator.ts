@@ -36,6 +36,7 @@ export class UserSimulator {
   private editableKnowledgeFile: string | null = null;
   private actionHistory: string[] = [];
   private pendingToolCalls: ToolCall[] = [];
+  private staleCycleCount = 0;
   private messageBusHandler: ((msg: ToolCallsUpdateMessage) => void) | null =
     null;
 
@@ -138,7 +139,17 @@ export class UserSimulator {
       const currentStateKey = `${normalizedScreen}::${pendingIds}`;
 
       if (currentStateKey === this.lastStateKey) {
-        return;
+        if (this.pendingToolCalls.length > 0) {
+          this.staleCycleCount++;
+          // Every 10 ticks (10s) on a static screen while blocked, we try a prompt
+          if (this.staleCycleCount % 10 !== 0) {
+            return;
+          }
+        } else {
+          return;
+        }
+      } else {
+        this.staleCycleCount = 0;
       }
       this.lastStateKey = currentStateKey;
 
