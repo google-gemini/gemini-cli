@@ -1862,7 +1862,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                         ? `line-${item.absoluteVisualIdx}`
                         : `ghost-${item.index}`
                     }
-                    width={inputWidth}
+                    // VirtualizedList applies paddingRight=1 for its scroll
+                    // gutter, so a visual line exactly inputWidth chars wide
+                    // would have its last char clipped. Add 1 so the inner
+                    // content area equals inputWidth.
+                    width={inputWidth + 1}
                     backgroundColor={listBackgroundColor}
                     containerHeight={Math.min(
                       buffer.viewportHeight,
