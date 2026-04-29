@@ -280,6 +280,84 @@ describe('Session Cleanup (Refactored)', () => {
       expect(existsSync(path.join(chatsDir, sessions[1].id))).toBe(false); // Subagent chats directory should be deleted
     });
 
+    it('should apply retention across all project temp directories', async () => {
+      const globalTempDir = await fs.mkdtemp(
+        path.join(os.tmpdir(), 'gemini-cli-global-cleanup-test-'),
+      );
+      const currentProjectTempDir = path.join(globalTempDir, 'current-project');
+      const otherProjectTempDir = path.join(globalTempDir, 'other-project');
+      const currentChatsDir = path.join(currentProjectTempDir, 'chats');
+      const otherChatsDir = path.join(otherProjectTempDir, 'chats');
+      const otherLogsDir = path.join(otherProjectTempDir, 'logs');
+
+      await fs.mkdir(currentChatsDir, { recursive: true });
+      await fs.mkdir(otherChatsDir, { recursive: true });
+      await fs.mkdir(otherLogsDir, { recursive: true });
+
+      const now = new Date();
+      const oldDate = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+
+      await fs.writeFile(
+        path.join(currentChatsDir, 'session-20250120-current1.json'),
+        JSON.stringify({
+          sessionId: 'current123',
+          startTime: now.toISOString(),
+          lastUpdated: now.toISOString(),
+          messages: [{ type: 'user', content: 'hello' }],
+        }),
+      );
+
+      await fs.writeFile(
+        path.join(otherChatsDir, 'session-20250101-oldother.json'),
+        JSON.stringify({
+          sessionId: 'old-other-session',
+          startTime: oldDate.toISOString(),
+          lastUpdated: oldDate.toISOString(),
+          messages: [{ type: 'user', content: 'hello' }],
+        }),
+      );
+      await fs.writeFile(
+        path.join(otherLogsDir, 'session-old-other-session.jsonl'),
+        'log content',
+      );
+
+      vi.spyOn(Storage, 'getGlobalTempDir').mockReturnValue(globalTempDir);
+
+      const config = createMockConfig({
+        storage: {
+          getProjectTempDir: () => currentProjectTempDir,
+        },
+      } as unknown as Partial<Config>);
+      const settings: Settings = {
+        general: { sessionRetention: { enabled: true, maxAge: '10d' } },
+      };
+
+      try {
+        const result = await cleanupExpiredSessions(config, settings);
+
+        expect(result.scanned).toBe(2);
+        expect(result.deleted).toBe(1);
+        expect(result.skipped).toBe(1);
+        expect(
+          existsSync(
+            path.join(currentChatsDir, 'session-20250120-current1.json'),
+          ),
+        ).toBe(true);
+        expect(
+          existsSync(
+            path.join(otherChatsDir, 'session-20250101-oldother.json'),
+          ),
+        ).toBe(false);
+        expect(
+          existsSync(
+            path.join(otherLogsDir, 'session-old-other-session.jsonl'),
+          ),
+        ).toBe(false);
+      } finally {
+        await fs.rm(globalTempDir, { recursive: true, force: true });
+      }
+    });
+
     it('should NOT delete sessions within the cutoff date', async () => {
       const sessions = await seedSessions(); // [current, 14d, 30d]
       const config = createMockConfig();
