@@ -55,6 +55,9 @@ const RETRYABLE_NETWORK_CODES = [
   'ECONNREFUSED',
   'ERR_SSL_WRONG_VERSION_NUMBER',
   'EPROTO', // Generic protocol error (often SSL-related)
+  'UND_ERR_HEADERS_TIMEOUT',
+  'UND_ERR_BODY_TIMEOUT',
+  'UND_ERR_CONNECT_TIMEOUT',
 ];
 
 // Node.js builds SSL error codes by prepending ERR_SSL_ to the uppercased
