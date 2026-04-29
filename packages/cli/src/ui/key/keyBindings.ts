@@ -792,10 +792,22 @@ export function getPlatformRedoBindings(
   platform: string,
 ): readonly KeyBinding[] {
   if (platform === 'win32') {
-    return [new KeyBinding('ctrl+y'), new KeyBinding('ctrl+shift+z')];
+    return [
+      new KeyBinding('ctrl+y'),
+      new KeyBinding('ctrl+shift+z'),
+      new KeyBinding('alt+shift+z'),
+    ];
   }
   if (platform === 'darwin') {
-    return [new KeyBinding('cmd+shift+z'), new KeyBinding('alt+shift+z')];
+    return [
+      new KeyBinding('cmd+shift+z'),
+      new KeyBinding('alt+shift+z'),
+      new KeyBinding('ctrl+shift+z'),
+    ];
   }
-  return [new KeyBinding('alt+shift+z'), new KeyBinding('cmd+shift+z')];
+  return [
+    new KeyBinding('alt+shift+z'),
+    new KeyBinding('cmd+shift+z'),
+    new KeyBinding('ctrl+shift+z'),
+  ];
 }
