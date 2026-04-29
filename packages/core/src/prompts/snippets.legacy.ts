@@ -477,7 +477,7 @@ ${options.planModeToolsList}
 - Save the implementation plan to the designated plans directory
 
 ### Phase 4: Review & Approval
-- Present the plan and request approval for the finalized plan using the \`${EXIT_PLAN_MODE_TOOL_NAME}\` tool
+- Present the plan and request approval for the finalized plan using the built-in \`${EXIT_PLAN_MODE_TOOL_NAME}\` tool. **CRITICAL: NEVER attempt to call this tool via \`${SHELL_TOOL_NAME}\`.**
 - If plan is approved, you can begin implementation
 - If plan is rejected, address the feedback and iterate on the plan
 
