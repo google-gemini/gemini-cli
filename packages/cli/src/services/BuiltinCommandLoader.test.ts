@@ -52,10 +52,15 @@ vi.mock('../ui/commands/permissionsCommand.js', async () => {
 
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import { BuiltinCommandLoader } from './BuiltinCommandLoader.js';
-import { isNightly, type Config } from '@google/gemini-cli-core';
+import {
+  isNightly,
+  startupProfiler,
+  type Config,
+} from '@google/gemini-cli-core';
 import { CommandKind } from '../ui/commands/types.js';
 
 import { restoreCommand } from '../ui/commands/restoreCommand.js';
+import { ideCommand } from '../ui/commands/ideCommand.js';
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
@@ -233,6 +238,27 @@ describe('BuiltinCommandLoader', () => {
     // ideCommand is now a constant, no longer needs config
     expect(restoreCommandMock).toHaveBeenCalledTimes(1);
     expect(restoreCommandMock).toHaveBeenCalledWith(null);
+  });
+
+  it('should end the startup profiler phase when command loading throws', async () => {
+    const end = vi.fn();
+    const startSpy = vi
+      .spyOn(startupProfiler, 'start')
+      .mockReturnValue({ end });
+    vi.mocked(ideCommand).mockRejectedValueOnce(new Error('ide failed'));
+
+    const loader = new BuiltinCommandLoader(mockConfig);
+
+    try {
+      await expect(
+        loader.loadCommands(new AbortController().signal),
+      ).rejects.toThrow('ide failed');
+
+      expect(startSpy).toHaveBeenCalledWith('load_builtin_commands');
+      expect(end).toHaveBeenCalledTimes(1);
+    } finally {
+      startSpy.mockRestore();
+    }
   });
 
   it('should return a list of all loaded commands', async () => {
