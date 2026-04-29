@@ -144,4 +144,106 @@ describe('conseca-logger', () => {
 
     expect(mockLogger.emit).not.toHaveBeenCalled();
   });
+
+  it('should omit user_prompt/trusted_content/policy from OTEL when logPrompts is disabled', () => {
+    const configNoPrompts = {
+      getTelemetryEnabled: vi.fn().mockReturnValue(true),
+      getSessionId: vi.fn().mockReturnValue('test-session-id'),
+      getTelemetryLogPromptsEnabled: vi.fn().mockReturnValue(false),
+      getTelemetryTracesEnabled: vi.fn().mockReturnValue(false),
+      isInteractive: vi.fn().mockReturnValue(true),
+      getExperiments: vi.fn().mockReturnValue({ experimentIds: [] }),
+      getContentGeneratorConfig: vi.fn().mockReturnValue({ authType: 'oauth' }),
+    } as unknown as Config;
+
+    const event = new ConsecaPolicyGenerationEvent(
+      'sensitive prompt',
+      'sensitive content',
+      'sensitive policy',
+    );
+
+    logConsecaPolicyGeneration(configNoPrompts, event);
+
+    const attrs = mockLogger.emit.mock.calls[0][0].attributes as Record<
+      string,
+      unknown
+    >;
+    expect(attrs['user_prompt']).toBeUndefined();
+    expect(attrs['trusted_content']).toBeUndefined();
+    expect(attrs['policy']).toBeUndefined();
+    expect(attrs['event.name']).toBe(EVENT_CONSECA_POLICY_GENERATION);
+  });
+
+  it('should include user_prompt/trusted_content/policy in OTEL when logPrompts is enabled', () => {
+    const event = new ConsecaPolicyGenerationEvent(
+      'visible prompt',
+      'visible content',
+      'visible policy',
+    );
+
+    logConsecaPolicyGeneration(mockConfig, event);
+
+    const attrs = mockLogger.emit.mock.calls[0][0].attributes as Record<
+      string,
+      unknown
+    >;
+    expect(attrs['user_prompt']).toBe('visible prompt');
+    expect(attrs['trusted_content']).toBe('visible content');
+    expect(attrs['policy']).toBe('visible policy');
+  });
+
+  it('should omit sensitive fields from verdict OTEL when logPrompts is disabled', () => {
+    const configNoPrompts = {
+      getTelemetryEnabled: vi.fn().mockReturnValue(true),
+      getSessionId: vi.fn().mockReturnValue('test-session-id'),
+      getTelemetryLogPromptsEnabled: vi.fn().mockReturnValue(false),
+      getTelemetryTracesEnabled: vi.fn().mockReturnValue(false),
+      isInteractive: vi.fn().mockReturnValue(true),
+      getExperiments: vi.fn().mockReturnValue({ experimentIds: [] }),
+      getContentGeneratorConfig: vi.fn().mockReturnValue({ authType: 'oauth' }),
+    } as unknown as Config;
+
+    const event = new ConsecaVerdictEvent(
+      'sensitive prompt',
+      'sensitive policy',
+      'sensitive tool call',
+      'allow',
+      'sensitive rationale',
+    );
+
+    logConsecaVerdict(configNoPrompts, event);
+
+    const attrs = mockLogger.emit.mock.calls[0][0].attributes as Record<
+      string,
+      unknown
+    >;
+    expect(attrs['user_prompt']).toBeUndefined();
+    expect(attrs['policy']).toBeUndefined();
+    expect(attrs['tool_call']).toBeUndefined();
+    expect(attrs['verdict_rationale']).toBeUndefined();
+    // verdict (the allow/deny result) is not sensitive and should be present
+    expect(attrs['verdict']).toBe('allow');
+  });
+
+  it('should include sensitive fields in verdict OTEL when logPrompts is enabled', () => {
+    const event = new ConsecaVerdictEvent(
+      'visible prompt',
+      'visible policy',
+      'visible tool call',
+      'deny',
+      'visible rationale',
+    );
+
+    logConsecaVerdict(mockConfig, event);
+
+    const attrs = mockLogger.emit.mock.calls[0][0].attributes as Record<
+      string,
+      unknown
+    >;
+    expect(attrs['user_prompt']).toBe('visible prompt');
+    expect(attrs['policy']).toBe('visible policy');
+    expect(attrs['tool_call']).toBe('visible tool call');
+    expect(attrs['verdict_rationale']).toBe('visible rationale');
+    expect(attrs['verdict']).toBe('deny');
+  });
 });
