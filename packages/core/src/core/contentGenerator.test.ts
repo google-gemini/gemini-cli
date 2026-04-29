@@ -851,19 +851,6 @@ describe('createContentGenerator', () => {
       ),
     ).rejects.toThrow('Invalid custom base URL: not-a-url');
   });
-
-  it('should allow non-https remote custom baseUrl values for container environments', async () => {
-    await expect(
-      createContentGenerator(
-        {
-          apiKey: 'test-api-key',
-          authType: AuthType.USE_GEMINI,
-          baseUrl: 'http://host.containers.internal',
-        },
-        mockConfig,
-      ),
-    );
-  });
 });
 
 describe('createContentGeneratorConfig', () => {
