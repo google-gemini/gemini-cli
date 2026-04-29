@@ -1919,6 +1919,99 @@ describe('loggers', () => {
     });
   });
 
+  describe('logToolCall — logPrompts flag', () => {
+    it('should omit function_args when logPrompts is disabled', () => {
+      const mockConfigNoPrompts = {
+        getSessionId: () => 'test-session-id',
+        getTargetDir: () => 'target-dir',
+        getUsageStatisticsEnabled: () => true,
+        getTelemetryEnabled: () => true,
+        getTelemetryLogPromptsEnabled: () => false,
+        getTelemetryTracesEnabled: () => false,
+        isInteractive: () => false,
+        getExperiments: () => undefined,
+        getExperimentsAsync: async () => undefined,
+        getContentGeneratorConfig: () => undefined,
+      } as unknown as Config;
+
+      const call: CompletedToolCall = {
+        status: CoreToolCallStatus.Success,
+        request: {
+          name: 'run_bash',
+          args: { command: 'echo sensitive' },
+          callId: 'call-1',
+          isClientInitiated: false,
+          prompt_id: 'prompt-noprompts',
+        },
+        response: {
+          callId: 'call-1',
+          responseParts: [],
+          resultDisplay: undefined,
+          error: undefined,
+          errorType: undefined,
+          contentLength: undefined,
+        },
+        tool: undefined as unknown as AnyDeclarativeTool,
+        invocation: {} as AnyToolInvocation,
+        durationMs: 50,
+      };
+      const event = new ToolCallEvent(call);
+      logToolCall(mockConfigNoPrompts, event);
+
+      const emitted = mockLogger.emit.mock.calls[0][0] as {
+        attributes: Record<string, unknown>;
+      };
+      expect(emitted.attributes['function_args']).toBeUndefined();
+      expect(emitted.attributes['function_name']).toBe('run_bash');
+    });
+
+    it('should include function_args when logPrompts is enabled', () => {
+      const mockConfigWithPrompts = {
+        getSessionId: () => 'test-session-id',
+        getTargetDir: () => 'target-dir',
+        getUsageStatisticsEnabled: () => true,
+        getTelemetryEnabled: () => true,
+        getTelemetryLogPromptsEnabled: () => true,
+        getTelemetryTracesEnabled: () => false,
+        isInteractive: () => false,
+        getExperiments: () => undefined,
+        getExperimentsAsync: async () => undefined,
+        getContentGeneratorConfig: () => undefined,
+      } as unknown as Config;
+
+      const call: CompletedToolCall = {
+        status: CoreToolCallStatus.Success,
+        request: {
+          name: 'run_bash',
+          args: { command: 'echo visible' },
+          callId: 'call-2',
+          isClientInitiated: false,
+          prompt_id: 'prompt-withprompts',
+        },
+        response: {
+          callId: 'call-2',
+          responseParts: [],
+          resultDisplay: undefined,
+          error: undefined,
+          errorType: undefined,
+          contentLength: undefined,
+        },
+        tool: undefined as unknown as AnyDeclarativeTool,
+        invocation: {} as AnyToolInvocation,
+        durationMs: 50,
+      };
+      const event = new ToolCallEvent(call);
+      logToolCall(mockConfigWithPrompts, event);
+
+      const emitted = mockLogger.emit.mock.calls[0][0] as {
+        attributes: Record<string, unknown>;
+      };
+      expect(emitted.attributes['function_args']).toBe(
+        JSON.stringify({ command: 'echo visible' }, null, 2),
+      );
+    });
+  });
+
   describe('logMalformedJsonResponse', () => {
     beforeEach(() => {
       vi.spyOn(ClearcutLogger.prototype, 'logMalformedJsonResponseEvent');

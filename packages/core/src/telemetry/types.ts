@@ -355,7 +355,6 @@ export class ToolCallEvent implements BaseTelemetryEvent {
       'event.name': EVENT_TOOL_CALL,
       'event.timestamp': this['event.timestamp'],
       function_name: this.function_name,
-      function_args: safeJsonStringify(this.function_args, 2),
       duration_ms: this.duration_ms,
       success: this.success,
       decision: this.decision,
@@ -369,6 +368,9 @@ export class ToolCallEvent implements BaseTelemetryEvent {
       end_time: this.end_time,
       metadata: this.metadata,
     };
+    if (config.getTelemetryLogPromptsEnabled()) {
+      attributes['function_args'] = safeJsonStringify(this.function_args, 2);
+    }
 
     if (this.error) {
       attributes[CoreToolCallStatus.Error] = this.error;
@@ -956,10 +958,13 @@ export class ConsecaPolicyGenerationEvent implements BaseTelemetryEvent {
       ...getCommonAttributes(config),
       'event.name': EVENT_CONSECA_POLICY_GENERATION,
       'event.timestamp': this['event.timestamp'],
-      user_prompt: this.user_prompt,
-      trusted_content: this.trusted_content,
-      policy: this.policy,
     };
+
+    if (config.getTelemetryLogPromptsEnabled()) {
+      attributes['user_prompt'] = this.user_prompt;
+      attributes['trusted_content'] = this.trusted_content;
+      attributes['policy'] = this.policy;
+    }
 
     if (this.error) {
       attributes['error'] = this.error;
@@ -1007,12 +1012,15 @@ export class ConsecaVerdictEvent implements BaseTelemetryEvent {
       ...getCommonAttributes(config),
       'event.name': EVENT_CONSECA_VERDICT,
       'event.timestamp': this['event.timestamp'],
-      user_prompt: this.user_prompt,
-      policy: this.policy,
-      tool_call: this.tool_call,
       verdict: this.verdict,
-      verdict_rationale: this.verdict_rationale,
     };
+
+    if (config.getTelemetryLogPromptsEnabled()) {
+      attributes['user_prompt'] = this.user_prompt;
+      attributes['policy'] = this.policy;
+      attributes['tool_call'] = this.tool_call;
+      attributes['verdict_rationale'] = this.verdict_rationale;
+    }
 
     if (this.error) {
       attributes['error'] = this.error;
