@@ -420,4 +420,54 @@ describe('plan_mode', () => {
       assertModelHasOutput(result);
     },
   });
+
+  evalTest('USUALLY_PASSES', {
+    suiteName: 'plan_mode',
+    suiteType: 'behavioral',
+    name: 'should invoke exit_plan_mode as a tool instead of a shell command',
+    approvalMode: ApprovalMode.PLAN,
+    params: {
+      settings: {
+        general: {
+          plan: { enabled: true },
+        },
+      },
+    },
+    files: {
+      'plans/my-plan.md': '# My Plan\n\n1. Step one',
+    },
+    prompt:
+      'I agree with the plan in plans/my-plan.md. Please exit plan mode and then run `echo "Starting implementation"`',
+    assert: async (rig) => {
+      await rig.waitForTelemetryReady();
+      const toolLogs = rig.readToolLogs();
+
+      // Check if exit_plan_mode was called as a tool
+      const exitPlanToolCall = toolLogs.find(
+        (log) => log.toolRequest.name === 'exit_plan_mode',
+      );
+
+      // Check if exit_plan_mode was called via shell
+      const shellCalls = toolLogs.filter(
+        (log) => log.toolRequest.name === 'run_shell_command',
+      );
+      const exitPlanViaShell = shellCalls.find((log) => {
+        try {
+          const args = JSON.parse(log.toolRequest.args);
+          return args.command.includes('exit_plan_mode');
+        } catch {
+          return false;
+        }
+      });
+
+      expect(
+        exitPlanViaShell,
+        'Should NOT call exit_plan_mode via run_shell_command',
+      ).toBeUndefined();
+      expect(
+        exitPlanToolCall,
+        'Should call exit_plan_mode tool directly',
+      ).toBeDefined();
+    },
+  });
 });
