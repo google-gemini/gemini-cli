@@ -51,7 +51,7 @@ export const SILENT_ACTIONS: ModelPolicyActionMap = {
 
 const DEFAULT_STATE: ModelPolicyStateMap = {
   terminal: 'terminal',
-  transient: 'sticky_retry',
+  transient: 'terminal',
   not_found: 'terminal',
   unknown: 'terminal',
 };

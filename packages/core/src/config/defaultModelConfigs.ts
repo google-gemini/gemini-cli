@@ -557,7 +557,7 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
         },
         stateTransitions: {
           terminal: 'terminal',
-          transient: 'sticky_retry',
+          transient: 'terminal',
           not_found: 'terminal',
           unknown: 'terminal',
         },
@@ -609,7 +609,7 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
         },
         stateTransitions: {
           terminal: 'terminal',
-          transient: 'sticky_retry',
+          transient: 'terminal',
           not_found: 'terminal',
           unknown: 'terminal',
         },
@@ -678,7 +678,7 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
         },
         stateTransitions: {
           terminal: 'terminal',
-          transient: 'sticky_retry',
+          transient: 'terminal',
           not_found: 'terminal',
           unknown: 'terminal',
         },
@@ -695,7 +695,7 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
         },
         stateTransitions: {
           terminal: 'terminal',
-          transient: 'sticky_retry',
+          transient: 'terminal',
           not_found: 'terminal',
           unknown: 'terminal',
         },
@@ -710,7 +710,7 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
         },
         stateTransitions: {
           terminal: 'terminal',
-          transient: 'sticky_retry',
+          transient: 'terminal',
           not_found: 'terminal',
           unknown: 'terminal',
         },
@@ -726,7 +726,7 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
         },
         stateTransitions: {
           terminal: 'terminal',
-          transient: 'sticky_retry',
+          transient: 'terminal',
           not_found: 'terminal',
           unknown: 'terminal',
         },
