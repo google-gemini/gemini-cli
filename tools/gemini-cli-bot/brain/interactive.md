@@ -24,7 +24,11 @@ Before beginning your analysis, you MUST perform the following research:
 
 1.  **Read Memory**: Read `tools/gemini-cli-bot/lessons-learned.md` to
     understand the current state.
-2.  **Verify Request Context**: Use the GitHub CLI to verify the current state
+2.  **Ignore Pending Tasks**: You are in interactive mode. You MUST explicitly
+    ignore any FAILED, STUCK, or pending tasks listed in the
+    `lessons-learned.md` Task Ledger. Do not attempt to complete or resume them.
+    Your ONLY goal is to address the user's specific comment.
+3.  **Verify Request Context**: Use the GitHub CLI to verify the current state
     of the issue/PR you were mentioned in. If the user's request is already
     addressed or obsolete, inform them via `issue-comment.md`.
 

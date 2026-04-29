@@ -109,6 +109,10 @@ or configuration changes:
 
 ### UNBLOCKING PROTOCOL (Recovery & Persistence)
 
+_(Note: This protocol ONLY applies during scheduled or background execution. If
+you are operating in Interactive Mode triggered by a comment, ignore this
+section and strictly address the user's comment.)_
+
 If you are continuing work on an existing Task (e.g., status is `SUBMITTED`,
 `FAILED`, or `STUCK`):
 
