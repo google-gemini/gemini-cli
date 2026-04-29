@@ -39,6 +39,7 @@ describe('createContentGenerator', () => {
   beforeEach(() => {
     resetVersionCache();
     vi.clearAllMocks();
+    vi.stubEnv('ANTIGRAVITY_CLI_ALIAS', '');
   });
 
   afterEach(() => {
