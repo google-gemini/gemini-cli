@@ -1,0 +1,41 @@
+name: 'User Research Insight'
+description: 'Share findings from user research, usability testing, or user interviews'
+labels:
+  - 'status/need-triage'
+body:
+  - type: 'markdown'
+    attributes:
+      value: |-
+        > [!IMPORTANT]
+        > Thanks for sharing your research findings!
+        >
+        > Structured user research helps the team make informed product decisions.
+        > Please search **[existing issues](https://github.com/google-gemini/gemini-cli/issues)** to see if similar findings have already been shared.
+
+  - type: 'textarea'
+    id: 'methodology'
+    attributes:
+      label: 'Research method'
+      description: 'How did you gather this insight? (e.g., usability test, user interview, survey, heuristic evaluation)'
+    validations:
+      required: true
+
+  - type: 'textarea'
+    id: 'findings'
+    attributes:
+      label: 'Key findings'
+      description: 'Summarize the main insights from your research.'
+    validations:
+      required: true
+
+  - type: 'textarea'
+    id: 'recommendations'
+    attributes:
+      label: 'Recommendations'
+      description: 'What changes would you recommend based on these findings?'
+
+  - type: 'textarea'
+    id: 'evidence'
+    attributes:
+      label: 'Supporting evidence'
+      description: 'Include data, quotes, recordings, or other evidence.'
