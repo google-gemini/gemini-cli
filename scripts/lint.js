@@ -45,6 +45,9 @@ function getPlatformArch() {
       shellcheck: 'darwin.aarch64',
     };
   }
+  // actionlint and shellcheck don't have Windows builds; return null so
+  // those linters are skipped gracefully.
+  return null;
   if (platform === 'win32' && arch === 'x64') {
     return {
       actionlint: 'windows_amd64',
@@ -124,6 +127,16 @@ const yamllintInstaller = isWindows
  * @type {{[linterName: string]: Linter}}
  */
 const LINTERS = {
+  ...(platformArch
+    ? {
+        actionlint: {
+          check: 'command -v actionlint',
+          installer: `
+      mkdir -p "${TEMP_DIR}/actionlint"
+      curl -sSLo "${TEMP_DIR}/.actionlint.tgz" "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_${platformArch.actionlint}.tar.gz"
+      tar -xzf "${TEMP_DIR}/.actionlint.tgz" -C "${TEMP_DIR}/actionlint"
+    `,
+          run: `
   actionlint: {
     check: actionlintCheck,
     installer: actionlintInstaller,
@@ -135,6 +148,15 @@ const LINTERS = {
         -ignore 'SC2129:' \
         -ignore 'label ".+" is unknown'
     `,
+        },
+        shellcheck: {
+          check: 'command -v shellcheck',
+          installer: `
+      mkdir -p "${TEMP_DIR}/shellcheck"
+      curl -sSLo "${TEMP_DIR}/.shellcheck.txz" "https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.${platformArch.shellcheck}.tar.xz"
+      tar -xf "${TEMP_DIR}/.shellcheck.txz" -C "${TEMP_DIR}/shellcheck" --strip-components=1
+    `,
+          run: `
   },
   shellcheck: {
     check: shellcheckCheck,
@@ -150,7 +172,9 @@ const LINTERS = {
           --format=gcc \
           --color=never | sed -e 's/note:/warning:/g' -e 's/style:/warning:/g'
     `,
-  },
+        },
+      }
+    : {}),
   yamllint: {
     check: yamllintCheck,
     installer: yamllintInstaller,
@@ -212,6 +236,10 @@ export function runESLint() {
 }
 
 export function runActionlint() {
+  if (!LINTERS.actionlint) {
+    console.log('\nSkipping actionlint (not supported on this platform).');
+    return;
+  }
   console.log('\nRunning actionlint...');
   if (!runCommand(LINTERS.actionlint.run)) {
     process.exit(1);
@@ -219,6 +247,10 @@ export function runActionlint() {
 }
 
 export function runShellcheck() {
+  if (!LINTERS.shellcheck) {
+    console.log('\nSkipping shellcheck (not supported on this platform).');
+    return;
+  }
   console.log('\nRunning shellcheck...');
   if (!runCommand(LINTERS.shellcheck.run)) {
     process.exit(1);

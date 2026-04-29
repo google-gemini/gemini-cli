@@ -564,6 +564,9 @@ export const useSlashCommandProcessor = (
                   return {
                     type: 'submit_prompt',
                     content: result.content,
+                    ...(result.modelOverride
+                      ? { modelOverride: result.modelOverride }
+                      : {}),
                   };
                 case 'confirm_shell_commands': {
                   const callId = `expansion-${Date.now()}`;
