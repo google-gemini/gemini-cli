@@ -35,10 +35,19 @@ try {
   }
   `;
   const output = execSync(
-    `gh api graphql -F owner=${GITHUB_OWNER} -F repo=${GITHUB_REPO} -f query='${query}'`,
-    { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] },
+    'gh api graphql -F owner=$OWNER -F repo=$REPO -F query=@-',
+    {
+      encoding: 'utf-8',
+      input: query,
+      env: { ...process.env, OWNER: GITHUB_OWNER, REPO: GITHUB_REPO },
+      stdio: ['pipe', 'pipe', 'ignore'],
+    },
   );
-  const data = JSON.parse(output).data.repository;
+  const response = JSON.parse(output);
+  if (response.errors) {
+    throw new Error(response.errors.map((e: { message: string }) => e.message).join(', '));
+  }
+  const data = response.data.repository;
 
   // 2. Map PR numbers to local commits using git log
   const logOutput = execSync('git log -n 5000 --format="%H|%s"', {
@@ -97,7 +106,7 @@ try {
     const reviewersOnPR = new Map<string, { name?: string }>();
     for (const review of pr.reviews.nodes) {
       if (
-        ['MEMBER', 'OWNER'].includes(review.authorAssociation) &&
+        ['MEMBER', 'OWNER', 'COLLABORATOR'].includes(review.authorAssociation) &&
         review.author?.login
       ) {
         const login = review.author.login.toLowerCase();
