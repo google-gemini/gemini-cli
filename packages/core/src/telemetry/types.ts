@@ -368,7 +368,7 @@ export class ToolCallEvent implements BaseTelemetryEvent {
       end_time: this.end_time,
       metadata: this.metadata,
     };
-    if (config.getTelemetryLogPromptsEnabled()) {
+    if (config.getTelemetryLogPromptsEnabled() && this.function_args) {
       attributes['function_args'] = safeJsonStringify(this.function_args, 2);
     }
 
@@ -961,9 +961,15 @@ export class ConsecaPolicyGenerationEvent implements BaseTelemetryEvent {
     };
 
     if (config.getTelemetryLogPromptsEnabled()) {
-      attributes['user_prompt'] = this.user_prompt;
-      attributes['trusted_content'] = this.trusted_content;
-      attributes['policy'] = this.policy;
+      if (this.user_prompt) {
+        attributes['user_prompt'] = this.user_prompt;
+      }
+      if (this.trusted_content) {
+        attributes['trusted_content'] = this.trusted_content;
+      }
+      if (this.policy) {
+        attributes['policy'] = this.policy;
+      }
     }
 
     if (this.error) {
@@ -1016,10 +1022,18 @@ export class ConsecaVerdictEvent implements BaseTelemetryEvent {
     };
 
     if (config.getTelemetryLogPromptsEnabled()) {
-      attributes['user_prompt'] = this.user_prompt;
-      attributes['policy'] = this.policy;
-      attributes['tool_call'] = this.tool_call;
-      attributes['verdict_rationale'] = this.verdict_rationale;
+      if (this.user_prompt) {
+        attributes['user_prompt'] = this.user_prompt;
+      }
+      if (this.policy) {
+        attributes['policy'] = this.policy;
+      }
+      if (this.tool_call) {
+        attributes['tool_call'] = this.tool_call;
+      }
+      if (this.verdict_rationale) {
+        attributes['verdict_rationale'] = this.verdict_rationale;
+      }
     }
 
     if (this.error) {
