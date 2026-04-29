@@ -32,12 +32,6 @@ concurrency:
   group: '${{ github.workflow }}-${{ github.event.issue.number || github.event.pull_request.number || github.event.inputs.issue_number || github.ref }}'
   cancel-in-progress: true
 
-permissions:
-  contents: 'write'
-  issues: 'write'
-  pull-requests: 'write'
-  actions: 'write'
-
 jobs:
   reasoning:
     name: 'Brain (Reasoning Layer)'
@@ -49,6 +43,12 @@ jobs:
         (github.event_name == 'workflow_dispatch' && github.event.inputs.run_interactive == 'true') ||
         (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@gemini-cli-robot') && contains(fromJSON('["COLLABORATOR", "MEMBER", "OWNER"]'), github.event.comment.author_association))
       )
+    # The reasoning phase is strictly readonly.
+    permissions:
+      contents: 'read'
+      issues: 'read'
+      pull-requests: 'read'
+      actions: 'read'
     env:
       GEMINI_CLI_TRUST_WORKSPACE: 'true'
     steps:
@@ -184,6 +184,11 @@ jobs:
     needs: 'reasoning'
     runs-on: 'ubuntu-latest'
     if: "github.repository == 'google-gemini/gemini-cli'"
+    # The publish phase is for archiving artifacts and optionally creating PRs.
+    permissions:
+      contents: 'write'
+      pull-requests: 'write'
+      actions: 'write'
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
