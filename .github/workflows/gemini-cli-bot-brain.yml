@@ -101,7 +101,7 @@ jobs:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           GEMINI_MODEL: 'gemini-3-flash-preview'
-          ENABLE_PRS: '${{ github.event.inputs.enable_prs || ''false'' }}'
+          ENABLE_PRS: "${{ github.event.inputs.enable_prs || 'false' }}"
           TRIGGER_ISSUE_NUMBER: '${{ github.event.issue.number || github.event.inputs.issue_number }}'
           TRIGGER_COMMENT_ID: '${{ github.event.comment.id || github.event.inputs.comment_id }}'
         run: |
