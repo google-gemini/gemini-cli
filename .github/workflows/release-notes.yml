@@ -27,6 +27,7 @@ jobs:
     permissions:
       contents: 'write'
       pull-requests: 'write'
+      issues: 'write'
     steps:
       - name: 'Checkout repository'
         uses: 'actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5' # ratchet:actions/checkout@v4
@@ -103,3 +104,15 @@ jobs:
           base: 'main'
           team-reviewers: 'gemini-cli-docs, gemini-cli-maintainers'
           delete-branch: true
+
+      - name: 'Create Issue on Failure'
+        if: '${{ failure() && steps.validate_version.outputs.CONTINUE == ''true'' }}'
+        env:
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          VERSION: '${{ steps.release_info.outputs.VERSION }}'
+          DETAILS_URL: '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
+        run: |
+          gh issue create \
+            --title "Release Notes Generation Failed for ${VERSION} on $(date +'%Y-%m-%d')" \
+            --body "The release notes generation workflow failed. See the full run for details: ${DETAILS_URL}" \
+            --label 'release-failure,priority/p0'
