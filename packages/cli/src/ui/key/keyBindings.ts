@@ -312,14 +312,21 @@ export const defaultKeyBindingConfig: KeyBindingConfig = new Map([
     Command.DELETE_CHAR_RIGHT,
     [new KeyBinding('delete'), new KeyBinding('ctrl+d')],
   ],
-  [Command.UNDO, [new KeyBinding('cmd+z'), new KeyBinding('alt+z')]],
+  [
+    Command.UNDO,
+    process.platform === 'win32'
+      ? [new KeyBinding('ctrl+z'), new KeyBinding('alt+z')]
+      : process.platform === 'darwin'
+        ? [new KeyBinding('cmd+z'), new KeyBinding('alt+z')]
+        : [new KeyBinding('alt+z'), new KeyBinding('cmd+z')],
+  ],
   [
     Command.REDO,
-    [
-      new KeyBinding('ctrl+shift+z'),
-      new KeyBinding('cmd+shift+z'),
-      new KeyBinding('alt+shift+z'),
-    ],
+    process.platform === 'win32'
+      ? [new KeyBinding('ctrl+y'), new KeyBinding('ctrl+shift+z')]
+      : process.platform === 'darwin'
+        ? [new KeyBinding('cmd+shift+z'), new KeyBinding('alt+shift+z')]
+        : [new KeyBinding('alt+shift+z'), new KeyBinding('cmd+shift+z')],
   ],
 
   // Scrolling
