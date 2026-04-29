@@ -67,7 +67,7 @@ describe('fuzzy-matcher', () => {
     });
 
     it('returns no match if the name is too long (security limit)', () => {
-      const longName = 'a'.repeat(65);
+      const longName = 'a'.repeat(129);
       const result = getClosestMatch(longName, ['a_tool']);
       expect(result.repairedName).toBeUndefined();
       expect(result.distance).toBe(Infinity);

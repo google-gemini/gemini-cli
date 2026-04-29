@@ -40,8 +40,9 @@ export function getClosestMatch(
   maxDistance = 2,
 ): FuzzyMatchResult {
   // Security: Prevent CPU exhaustion from excessively long tool names.
-  // A standard tool name is unlikely to exceed 64 characters.
-  if (hallucinatedName.length > 64) {
+  // A standard tool name is unlikely to exceed 128 characters.
+  // Use grapheme cluster counting to correctly handle multi-byte characters.
+  if (Array.from(hallucinatedName).length > 128) {
     return { isAmbiguous: false, distance: Infinity };
   }
 
