@@ -41,6 +41,7 @@ const KEY_INFO_MAP: Record<
   string,
   { name: string; shift?: boolean; ctrl?: boolean }
 > = {
+  OM: { name: 'enter' },
   '[200~': { name: 'paste-start' },
   '[201~': { name: 'paste-end' },
   '[[A': { name: 'f1' },
@@ -651,20 +652,8 @@ function* emitKeys(
       // tab
       name = 'tab';
       alt = escaped;
-    } else if (ch === '\b') {
-      // ctrl+h / ctrl+backspace (windows terminals send \x08 for ctrl+backspace)
-      name = 'backspace';
-      // In Windows environments, \b is sent for Ctrl+Backspace (standard backspace is translated to \x7f).
-      // We scope this to Windows/WT_SESSION to avoid breaking other unixes where \b is a plain backspace.
-      if (
-        typeof process !== 'undefined' &&
-        (process.env?.['OS'] === 'Windows_NT' || !!process.env?.['WT_SESSION'])
-      ) {
-        ctrl = true;
-      }
-      alt = escaped;
-    } else if (ch === '\x7f') {
-      // backspace
+    } else if (ch === '\b' || ch === '\x7f') {
+      // backspace or ctrl+h
       name = 'backspace';
       alt = escaped;
     } else if (ch === ESC) {
