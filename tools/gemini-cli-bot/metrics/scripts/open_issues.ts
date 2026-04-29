@@ -27,7 +27,7 @@ try {
   );
   const response = JSON.parse(output);
   if (response.errors) {
-    throw new Error(response.errors.map((e: any) => e.message).join(', '));
+    throw new Error(response.errors.map((e: { message: string }) => e.message).join(', '));
   }
   const count = response.data.repository.issues.totalCount;
   console.log(`open_issues,${count}`);
