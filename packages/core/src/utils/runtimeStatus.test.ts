@@ -11,6 +11,7 @@ import * as path from 'node:path';
 import {
   RUNTIME_STATUS_FILENAME,
   RUNTIME_STATUS_SCHEMA_VERSION,
+  clearRuntimeStatus,
   readRuntimeStatus,
   writeRuntimeStatus,
 } from './runtimeStatus.js';
@@ -300,5 +301,35 @@ describe('runtimeStatus', () => {
       fs.readFileSync(path.join(tmp, RUNTIME_STATUS_FILENAME), 'utf8'),
     ) as Record<string, unknown>;
     expect(data['gemini_cli_version']).toBe('0.0.0-test');
+  });
+
+  describe('clearRuntimeStatus', () => {
+    it('removes an existing runtime.json', async () => {
+      await writeRuntimeStatus(tmp, {
+        sessionId: 'abc',
+        workDir: '/w',
+        pid: 1,
+      });
+      expect(fs.existsSync(path.join(tmp, RUNTIME_STATUS_FILENAME))).toBe(true);
+      clearRuntimeStatus(tmp);
+      expect(fs.existsSync(path.join(tmp, RUNTIME_STATUS_FILENAME))).toBe(
+        false,
+      );
+    });
+
+    it('is idempotent when the file is already absent', () => {
+      // No file present yet.
+      expect(() => clearRuntimeStatus(tmp)).not.toThrow();
+      expect(fs.existsSync(path.join(tmp, RUNTIME_STATUS_FILENAME))).toBe(
+        false,
+      );
+      // Calling again on the same already-empty dir must also not throw.
+      expect(() => clearRuntimeStatus(tmp)).not.toThrow();
+    });
+
+    it('does not throw when the session dir does not exist', () => {
+      const ghost = path.join(tmp, 'does-not-exist');
+      expect(() => clearRuntimeStatus(ghost)).not.toThrow();
+    });
   });
 });

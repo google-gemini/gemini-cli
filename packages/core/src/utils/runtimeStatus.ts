@@ -153,6 +153,41 @@ export async function writeRuntimeStatus(
 }
 
 /**
+ * Remove `<sessionDir>/runtime.json` if present.
+ *
+ * Called only when the same PID switches to serving a *different* session
+ * id mid-flight (gemini-cli's `/clear` and session-browser-resume flows).
+ * Without this, the previous session's `runtime.json` would still claim
+ * this PID, and an external observer running a PID-liveness check would
+ * see the same PID mapped to two different sessions and treat both as
+ * live. All other exit paths (clean quit, crash) leave the file alone —
+ * the recorded PID is gone in both cases, so a liveness check by the
+ * external observer is sufficient and explicit cleanup adds nothing.
+ *
+ * Safe to call multiple times and on directories that no longer exist;
+ * I/O errors are swallowed so cleanup cannot disrupt the surrounding
+ * control flow.
+ */
+export function clearRuntimeStatus(sessionDir: string): void {
+  const target = runtimeStatusPath(sessionDir);
+  try {
+    fs.unlinkSync(target);
+  } catch (err) {
+    if (
+      err instanceof Error &&
+      'code' in err &&
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      ((err as NodeJS.ErrnoException).code === 'ENOENT' ||
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        (err as NodeJS.ErrnoException).code === 'ENOTDIR')
+    ) {
+      return;
+    }
+    // Any other I/O error is best-effort: never disrupt control flow.
+  }
+}
+
+/**
  * Read the runtime status file from a session directory, if present.
  *
  * Returns `null` if the file is missing, malformed, or written by a
