@@ -106,6 +106,7 @@ describe('mcp-client', () => {
   });
 
   afterEach(async () => {
+    vi.useRealTimers();
     try {
       if (testWorkspace && fs.existsSync(testWorkspace)) {
         if (process.platform === 'win32') {
@@ -118,7 +119,6 @@ describe('mcp-client', () => {
     }
     workspaceContext = null as unknown as WorkspaceContext;
     vi.restoreAllMocks();
-    vi.useRealTimers();
   });
 
   describe('McpClient', () => {
@@ -2422,6 +2422,7 @@ describe('connectToMcpServer with OAuth', () => {
   });
 
   afterEach(async () => {
+    vi.useRealTimers();
     try {
       if (testWorkspace && fs.existsSync(testWorkspace)) {
         if (process.platform === 'win32') {
@@ -2640,6 +2641,7 @@ describe('connectToMcpServer - HTTP→SSE fallback', () => {
   });
 
   afterEach(async () => {
+    vi.useRealTimers();
     try {
       if (testWorkspace && fs.existsSync(testWorkspace)) {
         if (process.platform === 'win32') {
@@ -2814,6 +2816,7 @@ describe('connectToMcpServer - OAuth with transport fallback', () => {
   });
 
   afterEach(async () => {
+    vi.useRealTimers();
     try {
       if (testWorkspace && fs.existsSync(testWorkspace)) {
         if (process.platform === 'win32') {
