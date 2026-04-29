@@ -81,7 +81,10 @@ describe('Plan Mode', () => {
 
     await rig.run({
       approvalMode: 'plan',
-      args: 'Create a file called plan.md in the plans directory.',
+      args:
+        'Create a file called plan.md in the plans directory with the ' +
+        'content "# Plan". Treat this as a Directive and write the file ' +
+        'immediately without proposing strategy or asking for confirmation.',
     });
 
     const toolLogs = rig.readToolLogs();
@@ -108,7 +111,7 @@ describe('Plan Mode', () => {
     ).toBeDefined();
     expect(
       planWrite?.toolRequest.success,
-      `Expected write_file to succeed, but it failed with error: ${planWrite?.toolRequest.error}`,
+      `Expected write_file to succeed, but it failed with error: ${'error' in (planWrite?.toolRequest || {}) ? (planWrite?.toolRequest as unknown as Record<string, string>)['error'] : 'unknown'}`,
     ).toBe(true);
   });
 
@@ -194,7 +197,11 @@ describe('Plan Mode', () => {
 
     await rig.run({
       approvalMode: 'plan',
-      args: 'Create a file called plan-no-session.md in the plans directory.',
+      args:
+        'Create a file called plan-no-session.md in the plans directory ' +
+        'with the content "# Plan". Treat this as a Directive and write ' +
+        'the file immediately without proposing strategy or asking for ' +
+        'confirmation.',
     });
 
     const toolLogs = rig.readToolLogs();
@@ -221,7 +228,7 @@ describe('Plan Mode', () => {
     ).toBeDefined();
     expect(
       planWrite?.toolRequest.success,
-      `Expected write_file to succeed, but it failed with error: ${planWrite?.toolRequest.error}`,
+      `Expected write_file to succeed, but it failed with error: ${'error' in (planWrite?.toolRequest || {}) ? (planWrite?.toolRequest as unknown as Record<string, string>)['error'] : 'unknown'}`,
     ).toBe(true);
   });
   it('should switch from a pro model to a flash model after exiting plan mode', async () => {
@@ -270,13 +277,24 @@ describe('Plan Mode', () => {
     );
 
     const apiRequests = rig.readAllApiRequest();
-    const modelNames = apiRequests.map((r) => r.attributes?.model || 'unknown');
+    const modelNames = apiRequests.map(
+      (r) =>
+        ('model' in (r.attributes || {})
+          ? (r.attributes as unknown as Record<string, string>)['model']
+          : 'unknown') || 'unknown',
+    );
 
     const proRequests = apiRequests.filter((r) =>
-      r.attributes?.model?.includes('pro'),
+      ('model' in (r.attributes || {})
+        ? (r.attributes as unknown as Record<string, string>)['model']
+        : 'unknown'
+      )?.includes('pro'),
     );
     const flashRequests = apiRequests.filter((r) =>
-      r.attributes?.model?.includes('flash'),
+      ('model' in (r.attributes || {})
+        ? (r.attributes as unknown as Record<string, string>)['model']
+        : 'unknown'
+      )?.includes('flash'),
     );
 
     expect(

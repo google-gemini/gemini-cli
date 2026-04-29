@@ -92,6 +92,28 @@ each tool.
 | [`ask_user`](../tools/ask-user.md) | `Communicate` | Requests clarification or missing information via an interactive dialog.               |
 | [`write_todos`](../tools/todos.md) | `Other`       | Maintains an internal list of subtasks. The model uses this to track its own progress. |
 
+### Task Tracker (Experimental)
+
+<!-- prettier-ignore -->
+> [!NOTE]
+> This is an experimental feature currently under active development. Enable via `experimental.taskTracker`.
+
+| Tool                                            | Kind    | Description                                                                 |
+| :---------------------------------------------- | :------ | :-------------------------------------------------------------------------- |
+| [`tracker_create_task`](../tools/tracker.md)    | `Other` | Creates a new task in the experimental tracker.                             |
+| [`tracker_update_task`](../tools/tracker.md)    | `Other` | Updates an existing task's status, description, or dependencies.            |
+| [`tracker_get_task`](../tools/tracker.md)       | `Other` | Retrieves the full details of a specific task.                              |
+| [`tracker_list_tasks`](../tools/tracker.md)     | `Other` | Lists tasks in the tracker, optionally filtered by status, type, or parent. |
+| [`tracker_add_dependency`](../tools/tracker.md) | `Other` | Adds a dependency between two tasks, ensuring topological execution.        |
+| [`tracker_visualize`](../tools/tracker.md)      | `Other` | Renders an ASCII tree visualization of the current task graph.              |
+
+### MCP
+
+| Tool                                              | Kind     | Description                                                            |
+| :------------------------------------------------ | :------- | :--------------------------------------------------------------------- |
+| [`list_mcp_resources`](../tools/mcp-resources.md) | `Search` | Lists all available resources exposed by connected MCP servers.        |
+| [`read_mcp_resource`](../tools/mcp-resources.md)  | `Read`   | Reads the content of a specific Model Context Protocol (MCP) resource. |
+
 ### Memory
 
 | Tool                                             | Kind    | Description                                                                          |
