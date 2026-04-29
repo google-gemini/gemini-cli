@@ -1,96 +1,56 @@
-# Gemini CLI Project Context
+# Gemini CLI — Project Mandates & Release Workflow
 
-Gemini CLI is an open-source AI agent that brings the power of Gemini directly
-into the terminal. It is designed to be a terminal-first, extensible, and
-powerful tool for developers.
+This repository follows a strict "Downstream Maintainer" model to ensure that
+local enhancements (CAMP-specific logic, UI tweaks) are integrated robustly with
+upstream Gemini CLI releases.
 
-## Project Overview
+## Branching Model
 
-- **Purpose:** Provide a seamless terminal interface for Gemini models,
-  supporting code understanding, generation, automation, and integration via MCP
-  (Model Context Protocol).
-- **Main Technologies:**
-  - **Runtime:** Node.js (>=20.0.0, recommended ~20.19.0 for development)
-  - **Language:** TypeScript
-  - **UI Framework:** React (using [Ink](https://github.com/vadimdemedes/ink)
-    for CLI rendering)
-  - **Testing:** Vitest
-  - **Bundling:** esbuild
-  - **Linting/Formatting:** ESLint, Prettier
-- **Architecture:** Monorepo structure using npm workspaces.
-  - `packages/cli`: User-facing terminal UI, input processing, and display
-    rendering.
-  - `packages/core`: Backend logic, Gemini API orchestration, prompt
-    construction, and tool execution.
-  - `packages/a2a-server`: Experimental Agent-to-Agent server.
-  - `packages/sdk`: Programmatic SDK for embedding Gemini CLI capabilities.
-  - `packages/devtools`: Integrated developer tools (Network/Console inspector).
-  - `packages/test-utils`: Shared test utilities and test rig.
-  - `packages/vscode-ide-companion`: VS Code extension pairing with the CLI.
+- **`main`**: Pure mirror of the upstream repository. Never commit local changes
+  here.
+- **`CAMP-main`**: Our primary integration branch. Contains all local patches
+  (e.g., CAMP §24 automation, enhanced UI components, robust SEA detection). All
+  new local features start here.
+- **`release/v<version>`**: Ephemeral branches carved from `CAMP-main` for
+  specific releases (e.g., `release/v0.39.x`). These branches are for final
+  validation, building, and tagging.
 
-## Building and Running
+## Release and Rebase Workflow
 
-- **Install Dependencies:** `npm install`
-- **Build All:** `npm run build:all` (Builds packages, sandbox, and VS Code
-  companion)
-- **Build Packages:** `npm run build`
-- **Run in Development:** `npm run start`
-- **Run in Debug Mode:** `npm run debug` (Enables Node.js inspector)
-- **Bundle Project:** `npm run bundle`
-- **Clean Artifacts:** `npm run clean`
+1.  **Upstream Sync**: When a new upstream release is available, pull it into
+    the `main` branch.
+2.  **Strategic Assessment**:
+    - **CRITICAL**: Before rebasing `CAMP-main`, the agent MUST analyze the
+      upstream changelog and source code.
+    - **Goal**: Identify if upstream has introduced features that overlap with
+      or improve upon our CAMP implementation.
+    - **Action**: If upstream provides a native primitive (e.g., a new hook or a
+      `ContextProcessor`), prioritize migrating our local "hacks" to the native
+      upstream approach to improve the long-term stability of the CAMP spec.
+3.  **Forward Porting**: Rebase `CAMP-main` onto `main`. Resolve conflicts with
+    a focus on preserving the architectural intent of our local changes.
+4.  **Release Carving**: Once `CAMP-main` is stable on the new version, create a
+    `release/v<version>` branch.
+5.  **Validation**: Perform a full `npm run build` and `npm run test` on the
+    release branch.
+6.  **Deterministic Release**:
+    - Run `make target-install` to deploy to the stable runtime path
+      (`~/.local/share/gemini-custom-runtime/`).
+    - Create an annotated git tag (e.g., `v0.40.0-rrs.1`) pointing to the
+      verified commit.
 
-## Testing and Quality
+## Development Standards
 
-- **Test Commands:**
-  - **Unit (All):** `npm run test`
-  - **Integration (E2E):** `npm run test:e2e`
-  - > **NOTE**: Please run the memory and perf tests locally **only if** you are
-    > implementing changes related to those test areas. Otherwise skip these
-    > tests locally and rely on CI to run them on nightly builds.
-  - **Memory (Nightly):** `npm run test:memory` (Runs memory regression tests
-    against baselines. Excluded from `preflight`, run nightly.)
-  - **Performance (Nightly):** `npm run test:perf` (Runs CPU performance
-    regression tests against baselines. Excluded from `preflight`, run nightly.)
-  - **Workspace-Specific:** `npm test -w <pkg> -- <path>` (Note: `<path>` must
-    be relative to the workspace root, e.g.,
-    `-w @google/gemini-cli-core -- src/routing/modelRouterService.test.ts`)
-- **Full Validation:** `npm run preflight` (Heaviest check; runs clean, install,
-  build, lint, type check, and tests. Recommended before submitting PRs. Due to
-  its long runtime, only run this at the very end of a code implementation task.
-  If it fails, use faster, targeted commands (e.g., `npm run test`,
-  `npm run lint`, or workspace-specific tests) to iterate on fixes before
-  re-running `preflight`. For simple, non-code changes like documentation or
-  prompting updates, skip `preflight` at the end of the task and wait for PR
-  validation.)
-- **Individual Checks:** `npm run lint` / `npm run format` / `npm run typecheck`
+- **Fix-Forward**: If a bug is found in a release branch, implement the fix in
+  `CAMP-main` first, then cherry-pick it to the active release branches. This
+  ensures fixes are not lost during the next rebase.
+- **Deterministic Builds**: Always use the Node.js execution model (via the Bash
+  wrapper) instead of experimental ELF/SEA binaries for production use.
+- **Makefile**: Use `make target-install` for all deployments to ensure a clean,
+  isolated runtime environment.
 
-## Development Conventions
+## Contextual Mandates (CAMP)
 
-- **Contributions:** Follow the process outlined in `CONTRIBUTING.md`. Requires
-  signing the Google CLA.
-- **Pull Requests:** Keep PRs small, focused, and linked to an existing issue.
-  Always activate the `pr-creator` skill for PR generation, even when using the
-  `gh` CLI.
-- **Commit Messages:** Follow the
-  [Conventional Commits](https://www.conventionalcommits.org/) standard.
-- **Imports:** Use specific imports and avoid restricted relative imports
-  between packages (enforced by ESLint).
-- **License Headers:** For all new source code files (`.ts`, `.tsx`, `.js`),
-  include the Apache-2.0 license header with the current year. (e.g.,
-  `Copyright 2026 Google LLC`). This is enforced by ESLint.
-
-## Testing Conventions
-
-- **Environment Variables:** When testing code that depends on environment
-  variables, use `vi.stubEnv('NAME', 'value')` in `beforeEach` and
-  `vi.unstubAllEnvs()` in `afterEach`. Avoid modifying `process.env` directly as
-  it can lead to test leakage and is less reliable. To "unset" a variable, use
-  an empty string `vi.stubEnv('NAME', '')`.
-
-## Documentation
-
-- Always use the `docs-writer` skill when you are asked to write, edit, or
-  review any documentation.
-- Documentation is located in the `docs/` directory.
-- Suggest documentation updates when code changes render existing documentation
-  obsolete or incomplete.
+- Refer to `~/AI/multi-agent-memory-architecture.md` for the core memory
+  protocols.
+- All session-end activities MUST include a diary entry in AAAK format.
