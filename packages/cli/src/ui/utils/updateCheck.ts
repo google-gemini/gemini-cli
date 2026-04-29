@@ -6,7 +6,12 @@
 
 import latestVersion from 'latest-version';
 import semver from 'semver';
-import { getPackageJson, debugLogger } from '@google/gemini-cli-core';
+import {
+  getPackageJson,
+  debugLogger,
+  getChannelFromVersion,
+  RELEASE_CHANNEL_STABILITY,
+} from '@google/gemini-cli-core';
 import type { LoadedSettings } from '../../config/settings.js';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -65,6 +70,7 @@ export async function checkForUpdates(
     }
 
     const { name, version: currentVersion } = packageJson;
+    const currentChannel = getChannelFromVersion(currentVersion);
     const isNightly = currentVersion.includes('nightly');
 
     if (isNightly) {
@@ -90,8 +96,21 @@ export async function checkForUpdates(
       }
     } else {
       const latestUpdate = await latestVersion(name);
+      if (!latestUpdate) {
+        return null;
+      }
 
-      if (latestUpdate && semver.gt(latestUpdate, currentVersion)) {
+      const targetChannel = getChannelFromVersion(latestUpdate);
+
+      // Only offer updates that are as stable or more stable than the current version
+      if (
+        RELEASE_CHANNEL_STABILITY[targetChannel] <
+        RELEASE_CHANNEL_STABILITY[currentChannel]
+      ) {
+        return null;
+      }
+
+      if (semver.gt(latestUpdate, currentVersion)) {
         const message = `Gemini CLI update available! ${currentVersion} → ${latestUpdate}`;
         const type = semver.diff(latestUpdate, currentVersion) || undefined;
         return {

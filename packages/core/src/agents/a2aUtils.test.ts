@@ -585,5 +585,27 @@ describe('a2aUtils', () => {
         status: 'completed',
       });
     });
+
+    it('should correctly push the first message when messageLog is empty (Issue #24894)', () => {
+      const reassembler = new A2AResultReassembler();
+
+      const message: Message = {
+        kind: 'message',
+        role: 'agent',
+        messageId: 'm1',
+        parts: [{ kind: 'text', text: 'First message' }],
+      };
+
+      reassembler.update({
+        kind: 'status-update',
+        contextId: 'ctx1',
+        status: {
+          state: 'working',
+          message,
+        },
+      } as unknown as SendMessageResult);
+
+      expect(reassembler.toString()).toBe('First message');
+    });
   });
 });
