@@ -91,6 +91,20 @@ export function getStableId(
     id = `file_${turnIdx}_${partIdx}_${createHash('md5')
       .update(part.fileData.fileUri)
       .digest('hex')}`;
+  } else if (isFunctionCallPart(part)) {
+    const hash = createHash('md5')
+      .update(
+        `${turnIdx}:${partIdx}:call:${part.functionCall.name}:${JSON.stringify(part.functionCall.args)}`,
+      )
+      .digest('hex');
+    id = `call_h_${hash}`;
+  } else if (isFunctionResponsePart(part)) {
+    const hash = createHash('md5')
+      .update(
+        `${turnIdx}:${partIdx}:resp:${part.functionResponse.name}:${JSON.stringify(part.functionResponse.response)}`,
+      )
+      .digest('hex');
+    id = `resp_h_${hash}`;
   }
 
   if (!id) {
@@ -154,11 +168,14 @@ export class ContextGraphBuilder {
 
         for (let partIdx = 0; partIdx < msg.parts.length; partIdx++) {
           const part = msg.parts[partIdx];
-          const apiId = isFunctionResponsePart(part)
-            ? `resp_${part.functionResponse.id}`
-            : isFunctionCallPart(part)
-              ? `call_${part.functionCall.id}`
-              : undefined;
+          const apiId =
+            isFunctionResponsePart(part) &&
+            typeof part.functionResponse.id === 'string'
+              ? `resp_${part.functionResponse.id}`
+              : isFunctionCallPart(part) &&
+                  typeof part.functionCall.id === 'string'
+                ? `call_${part.functionCall.id}`
+                : undefined;
           const id =
             apiId || getStableId(part, this.nodeIdentityMap, turnIdx, partIdx);
 
@@ -192,9 +209,10 @@ export class ContextGraphBuilder {
 
         for (let partIdx = 0; partIdx < msg.parts.length; partIdx++) {
           const part = msg.parts[partIdx];
-          const apiId = isFunctionCallPart(part)
-            ? `call_${part.functionCall.id}`
-            : undefined;
+          const apiId =
+            isFunctionCallPart(part) && typeof part.functionCall.id === 'string'
+              ? `call_${part.functionCall.id}`
+              : undefined;
           const id =
             apiId || getStableId(part, this.nodeIdentityMap, turnIdx, partIdx);
 

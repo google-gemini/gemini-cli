@@ -39,7 +39,7 @@ export async function render(
   const maxTokens = sidecar.config.budget.maxTokens;
   const currentTokens = env.tokenCalculator.calculateConcreteListTokens(nodes);
 
-  // V0: Always protect the first node (System Prompt) and the last turn
+  // Always protect the first node (System Prompt) and all nodes in the last turn
   if (nodes.length > 0) {
     const systemPrompt = nodes[0];
     protectedIds.add(systemPrompt.id);
@@ -52,12 +52,21 @@ export async function render(
       );
     }
 
+    // Identify all nodes belonging to the last logical turn/episode
     const lastNode = nodes[nodes.length - 1];
-    protectedIds.add(lastNode.id);
-    protectionReasons.set(lastNode.id, 'recent_turn');
-    if (lastNode.logicalParentId) {
-      protectedIds.add(lastNode.logicalParentId);
-      protectionReasons.set(lastNode.logicalParentId, 'recent_turn_parent');
+    const lastLogicalId = lastNode.logicalParentId;
+
+    if (lastLogicalId) {
+      for (const node of nodes) {
+        if (node.logicalParentId === lastLogicalId) {
+          protectedIds.add(node.id);
+          protectionReasons.set(node.id, 'recent_turn');
+        }
+      }
+    } else {
+      // Fallback: just protect the last node if no logical grouping exists
+      protectedIds.add(lastNode.id);
+      protectionReasons.set(lastNode.id, 'recent_turn');
     }
   }
 
