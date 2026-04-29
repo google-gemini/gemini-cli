@@ -92,13 +92,20 @@ export function resolvePolicyChain(
       }
       // 2. Fallback to family-based auto-routing
       if (!chain) {
+        const isAutoSelection =
+          (preferredModel && isAutoModel(preferredModel, config)) ||
+          isAutoModel(configuredModel, config);
         const previewEnabled =
           hasAccessToPreview &&
           (isGemini3Model(resolvedModel, config) ||
             preferredModel === PREVIEW_GEMINI_MODEL_AUTO ||
             configuredModel === PREVIEW_GEMINI_MODEL_AUTO);
+        const autoPrefix = isAutoSelection ? 'auto-' : '';
         const chainKey = previewEnabled ? 'preview' : 'default';
-        chain = config.modelConfigService.resolveChain(chainKey, context);
+        chain = config.modelConfigService.resolveChain(
+          `${autoPrefix}${chainKey}`,
+          context,
+        );
       }
     }
     if (!chain) {
@@ -116,6 +123,7 @@ export function resolvePolicyChain(
       isAutoPreferred ||
       isAutoConfigured
     ) {
+      const isAutoSelection = isAutoPreferred || isAutoConfigured;
       if (hasAccessToPreview) {
         const previewEnabled =
           isGemini3Model(resolvedModel, config) ||
@@ -123,6 +131,7 @@ export function resolvePolicyChain(
           configuredModel === PREVIEW_GEMINI_MODEL_AUTO;
         chain = getModelPolicyChain({
           previewEnabled,
+          isAutoSelection,
           userTier: config.getUserTier(),
           useGemini31,
           useGemini31FlashLite,
@@ -133,6 +142,7 @@ export function resolvePolicyChain(
         // to the stable Gemini 2.5 chain.
         chain = getModelPolicyChain({
           previewEnabled: false,
+          isAutoSelection,
           userTier: config.getUserTier(),
           useGemini31,
           useGemini31FlashLite,
@@ -144,7 +154,6 @@ export function resolvePolicyChain(
     }
     chain = applyDynamicSlicing(chain, resolvedModel, wrapsAround);
   }
-
   // Apply Unified Silent Injection for Plan Mode with defensive checks
   if (config?.getApprovalMode?.() === ApprovalMode.PLAN) {
     return chain.map((policy) => ({
@@ -295,10 +304,13 @@ export function applyModelSelection(
     config.getModelAvailabilityService().consumeStickyAttempt(finalModel);
   }
 
+  const chain = resolvePolicyChain(config, finalModel);
+  const policy = chain.find((p) => p.model === finalModel);
+
   return {
     model: finalModel,
     config: generateContentConfig,
-    maxAttempts: selection.attempts,
+    maxAttempts: selection.attempts ?? policy?.maxAttempts,
   };
 }
 
@@ -318,6 +330,10 @@ export function applyAvailabilityTransition(
       failureKind === 'terminal' ? 'quota' : 'capacity',
     );
   } else if (transition === 'sticky_retry') {
-    context.service.markRetryOncePerTurn(context.policy.model);
+    context.service.markRetryOncePerTurn(
+      context.policy.model,
+      context.policy.maxAttempts,
+    );
+    context.service.consumeStickyAttempt(context.policy.model);
   }
 }
