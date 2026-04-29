@@ -31,11 +31,6 @@ function askUserEvalTest(policy: EvalPolicy, evalCase: AppEvalCase) {
 }
 
 describe('ask_user', () => {
-  /**
-   * @group Communication
-   * @scenario ask-user
-   * @maintainer agent-team
-   */
   askUserEvalTest('USUALLY_PASSES', {
     suiteName: 'default',
     suiteType: 'behavioral',
@@ -53,11 +48,6 @@ describe('ask_user', () => {
     },
   });
 
-  /**
-   * @group Communication
-   * @scenario ask-user
-   * @maintainer agent-team
-   */
   askUserEvalTest('USUALLY_PASSES', {
     suiteName: 'default',
     suiteType: 'behavioral',
@@ -78,11 +68,6 @@ describe('ask_user', () => {
     },
   });
 
-  /**
-   * @group Communication
-   * @scenario ask-user
-   * @maintainer agent-team
-   */
   askUserEvalTest('USUALLY_PASSES', {
     suiteName: 'default',
     suiteType: 'behavioral',
@@ -125,11 +110,6 @@ describe('ask_user', () => {
   // confirm shell commands. Fixed via prompt refinements and tool definition
   // updates to clarify that shell command confirmation is handled by the UI.
   // See fix: https://github.com/google-gemini/gemini-cli/pull/20504
-  /**
-   * @group Communication
-   * @scenario ask-user
-   * @maintainer agent-team
-   */
   askUserEvalTest('USUALLY_PASSES', {
     suiteName: 'default',
     suiteType: 'behavioral',

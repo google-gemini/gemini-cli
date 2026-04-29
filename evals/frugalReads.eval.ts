@@ -13,10 +13,6 @@ describe('Frugal reads eval', () => {
    * Ensures that the agent is frugal in its use of context by relying
    * primarily on ranged reads when the line number is known, and combining
    * nearby ranges into a single contiguous read to save tool calls.
-   *
-   * @group Context
-   * @scenario frugal-reads
-   * @maintainer agent-team
    */
   evalTest('USUALLY_PASSES', {
     suiteName: 'default',
@@ -139,10 +135,6 @@ describe('Frugal reads eval', () => {
   /**
    * Ensures the agent uses multiple ranged reads when the targets are far
    * apart to avoid the need to read the whole file.
-   *
-   * @group Context
-   * @scenario frugal-reads
-   * @maintainer agent-team
    */
   evalTest('USUALLY_PASSES', {
     suiteName: 'default',
@@ -214,10 +206,6 @@ describe('Frugal reads eval', () => {
   /**
    * Validates that the agent reads the entire file if there are lots of matches
    * (e.g.: 10), as it's more efficient than many small ranged reads.
-   *
-   * @group Context
-   * @scenario frugal-reads
-   * @maintainer agent-team
    */
   evalTest('USUALLY_PASSES', {
     suiteName: 'default',
