@@ -329,9 +329,9 @@ export const directoryCommand: SlashCommand = {
           };
         }
 
-        const pathsToRemove = rest
-          .join(' ')
+        const pathsToRemove = args
           .split(',')
+          .map((p) => p.trim())
           .filter((p) => p);
         if (pathsToRemove.length === 0) {
           addItem({
