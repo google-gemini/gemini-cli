@@ -795,22 +795,13 @@ export function getPlatformUndoBindings(
 }
 
 export function getPlatformRedoBindings(
-  platform: string,
+  _platform: string,
 ): readonly KeyBinding[] {
-  if (platform === 'win32') {
-    return [new KeyBinding('ctrl+shift+z'), new KeyBinding('alt+shift+z')];
-  }
-  if (platform === 'darwin') {
-    return [
-      new KeyBinding('cmd+shift+z'),
-      new KeyBinding('alt+shift+z'),
-      new KeyBinding('ctrl+shift+z'),
-    ];
-  }
-  // Linux / WSL: Keep only shift-based redo to avoid conflict with YOLO (ctrl+y)
+  // Use a stable order for all platforms to minimize churn.
+  // Ctrl+Shift+Z is the universal primary.
   return [
     new KeyBinding('ctrl+shift+z'),
-    new KeyBinding('alt+shift+z'),
     new KeyBinding('cmd+shift+z'),
+    new KeyBinding('alt+shift+z'),
   ];
 }
