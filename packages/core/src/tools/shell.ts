@@ -32,6 +32,8 @@ import {
   ShellExecutionService,
   type ShellOutputEvent,
 } from '../services/shellExecutionService.js';
+import { ExecutionLifecycleService } from '../services/executionLifecycleService.js';
+import { LineBuffer } from '../utils/lineBuffer.js';
 import { formatBytes } from '../utils/formatters.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import {
@@ -63,12 +65,27 @@ export const OUTPUT_UPDATE_INTERVAL_MS = 1000;
 const BACKGROUND_DELAY_MS = 200;
 const SHOW_NL_DESCRIPTION_THRESHOLD = 150;
 
+/**
+ * Debounce window for `stream_output` line forwarding. Lines that arrive
+ * within this window are coalesced into a single `updateOutput` call to
+ * avoid flooding the ACP client on bursty output. Mirrors the reference
+ * value used by Claude Code's Monitor tool.
+ */
+export const STREAM_OUTPUT_BATCH_MS = 200;
+
 export interface ShellToolParams {
   command: string;
   description?: string;
   dir_path?: string;
   is_background?: boolean;
   delay_ms?: number;
+  /**
+   * When true and `is_background` is also true, each stdout line from the
+   * background process is forwarded to the ACP client in real time (as
+   * `tool_call_update` events) during the current turn. Ignored when
+   * `is_background` is false.
+   */
+  stream_output?: boolean;
   [PARAM_ADDITIONAL_PERMISSIONS]?: SandboxPermissions;
 }
 
@@ -569,7 +586,13 @@ export class ShellToolInvocation extends BaseToolInvocation<
             }
           },
           combinedController.signal,
-          this.context.config.getEnableInteractiveShell(),
+          // When stream_output is combined with is_background we need the
+          // child_process path: it emits decoded string chunks that LineBuffer
+          // can split into lines. The node-pty path emits AnsiOutput (terminal
+          // redraw snapshots) which isn't suitable for per-line streaming.
+          this.params.is_background && this.params.stream_output
+            ? false
+            : this.context.config.getEnableInteractiveShell(),
           {
             ...shellExecutionConfig,
             sessionId: this.context.config?.getSessionId?.() ?? 'default',
@@ -611,6 +634,74 @@ export class ShellToolInvocation extends BaseToolInvocation<
         // If the model requested to run in the background, do so after a short delay.
         let completed = false;
         if (this.params.is_background) {
+          // Stream stdout lines to the ACP client in real time if requested.
+          // Subscribe BEFORE the background() delay so no output is lost.
+          if (this.params.stream_output && updateOutput) {
+            const lineBuffer = new LineBuffer();
+            const pendingLines: string[] = [];
+            let batchTimer: NodeJS.Timeout | null = null;
+            let teardown = false;
+            let unsubscribeStream: (() => void) | null = null;
+
+            const flushPending = () => {
+              if (batchTimer) {
+                clearTimeout(batchTimer);
+                batchTimer = null;
+              }
+              if (pendingLines.length === 0) return;
+              const payload = pendingLines.join('\n');
+              pendingLines.length = 0;
+              updateOutput(payload, {
+                'gemini-cli/stream_output': true,
+                pid,
+              });
+            };
+            const enqueueLines = (lines: string[]) => {
+              if (lines.length === 0) return;
+              pendingLines.push(...lines);
+              if (batchTimer === null) {
+                batchTimer = setTimeout(flushPending, STREAM_OUTPUT_BATCH_MS);
+              }
+            };
+            const teardownStream = () => {
+              if (teardown) return;
+              teardown = true;
+              enqueueLines(lineBuffer.flush());
+              flushPending();
+              signal.removeEventListener('abort', teardownStream);
+              unsubscribeStream?.();
+              unsubscribeStream = null;
+            };
+            unsubscribeStream = ExecutionLifecycleService.subscribe(
+              pid,
+              (event) => {
+                if (teardown) return;
+                switch (event.type) {
+                  case 'data': {
+                    if (typeof event.chunk !== 'string') return;
+                    enqueueLines(lineBuffer.push(event.chunk));
+                    break;
+                  }
+                  case 'exit': {
+                    teardownStream();
+                    break;
+                  }
+                  default:
+                    break;
+                }
+              },
+            );
+            // The listener deliberately does NOT tear down on the turn's
+            // abortSignal: stream_output streams are designed to outlive the
+            // spawning turn (issue #25803 PR 2 / ConsultaSkill semantics).
+            // Teardown happens only on the process's own `exit` event or when
+            // the session ends. A stream already-aborted at subscribe time
+            // would indicate an abnormal state; flush defensively in that case.
+            if (signal.aborted) {
+              teardownStream();
+            }
+          }
+
           resultPromise
             .then(() => {
               completed = true;
@@ -633,6 +724,9 @@ export class ShellToolInvocation extends BaseToolInvocation<
             return {
               llmContent: `Command is running in background. PID: ${pid}. Initial output:\n${cumulativeOutput}`,
               returnDisplay: `Background process started with PID ${pid}.`,
+              ...(this.params.stream_output
+                ? { backgroundedStreamId: pid }
+                : {}),
             };
           }
         }
@@ -640,6 +734,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
 
       const result = await resultPromise;
 
+      let backgroundedStreamId: number | undefined;
       const backgroundPIDs: number[] = [];
       if (os.platform() !== 'win32') {
         let tempFileExists = false;
@@ -705,6 +800,9 @@ export class ShellToolInvocation extends BaseToolInvocation<
           command: this.params.command,
           initialOutput: result.output,
         };
+        if (this.params.stream_output && result.pid !== undefined) {
+          backgroundedStreamId = result.pid;
+        }
       } else {
         // Create a formatted error string for display, replacing the wrapper command
         // with the user-facing command.
@@ -938,6 +1036,9 @@ export class ShellToolInvocation extends BaseToolInvocation<
         return {
           llmContent: summary,
           returnDisplay,
+          ...(backgroundedStreamId !== undefined
+            ? { backgroundedStreamId }
+            : {}),
           ...executionError,
         };
       }
@@ -946,6 +1047,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
         llmContent,
         returnDisplay,
         data,
+        ...(backgroundedStreamId !== undefined ? { backgroundedStreamId } : {}),
         ...executionError,
       };
     } finally {

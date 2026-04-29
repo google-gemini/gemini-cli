@@ -35,7 +35,16 @@ export type ForcedToolDecision = 'allow' | 'deny' | 'ask_user';
  */
 export interface ExecuteOptions {
   abortSignal: AbortSignal;
-  updateOutput?: (output: ToolLiveOutput) => void;
+  /**
+   * Incremental progress callback. The optional second `_meta` parameter
+   * is forwarded verbatim to the ACP `tool_call_update._meta` field so
+   * clients (and sidecars) can tag / filter specific update kinds —
+   * e.g. stream_output lines carry `{ 'gemini-cli/stream_output': true }`.
+   */
+  updateOutput?: (
+    output: ToolLiveOutput,
+    _meta?: Record<string, unknown>,
+  ) => void;
   shellExecutionConfig?: ShellExecutionConfig;
   setExecutionIdCallback?: (executionId: number) => void;
 }
@@ -776,6 +785,19 @@ export interface ToolResult {
     name: string;
     args: Record<string, unknown>;
   };
+
+  /**
+   * Optional. When the tool returns early because it handed a long-running
+   * process off to the background AND the caller requested live streaming
+   * of stdout (e.g. `run_shell_command` with `stream_output: true`), this
+   * field carries the correlating stream id (typically the process PID).
+   *
+   * The ACP layer uses this to keep the tool call in `in_progress` state
+   * so subsequent streamed lines can still be emitted; the terminal
+   * `completed` status is deferred until the process actually exits or the
+   * turn is aborted.
+   */
+  backgroundedStreamId?: number;
 }
 
 /**
