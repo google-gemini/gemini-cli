@@ -117,6 +117,11 @@ export class PipelineOrchestrator {
     triggerTargets: ReadonlySet<string>,
     protectedLogicalIds: ReadonlySet<string> = new Set(),
   ): Promise<readonly ConcreteNode[]> {
+    this.tracer.logEvent('Orchestrator', 'Strategy Intent', {
+      trigger,
+      totalNodes: nodes.length,
+      targetNodes: triggerTargets.size,
+    });
     let currentBuffer = ContextWorkingBufferImpl.initialize(nodes);
     const triggerPipelines = this.pipelines.filter((p) =>
       p.triggers.includes(trigger),
@@ -196,6 +201,10 @@ export class PipelineOrchestrator {
     this.tracer.logEvent(
       'Orchestrator',
       `Triggering async pipeline: ${pipeline.name}`,
+      {
+        triggerTargets: triggerTargets.size,
+        totalNodes: nodes.length,
+      },
     );
     if (!nodes || nodes.length === 0) return;
 
