@@ -140,8 +140,8 @@ export class ContextManager {
    * Identifies 'pinned' nodes that should not be truncated.
    * This includes active tool calls (calls without responses in the graph).
    */
-  private getProtectedNodeIds(): Set<string> {
-    const protectedIds = new Set<string>();
+  private getProtectedNodeIds(): Map<string, string> {
+    const protectionMap = new Map<string, string>();
     const nodes = this.buffer.nodes;
 
     const calls = nodes.filter((n) => isToolExecution(n) && n.role === 'model');
@@ -156,11 +156,11 @@ export class ContextManager {
       const id = call.payload.functionCall?.id;
       // If we have a call but no response in the current graph, it's 'in flight'
       if (id && !responses.has(id)) {
-        protectedIds.add(call.id);
+        protectionMap.set(call.id, 'in_flight_tool_call');
       }
     }
 
-    return protectedIds;
+    return protectionMap;
   }
 
   /**
@@ -201,10 +201,10 @@ export class ContextManager {
   ): Promise<Content[]> {
     this.tracer.logEvent('ContextManager', 'Starting rendering of LLM context');
 
-    const protectedIds = new Set([
-      ...activeTaskIds,
-      ...this.getProtectedNodeIds(),
-    ]);
+    const protectionReasons = this.getProtectedNodeIds();
+    for (const id of activeTaskIds) {
+      protectionReasons.set(id, 'active_task');
+    }
 
     // Apply final GC Backstop pressure barrier synchronously before mapping
     const finalHistory = await render(
@@ -213,7 +213,7 @@ export class ContextManager {
       this.sidecar,
       this.tracer,
       this.env,
-      protectedIds,
+      protectionReasons,
     );
 
     this.tracer.logEvent('ContextManager', 'Finished rendering');

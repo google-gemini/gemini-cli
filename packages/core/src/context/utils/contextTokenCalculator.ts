@@ -74,6 +74,64 @@ export class ContextTokenCalculator {
   }
 
   /**
+   * Calculates a detailed breakdown of tokens by category for a list of nodes.
+   * Useful for calibration tracing and debugging overestimation.
+   */
+  calculateTokenBreakdown(nodes: readonly ConcreteNode[]): {
+    total: number;
+    text: number;
+    media: number;
+    tool: number;
+    overhead: number;
+  } {
+    const breakdown = { total: 0, text: 0, media: 0, tool: 0, overhead: 0 };
+    const seenIds = new Set<string>();
+
+    for (const node of nodes) {
+      if (seenIds.has(node.id)) continue;
+      seenIds.add(node.id);
+
+      const cost = this.getTokenCost(node);
+      breakdown.total += cost;
+
+      const behavior = this.registry.get(node.type);
+      const parts = behavior.getEstimatableParts(node);
+
+      for (const part of parts) {
+        if (typeof part.text === 'string') {
+          breakdown.text += estimateTokenCountSync(
+            [part],
+            0,
+            this.charsPerToken,
+          );
+        } else if (
+          part.inlineData?.mimeType?.startsWith('image/') ||
+          part.fileData?.mimeType?.startsWith('image/')
+        ) {
+          breakdown.media += estimateTokenCountSync(
+            [part],
+            0,
+            this.charsPerToken,
+          );
+        } else if (part.functionCall || part.functionResponse) {
+          breakdown.tool += estimateTokenCountSync(
+            [part],
+            0,
+            this.charsPerToken,
+          );
+        } else {
+          breakdown.overhead += estimateTokenCountSync(
+            [part],
+            0,
+            this.charsPerToken,
+          );
+        }
+      }
+    }
+    return breakdown;
+  }
+
+  /**
    * Fast calculation for a flat array of ConcreteNodes (The Nodes).
    * It relies entirely on the O(1) sidecar token cache.
    */

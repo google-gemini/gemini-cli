@@ -24,8 +24,10 @@ export async function render(
   sidecar: ContextProfile,
   tracer: ContextTracer,
   env: ContextEnvironment,
-  protectedIds: Set<string>,
+  protectionReasons: Map<string, string>,
 ): Promise<Content[]> {
+  const protectedIds = new Set(protectionReasons.keys());
+
   if (!sidecar.config.budget) {
     const contents = env.graphMapper.fromGraph(nodes);
     tracer.logEvent('Render', 'Render Context to LLM (No Budget)', {
@@ -39,13 +41,41 @@ export async function render(
 
   // V0: Always protect the first node (System Prompt) and the last turn
   if (nodes.length > 0) {
-    protectedIds.add(nodes[0].id);
-    if (nodes[0].logicalParentId) protectedIds.add(nodes[0].logicalParentId);
+    const systemPrompt = nodes[0];
+    protectedIds.add(systemPrompt.id);
+    protectionReasons.set(systemPrompt.id, 'system_prompt');
+    if (systemPrompt.logicalParentId) {
+      protectedIds.add(systemPrompt.logicalParentId);
+      protectionReasons.set(
+        systemPrompt.logicalParentId,
+        'system_prompt_parent',
+      );
+    }
 
     const lastNode = nodes[nodes.length - 1];
     protectedIds.add(lastNode.id);
-    if (lastNode.logicalParentId) protectedIds.add(lastNode.logicalParentId);
+    protectionReasons.set(lastNode.id, 'recent_turn');
+    if (lastNode.logicalParentId) {
+      protectedIds.add(lastNode.logicalParentId);
+      protectionReasons.set(lastNode.logicalParentId, 'recent_turn_parent');
+    }
   }
+
+  tracer.logEvent('Render', 'Budget Audit', {
+    maxTokens,
+    retainedTokens: sidecar.config.budget.retainedTokens,
+    currentTokens,
+    pressure: (currentTokens / maxTokens).toFixed(2),
+    isOverBudget: currentTokens > maxTokens,
+  });
+
+  tracer.logEvent('Render', 'Estimation Calibration', {
+    breakdown: env.tokenCalculator.calculateTokenBreakdown(nodes),
+  });
+
+  tracer.logEvent('Render', 'Protection Audit', {
+    reasons: Object.fromEntries(protectionReasons),
+  });
 
   if (currentTokens <= maxTokens) {
     tracer.logEvent(
@@ -59,12 +89,14 @@ export async function render(
     return contents;
   }
 
+  const targetDelta = currentTokens - sidecar.config.budget.retainedTokens;
   tracer.logEvent(
     'Render',
     `View exceeds maxTokens (${currentTokens} > ${maxTokens}). Hitting Synchronous Pressure Barrier.`,
+    { targetDelta },
   );
   debugLogger.log(
-    `Context Manager Synchronous Barrier triggered: View at ${currentTokens} tokens (limit: ${maxTokens}).`,
+    `Context Manager Synchronous Barrier triggered: View at ${currentTokens} tokens (limit: ${maxTokens}, target reduction: ${targetDelta}).`,
   );
 
   // Calculate exactly which nodes aged out of the retainedTokens budget to form our target delta
@@ -92,6 +124,11 @@ export async function render(
   tracer.logEvent(
     'Render',
     `Finished rendering. Final token count: ${finalTokens}.`,
+    {
+      finalTokens,
+      finalBreakdown:
+        env.tokenCalculator.calculateTokenBreakdown(processedNodes),
+    },
   );
   debugLogger.log(
     `Context Manager finished. Final actual token count: ${finalTokens}.`,

@@ -133,6 +133,7 @@ export class PipelineOrchestrator {
           this.tracer.logEvent(
             'Orchestrator',
             `Executing processor synchronously: ${processor.id}`,
+            { nodeCountBefore: currentBuffer.nodes.length },
           );
 
           const allowedTargets = currentBuffer.nodes.filter((n) =>
@@ -150,6 +151,27 @@ export class PipelineOrchestrator {
             allowedTargets,
             returnedNodes,
           );
+
+          const addedNodes = returnedNodes.filter(
+            (n) => !allowedTargets.some((at) => at.id === n.id),
+          );
+          const removedNodes = allowedTargets.filter(
+            (at) => !returnedNodes.some((n) => n.id === at.id),
+          );
+
+          this.tracer.logEvent('Orchestrator', 'Transformation Lineage', {
+            processorId: processor.id,
+            inputNodeCount: allowedTargets.length,
+            outputNodeCount: returnedNodes.length,
+            removedNodeIds: removedNodes.map((n) => n.id),
+            addedNodes: addedNodes.map((n) => ({
+              id: n.id,
+              replacesId: n.replacesId,
+              abstractsIds: n.abstractsIds,
+              approxTokens:
+                this.env.tokenCalculator.calculateConcreteListTokens([n]),
+            })),
+          });
         } catch (error) {
           debugLogger.error(
             `Synchronous processor ${processor.id} failed:`,
@@ -187,6 +209,7 @@ export class PipelineOrchestrator {
         this.tracer.logEvent(
           'Orchestrator',
           `Executing processor: ${processor.id} (async)`,
+          { nodeCountBefore: currentBuffer.nodes.length },
         );
 
         const allowedTargets = currentBuffer.nodes.filter((n) =>
@@ -204,6 +227,29 @@ export class PipelineOrchestrator {
           allowedTargets,
           returnedNodes,
         );
+
+        const addedNodes = returnedNodes.filter(
+          (n) => !allowedTargets.some((at) => at.id === n.id),
+        );
+        const removedNodes = allowedTargets.filter(
+          (at) => !returnedNodes.some((n) => n.id === at.id),
+        );
+
+        this.tracer.logEvent('Orchestrator', 'Transformation Lineage (Async)', {
+          processorId: processor.id,
+          inputNodeCount: allowedTargets.length,
+          outputNodeCount: returnedNodes.length,
+          removedNodeIds: removedNodes.map((n) => n.id),
+          addedNodes: addedNodes.map((n) => ({
+            id: n.id,
+            replacesId: n.replacesId,
+            abstractsIds: n.abstractsIds,
+            approxTokens: this.env.tokenCalculator.calculateConcreteListTokens([
+              n,
+            ]),
+          })),
+        });
+
         this.eventBus.emitProcessorResult({
           processorId: processor.id,
           targets: allowedTargets,
