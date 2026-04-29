@@ -931,7 +931,13 @@ export async function loadCliConfig(
       (ide.name !== 'vscode' || process.env['TERM_PROGRAM'] === 'vscode')
     ) {
       clientName = `acp-${ide.name}`;
+    } else {
+      clientName = 'acp';
     }
+  } else if (argv.isCommand) {
+    clientName = 'cli-command';
+  } else {
+    clientName = 'tui';
   }
 
   // TODO(joshualitt): Clean this up alongside removal of the legacy config.
