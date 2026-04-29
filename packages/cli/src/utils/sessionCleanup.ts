@@ -46,6 +46,16 @@ export interface CleanupResult {
   failed: number;
 }
 
+interface CleanupRoot {
+  tempDir: string;
+  chatsDir: string;
+}
+
+interface CleanupSessionFileEntry extends SessionFileEntry {
+  tempDir: string;
+  chatsDir: string;
+}
+
 /**
  * Helpers for session cleanup.
  */
@@ -66,13 +76,37 @@ function deriveShortIdFromFileName(fileName: string): string | null {
  */
 async function cleanupSessionAndSubagentsAsync(
   sessionId: string,
-  config: Config,
+  tempDir: string,
 ): Promise<void> {
-  const tempDir = config.storage.getProjectTempDir();
   const chatsDir = path.join(tempDir, 'chats');
 
   await deleteSessionArtifactsAsync(sessionId, tempDir);
   await deleteSubagentSessionDirAndArtifactsAsync(sessionId, chatsDir, tempDir);
+}
+
+async function getCleanupRoots(projectTempDir: string): Promise<CleanupRoot[]> {
+  const globalTempDir = Storage.getGlobalTempDir();
+  const relativeProjectTemp = path.relative(globalTempDir, projectTempDir);
+  const isUnderGlobalTemp =
+    relativeProjectTemp &&
+    !relativeProjectTemp.startsWith('..') &&
+    !path.isAbsolute(relativeProjectTemp);
+
+  if (!isUnderGlobalTemp) {
+    return [
+      { tempDir: projectTempDir, chatsDir: path.join(projectTempDir, 'chats') },
+    ];
+  }
+
+  const entries = await fs
+    .readdir(globalTempDir, { withFileTypes: true })
+    .catch(() => []);
+  return entries
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => {
+      const tempDir = path.join(globalTempDir, entry.name);
+      return { tempDir, chatsDir: path.join(tempDir, 'chats') };
+    });
 }
 
 /**
@@ -97,7 +131,9 @@ export async function cleanupExpiredSessions(
     }
 
     const retentionConfig = settings.general.sessionRetention;
-    const chatsDir = path.join(config.storage.getProjectTempDir(), 'chats');
+    const cleanupRoots = await getCleanupRoots(
+      config.storage.getProjectTempDir(),
+    );
 
     // Validate retention configuration
     const validationErrorMessage = validateRetentionConfig(
@@ -110,7 +146,21 @@ export async function cleanupExpiredSessions(
       return { ...result, disabled: true };
     }
 
-    const allFiles = await getAllSessionFiles(chatsDir, config.getSessionId());
+    const allFiles: CleanupSessionFileEntry[] = (
+      await Promise.all(
+        cleanupRoots.map(async (root): Promise<CleanupSessionFileEntry[]> => {
+          const files = await getAllSessionFiles(
+            root.chatsDir,
+            config.getSessionId(),
+          );
+          return files.map((file) => ({
+            ...file,
+            tempDir: root.tempDir,
+            chatsDir: root.chatsDir,
+          }));
+        }),
+      )
+    ).flat();
     result.scanned = allFiles.length;
 
     if (allFiles.length === 0) {
@@ -131,21 +181,21 @@ export async function cleanupExpiredSessions(
         const shortId = deriveShortIdFromFileName(sessionToDelete.fileName);
 
         if (shortId) {
-          if (processedShortIds.has(shortId)) {
+          const processedShortIdKey = `${sessionToDelete.chatsDir}:${shortId}`;
+          if (processedShortIds.has(processedShortIdKey)) {
             continue;
           }
-          processedShortIds.add(shortId);
+          processedShortIds.add(processedShortIdKey);
 
-          const matchingFiles = allFiles
-            .map((f) => f.fileName)
-            .filter(
-              (f) =>
-                f.startsWith(SESSION_FILE_PREFIX) &&
-                f.endsWith(`-${shortId}.json`),
-            );
+          const matchingFiles = allFiles.filter(
+            (f) =>
+              f.chatsDir === sessionToDelete.chatsDir &&
+              f.fileName.startsWith(SESSION_FILE_PREFIX) &&
+              f.fileName.endsWith(`-${shortId}.json`),
+          );
 
           for (const file of matchingFiles) {
-            const filePath = path.join(chatsDir, file);
+            const filePath = path.join(file.chatsDir, file.fileName);
             let fullSessionId: string | undefined;
 
             try {
@@ -173,7 +223,10 @@ export async function cleanupExpiredSessions(
                 await fs.unlink(filePath);
 
                 if (fullSessionId) {
-                  await cleanupSessionAndSubagentsAsync(fullSessionId, config);
+                  await cleanupSessionAndSubagentsAsync(
+                    fullSessionId,
+                    file.tempDir,
+                  );
                 }
                 result.deleted++;
               } else {
@@ -189,7 +242,7 @@ export async function cleanupExpiredSessions(
                 // File already deleted, do nothing.
               } else {
                 debugLogger.warn(
-                  `Failed to delete matching file ${file}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                  `Failed to delete matching file ${file.fileName}: ${error instanceof Error ? error.message : 'Unknown error'}`,
                 );
                 result.failed++;
               }
@@ -197,12 +250,18 @@ export async function cleanupExpiredSessions(
           }
         } else {
           // Fallback to old logic
-          const sessionPath = path.join(chatsDir, sessionToDelete.fileName);
+          const sessionPath = path.join(
+            sessionToDelete.chatsDir,
+            sessionToDelete.fileName,
+          );
           await fs.unlink(sessionPath);
 
           const sessionId = sessionToDelete.sessionInfo?.id;
           if (sessionId) {
-            await cleanupSessionAndSubagentsAsync(sessionId, config);
+            await cleanupSessionAndSubagentsAsync(
+              sessionId,
+              sessionToDelete.tempDir,
+            );
           }
 
           if (config.getDebugMode()) {
@@ -254,11 +313,11 @@ export async function cleanupExpiredSessions(
 /**
  * Identifies sessions that should be deleted (corrupted or expired based on retention policy)
  */
-export async function identifySessionsToDelete(
-  allFiles: SessionFileEntry[],
+export async function identifySessionsToDelete<T extends SessionFileEntry>(
+  allFiles: T[],
   retentionConfig: SessionRetentionSettings,
-): Promise<SessionFileEntry[]> {
-  const sessionsToDelete: SessionFileEntry[] = [];
+): Promise<T[]> {
+  const sessionsToDelete: T[] = [];
 
   // All corrupted files should be deleted
   sessionsToDelete.push(
