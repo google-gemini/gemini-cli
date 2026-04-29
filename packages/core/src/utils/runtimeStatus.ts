@@ -49,7 +49,7 @@ export interface RuntimeStatus {
   sessionId: string;
   workDir: string;
   hostname: string;
-  /** Seconds since Unix epoch (float, matches the kimi-cli on-disk format). */
+  /** Seconds since Unix epoch (float). */
   startedAt: number;
   geminiCliVersion: string | null;
 }
@@ -113,36 +113,36 @@ export async function writeRuntimeStatus(
     gemini_cli_version: await safeGeminiVersion(),
   };
 
-  fs.mkdirSync(sessionDir, { recursive: true });
+  await fs.promises.mkdir(sessionDir, { recursive: true });
 
   const target = runtimeStatusPath(sessionDir);
   const tempPath = `${target}.tmp.${crypto.randomUUID()}`;
-  // `ensureAscii=false` equivalent: JSON.stringify already keeps non-ASCII
-  // characters as their literal UTF-8 code points when written via utf-8.
+  // `JSON.stringify` already emits non-ASCII characters as their literal
+  // UTF-8 code points when the file is written via utf-8.
   const content = JSON.stringify(status, null, 2);
 
-  let fd: number | undefined;
+  let handle: fs.promises.FileHandle | undefined;
   try {
     // 'wx' = O_CREAT | O_EXCL — fail if `tempPath` already exists. The
     // random suffix already makes collision astronomically unlikely; the
     // exclusive open adds defense-in-depth against a pre-placed file or
     // symlink at the temp path (which 'w' would silently follow).
-    fd = fs.openSync(tempPath, 'wx', 0o600);
-    fs.writeSync(fd, content, 0, 'utf8');
-    fs.fsyncSync(fd);
-    fs.closeSync(fd);
-    fd = undefined;
-    fs.renameSync(tempPath, target);
+    handle = await fs.promises.open(tempPath, 'wx', 0o600);
+    await handle.write(content, 0, 'utf8');
+    await handle.sync();
+    await handle.close();
+    handle = undefined;
+    await fs.promises.rename(tempPath, target);
   } catch (err) {
-    if (fd !== undefined) {
+    if (handle !== undefined) {
       try {
-        fs.closeSync(fd);
+        await handle.close();
       } catch {
         // Ignore close errors during cleanup.
       }
     }
     try {
-      fs.unlinkSync(tempPath);
+      await fs.promises.unlink(tempPath);
     } catch {
       // Ignore unlink errors; tmp file may not have been created.
     }
