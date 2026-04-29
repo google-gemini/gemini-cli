@@ -107,7 +107,11 @@ export function getModelPolicyChain(
             }
           : {}),
       }),
-      definePolicy({ model: PREVIEW_GEMINI_FLASH_MODEL, isLastResort: true }),
+      definePolicy({
+        model: PREVIEW_GEMINI_FLASH_MODEL,
+        isLastResort: true,
+        maxAttempts: 10,
+      }),
     ];
   }
 
@@ -116,7 +120,11 @@ export function getModelPolicyChain(
       model: DEFAULT_GEMINI_MODEL,
       ...(isAuto ? AUTO_ROUTING_OVERRIDES : {}),
     }),
-    definePolicy({ model: DEFAULT_GEMINI_FLASH_MODEL, isLastResort: true }),
+    definePolicy({
+      model: DEFAULT_GEMINI_FLASH_MODEL,
+      isLastResort: true,
+      maxAttempts: 10,
+    }),
   ];
 }
 

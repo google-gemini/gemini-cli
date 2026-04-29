@@ -528,6 +528,7 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       {
         model: 'gemini-3-flash-preview',
         isLastResort: true,
+        maxAttempts: 10,
         actions: {
           terminal: 'prompt',
           transient: 'prompt',
@@ -562,6 +563,7 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       {
         model: 'gemini-3-flash-preview',
         isLastResort: true,
+        maxAttempts: 10,
         actions: {
           terminal: 'prompt',
           transient: 'prompt',
@@ -595,6 +597,7 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       {
         model: 'gemini-2.5-flash',
         isLastResort: true,
+        maxAttempts: 10,
         actions: {
           terminal: 'prompt',
           transient: 'prompt',
@@ -629,6 +632,7 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       {
         model: 'gemini-2.5-flash',
         isLastResort: true,
+        maxAttempts: 10,
         actions: {
           terminal: 'prompt',
           transient: 'prompt',
