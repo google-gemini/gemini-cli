@@ -268,6 +268,7 @@ export class LegacyAgentProtocol implements AgentProtocol {
           );
           this._emit([continuationMessage]);
 
+          this._translationState.isContinuation = true;
           currentParts = [{ text: continuationPrompt }];
           turnCount--;
           continue;
