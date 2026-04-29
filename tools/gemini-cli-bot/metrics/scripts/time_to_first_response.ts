@@ -2,11 +2,9 @@
  * @license
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
- *
- * @license
  */
 
-import { GITHUB_OWNER, GITHUB_REPO, type MetricOutput } from '../types.js';
+import { GITHUB_OWNER, GITHUB_REPO } from '../types.js';
 import { execSync } from 'node:child_process';
 
 try {
@@ -130,27 +128,10 @@ try {
   const firstParty = calculateAvg(allItems.filter((i) => is1P(i.association)));
   const overall = calculateAvg(allItems);
 
-  const timestamp = new Date().toISOString();
+  console.log(`time_to_first_response_overall_hours,${Math.round(overall * 100) / 100}`);
+  console.log(`time_to_first_response_maintainers_hours,${Math.round(maintainers * 100) / 100}`);
+  console.log(`time_to_first_response_1p_hours,${Math.round(firstParty * 100) / 100}`);
 
-  const metrics: MetricOutput[] = [
-    {
-      metric: 'time_to_first_response_overall_hours',
-      value: Math.round(overall * 100) / 100,
-      timestamp,
-    },
-    {
-      metric: 'time_to_first_response_maintainers_hours',
-      value: Math.round(maintainers * 100) / 100,
-      timestamp,
-    },
-    {
-      metric: 'time_to_first_response_1p_hours',
-      value: Math.round(firstParty * 100) / 100,
-      timestamp,
-    },
-  ];
-
-  metrics.forEach((m) => process.stdout.write(JSON.stringify(m) + '\n'));
 } catch (err) {
   process.stderr.write(err instanceof Error ? err.message : String(err));
   process.exit(1);

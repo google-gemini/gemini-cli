@@ -2,11 +2,9 @@
  * @license
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
- *
- * @license
  */
 
-import { GITHUB_OWNER, GITHUB_REPO, type MetricOutput } from '../types.js';
+import { GITHUB_OWNER, GITHUB_REPO } from '../types.js';
 import { execSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -97,7 +95,7 @@ try {
     const reviewersOnPR = new Map<string, { name?: string }>();
     for (const review of pr.reviews.nodes) {
       if (
-        ['MEMBER', 'OWNER'].includes(review.authorAssociation) &&
+        ['MEMBER', 'OWNER', 'COLLABORATOR'].includes(review.authorAssociation) &&
         review.author?.login
       ) {
         const login = review.author.login.toLowerCase();
@@ -138,19 +136,8 @@ try {
     totalMaintainerReviews > 0
       ? maintainerReviewsWithExpertise / totalMaintainerReviews
       : 0;
-  const timestamp = new Date().toISOString();
 
-  process.stdout.write(
-    JSON.stringify(<MetricOutput>{
-      metric: 'domain_expertise',
-      value: Math.round(ratio * 100) / 100,
-      timestamp,
-      details: {
-        totalMaintainerReviews,
-        maintainerReviewsWithExpertise,
-      },
-    }) + '\n',
-  );
+  console.log(`domain_expertise,${Math.round(ratio * 100) / 100}`);
 } catch (err) {
   process.stderr.write(err instanceof Error ? err.message : String(err));
   process.exit(1);

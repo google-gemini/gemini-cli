@@ -2,11 +2,9 @@
  * @license
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
- *
- * @license
  */
 
-import { GITHUB_OWNER, GITHUB_REPO, type MetricOutput } from '../types.js';
+import { GITHUB_OWNER, GITHUB_REPO } from '../types.js';
 import { execSync } from 'node:child_process';
 
 try {
@@ -96,42 +94,13 @@ try {
   );
   const issueOverall = calculateAvg(issues);
 
-  const timestamp = new Date().toISOString();
+  console.log(`latency_pr_overall_hours,${Math.round(prOverall * 100) / 100}`);
+  console.log(`latency_pr_maintainers_hours,${Math.round(prMaintainers * 100) / 100}`);
+  console.log(`latency_pr_community_hours,${Math.round(prCommunity * 100) / 100}`);
+  console.log(`latency_issue_overall_hours,${Math.round(issueOverall * 100) / 100}`);
+  console.log(`latency_issue_maintainers_hours,${Math.round(issueMaintainers * 100) / 100}`);
+  console.log(`latency_issue_community_hours,${Math.round(issueCommunity * 100) / 100}`);
 
-  const metrics: MetricOutput[] = [
-    {
-      metric: 'latency_pr_overall_hours',
-      value: Math.round(prOverall * 100) / 100,
-      timestamp,
-    },
-    {
-      metric: 'latency_pr_maintainers_hours',
-      value: Math.round(prMaintainers * 100) / 100,
-      timestamp,
-    },
-    {
-      metric: 'latency_pr_community_hours',
-      value: Math.round(prCommunity * 100) / 100,
-      timestamp,
-    },
-    {
-      metric: 'latency_issue_overall_hours',
-      value: Math.round(issueOverall * 100) / 100,
-      timestamp,
-    },
-    {
-      metric: 'latency_issue_maintainers_hours',
-      value: Math.round(issueMaintainers * 100) / 100,
-      timestamp,
-    },
-    {
-      metric: 'latency_issue_community_hours',
-      value: Math.round(issueCommunity * 100) / 100,
-      timestamp,
-    },
-  ];
-
-  metrics.forEach((m) => process.stdout.write(JSON.stringify(m) + '\n'));
 } catch (err) {
   process.stderr.write(err instanceof Error ? err.message : String(err));
   process.exit(1);

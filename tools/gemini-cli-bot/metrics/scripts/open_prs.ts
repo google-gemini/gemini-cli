@@ -5,14 +5,26 @@
  */
 
 import { execSync } from 'node:child_process';
+import { GITHUB_OWNER, GITHUB_REPO } from '../types.js';
 
 try {
-  const count = execSync(
-    'gh pr list --state open --limit 1000 --json number --jq length',
+  const query = `
+  query($owner: String!, $repo: String!) {
+    repository(owner: $owner, name: $repo) {
+      pullRequests(states: OPEN) {
+        totalCount
+      }
+    }
+  }
+  `;
+  const output = execSync(
+    `gh api graphql -F owner=${GITHUB_OWNER} -F repo=${GITHUB_REPO} -f query='${query}'`,
     {
       encoding: 'utf-8',
     },
   ).trim();
+  const data = JSON.parse(output);
+  const count = data.data.repository.pullRequests.totalCount;
   console.log(`open_prs,${count}`);
 } catch {
   // Fallback if gh fails or no PRs found
