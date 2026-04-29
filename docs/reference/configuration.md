@@ -417,8 +417,8 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
 
 - **`voice.provider`** (enum):
-  - **Description:** Transcription backend: "gemini" (default, zero-install) or
-    "whisper" (local).
+  - **Description:** Set transcription backend: "gemini" (default, zero-install)
+    or "whisper" (local).
   - **Default:** `"gemini"`
   - **Values:** `"gemini"`, `"whisper"`
 

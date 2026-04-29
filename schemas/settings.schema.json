@@ -581,8 +581,8 @@
         },
         "provider": {
           "title": "Transcription Backend",
-          "description": "Transcription backend: \"gemini\" (default, zero-install) or \"whisper\" (local).",
-          "markdownDescription": "Transcription backend: \"gemini\" (default, zero-install) or \"whisper\" (local).\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `gemini`",
+          "description": "Set transcription backend: \"gemini\" (default, zero-install) or \"whisper\" (local).",
+          "markdownDescription": "Set transcription backend: \"gemini\" (default, zero-install) or \"whisper\" (local).\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `gemini`",
           "default": "gemini",
           "type": "string",
           "enum": ["gemini", "whisper"]

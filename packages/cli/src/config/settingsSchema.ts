@@ -929,7 +929,7 @@ const SETTINGS_SCHEMA = {
         requiresRestart: false,
         default: 'gemini',
         description:
-          'Transcription backend: "gemini" (default, zero-install) or "whisper" (local).',
+          'Set transcription backend: "gemini" (default, zero-install) or "whisper" (local).',
         showInDialog: true,
         options: [
           { value: 'gemini', label: 'Gemini (Cloud)' },
