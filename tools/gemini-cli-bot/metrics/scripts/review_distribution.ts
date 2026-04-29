@@ -41,7 +41,7 @@ try {
 
     for (const review of pr.reviews.nodes) {
       if (
-        ['MEMBER', 'OWNER'].includes(review.authorAssociation) &&
+        ['MEMBER', 'OWNER', 'COLLABORATOR'].includes(review.authorAssociation) &&
         review.author?.login
       ) {
         const login = review.author.login.toLowerCase();
@@ -66,16 +66,7 @@ try {
       counts.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / counts.length;
   }
 
-  const timestamp = new Date().toISOString();
-
-  process.stdout.write(
-    JSON.stringify(<MetricOutput>{
-      metric: 'review_distribution_variance',
-      value: Math.round(variance * 100) / 100,
-      timestamp,
-      details: reviewCounts,
-    }) + '\n',
-  );
+  console.log(`review_distribution_variance,${Math.round(variance * 100) / 100}`);
 } catch (err) {
   process.stderr.write(err instanceof Error ? err.message : String(err));
   process.exit(1);

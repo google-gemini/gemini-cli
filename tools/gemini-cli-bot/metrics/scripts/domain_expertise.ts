@@ -97,7 +97,7 @@ try {
     const reviewersOnPR = new Map<string, { name?: string }>();
     for (const review of pr.reviews.nodes) {
       if (
-        ['MEMBER', 'OWNER'].includes(review.authorAssociation) &&
+        ['MEMBER', 'OWNER', 'COLLABORATOR'].includes(review.authorAssociation) &&
         review.author?.login
       ) {
         const login = review.author.login.toLowerCase();
@@ -138,19 +138,8 @@ try {
     totalMaintainerReviews > 0
       ? maintainerReviewsWithExpertise / totalMaintainerReviews
       : 0;
-  const timestamp = new Date().toISOString();
-
-  process.stdout.write(
-    JSON.stringify(<MetricOutput>{
-      metric: 'domain_expertise',
-      value: Math.round(ratio * 100) / 100,
-      timestamp,
-      details: {
-        totalMaintainerReviews,
-        maintainerReviewsWithExpertise,
-      },
-    }) + '\n',
-  );
+  
+  console.log(`domain_expertise,${Math.round(ratio * 100) / 100}`);
 } catch (err) {
   process.stderr.write(err instanceof Error ? err.message : String(err));
   process.exit(1);
