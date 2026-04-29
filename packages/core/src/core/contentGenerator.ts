@@ -115,9 +115,8 @@ const VERTEX_AI_SHARED_REQUEST_TYPE_HEADER =
   'X-Vertex-AI-LLM-Shared-Request-Type';
 
 function validateBaseUrl(baseUrl: string): void {
-  let url: URL;
   try {
-    url = new URL(baseUrl);
+    new URL(baseUrl);
   } catch {
     throw new Error(`Invalid custom base URL: ${baseUrl}`);
   }
