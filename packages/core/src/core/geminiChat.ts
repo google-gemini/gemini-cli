@@ -775,8 +775,11 @@ export class GeminiChat {
     this.agentHistory.push(content);
   }
 
-  setHistory(history: readonly Content[]): void {
-    this.agentHistory.set(history);
+  setHistory(
+    history: readonly Content[],
+    options: { silent?: boolean } = {},
+  ): void {
+    this.agentHistory.set(history, options);
     this.lastPromptTokenCount = estimateTokenCountSync(
       this.agentHistory.flatMap((c) => c.parts || []),
     );

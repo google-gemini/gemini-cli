@@ -21,6 +21,7 @@ import { ContextWorkingBufferImpl } from './contextWorkingBuffer.js';
 
 export class PipelineOrchestrator {
   private activeTimers: NodeJS.Timeout[] = [];
+  private readonly pendingPipelines = new Map<string, Promise<void>>();
 
   constructor(
     private readonly pipelines: PipelineDef[],
@@ -30,6 +31,20 @@ export class PipelineOrchestrator {
     private readonly tracer: ContextTracer,
   ) {
     this.setupTriggers();
+  }
+
+  /**
+   * Returns a promise that resolves when all currently executing async pipelines have finished.
+   * This acts as a 'Pressure Barrier' for the ContextManager.
+   */
+  async waitForPipelines(): Promise<void> {
+    const pending = Array.from(this.pendingPipelines.values());
+    if (pending.length > 0) {
+      debugLogger.log(
+        `[PipelineOrchestrator] Waiting for ${pending.length} pending async pipelines to complete...`,
+      );
+      await Promise.allSettled(pending);
+    }
   }
 
   private isNodeAllowed(
@@ -78,12 +93,16 @@ export class PipelineOrchestrator {
     };
 
     bindTriggers(this.pipelines, (pipeline, nodes, targets, protectedIds) => {
-      void this.executePipelineAsync(
+      const promise = this.executePipelineAsync(
         pipeline,
         nodes,
         new Set(targets),
         new Set(protectedIds),
       );
+
+      const pipelineId = `${pipeline.name}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      this.pendingPipelines.set(pipelineId, promise);
+      void promise.finally(() => this.pendingPipelines.delete(pipelineId));
     });
 
     bindTriggers(this.asyncPipelines, (pipeline, nodes, targetIds) => {

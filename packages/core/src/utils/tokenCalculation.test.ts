@@ -122,7 +122,7 @@ describe('tokenCalculation', () => {
         model,
       );
 
-      expect(count).toBe(3001);
+      expect(count).toBe(259);
       expect(mockContentGenerator.countTokens).toHaveBeenCalled();
     });
 
@@ -140,7 +140,7 @@ describe('tokenCalculation', () => {
         model,
       );
 
-      expect(count).toBe(3000);
+      expect(count).toBe(258);
     });
 
     it('should use countTokens API for PDF requests', async () => {
@@ -175,8 +175,8 @@ describe('tokenCalculation', () => {
         model,
       );
 
-      // PDF estimate: 25800 tokens (~100 pages at 258 tokens/page)
-      expect(count).toBe(25800);
+      // PDF estimate: 2580 tokens (~10 pages at 258 tokens/page)
+      expect(count).toBe(2580);
     });
   });
 
@@ -225,9 +225,9 @@ describe('tokenCalculation', () => {
       ];
 
       const tokens = estimateTokenCountSync(parts);
-      // image 3000 + text 4.5 + response 5 = ~3009.5
-      expect(tokens).toBeGreaterThan(3000);
-      expect(tokens).toBeLessThan(3100);
+      // image 258 + text 4.5 + response 5 = ~267.5
+      expect(tokens).toBeGreaterThan(250);
+      expect(tokens).toBeLessThan(300);
     });
 
     it('should respect the maximum recursion depth limit', () => {

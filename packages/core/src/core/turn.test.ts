@@ -109,6 +109,7 @@ describe('Turn', () => {
         expect.any(AbortSignal),
         LlmRole.MAIN,
         undefined,
+        false,
       );
 
       expect(events).toEqual([
@@ -174,7 +175,7 @@ describe('Turn', () => {
         }),
       );
       expect(event2.value.callId).toEqual(
-        expect.stringMatching(/^tool2_\d{13}_\d+$/),
+        expect.stringMatching(/^synth_prompt-id-1_\d{13,}_\d+$/),
       );
       expect(turn.pendingToolCalls[1]).toEqual(event2.value);
       expect(turn.getDebugResponses().length).toBe(1);

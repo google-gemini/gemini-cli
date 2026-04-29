@@ -34,6 +34,10 @@ export class HistoryObserver {
       this.seenNodeIds.clear();
     }
 
+    if (event.type === 'SILENT_SYNC') {
+      return;
+    }
+
     // Always process the FULL history to provide a complete view to the ContextManager.
     // The ContextManager relies on the 'nodes' array to be the TOTAL set of valid pristine nodes.
     const fullHistory = this.chatHistory.get();

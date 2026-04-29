@@ -106,14 +106,14 @@ export const generalistProfile: ContextProfile = {
             'NodeDistillation',
             env,
             resolveProcessorOptions(config, 'NodeDistillation', {
-              nodeThresholdTokens: 3000,
+              nodeThresholdTokens: 1000,
             }),
           ),
           createNodeTruncationProcessor(
             'NodeTruncation',
             env,
             resolveProcessorOptions(config, 'NodeTruncation', {
-              maxTokensPerNode: 2000,
+              maxTokensPerNode: 1200,
             }),
           ),
         ],

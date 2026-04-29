@@ -6,17 +6,14 @@
 
 import type { Content } from '@google/genai';
 import type { ConcreteNode } from './types.js';
-import { debugLogger } from '../../utils/debugLogger.js';
-import type {
-  ContextEnvironment,
-  ContextTracer,
-} from '../pipeline/environment.js';
-import type { PipelineOrchestrator } from '../pipeline/orchestrator.js';
+import type { ContextTracer } from '../tracer.js';
 import type { ContextProfile } from '../config/profiles.js';
+import type { PipelineOrchestrator } from '../pipeline/orchestrator.js';
+import type { ContextEnvironment } from '../pipeline/environment.js';
 
 /**
- * Orchestrates the final render: takes a working buffer view (The Nodes),
- * applies the Immediate Sanitization pipeline, and enforces token boundaries.
+ * Maps the Episodic Context Graph back into a raw Gemini Content[] array for transmission.
+ * It applies synchronous context management (GC backstop) if the budget is exceeded.
  */
 export async function render(
   nodes: readonly ConcreteNode[],
@@ -24,10 +21,8 @@ export async function render(
   sidecar: ContextProfile,
   tracer: ContextTracer,
   env: ContextEnvironment,
-  protectionReasons: Map<string, string>,
+  protectionReasons: Map<string, string> = new Map(),
 ): Promise<{ history: Content[]; didApplyManagement: boolean }> {
-  const protectedIds = new Set(protectionReasons.keys());
-
   if (!sidecar.config.budget) {
     const contents = env.graphMapper.fromGraph(nodes);
     tracer.logEvent('Render', 'Render Context to LLM (No Budget)', {
@@ -39,36 +34,7 @@ export async function render(
   const maxTokens = sidecar.config.budget.maxTokens;
   const currentTokens = env.tokenCalculator.calculateConcreteListTokens(nodes);
 
-  // Always protect the first node (System Prompt) and all nodes in the last turn
-  if (nodes.length > 0) {
-    const systemPrompt = nodes[0];
-    protectedIds.add(systemPrompt.id);
-    protectionReasons.set(systemPrompt.id, 'system_prompt');
-    if (systemPrompt.logicalParentId) {
-      protectedIds.add(systemPrompt.logicalParentId);
-      protectionReasons.set(
-        systemPrompt.logicalParentId,
-        'system_prompt_parent',
-      );
-    }
-
-    // Identify all nodes belonging to the last logical turn/episode
-    const lastNode = nodes[nodes.length - 1];
-    const lastLogicalId = lastNode.logicalParentId;
-
-    if (lastLogicalId) {
-      for (const node of nodes) {
-        if (node.logicalParentId === lastLogicalId) {
-          protectedIds.add(node.id);
-          protectionReasons.set(node.id, 'recent_turn');
-        }
-      }
-    } else {
-      // Fallback: just protect the last node if no logical grouping exists
-      protectedIds.add(lastNode.id);
-      protectionReasons.set(lastNode.id, 'recent_turn');
-    }
-  }
+  const protectedIds = new Set(protectionReasons.keys());
 
   tracer.logEvent('Render', 'Budget Audit', {
     maxTokens,
@@ -104,9 +70,6 @@ export async function render(
     `View exceeds maxTokens (${currentTokens} > ${maxTokens}). Hitting Synchronous Pressure Barrier.`,
     { targetDelta },
   );
-  debugLogger.log(
-    `Context Manager Synchronous Barrier triggered: View at ${currentTokens} tokens (limit: ${maxTokens}, target reduction: ${targetDelta}).`,
-  );
 
   // Calculate exactly which nodes aged out of the retainedTokens budget to form our target delta
   const agedOutNodes = new Set<string>();
@@ -126,21 +89,6 @@ export async function render(
     nodes,
     agedOutNodes,
     protectedIds,
-  );
-
-  const finalTokens =
-    env.tokenCalculator.calculateConcreteListTokens(processedNodes);
-  tracer.logEvent(
-    'Render',
-    `Finished rendering. Final token count: ${finalTokens}.`,
-    {
-      finalTokens,
-      finalBreakdown:
-        env.tokenCalculator.calculateTokenBreakdown(processedNodes),
-    },
-  );
-  debugLogger.log(
-    `Context Manager finished. Final actual token count: ${finalTokens}.`,
   );
 
   // Apply skipList logic to abstract over summarized nodes

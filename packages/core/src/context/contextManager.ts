@@ -29,6 +29,12 @@ export class ContextManager {
   private readonly orchestrator: PipelineOrchestrator;
   private readonly historyObserver: HistoryObserver;
 
+  // Cache for Anomaly 3 (Redundant Renders)
+  private lastRenderCache?: {
+    nodesHash: string;
+    result: { history: Content[]; didApplyManagement: boolean };
+  };
+
   constructor(
     private readonly sidecar: ContextProfile,
     private readonly env: ContextEnvironment,
@@ -68,6 +74,13 @@ export class ContextManager {
     });
 
     this.historyObserver.start();
+  }
+
+  /**
+   * Returns a promise that resolves when all currently executing async pipelines have finished.
+   */
+  async waitForPipelines(): Promise<void> {
+    return this.orchestrator.waitForPipelines();
   }
 
   /**
@@ -138,12 +151,48 @@ export class ContextManager {
 
   /**
    * Identifies 'pinned' nodes that should not be truncated.
-   * This includes active tool calls (calls without responses in the graph).
+   * This includes:
+   * 1. The entire first logical episode (System Prompt).
+   * 2. The entire last logical episode (Recent context).
+   * 3. Active tool calls (calls without responses in the graph).
    */
-  private getProtectedNodeIds(): Map<string, string> {
+  private getProtectedNodeIds(
+    extraProtectedIds: Set<string> = new Set(),
+  ): Map<string, string> {
     const protectionMap = new Map<string, string>();
     const nodes = this.buffer.nodes;
+    if (nodes.length === 0) return protectionMap;
 
+    // 1. Always protect the entire first logical episode (System Prompt)
+    const firstNode = nodes[0];
+    const firstLogicalId = firstNode.logicalParentId;
+    if (firstLogicalId) {
+      for (const node of nodes) {
+        if (node.logicalParentId === firstLogicalId) {
+          protectionMap.set(node.id, 'system_prompt');
+        }
+      }
+      protectionMap.set(firstLogicalId, 'system_prompt_episode');
+    } else {
+      protectionMap.set(firstNode.id, 'system_prompt_isolated');
+    }
+
+    // 2. Identify all nodes belonging to the last logical turn/episode (Recent context)
+    const lastNode = nodes[nodes.length - 1];
+    const lastLogicalId = lastNode.logicalParentId;
+
+    if (lastLogicalId) {
+      for (const node of nodes) {
+        if (node.logicalParentId === lastLogicalId) {
+          protectionMap.set(node.id, 'recent_turn');
+        }
+      }
+      protectionMap.set(lastLogicalId, 'recent_turn_episode');
+    } else {
+      protectionMap.set(lastNode.id, 'recent_turn_isolated');
+    }
+
+    // 3. Identify active tool calls that must NEVER be truncated
     const calls = nodes.filter((n) => isToolExecution(n) && n.role === 'model');
     const responses = new Set(
       nodes
@@ -158,6 +207,11 @@ export class ContextManager {
       if (id && !responses.has(id)) {
         protectionMap.set(call.id, 'in_flight_tool_call');
       }
+    }
+
+    // 4. Any externally requested protections
+    for (const id of extraProtectedIds) {
+      protectionMap.set(id, 'external_active_task');
     }
 
     return protectionMap;
@@ -201,6 +255,20 @@ export class ContextManager {
   ): Promise<{ history: Content[]; didApplyManagement: boolean }> {
     this.tracer.logEvent('ContextManager', 'Starting rendering of LLM context');
 
+    // 1. Synchronous Pressure Barrier: Wait for background management pipelines to finish.
+    // This ensures that the render sees the results of recent pushes (Anomaly 2).
+    await this.orchestrator.waitForPipelines();
+
+    // 2. Cache Check (Anomaly 3): If nodes haven't changed, return previous result.
+    // We use a simple join of IDs as a cheap "graph hash".
+    const nodesHash = this.buffer.nodes.map((n) => n.id).join('|');
+    if (this.lastRenderCache?.nodesHash === nodesHash) {
+      debugLogger.log(
+        '[ContextManager] Render cache hit. Skipping redundant render.',
+      );
+      return this.lastRenderCache.result;
+    }
+
     const protectionReasons = this.getProtectedNodeIds();
     for (const id of activeTaskIds) {
       protectionReasons.set(id, 'active_task');
@@ -218,7 +286,15 @@ export class ContextManager {
 
     this.tracer.logEvent('ContextManager', 'Finished rendering');
 
-    const summary = finalHistory.map((c) => {
+    const result = {
+      history: hardenHistory(finalHistory),
+      didApplyManagement,
+    };
+
+    // Update cache
+    this.lastRenderCache = { nodesHash, result };
+
+    const summary = result.history.map((c) => {
       const parts = c.parts || [];
       const calls = parts
         .filter((p) => p.functionCall)
@@ -237,6 +313,6 @@ export class ContextManager {
       `[ContextManager] Rendered history for LLM request: ${JSON.stringify(summary, null, 2)}`,
     );
 
-    return { history: hardenHistory(finalHistory), didApplyManagement };
+    return result;
   }
 }

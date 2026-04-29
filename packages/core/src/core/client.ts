@@ -622,19 +622,19 @@ export class GeminiClient {
       return turn;
     }
 
-    // Adopt the request into history immediately so that context management and
-    // safety checkers see the complete state including the latest tool responses.
-    this.getChat().addHistory(createUserContent(request));
-
     // Check for context window overflow
     const modelForLimitCheck = this._getActiveModelForCurrentTurn();
 
     if (this.config.getContextManagementConfig().enabled) {
+      // Adopt the request into history before context management rendering
+      // so that it sees the complete state (e.g. latest tool responses).
+      this.getChat().addHistory(createUserContent(request));
+
       if (this.contextManager) {
         const { history: newHistory, didApplyManagement } =
           await this.contextManager.renderHistory();
         if (didApplyManagement) {
-          this.getChat().setHistory(newHistory);
+          this.getChat().setHistory(newHistory, { silent: true });
         }
       } else {
         const newHistory = await this.agentHistoryProvider.manageHistory(
@@ -761,13 +761,16 @@ export class GeminiClient {
     // Update tools with the final modelId to ensure model-dependent descriptions are used.
     await this.setTools(modelToUse);
 
+    const contextManagementEnabled =
+      this.config.getContextManagementConfig().enabled;
+
     const resultStream = turn.run(
       modelConfigKey,
       request,
       signal,
       displayContent,
       LlmRole.MAIN,
-      true, // skipHistoryPush: already added above
+      contextManagementEnabled, // skipHistoryPush: only skip if we already added it above
     );
     let isError = false;
     let isInvalidStream = false;
