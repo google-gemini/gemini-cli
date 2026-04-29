@@ -1870,6 +1870,55 @@ describe('useTextBuffer', () => {
       expect(handled).toBe(false);
     });
 
+    if (process.platform === 'linux') {
+      it('should handle "Ctrl+Z" for smart bubbling on Linux/WSL', async () => {
+        const { result } = await renderHook(() => useTextBuffer({ viewport }));
+
+        const ctrlZ: Key = {
+          name: 'z',
+          ctrl: true,
+          shift: false,
+          alt: false,
+          cmd: false,
+          insertable: false,
+          sequence: '\x1a',
+        };
+
+        // 1. Empty buffer: should NOT handle (bubble up to Suspend)
+        let handled = true;
+        act(() => {
+          handled = result.current.handleInput(ctrlZ);
+        });
+        expect(handled).toBe(false);
+
+        // 2. Add text
+        act(() => {
+          result.current.handleInput({
+            name: 'x',
+            insertable: true,
+            sequence: 'x',
+            shift: false,
+            alt: false,
+            ctrl: false,
+            cmd: false,
+          });
+        });
+
+        // 3. Has history: should handle (perform Undo)
+        act(() => {
+          handled = result.current.handleInput(ctrlZ);
+        });
+        expect(handled).toBe(true);
+        expect(getBufferState(result).text).toBe('');
+
+        // 4. Empty again: should NOT handle
+        act(() => {
+          handled = result.current.handleInput(ctrlZ);
+        });
+        expect(handled).toBe(false);
+      });
+    }
+
     it('should only handle Redo if there is something to redo', async () => {
       const { result } = await renderHook(() => useTextBuffer({ viewport }));
 

@@ -785,7 +785,13 @@ export function getPlatformUndoBindings(
   if (platform === 'darwin') {
     return [new KeyBinding('cmd+z'), new KeyBinding('alt+z')];
   }
-  return [new KeyBinding('alt+z'), new KeyBinding('cmd+z')];
+  // Linux / WSL: Promote Alt+Z to avoid Windows interception,
+  // but keep Ctrl+Z for smart bubbling.
+  return [
+    new KeyBinding('alt+z'),
+    new KeyBinding('cmd+z'),
+    new KeyBinding('ctrl+z'),
+  ];
 }
 
 export function getPlatformRedoBindings(
@@ -793,8 +799,8 @@ export function getPlatformRedoBindings(
 ): readonly KeyBinding[] {
   if (platform === 'win32') {
     return [
-      new KeyBinding('ctrl+y'),
       new KeyBinding('ctrl+shift+z'),
+      new KeyBinding('ctrl+y'),
       new KeyBinding('alt+shift+z'),
     ];
   }
@@ -805,9 +811,11 @@ export function getPlatformRedoBindings(
       new KeyBinding('ctrl+shift+z'),
     ];
   }
+  // Linux / WSL: Prioritize Ctrl+Shift+Z, keep Ctrl+Y as secondary for smart bubbling.
   return [
+    new KeyBinding('ctrl+shift+z'),
     new KeyBinding('alt+shift+z'),
     new KeyBinding('cmd+shift+z'),
-    new KeyBinding('ctrl+shift+z'),
+    new KeyBinding('ctrl+y'),
   ];
 }

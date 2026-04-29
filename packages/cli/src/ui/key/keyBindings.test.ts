@@ -119,6 +119,8 @@ describe('keyBindings config', () => {
     } else {
       expect(undoBindings?.[0].name).toBe('z');
       expect(undoBindings?.[0].alt).toBe(true);
+      // Ensure ctrl+z is also present for smart bubbling
+      expect(undoBindings?.some((b) => b.name === 'z' && b.ctrl)).toBe(true);
     }
   });
 
