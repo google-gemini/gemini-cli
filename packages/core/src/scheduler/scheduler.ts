@@ -334,9 +334,15 @@ export class Scheduler {
         }
 
         if (!tool) {
+          // Security: Truncate the name before passing it to error creation
+          // to prevent DoS in getToolSuggestion fuzzy matching.
+          const truncatedRequest = {
+            ...enrichedRequest,
+            name: enrichedRequest.name.slice(0, 64),
+          };
           return {
             ...this._createToolNotFoundErroredToolCall(
-              enrichedRequest,
+              truncatedRequest,
               allToolNames,
             ),
             approvalMode: currentApprovalMode,
