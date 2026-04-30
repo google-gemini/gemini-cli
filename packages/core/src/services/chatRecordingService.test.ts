@@ -774,10 +774,13 @@ describe('ChatRecordingService', () => {
       expect(fs.existsSync(logFile)).toBe(false);
     });
 
-    it('should not throw if session file does not exist', async () => {
+    it('should throw if session file does not exist', async () => {
+      const chatsDir = path.join(testTempDir, 'chats');
+      fs.mkdirSync(chatsDir, { recursive: true });
+
       await expect(
         chatRecordingService.deleteSession('non-existent'),
-      ).resolves.not.toThrow();
+      ).rejects.toThrow('No session file found for non-existent');
     });
   });
 
