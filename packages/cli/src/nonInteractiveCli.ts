@@ -360,23 +360,27 @@ export async function runNonInteractive(
             }
             toolCallRequests.push(event.value);
           } else if (event.type === GeminiEventType.LoopDetected) {
+            const message = 'Loop detected, stopping execution';
             if (streamFormatter) {
               streamFormatter.emitEvent({
                 type: JsonStreamEventType.ERROR,
                 timestamp: new Date().toISOString(),
                 severity: 'warning',
-                message: 'Loop detected, stopping execution',
+                message,
               });
             }
+            warnings.push(message);
           } else if (event.type === GeminiEventType.MaxSessionTurns) {
+            const message = 'Maximum session turns exceeded';
             if (streamFormatter) {
               streamFormatter.emitEvent({
                 type: JsonStreamEventType.ERROR,
                 timestamp: new Date().toISOString(),
                 severity: 'error',
-                message: 'Maximum session turns exceeded',
+                message,
               });
             }
+            warnings.push(message);
           } else if (event.type === GeminiEventType.Error) {
             throw event.value.error;
           } else if (event.type === GeminiEventType.AgentExecutionStopped) {

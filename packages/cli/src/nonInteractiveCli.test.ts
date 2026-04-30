@@ -1727,6 +1727,53 @@ describe('runNonInteractive', () => {
     },
   );
 
+  it.each([
+    {
+      name: 'loop detected',
+      events: [
+        { type: GeminiEventType.LoopDetected },
+      ] as ServerGeminiStreamEvent[],
+      expectedWarning: 'Loop detected, stopping execution',
+    },
+    {
+      name: 'max session turns',
+      events: [
+        { type: GeminiEventType.MaxSessionTurns },
+      ] as ServerGeminiStreamEvent[],
+      expectedWarning: 'Maximum session turns exceeded',
+    },
+  ])(
+    'should include warning in JSON mode for: $name',
+    async ({ events, expectedWarning }) => {
+      vi.mocked(mockConfig.getOutputFormat).mockReturnValue(OutputFormat.JSON);
+      vi.spyOn(uiTelemetryService, 'getMetrics').mockReturnValue(
+        MOCK_SESSION_METRICS,
+      );
+
+      const streamEvents: ServerGeminiStreamEvent[] = [
+        ...events,
+        {
+          type: GeminiEventType.Finished,
+          value: { reason: undefined, usageMetadata: { totalTokenCount: 0 } },
+        },
+      ];
+      mockGeminiClient.sendMessageStream.mockReturnValue(
+        createStreamFromEvents(streamEvents),
+      );
+
+      await runNonInteractive({
+        config: mockConfig,
+        settings: mockSettings,
+        input: 'test',
+        prompt_id: 'test',
+      });
+
+      const output = JSON.parse(getWrittenOutput());
+      expect(output.warnings).toBeDefined();
+      expect(output.warnings).toContain(expectedWarning);
+    },
+  );
+
   it('should log error when tool recording fails', async () => {
     const toolCallEvent: ServerGeminiStreamEvent = {
       type: GeminiEventType.ToolCallRequest,

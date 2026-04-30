@@ -580,9 +580,7 @@ export async function runNonInteractive({
                 message: stripAnsi(event.message),
               });
             }
-            if (severity === 'warning') {
-              warnings.push(event.message);
-            }
+            warnings.push(event.message);
             break;
           }
           case 'agent_end': {
