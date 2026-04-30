@@ -1295,6 +1295,47 @@ describe('ChatRecordingService', () => {
       expect(messages![0].content).toEqual([{ text: 'New user message' }]);
       expect(messages![0].type).toBe('user');
     });
+
+    it('should correctly reconstruct sibling parts (text/media) in tool response turns', async () => {
+      const callId = 'tool-call-1';
+      const history: Content[] = [
+        {
+          role: 'model',
+          parts: [
+            { functionCall: { id: callId, name: 'list_files', args: {} } },
+          ],
+        },
+        {
+          role: 'user',
+          parts: [
+            { text: 'Sibling text' },
+            {
+              functionResponse: {
+                id: callId,
+                name: 'list_files',
+                response: { files: [] },
+              },
+            },
+            { inlineData: { data: 'base64data', mimeType: 'image/png' } },
+          ],
+        },
+      ];
+
+      chatRecordingService.updateMessagesFromHistory(history, true);
+
+      const messages = chatRecordingService.getConversation()?.messages;
+      expect(messages).toHaveLength(1);
+      const geminiMsg = messages![0] as MessageRecord & { type: 'gemini' };
+      expect(geminiMsg.toolCalls).toHaveLength(1);
+
+      const result = geminiMsg.toolCalls![0].result as Part[];
+      expect(result).toHaveLength(3);
+      expect(result[0]).toEqual({ text: 'Sibling text' });
+      expect(result[1].functionResponse?.id).toBe(callId);
+      expect(result[2]).toEqual({
+        inlineData: { data: 'base64data', mimeType: 'image/png' },
+      });
+    });
   });
 
   describe('ENOENT (missing directory) handling', () => {

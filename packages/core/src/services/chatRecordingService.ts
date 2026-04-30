@@ -908,17 +908,21 @@ export class ChatRecordingService {
         ) {
           const nextTurn = history[i + 1];
           const nextParts = nextTurn.parts || [];
-          const hasResponses = nextParts.some((p) => p.functionResponse);
+          const callIds = nextParts
+            .map((p) => p.functionResponse?.id)
+            .filter((id): id is string => !!id);
 
-          if (hasResponses) {
+          if (callIds.length > 0) {
             const respMap = new Map<string, Part[]>();
+            let currentCallId = callIds[0];
             for (const p of nextParts) {
               if (p.functionResponse?.id) {
-                if (!respMap.has(p.functionResponse.id)) {
-                  respMap.set(p.functionResponse.id, []);
-                }
-                respMap.get(p.functionResponse.id)!.push(p);
+                currentCallId = p.functionResponse.id;
               }
+              if (!respMap.has(currentCallId)) {
+                respMap.set(currentCallId, []);
+              }
+              respMap.get(currentCallId)!.push(p);
             }
 
             for (const tc of geminiMsg.toolCalls!) {
@@ -955,12 +959,9 @@ export class ChatRecordingService {
         (this.cachedConversation.messages.length === 0 && history.length > 0) ||
         reconstruct
       ) {
-        this.cachedConversation.messages =
-          this.reconstructMessagesFromHistory(history);
-        this.updateMetadata({ lastUpdated: new Date().toISOString() });
-        // Snapshot the reconstruction to ensure persistence
-        this.appendRecord({
-          $set: { messages: this.cachedConversation.messages },
+        this.updateMetadata({
+          messages: this.reconstructMessagesFromHistory(history),
+          lastUpdated: new Date().toISOString(),
         });
         return;
       }
