@@ -179,3 +179,15 @@ export function appendToLastTextPart(
 
   return newPrompt;
 }
+
+/**
+ * Type guard to determine if a Part is a TextPart.
+ */
+export function isTextPart(part: unknown): part is { text: string } {
+  return (
+    typeof part === 'object' &&
+    part !== null &&
+    'text' in part &&
+    typeof (part as { text: unknown }).text === 'string'
+  );
+}

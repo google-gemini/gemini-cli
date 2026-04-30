@@ -13,6 +13,7 @@ import {
   copyFileSync,
   writeFileSync,
   readFileSync,
+  chmodSync,
 } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -98,6 +99,11 @@ function removeSignature(filePath) {
  * @param {string} filePath
  */
 function signFile(filePath) {
+  if (process.env.SKIP_SIGNING === 'true') {
+    console.log(`Skipping signing for ${filePath} (SKIP_SIGNING=true)`);
+    return;
+  }
+
   const platform = process.platform;
 
   if (platform === 'darwin') {
@@ -177,6 +183,27 @@ try {
 } catch (e) {
   console.error('Build step failed:', e.message);
   process.exit(1);
+}
+
+// 2b. Copy host-platform ripgrep binary into the bundle for the SEA.
+// (npm tarballs omit these to stay under the registry upload limit.)
+const ripgrepVendorSrc = join(root, 'packages/core/vendor/ripgrep');
+const ripgrepVendorDest = join(bundleDir, 'vendor', 'ripgrep');
+if (existsSync(ripgrepVendorSrc)) {
+  const rgBinName = `rg-${process.platform}-${process.arch}${
+    process.platform === 'win32' ? '.exe' : ''
+  }`;
+  const rgSrc = join(ripgrepVendorSrc, rgBinName);
+  if (existsSync(rgSrc)) {
+    mkdirSync(ripgrepVendorDest, { recursive: true });
+    cpSync(rgSrc, join(ripgrepVendorDest, rgBinName), { dereference: true });
+    console.log(`Copied ${rgBinName} to bundle/vendor/ripgrep/`);
+  } else {
+    console.warn(
+      `Warning: bundled ripgrep binary not found for ${process.platform}/${process.arch} at ${rgSrc}. ` +
+        `The SEA will fall back to system grep at runtime.`,
+    );
+  }
 }
 
 // 3. Stage & Sign Native Modules
@@ -304,6 +331,23 @@ if (existsSync(policyDir)) {
   }
 }
 
+// Add ripgrep binary (copied in step 2b). Must be registered here so that
+// sea-launch.cjs extracts it to runtimeDir/vendor/ripgrep/ on startup; the
+// runtime resolver in packages/core/src/tools/ripGrep.ts uses __dirname-
+// relative paths to find it.
+if (existsSync(ripgrepVendorDest)) {
+  const rgFiles = globSync('*', { cwd: ripgrepVendorDest, nodir: true });
+  for (const rgFile of rgFiles) {
+    const fsPath = join(ripgrepVendorDest, rgFile);
+    const relativePath = join('vendor', 'ripgrep', rgFile);
+    const content = readFileSync(fsPath);
+    const hash = sha256(content);
+    const assetKey = `vendor:${rgFile}`;
+    assets[assetKey] = fsPath;
+    manifest.files.push({ key: assetKey, path: relativePath, hash: hash });
+  }
+}
+
 // Add assets from Staging
 if (includeNativeModules) {
   addAssetsFromDir('node_modules/@lydell', 'node_modules/@lydell');
@@ -416,6 +460,7 @@ console.log('Injecting SEA blob...');
 const sentinelFuse = 'NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2';
 
 try {
+  chmodSync(targetBinaryPath, 0o755);
   const args = [
     'postject',
     targetBinaryPath,
@@ -429,7 +474,7 @@ try {
     args.push('--macho-segment-name', 'NODE_SEA');
   }
 
-  runCommand('npx', args);
+  runCommand('npx', ['--yes', ...args]);
   console.log('Injection successful.');
 } catch (e) {
   console.error('Postject failed:', e.message);

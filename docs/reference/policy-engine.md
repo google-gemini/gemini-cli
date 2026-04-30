@@ -71,7 +71,9 @@ primary conditions are the tool's name and its arguments.
 
 #### Tool Name
 
-The `toolName` in the rule must match the name of the tool being called.
+The `toolName` in the rule must match the name of the tool being called. For a
+complete list of built-in tool names, see the
+[Tools reference](/docs/reference/tools#available-tools).
 
 - **Wildcards**: You can use wildcards to match multiple tools.
   - `*`: Matches **any tool** (built-in or MCP).
@@ -87,7 +89,9 @@ The `toolName` in the rule must match the name of the tool being called.
 
 If `argsPattern` is specified, the tool's arguments are converted to a stable
 JSON string, which is then tested against the provided regular expression. If
-the arguments don't match the pattern, the rule does not apply.
+the arguments don't match the pattern, the rule does not apply. For a list of
+argument keys available for each tool, see the **Parameters** in the
+[Tools reference](/docs/reference/tools#available-tools).
 
 #### Execution environment
 
@@ -120,6 +124,12 @@ There are three possible decisions a rule can enforce:
 
 ### Priority system and tiers
 
+> [!WARNING] The **Workspace** tier (project-level policies) is currently
+> non-functional. Defining policies in a workspace's `.gemini/policies`
+> directory will not have any effect. See
+> [issue #18186](https://github.com/google-gemini/gemini-cli/issues/18186). Use
+> User or Admin policies instead.
+
 The policy engine uses a sophisticated priority system to resolve conflicts when
 multiple rules match a single tool call. The core principle is simple: **the
 rule with the highest priority wins**.
@@ -127,13 +137,13 @@ rule with the highest priority wins**.
 To provide a clear hierarchy, policies are organized into three tiers. Each tier
 has a designated number that forms the base of the final priority calculation.
 
-| Tier      | Base | Description                                                                       |
-| :-------- | :--- | :-------------------------------------------------------------------------------- |
-| Default   | 1    | Built-in policies that ship with Gemini CLI.                                      |
-| Extension | 2    | Policies defined in extensions.                                                   |
-| Workspace | 3    | Policies defined in the current workspace's configuration directory.              |
-| User      | 4    | Custom policies defined by the user.                                              |
-| Admin     | 5    | Policies managed by an administrator (for example, in an enterprise environment). |
+| Tier      | Base | Description                                                                                   |
+| :-------- | :--- | :-------------------------------------------------------------------------------------------- |
+| Default   | 1    | Built-in policies that ship with Gemini CLI.                                                  |
+| Extension | 2    | Policies defined in extensions.                                                               |
+| Workspace | 3    | **(Currently disabled)** Policies defined in the current workspace's configuration directory. |
+| User      | 4    | Custom policies defined by the user.                                                          |
+| Admin     | 5    | Policies managed by an administrator (for example, in an enterprise environment).             |
 
 Within a TOML policy file, you assign a priority value from **0 to 999**. The
 engine transforms this into a final priority using the following formula:
@@ -214,11 +224,11 @@ User, and (if configured) Admin directories.
 
 ### Policy locations
 
-| Tier          | Type   | Location                                  |
-| :------------ | :----- | :---------------------------------------- |
-| **User**      | Custom | `~/.gemini/policies/*.toml`               |
-| **Workspace** | Custom | `$WORKSPACE_ROOT/.gemini/policies/*.toml` |
-| **Admin**     | System | _See below (OS specific)_                 |
+| Tier          | Type   | Location                                                 |
+| :------------ | :----- | :------------------------------------------------------- |
+| **User**      | Custom | `~/.gemini/policies/*.toml`                              |
+| **Workspace** | Custom | **(Disabled)** `$WORKSPACE_ROOT/.gemini/policies/*.toml` |
+| **Admin**     | System | _See below (OS specific)_                                |
 
 #### System-wide policies (Admin)
 
@@ -273,7 +283,11 @@ directory are **ignored**.
 
 ### TOML rule schema
 
-Here is a breakdown of the fields available in a TOML policy rule:
+This section describes the fields available in a TOML policy rule.
+
+For valid built-in `toolName` values and their argument structures (used by
+`argsPattern`), see the
+[Tools reference](/docs/reference/tools#available-tools).
 
 ```toml
 [[rule]]
@@ -359,6 +373,9 @@ priority = 10
 
 To simplify writing policies for `run_shell_command`, you can use
 `commandPrefix` or `commandRegex` instead of the more complex `argsPattern`.
+These are policy-rule shorthands, not arguments of the `run_shell_command` tool
+itself. For the tool's invocation arguments, see [Shell tool](/docs/tools/shell)
+and [Tools reference](/docs/reference/tools#available-tools).
 
 - `commandPrefix`: Matches if the `command` argument starts with the given
   string.

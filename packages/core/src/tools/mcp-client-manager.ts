@@ -24,7 +24,10 @@ import { debugLogger } from '../utils/debugLogger.js';
 import { createHash } from 'node:crypto';
 import { stableStringify } from '../policy/stable-stringify.js';
 import type { PromptRegistry } from '../prompts/prompt-registry.js';
-import type { ResourceRegistry } from '../resources/resource-registry.js';
+import type {
+  ResourceRegistry,
+  MCPResource,
+} from '../resources/resource-registry.js';
 
 /**
  * Manages the lifecycle of multiple MCP clients, including local child processes.
@@ -161,7 +164,32 @@ export class McpClientManager {
   }
 
   getClient(serverName: string): McpClient | undefined {
-    return this.clients.get(serverName);
+    for (const client of this.clients.values()) {
+      if (client.getServerName() === serverName) {
+        return client;
+      }
+    }
+    return undefined;
+  }
+
+  findResourceByUri(uri: string): MCPResource | undefined {
+    if (!this.mainResourceRegistry) return undefined;
+
+    // Try serverName:uri format first
+    const qualifiedMatch = this.mainResourceRegistry.findResourceByUri(uri);
+    if (qualifiedMatch) {
+      return qualifiedMatch;
+    }
+
+    // Try direct URI match
+    return this.mainResourceRegistry
+      .getAllResources()
+      .find((r) => r.uri === uri);
+  }
+
+  getAllResources(): MCPResource[] {
+    if (!this.mainResourceRegistry) return [];
+    return this.mainResourceRegistry.getAllResources();
   }
 
   removeRegistries(registries: {
@@ -187,6 +215,7 @@ export class McpClientManager {
       Object.keys(extension.mcpServers ?? {}).map((name) => {
         const config = this.allServerConfigs.get(name);
         if (config?.extension?.id === extension.id) {
+          const clientKey = this.getClientKey(name, config);
           this.allServerConfigs.delete(name);
           // Also remove from blocked servers if present
           const index = this.blockedMcpServers.findIndex(
@@ -195,7 +224,7 @@ export class McpClientManager {
           if (index !== -1) {
             this.blockedMcpServers.splice(index, 1);
           }
-          return this.disconnectClient(name, true);
+          return this.disconnectClient(clientKey, true);
         }
         return Promise.resolve();
       }),
