@@ -43,6 +43,16 @@ if (packageName === 'core' && existsSync(bundleScript)) {
 // copy .{md,json} files
 execSync('node ../../scripts/copy_files.js', { stdio: 'inherit' });
 
+// Copy extension examples for the cli package
+if (packageName === 'cli') {
+  const examplesSource = join(process.cwd(), 'src', 'commands', 'extensions', 'examples');
+  const examplesTarget = join(process.cwd(), 'dist', 'commands', 'extensions', 'examples');
+  if (existsSync(examplesSource)) {
+    cpSync(examplesSource, examplesTarget, { recursive: true, dereference: true });
+    console.log('Copied extension examples to dist/commands/extensions/examples/');
+  }
+}
+
 // Copy documentation for the core package
 if (packageName === 'core') {
   const docsSource = join(process.cwd(), '..', '..', 'docs');
