@@ -13,21 +13,22 @@ import {
   afterEach,
   type Mock,
   type Mocked,
+  type MockInstance,
 } from 'vitest';
 import { Session } from './acpSession.js';
 import type * as acp from '@agentclientprotocol/sdk';
 import {
-  StreamEventType,
   ReadManyFilesTool,
   type GeminiChat,
   type Config,
   type MessageBus,
-  LlmRole,
   type GitService,
-  type ModelRouterService,
   InvalidStreamError,
+  GeminiEventType,
+  type ServerGeminiStreamEvent,
 } from '@google/gemini-cli-core';
 import type { LoadedSettings } from '../config/settings.js';
+import { type Part, FinishReason } from '@google/genai';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import type { CommandHandler } from './acpCommandHandler.js';
@@ -57,11 +58,23 @@ vi.mock(
   },
 );
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function* createMockStream(items: any[]) {
+async function* createMockStream(
+  items: readonly ServerGeminiStreamEvent[],
+): AsyncGenerator<ServerGeminiStreamEvent> {
   for (const item of items) {
     yield item;
   }
+
+  yield {
+    type: GeminiEventType.Finished,
+    value: {
+      reason: FinishReason.STOP,
+      usageMetadata: {
+        promptTokenCount: 5,
+        candidatesTokenCount: 10,
+      },
+    },
+  };
 }
 
 describe('Session', () => {
@@ -72,6 +85,13 @@ describe('Session', () => {
   let mockToolRegistry: { getTool: Mock };
   let mockTool: { kind: string; build: Mock };
   let mockMessageBus: Mocked<MessageBus>;
+  let mockSendMessageStream: MockInstance<
+    (
+      request: Part[],
+      signal: AbortSignal,
+      promptId: string,
+    ) => AsyncGenerator<ServerGeminiStreamEvent>
+  >;
 
   beforeEach(() => {
     mockChat = {
@@ -97,6 +117,7 @@ describe('Session', () => {
       subscribe: vi.fn(),
       unsubscribe: vi.fn(),
     } as unknown as Mocked<MessageBus>;
+    mockSendMessageStream = vi.fn();
     mockConfig = {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getActiveModel: vi.fn().mockReturnValue('gemini-pro'),
@@ -124,6 +145,11 @@ describe('Session', () => {
       }),
       waitForMcpInit: vi.fn(),
       getDisableAlwaysAllow: vi.fn().mockReturnValue(false),
+      getMaxSessionTurns: vi.fn().mockReturnValue(-1),
+      geminiClient: {
+        sendMessageStream: mockSendMessageStream,
+        getChat: vi.fn().mockReturnValue(mockChat),
+      },
       get config() {
         return this;
       },
@@ -176,11 +202,11 @@ describe('Session', () => {
   it('should await MCP initialization before processing a prompt', async () => {
     const stream = createMockStream([
       {
-        type: StreamEventType.CHUNK,
-        value: { candidates: [{ content: { parts: [{ text: 'Hi' }] } }] },
+        type: GeminiEventType.Content,
+        value: 'Hi',
       },
     ]);
-    mockChat.sendMessageStream.mockResolvedValue(stream);
+    mockSendMessageStream.mockReturnValue(stream);
 
     await session.prompt({
       sessionId: 'session-1',
@@ -193,20 +219,18 @@ describe('Session', () => {
   it('should handle prompt with text response', async () => {
     const stream = createMockStream([
       {
-        type: StreamEventType.CHUNK,
-        value: {
-          candidates: [{ content: { parts: [{ text: 'Hello' }] } }],
-        },
+        type: GeminiEventType.Content,
+        value: 'Hello',
       },
     ]);
-    mockChat.sendMessageStream.mockResolvedValue(stream);
+    mockSendMessageStream.mockReturnValue(stream);
 
     const result = await session.prompt({
       sessionId: 'session-1',
       prompt: [{ type: 'text', text: 'Hi' }],
     });
 
-    expect(mockChat.sendMessageStream).toHaveBeenCalled();
+    expect(mockSendMessageStream).toHaveBeenCalled();
     expect(mockConnection.sessionUpdate).toHaveBeenCalledWith({
       sessionId: 'session-1',
       update: {
@@ -217,41 +241,40 @@ describe('Session', () => {
     expect(result).toMatchObject({ stopReason: 'end_turn' });
   });
 
-  it('should use model router to determine model', async () => {
-    const mockRouter = {
-      route: vi.fn().mockResolvedValue({ model: 'routed-model' }),
-    } as unknown as ModelRouterService;
-    mockConfig.getModelRouterService.mockReturnValue(mockRouter);
-
+  it('should pass current session information directly onto geminiClient.sendMessageStream', async () => {
     const stream = createMockStream([
       {
-        type: StreamEventType.CHUNK,
-        value: {
-          candidates: [{ content: { parts: [{ text: 'Hello' }] } }],
-        },
+        type: GeminiEventType.Content,
+        value: 'Hello',
       },
     ]);
-    mockChat.sendMessageStream.mockResolvedValue(stream);
+    mockSendMessageStream.mockReturnValue(stream);
 
     await session.prompt({
       sessionId: 'session-1',
       prompt: [{ type: 'text', text: 'Hi' }],
     });
 
-    expect(mockRouter.route).toHaveBeenCalled();
-    expect(mockChat.sendMessageStream).toHaveBeenCalledWith(
-      expect.objectContaining({ model: 'routed-model' }),
-      expect.any(Array),
-      expect.any(String),
-      expect.any(Object),
+    expect(mockSendMessageStream).toHaveBeenCalledWith(
+      expect.arrayContaining([{ text: 'Hi' }]),
+      expect.any(AbortSignal),
       expect.any(String),
     );
   });
 
   it('should handle prompt with empty response (InvalidStreamError)', async () => {
-    mockChat.sendMessageStream.mockRejectedValue(
-      new InvalidStreamError('Empty response', 'NO_RESPONSE_TEXT'),
-    );
+    const error = new InvalidStreamError('Empty response', 'NO_RESPONSE_TEXT');
+    mockSendMessageStream.mockImplementation(() => {
+      async function* errorGen(): AsyncGenerator<
+        ServerGeminiStreamEvent,
+        void,
+        unknown
+      > {
+        yield* [];
+        throw error;
+      }
+      return errorGen();
+    });
 
     const result = await session.prompt({
       sessionId: 'session-1',
@@ -262,9 +285,21 @@ describe('Session', () => {
   });
 
   it('should handle prompt with no finish reason (InvalidStreamError)', async () => {
-    mockChat.sendMessageStream.mockRejectedValue(
-      new InvalidStreamError('No finish reason', 'NO_FINISH_REASON'),
+    const error = new InvalidStreamError(
+      'No finish reason',
+      'NO_FINISH_REASON',
     );
+    mockSendMessageStream.mockImplementation(() => {
+      async function* errorGen(): AsyncGenerator<
+        ServerGeminiStreamEvent,
+        void,
+        unknown
+      > {
+        yield* [];
+        throw error;
+      }
+      return errorGen();
+    });
 
     const result = await session.prompt({
       sessionId: 'session-1',
@@ -298,24 +333,26 @@ describe('Session', () => {
   it('should handle tool calls', async () => {
     const stream1 = createMockStream([
       {
-        type: StreamEventType.CHUNK,
+        type: GeminiEventType.ToolCallRequest,
         value: {
-          functionCalls: [{ name: 'test_tool', args: { foo: 'bar' } }],
+          callId: 'call-1',
+          name: 'test_tool',
+          args: { foo: 'bar' },
+          isClientInitiated: false,
+          prompt_id: 'prompt-1',
         },
       },
     ]);
     const stream2 = createMockStream([
       {
-        type: StreamEventType.CHUNK,
-        value: {
-          candidates: [{ content: { parts: [{ text: 'Result' }] } }],
-        },
+        type: GeminiEventType.Content,
+        value: 'Result',
       },
     ]);
 
-    mockChat.sendMessageStream
-      .mockResolvedValueOnce(stream1)
-      .mockResolvedValueOnce(stream2);
+    mockSendMessageStream
+      .mockReturnValueOnce(stream1)
+      .mockReturnValueOnce(stream2);
 
     const result = await session.prompt({
       sessionId: 'session-1',
@@ -347,22 +384,26 @@ describe('Session', () => {
 
     const stream1 = createMockStream([
       {
-        type: StreamEventType.CHUNK,
+        type: GeminiEventType.ToolCallRequest,
         value: {
-          functionCalls: [{ name: 'test_tool', args: {} }],
+          callId: 'call-1',
+          name: 'test_tool',
+          args: {},
+          isClientInitiated: false,
+          prompt_id: 'prompt-1',
         },
       },
     ]);
     const stream2 = createMockStream([
       {
-        type: StreamEventType.CHUNK,
-        value: { candidates: [] },
+        type: GeminiEventType.Content,
+        value: '',
       },
     ]);
 
-    mockChat.sendMessageStream
-      .mockResolvedValueOnce(stream1)
-      .mockResolvedValueOnce(stream2);
+    mockSendMessageStream
+      .mockReturnValueOnce(stream1)
+      .mockReturnValueOnce(stream2);
 
     await session.prompt({
       sessionId: 'session-1',
@@ -381,11 +422,11 @@ describe('Session', () => {
 
     const stream = createMockStream([
       {
-        type: StreamEventType.CHUNK,
-        value: { candidates: [] },
+        type: GeminiEventType.Content,
+        value: '',
       },
     ]);
-    mockChat.sendMessageStream.mockResolvedValue(stream);
+    mockSendMessageStream.mockReturnValue(stream);
 
     await session.prompt({
       sessionId: 'session-1',
@@ -402,23 +443,33 @@ describe('Session', () => {
 
     expect(path.resolve).toHaveBeenCalled();
     expect(fs.stat).toHaveBeenCalled();
-    expect(mockChat.sendMessageStream).toHaveBeenCalledWith(
-      expect.anything(),
+    expect(mockSendMessageStream).toHaveBeenCalledWith(
       expect.arrayContaining([
         expect.objectContaining({
           text: expect.stringContaining('Content from @file.txt'),
         }),
       ]),
-      expect.anything(),
       expect.any(AbortSignal),
-      LlmRole.MAIN,
+      expect.any(String),
     );
   });
 
   it('should handle rate limit error', async () => {
     const error = new Error('Rate limit');
-    (error as unknown as { status: number }).status = 429;
-    mockChat.sendMessageStream.mockRejectedValue(error);
+    const customError = error as { status?: number; message?: string };
+    customError.status = 429;
+
+    mockSendMessageStream.mockImplementation(() => {
+      async function* errorGen(): AsyncGenerator<
+        ServerGeminiStreamEvent,
+        void,
+        unknown
+      > {
+        yield* [];
+        throw customError;
+      }
+      return errorGen();
+    });
 
     await expect(
       session.prompt({
@@ -436,28 +487,81 @@ describe('Session', () => {
 
     const stream1 = createMockStream([
       {
-        type: StreamEventType.CHUNK,
+        type: GeminiEventType.ToolCallRequest,
         value: {
-          functionCalls: [{ name: 'unknown_tool', args: {} }],
+          callId: 'call-1',
+          name: 'unknown_tool',
+          args: {},
+          isClientInitiated: false,
+          prompt_id: 'prompt-1',
         },
       },
     ]);
     const stream2 = createMockStream([
       {
-        type: StreamEventType.CHUNK,
-        value: { candidates: [] },
+        type: GeminiEventType.Content,
+        value: '',
       },
     ]);
 
-    mockChat.sendMessageStream
-      .mockResolvedValueOnce(stream1)
-      .mockResolvedValueOnce(stream2);
+    mockSendMessageStream
+      .mockReturnValueOnce(stream1)
+      .mockReturnValueOnce(stream2);
 
     await session.prompt({
       sessionId: 'session-1',
       prompt: [{ type: 'text', text: 'Call tool' }],
     });
 
-    expect(mockChat.sendMessageStream).toHaveBeenCalledTimes(2);
+    expect(mockSendMessageStream).toHaveBeenCalledTimes(2);
+  });
+
+  it('should handle GeminiEventType.LoopDetected', async () => {
+    const stream = createMockStream([
+      {
+        type: GeminiEventType.LoopDetected,
+      },
+    ]);
+    mockSendMessageStream.mockReturnValue(stream);
+
+    const result = await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Trigger Loop Simulation' }],
+    });
+
+    expect(result.stopReason).toBe('max_turn_requests');
+  });
+
+  it('should handle GeminiEventType.ContextWindowWillOverflow', async () => {
+    const stream = createMockStream([
+      {
+        type: GeminiEventType.ContextWindowWillOverflow,
+        value: { estimatedRequestTokenCount: 1000, remainingTokenCount: 200 },
+      },
+    ]);
+    mockSendMessageStream.mockReturnValue(stream);
+
+    const result = await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Trigger Overflow Simulation' }],
+    });
+
+    expect(result.stopReason).toBe('max_tokens');
+  });
+
+  it('should handle GeminiEventType.MaxSessionTurns', async () => {
+    const stream = createMockStream([
+      {
+        type: GeminiEventType.MaxSessionTurns,
+      },
+    ]);
+    mockSendMessageStream.mockReturnValue(stream);
+
+    const result = await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Trigger Safety Limits' }],
+    });
+
+    expect(result.stopReason).toBe('max_turn_requests');
   });
 });
