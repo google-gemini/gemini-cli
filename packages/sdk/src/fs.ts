@@ -8,6 +8,13 @@ import type { Config as CoreConfig } from '@google/gemini-cli-core';
 import type { AgentFilesystem } from './types.js';
 import fs from 'node:fs/promises';
 
+/**
+ * SDK implementation of {@link AgentFilesystem} that enforces path-based
+ * access policies from the core Config.
+ *
+ * Read operations return `null` when access is denied; write operations
+ * throw an error.
+ */
 export class SdkAgentFilesystem implements AgentFilesystem {
   constructor(private readonly config: CoreConfig) {}
 
