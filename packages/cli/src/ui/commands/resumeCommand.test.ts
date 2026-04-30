@@ -27,6 +27,26 @@ describe('resumeCommand', () => {
     );
   });
 
+  it('should expose /resume-specific usage strings in checkpoint descriptions', () => {
+    const save = resumeCommand.subCommands?.find(
+      (subCommand) => subCommand.name === 'save',
+    );
+    const resume = resumeCommand.subCommands?.find(
+      (subCommand) => subCommand.name === 'resume',
+    );
+    const deleteCommand = resumeCommand.subCommands?.find(
+      (subCommand) => subCommand.name === 'delete',
+    );
+    const share = resumeCommand.subCommands?.find(
+      (subCommand) => subCommand.name === 'share',
+    );
+
+    expect(save?.description).toContain('/resume save <tag>');
+    expect(resume?.description).toContain('/resume resume <tag>');
+    expect(deleteCommand?.description).toContain('/resume delete <tag>');
+    expect(share?.description).toContain('/resume share <file>');
+  });
+
   it('should keep a hidden /resume checkpoints compatibility alias', () => {
     const checkpoints = resumeCommand.subCommands?.find(
       (subCommand) => subCommand.name === 'checkpoints',
