@@ -47,16 +47,16 @@ jobs:
             }
             const batchLabel = 'Stale';
 
-            const threeMonthsAgo = new Date();
-            threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+            const sixtyDaysAgo = new Date();
+            sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
 
-            const tenDaysAgo = new Date();
-            tenDaysAgo.setDate(tenDaysAgo.getDate() - 10);
+            const sevenDaysAgo = new Date();
+            sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-            core.info(`Cutoff date for creation: ${threeMonthsAgo.toISOString()}`);
-            core.info(`Cutoff date for updates: ${tenDaysAgo.toISOString()}`);
+            core.info(`Cutoff date for creation: ${sixtyDaysAgo.toISOString()}`);
+            core.info(`Cutoff date for updates: ${sevenDaysAgo.toISOString()}`);
 
-            const query = `repo:${context.repo.owner}/${context.repo.repo} is:issue is:open created:<${threeMonthsAgo.toISOString()}`;
+            const query = `repo:${context.repo.owner}/${context.repo.repo} is:issue is:open created:<${sixtyDaysAgo.toISOString()}`;
             core.info(`Searching with query: ${query}`);
 
             const itemsToCheck = await github.paginate(github.rest.search.issuesAndPullRequests, {
@@ -91,7 +91,8 @@ jobs:
                 continue;
               }
 
-              let isStale = updatedAt < tenDaysAgo;
+              const hasStaleLabel = rawLabels.includes(batchLabel);
+              let isStale = updatedAt < sevenDaysAgo;
 
               // If apparently active, check if it's only bot activity
               if (!isStale) {
@@ -107,11 +108,11 @@ jobs:
 
                   const lastHumanComment = comments.data.find(comment => comment.user.type !== 'Bot');
                   if (lastHumanComment) {
-                    isStale = new Date(lastHumanComment.created_at) < tenDaysAgo;
+                    isStale = new Date(lastHumanComment.created_at) < sevenDaysAgo;
                   } else {
                     // No human comments. Check if creator is human.
                     if (issue.user.type !== 'Bot') {
-                       isStale = createdAt < tenDaysAgo;
+                       isStale = createdAt < sevenDaysAgo;
                     } else {
                        isStale = true; // Bot created, only bot comments
                     }
@@ -124,34 +125,42 @@ jobs:
 
               if (isStale) {
                 processedCount++;
-                const message = `Closing stale issue #${issue.number}: "${issue.title}" (${issue.html_url})`;
-                core.info(message);
+                
+                if (!hasStaleLabel) {
+                  core.info(`Nudging stale issue #${issue.number}: "${issue.title}"`);
+                  if (!dryRun) {
+                    await github.rest.issues.addLabels({
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      issue_number: issue.number,
+                      labels: [batchLabel]
+                    });
 
-                if (!dryRun) {
-                  // Add label
-                  await github.rest.issues.addLabels({
-                    owner: context.repo.owner,
-                    repo: context.repo.repo,
-                    issue_number: issue.number,
-                    labels: [batchLabel]
-                  });
+                    await github.rest.issues.createComment({
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      issue_number: issue.number,
+                      body: 'Hello! As part of our effort to keep our backlog manageable, we are tidying up older reports. It looks like this issue hasn\'t been active for a while. If there is no further activity, we will close this in 7 days. Thank you!'
+                    });
+                  }
+                } else {
+                  core.info(`Closing stale issue #${issue.number}: "${issue.title}"`);
+                  if (!dryRun) {
+                    await github.rest.issues.createComment({
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      issue_number: issue.number,
+                      body: 'Closing this issue due to continued inactivity. If you are still experiencing this bug on the latest stable build, please feel free to comment or create a new issue with updated details.'
+                    });
 
-                  // Add comment
-                  await github.rest.issues.createComment({
-                    owner: context.repo.owner,
-                    repo: context.repo.repo,
-                    issue_number: issue.number,
-                    body: 'Hello! As part of our effort to keep our backlog manageable and focus on the most active issues, we are tidying up older reports.\n\nIt looks like this issue hasn\'t been active for a while, so we are closing it for now. However, if you are still experiencing this bug on the latest stable build, please feel free to comment on this issue or create a new one with updated details.\n\nThank you for your contribution!'
-                  });
-
-                  // Close issue
-                  await github.rest.issues.update({
-                    owner: context.repo.owner,
-                    repo: context.repo.repo,
-                    issue_number: issue.number,
-                    state: 'closed',
-                    state_reason: 'not_planned'
-                  });
+                    await github.rest.issues.update({
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      issue_number: issue.number,
+                      state: 'closed',
+                      state_reason: 'not_planned'
+                    });
+                  }
                 }
               }
             }
