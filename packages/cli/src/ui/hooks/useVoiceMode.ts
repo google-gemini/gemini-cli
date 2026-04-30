@@ -200,13 +200,17 @@ export function useVoiceMode({
           const textBefore = baseline.slice(0, insertOffset);
           const textAfter = baseline.slice(insertOffset);
 
-          const needsSpace =
-            textBefore.length > 0 &&
-            !textBefore.endsWith(' ') &&
-            !textBefore.endsWith('\n');
-          const prefix = needsSpace ? textBefore + ' ' : textBefore;
+          const prefix =
+            textBefore.length > 0 && !/\s$/.test(textBefore)
+              ? textBefore + ' '
+              : textBefore;
 
-          const newTotalText = prefix + text + textAfter;
+          const suffix =
+            text.length > 0 && textAfter.length > 0 && !/^\s/.test(textAfter)
+              ? ' '
+              : '';
+
+          const newTotalText = prefix + text + suffix + textAfter;
           bufferRef.current.setText(newTotalText, prefix.length + text.length);
         }
         liveTranscriptionRef.current = text;
