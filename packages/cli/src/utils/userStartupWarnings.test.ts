@@ -146,9 +146,8 @@ describe('getUserStartupWarnings', () => {
 
   describe('folder trust check', () => {
     it('should throw FatalUntrustedWorkspaceError when untrusted in headless mode', async () => {
-      const { isHeadlessMode, FatalUntrustedWorkspaceError } = await import(
-        '@google/gemini-cli-core'
-      );
+      const { isHeadlessMode, FatalUntrustedWorkspaceError } =
+        await import('@google/gemini-cli-core');
       vi.mocked(isFolderTrustEnabled).mockReturnValue(true);
       vi.mocked(isWorkspaceTrusted).mockImplementation(() => {
         throw new FatalUntrustedWorkspaceError(

@@ -1261,9 +1261,8 @@ function doIt() {
 
   describe('JIT context discovery', () => {
     it('should append JIT context to output when enabled and context is found', async () => {
-      const { discoverJitContext, appendJitContext } = await import(
-        './jit-context.js'
-      );
+      const { discoverJitContext, appendJitContext } =
+        await import('./jit-context.js');
       vi.mocked(discoverJitContext).mockResolvedValue('Use the useAuth hook.');
       vi.mocked(appendJitContext).mockImplementation((content, context) => {
         if (!context) return content;
@@ -1292,9 +1291,8 @@ function doIt() {
     });
 
     it('should not append JIT context when disabled', async () => {
-      const { discoverJitContext, appendJitContext } = await import(
-        './jit-context.js'
-      );
+      const { discoverJitContext, appendJitContext } =
+        await import('./jit-context.js');
       vi.mocked(discoverJitContext).mockResolvedValue('');
       vi.mocked(appendJitContext).mockImplementation((content, context) => {
         if (!context) return content;

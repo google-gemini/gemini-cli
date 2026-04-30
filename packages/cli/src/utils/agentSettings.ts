@@ -17,8 +17,10 @@ export type AgentActionStatus = 'success' | 'no-op' | 'error';
 /**
  * Metadata representing the result of an agent settings operation.
  */
-export interface AgentActionResult
-  extends Omit<FeatureActionResult, 'featureName'> {
+export interface AgentActionResult extends Omit<
+  FeatureActionResult,
+  'featureName'
+> {
   agentName: string;
 }
 

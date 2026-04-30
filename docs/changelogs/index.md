@@ -1,3 +1,21 @@
+## Announcements: v0.40.0 - 2026-04-28
+
+- **Offline Search Support:** Bundled `ripgrep` binaries into the Single
+  Executable Application (SEA) for built-in, offline search capabilities
+  ([#25342](https://github.com/google-gemini/gemini-cli/pull/25342) by
+  @scidomino).
+- **MCP Resource Management:** Added new tools to discover, list, and read Model
+  Context Protocol (MCP) resources
+  ([#25331](https://github.com/google-gemini/gemini-cli/pull/25331) by
+  @ruomengz).
+- **Refined Memory System:** Replaced the standalone Memory Manager Agent with a
+  more efficient prompt-driven editing system across four tiers of memory
+  ([#25716](https://github.com/google-gemini/gemini-cli/pull/25716) by
+  @SandyTao520).
+- **Local Model Integration:** Streamlined setup for `gemini gemma` local models
+  ([#25498](https://github.com/google-gemini/gemini-cli/pull/25498) by
+  @Samee24).
+
 # Gemini CLI release notes
 
 Gemini CLI has three major release channels: nightly, preview, and stable. For
