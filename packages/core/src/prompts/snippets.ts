@@ -577,7 +577,8 @@ You are operating with a persistent file-based task tracking system located at \
 5.  **VERIFICATION**: Before marking a task as complete, verify the work is actually done (e.g., run the test, check the file existence).
 6.  **STATE OVER CHAT**: If the user says "I think we finished that," but the tool says it is 'pending', trust the tool--or verify explicitly before updating.
 7.  **DEPENDENCY MANAGEMENT**: Respect task topology. Never attempt to execute a task if its dependencies are not marked as 'closed'. If you are blocked, focus only on the leaf nodes of the task graph.
-8.  **DETAILED TASKS**: Ensure that the tasks created have highly detailed titles and descriptions. The description MUST provide significantly more specific details and technical context than the title.`.trim();
+8.  **DETAILED TASKS**: Ensure that the tasks created have highly detailed titles and descriptions. The description MUST provide significantly more specific details and technical context than the title.
+9.  **TURN EFFICIENCY**: Update the tracker immediately when a step is completed. Combine ${trackerUpdate} calls with other tool calls in the same turn to save turns.`.trim();
 }
 
 export function renderPlanningWorkflow(
@@ -603,7 +604,7 @@ ${options.planModeToolsList}
    - **Inquiries:** If the request is an **Inquiry** (e.g., "How does X work?"), answer directly. DO NOT create a plan.
    - **Directives:** If the request is a **Directive** (e.g., "Fix bug Y"), follow the workflow below.
 5. **Plan Storage:** Save plans as Markdown (.md) using descriptive filenames.
-6. **Direct Modification:** If asked to modify code, explain you are in Plan Mode and use ${formatToolName(EXIT_PLAN_MODE_TOOL_NAME)} to request approval.
+6. **Direct Modification:** If asked to modify code, explain you are in Plan Mode and use the built-in ${formatToolName(EXIT_PLAN_MODE_TOOL_NAME)} tool to request approval. **CRITICAL: NEVER attempt to call this tool via ${formatToolName(SHELL_TOOL_NAME)}.**
 7. **Presenting Plan:** When seeking informal agreement on a plan, or any time the user asks to see the plan, you MUST output the full content of the plan in the chat response. This overrides the "Minimal Output" guideline.
 
 ## Planning Workflow
@@ -627,7 +628,7 @@ Write the implementation plan to \`${options.plansDir}/\`. The plan's structure 
 - **Complex Tasks:** Include **Background & Motivation**, **Scope & Impact**, **Proposed Solution**, **Alternatives Considered**, a phased **Implementation Plan**, **Verification**, and **Migration & Rollback** strategies.${options.interactive ? '\n- **Alignment Check:** After drafting the plan, you MUST present it to the user in the chat (adhering to Rule 7 for presenting plans) to ensure alignment on the specific details. Ask for feedback or confirmation, and proceed to Step 4 (Review & Approval) once the user agrees with the detailed plan.' : ''}
 
 ### 4. Review & Approval
-ONLY use the ${formatToolName(EXIT_PLAN_MODE_TOOL_NAME)} tool to present the plan for formal approval AFTER you have reached an informal agreement with the user in the chat regarding the proposed strategy. When called, this tool will present the plan and ${options.interactive ? 'formally request approval.' : 'begin implementation.'}
+ONLY use the built-in ${formatToolName(EXIT_PLAN_MODE_TOOL_NAME)} tool to present the plan for formal approval AFTER you have reached an informal agreement with the user in the chat regarding the proposed strategy. **CRITICAL: NEVER attempt to call this tool via ${formatToolName(SHELL_TOOL_NAME)}.** When called, this tool will present the plan and ${options.interactive ? 'formally request approval.' : 'begin implementation.'}
 
 ${renderApprovedPlanSection(options.approvedPlanPath)}`.trim();
 }

@@ -2061,6 +2061,87 @@ const SETTINGS_SCHEMA = {
         description: 'Enable access to Gemma 4 models (experimental).',
         showInDialog: true,
       },
+      voiceMode: {
+        type: 'boolean',
+        label: 'Voice Mode',
+        category: 'Experimental',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Enable experimental voice dictation and commands (/voice, /voice model).',
+        showInDialog: true,
+      },
+      voice: {
+        type: 'object',
+        label: 'Voice',
+        category: 'Experimental',
+        requiresRestart: false,
+        default: {},
+        description: 'Settings for voice mode and transcription.',
+        showInDialog: false,
+        properties: {
+          activationMode: {
+            type: 'enum',
+            label: 'Voice Activation Mode',
+            category: 'Experimental',
+            requiresRestart: false,
+            default: 'push-to-talk',
+            description: 'How to trigger voice recording with the Space key.',
+            showInDialog: true,
+            options: [
+              { value: 'push-to-talk', label: 'Push-To-Talk (Hold Space)' },
+              { value: 'toggle', label: 'Toggle (Press Space to start/stop)' },
+            ],
+          },
+          backend: {
+            type: 'enum',
+            label: 'Voice Transcription Backend',
+            category: 'Experimental',
+            requiresRestart: false,
+            default: 'gemini-live',
+            description: 'The backend to use for voice transcription.',
+            showInDialog: true,
+            options: [
+              { value: 'gemini-live', label: 'Gemini Live API (Cloud)' },
+              { value: 'whisper', label: 'Whisper (Local)' },
+            ],
+          },
+          whisperModel: {
+            type: 'enum',
+            label: 'Whisper Model',
+            category: 'Experimental',
+            requiresRestart: false,
+            default: 'ggml-base.en.bin',
+            description: 'The Whisper model to use for local transcription.',
+            showInDialog: true,
+            options: [
+              { value: 'ggml-tiny.en.bin', label: 'Tiny (EN) - Fast (~75MB)' },
+              {
+                value: 'ggml-base.en.bin',
+                label: 'Base (EN) - Balanced (~142MB)',
+              },
+              {
+                value: 'ggml-large-v3-turbo-q5_0.bin',
+                label: 'Large v3 Turbo (Q5_0) - High Accuracy (~547MB)',
+              },
+              {
+                value: 'ggml-large-v3-turbo-q8_0.bin',
+                label: 'Large v3 Turbo (Q8_0) - Max Accuracy (~834MB)',
+              },
+            ],
+          },
+          stopGracePeriodMs: {
+            type: 'number',
+            label: 'Voice Stop Grace Period (ms)',
+            category: 'Experimental',
+            requiresRestart: false,
+            default: 1000,
+            description:
+              'How long to wait for final transcription after stopping recording.',
+            showInDialog: true,
+          },
+        },
+      },
       adk: {
         type: 'object',
         label: 'ADK',
@@ -2306,6 +2387,17 @@ const SETTINGS_SCHEMA = {
         description:
           'Disable the built-in save_memory tool and let the main agent persist project context by editing markdown files directly with edit/write_file. Route facts across four tiers: team-shared conventions go to project GEMINI.md files, project-specific personal notes go to the per-project private memory folder (MEMORY.md as index + sibling .md files for detail), and cross-project personal preferences go to the global ~/.gemini/GEMINI.md (the only file under ~/.gemini/ that the agent can edit — settings, credentials, etc. remain off-limits). Set to false to fall back to the legacy save_memory tool.',
         showInDialog: true,
+      },
+      stressTestProfile: {
+        type: 'boolean',
+        label:
+          'Use the stress test profile to aggressively trigger context management.',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Significantly lowers token limits to force early garbage collection and distillation for testing purposes.',
+        showInDialog: false,
       },
       autoMemory: {
         type: 'boolean',
@@ -3197,6 +3289,7 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
           secondary: { type: 'string' },
           link: { type: 'string' },
           accent: { type: 'string' },
+          response: { type: 'string' },
         },
       },
       background: {

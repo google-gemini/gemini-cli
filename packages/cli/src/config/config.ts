@@ -37,6 +37,7 @@ import {
   getAdminErrorMessage,
   isHeadlessMode,
   Config,
+  SimpleExtensionLoader,
   resolveToRealPath,
   applyAdminAllowlist,
   applyRequiredServers,
@@ -48,7 +49,6 @@ import {
   type HookEventName,
   type OutputFormat,
   detectIdeFromEnv,
-  generalistProfile,
 } from '@google/gemini-cli-core';
 import {
   type Settings,
@@ -97,6 +97,7 @@ export interface CliArgs {
   extensions: string[] | undefined;
   listExtensions: boolean | undefined;
   resume: string | typeof RESUME_LATEST | undefined;
+  sessionId: string | undefined;
   listSessions: boolean | undefined;
   deleteSession: string | undefined;
   includeDirectories: string[] | undefined;
@@ -237,6 +238,10 @@ export async function parseArguments(
       const hasPositionalQuery = Array.isArray(query)
         ? query.length > 0
         : !!query;
+
+      if (argv['resume'] !== undefined && argv['session-id'] !== undefined) {
+        return 'Cannot use both --resume (-r) and --session-id together';
+      }
 
       if (argv['prompt'] && hasPositionalQuery) {
         return 'Cannot use both a positional prompt and the --prompt (-p) flag together';
@@ -407,6 +412,25 @@ export async function parseArguments(
             return trimmed;
           },
         })
+        .option('session-id', {
+          type: 'string',
+          nargs: 1,
+          description: 'Start a new session with a manually provided UUID.',
+          coerce: (value: string): string => {
+            const trimmed = value.trim();
+            if (!trimmed) {
+              throw new Error('The --session-id option cannot be empty.');
+            }
+            if (!/^[a-zA-Z0-9-_]+$/.test(trimmed)) {
+              throw new Error(
+                'Invalid session ID "' +
+                  trimmed +
+                  '": Only alphanumeric characters, dashes, and underscores are allowed.',
+              );
+            }
+            return trimmed;
+          },
+        })
         .option('list-sessions', {
           type: 'boolean',
           description:
@@ -535,6 +559,7 @@ export interface LoadCliConfigOptions {
     disabled?: string[];
   };
   worktreeSettings?: WorktreeSettings;
+  skipExtensions?: boolean;
 }
 
 export async function loadCliConfig(
@@ -543,7 +568,7 @@ export async function loadCliConfig(
   argv: CliArgs,
   options: LoadCliConfigOptions = {},
 ): Promise<Config> {
-  const { cwd = process.cwd(), projectHooks } = options;
+  const { cwd = process.cwd(), projectHooks, skipExtensions = false } = options;
   const debugMode = isDebugMode(argv);
 
   const worktreeSettings =
@@ -618,21 +643,24 @@ export async function loadCliConfig(
     includeDirectories.push(...ideFolders);
   }
 
-  const extensionManager = new ExtensionManager({
-    settings,
-    requestConsent: requestConsentNonInteractive,
-    requestSetting: promptForSetting,
-    workspaceDir: cwd,
-    enabledExtensionOverrides: argv.extensions,
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    eventEmitter: coreEvents as EventEmitter<ExtensionEvents>,
-    clientVersion: await getVersion(),
-  });
-  await extensionManager.loadExtensions();
+  let extensionManager: ExtensionManager | undefined;
+  if (!skipExtensions) {
+    extensionManager = new ExtensionManager({
+      settings,
+      requestConsent: requestConsentNonInteractive,
+      requestSetting: promptForSetting,
+      workspaceDir: cwd,
+      enabledExtensionOverrides: argv.extensions,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      eventEmitter: coreEvents as EventEmitter<ExtensionEvents>,
+      clientVersion: await getVersion(),
+    });
+    await extensionManager.loadExtensions();
+  }
 
   const extensionPlanSettings = extensionManager
-    .getExtensions()
-    .find((ext) => ext.isActive && ext.plan?.directory)?.plan;
+    ?.getExtensions()
+    ?.find((ext) => ext.isActive && ext.plan?.directory)?.plan;
 
   const experimentalJitContext = settings.experimental.jitContext ?? true;
 
@@ -650,6 +678,9 @@ export async function loadCliConfig(
   let fileCount = 0;
   let filePaths: string[] = [];
 
+  const finalExtensionLoader =
+    extensionManager ?? new SimpleExtensionLoader([]);
+
   if (!experimentalJitContext) {
     // Call the (now wrapper) loadHierarchicalGeminiMemory which calls the server's version
     const result = await loadServerHierarchicalMemory(
@@ -658,7 +689,7 @@ export async function loadCliConfig(
         ? includeDirectories
         : [],
       fileService,
-      extensionManager,
+      finalExtensionLoader,
       trustedFolder,
       memoryImportFormat,
       memoryFileFiltering,
@@ -818,8 +849,15 @@ export async function loadCliConfig(
   );
 
   const defaultModel = PREVIEW_GEMINI_MODEL_AUTO;
-  const specifiedModel =
+  const rawModel =
     argv.model || process.env['GEMINI_MODEL'] || settings.model?.name;
+
+  // Ensure specifiedModel is a string (e.g. if yargs parsed multiple --model as an array)
+  const specifiedModel = Array.isArray(rawModel)
+    ? String(rawModel.at(-1) ?? '').trim() || ''
+    : rawModel === undefined
+      ? undefined
+      : String(rawModel ?? '').trim() || '';
 
   const resolvedModel =
     specifiedModel === GEMINI_MODEL_ALIAS_AUTO
@@ -901,17 +939,28 @@ export async function loadCliConfig(
       (ide.name !== 'vscode' || process.env['TERM_PROGRAM'] === 'vscode')
     ) {
       clientName = `acp-${ide.name}`;
+    } else {
+      clientName = 'acp';
     }
+  } else if (argv.isCommand) {
+    clientName = 'cli-command';
+  } else {
+    clientName = 'tui';
   }
 
-  const useGeneralistProfile =
-    settings.experimental?.generalistProfile ?? false;
-  const useContextManagement =
-    settings.experimental?.contextManagement ?? false;
+  // TODO(joshualitt): Clean this up alongside removal of the legacy config.
+  let profileSelector: string | undefined = undefined;
+  if (settings.experimental?.stressTestProfile) {
+    profileSelector = 'stressTestProfile';
+  } else if (
+    settings.experimental?.generalistProfile ||
+    settings.experimental?.contextManagement
+  ) {
+    profileSelector = 'generalistProfile';
+  }
+
   const contextManagement = {
-    ...(useGeneralistProfile ? generalistProfile : {}),
-    ...(useContextManagement ? settings?.contextManagement : {}),
-    enabled: useContextManagement || useGeneralistProfile,
+    enabled: !!profileSelector,
   };
 
   return new Config({
@@ -935,6 +984,7 @@ export async function loadCliConfig(
     worktreeSettings,
 
     coreTools: settings.tools?.core || undefined,
+    experimentalContextManagementConfig: profileSelector,
     allowedTools: allowedTools.length > 0 ? allowedTools : undefined,
     policyEngineConfig,
     policyUpdateConfirmationRequest,
@@ -995,11 +1045,12 @@ export async function loadCliConfig(
     listSessions: argv.listSessions || false,
     deleteSession: argv.deleteSession,
     enabledExtensions: argv.extensions,
-    extensionLoader: extensionManager,
+    extensionLoader: finalExtensionLoader,
     extensionRegistryURI,
     enableExtensionReloading: settings.experimental?.extensionReloading,
     enableAgents: settings.experimental?.enableAgents,
     plan: settings.general?.plan?.enabled ?? true,
+    voiceMode: settings.experimental?.voiceMode,
     tracker: settings.experimental?.taskTracker,
     directWebFetch: settings.experimental?.directWebFetch,
     planSettings: settings.general?.plan?.directory

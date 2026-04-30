@@ -112,6 +112,7 @@ export async function loadConversationRecord(
       userMessageCount?: number;
       firstUserMessage?: string;
       hasUserOrAssistantMessage?: boolean;
+      memoryScratchpadIsStale?: boolean;
     })
   | null
 > {
@@ -133,6 +134,8 @@ export async function loadConversationRecord(
       string,
       { isUser: boolean; isUserOrAssistant: boolean }
     >();
+    let isTrackingMemoryScratchpadFreshness = false;
+    let memoryScratchpadIsStale = false;
     let firstUserMessageStr: string | undefined;
 
     for await (const line of rl) {
@@ -140,6 +143,9 @@ export async function loadConversationRecord(
       try {
         const record = JSON.parse(line) as unknown;
         if (isRewindRecord(record)) {
+          if (isTrackingMemoryScratchpadFreshness) {
+            memoryScratchpadIsStale = true;
+          }
           const rewindId = record.$rewindTo;
           if (options?.metadataOnly) {
             const idx = messageIds.indexOf(rewindId);
@@ -168,6 +174,9 @@ export async function loadConversationRecord(
             }
           }
         } else if (isMessageRecord(record)) {
+          if (isTrackingMemoryScratchpadFreshness) {
+            memoryScratchpadIsStale = true;
+          }
           const id = record.id;
           const isUser = hasProperty(record, 'type') && record.type === 'user';
           const isUserOrAssistant =
@@ -206,6 +215,12 @@ export async function loadConversationRecord(
             }
           }
         } else if (isMetadataUpdateRecord(record)) {
+          if (hasProperty(record.$set, 'memoryScratchpad')) {
+            isTrackingMemoryScratchpadFreshness = Boolean(
+              record.$set.memoryScratchpad,
+            );
+            memoryScratchpadIsStale = false;
+          }
           // Metadata update
           metadata = {
             ...metadata,
@@ -257,6 +272,7 @@ export async function loadConversationRecord(
       startTime: metadata.startTime || new Date().toISOString(),
       lastUpdated: metadata.lastUpdated || new Date().toISOString(),
       summary: metadata.summary,
+      memoryScratchpad: metadata.memoryScratchpad,
       directories: metadata.directories,
       kind: metadata.kind,
       messages: options?.metadataOnly ? [] : loadedMessages,
@@ -267,6 +283,9 @@ export async function loadConversationRecord(
         options?.metadataOnly && metadataMessages.length > 0
           ? metadataMessages.filter((m) => m.type === 'user').length
           : userMessageCount,
+      memoryScratchpadIsStale: isTrackingMemoryScratchpadFreshness
+        ? memoryScratchpadIsStale
+        : undefined,
       firstUserMessage: fallbackFirstUserMessage,
       hasUserOrAssistantMessage:
         options?.metadataOnly && metadataMessages.length > 0
@@ -331,6 +350,13 @@ export class ChatRecordingService {
             this.appendRecord(initialMetadata);
             for (const msg of this.cachedConversation.messages) {
               this.appendRecord(msg);
+            }
+            if (this.cachedConversation.memoryScratchpad) {
+              this.appendRecord({
+                $set: {
+                  memoryScratchpad: this.cachedConversation.memoryScratchpad,
+                },
+              });
             }
           }
 
@@ -763,6 +789,32 @@ export class ChatRecordingService {
       }
     } catch (error) {
       debugLogger.error(`Error deleting associated file ${file}:`, error);
+    }
+  }
+
+  /**
+   * Asynchronously deletes the current session's chat file and tool outputs.
+   * This encapsulates the session ID logic and uses non-blocking I/O to avoid
+   * blocking the event loop on exit.
+   */
+  async deleteCurrentSessionAsync(): Promise<void> {
+    if (!this.conversationFile) {
+      return;
+    }
+
+    try {
+      const tempDir = this.context.config.storage.getProjectTempDir();
+
+      // Delete the conversation file directly using the tracked path.
+      await fs.promises.unlink(this.conversationFile).catch(() => {
+        // File may not exist; ignore.
+      });
+
+      // Delegate tool-output and log cleanup to the shared utility.
+      await deleteSessionArtifactsAsync(this.sessionId, tempDir);
+    } catch (error) {
+      debugLogger.error('Error deleting current session.', error);
+      throw error;
     }
   }
 
