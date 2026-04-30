@@ -552,7 +552,7 @@ export async function runNonInteractive({
             const errorCode = event._meta?.['code'];
 
             if (errorCode === 'AGENT_EXECUTION_BLOCKED') {
-              const blockMessage = `Agent execution blocked: ${event.message}`;
+              const blockMessage = `Agent execution blocked: ${event.message.trim()}`;
               if (config.getOutputFormat() === OutputFormat.TEXT) {
                 process.stderr.write(`[WARNING] ${blockMessage}\n`);
               } else if (streamFormatter) {
