@@ -4979,7 +4979,7 @@ describe('InputPrompt', () => {
       );
 
       // Initially not recording
-      expect(lastFrame()).not.toContain('🎤 Listening...');
+      expect(lastFrame()).not.toContain('Listening...');
       expect(lastFrame()).toContain('🎤 >');
       expect(lastFrame()).toContain(
         'Type your message or space to talk (Esc to exit)',
@@ -5025,7 +5025,7 @@ describe('InputPrompt', () => {
         stdin.write(' ');
       });
       await waitFor(() => {
-        expect(lastFrame()).not.toContain('🎤 Listening...');
+        expect(lastFrame()).not.toContain('Listening...');
         expect(lastFrame()).toContain('🎤 >');
       });
 
@@ -5284,7 +5284,8 @@ describe('InputPrompt', () => {
           stdin.write(' ');
           vi.advanceTimersByTime(100);
         });
-        expect(lastFrame()).toContain('🎤 Listening...');
+        expect(lastFrame()).toContain('🎤 >');
+        expect(lastFrame()).toContain('Listening...');
 
         // Stop heartbeat (release)
         await act(async () => {

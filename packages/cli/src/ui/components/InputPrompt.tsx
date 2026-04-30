@@ -1800,7 +1800,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         useBackgroundColor={useBackgroundColor}
       >
         <Box flexGrow={1} flexDirection="row" paddingX={1}>
-          {isVoiceModeEnabled && !isRecording && (
+          {isVoiceModeEnabled && (
             <Text color={theme.text.accent}>🎤 </Text>
           )}
           <Text
@@ -1829,7 +1829,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           <Box flexGrow={1} flexDirection="column" ref={innerBoxRef}>
             {isRecording && (
               <Box flexDirection="row" marginBottom={0}>
-                <Text color={theme.status.success}>🎤 Listening...</Text>
+                <Text color={theme.status.success}>Listening...</Text>
               </Box>
             )}
             {buffer.text.length === 0 && !isRecording ? (
