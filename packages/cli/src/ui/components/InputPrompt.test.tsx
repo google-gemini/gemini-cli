@@ -5292,7 +5292,7 @@ describe('InputPrompt', () => {
         });
 
         await waitFor(() => {
-          expect(lastFrame()).not.toContain('🎤 Listening...');
+          expect(lastFrame()).not.toContain('Listening...');
         });
 
         unmount();
