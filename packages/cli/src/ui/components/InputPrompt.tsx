@@ -1801,7 +1801,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         useBackgroundColor={useBackgroundColor}
       >
         <Box flexGrow={1} flexDirection="row" paddingX={1}>
-          {isVoiceModeEnabled && <Text color={theme.text.accent}>🎤 </Text>}
+          {isVoiceModeEnabled &&
+            (isRecording ? (
+              <ListeningIndicator color={theme.text.accent} />
+            ) : (
+              <Text color={theme.text.accent}>🎤 </Text>
+            ))}
           <Text
             color={statusColor ?? theme.text.accent}
             aria-label={statusText || undefined}
@@ -1821,16 +1826,16 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
               <Text color={theme.text.accent}>(r:) </Text>
             ) : showYoloStyling ? (
               '*'
+            ) : showYoloStyling ? (
+              '*'
             ) : (
               '>'
             )}{' '}
           </Text>
+          {isRecording && (
+            <Text color={theme.status.success}>Listening... </Text>
+          )}
           <Box flexGrow={1} flexDirection="column" ref={innerBoxRef}>
-            {isRecording && (
-              <Box flexDirection="row" marginBottom={0}>
-                <ListeningIndicator color={theme.status.success} />
-              </Box>
-            )}
             {buffer.text.length === 0 && !isRecording ? (
               effectivePlaceholder ? (
                 showCursor ? (

@@ -106,9 +106,7 @@ vi.mock('../utils/clipboardUtils.js');
 vi.mock('../hooks/useKittyKeyboardProtocol.js');
 
 vi.mock('./shared/ListeningIndicator.js', () => ({
-  ListeningIndicator: vi.fn(({ color }) => (
-    <Text color={color}>Listening...</Text>
-  )),
+  ListeningIndicator: vi.fn(({ color }) => <Text color={color}>~~~ </Text>),
 }));
 
 // Mock ink BEFORE importing components that use it to intercept terminalCursorPosition
@@ -5290,7 +5288,7 @@ describe('InputPrompt', () => {
           stdin.write(' ');
           vi.advanceTimersByTime(100);
         });
-        expect(lastFrame()).toContain('🎤 >');
+        expect(lastFrame()).toContain('~~~ >');
         expect(lastFrame()).toContain('Listening...');
 
         // Stop heartbeat (release)

@@ -25,13 +25,13 @@ export const ListeningIndicator: React.FC<ListeningIndicatorProps> = ({
     return () => clearInterval(timer);
   }, []);
 
-  // Generate 4 bars for the wave
-  const bars = Array.from({ length: 4 }).map((_, i) => {
+  // Generate 3 bars for the wave
+  const bars = Array.from({ length: 3 }).map((_, i) => {
     // Sine wave calculation to map to our 8 block characters (0-7)
-    const phase = tick * 0.4 + i * 0.8;
+    const phase = tick * 0.4 + i * 1.2;
     const height = Math.floor((Math.sin(phase) + 1) * 3.5);
     return WAVE_CHARS[Math.max(0, Math.min(7, height))] ?? ' ';
   });
 
-  return <Text color={color}>{bars.join(' ')}</Text>;
+  return <Text color={color}>{bars.join('')} </Text>;
 };
