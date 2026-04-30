@@ -38,7 +38,7 @@ exports[`System Lifecycle Golden Tests > Scenario 1: Organic Growth with Huge To
     {
       "parts": [
         {
-          "text": "[Multi-Modal Blob (image/png, 0.01MB) degraded to text to preserve context window. Saved to: <MOCKED_DIR>]",
+          "text": "Please continue.",
         },
       ],
       "role": "user",
@@ -46,28 +46,28 @@ exports[`System Lifecycle Golden Tests > Scenario 1: Organic Growth with Huge To
   ],
   "tokenTrajectory": [
     {
-      "tokensAfterBackground": 12,
-      "tokensBeforeBackground": 12,
+      "tokensAfterBackground": 17,
+      "tokensBeforeBackground": 17,
       "turnIndex": 0,
     },
     {
-      "tokensAfterBackground": 24,
-      "tokensBeforeBackground": 24,
+      "tokensAfterBackground": 34,
+      "tokensBeforeBackground": 34,
       "turnIndex": 1,
     },
     {
-      "tokensAfterBackground": 20138,
-      "tokensBeforeBackground": 20147,
+      "tokensAfterBackground": 327,
+      "tokensBeforeBackground": 20172,
       "turnIndex": 2,
     },
     {
-      "tokensAfterBackground": 3335,
-      "tokensBeforeBackground": 23143,
+      "tokensAfterBackground": 93,
+      "tokensBeforeBackground": 3037,
       "turnIndex": 3,
     },
     {
-      "tokensAfterBackground": 86,
-      "tokensBeforeBackground": 3033,
+      "tokensAfterBackground": 27,
+      "tokensBeforeBackground": 27,
       "turnIndex": 4,
     },
   ],
@@ -120,13 +120,13 @@ exports[`System Lifecycle Golden Tests > Scenario 2: Under Budget (No Modificati
   ],
   "tokenTrajectory": [
     {
-      "tokensAfterBackground": 12,
-      "tokensBeforeBackground": 12,
+      "tokensAfterBackground": 17,
+      "tokensBeforeBackground": 17,
       "turnIndex": 0,
     },
     {
-      "tokensAfterBackground": 24,
-      "tokensBeforeBackground": 24,
+      "tokensAfterBackground": 34,
+      "tokensBeforeBackground": 34,
       "turnIndex": 1,
     },
   ],
@@ -195,18 +195,18 @@ exports[`System Lifecycle Golden Tests > Scenario 3: Async-Driven Background GC 
   ],
   "tokenTrajectory": [
     {
-      "tokensAfterBackground": 37,
-      "tokensBeforeBackground": 37,
+      "tokensAfterBackground": 42,
+      "tokensBeforeBackground": 42,
       "turnIndex": 0,
     },
     {
-      "tokensAfterBackground": 74,
-      "tokensBeforeBackground": 74,
+      "tokensAfterBackground": 84,
+      "tokensBeforeBackground": 84,
       "turnIndex": 1,
     },
     {
-      "tokensAfterBackground": 111,
-      "tokensBeforeBackground": 111,
+      "tokensAfterBackground": 126,
+      "tokensBeforeBackground": 126,
       "turnIndex": 2,
     },
   ],

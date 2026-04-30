@@ -20,8 +20,6 @@ export enum NodeType {
   AGENT_YIELD = 'AGENT_YIELD',
   SNAPSHOT = 'SNAPSHOT',
   ROLLING_SUMMARY = 'ROLLING_SUMMARY',
-  EPISODE = 'EPISODE',
-  TASK = 'TASK',
 }
 
 export interface Node {
@@ -44,8 +42,8 @@ export interface BaseConcreteNode extends Node {
   /** The original, high-fidelity Part object from the API */
   readonly payload: Part;
 
-  /** The ID of the Logical Node (e.g., Episode) that structurally owns this node */
-  readonly logicalParentId?: string;
+  /** The ID of the specific turn in history this node belongs to. Unique per turn. */
+  readonly turnId: string;
 
   /** If this node replaced a single node 1:1 (e.g., masking), this points to the original */
   readonly replacesId?: string;
@@ -122,34 +120,6 @@ export type ConcreteNode =
   | AgentYield
   | Snapshot
   | RollingSummary;
-
-/**
- * Logical Nodes
- * These define hierarchy and grouping. They do not directly render to Gemini.
- */
-export interface Episode extends Node {
-  readonly type: NodeType.EPISODE;
-  /** References to the Concrete Node IDs that conceptually belong to this Episode. */
-  concreteNodes: readonly ConcreteNode[];
-}
-
-export interface Task extends Node {
-  readonly type: NodeType.TASK;
-  readonly goal: string;
-  readonly status: 'active' | 'completed' | 'failed';
-  /** References to the Episode IDs that belong to this task */
-  readonly episodeIds: readonly string[];
-}
-
-export type LogicalNode = Task | Episode;
-
-export function isEpisode(node: Node): node is Episode {
-  return node.type === NodeType.EPISODE;
-}
-
-export function isTask(node: Node): node is Task {
-  return node.type === NodeType.TASK;
-}
 
 export function isAgentThought(node: Node): node is AgentThought {
   return node.type === NodeType.AGENT_THOUGHT;

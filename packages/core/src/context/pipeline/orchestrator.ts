@@ -60,12 +60,12 @@ export class PipelineOrchestrator {
   private isNodeAllowed(
     node: ConcreteNode,
     triggerTargets: ReadonlySet<string>,
-    protectedLogicalIds: ReadonlySet<string> = new Set(),
+    protectedTurnIds: ReadonlySet<string> = new Set(),
   ): boolean {
     return (
       triggerTargets.has(node.id) &&
-      !protectedLogicalIds.has(node.id) &&
-      (!node.logicalParentId || !protectedLogicalIds.has(node.logicalParentId))
+      !protectedTurnIds.has(node.id) &&
+      !protectedTurnIds.has(node.turnId)
     );
   }
 
@@ -170,7 +170,7 @@ export class PipelineOrchestrator {
     trigger: PipelineTrigger,
     nodes: readonly ConcreteNode[],
     triggerTargets: ReadonlySet<string>,
-    protectedLogicalIds: ReadonlySet<string> = new Set(),
+    protectedTurnIds: ReadonlySet<string> = new Set(),
   ): Promise<readonly ConcreteNode[]> {
     this.tracer.logEvent('Orchestrator', 'Strategy Intent', {
       trigger,
@@ -197,7 +197,7 @@ export class PipelineOrchestrator {
           );
 
           const allowedTargets = currentBuffer.nodes.filter((n) =>
-            this.isNodeAllowed(n, triggerTargets, protectedLogicalIds),
+            this.isNodeAllowed(n, triggerTargets, protectedTurnIds),
           );
 
           const returnedNodes = await processor.process({
@@ -251,7 +251,7 @@ export class PipelineOrchestrator {
     pipeline: PipelineDef,
     nodes: readonly ConcreteNode[],
     triggerTargets: Set<string>,
-    protectedLogicalIds: ReadonlySet<string> = new Set(),
+    protectedTurnIds: ReadonlySet<string> = new Set(),
   ) {
     this.tracer.logEvent(
       'Orchestrator',
@@ -277,7 +277,7 @@ export class PipelineOrchestrator {
         );
 
         const allowedTargets = currentBuffer.nodes.filter((n) =>
-          this.isNodeAllowed(n, triggerTargets, protectedLogicalIds),
+          this.isNodeAllowed(n, triggerTargets, protectedTurnIds),
         );
 
         const returnedNodes = await processor.process({

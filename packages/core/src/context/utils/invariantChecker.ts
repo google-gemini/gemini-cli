@@ -31,12 +31,11 @@ export function checkContextInvariants(
     );
   }
 
-  // Check for orphan logic (nodes without parents that aren't roots)
-  const orphans = nodes.filter((n) => !n.logicalParentId);
-  if (orphans.length > 1) {
-    // Usually only the system prompt or very first message is an orphan
+  // Check for orphan logic (nodes without turn association)
+  const orphans = nodes.filter((n) => !n.turnId);
+  if (orphans.length > 0) {
     debugLogger.warn(
-      `[InvariantCheck][${context}] Detected ${orphans.length} nodes without logicalParentId.`,
+      `[InvariantCheck][${context}] Detected ${orphans.length} nodes without turnId.`,
     );
   }
 

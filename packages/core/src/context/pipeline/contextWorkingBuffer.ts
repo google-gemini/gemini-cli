@@ -264,20 +264,4 @@ export class ContextWorkingBufferImpl implements ContextWorkingBuffer {
   getAuditLog(): readonly GraphMutation[] {
     return this.history;
   }
-
-  getLineage(id: string): readonly ConcreteNode[] {
-    const lineage: ConcreteNode[] = [];
-    const currentNodesMap = new Map(this.nodes.map((n) => [n.id, n]));
-
-    let current = currentNodesMap.get(id);
-    while (current) {
-      lineage.push(current);
-      if (current.logicalParentId && current.logicalParentId !== current.id) {
-        current = currentNodesMap.get(current.logicalParentId);
-      } else {
-        break;
-      }
-    }
-    return lineage;
-  }
 }

@@ -84,6 +84,7 @@ export function createNodeTruncationProcessor(
               id: randomUUID(),
               payload: { ...payload, text: squashResult.text },
               replacesId: node.id,
+              turnId: node.turnId,
             });
             continue;
           }

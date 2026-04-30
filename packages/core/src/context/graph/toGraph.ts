@@ -5,7 +5,7 @@
  */
 
 import type { Content, Part } from '@google/genai';
-import { type ConcreteNode, type Episode, NodeType } from './types.js';
+import { type ConcreteNode, NodeType } from './types.js';
 import { randomUUID, createHash } from 'node:crypto';
 import { debugLogger } from '../../utils/debugLogger.js';
 
@@ -130,14 +130,6 @@ export function getStableId(
   return id;
 }
 
-function isCompleteEpisode(ep: Partial<Episode>): ep is Episode {
-  return (
-    typeof ep.id === 'string' &&
-    Array.isArray(ep.concreteNodes) &&
-    ep.concreteNodes.length > 0
-  );
-}
-
 /**
  * Builds a 1:1 Mirror Graph from Chat History.
  * Every Part in history is mapped to exactly one ConcreteNode.
@@ -148,18 +140,6 @@ export class ContextGraphBuilder {
   ) {}
 
   processHistory(history: readonly Content[]): ConcreteNode[] {
-    const episodes: Episode[] = [];
-    let currentEpisode: Partial<Episode> | null = null;
-    let currentEpisodeId: string | undefined;
-
-    const finalizeEpisode = () => {
-      if (currentEpisode && isCompleteEpisode(currentEpisode)) {
-        episodes.push(currentEpisode);
-      }
-      currentEpisode = null;
-      currentEpisodeId = undefined;
-    };
-
     const nodes: ConcreteNode[] = [];
 
     // Tracks occurrences of identical turn content to ensure unique stable IDs
@@ -169,8 +149,22 @@ export class ContextGraphBuilder {
       const msg = history[turnIdx];
       if (!msg.parts) continue;
 
+      // Defensive: Skip legacy environment header if it's the first turn.
+      // We now manage this as an orthogonal late-addition header.
+      if (turnIdx === 0 && msg.role === 'user' && msg.parts.length === 1) {
+        const text = msg.parts[0].text;
+        if (
+          text?.startsWith('<session_context>') &&
+          text?.includes('This is the Gemini CLI.')
+        ) {
+          debugLogger.log(
+            '[ContextGraphBuilder] Skipping legacy environment header turn from graph.',
+          );
+          continue;
+        }
+      }
+
       // Generate a stable salt for this turn based on its role and content
-      // This remains stable even if the turn's index in history changes.
       const turnContent = JSON.stringify(msg.parts);
       const h = createHash('md5')
         .update(`${msg.role}:${turnContent}`)
@@ -178,27 +172,9 @@ export class ContextGraphBuilder {
       const occurrence = (seenHashes.get(h) || 0) + 1;
       seenHashes.set(h, occurrence);
       const turnSalt = `${h}_${occurrence}`;
+      const turnId = getStableId(msg, this.nodeIdentityMap, turnSalt, -1);
 
       if (msg.role === 'user') {
-        const hasUserParts = msg.parts.some(
-          (p) => !!p.text || !!p.inlineData || !!p.fileData,
-        );
-
-        // A user text message starts a new logical episode
-        if (hasUserParts) {
-          finalizeEpisode();
-          currentEpisodeId = getStableId(
-            msg,
-            this.nodeIdentityMap,
-            turnSalt,
-            0,
-          );
-          currentEpisode = {
-            id: currentEpisodeId,
-            concreteNodes: [],
-          };
-        }
-
         for (let partIdx = 0; partIdx < msg.parts.length; partIdx++) {
           const part = msg.parts[partIdx];
           const apiId =
@@ -220,31 +196,11 @@ export class ContextGraphBuilder {
               : NodeType.USER_PROMPT,
             role: 'user',
             payload: part,
-            logicalParentId: currentEpisodeId,
+            turnId,
           };
           nodes.push(node);
-          if (currentEpisode) {
-            currentEpisode.concreteNodes = [
-              ...(currentEpisode.concreteNodes || []),
-              node,
-            ];
-          }
         }
       } else if (msg.role === 'model') {
-        // Model turns belong to the current episode (if one exists) or start a new one
-        if (!currentEpisode) {
-          currentEpisodeId = getStableId(
-            msg,
-            this.nodeIdentityMap,
-            turnSalt,
-            0,
-          );
-          currentEpisode = {
-            id: currentEpisodeId,
-            concreteNodes: [],
-          };
-        }
-
         for (let partIdx = 0; partIdx < msg.parts.length; partIdx++) {
           const part = msg.parts[partIdx];
           const apiId =
@@ -262,25 +218,15 @@ export class ContextGraphBuilder {
               : NodeType.AGENT_THOUGHT,
             role: 'model',
             payload: part,
-            logicalParentId: currentEpisodeId,
+            turnId,
           };
           nodes.push(node);
-          if (currentEpisode) {
-            currentEpisode.concreteNodes = [
-              ...(currentEpisode.concreteNodes || []),
-              node,
-            ];
-          }
         }
       }
     }
 
-    if (currentEpisode && isCompleteEpisode(currentEpisode)) {
-      episodes.push(currentEpisode);
-    }
-
     debugLogger.log(
-      `[ContextGraphBuilder] Mirror Graph built with ${nodes.length} nodes across ${episodes.length} episodes.`,
+      `[ContextGraphBuilder] Mirror Graph built with ${nodes.length} nodes.`,
     );
     return nodes;
   }

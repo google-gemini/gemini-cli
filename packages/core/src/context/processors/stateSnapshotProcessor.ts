@@ -88,7 +88,7 @@ export function createStateSnapshotProcessor(
 
             const snapshotNode: Snapshot = {
               id: newId,
-              logicalParentId: newId,
+              turnId: newId,
               type: NodeType.SNAPSHOT,
               timestamp: timestamp ?? Date.now(),
               role: 'user',
@@ -149,7 +149,7 @@ export function createStateSnapshotProcessor(
         const newId = randomUUID();
         const snapshotNode: Snapshot = {
           id: newId,
-          logicalParentId: newId,
+          turnId: newId,
           type: NodeType.SNAPSHOT,
           timestamp: nodesToSummarize[nodesToSummarize.length - 1].timestamp,
           role: 'user',

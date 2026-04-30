@@ -95,6 +95,7 @@ export function createBlobDegradationProcessor(
             id: randomUUID(),
             payload: { text: newText },
             replacesId: node.id,
+            turnId: node.turnId,
           });
         } else {
           returnedNodes.push(node);

@@ -105,6 +105,7 @@ export function createNodeDistillationProcessor(
                   payload: distilledPayload,
                   replacesId: node.id,
                   timestamp: node.timestamp,
+                  turnId: node.turnId,
                 });
                 break;
               }
@@ -163,6 +164,7 @@ export function createNodeDistillationProcessor(
                     payload: distilledPayload,
                     replacesId: node.id,
                     timestamp: node.timestamp,
+                    turnId: node.turnId,
                   });
                   break;
                 }

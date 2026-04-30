@@ -10,7 +10,7 @@ import { debugLogger } from '../../utils/debugLogger.js';
 
 /**
  * Reconstructs a valid Gemini Chat History from a list of Concrete Nodes.
- * This process is "role-alternation-aware" and uses logicalParentId to
+ * This process is "role-alternation-aware" and uses turnId to
  * preserve original turn boundaries even if multiple turns have the same role.
  */
 export function fromGraph(nodes: readonly ConcreteNode[]): Content[] {
@@ -22,7 +22,7 @@ export function fromGraph(nodes: readonly ConcreteNode[]): Content[] {
   let currentTurn: (Content & { _turnId?: string }) | null = null;
 
   for (const node of nodes) {
-    const turnId = node.logicalParentId;
+    const turnId = node.turnId;
 
     // We start a new turn if:
     // 1. We don't have a current turn.
@@ -31,7 +31,7 @@ export function fromGraph(nodes: readonly ConcreteNode[]): Content[] {
     if (
       !currentTurn ||
       currentTurn.role !== node.role ||
-      (turnId && currentTurn._turnId !== turnId)
+      currentTurn._turnId !== turnId
     ) {
       currentTurn = {
         role: node.role,

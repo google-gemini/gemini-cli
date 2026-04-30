@@ -73,10 +73,10 @@ export function createStateSnapshotAsyncProcessor(
 
             previousConsumedIds = latest.payload.consumedIds;
 
-            // Prepend a synthetic node representing the previous rolling state
+            const snapshotId = randomUUID();
             const previousStateNode: ConcreteNode = {
-              id: randomUUID(),
-              logicalParentId: '',
+              id: snapshotId,
+              turnId: snapshotId,
               type: NodeType.SNAPSHOT,
               timestamp: latest.timestamp,
               role: 'user',

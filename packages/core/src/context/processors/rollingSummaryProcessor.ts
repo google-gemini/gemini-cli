@@ -127,7 +127,7 @@ export function createRollingSummaryProcessor(
 
         const summaryNode: RollingSummary = {
           id: newId,
-          logicalParentId: newId,
+          turnId: newId,
           type: NodeType.ROLLING_SUMMARY,
           timestamp: nodesToSummarize[nodesToSummarize.length - 1].timestamp,
           role: 'user',

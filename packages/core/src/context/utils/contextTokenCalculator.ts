@@ -95,9 +95,9 @@ export class ContextTokenCalculator {
       if (seenIds.has(node.id)) continue;
       seenIds.add(node.id);
 
-      if (node.logicalParentId) {
-        if (!seenTurnIds.has(node.logicalParentId)) {
-          seenTurnIds.add(node.logicalParentId);
+      if (node.turnId) {
+        if (!seenTurnIds.has(node.turnId)) {
+          seenTurnIds.add(node.turnId);
           breakdown.overhead += MSG_OVERHEAD_TOKENS;
           breakdown.total += MSG_OVERHEAD_TOKENS;
         }
@@ -157,9 +157,9 @@ export class ContextTokenCalculator {
         seenIds.add(node.id);
         tokens += this.getTokenCost(node);
 
-        if (node.logicalParentId) {
-          if (!seenTurnIds.has(node.logicalParentId)) {
-            seenTurnIds.add(node.logicalParentId);
+        if (node.turnId) {
+          if (!seenTurnIds.has(node.turnId)) {
+            seenTurnIds.add(node.turnId);
             tokens += MSG_OVERHEAD_TOKENS;
           }
         }

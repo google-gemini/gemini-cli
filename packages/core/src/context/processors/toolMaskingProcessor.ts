@@ -221,6 +221,7 @@ export function createToolMaskingProcessor(
                 id: randomUUID(),
                 payload: maskedPart,
                 replacesId: node.id,
+                turnId: node.turnId,
               });
               continue;
             }
@@ -248,6 +249,7 @@ export function createToolMaskingProcessor(
                 id: randomUUID(),
                 payload: maskedPart,
                 replacesId: node.id,
+                turnId: node.turnId,
               });
               continue;
             }

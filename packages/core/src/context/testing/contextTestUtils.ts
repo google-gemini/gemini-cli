@@ -41,7 +41,7 @@ export const createMockGenerateContentResponse = (
   }) as GenerateContentResponse;
 
 export function createDummyNode(
-  logicalParentId: string,
+  turnId: string,
   type: NodeType,
   _tokens = 100,
   overrides?: Partial<ConcreteNode>,
@@ -58,7 +58,7 @@ export function createDummyNode(
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   return {
     id: id || randomUUID(),
-    logicalParentId,
+    turnId,
     type,
     timestamp: Date.now(),
     role,
@@ -68,7 +68,7 @@ export function createDummyNode(
 }
 
 export function createDummyToolNode(
-  logicalParentId: string,
+  turnId: string,
   _intentTokens = 100,
   _obsTokens = 200,
   overrides?: Partial<ToolExecution>,
@@ -81,7 +81,7 @@ export function createDummyToolNode(
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   return {
     id: id || randomUUID(),
-    logicalParentId,
+    turnId,
     type: NodeType.TOOL_EXECUTION,
     timestamp: Date.now(),
     role: 'model',

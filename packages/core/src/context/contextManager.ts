@@ -157,9 +157,8 @@ export class ContextManager {
   /**
    * Identifies 'pinned' nodes that should not be truncated.
    * This includes:
-   * 1. The entire first logical episode (System Prompt).
-   * 2. The entire last logical episode (Recent context).
-   * 3. Active tool calls (calls without responses in the graph).
+   * 1. The entire last turn (Recent context).
+   * 2. Active tool calls (calls without responses in the graph).
    */
   private getProtectedNodeIds(
     nodes: readonly ConcreteNode[],
@@ -168,22 +167,17 @@ export class ContextManager {
     const protectionMap = new Map<string, string>();
     if (nodes.length === 0) return protectionMap;
 
-    // 2. Identify all nodes belonging to the last logical turn/episode (Recent context)
+    // 1. Identify all nodes belonging to the last turn (Recent context)
     const lastNode = nodes[nodes.length - 1];
-    const lastLogicalId = lastNode.logicalParentId;
+    const lastTurnId = lastNode.turnId;
 
-    if (lastLogicalId) {
-      for (const node of nodes) {
-        if (node.logicalParentId === lastLogicalId) {
-          protectionMap.set(node.id, 'recent_turn');
-        }
+    for (const node of nodes) {
+      if (node.turnId === lastTurnId) {
+        protectionMap.set(node.id, 'recent_turn');
       }
-      protectionMap.set(lastLogicalId, 'recent_turn_episode');
-    } else {
-      protectionMap.set(lastNode.id, 'recent_turn_isolated');
     }
 
-    // 3. Identify active tool calls that must NEVER be truncated
+    // 2. Identify active tool calls that must NEVER be truncated
     const calls = nodes.filter((n) => isToolExecution(n) && n.role === 'model');
     const responses = new Set(
       nodes
@@ -200,7 +194,7 @@ export class ContextManager {
       }
     }
 
-    // 4. Any externally requested protections
+    // 3. Any externally requested protections
     for (const id of extraProtectedIds) {
       protectionMap.set(id, 'external_active_task');
     }
