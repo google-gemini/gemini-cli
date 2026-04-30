@@ -16,7 +16,7 @@ import { HistoryObserver } from './historyObserver.js';
 import { render } from './graph/render.js';
 import { ContextWorkingBufferImpl } from './pipeline/contextWorkingBuffer.js';
 import { debugLogger } from '../utils/debugLogger.js';
-import { hardenHistory } from './historyHardening.js';
+import { hardenHistory } from '../utils/historyHardening.js';
 import { checkContextInvariants } from './utils/invariantChecker.js';
 
 export class ContextManager {
@@ -308,7 +308,6 @@ export class ContextManager {
 
     // Update cache
     this.lastRenderCache = { nodesHash: totalHash, result };
-
     return result;
   }
 }

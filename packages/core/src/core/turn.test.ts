@@ -48,6 +48,7 @@ describe('Turn', () => {
     sendMessageStream: typeof mockSendMessageStream;
     getHistory: typeof mockGetHistory;
     maybeIncludeSchemaDepthContext: typeof mockMaybeIncludeSchemaDepthContext;
+    context: { config: { isContextManagementEnabled: () => boolean } };
   };
   let mockChatInstance: MockedChatInstance;
 
@@ -57,6 +58,11 @@ describe('Turn', () => {
       sendMessageStream: mockSendMessageStream,
       getHistory: mockGetHistory,
       maybeIncludeSchemaDepthContext: mockMaybeIncludeSchemaDepthContext,
+      context: {
+        config: {
+          isContextManagementEnabled: () => false,
+        },
+      },
     };
     turn = new Turn(mockChatInstance as unknown as GeminiChat, 'prompt-id-1');
     mockGetHistory.mockReturnValue([]);
@@ -174,7 +180,7 @@ describe('Turn', () => {
         }),
       );
       expect(event2.value.callId).toEqual(
-        expect.stringMatching(/^synth_prompt-id-1_\d{13,}_\d+$/),
+        expect.stringMatching(/^tool2_\d{13}_\d+$/),
       );
       expect(turn.pendingToolCalls[1]).toEqual(event2.value);
       expect(turn.getDebugResponses().length).toBe(1);

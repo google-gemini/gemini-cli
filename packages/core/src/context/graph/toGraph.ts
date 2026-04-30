@@ -180,14 +180,13 @@ export class ContextGraphBuilder {
           const apiId =
             isFunctionResponsePart(part) &&
             typeof part.functionResponse.id === 'string'
-              ? `resp_${part.functionResponse.id}`
+              ? `resp_${part.functionResponse.id}_${turnSalt}_${partIdx}`
               : isFunctionCallPart(part) &&
                   typeof part.functionCall.id === 'string'
-                ? `call_${part.functionCall.id}`
+                ? `call_${part.functionCall.id}_${turnSalt}_${partIdx}`
                 : undefined;
           const id =
             apiId || getStableId(part, this.nodeIdentityMap, turnSalt, partIdx);
-
           const node: ConcreteNode = {
             id,
             timestamp: Date.now(),
@@ -205,11 +204,10 @@ export class ContextGraphBuilder {
           const part = msg.parts[partIdx];
           const apiId =
             isFunctionCallPart(part) && typeof part.functionCall.id === 'string'
-              ? `call_${part.functionCall.id}`
+              ? `call_${part.functionCall.id}_${turnSalt}_${partIdx}`
               : undefined;
           const id =
             apiId || getStableId(part, this.nodeIdentityMap, turnSalt, partIdx);
-
           const node: ConcreteNode = {
             id,
             timestamp: Date.now(),

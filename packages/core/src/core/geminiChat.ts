@@ -48,6 +48,7 @@ import {
 } from '../telemetry/types.js';
 import { handleFallback } from '../fallback/handler.js';
 import { isFunctionResponse } from '../utils/messageInspectors.js';
+import { scrubHistory } from '../utils/historyHardening.js';
 import { partListUnionToString } from './geminiRequest.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
 import { estimateTokenCountSync } from '../utils/tokenCalculation.js';
@@ -96,6 +97,18 @@ const MID_STREAM_RETRY_OPTIONS: MidStreamRetryOptions = {
 };
 
 export const SYNTHETIC_THOUGHT_SIGNATURE = 'skip_thought_signature_validator';
+
+/**
+ * Internal interface for parts that carry the magic 'callIndex' property
+ * used during model response consolidation.
+ */
+interface IndexedPart extends Part {
+  callIndex?: number;
+}
+
+function isIndexedPart(part: Part): part is IndexedPart {
+  return 'callIndex' in part;
+}
 
 /**
  * Returns true if the response is valid, false otherwise.
@@ -255,7 +268,7 @@ export class GeminiChat {
   agentHistory: AgentChatHistory;
 
   constructor(
-    private readonly context: AgentLoopContext,
+    readonly context: AgentLoopContext,
     private systemInstruction: string = '',
     private tools: Tool[] = [],
     history: Content[] = [],
@@ -502,8 +515,14 @@ export class GeminiChat {
     abortSignal: AbortSignal,
     role: LlmRole,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
+    // Last mile scrubbing to remove internal tracking properties (e.g. callIndex)
+    // before sending to the Gemini API. This whitelists only standard Gemini fields.
+    const scrubbedContents = this.context.config.isContextManagementEnabled()
+      ? scrubHistory([...requestContents])
+      : [...requestContents];
+
     const contentsForPreviewModel =
-      this.ensureActiveLoopHasThoughtSignatures(requestContents);
+      this.ensureActiveLoopHasThoughtSignatures(scrubbedContents);
 
     // Track final request parameters for AfterModel hooks
     const {
@@ -945,7 +964,19 @@ export class GeminiChat {
           }
 
           modelResponseParts.push(
-            ...content.parts.filter((part) => !part.thought),
+            ...content.parts
+              .filter((part) => !part.thought)
+              .map((part) => {
+                if (!this.context.config.isContextManagementEnabled()) {
+                  return part;
+                }
+                return {
+                  ...part,
+                  callIndex: chunk.functionCalls?.findIndex(
+                    (fc) => fc.name === part.functionCall?.name,
+                  ),
+                };
+              }),
           );
         }
       }
@@ -990,29 +1021,19 @@ export class GeminiChat {
       ? Array.from(finalFunctionCallsMap.values())
       : legacyFunctionCalls;
 
+    let currentCallSourceIndex = -1;
     if (this.context.config.isContextManagementEnabled()) {
       debugLogger.log(
         `[GeminiChat] Starting consolidation for ${modelResponseParts.length} raw parts and ${finalFunctionCalls.length} assembled function calls.`,
       );
       for (const part of modelResponseParts) {
         if (part.functionCall) {
-          // Skip partial functionCall stream chunks! We will replace them
-          // entirely with the pristine, fully assembled objects from the SDK
-          // (finalFunctionCalls) immediately below. We only push the very first
-          // partial chunk of a sequence as a placeholder so we know *where*
-          // in the sequence of parts the tool call happened.
-          const lastPart = consolidatedParts[consolidatedParts.length - 1];
-          const currentId = part.functionCall.id;
-          const lastId = lastPart?.functionCall?.id;
-
+          const partIndex = isIndexedPart(part) ? part.callIndex : undefined;
           const isNewCall =
-            !lastPart?.functionCall ||
-            (currentId !== undefined &&
-              lastId !== undefined &&
-              currentId !== lastId) ||
-            lastPart.functionCall.name !== part.functionCall.name;
+            partIndex !== undefined && partIndex > currentCallSourceIndex;
 
           if (isNewCall) {
+            currentCallSourceIndex = partIndex;
             consolidatedParts.push({ ...part }); // Push placeholder
           }
         } else {

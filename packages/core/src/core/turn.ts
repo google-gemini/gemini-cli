@@ -411,7 +411,9 @@ export class Turn {
     const args = fnCall.args || {};
     const callId =
       fnCall.id ??
-      `synth_${this.prompt_id}_${Date.now()}_${this.callCounter++}`;
+      (this.chat.context.config.isContextManagementEnabled()
+        ? `synth_${this.prompt_id}_${Date.now()}_${this.callCounter++}`
+        : `${name}_${Date.now()}_${this.callCounter++}`);
 
     const toolCallRequest: ToolCallRequestInfo = {
       callId,
