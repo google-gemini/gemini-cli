@@ -78,7 +78,13 @@ export class MessageBus extends EventEmitter {
 
   async publish(message: Message): Promise<void> {
     if (this.debug) {
-      debugLogger.debug(`[MESSAGE_BUS] publish: ${safeJsonStringify(message)}`);
+      const correlationId =
+        'correlationId' in message
+          ? ` correlationId=${message.correlationId}`
+          : '';
+      debugLogger.debug(
+        `[MESSAGE_BUS] publish: type=${message.type}${correlationId}`,
+      );
     }
     try {
       if (!this.isValidMessage(message)) {
