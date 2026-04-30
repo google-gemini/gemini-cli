@@ -88,7 +88,8 @@ describe('SkillCommandLoader', () => {
       type: 'tool',
       toolName: ACTIVATE_SKILL_TOOL_NAME,
       toolArgs: { name: 'test-skill' },
-      postSubmitPrompt: 'Use the skill test-skill',
+      postSubmitPrompt:
+        "The test-skill skill is now activated. If there is an active task in the conversation, continue it using this skill's instructions. If no task was provided, ask what task to apply it to.",
     });
   });
 
