@@ -1296,7 +1296,7 @@ describe('LocalAgentExecutor', () => {
       mockModelResponse(
         [
           {
-            name: TASK_COMPLETE_TOOL_NAME,
+            name: COMPLETE_TASK_TOOL_NAME,
             args: { result: 'Plan done' },
             id: 'call1',
           },
