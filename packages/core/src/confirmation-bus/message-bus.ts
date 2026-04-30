@@ -11,6 +11,7 @@ import { PolicyDecision } from '../policy/types.js';
 import { MessageBusType, type Message } from './types.js';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { sanitizeToolArgs } from '../utils/agent-sanitization-utils.js';
 
 export class MessageBus extends EventEmitter {
   private listenerToAbortCleanup = new WeakMap<
@@ -78,12 +79,16 @@ export class MessageBus extends EventEmitter {
 
   async publish(message: Message): Promise<void> {
     if (this.debug) {
-      debugLogger.debug(`[MESSAGE_BUS] publish: ${safeJsonStringify(message)}`);
+      debugLogger.debug(
+        `[MESSAGE_BUS] publish: ${safeJsonStringify(sanitizeToolArgs(message))}`,
+      );
     }
     try {
       if (!this.isValidMessage(message)) {
         throw new Error(
-          `Invalid message structure: ${safeJsonStringify(message)}`,
+          `Invalid message structure: ${safeJsonStringify(
+            sanitizeToolArgs(message),
+          )}`,
         );
       }
 

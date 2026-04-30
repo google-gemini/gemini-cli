@@ -242,14 +242,19 @@ export abstract class BaseToolInvocation<
     ) {
       if (this._toolName) {
         const options = this.getPolicyUpdateOptions(outcome);
-        void this.messageBus
-          .publish({
+        try {
+          const p = this.messageBus.publish({
             type: MessageBusType.UPDATE_POLICY,
             toolName: this._toolName,
             persist: outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave,
             ...options,
-          })
-          .catch(() => {});
+          });
+          if (p instanceof Promise) {
+            p.catch(() => {});
+          }
+        } catch {
+          // Ignore errors in fire-and-forget update
+        }
       }
     }
   }
@@ -363,10 +368,18 @@ export abstract class BaseToolInvocation<
         );
       };
 
-      this.messageBus.publish(request).catch(() => {
+      try {
+        const p = this.messageBus.publish(request);
+        if (p instanceof Promise) {
+          p.catch(() => {
+            cleanup();
+            resolve('allow');
+          });
+        }
+      } catch {
         cleanup();
         resolve('allow');
-      });
+      }
     });
   }
 

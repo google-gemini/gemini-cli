@@ -293,13 +293,14 @@ describe('MessageBus', () => {
           MessageBusType.TOOL_CONFIRMATION_REQUEST,
           (msg) => {
             if (msg.subagent === subagentName) {
-              void messageBus
-                .publish({
-                  type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
-                  correlationId: msg.correlationId,
-                  confirmed: true,
-                })
-                .catch(() => {});
+              const p = messageBus.publish({
+                type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+                correlationId: msg.correlationId,
+                confirmed: true,
+              });
+              if (p instanceof Promise) {
+                p.catch(() => {});
+              }
               resolve();
             }
           },
@@ -337,13 +338,14 @@ describe('MessageBus', () => {
           MessageBusType.TOOL_CONFIRMATION_REQUEST,
           (msg) => {
             if (msg.subagent === 'agent1/agent2') {
-              void messageBus
-                .publish({
-                  type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
-                  correlationId: msg.correlationId,
-                  confirmed: true,
-                })
-                .catch(() => {});
+              const p = messageBus.publish({
+                type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+                correlationId: msg.correlationId,
+                confirmed: true,
+              });
+              if (p instanceof Promise) {
+                p.catch(() => {});
+              }
               resolve();
             }
           },
