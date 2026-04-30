@@ -3061,11 +3061,33 @@ export class Config implements McpContext, AgentLoopContext {
    * file (the latter is the only file under `~/.gemini/` that is reachable —
    * settings, credentials, keybindings, etc. remain disallowed).
    *
+   * One subtree is *carved back out*: `<projectMemoryDir>/.inbox/` is owned
+   * by the auto-memory extraction agent and the `/memory inbox` review flow,
+   * so the main agent is denied access to it even though it falls inside the
+   * project temp dir.
+   *
    * @param absolutePath The absolute path to check.
    * @returns true if the path is allowed, false otherwise.
    */
   isPathAllowed(absolutePath: string): boolean {
     const resolvedPath = resolveToRealPath(absolutePath);
+
+    // The auto-memory inbox (`<projectMemoryDir>/.inbox/`) is owned by the
+    // background extraction agent and the `/memory inbox` review flow. The
+    // main agent must NOT drop files into it directly (that would let the
+    // model bypass review). Deny first, even if the path also satisfies the
+    // workspace or project-temp allowlists below.
+    const inboxRoot = path.join(
+      this.storage.getProjectMemoryTempDir(),
+      '.inbox',
+    );
+    const resolvedInboxRoot = resolveToRealPath(inboxRoot);
+    if (
+      resolvedPath === resolvedInboxRoot ||
+      isSubpath(resolvedInboxRoot, resolvedPath)
+    ) {
+      return false;
+    }
 
     const workspaceContext = this.getWorkspaceContext();
     if (workspaceContext.isPathWithinWorkspace(resolvedPath)) {

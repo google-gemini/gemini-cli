@@ -163,6 +163,9 @@ export const memoryCommand: SlashCommand = {
               await config.reloadSkills();
               context.ui.reloadCommands();
             },
+            onReloadMemory: async () => {
+              await refreshMemory(config);
+            },
           }),
         };
       },

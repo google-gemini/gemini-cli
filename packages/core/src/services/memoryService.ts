@@ -6,7 +6,7 @@
 
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import { constants as fsConstants } from 'node:fs';
+import { constants as fsConstants, type Dirent } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import * as Diff from 'diff';
 import type { Config } from '../config/config.js';
@@ -36,6 +36,7 @@ import { MessageBus } from '../confirmation-bus/message-bus.js';
 import { Storage } from '../config/storage.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
 import { READ_FILE_TOOL_NAME } from '../tools/tool-names.js';
+import { getGlobalMemoryFilePath } from '../tools/memoryTool.js';
 import {
   applyParsedSkillPatches,
   hasParsedPatchHunks,
@@ -78,6 +79,8 @@ export interface ExtractionRun {
   sessionIds: string[];
   candidateSessions?: SessionVersion[];
   processedSessions?: SessionVersion[];
+  memoryCandidatesCreated?: string[];
+  memoryFilesUpdated?: string[];
   skillsCreated: string[];
   turnCount?: number;
   durationMs?: number;
@@ -163,6 +166,8 @@ function isExtractionRunLike(value: unknown): value is {
   sessionIds?: unknown;
   candidateSessions?: unknown;
   processedSessions?: unknown;
+  memoryCandidatesCreated?: unknown;
+  memoryFilesUpdated?: unknown;
   skillsCreated: unknown;
   turnCount?: unknown;
   durationMs?: unknown;
@@ -194,22 +199,44 @@ function buildExtractionRun(value: unknown): ExtractionRun | null {
   const candidateSessions = normalizeSessionVersions(value.candidateSessions);
   const processedSessions = normalizeSessionVersions(value.processedSessions);
   const sessionIds = normalizeStringArray(value.sessionIds);
-
-  return {
+  const run: ExtractionRun = {
     runAt: value.runAt,
     sessionIds:
       sessionIds.length > 0
         ? sessionIds
         : processedSessions.map((session) => session.sessionId),
-    candidateSessions:
-      candidateSessions.length > 0 ? candidateSessions : undefined,
-    processedSessions:
-      processedSessions.length > 0 ? processedSessions : undefined,
     skillsCreated: normalizeStringArray(value.skillsCreated),
-    turnCount: normalizeOptionalNumber(value.turnCount),
-    durationMs: normalizeOptionalNumber(value.durationMs),
-    terminateReason: normalizeOptionalString(value.terminateReason),
   };
+
+  if (candidateSessions.length > 0) {
+    run.candidateSessions = candidateSessions;
+  }
+  if (processedSessions.length > 0) {
+    run.processedSessions = processedSessions;
+  }
+  if ('memoryCandidatesCreated' in value) {
+    run.memoryCandidatesCreated = normalizeStringArray(
+      value.memoryCandidatesCreated,
+    );
+  }
+  if ('memoryFilesUpdated' in value) {
+    run.memoryFilesUpdated = normalizeStringArray(value.memoryFilesUpdated);
+  }
+
+  const turnCount = normalizeOptionalNumber(value.turnCount);
+  if (turnCount !== undefined) {
+    run.turnCount = turnCount;
+  }
+  const durationMs = normalizeOptionalNumber(value.durationMs);
+  if (durationMs !== undefined) {
+    run.durationMs = durationMs;
+  }
+  const terminateReason = normalizeOptionalString(value.terminateReason);
+  if (terminateReason !== undefined) {
+    run.terminateReason = terminateReason;
+  }
+
+  return run;
 }
 
 function getTimestampMs(timestamp: string): number {
@@ -897,6 +924,318 @@ export async function validatePatches(
   return validPatches;
 }
 
+type FileSnapshot = Map<string, string>;
+
+function isHiddenPath(relativePath: string): boolean {
+  return relativePath
+    .split(path.sep)
+    .some((part) => part.length > 0 && part.startsWith('.'));
+}
+
+async function snapshotFiles(
+  rootDir: string,
+  shouldIncludeFile: (relativePath: string) => boolean = () => true,
+  shouldDescendDirectory: (relativePath: string) => boolean = () => true,
+): Promise<FileSnapshot> {
+  const snapshot: FileSnapshot = new Map();
+
+  async function walk(currentDir: string): Promise<void> {
+    let entries: Array<Dirent<string>>;
+    try {
+      entries = await fs.readdir(currentDir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+
+    for (const entry of entries) {
+      const absolutePath = path.join(currentDir, entry.name);
+      const relativePath = path.relative(rootDir, absolutePath);
+      if (!relativePath) {
+        continue;
+      }
+
+      if (entry.isDirectory()) {
+        if (shouldDescendDirectory(relativePath)) {
+          await walk(absolutePath);
+        }
+        continue;
+      }
+
+      if (!entry.isFile() || !shouldIncludeFile(relativePath)) {
+        continue;
+      }
+
+      try {
+        snapshot.set(relativePath, await fs.readFile(absolutePath, 'utf-8'));
+      } catch {
+        // Best-effort snapshot: ignore files that disappear or are unreadable.
+      }
+    }
+  }
+
+  await walk(rootDir);
+  return snapshot;
+}
+
+async function snapshotInboxCandidates(
+  memoryDir: string,
+): Promise<FileSnapshot> {
+  return snapshotFiles(path.join(memoryDir, '.inbox'));
+}
+
+/**
+ * Builds a human-readable summary of the current memory inbox state, grouped
+ * by kind and showing the contents of each `.patch` file. Used as part of the
+ * extraction agent's initial context so the agent can extend existing
+ * canonical patches in-place rather than creating new files each session.
+ *
+ * Returns an empty string if the inbox is empty.
+ */
+async function buildPendingInboxSummary(memoryDir: string): Promise<string> {
+  const sections: string[] = [];
+  for (const kind of ['private', 'global'] as const) {
+    const kindRoot = path.join(memoryDir, '.inbox', kind);
+    let entries: Array<Dirent<string>>;
+    try {
+      entries = await fs.readdir(kindRoot, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+
+    const patchFiles = entries
+      .filter((e) => e.isFile() && e.name.endsWith('.patch'))
+      .map((e) => e.name)
+      .sort();
+
+    if (patchFiles.length === 0) {
+      continue;
+    }
+
+    const filesSection: string[] = [`## ${kind} (${patchFiles.length})`];
+    for (const fileName of patchFiles) {
+      const fullPath = path.join(kindRoot, fileName);
+      let content = '';
+      try {
+        content = await fs.readFile(fullPath, 'utf-8');
+      } catch {
+        continue;
+      }
+      filesSection.push('');
+      filesSection.push(`### ${fileName}`);
+      filesSection.push('```');
+      filesSection.push(content.trimEnd());
+      filesSection.push('```');
+    }
+    sections.push(filesSection.join('\n'));
+  }
+  return sections.join('\n\n');
+}
+
+async function snapshotActiveProjectMemory(
+  memoryDir: string,
+): Promise<FileSnapshot> {
+  return snapshotFiles(
+    memoryDir,
+    (relativePath) =>
+      relativePath.endsWith('.md') && !isHiddenPath(relativePath),
+    (relativePath) => {
+      const firstPart = relativePath.split(path.sep)[0];
+      return firstPart !== 'skills' && !firstPart.startsWith('.');
+    },
+  );
+}
+
+interface FileSnapshotDiff {
+  added: string[];
+  updated: string[];
+  deleted: string[];
+}
+
+function diffFileSnapshots(
+  before: FileSnapshot,
+  after: FileSnapshot,
+): FileSnapshotDiff {
+  const added: string[] = [];
+  const updated: string[] = [];
+  const deleted: string[] = [];
+
+  for (const [relativePath, content] of after) {
+    if (!before.has(relativePath)) {
+      added.push(relativePath);
+    } else if (before.get(relativePath) !== content) {
+      updated.push(relativePath);
+    }
+  }
+
+  for (const relativePath of before.keys()) {
+    if (!after.has(relativePath)) {
+      deleted.push(relativePath);
+    }
+  }
+
+  return {
+    added: added.sort(),
+    updated: updated.sort(),
+    deleted: deleted.sort(),
+  };
+}
+
+function getChangedSnapshotPaths(diff: FileSnapshotDiff): string[] {
+  return [...diff.added, ...diff.updated].sort();
+}
+
+function getAllSnapshotDiffPaths(diff: FileSnapshotDiff): string[] {
+  return [...diff.added, ...diff.updated, ...diff.deleted].sort();
+}
+
+async function restoreFileSnapshot(
+  rootDir: string,
+  before: FileSnapshot,
+  after: FileSnapshot,
+  diff: FileSnapshotDiff,
+): Promise<void> {
+  for (const relativePath of diff.added) {
+    if (!after.has(relativePath)) {
+      continue;
+    }
+    await fs.rm(path.join(rootDir, relativePath), { force: true });
+  }
+
+  for (const relativePath of [...diff.updated, ...diff.deleted]) {
+    const content = before.get(relativePath);
+    if (content === undefined) {
+      continue;
+    }
+    const filePath = path.join(rootDir, relativePath);
+    await fs.mkdir(path.dirname(filePath), { recursive: true });
+    await fs.writeFile(filePath, content, 'utf-8');
+  }
+}
+
+/**
+ * Resolves an absolute file path through symlinks (using the parent directory
+ * if the file itself does not yet exist) so that snapshots and rollbacks key
+ * off the same canonical path on macOS (`/var/...` vs `/private/var/...`),
+ * symlinked home dirs, etc.
+ */
+async function canonicalizeAbsoluteFilePath(
+  absolutePath: string,
+): Promise<string> {
+  const resolved = path.resolve(absolutePath);
+  try {
+    return await fs.realpath(resolved);
+  } catch {
+    // File doesn't exist yet; canonicalize the parent dir if possible so a
+    // future write to this path is comparable.
+    try {
+      const parent = await fs.realpath(path.dirname(resolved));
+      return path.join(parent, path.basename(resolved));
+    } catch {
+      return resolved;
+    }
+  }
+}
+
+/**
+ * Snapshots a known list of absolute file paths. Files that don't exist are
+ * simply absent from the returned map (matching `snapshotFiles` semantics).
+ *
+ * Used to guard "active memory" files that live OUTSIDE `<memoryDir>` (the
+ * project's committed `<projectRoot>/GEMINI.md` and the user's global
+ * `~/.gemini/GEMINI.md`). The extraction agent must NEVER edit these files
+ * directly — they go through the `.inbox/<kind>/*.patch` review flow.
+ */
+async function snapshotAbsoluteFiles(
+  absolutePaths: readonly string[],
+): Promise<FileSnapshot> {
+  const snapshot: FileSnapshot = new Map();
+  for (const absolutePath of absolutePaths) {
+    try {
+      snapshot.set(absolutePath, await fs.readFile(absolutePath, 'utf-8'));
+    } catch {
+      // File doesn't exist yet; not present in snapshot. Diff will mark it
+      // as `added` if the agent illegally creates it.
+    }
+  }
+  return snapshot;
+}
+
+/**
+ * Restores the supplied diff against absolute file paths (no rootDir prefix).
+ * Mirrors `restoreFileSnapshot` for absolute-path snapshots.
+ */
+async function restoreAbsoluteFileSnapshot(
+  before: FileSnapshot,
+  after: FileSnapshot,
+  diff: FileSnapshotDiff,
+): Promise<void> {
+  for (const absolutePath of diff.added) {
+    if (!after.has(absolutePath)) {
+      continue;
+    }
+    await fs.rm(absolutePath, { force: true });
+  }
+
+  for (const absolutePath of [...diff.updated, ...diff.deleted]) {
+    const content = before.get(absolutePath);
+    if (content === undefined) {
+      continue;
+    }
+    await fs.mkdir(path.dirname(absolutePath), { recursive: true });
+    await fs.writeFile(absolutePath, content, 'utf-8');
+  }
+}
+
+/**
+ * Returns the canonical absolute paths of the "active memory" files that live
+ * OUTSIDE `<memoryDir>` and must never be touched by the extraction agent.
+ * These are guarded by snapshot+rollback because the agent's WriteFile tool
+ * is technically allowed to write under `<projectRoot>` (workspace-wide) and
+ * to the surgical `~/.gemini/GEMINI.md` carve-out — neither of which we want
+ * the extraction agent using.
+ *
+ * If projectRoot can't be resolved (test fixtures missing the accessor), we
+ * still guard the global file — extraction must never silently lose its
+ * post-run rollback because of a misconfigured config.
+ */
+async function getProtectedActiveMemoryPaths(
+  config: Config,
+): Promise<string[]> {
+  const candidates: string[] = [];
+
+  let projectRoot: string | undefined;
+  try {
+    if (typeof config.getProjectRoot === 'function') {
+      projectRoot = config.getProjectRoot();
+    } else if (typeof config.storage?.getProjectRoot === 'function') {
+      projectRoot = config.storage.getProjectRoot();
+    }
+  } catch {
+    projectRoot = undefined;
+  }
+  if (typeof projectRoot === 'string' && projectRoot.length > 0) {
+    candidates.push(path.join(projectRoot, 'GEMINI.md'));
+  }
+
+  try {
+    candidates.push(getGlobalMemoryFilePath());
+  } catch {
+    // Global storage path unavailable — skip.
+  }
+
+  const canonical = await Promise.all(
+    candidates.map(canonicalizeAbsoluteFilePath),
+  );
+  return Array.from(new Set(canonical));
+}
+
+function prefixRelativePaths(
+  prefix: string,
+  relativePaths: string[],
+): string[] {
+  return relativePaths.map((relativePath) => path.join(prefix, relativePath));
+}
+
 /**
  * Main entry point for the skill extraction background task.
  * Designed to be called fire-and-forget on session startup.
@@ -988,6 +1327,17 @@ export async function startMemoryService(config: Config): Promise<void> {
       `[MemoryService] ${skillsBefore.size} existing skill(s) in memory`,
     );
 
+    const inboxCandidatesBefore = await snapshotInboxCandidates(memoryDir);
+    const activeMemoryBefore = await snapshotActiveProjectMemory(memoryDir);
+    // Active memory files outside <memoryDir> (project root GEMINI.md, global
+    // ~/.gemini/GEMINI.md). The extraction agent must NEVER touch these — any
+    // changes here are reverted after the agent finishes.
+    const protectedActiveMemoryPaths =
+      await getProtectedActiveMemoryPaths(config);
+    const protectedActiveMemoryBefore = await snapshotAbsoluteFiles(
+      protectedActiveMemoryPaths,
+    );
+
     // Read existing skills for context (memory-extracted + global/workspace)
     const existingSkillsSummary = await buildExistingSkillsSummary(
       skillsDir,
@@ -999,11 +1349,23 @@ export async function startMemoryService(config: Config): Promise<void> {
       );
     }
 
+    // Surface the current inbox state to the agent so it can rewrite
+    // existing canonical patches in place instead of accumulating new ones
+    // across sessions.
+    const pendingInboxSummary = await buildPendingInboxSummary(memoryDir);
+    if (pendingInboxSummary) {
+      debugLogger.log(
+        `[MemoryService] Pending inbox surfaced to agent:\n${pendingInboxSummary}`,
+      );
+    }
+
     // Build agent definition and context
     const agentDefinition = SkillExtractionAgent(
       skillsDir,
       sessionIndex,
       existingSkillsSummary,
+      memoryDir,
+      pendingInboxSummary,
     );
 
     const context = buildAgentLoopContext(config);
@@ -1109,6 +1471,65 @@ export async function startMemoryService(config: Config): Promise<void> {
       );
     }
 
+    // The agent contract is: all memory updates must go through .inbox/<kind>/*.patch
+    // files. Any direct write to active memory (MEMORY.md, sibling .md files) is a
+    // violation and is rolled back here so the user always sees patches before any
+    // active file changes.
+    const activeMemoryAfter = await snapshotActiveProjectMemory(memoryDir);
+    const activeMemoryDiff = diffFileSnapshots(
+      activeMemoryBefore,
+      activeMemoryAfter,
+    );
+    const rejectedMemoryWrites = getAllSnapshotDiffPaths(activeMemoryDiff);
+    if (rejectedMemoryWrites.length > 0) {
+      await restoreFileSnapshot(
+        memoryDir,
+        activeMemoryBefore,
+        activeMemoryAfter,
+        activeMemoryDiff,
+      );
+      debugLogger.log(
+        `[MemoryService] Rejected ${rejectedMemoryWrites.length} direct active memory write(s); patches in .inbox/ are the only supported path: ${rejectedMemoryWrites.join(', ')}`,
+      );
+    }
+
+    // Same defense for active memory files OUTSIDE <memoryDir>: project root
+    // GEMINI.md and global ~/.gemini/GEMINI.md. The extraction agent's WriteFile
+    // tool is allowed to reach these by the workspace policy and the surgical
+    // global allowlist, so we have to detect-and-rollback after the fact.
+    const protectedActiveMemoryAfter = await snapshotAbsoluteFiles(
+      protectedActiveMemoryPaths,
+    );
+    const protectedActiveMemoryDiff = diffFileSnapshots(
+      protectedActiveMemoryBefore,
+      protectedActiveMemoryAfter,
+    );
+    const rejectedProtectedWrites = getAllSnapshotDiffPaths(
+      protectedActiveMemoryDiff,
+    );
+    if (rejectedProtectedWrites.length > 0) {
+      await restoreAbsoluteFileSnapshot(
+        protectedActiveMemoryBefore,
+        protectedActiveMemoryAfter,
+        protectedActiveMemoryDiff,
+      );
+      debugLogger.log(
+        `[MemoryService] Rolled back ${rejectedProtectedWrites.length} direct write(s) to protected active memory file(s) outside <memoryDir>: ${rejectedProtectedWrites.join(', ')}`,
+      );
+    }
+
+    // Anything still in .inbox/ is reviewable; nothing is auto-applied.
+    const memoryFilesUpdated: string[] = [];
+    const memoryCandidatesCreated = prefixRelativePaths(
+      '.inbox',
+      getChangedSnapshotPaths(
+        diffFileSnapshots(
+          inboxCandidatesBefore,
+          await snapshotInboxCandidates(memoryDir),
+        ),
+      ),
+    );
+
     const processedSessions = candidateSessions
       .filter((session) =>
         processedSessionKeys.has(getSessionVersionKey(session)),
@@ -1127,6 +1548,8 @@ export async function startMemoryService(config: Config): Promise<void> {
         lastUpdated: session.lastUpdated,
       })),
       processedSessions,
+      memoryCandidatesCreated,
+      memoryFilesUpdated,
       skillsCreated,
       turnCount: normalizeOptionalNumber(executorResult?.turn_count),
       durationMs: normalizeOptionalNumber(executorResult?.duration_ms),
@@ -1139,8 +1562,17 @@ export async function startMemoryService(config: Config): Promise<void> {
     };
     await writeExtractionState(statePath, updatedState);
 
-    if (skillsCreated.length > 0 || patchesCreatedThisRun.length > 0) {
+    if (
+      skillsCreated.length > 0 ||
+      patchesCreatedThisRun.length > 0 ||
+      memoryCandidatesCreated.length > 0
+    ) {
       const completionParts: string[] = [];
+      if (memoryCandidatesCreated.length > 0) {
+        completionParts.push(
+          `prepared ${memoryCandidatesCreated.length} memory candidate(s): ${memoryCandidatesCreated.join(', ')}`,
+        );
+      }
       if (skillsCreated.length > 0) {
         completionParts.push(
           `created ${skillsCreated.length} skill(s): ${skillsCreated.join(', ')}`,
@@ -1155,6 +1587,11 @@ export async function startMemoryService(config: Config): Promise<void> {
         `[MemoryService] Completed in ${elapsed}s. ${completionParts.join('; ')} (read ${processedSessions.length}/${candidateSessions.length} surfaced session(s))`,
       );
       const feedbackParts: string[] = [];
+      if (memoryCandidatesCreated.length > 0) {
+        feedbackParts.push(
+          `${memoryCandidatesCreated.length} memory candidate${memoryCandidatesCreated.length > 1 ? 's' : ''} extracted from past sessions`,
+        );
+      }
       if (skillsCreated.length > 0) {
         feedbackParts.push(
           `${skillsCreated.length} new skill${skillsCreated.length > 1 ? 's' : ''} extracted from past sessions: ${skillsCreated.join(', ')}`,
