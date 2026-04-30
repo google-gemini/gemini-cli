@@ -42,13 +42,19 @@ if (!existsSync(generatedCoreDir)) {
 }
 
 try {
-  const gitHash = execSync('git rev-parse --short HEAD', {
-    encoding: 'utf-8',
-  }).trim();
-  if (gitHash) {
-    gitCommitInfo = gitHash;
+  // Check for GIT_COMMIT env var first (e.g. when building inside Docker
+  // without a .git directory available)
+  const envCommit = process.env.GIT_COMMIT;
+  if (envCommit && /^[0-9a-f]+$/i.test(envCommit)) {
+    gitCommitInfo = envCommit;
+  } else {
+    const gitHash = execSync('git rev-parse --short HEAD', {
+      encoding: 'utf-8',
+    }).trim();
+    if (gitHash) {
+      gitCommitInfo = gitHash;
+    }
   }
-
   const result = await readPackageUp();
   cliVersion = result?.packageJson?.version ?? 'UNKNOWN';
 } catch {
