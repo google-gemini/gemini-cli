@@ -262,6 +262,7 @@ export async function startInteractiveUI(
 }
 
 export async function main() {
+  let config: Config | undefined;
   const cliStartupHandle = startupProfiler.start('cli_startup');
 
   // Listen for admin controls from parent process (IPC) in non-sandbox mode. In
@@ -272,22 +273,11 @@ export async function main() {
   registerCleanup(adminControlsListner.cleanup);
 
   const cleanupStdio = patchStdio();
-  if (isHeadlessMode()) {
-    // In headless mode, ensure all console output during early initialization
-    // goes to stderr so it doesn't pollute stdout (e.g. JSON output).
-    // ConsolePatcher will perform a more comprehensive patch later.
-    /* eslint-disable no-console */
-    console.log = console.error;
-    console.info = console.error;
-    /* eslint-enable no-console */
-  }
   registerSyncCleanup(() => {
     // This is needed to ensure we don't lose any buffered output.
     initializeOutputListenersAndFlush(config);
     cleanupStdio();
   });
-
-  let config: Config | undefined;
 
   setupUnhandledRejectionHandler();
 
