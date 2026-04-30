@@ -12,7 +12,7 @@
  * and mutable TranslationState, returning zero or more AgentEvents.
  */
 
-import type { FinishReason } from '@google/genai';
+import { FinishReason } from '@google/genai';
 import { GeminiEventType } from '../core/turn.js';
 import type {
   ServerGeminiStreamEvent,
@@ -26,6 +26,7 @@ import type {
   Usage,
   AgentEventType,
   ToolDisplay,
+  WithMeta,
 } from './types.js';
 import {
   geminiPartsToContentParts,
@@ -42,6 +43,8 @@ export interface TranslationState {
   streamStartEmitted: boolean;
   model: string | undefined;
   eventCounter: number;
+  /** Whether the current stream is an auto-continuation of a truncated response. */
+  isContinuation: boolean;
   /** Tracks callId → tool name from requests so responses can reference the name. */
   pendingToolNames: Map<string, string>;
 }
@@ -52,6 +55,7 @@ export function createTranslationState(streamId?: string): TranslationState {
     streamStartEmitted: false,
     model: undefined,
     eventCounter: 0,
+    isContinuation: false,
     pendingToolNames: new Map(),
   };
 }
@@ -66,6 +70,12 @@ function makeEvent<T extends AgentEventType>(
   payload: Partial<AgentEvent<T>>,
 ): AgentEvent {
   const id = `${state.streamId}-${state.eventCounter++}`;
+  // Propagate continuation flag to metadata
+  const _meta = {
+    ...((payload as WithMeta)._meta ?? {}),
+    ...(state.isContinuation ? { isContinuation: true } : {}),
+  };
+
   // TypeScript cannot preserve the specific discriminated union member across
   // this generic object assembly, so keep the narrowing local to the event
   // constructor boundary.
@@ -76,6 +86,7 @@ function makeEvent<T extends AgentEventType>(
     timestamp: new Date().toISOString(),
     streamId: state.streamId,
     type,
+    ...(Object.keys(_meta).length > 0 ? { _meta } : {}),
   } as AgentEvent;
 }
 
@@ -297,6 +308,9 @@ function handleFinished(
   if (value.usageMetadata) {
     ensureStreamStart(state, out);
     const usage = mapUsage(value.usageMetadata, state.model);
+    if (state.isContinuation) {
+      usage.isContinuation = true;
+    }
     out.push(makeEvent('usage', state, usage));
   }
 }
@@ -329,24 +343,24 @@ export function mapFinishReason(
   if (!reason) return 'completed';
 
   switch (reason) {
-    case 'STOP':
-    case 'FINISH_REASON_UNSPECIFIED':
+    case FinishReason.STOP:
+    case FinishReason.FINISH_REASON_UNSPECIFIED:
       return 'completed';
-    case 'MAX_TOKENS':
+    case FinishReason.MAX_TOKENS:
       return 'max_budget';
-    case 'SAFETY':
-    case 'RECITATION':
-    case 'LANGUAGE':
-    case 'BLOCKLIST':
-    case 'PROHIBITED_CONTENT':
-    case 'SPII':
-    case 'IMAGE_SAFETY':
-    case 'IMAGE_PROHIBITED_CONTENT':
+    case FinishReason.SAFETY:
+    case FinishReason.RECITATION:
+    case FinishReason.LANGUAGE:
+    case FinishReason.BLOCKLIST:
+    case FinishReason.PROHIBITED_CONTENT:
+    case FinishReason.SPII:
+    case FinishReason.IMAGE_SAFETY:
+    case FinishReason.IMAGE_PROHIBITED_CONTENT:
       return 'refusal';
-    case 'MALFORMED_FUNCTION_CALL':
-    case 'OTHER':
-    case 'UNEXPECTED_TOOL_CALL':
-    case 'NO_IMAGE':
+    case FinishReason.MALFORMED_FUNCTION_CALL:
+    case FinishReason.OTHER:
+    case FinishReason.UNEXPECTED_TOOL_CALL:
+    case FinishReason.NO_IMAGE:
       return 'failed';
     default:
       return 'failed';
