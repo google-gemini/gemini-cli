@@ -35,7 +35,10 @@ execSync('tsc --build', { stdio: 'inherit' });
 const bundleScript = join(process.cwd(), 'scripts', 'bundle-browser-mcp.mjs');
 if (packageName === 'core' && existsSync(bundleScript)) {
   console.log('Running chrome devtools MCP bundling...');
-  const isBun = 'bun' in process.versions;
+  // See scripts/build.js for why both checks are needed.
+  const isBun =
+    !!process.versions.bun ||
+    !!process.env.npm_config_user_agent?.includes('bun');
   execSync(
     isBun ? 'bun run bundle:browser-mcp' : 'npm run bundle:browser-mcp',
     {
