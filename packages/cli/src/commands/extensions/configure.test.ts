@@ -20,6 +20,7 @@ import {
   getScopedEnvContents,
   type ExtensionSetting,
 } from '../../config/extensions/extensionSettings.js';
+import { cleanupTmpDir } from '@google/gemini-cli-test-utils';
 import prompts from 'prompts';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
@@ -99,16 +100,7 @@ describe('extensions configure command', () => {
   });
 
   afterEach(async () => {
-    try {
-      if (tempWorkspaceDir && fs.existsSync(tempWorkspaceDir)) {
-        if (process.platform === 'win32') {
-          await new Promise((resolve) => setTimeout(resolve, 100));
-        }
-        fs.rmSync(tempWorkspaceDir, { recursive: true, force: true });
-      }
-    } catch {
-      // ignore
-    }
+    await cleanupTmpDir(tempWorkspaceDir);
     vi.restoreAllMocks();
   });
 

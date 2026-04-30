@@ -10,6 +10,7 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import { ExtensionManager } from './extension-manager.js';
 import { createTestMergedSettings } from './settings.js';
+import { cleanupTmpDir } from '@google/gemini-cli-test-utils';
 import {
   loadAgentsFromDirectory,
   loadSkillsFromDir,
@@ -88,18 +89,8 @@ describe('ExtensionManager Settings Scope', () => {
   });
 
   afterEach(async () => {
-    for (const dir of [currentTempHome, tempWorkspace]) {
-      try {
-        if (dir && fs.existsSync(dir)) {
-          if (process.platform === 'win32') {
-            await new Promise((resolve) => setTimeout(resolve, 100));
-          }
-          fs.rmSync(dir, { recursive: true, force: true });
-        }
-      } catch {
-        // ignore
-      }
-    }
+    await cleanupTmpDir(currentTempHome);
+    await cleanupTmpDir(tempWorkspace);
     vi.clearAllMocks();
   });
 

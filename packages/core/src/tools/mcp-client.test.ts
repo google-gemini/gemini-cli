@@ -45,6 +45,7 @@ import type { ResourceRegistry } from '../resources/resource-registry.js';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { cleanupTmpDir } from '@google/gemini-cli-test-utils';
 import { coreEvents } from '../utils/events.js';
 import type { EnvironmentSanitizationConfig } from '../services/environmentSanitization.js';
 
@@ -107,16 +108,7 @@ describe('mcp-client', () => {
 
   afterEach(async () => {
     vi.useRealTimers();
-    try {
-      if (testWorkspace && fs.existsSync(testWorkspace)) {
-        if (process.platform === 'win32') {
-          await new Promise((resolve) => setTimeout(resolve, 100));
-        }
-        fs.rmSync(testWorkspace, { recursive: true, force: true });
-      }
-    } catch {
-      // ignore
-    }
+    await cleanupTmpDir(testWorkspace);
     workspaceContext = null as unknown as WorkspaceContext;
     vi.restoreAllMocks();
   });
@@ -2423,16 +2415,7 @@ describe('connectToMcpServer with OAuth', () => {
 
   afterEach(async () => {
     vi.useRealTimers();
-    try {
-      if (testWorkspace && fs.existsSync(testWorkspace)) {
-        if (process.platform === 'win32') {
-          await new Promise((resolve) => setTimeout(resolve, 100));
-        }
-        fs.rmSync(testWorkspace, { recursive: true, force: true });
-      }
-    } catch {
-      // ignore
-    }
+    await cleanupTmpDir(testWorkspace);
     workspaceContext = null as unknown as WorkspaceContext;
     vi.clearAllMocks();
   });
@@ -2642,16 +2625,7 @@ describe('connectToMcpServer - HTTP→SSE fallback', () => {
 
   afterEach(async () => {
     vi.useRealTimers();
-    try {
-      if (testWorkspace && fs.existsSync(testWorkspace)) {
-        if (process.platform === 'win32') {
-          await new Promise((resolve) => setTimeout(resolve, 100));
-        }
-        fs.rmSync(testWorkspace, { recursive: true, force: true });
-      }
-    } catch {
-      // ignore
-    }
+    await cleanupTmpDir(testWorkspace);
     workspaceContext = null as unknown as WorkspaceContext;
     vi.clearAllMocks();
   });
@@ -2817,16 +2791,7 @@ describe('connectToMcpServer - OAuth with transport fallback', () => {
 
   afterEach(async () => {
     vi.useRealTimers();
-    try {
-      if (testWorkspace && fs.existsSync(testWorkspace)) {
-        if (process.platform === 'win32') {
-          await new Promise((resolve) => setTimeout(resolve, 100));
-        }
-        fs.rmSync(testWorkspace, { recursive: true, force: true });
-      }
-    } catch {
-      // ignore
-    }
+    await cleanupTmpDir(testWorkspace);
     workspaceContext = null as unknown as WorkspaceContext;
     vi.clearAllMocks();
     vi.unstubAllGlobals();
