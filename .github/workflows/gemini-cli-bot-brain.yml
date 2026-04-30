@@ -54,7 +54,7 @@ jobs:
       GEMINI_CLI_TRUST_WORKSPACE: 'true'
     steps:
       - name: 'Determine Checkout Ref'
-        id: determine_ref
+        id: 'determine_ref'
         env:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           ISSUE_NUMBER: '${{ github.event.issue.number || github.event.pull_request.number || github.event.inputs.issue_number }}'
@@ -66,7 +66,7 @@ jobs:
               REF="$PR_HEAD"
             fi
           fi
-          echo "ref=$REF" >> $GITHUB_OUTPUT
+          echo "ref=$REF" >> "$GITHUB_OUTPUT"
 
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
@@ -235,7 +235,7 @@ jobs:
           permission-issues: 'write'
 
       - name: 'Determine Checkout Ref'
-        id: determine_ref
+        id: 'determine_ref'
         env:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           ISSUE_NUMBER: '${{ github.event.issue.number || github.event.pull_request.number || github.event.inputs.issue_number }}'
@@ -247,7 +247,7 @@ jobs:
               REF="$PR_HEAD"
             fi
           fi
-          echo "ref=$REF" >> $GITHUB_OUTPUT
+          echo "ref=$REF" >> "$GITHUB_OUTPUT"
 
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
