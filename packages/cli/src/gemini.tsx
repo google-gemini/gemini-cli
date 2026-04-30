@@ -13,6 +13,7 @@ import {
   type OutputPayload,
   type ConsoleLogPayload,
   type UserFeedbackPayload,
+  type CoreEvents,
   createSessionId,
   logUserPrompt,
   AuthType,
@@ -271,11 +272,22 @@ export async function main() {
   registerCleanup(adminControlsListner.cleanup);
 
   const cleanupStdio = patchStdio();
+  if (isHeadlessMode()) {
+    // In headless mode, ensure all console output during early initialization
+    // goes to stderr so it doesn't pollute stdout (e.g. JSON output).
+    // ConsolePatcher will perform a more comprehensive patch later.
+    /* eslint-disable no-console */
+    console.log = console.error;
+    console.info = console.error;
+    /* eslint-enable no-console */
+  }
   registerSyncCleanup(() => {
     // This is needed to ensure we don't lose any buffered output.
-    initializeOutputListenersAndFlush();
+    initializeOutputListenersAndFlush(config);
     cleanupStdio();
   });
+
+  let config: Config | undefined;
 
   setupUnhandledRejectionHandler();
 
@@ -534,7 +546,7 @@ export async function main() {
   // may have side effects.
   {
     const loadConfigHandle = startupProfiler.start('load_cli_config');
-    const config = await loadCliConfig(settings.merged, sessionId, argv, {
+    config = await loadCliConfig(settings.merged, sessionId, argv, {
       projectHooks: settings.workspace.settings.hooks,
       worktreeSettings: worktreeInfo,
     });
@@ -780,7 +792,7 @@ export async function main() {
       debugLogger.log('Session ID: %s', sessionId);
     }
 
-    initializeOutputListenersAndFlush();
+    initializeOutputListenersAndFlush(config);
 
     await runNonInteractive({
       config,
@@ -795,7 +807,7 @@ export async function main() {
   }
 }
 
-export function initializeOutputListenersAndFlush() {
+export function initializeOutputListenersAndFlush(config?: Config) {
   // If there are no listeners for output, make sure we flush so output is not
   // lost.
   if (coreEvents.listenerCount(CoreEvent.Output) === 0) {
@@ -824,7 +836,26 @@ export function initializeOutputListenersAndFlush() {
       });
     }
   }
-  coreEvents.drainBacklogs();
+
+  const outputFormat = config?.getOutputFormat();
+  const forceToStderr = outputFormat === 'json';
+
+  coreEvents.drainBacklogs(
+    <K extends keyof CoreEvents>(event: K, args: CoreEvents[K]) => {
+      if (forceToStderr && event === (CoreEvent.Output as string)) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        const payload = args[0] as OutputPayload;
+        if (!payload.isStderr) {
+          return {
+            event,
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+            args: [{ ...payload, isStderr: true }] as unknown as CoreEvents[K],
+          };
+        }
+      }
+      return { event, args };
+    },
+  );
 }
 
 function setupAdminControlsListener() {
