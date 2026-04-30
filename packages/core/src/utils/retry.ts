@@ -53,13 +53,32 @@ const RETRYABLE_NETWORK_CODES = [
   'ENOTFOUND',
   'EAI_AGAIN',
   'ECONNREFUSED',
-  // SSL/TLS transient errors
-  'ERR_SSL_SSLV3_ALERT_BAD_RECORD_MAC',
   'ERR_SSL_WRONG_VERSION_NUMBER',
-  'ERR_SSL_DECRYPTION_FAILED_OR_BAD_RECORD_MAC',
-  'ERR_SSL_BAD_RECORD_MAC',
   'EPROTO', // Generic protocol error (often SSL-related)
+  'UND_ERR_HEADERS_TIMEOUT',
+  'UND_ERR_BODY_TIMEOUT',
+  'UND_ERR_CONNECT_TIMEOUT',
 ];
+
+// Node.js builds SSL error codes by prepending ERR_SSL_ to the uppercased
+// OpenSSL reason string with spaces replaced by underscores (see
+// TLSWrap::ClearOut in node/src/crypto/crypto_tls.cc). The reason string
+// format varies by OpenSSL version (e.g. ERR_SSL_SSLV3_ALERT_BAD_RECORD_MAC
+// on OpenSSL 1.x, ERR_SSL_SSL/TLS_ALERT_BAD_RECORD_MAC on OpenSSL 3.x), so
+// match the stable suffix instead of enumerating every variant.
+const RETRYABLE_SSL_ERROR_PATTERN = /^ERR_SSL_.*BAD_RECORD_MAC/i;
+
+/**
+ * Returns true if the error code should be retried: either an exact match
+ * against RETRYABLE_NETWORK_CODES, or an SSL BAD_RECORD_MAC variant (the
+ * OpenSSL reason-string portion of the code varies across OpenSSL versions).
+ */
+function isRetryableSslErrorCode(code: string): boolean {
+  return (
+    RETRYABLE_NETWORK_CODES.includes(code) ||
+    RETRYABLE_SSL_ERROR_PATTERN.test(code)
+  );
+}
 
 function getNetworkErrorCode(error: unknown): string | undefined {
   const getCode = (obj: unknown): string | undefined => {
@@ -112,7 +131,7 @@ export function getRetryErrorType(error: unknown): string {
   }
 
   const errorCode = getNetworkErrorCode(error);
-  if (errorCode && RETRYABLE_NETWORK_CODES.includes(errorCode)) {
+  if (errorCode && isRetryableSslErrorCode(errorCode)) {
     return errorCode;
   }
 
@@ -153,7 +172,7 @@ export function isRetryableError(
 ): boolean {
   // Check for common network error codes
   const errorCode = getNetworkErrorCode(error);
-  if (errorCode && RETRYABLE_NETWORK_CODES.includes(errorCode)) {
+  if (errorCode && isRetryableSslErrorCode(errorCode)) {
     return true;
   }
 
@@ -230,6 +249,9 @@ export async function retryWithBackoff<T>(
     ...cleanOptions,
   };
 
+  const getCurrentMaxAttempts = () =>
+    getAvailabilityContext?.()?.policy.maxAttempts ?? maxAttempts;
+
   let attempt = 0;
   let currentDelay = initialDelayMs;
   const throwIfAborted = () => {
@@ -238,7 +260,7 @@ export async function retryWithBackoff<T>(
     }
   };
 
-  while (attempt < maxAttempts) {
+  while (attempt < getCurrentMaxAttempts()) {
     if (signal?.aborted) {
       throw createAbortError();
     }
@@ -325,7 +347,7 @@ export async function retryWithBackoff<T>(
         errorCode !== undefined && errorCode >= 500 && errorCode < 600;
 
       if (classifiedError instanceof RetryableQuotaError || is500) {
-        if (attempt >= maxAttempts) {
+        if (attempt >= getCurrentMaxAttempts()) {
           const errorMessage =
             classifiedError instanceof Error ? classifiedError.message : '';
           debugLogger.warn(
@@ -386,7 +408,7 @@ export async function retryWithBackoff<T>(
 
       // Generic retry logic for other errors
       if (
-        attempt >= maxAttempts ||
+        attempt >= getCurrentMaxAttempts() ||
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         !shouldRetryOnError(error as Error, retryFetchErrors)
       ) {
