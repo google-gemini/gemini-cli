@@ -10,6 +10,7 @@ import {
   createMockEnvironment,
   createDummyNode,
 } from '../testing/contextTestUtils.js';
+import { NodeType } from '../graph/types.js';
 import type { ContextEnvironment } from './environment.js';
 import type {
   ContextProcessor,
@@ -27,7 +28,7 @@ function createModifyingProcessor(id: string): ContextProcessor {
     name: 'ModifyingProcessor',
     process: async (args: ProcessArgs) => {
       const newTargets = [...args.targets];
-      if (newTargets.length > 0 && newTargets[0].type === 'USER_PROMPT') {
+      if (newTargets.length > 0 && newTargets[0].type === NodeType.USER_PROMPT) {
         const prompt = newTargets[0];
         if (prompt.payload.text) {
           newTargets[0] = {
@@ -109,7 +110,7 @@ describe('PipelineOrchestrator (Component)', () => {
       ];
 
       const orchestrator = setupOrchestrator(pipelines);
-      const originalNode = createDummyNode('ep1', 'USER_PROMPT', 50, {
+      const originalNode = createDummyNode('ep1', NodeType.USER_PROMPT, 50, {
         payload: { text: 'Original' },
       });
 
@@ -136,7 +137,7 @@ describe('PipelineOrchestrator (Component)', () => {
       ];
 
       const orchestrator = setupOrchestrator(pipelines);
-      const originalNode = createDummyNode('ep1', 'USER_PROMPT', 50, {
+      const originalNode = createDummyNode('ep1', NodeType.USER_PROMPT, 50, {
         payload: { text: 'Original' },
       });
 
@@ -163,7 +164,7 @@ describe('PipelineOrchestrator (Component)', () => {
       ];
 
       const orchestrator = setupOrchestrator(pipelines);
-      const originalNode = createDummyNode('ep1', 'USER_PROMPT', 50, {
+      const originalNode = createDummyNode('ep1', NodeType.USER_PROMPT, 50, {
         payload: { text: 'Original' },
       });
 
@@ -200,8 +201,8 @@ describe('PipelineOrchestrator (Component)', () => {
         ],
       );
 
-      const node1 = createDummyNode('ep1', 'USER_PROMPT', 10);
-      const node2 = createDummyNode('ep1', 'AGENT_THOUGHT', 20);
+      const node1 = createDummyNode('ep1', NodeType.USER_PROMPT, 10);
+      const node2 = createDummyNode('ep1', NodeType.AGENT_THOUGHT, 20);
 
       eventBus.emitChunkReceived({
         nodes: [node1, node2],

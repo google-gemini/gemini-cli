@@ -13,6 +13,7 @@ import {
   createDummyToolNode,
   createMockLlmClient,
 } from '../testing/contextTestUtils.js';
+import { NodeType } from '../graph/types.js';
 import type {
   UserPrompt,
   AgentThought,
@@ -40,7 +41,7 @@ describe('NodeDistillationProcessor', () => {
 
     const prompt = createDummyNode(
       'ep1',
-      'USER_PROMPT',
+      NodeType.USER_PROMPT,
       50,
       {
         payload: { text: longText },
@@ -50,7 +51,7 @@ describe('NodeDistillationProcessor', () => {
 
     const thought = createDummyNode(
       'ep1',
-      'AGENT_THOUGHT',
+      NodeType.AGENT_THOUGHT,
       50,
       {
         payload: { text: longText },
@@ -119,7 +120,7 @@ describe('NodeDistillationProcessor', () => {
 
     const prompt = createDummyNode(
       'ep1',
-      'USER_PROMPT',
+      NodeType.USER_PROMPT,
       10,
       {
         payload: { text: shortText },
@@ -129,7 +130,7 @@ describe('NodeDistillationProcessor', () => {
 
     const thought = createDummyNode(
       'ep1',
-      'AGENT_THOUGHT',
+      NodeType.AGENT_THOUGHT,
       13,
       {
         payload: { text: 'Short thought' },

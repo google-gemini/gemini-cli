@@ -11,7 +11,11 @@ import type {
   BackstopTargetOptions,
 } from '../pipeline.js';
 import type { ContextEnvironment } from '../pipeline/environment.js';
-import type { ConcreteNode, RollingSummary } from '../graph/types.js';
+import {
+  type ConcreteNode,
+  type RollingSummary,
+  NodeType,
+} from '../graph/types.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 import { LlmRole } from '../../telemetry/llmRole.js';
 
@@ -124,7 +128,7 @@ export function createRollingSummaryProcessor(
         const summaryNode: RollingSummary = {
           id: newId,
           logicalParentId: newId,
-          type: 'ROLLING_SUMMARY',
+          type: NodeType.ROLLING_SUMMARY,
           timestamp: Date.now(),
           role: 'user',
           payload: { text: snapshotText },

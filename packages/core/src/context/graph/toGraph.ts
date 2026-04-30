@@ -5,7 +5,11 @@
  */
 
 import type { Content, Part } from '@google/genai';
-import type { ConcreteNode, Episode } from './types.js';
+import {
+  type ConcreteNode,
+  type Episode,
+  NodeType,
+} from './types.js';
 import { randomUUID, createHash } from 'node:crypto';
 import { debugLogger } from '../../utils/debugLogger.js';
 
@@ -216,8 +220,8 @@ export class ContextGraphBuilder {
             id,
             timestamp: Date.now(),
             type: isFunctionResponsePart(part)
-              ? 'TOOL_EXECUTION'
-              : 'USER_PROMPT',
+              ? NodeType.TOOL_EXECUTION
+              : NodeType.USER_PROMPT,
             role: 'user',
             payload: part,
             logicalParentId: currentEpisodeId,
@@ -257,7 +261,9 @@ export class ContextGraphBuilder {
           const node: ConcreteNode = {
             id,
             timestamp: Date.now(),
-            type: isFunctionCallPart(part) ? 'TOOL_EXECUTION' : 'AGENT_THOUGHT',
+            type: isFunctionCallPart(part)
+              ? NodeType.TOOL_EXECUTION
+              : NodeType.AGENT_THOUGHT,
             role: 'model',
             payload: part,
             logicalParentId: currentEpisodeId,

@@ -10,9 +10,23 @@ import type { Part } from '@google/genai';
  * Basic Node Interface
  * Every element in the Context Graph is a Node.
  */
+
+export enum NodeType {
+  USER_PROMPT = 'USER_PROMPT',
+  SYSTEM_EVENT = 'SYSTEM_EVENT',
+  AGENT_THOUGHT = 'AGENT_THOUGHT',
+  TOOL_EXECUTION = 'TOOL_EXECUTION',
+  MASKED_TOOL = 'MASKED_TOOL',
+  AGENT_YIELD = 'AGENT_YIELD',
+  SNAPSHOT = 'SNAPSHOT',
+  ROLLING_SUMMARY = 'ROLLING_SUMMARY',
+  EPISODE = 'EPISODE',
+  TASK = 'TASK',
+}
+
 export interface Node {
   readonly id: string;
-  readonly type: string;
+  readonly type: NodeType;
 }
 
 /**
@@ -23,6 +37,7 @@ export interface Node {
  * ensuring 100% fidelity during reconstruction.
  */
 export interface BaseConcreteNode extends Node {
+  readonly type: NodeType;
   readonly timestamp: number;
   /** The role of the turn this part belongs to */
   readonly role: 'user' | 'model';
@@ -44,12 +59,12 @@ export interface BaseConcreteNode extends Node {
  * Events that wake the agent up and initiate an Episode.
  */
 export interface UserPrompt extends BaseConcreteNode {
-  readonly type: 'USER_PROMPT';
+  readonly type: NodeType.USER_PROMPT;
   readonly role: 'user';
 }
 
 export interface SystemEvent extends BaseConcreteNode {
-  readonly type: 'SYSTEM_EVENT';
+  readonly type: NodeType.SYSTEM_EVENT;
   readonly name: string;
   readonly payload: Part; // System events are usually injected as user text parts
 }
@@ -61,16 +76,16 @@ export type EpisodeTrigger = UserPrompt | SystemEvent;
  * The internal autonomous actions taken by the agent during its loop.
  */
 export interface AgentThought extends BaseConcreteNode {
-  readonly type: 'AGENT_THOUGHT';
+  readonly type: NodeType.AGENT_THOUGHT;
   readonly role: 'model';
 }
 
 export interface ToolExecution extends BaseConcreteNode {
-  readonly type: 'TOOL_EXECUTION';
+  readonly type: NodeType.TOOL_EXECUTION;
 }
 
 export interface MaskedTool extends BaseConcreteNode {
-  readonly type: 'MASKED_TOOL';
+  readonly type: NodeType.MASKED_TOOL;
 }
 
 export type EpisodeStep = AgentThought | ToolExecution | MaskedTool;
@@ -80,7 +95,7 @@ export type EpisodeStep = AgentThought | ToolExecution | MaskedTool;
  * The final message where the agent yields control back to the user.
  */
 export interface AgentYield extends BaseConcreteNode {
-  readonly type: 'AGENT_YIELD';
+  readonly type: NodeType.AGENT_YIELD;
   readonly role: 'model';
 }
 
@@ -89,11 +104,11 @@ export interface AgentYield extends BaseConcreteNode {
  * Processors that generate summaries emit explicit synthetic nodes.
  */
 export interface Snapshot extends BaseConcreteNode {
-  readonly type: 'SNAPSHOT';
+  readonly type: NodeType.SNAPSHOT;
 }
 
 export interface RollingSummary extends BaseConcreteNode {
-  readonly type: 'ROLLING_SUMMARY';
+  readonly type: NodeType.ROLLING_SUMMARY;
 }
 
 export type SyntheticLeaf = Snapshot | RollingSummary;
@@ -113,13 +128,13 @@ export type ConcreteNode =
  * These define hierarchy and grouping. They do not directly render to Gemini.
  */
 export interface Episode extends Node {
-  readonly type: 'EPISODE';
+  readonly type: NodeType.EPISODE;
   /** References to the Concrete Node IDs that conceptually belong to this Episode. */
   concreteNodes: readonly ConcreteNode[];
 }
 
 export interface Task extends Node {
-  readonly type: 'TASK';
+  readonly type: NodeType.TASK;
   readonly goal: string;
   readonly status: 'active' | 'completed' | 'failed';
   /** References to the Episode IDs that belong to this task */
@@ -129,41 +144,41 @@ export interface Task extends Node {
 export type LogicalNode = Task | Episode;
 
 export function isEpisode(node: Node): node is Episode {
-  return node.type === 'EPISODE';
+  return node.type === NodeType.EPISODE;
 }
 
 export function isTask(node: Node): node is Task {
-  return node.type === 'TASK';
+  return node.type === NodeType.TASK;
 }
 
 export function isAgentThought(node: Node): node is AgentThought {
-  return node.type === 'AGENT_THOUGHT';
+  return node.type === NodeType.AGENT_THOUGHT;
 }
 
 export function isAgentYield(node: Node): node is AgentYield {
-  return node.type === 'AGENT_YIELD';
+  return node.type === NodeType.AGENT_YIELD;
 }
 
 export function isToolExecution(node: Node): node is ToolExecution {
-  return node.type === 'TOOL_EXECUTION';
+  return node.type === NodeType.TOOL_EXECUTION;
 }
 
 export function isMaskedTool(node: Node): node is MaskedTool {
-  return node.type === 'MASKED_TOOL';
+  return node.type === NodeType.MASKED_TOOL;
 }
 
 export function isUserPrompt(node: Node): node is UserPrompt {
-  return node.type === 'USER_PROMPT';
+  return node.type === NodeType.USER_PROMPT;
 }
 
 export function isSystemEvent(node: Node): node is SystemEvent {
-  return node.type === 'SYSTEM_EVENT';
+  return node.type === NodeType.SYSTEM_EVENT;
 }
 
 export function isSnapshot(node: Node): node is Snapshot {
-  return node.type === 'SNAPSHOT';
+  return node.type === NodeType.SNAPSHOT;
 }
 
 export function isRollingSummary(node: Node): node is RollingSummary {
-  return node.type === 'ROLLING_SUMMARY';
+  return node.type === NodeType.ROLLING_SUMMARY;
 }

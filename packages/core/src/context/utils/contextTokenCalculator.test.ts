@@ -10,6 +10,7 @@ import { NodeBehaviorRegistry } from '../graph/behaviorRegistry.js';
 import { registerBuiltInBehaviors } from '../graph/builtinBehaviors.js';
 import { createDummyNode } from '../testing/contextTestUtils.js';
 import { MSG_OVERHEAD_TOKENS } from '../../utils/tokenCalculation.js';
+import { NodeType } from '../graph/types.js';
 
 describe('ContextTokenCalculator', () => {
   const registry = new NodeBehaviorRegistry();
@@ -21,9 +22,9 @@ describe('ContextTokenCalculator', () => {
     const turn1Id = 'turn-1';
     const turn2Id = 'turn-2';
 
-    const node1 = createDummyNode(turn1Id, 'USER_PROMPT');
-    const node2 = createDummyNode(turn1Id, 'USER_PROMPT'); // Same turn
-    const node3 = createDummyNode(turn2Id, 'AGENT_THOUGHT'); // Different turn
+    const node1 = createDummyNode(turn1Id, NodeType.USER_PROMPT);
+    const node2 = createDummyNode(turn1Id, NodeType.USER_PROMPT); // Same turn
+    const node3 = createDummyNode(turn2Id, NodeType.AGENT_THOUGHT); // Different turn
 
     const nodes = [node1, node2, node3];
 
@@ -41,7 +42,7 @@ describe('ContextTokenCalculator', () => {
 
   it('should handle categorical breakdown with overhead', () => {
     const turn1Id = 'turn-1';
-    const node = createDummyNode(turn1Id, 'USER_PROMPT');
+    const node = createDummyNode(turn1Id, NodeType.USER_PROMPT);
 
     const breakdown = calculator.calculateTokenBreakdown([node]);
 
@@ -53,8 +54,8 @@ describe('ContextTokenCalculator', () => {
 
   it('should not double-count overhead for duplicate turn IDs in separate nodes', () => {
     const turn1Id = 'turn-1';
-    const node1 = createDummyNode(turn1Id, 'USER_PROMPT');
-    const node2 = createDummyNode(turn1Id, 'USER_PROMPT');
+    const node1 = createDummyNode(turn1Id, NodeType.USER_PROMPT);
+    const node2 = createDummyNode(turn1Id, NodeType.USER_PROMPT);
 
     const total = calculator.calculateConcreteListTokens([node1, node2]);
 

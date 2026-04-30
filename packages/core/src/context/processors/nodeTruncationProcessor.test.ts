@@ -11,7 +11,12 @@ import {
   createMockEnvironment,
   createDummyNode,
 } from '../testing/contextTestUtils.js';
-import type { UserPrompt, AgentThought, AgentYield } from '../graph/types.js';
+import {
+  NodeType,
+  type UserPrompt,
+  type AgentThought,
+  type AgentYield,
+} from '../graph/types.js';
 
 describe('NodeTruncationProcessor', () => {
   it('should truncate nodes that exceed maxTokensPerNode', async () => {
@@ -30,7 +35,7 @@ describe('NodeTruncationProcessor', () => {
 
     const prompt = createDummyNode(
       'ep1',
-      'USER_PROMPT',
+      NodeType.USER_PROMPT,
       50,
       {
         payload: { text: longText },
@@ -40,7 +45,7 @@ describe('NodeTruncationProcessor', () => {
 
     const thought = createDummyNode(
       'ep1',
-      'AGENT_THOUGHT',
+      NodeType.AGENT_THOUGHT,
       50,
       {
         payload: { text: longText },
@@ -50,7 +55,7 @@ describe('NodeTruncationProcessor', () => {
 
     const yieldNode = createDummyNode(
       'ep1',
-      'AGENT_YIELD',
+      NodeType.AGENT_YIELD,
       50,
       {
         payload: { text: longText },
@@ -95,7 +100,7 @@ describe('NodeTruncationProcessor', () => {
 
     const prompt = createDummyNode(
       'ep1',
-      'USER_PROMPT',
+      NodeType.USER_PROMPT,
       10,
       {
         payload: { text: shortText },
@@ -105,7 +110,7 @@ describe('NodeTruncationProcessor', () => {
 
     const thought = createDummyNode(
       'ep1',
-      'AGENT_THOUGHT',
+      NodeType.AGENT_THOUGHT,
       13,
       {
         payload: { text: 'Short thought' }, // 13 chars

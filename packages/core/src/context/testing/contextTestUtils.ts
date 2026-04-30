@@ -12,7 +12,11 @@ import { ContextTracer } from '../tracer.js';
 import { ContextEnvironmentImpl } from '../pipeline/environmentImpl.js';
 import { ContextEventBus } from '../eventBus.js';
 import { PipelineOrchestrator } from '../pipeline/orchestrator.js';
-import type { ConcreteNode, ToolExecution } from '../graph/types.js';
+import {
+  type ConcreteNode,
+  type ToolExecution,
+  NodeType,
+} from '../graph/types.js';
 import type { ContextEnvironment } from '../pipeline/environment.js';
 import type { Config } from '../../config/config.js';
 import type { BaseLlmClient } from '../../core/baseLlmClient.js';
@@ -38,16 +42,16 @@ export const createMockGenerateContentResponse = (
 
 export function createDummyNode(
   logicalParentId: string,
-  type: ConcreteNode['type'],
+  type: NodeType,
   _tokens = 100,
   overrides?: Partial<ConcreteNode>,
   id?: string,
 ): ConcreteNode {
   const role =
-    type === 'USER_PROMPT' ||
-    type === 'SYSTEM_EVENT' ||
-    type === 'SNAPSHOT' ||
-    type === 'ROLLING_SUMMARY'
+    type === NodeType.USER_PROMPT ||
+    type === NodeType.SYSTEM_EVENT ||
+    type === NodeType.SNAPSHOT ||
+    type === NodeType.ROLLING_SUMMARY
       ? 'user'
       : 'model';
 
@@ -78,7 +82,7 @@ export function createDummyToolNode(
   return {
     id: id || randomUUID(),
     logicalParentId,
-    type: 'TOOL_EXECUTION',
+    type: NodeType.TOOL_EXECUTION,
     timestamp: Date.now(),
     role: 'model',
     payload: {

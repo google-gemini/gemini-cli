@@ -11,7 +11,11 @@ import type {
   BackstopTargetOptions,
 } from '../pipeline.js';
 import type { ContextEnvironment } from '../pipeline/environment.js';
-import type { ConcreteNode, Snapshot } from '../graph/types.js';
+import {
+  type ConcreteNode,
+  type Snapshot,
+  NodeType,
+} from '../graph/types.js';
 import { SnapshotGenerator } from '../utils/snapshotGenerator.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 
@@ -88,7 +92,7 @@ export function createStateSnapshotProcessor(
             const snapshotNode: Snapshot = {
               id: newId,
               logicalParentId: newId,
-              type: 'SNAPSHOT',
+              type: NodeType.SNAPSHOT,
               timestamp: Date.now(),
               role: 'user',
               payload: { text: newText },
@@ -155,7 +159,7 @@ export function createStateSnapshotProcessor(
         const snapshotNode: Snapshot = {
           id: newId,
           logicalParentId: newId,
-          type: 'SNAPSHOT',
+          type: NodeType.SNAPSHOT,
           timestamp: Date.now(),
           role: 'user',
           payload: { text: snapshotText },

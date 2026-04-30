@@ -7,7 +7,7 @@ import { randomUUID } from 'node:crypto';
 import type { JSONSchemaType } from 'ajv';
 import type { AsyncContextProcessor, ProcessArgs } from '../pipeline.js';
 import type { ContextEnvironment } from '../pipeline/environment.js';
-import type { ConcreteNode } from '../graph/types.js';
+import { type ConcreteNode, NodeType } from '../graph/types.js';
 import { SnapshotGenerator } from '../utils/snapshotGenerator.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 
@@ -77,7 +77,7 @@ export function createStateSnapshotAsyncProcessor(
             const previousStateNode: ConcreteNode = {
               id: randomUUID(),
               logicalParentId: '',
-              type: 'SNAPSHOT',
+              type: NodeType.SNAPSHOT,
               timestamp: latest.timestamp,
               role: 'user',
               payload: { text: latest.payload.newText },

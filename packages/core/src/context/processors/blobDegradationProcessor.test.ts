@@ -11,7 +11,7 @@ import {
   createMockEnvironment,
   createDummyNode,
 } from '../testing/contextTestUtils.js';
-import type { ConcreteNode } from '../graph/types.js';
+import { type ConcreteNode, NodeType } from '../graph/types.js';
 
 describe('BlobDegradationProcessor', () => {
   it('should ignore text parts and only target inline_data and file_data', async () => {
@@ -27,13 +27,13 @@ describe('BlobDegradationProcessor', () => {
       env,
     );
 
-    const node1 = createDummyNode('ep1', 'USER_PROMPT', 10, {
+    const node1 = createDummyNode('ep1', NodeType.USER_PROMPT, 10, {
       payload: { text: 'Hello' },
     });
-    const node2 = createDummyNode('ep1', 'USER_PROMPT', 100, {
+    const node2 = createDummyNode('ep1', NodeType.USER_PROMPT, 100, {
       payload: { inlineData: { mimeType: 'image/png', data: fakeData } },
     });
-    const node3 = createDummyNode('ep1', 'USER_PROMPT', 10, {
+    const node3 = createDummyNode('ep1', NodeType.USER_PROMPT, 10, {
       payload: { text: 'World' },
     });
 
@@ -64,12 +64,12 @@ describe('BlobDegradationProcessor', () => {
       env,
     );
 
-    const node1 = createDummyNode('ep1', 'USER_PROMPT', 100, {
+    const node1 = createDummyNode('ep1', NodeType.USER_PROMPT, 100, {
       payload: {
         fileData: { mimeType: 'video/mp4', fileUri: 'gs://test1' },
       },
     });
-    const node2 = createDummyNode('ep1', 'USER_PROMPT', 100, {
+    const node2 = createDummyNode('ep1', NodeType.USER_PROMPT, 100, {
       payload: {
         fileData: { mimeType: 'video/mp4', fileUri: 'gs://test2' },
       },
