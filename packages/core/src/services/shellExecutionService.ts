@@ -47,7 +47,7 @@ import {
 const { Terminal } = pkg;
 
 const MAX_CHILD_PROCESS_BUFFER_SIZE = 16 * 1024 * 1024; // 16MB
-export const DEFAULT_FOREGROUND_OUTPUT_LIMIT_BYTES = 10 * 1024 * 1024; // 10MB
+export const DEFAULT_FOREGROUND_OUTPUT_LIMIT_BYTES = 10 * 1024 * 1024; // 10 MiB
 
 /**
  * An environment variable that is set for shell executions. This can be used
@@ -120,6 +120,7 @@ interface ActivePty {
   ptyProcess: DestroyablePty;
   headlessTerminal: pkg.Terminal;
   maxSerializedLines?: number;
+  outputLimitDisabled?: boolean;
   command: string;
   sessionId?: string;
 }
@@ -129,6 +130,7 @@ interface ActiveChildProcess {
   state: {
     output: string;
     truncated: boolean;
+    outputLimitDisabled?: boolean;
     sniffChunks: Buffer[];
     binaryBytesReceived: number;
   };
@@ -389,7 +391,7 @@ export class ShellExecutionService {
   private static getOutputLimitExceededMessage(maxOutputBytes: number): string {
     const limit =
       maxOutputBytes >= 1024 * 1024
-        ? `${(maxOutputBytes / (1024 * 1024)).toFixed(1)}MB`
+        ? `${(maxOutputBytes / (1024 * 1024)).toFixed(1)}MiB`
         : `${maxOutputBytes} bytes`;
     return `[GEMINI_CLI_WARNING: Command output exceeded the ${limit} limit for foreground shell commands and was stopped. Long-running or streaming commands should be run in the background, then inspected with read_background_output.]`;
   }
@@ -556,7 +558,7 @@ export class ShellExecutionService {
         env: finalEnv,
       });
 
-      const state = {
+      const state: ActiveChildProcess['state'] = {
         output: '',
         truncated: false,
         sniffChunks: [] as Buffer[],
@@ -633,7 +635,13 @@ export class ShellExecutionService {
 
       const maxOutputBytes = shellExecutionConfig.maxOutputBytes;
       const maybeStopForOutputLimit = (bytesReceived: number) => {
-        if (!maxOutputBytes || outputLimitExceeded || exited) {
+        if (
+          maxOutputBytes === undefined ||
+          outputLimitExceeded ||
+          exited ||
+          state.outputLimitDisabled ||
+          child.pid === undefined
+        ) {
           return;
         }
         streamedBytes += bytesReceived;
@@ -642,18 +650,16 @@ export class ShellExecutionService {
         }
 
         outputLimitExceeded = true;
-        if (child.pid) {
-          killProcessGroup({
-            pid: child.pid,
-            escalate: true,
-            isExited: () => exited,
-          }).catch((err) => {
-            debugLogger.warn(
-              'Failed to stop shell command after output limit:',
-              err,
-            );
-          });
-        }
+        killProcessGroup({
+          pid: child.pid,
+          escalate: true,
+          isExited: () => exited,
+        }).catch((err) => {
+          debugLogger.warn(
+            'Failed to stop shell command after output limit:',
+            err,
+          );
+        });
       };
 
       const handleOutput = (data: Buffer, stream: 'stdout' | 'stderr') => {
@@ -741,7 +747,7 @@ export class ShellExecutionService {
         cmdCleanup?.();
 
         let combinedOutput = state.output;
-        if (outputLimitExceeded && maxOutputBytes) {
+        if (outputLimitExceeded && maxOutputBytes !== undefined) {
           combinedOutput += `\n${ShellExecutionService.getOutputLimitExceededMessage(
             maxOutputBytes,
           )}`;
@@ -1052,7 +1058,12 @@ export class ShellExecutionService {
       const maxOutputBytes = shellExecutionConfig.maxOutputBytes;
 
       const maybeStopForOutputLimit = (bytesReceived: number) => {
-        if (!maxOutputBytes || outputLimitExceeded || exited) {
+        if (
+          maxOutputBytes === undefined ||
+          outputLimitExceeded ||
+          exited ||
+          ShellExecutionService.activePtys.get(ptyPid)?.outputLimitDisabled
+        ) {
           return;
         }
         streamedBytes += bytesReceived;
@@ -1291,11 +1302,12 @@ export class ShellExecutionService {
               endLine,
             );
             const finalOutput = getFullBufferText(headlessTerminal);
-            const output = outputLimitExceeded
-              ? `${finalOutput}\n${ShellExecutionService.getOutputLimitExceededMessage(
-                  maxOutputBytes!,
-                )}`
-              : finalOutput;
+            let output = finalOutput;
+            if (outputLimitExceeded && maxOutputBytes !== undefined) {
+              output += `\n${ShellExecutionService.getOutputLimitExceededMessage(
+                maxOutputBytes,
+              )}`;
+            }
 
             // Dispose the headless terminal to free scrollback buffers.
             // This must happen after getFullBufferText() extracts the output.
@@ -1456,6 +1468,13 @@ export class ShellExecutionService {
 
     if (!resolvedSessionId) {
       throw new Error('Session ID is required for background operations');
+    }
+
+    if (activePty) {
+      activePty.outputLimitDisabled = true;
+    }
+    if (activeChild) {
+      activeChild.state.outputLimitDisabled = true;
     }
 
     const MAX_BACKGROUND_PROCESS_HISTORY_SIZE = 100;

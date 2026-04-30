@@ -409,6 +409,27 @@ describe('ShellExecutionService', () => {
       );
     });
 
+    it('should disable the PTY output limit after moving to background', async () => {
+      const abortController = new AbortController();
+      const handle = await ShellExecutionService.execute(
+        'streaming-command',
+        '/test/dir',
+        onOutputEventMock,
+        abortController.signal,
+        true,
+        { ...shellExecutionConfig, maxOutputBytes: 10 },
+      );
+
+      await new Promise((resolve) => process.nextTick(resolve));
+      ShellExecutionService.background(12345, 'default', 'streaming-command');
+      mockPtyProcess.onData.mock.calls[0][0]('01234567890');
+
+      const result = await handle.result;
+      expect(result.backgrounded).toBe(true);
+      expect(result.outputLimitExceeded).toBeFalsy();
+      expect(mockProcessKill).not.toHaveBeenCalled();
+    });
+
     it('should not wrap long lines in the final output', async () => {
       // Set a small width to force wrapping
       const narrowConfig = { ...shellExecutionConfig, terminalWidth: 10 };
@@ -1454,6 +1475,21 @@ describe('ShellExecutionService child_process fallback', () => {
         'SIGTERM',
       );
     });
+
+    it('should disable the child process output limit after moving to background', async () => {
+      const { result } = await simulateExecution(
+        'streaming-output',
+        (cp) => {
+          ShellExecutionService.background(12345, 'default', 'streaming-output');
+          cp.stdout?.emit('data', Buffer.from('01234567890'));
+        },
+        { ...shellExecutionConfig, maxOutputBytes: 10 },
+      );
+
+      expect(result.backgrounded).toBe(true);
+      expect(result.outputLimitExceeded).toBeFalsy();
+      expect(mockProcessKill).not.toHaveBeenCalled();
+    });
   });
 
   describe('Failed Execution', () => {
@@ -1925,8 +1961,9 @@ describe('ShellExecutionService environment variables', () => {
     vi.stubEnv('GEMINI_CLI_TEST_VAR', 'test-value'); // A test var that should be kept
 
     vi.resetModules();
-    const { ShellExecutionService } =
-      await import('./shellExecutionService.js');
+    const { ShellExecutionService } = await import(
+      './shellExecutionService.js'
+    );
 
     // Test pty path
     await ShellExecutionService.execute(
@@ -1984,8 +2021,9 @@ describe('ShellExecutionService environment variables', () => {
     vi.stubEnv('GEMINI_CLI_TEST_VAR', 'test-value'); // A test var that should be kept
 
     vi.resetModules();
-    const { ShellExecutionService } =
-      await import('./shellExecutionService.js');
+    const { ShellExecutionService } = await import(
+      './shellExecutionService.js'
+    );
 
     // Test pty path
     await ShellExecutionService.execute(
@@ -2040,8 +2078,9 @@ describe('ShellExecutionService environment variables', () => {
     vi.stubEnv('GITHUB_SHA', '');
     vi.stubEnv('SURFACE', '');
     vi.resetModules();
-    const { ShellExecutionService } =
-      await import('./shellExecutionService.js');
+    const { ShellExecutionService } = await import(
+      './shellExecutionService.js'
+    );
 
     // Test pty path
     await ShellExecutionService.execute(
@@ -2147,8 +2186,9 @@ describe('ShellExecutionService environment variables', () => {
     vi.stubEnv('GIT_CONFIG_KEY_1', 'pull.rebase');
     vi.stubEnv('GIT_CONFIG_VALUE_1', 'true');
 
-    const { ShellExecutionService } =
-      await import('./shellExecutionService.js');
+    const { ShellExecutionService } = await import(
+      './shellExecutionService.js'
+    );
 
     mockGetPty.mockResolvedValue(null); // Force child_process fallback
     await ShellExecutionService.execute(
@@ -2198,8 +2238,9 @@ describe('ShellExecutionService environment variables', () => {
     vi.stubEnv('GCM_INTERACTIVE', undefined);
     vi.stubEnv('GIT_CONFIG_COUNT', undefined);
 
-    const { ShellExecutionService } =
-      await import('./shellExecutionService.js');
+    const { ShellExecutionService } = await import(
+      './shellExecutionService.js'
+    );
 
     mockGetPty.mockResolvedValue(null); // Force child_process fallback
     await ShellExecutionService.execute(
