@@ -17,17 +17,18 @@ export interface TerminalTitleOptions {
 }
 
 function truncate(text: string, maxLen: number): string {
-  if (text.length <= maxLen) {
+  const chars = Array.from(text);
+  if (chars.length <= maxLen) {
     return text;
   }
-  return text.substring(0, maxLen - 1) + '…';
+  return chars.slice(0, maxLen - 1).join('') + '…';
 }
 
 /**
  * Computes the dynamic terminal window title based on the current CLI state.
  *
  * @param options - The current state of the CLI and environment context
- * @returns A formatted string padded to 80 characters for the terminal title
+ * @returns A formatted string for the terminal title, truncated to at most 80 characters
  */
 export function computeTerminalTitle({
   streamingState,
@@ -48,7 +49,7 @@ export function computeTerminalTitle({
     // Max context length is 80 - base.length - 2 (for brackets)
     const maxContextLen = MAX_LEN - base.length - 2;
     displayContext = truncate(displayContext, maxContextLen);
-    return `${base}(${displayContext})`.padEnd(MAX_LEN, ' ');
+    return Array.from(`${base}(${displayContext})`).slice(0, MAX_LEN).join('');
   }
 
   // Pre-calculate suffix but keep it flexible
@@ -109,7 +110,6 @@ export function computeTerminalTitle({
   // eslint-disable-next-line no-control-regex
   const safeTitle = title.replace(/[\x00-\x1F\x7F]/g, '');
 
-  // Pad the title to a fixed width to prevent taskbar icon resizing/jitter.
-  // We also slice it to ensure it NEVER exceeds MAX_LEN.
-  return safeTitle.padEnd(MAX_LEN, ' ').substring(0, MAX_LEN);
+  // Truncate to ensure it NEVER exceeds MAX_LEN.
+  return Array.from(safeTitle).slice(0, MAX_LEN).join('');
 }
