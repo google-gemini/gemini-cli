@@ -280,6 +280,100 @@ describe('Session Cleanup (Refactored)', () => {
       expect(existsSync(path.join(chatsDir, sessions[1].id))).toBe(false); // Subagent chats directory should be deleted
     });
 
+    it('should delete legacy pretty-printed session files and their artifacts', async () => {
+      const twoWeeksAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
+      const sessionId = 'legacy-uuid';
+      const shortId = 'legacy12';
+      const fileName = `session-20250110-${shortId}.json`;
+      const filePath = path.join(chatsDir, fileName);
+
+      // Write pretty-printed JSON
+      await fs.writeFile(
+        filePath,
+        JSON.stringify(
+          {
+            sessionId,
+            lastUpdated: twoWeeksAgo.toISOString(),
+            startTime: twoWeeksAgo.toISOString(),
+            messages: [{ type: 'user', content: 'hello legacy' }],
+          },
+          null,
+          2,
+        ),
+      );
+
+      await writeArtifacts(sessionId);
+
+      const config = createMockConfig();
+      const settings: Settings = {
+        general: { sessionRetention: { enabled: true, maxAge: '10d' } },
+      };
+
+      const result = await cleanupExpiredSessions(config, settings);
+
+      expect(result.deleted).toBe(1);
+      expect(existsSync(filePath)).toBe(false);
+      // Artifacts should be gone because we extracted sessionId from legacy JSON
+      expect(
+        existsSync(path.join(toolOutputsDir, `session-${sessionId}`)),
+      ).toBe(false);
+    });
+
+    it('should delete expired JSONL session files and their artifacts', async () => {
+      const twoWeeksAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
+      const sessionId = 'jsonl-uuid';
+      const shortId = 'jsonl123';
+      const fileName = `session-20250110-${shortId}.jsonl`;
+      const filePath = path.join(chatsDir, fileName);
+
+      // Write JSONL
+      const metadata = {
+        sessionId,
+        lastUpdated: twoWeeksAgo.toISOString(),
+        startTime: twoWeeksAgo.toISOString(),
+        kind: 'main',
+      };
+      const message = { id: '1', type: 'user', content: 'hello jsonl' };
+      await fs.writeFile(
+        filePath,
+        JSON.stringify(metadata) + '\n' + JSON.stringify(message) + '\n',
+      );
+
+      await writeArtifacts(sessionId);
+
+      const config = createMockConfig();
+      const settings: Settings = {
+        general: { sessionRetention: { enabled: true, maxAge: '10d' } },
+      };
+
+      const result = await cleanupExpiredSessions(config, settings);
+
+      expect(result.deleted).toBe(1);
+      expect(existsSync(filePath)).toBe(false);
+      // Artifacts should be gone because we extracted sessionId from JSONL first line
+      expect(
+        existsSync(path.join(toolOutputsDir, `session-${sessionId}`)),
+      ).toBe(false);
+    });
+
+    it('should delete corrupted session files even if sessionId cannot be extracted', async () => {
+      const shortId = 'corrupt1';
+      const fileName = `session-20250110-${shortId}.json`;
+      const filePath = path.join(chatsDir, fileName);
+
+      await fs.writeFile(filePath, 'completely invalid json');
+
+      const config = createMockConfig();
+      const settings: Settings = {
+        general: { sessionRetention: { enabled: true, maxAge: '10d' } },
+      };
+
+      const result = await cleanupExpiredSessions(config, settings);
+
+      expect(result.deleted).toBe(1);
+      expect(existsSync(filePath)).toBe(false);
+    });
+
     it('should NOT delete sessions within the cutoff date', async () => {
       const sessions = await seedSessions(); // [current, 14d, 30d]
       const config = createMockConfig();
