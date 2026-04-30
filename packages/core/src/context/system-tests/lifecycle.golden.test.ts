@@ -21,7 +21,7 @@ expect.addSnapshotSerializer({
     (/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i.test(
       val,
     ) ||
-      /\/tmp\/sim/.test(val)),
+      /[\\/]tmp[\\/]sim/.test(val)),
   print: (val) => {
     if (typeof val !== 'string') return `"${val}"`;
     let scrubbed = val
@@ -29,7 +29,7 @@ expect.addSnapshotSerializer({
         /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi,
         '<UUID>',
       )
-      .replace(/\/tmp\/sim[^\s"'\]]*/g, '<MOCKED_DIR>');
+      .replace(/[\\/]tmp[\\/]sim[^\s"'\]]*/g, '<MOCKED_DIR>');
 
     // Also scrub timestamps in filenames like blob_1234567890_...
     scrubbed = scrubbed.replace(/blob_\d+_/g, 'blob_<TIMESTAMP>_');

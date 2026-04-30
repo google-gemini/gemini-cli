@@ -38,9 +38,27 @@ describe('StateSnapshotProcessor', () => {
       },
     );
 
-    const nodeA = createDummyNode('ep1', NodeType.USER_PROMPT, 50, {}, 'node-A');
-    const nodeB = createDummyNode('ep1', NodeType.AGENT_THOUGHT, 60, {}, 'node-B');
-    const nodeC = createDummyNode('ep2', NodeType.USER_PROMPT, 50, {}, 'node-C');
+    const nodeA = createDummyNode(
+      'ep1',
+      NodeType.USER_PROMPT,
+      50,
+      {},
+      'node-A',
+    );
+    const nodeB = createDummyNode(
+      'ep1',
+      NodeType.AGENT_THOUGHT,
+      60,
+      {},
+      'node-B',
+    );
+    const nodeC = createDummyNode(
+      'ep2',
+      NodeType.USER_PROMPT,
+      50,
+      {},
+      'node-C',
+    );
 
     const targets = [nodeA, nodeB, nodeC];
 
@@ -84,7 +102,13 @@ describe('StateSnapshotProcessor', () => {
     // Make deficit 0 so we don't fall through to the sync backstop and fail the test that way
 
     // node-A is MISSING (user deleted it)
-    const nodeB = createDummyNode('ep1', NodeType.AGENT_THOUGHT, 60, {}, 'node-B');
+    const nodeB = createDummyNode(
+      'ep1',
+      NodeType.AGENT_THOUGHT,
+      60,
+      {},
+      'node-B',
+    );
     const targets = [nodeB];
 
     const messages = [
@@ -118,9 +142,27 @@ describe('StateSnapshotProcessor', () => {
       { target: 'max' },
     ); // Summarize all
 
-    const nodeA = createDummyNode('ep1', NodeType.USER_PROMPT, 50, {}, 'node-A');
-    const nodeB = createDummyNode('ep1', NodeType.AGENT_THOUGHT, 60, {}, 'node-B');
-    const nodeC = createDummyNode('ep2', NodeType.USER_PROMPT, 50, {}, 'node-C');
+    const nodeA = createDummyNode(
+      'ep1',
+      NodeType.USER_PROMPT,
+      50,
+      {},
+      'node-A',
+    );
+    const nodeB = createDummyNode(
+      'ep1',
+      NodeType.AGENT_THOUGHT,
+      60,
+      {},
+      'node-B',
+    );
+    const nodeC = createDummyNode(
+      'ep2',
+      NodeType.USER_PROMPT,
+      50,
+      {},
+      'node-C',
+    );
     const targets = [nodeA, nodeB, nodeC];
     const result = await processor.process(createMockProcessArgs(targets));
 

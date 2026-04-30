@@ -28,7 +28,10 @@ function createModifyingProcessor(id: string): ContextProcessor {
     name: 'ModifyingProcessor',
     process: async (args: ProcessArgs) => {
       const newTargets = [...args.targets];
-      if (newTargets.length > 0 && newTargets[0].type === NodeType.USER_PROMPT) {
+      if (
+        newTargets.length > 0 &&
+        newTargets[0].type === NodeType.USER_PROMPT
+      ) {
         const prompt = newTargets[0];
         if (prompt.payload.text) {
           newTargets[0] = {

@@ -11,11 +11,7 @@ import type {
   BackstopTargetOptions,
 } from '../pipeline.js';
 import type { ContextEnvironment } from '../pipeline/environment.js';
-import {
-  type ConcreteNode,
-  type Snapshot,
-  NodeType,
-} from '../graph/types.js';
+import { type ConcreteNode, type Snapshot, NodeType } from '../graph/types.js';
 import { SnapshotGenerator } from '../utils/snapshotGenerator.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 

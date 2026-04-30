@@ -5,11 +5,7 @@
  */
 
 import type { Content, Part } from '@google/genai';
-import {
-  type ConcreteNode,
-  type Episode,
-  NodeType,
-} from './types.js';
+import { type ConcreteNode, type Episode, NodeType } from './types.js';
 import { randomUUID, createHash } from 'node:crypto';
 import { debugLogger } from '../../utils/debugLogger.js';
 

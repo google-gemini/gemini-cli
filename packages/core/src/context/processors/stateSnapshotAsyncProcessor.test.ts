@@ -26,8 +26,20 @@ describe('StateSnapshotAsyncProcessor', () => {
       { type: 'point-in-time' },
     );
 
-    const nodeA = createDummyNode('ep1', NodeType.USER_PROMPT, 50, {}, 'node-A');
-    const nodeB = createDummyNode('ep1', NodeType.AGENT_THOUGHT, 60, {}, 'node-B');
+    const nodeA = createDummyNode(
+      'ep1',
+      NodeType.USER_PROMPT,
+      50,
+      {},
+      'node-A',
+    );
+    const nodeB = createDummyNode(
+      'ep1',
+      NodeType.AGENT_THOUGHT,
+      60,
+      {},
+      'node-B',
+    );
 
     const targets = [nodeA, nodeB];
     await worker.process(createMockProcessArgs(targets, targets, []));
@@ -57,7 +69,13 @@ describe('StateSnapshotAsyncProcessor', () => {
       { type: 'accumulate' },
     );
 
-    const nodeC = createDummyNode('ep2', NodeType.USER_PROMPT, 50, {}, 'node-C');
+    const nodeC = createDummyNode(
+      'ep2',
+      NodeType.USER_PROMPT,
+      50,
+      {},
+      'node-C',
+    );
     const targets = [nodeC];
 
     const inboxMessages: InboxMessage[] = [

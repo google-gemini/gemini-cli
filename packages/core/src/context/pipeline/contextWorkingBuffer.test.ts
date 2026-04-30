@@ -77,9 +77,27 @@ describe('ContextWorkingBufferImpl', () => {
   });
 
   it('should track N:1 abstractions (e.g., rolling summaries)', () => {
-    const p1 = createDummyNode('ep1', NodeType.USER_PROMPT, 10, undefined, 'p1');
-    const p2 = createDummyNode('ep1', NodeType.AGENT_THOUGHT, 10, undefined, 'p2');
-    const p3 = createDummyNode('ep1', NodeType.USER_PROMPT, 10, undefined, 'p3');
+    const p1 = createDummyNode(
+      'ep1',
+      NodeType.USER_PROMPT,
+      10,
+      undefined,
+      'p1',
+    );
+    const p2 = createDummyNode(
+      'ep1',
+      NodeType.AGENT_THOUGHT,
+      10,
+      undefined,
+      'p2',
+    );
+    const p3 = createDummyNode(
+      'ep1',
+      NodeType.USER_PROMPT,
+      10,
+      undefined,
+      'p3',
+    );
 
     let buffer = ContextWorkingBufferImpl.initialize([p1, p2, p3]);
 
@@ -106,11 +124,23 @@ describe('ContextWorkingBufferImpl', () => {
   });
 
   it('should track multi-generation provenance correctly', () => {
-    const p1 = createDummyNode('ep1', NodeType.USER_PROMPT, 10, undefined, 'p1');
+    const p1 = createDummyNode(
+      'ep1',
+      NodeType.USER_PROMPT,
+      10,
+      undefined,
+      'p1',
+    );
     let buffer = ContextWorkingBufferImpl.initialize([p1]);
 
     // Gen 1: Masked
-    const gen1 = createDummyNode('ep1', NodeType.USER_PROMPT, 8, undefined, 'gen1');
+    const gen1 = createDummyNode(
+      'ep1',
+      NodeType.USER_PROMPT,
+      8,
+      undefined,
+      'gen1',
+    );
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (gen1 as any).replacesId = 'p1';
     buffer = buffer.applyProcessorResult('Masking', [p1], [gen1]);
@@ -141,7 +171,13 @@ describe('ContextWorkingBufferImpl', () => {
   });
 
   it('should handle net-new injected nodes without throwing', () => {
-    const p1 = createDummyNode('ep1', NodeType.USER_PROMPT, 10, undefined, 'p1');
+    const p1 = createDummyNode(
+      'ep1',
+      NodeType.USER_PROMPT,
+      10,
+      undefined,
+      'p1',
+    );
     let buffer = ContextWorkingBufferImpl.initialize([p1]);
 
     const injected = createDummyNode(
