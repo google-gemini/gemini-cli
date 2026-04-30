@@ -401,6 +401,7 @@ export class LoadedSettings {
       rawJson: file.rawJson,
       settings: structuredClone(file.settings),
       originalSettings: structuredClone(file.originalSettings),
+      readOnly: file.readOnly,
     });
     return {
       system: cloneSettingsFile(this.system),
