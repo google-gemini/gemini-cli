@@ -1,0 +1,12 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`commandsCommand > list > should list .toml files from available sources 1`] = `
+"### User Commands (/mock/user/commands)
+- user1.toml
+### Project Commands (/mock/project/commands)
+- proj1.toml
+### Extension: ext1 Commands (/mock/ext1/commands)
+- ext1.toml
+
+_Note: MCP prompts are dynamically loaded from configured MCP servers._"
+`;
