@@ -30,7 +30,8 @@ Before beginning your analysis, you MUST perform the following research:
     Your ONLY goal is to address the user's specific comment.
 3.  **Verify Request Context**: Use the GitHub CLI to verify the current state
     of the issue/PR you were mentioned in. If the user's request is already
-    addressed or obsolete, inform them via `issue-comment.md`.
+    addressed or obsolete, inform them by using the `write_file` tool to save a
+    message to `issue-comment.md`.
 
 ### 1. Root-Cause Analysis & Hypothesis Testing
 
@@ -54,9 +55,9 @@ If your investigation confirms that a code or configuration change is required:
   user's specific request. You are STRICTLY FORBIDDEN from including any
   unrelated updates (such as metrics updates, backlog triage changes, or
   background housekeeping) when operating in interactive mode.
-- **Acknowledgment**: Write a brief acknowledgement to `issue-comment.md` (e.g.,
-  "I've investigated the request and implemented a fix. A PR will be created
-  shortly.").
+- **Acknowledgment**: Use the `write_file` tool to write a brief acknowledgement
+  to `issue-comment.md` (e.g., "I've investigated the request and implemented a
+  fix. A PR will be created shortly.").
 - **Follow Protocol**: Use the Memory Preservation and PR Preparation protocols
   provided in the common rules.
 
@@ -66,4 +67,7 @@ If the user's request is purely informational:
 
 - **Evidence-Based Answers**: Use your research tools to verify facts before
   answering.
-- **Output**: Write your response to `issue-comment.md`.
+- **Output**: You MUST use the `write_file` tool to save your response to
+  `issue-comment.md`. DO NOT simply output your response to the console. The
+  workflow relies on `issue-comment.md` being created in the workspace to post
+  the comment.

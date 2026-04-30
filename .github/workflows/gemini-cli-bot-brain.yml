@@ -86,8 +86,15 @@ jobs:
           if [ -n "$LAST_RUN_ID" ]; then
             echo "Found previous successful run: $LAST_RUN_ID"
 
-            # Download brain memory (all state in one artifact)
-            gh run download "$LAST_RUN_ID" -n brain-data -D . || echo "brain-data not found"
+            # Download brain memory to a temp dir so we can selectively restore only persistent state
+            mkdir -p .temp_brain_data
+            gh run download "$LAST_RUN_ID" -n brain-data -D .temp_brain_data || echo "brain-data not found"
+
+            # Restore only persistent memory files
+            cp .temp_brain_data/tools/gemini-cli-bot/lessons-learned.md tools/gemini-cli-bot/lessons-learned.md 2>/dev/null || true
+            mkdir -p tools/gemini-cli-bot/history/
+            cp .temp_brain_data/tools/gemini-cli-bot/history/*.csv tools/gemini-cli-bot/history/ 2>/dev/null || true
+            rm -rf .temp_brain_data
           else
             echo "No previous successful run found."
           fi
@@ -132,6 +139,13 @@ jobs:
           cat trigger_context.md "$PROMPT_PATH" tools/gemini-cli-bot/brain/common.md > combined_prompt.md
 
           node bundle/gemini.js --policy tools/gemini-cli-bot/ci-policy.toml -p "$(cat combined_prompt.md)"
+
+          if [ -n "$TRIGGER_ISSUE_NUMBER" ] && [ ! -s "issue-comment.md" ] && [ ! -s "pr-comment.md" ]; then
+            echo "Agent failed to respond. Generating fallback error message."
+            echo "⚠️ **Gemini CLI Bot failed to generate a response.**" > "issue-comment.md"
+            echo "" >> "issue-comment.md"
+            echo "I encountered an error or failed to generate a complete response to your request. You can check the [GitHub Actions Run Log](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) for more details on what went wrong." >> "issue-comment.md"
+          fi
 
       - name: 'Run Critique Phase'
         if: "${{ github.event.inputs.enable_prs == 'true' || github.event_name == 'issue_comment' || github.event_name == 'pull_request_review_comment' || github.event.inputs.run_interactive == 'true' }}"
