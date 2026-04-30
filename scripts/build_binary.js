@@ -99,6 +99,11 @@ function removeSignature(filePath) {
  * @param {string} filePath
  */
 function signFile(filePath) {
+  if (process.env.SKIP_SIGNING === 'true') {
+    console.log(`Skipping signing for ${filePath} (SKIP_SIGNING=true)`);
+    return;
+  }
+
   const platform = process.platform;
 
   if (platform === 'darwin') {

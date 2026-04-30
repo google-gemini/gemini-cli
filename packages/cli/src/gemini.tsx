@@ -125,7 +125,11 @@ export function getNodeMemoryArgs(isDebugMode: boolean): string[] {
     );
   }
 
-  if (process.env['GEMINI_CLI_NO_RELAUNCH']) {
+  if (
+    process.env['IS_BINARY'] === 'true' ||
+    process.env['GEMINI_CLI_NO_RELAUNCH'] ||
+    process.env['SANDBOX']
+  ) {
     return [];
   }
 
