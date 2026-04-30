@@ -105,6 +105,12 @@ vi.mock('clipboardy');
 vi.mock('../utils/clipboardUtils.js');
 vi.mock('../hooks/useKittyKeyboardProtocol.js');
 
+vi.mock('./shared/ListeningIndicator.js', () => ({
+  ListeningIndicator: vi.fn(({ color }) => (
+    <Text color={color}>Listening...</Text>
+  )),
+}));
+
 // Mock ink BEFORE importing components that use it to intercept terminalCursorPosition
 vi.mock('ink', async (importOriginal) => {
   const actual = await importOriginal<typeof import('ink')>();
