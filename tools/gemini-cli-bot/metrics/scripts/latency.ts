@@ -2,11 +2,9 @@
  * @license
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
- *
- * @license
  */
 
-import { GITHUB_OWNER, GITHUB_REPO, type MetricOutput } from '../types.js';
+import { GITHUB_OWNER, GITHUB_REPO } from '../types.js';
 import { execSync } from 'node:child_process';
 
 try {
@@ -32,7 +30,7 @@ try {
   `;
   const output = execSync(
     `gh api graphql -F owner=${GITHUB_OWNER} -F repo=${GITHUB_REPO} -f query='${query}'`,
-    { encoding: 'utf-8' },
+    { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] },
   );
   const data = JSON.parse(output).data.repository;
 
