@@ -8,35 +8,25 @@ import { GITHUB_OWNER, GITHUB_REPO } from '../types.js';
 import { execSync } from 'node:child_process';
 
 try {
-  const query = `
-  query($owner: String!, $repo: String!, $cursor: String) {
-    repository(owner: $owner, name: $repo) {
-      pullRequests(states: OPEN, first: 100, orderBy: {field: CREATED_AT, direction: ASC}, after: $cursor) {
-        totalCount
-        nodes {
-          createdAt
-        }
-        pageInfo {
-          hasNextPage
-          endCursor
-        }
-      }
-      issues(states: OPEN, first: 100, orderBy: {field: CREATED_AT, direction: ASC}, after: $cursor) {
-        totalCount
-        nodes {
-          createdAt
-        }
-        pageInfo {
-          hasNextPage
-          endCursor
+  const fetchNodes = async (type: 'pullRequests' | 'issues') => {
+    const query = `
+    query($owner: String!, $repo: String!, $cursor: String) {
+      repository(owner: $owner, name: $repo) {
+        ${type}(states: OPEN, first: 100, orderBy: {field: CREATED_AT, direction: ASC}, after: $cursor) {
+          totalCount
+          nodes {
+            createdAt
+          }
+          pageInfo {
+            hasNextPage
+            endCursor
+          }
         }
       }
     }
-  }
-  `;
+    `;
 
-  const fetchNodes = async (type: 'pullRequests' | 'issues') => {
-    let allNodes: { createdAt: string }[] = [];
+    const allNodes: { createdAt: string }[] = [];
     let cursor: string | null = null;
     let totalCount = 0;
     
