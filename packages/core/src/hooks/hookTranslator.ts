@@ -5,8 +5,10 @@
  */
 
 import type {
+  Content,
   GenerateContentResponse,
   GenerateContentParameters,
+  Part,
   ToolConfig,
   FinishReason,
   FunctionCallingConfig,
@@ -100,11 +102,10 @@ function hasTextProperty(value: unknown): value is { text: string } {
 }
 
 /**
- * Type guard to check if content has role and parts properties
+ * Type guard to check if a value is a Content object (i.e. has role and parts
+ * properties). Narrows to Content so callers can access `parts` as Part[].
  */
-function isContentWithParts(
-  content: unknown,
-): content is { role: string; parts: unknown } {
+function isContentWithParts(content: unknown): content is Content {
   return (
     typeof content === 'object' &&
     content !== null &&
@@ -226,22 +227,124 @@ export class HookTranslatorGenAIv1 extends HookTranslator {
     baseRequest?: GenerateContentParameters,
   ): GenerateContentParameters {
     // Convert hook messages back to SDK Content format.
+    //
+    // When both hookRequest.messages and baseRequest.contents are present, we
+    // merge the hook's text edits back into the original contents in place,
+    // preserving non-text parts (functionCall, functionResponse, inlineData,
+    // thought, etc.) that toHookLLMRequest filtered out for the simplified
+    // hook API. Without this merge, a BeforeModel hook that modifies text
+    // would destroy tool call/response history and cause the model to loop
+    // (see https://github.com/google-gemini/gemini-cli/issues/25558).
+    //
     // If the hook returned a partial request without messages (e.g. only
     // overriding `model`), fall back to the base request's contents so the
     // conversation is preserved.
-    const contents = hookRequest.messages
-      ? hookRequest.messages.map((message) => ({
-          role: message.role === 'model' ? 'model' : message.role,
-          parts: [
-            {
-              text:
-                typeof message.content === 'string'
-                  ? message.content
-                  : String(message.content),
-            },
-          ],
-        }))
-      : (baseRequest?.contents ?? []);
+    let contents: GenerateContentParameters['contents'];
+
+    if (!hookRequest.messages) {
+      contents = baseRequest?.contents ?? [];
+    } else if (baseRequest?.contents) {
+      // Merge hook messages back into base contents, preserving non-text parts.
+      const baseContents = Array.isArray(baseRequest.contents)
+        ? baseRequest.contents
+        : [baseRequest.contents];
+
+      // The merged result is uniformly Content[] — ContentListUnion does not
+      // allow mixing strings (PartUnion) and Content objects in the same
+      // array, so any string entries from baseContents are normalized to
+      // Content here.
+      const merged: Content[] = [];
+      let messageIndex = 0;
+
+      const messageToContent = (
+        message: LLMRequest['messages'][number],
+      ): Content => ({
+        role: message.role === 'model' ? 'model' : message.role,
+        parts: [
+          {
+            text:
+              typeof message.content === 'string'
+                ? message.content
+                : String(message.content),
+          },
+        ],
+      });
+
+      for (const content of baseContents) {
+        // Normalize each baseContents entry into a Content object so the
+        // merged array is homogeneous.
+        if (typeof content === 'string') {
+          // String entries always contributed one message to the hook view.
+          if (messageIndex < hookRequest.messages.length) {
+            merged.push(messageToContent(hookRequest.messages[messageIndex++]));
+          } else {
+            merged.push({ role: 'user', parts: [{ text: content }] });
+          }
+          continue;
+        }
+
+        if (!isContentWithParts(content)) {
+          // Bare Part object (PartUnion expansion: Content | Part | string).
+          // toHookLLMRequest does not emit a message for these, so preserve
+          // them as a single-part Content with a default role.
+          merged.push({ role: 'user', parts: [content] });
+          continue;
+        }
+
+        const parts: Part[] = content.parts ?? [];
+        const hasText = parts.some(hasTextProperty);
+        const baseContent: Content = { ...content, parts };
+
+        if (!hasText) {
+          // toHookLLMRequest skipped this entry — preserve it untouched so
+          // tool-call/response history is not lost.
+          merged.push(baseContent);
+          continue;
+        }
+
+        // This entry contributed a message — merge the hook's text back in
+        // and keep any non-text parts in their original order.
+        if (messageIndex < hookRequest.messages.length) {
+          const message = hookRequest.messages[messageIndex++];
+          const newText =
+            typeof message.content === 'string'
+              ? message.content
+              : String(message.content);
+          const nonTextParts = parts.filter(
+            (p): p is Part => !hasTextProperty(p),
+          );
+
+          merged.push({
+            ...baseContent,
+            role: message.role === 'model' ? 'model' : message.role,
+            parts: [{ text: newText }, ...nonTextParts],
+          });
+        } else {
+          merged.push(baseContent);
+        }
+      }
+
+      // Append any remaining hook messages beyond baseContents (the hook may
+      // have added new turns).
+      while (messageIndex < hookRequest.messages.length) {
+        merged.push(messageToContent(hookRequest.messages[messageIndex++]));
+      }
+
+      contents = merged;
+    } else {
+      // No baseRequest contents to merge against — fall back to text-only.
+      contents = hookRequest.messages.map((message) => ({
+        role: message.role === 'model' ? 'model' : message.role,
+        parts: [
+          {
+            text:
+              typeof message.content === 'string'
+                ? message.content
+                : String(message.content),
+          },
+        ],
+      }));
+    }
 
     // Build the result with proper typing.
     // Use nullish coalescing so a hook that only sets `model` still works --
