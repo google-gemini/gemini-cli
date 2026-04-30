@@ -897,9 +897,10 @@ export class GeminiChat {
     // The SDK provides fully assembled FunctionCall objects in chunk.functionCalls
     // We use a Map to ensure we only keep the latest version of each call (by ID)
     const finalFunctionCallsMap = new Map<string, FunctionCall>();
+    const legacyFunctionCalls: FunctionCall[] = [];
 
-    let lastCallKey: string | undefined;
-    let lastAssignedId: string | undefined;
+    // Map to track synthetic IDs assigned to each call index across chunks
+    const callIndexToId = new Map<number, string>();
 
     for await (const chunk of streamResponse) {
       const candidateWithReason = chunk?.candidates?.find(
@@ -911,20 +912,24 @@ export class GeminiChat {
       }
 
       if (chunk.functionCalls && chunk.functionCalls.length > 0) {
-        const turnTimestamp = Date.now();
-        for (const fnCall of chunk.functionCalls) {
-          if (!fnCall.id) {
-            const callKey = `${fnCall.name}:${JSON.stringify(fnCall.args || {})}`;
-            if (callKey !== lastCallKey) {
-              lastCallKey = callKey;
-              lastAssignedId = `synth_${this.context.promptId}_${turnTimestamp}_${this.callCounter++}`;
-              debugLogger.log(
-                `[GeminiChat] Assigned synthetic ID: ${lastAssignedId} to tool: ${fnCall.name}`,
-              );
+        if (this.context.config.isContextManagementEnabled()) {
+          for (let i = 0; i < chunk.functionCalls.length; i++) {
+            const fnCall = chunk.functionCalls[i];
+            if (!fnCall.id) {
+              let id = callIndexToId.get(i);
+              if (!id) {
+                id = `synth_${this.context.promptId}_${Date.now()}_${this.callCounter++}`;
+                callIndexToId.set(i, id);
+                debugLogger.log(
+                  `[GeminiChat] Assigned synthetic ID: ${id} to tool at index ${i}: ${fnCall.name}`,
+                );
+              }
+              fnCall.id = id;
             }
-            fnCall.id = lastAssignedId;
+            finalFunctionCallsMap.set(fnCall.id, fnCall);
           }
-          finalFunctionCallsMap.set(fnCall.id!, fnCall);
+        } else {
+          legacyFunctionCalls.push(...chunk.functionCalls);
         }
       }
       if (isValidResponse(chunk)) {
@@ -981,7 +986,9 @@ export class GeminiChat {
 
     // String thoughts and consolidate text parts.
     const consolidatedParts: Part[] = [];
-    const finalFunctionCalls = Array.from(finalFunctionCallsMap.values());
+    const finalFunctionCalls = this.context.config.isContextManagementEnabled()
+      ? Array.from(finalFunctionCallsMap.values())
+      : legacyFunctionCalls;
 
     if (this.context.config.isContextManagementEnabled()) {
       debugLogger.log(
