@@ -6,7 +6,7 @@
  * @license
  */
 
-import { GITHUB_OWNER, GITHUB_REPO, type MetricOutput } from '../types.js';
+import { GITHUB_OWNER, GITHUB_REPO } from '../types.js';
 import { execSync } from 'node:child_process';
 
 try {
@@ -87,15 +87,33 @@ try {
     ),
   );
 
-  process.stdout.write(`throughput_pr_overall_per_day,${Math.round(prOverall * 100) / 100}\n`);
-  process.stdout.write(`throughput_pr_maintainers_per_day,${Math.round(prMaintainers * 100) / 100}\n`);
-  process.stdout.write(`throughput_pr_community_per_day,${Math.round(prCommunity * 100) / 100}\n`);
-  process.stdout.write(`throughput_issue_overall_per_day,${Math.round(issueOverall * 100) / 100}\n`);
-  process.stdout.write(`throughput_issue_maintainers_per_day,${Math.round(issueMaintainers * 100) / 100}\n`);
-  process.stdout.write(`throughput_issue_community_per_day,${Math.round(issueCommunity * 100) / 100}\n`);
-  process.stdout.write(`throughput_issue_overall_days_per_issue,${issueOverall > 0 ? Math.round((1 / issueOverall) * 100) / 100 : 0}\n`);
-  process.stdout.write(`throughput_issue_maintainers_days_per_issue,${issueMaintainers > 0 ? Math.round((1 / issueMaintainers) * 100) / 100 : 0}\n`);
-  process.stdout.write(`throughput_issue_community_days_per_issue,${issueCommunity > 0 ? Math.round((1 / issueCommunity) * 100) / 100 : 0}\n`);
+  process.stdout.write(
+    `throughput_pr_overall_per_day,${Math.round(prOverall * 100) / 100}\n`,
+  );
+  process.stdout.write(
+    `throughput_pr_maintainers_per_day,${Math.round(prMaintainers * 100) / 100}\n`,
+  );
+  process.stdout.write(
+    `throughput_pr_community_per_day,${Math.round(prCommunity * 100) / 100}\n`,
+  );
+  process.stdout.write(
+    `throughput_issue_overall_per_day,${Math.round(issueOverall * 100) / 100}\n`,
+  );
+  process.stdout.write(
+    `throughput_issue_maintainers_per_day,${Math.round(issueMaintainers * 100) / 100}\n`,
+  );
+  process.stdout.write(
+    `throughput_issue_community_per_day,${Math.round(issueCommunity * 100) / 100}\n`,
+  );
+  process.stdout.write(
+    `throughput_issue_overall_days_per_issue,${issueOverall > 0 ? Math.round((1 / issueOverall) * 100) / 100 : 0}\n`,
+  );
+  process.stdout.write(
+    `throughput_issue_maintainers_days_per_issue,${issueMaintainers > 0 ? Math.round((1 / issueMaintainers) * 100) / 100 : 0}\n`,
+  );
+  process.stdout.write(
+    `throughput_issue_community_days_per_issue,${issueCommunity > 0 ? Math.round((1 / issueCommunity) * 100) / 100 : 0}\n`,
+  );
 } catch (err) {
   process.stderr.write(err instanceof Error ? err.message : String(err));
   process.exit(1);

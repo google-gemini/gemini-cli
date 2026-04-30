@@ -6,7 +6,7 @@
  * @license
  */
 
-import { GITHUB_OWNER, GITHUB_REPO, type MetricOutput } from '../types.js';
+import { GITHUB_OWNER, GITHUB_REPO } from '../types.js';
 import { execSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -97,7 +97,9 @@ try {
     const reviewersOnPR = new Map<string, { name?: string }>();
     for (const review of pr.reviews.nodes) {
       if (
-        ['MEMBER', 'OWNER', 'COLLABORATOR'].includes(review.authorAssociation) &&
+        ['MEMBER', 'OWNER', 'COLLABORATOR'].includes(
+          review.authorAssociation,
+        ) &&
         review.author?.login
       ) {
         const login = review.author.login.toLowerCase();

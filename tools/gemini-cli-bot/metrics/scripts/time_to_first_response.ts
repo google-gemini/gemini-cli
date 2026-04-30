@@ -6,7 +6,7 @@
  * @license
  */
 
-import { GITHUB_OWNER, GITHUB_REPO, type MetricOutput } from '../types.js';
+import { GITHUB_OWNER, GITHUB_REPO } from '../types.js';
 import { execSync } from 'node:child_process';
 
 try {
@@ -129,8 +129,12 @@ try {
   );
   const overall = calculateAvg(allItems);
 
-  process.stdout.write(`time_to_first_response_overall_hours,${Math.round(overall * 100) / 100}\n`);
-  process.stdout.write(`time_to_first_response_maintainers_hours,${Math.round(maintainers * 100) / 100}\n`);
+  process.stdout.write(
+    `time_to_first_response_overall_hours,${Math.round(overall * 100) / 100}\n`,
+  );
+  process.stdout.write(
+    `time_to_first_response_maintainers_hours,${Math.round(maintainers * 100) / 100}\n`,
+  );
 } catch (err) {
   process.stderr.write(err instanceof Error ? err.message : String(err));
   process.exit(1);
