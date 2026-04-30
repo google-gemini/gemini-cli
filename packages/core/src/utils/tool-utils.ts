@@ -40,10 +40,23 @@ export function getToolSuggestion(
   allToolNames: string[],
   topN = 3,
 ): string {
-  const matches = allToolNames.map((toolName) => ({
-    name: toolName,
-    distance: levenshtein.get(unknownToolName, toolName),
-  }));
+  // Security: Prevent CPU exhaustion from excessively long tool names.
+  // We use the same 64-character limit as in tool repair.
+  const searchName = unknownToolName.slice(0, 64).toLowerCase();
+
+  const matches = allToolNames
+    .filter((name) => {
+      // Security: Skip excessively long names.
+      // Optimization: If length difference is massive, it won't be a top result.
+      // We don't have a hard maxDistance here, but we can safely skip if difference > 32.
+      return (
+        name.length <= 64 && Math.abs(searchName.length - name.length) <= 32
+      );
+    })
+    .map((toolName) => ({
+      name: toolName,
+      distance: levenshtein.get(searchName, toolName.toLowerCase()),
+    }));
 
   matches.sort((a, b) => a.distance - b.distance);
 
