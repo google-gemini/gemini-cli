@@ -12,6 +12,13 @@ import {
 } from '../themes/color-utils.js';
 import { theme } from '../semantic-colors.js';
 import { debugLogger } from '@google/gemini-cli-core';
+import {
+  wrapHyperlink,
+  looksLikeFilePath,
+  extractFilePath,
+  resolveFileUri,
+  PLAIN_TEXT_FILE_PATH_REGEX,
+} from './hyperlinkUtils.js';
 
 // Constants for Markdown parsing
 const BOLD_MARKER_LENGTH = 2; // For "**"
@@ -69,17 +76,71 @@ const ansiColorize = (str: string, color: string | undefined): string => {
 };
 
 /**
+ * Helper to colorize plain text, optionally detecting and hyperlinking file paths.
+ */
+const colorizeWithFileLinks = (
+  text: string,
+  color: string | undefined,
+  enableHyperlinks: boolean,
+): string => {
+  if (!enableHyperlinks || !text) {
+    return ansiColorize(text, color);
+  }
+
+  let result = '';
+  let lastIdx = 0;
+
+  for (const m of text.matchAll(PLAIN_TEXT_FILE_PATH_REGEX)) {
+    if (m.index === undefined) {
+      continue;
+    }
+    // Skip if this looks like part of a URL (preceded by ://)
+    const precedingText = text.slice(Math.max(0, m.index - 3), m.index);
+    if (precedingText.includes('://')) {
+      continue;
+    }
+
+    if (m.index > lastIdx) {
+      result += ansiColorize(text.slice(lastIdx, m.index), color);
+    }
+
+    const filePath = m[1];
+    const line = m[2];
+    const col = m[3];
+    const fullMatch = m[0];
+    const uri = resolveFileUri(filePath, line, col);
+    result += wrapHyperlink(ansiColorize(fullMatch, color), uri);
+
+    lastIdx = m.index + fullMatch.length;
+  }
+
+  if (lastIdx === 0) return ansiColorize(text, color);
+
+  if (lastIdx < text.length) {
+    result += ansiColorize(text.slice(lastIdx), color);
+  }
+
+  return result;
+};
+
+export interface ParseMarkdownOptions {
+  enableHyperlinks?: boolean;
+}
+
+/**
  * Converts markdown text into a string with ANSI escape codes.
  * This mirrors the parsing logic in InlineMarkdownRenderer.tsx
  */
 export const parseMarkdownToANSI = (
   text: string,
   defaultColor?: string,
+  options?: ParseMarkdownOptions,
 ): string => {
+  const enableHyperlinks = options?.enableHyperlinks ?? false;
   const baseColor = defaultColor ?? theme.text.primary;
   // Early return for plain text without markdown or URLs
   if (!/[*_~`<[https?:]/.test(text)) {
-    return ansiColorize(text, baseColor);
+    return colorizeWithFileLinks(text, baseColor, enableHyperlinks);
   }
 
   let result = '';
@@ -90,7 +151,11 @@ export const parseMarkdownToANSI = (
 
   while ((match = inlineRegex.exec(text)) !== null) {
     if (match.index > lastIndex) {
-      result += ansiColorize(text.slice(lastIndex, match.index), baseColor);
+      result += colorizeWithFileLinks(
+        text.slice(lastIndex, match.index),
+        baseColor,
+        enableHyperlinks,
+      );
     }
 
     const fullMatch = match[0];
@@ -110,6 +175,7 @@ export const parseMarkdownToANSI = (
                 -BOLD_MARKER_LENGTH - ITALIC_MARKER_LENGTH,
               ),
               baseColor,
+              options,
             ),
           ),
         );
@@ -122,6 +188,7 @@ export const parseMarkdownToANSI = (
           parseMarkdownToANSI(
             fullMatch.slice(BOLD_MARKER_LENGTH, -BOLD_MARKER_LENGTH),
             baseColor,
+            options,
           ),
         );
       } else if (
@@ -141,6 +208,7 @@ export const parseMarkdownToANSI = (
           parseMarkdownToANSI(
             fullMatch.slice(ITALIC_MARKER_LENGTH, -ITALIC_MARKER_LENGTH),
             baseColor,
+            options,
           ),
         );
       } else if (
@@ -155,6 +223,7 @@ export const parseMarkdownToANSI = (
               -STRIKETHROUGH_MARKER_LENGTH,
             ),
             baseColor,
+            options,
           ),
         );
       } else if (
@@ -164,7 +233,20 @@ export const parseMarkdownToANSI = (
       ) {
         const codeMatch = fullMatch.match(/^(`+)(.+?)\1$/s);
         if (codeMatch && codeMatch[2]) {
-          styledPart = ansiColorize(codeMatch[2], theme.text.accent);
+          const codeContent = codeMatch[2];
+          const styled = ansiColorize(codeContent, theme.text.accent);
+          if (enableHyperlinks && looksLikeFilePath(codeContent)) {
+            const pathPart = extractFilePath(codeContent);
+            const suffixMatch = codeContent.match(/:(\d+)(?::(\d+))?$/);
+            const uri = resolveFileUri(
+              pathPart,
+              suffixMatch?.[1],
+              suffixMatch?.[2],
+            );
+            styledPart = wrapHyperlink(styled, uri);
+          } else {
+            styledPart = styled;
+          }
         }
       } else if (
         fullMatch.startsWith('[') &&
@@ -175,11 +257,22 @@ export const parseMarkdownToANSI = (
         if (linkMatch) {
           const linkText = linkMatch[1];
           const url = linkMatch[2];
-          styledPart =
-            parseMarkdownToANSI(linkText, baseColor) +
+          const linkOutput =
+            parseMarkdownToANSI(linkText, baseColor, options) +
             ansiColorize(' (', baseColor) +
             ansiColorize(url, theme.text.link) +
             ansiColorize(')', baseColor);
+          const isHttp = /^https?:\/\//.test(url);
+          if (enableHyperlinks && (isHttp || looksLikeFilePath(url))) {
+            const pathPart = extractFilePath(url);
+            const suffixMatch = url.match(/:(\d+)(?::(\d+))?$/);
+            const uri = isHttp
+              ? url
+              : resolveFileUri(pathPart, suffixMatch?.[1], suffixMatch?.[2]);
+            styledPart = wrapHyperlink(linkOutput, uri);
+          } else {
+            styledPart = linkOutput;
+          }
         }
       } else if (
         fullMatch.startsWith('<u>') &&
@@ -194,10 +287,14 @@ export const parseMarkdownToANSI = (
               -UNDERLINE_TAG_END_LENGTH,
             ),
             baseColor,
+            options,
           ),
         );
       } else if (fullMatch.match(/^https?:\/\//)) {
-        styledPart = ansiColorize(fullMatch, theme.text.link);
+        const colored = ansiColorize(fullMatch, theme.text.link);
+        styledPart = enableHyperlinks
+          ? wrapHyperlink(colored, fullMatch)
+          : colored;
       }
     } catch (e) {
       debugLogger.warn('Error parsing inline markdown part:', fullMatch, e);
@@ -209,7 +306,11 @@ export const parseMarkdownToANSI = (
   }
 
   if (lastIndex < text.length) {
-    result += ansiColorize(text.slice(lastIndex), baseColor);
+    result += colorizeWithFileLinks(
+      text.slice(lastIndex),
+      baseColor,
+      enableHyperlinks,
+    );
   }
 
   return result;
