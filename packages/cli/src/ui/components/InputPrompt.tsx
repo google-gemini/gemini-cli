@@ -91,6 +91,7 @@ import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 import { useIsHelpDismissKey } from '../utils/shortcutsHelp.js';
 import { useRepeatedKeyPress } from '../hooks/useRepeatedKeyPress.js';
 import { useKeyMatchers } from '../hooks/useKeyMatchers.js';
+import { AudioWaveIndicator } from './AudioWaveIndicator.js';
 
 /**
  * Returns if the terminal can be trusted to handle paste events atomically
@@ -284,7 +285,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const hasUserNavigatedSuggestions = useRef(false);
   const listRef = useRef<ScrollableListRef<ScrollableItem>>(null);
 
-  const { isRecording, handleVoiceInput, resetTurnBaseline } = useVoiceMode({
+  const { isRecording, isConnecting, handleVoiceInput, resetTurnBaseline } = useVoiceMode({
     buffer,
     config,
     settings,
@@ -1812,7 +1813,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           <Box flexGrow={1} flexDirection="column" ref={innerBoxRef}>
             {isRecording && (
               <Box flexDirection="row" marginBottom={0}>
-                <Text color={theme.status.success}>🎙️ Listening...</Text>
+                <AudioWaveIndicator isConnecting={isConnecting} />
               </Box>
             )}
             {isVoiceModeEnabled && !isRecording && (
