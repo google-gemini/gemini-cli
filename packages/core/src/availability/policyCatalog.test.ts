@@ -53,8 +53,11 @@ describe('policyCatalog', () => {
     expect(chain).toHaveLength(2);
   });
 
-  it('marks preview transients as sticky retries', () => {
-    const [previewPolicy] = getModelPolicyChain({ previewEnabled: true });
+  it('marks preview transients as sticky retries when auto-selected', () => {
+    const [previewPolicy] = getModelPolicyChain({
+      previewEnabled: true,
+      isAutoSelection: true,
+    });
     expect(previewPolicy.model).toBe(PREVIEW_GEMINI_MODEL);
     expect(previewPolicy.stateTransitions.transient).toBe('sticky_retry');
   });
