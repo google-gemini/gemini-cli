@@ -30,10 +30,28 @@ const MULTIPLIERS = {
 };
 
 /**
- * Matches a trailing hyphen followed by exactly 8 alphanumeric characters before the .json extension.
+ * Matches a trailing hyphen followed by exactly 8 alphanumeric characters before the .json or .jsonl extension.
  * Example: session-20250110-abcdef12.json -> captures "abcdef12"
  */
-const SHORT_ID_REGEX = /-([a-zA-Z0-9]{8})\.json$/;
+const SHORT_ID_REGEX = /-([a-zA-Z0-9]{8})\.jsonl?$/;
+
+function hasProperty<T extends string>(
+  obj: unknown,
+  prop: T,
+): obj is { [key in T]: unknown } {
+  return obj !== null && typeof obj === 'object' && prop in obj;
+}
+
+function isStringProperty<T extends string>(
+  obj: unknown,
+  prop: T,
+): obj is { [key in T]: string } {
+  return hasProperty(obj, prop) && typeof obj[prop] === 'string';
+}
+
+function isSessionIdRecord(record: unknown): record is { sessionId: string } {
+  return isStringProperty(record, 'sessionId');
+}
 
 /**
  * Result of session cleanup operation
@@ -54,7 +72,10 @@ export interface CleanupResult {
  * Derives an 8-character shortId from a session filename.
  */
 function deriveShortIdFromFileName(fileName: string): string | null {
-  if (fileName.startsWith(SESSION_FILE_PREFIX) && fileName.endsWith('.json')) {
+  if (
+    fileName.startsWith(SESSION_FILE_PREFIX) &&
+    (fileName.endsWith('.json') || fileName.endsWith('.jsonl'))
+  ) {
     const match = fileName.match(SHORT_ID_REGEX);
     return match ? match[1] : null;
   }
@@ -141,7 +162,8 @@ export async function cleanupExpiredSessions(
             .filter(
               (f) =>
                 f.startsWith(SESSION_FILE_PREFIX) &&
-                f.endsWith(`-${shortId}.json`),
+                (f.endsWith(`-${shortId}.json`) ||
+                  f.endsWith(`-${shortId}.jsonl`)),
             );
 
           for (const file of matchingFiles) {
@@ -151,21 +173,44 @@ export async function cleanupExpiredSessions(
             try {
               // Try to read file to get full sessionId
               try {
-                const fileContent = await fs.readFile(filePath, 'utf8');
-                const content: unknown = JSON.parse(fileContent);
-                if (
-                  content &&
-                  typeof content === 'object' &&
-                  'sessionId' in content
-                ) {
-                  const record = content as Record<string, unknown>;
-                  const id = record['sessionId'];
-                  if (typeof id === 'string') {
-                    fullSessionId = id;
+                const CHUNK_SIZE = 4096;
+                const buffer = Buffer.alloc(CHUNK_SIZE);
+                let fd: fs.FileHandle | undefined;
+                try {
+                  fd = await fs.open(filePath, 'r');
+                  const { bytesRead } = await fd.read(buffer, 0, CHUNK_SIZE, 0);
+                  if (bytesRead > 0) {
+                    const contentChunk = buffer.toString('utf8', 0, bytesRead);
+                    const newlineIndex = contentChunk.indexOf('\n');
+                    const firstLine =
+                      newlineIndex !== -1
+                        ? contentChunk.substring(0, newlineIndex)
+                        : contentChunk;
+
+                    try {
+                      const record: unknown = JSON.parse(firstLine);
+                      if (isSessionIdRecord(record)) {
+                        fullSessionId = record.sessionId;
+                      }
+                    } catch {
+                      // Ignore first line parse error, try full parse for legacy pretty-printed JSON
+                    }
+                  }
+                } finally {
+                  if (fd !== undefined) {
+                    await fd.close();
+                  }
+                }
+
+                if (!fullSessionId) {
+                  const fileContent = await fs.readFile(filePath, 'utf8');
+                  const content: unknown = JSON.parse(fileContent);
+                  if (isSessionIdRecord(content)) {
+                    fullSessionId = content.sessionId;
                   }
                 }
               } catch {
-                // If read/parse fails, skip getting sessionId, just delete the file
+                // If read/parse fails, skip getting sessionId, just delete the file below
               }
 
               // Delete the session file
