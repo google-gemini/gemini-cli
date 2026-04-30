@@ -347,10 +347,13 @@ export async function createContentGenerator(
 
       const googleGenAI = new GoogleGenAI({
         apiKey: config.apiKey === '' ? undefined : config.apiKey,
-        vertexai: config.vertexai,
-        project: config.googleCloudProject,
-        location: config.googleCloudLocation,
         vertexai: config.vertexai ?? config.authType === AuthType.USE_VERTEX_AI,
+        ...(config.googleCloudProject !== undefined
+          ? { project: config.googleCloudProject }
+          : {}),
+        ...(config.googleCloudLocation !== undefined
+          ? { location: config.googleCloudLocation }
+          : {}),
         httpOptions,
         ...(apiVersionEnv && { apiVersion: apiVersionEnv }),
       });
