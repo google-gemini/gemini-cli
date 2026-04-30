@@ -5,16 +5,21 @@
  */
 
 import { execSync } from 'node:child_process';
+import { GITHUB_OWNER, GITHUB_REPO } from '../types.js';
 
 try {
-  const count = execSync(
-    'gh issue list --state open --limit 1000 --json number --jq length',
+  const query = 'query($owner: String!, $repo: String!) { repository(owner: $owner, name: $repo) { issues(states: OPEN) { totalCount } } }';
+  const output = execSync(
+    `gh api graphql -F owner=${GITHUB_OWNER} -F repo=${GITHUB_REPO} -f query='${query}'`,
     {
       encoding: 'utf-8',
+      stdio: ['ignore', 'pipe', 'ignore'],
     },
   ).trim();
-  console.log(`open_issues,${count}`);
+  const parsed = JSON.parse(output);
+  const totalCount = parsed?.data?.repository?.issues?.totalCount ?? 0;
+  process.stdout.write(`open_issues,${totalCount}\n`);
 } catch {
   // Fallback if gh fails or no issues found
-  console.log('open_issues,0');
+  process.stdout.write('open_issues,0\n');
 }

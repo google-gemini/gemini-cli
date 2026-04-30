@@ -42,42 +42,15 @@ function processOutputLine(line: string, results: string[]) {
   const trimmedLine = line.trim();
   if (!trimmedLine) return;
 
-  let metricName = '';
-  let metricValue = 0;
-
-  try {
-    const parsed = JSON.parse(trimmedLine);
-    if (
-      parsed &&
-      typeof parsed === 'object' &&
-      'metric' in parsed &&
-      'value' in parsed
-    ) {
-      metricName = parsed.metric;
-      metricValue = parseFloat(parsed.value);
-      results.push(`${metricName},${metricValue}`);
-    } else {
-      const parts = trimmedLine.split(',');
-      if (parts.length === 2) {
-        metricName = parts[0];
-        metricValue = parseFloat(parts[1]);
-        results.push(trimmedLine);
-      } else {
-        results.push(trimmedLine);
-        return; // Unable to parse for deltas
-      }
-    }
-  } catch {
-    const parts = trimmedLine.split(',');
-    if (parts.length === 2) {
-      metricName = parts[0];
-      metricValue = parseFloat(parts[1]);
-      results.push(trimmedLine);
-    } else {
-      results.push(trimmedLine);
-      return; // Unable to parse for deltas
-    }
+  const parts = trimmedLine.split(',');
+  if (parts.length !== 2) {
+    results.push(trimmedLine);
+    return;
   }
+
+  const metricName = parts[0];
+  const metricValue = parseFloat(parts[1]);
+  results.push(trimmedLine);
 
   // Calculate and append deltas if the metric is a valid number
   if (metricName && !isNaN(metricValue)) {
