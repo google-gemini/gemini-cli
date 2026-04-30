@@ -28,6 +28,7 @@ type PolicyConfig = Omit<ModelPolicy, 'actions' | 'stateTransitions'> & {
 
 export interface ModelPolicyOptions {
   previewEnabled: boolean;
+  isAutoSelection?: boolean;
   userTier?: UserTierId;
   useGemini31?: boolean;
   useGemini31FlashLite?: boolean;
@@ -50,15 +51,19 @@ export const SILENT_ACTIONS: ModelPolicyActionMap = {
 
 const DEFAULT_STATE: ModelPolicyStateMap = {
   terminal: 'terminal',
-  transient: 'sticky_retry',
+  transient: 'terminal',
   not_found: 'terminal',
   unknown: 'terminal',
 };
 
-const DEFAULT_CHAIN: ModelPolicyChain = [
-  definePolicy({ model: DEFAULT_GEMINI_MODEL }),
-  definePolicy({ model: DEFAULT_GEMINI_FLASH_MODEL, isLastResort: true }),
-];
+const AUTO_ROUTING_OVERRIDES = {
+  maxAttempts: 3,
+  actions: { ...DEFAULT_ACTIONS, transient: 'silent' } as ModelPolicyActionMap,
+  stateTransitions: {
+    ...DEFAULT_STATE,
+    transient: 'sticky_retry',
+  } as ModelPolicyStateMap,
+};
 
 const FLASH_LITE_CHAIN: ModelPolicyChain = [
   definePolicy({
@@ -82,20 +87,45 @@ const FLASH_LITE_CHAIN: ModelPolicyChain = [
 export function getModelPolicyChain(
   options: ModelPolicyOptions,
 ): ModelPolicyChain {
+  const isAuto = options.isAutoSelection ?? false;
+
   if (options.previewEnabled) {
-    const previewModel = resolveModel(
+    const proModel = resolveModel(
       PREVIEW_GEMINI_MODEL,
       options.useGemini31,
       options.useGemini31FlashLite,
       options.useCustomToolModel,
     );
     return [
-      definePolicy({ model: previewModel }),
-      definePolicy({ model: PREVIEW_GEMINI_FLASH_MODEL, isLastResort: true }),
+      definePolicy({
+        model: proModel,
+        ...(isAuto
+          ? {
+              maxAttempts: 3,
+              actions: { ...DEFAULT_ACTIONS, transient: 'silent' },
+              stateTransitions: { ...DEFAULT_STATE, transient: 'sticky_retry' },
+            }
+          : {}),
+      }),
+      definePolicy({
+        model: PREVIEW_GEMINI_FLASH_MODEL,
+        isLastResort: true,
+        maxAttempts: 10,
+      }),
     ];
   }
 
-  return cloneChain(DEFAULT_CHAIN);
+  return [
+    definePolicy({
+      model: DEFAULT_GEMINI_MODEL,
+      ...(isAuto ? AUTO_ROUTING_OVERRIDES : {}),
+    }),
+    definePolicy({
+      model: DEFAULT_GEMINI_FLASH_MODEL,
+      isLastResort: true,
+      maxAttempts: 10,
+    }),
+  ];
 }
 
 export function createSingleModelChain(model: string): ModelPolicyChain {
@@ -137,6 +167,7 @@ function definePolicy(config: PolicyConfig): ModelPolicy {
   return {
     model: config.model,
     isLastResort: config.isLastResort,
+    maxAttempts: config.maxAttempts,
     actions: { ...DEFAULT_ACTIONS, ...(config.actions ?? {}) },
     stateTransitions: {
       ...DEFAULT_STATE,
