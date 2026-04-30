@@ -9,6 +9,11 @@
 import { spawn } from 'node:child_process';
 import os from 'node:os';
 import v8 from 'node:v8';
+import {
+  RELAUNCH_EXIT_CODE,
+  getSpawnConfig,
+  getScriptArgs,
+} from './src/utils/processUtils.js';
 
 // --- Global Entry Point ---
 
@@ -70,22 +75,18 @@ async function getMemoryNodeArgs(): Promise<string[]> {
 }
 
 async function run() {
-  if (!process.env['GEMINI_CLI_NO_RELAUNCH'] && !process.env['SANDBOX']) {
+  if (
+    !process.env['GEMINI_CLI_NO_RELAUNCH'] &&
+    !process.env['SANDBOX'] &&
+    process.env['IS_BINARY'] !== 'true'
+  ) {
     // --- Lightweight Parent Process / Daemon ---
     // We avoid importing heavy dependencies here to save ~1.5s of startup time.
 
-    const nodeArgs: string[] = [...process.execArgv];
-    const scriptArgs = process.argv.slice(2);
-
+    const scriptArgs = getScriptArgs();
     const memoryArgs = await getMemoryNodeArgs();
-    nodeArgs.push(...memoryArgs);
+    const { spawnArgs, env: newEnv } = getSpawnConfig(memoryArgs, scriptArgs);
 
-    const script = process.argv[1];
-    nodeArgs.push(script);
-    nodeArgs.push(...scriptArgs);
-
-    const newEnv = { ...process.env, GEMINI_CLI_NO_RELAUNCH: 'true' };
-    const RELAUNCH_EXIT_CODE = 199;
     let latestAdminSettings: unknown = undefined;
 
     // Prevent the parent process from exiting prematurely on signals.
@@ -97,7 +98,7 @@ async function run() {
     const runner = () => {
       process.stdin.pause();
 
-      const child = spawn(process.execPath, nodeArgs, {
+      const child = spawn(process.execPath, spawnArgs, {
         stdio: ['inherit', 'inherit', 'inherit', 'ipc'],
         env: newEnv,
       });
