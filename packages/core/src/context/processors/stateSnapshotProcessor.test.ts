@@ -168,7 +168,7 @@ describe('StateSnapshotProcessor', () => {
 
     // Should synthesize a new snapshot synchronously
     expect(env.llmClient.generateContent).toHaveBeenCalled();
-    expect(result.length).toBe(2); // nodeA is skipped as "system prompt", snapshot + nodeA
-    expect(result[1].type).toBe(NodeType.SNAPSHOT);
+    expect(result.length).toBe(1); // nodeA is no longer protected, so everything is snapshotted
+    expect(result[0].type).toBe(NodeType.SNAPSHOT);
   });
 });

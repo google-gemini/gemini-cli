@@ -58,10 +58,9 @@ describe('ContextManager Sync Pressure Barrier Tests', () => {
 
     expect(projection.length).toBeLessThan(rawHistoryLength);
 
-    // Verify Episode 0 (System) is perfectly preserved at the front
-
+    // Verify Episode 0 (System) was pruned, so we now start with a sentinel due to role alternation
     expect(projection[0].role).toBe('user');
-    expect(projection[0].parts![0].text).toBe('System prompt');
+    expect(projection[0].parts![0].text).toBe('[Continuing from previous AI thoughts...]');
 
     // Filter out synthetic Yield nodes (they are model responses without actual tool/text bodies)
     const contentNodes = projection.filter(

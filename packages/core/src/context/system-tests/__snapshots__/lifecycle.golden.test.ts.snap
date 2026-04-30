@@ -6,16 +6,13 @@ exports[`System Lifecycle Golden Tests > Scenario 1: Organic Growth with Huge To
     {
       "parts": [
         {
-          "text": "System Instructions",
+          "text": "[Continuing from previous AI thoughts...]",
         },
       ],
       "role": "user",
     },
     {
       "parts": [
-        {
-          "text": "Ack.",
-        },
         {
           "text": "Nice diagram.",
         },
@@ -59,18 +56,18 @@ exports[`System Lifecycle Golden Tests > Scenario 1: Organic Growth with Huge To
       "turnIndex": 1,
     },
     {
-      "tokensAfterBackground": 20135,
+      "tokensAfterBackground": 20138,
       "tokensBeforeBackground": 20147,
       "turnIndex": 2,
     },
     {
-      "tokensAfterBackground": 3347,
-      "tokensBeforeBackground": 23155,
+      "tokensAfterBackground": 3335,
+      "tokensBeforeBackground": 23143,
       "turnIndex": 3,
     },
     {
-      "tokensAfterBackground": 98,
-      "tokensBeforeBackground": 3045,
+      "tokensAfterBackground": 86,
+      "tokensBeforeBackground": 3033,
       "turnIndex": 4,
     },
   ],
