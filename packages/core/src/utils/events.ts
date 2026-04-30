@@ -422,8 +422,15 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
   /**
    * Flushes buffered messages. Call this immediately after primary UI listener
    * subscribes.
+   *
+   * @param transform - Optional function to transform events before they are emitted.
    */
-  drainBacklogs(): void {
+  drainBacklogs(
+    transform?: <K extends keyof CoreEvents>(
+      event: K,
+      args: CoreEvents[K],
+    ) => { event: K; args: CoreEvents[K] } | undefined,
+  ): void {
     const backlog = this._eventBacklog;
     const head = this._backlogHead;
     this._eventBacklog = [];
@@ -431,10 +438,21 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
     for (let i = head; i < backlog.length; i++) {
       const item = backlog[i];
       if (item === undefined) continue;
+
+      let eventToEmit = item.event;
+      let argsToEmit = item.args;
+
+      if (transform) {
+        const transformed = transform(item.event, item.args);
+        if (!transformed) continue;
+        eventToEmit = transformed.event;
+        argsToEmit = transformed.args;
+      }
+
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       (this.emit as (event: keyof CoreEvents, ...args: unknown[]) => boolean)(
-        item.event,
-        ...item.args,
+        eventToEmit,
+        ...argsToEmit,
       );
     }
   }

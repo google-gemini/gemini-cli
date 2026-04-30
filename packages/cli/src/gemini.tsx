@@ -13,6 +13,7 @@ import {
   type OutputPayload,
   type ConsoleLogPayload,
   type UserFeedbackPayload,
+  type CoreEvents,
   createSessionId,
   logUserPrompt,
   AuthType,
@@ -265,6 +266,7 @@ export async function startInteractiveUI(
 }
 
 export async function main() {
+  let config: Config | undefined;
   const cliStartupHandle = startupProfiler.start('cli_startup');
 
   // Listen for admin controls from parent process (IPC) in non-sandbox mode. In
@@ -277,7 +279,7 @@ export async function main() {
   const cleanupStdio = patchStdio();
   registerSyncCleanup(() => {
     // This is needed to ensure we don't lose any buffered output.
-    initializeOutputListenersAndFlush();
+    initializeOutputListenersAndFlush(config);
     cleanupStdio();
   });
 
@@ -539,7 +541,7 @@ export async function main() {
   // may have side effects.
   {
     const loadConfigHandle = startupProfiler.start('load_cli_config');
-    const config = await loadCliConfig(settings.merged, sessionId, argv, {
+    config = await loadCliConfig(settings.merged, sessionId, argv, {
       projectHooks: settings.workspace.settings.hooks,
       worktreeSettings: worktreeInfo,
     });
@@ -785,7 +787,7 @@ export async function main() {
       debugLogger.log('Session ID: %s', sessionId);
     }
 
-    initializeOutputListenersAndFlush();
+    initializeOutputListenersAndFlush(config);
 
     await runNonInteractive({
       config,
@@ -800,7 +802,7 @@ export async function main() {
   }
 }
 
-export function initializeOutputListenersAndFlush() {
+export function initializeOutputListenersAndFlush(config?: Config) {
   // If there are no listeners for output, make sure we flush so output is not
   // lost.
   if (coreEvents.listenerCount(CoreEvent.Output) === 0) {
@@ -812,24 +814,43 @@ export function initializeOutputListenersAndFlush() {
         writeToStdout(payload.chunk, payload.encoding);
       }
     });
-
-    if (coreEvents.listenerCount(CoreEvent.ConsoleLog) === 0) {
-      coreEvents.on(CoreEvent.ConsoleLog, (payload: ConsoleLogPayload) => {
-        if (payload.type === 'error' || payload.type === 'warn') {
-          writeToStderr(payload.content + '\n');
-        } else {
-          writeToStderr(payload.content + '\n');
-        }
-      });
-    }
-
-    if (coreEvents.listenerCount(CoreEvent.UserFeedback) === 0) {
-      coreEvents.on(CoreEvent.UserFeedback, (payload: UserFeedbackPayload) => {
-        writeToStderr(payload.message + '\n');
-      });
-    }
   }
-  coreEvents.drainBacklogs();
+
+  if (coreEvents.listenerCount(CoreEvent.ConsoleLog) === 0) {
+    coreEvents.on(CoreEvent.ConsoleLog, (payload: ConsoleLogPayload) => {
+      if (payload.type === 'error' || payload.type === 'warn') {
+        writeToStderr(payload.content + '\n');
+      } else {
+        writeToStderr(payload.content + '\n');
+      }
+    });
+  }
+
+  if (coreEvents.listenerCount(CoreEvent.UserFeedback) === 0) {
+    coreEvents.on(CoreEvent.UserFeedback, (payload: UserFeedbackPayload) => {
+      writeToStderr(payload.message + '\n');
+    });
+  }
+
+  const outputFormat = config?.getOutputFormat();
+  const forceToStderr = outputFormat === 'json' || config === undefined;
+
+  coreEvents.drainBacklogs(
+    <K extends keyof CoreEvents>(event: K, args: CoreEvents[K]) => {
+      if (forceToStderr && event === (CoreEvent.Output as string)) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        const payload = args[0] as OutputPayload;
+        if (!payload.isStderr) {
+          return {
+            event,
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+            args: [{ ...payload, isStderr: true }] as unknown as CoreEvents[K],
+          };
+        }
+      }
+      return { event, args };
+    },
+  );
 }
 
 function setupAdminControlsListener() {
