@@ -5,7 +5,7 @@
  */
 
 import { type ColorsTheme, Theme } from '../../theme.js';
-import { darkSemanticColors } from '../../semantic-tokens.js';
+import type { SemanticColors } from '../../semantic-tokens.js';
 
 const ansiColors: ColorsTheme = {
   type: 'dark',
@@ -27,9 +27,46 @@ const ansiColors: ColorsTheme = {
   GradientColors: ['cyan', 'green'],
 };
 
+// semantic colors derived from ansi color names instead of hex values
+const ansiDarkSemanticColors: SemanticColors = {
+  text: {
+    primary: ansiColors.Foreground,
+    secondary: ansiColors.Gray,
+    link: ansiColors.AccentBlue,
+    accent: ansiColors.AccentPurple,
+    response: ansiColors.Foreground,
+  },
+  background: {
+    primary: ansiColors.Background,
+    message: ansiColors.Background,
+    input: ansiColors.Background,
+    focus: ansiColors.FocusBackground ?? ansiColors.Background,
+    diff: {
+      added: ansiColors.DiffAdded,
+      removed: ansiColors.DiffRemoved,
+    },
+  },
+  border: {
+    default: ansiColors.DarkGray,
+  },
+  ui: {
+    comment: ansiColors.Comment,
+    symbol: ansiColors.Gray,
+    active: ansiColors.AccentBlue,
+    dark: ansiColors.DarkGray,
+    focus: ansiColors.AccentGreen,
+    gradient: ansiColors.GradientColors,
+  },
+  status: {
+    error: ansiColors.AccentRed,
+    success: ansiColors.AccentGreen,
+    warning: ansiColors.AccentYellow,
+  },
+};
+
 export const ANSI: Theme = new Theme(
   'ANSI',
-  'dark', // Consistent with its color palette base
+  'dark',
   {
     hljs: {
       display: 'block',
@@ -157,5 +194,5 @@ export const ANSI: Theme = new Theme(
     },
   },
   ansiColors,
-  darkSemanticColors,
+  ansiDarkSemanticColors,
 );
