@@ -63,17 +63,31 @@ describe('file_creation_behavior', () => {
     assert: async (rig) => {
       // Verify that read_file was called on config.json before write_file
       const logs = rig.readToolLogs();
-      const targetReadFileIndex = logs.findIndex(
-        (log) =>
-          log.toolRequest?.name === 'read_file' &&
-          log.toolRequest.args.includes('config.json'),
-      );
+      const targetReadFileIndex = logs.findIndex((log) => {
+        if (log.toolRequest?.name !== 'read_file') return false;
+        try {
+          const args =
+            typeof log.toolRequest.args === 'string'
+              ? JSON.parse(log.toolRequest.args)
+              : log.toolRequest.args;
+          return args.path === 'config.json';
+        } catch {
+          return false;
+        }
+      });
 
-      const targetWriteFileIndex = logs.findIndex(
-        (log) =>
-          log.toolRequest?.name === 'write_file' &&
-          log.toolRequest.args.includes('config.json'),
-      );
+      const targetWriteFileIndex = logs.findIndex((log) => {
+        if (log.toolRequest?.name !== 'write_file') return false;
+        try {
+          const args =
+            typeof log.toolRequest.args === 'string'
+              ? JSON.parse(log.toolRequest.args)
+              : log.toolRequest.args;
+          return args.path === 'config.json';
+        } catch {
+          return false;
+        }
+      });
 
       expect(
         targetReadFileIndex,
