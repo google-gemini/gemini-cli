@@ -114,6 +114,12 @@ export class FatalToolExecutionError extends FatalError {
     this.name = 'FatalToolExecutionError';
   }
 }
+export class FatalUntrustedWorkspaceError extends FatalError {
+  constructor(message: string) {
+    super(message, 55);
+    this.name = 'FatalUntrustedWorkspaceError';
+  }
+}
 export class FatalCancellationError extends FatalError {
   constructor(message: string) {
     super(message, 130); // Standard exit code for SIGINT

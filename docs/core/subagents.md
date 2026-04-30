@@ -87,11 +87,23 @@ Gemini CLI comes with the following built-in subagents:
 
 ### Generalist Agent
 
-- **Name:** `generalist_agent`
-- **Purpose:** Route tasks to the appropriate specialized subagent.
-- **When to use:** Implicitly used by the main agent for routing. Not directly
-  invoked by the user.
-- **Configuration:** Enabled by default. No specific configuration options.
+- **Name:** `generalist`
+- **Purpose:** A general, all-purpose subagent that uses the inherited tool
+  access and configurations from the main agent. Useful for executing broad,
+  resource-heavy subtasks in an isolated conversation, optimizing your main
+  agent's context by returning only the final result of that given task.
+- **When to use:** Use this agent when a task requires many steps, handles large
+  volumes of information, or requires the same full capabilities as the main
+  agent. It is ideal for:
+  - **Multi-file modifications:** Applying refactors or fixing errors across
+    several files at once.
+  - **High-volume execution:** Running commands or tests that produce extensive
+    terminal output.
+  - **Action-oriented research:** Investigations where the agent needs to both
+    search code and run commands or make edits to find a solution. By delegating
+    these tasks, you prevent your main conversation from becoming cluttered or
+    slow. You can invoke it explicitly using `@generalist`.
+- **Configuration:** Enabled by default.
 
 ### Browser Agent (experimental)
 

@@ -22,8 +22,7 @@ import { theme } from '../../semantic-colors.js';
 import { useConfig } from '../../contexts/ConfigContext.js';
 import { isShellTool } from './ToolShared.js';
 import {
-  shouldHideToolCall,
-  CoreToolCallStatus,
+  isVisibleInToolGroup,
   Kind,
   EDIT_DISPLAY_NAME,
   GLOB_DISPLAY_NAME,
@@ -36,6 +35,7 @@ import {
   READ_MANY_FILES_DISPLAY_NAME,
   isFileDiff,
 } from '@google/gemini-cli-core';
+import { buildToolVisibilityContextFromDisplay } from '../../utils/historyUtils.js';
 import { useUIState } from '../../contexts/UIStateContext.js';
 import { getToolGroupBorderAppearance } from '../../utils/borderStyles.js';
 import { useSettings } from '../../contexts/SettingsContext.js';
@@ -102,7 +102,6 @@ interface ToolGroupMessageProps {
   borderTop?: boolean;
   borderBottom?: boolean;
   isExpandable?: boolean;
-  isToolGroupBoundary?: boolean;
 }
 
 // Main component renders the border and maps the tools using ToolMessage
@@ -116,7 +115,6 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   borderTop: borderTopOverride,
   borderBottom: borderBottomOverride,
   isExpandable,
-  isToolGroupBoundary,
 }) => {
   const settings = useSettings();
   const isLowErrorVerbosity = settings.merged.ui?.errorVerbosity !== 'full';
@@ -125,40 +123,13 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   // Filter out tool calls that should be hidden (e.g. in-progress Ask User, or Plan Mode operations).
   const visibleToolCalls = useMemo(
     () =>
-      allToolCalls.filter((t) => {
-        // Hide internal errors unless full verbosity
-        if (
-          isLowErrorVerbosity &&
-          t.status === CoreToolCallStatus.Error &&
-          !t.isClientInitiated
-        ) {
-          return false;
-        }
-        // Standard hiding logic (e.g. Plan Mode internal edits)
-        if (
-          shouldHideToolCall({
-            displayName: t.name,
-            status: t.status,
-            approvalMode: t.approvalMode,
-            hasResultDisplay: !!t.resultDisplay,
-            parentCallId: t.parentCallId,
-          })
-        ) {
-          return false;
-        }
-
-        // We HIDE tools that are still in pre-execution states (Confirming, Pending)
-        // from the History log. They live in the Global Queue or wait for their turn.
-        // Only show tools that are actually running or finished.
-        const displayStatus = mapCoreStatusToDisplayStatus(t.status);
-
-        // We hide Confirming tools from the history log because they are
-        // currently being rendered in the interactive ToolConfirmationQueue.
-        // We show everything else, including Pending (waiting to run) and
-        // Canceled (rejected by user), to ensure the history is complete
-        // and to avoid tools "vanishing" after approval.
-        return displayStatus !== ToolCallStatus.Confirming;
-      }),
+      allToolCalls.filter((t) =>
+        // Use the unified visibility utility
+        isVisibleInToolGroup(
+          buildToolVisibilityContextFromDisplay(t),
+          isLowErrorVerbosity ? 'low' : 'full',
+        ),
+      ),
     [allToolCalls, isLowErrorVerbosity],
   );
 
@@ -275,11 +246,10 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
           (showClosingBorder ? 1 : 0);
       } else if (isTopicToolCall) {
         // Topic Message Spacing Breakdown:
-        // 1. Top Margin (1): Present unless it's the very first item following a boundary.
-        // 2. Topic Content (1).
-        // 3. Bottom Margin (1): Always present around TopicMessage for breathing room.
-        const hasTopMargin = !(isFirst && isToolGroupBoundary);
-        height += (hasTopMargin ? 1 : 0) + 1 + 1;
+        // 1. Topic Content (1).
+        // 2. Bottom Margin (1): Always present around TopicMessage for breathing room.
+        // 3. Closing Border (1): Added if transition logic (showClosingBorder) requires it.
+        height += 1 + 1 + (showClosingBorder ? 1 : 0);
       } else if (isCompact) {
         // Compact Tool: Always renders as a single dense line.
         height += 1;
@@ -300,12 +270,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
       }
     }
     return height;
-  }, [
-    groupedTools,
-    isCompactModeEnabled,
-    borderTopOverride,
-    isToolGroupBoundary,
-  ]);
+  }, [groupedTools, isCompactModeEnabled, borderTopOverride]);
 
   let countToolCallsWithResults = 0;
   for (const tool of visibleToolCalls) {
@@ -473,10 +438,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
               {isCompact ? (
                 <DenseToolMessage {...commonProps} />
               ) : isTopicToolCall ? (
-                <Box
-                  marginTop={isFirst && isToolGroupBoundary ? 0 : 1}
-                  marginBottom={1}
-                >
+                <Box marginBottom={1}>
                   <TopicMessage {...commonProps} />
                 </Box>
               ) : isShellToolCall ? (

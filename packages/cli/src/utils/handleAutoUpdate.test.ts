@@ -301,7 +301,7 @@ describe('handleAutoUpdate', () => {
 
     expect(updateEventEmitter.emit).toHaveBeenCalledWith('update-failed', {
       message:
-        'Automatic update failed. Please try updating manually. (command: npm i -g @google/gemini-cli@2.0.0)',
+        'Automatic update failed. Please try updating manually:\n\nnpm i -g @google/gemini-cli@2.0.0',
     });
   });
 
@@ -325,7 +325,7 @@ describe('handleAutoUpdate', () => {
 
     expect(updateEventEmitter.emit).toHaveBeenCalledWith('update-failed', {
       message:
-        'Automatic update failed. Please try updating manually. (error: Spawn error)',
+        'Automatic update failed. Please try updating manually. (error: Spawn error)\n\nnpm i -g @google/gemini-cli@2.0.0',
     });
   });
 
@@ -334,7 +334,8 @@ describe('handleAutoUpdate', () => {
       ...mockUpdateInfo,
       update: {
         ...mockUpdateInfo.update,
-        latest: '2.0.0-nightly',
+        current: '1.0.0-nightly.0',
+        latest: '2.0.0-nightly.1',
       },
     };
     mockGetInstallationInfo.mockReturnValue({
@@ -354,6 +355,26 @@ describe('handleAutoUpdate', () => {
         detached: true,
       },
     );
+  });
+
+  it('should NOT update if target is less stable than current (defense-in-depth)', async () => {
+    mockUpdateInfo = {
+      ...mockUpdateInfo,
+      update: {
+        ...mockUpdateInfo.update,
+        current: '1.0.0',
+        latest: '1.1.0-nightly.1',
+      },
+    };
+    mockGetInstallationInfo.mockReturnValue({
+      updateCommand: 'npm i -g @google/gemini-cli@latest',
+      isGlobal: false,
+      packageManager: PackageManager.NPM,
+    });
+
+    handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', mockSpawn);
+
+    expect(mockSpawn).not.toHaveBeenCalled();
   });
 
   it('should emit "update-success" when the update process succeeds', async () => {
@@ -435,13 +456,15 @@ describe('setUpdateHandler', () => {
   });
 
   it('should handle update-failed event', () => {
-    updateEventEmitter.emit('update-failed', { message: 'Failed' });
+    updateEventEmitter.emit('update-failed', {
+      message: 'Failed message with command',
+    });
 
     expect(setUpdateInfo).toHaveBeenCalledWith(null);
     expect(addItem).toHaveBeenCalledWith(
       {
         type: MessageType.ERROR,
-        text: 'Automatic update failed. Please try updating manually',
+        text: 'Failed message with command',
       },
       expect.any(Number),
     );

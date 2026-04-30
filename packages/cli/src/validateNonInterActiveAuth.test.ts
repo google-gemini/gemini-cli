@@ -294,7 +294,7 @@ describe('validateNonInterActiveAuth', () => {
     expect(processExitSpy).not.toHaveBeenCalled();
   });
 
-  it('succeeds if effectiveAuthType matches enforcedAuthType', async () => {
+  it('succeeds if effectiveAuthType matches enforcedType', async () => {
     mockSettings.merged.security.auth.enforcedType = AuthType.USE_GEMINI;
     process.env['GEMINI_API_KEY'] = 'fake-key';
     const nonInteractiveConfig = createLocalMockConfig({});
@@ -308,7 +308,7 @@ describe('validateNonInterActiveAuth', () => {
     expect(debugLoggerErrorSpy).not.toHaveBeenCalled();
   });
 
-  it('exits if configuredAuthType does not match enforcedAuthType', async () => {
+  it('exits if configuredAuthType does not match enforcedType', async () => {
     mockSettings.merged.security.auth.enforcedType = AuthType.LOGIN_WITH_GOOGLE;
     const nonInteractiveConfig = createLocalMockConfig({
       getOutputFormat: vi.fn().mockReturnValue(OutputFormat.TEXT),
@@ -334,7 +334,7 @@ describe('validateNonInterActiveAuth', () => {
     );
   });
 
-  it('exits if auth from env var does not match enforcedAuthType', async () => {
+  it('exits if auth from env var does not match enforcedType', async () => {
     mockSettings.merged.security.auth.enforcedType = AuthType.LOGIN_WITH_GOOGLE;
     process.env['GEMINI_API_KEY'] = 'fake-key';
     const nonInteractiveConfig = createLocalMockConfig({

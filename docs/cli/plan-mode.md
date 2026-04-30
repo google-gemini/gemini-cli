@@ -130,7 +130,9 @@ These are the only allowed tools:
   [`cli_help`](../core/subagents.md#cli-help-agent)
 - **Interaction:** [`ask_user`](../tools/ask-user.md)
 - **MCP tools (Read):** Read-only [MCP tools](../tools/mcp-server.md) (for
-  example, `github_read_issue`, `postgres_read_schema`) are allowed.
+  example, `github_read_issue`, `postgres_read_schema`) and core
+  [MCP resource tools](../tools/mcp-resources.md) (`list_mcp_resources`,
+  `read_mcp_resource`) are allowed.
 - **Planning (Write):**
   [`write_file`](../tools/file-system.md#3-write_file-writefile) and
   [`replace`](../tools/file-system.md#6-replace-edit) only allowed for `.md`
@@ -327,8 +329,11 @@ Storage whenever Gemini CLI exits Plan Mode to start the implementation.
 
 ```bash
 #!/usr/bin/env bash
-# Extract the plan path from the tool input JSON
-plan_path=$(jq -r '.tool_input.plan_path // empty')
+# Extract the plan filename from the tool input JSON
+plan_filename=$(jq -r '.tool_input.plan_filename // empty')
+
+# Construct the absolute path using the GEMINI_PLANS_DIR environment variable
+plan_path="$GEMINI_PLANS_DIR/$plan_filename"
 
 if [ -f "$plan_path" ]; then
   # Generate a unique filename using a timestamp
@@ -354,7 +359,7 @@ To register this `AfterTool` hook, add it to your `settings.json`:
           {
             "name": "archive-plan",
             "type": "command",
-            "command": "./.gemini/hooks/archive-plan.sh"
+            "command": "~/.gemini/hooks/archive-plan.sh"
           }
         ]
       }
@@ -441,6 +446,10 @@ on the current phase of your task:
     switches to a high-speed **Flash** model. This provides a faster, more
     responsive experience during the implementation of the plan.
 
+If the high-reasoning model is unavailable or you don't have access to it,
+Gemini CLI automatically and silently falls back to a faster model to ensure
+your workflow isn't interrupted.
+
 This behavior is enabled by default to provide the best balance of quality and
 performance. You can disable this automatic switching in your settings:
 
@@ -461,7 +470,8 @@ associated plan files and task trackers.
 
 - **Default behavior:** Sessions (and their plans) are retained for **30 days**.
 - **Configuration:** You can customize this behavior via the `/settings` command
-  (search for **Session Retention**) or in your `settings.json` file. See
+  (search for **Enable Session Cleanup** or **Keep chat history**) or in your
+  `settings.json` file. See
   [session retention](../cli/session-management.md#session-retention) for more
   details.
 

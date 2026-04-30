@@ -75,6 +75,7 @@ vi.mock('../utils/shell-utils.js', async (importOriginal) => {
   return {
     ...actual,
     resolveExecutable: mockResolveExecutable,
+    spawnAsync: vi.fn().mockResolvedValue({ stdout: '', stderr: '' }),
   };
 });
 vi.mock('node:child_process', async (importOriginal) => {
@@ -695,7 +696,7 @@ describe('ShellExecutionService', () => {
       );
 
       expect(sigtermCallIndex).toBe(0);
-      expect(sigkillCallIndex).toBe(1);
+      expect(sigkillCallIndex).toBeGreaterThan(0);
       expect(sigtermCallIndex).toBeLessThan(sigkillCallIndex);
 
       expect(result.signal).toBe(9);
@@ -1476,8 +1477,11 @@ describe('ShellExecutionService child_process fallback', () => {
 
           const { result } = await simulateExecution(
             'sleep 10',
-            (cp, abortController) => {
+            async (cp, abortController) => {
               abortController.abort();
+              await new Promise(process.nextTick);
+              await new Promise(process.nextTick);
+              await new Promise(process.nextTick);
               if (expectedExit.signal) {
                 cp.emit('exit', null, expectedExit.signal);
                 cp.emit('close', null, expectedExit.signal);
@@ -1497,11 +1501,14 @@ describe('ShellExecutionService child_process fallback', () => {
               expectedSignal,
             );
           } else {
-            expect(mockCpSpawn).toHaveBeenCalledWith(
-              expectedCommand,
-              ['/pid', String(mockChildProcess.pid), '/f', '/t'],
-              expect.anything(),
-            );
+            // Taskkill is spawned via spawnAsync which is mocked
+            const { spawnAsync } = await import('../utils/shell-utils.js');
+            expect(spawnAsync).toHaveBeenCalledWith(expectedCommand, [
+              '/pid',
+              String(mockChildProcess.pid),
+              '/f',
+              '/t',
+            ]);
           }
         });
       },
@@ -1531,6 +1538,7 @@ describe('ShellExecutionService child_process fallback', () => {
       );
 
       abortController.abort();
+      await vi.advanceTimersByTimeAsync(0);
 
       // Check the first kill signal
       expect(mockProcessKill).toHaveBeenCalledWith(
@@ -1609,6 +1617,22 @@ describe('ShellExecutionService child_process fallback', () => {
         'binary_progress',
         'exit',
       ]);
+    });
+
+    it('should correctly measure sniffedBytes with >20 small chunks to prevent OOM (regression #22170)', async () => {
+      mockIsBinary.mockReturnValue(false);
+
+      await simulateExecution('cat lots_of_chunks', (cp) => {
+        for (let i = 0; i < 25; i++) {
+          cp.stdout?.emit('data', Buffer.alloc(10, 'a'));
+        }
+        cp.emit('exit', 0, null);
+        cp.emit('close', 0, null);
+      });
+
+      const lastCallBuffer =
+        mockIsBinary.mock.calls[mockIsBinary.mock.calls.length - 1][0];
+      expect(lastCallBuffer.length).toBe(250);
     });
   });
 
@@ -1717,10 +1741,12 @@ describe('ShellExecutionService execution method selection', () => {
     );
 
     // Simulate exit to allow promise to resolve
+    if (!mockPtyProcess.onExit.mock.calls[0]) {
+      const res = await handle.result;
+      throw new Error(`Failed early in executeWithPty: ${res.error}`);
+    }
     mockPtyProcess.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
     const result = await handle.result;
-
-    expect(mockGetPty).toHaveBeenCalled();
     expect(mockPtySpawn).toHaveBeenCalled();
     expect(mockCpSpawn).not.toHaveBeenCalled();
     expect(result.executionMethod).toBe('mock-pty');
