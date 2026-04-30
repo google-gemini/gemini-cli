@@ -289,6 +289,37 @@ describe('ToolRegistry', () => {
     });
   });
 
+  describe('getTool with hyphenated MCP server names', () => {
+    it('should resolve a hallucinated snake_case name to the registered hyphenated MCP tool', () => {
+      // Server registers as "mcp_hyphen-server_test-tool", but the model
+      // commonly emits the function call as "mcp_hyphen_server_test_tool"
+      // (hyphens collapsed to underscores). Lookup should still resolve.
+      const mcpTool = createMCPTool('hyphen-server', 'test-tool', 'desc');
+      toolRegistry.registerTool(mcpTool);
+
+      expect(mcpTool.name).toBe('mcp_hyphen-server_test-tool');
+      expect(toolRegistry.getTool('mcp_hyphen-server_test-tool')).toBe(mcpTool);
+      expect(toolRegistry.getTool('mcp_hyphen_server_test_tool')).toBe(mcpTool);
+    });
+
+    it('should return undefined when two MCP tools collapse to the same name', () => {
+      // mcp_a-b_c and mcp_a_b-c both collapse to mcp_a_b_c. Refuse to guess.
+      const ambiguousA = createMCPTool('a-b', 'c', 'desc');
+      const ambiguousB = createMCPTool('a', 'b-c', 'desc');
+      toolRegistry.registerTool(ambiguousA);
+      toolRegistry.registerTool(ambiguousB);
+
+      expect(toolRegistry.getTool('mcp_a_b_c')).toBeUndefined();
+    });
+
+    it('should leave non-MCP tools alone', () => {
+      const regular = new MockTool({ name: 'mock-tool' });
+      toolRegistry.registerTool(regular);
+
+      expect(toolRegistry.getTool('mock_tool')).toBeUndefined();
+    });
+  });
+
   describe('removeMcpToolsByServer', () => {
     it('should remove all tools from a specific server', () => {
       const serverName = 'test-server';
