@@ -78,3 +78,25 @@ export const MAX_SHELL_OUTPUT_SIZE = 10_000_000; // 10 MB
 // chunk, amortizing the cost to once per SHELL_OUTPUT_TRUNCATION_BUFFER bytes
 // of new input (i.e. once per ~1 MB on a busy shell).
 export const SHELL_OUTPUT_TRUNCATION_BUFFER = 1_000_000; // 1 MB
+
+/** Layout constants for dialog components */
+export const DIALOG_PADDING = 2;
+export const DIALOG_HEADER_HEIGHT = 2;
+export const DIALOG_CONTROLS_HEIGHT = 2;
+
+/** Layout constants for ThemeDialog component */
+export const THEME_DIALOG_PREVIEW_PANE_WIDTH_PERCENTAGE = 0.55;
+export const THEME_DIALOG_SELECTION_PANE_WIDTH_PERCENTAGE = 0.45;
+/** A safety margin to prevent text from touching the border in the preview pane. */
+export const THEME_DIALOG_PREVIEW_PANE_WIDTH_SAFETY_MARGIN = 0.9;
+/** Combined horizontal padding from the dialog and preview pane. */
+export const THEME_DIALOG_TOTAL_HORIZONTAL_PADDING = 4;
+/** Vertical space taken by elements other than the two code blocks in the preview pane.
+ * Includes "Preview" title, borders, and margin between blocks.
+ */
+export const THEME_DIALOG_PREVIEW_PANE_FIXED_VERTICAL_SPACE = 8;
+export const THEME_DIALOG_TAB_TO_SELECT_HEIGHT = 2;
+export const THEME_DIALOG_PREVIEW_CODE_BLOCK_HEIGHT_PERCENTAGE = 0.6;
+export const THEME_DIALOG_PREVIEW_DIFF_HEIGHT_PERCENTAGE = 0.4;
+export const THEME_DIALOG_COLUMN_PADDING = 2;
+export const THEME_DIALOG_MAX_ITEMS_TO_SHOW = 12;
