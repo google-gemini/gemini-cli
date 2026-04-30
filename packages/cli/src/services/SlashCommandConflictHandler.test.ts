@@ -173,6 +173,79 @@ describe('SlashCommandConflictHandler', () => {
     expect(coreEvents.emitFeedback).not.toHaveBeenCalled();
   });
 
+  it('should notify again when a conflict is resolved and later reappears', () => {
+    const conflict = {
+      name: 'deploy',
+      renamedTo: 'firebase.deploy',
+      loserExtensionName: 'firebase',
+      loserKind: CommandKind.EXTENSION_FILE,
+      winnerKind: CommandKind.BUILT_IN,
+    };
+
+    simulateEvent([conflict]);
+    vi.advanceTimersByTime(600);
+    expect(coreEvents.emitFeedback).toHaveBeenCalledTimes(1);
+
+    vi.mocked(coreEvents.emitFeedback).mockClear();
+
+    simulateEvent([]);
+    vi.advanceTimersByTime(600);
+    expect(coreEvents.emitFeedback).not.toHaveBeenCalled();
+
+    simulateEvent([conflict]);
+    vi.advanceTimersByTime(600);
+    expect(coreEvents.emitFeedback).toHaveBeenCalledTimes(1);
+  });
+
+  it('should deduplicate duplicate conflicts within a single payload', () => {
+    const conflict = {
+      name: 'deploy',
+      renamedTo: 'firebase.deploy',
+      loserExtensionName: 'firebase',
+      loserKind: CommandKind.EXTENSION_FILE,
+      winnerKind: CommandKind.BUILT_IN,
+    };
+
+    simulateEvent([conflict, conflict]);
+    vi.advanceTimersByTime(600);
+
+    expect(coreEvents.emitFeedback).toHaveBeenCalledTimes(1);
+    expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
+      'info',
+      "Extension 'firebase' command '/deploy' was renamed to '/firebase.deploy' because it conflicts with built-in command.",
+    );
+  });
+
+  it('should clear pending conflicts when stopped before flush', () => {
+    const staleConflict = {
+      name: 'deploy',
+      renamedTo: 'firebase.deploy',
+      loserExtensionName: 'firebase',
+      loserKind: CommandKind.EXTENSION_FILE,
+      winnerKind: CommandKind.BUILT_IN,
+    };
+    const nextConflict = {
+      name: 'chat',
+      renamedTo: 'google-workspace.chat',
+      loserExtensionName: 'google-workspace',
+      loserKind: CommandKind.SKILL,
+      winnerKind: CommandKind.BUILT_IN,
+    };
+
+    simulateEvent([staleConflict]);
+    handler.stop();
+    handler.start();
+
+    simulateEvent([nextConflict]);
+    vi.advanceTimersByTime(600);
+
+    expect(coreEvents.emitFeedback).toHaveBeenCalledTimes(1);
+    expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
+      'info',
+      "Extension 'google-workspace' skill '/chat' was renamed to '/google-workspace.chat' because it conflicts with built-in command.",
+    );
+  });
+
   it('should display a descriptive message for a skill conflict', () => {
     simulateEvent([
       {
