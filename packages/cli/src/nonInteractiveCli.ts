@@ -295,6 +295,7 @@ export async function runNonInteractive(
       let currentMessages: Content[] = [{ role: 'user', parts: query }];
 
       let turnCount = 0;
+      let invalidStreamError: string | undefined;
       while (true) {
         turnCount++;
         if (
@@ -395,6 +396,21 @@ export async function runNonInteractive(
             if (config.getOutputFormat() === OutputFormat.TEXT) {
               process.stderr.write(`[WARNING] ${blockMessage}\n`);
             }
+          } else if (event.type === GeminiEventType.InvalidStream) {
+            invalidStreamError =
+              'Invalid stream: The model returned an empty response or malformed tool call.';
+            if (streamFormatter) {
+              streamFormatter.emitEvent({
+                type: JsonStreamEventType.ERROR,
+                timestamp: new Date().toISOString(),
+                severity: 'error',
+                message: invalidStreamError,
+              });
+            } else if (config.getOutputFormat() === OutputFormat.TEXT) {
+              process.stderr.write(`[ERROR] ${invalidStreamError}\n`);
+            }
+            toolCallRequests.length = 0;
+            break;
           }
         }
 
@@ -508,14 +524,21 @@ export async function runNonInteractive(
             streamFormatter.emitEvent({
               type: JsonStreamEventType.RESULT,
               timestamp: new Date().toISOString(),
-              status: 'success',
+              status: invalidStreamError ? 'error' : 'success',
               stats: streamFormatter.convertToStreamStats(metrics, durationMs),
             });
           } else if (config.getOutputFormat() === OutputFormat.JSON) {
             const formatter = new JsonFormatter();
             const stats = uiTelemetryService.getMetrics();
             textOutput.write(
-              formatter.format(config.getSessionId(), responseText, stats),
+              formatter.format(
+                config.getSessionId(),
+                responseText,
+                stats,
+                invalidStreamError
+                  ? { type: 'INVALID_STREAM', message: invalidStreamError }
+                  : undefined,
+              ),
             );
           } else {
             textOutput.ensureTrailingNewline(); // Ensure a final newline
