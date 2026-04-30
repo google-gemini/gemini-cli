@@ -283,7 +283,7 @@ jobs:
               exit 1
             fi
 
-            git checkout -b "$BRANCH_NAME"
+            git checkout -B "$BRANCH_NAME"
             git apply "${{ runner.temp }}/brain-data/bot-changes.patch"
             git add .
 
