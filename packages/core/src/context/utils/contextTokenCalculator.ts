@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Part } from '@google/genai';
+import type { Part, Content } from '@google/genai';
 import {
   estimateTokenCountSync,
   MSG_OVERHEAD_TOKENS,
@@ -166,6 +166,15 @@ export class ContextTokenCalculator {
       }
     }
     return tokens;
+  }
+
+  /**
+   * Calculates the token cost for a single Gemini Content object.
+   */
+  calculateContentTokens(content: Content): number {
+    return (
+      this.estimateTokensForParts(content.parts || []) + MSG_OVERHEAD_TOKENS
+    );
   }
 
   /**

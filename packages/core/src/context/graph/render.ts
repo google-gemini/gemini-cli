@@ -22,6 +22,7 @@ export async function render(
   tracer: ContextTracer,
   env: ContextEnvironment,
   protectionReasons: Map<string, string> = new Map(),
+  headerTokens: number = 0,
 ): Promise<{ history: Content[]; didApplyManagement: boolean }> {
   if (!sidecar.config.budget) {
     const contents = env.graphMapper.fromGraph(nodes);
@@ -32,13 +33,16 @@ export async function render(
   }
 
   const maxTokens = sidecar.config.budget.maxTokens;
-  const currentTokens = env.tokenCalculator.calculateConcreteListTokens(nodes);
+  const graphTokens = env.tokenCalculator.calculateConcreteListTokens(nodes);
+  const currentTokens = graphTokens + headerTokens;
 
   const protectedIds = new Set(protectionReasons.keys());
 
   tracer.logEvent('Render', 'Budget Audit', {
     maxTokens,
     retainedTokens: sidecar.config.budget.retainedTokens,
+    graphTokens,
+    headerTokens,
     currentTokens,
     pressure: (currentTokens / maxTokens).toFixed(2),
     isOverBudget: currentTokens > maxTokens,

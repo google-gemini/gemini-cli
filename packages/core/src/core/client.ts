@@ -376,7 +376,9 @@ export class GeminiClient {
     const toolDeclarations = toolRegistry.getFunctionDeclarations();
     const tools: Tool[] = [{ functionDeclarations: toolDeclarations }];
 
-    const history = await getInitialChatHistory(this.config, extraHistory);
+    const history = this.config.getContextManagementConfig().enabled
+      ? (extraHistory ?? [])
+      : await getInitialChatHistory(this.config, extraHistory);
 
     try {
       const systemMemory = this.config.getSystemInstructionMemory();

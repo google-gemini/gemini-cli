@@ -42,6 +42,7 @@ export class ContextManager {
     private readonly tracer: ContextTracer,
     orchestrator: PipelineOrchestrator,
     chatHistory: AgentChatHistory,
+    private readonly headerProvider?: () => Promise<Content | undefined>,
   ) {
     this.eventBus = env.eventBus;
     this.orchestrator = orchestrator;
@@ -167,20 +168,6 @@ export class ContextManager {
     const protectionMap = new Map<string, string>();
     if (nodes.length === 0) return protectionMap;
 
-    // 1. Always protect the entire first logical episode (System Prompt)
-    const firstNode = nodes[0];
-    const firstLogicalId = firstNode.logicalParentId;
-    if (firstLogicalId) {
-      for (const node of nodes) {
-        if (node.logicalParentId === firstLogicalId) {
-          protectionMap.set(node.id, 'system_prompt');
-        }
-      }
-      protectionMap.set(firstLogicalId, 'system_prompt_episode');
-    } else {
-      protectionMap.set(firstNode.id, 'system_prompt_isolated');
-    }
-
     // 2. Identify all nodes belonging to the last logical turn/episode (Recent context)
     const lastNode = nodes[nodes.length - 1];
     const lastLogicalId = lastNode.logicalParentId;
@@ -275,10 +262,21 @@ export class ContextManager {
       nodes = [...nodes, ...previewNodes];
     }
 
-    // 2. Cache Check (Anomaly 3): If nodes haven't changed, return previous result.
-    // We use a simple join of IDs as a cheap "graph hash".
-    const nodesHash = nodes.map((n) => n.id).join('|');
-    if (this.lastRenderCache?.nodesHash === nodesHash) {
+    // 2. Fetch Header and calculate tokens
+    const header = this.headerProvider
+      ? await this.headerProvider()
+      : undefined;
+    const headerTokens = header
+      ? this.env.tokenCalculator.calculateContentTokens(header)
+      : 0;
+
+    // 3. Cache Check (Anomaly 3): If nodes haven't changed, return previous result.
+    // We combine the graph hash with a hash of the header to ensure total freshness.
+    const graphHash = nodes.map((n) => n.id).join('|');
+    const headerHash = header ? JSON.stringify(header.parts) : 'no-header';
+    const totalHash = `${graphHash}::${headerHash}`;
+
+    if (this.lastRenderCache?.nodesHash === totalHash) {
       debugLogger.log(
         '[ContextManager] Render cache hit. Skipping redundant render.',
       );
@@ -288,13 +286,14 @@ export class ContextManager {
     const protectionReasons = this.getProtectedNodeIds(nodes, activeTaskIds);
 
     // Apply final GC Backstop pressure barrier synchronously before mapping
-    const { history: finalHistory, didApplyManagement } = await render(
+    const { history: renderedHistory, didApplyManagement } = await render(
       nodes,
       this.orchestrator,
       this.sidecar,
       this.tracer,
       this.env,
       protectionReasons,
+      headerTokens,
     );
 
     // Structural validation in debug mode
@@ -302,15 +301,19 @@ export class ContextManager {
 
     this.tracer.logEvent('ContextManager', 'Finished rendering');
 
+    const combinedHistory = header
+      ? [header, ...renderedHistory]
+      : renderedHistory;
+
     const result = {
-      history: hardenHistory(finalHistory, {
+      history: hardenHistory(combinedHistory, {
         sentinels: this.sidecar.sentinels,
       }),
       didApplyManagement,
     };
 
     // Update cache
-    this.lastRenderCache = { nodesHash, result };
+    this.lastRenderCache = { nodesHash: totalHash, result };
 
     return result;
   }

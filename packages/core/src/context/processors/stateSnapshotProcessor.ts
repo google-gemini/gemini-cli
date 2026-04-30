@@ -133,12 +133,6 @@ export function createStateSnapshotProcessor(
 
       // Scan oldest to newest
       for (const node of targets) {
-        if (node.id === targets[0].id && node.type === 'USER_PROMPT') {
-          // Keep system prompt if it's the very first node
-          // In a real system, system prompt is protected, but we double check
-          continue;
-        }
-
         nodesToSummarize.push(node);
         deficitAccumulator += env.tokenCalculator.getTokenCost(node);
 
