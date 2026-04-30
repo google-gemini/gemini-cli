@@ -28,14 +28,15 @@ export class PrivateIpError extends Error {
   }
 }
 
-let defaultTimeout = 300000; // 5 minutes
+let defaultHeadersTimeout = 60000; // 60 seconds
+const defaultBodyTimeout = 300000; // 5 minutes
 let currentProxy: string | undefined = undefined;
 
 // Configure default global dispatcher with higher timeouts
 setGlobalDispatcher(
   new Agent({
-    headersTimeout: defaultTimeout,
-    bodyTimeout: defaultTimeout,
+    headersTimeout: defaultHeadersTimeout,
+    bodyTimeout: defaultBodyTimeout,
   }),
 );
 
@@ -45,14 +46,15 @@ export function updateGlobalFetchTimeouts(timeoutMs: number) {
       `Invalid timeout value: ${timeoutMs}. Must be a positive finite number.`,
     );
   }
-  defaultTimeout = timeoutMs;
+  defaultHeadersTimeout = timeoutMs;
+  // We keep body timeout high for LLM streaming responses
   if (currentProxy) {
     setGlobalProxy(currentProxy);
   } else {
     setGlobalDispatcher(
       new Agent({
-        headersTimeout: defaultTimeout,
-        bodyTimeout: defaultTimeout,
+        headersTimeout: defaultHeadersTimeout,
+        bodyTimeout: defaultBodyTimeout,
       }),
     );
   }
@@ -214,8 +216,8 @@ export function setGlobalProxy(proxy: string) {
   setGlobalDispatcher(
     new ProxyAgent({
       uri: proxy,
-      headersTimeout: defaultTimeout,
-      bodyTimeout: defaultTimeout,
+      headersTimeout: defaultHeadersTimeout,
+      bodyTimeout: defaultBodyTimeout,
     }),
   );
 }
