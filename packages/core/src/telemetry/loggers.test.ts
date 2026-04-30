@@ -642,6 +642,54 @@ describe('loggers', () => {
         }),
       });
     });
+    it('should not include response_text when logPrompts is disabled', () => {
+      const mockConfigNoPrompts = {
+        getSessionId: () => 'test-session-id',
+        getTargetDir: () => 'target-dir',
+        getUsageStatisticsEnabled: () => true,
+        getTelemetryEnabled: () => true,
+        getTelemetryLogPromptsEnabled: () => false,
+        getTelemetryTracesEnabled: () => false,
+        isInteractive: () => false,
+        getExperiments: () => undefined,
+        getExperimentsAsync: async () => undefined,
+        getContentGeneratorConfig: () => undefined,
+      } as unknown as Config;
+
+      const event = new ApiResponseEvent(
+        'test-model',
+        100,
+        { prompt_id: 'prompt-id-noprompts', contents: [] },
+        { candidates: [] },
+        AuthType.LOGIN_WITH_GOOGLE,
+        {},
+        'this response should be hidden',
+      );
+
+      logApiResponse(mockConfigNoPrompts, event);
+
+      const firstEmitCall = mockLogger.emit.mock.calls[0][0];
+      expect(firstEmitCall.attributes['response_text']).toBeUndefined();
+    });
+
+    it('should include response_text when logPrompts is enabled', () => {
+      const event = new ApiResponseEvent(
+        'test-model',
+        100,
+        { prompt_id: 'prompt-id-withprompts', contents: [] },
+        { candidates: [] },
+        AuthType.LOGIN_WITH_GOOGLE,
+        {},
+        'this response should be visible',
+      );
+
+      logApiResponse(mockConfig, event);
+
+      const firstEmitCall = mockLogger.emit.mock.calls[0][0];
+      expect(firstEmitCall.attributes['response_text']).toBe(
+        'this response should be visible',
+      );
+    });
   });
 
   describe('logApiError', () => {
@@ -1076,6 +1124,10 @@ describe('loggers', () => {
       expect(attributes['gen_ai.provider.name']).toBe('gcp.vertex_ai');
       // Ensure prompt messages are NOT included
       expect(attributes['gen_ai.input.messages']).toBeUndefined();
+
+      // Ensure request_text is also NOT included in the first (toLogRecord) log
+      const firstLogCall = mockLogger.emit.mock.calls[0][0];
+      expect(firstLogCall.attributes['request_text']).toBeUndefined();
     });
 
     it('should correctly derive model from prompt details if available in semantic log', () => {
@@ -1373,16 +1425,20 @@ describe('loggers', () => {
           error_type: undefined,
           mcp_server_name: undefined,
           extension_id: undefined,
-          metadata: {
-            model_added_lines: 1,
-            model_removed_lines: 2,
-            model_added_chars: 3,
-            model_removed_chars: 4,
-            user_added_lines: 5,
-            user_removed_lines: 6,
-            user_added_chars: 7,
-            user_removed_chars: 8,
-          },
+          metadata: JSON.stringify(
+            {
+              model_added_lines: 1,
+              model_removed_lines: 2,
+              model_added_chars: 3,
+              model_removed_chars: 4,
+              user_added_lines: 5,
+              user_removed_lines: 6,
+              user_added_chars: 7,
+              user_removed_chars: 8,
+            },
+            null,
+            2,
+          ),
           content_length: 13,
         },
       });
@@ -1455,12 +1511,16 @@ describe('loggers', () => {
         body: 'Tool call: ask_user. Decision: accept. Success: true. Duration: 100ms.',
         attributes: expect.objectContaining({
           function_name: 'ask_user',
-          metadata: expect.objectContaining({
-            ask_user: {
-              question_types: ['choice'],
-              dismissed: false,
+          metadata: JSON.stringify(
+            {
+              ask_user: {
+                question_types: ['choice'],
+                dismissed: false,
+              },
             },
-          }),
+            null,
+            2,
+          ),
         }),
       });
     });
@@ -1864,6 +1924,99 @@ describe('loggers', () => {
           content_length: undefined,
         },
       });
+    });
+  });
+
+  describe('logToolCall — logPrompts flag', () => {
+    it('should omit function_args when logPrompts is disabled', () => {
+      const mockConfigNoPrompts = {
+        getSessionId: () => 'test-session-id',
+        getTargetDir: () => 'target-dir',
+        getUsageStatisticsEnabled: () => true,
+        getTelemetryEnabled: () => true,
+        getTelemetryLogPromptsEnabled: () => false,
+        getTelemetryTracesEnabled: () => false,
+        isInteractive: () => false,
+        getExperiments: () => undefined,
+        getExperimentsAsync: async () => undefined,
+        getContentGeneratorConfig: () => undefined,
+      } as unknown as Config;
+
+      const call: CompletedToolCall = {
+        status: CoreToolCallStatus.Success,
+        request: {
+          name: 'run_bash',
+          args: { command: 'echo sensitive' },
+          callId: 'call-1',
+          isClientInitiated: false,
+          prompt_id: 'prompt-noprompts',
+        },
+        response: {
+          callId: 'call-1',
+          responseParts: [],
+          resultDisplay: undefined,
+          error: undefined,
+          errorType: undefined,
+          contentLength: undefined,
+        },
+        tool: undefined as unknown as AnyDeclarativeTool,
+        invocation: {} as AnyToolInvocation,
+        durationMs: 50,
+      };
+      const event = new ToolCallEvent(call);
+      logToolCall(mockConfigNoPrompts, event);
+
+      const emitted = mockLogger.emit.mock.calls[0][0] as {
+        attributes: Record<string, unknown>;
+      };
+      expect(emitted.attributes['function_args']).toBeUndefined();
+      expect(emitted.attributes['function_name']).toBe('run_bash');
+    });
+
+    it('should include function_args when logPrompts is enabled', () => {
+      const mockConfigWithPrompts = {
+        getSessionId: () => 'test-session-id',
+        getTargetDir: () => 'target-dir',
+        getUsageStatisticsEnabled: () => true,
+        getTelemetryEnabled: () => true,
+        getTelemetryLogPromptsEnabled: () => true,
+        getTelemetryTracesEnabled: () => false,
+        isInteractive: () => false,
+        getExperiments: () => undefined,
+        getExperimentsAsync: async () => undefined,
+        getContentGeneratorConfig: () => undefined,
+      } as unknown as Config;
+
+      const call: CompletedToolCall = {
+        status: CoreToolCallStatus.Success,
+        request: {
+          name: 'run_bash',
+          args: { command: 'echo visible' },
+          callId: 'call-2',
+          isClientInitiated: false,
+          prompt_id: 'prompt-withprompts',
+        },
+        response: {
+          callId: 'call-2',
+          responseParts: [],
+          resultDisplay: undefined,
+          error: undefined,
+          errorType: undefined,
+          contentLength: undefined,
+        },
+        tool: undefined as unknown as AnyDeclarativeTool,
+        invocation: {} as AnyToolInvocation,
+        durationMs: 50,
+      };
+      const event = new ToolCallEvent(call);
+      logToolCall(mockConfigWithPrompts, event);
+
+      const emitted = mockLogger.emit.mock.calls[0][0] as {
+        attributes: Record<string, unknown>;
+      };
+      expect(emitted.attributes['function_args']).toBe(
+        JSON.stringify({ command: 'echo visible' }, null, 2),
+      );
     });
   });
 
