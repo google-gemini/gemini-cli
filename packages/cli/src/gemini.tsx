@@ -838,7 +838,7 @@ export function initializeOutputListenersAndFlush(config?: Config) {
   }
 
   const outputFormat = config?.getOutputFormat();
-  const forceToStderr = outputFormat === 'json';
+  const forceToStderr = outputFormat === 'json' || config === undefined;
 
   coreEvents.drainBacklogs(
     <K extends keyof CoreEvents>(event: K, args: CoreEvents[K]) => {
