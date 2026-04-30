@@ -47,6 +47,7 @@ import {
 const { Terminal } = pkg;
 
 const MAX_CHILD_PROCESS_BUFFER_SIZE = 16 * 1024 * 1024; // 16MB
+export const DEFAULT_FOREGROUND_OUTPUT_LIMIT_BYTES = 10 * 1024 * 1024; // 10MB
 
 /**
  * An environment variable that is set for shell executions. This can be used
@@ -101,6 +102,7 @@ export interface ShellExecutionConfig {
   disableDynamicLineTrimming?: boolean;
   scrollback?: number;
   maxSerializedLines?: number;
+  maxOutputBytes?: number;
   sandboxConfig?: SandboxConfig;
   backgroundCompletionBehavior?: 'inject' | 'notify' | 'silent';
   originalCommand?: string;
@@ -384,6 +386,14 @@ export class ShellExecutionService {
     return { newBuffer: truncatedBuffer + chunk, truncated: true };
   }
 
+  private static getOutputLimitExceededMessage(maxOutputBytes: number): string {
+    const limit =
+      maxOutputBytes >= 1024 * 1024
+        ? `${(maxOutputBytes / (1024 * 1024)).toFixed(1)}MB`
+        : `${maxOutputBytes} bytes`;
+    return `[GEMINI_CLI_WARNING: Command output exceeded the ${limit} limit for foreground shell commands and was stopped. Long-running or streaming commands should be run in the background, then inspected with read_background_output.]`;
+  }
+
   private static async prepareExecution(
     commandToExecute: string,
     cwd: string,
@@ -618,8 +628,36 @@ export class ShellExecutionService {
       let isStreamingRawContent = true;
       const MAX_SNIFF_SIZE = 4096;
       let sniffedBytes = 0;
+      let streamedBytes = 0;
+      let outputLimitExceeded = false;
+
+      const maxOutputBytes = shellExecutionConfig.maxOutputBytes;
+      const maybeStopForOutputLimit = (bytesReceived: number) => {
+        if (!maxOutputBytes || outputLimitExceeded || exited) {
+          return;
+        }
+        streamedBytes += bytesReceived;
+        if (streamedBytes <= maxOutputBytes) {
+          return;
+        }
+
+        outputLimitExceeded = true;
+        if (child.pid) {
+          killProcessGroup({
+            pid: child.pid,
+            escalate: true,
+            isExited: () => exited,
+          }).catch((err) => {
+            debugLogger.warn(
+              'Failed to stop shell command after output limit:',
+              err,
+            );
+          });
+        }
+      };
 
       const handleOutput = (data: Buffer, stream: 'stdout' | 'stderr') => {
+        maybeStopForOutputLimit(data.length);
         if (!stdoutDecoder || !stderrDecoder) {
           const encoding = getCachedEncodingForBuffer(data);
           try {
@@ -703,6 +741,11 @@ export class ShellExecutionService {
         cmdCleanup?.();
 
         let combinedOutput = state.output;
+        if (outputLimitExceeded && maxOutputBytes) {
+          combinedOutput += `\n${ShellExecutionService.getOutputLimitExceededMessage(
+            maxOutputBytes,
+          )}`;
+        }
         if (state.truncated) {
           const truncationMessage = `\n[GEMINI_CLI_WARNING: Output truncated. The buffer is limited to ${
             MAX_CHILD_PROCESS_BUFFER_SIZE / (1024 * 1024)
@@ -724,6 +767,7 @@ export class ShellExecutionService {
           signal: exitSignal,
           error,
           aborted: abortSignal.aborted,
+          outputLimitExceeded,
           pid: child.pid,
           executionMethod: 'child_process',
         };
@@ -1000,9 +1044,33 @@ export class ShellExecutionService {
       let isStreamingRawContent = true;
       const MAX_SNIFF_SIZE = 4096;
       let sniffedBytes = 0;
+      let streamedBytes = 0;
+      let outputLimitExceeded = false;
       let isWriting = false;
       let hasStartedOutput = false;
       let renderTimeout: NodeJS.Timeout | null = null;
+      const maxOutputBytes = shellExecutionConfig.maxOutputBytes;
+
+      const maybeStopForOutputLimit = (bytesReceived: number) => {
+        if (!maxOutputBytes || outputLimitExceeded || exited) {
+          return;
+        }
+        streamedBytes += bytesReceived;
+        if (streamedBytes <= maxOutputBytes) {
+          return;
+        }
+
+        outputLimitExceeded = true;
+        killProcessGroup({
+          pid: ptyPid,
+          escalate: true,
+          isExited: () => exited,
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          pty: ptyProcess,
+        }).catch((err) => {
+          debugLogger.warn('Failed to stop PTY after output limit:', err);
+        });
+      };
 
       const renderFn = () => {
         renderTimeout = null;
@@ -1112,6 +1180,7 @@ export class ShellExecutionService {
       });
 
       const handleOutput = (data: Buffer) => {
+        maybeStopForOutputLimit(data.length);
         processingChain = processingChain.then(
           () =>
             new Promise<void>((resolveChunk) => {
@@ -1222,6 +1291,11 @@ export class ShellExecutionService {
               endLine,
             );
             const finalOutput = getFullBufferText(headlessTerminal);
+            const output = outputLimitExceeded
+              ? `${finalOutput}\n${ShellExecutionService.getOutputLimitExceededMessage(
+                  maxOutputBytes!,
+                )}`
+              : finalOutput;
 
             // Dispose the headless terminal to free scrollback buffers.
             // This must happen after getFullBufferText() extracts the output.
@@ -1238,12 +1312,13 @@ export class ShellExecutionService {
 
             ExecutionLifecycleService.completeWithResult(ptyPid, {
               rawOutput: Buffer.from(''),
-              output: finalOutput,
+              output,
               ansiOutput: ansiOutputSnapshot,
               exitCode,
               signal: signal ?? null,
               error,
               aborted: abortSignal.aborted,
+              outputLimitExceeded,
               pid: ptyPid,
               executionMethod: ptyInfo?.name ?? 'node-pty',
             });

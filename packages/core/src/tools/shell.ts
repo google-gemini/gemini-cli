@@ -29,6 +29,7 @@ import {
 import { getErrorMessage } from '../utils/errors.js';
 import { summarizeToolOutput } from '../utils/summarizer.js';
 import {
+  DEFAULT_FOREGROUND_OUTPUT_LIMIT_BYTES,
   ShellExecutionService,
   type ShellOutputEvent,
 } from '../services/shellExecutionService.js';
@@ -600,6 +601,10 @@ export class ShellToolInvocation extends BaseToolInvocation<
             backgroundCompletionBehavior:
               this.context.config.getShellBackgroundCompletionBehavior(),
             originalCommand: strippedCommand,
+            maxOutputBytes: this.params.is_background
+              ? undefined
+              : (shellExecutionConfig?.maxOutputBytes ??
+                DEFAULT_FOREGROUND_OUTPUT_LIMIT_BYTES),
           },
         );
 
@@ -683,7 +688,17 @@ export class ShellToolInvocation extends BaseToolInvocation<
 
       let llmContent = '';
       let timeoutMessage = '';
-      if (result.aborted) {
+      if (result.outputLimitExceeded) {
+        timeoutMessage =
+          'Command was automatically stopped because it produced too much output. ' +
+          'For long-running or streaming commands, run the command with is_background=true and inspect it with read_background_output.';
+        llmContent = timeoutMessage;
+        if (result.output.trim()) {
+          llmContent += ` Below is the output before it was stopped:\n${result.output}`;
+        } else {
+          llmContent += ' There was no output before it was stopped.';
+        }
+      } else if (result.aborted) {
         if (timeoutController.signal.aborted) {
           timeoutMessage = `Command was automatically cancelled because it exceeded the timeout of ${(
             timeoutMs / 60000
@@ -745,6 +760,12 @@ export class ShellToolInvocation extends BaseToolInvocation<
       } else {
         if (this.params.is_background || result.backgrounded) {
           returnDisplay = `Command moved to background (PID: ${result.pid}). Output hidden. Press Ctrl+B to view.`;
+        } else if (result.outputLimitExceeded) {
+          if (result.output.trim()) {
+            returnDisplay = `${timeoutMessage}\n\nOutput before stopping:\n${result.output}`;
+          } else {
+            returnDisplay = timeoutMessage;
+          }
         } else if (result.aborted) {
           const cancelMsg = timeoutMessage || 'Command cancelled by user.';
           if (result.output.trim()) {

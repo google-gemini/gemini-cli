@@ -29,6 +29,12 @@ The tool returns a JSON object containing:
 - `Exit Code`: The process return code.
 - `Background PIDs`: PIDs of any started background processes.
 
+Foreground commands that produce more than 10 MiB of output are stopped
+automatically to avoid unbounded context growth. Run long-lived streams such as
+`docker compose logs -f`, `tail -f`, and development servers with
+`is_background: true`, then inspect bounded snapshots with
+`read_background_output`.
+
 ## Configuration
 
 You can configure the behavior of the `run_shell_command` tool by modifying your

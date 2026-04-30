@@ -22,6 +22,7 @@ const mockShellExecutionService = vi.hoisted(() => vi.fn());
 const mockShellBackground = vi.hoisted(() => vi.fn());
 
 vi.mock('../services/shellExecutionService.js', () => ({
+  DEFAULT_FOREGROUND_OUTPUT_LIMIT_BYTES: 10 * 1024 * 1024,
   ShellExecutionService: {
     execute: mockShellExecutionService,
     background: mockShellBackground,
@@ -1002,6 +1003,23 @@ EOF`;
       const result = await promise;
       // Should only contain Output field
       expect(result.llmContent).toBe('Output: hello');
+    });
+
+    it('should explain when a foreground command is stopped for too much output', async () => {
+      const invocation = shellTool.build({ command: 'docker compose logs -f' });
+      const promise = invocation.execute({ abortSignal: mockAbortSignal });
+      resolveShellExecution({
+        output: 'log line',
+        outputLimitExceeded: true,
+        exitCode: null,
+        signal: 15,
+      });
+
+      const result = await promise;
+      expect(result.llmContent).toContain('produced too much output');
+      expect(result.llmContent).toContain('is_background=true');
+      expect(result.llmContent).toContain('read_background_output');
+      expect(result.returnDisplay).toContain('Output before stopping');
     });
   });
 
