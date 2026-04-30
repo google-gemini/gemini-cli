@@ -20,9 +20,8 @@ import { ExtensionManager } from '../../config/extension-manager.js';
 import { loadSettings, type LoadedSettings } from '../../config/settings.js';
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
-  const { mockCoreDebugLogger } = await import(
-    '../../test-utils/mockDebugLogger.js'
-  );
+  const { mockCoreDebugLogger } =
+    await import('../../test-utils/mockDebugLogger.js');
   const actual =
     await importOriginal<typeof import('@google/gemini-cli-core')>();
   const mocked = mockCoreDebugLogger(actual, { stripAnsi: true });
