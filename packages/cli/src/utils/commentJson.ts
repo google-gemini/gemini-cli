@@ -7,6 +7,7 @@
 import * as fs from 'node:fs';
 import { parse, stringify } from 'comment-json';
 import { coreEvents } from '@google/gemini-cli-core';
+import stripJsonComments from 'strip-json-comments';
 
 /**
  * Type representing an object that may contain Symbol keys for comments.
@@ -21,16 +22,23 @@ export function updateSettingsFilePreservingFormat(
   updates: Record<string, unknown>,
 ): void {
   if (!fs.existsSync(filePath)) {
-    fs.writeFileSync(filePath, JSON.stringify(updates, null, 2), 'utf-8');
+    fs.writeFileSync(filePath, JSON.stringify(updates, null, 2) + '\n', 'utf-8');
     return;
   }
 
   const originalContent = fs.readFileSync(filePath, 'utf-8');
+  const hasTrailingNewline = originalContent.endsWith('\n');
 
   let parsed: Record<string, unknown>;
+  let cleanParsed: Record<string, unknown>;
   try {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     parsed = parse(originalContent) as Record<string, unknown>;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    cleanParsed = JSON.parse(stripJsonComments(originalContent)) as Record<
+      string,
+      unknown
+    >;
   } catch (error) {
     coreEvents.emitFeedback(
       'error',
@@ -40,10 +48,57 @@ export function updateSettingsFilePreservingFormat(
     return;
   }
 
+  // First, check if logical content would change using the clean parse
+  const updatedClean = applyUpdates(structuredClone(cleanParsed), updates);
+  if (deepEqual(cleanParsed, updatedClean)) {
+    return;
+  }
+
+  // If content changed, apply to the version with comments and write
   const updatedStructure = applyUpdates(parsed, updates);
   const updatedContent = stringify(updatedStructure, null, 2);
+  const finalContent = hasTrailingNewline
+    ? updatedContent + '\n'
+    : updatedContent;
 
-  fs.writeFileSync(filePath, updatedContent, 'utf-8');
+  fs.writeFileSync(filePath, finalContent, 'utf-8');
+}
+
+/**
+ * Performs a deep equality check on two objects, ignoring Symbol keys.
+ * This is used to compare comment-json parsed objects without their comment metadata.
+ */
+function deepEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+
+  if (a && b && typeof a === 'object' && typeof b === 'object') {
+    if (Array.isArray(a) !== Array.isArray(b)) return false;
+
+    if (Array.isArray(a) && Array.isArray(b)) {
+      if (a.length !== b.length) return false;
+      for (let i = 0; i < a.length; i++) {
+        if (!deepEqual(a[i], b[i])) return false;
+      }
+      return true;
+    }
+
+    const keysA = Object.getOwnPropertyNames(a);
+    const keysB = Object.getOwnPropertyNames(b);
+
+    if (keysA.length !== keysB.length) return false;
+
+    for (const key of keysA) {
+      if (!Object.prototype.hasOwnProperty.call(b, key)) return false;
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      if (!deepEqual((a as Record<string, unknown>)[key], (b as Record<string, unknown>)[key])) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  return false;
 }
 
 /**

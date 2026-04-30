@@ -366,5 +366,71 @@ describe('commentJson', () => {
 
       expect(updatedContent).toContain('// This should be preserved');
     });
+
+    it('should skip write if logical content has not changed', async () => {
+      const originalContent = `{
+        "context": {
+          "fileName": ["AGENTS.md", "GEMINI.md"]
+        }
+      }\n`;
+
+      fs.writeFileSync(testFilePath, originalContent, 'utf-8');
+      const originalMtime = fs.statSync(testFilePath).mtimeMs;
+
+      // Wait a bit to ensure mtime would change if a write happened
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      updateSettingsFilePreservingFormat(testFilePath, {
+        context: {
+          fileName: ['AGENTS.md', 'GEMINI.md'],
+        },
+      });
+
+      const newMtime = fs.statSync(testFilePath).mtimeMs;
+      expect(newMtime).toBe(originalMtime);
+
+      const updatedContent = fs.readFileSync(testFilePath, 'utf-8');
+      expect(updatedContent).toBe(originalContent);
+    });
+
+    it('should preserve trailing newline on legitimate update', () => {
+      const originalContent = `{
+        "model": "gemini-2.5-pro"
+      }\n`;
+
+      fs.writeFileSync(testFilePath, originalContent, 'utf-8');
+
+      updateSettingsFilePreservingFormat(testFilePath, {
+        model: 'gemini-2.5-flash',
+      });
+
+      const updatedContent = fs.readFileSync(testFilePath, 'utf-8');
+      expect(updatedContent).toMatch(/\n$/);
+      expect(updatedContent).toContain('"model": "gemini-2.5-flash"');
+    });
+
+    it('should add trailing newline to new files', () => {
+      updateSettingsFilePreservingFormat(testFilePath, {
+        model: 'gemini-2.5-pro',
+      });
+
+      const content = fs.readFileSync(testFilePath, 'utf-8');
+      expect(content).toMatch(/\n$/);
+    });
+
+    it('should NOT add trailing newline if original file did not have one', () => {
+      const originalContent = `{
+        "model": "gemini-2.5-pro"
+      }`;
+
+      fs.writeFileSync(testFilePath, originalContent, 'utf-8');
+
+      updateSettingsFilePreservingFormat(testFilePath, {
+        model: 'gemini-2.5-flash',
+      });
+
+      const updatedContent = fs.readFileSync(testFilePath, 'utf-8');
+      expect(updatedContent).not.toMatch(/\n$/);
+    });
   });
 });
