@@ -95,8 +95,8 @@ Test System Prompt`;
     });
 
     // Trigger the refresh action that follows reloading
-    // @ts-expect-error accessing private method for testing
-    await config.onAgentsRefreshed();
+
+    await config.getAgentRegistry().reload();
 
     // 4. Verify the agent is UNREGISTERED
     const finalAgents = agentRegistry.getAllDefinitions().map((d) => d.name);
@@ -237,8 +237,8 @@ Test System Prompt`;
     });
 
     // Trigger the refresh action that follows reloading
-    // @ts-expect-error accessing private method for testing
-    await config.onAgentsRefreshed();
+
+    await config.getAgentRegistry().reload();
 
     expect(agentRegistry.getAllDefinitions().map((d) => d.name)).toContain(
       agentName,

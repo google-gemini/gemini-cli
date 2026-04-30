@@ -20,12 +20,12 @@ import {
   ShellExecutionService,
   ExecutionLifecycleService,
   CoreToolCallStatus,
+  escapeShellArg,
 } from '@google/gemini-cli-core';
 import { type PartListUnion } from '@google/genai';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { SHELL_COMMAND_NAME } from '../constants.js';
 import { formatBytes } from '../utils/formatters.js';
-import crypto from 'node:crypto';
 import path from 'node:path';
 import os from 'node:os';
 import fs from 'node:fs';
@@ -362,18 +362,6 @@ export const useExecutionLifecycle = (
       let commandToExecute = rawQuery;
       let pwdFilePath: string | undefined;
 
-      // On non-windows, wrap the command to capture the final working directory.
-      if (!isWindows) {
-        let command = rawQuery.trim();
-        const pwdFileName = `shell_pwd_${crypto.randomBytes(6).toString('hex')}.tmp`;
-        pwdFilePath = path.join(os.tmpdir(), pwdFileName);
-        // Ensure command ends with a separator before adding our own.
-        if (!command.endsWith(';') && !command.endsWith('&')) {
-          command += ';';
-        }
-        commandToExecute = `{ ${command} }; __code=$?; pwd > "${pwdFilePath}"; exit $__code`;
-      }
-
       const executeCommand = async () => {
         let cumulativeStdout: string | AnsiOutput = '';
         let isBinaryStream = false;
@@ -403,9 +391,23 @@ export const useExecutionLifecycle = (
         };
         abortSignal.addEventListener('abort', abortHandler, { once: true });
 
-        onDebugMessage(`Executing in ${targetDir}: ${commandToExecute}`);
-
         try {
+          // On non-windows, wrap the command to capture the final working directory.
+          if (!isWindows) {
+            let command = rawQuery.trim();
+            if (command.endsWith('\\')) {
+              command += ' ';
+            }
+            const tmpDir = fs.mkdtempSync(
+              path.join(os.tmpdir(), 'gemini-shell-'),
+            );
+            pwdFilePath = path.join(tmpDir, 'pwd.tmp');
+            const escapedPwdFilePath = escapeShellArg(pwdFilePath, 'bash');
+            commandToExecute = `{\n${command}\n}\n__code=$?; pwd > ${escapedPwdFilePath}; exit $__code`;
+          }
+
+          onDebugMessage(`Executing in ${targetDir}: ${commandToExecute}`);
+
           const activeTheme = themeManager.getActiveTheme();
           const shellExecutionConfig = {
             ...config.getShellExecutionConfig(),
@@ -630,8 +632,18 @@ export const useExecutionLifecycle = (
           );
         } finally {
           abortSignal.removeEventListener('abort', abortHandler);
-          if (pwdFilePath && fs.existsSync(pwdFilePath)) {
-            fs.unlinkSync(pwdFilePath);
+          if (pwdFilePath) {
+            const tmpDir = path.dirname(pwdFilePath);
+            try {
+              if (fs.existsSync(pwdFilePath)) {
+                fs.unlinkSync(pwdFilePath);
+              }
+              if (fs.existsSync(tmpDir)) {
+                fs.rmSync(tmpDir, { recursive: true, force: true });
+              }
+            } catch {
+              // Ignore cleanup errors
+            }
           }
 
           dispatch({ type: 'SET_ACTIVE_PTY', pid: null });
