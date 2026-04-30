@@ -23,6 +23,7 @@ import {
   type LoadedSettings,
 } from '../../config/settings.js';
 import { getErrorMessage } from '@google/gemini-cli-core';
+import { exitCli } from '../utils.js';
 
 // Mock dependencies
 const emitConsoleLog = vi.hoisted(() => vi.fn());
@@ -64,6 +65,7 @@ describe('extensions disable command', () => {
   const mockLoadSettings = vi.mocked(loadSettings);
   const mockGetErrorMessage = vi.mocked(getErrorMessage);
   const mockExtensionManager = vi.mocked(ExtensionManager);
+  const mockExitCli = vi.mocked(exitCli);
 
   beforeEach(async () => {
     vi.clearAllMocks();
@@ -76,6 +78,7 @@ describe('extensions disable command', () => {
     mockExtensionManager.prototype.disableExtension = vi
       .fn()
       .mockResolvedValue(undefined);
+    mockExtensionManager.prototype.getExtensions = vi.fn().mockReturnValue([]);
   });
 
   afterEach(() => {
@@ -85,21 +88,18 @@ describe('extensions disable command', () => {
   describe('handleDisable', () => {
     it.each([
       {
-        name: 'my-extension',
         scope: undefined,
         expectedScope: SettingScope.User,
         expectedLog:
           'Extension "my-extension" successfully disabled for scope "undefined".',
       },
       {
-        name: 'my-extension',
         scope: 'user',
         expectedScope: SettingScope.User,
         expectedLog:
           'Extension "my-extension" successfully disabled for scope "user".',
       },
       {
-        name: 'my-extension',
         scope: 'workspace',
         expectedScope: SettingScope.Workspace,
         expectedLog:
@@ -107,9 +107,9 @@ describe('extensions disable command', () => {
       },
     ])(
       'should disable an extension in the $expectedScope scope when scope is $scope',
-      async ({ name, scope, expectedScope, expectedLog }) => {
+      async ({ scope, expectedScope, expectedLog }) => {
         const mockCwd = vi.spyOn(process, 'cwd').mockReturnValue('/test/dir');
-        await handleDisable({ name, scope });
+        await handleDisable({ names: ['my-extension'], scope });
         expect(mockExtensionManager).toHaveBeenCalledWith(
           expect.objectContaining({
             workspaceDir: '/test/dir',
@@ -120,30 +120,86 @@ describe('extensions disable command', () => {
         ).toHaveBeenCalled();
         expect(
           mockExtensionManager.prototype.disableExtension,
-        ).toHaveBeenCalledWith(name, expectedScope);
+        ).toHaveBeenCalledWith('my-extension', expectedScope);
         expect(emitConsoleLog).toHaveBeenCalledWith('log', expectedLog);
         mockCwd.mockRestore();
       },
     );
 
-    it('should log an error message and exit with code 1 when extension disabling fails', async () => {
-      const mockProcessExit = vi
-        .spyOn(process, 'exit')
-        .mockImplementation((() => {}) as (
-          code?: string | number | null | undefined,
-        ) => never);
+    it('should disable multiple extensions when given a list of names', async () => {
+      const mockCwd = vi.spyOn(process, 'cwd').mockReturnValue('/test/dir');
+      await handleDisable({ names: ['ext-a', 'ext-b'] });
+
+      expect(
+        mockExtensionManager.prototype.disableExtension,
+      ).toHaveBeenCalledWith('ext-a', SettingScope.User);
+      expect(
+        mockExtensionManager.prototype.disableExtension,
+      ).toHaveBeenCalledWith('ext-b', SettingScope.User);
+      mockCwd.mockRestore();
+    });
+
+    it('should dedupe duplicate names', async () => {
+      const mockCwd = vi.spyOn(process, 'cwd').mockReturnValue('/test/dir');
+      await handleDisable({ names: ['ext-a', 'ext-a'] });
+
+      expect(
+        mockExtensionManager.prototype.disableExtension,
+      ).toHaveBeenCalledTimes(1);
+      mockCwd.mockRestore();
+    });
+
+    it('should disable every installed extension when --all is set', async () => {
+      const mockCwd = vi.spyOn(process, 'cwd').mockReturnValue('/test/dir');
+      mockExtensionManager.prototype.getExtensions = vi
+        .fn()
+        .mockReturnValue([{ name: 'ext-a' }, { name: 'ext-b' }]);
+
+      await handleDisable({ all: true });
+
+      expect(
+        mockExtensionManager.prototype.disableExtension,
+      ).toHaveBeenCalledWith('ext-a', SettingScope.User);
+      expect(
+        mockExtensionManager.prototype.disableExtension,
+      ).toHaveBeenCalledWith('ext-b', SettingScope.User);
+      mockCwd.mockRestore();
+    });
+
+    it('should log a message and return when --all is set with no installed extensions', async () => {
+      const mockCwd = vi.spyOn(process, 'cwd').mockReturnValue('/test/dir');
+      mockExtensionManager.prototype.getExtensions = vi
+        .fn()
+        .mockReturnValue([]);
+
+      await handleDisable({ all: true });
+
+      expect(emitConsoleLog).toHaveBeenCalledWith(
+        'log',
+        'No extensions currently installed.',
+      );
+      expect(
+        mockExtensionManager.prototype.disableExtension,
+      ).not.toHaveBeenCalled();
+      mockCwd.mockRestore();
+    });
+
+    it('should log each error and call exitCli(1) when disabling fails', async () => {
+      const mockCwd = vi.spyOn(process, 'cwd').mockReturnValue('/test/dir');
       const error = new Error('Disable failed');
       (
         mockExtensionManager.prototype.disableExtension as Mock
       ).mockRejectedValue(error);
       mockGetErrorMessage.mockReturnValue('Disable failed message');
-      await handleDisable({ name: 'my-extension' });
+
+      await handleDisable({ names: ['my-extension'] });
+
       expect(emitConsoleLog).toHaveBeenCalledWith(
         'error',
-        'Disable failed message',
+        'Failed to disable "my-extension": Disable failed message',
       );
-      expect(mockProcessExit).toHaveBeenCalledWith(1);
-      mockProcessExit.mockRestore();
+      expect(mockExitCli).toHaveBeenCalledWith(1);
+      mockCwd.mockRestore();
     });
   });
 
@@ -151,8 +207,8 @@ describe('extensions disable command', () => {
     const command = disableCommand;
 
     it('should have correct command and describe', () => {
-      expect(command.command).toBe('disable [--scope] <name>');
-      expect(command.describe).toBe('Disables an extension.');
+      expect(command.command).toBe('disable [names..]');
+      expect(command.describe).toBe('Disables one or more extensions.');
     });
 
     describe('builder', () => {
@@ -176,16 +232,33 @@ describe('extensions disable command', () => {
         (command.builder as (yargs: Argv) => Argv)(
           yargsMock as unknown as Argv,
         );
-        expect(yargsMock.positional).toHaveBeenCalledWith('name', {
-          describe: 'The name of the extension to disable.',
-          type: 'string',
-        });
+        expect(yargsMock.positional).toHaveBeenCalledWith(
+          'names',
+          expect.objectContaining({
+            type: 'string',
+            array: true,
+          }),
+        );
+        expect(yargsMock.option).toHaveBeenCalledWith(
+          'all',
+          expect.objectContaining({ type: 'boolean' }),
+        );
         expect(yargsMock.option).toHaveBeenCalledWith('scope', {
           describe: 'The scope to disable the extension in.',
           type: 'string',
           default: SettingScope.User,
         });
         expect(yargsMock.check).toHaveBeenCalled();
+      });
+
+      it('check function should throw when neither names nor --all is provided', () => {
+        (command.builder as (yargs: Argv) => Argv)(
+          yargsMock as unknown as Argv,
+        );
+        const checkCallback = yargsMock.check.mock.calls[0][0];
+        expect(() => checkCallback({})).toThrow(
+          /at least one extension name to disable/,
+        );
       });
 
       it('check function should throw for invalid scope', () => {
@@ -198,7 +271,7 @@ describe('extensions disable command', () => {
         )
           .map((s) => s.toLowerCase())
           .join(', ')}.`;
-        expect(() => checkCallback({ scope: 'invalid' })).toThrow(
+        expect(() => checkCallback({ all: true, scope: 'invalid' })).toThrow(
           expectedError,
         );
       });
@@ -210,7 +283,7 @@ describe('extensions disable command', () => {
             yargsMock as unknown as Argv,
           );
           const checkCallback = yargsMock.check.mock.calls[0][0];
-          expect(checkCallback({ scope })).toBe(true);
+          expect(checkCallback({ all: true, scope })).toBe(true);
         },
       );
     });
@@ -218,12 +291,14 @@ describe('extensions disable command', () => {
     it('handler should trigger extension disabling', async () => {
       const mockCwd = vi.spyOn(process, 'cwd').mockReturnValue('/test/dir');
       interface TestArgv {
-        name: string;
+        names: string[];
+        all: boolean;
         scope: string;
         [key: string]: unknown;
       }
       const argv: TestArgv = {
-        name: 'test-ext',
+        names: ['test-ext'],
+        all: false,
         scope: 'workspace',
         _: [],
         $0: '',
@@ -244,6 +319,37 @@ describe('extensions disable command', () => {
         'log',
         'Extension "test-ext" successfully disabled for scope "workspace".',
       );
+      mockCwd.mockRestore();
+    });
+
+    it('handler should normalize a scalar string positional to a single-element array', async () => {
+      // Regression: yargs may pass `names` as a bare string when only one
+      // positional is provided. The handler must wrap it in an array, not let
+      // it be iterated character-by-character.
+      const mockCwd = vi.spyOn(process, 'cwd').mockReturnValue('/test/dir');
+      interface TestArgv {
+        names: string;
+        all: boolean;
+        scope: string;
+        [key: string]: unknown;
+      }
+      const argv: TestArgv = {
+        names: 'conductor',
+        all: false,
+        scope: 'user',
+        _: [],
+        $0: '',
+      };
+      await (command.handler as unknown as (args: TestArgv) => Promise<void>)(
+        argv,
+      );
+
+      expect(
+        mockExtensionManager.prototype.disableExtension,
+      ).toHaveBeenCalledTimes(1);
+      expect(
+        mockExtensionManager.prototype.disableExtension,
+      ).toHaveBeenCalledWith('conductor', SettingScope.User);
       mockCwd.mockRestore();
     });
   });
