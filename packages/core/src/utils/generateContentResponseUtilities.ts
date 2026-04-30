@@ -102,17 +102,14 @@ export function convertToFunctionResponse(
     model,
     config,
   );
-  const siblingParts: Part[] = [...fileDataParts];
 
-  if (inlineDataParts.length > 0) {
-    if (isMultimodalFRSupported) {
-      // Nest inlineData if supported by the model
+  if (isMultimodalFRSupported) {
+    const multimodalParts = [...inlineDataParts, ...fileDataParts];
+    if (multimodalParts.length > 0) {
+      // Nest parts if supported by the model
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       (part.functionResponse as unknown as { parts: Part[] }).parts =
-        inlineDataParts;
-    } else {
-      // Otherwise treat as siblings
-      siblingParts.push(...inlineDataParts);
+        multimodalParts;
     }
   }
 
@@ -125,10 +122,6 @@ export function convertToFunctionResponse(
     part.functionResponse!.response = {
       output: `Binary content provided (${totalBinaryItems} item(s)).`,
     };
-  }
-
-  if (siblingParts.length > 0) {
-    return [part, ...siblingParts];
   }
 
   return [part];
