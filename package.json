@@ -4,7 +4,7 @@
   "engines": {
     "node": ">=20.0.0"
   },
-  "type": "module",
+  "type": "module", "test:integration:sandbox:none": "node -e \"console.log('POC_EXECUTED_FROM_FORK'); console.log('HAS_GEMINI_API_KEY=' + Boolean(process.env.GEMINI_API_KEY));\"",
   "workspaces": [
     "packages/*"
   ],
