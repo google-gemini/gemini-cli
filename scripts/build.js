@@ -55,19 +55,11 @@ if (isBun) {
     cwd: root,
   });
 
-  if (process.env.CI) {
-    console.log('Building other workspaces sequentially...');
-    execSync(
-      "bun run --filter '*' --filter '!@google/gemini-cli-core' --sequential build",
-      { stdio: 'inherit', cwd: root },
-    );
-  } else {
-    console.log('Building other workspaces in parallel...');
-    execSync(
-      "bun run --filter '*' --filter '!@google/gemini-cli-core' --parallel build",
-      { stdio: 'inherit', cwd: root },
-    );
-  }
+  console.log('Building other workspaces in parallel...');
+  execSync(
+    "bun run --filter '*' --filter '!@google/gemini-cli-core' --parallel build",
+    { stdio: 'inherit', cwd: root },
+  );
 } else if (process.env.CI) {
   console.log('CI environment detected. Building workspaces sequentially...');
   execSync('npm run build --workspaces', { stdio: 'inherit', cwd: root });
