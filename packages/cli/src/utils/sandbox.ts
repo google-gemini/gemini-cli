@@ -55,6 +55,8 @@ export async function start_sandbox(
   });
   patcher.patch();
 
+  let stopProxy: (() => void) | undefined = undefined;
+
   try {
     if (config.command === 'sandbox-exec') {
       // disallow BUILD_SANDBOX
@@ -68,9 +70,17 @@ export async function start_sandbox(
       let profileFile = fileURLToPath(
         new URL(`sandbox-macos-${profile}.sb`, import.meta.url),
       );
-      // if profile name is not recognized, then look for file under project settings directory
+      // if profile name is not recognized, look in user-level ~/.gemini first,
+      // then fall back to project-level .gemini. path.basename() strips any
+      // directory separators to prevent path traversal via SEATBELT_PROFILE.
       if (!BUILTIN_SEATBELT_PROFILES.includes(profile)) {
-        profileFile = path.join(GEMINI_DIR, `sandbox-macos-${profile}.sb`);
+        const safeProfile = path.basename(profile);
+        const fileName = `sandbox-macos-${safeProfile}.sb`;
+        const userProfileFile = path.join(homedir(), GEMINI_DIR, fileName);
+        const projectProfileFile = path.join(GEMINI_DIR, fileName);
+        profileFile = fs.existsSync(userProfileFile)
+          ? userProfileFile
+          : projectProfileFile;
       }
       if (!fs.existsSync(profileFile)) {
         throw new FatalSandboxError(
@@ -180,17 +190,18 @@ export async function start_sandbox(
           detached: true,
         });
         // install handlers to stop proxy on exit/signal
-        const stopProxy = () => {
+        stopProxy = () => {
           debugLogger.log('stopping proxy ...');
           if (proxyProcess?.pid) {
-            process.kill(-proxyProcess.pid, 'SIGTERM');
+            try {
+              process.kill(-proxyProcess.pid, 'SIGTERM');
+            } catch {
+              // ignore
+            }
           }
         };
-        process.off('exit', stopProxy);
         process.on('exit', stopProxy);
-        process.off('SIGINT', stopProxy);
         process.on('SIGINT', stopProxy);
-        process.off('SIGTERM', stopProxy);
         process.on('SIGTERM', stopProxy);
 
         // commented out as it disrupts ink rendering
@@ -738,15 +749,18 @@ export async function start_sandbox(
         detached: true,
       });
       // install handlers to stop proxy on exit/signal
-      const stopProxy = () => {
+      stopProxy = () => {
         debugLogger.log('stopping proxy container ...');
-        execSync(`${command} rm -f ${SANDBOX_PROXY_NAME}`);
+        try {
+          spawnSync(command, ['rm', '-f', SANDBOX_PROXY_NAME], {
+            stdio: 'ignore',
+          });
+        } catch {
+          // ignore
+        }
       };
-      process.off('exit', stopProxy);
       process.on('exit', stopProxy);
-      process.off('SIGINT', stopProxy);
       process.on('SIGINT', stopProxy);
-      process.off('SIGTERM', stopProxy);
       process.on('SIGTERM', stopProxy);
 
       // commented out as it disrupts ink rendering
@@ -798,6 +812,12 @@ export async function start_sandbox(
       });
     });
   } finally {
+    if (stopProxy) {
+      stopProxy();
+      process.off('exit', stopProxy);
+      process.off('SIGINT', stopProxy);
+      process.off('SIGTERM', stopProxy);
+    }
     patcher.cleanup();
   }
 }

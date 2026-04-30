@@ -1,0 +1,182 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`System Lifecycle Golden Tests > Scenario 1: Organic Growth with Huge Tool Output & Images 1`] = `
+{
+  "finalProjection": [
+    {
+      "parts": [
+        {
+          "text": "Nice diagram.",
+        },
+      ],
+      "role": "model",
+    },
+    {
+      "parts": [
+        {
+          "text": "Can we refactor?",
+        },
+      ],
+      "role": "user",
+    },
+    {
+      "parts": [
+        {
+          "text": "Yes we can.",
+        },
+      ],
+      "role": "model",
+    },
+  ],
+  "tokenTrajectory": [
+    {
+      "tokensAfterBackground": 6,
+      "tokensBeforeBackground": 6,
+      "turnIndex": 0,
+    },
+    {
+      "tokensAfterBackground": 11,
+      "tokensBeforeBackground": 11,
+      "turnIndex": 1,
+    },
+    {
+      "tokensAfterBackground": 458,
+      "tokensBeforeBackground": 20170,
+      "turnIndex": 2,
+    },
+    {
+      "tokensAfterBackground": 61,
+      "tokensBeforeBackground": 3017,
+      "turnIndex": 3,
+    },
+    {
+      "tokensAfterBackground": 10,
+      "tokensBeforeBackground": 10,
+      "turnIndex": 4,
+    },
+  ],
+}
+`;
+
+exports[`System Lifecycle Golden Tests > Scenario 2: Under Budget (No Modifications) 1`] = `
+{
+  "finalProjection": [
+    {
+      "parts": [
+        {
+          "text": "System Instructions",
+        },
+      ],
+      "role": "user",
+    },
+    {
+      "parts": [
+        {
+          "text": "Ack.",
+        },
+      ],
+      "role": "model",
+    },
+    {
+      "parts": [
+        {
+          "text": "Hello!",
+        },
+      ],
+      "role": "user",
+    },
+    {
+      "parts": [
+        {
+          "text": "Hi, how can I help?",
+        },
+      ],
+      "role": "model",
+    },
+  ],
+  "tokenTrajectory": [
+    {
+      "tokensAfterBackground": 6,
+      "tokensBeforeBackground": 6,
+      "turnIndex": 0,
+    },
+    {
+      "tokensAfterBackground": 11,
+      "tokensBeforeBackground": 11,
+      "turnIndex": 1,
+    },
+  ],
+}
+`;
+
+exports[`System Lifecycle Golden Tests > Scenario 3: Async-Driven Background GC 1`] = `
+{
+  "finalProjection": [
+    {
+      "parts": [
+        {
+          "text": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        },
+      ],
+      "role": "user",
+    },
+    {
+      "parts": [
+        {
+          "text": "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+        },
+      ],
+      "role": "model",
+    },
+    {
+      "parts": [
+        {
+          "text": "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC",
+        },
+      ],
+      "role": "user",
+    },
+    {
+      "parts": [
+        {
+          "text": "DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD",
+        },
+      ],
+      "role": "model",
+    },
+    {
+      "parts": [
+        {
+          "text": "EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE",
+        },
+      ],
+      "role": "user",
+    },
+    {
+      "parts": [
+        {
+          "text": "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
+        },
+      ],
+      "role": "model",
+    },
+  ],
+  "tokenTrajectory": [
+    {
+      "tokensAfterBackground": 25,
+      "tokensBeforeBackground": 25,
+      "turnIndex": 0,
+    },
+    {
+      "tokensAfterBackground": 49,
+      "tokensBeforeBackground": 49,
+      "turnIndex": 1,
+    },
+    {
+      "tokensAfterBackground": 73,
+      "tokensBeforeBackground": 73,
+      "turnIndex": 2,
+    },
+  ],
+}
+`;

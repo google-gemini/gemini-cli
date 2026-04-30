@@ -107,7 +107,9 @@ describe('ActivateSkillTool', () => {
   it('should activate a valid skill and return its content in XML tags', async () => {
     const params = { name: 'test-skill' };
     const invocation = tool.build(params);
-    const result = await invocation.execute(new AbortController().signal);
+    const result = await invocation.execute({
+      abortSignal: new AbortController().signal,
+    });
 
     expect(mockConfig.getSkillManager().activateSkill).toHaveBeenCalledWith(
       'test-skill',
@@ -136,7 +138,9 @@ describe('ActivateSkillTool', () => {
     vi.mocked(mockConfig.getSkillManager().getSkill).mockReturnValue(null);
     const params = { name: 'test-skill' };
     const invocation = tool.build(params);
-    const result = await invocation.execute(new AbortController().signal);
+    const result = await invocation.execute({
+      abortSignal: new AbortController().signal,
+    });
 
     expect(result.llmContent).toContain('Error: Skill "test-skill" not found.');
     expect(mockConfig.getSkillManager().activateSkill).not.toHaveBeenCalled();

@@ -99,7 +99,9 @@ describe('analyzeScreenshot', () => {
       const invocation = tool.build({
         instruction: 'Find the blue submit button',
       });
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
 
       // Verify screenshot was captured
       expect(browserManager.callTool).toHaveBeenCalledWith(
@@ -165,7 +167,7 @@ describe('analyzeScreenshot', () => {
       const invocation = tool.build({
         instruction: 'Find the search bar',
       });
-      await invocation.execute(new AbortController().signal);
+      await invocation.execute({ abortSignal: new AbortController().signal });
 
       const contentGenerator = config.getContentGenerator();
       expect(contentGenerator.generateContent).toHaveBeenCalledWith(
@@ -194,7 +196,9 @@ describe('analyzeScreenshot', () => {
       const invocation = tool.build({
         instruction: 'Find the button',
       });
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
 
       expect(result.error).toBeDefined();
       expect(result.llmContent).toContain('Failed to capture screenshot');
@@ -217,7 +221,9 @@ describe('analyzeScreenshot', () => {
       const invocation = tool.build({
         instruction: 'Check the layout',
       });
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
 
       expect(result.error).toBeDefined();
       expect(result.llmContent).toContain('Visual model returned no analysis');
@@ -238,7 +244,9 @@ describe('analyzeScreenshot', () => {
       const invocation = tool.build({
         instruction: 'Find the red error',
       });
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
 
       expect(result.error).toBeDefined();
       expect(result.llmContent).toContain(
@@ -261,7 +269,9 @@ describe('analyzeScreenshot', () => {
       const invocation = tool.build({
         instruction: 'Identify the element',
       });
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
 
       expect(result.error).toBeDefined();
       expect(result.llmContent).toContain(
@@ -281,7 +291,9 @@ describe('analyzeScreenshot', () => {
       const invocation = tool.build({
         instruction: 'Find something',
       });
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
 
       expect(result.error).toBeDefined();
       expect(result.llmContent).toContain('Visual analysis failed');
