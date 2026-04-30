@@ -36,7 +36,8 @@ function main() {
     });
 
     // Get changed files using the triple-dot syntax which correctly handles merge commits
-    const changedFiles = execSync(`git diff --name-only FETCH_HEAD...HEAD`, {
+    const head = process.env.PR_HEAD_SHA || 'HEAD';
+    const changedFiles = execSync(`git diff --name-only FETCH_HEAD...${head}`, {
       encoding: 'utf-8',
     })
       .split('\n')
@@ -70,7 +71,7 @@ function main() {
       if (coreChanges.length > 0) {
         // Get the actual diff content for core files
         const diff = execSync(
-          `git diff -U0 FETCH_HEAD...HEAD -- packages/core/src/`,
+          `git diff -U0 FETCH_HEAD...${head} -- packages/core/src/`,
           { encoding: 'utf-8' },
         );
         for (const sig of STEERING_SIGNATURES) {

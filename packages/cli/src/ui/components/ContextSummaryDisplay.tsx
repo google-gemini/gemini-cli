@@ -8,6 +8,8 @@ import type React from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { type IdeContext, type MCPServerConfig } from '@google/gemini-cli-core';
+import { Command } from '../key/keyMatchers.js';
+import { formatCommand } from '../key/keybindingUtils.js';
 
 interface ContextSummaryDisplayProps {
   geminiMdFileCount: number;
@@ -49,7 +51,7 @@ export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
     }
     return `${openFileCount} open file${
       openFileCount > 1 ? 's' : ''
-    } (ctrl+g to view)`;
+    } (${formatCommand(Command.SHOW_IDE_CONTEXT_DETAIL)} to view)`;
   })();
 
   const geminiMdText = (() => {

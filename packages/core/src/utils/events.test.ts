@@ -9,6 +9,7 @@ import {
   CoreEventEmitter,
   CoreEvent,
   coreEvents,
+  type CoreEvents,
   type UserFeedbackPayload,
   type McpProgressPayload,
 } from './events.js';
@@ -265,6 +266,61 @@ describe('CoreEventEmitter', () => {
       expect(listener).toHaveBeenCalledTimes(MAX_BACKLOG_SIZE);
       // Verify strictly that the FIRST call was Output 10 (0-9 dropped)
       expect(listener.mock.calls[0][0]).toMatchObject({ chunk: 'Output 10' });
+    });
+  });
+
+  describe('drainBacklogs Transformation', () => {
+    it('should transform events during drain', () => {
+      const listener = vi.fn();
+      events.emitOutput(false, 'stdout chunk');
+      events.emitFeedback('info', 'info message');
+
+      events.on(CoreEvent.Output, listener);
+      events.on(CoreEvent.UserFeedback, listener);
+
+      events.drainBacklogs(
+        <K extends keyof CoreEvents>(event: K, args: CoreEvents[K]) => {
+          if (event === (CoreEvent.Output as string)) {
+            const payload = args[0] as { isStderr: boolean; chunk: string };
+            return {
+              event,
+              args: [
+                { ...payload, isStderr: true },
+              ] as unknown as CoreEvents[K],
+            };
+          }
+          return { event, args };
+        },
+      );
+
+      expect(listener).toHaveBeenCalledTimes(2);
+      expect(listener).toHaveBeenCalledWith(
+        expect.objectContaining({ isStderr: true, chunk: 'stdout chunk' }),
+      );
+      expect(listener).toHaveBeenCalledWith(
+        expect.objectContaining({ message: 'info message' }),
+      );
+    });
+
+    it('should drop events when transform returns undefined', () => {
+      const listener = vi.fn();
+      events.emitOutput(false, 'drop me');
+      events.emitFeedback('info', 'keep me');
+
+      events.on(CoreEvent.Output, listener);
+      events.on(CoreEvent.UserFeedback, listener);
+
+      events.drainBacklogs((event, args) => {
+        if (event === CoreEvent.Output) {
+          return undefined;
+        }
+        return { event, args };
+      });
+
+      expect(listener).toHaveBeenCalledTimes(1);
+      expect(listener).toHaveBeenCalledWith(
+        expect.objectContaining({ message: 'keep me' }),
+      );
     });
   });
 

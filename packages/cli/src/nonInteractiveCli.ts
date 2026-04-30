@@ -46,6 +46,7 @@ import {
   handleMaxTurnsExceededError,
 } from './utils/errors.js';
 import { TextOutput } from './ui/utils/textOutput.js';
+import { runNonInteractive as runNonInteractiveAgentSession } from './nonInteractiveCliAgentSession.js';
 
 interface RunNonInteractiveParams {
   config: Config;
@@ -55,13 +56,16 @@ interface RunNonInteractiveParams {
   resumedSessionData?: ResumedSessionData;
 }
 
-export async function runNonInteractive({
-  config,
-  settings,
-  input,
-  prompt_id,
-  resumedSessionData,
-}: RunNonInteractiveParams): Promise<void> {
+export async function runNonInteractive(
+  params: RunNonInteractiveParams,
+): Promise<void> {
+  const useAgentSession = params.config.getAgentSessionNoninteractiveEnabled();
+  if (useAgentSession) {
+    return runNonInteractiveAgentSession(params);
+  }
+
+  const { config, settings, input, prompt_id, resumedSessionData } = params;
+
   return promptIdContext.run(prompt_id, async () => {
     const consolePatcher = new ConsolePatcher({
       stderr: true,
@@ -76,7 +80,7 @@ export async function runNonInteractive({
       const { setupInitialActivityLogger } = await import(
         './utils/devtoolsService.js'
       );
-      await setupInitialActivityLogger(config);
+      setupInitialActivityLogger(config);
     }
 
     const { stdout: workingStdout } = createWorkingStdio();
@@ -183,6 +187,7 @@ export async function runNonInteractive({
     };
 
     let errorToHandle: unknown | undefined;
+    let scheduler: Scheduler | undefined;
     try {
       consolePatcher.patch();
 
@@ -211,7 +216,7 @@ export async function runNonInteractive({
       });
 
       const geminiClient = config.getGeminiClient();
-      const scheduler = new Scheduler({
+      scheduler = new Scheduler({
         context: config,
         messageBus: config.getMessageBus(),
         getPreferredEditor: () => undefined,
@@ -290,6 +295,7 @@ export async function runNonInteractive({
       let currentMessages: Content[] = [{ role: 'user', parts: query }];
 
       let turnCount = 0;
+      let invalidStreamError: string | undefined;
       while (true) {
         turnCount++;
         if (
@@ -390,6 +396,21 @@ export async function runNonInteractive({
             if (config.getOutputFormat() === OutputFormat.TEXT) {
               process.stderr.write(`[WARNING] ${blockMessage}\n`);
             }
+          } else if (event.type === GeminiEventType.InvalidStream) {
+            invalidStreamError =
+              'Invalid stream: The model returned an empty response or malformed tool call.';
+            if (streamFormatter) {
+              streamFormatter.emitEvent({
+                type: JsonStreamEventType.ERROR,
+                timestamp: new Date().toISOString(),
+                severity: 'error',
+                message: invalidStreamError,
+              });
+            } else if (config.getOutputFormat() === OutputFormat.TEXT) {
+              process.stderr.write(`[ERROR] ${invalidStreamError}\n`);
+            }
+            toolCallRequests.length = 0;
+            break;
           }
         }
 
@@ -503,14 +524,21 @@ export async function runNonInteractive({
             streamFormatter.emitEvent({
               type: JsonStreamEventType.RESULT,
               timestamp: new Date().toISOString(),
-              status: 'success',
+              status: invalidStreamError ? 'error' : 'success',
               stats: streamFormatter.convertToStreamStats(metrics, durationMs),
             });
           } else if (config.getOutputFormat() === OutputFormat.JSON) {
             const formatter = new JsonFormatter();
             const stats = uiTelemetryService.getMetrics();
             textOutput.write(
-              formatter.format(config.getSessionId(), responseText, stats),
+              formatter.format(
+                config.getSessionId(),
+                responseText,
+                stats,
+                invalidStreamError
+                  ? { type: 'INVALID_STREAM', message: invalidStreamError }
+                  : undefined,
+              ),
             );
           } else {
             textOutput.ensureTrailingNewline(); // Ensure a final newline
@@ -524,6 +552,7 @@ export async function runNonInteractive({
       // Cleanup stdin cancellation before other cleanup
       cleanupStdinCancellation();
 
+      scheduler?.dispose();
       consolePatcher.cleanup();
       coreEvents.off(CoreEvent.UserFeedback, handleUserFeedback);
     }

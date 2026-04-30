@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -284,7 +284,7 @@ export class LinkExtensionCommand implements Command {
 
     try {
       await stat(sourceFilepath);
-    } catch (_error) {
+    } catch {
       return { name: this.name, data: `Invalid source: ${sourceFilepath}` };
     }
 

@@ -66,6 +66,13 @@ export const planCommand: SlashCommand = {
       coreEvents.emitFeedback('info', 'Switched to Plan Mode.');
     }
 
+    if (context.invocation?.args) {
+      return {
+        type: 'submit_prompt',
+        content: context.invocation.args,
+      };
+    }
+
     const approvedPlanPath = config.getApprovedPlanPath();
 
     if (!approvedPlanPath) {
@@ -86,12 +93,14 @@ export const planCommand: SlashCommand = {
         type: MessageType.GEMINI,
         text: partToString(content.llmContent),
       });
+      return;
     } catch (error) {
       coreEvents.emitFeedback(
         'error',
         `Failed to read approved plan at ${approvedPlanPath}: ${error}`,
         error,
       );
+      return;
     }
   },
   subCommands: [
@@ -100,6 +109,7 @@ export const planCommand: SlashCommand = {
       description: 'Copy the currently approved plan to your clipboard',
       kind: CommandKind.BUILT_IN,
       autoExecute: true,
+      takesArgs: false,
       action: copyAction,
     },
   ],

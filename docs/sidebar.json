@@ -96,6 +96,11 @@
             ]
           },
           { "label": "Agent Skills", "slug": "docs/cli/skills" },
+          {
+            "label": "Auto Memory",
+            "badge": "🔬",
+            "slug": "docs/cli/auto-memory"
+          },
           { "label": "Checkpointing", "slug": "docs/cli/checkpointing" },
           { "label": "Headless mode", "slug": "docs/cli/headless" },
           {
@@ -111,8 +116,25 @@
               { "label": "Reference", "slug": "docs/hooks/reference" }
             ]
           },
-          { "label": "IDE integration", "slug": "docs/ide-integration" },
-          { "label": "MCP servers", "slug": "docs/tools/mcp-server" },
+          {
+            "label": "IDE integration",
+            "collapsed": true,
+            "items": [
+              { "label": "Overview", "slug": "docs/ide-integration" },
+              {
+                "label": "Developer guide: ACP mode",
+                "slug": "docs/cli/acp-mode"
+              }
+            ]
+          },
+          {
+            "label": "MCP servers",
+            "collapsed": true,
+            "items": [
+              { "label": "Overview", "slug": "docs/tools/mcp-server" },
+              { "label": "Resource tools", "slug": "docs/tools/mcp-resources" }
+            ]
+          },
           { "label": "Model routing", "slug": "docs/cli/model-routing" },
           { "label": "Model selection", "slug": "docs/cli/model" },
           {
@@ -128,12 +150,10 @@
           { "label": "Plan mode", "slug": "docs/cli/plan-mode" },
           {
             "label": "Subagents",
-            "badge": "🔬",
             "slug": "docs/core/subagents"
           },
           {
             "label": "Remote subagents",
-            "badge": "🔬",
             "slug": "docs/core/remote-agents"
           },
           { "label": "Rewind", "slug": "docs/cli/rewind" },

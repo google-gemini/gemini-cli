@@ -17,7 +17,11 @@ import {
   DEFAULT_MAX_TIME_MINUTES,
 } from './types.js';
 import type { A2AAuthConfig } from './auth-provider/types.js';
-import { MCPServerConfig } from '../config/config.js';
+import {
+  MCPServerConfig,
+  AuthProviderType,
+  type MCPOAuthConfig,
+} from '../config/config.js';
 import { isValidToolName } from '../tools/tool-names.js';
 import { FRONTMATTER_REGEX } from '../skills/skillLoader.js';
 import { getErrorMessage } from '../utils/errors.js';
@@ -62,6 +66,27 @@ const mcpServerSchema = z.object({
   description: z.string().optional(),
   include_tools: z.array(z.string()).optional(),
   exclude_tools: z.array(z.string()).optional(),
+  auth: z
+    .union([
+      z.object({
+        type: z.literal('google-credentials'),
+        scopes: z.array(z.string()).optional(),
+      }),
+      z.object({
+        type: z.literal('oauth'),
+        client_id: z.string().optional(),
+        client_secret: z.string().optional(),
+        scopes: z.array(z.string()).optional(),
+        authorization_url: z.string().url().optional(),
+        token_url: z.string().url().optional(),
+        issuer: z.string().url().optional(),
+        audiences: z.array(z.string()).optional(),
+        redirect_uri: z.string().url().optional(),
+        token_param_name: z.string().optional(),
+        registration_url: z.string().url().optional(),
+      }),
+    ])
+    .optional(),
 });
 
 const localAgentSchema = z
@@ -74,9 +99,12 @@ const localAgentSchema = z
       .array(
         z
           .string()
-          .refine((val) => isValidToolName(val, { allowWildcards: true }), {
-            message: 'Invalid tool name',
-          }),
+          .refine(
+            (val: string) => isValidToolName(val, { allowWildcards: true }),
+            {
+              message: 'Invalid tool name',
+            },
+          ),
       )
       .optional(),
     mcp_servers: z.record(mcpServerSchema).optional(),
@@ -125,6 +153,11 @@ const oauth2AuthSchema = z.object({
   scopes: z.array(z.string()).optional(),
   authorization_url: z.string().url().optional(),
   token_url: z.string().url().optional(),
+  issuer: z.string().url().optional(),
+  audiences: z.array(z.string()).optional(),
+  redirect_uri: z.string().url().optional(),
+  token_param_name: z.string().optional(),
+  registration_url: z.string().url().optional(),
 });
 
 const authConfigSchema = z
@@ -191,7 +224,7 @@ const remoteAgentJsonSchema = baseRemoteAgentSchema
   .extend({
     agent_card_url: z.undefined().optional(),
     agent_card_json: z.string().refine(
-      (val) => {
+      (val: string) => {
         try {
           JSON.parse(val);
           return true;
@@ -436,6 +469,11 @@ function convertFrontmatterAuthToConfig(
         scopes: frontmatter.scopes,
         authorization_url: frontmatter.authorization_url,
         token_url: frontmatter.token_url,
+        issuer: frontmatter.issuer,
+        audiences: frontmatter.audiences,
+        redirect_uri: frontmatter.redirect_uri,
+        token_param_name: frontmatter.token_param_name,
+        registration_url: frontmatter.registration_url,
       };
 
     default: {
@@ -511,6 +549,33 @@ export function markdownToAgentDefinition(
   const mcpServers: Record<string, MCPServerConfig> = {};
   if (markdown.mcp_servers) {
     for (const [name, config] of Object.entries(markdown.mcp_servers)) {
+      let authProviderType: AuthProviderType | undefined = undefined;
+      let oauth: MCPOAuthConfig | undefined = undefined;
+
+      if (config.auth) {
+        if (config.auth.type === 'google-credentials') {
+          authProviderType = AuthProviderType.GOOGLE_CREDENTIALS;
+          oauth = {
+            enabled: true,
+            scopes: config.auth.scopes,
+          };
+        } else if (config.auth.type === 'oauth') {
+          oauth = {
+            enabled: true,
+            clientId: config.auth.client_id,
+            clientSecret: config.auth.client_secret,
+            scopes: config.auth.scopes,
+            authorizationUrl: config.auth.authorization_url,
+            tokenUrl: config.auth.token_url,
+            issuer: config.auth.issuer,
+            audiences: config.auth.audiences,
+            redirectUri: config.auth.redirect_uri,
+            tokenParamName: config.auth.token_param_name,
+            registrationUrl: config.auth.registration_url,
+          };
+        }
+      }
+
       mcpServers[name] = new MCPServerConfig(
         config.command,
         config.args,
@@ -526,6 +591,9 @@ export function markdownToAgentDefinition(
         config.description,
         config.include_tools,
         config.exclude_tools,
+        undefined, // extension
+        oauth,
+        authProviderType,
       );
     }
   }

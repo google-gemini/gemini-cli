@@ -242,4 +242,57 @@ decision = "deny"
     const content = memfs.readFileSync(policyFile, 'utf-8') as string;
     expect(content).toContain('toolName = "test_tool"');
   });
+
+  it('should include modes if provided', async () => {
+    createPolicyUpdater(policyEngine, messageBus, mockStorage);
+
+    const policyFile = '/mock/user/.gemini/policies/auto-saved.toml';
+    vi.spyOn(mockStorage, 'getAutoSavedPolicyPath').mockReturnValue(policyFile);
+
+    await messageBus.publish({
+      type: MessageBusType.UPDATE_POLICY,
+      toolName: 'test_tool',
+      persist: true,
+      modes: [ApprovalMode.DEFAULT, ApprovalMode.YOLO],
+    });
+
+    await vi.advanceTimersByTimeAsync(100);
+
+    const content = memfs.readFileSync(policyFile, 'utf-8') as string;
+    expect(content).toContain('modes = [ "default", "yolo" ]');
+  });
+
+  it('should update existing rule modes instead of appending redundant rule', async () => {
+    createPolicyUpdater(policyEngine, messageBus, mockStorage);
+
+    const policyFile = '/mock/user/.gemini/policies/auto-saved.toml';
+    vi.spyOn(mockStorage, 'getAutoSavedPolicyPath').mockReturnValue(policyFile);
+
+    const existingContent = `
+[[rule]]
+decision = "allow"
+priority = 950
+toolName = "test_tool"
+modes = [ "autoEdit", "yolo" ]
+`;
+    const dir = path.dirname(policyFile);
+    memfs.mkdirSync(dir, { recursive: true });
+    memfs.writeFileSync(policyFile, existingContent);
+
+    // Now grant in DEFAULT mode, which should include [default, autoEdit, yolo]
+    await messageBus.publish({
+      type: MessageBusType.UPDATE_POLICY,
+      toolName: 'test_tool',
+      persist: true,
+      modes: [ApprovalMode.DEFAULT, ApprovalMode.AUTO_EDIT, ApprovalMode.YOLO],
+    });
+
+    await vi.advanceTimersByTimeAsync(100);
+
+    const content = memfs.readFileSync(policyFile, 'utf-8') as string;
+    // Should NOT have two [[rule]] entries for test_tool
+    const ruleCount = (content.match(/\[\[rule\]\]/g) || []).length;
+    expect(ruleCount).toBe(1);
+    expect(content).toContain('modes = [ "default", "autoEdit", "yolo" ]');
+  });
 });

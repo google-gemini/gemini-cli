@@ -71,6 +71,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     Scheduler: class {
       schedule = mockSchedulerSchedule;
       cancelAll = vi.fn();
+      dispose = vi.fn();
     },
     isTelemetrySdkInitialized: vi.fn().mockReturnValue(true),
     ChatRecordingService: MockChatRecordingService,
@@ -166,7 +167,7 @@ describe('runNonInteractive', () => {
     };
 
     mockConfig = {
-      initialize: vi.fn().mockResolvedValue(undefined),
+      initialize: vi.fn().mockReturnValue(Promise.resolve(undefined)),
       getMessageBus: vi.fn().mockReturnValue({
         subscribe: vi.fn(),
         unsubscribe: vi.fn(),
@@ -190,6 +191,7 @@ describe('runNonInteractive', () => {
       isTrustedFolder: vi.fn().mockReturnValue(false),
       getRawOutput: vi.fn().mockReturnValue(false),
       getAcceptRawOutputRisk: vi.fn().mockReturnValue(false),
+      getAgentSessionNoninteractiveEnabled: vi.fn().mockReturnValue(false),
     } as unknown as Config;
 
     mockSettings = {
@@ -701,7 +703,7 @@ describe('runNonInteractive', () => {
       createStreamFromEvents(events),
     );
     vi.mocked(mockConfig.getOutputFormat).mockReturnValue(OutputFormat.JSON);
-    vi.mocked(uiTelemetryService.getMetrics).mockReturnValue(
+    vi.spyOn(uiTelemetryService, 'getMetrics').mockReturnValue(
       MOCK_SESSION_METRICS,
     );
 
@@ -791,7 +793,7 @@ describe('runNonInteractive', () => {
       .mockReturnValueOnce(createStreamFromEvents(secondCallEvents));
 
     vi.mocked(mockConfig.getOutputFormat).mockReturnValue(OutputFormat.JSON);
-    vi.mocked(uiTelemetryService.getMetrics).mockReturnValue(
+    vi.spyOn(uiTelemetryService, 'getMetrics').mockReturnValue(
       MOCK_SESSION_METRICS,
     );
 
@@ -834,7 +836,7 @@ describe('runNonInteractive', () => {
       createStreamFromEvents(events),
     );
     vi.mocked(mockConfig.getOutputFormat).mockReturnValue(OutputFormat.JSON);
-    vi.mocked(uiTelemetryService.getMetrics).mockReturnValue(
+    vi.spyOn(uiTelemetryService, 'getMetrics').mockReturnValue(
       MOCK_SESSION_METRICS,
     );
 
@@ -1528,7 +1530,7 @@ describe('runNonInteractive', () => {
     vi.mocked(mockConfig.getOutputFormat).mockReturnValue(
       OutputFormat.STREAM_JSON,
     );
-    vi.mocked(uiTelemetryService.getMetrics).mockReturnValue(
+    vi.spyOn(uiTelemetryService, 'getMetrics').mockReturnValue(
       MOCK_SESSION_METRICS,
     );
 
@@ -1690,7 +1692,7 @@ describe('runNonInteractive', () => {
       vi.mocked(mockConfig.getOutputFormat).mockReturnValue(
         OutputFormat.STREAM_JSON,
       );
-      vi.mocked(uiTelemetryService.getMetrics).mockReturnValue(
+      vi.spyOn(uiTelemetryService, 'getMetrics').mockReturnValue(
         MOCK_SESSION_METRICS,
       );
 
@@ -1712,7 +1714,7 @@ describe('runNonInteractive', () => {
           input,
           prompt_id: promptId,
         });
-      } catch (_error) {
+      } catch {
         // Expected exit
       }
 
@@ -1865,7 +1867,7 @@ describe('runNonInteractive', () => {
 
   it('should write JSON output when a tool call returns STOP_EXECUTION error', async () => {
     vi.mocked(mockConfig.getOutputFormat).mockReturnValue(OutputFormat.JSON);
-    vi.mocked(uiTelemetryService.getMetrics).mockReturnValue(
+    vi.spyOn(uiTelemetryService, 'getMetrics').mockReturnValue(
       MOCK_SESSION_METRICS,
     );
 
@@ -1929,7 +1931,7 @@ describe('runNonInteractive', () => {
     vi.mocked(mockConfig.getOutputFormat).mockReturnValue(
       OutputFormat.STREAM_JSON,
     );
-    vi.mocked(uiTelemetryService.getMetrics).mockReturnValue(
+    vi.spyOn(uiTelemetryService, 'getMetrics').mockReturnValue(
       MOCK_SESSION_METRICS,
     );
 
@@ -2034,6 +2036,87 @@ describe('runNonInteractive', () => {
       // sendMessageStream is called once, recursion is internal to it and transparent to the caller
       expect(mockGeminiClient.sendMessageStream).toHaveBeenCalledTimes(1);
       expect(getWrittenOutput()).toBe('Final answer\n');
+    });
+
+    it('should handle InvalidStream event gracefully in TEXT mode', async () => {
+      const events: ServerGeminiStreamEvent[] = [
+        { type: GeminiEventType.InvalidStream },
+      ];
+      mockGeminiClient.sendMessageStream.mockReturnValue(
+        createStreamFromEvents(events),
+      );
+
+      await runNonInteractive({
+        config: mockConfig,
+        settings: mockSettings,
+        input: 'test invalid stream',
+        prompt_id: 'prompt-id-invalid',
+      });
+
+      expect(processStderrSpy).toHaveBeenCalledWith(
+        '[ERROR] Invalid stream: The model returned an empty response or malformed tool call.\n',
+      );
+      expect(mockGeminiClient.sendMessageStream).toHaveBeenCalledTimes(1);
+    });
+
+    it('should handle InvalidStream event gracefully in STREAM_JSON mode', async () => {
+      vi.spyOn(uiTelemetryService, 'getMetrics').mockReturnValue(
+        MOCK_SESSION_METRICS,
+      );
+      vi.spyOn(mockConfig, 'getOutputFormat').mockReturnValue(
+        OutputFormat.STREAM_JSON,
+      );
+      const events: ServerGeminiStreamEvent[] = [
+        { type: GeminiEventType.InvalidStream },
+      ];
+      mockGeminiClient.sendMessageStream.mockReturnValue(
+        createStreamFromEvents(events),
+      );
+
+      await runNonInteractive({
+        config: mockConfig,
+        settings: mockSettings,
+        input: 'test invalid stream',
+        prompt_id: 'prompt-id-invalid',
+      });
+
+      const output = getWrittenOutput();
+      expect(output).toContain('"type":"error"');
+      expect(output).toContain('"severity":"error"');
+      expect(output).toContain(
+        'Invalid stream: The model returned an empty response or malformed tool call.',
+      );
+      expect(mockGeminiClient.sendMessageStream).toHaveBeenCalledTimes(1);
+    });
+
+    it('should handle InvalidStream event gracefully in JSON mode', async () => {
+      vi.spyOn(uiTelemetryService, 'getMetrics').mockReturnValue(
+        MOCK_SESSION_METRICS,
+      );
+      vi.spyOn(mockConfig, 'getOutputFormat').mockReturnValue(
+        OutputFormat.JSON,
+      );
+      const events: ServerGeminiStreamEvent[] = [
+        { type: GeminiEventType.InvalidStream },
+      ];
+      mockGeminiClient.sendMessageStream.mockReturnValue(
+        createStreamFromEvents(events),
+      );
+
+      await runNonInteractive({
+        config: mockConfig,
+        settings: mockSettings,
+        input: 'test invalid stream',
+        prompt_id: 'prompt-id-invalid',
+      });
+
+      const output = getWrittenOutput();
+      expect(output).toContain('"error": {');
+      expect(output).toContain('"type": "INVALID_STREAM"');
+      expect(output).toContain(
+        'Invalid stream: The model returned an empty response or malformed tool call.',
+      );
+      expect(mockGeminiClient.sendMessageStream).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -2216,7 +2299,7 @@ describe('runNonInteractive', () => {
       vi.mocked(mockConfig.getOutputFormat).mockReturnValue(
         OutputFormat.STREAM_JSON,
       );
-      vi.mocked(uiTelemetryService.getMetrics).mockReturnValue(
+      vi.spyOn(uiTelemetryService, 'getMetrics').mockReturnValue(
         MOCK_SESSION_METRICS,
       );
 

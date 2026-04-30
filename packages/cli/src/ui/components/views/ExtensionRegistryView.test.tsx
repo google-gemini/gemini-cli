@@ -21,6 +21,8 @@ import {
   type GenericListItem,
 } from '../shared/SearchableList.js';
 import { type TextBuffer } from '../shared/text-buffer.js';
+import { type UseHistoryManagerReturn } from '../../hooks/useHistoryManager.js';
+import { ExtensionUpdateState } from '../../state/extensions.js';
 
 // Mocks
 vi.mock('../../hooks/useExtensionRegistry.js');
@@ -97,6 +99,7 @@ describe('ExtensionRegistryView', () => {
 
     vi.mocked(useExtensionUpdates).mockReturnValue({
       extensionsUpdateState: new Map(),
+      dispatchExtensionStateUpdate: vi.fn(),
     } as unknown as ReturnType<typeof useExtensionUpdates>);
 
     // Mock useRegistrySearch implementation
@@ -134,6 +137,9 @@ describe('ExtensionRegistryView', () => {
         uiState: {
           staticExtraHeight: 5,
           terminalHeight: 40,
+          historyManager: {
+            addItem: vi.fn(),
+          } as unknown as UseHistoryManagerReturn,
         } as Partial<UIState>,
       },
     );
@@ -224,6 +230,44 @@ describe('ExtensionRegistryView', () => {
         mockExtensions[0],
         expect.any(Function),
       );
+    });
+  });
+
+  it('should show [Update available] and hide [Installed] when update is available', async () => {
+    mockExtensionManager.getExtensions = vi
+      .fn()
+      .mockReturnValue([{ name: 'Test Extension 1' }]);
+    vi.mocked(useExtensionUpdates).mockReturnValue({
+      extensionsUpdateState: new Map([
+        ['Test Extension 1', ExtensionUpdateState.UPDATE_AVAILABLE],
+      ]),
+      dispatchExtensionStateUpdate: vi.fn(),
+    } as unknown as ReturnType<typeof useExtensionUpdates>);
+
+    const { lastFrame } = await renderView();
+
+    await waitFor(() => {
+      expect(lastFrame()).toContain('[Update available]');
+      expect(lastFrame()).not.toContain('[Installed]');
+    });
+  });
+
+  it('should show [Updating...] and hide [Installed] when update is in progress', async () => {
+    mockExtensionManager.getExtensions = vi
+      .fn()
+      .mockReturnValue([{ name: 'Test Extension 1' }]);
+    vi.mocked(useExtensionUpdates).mockReturnValue({
+      extensionsUpdateState: new Map([
+        ['Test Extension 1', ExtensionUpdateState.UPDATING],
+      ]),
+      dispatchExtensionStateUpdate: vi.fn(),
+    } as unknown as ReturnType<typeof useExtensionUpdates>);
+
+    const { lastFrame } = await renderView();
+
+    await waitFor(() => {
+      expect(lastFrame()).toContain('[Updating...]');
+      expect(lastFrame()).not.toContain('[Installed]');
     });
   });
 });

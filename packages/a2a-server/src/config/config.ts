@@ -25,7 +25,6 @@ import {
   ExperimentFlags,
   isHeadlessMode,
   FatalAuthenticationError,
-  isCloudShell,
   PolicyDecision,
   PRIORITY_YOLO_ALLOW_ALL,
   type TelemetryTarget,
@@ -43,7 +42,6 @@ export async function loadConfig(
   taskId: string,
 ): Promise<Config> {
   const workspaceDir = process.cwd();
-  const adcFilePath = process.env['GOOGLE_APPLICATION_CREDENTIALS'];
 
   const folderTrust =
     settings.folderTrust === true ||
@@ -125,7 +123,7 @@ export async function loadConfig(
     trustedFolder: true,
     extensionLoader,
     checkpointing,
-    interactive: !isHeadlessMode(),
+    interactive: true,
     enableInteractiveShell: !isHeadlessMode(),
     ptyInfo: 'auto',
     enableAgents: settings.experimental?.enableAgents ?? true,
@@ -192,7 +190,7 @@ export async function loadConfig(
   await config.waitForMcpInit();
   startupProfiler.flush(config);
 
-  await refreshAuthentication(config, adcFilePath, 'Config');
+  await refreshAuthentication(config, 'Config');
 
   return config;
 }
@@ -263,75 +261,51 @@ function findEnvFile(startDir: string): string | null {
 
 async function refreshAuthentication(
   config: Config,
-  adcFilePath: string | undefined,
   logPrefix: string,
 ): Promise<void> {
   if (process.env['USE_CCPA']) {
     logger.info(`[${logPrefix}] Using CCPA Auth:`);
+
+    logger.info(`[${logPrefix}] Attempting COMPUTE_ADC first.`);
     try {
-      if (adcFilePath) {
-        path.resolve(adcFilePath);
-      }
-    } catch (e) {
-      logger.error(
-        `[${logPrefix}] USE_CCPA env var is true but unable to resolve GOOGLE_APPLICATION_CREDENTIALS file path ${adcFilePath}. Error ${e}`,
+      await config.refreshAuth(AuthType.COMPUTE_ADC);
+      logger.info(`[${logPrefix}] COMPUTE_ADC successful.`);
+    } catch (adcError) {
+      const adcMessage =
+        adcError instanceof Error ? adcError.message : String(adcError);
+      logger.info(
+        `[${logPrefix}] COMPUTE_ADC failed or not available: ${adcMessage}`,
       );
-    }
 
-    const useComputeAdc = process.env['GEMINI_CLI_USE_COMPUTE_ADC'] === 'true';
-    const isHeadless = isHeadlessMode();
-    const shouldSkipOauth = isHeadless || useComputeAdc;
+      const useComputeAdc =
+        process.env['GEMINI_CLI_USE_COMPUTE_ADC'] === 'true';
+      const isHeadless = isHeadlessMode();
 
-    if (shouldSkipOauth) {
-      if (isCloudShell() || useComputeAdc) {
-        logger.info(
-          `[${logPrefix}] Skipping LOGIN_WITH_GOOGLE due to ${isHeadless ? 'headless mode' : 'GEMINI_CLI_USE_COMPUTE_ADC'}. Attempting COMPUTE_ADC.`,
-        );
-        try {
-          await config.refreshAuth(AuthType.COMPUTE_ADC);
-          logger.info(`[${logPrefix}] COMPUTE_ADC successful.`);
-        } catch (adcError) {
-          const adcMessage =
-            adcError instanceof Error ? adcError.message : String(adcError);
-          throw new FatalAuthenticationError(
-            `COMPUTE_ADC failed: ${adcMessage}. (Skipped LOGIN_WITH_GOOGLE due to ${isHeadless ? 'headless mode' : 'GEMINI_CLI_USE_COMPUTE_ADC'})`,
-          );
-        }
-      } else {
+      if (isHeadless || useComputeAdc) {
+        const reason = isHeadless
+          ? 'headless mode'
+          : 'GEMINI_CLI_USE_COMPUTE_ADC=true';
         throw new FatalAuthenticationError(
-          `Interactive terminal required for LOGIN_WITH_GOOGLE. Run in an interactive terminal or set GEMINI_CLI_USE_COMPUTE_ADC=true to use Application Default Credentials.`,
+          `COMPUTE_ADC failed: ${adcMessage}. (LOGIN_WITH_GOOGLE fallback skipped due to ${reason}. Run in an interactive terminal to use OAuth.)`,
         );
       }
-    } else {
+
+      logger.info(
+        `[${logPrefix}] COMPUTE_ADC failed, falling back to LOGIN_WITH_GOOGLE.`,
+      );
       try {
         await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
       } catch (e) {
-        if (
-          e instanceof FatalAuthenticationError &&
-          (isCloudShell() || useComputeAdc)
-        ) {
-          logger.warn(
-            `[${logPrefix}] LOGIN_WITH_GOOGLE failed. Attempting COMPUTE_ADC fallback.`,
+        if (e instanceof FatalAuthenticationError) {
+          const originalMessage = e instanceof Error ? e.message : String(e);
+          throw new FatalAuthenticationError(
+            `${originalMessage}. The initial COMPUTE_ADC attempt also failed: ${adcMessage}`,
           );
-          try {
-            await config.refreshAuth(AuthType.COMPUTE_ADC);
-            logger.info(`[${logPrefix}] COMPUTE_ADC fallback successful.`);
-          } catch (adcError) {
-            logger.error(
-              `[${logPrefix}] COMPUTE_ADC fallback failed: ${adcError}`,
-            );
-            const originalMessage = e instanceof Error ? e.message : String(e);
-            const adcMessage =
-              adcError instanceof Error ? adcError.message : String(adcError);
-            throw new FatalAuthenticationError(
-              `${originalMessage}. Fallback to COMPUTE_ADC also failed: ${adcMessage}`,
-            );
-          }
-        } else {
-          throw e;
         }
+        throw e;
       }
     }
+
     logger.info(
       `[${logPrefix}] GOOGLE_CLOUD_PROJECT: ${process.env['GOOGLE_CLOUD_PROJECT']}`,
     );

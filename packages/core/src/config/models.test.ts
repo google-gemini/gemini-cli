@@ -32,6 +32,8 @@ import {
   PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
   isPreviewModel,
   isProModel,
+  GEMMA_4_31B_IT_MODEL,
+  GEMMA_4_26B_A4B_IT_MODEL,
 } from './models.js';
 import type { Config } from './config.js';
 import { ModelConfigService } from '../services/modelConfigService.js';
@@ -271,6 +273,13 @@ describe('isCustomModel', () => {
     expect(isCustomModel(GEMINI_MODEL_ALIAS_AUTO)).toBe(false);
     expect(isCustomModel(GEMINI_MODEL_ALIAS_PRO)).toBe(false);
   });
+
+  it('should not throw if the model is an array (e.g. from yargs)', () => {
+    // @ts-expect-error - testing invalid runtime input
+    expect(() => isCustomModel(['gemini-2.0-flash', 'gpt-4'])).not.toThrow();
+    // @ts-expect-error - testing invalid runtime input
+    expect(isCustomModel(['gemini-2.0-flash', 'gpt-4'])).toBe(true); // last one is custom
+  });
 });
 
 describe('supportsModernFeatures', () => {
@@ -356,6 +365,10 @@ describe('getDisplayString', () => {
 
   it('should return the model name as is for other models', () => {
     expect(getDisplayString('custom-model')).toBe('custom-model');
+    expect(getDisplayString(GEMMA_4_31B_IT_MODEL)).toBe(GEMMA_4_31B_IT_MODEL);
+    expect(getDisplayString(GEMMA_4_26B_A4B_IT_MODEL)).toBe(
+      GEMMA_4_26B_A4B_IT_MODEL,
+    );
     expect(getDisplayString(DEFAULT_GEMINI_FLASH_LITE_MODEL)).toBe(
       DEFAULT_GEMINI_FLASH_LITE_MODEL,
     );
@@ -424,6 +437,15 @@ describe('resolveModel', () => {
       const customModel = 'custom-model-v1';
       const model = resolveModel(customModel);
       expect(model).toBe(customModel);
+    });
+
+    it('should handle non-string inputs gracefully', () => {
+      // @ts-expect-error - testing invalid runtime input
+      expect(resolveModel(['a', 'b'])).toBe('b');
+      // @ts-expect-error - testing invalid runtime input
+      expect(resolveModel(true)).toBe('true');
+      // @ts-expect-error - testing invalid runtime input
+      expect(resolveModel(null)).toBe('');
     });
   });
 
@@ -571,6 +593,17 @@ describe('isActiveModel', () => {
     expect(isActiveModel(DEFAULT_GEMINI_MODEL)).toBe(true);
     expect(isActiveModel(PREVIEW_GEMINI_MODEL)).toBe(true);
     expect(isActiveModel(DEFAULT_GEMINI_FLASH_MODEL)).toBe(true);
+  });
+
+  it('should return true for Gemma 4 models only when experimentalGemma is true', () => {
+    expect(isActiveModel(GEMMA_4_31B_IT_MODEL)).toBe(false);
+    expect(isActiveModel(GEMMA_4_26B_A4B_IT_MODEL)).toBe(false);
+    expect(isActiveModel(GEMMA_4_31B_IT_MODEL, false, false, false, true)).toBe(
+      true,
+    );
+    expect(
+      isActiveModel(GEMMA_4_26B_A4B_IT_MODEL, false, false, false, true),
+    ).toBe(true);
   });
 
   it('should return false for Gemini 3.1 models when Gemini 3.1 is not launched', () => {

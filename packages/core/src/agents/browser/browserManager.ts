@@ -30,6 +30,7 @@ import * as path from 'node:path';
 import * as fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { injectAutomationOverlay } from './automationOverlay.js';
+import { logBrowserAgentConnection } from '../../telemetry/loggers.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -37,8 +38,26 @@ const __dirname = path.dirname(__filename);
 // Default browser profile directory name within ~/.gemini/
 const BROWSER_PROFILE_DIR = 'cli-browser-profile';
 
+/**
+ * Typed error for domain restriction violations.
+ * Thrown when a navigation tool targets a domain not in allowedDomains.
+ * Caught by mcpToolWrapper to terminate the agent immediately.
+ */
+export class DomainNotAllowedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'DomainNotAllowedError';
+  }
+}
+
 // Default timeout for MCP operations
 const MCP_TIMEOUT_MS = 60_000;
+
+// Maximum reconnection attempts before giving up
+const MAX_RECONNECT_RETRIES = 3;
+
+// Base delay (ms) for exponential backoff between reconnection attempts
+const RECONNECT_BASE_DELAY_MS = 500;
 
 /**
  * Tools that can cause a full-page navigation (explicitly or implicitly).
@@ -92,10 +111,160 @@ export interface McpToolCallResult {
  * in the main ToolRegistry. Tools are kept local to the browser agent.
  */
 export class BrowserManager {
+  // --- Static singleton management ---
+  private static instances = new Map<string, BrowserManager>();
+
+  /**
+   * Maximum number of parallel browser instances allowed in isolated mode.
+   * Prevents unbounded resource consumption from concurrent browser_agent calls.
+   */
+  static readonly MAX_PARALLEL_INSTANCES = 5;
+
+  /**
+   * Returns the cache key for a given config.
+   * Uses `sessionMode:profilePath` so different profiles get separate instances.
+   */
+  private static getInstanceKey(config: Config): string {
+    const browserConfig = config.getBrowserAgentConfig();
+    const sessionMode = browserConfig.customConfig.sessionMode ?? 'persistent';
+    const profilePath = browserConfig.customConfig.profilePath ?? 'default';
+    return `${sessionMode}:${profilePath}`;
+  }
+
+  /**
+   * Returns an existing BrowserManager for the current config's session mode
+   * and profile, or creates a new one.
+   *
+   * Concurrency rules:
+   * - **persistent / existing mode**: Only one instance is allowed at a time.
+   *   If the instance is already in-use, an error is thrown instructing the
+   *   caller to run browser tasks sequentially.
+   * - **isolated mode**: Parallel instances are allowed up to
+   *   MAX_PARALLEL_INSTANCES. Each isolated instance gets its own temp profile.
+   */
+  static getInstance(config: Config): BrowserManager {
+    const key = BrowserManager.getInstanceKey(config);
+    const sessionMode =
+      config.getBrowserAgentConfig().customConfig.sessionMode ?? 'persistent';
+    let instance = BrowserManager.instances.get(key);
+    if (!instance) {
+      instance = new BrowserManager(config);
+      BrowserManager.instances.set(key, instance);
+      debugLogger.log(`Created new BrowserManager singleton (key: ${key})`);
+    } else if (instance.inUse) {
+      // Persistent and existing modes share a browser profile directory.
+      // Chrome prevents multiple instances from using the same profile, so
+      // concurrent usage would cause "profile locked" errors.
+      if (sessionMode === 'persistent' || sessionMode === 'existing') {
+        throw new Error(
+          `Cannot launch a concurrent browser agent in "${sessionMode}" session mode. ` +
+            `The browser instance is already in use by another task. ` +
+            `Please run browser tasks sequentially, or switch to "isolated" session mode for concurrent browser usage.`,
+        );
+      }
+
+      // Isolated mode: allow parallel instances up to the limit.
+      let inUseCount = 1; // primary is already in-use
+      let suffix = 1;
+      let parallelKey = `${key}:${suffix}`;
+      let parallel = BrowserManager.instances.get(parallelKey);
+      while (parallel?.inUse) {
+        inUseCount++;
+        if (inUseCount >= BrowserManager.MAX_PARALLEL_INSTANCES) {
+          throw new Error(
+            `Maximum number of parallel browser instances (${BrowserManager.MAX_PARALLEL_INSTANCES}) reached. ` +
+              `Please wait for an existing browser task to complete before starting a new one.`,
+          );
+        }
+        suffix++;
+        parallelKey = `${key}:${suffix}`;
+        parallel = BrowserManager.instances.get(parallelKey);
+      }
+      if (!parallel) {
+        parallel = new BrowserManager(config);
+        BrowserManager.instances.set(parallelKey, parallel);
+        debugLogger.log(
+          `Created parallel BrowserManager (key: ${parallelKey})`,
+        );
+      } else {
+        debugLogger.log(
+          `Reusing released parallel BrowserManager (key: ${parallelKey})`,
+        );
+      }
+      instance = parallel;
+    } else {
+      debugLogger.log(
+        `Reusing existing BrowserManager singleton (key: ${key})`,
+      );
+    }
+    return instance;
+  }
+
+  /**
+   * Closes all cached BrowserManager instances and clears the cache.
+   * Called on /clear commands and CLI exit.
+   */
+  static async resetAll(): Promise<void> {
+    const results = await Promise.allSettled(
+      Array.from(BrowserManager.instances.values()).map((instance) =>
+        instance.close(),
+      ),
+    );
+    for (const result of results) {
+      if (result.status === 'rejected') {
+        debugLogger.error(
+          `Error during BrowserManager cleanup: ${result.reason instanceof Error ? result.reason.message : String(result.reason)}`,
+        );
+      }
+    }
+    BrowserManager.instances.clear();
+  }
+
+  /**
+   * Alias for resetAll — used by CLI exit cleanup for clarity.
+   */
+  static async closeAll(): Promise<void> {
+    await BrowserManager.resetAll();
+  }
+
+  // --- Instance state ---
   // Raw MCP SDK Client - NOT the wrapper McpClient
   private rawMcpClient: Client | undefined;
   private mcpTransport: StdioClientTransport | undefined;
   private discoveredTools: McpTool[] = [];
+  private disconnected = false;
+  private isClosing = false;
+  private connectionPromise: Promise<void> | undefined;
+
+  /**
+   * Whether this instance is currently acquired by an active invocation.
+   * Used by getInstance() to avoid handing the same browser to concurrent
+   * browser_agent calls.
+   */
+  private inUse = false;
+
+  /**
+   * Marks this instance as in-use. Call this when starting a browser agent
+   * invocation so concurrent calls get a separate instance.
+   */
+  acquire(): void {
+    this.inUse = true;
+  }
+
+  /**
+   * Marks this instance as available for reuse. Call this in the finally
+   * block of a browser agent invocation.
+   */
+  release(): void {
+    this.inUse = false;
+  }
+
+  /**
+   * Returns whether this instance is currently acquired by an active invocation.
+   */
+  isAcquired(): boolean {
+    return this.inUse;
+  }
 
   /** State for action rate limiting */
   private actionCounter = 0;
@@ -146,38 +315,34 @@ export class BrowserManager {
    * @param toolName The name of the tool to call
    * @param args Arguments to pass to the tool
    * @param signal Optional AbortSignal to cancel the call
+   * @param isInternal Determine if the tool is for internal execution
    * @returns The result from the MCP server
    */
   async callTool(
     toolName: string,
     args: Record<string, unknown>,
     signal?: AbortSignal,
+    isInternal: boolean = false,
   ): Promise<McpToolCallResult> {
     if (signal?.aborted) {
       throw signal.reason ?? new Error('Operation cancelled');
     }
 
     // Hard enforcement of per-action rate limit
-    if (this.actionCounter > this.maxActionsPerTask) {
-      const error = new Error(
-        `Browser agent reached maximum action limit (${this.maxActionsPerTask}). ` +
-          `Task terminated to prevent runaway execution. To config the limit, use maxActionsPerTask in the settings.`,
-      );
-      throw error;
+    if (!isInternal) {
+      if (this.actionCounter >= this.maxActionsPerTask) {
+        const error = new Error(
+          `Browser agent reached maximum action limit (${this.maxActionsPerTask}). ` +
+            `Task terminated to prevent runaway execution. To config the limit, use maxActionsPerTask in the settings.`,
+        );
+        throw error;
+      }
+      this.actionCounter++;
     }
-    this.actionCounter++;
 
     const errorMessage = this.checkNavigationRestrictions(toolName, args);
     if (errorMessage) {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: errorMessage,
-          },
-        ],
-        isError: true,
-      };
+      throw new DomainNotAllowedError(errorMessage);
     }
 
     const client = await this.getRawMcpClient();
@@ -224,6 +389,11 @@ export class BrowserManager {
       POTENTIALLY_NAVIGATING_TOOLS.has(toolName) &&
       !signal?.aborted
     ) {
+      // Don't re-inject if explicitly switching to a page in the background
+      if (toolName === 'select_page' && args['bringToFront'] === false) {
+        return result;
+      }
+
       try {
         if (this.shouldInjectOverlay) {
           await injectAutomationOverlay(this, signal);
@@ -267,13 +437,52 @@ export class BrowserManager {
   }
 
   /**
+   * Returns whether the MCP client is currently connected and healthy.
+   */
+  isConnected(): boolean {
+    return this.rawMcpClient !== undefined && !this.disconnected;
+  }
+
+  /**
    * Ensures browser and MCP client are connected.
+   * If a previous connection was lost (e.g., user closed the browser),
+   * this will reconnect with exponential backoff (up to MAX_RECONNECT_RETRIES).
+   *
+   * Concurrent callers share a single in-flight connection promise so that
+   * two subagents racing at startup do not trigger duplicate connectMcp() calls.
    */
   async ensureConnection(): Promise<void> {
-    if (this.rawMcpClient) {
+    // Already connected and healthy — nothing to do
+    if (this.isConnected()) {
       return;
     }
 
+    // A connection is already being established — wait for it instead of racing
+    if (this.connectionPromise) {
+      return this.connectionPromise;
+    }
+
+    // If previously connected but transport died, clean up before reconnecting
+    if (this.disconnected) {
+      debugLogger.log(
+        'Previous browser connection was lost. Cleaning up before reconnecting...',
+      );
+      await this.close();
+      this.disconnected = false;
+    }
+
+    // Start connecting; store the promise so concurrent callers can join it
+    this.connectionPromise = this.connectWithRetry().finally(() => {
+      this.connectionPromise = undefined;
+    });
+
+    return this.connectionPromise;
+  }
+
+  /**
+   * Connects to chrome-devtools-mcp with exponential backoff retry.
+   */
+  private async connectWithRetry(): Promise<void> {
     // Request browser consent if needed (first-run privacy notice)
     const consentGranted = await getBrowserConsentIfNeeded();
     if (!consentGranted) {
@@ -283,7 +492,23 @@ export class BrowserManager {
       );
     }
 
-    await this.connectMcp();
+    let lastError: Error | undefined;
+    for (let attempt = 0; attempt < MAX_RECONNECT_RETRIES; attempt++) {
+      try {
+        await this.connectMcp();
+        return;
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        if (attempt < MAX_RECONNECT_RETRIES - 1) {
+          const delay = RECONNECT_BASE_DELAY_MS * Math.pow(2, attempt);
+          debugLogger.log(
+            `Connection attempt ${attempt + 1} failed, retrying in ${delay}ms...`,
+          );
+          await new Promise((resolve) => setTimeout(resolve, delay));
+        }
+      }
+    }
+    throw lastError!;
   }
 
   /**
@@ -292,6 +517,7 @@ export class BrowserManager {
    * the transport will terminate the browser.
    */
   async close(): Promise<void> {
+    this.isClosing = true;
     // Close MCP client first
     if (this.rawMcpClient) {
       try {
@@ -317,6 +543,7 @@ export class BrowserManager {
     }
 
     this.discoveredTools = [];
+    this.connectionPromise = undefined;
   }
 
   /**
@@ -330,6 +557,7 @@ export class BrowserManager {
    * BrowserManager instance.
    */
   private async connectMcp(): Promise<void> {
+    this.isClosing = false;
     debugLogger.log('Connecting isolated MCP client to chrome-devtools-mcp...');
 
     // Create raw MCP SDK Client (not the wrapper McpClient)
@@ -345,7 +573,36 @@ export class BrowserManager {
 
     // Build args for chrome-devtools-mcp
     const browserConfig = this.config.getBrowserAgentConfig();
-    const sessionMode = browserConfig.customConfig.sessionMode ?? 'persistent';
+    const rawSessionMode = browserConfig.customConfig.sessionMode;
+    let sessionMode: 'persistent' | 'isolated' | 'existing' =
+      rawSessionMode === 'isolated' || rawSessionMode === 'existing'
+        ? rawSessionMode
+        : 'persistent';
+
+    // Detect sandbox environment.
+    // SANDBOX env var is set to 'sandbox-exec' (seatbelt) or the container
+    // name (Docker/Podman/gVisor/LXC) when running inside a sandbox.
+    // CI uses 'sandbox:none' as a metadata label — not a real sandbox.
+    const sandboxType = process.env['SANDBOX'];
+    const isContainerSandbox =
+      !!sandboxType &&
+      sandboxType !== 'sandbox-exec' &&
+      sandboxType !== 'sandbox:none';
+    const isSeatbeltSandbox =
+      sandboxType === 'sandbox-exec' && sessionMode !== 'existing';
+
+    // Seatbelt sandbox: force isolated + headless for filesystem compatibility.
+    // Chrome exists on the host, but persistent profiles may conflict with
+    // seatbelt restrictions. Isolated mode uses tmpdir (always writable).
+    if (isSeatbeltSandbox) {
+      if (sessionMode !== 'isolated') {
+        sessionMode = 'isolated';
+        coreEvents.emitFeedback(
+          'info',
+          '🔒 Sandbox: Using isolated browser session for compatibility.',
+        );
+      }
+    }
 
     const mcpArgs = ['--experimental-vision'];
 
@@ -357,15 +614,44 @@ export class BrowserManager {
     if (sessionMode === 'isolated') {
       mcpArgs.push('--isolated');
     } else if (sessionMode === 'existing') {
-      mcpArgs.push('--autoConnect');
-      const message =
-        '🔒 Browsing with your signed-in Chrome profile — cookies and saved logins will be visible to the agent.';
-      coreEvents.emitFeedback('info', message);
-      coreEvents.emitConsoleLog('info', message);
+      if (isContainerSandbox) {
+        // In container sandboxes, --autoConnect can't discover Chrome on the
+        // host (it uses local pipes/sockets). Use --browser-url with the
+        // resolved IP of host.docker.internal instead of the hostname, because
+        // Chrome's DevTools protocol rejects HTTP requests where the Host
+        // header is not 'localhost' or an IP address.
+        const dns = await import('node:dns');
+        let browserHost = 'host.docker.internal';
+        try {
+          const { address } = await dns.promises.lookup(browserHost);
+          browserHost = address;
+        } catch {
+          // Fallback: use hostname as-is if DNS resolution fails
+          debugLogger.log(
+            `Could not resolve host.docker.internal, using hostname directly`,
+          );
+        }
+        const browserUrl = `http://${browserHost}:9222`;
+        mcpArgs.push('--browser-url', browserUrl);
+        coreEvents.emitFeedback(
+          'info',
+          `🔒 Container sandbox: Connecting to Chrome via ${browserHost}:9222.`,
+        );
+      } else {
+        mcpArgs.push('--autoConnect');
+        const message =
+          '🔒 Browsing with your signed-in Chrome profile — cookies and saved logins will be visible to the agent.';
+        coreEvents.emitFeedback('info', message);
+        coreEvents.emitConsoleLog('info', message);
+      }
     }
 
-    // Add optional settings from config
-    if (browserConfig.customConfig.headless) {
+    // Add optional settings from config.
+    // Force headless in seatbelt sandbox since Chrome profile/display access
+    // may be restricted, and the user is running in a sandboxed environment.
+    const effectiveHeadless =
+      !!browserConfig.customConfig.headless || isSeatbeltSandbox;
+    if (effectiveHeadless) {
       mcpArgs.push('--headless');
     }
     if (browserConfig.customConfig.profilePath) {
@@ -397,7 +683,7 @@ export class BrowserManager {
         })
         .join(', ');
       mcpArgs.push(
-        `--chromeArg="--host-rules=MAP * 127.0.0.1, ${exclusionRules}, EXCLUDE 127.0.0.1"`,
+        `--chromeArg="--host-rules=MAP * ~NOTFOUND, ${exclusionRules}"`,
       );
     }
 
@@ -438,11 +724,14 @@ export class BrowserManager {
     }
 
     this.mcpTransport.onclose = () => {
+      this.disconnected = true;
+      if (this.isClosing) {
+        return;
+      }
       debugLogger.error(
         'chrome-devtools-mcp transport closed unexpectedly. ' +
           'The MCP server process may have crashed.',
       );
-      this.rawMcpClient = undefined;
     };
     this.mcpTransport.onerror = (error: Error) => {
       debugLogger.error(
@@ -456,13 +745,22 @@ export class BrowserManager {
       sessionMode === 'existing' ? 15_000 : MCP_TIMEOUT_MS;
 
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    const connectStartMs = Date.now();
     try {
       await Promise.race([
         (async () => {
           await this.rawMcpClient!.connect(this.mcpTransport!);
           debugLogger.log('MCP client connected to chrome-devtools-mcp');
           await this.discoverTools();
-          this.registerInputBlockerHandler();
+          // clear the action counter for each connection
+          this.actionCounter = 0;
+
+          logBrowserAgentConnection(this.config, Date.now() - connectStartMs, {
+            session_mode: sessionMode,
+            headless: effectiveHeadless,
+            success: true,
+            tool_count: this.discoveredTools.length,
+          });
         })(),
         new Promise<never>((_, reject) => {
           timeoutId = setTimeout(
@@ -479,11 +777,19 @@ export class BrowserManager {
     } catch (error) {
       await this.close();
 
+      const rawErrorMessage =
+        error instanceof Error ? error.message : String(error);
+      const errorType = BrowserManager.classifyConnectionError(rawErrorMessage);
+
+      logBrowserAgentConnection(this.config, Date.now() - connectStartMs, {
+        session_mode: sessionMode,
+        headless: effectiveHeadless,
+        success: false,
+        error_type: errorType,
+      });
+
       // Provide error-specific, session-mode-aware remediation
-      throw this.createConnectionError(
-        error instanceof Error ? error.message : String(error),
-        sessionMode,
-      );
+      throw this.createConnectionError(rawErrorMessage, sessionMode);
     } finally {
       if (timeoutId !== undefined) {
         clearTimeout(timeoutId);
@@ -492,14 +798,33 @@ export class BrowserManager {
   }
 
   /**
+   * Classifies a connection error message into a known error type.
+   * Shared between connectMcp error recording and createConnectionError
+   * to ensure consistent error categorization across the browser agent.
+   */
+  private static classifyConnectionError(
+    message: string,
+  ): 'profile_locked' | 'timeout' | 'connection_refused' | 'unknown' {
+    const lowerMessage = message.toLowerCase();
+    if (lowerMessage.includes('already running')) {
+      return 'profile_locked';
+    } else if (lowerMessage.includes('timed out')) {
+      return 'timeout';
+    } else if (lowerMessage.includes('connection refused')) {
+      return 'connection_refused';
+    }
+    return 'unknown';
+  }
+
+  /**
    * Creates an Error with context-specific remediation based on the actual
    * error message and the current sessionMode.
    */
   private createConnectionError(message: string, sessionMode: string): Error {
-    const lowerMessage = message.toLowerCase();
+    const errorType = BrowserManager.classifyConnectionError(message);
 
     // "already running for the current profile" — persistent mode profile lock
-    if (lowerMessage.includes('already running')) {
+    if (errorType === 'profile_locked') {
       if (sessionMode === 'persistent' || sessionMode === 'isolated') {
         return new Error(
           `Could not connect to Chrome: ${message}\n\n` +
@@ -519,7 +844,7 @@ export class BrowserManager {
     }
 
     // Timeout errors
-    if (lowerMessage.includes('timed out')) {
+    if (errorType === 'timeout') {
       if (sessionMode === 'existing') {
         return new Error(
           `Timed out connecting to Chrome: ${message}\n\n` +
@@ -608,8 +933,7 @@ export class BrowserManager {
       const urlHostname = parsedUrl.hostname;
 
       if (!this.isDomainAllowed(urlHostname, allowedDomains)) {
-        // If none matched, then deny
-        return `Tool '${toolName}' is not permitted for the requested URL/domain based on your current browser settings.`;
+        return 'Domain not allowed: The requested domain is not in the allowed list.';
       }
 
       // Check query parameters for embedded URLs that could bypass domain
@@ -628,7 +952,7 @@ export class BrowserManager {
           ) {
             const embeddedHostname = embeddedUrl.hostname.replace(/\.$/, '');
             if (!this.isDomainAllowed(embeddedHostname, allowedDomains)) {
-              return `Tool '${toolName}' is not permitted: an embedded URL targets a disallowed domain.`;
+              return 'Domain not allowed: Embedded URL targets a disallowed domain.';
             }
           }
         } catch {
@@ -664,46 +988,5 @@ export class BrowserManager {
     }
     // If none matched, then deny
     return false;
-  }
-
-  /**
-   * Registers a fallback notification handler on the MCP client to
-   * automatically re-inject the input blocker after any server-side
-   * notification (e.g. page navigation, resource updates).
-   *
-   * This covers ALL navigation types (link clicks, form submissions,
-   * history navigation) — not just explicit navigate_page tool calls.
-   */
-  private registerInputBlockerHandler(): void {
-    if (!this.rawMcpClient) {
-      return;
-    }
-
-    if (!this.config.shouldDisableBrowserUserInput()) {
-      return;
-    }
-
-    const existingHandler = this.rawMcpClient.fallbackNotificationHandler;
-    this.rawMcpClient.fallbackNotificationHandler = async (notification: {
-      method: string;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      params?: any;
-    }) => {
-      // Chain with any existing handler first.
-      if (existingHandler) {
-        await existingHandler(notification);
-      }
-
-      // Only re-inject on resource update notifications which indicate
-      // page content has changed (navigation, new page, etc.)
-      if (notification.method === 'notifications/resources/updated') {
-        debugLogger.log('Page content changed, re-injecting input blocker...');
-        void injectInputBlocker(this);
-      }
-    };
-
-    debugLogger.log(
-      'Registered global notification handler for input blocker re-injection',
-    );
   }
 }

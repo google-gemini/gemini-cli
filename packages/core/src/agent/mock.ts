@@ -10,6 +10,7 @@ import type {
   AgentEventData,
   AgentProtocol,
   AgentSend,
+  ContentPart,
   Unsubscribe,
 } from './types.js';
 
@@ -133,11 +134,17 @@ export class MockAgentProtocol implements AgentProtocol {
 
     // 1. User/Update event (BEFORE agent_start)
     if ('message' in payload && payload.message) {
+      const message = Array.isArray(payload.message)
+        ? { content: payload.message, displayContent: undefined }
+        : payload.message;
+      const userContent: ContentPart[] = message.displayContent
+        ? [{ type: 'text', text: message.displayContent }]
+        : message.content;
       eventsToEmit.push(
         normalize({
           type: 'message',
           role: 'user',
-          content: payload.message,
+          content: userContent,
           _meta: payload._meta,
         }),
       );

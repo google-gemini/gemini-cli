@@ -1,22 +1,29 @@
-# Local Model Routing (experimental)
+# Manual Local Model Routing Setup (experimental)
 
 Gemini CLI supports using a local model for
 [routing decisions](../cli/model-routing.md). When configured, Gemini CLI will
 use a locally-running **Gemma** model to make routing decisions (instead of
 sending routing decisions to a hosted model).
 
+<!-- prettier-ignore -->
+> [!NOTE]
+> This is an experimental feature currently under active development.
+
+<!-- prettier-ignore -->
+> [!IMPORTANT]
+> **Recommended:** We now provide a fully automated setup command. We recommend
+> using the [`gemini gemma` Setup Guide](./gemma-setup.md) instead of following
+> these manual steps.
+
 This feature can help reduce costs associated with hosted model usage while
 offering similar routing decision latency and quality.
 
-> **Note: Local model routing is currently an experimental feature.**
-
-## Setup
+## Manual Setup
 
 Using a Gemma model for routing decisions requires that an implementation of a
 Gemma model be running locally on your machine, served behind an HTTP endpoint
-and accessed via the Gemini API.
-
-To serve the Gemma model, follow these steps:
+and accessed via the Gemini API. If you cannot use the `gemini gemma setup`
+command, follow these manual steps:
 
 ### Download the LiteRT-LM runtime
 
@@ -108,7 +115,7 @@ Download complete.
 $ ./lit.lit.macos_arm64 pull gemma3-1b-gpu-custom
 
 [Legal] The model you are about to download is governed by
-the Gemma Terms of Use and Prohibited Use Policy. Please review these terms and ensure you agree before continuing.
+the Gemma Terms of Use and Prohibited Use Policy. Review these terms and ensure you agree before continuing.
 
 Full Terms: https://ai.google.dev/gemma/terms
 Prohibited Use Policy: https://ai.google.dev/gemma/prohibited_use_policy

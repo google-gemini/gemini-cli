@@ -1,17 +1,17 @@
 # Gemini CLI: License, Terms of Service, and Privacy Notices
 
 Gemini CLI is an open-source tool that lets you interact with Google's powerful
-AI services directly from your command-line interface. The Gemini CLI software
-is licensed under the
+AI services directly from your command-line interface. Gemini CLI software is
+licensed under the
 [Apache 2.0 license](https://github.com/google-gemini/gemini-cli/blob/main/LICENSE).
 When you use Gemini CLI to access or use Google’s services, the Terms of Service
 and Privacy Notices applicable to those services apply to such access and use.
 
-Directly accessing the services powering Gemini CLI (e.g., the Gemini Code
-Assist service) using third-party software, tools, or services (for example,
-using OpenClaw with Gemini CLI OAuth) is a violation of applicable terms and
-policies. Such actions may be grounds for suspension or termination of your
-account.
+Directly accessing the services powering Gemini CLI (for example, the Gemini
+Code Assist service) using third-party software, tools, or services (for
+example, using OpenClaw with Gemini CLI OAuth) is a violation of applicable
+terms and policies. Such actions may be grounds for suspension or termination of
+your account.
 
 Your Gemini CLI Usage Statistics are handled in accordance with Google's Privacy
 Policy.
@@ -19,7 +19,7 @@ Policy.
 <!-- prettier-ignore -->
 > [!NOTE]
 > See [quotas and pricing](quota-and-pricing.md) for the quota and
-> pricing details that apply to your usage of the Gemini CLI.
+> pricing details that apply to your usage of Gemini CLI.
 
 ## Supported authentication methods
 
@@ -37,7 +37,7 @@ If you log in with your Google account and you do not already have a Gemini Code
 Assist account associated with your Google account, you will be directed to the
 sign up flow for Gemini Code Assist for individuals. If your Google account is
 managed by your organization, your administrator may not permit access to Gemini
-Code Assist for individuals. Please see the
+Code Assist for individuals. See the
 [Gemini Code Assist for individuals FAQs](https://developers.google.com/gemini-code-assist/resources/faqs)
 for further information.
 
@@ -76,7 +76,7 @@ If you are using a Gemini API key for authentication with the
 [Gemini Developer API](https://ai.google.dev/gemini-api/docs), these Terms of
 Service and Privacy Notice documents apply:
 
-- Terms of Service: Your use of the Gemini CLI is governed by the
+- Terms of Service: Your use of Gemini CLI is governed by the
   [Gemini API Terms of Service](https://ai.google.dev/gemini-api/terms). These
   terms may differ depending on whether you are using an unpaid or paid service:
   - For unpaid services, refer to the
@@ -92,7 +92,7 @@ If you are using a Gemini API key for authentication with a
 [Vertex AI GenAI API](https://cloud.google.com/vertex-ai/generative-ai/docs/reference/rest)
 backend, these Terms of Service and Privacy Notice documents apply:
 
-- Terms of Service: Your use of the Gemini CLI is governed by the
+- Terms of Service: Your use of Gemini CLI is governed by the
   [Google Cloud Platform Service Terms](https://cloud.google.com/terms/service-terms/).
 - Privacy Notice: The collection and use of your data is described in the
   [Google Cloud Privacy Notice](https://cloud.google.com/terms/cloud-privacy-notice).

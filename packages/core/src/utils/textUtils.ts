@@ -133,3 +133,21 @@ export function safeTemplateReplace(
       : match,
   );
 }
+
+/**
+ * Sanitizes output for injection into the model conversation.
+ * Wraps output in a secure <output> tag and handles potential injection vectors
+ * (like closing tags or template patterns) within the data.
+ * @param output The raw output to sanitize.
+ * @returns The sanitized string ready for injection.
+ */
+export function sanitizeOutput(output: string): string {
+  const trimmed = output.trim();
+  if (trimmed.length === 0) {
+    return '';
+  }
+
+  // Prevent direct closing tag injection.
+  const escaped = trimmed.replaceAll('</output>', '&lt;/output&gt;');
+  return `<output>\n${escaped}\n</output>`;
+}

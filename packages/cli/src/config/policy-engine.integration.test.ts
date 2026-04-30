@@ -67,6 +67,11 @@ describe('Policy Engine Integration Tests', () => {
       expect(
         (await engine.check({ name: 'unknown_tool' }, undefined)).decision,
       ).toBe(PolicyDecision.ASK_USER);
+
+      // invoke_agent should be allowed by default (via agents.toml)
+      expect(
+        (await engine.check({ name: 'invoke_agent' }, undefined)).decision,
+      ).toBe(PolicyDecision.ALLOW);
     });
 
     it('should handle MCP server wildcard patterns correctly', async () => {
@@ -350,8 +355,36 @@ describe('Policy Engine Integration Tests', () => {
         (await engine.check({ name: 'get_internal_docs' }, undefined)).decision,
       ).toBe(PolicyDecision.ALLOW);
       expect(
-        (await engine.check({ name: 'cli_help' }, undefined)).decision,
+        (
+          await engine.check(
+            { name: 'invoke_agent', args: { agent_name: 'cli_help' } },
+            undefined,
+          )
+        ).decision,
       ).toBe(PolicyDecision.ALLOW);
+
+      // codebase_investigator should be allowed in Plan mode
+      expect(
+        (
+          await engine.check(
+            {
+              name: 'invoke_agent',
+              args: { agent_name: 'codebase_investigator' },
+            },
+            undefined,
+          )
+        ).decision,
+      ).toBe(PolicyDecision.ALLOW);
+
+      // Unknown agents should be denied in Plan mode (via catch-all)
+      expect(
+        (
+          await engine.check(
+            { name: 'invoke_agent', args: { agent_name: 'unknown_agent' } },
+            undefined,
+          )
+        ).decision,
+      ).toBe(PolicyDecision.DENY);
 
       // Other tools should be denied via catch all
       expect(
@@ -520,8 +553,8 @@ describe('Policy Engine Integration Tests', () => {
       const readOnlyToolRule = rules.find(
         (r) => r.toolName === 'glob' && !r.subagent,
       );
-      // Priority 70 in default tier → 1.07 (Overriding Plan Mode Deny)
-      expect(readOnlyToolRule?.priority).toBeCloseTo(1.07, 5);
+      // Priority 50 in default tier → 1.05 (Overriding Plan Mode Deny)
+      expect(readOnlyToolRule?.priority).toBeCloseTo(1.05, 5);
 
       // Verify the engine applies these priorities correctly
       expect(
@@ -605,12 +638,12 @@ describe('Policy Engine Integration Tests', () => {
     it('should verify non-interactive mode transformation', async () => {
       const settings: Settings = {};
 
-      const config = await createPolicyEngineConfig(
+      const engineConfig = await createPolicyEngineConfig(
         settings,
         ApprovalMode.DEFAULT,
+        undefined,
+        false,
       );
-      // Enable non-interactive mode
-      const engineConfig = { ...config, nonInteractive: true };
       const engine = new PolicyEngine(engineConfig);
 
       // ASK_USER should become DENY in non-interactive mode
@@ -677,8 +710,8 @@ describe('Policy Engine Integration Tests', () => {
       expect(server1Rule?.priority).toBe(4.1); // Allowed servers (user tier)
 
       const globRule = rules.find((r) => r.toolName === 'glob' && !r.subagent);
-      // Priority 70 in default tier → 1.07
-      expect(globRule?.priority).toBeCloseTo(1.07, 5); // Auto-accept read-only
+      // Priority 50 in default tier → 1.05
+      expect(globRule?.priority).toBeCloseTo(1.05, 5); // Auto-accept read-only
 
       // The PolicyEngine will sort these by priority when it's created
       const engine = new PolicyEngine(config);

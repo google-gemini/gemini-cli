@@ -72,6 +72,7 @@ export interface CommandContext {
     loadHistory: (history: HistoryItem[], postLoadInput?: string) => void;
     /** Toggles a special display mode. */
     toggleCorgiMode: () => void;
+    toggleVoiceMode: () => void;
     toggleDebugProfiler: () => void;
     toggleVimEnabled: () => Promise<boolean>;
     reloadCommands: () => void;
@@ -90,7 +91,7 @@ export interface CommandContext {
      */
     setConfirmationRequest: (value: ConfirmationRequest) => void;
     removeComponent: () => void;
-    toggleBackgroundShell: () => void;
+    toggleBackgroundTasks: () => void;
     toggleShortcutsHelp: () => void;
   };
   // Session-specific data
@@ -107,6 +108,8 @@ export interface CommandContext {
 export interface QuitActionReturn {
   type: 'quit';
   messages: HistoryItem[];
+  /** When true, the current session's history and temporary files will be deleted on exit. */
+  deleteSession?: boolean;
 }
 
 /**
@@ -125,6 +128,7 @@ export interface OpenDialogActionReturn {
     | 'settings'
     | 'sessionBrowser'
     | 'model'
+    | 'voice-model'
     | 'agentConfig'
     | 'permissions';
 }
@@ -239,6 +243,15 @@ export interface SlashCommand {
    * Defaults to true. Set to false for fast completions to avoid flicker.
    */
   showCompletionLoading?: boolean;
+
+  /**
+   * Whether the command expects arguments.
+   * If false, and the command is a subcommand, the command parser may treat
+   * any following text as arguments for the parent command instead of this subcommand,
+   * provided the parent command has an action.
+   * Defaults to true.
+   */
+  takesArgs?: boolean;
 
   subCommands?: SlashCommand[];
 }

@@ -104,6 +104,47 @@ describe('planCommand', () => {
     );
   });
 
+  it('should not return a submit_prompt action if arguments are empty', async () => {
+    vi.mocked(
+      mockContext.services.agentContext!.config.isPlanEnabled,
+    ).mockReturnValue(true);
+    mockContext.invocation = {
+      raw: '/plan',
+      name: 'plan',
+      args: '',
+    };
+
+    if (!planCommand.action) throw new Error('Action missing');
+    const result = await planCommand.action(mockContext, '');
+
+    expect(result).toBeUndefined();
+    expect(
+      mockContext.services.agentContext!.config.setApprovalMode,
+    ).toHaveBeenCalledWith(ApprovalMode.PLAN);
+  });
+
+  it('should return a submit_prompt action if arguments are provided', async () => {
+    vi.mocked(
+      mockContext.services.agentContext!.config.isPlanEnabled,
+    ).mockReturnValue(true);
+    mockContext.invocation = {
+      raw: '/plan implement auth',
+      name: 'plan',
+      args: 'implement auth',
+    };
+
+    if (!planCommand.action) throw new Error('Action missing');
+    const result = await planCommand.action(mockContext, 'implement auth');
+
+    expect(result).toEqual({
+      type: 'submit_prompt',
+      content: 'implement auth',
+    });
+    expect(
+      mockContext.services.agentContext!.config.setApprovalMode,
+    ).toHaveBeenCalledWith(ApprovalMode.PLAN);
+  });
+
   it('should display the approved plan from config', async () => {
     const mockPlanPath = '/mock/plans/dir/approved-plan.md';
     vi.mocked(

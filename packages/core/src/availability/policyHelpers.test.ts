@@ -9,8 +9,10 @@ import {
   resolvePolicyChain,
   buildFallbackPolicyContext,
   applyModelSelection,
+  applyAvailabilityTransition,
 } from './policyHelpers.js';
-import { createDefaultPolicy } from './policyCatalog.js';
+import { createDefaultPolicy, SILENT_ACTIONS } from './policyCatalog.js';
+import type { RetryAvailabilityContext } from './modelPolicy.js';
 import type { Config } from '../config/config.js';
 import {
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
@@ -21,6 +23,7 @@ import {
 import { AuthType } from '../core/contentGenerator.js';
 import { ModelConfigService } from '../services/modelConfigService.js';
 import { DEFAULT_MODEL_CONFIGS } from '../config/defaultModelConfigs.js';
+import { ApprovalMode } from '../policy/types.js';
 
 const createMockConfig = (overrides: Partial<Config> = {}): Config => {
   const config = {
@@ -34,6 +37,7 @@ const createMockConfig = (overrides: Partial<Config> = {}): Config => {
       return useGemini31 && authType === AuthType.USE_GEMINI;
     },
     getContentGeneratorConfig: () => ({ authType: undefined }),
+    getMaxAttemptsPerTurn: () => 3,
     ...overrides,
   } as unknown as Config;
   return config;
@@ -164,6 +168,18 @@ describe('policyHelpers', () => {
       expect(chain[0]?.model).toBe(PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL);
       expect(chain[1]?.model).toBe('gemini-3-flash-preview');
     });
+
+    it('applies SILENT_ACTIONS when ApprovalMode is PLAN', () => {
+      const config = createMockConfig({
+        getApprovalMode: () => ApprovalMode.PLAN,
+        getModel: () => DEFAULT_GEMINI_MODEL_AUTO,
+      });
+      const chain = resolvePolicyChain(config);
+
+      expect(chain).toHaveLength(2);
+      expect(chain[0]?.actions).toEqual(SILENT_ACTIONS);
+      expect(chain[1]?.actions).toEqual(SILENT_ACTIONS);
+    });
   });
 
   describe('resolvePolicyChain behavior is identical between dynamic and legacy implementations', () => {
@@ -188,6 +204,7 @@ describe('policyHelpers', () => {
         hasAccess: false,
       },
       { name: 'Concrete Model (2.5 Pro)', model: 'gemini-2.5-pro' },
+      { name: 'Explicit Gemini 3', model: 'gemini-3-pro-preview' },
       { name: 'Custom Model', model: 'my-custom-model' },
       {
         name: 'Wrap Around',
@@ -423,6 +440,53 @@ describe('policyHelpers', () => {
       ).not.toHaveBeenCalled();
       expect(config.setActiveModel).toHaveBeenCalledWith('gemini-pro');
       expect(result.maxAttempts).toBe(1);
+    });
+  });
+
+  describe('applyAvailabilityTransition', () => {
+    it('marks terminal on terminal transition', () => {
+      const mockService = { markTerminal: vi.fn() };
+      const context = {
+        service: mockService,
+        policy: {
+          model: 'test-model',
+          stateTransitions: { transient: 'terminal' },
+        },
+      };
+      const getContext = () => context as unknown as RetryAvailabilityContext;
+
+      applyAvailabilityTransition(getContext, 'transient');
+
+      expect(mockService.markTerminal).toHaveBeenCalledWith(
+        'test-model',
+        'capacity',
+      );
+    });
+
+    it('marks sticky and consumes on sticky_retry transition', () => {
+      const mockService = {
+        markRetryOncePerTurn: vi.fn(),
+        consumeStickyAttempt: vi.fn(),
+      };
+      const context = {
+        service: mockService,
+        policy: {
+          model: 'test-model',
+          stateTransitions: { transient: 'sticky_retry' },
+          maxAttempts: 3,
+        },
+      };
+      const getContext = () => context as unknown as RetryAvailabilityContext;
+
+      applyAvailabilityTransition(getContext, 'transient');
+
+      expect(mockService.markRetryOncePerTurn).toHaveBeenCalledWith(
+        'test-model',
+        3,
+      );
+      expect(mockService.consumeStickyAttempt).toHaveBeenCalledWith(
+        'test-model',
+      );
     });
   });
 });

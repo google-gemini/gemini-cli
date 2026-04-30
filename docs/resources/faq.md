@@ -8,7 +8,7 @@ problems encountered while using Gemini CLI.
 This section addresses common questions about Gemini CLI usage, security, and
 troubleshooting general errors.
 
-### Why can't I use third-party software (e.g. Claude Code, OpenClaw, OpenCode) with Gemini CLI?
+### Why can't I use third-party software like Claude Code, OpenClaw, or OpenCode with Gemini CLI?
 
 Using third-party software, tools, or services to harvest or piggyback on Gemini
 CLI's OAuth authentication to access our backend services is a direct violation
@@ -113,8 +113,8 @@ export GOOGLE_CLOUD_PROJECT="your-project-id"
 $env:GOOGLE_CLOUD_PROJECT="your-project-id"
 ```
 
-To make this setting permanent, add this line to your shell's startup file
-(e.g., `~/.bashrc`, `~/.zshrc`).
+To make this setting permanent, add this line to your shell's startup file (for
+example, `~/.bashrc`, `~/.zshrc`).
 
 ### What is the best way to store my API keys securely?
 
@@ -131,9 +131,9 @@ To store your API keys securely, you can:
   Manager, or a secret manager on Linux). You can then have your scripts or
   environment load the key from the secure storage at runtime.
 
-### Where are the Gemini CLI configuration and settings files stored?
+### Where are Gemini CLI configuration and settings files stored?
 
-The Gemini CLI configuration is stored in two `settings.json` files:
+Gemini CLI configuration is stored in two `settings.json` files:
 
 1.  In your home directory: `~/.gemini/settings.json`.
 2.  In your project's root directory: `./.gemini/settings.json`.

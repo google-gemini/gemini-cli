@@ -18,7 +18,7 @@ vi.mock('../../utils/processUtils.js', () => ({
 }));
 
 const mockedExit = vi.hoisted(() => vi.fn());
-const mockedCwd = vi.hoisted(() => vi.fn());
+const mockedCwd = vi.hoisted(() => vi.fn().mockReturnValue('/mock/cwd'));
 const mockedRows = vi.hoisted(() => ({ current: 24 }));
 
 vi.mock('node:process', async () => {
@@ -85,7 +85,7 @@ describe('FolderTrustDialog', () => {
     );
 
     expect(lastFrame()).toContain('This folder contains:');
-    expect(lastFrame()).toContain('hidden');
+    expect(lastFrame()).not.toContain('cmd9');
     unmount();
   });
 
@@ -116,7 +116,7 @@ describe('FolderTrustDialog', () => {
 
     // With maxHeight=4, the intro text (4 lines) will take most of the space.
     // The discovery results will likely be hidden.
-    expect(lastFrame()).toContain('hidden');
+    expect(lastFrame()).not.toContain('cmd1');
     unmount();
   });
 
@@ -145,7 +145,7 @@ describe('FolderTrustDialog', () => {
       },
     );
 
-    expect(lastFrame()).toContain('hidden');
+    expect(lastFrame()).not.toContain('cmd1');
     unmount();
   });
 
@@ -178,9 +178,10 @@ describe('FolderTrustDialog', () => {
     // Initial state: truncated
     await waitFor(() => {
       expect(lastFrame()).toContain('Do you trust the files in this folder?');
-      expect(lastFrame()).toContain('Press Ctrl+O');
-      expect(lastFrame()).toContain('hidden');
+      expect(lastFrame()).not.toContain('cmd9');
     });
+
+    unmount();
 
     // We can't easily simulate global Ctrl+O toggle in this unit test
     // because it's handled in AppContainer.
@@ -195,7 +196,7 @@ describe('FolderTrustDialog', () => {
           width: 80,
           config: makeFakeConfig({ useAlternateBuffer: false }),
           settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
-          uiState: { constrainHeight: false, terminalHeight: 24 },
+          uiState: { constrainHeight: false, terminalHeight: 50 },
         },
       );
 
@@ -205,7 +206,6 @@ describe('FolderTrustDialog', () => {
       expect(lastFrameExpanded()).toContain('- cmd4');
     });
 
-    unmount();
     unmountExpanded();
   });
 

@@ -1,7 +1,7 @@
 # Get started with Gemini CLI
 
 Welcome to Gemini CLI! This guide will help you install, configure, and start
-using the Gemini CLI to enhance your workflow right from your terminal.
+using Gemini CLI to enhance your workflow right from your terminal.
 
 ## Quickstart: Install, authenticate, configure, and use Gemini CLI
 
@@ -24,7 +24,8 @@ Once Gemini CLI is installed, run Gemini CLI from your command line:
 gemini
 ```
 
-For more installation options, see [Gemini CLI Installation](./installation.md).
+For more installation options, see
+[Gemini CLI Installation](./installation.mdx).
 
 ## Authenticate
 
@@ -46,7 +47,7 @@ cases, you can log in with your existing Google account:
 
 Certain account types may require you to configure a Google Cloud project. For
 more information, including other authentication methods, see
-[Gemini CLI Authentication Setup](./authentication.md).
+[Gemini CLI Authentication Setup](./authentication.mdx).
 
 ## Configure
 
@@ -132,7 +133,7 @@ colors. After analyzing the source code, here's how it works:
   getters. The `red` getter adds the red color code, and the `bold` getter adds
   the bold code.
 
-- **Output generation:** When the chain is treated as a string (e.g., in
+- **Output generation:** When the chain is treated as a string (for example, in
   `console.log`), a final `toString()` method is called. This method joins all
   the stored ANSI codes, wraps them around the input string ('Hello'), and adds
   a reset code at the end. This produces the final, styled string that the

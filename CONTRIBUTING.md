@@ -110,7 +110,9 @@ assign or unassign the issue as requested, provided the conditions are met
 (e.g., an issue must be unassigned to be assigned).
 
 Please note that you can have a maximum of 3 issues assigned to you at any given
-time.
+time and that only
+[issues labeled "help wanted"](https://github.com/google-gemini/gemini-cli/issues?q=is%3Aissue%20state%3Aopen%20label%3A%22help%20wanted%22)
+may be self-assigned.
 
 ### Pull request guidelines
 
@@ -346,9 +348,11 @@ npm run lint
 
 - Please adhere to the coding style, patterns, and conventions used throughout
   the existing codebase.
-- Consult [GEMINI.md](../GEMINI.md) (typically found in the project root) for
-  specific instructions related to AI-assisted development, including
-  conventions for React, comments, and Git usage.
+- Consult
+  [GEMINI.md](https://github.com/google-gemini/gemini-cli/blob/main/GEMINI.md)
+  (typically found in the project root) for specific instructions related to
+  AI-assisted development, including conventions for React, comments, and Git
+  usage.
 - **Imports:** Pay special attention to import paths. The project uses ESLint to
   enforce restrictions on relative imports between packages.
 
@@ -505,8 +509,9 @@ code.
 
 ### Documentation structure
 
-Our documentation is organized using [sidebar.json](/docs/sidebar.json) as the
-table of contents. When adding new documentation:
+Our documentation is organized using
+[sidebar.json](https://github.com/google-gemini/gemini-cli/blob/main/docs/sidebar.json)
+as the table of contents. When adding new documentation:
 
 1. Create your markdown file **in the appropriate directory** under `/docs`.
 2. Add an entry to `sidebar.json` in the relevant section.
