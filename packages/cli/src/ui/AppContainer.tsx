@@ -92,7 +92,6 @@ import {
   ApiKeyUpdatedEvent,
   LegacyAgentProtocol,
   type InjectionSource,
-  startMemoryService,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import process from 'node:process';
@@ -104,6 +103,7 @@ import { useQuotaAndFallback } from './hooks/useQuotaAndFallback.js';
 import { useEditorSettings } from './hooks/useEditorSettings.js';
 import { useSettingsCommand } from './hooks/useSettingsCommand.js';
 import { useModelCommand } from './hooks/useModelCommand.js';
+import { useVoiceModelCommand } from './hooks/useVoiceModelCommand.js';
 import { useSlashCommandProcessor } from './hooks/slashCommandProcessor.js';
 import { useVimMode } from './contexts/VimModeContext.js';
 import {
@@ -125,6 +125,7 @@ import { type BackgroundTask } from './hooks/useExecutionLifecycle.js';
 import { useVim } from './hooks/vim.js';
 import { type LoadableSettingScope, SettingScope } from '../config/settings.js';
 import { type InitializationResult } from '../core/initializer.js';
+import { startAutoMemoryIfEnabled } from '../utils/autoMemory.js';
 import { useFocus } from './hooks/useFocus.js';
 import { useKeypress, type Key } from './hooks/useKeypress.js';
 import { KeypressPriority } from './contexts/KeypressContext.js';
@@ -312,6 +313,7 @@ export const AppContainer = (props: AppContainerProps) => {
   );
 
   const [shellModeActive, setShellModeActive] = useState(false);
+  const [isVoiceModeEnabled, setVoiceModeEnabled] = useState(false);
   const [modelSwitchedFromQuotaError, setModelSwitchedFromQuotaError] =
     useState<boolean>(false);
   const [historyRemountKey, setHistoryRemountKey] = useState(0);
@@ -486,12 +488,7 @@ export const AppContainer = (props: AppContainerProps) => {
       setConfigInitialized(true);
       startupProfiler.flush(config);
 
-      // Fire-and-forget Auto Memory service (skill extraction from past sessions)
-      if (config.isAutoMemoryEnabled()) {
-        startMemoryService(config).catch((e) => {
-          debugLogger.error('Failed to start memory service:', e);
-        });
-      }
+      startAutoMemoryIfEnabled(config);
 
       const sessionStartSource = resumedSessionData
         ? SessionStartSource.Resume
@@ -878,10 +875,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
     async (apiKey: string) => {
       try {
         onAuthError(null);
-        if (!apiKey.trim() && apiKey.length > 1) {
-          onAuthError(
-            'API key cannot be empty string with length greater than 1.',
-          );
+        if (!apiKey.trim()) {
+          onAuthError('API key cannot be empty or whitespace only.');
           return;
         }
 
@@ -951,6 +946,12 @@ Logging in with Google... Restarting Gemini CLI to continue.
   const { isModelDialogOpen, openModelDialog, closeModelDialog } =
     useModelCommand();
 
+  const {
+    isVoiceModelDialogOpen,
+    openVoiceModelDialog,
+    closeVoiceModelDialog,
+  } = useVoiceModelCommand();
+
   const { toggleVimEnabled } = useVimMode();
 
   const setIsBackgroundTaskListOpenRef = useRef<(open: boolean) => void>(
@@ -974,6 +975,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       openSettingsDialog,
       openSessionBrowser,
       openModelDialog,
+      openVoiceModelDialog,
       openAgentConfigDialog,
       openPermissionsDialog,
       quit: (messages: HistoryItem[]) => {
@@ -986,6 +988,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       },
       setDebugMessage,
       toggleCorgiMode: () => setCorgiMode((prev) => !prev),
+      toggleVoiceMode: () => setVoiceModeEnabled((prev) => !prev),
       toggleDebugProfiler,
       dispatchExtensionStateUpdate,
       addConfirmUpdateExtensionRequest,
@@ -1011,6 +1014,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       openSettingsDialog,
       openSessionBrowser,
       openModelDialog,
+      openVoiceModelDialog,
       openAgentConfigDialog,
       setQuittingMessages,
       setDebugMessage,
@@ -2196,6 +2200,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     isThemeDialogOpen ||
     isSettingsDialogOpen ||
     isModelDialogOpen ||
+    isVoiceModelDialogOpen ||
     isAgentConfigDialogOpen ||
     isPermissionsDialogOpen ||
     isAuthenticating ||
@@ -2453,6 +2458,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       isSettingsDialogOpen,
       isSessionBrowserOpen,
       isModelDialogOpen,
+      isVoiceModelDialogOpen,
       isAgentConfigDialogOpen,
       selectedAgentName,
       selectedAgentDisplayName,
@@ -2473,6 +2479,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       pendingGeminiHistoryItems,
       thought,
       isInputActive,
+      isVoiceModeEnabled,
       isResuming,
       shouldShowIdePrompt,
       isFolderTrustDialogOpen: isFolderTrustDialogOpen ?? false,
@@ -2564,6 +2571,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       isSettingsDialogOpen,
       isSessionBrowserOpen,
       isModelDialogOpen,
+      isVoiceModelDialogOpen,
       isAgentConfigDialogOpen,
       selectedAgentName,
       selectedAgentDisplayName,
@@ -2584,6 +2592,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       pendingGeminiHistoryItems,
       thought,
       isInputActive,
+      isVoiceModeEnabled,
       isResuming,
       shouldShowIdePrompt,
       isFolderTrustDialogOpen,
@@ -2676,6 +2685,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       exitPrivacyNotice,
       closeSettingsDialog,
       closeModelDialog,
+      openVoiceModelDialog,
+      closeVoiceModelDialog,
       openAgentConfigDialog,
       closeAgentConfigDialog,
       openPermissionsDialog,
@@ -2756,6 +2767,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
         setAccountSuspensionInfo(null);
         setAuthState(AuthState.Updating);
       },
+      setVoiceModeEnabled: (value: boolean) => {
+        setVoiceModeEnabled(value);
+      },
     }),
     [
       handleThemeSelect,
@@ -2769,6 +2783,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       exitPrivacyNotice,
       closeSettingsDialog,
       closeModelDialog,
+      openVoiceModelDialog,
+      closeVoiceModelDialog,
       openAgentConfigDialog,
       closeAgentConfigDialog,
       openPermissionsDialog,
@@ -2812,6 +2828,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       config,
       historyManager,
       getPreferredEditor,
+      setVoiceModeEnabled,
     ],
   );
 
