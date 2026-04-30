@@ -25,6 +25,10 @@ export const VARIABLE_SCHEMA = {
     type: 'string',
     description: 'The path of the extension in the filesystem.',
   },
+  PLUGIN_ROOT: {
+    type: 'string',
+    description: 'The root path of the plugin (alias for extensionPath).',
+  },
   workspacePath: {
     type: 'string',
     description: 'The absolute path of the current workspace.',
