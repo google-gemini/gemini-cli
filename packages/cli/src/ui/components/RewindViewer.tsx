@@ -18,7 +18,7 @@ import { theme } from '../semantic-colors.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { useRewind } from '../hooks/useRewind.js';
 import { RewindConfirmation, RewindOutcome } from './RewindConfirmation.js';
-import { stripReferenceContent } from '../utils/formatters.js';
+import { getCleanedRewindText } from '../utils/formatters.js';
 import { Command } from '../key/keyMatchers.js';
 import { CliSpinner } from './CliSpinner.js';
 import { ExpandableText } from './shared/ExpandableText.js';
@@ -35,14 +35,6 @@ interface RewindViewerProps {
 }
 
 const MAX_LINES_PER_BOX = 2;
-
-const getCleanedRewindText = (userPrompt: MessageRecord): string => {
-  const contentToUse = userPrompt.displayContent || userPrompt.content;
-  const originalUserText = contentToUse ? partToString(contentToUse) : '';
-  return userPrompt.displayContent
-    ? originalUserText
-    : stripReferenceContent(originalUserText);
-};
 
 export const RewindViewer: React.FC<RewindViewerProps> = ({
   conversation,
