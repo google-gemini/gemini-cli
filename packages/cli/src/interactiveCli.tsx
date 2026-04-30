@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { render } from 'ink';
+import { render, setStringWidthFunction } from 'ink';
 import { basename } from 'node:path';
 import { AppContainer } from './ui/AppContainer.js';
 import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
@@ -50,6 +50,7 @@ import { TerminalProvider } from './ui/contexts/TerminalContext.js';
 import { OverflowProvider } from './ui/contexts/OverflowContext.js';
 import { profiler } from './ui/components/DebugProfiler.js';
 import { initializeConsoleStore } from './ui/hooks/useConsoleMessages.js';
+import { getCachedStringWidth } from './ui/utils/textUtils.js';
 
 const SLOW_RENDER_MS = 200;
 
@@ -62,6 +63,11 @@ export async function startInteractiveUI(
   initializationResult: InitializationResult,
 ) {
   initializeConsoleStore();
+
+  // Override Ink's string width function with our corrected version that
+  // compensates for Thai/Lao SARA AM width mismatch in string-width@8.1.0.
+  // See: https://github.com/google-gemini/gemini-cli/issues/25369
+  setStringWidthFunction(getCachedStringWidth);
   // Never enter Ink alternate buffer mode when screen reader mode is enabled
   // as there is no benefit of alternate buffer mode when using a screen reader
   // and the Ink alternate buffer mode requires line wrapping harmful to
