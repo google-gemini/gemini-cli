@@ -14,6 +14,7 @@ import { normalizePath, isSubpath } from './paths.js';
 import { FatalConfigError, getErrorMessage } from './errors.js';
 import { coreEvents } from './events.js';
 import { ideContextStore } from '../ide/ideContext.js';
+import { debugLogger } from './debugLogger.js';
 
 export enum TrustLevel {
   TRUST_FOLDER = 'TRUST_FOLDER',
@@ -216,6 +217,13 @@ export class LoadedTrustedFolders {
       retries: {
         retries: 10,
         minTimeout: 100,
+      },
+      onCompromised: (err) => {
+        // Ignore compromised lock since we expect another process might release it concurrently
+        debugLogger.debug(
+          'Trusted folders lock was compromised (likely released concurrently):',
+          err,
+        );
       },
     });
 

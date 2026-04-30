@@ -119,6 +119,28 @@ describe('Trust Utility (Core)', () => {
     expect(savedContent[finalKey]).toBe(TrustLevel.TRUST_FOLDER);
   });
 
+  it('safely handles ECOMPROMISED errors from proper-lockfile', async () => {
+    let compromisedHandler: ((err: Error) => void) | undefined;
+    vi.mocked(lock).mockImplementation(async (file, options) => {
+      // @ts-expect-error onCompromised is not typed in the mock but is passed
+      compromisedHandler = options.onCompromised;
+      return vi.fn().mockResolvedValue(undefined);
+    });
+
+    const folders = loadTrustedFolders();
+    const testPath = path.resolve('/new/trusted/path');
+    await folders.setValue(testPath, TrustLevel.TRUST_FOLDER);
+
+    expect(compromisedHandler).toBeDefined();
+
+    // Calling the handler should not throw
+    expect(() =>
+      compromisedHandler!(
+        Object.assign(new Error('Compromised'), { code: 'ECOMPROMISED' }),
+      ),
+    ).not.toThrow();
+  });
+
   it('should handle comments in JSON', () => {
     const content = `
     {

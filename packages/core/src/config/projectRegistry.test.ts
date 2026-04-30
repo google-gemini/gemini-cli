@@ -294,6 +294,29 @@ describe('ProjectRegistry', () => {
     );
   });
 
+  it('safely handles ECOMPROMISED errors from proper-lockfile', async () => {
+    const registry = new ProjectRegistry(registryPath);
+    await registry.initialize();
+
+    let compromisedHandler: ((err: Error) => void) | undefined;
+    vi.mocked(lock).mockImplementation(async (file, options) => {
+      // @ts-expect-error onCompromised is not typed in the mock but is passed
+      compromisedHandler = options.onCompromised;
+      return vi.fn().mockResolvedValue(undefined);
+    });
+
+    await registry.getShortId('/foo');
+
+    expect(compromisedHandler).toBeDefined();
+
+    // Calling the handler should not throw
+    expect(() =>
+      compromisedHandler!(
+        Object.assign(new Error('Compromised'), { code: 'ECOMPROMISED' }),
+      ),
+    ).not.toThrow();
+  });
+
   it('throws if not initialized', async () => {
     const registry = new ProjectRegistry(registryPath);
     await expect(registry.getShortId('/foo')).rejects.toThrow(
