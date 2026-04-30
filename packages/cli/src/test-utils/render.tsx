@@ -552,6 +552,8 @@ const mockUIActions: UIActions = {
   exitPrivacyNotice: vi.fn(),
   closeSettingsDialog: vi.fn(),
   closeModelDialog: vi.fn(),
+  openVoiceModelDialog: vi.fn(),
+  closeVoiceModelDialog: vi.fn(),
   openAgentConfigDialog: vi.fn(),
   closeAgentConfigDialog: vi.fn(),
   openPermissionsDialog: vi.fn(),
@@ -598,10 +600,12 @@ const mockUIActions: UIActions = {
   handleNewAgentsSelect: vi.fn(),
   getPreferredEditor: vi.fn(),
   clearAccountSuspension: vi.fn(),
+  setVoiceModeEnabled: vi.fn(),
 };
 
 import { type TextBuffer } from '../ui/components/shared/text-buffer.js';
 import { InputContext, type InputState } from '../ui/contexts/InputContext.js';
+import { QuotaContext, type QuotaState } from '../ui/contexts/QuotaContext.js';
 
 let capturedOverflowState: OverflowState | undefined;
 let capturedOverflowActions: OverflowActions | undefined;
@@ -619,6 +623,7 @@ export const renderWithProviders = async (
     shellFocus = true,
     settings = mockSettings,
     uiState: providedUiState,
+    quotaState: providedQuotaState,
     inputState: providedInputState,
     width,
     mouseEventsEnabled = false,
@@ -631,6 +636,7 @@ export const renderWithProviders = async (
     shellFocus?: boolean;
     settings?: LoadedSettings;
     uiState?: Partial<UIState>;
+    quotaState?: Partial<QuotaState>;
     inputState?: Partial<InputState>;
     width?: number;
     mouseEventsEnabled?: boolean;
@@ -665,6 +671,16 @@ export const renderWithProviders = async (
       },
     },
   ) as UIState;
+
+  const quotaState: QuotaState = {
+    userTier: undefined,
+    stats: undefined,
+    proQuotaRequest: null,
+    validationRequest: null,
+    overageMenuRequest: null,
+    emptyWalletRequest: null,
+    ...providedQuotaState,
+  };
 
   const inputState = {
     buffer: { text: '' } as unknown as TextBuffer,
@@ -727,65 +743,67 @@ export const renderWithProviders = async (
     <AppContext.Provider value={appState}>
       <ConfigContext.Provider value={config}>
         <SettingsContext.Provider value={settings}>
-          <InputContext.Provider value={inputState}>
-            <UIStateContext.Provider value={finalUiState}>
-              <VimModeProvider>
-                <ShellFocusContext.Provider value={shellFocus}>
-                  <SessionStatsProvider sessionId={config.getSessionId()}>
-                    <StreamingContext.Provider
-                      value={finalUiState.streamingState}
-                    >
-                      <UIActionsContext.Provider value={finalUIActions}>
-                        <OverflowProvider>
-                          <ToolActionsProvider
-                            config={config}
-                            toolCalls={allToolCalls}
-                            isExpanded={
-                              toolActions?.isExpanded ??
-                              vi.fn().mockReturnValue(false)
-                            }
-                            toggleExpansion={
-                              toolActions?.toggleExpansion ?? vi.fn()
-                            }
-                            toggleAllExpansion={
-                              toolActions?.toggleAllExpansion ?? vi.fn()
-                            }
-                          >
-                            <AskUserActionsProvider
-                              request={null}
-                              onSubmit={vi.fn()}
-                              onCancel={vi.fn()}
+          <QuotaContext.Provider value={quotaState}>
+            <InputContext.Provider value={inputState}>
+              <UIStateContext.Provider value={finalUiState}>
+                <VimModeProvider>
+                  <ShellFocusContext.Provider value={shellFocus}>
+                    <SessionStatsProvider sessionId={config.getSessionId()}>
+                      <StreamingContext.Provider
+                        value={finalUiState.streamingState}
+                      >
+                        <UIActionsContext.Provider value={finalUIActions}>
+                          <OverflowProvider>
+                            <ToolActionsProvider
+                              config={config}
+                              toolCalls={allToolCalls}
+                              isExpanded={
+                                toolActions?.isExpanded ??
+                                vi.fn().mockReturnValue(false)
+                              }
+                              toggleExpansion={
+                                toolActions?.toggleExpansion ?? vi.fn()
+                              }
+                              toggleAllExpansion={
+                                toolActions?.toggleAllExpansion ?? vi.fn()
+                              }
                             >
-                              <KeypressProvider>
-                                <MouseProvider
-                                  mouseEventsEnabled={mouseEventsEnabled}
-                                >
-                                  <TerminalProvider>
-                                    <ScrollProvider>
-                                      <ContextCapture>
-                                        <Box
-                                          width={terminalWidth}
-                                          flexShrink={0}
-                                          flexGrow={0}
-                                          flexDirection="column"
-                                        >
-                                          {comp}
-                                        </Box>
-                                      </ContextCapture>
-                                    </ScrollProvider>
-                                  </TerminalProvider>
-                                </MouseProvider>
-                              </KeypressProvider>
-                            </AskUserActionsProvider>
-                          </ToolActionsProvider>
-                        </OverflowProvider>
-                      </UIActionsContext.Provider>
-                    </StreamingContext.Provider>
-                  </SessionStatsProvider>
-                </ShellFocusContext.Provider>
-              </VimModeProvider>
-            </UIStateContext.Provider>
-          </InputContext.Provider>
+                              <AskUserActionsProvider
+                                request={null}
+                                onSubmit={vi.fn()}
+                                onCancel={vi.fn()}
+                              >
+                                <KeypressProvider>
+                                  <MouseProvider
+                                    mouseEventsEnabled={mouseEventsEnabled}
+                                  >
+                                    <TerminalProvider>
+                                      <ScrollProvider>
+                                        <ContextCapture>
+                                          <Box
+                                            width={terminalWidth}
+                                            flexShrink={0}
+                                            flexGrow={0}
+                                            flexDirection="column"
+                                          >
+                                            {comp}
+                                          </Box>
+                                        </ContextCapture>
+                                      </ScrollProvider>
+                                    </TerminalProvider>
+                                  </MouseProvider>
+                                </KeypressProvider>
+                              </AskUserActionsProvider>
+                            </ToolActionsProvider>
+                          </OverflowProvider>
+                        </UIActionsContext.Provider>
+                      </StreamingContext.Provider>
+                    </SessionStatsProvider>
+                  </ShellFocusContext.Provider>
+                </VimModeProvider>
+              </UIStateContext.Provider>
+            </InputContext.Provider>
+          </QuotaContext.Provider>
         </SettingsContext.Provider>
       </ConfigContext.Provider>
     </AppContext.Provider>
