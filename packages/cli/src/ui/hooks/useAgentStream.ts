@@ -279,12 +279,17 @@ export const useAgentStream = ({
           break;
         }
 
-        case 'error':
+        case 'error': {
+          const message =
+            event._meta?.['code'] === 'AGENT_EXECUTION_BLOCKED'
+              ? `Agent execution blocked: ${event.message}`
+              : event.message;
           addItem(
-            { type: MessageType.ERROR, text: event.message },
+            { type: MessageType.ERROR, text: message },
             userMessageTimestampRef.current,
           );
           break;
+        }
 
         case 'initialize':
         case 'session_update':
