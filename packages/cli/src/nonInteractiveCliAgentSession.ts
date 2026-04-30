@@ -59,6 +59,13 @@ interface RunNonInteractiveParams {
   resumedSessionData?: ResumedSessionData;
 }
 
+/**
+ * Runs the non-interactive CLI using the LegacyAgentSession.
+ *
+ * Programmatic output formats (JSON, STREAM_JSON) use lenient sanitization
+ * by stripping ANSI escape sequences from messages to ensure clean,
+ * parseable output for downstream consumers.
+ */
 export async function runNonInteractive({
   config,
   settings,
@@ -545,17 +552,18 @@ export async function runNonInteractive({
             const errorCode = event._meta?.['code'];
 
             if (errorCode === 'AGENT_EXECUTION_BLOCKED') {
+              const blockMessage = event.message;
               if (config.getOutputFormat() === OutputFormat.TEXT) {
-                process.stderr.write(`[WARNING] ${event.message}\n`);
+                process.stderr.write(`[WARNING] ${blockMessage}\n`);
               } else if (streamFormatter) {
                 streamFormatter.emitEvent({
                   type: JsonStreamEventType.ERROR,
                   timestamp: new Date().toISOString(),
                   severity: 'warning',
-                  message: event.message,
+                  message: stripAnsi(blockMessage),
                 });
               }
-              warnings.push(event.message);
+              warnings.push(blockMessage);
               break;
             }
 
@@ -569,10 +577,12 @@ export async function runNonInteractive({
                 type: JsonStreamEventType.ERROR,
                 timestamp: new Date().toISOString(),
                 severity,
-                message: event.message,
+                message: stripAnsi(event.message),
               });
             }
-            warnings.push(event.message);
+            if (severity === 'warning') {
+              warnings.push(event.message);
+            }
             break;
           }
           case 'agent_end': {

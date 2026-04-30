@@ -56,6 +56,13 @@ interface RunNonInteractiveParams {
   resumedSessionData?: ResumedSessionData;
 }
 
+/**
+ * Runs the non-interactive CLI loop.
+ *
+ * Programmatic output formats (JSON, STREAM_JSON) use lenient sanitization
+ * by stripping ANSI escape sequences from messages to ensure clean,
+ * parseable output for downstream consumers.
+ */
 export async function runNonInteractive(
   params: RunNonInteractiveParams,
 ): Promise<void> {
@@ -401,7 +408,7 @@ export async function runNonInteractive(
                 type: JsonStreamEventType.ERROR,
                 timestamp: new Date().toISOString(),
                 severity: 'warning',
-                message: blockMessage,
+                message: stripAnsi(blockMessage),
               });
             }
             warnings.push(blockMessage);
