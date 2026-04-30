@@ -6,7 +6,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { initializeOutputListenersAndFlush } from './gemini.js';
-import { coreEvents, type Config } from '@google/gemini-cli-core';
+import { coreEvents, CoreEvent, type Config } from '@google/gemini-cli-core';
 
 // Mock core dependencies
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
@@ -79,5 +79,22 @@ describe('Output Redirection', () => {
     // Verify it was forced to stderr
     expect(writeToStderr).toHaveBeenCalledWith('early init message', undefined);
     expect(writeToStdout).not.toHaveBeenCalled();
+  });
+
+  it('should attach ConsoleLog and UserFeedback listeners even if Output already has one', () => {
+    // Manually attach an Output listener
+    coreEvents.on(CoreEvent.Output, vi.fn());
+
+    // Initialize - should still attach ConsoleLog and UserFeedback defaults
+    initializeOutputListenersAndFlush(undefined);
+
+    // Simulate events
+    coreEvents.emitConsoleLog('info', 'stray log');
+    coreEvents.emitFeedback('info', 'stray feedback');
+
+    // Draining happens inside initializeOutputListenersAndFlush for existing backlog,
+    // but here we check the newly attached listeners for immediate emission.
+    expect(writeToStderr).toHaveBeenCalledWith('stray log\n');
+    expect(writeToStderr).toHaveBeenCalledWith('stray feedback\n');
   });
 });

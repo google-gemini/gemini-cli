@@ -819,22 +819,22 @@ export function initializeOutputListenersAndFlush(config?: Config) {
         writeToStdout(payload.chunk, payload.encoding);
       }
     });
+  }
 
-    if (coreEvents.listenerCount(CoreEvent.ConsoleLog) === 0) {
-      coreEvents.on(CoreEvent.ConsoleLog, (payload: ConsoleLogPayload) => {
-        if (payload.type === 'error' || payload.type === 'warn') {
-          writeToStderr(payload.content + '\n');
-        } else {
-          writeToStderr(payload.content + '\n');
-        }
-      });
-    }
+  if (coreEvents.listenerCount(CoreEvent.ConsoleLog) === 0) {
+    coreEvents.on(CoreEvent.ConsoleLog, (payload: ConsoleLogPayload) => {
+      if (payload.type === 'error' || payload.type === 'warn') {
+        writeToStderr(payload.content + '\n');
+      } else {
+        writeToStderr(payload.content + '\n');
+      }
+    });
+  }
 
-    if (coreEvents.listenerCount(CoreEvent.UserFeedback) === 0) {
-      coreEvents.on(CoreEvent.UserFeedback, (payload: UserFeedbackPayload) => {
-        writeToStderr(payload.message + '\n');
-      });
-    }
+  if (coreEvents.listenerCount(CoreEvent.UserFeedback) === 0) {
+    coreEvents.on(CoreEvent.UserFeedback, (payload: UserFeedbackPayload) => {
+      writeToStderr(payload.message + '\n');
+    });
   }
 
   const outputFormat = config?.getOutputFormat();
