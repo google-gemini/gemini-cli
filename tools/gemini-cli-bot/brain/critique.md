@@ -92,7 +92,12 @@ above:
     logic and the goals of the prior investigation. Do not invent new workflows;
     just ensure the existing ones are implemented robustly according to this
     checklist.
-4.  Re-stage the file with `git add`. **CRITICAL: You MUST use `git add` to
+4.  **Strict Scope Constraint**: You are STRICTLY FORBIDDEN from modifying or
+    staging any file that was not already staged by the investigation phase. You
+    must ONLY critique and fix the files explicitly included in
+    `git diff --staged`. Do not attempt to complete pending tasks from the
+    memory ledger or introduce unrelated refactoring to unstaged files.
+5.  Re-stage the file with `git add`. **CRITICAL: You MUST use `git add` to
     stage your fixes.**
 
 ## Final Verdict & Logging
