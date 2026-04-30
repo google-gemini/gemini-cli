@@ -296,6 +296,7 @@ export async function runNonInteractive(
 
       let turnCount = 0;
       let invalidStreamError: string | undefined;
+      const warnings: string[] = [];
       while (true) {
         turnCount++;
         if (
@@ -395,7 +396,15 @@ export async function runNonInteractive(
             const blockMessage = `Agent execution blocked: ${event.value.systemMessage?.trim() || event.value.reason}`;
             if (config.getOutputFormat() === OutputFormat.TEXT) {
               process.stderr.write(`[WARNING] ${blockMessage}\n`);
+            } else if (streamFormatter) {
+              streamFormatter.emitEvent({
+                type: JsonStreamEventType.ERROR,
+                timestamp: new Date().toISOString(),
+                severity: 'warning',
+                message: blockMessage,
+              });
             }
+            warnings.push(blockMessage);
           } else if (event.type === GeminiEventType.InvalidStream) {
             invalidStreamError =
               'Invalid stream: The model returned an empty response or malformed tool call.';
@@ -507,7 +516,13 @@ export async function runNonInteractive(
               const formatter = new JsonFormatter();
               const stats = uiTelemetryService.getMetrics();
               textOutput.write(
-                formatter.format(config.getSessionId(), responseText, stats),
+                formatter.format(
+                  config.getSessionId(),
+                  responseText,
+                  stats,
+                  undefined,
+                  warnings,
+                ),
               );
             } else {
               textOutput.ensureTrailingNewline(); // Ensure a final newline
@@ -538,6 +553,7 @@ export async function runNonInteractive(
                 invalidStreamError
                   ? { type: 'INVALID_STREAM', message: invalidStreamError }
                   : undefined,
+                warnings,
               ),
             );
           } else {

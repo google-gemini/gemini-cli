@@ -339,7 +339,13 @@ export async function runNonInteractive({
           const formatter = new JsonFormatter();
           const stats = uiTelemetryService.getMetrics();
           textOutput.write(
-            formatter.format(config.getSessionId(), responseText, stats),
+            formatter.format(
+              config.getSessionId(),
+              responseText,
+              stats,
+              undefined,
+              warnings,
+            ),
           );
         } else {
           textOutput.ensureTrailingNewline();
@@ -420,6 +426,7 @@ export async function runNonInteractive({
       let responseText = '';
       let preToolResponseText: string | undefined;
       let streamEnded = false;
+      const warnings: string[] = [];
       for await (const event of session.stream({ streamId })) {
         if (streamEnded) break;
         switch (event.type) {
@@ -540,7 +547,15 @@ export async function runNonInteractive({
             if (errorCode === 'AGENT_EXECUTION_BLOCKED') {
               if (config.getOutputFormat() === OutputFormat.TEXT) {
                 process.stderr.write(`[WARNING] ${event.message}\n`);
+              } else if (streamFormatter) {
+                streamFormatter.emitEvent({
+                  type: JsonStreamEventType.ERROR,
+                  timestamp: new Date().toISOString(),
+                  severity: 'warning',
+                  message: event.message,
+                });
               }
+              warnings.push(event.message);
               break;
             }
 
@@ -557,6 +572,7 @@ export async function runNonInteractive({
                 message: event.message,
               });
             }
+            warnings.push(event.message);
             break;
           }
           case 'agent_end': {
