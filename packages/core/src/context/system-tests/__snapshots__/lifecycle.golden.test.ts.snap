@@ -41,7 +41,7 @@ exports[`System Lifecycle Golden Tests > Scenario 1: Organic Growth with Huge To
     {
       "parts": [
         {
-          "text": "[Multi-Modal Blob (image/png, 0.01MB) degraded to text to preserve context window. Saved to: /tmp/sim/degraded-blobs/session-sim-prompt/blob_1777509075404_8c8f248a-f6ab-47a1-818f-d56a94c7dd9a.png]",
+          "text": "[Multi-Modal Blob (image/png, 0.01MB) degraded to text to preserve context window. Saved to: <MOCKED_DIR>]",
         },
       ],
       "role": "user",
