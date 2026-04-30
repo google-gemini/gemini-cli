@@ -1,4 +1,6 @@
-npm run pre-commit || {
+if command -v npm >/dev/null 2>&1; then PM=npm; else PM=bun; fi
+
+"$PM" run pre-commit || {
   echo ''
   echo '===================================================='
   echo 'pre-commit checks failed. in case of emergency, run:'

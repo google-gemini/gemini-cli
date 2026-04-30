@@ -24,16 +24,26 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, '..');
+const isBun = 'bun' in process.versions;
 
-// npm install if node_modules was removed (e.g. via npm run clean or scripts/clean.js)
+// install if node_modules was removed (e.g. via npm run clean or scripts/clean.js)
 if (!existsSync(join(root, 'node_modules'))) {
-  execSync('npm install', { stdio: 'inherit', cwd: root });
+  execSync(isBun ? 'bun install' : 'npm install', {
+    stdio: 'inherit',
+    cwd: root,
+  });
 }
 
 // build all workspaces/packages
-execSync('npm run generate', { stdio: 'inherit', cwd: root });
+execSync(isBun ? 'bun run generate' : 'npm run generate', {
+  stdio: 'inherit',
+  cwd: root,
+});
 
-if (process.env.CI) {
+if (isBun) {
+  // bun's --filter handles workspace ordering and parallelism natively
+  execSync("bun run --filter '*' build", { stdio: 'inherit', cwd: root });
+} else if (process.env.CI) {
   console.log('CI environment detected. Building workspaces sequentially...');
   execSync('npm run build --workspaces', { stdio: 'inherit', cwd: root });
 } else {
