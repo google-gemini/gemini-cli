@@ -6,35 +6,34 @@
 
 import {
   type ApprovalMode,
-  type GeminiChat,
-  type ToolResult,
   type ConversationRecord,
   CoreToolCallStatus,
   logToolCall,
   convertToFunctionResponse,
   ToolConfirmationOutcome,
-  isWithinRoot,
   getErrorStatus,
   DiscoveredMCPTool,
-  StreamEventType,
   ToolCallEvent,
   debugLogger,
   ReadManyFilesTool,
-  REFERENCE_CONTENT_START,
-  type RoutingContext,
   partListUnionToString,
-  LlmRole,
-  processSingleFileContent,
-  InvalidStreamError,
   type AgentLoopContext,
   updatePolicy,
-  isNodeError,
   getErrorMessage,
   type FilterFilesOptions,
   isTextPart,
+  GeminiEventType,
+  type ToolCallRequestInfo,
+  type GeminiChat,
+  type ToolResult,
+  isWithinRoot,
+  processSingleFileContent,
+  isNodeError,
+  REFERENCE_CONTENT_START,
+  InvalidStreamError,
 } from '@google/gemini-cli-core';
 import * as acp from '@agentclientprotocol/sdk';
-import type { Content, Part, FunctionCall } from '@google/genai';
+import type { Part, FunctionCall } from '@google/genai';
 import type { LoadedSettings } from '../config/settings.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
@@ -49,6 +48,11 @@ import {
 } from './acpUtils.js';
 import { z } from 'zod';
 import { getAcpErrorMessage } from './acpErrors.js';
+
+const StructuredErrorSchema = z.object({
+  status: z.number().optional(),
+  message: z.string().optional(),
+});
 
 export class Session {
   private pendingPrompt: AbortController | null = null;
@@ -188,7 +192,6 @@ export class Session {
     await this.context.config.waitForMcpInit();
 
     const promptId = Math.random().toString(16).slice(2);
-    const chat = this.chat;
 
     const parts = await this.#resolvePrompt(params.prompt, pendingSend.signal);
 
@@ -236,100 +239,125 @@ export class Session {
     let totalOutputTokens = 0;
     const modelUsageMap = new Map<string, { input: number; output: number }>();
 
-    let nextMessage: Content | null = { role: 'user', parts };
+    let currentParts: Part[] = parts;
+    let turnCount = 0;
+    const maxTurns = this.context.config.getMaxSessionTurns();
 
-    while (nextMessage !== null) {
-      if (pendingSend.signal.aborted) {
-        chat.addHistory(nextMessage);
-        return { stopReason: CoreToolCallStatus.Cancelled };
+    while (true) {
+      turnCount++;
+      if (maxTurns >= 0 && turnCount > maxTurns) {
+        return {
+          stopReason: 'max_turn_requests',
+          _meta: {
+            quota: {
+              token_count: {
+                input_tokens: totalInputTokens,
+                output_tokens: totalOutputTokens,
+              },
+              model_usage: Array.from(modelUsageMap.entries()).map(
+                ([modelName, counts]) => ({
+                  model: modelName,
+                  token_count: {
+                    input_tokens: counts.input,
+                    output_tokens: counts.output,
+                  },
+                }),
+              ),
+            },
+          },
+        };
       }
 
-      const functionCalls: FunctionCall[] = [];
+      if (pendingSend.signal.aborted) {
+        return { stopReason: 'cancelled' };
+      }
+
+      const toolCallRequests: ToolCallRequestInfo[] = [];
+      let stopReason: acp.StopReason = 'end_turn';
+      let turnModelId = this.context.config.getModel();
+      let turnInputTokens = 0;
+      let turnOutputTokens = 0;
 
       try {
-        const routingContext: RoutingContext = {
-          history: chat.getHistory(/*curated=*/ true),
-          request: nextMessage?.parts ?? [],
-          signal: pendingSend.signal,
-          requestedModel: this.context.config.getModel(),
-        };
-
-        const router = this.context.config.getModelRouterService();
-        const { model } = await router.route(routingContext);
-        const responseStream = await chat.sendMessageStream(
-          { model },
-          nextMessage?.parts ?? [],
-          promptId,
+        const responseStream = this.context.geminiClient.sendMessageStream(
+          currentParts,
           pendingSend.signal,
-          LlmRole.MAIN,
+          promptId,
         );
-        nextMessage = null;
 
-        let turnInputTokens = 0;
-        let turnOutputTokens = 0;
-        let turnModelId = model;
-
-        for await (const resp of responseStream) {
+        for await (const event of responseStream) {
           if (pendingSend.signal.aborted) {
-            return { stopReason: CoreToolCallStatus.Cancelled };
+            return { stopReason: 'cancelled' };
           }
 
-          if (resp.type === StreamEventType.CHUNK && resp.value.usageMetadata) {
-            turnInputTokens =
-              resp.value.usageMetadata.promptTokenCount ?? turnInputTokens;
-            turnOutputTokens =
-              resp.value.usageMetadata.candidatesTokenCount ?? turnOutputTokens;
-            if (resp.value.modelVersion) {
-              turnModelId = resp.value.modelVersion;
-            }
-          }
-
-          if (
-            resp.type === StreamEventType.CHUNK &&
-            resp.value.candidates &&
-            resp.value.candidates.length > 0
-          ) {
-            const candidate = resp.value.candidates[0];
-            for (const part of candidate.content?.parts ?? []) {
-              if (!part.text) {
-                continue;
-              }
-
+          switch (event.type) {
+            case GeminiEventType.Content: {
               const content: acp.ContentBlock = {
                 type: 'text',
-                text: part.text,
+                text: event.value,
               };
 
-              // eslint-disable-next-line @typescript-eslint/no-floating-promises
-              this.sendUpdate({
-                sessionUpdate: part.thought
-                  ? 'agent_thought_chunk'
-                  : 'agent_message_chunk',
+              await this.sendUpdate({
+                sessionUpdate: 'agent_message_chunk',
                 content,
               });
+              break;
             }
+
+            case GeminiEventType.Thought: {
+              const thoughtText = `**${event.value.subject}**\n${event.value.description}`;
+              await this.sendUpdate({
+                sessionUpdate: 'agent_thought_chunk',
+                content: { type: 'text', text: thoughtText },
+              });
+              break;
+            }
+
+            case GeminiEventType.ToolCallRequest:
+              toolCallRequests.push(event.value);
+              break;
+
+            case GeminiEventType.Finished: {
+              const usage = event.value.usageMetadata;
+              if (usage) {
+                turnInputTokens = usage.promptTokenCount ?? turnInputTokens;
+                turnOutputTokens =
+                  usage.candidatesTokenCount ?? turnOutputTokens;
+              }
+              break;
+            }
+
+            case GeminiEventType.ModelInfo:
+              turnModelId = event.value;
+              break;
+
+            case GeminiEventType.MaxSessionTurns:
+              stopReason = 'max_turn_requests';
+              break;
+
+            case GeminiEventType.LoopDetected:
+              stopReason = 'max_turn_requests';
+              break;
+
+            case GeminiEventType.ContextWindowWillOverflow:
+              stopReason = 'max_tokens';
+              break;
+
+            case GeminiEventType.Error: {
+              const parseResult = StructuredErrorSchema.safeParse(
+                event.value.error,
+              );
+              const errData = parseResult.success ? parseResult.data : {};
+
+              throw new acp.RequestError(
+                errData.status ?? 500,
+                errData.message ?? 'Unknown stream execution error.',
+              );
+            }
+
+            default:
+              break;
           }
-
-          if (resp.type === StreamEventType.CHUNK && resp.value.functionCalls) {
-            functionCalls.push(...resp.value.functionCalls);
-          }
-        }
-
-        totalInputTokens += turnInputTokens;
-        totalOutputTokens += turnOutputTokens;
-
-        if (turnInputTokens > 0 || turnOutputTokens > 0) {
-          const existing = modelUsageMap.get(turnModelId) ?? {
-            input: 0,
-            output: 0,
-          };
-          existing.input += turnInputTokens;
-          existing.output += turnOutputTokens;
-          modelUsageMap.set(turnModelId, existing);
-        }
-
-        if (pendingSend.signal.aborted) {
-          return { stopReason: CoreToolCallStatus.Cancelled };
         }
       } catch (error) {
         if (getErrorStatus(error) === 429) {
@@ -343,7 +371,11 @@ export class Session {
           pendingSend.signal.aborted ||
           (error instanceof Error && error.name === 'AbortError')
         ) {
-          return { stopReason: CoreToolCallStatus.Cancelled };
+          return { stopReason: 'cancelled' };
+        }
+
+        if (error instanceof acp.RequestError) {
+          throw error;
         }
 
         if (
@@ -386,16 +418,59 @@ export class Session {
         );
       }
 
-      if (functionCalls.length > 0) {
-        const toolResponseParts: Part[] = [];
+      totalInputTokens += turnInputTokens;
+      totalOutputTokens += turnOutputTokens;
 
-        for (const fc of functionCalls) {
-          const response = await this.runTool(pendingSend.signal, promptId, fc);
-          toolResponseParts.push(...response);
-        }
-
-        nextMessage = { role: 'user', parts: toolResponseParts };
+      if (turnInputTokens > 0 || turnOutputTokens > 0) {
+        const existing = modelUsageMap.get(turnModelId) ?? {
+          input: 0,
+          output: 0,
+        };
+        existing.input += turnInputTokens;
+        existing.output += turnOutputTokens;
+        modelUsageMap.set(turnModelId, existing);
       }
+
+      if (stopReason !== 'end_turn') {
+        return {
+          stopReason,
+          _meta: {
+            quota: {
+              token_count: {
+                input_tokens: totalInputTokens,
+                output_tokens: totalOutputTokens,
+              },
+              model_usage: Array.from(modelUsageMap.entries()).map(
+                ([modelName, counts]) => ({
+                  model: modelName,
+                  token_count: {
+                    input_tokens: counts.input,
+                    output_tokens: counts.output,
+                  },
+                }),
+              ),
+            },
+          },
+        };
+      }
+
+      if (toolCallRequests.length === 0) {
+        break;
+      }
+
+      const toolResponseParts: Part[] = [];
+      for (const tReq of toolCallRequests) {
+        const fc: FunctionCall = {
+          id: tReq.callId,
+          name: tReq.name,
+          args: tReq.args,
+        };
+
+        const response = await this.runTool(pendingSend.signal, promptId, fc);
+        toolResponseParts.push(...response);
+      }
+
+      currentParts = toolResponseParts;
     }
 
     const modelUsageArray = Array.from(modelUsageMap.entries()).map(
