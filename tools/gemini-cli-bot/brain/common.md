@@ -99,7 +99,11 @@ or configuration changes:
     - Why it is recommended.
     - Expected impact on metrics or productivity.
 2.  **Surgical Changes**: Only propose a **single improvement or fix per PR**.
-    Prioritize highest impact, lowest risk.
+    Prioritize highest impact, lowest risk. While changes should be surgical
+    (one goal per PR), removing duplicated, conflicting, or obsolete legacy
+    workflows is considered the ultimate "surgical" fix. Do not hesitate to
+    delete files or workflows if your evidence shows they are conflicting with
+    standard practices.
 3.  **Acknowledgment**: If invoked by a comment, use the `write_file` tool to
     save a brief acknowledgement to `issue-comment.md`.
 4.  **Stage Files**: Use `git add <file>` to stage files for the PR. **DO NOT**

@@ -120,7 +120,7 @@ jobs:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
         run: 'npx tsx tools/gemini-cli-bot/metrics/index.ts'
 
-      - name: 'Run Brain Phases'
+      - name: 'Run Brain and Critique Loop'
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
@@ -151,39 +151,77 @@ jobs:
             gh issue view "$TRIGGER_ISSUE_NUMBER" >> trigger_context.md 2>/dev/null || gh pr view "$TRIGGER_ISSUE_NUMBER" >> trigger_context.md
             echo "</untrusted_context>" >> trigger_context.md
           fi
-
-          cat trigger_context.md "$PROMPT_PATH" tools/gemini-cli-bot/brain/common.md > combined_prompt.md
-
-          node bundle/gemini.js --policy tools/gemini-cli-bot/ci-policy.toml -p "$(cat combined_prompt.md)"
-
-          if [ -n "$TRIGGER_ISSUE_NUMBER" ] && [ ! -s "issue-comment.md" ] && [ ! -s "pr-comment.md" ]; then
-            echo "Agent failed to respond. Generating fallback error message."
-            echo "⚠️ **Gemini CLI Bot failed to generate a response.**" > "issue-comment.md"
-            echo "" >> "issue-comment.md"
-            echo "I encountered an error or failed to generate a complete response to your request. You can check the [GitHub Actions Run Log](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) for more details on what went wrong." >> "issue-comment.md"
-          fi
-
-      - name: 'Run Critique Phase'
-        if: "${{ github.event.inputs.enable_prs == 'true' || github.event_name == 'issue_comment' || github.event_name == 'pull_request_review_comment' || github.event.inputs.run_interactive == 'true' }}"
-        env:
-          GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
-          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
-          GEMINI_MODEL: 'gemini-3-flash-preview'
-        run: |
-          if git diff --staged --quiet; then
-             echo "No changes staged. Skipping critique."
-             echo "[APPROVED]" > critique_result.txt
-          else
-             node bundle/gemini.js --policy tools/gemini-cli-bot/ci-policy.toml -p "$(cat tools/gemini-cli-bot/brain/critique.md)" 2>&1 | tee critique_output.log
-
-             if [ "${PIPESTATUS[0]}" -eq 0 ] && grep -q "\[APPROVED\]" critique_output.log && ! grep -q "\[REJECTED\]" critique_output.log; then
+          
+          MAX_ITERATIONS=2
+          ITERATION=1
+          
+          while [ $ITERATION -le $MAX_ITERATIONS ]; do
+            echo "========================================"
+            echo "Starting Iteration $ITERATION"
+            echo "========================================"
+            
+            # --- BRAIN PHASE ---
+            cat trigger_context.md > combined_prompt.md
+            if [ -f "critique_feedback.md" ]; then
+               cat critique_feedback.md >> combined_prompt.md
+            fi
+            cat "$PROMPT_PATH" tools/gemini-cli-bot/brain/common.md >> combined_prompt.md
+            
+            echo "Running Brain Agent..."
+            node bundle/gemini.js --policy tools/gemini-cli-bot/ci-policy.toml -p "$(cat combined_prompt.md)"
+            
+            if [ -n "$TRIGGER_ISSUE_NUMBER" ] && [ ! -s "issue-comment.md" ] && [ ! -s "pr-comment.md" ]; then
+              echo "Agent failed to respond. Generating fallback error message."
+              echo "⚠️ **Gemini CLI Bot failed to generate a response.**" > "issue-comment.md"
+              echo "" >> "issue-comment.md"
+              echo "I encountered an error or failed to generate a complete response to your request. You can check the [GitHub Actions Run Log](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) for more details on what went wrong." >> "issue-comment.md"
+            fi
+            
+            # --- CRITIQUE PHASE ---
+            if [ "${{ github.event.inputs.enable_prs == 'true' || github.event_name == 'issue_comment' || github.event_name == 'pull_request_review_comment' || github.event.inputs.run_interactive == 'true' }}" != "true" ]; then
+                echo "PRs disabled, skipping critique."
+                echo "[APPROVED]" > critique_result.txt
+                break
+            fi
+            
+            if git diff --staged --quiet && [ ! -s "issue-comment.md" ] && [ ! -s "pr-comment.md" ]; then
+               echo "No changes staged and no comments generated. Skipping critique."
                echo "[APPROVED]" > critique_result.txt
-             else
-               echo "Critique failed, rejected, or did not explicitly approve changes. Skipping PR creation."
-               echo "[REJECTED]" > critique_result.txt
-             fi
-          fi
-
+               break
+            fi
+            
+            echo "Running Critique Agent..."
+            node bundle/gemini.js --policy tools/gemini-cli-bot/ci-policy.toml -p "$(cat tools/gemini-cli-bot/brain/critique.md)" 2>&1 | tee critique_output.log
+            
+            if [ "${PIPESTATUS[0]}" -eq 0 ] && grep -q "\[APPROVED\]" critique_output.log && ! grep -q "\[REJECTED\]" critique_output.log; then
+               echo "Critique Approved."
+               echo "[APPROVED]" > critique_result.txt
+               break
+            else
+               echo "Critique Rejected."
+               if [ $ITERATION -lt $MAX_ITERATIONS ]; then
+                 echo "Preparing feedback for next iteration..."
+                 echo "<critique_feedback>" > critique_feedback.md
+                 echo "# Critique Feedback (Iteration $ITERATION)" >> critique_feedback.md
+                 echo "Your previous changes were rejected by the Critique agent. You MUST fix the following issues:" >> critique_feedback.md
+                 cat critique_output.log >> critique_feedback.md
+                 echo "</critique_feedback>" >> critique_feedback.md
+                 
+                 # Discard rejected changes
+                 git reset
+                 git checkout .
+                 rm -f pr-description.md branch-name.txt pr-comment.md pr-number.txt issue-comment.md bot-changes.patch
+               else
+                 echo "Max iterations reached. Failing."
+                 echo "[REJECTED]" > critique_result.txt
+                 # We still want to upload artifacts for debugging even if it failed.
+                 git diff --staged > bot-changes.patch || true
+                 break
+               fi
+            fi
+            
+            ITERATION=$((ITERATION+1))
+          done
       - name: 'Generate Patch'
         if: "${{ github.event.inputs.enable_prs == 'true' || github.event_name == 'issue_comment' || github.event_name == 'pull_request_review_comment' || github.event.inputs.run_interactive == 'true' }}"
         run: |

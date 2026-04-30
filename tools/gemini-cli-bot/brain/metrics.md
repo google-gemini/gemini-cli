@@ -80,6 +80,13 @@ Before proposing an intervention, accurately identify the blocker:
 
 ### 5. Policy Critique & Evaluation
 
+- **Identify Architectural Overlap:** Before optimizing any workflow, script, or
+  configuration, you MUST search the repository to see if other systems act on
+  the same domain or lifecycle event. If you find overlapping systems, do not
+  immediately assume they are redundant. **You must verify their intent:** Do
+  they contradict each other (e.g., different thresholds, duplicate messaging)?
+  If they are truly conflicting, your PR should consolidate them. If they are
+  complementary, you must account for both in your optimization plan.
 - **Review Existing Policies**: Examine the existing automation in
   `.github/workflows/` and scripts in `tools/gemini-cli-bot/reflexes/scripts/`.
 - **Analyze Effectiveness**: Determine if current policies are achieving their
