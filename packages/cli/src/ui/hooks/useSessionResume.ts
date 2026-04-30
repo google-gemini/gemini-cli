@@ -10,6 +10,7 @@ import {
   type Config,
   type ResumedSessionData,
   convertSessionToClientHistory,
+  uiTelemetryService,
 } from '@google/gemini-cli-core';
 import type { Part } from '@google/genai';
 import type { HistoryItemWithoutId } from '../types.js';
@@ -82,6 +83,10 @@ export function useSessionResume({
           // but filter out ones that no longer exist
           workspaceContext.addDirectories(resumedData.conversation.directories);
         }
+
+        // Ensure telemetry and session ID are synchronized from the resumed session.
+        uiTelemetryService.hydrate(resumedData.conversation);
+        config.setSessionId(resumedData.conversation.sessionId);
 
         // Give the history to the Gemini client.
         await config.getGeminiClient()?.resumeChat(clientHistory, resumedData);
