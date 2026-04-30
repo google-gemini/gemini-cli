@@ -1800,9 +1800,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         useBackgroundColor={useBackgroundColor}
       >
         <Box flexGrow={1} flexDirection="row" paddingX={1}>
-          {isVoiceModeEnabled && (
-            <Text color={theme.text.accent}>🎤 </Text>
-          )}
+          {isVoiceModeEnabled && <Text color={theme.text.accent}>🎤 </Text>}
           <Text
             color={statusColor ?? theme.text.accent}
             aria-label={statusText || undefined}
