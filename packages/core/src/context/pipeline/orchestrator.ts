@@ -22,6 +22,8 @@ import { ContextWorkingBufferImpl } from './contextWorkingBuffer.js';
 export class PipelineOrchestrator {
   private activeTimers: NodeJS.Timeout[] = [];
   private readonly pendingPipelines = new Map<string, Promise<void>>();
+  private readonly pipelineMutex = new Map<string, Promise<void>>();
+  private nodeProvider: (() => readonly ConcreteNode[]) | undefined;
 
   constructor(
     private readonly pipelines: PipelineDef[],
@@ -31,6 +33,14 @@ export class PipelineOrchestrator {
     private readonly tracer: ContextTracer,
   ) {
     this.setupTriggers();
+  }
+
+  /**
+   * Sets the provider for the latest live nodes.
+   * This is used by sequential pipeline runs to ensure they operate on current state.
+   */
+  setNodeProvider(provider: () => readonly ConcreteNode[]) {
+    this.nodeProvider = provider;
   }
 
   /**
@@ -93,16 +103,42 @@ export class PipelineOrchestrator {
     };
 
     bindTriggers(this.pipelines, (pipeline, nodes, targets, protectedIds) => {
-      const promise = this.executePipelineAsync(
-        pipeline,
-        nodes,
-        new Set(targets),
-        new Set(protectedIds),
-      );
+      // Fetch the tail of the current chain for this pipeline, or start a new one
+      const existing =
+        this.pipelineMutex.get(pipeline.name) || Promise.resolve();
+
+      const nextPromise = (async () => {
+        try {
+          // Wait for the previous run of THIS pipeline to complete
+          await existing;
+
+          // We re-fetch the LATEST nodes from the environment's live buffer
+          // to ensure this sequential run isn't operating on stale data from the trigger event.
+          const latestNodes = this.nodeProvider!();
+
+          await this.executePipelineAsync(
+            pipeline,
+            latestNodes,
+            new Set(targets),
+            new Set(protectedIds),
+          );
+        } catch (e) {
+          debugLogger.error(`Pipeline chain ${pipeline.name} failed:`, e);
+        }
+      })();
+
+      // Update the chain tail
+      this.pipelineMutex.set(pipeline.name, nextPromise);
 
       const pipelineId = `${pipeline.name}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      this.pendingPipelines.set(pipelineId, promise);
-      void promise.finally(() => this.pendingPipelines.delete(pipelineId));
+      this.pendingPipelines.set(pipelineId, nextPromise);
+      void nextPromise.finally(() => {
+        this.pendingPipelines.delete(pipelineId);
+        // Only clear the mutex if we are still the tail of the chain
+        if (this.pipelineMutex.get(pipeline.name) === nextPromise) {
+          this.pipelineMutex.delete(pipeline.name);
+        }
+      });
     });
 
     bindTriggers(this.asyncPipelines, (pipeline, nodes, targetIds) => {

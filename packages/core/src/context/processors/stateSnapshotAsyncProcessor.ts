@@ -102,6 +102,7 @@ export function createStateSnapshotAsyncProcessor(
           newText: snapshotText,
           consumedIds: newConsumedIds,
           type: processorType,
+          timestamp: targets[targets.length - 1].timestamp,
         });
       } catch (e) {
         debugLogger.error(

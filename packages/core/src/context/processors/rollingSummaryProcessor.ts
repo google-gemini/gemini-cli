@@ -129,7 +129,7 @@ export function createRollingSummaryProcessor(
           id: newId,
           logicalParentId: newId,
           type: NodeType.ROLLING_SUMMARY,
-          timestamp: Date.now(),
+          timestamp: nodesToSummarize[nodesToSummarize.length - 1].timestamp,
           role: 'user',
           payload: { text: snapshotText },
           abstractsIds: nodesToSummarize.map((n) => n.id),

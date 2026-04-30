@@ -46,6 +46,9 @@ export class ContextManager {
     this.eventBus = env.eventBus;
     this.orchestrator = orchestrator;
 
+    // Provide the orchestrator with a way to fetch the latest nodes from the live buffer
+    this.orchestrator.setNodeProvider(() => this.buffer.nodes);
+
     this.historyObserver = new HistoryObserver(
       chatHistory,
       this.env.eventBus,

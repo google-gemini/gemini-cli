@@ -61,6 +61,7 @@ export function createStateSnapshotProcessor(
         newText: string;
         consumedIds: string[];
         type: string;
+        timestamp: number;
       }>('PROPOSED_SNAPSHOT');
 
       if (proposedSnapshots.length > 0) {
@@ -75,7 +76,7 @@ export function createStateSnapshotProcessor(
         );
 
         for (const proposed of sorted) {
-          const { consumedIds, newText } = proposed.payload;
+          const { consumedIds, newText, timestamp } = proposed.payload;
 
           // Verify all consumed IDs still exist sequentially in targets
           const targetIds = new Set(targets.map((t) => t.id));
@@ -89,7 +90,7 @@ export function createStateSnapshotProcessor(
               id: newId,
               logicalParentId: newId,
               type: NodeType.SNAPSHOT,
-              timestamp: Date.now(),
+              timestamp: timestamp ?? Date.now(),
               role: 'user',
               payload: { text: newText },
               abstractsIds: consumedIds,
@@ -156,7 +157,7 @@ export function createStateSnapshotProcessor(
           id: newId,
           logicalParentId: newId,
           type: NodeType.SNAPSHOT,
-          timestamp: Date.now(),
+          timestamp: nodesToSummarize[nodesToSummarize.length - 1].timestamp,
           role: 'user',
           payload: { text: snapshotText },
           abstractsIds: nodesToSummarize.map((n) => n.id),

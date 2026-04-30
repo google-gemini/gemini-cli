@@ -6,7 +6,7 @@
 import { randomUUID } from 'node:crypto';
 import type { JSONSchemaType } from 'ajv';
 import type { ContextProcessor, ProcessArgs } from '../pipeline.js';
-import type { ConcreteNode } from '../graph/types.js';
+import { type ConcreteNode, NodeType } from '../graph/types.js';
 import type { ContextEnvironment } from '../pipeline/environment.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 import {
@@ -84,8 +84,8 @@ export function createNodeDistillationProcessor(
         const payload = node.payload;
 
         switch (node.type) {
-          case 'USER_PROMPT':
-          case 'AGENT_THOUGHT': {
+          case NodeType.USER_PROMPT:
+          case NodeType.AGENT_THOUGHT: {
             const text = payload.text;
             if (text && text.length > thresholdChars) {
               const summary = await generateSummary(text, node.type);
@@ -104,6 +104,7 @@ export function createNodeDistillationProcessor(
                   id: randomUUID(),
                   payload: distilledPayload,
                   replacesId: node.id,
+                  timestamp: node.timestamp,
                 });
                 break;
               }
@@ -112,7 +113,7 @@ export function createNodeDistillationProcessor(
             break;
           }
 
-          case 'TOOL_EXECUTION': {
+          case NodeType.TOOL_EXECUTION: {
             if (payload.functionResponse) {
               const rawObs = payload.functionResponse.response;
               let stringifiedObs = '';
@@ -161,6 +162,7 @@ export function createNodeDistillationProcessor(
                     id: randomUUID(),
                     payload: distilledPayload,
                     replacesId: node.id,
+                    timestamp: node.timestamp,
                   });
                   break;
                 }
