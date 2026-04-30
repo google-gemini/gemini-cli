@@ -202,30 +202,23 @@ export class MessageBus extends EventEmitter {
   }
 
   /**
-   * Request-response pattern: Publish a message and wait for a correlated response
-   * This enables synchronous-style communication over the async MessageBus
-   * The correlation ID is generated internally and added to the request
+   * Request-response pattern: Publish a message and wait for a correlated response.
+   * The correlation ID is generated internally and added to the request.
    */
   async request<TRequest extends Message, TResponse extends Message>(
     request: Omit<TRequest, 'correlationId'>,
     responseType: TResponse['type'],
-    timeoutMs: number = 60000,
+    options?: { signal?: AbortSignal },
   ): Promise<TResponse> {
     const correlationId = randomUUID();
 
     return new Promise<TResponse>((resolve, reject) => {
-      const timeoutId = setTimeout(() => {
-        cleanup();
-        reject(new Error(`Request timed out waiting for ${responseType}`));
-      }, timeoutMs);
-
       const cleanup = () => {
-        clearTimeout(timeoutId);
         this.unsubscribe(responseType, responseHandler);
+        this.removeListener('error', errorHandler);
       };
 
       const responseHandler = (response: TResponse) => {
-        // Check if this response matches our request
         if (
           'correlationId' in response &&
           response.correlationId === correlationId
@@ -235,12 +228,32 @@ export class MessageBus extends EventEmitter {
         }
       };
 
-      // Subscribe to responses
-      this.subscribe<TResponse>(responseType, responseHandler);
+      const errorHandler = (error: unknown) => {
+        cleanup();
+        reject(error);
+      };
 
-      // Publish the request with correlation ID
-      // eslint-disable-next-line @typescript-eslint/no-floating-promises, @typescript-eslint/no-unsafe-type-assertion
-      this.publish({ ...request, correlationId } as TRequest);
+      if (options?.signal) {
+        const signal = options.signal;
+        if (signal.aborted) {
+          reject(new Error(`Request aborted waiting for ${responseType}`));
+          return;
+        }
+        signal.addEventListener(
+          'abort',
+          () => {
+            cleanup();
+            reject(new Error(`Request aborted waiting for ${responseType}`));
+          },
+          { once: true },
+        );
+      }
+
+      this.subscribe<TResponse>(responseType, responseHandler);
+      this.once('error', errorHandler);
+
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      void this.publish({ ...request, correlationId } as TRequest);
     });
   }
 }

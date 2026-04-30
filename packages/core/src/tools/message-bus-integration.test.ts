@@ -262,10 +262,9 @@ describe('Message Bus Integration', () => {
       const tool = new TestTool(messageBus);
       const invocation = tool.build({ testParam: 'test-value' });
 
-      // Mock publish to throw error
-      vi.spyOn(messageBus, 'publish').mockImplementation(() => {
-        throw new Error('Message bus error');
-      });
+      vi.spyOn(messageBus, 'publish').mockRejectedValue(
+        new Error('async error'),
+      );
 
       const result = await invocation.shouldConfirmExecute(
         new AbortController().signal,
