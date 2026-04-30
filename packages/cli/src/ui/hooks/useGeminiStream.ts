@@ -704,7 +704,12 @@ export const useGeminiStream = (
 
   const lastQueryRef = useRef<PartListUnion | null>(null);
   const lastPromptIdRef = useRef<string | null>(null);
-  const loopDetectedRef = useRef(false);
+  const loopDetectedRef = useRef<{
+    count: number;
+    type?: string;
+    detail?: string;
+    confirmedByModel?: string;
+  } | null>(null);
   const [
     loopDetectionConfirmationRequest,
     setLoopDetectionConfirmationRequest,
@@ -1505,7 +1510,7 @@ export const useGeminiStream = (
           case ServerGeminiEventType.LoopDetected:
             // handle later because we want to move pending history to history
             // before we add loop detected message to history
-            loopDetectedRef.current = true;
+            loopDetectedRef.current = event.value || { count: 2 };
             break;
           case ServerGeminiEventType.Retry:
           case ServerGeminiEventType.InvalidStream:
@@ -1656,7 +1661,8 @@ export const useGeminiStream = (
                 setPendingHistoryItem(null);
               }
               if (loopDetectedRef.current) {
-                loopDetectedRef.current = false;
+                const loopDetails = loopDetectedRef.current;
+                loopDetectedRef.current = null;
                 // Show the confirmation dialog to choose whether to disable loop detection
                 setLoopDetectionConfirmationRequest({
                   onComplete: async (result: {
@@ -1682,9 +1688,16 @@ export const useGeminiStream = (
                         );
                       }
                     } else {
+                      let detailText = '';
+                      if (loopDetails.detail) {
+                        detailText = ` Details: ${loopDetails.detail}.`;
+                      } else if (loopDetails.confirmedByModel) {
+                        detailText = ` Identified by model: ${loopDetails.confirmedByModel}.`;
+                      }
+
                       addItem({
                         type: 'info',
-                        text: `A potential loop was detected. This can happen due to repetitive tool calls or other model behavior. The request has been halted.`,
+                        text: `A potential loop was detected.${detailText} This can happen due to repetitive tool calls or other model behavior. The request has been halted.`,
                       });
                     }
                   },

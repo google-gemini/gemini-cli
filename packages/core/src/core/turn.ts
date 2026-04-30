@@ -28,6 +28,7 @@ import { InvalidStreamError, type GeminiChat } from './geminiChat.js';
 import { parseThought, type ThoughtSummary } from '../utils/thoughtUtils.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
 import { getCitations } from '../utils/generateContentResponseUtilities.js';
+import type { LoopType } from '../telemetry/types.js';
 import { LlmRole } from '../telemetry/types.js';
 
 import {
@@ -206,6 +207,12 @@ export type ServerGeminiFinishedEvent = {
 
 export type ServerGeminiLoopDetectedEvent = {
   type: GeminiEventType.LoopDetected;
+  value?: {
+    count: number;
+    type?: LoopType;
+    detail?: string;
+    confirmedByModel?: string;
+  };
 };
 
 export type ServerGeminiCitationEvent = {

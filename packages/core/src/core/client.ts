@@ -696,7 +696,7 @@ export class GeminiClient {
 
     const loopResult = await this.loopDetector.turnStarted(signal);
     if (loopResult.count > 1) {
-      yield { type: GeminiEventType.LoopDetected };
+      yield { type: GeminiEventType.LoopDetected, value: loopResult };
       return turn;
     } else if (loopResult.count === 1) {
       if (boundedTurns <= 1) {
@@ -765,7 +765,7 @@ export class GeminiClient {
     for await (const event of resultStream) {
       const loopResult = this.loopDetector.addAndCheck(event);
       if (loopResult.count > 1) {
-        yield { type: GeminiEventType.LoopDetected };
+        yield { type: GeminiEventType.LoopDetected, value: loopResult };
         loopDetectedAbort = true;
         break;
       } else if (loopResult.count === 1) {
