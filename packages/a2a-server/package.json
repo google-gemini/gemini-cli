@@ -32,7 +32,7 @@
     "fs-extra": "^11.3.0",
     "strip-json-comments": "^3.1.1",
     "tar": "^7.5.8",
-    "uuid": "^13.0.0",
+    "uuid": "^14.0.0",
     "winston": "^3.17.0"
   },
   "devDependencies": {
