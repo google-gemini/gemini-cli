@@ -294,11 +294,15 @@ export function ThemeDialog({
                 const itemWithExtras = item as typeof item & {
                   themeWarning?: string;
                   themeMatch?: string;
+                  themeNameDisplay?: string;
+                  themeTypeDisplay?: string;
                 };
 
-                if (item.themeNameDisplay && item.themeTypeDisplay) {
-                  const match = item.themeNameDisplay.match(/^(.*) \((.*)\)$/);
-                  let themeNamePart: React.ReactNode = item.themeNameDisplay;
+                if (itemWithExtras.themeNameDisplay) {
+                  const match =
+                    itemWithExtras.themeNameDisplay.match(/^(.*) \((.*)\)$/);
+                  let themeNamePart: React.ReactNode =
+                    itemWithExtras.themeNameDisplay;
                   if (match) {
                     themeNamePart = (
                       <>
@@ -310,10 +314,15 @@ export function ThemeDialog({
 
                   return (
                     <Text color={titleColor} wrap="truncate" key={item.key}>
-                      {themeNamePart}{' '}
-                      <Text color={theme.text.secondary}>
-                        {item.themeTypeDisplay}
-                      </Text>
+                      {themeNamePart}
+                      {itemWithExtras.themeTypeDisplay ? (
+                        <>
+                          {' '}
+                          <Text color={theme.text.secondary}>
+                            {itemWithExtras.themeTypeDisplay}
+                          </Text>
+                        </>
+                      ) : null}
                       {itemWithExtras.themeMatch && (
                         <Text color={theme.status.success}>
                           {itemWithExtras.themeMatch}
