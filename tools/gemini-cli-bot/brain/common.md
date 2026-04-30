@@ -93,15 +93,15 @@ advanced triage, or semantic labeling).
 If the `ENABLE_PRS` environment variable is `true` and you are proposing script
 or configuration changes:
 
-1.  **Generate `pr-description.md`**: Create this file in the root directory.
-    Include:
+1.  **Generate `pr-description.md`**: Use the `write_file` tool to create this
+    file in the root directory. Include:
     - What the change is.
     - Why it is recommended.
     - Expected impact on metrics or productivity.
 2.  **Surgical Changes**: Only propose a **single improvement or fix per PR**.
     Prioritize highest impact, lowest risk.
-3.  **Acknowledgment**: If invoked by a comment, write a brief acknowledgement
-    to `issue-comment.md`.
+3.  **Acknowledgment**: If invoked by a comment, use the `write_file` tool to
+    save a brief acknowledgement to `issue-comment.md`.
 4.  **Stage Files**: Use `git add <file>` to stage files for the PR. **DO NOT**
     stage internal bot files like `pr-description.md`, `lessons-learned.md`,
     branch-name.txt, pr-comment.md, pr-number.txt, issue-comment.md, or anything
@@ -112,10 +112,10 @@ or configuration changes:
 If you are continuing work on an existing Task (e.g., status is `SUBMITTED`,
 `FAILED`, or `STUCK`):
 
-1.  **Update Existing PR**: Generate `branch-name.txt` with the branch name
-    (format: `bot/task-{ID}`).
-2.  **Respond to Maintainers**: Generate `pr-comment.md` (content) and
-    `pr-number.txt` (ID).
+1.  **Update Existing PR**: Use `write_file` to generate `branch-name.txt` with
+    the branch name (format: `bot/task-{ID}`).
+2.  **Respond to Maintainers**: Use `write_file` to generate `pr-comment.md`
+    (content) and `pr-number.txt` (ID).
 3.  **Handle CI Failures**: Diagnose failing checks using `gh run view` and
     priority must be generating a new patch to fix the failure.
 

@@ -312,15 +312,8 @@ export const defaultKeyBindingConfig: KeyBindingConfig = new Map([
     Command.DELETE_CHAR_RIGHT,
     [new KeyBinding('delete'), new KeyBinding('ctrl+d')],
   ],
-  [Command.UNDO, [new KeyBinding('cmd+z'), new KeyBinding('alt+z')]],
-  [
-    Command.REDO,
-    [
-      new KeyBinding('ctrl+shift+z'),
-      new KeyBinding('cmd+shift+z'),
-      new KeyBinding('alt+shift+z'),
-    ],
-  ],
+  [Command.UNDO, getPlatformUndoBindings(process.platform)],
+  [Command.REDO, getPlatformRedoBindings(process.platform)],
 
   // Scrolling
   [Command.SCROLL_UP, [new KeyBinding('shift+up')]],
@@ -781,4 +774,34 @@ export async function loadCustomKeybindings(): Promise<{
   }
 
   return { config, errors };
+}
+
+export function getPlatformUndoBindings(
+  platform: string,
+): readonly KeyBinding[] {
+  if (platform === 'win32') {
+    return [new KeyBinding('ctrl+z'), new KeyBinding('alt+z')];
+  }
+  if (platform === 'darwin') {
+    return [new KeyBinding('cmd+z'), new KeyBinding('alt+z')];
+  }
+  // Linux / WSL: Promote Alt+Z to avoid Windows interception,
+  // but keep Ctrl+Z for smart bubbling.
+  return [
+    new KeyBinding('alt+z'),
+    new KeyBinding('cmd+z'),
+    new KeyBinding('ctrl+z'),
+  ];
+}
+
+export function getPlatformRedoBindings(
+  _platform: string,
+): readonly KeyBinding[] {
+  // Use a stable order for all platforms to minimize churn.
+  // Ctrl+Shift+Z is the universal primary.
+  return [
+    new KeyBinding('ctrl+shift+z'),
+    new KeyBinding('cmd+shift+z'),
+    new KeyBinding('alt+shift+z'),
+  ];
 }
