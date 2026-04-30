@@ -82,6 +82,7 @@ import { CompleteTaskTool } from '../tools/complete-task.js';
 import {
   COMPLETE_TASK_TOOL_NAME,
   ACTIVATE_SKILL_TOOL_NAME,
+  UPDATE_TOPIC_TOOL_NAME,
 } from '../tools/definitions/base-declarations.js';
 
 /** A callback function to report on agent activity. */
@@ -186,6 +187,10 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       // Check if the tool is an agent tool to prevent recursion.
       // We do not allow agents to call other agents.
       if (tool.kind === Kind.Agent) {
+        return;
+      }
+
+      if (tool.name === UPDATE_TOPIC_TOOL_NAME) {
         return;
       }
 
@@ -774,6 +779,8 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         return {
           result: finalResult || 'Task completed.',
           terminate_reason: terminateReason,
+          turn_count: turnCounter,
+          duration_ms: Date.now() - startTime,
         };
       }
 
@@ -781,6 +788,8 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         result:
           finalResult || 'Agent execution was terminated before completion.',
         terminate_reason: terminateReason,
+        turn_count: turnCounter,
+        duration_ms: Date.now() - startTime,
       };
     } catch (error) {
       // Check if the error is an AbortError caused by our internal timeout.
@@ -821,6 +830,8 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
             return {
               result: finalResult,
               terminate_reason: terminateReason,
+              turn_count: turnCounter,
+              duration_ms: Date.now() - startTime,
             };
           }
         }
@@ -835,6 +846,8 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         return {
           result: finalResult,
           terminate_reason: terminateReason,
+          turn_count: turnCounter,
+          duration_ms: Date.now() - startTime,
         };
       }
 
