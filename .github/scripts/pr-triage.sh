@@ -40,7 +40,8 @@ get_issue_labels() {
     fi
 
     local labels
-    labels=$(echo "${gh_output}" | grep -x -E '(area|priority)/.*|help wanted|🔒 maintainer only' | tr '\n' ',' | sed 's/,$//' || echo "")
+    # Note: 'help wanted' is intentionally omitted here so it does not propagate from issues to PRs.
+    labels=$(echo "${gh_output}" | grep -x -E '(area|priority)/.*|🔒 maintainer only' | tr '\n' ',' | sed 's/,$//' || echo "")
     
     # Save to flat cache
     ISSUE_LABELS_CACHE_FLAT="${ISSUE_LABELS_CACHE_FLAT}${ISSUE_NUM}:${labels}|"
