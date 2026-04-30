@@ -86,7 +86,7 @@ ${environmentMemory}
 
 export async function getInitialChatHistory(
   config: Config,
-  extraHistory?: Content[],
+  extraHistory?: readonly Content[],
 ): Promise<Content[]> {
   const envParts = await getEnvironmentContext(config);
   const envContextString = envParts.map((part) => part.text || '').join('\n\n');

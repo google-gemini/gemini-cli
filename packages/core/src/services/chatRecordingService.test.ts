@@ -1237,6 +1237,64 @@ describe('ChatRecordingService', () => {
       // No tool calls matched, so writeFileSync should NOT have been called
       expect(appendFileSyncSpy).not.toHaveBeenCalled();
     });
+
+    it('should repopulate cachedConversation.messages when updating from history if cache is empty (regression)', async () => {
+      // This simulates the state after /chat resume where history is loaded into GeminiChat
+      // but ChatRecordingService's cache is still empty.
+      const history: Content[] = [
+        {
+          role: 'user',
+          parts: [{ text: 'Hello' }],
+        },
+        {
+          role: 'model',
+          parts: [{ text: 'Hi there!' }],
+        },
+        {
+          role: 'user',
+          parts: [{ text: 'How are you?' }],
+        },
+      ];
+
+      // Initially empty (except for metadata)
+      expect(chatRecordingService.getConversation()?.messages).toHaveLength(0);
+
+      chatRecordingService.updateMessagesFromHistory(history);
+
+      const messages = chatRecordingService.getConversation()?.messages;
+      // CURRENTLY FAILS: it only updates tool results, doesn't reconstruct messages.
+      expect(messages).toHaveLength(3);
+      expect(messages![0].content).toEqual([{ text: 'Hello' }]);
+      expect(messages![1].content).toEqual([{ text: 'Hi there!' }]);
+      expect(messages![2].content).toEqual([{ text: 'How are you?' }]);
+    });
+
+    it('should force reconstruction when reconstruct flag is true, even if cache is not empty', async () => {
+      // 1. Initial state with some messages
+      chatRecordingService.recordMessage({
+        type: 'user',
+        content: 'Old user message',
+        model: 'gemini-pro',
+      });
+
+      expect(chatRecordingService.getConversation()?.messages).toHaveLength(1);
+
+      // 2. New history to replace the old one
+      const newHistory: Content[] = [
+        {
+          role: 'user',
+          parts: [{ text: 'New user message' }],
+        },
+      ];
+
+      // 3. Update with reconstruct = true
+      chatRecordingService.updateMessagesFromHistory(newHistory, true);
+
+      const messages = chatRecordingService.getConversation()?.messages;
+      expect(messages).toHaveLength(1);
+      expect(messages![0].content).toEqual([{ text: 'New user message' }]);
+      expect(messages![0].type).toBe('user');
+    });
   });
 
   describe('ENOENT (missing directory) handling', () => {
