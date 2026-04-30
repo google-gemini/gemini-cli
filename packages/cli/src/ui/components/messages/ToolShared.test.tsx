@@ -7,7 +7,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render } from '../../../test-utils/render.js';
 import { Text } from 'ink';
-import { McpProgressIndicator } from './ToolShared.js';
+import { McpProgressIndicator, ToolInfo } from './ToolShared.js';
+import { CoreToolCallStatus } from '@google/gemini-cli-core';
 
 vi.mock('../GeminiRespondingSpinner.js', () => ({
   GeminiRespondingSpinner: () => <Text>MockSpinner</Text>,
@@ -63,5 +64,39 @@ describe('McpProgressIndicator', () => {
     const output = lastFrame();
     expect(output).toContain('100%');
     expect(output).not.toContain('150%');
+  });
+});
+
+describe('ToolInfo', () => {
+  const longDescription = 'long '.repeat(50);
+
+  it('truncates description by default', async () => {
+    const { lastFrame } = await render(
+      <ToolInfo
+        name="test-tool"
+        description={longDescription}
+        status={CoreToolCallStatus.Success}
+        emphasis="medium"
+      />,
+    );
+    const output = lastFrame();
+    // In Ink, a single line Box with wrap="truncate" will be truncated.
+    // Since we don't know the exact terminal width in this test, we check if it is short.
+    expect(output.trim().split('\n').length).toBe(1);
+  });
+
+  it('wraps description when isExpanded is true', async () => {
+    const { lastFrame } = await render(
+      <ToolInfo
+        name="test-tool"
+        description={longDescription}
+        status={CoreToolCallStatus.Success}
+        emphasis="medium"
+        isExpanded={true}
+      />,
+    );
+    const output = lastFrame();
+    // When expanded, it should wrap into multiple lines.
+    expect(output.trim().split('\n').length).toBeGreaterThan(1);
   });
 });

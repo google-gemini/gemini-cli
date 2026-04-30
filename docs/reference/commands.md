@@ -504,12 +504,12 @@ the dedicated [Custom Commands documentation](../cli/custom-commands.md).
 These shortcuts apply directly to the input prompt for text manipulation.
 
 - **Undo:**
-  - **Keyboard shortcut:** Press **Alt+z** or **Cmd+z** to undo the last action
-    in the input prompt.
+  - **Keyboard shortcut:** Press **Ctrl+z** (Windows), **Cmd+z** (macOS), or
+    **Alt+z** (Linux/WSL) to undo the last action in the input prompt.
 
 - **Redo:**
-  - **Keyboard shortcut:** Press **Shift+Alt+Z** or **Shift+Cmd+Z** to redo the
-    last undone action in the input prompt.
+  - **Keyboard shortcut:** Press **Shift+Cmd+Z** (macOS), or **Shift+Alt+Z**
+    (Linux/WSL) to redo the last undone action in the input prompt.
 
 ## At commands (`@`)
 
