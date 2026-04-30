@@ -4992,7 +4992,7 @@ describe('InputPrompt', () => {
 
       // Now should show listening
       await waitFor(() => {
-        expect(lastFrame()).toContain('🎤 Listening...');
+        expect(lastFrame()).toContain('Listening...');
       });
 
       unmount();
@@ -5017,7 +5017,7 @@ describe('InputPrompt', () => {
         stdin.write(' ');
       });
       await waitFor(() => {
-        expect(lastFrame()).toContain('🎤 Listening...');
+        expect(lastFrame()).toContain('Listening...');
       });
 
       // Stop recording
@@ -5056,7 +5056,7 @@ describe('InputPrompt', () => {
       });
 
       await waitFor(() => {
-        expect(lastFrame()).toContain('🎤 Listening...');
+        expect(lastFrame()).toContain('Listening...');
       });
 
       unmount();
@@ -5082,7 +5082,7 @@ describe('InputPrompt', () => {
       });
 
       // Should NOT show listening, instead should call handleInput which handles space
-      expect(lastFrame()).not.toContain('🎤 Listening...');
+      expect(lastFrame()).not.toContain('Listening...');
       expect(mockBuffer.handleInput).toHaveBeenCalled();
       unmount();
     });
@@ -5211,14 +5211,14 @@ describe('InputPrompt', () => {
 
         // Should insert space optimistically
         expect(mockBuffer.insert).toHaveBeenCalledWith(' ');
-        expect(lastFrame()).not.toContain('🎤 Listening...');
+        expect(lastFrame()).not.toContain('Listening...');
 
         // Advance timer past HOLD_DELAY_MS
         await act(async () => {
           vi.advanceTimersByTime(700);
         });
 
-        expect(lastFrame()).not.toContain('🎤 Listening...');
+        expect(lastFrame()).not.toContain('Listening...');
         unmount();
       });
 
@@ -5248,7 +5248,7 @@ describe('InputPrompt', () => {
           // Should have backspaced the optimistic space
           expect(mockBuffer.backspace).toHaveBeenCalled();
           // Should show listening
-          expect(lastFrame()).toContain('🎤 Listening...');
+          expect(lastFrame()).toContain('Listening...');
         });
 
         unmount();
@@ -5274,7 +5274,7 @@ describe('InputPrompt', () => {
         // Use a short interval in waitFor to prevent advancing fake timers past the 300ms RELEASE_DELAY_MS
         await waitFor(
           () => {
-            expect(lastFrame()).toContain('🎤 Listening...');
+            expect(lastFrame()).toContain('Listening...');
           },
           { interval: 10 },
         );
