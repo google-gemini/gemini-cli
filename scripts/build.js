@@ -47,21 +47,21 @@ execSync(isBun ? 'bun run generate' : 'npm run generate', {
 });
 
 if (isBun) {
-  if (process.env.CI) {
-    console.log('CI environment detected. Building workspaces sequentially...');
-    execSync("bun run --filter '*' --sequential build", {
-      stdio: 'inherit',
-      cwd: root,
-    });
-  } else {
-    // Build core first because everyone depends on it
-    console.log('Building @google/gemini-cli-core...');
-    execSync('bun run --filter @google/gemini-cli-core build', {
-      stdio: 'inherit',
-      cwd: root,
-    });
+  // bun run --filter does not respect topological order, so build core
+  // explicitly first (everyone depends on it) before the rest.
+  console.log('Building @google/gemini-cli-core...');
+  execSync('bun run --filter @google/gemini-cli-core build', {
+    stdio: 'inherit',
+    cwd: root,
+  });
 
-    // Build the rest in parallel
+  if (process.env.CI) {
+    console.log('Building other workspaces sequentially...');
+    execSync(
+      "bun run --filter '*' --filter '!@google/gemini-cli-core' --sequential build",
+      { stdio: 'inherit', cwd: root },
+    );
+  } else {
     console.log('Building other workspaces in parallel...');
     execSync(
       "bun run --filter '*' --filter '!@google/gemini-cli-core' --parallel build",
