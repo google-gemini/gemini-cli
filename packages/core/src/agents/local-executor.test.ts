@@ -207,18 +207,25 @@ vi.mock('../config/scoped-config.js', async (importOriginal) => {
     ...actual,
     runWithScopedWorkspaceContext: vi.fn(actual.runWithScopedWorkspaceContext),
     createScopedWorkspaceContext: vi.fn(actual.createScopedWorkspaceContext),
+    runWithScopedMemoryInboxAccess: vi.fn(
+      actual.runWithScopedMemoryInboxAccess,
+    ),
   };
 });
 
 import {
   runWithScopedWorkspaceContext,
   createScopedWorkspaceContext,
+  runWithScopedMemoryInboxAccess,
 } from '../config/scoped-config.js';
 const mockedRunWithScopedWorkspaceContext = vi.mocked(
   runWithScopedWorkspaceContext,
 );
 const mockedCreateScopedWorkspaceContext = vi.mocked(
   createScopedWorkspaceContext,
+);
+const mockedRunWithScopedMemoryInboxAccess = vi.mocked(
+  runWithScopedMemoryInboxAccess,
 );
 
 const MockedGeminiChat = vi.mocked(GeminiChat);
@@ -421,6 +428,7 @@ describe('LocalAgentExecutor', () => {
     mockedLogAgentFinish.mockReset();
     mockedRunWithScopedWorkspaceContext.mockClear();
     mockedCreateScopedWorkspaceContext.mockClear();
+    mockedRunWithScopedMemoryInboxAccess.mockClear();
     mockedPromptIdContext.getStore.mockReset();
     mockedPromptIdContext.run.mockImplementation((_id, fn) => fn());
 
@@ -940,6 +948,28 @@ describe('LocalAgentExecutor', () => {
       expect(mockedRunWithScopedWorkspaceContext).toHaveBeenCalledOnce();
     });
 
+    it('should use runWithScopedMemoryInboxAccess when memoryInboxAccess is set', async () => {
+      const definition = createTestDefinition();
+      definition.memoryInboxAccess = true;
+      const executor = await LocalAgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+
+      mockModelResponse([
+        {
+          name: COMPLETE_TASK_TOOL_NAME,
+          args: { finalResult: 'done' },
+          id: 'c1',
+        },
+      ]);
+
+      await executor.run({ goal: 'test' }, signal);
+
+      expect(mockedRunWithScopedMemoryInboxAccess).toHaveBeenCalledOnce();
+    });
+
     it('should not use runWithScopedWorkspaceContext when workspaceDirectories is not set', async () => {
       const definition = createTestDefinition();
       const executor = await LocalAgentExecutor.create(
@@ -961,6 +991,7 @@ describe('LocalAgentExecutor', () => {
 
       expect(mockedCreateScopedWorkspaceContext).not.toHaveBeenCalled();
       expect(mockedRunWithScopedWorkspaceContext).not.toHaveBeenCalled();
+      expect(mockedRunWithScopedMemoryInboxAccess).not.toHaveBeenCalled();
     });
   });
 

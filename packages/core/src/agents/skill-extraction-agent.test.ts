@@ -34,6 +34,7 @@ describe('SkillExtractionAgent', () => {
     expect(agent.name).toBe('confucius');
     expect(agent.displayName).toBe('Skill Extractor');
     expect(agent.modelConfig.model).toBe(PREVIEW_GEMINI_FLASH_MODEL);
+    expect(agent.memoryInboxAccess).toBe(true);
     expect(agent.toolConfig?.tools).toEqual(
       expect.arrayContaining([
         READ_FILE_TOOL_NAME,
@@ -82,6 +83,8 @@ describe('SkillExtractionAgent', () => {
     );
     expect(prompt).toContain('EXACTLY ONE canonical patch file per kind');
     expect(prompt).toContain('extraction.patch');
+    expect(prompt).not.toContain('MEMORY.patch');
+    expect(prompt).not.toContain('verify-workflow.patch');
     expect(prompt).toContain('IMPORTANT — incremental updates');
     expect(prompt).toContain(
       'REWRITE that file by combining its existing hunks with your new',

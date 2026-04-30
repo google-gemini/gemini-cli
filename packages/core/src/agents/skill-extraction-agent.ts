@@ -169,9 +169,8 @@ function buildSystemPrompt(skillsDir: string, memoryDir: string): string {
     '- Include 3 lines of context around each change for updates.',
     '- Line counts in @@ headers MUST be accurate.',
     '- One `.patch` file may include multiple hunks across multiple files in the same kind.',
-    '- The patch FILENAME under .inbox/<kind>/ is informational; the headers determine',
-    '  the actual target. Choose a descriptive filename like `MEMORY.patch` or',
-    '  `verify-workflow.patch`.',
+    '- The patch FILENAME under .inbox/<kind>/ MUST be the canonical',
+    '  `extraction.patch`; the headers determine the actual target file(s).',
     '- Patches that fail validation or fail to apply cleanly are discarded silently.',
     "- The header path must resolve under the kind's allowed root (see above) or the",
     '  patch will be rejected.',
@@ -416,6 +415,7 @@ export const SkillExtractionAgent = (
   modelConfig: {
     model: PREVIEW_GEMINI_FLASH_MODEL,
   },
+  memoryInboxAccess: true,
   toolConfig: {
     tools: [
       ACTIVATE_SKILL_TOOL_NAME,

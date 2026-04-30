@@ -230,6 +230,14 @@ export interface LocalAgentDefinition<
   workspaceDirectories?: string[];
 
   /**
+   * Allows this agent to access the canonical auto-memory inbox patch files
+   * under `<projectMemoryDir>/.inbox/{private,global}/extraction.patch`.
+   * This is intentionally narrow so the main session cannot bypass review by
+   * writing arbitrary inbox patches.
+   */
+  memoryInboxAccess?: boolean;
+
+  /**
    * Optional inline MCP servers for this agent.
    */
   mcpServers?: Record<string, MCPServerConfig>;
