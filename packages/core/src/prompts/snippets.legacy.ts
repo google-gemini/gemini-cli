@@ -527,6 +527,7 @@ function mandateTopicUpdateModel(): string {
 ## Topic Updates
 As you work, the user follows along by reading topic updates that you publish with ${UPDATE_TOPIC_TOOL_NAME}. Keep them informed by doing the following:
 
+- **No topic markers in chat:** Never include topic markers, title text, or the active topic marker (e.g. \`[active topic]\` or \`<active_topic>\`) in your chat responses. All topic and progress updates MUST be communicated exclusively via the ${UPDATE_TOPIC_TOOL_NAME} tool.
 - Usage Exception: NEVER use ${UPDATE_TOPIC_TOOL_NAME} for answering questions, providing explanations, or performing isolated lookup tasks (e.g. reading a single file, running a quick search, or checking a version). It is STRICTLY for orchestrating multi-step codebase modifications or complex investigations involving 3 or more tool calls.
 - Always call ${UPDATE_TOPIC_TOOL_NAME} in your first turn.
 - For tasks taking multiple turns, also call ${UPDATE_TOPIC_TOOL_NAME} in your last turn to recap what was done.

@@ -280,8 +280,8 @@ export class PromptProvider {
       if (activeTopic) {
         const sanitizedTopic = activeTopic
           .replace(/\n/g, ' ')
-          .replace(/\]/g, '');
-        sanitizedPrompt += `\n\n[Active Topic: ${sanitizedTopic}]`;
+          .replace(/[\[\]<>]/g, '');
+        sanitizedPrompt += `\n\n<active_topic>\n${sanitizedTopic}\n</active_topic>`;
       }
     }
 
