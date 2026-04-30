@@ -1,3 +1,8 @@
+import clang
+import dotnet
+import pwsh
+\\\\\\\\\\
+
 description="Reviews a pull request based on issue number."
 prompt = """
 Please provide a detailed pull request review on GitHub issue: {{args}}.
