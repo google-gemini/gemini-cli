@@ -50,6 +50,7 @@ class DiscoveredToolInvocation extends BaseToolInvocation<
     prefixedToolName: string,
     params: ToolParams,
     messageBus: MessageBus,
+    private readonly canUpdateOutput: boolean,
   ) {
     super(params, messageBus, prefixedToolName);
   }
@@ -89,6 +90,16 @@ class DiscoveredToolInvocation extends BaseToolInvocation<
     let error: Error | null = null;
     let code: number | null = null;
     let signal: NodeJS.Signals | null = null;
+    let sizeLimitExceeded = false;
+    const MAX_STDOUT_SIZE = 10 * 1024 * 1024; // 10MB limit
+    const MAX_STDERR_SIZE = 10 * 1024 * 1024; // 10MB limit
+
+    let stdoutByteLength = 0;
+    let stderrByteLength = 0;
+
+    const stdoutDecoder = new StringDecoder('utf8');
+    const stderrDecoder = new StringDecoder('utf8');
+    let uiCumulativeOutput = '';
 
     try {
       const child = spawn(finalCommand, finalArgs, {
@@ -97,13 +108,37 @@ class DiscoveredToolInvocation extends BaseToolInvocation<
       child.stdin.write(JSON.stringify(this.params));
       child.stdin.end();
 
-      await new Promise<void>((resolve) => {
+      await new Promise<void>((resolve, reject) => {
         const onStdout = (data: Buffer) => {
-          stdout += data?.toString();
+          if (sizeLimitExceeded || !data) return;
+          if (stdoutByteLength + data.length > MAX_STDOUT_SIZE) {
+            sizeLimitExceeded = true;
+            child.kill();
+            return;
+          }
+          stdoutByteLength += data.length;
+          const decoded = stdoutDecoder.write(data);
+          stdout += decoded;
+          uiCumulativeOutput += decoded;
+          if (this.canUpdateOutput) {
+            _updateOutput?.(uiCumulativeOutput);
+          }
         };
 
         const onStderr = (data: Buffer) => {
-          stderr += data?.toString();
+          if (sizeLimitExceeded || !data) return;
+          if (stderrByteLength + data.length > MAX_STDERR_SIZE) {
+            sizeLimitExceeded = true;
+            child.kill();
+            return;
+          }
+          stderrByteLength += data.length;
+          const decoded = stderrDecoder.write(data);
+          stderr += decoded;
+          uiCumulativeOutput += decoded;
+          if (this.canUpdateOutput) {
+            _updateOutput?.(uiCumulativeOutput);
+          }
         };
 
         const onError = (err: Error) => {
@@ -117,6 +152,18 @@ class DiscoveredToolInvocation extends BaseToolInvocation<
           code = _code;
           signal = _signal;
           cleanup();
+
+          // Flush remaining bytes from decoders
+          stdout += stdoutDecoder.end();
+          stderr += stderrDecoder.end();
+
+          if (sizeLimitExceeded) {
+            return reject(
+              new Error(
+                `Tool execution exceeded memory limit of ${MAX_STDOUT_SIZE} bytes.`,
+              ),
+            );
+          }
           resolve();
         };
 
@@ -135,12 +182,21 @@ class DiscoveredToolInvocation extends BaseToolInvocation<
         child.on('error', onError);
         child.on('close', onClose);
       });
+    } catch (e) {
+      error = e instanceof Error ? e : new Error(String(e));
     } finally {
       cleanupFunc?.();
     }
 
-    // if there is any error, non-zero exit code, signal, or stderr, return error details instead of stdout
-    if (error || code !== 0 || signal || stderr) {
+    // If there is a process error, signal, or non-zero exit code, return error details.
+    // We allow code 1 as successful ONLY if the tool supports streaming updates (canUpdateOutput),
+    // because many tools use it for non-fatal status (e.g. progress).
+    // For non-streaming tools, we maintain the original strict contract (code 0 and NO stderr).
+    const isFailure = this.canUpdateOutput
+      ? error || (code !== null && code > 1) || signal
+      : error || code !== 0 || signal || stderr;
+
+    if (isFailure) {
       const llmContent = [
         `Stdout: ${stdout || '(empty)'}`,
         `Stderr: ${stderr || '(empty)'}`,
@@ -158,9 +214,10 @@ class DiscoveredToolInvocation extends BaseToolInvocation<
       };
     }
 
+    const output = stdout || stderr;
     return {
-      llmContent: stdout,
-      returnDisplay: stdout,
+      llmContent: output,
+      returnDisplay: output,
     };
   }
 }
@@ -178,6 +235,7 @@ export class DiscoveredTool extends BaseDeclarativeTool<
     description: string,
     override readonly parameterSchema: Record<string, unknown>,
     messageBus: MessageBus,
+    canUpdateOutput = false,
   ) {
     const discoveryCmd = config.getToolDiscoveryCommand()!;
     const callCommand = config.getToolCallCommand()!;
@@ -207,7 +265,7 @@ Signal: Signal number or \`(none)\` if no signal was received.
       parameterSchema,
       messageBus,
       false, // isOutputMarkdown
-      false, // canUpdateOutput
+      canUpdateOutput,
     );
     this.originalName = originalName;
   }
@@ -224,8 +282,13 @@ Signal: Signal number or \`(none)\` if no signal was received.
       _toolName ?? this.name,
       params,
       messageBus,
+      this.canUpdateOutput,
     );
   }
+}
+
+interface DiscoveredToolDeclaration extends FunctionDeclaration {
+  canUpdateOutput?: boolean;
 }
 
 export class ToolRegistry {
@@ -503,6 +566,8 @@ export class ToolRegistry {
             !Array.isArray(func.parametersJsonSchema)
               ? func.parametersJsonSchema
               : {};
+          const canUpdateOutput = !!(func as DiscoveredToolDeclaration)
+            .canUpdateOutput;
           this.registerTool(
             new DiscoveredTool(
               this.config,
@@ -512,6 +577,7 @@ export class ToolRegistry {
               // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
               parameters as Record<string, unknown>,
               this.messageBus,
+              canUpdateOutput,
             ),
           );
         }
