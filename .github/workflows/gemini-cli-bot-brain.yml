@@ -140,6 +140,13 @@ jobs:
 
           node bundle/gemini.js --policy tools/gemini-cli-bot/ci-policy.toml -p "$(cat combined_prompt.md)"
 
+          if [ -n "$TRIGGER_ISSUE_NUMBER" ] && [ ! -s "issue-comment.md" ] && [ ! -s "pr-comment.md" ]; then
+            echo "Agent failed to respond. Generating fallback error message."
+            echo "⚠️ **Gemini CLI Bot failed to generate a response.**" > "issue-comment.md"
+            echo "" >> "issue-comment.md"
+            echo "I encountered an error or failed to generate a complete response to your request. You can check the [GitHub Actions Run Log](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) for more details on what went wrong." >> "issue-comment.md"
+          fi
+
       - name: 'Run Critique Phase'
         if: "${{ github.event.inputs.enable_prs == 'true' || github.event_name == 'issue_comment' || github.event_name == 'pull_request_review_comment' || github.event.inputs.run_interactive == 'true' }}"
         env:
