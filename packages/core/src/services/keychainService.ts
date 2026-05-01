@@ -21,6 +21,13 @@ import { FileKeychain } from './fileKeychain.js';
 
 export const FORCE_FILE_STORAGE_ENV_VAR = 'GEMINI_FORCE_FILE_STORAGE';
 
+export class SecureStorageError extends Error {
+  constructor(message = 'A secure storage operation failed.') {
+    super(message);
+    this.name = 'SecureStorageError';
+  }
+}
+
 /**
  * Service for interacting with OS-level secure storage (e.g. @github/keytar).
  */
@@ -51,7 +58,11 @@ export class KeychainService {
    */
   async getPassword(account: string): Promise<string | null> {
     const keychain = await this.getKeychainOrThrow();
-    return keychain.getPassword(this.serviceName, account);
+    try {
+      return await keychain.getPassword(this.serviceName, account);
+    } catch {
+      throw new SecureStorageError();
+    }
   }
 
   /**
@@ -60,7 +71,11 @@ export class KeychainService {
    */
   async setPassword(account: string, value: string): Promise<void> {
     const keychain = await this.getKeychainOrThrow();
-    await keychain.setPassword(this.serviceName, account, value);
+    try {
+      await keychain.setPassword(this.serviceName, account, value);
+    } catch {
+      throw new SecureStorageError();
+    }
   }
 
   /**
@@ -70,7 +85,11 @@ export class KeychainService {
    */
   async deletePassword(account: string): Promise<boolean> {
     const keychain = await this.getKeychainOrThrow();
-    return keychain.deletePassword(this.serviceName, account);
+    try {
+      return await keychain.deletePassword(this.serviceName, account);
+    } catch {
+      throw new SecureStorageError();
+    }
   }
 
   /**
@@ -81,13 +100,17 @@ export class KeychainService {
     Array<{ account: string; password: string }>
   > {
     const keychain = await this.getKeychainOrThrow();
-    return keychain.findCredentials(this.serviceName);
+    try {
+      return await keychain.findCredentials(this.serviceName);
+    } catch {
+      throw new SecureStorageError();
+    }
   }
 
   private async getKeychainOrThrow(): Promise<Keychain> {
     const keychain = await this.getKeychain();
     if (!keychain) {
-      throw new Error('Keychain is not available');
+      throw new SecureStorageError();
     }
     return keychain;
   }
@@ -143,12 +166,8 @@ export class KeychainService {
       debugLogger.debug('Keychain functional verification failed');
       return null;
     } catch (error) {
-      // Avoid logging full error objects to prevent PII exposure.
-      const message = error instanceof Error ? error.message : String(error);
-      debugLogger.debug(
-        'Keychain initialization encountered an error:',
-        message,
-      );
+      void error;
+      debugLogger.debug('Keychain initialization failed');
       return null;
     }
   }
@@ -176,15 +195,21 @@ export class KeychainService {
   private async isKeychainFunctional(keychain: Keychain): Promise<boolean> {
     const testAccount = `${KEYCHAIN_TEST_PREFIX}${crypto.randomBytes(8).toString('hex')}`;
     const testPassword = 'test';
+    try {
+      await keychain.setPassword(this.serviceName, testAccount, testPassword);
+      const retrieved = await keychain.getPassword(
+        this.serviceName,
+        testAccount,
+      );
+      const deleted = await keychain.deletePassword(
+        this.serviceName,
+        testAccount,
+      );
 
-    await keychain.setPassword(this.serviceName, testAccount, testPassword);
-    const retrieved = await keychain.getPassword(this.serviceName, testAccount);
-    const deleted = await keychain.deletePassword(
-      this.serviceName,
-      testAccount,
-    );
-
-    return deleted && retrieved === testPassword;
+      return deleted && retrieved === testPassword;
+    } catch {
+      return false;
+    }
   }
 
   /**

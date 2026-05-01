@@ -7,7 +7,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { KeychainTokenStorage } from './keychain-token-storage.js';
 import type { OAuthCredentials } from './types.js';
-import { KeychainService } from '../../services/keychainService.js';
+import {
+  KeychainService,
+  SecureStorageError,
+} from '../../services/keychainService.js';
 import { coreEvents } from '../../utils/events.js';
 import { KEYCHAIN_TEST_PREFIX } from '../../services/keychainTypes.js';
 
@@ -152,16 +155,16 @@ describe('KeychainTokenStorage', () => {
         false,
       );
       vi.spyOn(KeychainService.prototype, 'getPassword').mockRejectedValue(
-        new Error('Keychain is not available'),
+        new SecureStorageError(),
       );
       vi.spyOn(KeychainService.prototype, 'setPassword').mockRejectedValue(
-        new Error('Keychain is not available'),
+        new SecureStorageError(),
       );
       vi.spyOn(KeychainService.prototype, 'deletePassword').mockRejectedValue(
-        new Error('Keychain is not available'),
+        new SecureStorageError(),
       );
       vi.spyOn(KeychainService.prototype, 'findCredentials').mockRejectedValue(
-        new Error('Keychain is not available'),
+        new SecureStorageError(),
       );
     });
 
@@ -180,7 +183,7 @@ describe('KeychainTokenStorage', () => {
               (...args: unknown[]) => Promise<unknown>
             >
           )[method](...args),
-        ).rejects.toThrow('Keychain is not available');
+        ).rejects.toThrow('A secure storage operation failed.');
       },
     );
 

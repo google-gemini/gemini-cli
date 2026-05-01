@@ -16,7 +16,7 @@ import {
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import { spawnSync } from 'node:child_process';
-import { KeychainService } from './keychainService.js';
+import { KeychainService, SecureStorageError } from './keychainService.js';
 import { coreEvents } from '../utils/events.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { FileKeychain } from './fileKeychain.js';
@@ -146,7 +146,7 @@ describe('KeychainService', () => {
       );
     });
 
-    it('should return true (via fallback), log error, and emit telemetry indicating native is unavailable on failed functional test', async () => {
+    it('should return true (via fallback), log sanitized error, and emit telemetry indicating native is unavailable on failed functional test', async () => {
       mockKeytar.setPassword?.mockRejectedValue(new Error('locked'));
 
       const available = await service.isAvailable();
@@ -154,9 +154,14 @@ describe('KeychainService', () => {
       // Because it falls back to FileKeychain, it is always available.
       expect(available).toBe(true);
       expect(debugLogger.debug).toHaveBeenCalledWith(
-        expect.stringContaining('encountered an error'),
-        'locked',
+        expect.stringContaining('functional verification failed'),
       );
+      const debugCalls = vi.mocked(debugLogger.debug).mock.calls;
+      expect(
+        debugCalls.some((call) =>
+          call.some((arg) => String(arg).includes('locked')),
+        ),
+      ).toBe(false);
       expect(coreEvents.emitTelemetryKeychainAvailability).toHaveBeenCalledWith(
         expect.objectContaining({ available: false }),
       );
@@ -326,6 +331,53 @@ describe('KeychainService', () => {
 
     it('getPassword should return null if key is missing', async () => {
       expect(await service.getPassword('missing')).toBeNull();
+    });
+  });
+
+  describe('SecureStorageError sanitization', () => {
+    beforeEach(async () => {
+      process.env['GEMINI_FORCE_FILE_STORAGE'] = 'true';
+      await service.isAvailable();
+      vi.clearAllMocks();
+    });
+
+    it.each([
+      { method: 'getPassword', args: ['acc'] },
+      { method: 'setPassword', args: ['acc', 'val'] },
+      { method: 'deletePassword', args: ['acc'] },
+      { method: 'findCredentials', args: [] },
+    ])('should sanitize errors for $method', async ({ method, args }) => {
+      const sensitive = 'USER=indra;PATH=/home/indra/.secret';
+      mockFileKeychain.getPassword?.mockRejectedValue(new Error(sensitive));
+      mockFileKeychain.setPassword?.mockRejectedValue(new Error(sensitive));
+      mockFileKeychain.deletePassword?.mockRejectedValue(new Error(sensitive));
+      mockFileKeychain.findCredentials?.mockRejectedValue(new Error(sensitive));
+
+      await expect(
+        (
+          service as unknown as Record<
+            string,
+            (...args: unknown[]) => Promise<unknown>
+          >
+        )[method](...args),
+      ).rejects.toEqual(
+        expect.objectContaining({
+          name: 'SecureStorageError',
+          message: 'A secure storage operation failed.',
+        }),
+      );
+
+      try {
+        await (
+          service as unknown as Record<
+            string,
+            (...args: unknown[]) => Promise<unknown>
+          >
+        )[method](...args);
+      } catch (error) {
+        expect(error).toBeInstanceOf(SecureStorageError);
+        expect(String(error)).not.toContain(sensitive);
+      }
     });
   });
 });
