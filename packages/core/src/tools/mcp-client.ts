@@ -1165,6 +1165,19 @@ export function populateMcpServerCommand(
   return mcpServers;
 }
 
+function expandMcpServerConfigValue(
+  value: string,
+  env: Record<string, string | undefined>,
+): string {
+  return expandEnvVars(
+    value.replace(
+      /\{\{(\w+)\}\}/g,
+      (match, name: string) => env[name] ?? match,
+    ),
+    env,
+  );
+}
+
 /**
  * Connects to an MCP server and discovers available tools, registering them with the tool registry.
  * This function handles the complete lifecycle of connecting to a server, discovering tools,
@@ -2270,15 +2283,26 @@ export async function createTransport(
     // Expand and merge explicit environment variables from the MCP configuration.
     if (mcpServerConfig.env) {
       for (const [key, value] of Object.entries(mcpServerConfig.env)) {
-        finalEnv[key] = expandEnvVars(value, expansionEnv);
+        finalEnv[key] = expandMcpServerConfigValue(value, expansionEnv);
       }
     }
 
+    const command = expandMcpServerConfigValue(
+      mcpServerConfig.command,
+      expansionEnv,
+    );
+    const args = mcpServerConfig.args?.map((arg) =>
+      expandMcpServerConfigValue(arg, expansionEnv),
+    );
+    const cwd = mcpServerConfig.cwd
+      ? expandMcpServerConfigValue(mcpServerConfig.cwd, expansionEnv)
+      : undefined;
+
     let transport: Transport = new StdioClientTransport({
-      command: mcpServerConfig.command,
-      args: mcpServerConfig.args || [],
+      command,
+      args: args || [],
       env: finalEnv,
-      cwd: mcpServerConfig.cwd,
+      cwd,
       stderr: 'pipe',
     });
 

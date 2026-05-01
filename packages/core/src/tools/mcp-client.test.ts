@@ -1993,6 +1993,45 @@ describe('mcp-client', () => {
       });
     });
 
+    it('should expand template variables in stdio MCP server config', async () => {
+      const mockedTransport = vi
+        .spyOn(SdkClientStdioLib, 'StdioClientTransport')
+        .mockReturnValue({} as SdkClientStdioLib.StdioClientTransport);
+      const originalEnv = process.env;
+      process.env = {
+        ...originalEnv,
+        HOME: '/home/test-user',
+      };
+
+      try {
+        await createTransport(
+          'test-server',
+          {
+            command: '{{HOME}}/.bun/bin/bun',
+            args: ['{{HOME}}/server.js', '$HOME/config.json'],
+            env: {
+              SERVER_ROOT: '{{HOME}}/mcp',
+            },
+            cwd: '{{HOME}}/workspace',
+          },
+          false,
+          MOCK_CONTEXT,
+        );
+
+        expect(mockedTransport).toHaveBeenCalledWith({
+          command: '/home/test-user/.bun/bin/bun',
+          args: ['/home/test-user/server.js', '/home/test-user/config.json'],
+          cwd: '/home/test-user/workspace',
+          env: expect.objectContaining({
+            SERVER_ROOT: '/home/test-user/mcp',
+          }),
+          stderr: 'pipe',
+        });
+      } finally {
+        process.env = originalEnv;
+      }
+    });
+
     it('sets an env variable GEMINI_CLI=1 for stdio MCP servers', async () => {
       const mockedTransport = vi
         .spyOn(SdkClientStdioLib, 'StdioClientTransport')
