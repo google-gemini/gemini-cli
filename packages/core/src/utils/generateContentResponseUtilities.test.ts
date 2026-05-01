@@ -158,6 +158,37 @@ describe('generateContentResponseUtilities', () => {
       ]);
     });
 
+    it('should filter out audio/video MIME types and add a steering message', () => {
+      const llmContent: PartListUnion = [
+        { text: 'Some text' },
+        { inlineData: { mimeType: 'audio/mpeg', data: 'audio_data' } },
+        { inlineData: { mimeType: 'video/mp4', data: 'video_data' } },
+      ];
+
+      const result = convertToFunctionResponse(
+        toolName,
+        callId,
+        llmContent,
+        PREVIEW_GEMINI_MODEL,
+      );
+
+      // Verify binary data is gone
+      const binaryParts = result.filter((p) => p.inlineData);
+      expect(binaryParts).toHaveLength(0);
+
+      // Verify steering message is injected into the response output
+      const frPart = result.find((p) => p.functionResponse);
+      const response = frPart?.functionResponse?.response as Record<
+        string,
+        unknown
+      >;
+      const output = response?.['output'] as string;
+      expect(output).toContain('[SYSTEM ERROR: PROTOCOL_LIMITATION]');
+      expect(output).toContain('audio/mpeg, video/mp4');
+      expect(output).toContain("using the '@' syntax");
+      expect(output).toContain('Some text'); // Original text should be preserved
+    });
+
     it('should handle llmContent with fileData for Gemini 3 model (should be siblings)', () => {
       const llmContent: Part = {
         fileData: { mimeType: 'application/pdf', fileUri: 'gs://...' },
