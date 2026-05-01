@@ -15,6 +15,7 @@ export class JsonFormatter {
     response?: string,
     stats?: SessionMetrics,
     error?: JsonError,
+    warnings?: string[],
   ): string {
     const output: JsonOutput = {};
 
@@ -32,6 +33,10 @@ export class JsonFormatter {
 
     if (error) {
       output.error = error;
+    }
+
+    if (warnings && warnings.length > 0) {
+      output.warnings = warnings.map((w) => stripAnsi(w));
     }
 
     return JSON.stringify(output, null, 2);
