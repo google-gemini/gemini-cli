@@ -2057,8 +2057,8 @@ const SETTINGS_SCHEMA = {
         label: 'Gemma Models',
         category: 'Experimental',
         requiresRestart: true,
-        default: false,
-        description: 'Enable access to Gemma 4 models (experimental).',
+        default: true,
+        description: 'Enable access to Gemma 4 models via Gemini API.',
         showInDialog: true,
       },
       voiceMode: {

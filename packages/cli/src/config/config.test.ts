@@ -804,6 +804,100 @@ describe('loadCliConfig', () => {
     vi.restoreAllMocks();
   });
 
+  describe('Model resolution', () => {
+    it('should handle multiple --model flags by taking the last one', async () => {
+      const argv = {
+        query: undefined,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        model: ['gemini-1.5-pro', 'gemini-2.0-flash'] as any,
+        sandbox: undefined,
+        debug: false,
+        prompt: undefined,
+        promptInteractive: undefined,
+        yolo: undefined,
+        approvalMode: undefined,
+        policy: undefined,
+        adminPolicy: undefined,
+        allowedMcpServerNames: undefined,
+        allowedTools: undefined,
+        extensions: undefined,
+        listExtensions: false,
+        listSessions: false,
+        deleteSession: undefined,
+        screenReader: undefined,
+        isCommand: false,
+        rawOutput: false,
+        acceptRawOutputRisk: false,
+        startupMessages: [],
+        resume: undefined,
+        includeDirectories: [],
+        useWriteTodos: false,
+        outputFormat: undefined,
+        fakeResponses: undefined,
+        recordResponses: undefined,
+        skipTrust: false,
+      };
+
+      const settings = createTestMergedSettings();
+      const config = await loadCliConfig(
+        settings,
+        'test-session',
+        argv as unknown as CliArgs,
+        {
+          cwd: process.cwd(),
+        },
+      );
+
+      expect(config.getModel()).toBe('gemini-2.0-flash');
+    });
+
+    it('should handle non-string model flags by coercing to string', async () => {
+      const argv = {
+        query: undefined,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        model: true as any,
+        sandbox: undefined,
+        debug: false,
+        prompt: undefined,
+        promptInteractive: undefined,
+        yolo: undefined,
+        approvalMode: undefined,
+        policy: undefined,
+        adminPolicy: undefined,
+        allowedMcpServerNames: undefined,
+        allowedTools: undefined,
+        extensions: undefined,
+        listExtensions: false,
+        listSessions: false,
+        deleteSession: undefined,
+        screenReader: undefined,
+        isCommand: false,
+        rawOutput: false,
+        acceptRawOutputRisk: false,
+        startupMessages: [],
+        resume: undefined,
+        includeDirectories: [],
+        useWriteTodos: false,
+        outputFormat: undefined,
+        fakeResponses: undefined,
+        recordResponses: undefined,
+        skipTrust: false,
+      };
+
+      const settings = createTestMergedSettings();
+      const config = await loadCliConfig(
+        settings,
+        'test-session',
+        argv as unknown as CliArgs,
+        {
+          cwd: process.cwd(),
+        },
+      );
+
+      expect(config.getModel()).toBe('true');
+    });
+  });
+
   describe('Proxy configuration', () => {
     const originalProxyEnv: { [key: string]: string | undefined } = {};
     const proxyEnvVars = [
@@ -3894,7 +3988,7 @@ describe('loadCliConfig acpMode and clientName', () => {
     expect(config.getClientName()).toBe('acp-vscode');
   });
 
-  it('should set acpMode to true but leave clientName undefined for generic terminals', async () => {
+  it('should set acpMode to true and set clientName to acp for generic terminals', async () => {
     process.argv = ['node', 'script.js', '--acp'];
     vi.stubEnv('TERM_PROGRAM', 'iTerm.app'); // Generic terminal
     vi.stubEnv('VSCODE_GIT_ASKPASS_MAIN', '');
@@ -3906,10 +4000,10 @@ describe('loadCliConfig acpMode and clientName', () => {
       argv,
     );
     expect(config.getAcpMode()).toBe(true);
-    expect(config.getClientName()).toBeUndefined();
+    expect(config.getClientName()).toBe('acp');
   });
 
-  it('should set acpMode to false and clientName to undefined by default', async () => {
+  it('should set acpMode to false and clientName to tui by default', async () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments(createTestMergedSettings());
     const config = await loadCliConfig(
@@ -3918,6 +4012,6 @@ describe('loadCliConfig acpMode and clientName', () => {
       argv,
     );
     expect(config.getAcpMode()).toBe(false);
-    expect(config.getClientName()).toBeUndefined();
+    expect(config.getClientName()).toBe('tui');
   });
 });
