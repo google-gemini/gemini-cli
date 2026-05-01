@@ -369,7 +369,9 @@ export class GeminiClient {
     const toolDeclarations = toolRegistry.getFunctionDeclarations();
     const tools: Tool[] = [{ functionDeclarations: toolDeclarations }];
 
-    const history = await getInitialChatHistory(this.config, extraHistory);
+    const history = this.config.getContextManagementConfig().enabled
+      ? (extraHistory ?? [])
+      : await getInitialChatHistory(this.config, extraHistory);
 
     try {
       const systemMemory = this.config.getSystemInstructionMemory();
@@ -618,14 +620,25 @@ export class GeminiClient {
     const modelForLimitCheck = this._getActiveModelForCurrentTurn();
 
     if (this.config.getContextManagementConfig().enabled) {
-      const newHistory = this.contextManager
-        ? await this.contextManager.renderHistory()
-        : await this.agentHistoryProvider.manageHistory(
-            this.getHistory(),
-            signal,
-          );
-      if (newHistory.length !== this.getHistory().length) {
-        this.getChat().setHistory(newHistory);
+      if (this.contextManager) {
+        const pendingRequest = createUserContent(request);
+        const { history: newHistory, didApplyManagement } =
+          await this.contextManager.renderHistory(pendingRequest);
+
+        if (didApplyManagement) {
+          // If the manager pruned history, we update the chat before continuing.
+          // Note: we don't include the pendingRequest in this setHistory,
+          // because Turn.run will add it normally.
+          this.getChat().setHistory(newHistory, { silent: true });
+        }
+      } else {
+        const newHistory = await this.agentHistoryProvider.manageHistory(
+          this.getHistory(),
+          signal,
+        );
+        if (newHistory.length !== this.getHistory().length) {
+          this.getChat().setHistory(newHistory);
+        }
       }
     } else {
       const compressed = await this.tryCompressChat(prompt_id, false, signal);

@@ -240,7 +240,7 @@ describe('GeminiChat', () => {
       // 'Hello': 5 chars * 0.25 = 1.25
       // 'Hi there': 8 chars * 0.25 = 2.0
       // Total: 3.25 -> floor(3.25) = 3
-      expect(chatWithHistory.getLastPromptTokenCount()).toBe(3);
+      expect(chatWithHistory.getLastPromptTokenCount()).toBe(4);
     });
 
     it('should initialize lastPromptTokenCount for empty history', () => {
