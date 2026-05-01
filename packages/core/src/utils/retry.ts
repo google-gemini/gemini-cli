@@ -235,6 +235,7 @@ export async function retryWithBackoff<T>(
 
   const {
     maxAttempts,
+    maxFallbackCount,
     initialDelayMs,
     maxDelayMs,
     onPersistent429,
@@ -310,9 +311,9 @@ export async function retryWithBackoff<T>(
         classifiedError instanceof ModelNotFoundError
       ) {
         if (onPersistent429) {
-          if (resetCount >= options.maxFallbackCount) {
+          if (resetCount >= maxFallbackCount) {
             debugLogger.warn(
-              "Exhausted " + options.maxFallbackCount + " fallback attempts. Aborting to prevent infinite loop.",
+              `Exhausted ${maxFallbackCount} fallback attempts. Aborting to prevent infinite loop.`,
             );
             throw classifiedError;
           }
@@ -339,7 +340,7 @@ export async function retryWithBackoff<T>(
       // Handle ValidationRequiredError - user needs to verify before proceeding
       if (classifiedError instanceof ValidationRequiredError) {
         if (onValidationRequired) {
-          if (resetCount >= options.maxFallbackCount) {
+          if (resetCount >= maxFallbackCount) {
             debugLogger.warn(
               `Exhausted allowed state resets. Aborting to prevent infinite validation loop.`,
             );
@@ -375,9 +376,9 @@ export async function retryWithBackoff<T>(
             `Attempt ${attempt} failed${errorMessage ? `: ${errorMessage}` : ''}. Max attempts reached`,
           );
           if (onPersistent429) {
-            if (resetCount >= options.maxFallbackCount) {
+            if (resetCount >= maxFallbackCount) {
               debugLogger.warn(
-                "Exhausted " + options.maxFallbackCount + " fallback attempts. Aborting to prevent infinite loop.",
+                `Exhausted ${maxFallbackCount} fallback attempts. Aborting to prevent infinite loop.`,
               );
               throw classifiedError instanceof RetryableQuotaError
                 ? classifiedError
