@@ -1814,6 +1814,13 @@ export class Config implements McpContext, AgentLoopContext {
     this.compressionTruncationCounter = 0;
     this.quotaErrorOccurred = false;
     this.creditsNotificationShown = false;
+    this.modelAvailabilityService.reset();
+    this.modelQuotas.clear();
+    this.lastRetrievedQuota = undefined;
+    this.lastEmittedQuotaRemaining = undefined;
+    this.lastEmittedQuotaLimit = undefined;
+    this.lastQuotaFetchTime = 0;
+    this.hasAccessToPreviewModel = null;
 
     if (previousPlansDir) {
       this.refreshSessionScopedPlansDirectory(previousPlansDir);
