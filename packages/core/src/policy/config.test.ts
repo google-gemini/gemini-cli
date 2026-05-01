@@ -41,6 +41,7 @@ vi.mock('node:fs/promises', async (importOriginal) => {
     mkdir: vi.fn(actual.mkdir),
     open: vi.fn(actual.open),
     rename: vi.fn(actual.rename),
+    realpath: vi.fn(actual.realpath),
   };
   return {
     ...mockFs,
@@ -92,13 +93,14 @@ describe('createPolicyEngineConfig', () => {
     });
 
     vi.mocked(fs.stat).mockImplementation(async (p) => {
-      if (nodePath.resolve(p.toString()) === nodePath.dirname(resolvedPath)) {
+      const resolvedP = nodePath.resolve(p.toString());
+      if (resolvedP === nodePath.dirname(resolvedPath)) {
         return {
           isDirectory: () => true,
           isFile: () => false,
         } as unknown as Stats;
       }
-      if (nodePath.resolve(p.toString()) === resolvedPath) {
+      if (resolvedP === resolvedPath) {
         return {
           isDirectory: () => false,
           isFile: () => true,
@@ -109,6 +111,21 @@ describe('createPolicyEngineConfig', () => {
           'node:fs/promises',
         )
       ).stat(p);
+    });
+
+    vi.mocked(fs.realpath).mockImplementation(async (p) => {
+      const resolvedP = nodePath.resolve(p.toString());
+      if (
+        resolvedP === resolvedPath ||
+        resolvedP === nodePath.dirname(resolvedPath)
+      ) {
+        return resolvedP;
+      }
+      return (
+        await vi.importActual<typeof import('node:fs/promises')>(
+          'node:fs/promises',
+        )
+      ).realpath(p);
     });
 
     vi.mocked(fs.readFile).mockImplementation(async (p) => {
