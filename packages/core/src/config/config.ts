@@ -1822,6 +1822,8 @@ export class Config implements McpContext, AgentLoopContext {
     this.lastQuotaFetchTime = 0;
     this.hasAccessToPreviewModel = null;
 
+    this.emitQuotaChangedEvent();
+
     if (previousPlansDir) {
       this.refreshSessionScopedPlansDirectory(previousPlansDir);
     }
