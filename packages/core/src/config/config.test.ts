@@ -2303,6 +2303,12 @@ describe('setApprovalMode with folder trust', () => {
 
     it('should register GrepTool as a fallback when useRipgrep is true but it is not available', async () => {
       vi.mocked(canUseRipgrep).mockResolvedValue(false);
+      const warnSpy = vi
+        .spyOn(debugLogger, 'warn')
+        .mockImplementation(() => {});
+      const debugSpy = vi
+        .spyOn(debugLogger, 'debug')
+        .mockImplementation(() => {});
       const config = new Config({ ...baseParams, useRipgrep: true });
       await config.initialize();
 
@@ -2322,11 +2328,23 @@ describe('setApprovalMode with folder trust', () => {
       );
       const event = vi.mocked(logRipgrepFallback).mock.calls[0][1];
       expect(event.error).toBeUndefined();
+      expect(warnSpy).not.toHaveBeenCalledWith(
+        'Ripgrep is not available. Falling back to GrepTool.',
+      );
+      expect(debugSpy).toHaveBeenCalledWith(
+        'Ripgrep is not available. Falling back to GrepTool.',
+      );
     });
 
     it('should register GrepTool as a fallback when canUseRipgrep throws an error', async () => {
       const error = new Error('ripGrep check failed');
       vi.mocked(canUseRipgrep).mockRejectedValue(error);
+      const warnSpy = vi
+        .spyOn(debugLogger, 'warn')
+        .mockImplementation(() => {});
+      const debugSpy = vi
+        .spyOn(debugLogger, 'debug')
+        .mockImplementation(() => {});
       const config = new Config({ ...baseParams, useRipgrep: true });
       await config.initialize();
 
@@ -2346,6 +2364,12 @@ describe('setApprovalMode with folder trust', () => {
       );
       const event = vi.mocked(logRipgrepFallback).mock.calls[0][1];
       expect(event.error).toBe(String(error));
+      expect(warnSpy).not.toHaveBeenCalledWith(
+        'Ripgrep is not available. Falling back to GrepTool.',
+      );
+      expect(debugSpy).toHaveBeenCalledWith(
+        'Ripgrep is not available. Falling back to GrepTool.',
+      );
     });
 
     it('should register GrepTool when useRipgrep is false', async () => {

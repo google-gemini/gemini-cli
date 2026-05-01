@@ -3692,7 +3692,9 @@ export class Config implements McpContext, AgentLoopContext {
           registry.registerTool(new RipGrepTool(this, this.messageBus)),
         );
       } else {
-        debugLogger.warn(`Ripgrep is not available. Falling back to GrepTool.`);
+        debugLogger.debug(
+          `Ripgrep is not available. Falling back to GrepTool.`,
+        );
         logRipgrepFallback(this, new RipgrepFallbackEvent(errorString));
         maybeRegister(GrepTool, () =>
           registry.registerTool(new GrepTool(this, this.messageBus)),
