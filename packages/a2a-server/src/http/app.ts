@@ -32,6 +32,7 @@ import {
   GitService,
 } from '@google/gemini-cli-core';
 import type { Command, CommandArgument } from '../commands/types.js';
+import { validateCommandExecution } from '../commands/argument-validator.js';
 
 type CommandResponse = {
   name: string;
@@ -139,6 +140,14 @@ async function handleExecuteCommand(
 
     if (args && !Array.isArray(args)) {
       return res.status(400).json({ error: '"args" field must be an array.' });
+    }
+
+    // Validate command and arguments using allowlist-based validator
+    const validation = validateCommandExecution(command, args ?? []);
+    if (!validation.valid) {
+      return res.status(400).json({
+        error: validation.error ?? 'Invalid command or arguments.',
+      });
     }
 
     const commandToExecute = commandRegistry.get(command);

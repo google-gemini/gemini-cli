@@ -1220,4 +1220,340 @@ describe('E2E Tests', () => {
       exitSpy.mockRestore();
     });
   });
+
+  describe('/executeCommand - Security Tests', () => {
+    beforeEach(() => {
+      getExtensionsSpy.mockReturnValue([]);
+    });
+
+    describe('shell injection prevention', () => {
+      it('should reject memory add with semicolon injection', async () => {
+        const agent = request.agent(app);
+        const res = await agent
+          .post('/executeCommand')
+          .send({ command: 'memory add', args: ['test;rm -rf /'] })
+          .set('Content-Type', 'application/json')
+          .expect(400);
+
+        expect(res.body.error).toContain(
+          'control characters or shell metacharacters',
+        );
+      });
+
+      it('should reject memory add with pipe injection', async () => {
+        const agent = request.agent(app);
+        const res = await agent
+          .post('/executeCommand')
+          .send({ command: 'memory add', args: ['test|whoami'] })
+          .set('Content-Type', 'application/json')
+          .expect(400);
+
+        expect(res.body.error).toContain(
+          'control characters or shell metacharacters',
+        );
+      });
+
+      it('should reject memory add with backtick command substitution', async () => {
+        const agent = request.agent(app);
+        const res = await agent
+          .post('/executeCommand')
+          .send({ command: 'memory add', args: ['test`whoami`'] })
+          .set('Content-Type', 'application/json')
+          .expect(400);
+
+        expect(res.body.error).toContain(
+          'control characters or shell metacharacters',
+        );
+      });
+
+      it('should reject memory add with dollar command substitution', async () => {
+        const agent = request.agent(app);
+        const res = await agent
+          .post('/executeCommand')
+          .send({ command: 'memory add', args: ['test$(whoami)'] })
+          .set('Content-Type', 'application/json')
+          .expect(400);
+
+        expect(res.body.error).toContain(
+          'control characters or shell metacharacters',
+        );
+      });
+
+      it('should reject memory add with ampersand background execution', async () => {
+        const agent = request.agent(app);
+        const res = await agent
+          .post('/executeCommand')
+          .send({ command: 'memory add', args: ['test&whoami'] })
+          .set('Content-Type', 'application/json')
+          .expect(400);
+
+        expect(res.body.error).toContain(
+          'control characters or shell metacharacters',
+        );
+      });
+
+      it('should reject memory add with redirection operators', async () => {
+        let res = await request
+          .agent(app)
+          .post('/executeCommand')
+          .send({ command: 'memory add', args: ['test>file'] })
+          .set('Content-Type', 'application/json')
+          .expect(400);
+        expect(res.body.error).toContain(
+          'control characters or shell metacharacters',
+        );
+
+        res = await request
+          .agent(app)
+          .post('/executeCommand')
+          .send({ command: 'memory add', args: ['test<file'] })
+          .set('Content-Type', 'application/json')
+          .expect(400);
+        expect(res.body.error).toContain(
+          'control characters or shell metacharacters',
+        );
+      });
+
+      it('should reject memory add with wildcards', async () => {
+        let res = await request
+          .agent(app)
+          .post('/executeCommand')
+          .send({ command: 'memory add', args: ['test*'] })
+          .set('Content-Type', 'application/json')
+          .expect(400);
+        expect(res.body.error).toContain(
+          'control characters or shell metacharacters',
+        );
+
+        res = await request
+          .agent(app)
+          .post('/executeCommand')
+          .send({ command: 'memory add', args: ['test?'] })
+          .set('Content-Type', 'application/json')
+          .expect(400);
+        expect(res.body.error).toContain(
+          'control characters or shell metacharacters',
+        );
+      });
+    });
+
+    describe('path traversal prevention', () => {
+      it('should reject restore with parent directory traversal', async () => {
+        const agent = request.agent(app);
+        const res = await agent
+          .post('/executeCommand')
+          .send({ command: 'restore', args: ['../checkpoint'] })
+          .set('Content-Type', 'application/json')
+          .expect(400);
+
+        expect(res.body.error).toContain('Invalid checkpoint name');
+      });
+
+      it('should reject restore with multiple parent directory traversal', async () => {
+        const agent = request.agent(app);
+        const res = await agent
+          .post('/executeCommand')
+          .send({ command: 'restore', args: ['../../etc/passwd'] })
+          .set('Content-Type', 'application/json')
+          .expect(400);
+
+        expect(res.body.error).toContain('Invalid checkpoint name');
+      });
+
+      it('should reject restore with absolute path', async () => {
+        const agent = request.agent(app);
+        const res = await agent
+          .post('/executeCommand')
+          .send({ command: 'restore', args: ['/etc/passwd'] })
+          .set('Content-Type', 'application/json')
+          .expect(400);
+
+        expect(res.body.error).toContain('Invalid checkpoint name');
+      });
+
+      it('should reject restore with Windows absolute path', async () => {
+        const agent = request.agent(app);
+        const res = await agent
+          .post('/executeCommand')
+          .send({
+            command: 'restore',
+            args: ['C:\\Windows\\System32\\config\\SAM'],
+          })
+          .set('Content-Type', 'application/json')
+          .expect(400);
+
+        expect(res.body.error).toContain('Invalid checkpoint name');
+      });
+    });
+
+    describe('null byte injection prevention', () => {
+      it('should reject command with null byte', async () => {
+        const agent = request.agent(app);
+        const res = await agent
+          .post('/executeCommand')
+          .send({ command: 'memory\0show', args: [] })
+          .set('Content-Type', 'application/json')
+          .expect(400);
+
+        expect(res.body.error).toBe('Invalid command name');
+      });
+
+      it('should reject restore checkpoint with null byte', async () => {
+        const agent = request.agent(app);
+        const res = await agent
+          .post('/executeCommand')
+          .send({ command: 'restore', args: ['checkpoint\0.json'] })
+          .set('Content-Type', 'application/json')
+          .expect(400);
+
+        expect(res.body.error).toContain('Invalid checkpoint name');
+      });
+    });
+
+    describe('control character prevention', () => {
+      it('should reject memory add with control characters', async () => {
+        const agent = request.agent(app);
+        const res = await agent
+          .post('/executeCommand')
+          .send({ command: 'memory add', args: ['test\x00malicious'] })
+          .set('Content-Type', 'application/json')
+          .expect(400);
+
+        expect(res.body.error).toContain('control characters');
+      });
+    });
+
+    describe('DoS prevention', () => {
+      it('should reject excessive argument count', async () => {
+        const manyArgs = Array(101).fill('arg');
+        const agent = request.agent(app);
+        const res = await agent
+          .post('/executeCommand')
+          .send({ command: 'memory add', args: manyArgs })
+          .set('Content-Type', 'application/json')
+          .expect(400);
+
+        expect(res.body.error).toContain('Too many arguments');
+      });
+
+      it('should reject excessively long argument', async () => {
+        const longArg = 'a'.repeat(101 * 1024); // 101KB
+        const agent = request.agent(app);
+        const res = await agent
+          .post('/executeCommand')
+          .send({ command: 'memory add', args: [longArg] })
+          .set('Content-Type', 'application/json');
+
+        // Express may reject with 413 before our validator, or validator rejects with 400
+        expect([400, 413]).toContain(res.status);
+        if (res.status === 400) {
+          expect(res.body.error).toContain('Argument too long');
+        }
+      });
+
+      it('should reject memory text exceeding max length', async () => {
+        const longText = 'a'.repeat(11 * 1024); // 11KB
+        const agent = request.agent(app);
+        const res = await agent
+          .post('/executeCommand')
+          .send({ command: 'memory add', args: [longText] })
+          .set('Content-Type', 'application/json')
+          .expect(400);
+
+        expect(res.body.error).toContain('max 10KB');
+      });
+    });
+
+    describe('command-specific validation', () => {
+      it('should reject memory show with arguments', async () => {
+        const agent = request.agent(app);
+        const res = await agent
+          .post('/executeCommand')
+          .send({ command: 'memory show', args: ['unexpected'] })
+          .set('Content-Type', 'application/json')
+          .expect(400);
+
+        expect(res.body.error).toContain('does not accept arguments');
+      });
+
+      it('should reject restore without arguments', async () => {
+        const agent = request.agent(app);
+        const res = await agent
+          .post('/executeCommand')
+          .send({ command: 'restore', args: [] })
+          .set('Content-Type', 'application/json')
+          .expect(400);
+
+        expect(res.body.error).toContain('requires a checkpoint name');
+      });
+
+      it('should reject restore with multiple arguments', async () => {
+        const agent = request.agent(app);
+        const res = await agent
+          .post('/executeCommand')
+          .send({ command: 'restore', args: ['checkpoint1', 'checkpoint2'] })
+          .set('Content-Type', 'application/json')
+          .expect(400);
+
+        expect(res.body.error).toContain('accepts only one argument');
+      });
+
+      it('should reject unknown command from registry', async () => {
+        // Mock registry to return undefined (command not found)
+        vi.spyOn(commandRegistry, 'get').mockReturnValue(undefined);
+
+        const agent = request.agent(app);
+        const res = await agent
+          .post('/executeCommand')
+          .send({ command: 'unknown-command', args: [] })
+          .set('Content-Type', 'application/json')
+          .expect(404);
+
+        expect(res.body.error).toContain('Command not found');
+      });
+    });
+
+    describe('valid commands should still work', () => {
+      it('should accept valid restore command', async () => {
+        const mockCommand = {
+          name: 'restore',
+          description: 'restore command',
+          execute: vi
+            .fn()
+            .mockResolvedValue({ name: 'restore', data: 'restored' }),
+        };
+        vi.spyOn(commandRegistry, 'get').mockReturnValue(mockCommand);
+
+        const agent = request.agent(app);
+        const res = await agent
+          .post('/executeCommand')
+          .send({ command: 'restore', args: ['valid-checkpoint'] })
+          .set('Content-Type', 'application/json')
+          .expect(200);
+
+        expect(res.body.data).toBe('restored');
+        expect(mockCommand.execute).toHaveBeenCalled();
+      });
+
+      it('should accept valid restore with .json extension', async () => {
+        const mockCommand = {
+          name: 'restore',
+          description: 'restore command',
+          execute: vi
+            .fn()
+            .mockResolvedValue({ name: 'restore', data: 'restored' }),
+        };
+        vi.spyOn(commandRegistry, 'get').mockReturnValue(mockCommand);
+
+        const agent = request.agent(app);
+        const res = await agent
+          .post('/executeCommand')
+          .send({ command: 'restore', args: ['checkpoint-123.json'] })
+          .set('Content-Type', 'application/json')
+          .expect(200);
+
+        expect(res.body.data).toBe('restored');
+      });
+    });
+  });
 });
