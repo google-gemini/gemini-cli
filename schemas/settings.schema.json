@@ -3049,9 +3049,9 @@
       "properties": {
         "gemma": {
           "title": "Gemma Models",
-          "description": "Enable access to Gemma 4 models (experimental).",
-          "markdownDescription": "Enable access to Gemma 4 models (experimental).\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
-          "default": false,
+          "description": "Enable access to Gemma 4 models via Gemini API.",
+          "markdownDescription": "Enable access to Gemma 4 models via Gemini API.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
           "type": "boolean"
         },
         "voiceMode": {
