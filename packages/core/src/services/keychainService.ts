@@ -12,6 +12,10 @@ import { coreEvents } from '../utils/events.js';
 import { KeychainAvailabilityEvent } from '../telemetry/types.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import {
+  SECURE_STORAGE_GENERIC_MESSAGE,
+  SecureStorageError,
+} from '../utils/errors.js';
+import {
   type Keychain,
   KeychainSchema,
   KEYCHAIN_TEST_PREFIX,
@@ -50,8 +54,10 @@ export class KeychainService {
    * @throws Error if the keychain is unavailable.
    */
   async getPassword(account: string): Promise<string | null> {
-    const keychain = await this.getKeychainOrThrow();
-    return keychain.getPassword(this.serviceName, account);
+    return this.runSecureStorageOperation(async () => {
+      const keychain = await this.getKeychainOrThrow();
+      return keychain.getPassword(this.serviceName, account);
+    });
   }
 
   /**
@@ -59,8 +65,10 @@ export class KeychainService {
    * @throws Error if the keychain is unavailable.
    */
   async setPassword(account: string, value: string): Promise<void> {
-    const keychain = await this.getKeychainOrThrow();
-    await keychain.setPassword(this.serviceName, account, value);
+    await this.runSecureStorageOperation(async () => {
+      const keychain = await this.getKeychainOrThrow();
+      await keychain.setPassword(this.serviceName, account, value);
+    });
   }
 
   /**
@@ -69,8 +77,10 @@ export class KeychainService {
    * @throws Error if the keychain is unavailable.
    */
   async deletePassword(account: string): Promise<boolean> {
-    const keychain = await this.getKeychainOrThrow();
-    return keychain.deletePassword(this.serviceName, account);
+    return this.runSecureStorageOperation(async () => {
+      const keychain = await this.getKeychainOrThrow();
+      return keychain.deletePassword(this.serviceName, account);
+    });
   }
 
   /**
@@ -80,14 +90,16 @@ export class KeychainService {
   async findCredentials(): Promise<
     Array<{ account: string; password: string }>
   > {
-    const keychain = await this.getKeychainOrThrow();
-    return keychain.findCredentials(this.serviceName);
+    return this.runSecureStorageOperation(async () => {
+      const keychain = await this.getKeychainOrThrow();
+      return keychain.findCredentials(this.serviceName);
+    });
   }
 
   private async getKeychainOrThrow(): Promise<Keychain> {
     const keychain = await this.getKeychain();
     if (!keychain) {
-      throw new Error('Keychain is not available');
+      throw new SecureStorageError(SECURE_STORAGE_GENERIC_MESSAGE);
     }
     return keychain;
   }
@@ -142,13 +154,8 @@ export class KeychainService {
 
       debugLogger.debug('Keychain functional verification failed');
       return null;
-    } catch (error) {
-      // Avoid logging full error objects to prevent PII exposure.
-      const message = error instanceof Error ? error.message : String(error);
-      debugLogger.debug(
-        'Keychain initialization encountered an error:',
-        message,
-      );
+    } catch {
+      debugLogger.debug('Keychain initialization failed');
       return null;
     }
   }
@@ -165,10 +172,7 @@ export class KeychainService {
       return potential as Keychain;
     }
 
-    debugLogger.debug(
-      'Keychain module failed structural validation:',
-      result.error.flatten().fieldErrors,
-    );
+    debugLogger.debug('Keychain module failed structural validation');
     return null;
   }
 
@@ -177,14 +181,31 @@ export class KeychainService {
     const testAccount = `${KEYCHAIN_TEST_PREFIX}${crypto.randomBytes(8).toString('hex')}`;
     const testPassword = 'test';
 
-    await keychain.setPassword(this.serviceName, testAccount, testPassword);
-    const retrieved = await keychain.getPassword(this.serviceName, testAccount);
-    const deleted = await keychain.deletePassword(
-      this.serviceName,
-      testAccount,
+    await this.runSecureStorageOperation(() =>
+      keychain.setPassword(this.serviceName, testAccount, testPassword),
+    );
+    const retrieved = await this.runSecureStorageOperation(() =>
+      keychain.getPassword(this.serviceName, testAccount),
+    );
+    const deleted = await this.runSecureStorageOperation(() =>
+      keychain.deletePassword(this.serviceName, testAccount),
     );
 
     return deleted && retrieved === testPassword;
+  }
+
+  private async runSecureStorageOperation<T>(
+    operation: () => Promise<T>,
+  ): Promise<T> {
+    try {
+      return await operation();
+    } catch (error) {
+      console.error('Secure storage operation failed:', error);
+      if (error instanceof SecureStorageError) {
+        throw error;
+      }
+      throw new SecureStorageError(SECURE_STORAGE_GENERIC_MESSAGE);
+    }
   }
 
   /**

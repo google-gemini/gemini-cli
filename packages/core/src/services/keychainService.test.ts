@@ -19,6 +19,10 @@ import { spawnSync } from 'node:child_process';
 import { KeychainService } from './keychainService.js';
 import { coreEvents } from '../utils/events.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import {
+  SECURE_STORAGE_GENERIC_MESSAGE,
+  SecureStorageError,
+} from '../utils/errors.js';
 import { FileKeychain } from './fileKeychain.js';
 
 type MockKeychain = {
@@ -146,16 +150,16 @@ describe('KeychainService', () => {
       );
     });
 
-    it('should return true (via fallback), log error, and emit telemetry indicating native is unavailable on failed functional test', async () => {
-      mockKeytar.setPassword?.mockRejectedValue(new Error('locked'));
+    it('should return true (via fallback), log sanitized error, and emit telemetry indicating native is unavailable on failed functional test', async () => {
+      const sensitiveMessage = 'locked /Users/test/keychain';
+      mockKeytar.setPassword?.mockRejectedValue(new Error(sensitiveMessage));
 
       const available = await service.isAvailable();
 
       // Because it falls back to FileKeychain, it is always available.
       expect(available).toBe(true);
       expect(debugLogger.debug).toHaveBeenCalledWith(
-        expect.stringContaining('encountered an error'),
-        'locked',
+        'Keychain initialization failed',
       );
       expect(coreEvents.emitTelemetryKeychainAvailability).toHaveBeenCalledWith(
         expect.objectContaining({ available: false }),
@@ -164,6 +168,25 @@ describe('KeychainService', () => {
         expect.stringContaining('Using FileKeychain fallback'),
       );
       expect(FileKeychain).toHaveBeenCalled();
+    });
+
+    it('should sanitize initialization logging when native keychain throws', async () => {
+      const sensitiveMessage =
+        'denied /Users/alice/Library/Keychains/login.keychain-db';
+      mockKeytar.setPassword?.mockRejectedValue(new Error(sensitiveMessage));
+
+      await service.isAvailable();
+
+      const debugCalls = vi.mocked(debugLogger.debug).mock.calls;
+      for (const call of debugCalls) {
+        const joined = call.join(' ');
+        expect(joined).not.toContain('denied');
+        expect(joined).not.toContain('/Users/alice');
+        expect(joined).not.toContain('login.keychain-db');
+      }
+      expect(debugLogger.debug).toHaveBeenCalledWith(
+        'Keychain initialization failed',
+      );
     });
 
     it('should return true (via fallback), log validation error, and emit telemetry on module load failure', async () => {
@@ -175,7 +198,6 @@ describe('KeychainService', () => {
       expect(available).toBe(true);
       expect(debugLogger.debug).toHaveBeenCalledWith(
         expect.stringContaining('failed structural validation'),
-        expect.objectContaining({ getPassword: expect.any(Array) }),
       );
       expect(coreEvents.emitTelemetryKeychainAvailability).toHaveBeenCalledWith(
         expect.objectContaining({ available: false }),
@@ -308,6 +330,29 @@ describe('KeychainService', () => {
       vi.clearAllMocks();
     });
 
+    const sensitiveFragments = [
+      'account=acc1',
+      '/Users/secret',
+      'AccessDenied',
+    ];
+
+    const expectSecureStorageFailure = async (
+      promise: Promise<unknown>,
+    ): Promise<void> => {
+      let thrown: unknown;
+      try {
+        await promise;
+      } catch (error) {
+        thrown = error;
+      }
+
+      expect(thrown).toBeInstanceOf(SecureStorageError);
+      expect((thrown as Error).message).toBe(SECURE_STORAGE_GENERIC_MESSAGE);
+      for (const fragment of sensitiveFragments) {
+        expect((thrown as Error).message).not.toContain(fragment);
+      }
+    };
+
     it('should store, retrieve, and delete passwords correctly', async () => {
       await service.setPassword('acc1', 'secret1');
       await service.setPassword('acc2', 'secret2');
@@ -326,6 +371,38 @@ describe('KeychainService', () => {
 
     it('getPassword should return null if key is missing', async () => {
       expect(await service.getPassword('missing')).toBeNull();
+    });
+
+    it('should throw SecureStorageError with sanitized message for getPassword', async () => {
+      mockKeytar.getPassword?.mockRejectedValue(
+        new Error('AccessDenied account=acc1 /Users/secret'),
+      );
+
+      await expectSecureStorageFailure(service.getPassword('acc1'));
+    });
+
+    it('should throw SecureStorageError with sanitized message for setPassword', async () => {
+      mockKeytar.setPassword?.mockRejectedValue(
+        new Error('AccessDenied account=acc1 /Users/secret'),
+      );
+
+      await expectSecureStorageFailure(service.setPassword('acc1', 'secret'));
+    });
+
+    it('should throw SecureStorageError with sanitized message for deletePassword', async () => {
+      mockKeytar.deletePassword?.mockRejectedValue(
+        new Error('AccessDenied account=acc1 /Users/secret'),
+      );
+
+      await expectSecureStorageFailure(service.deletePassword('acc1'));
+    });
+
+    it('should throw SecureStorageError with sanitized message for findCredentials', async () => {
+      mockKeytar.findCredentials?.mockRejectedValue(
+        new Error('AccessDenied account=acc1 /Users/secret'),
+      );
+
+      await expectSecureStorageFailure(service.findCredentials());
     });
   });
 });
