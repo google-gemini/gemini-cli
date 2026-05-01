@@ -70,6 +70,8 @@ jobs:
       - name: 'Generate Changelog with Gemini'
         if: "steps.validate_version.outputs.CONTINUE == 'true'"
         uses: 'google-github-actions/run-gemini-cli@a3bf79042542528e91937b3a3a6fbc4967ee3c31' # ratchet:google-github-actions/run-gemini-cli@v0
+        env:
+          GEMINI_CLI_TRUST_WORKSPACE: true
         with:
           gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
           prompt: |

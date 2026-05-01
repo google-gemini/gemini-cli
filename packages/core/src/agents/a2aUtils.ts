@@ -126,7 +126,7 @@ export class A2AResultReassembler {
     if (!message) return;
     if (message.role === 'user') return; // Skip user messages reflected by server
     const text = extractPartsText(message.parts, '');
-    if (text && this.messageLog[this.messageLog.length - 1] !== text) {
+    if (text && this.messageLog.at(-1) !== text) {
       this.messageLog.push(text);
     }
   }

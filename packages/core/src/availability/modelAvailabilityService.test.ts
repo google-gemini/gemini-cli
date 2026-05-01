@@ -34,6 +34,12 @@ describe('ModelAvailabilityService', () => {
     expect(service.snapshot(model)).toEqual({ available: true });
   });
 
+  it('tracks retry with custom attempts', () => {
+    service.markRetryOncePerTurn(model, 3);
+    const selection = service.selectFirstAvailable([model]);
+    expect(selection.attempts).toBe(3);
+  });
+
   it('tracks terminal failures', () => {
     service.markTerminal(model, 'quota');
     expect(service.snapshot(model)).toEqual({

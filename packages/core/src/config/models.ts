@@ -109,8 +109,15 @@ export function resolveModel(
   hasAccessToPreview: boolean = true,
   config?: ModelCapabilityContext,
 ): string {
+  // Defensive check against non-string inputs at runtime
+  const normalizedModel = Array.isArray(requestedModel)
+    ? String(requestedModel.at(-1) ?? '').trim() || ''
+    : typeof requestedModel !== 'string'
+      ? String(requestedModel ?? '').trim() || ''
+      : requestedModel.trim() || '';
+
   if (config?.getExperimentalDynamicModelConfiguration?.() === true) {
-    const resolved = config.modelConfigService.resolveModelId(requestedModel, {
+    const resolved = config.modelConfigService.resolveModelId(normalizedModel, {
       useGemini3_1,
       useGemini3_1FlashLite,
       useCustomTools: useCustomToolModel,
@@ -132,7 +139,7 @@ export function resolveModel(
   }
 
   let resolved: string;
-  switch (requestedModel) {
+  switch (normalizedModel) {
     case PREVIEW_GEMINI_MODEL:
     case PREVIEW_GEMINI_MODEL_AUTO:
     case GEMINI_MODEL_ALIAS_AUTO:
@@ -161,7 +168,7 @@ export function resolveModel(
       break;
     }
     default: {
-      resolved = requestedModel;
+      resolved = normalizedModel;
       break;
     }
   }
@@ -448,7 +455,7 @@ export function isActiveModel(
   useGemini3_1: boolean = false,
   useGemini3_1FlashLite: boolean = false,
   useCustomToolModel: boolean = false,
-  experimentalGemma: boolean = false,
+  experimentalGemma: boolean = true,
 ): boolean {
   if (!VALID_GEMINI_MODELS.has(model)) {
     return false;

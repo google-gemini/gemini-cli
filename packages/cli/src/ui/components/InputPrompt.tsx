@@ -360,6 +360,20 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     isShellSuggestionsVisible,
   } = completion;
 
+  const effectivePlaceholder = useMemo(() => {
+    if (!isVoiceModeEnabled) return placeholder;
+    const voiceAction =
+      (settings.experimental.voice?.activationMode ?? 'push-to-talk') ===
+      'push-to-talk'
+        ? 'hold space to talk'
+        : 'space to talk';
+    return `  Type your message or ${voiceAction} (Esc to exit)`;
+  }, [
+    isVoiceModeEnabled,
+    placeholder,
+    settings.experimental.voice?.activationMode,
+  ]);
+
   const showCursor =
     focus && isShellFocused && !isEmbeddedShellFocused && !copyModeEnabled;
 
@@ -1786,6 +1800,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         useBackgroundColor={useBackgroundColor}
       >
         <Box flexGrow={1} flexDirection="row" paddingX={1}>
+          {isVoiceModeEnabled && <Text color={theme.text.accent}>🎤 </Text>}
           <Text
             color={statusColor ?? theme.text.accent}
             aria-label={statusText || undefined}
@@ -1812,35 +1827,25 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           <Box flexGrow={1} flexDirection="column" ref={innerBoxRef}>
             {isRecording && (
               <Box flexDirection="row" marginBottom={0}>
-                <Text color={theme.status.success}>🎙️ Listening...</Text>
-              </Box>
-            )}
-            {isVoiceModeEnabled && !isRecording && (
-              <Box flexDirection="row" marginBottom={0}>
-                <Text color={theme.text.secondary}>
-                  &gt; Voice mode:{' '}
-                  {(settings.experimental.voice?.activationMode ??
-                    'push-to-talk') === 'push-to-talk'
-                    ? 'Hold Space to record'
-                    : 'Space to start/stop recording'}{' '}
-                  (Esc to exit)
-                </Text>
+                <Text color={theme.status.success}>Listening...</Text>
               </Box>
             )}
             {buffer.text.length === 0 && !isRecording ? (
-              !isVoiceModeEnabled && placeholder ? (
+              effectivePlaceholder ? (
                 showCursor ? (
                   <Text
                     terminalCursorFocus={showCursor}
                     terminalCursorPosition={0}
                   >
-                    {chalk.inverse(placeholder.slice(0, 1))}
+                    {chalk.inverse(effectivePlaceholder.slice(0, 1))}
                     <Text color={theme.text.secondary}>
-                      {placeholder.slice(1)}
+                      {effectivePlaceholder.slice(1)}
                     </Text>
                   </Text>
                 ) : (
-                  <Text color={theme.text.secondary}>{placeholder}</Text>
+                  <Text color={theme.text.secondary}>
+                    {effectivePlaceholder}
+                  </Text>
                 )
               ) : null
             ) : (
