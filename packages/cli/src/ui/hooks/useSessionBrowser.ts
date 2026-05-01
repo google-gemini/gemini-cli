@@ -68,6 +68,9 @@ export const useSessionBrowser = (
           }
 
           // Use the old session's ID to continue it.
+          // Config.setSessionId centrally handles the runtime.json
+          // sidecar swap — gated on the bootstrap-set ownership flag —
+          // so this caller does not need to touch it directly.
           const existingSessionId = conversation.sessionId;
           config.setSessionId(existingSessionId);
           uiTelemetryService.hydrate(conversation);

@@ -121,6 +121,7 @@ export * from './utils/events.js';
 export * from './utils/extensionLoader.js';
 export * from './utils/package.js';
 export * from './utils/version.js';
+export * from './utils/runtimeStatus.js';
 export * from './utils/checkpointUtils.js';
 export * from './utils/secure-browser-launcher.js';
 export * from './utils/apiConversionUtils.js';

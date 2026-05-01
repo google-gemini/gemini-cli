@@ -35,6 +35,7 @@ import {
   debugLogger,
   isHeadlessMode,
   Storage,
+  writeRuntimeStatus,
 } from '@google/gemini-cli-core';
 
 import { loadCliConfig, parseArguments } from './config/config.js';
@@ -622,6 +623,38 @@ export async function main() {
       await deleteSession(config, sessionToDelete);
       await runExitCleanup();
       process.exit(ExitCodes.SUCCESS);
+    }
+
+    // Make the live session externally observable. Write a small JSON
+    // status file at <sessionTempDir>/runtime.json that records
+    // (pid, sessionId, workDir, hostname, startedAt, geminiCliVersion)
+    // so terminal multiplexers, tab managers, IDE integrations, and
+    // observability daemons can map a running PID to its session — even
+    // when started without --resume/--session-id, which is the common
+    // case. Best-effort: never block startup if the write fails.
+    //
+    // Placed after the --list-* / --delete-session early exits so those
+    // utility commands don't leave a sidecar claiming a session that
+    // never started, and before all three session-serving paths
+    // (interactive, ACP, non-interactive). The file is intentionally
+    // NOT cleared on exit — external observers must verify the recorded
+    // PID is alive anyway, so explicit cleanup adds no on-disk benefit.
+    try {
+      const sessionDir = config.storage.getSessionTempDir();
+      await writeRuntimeStatus(sessionDir, {
+        sessionId: config.getSessionId(),
+        workDir: config.getTargetDir(),
+      });
+      // Mark this Config as the owner of a runtime.json sidecar for the
+      // current PID. From this point on, Config.setSessionId refreshes
+      // the sidecar on every same-PID session swap (`/clear`, session
+      // browser resume, etc.). Non-interactive entry points that never
+      // reach this bootstrap leave sibling sidecars alone, so a short-
+      // lived `gemini --prompt` invocation cannot trample a concurrent
+      // shell's sidecar that happens to share the outgoing session id.
+      config.markRuntimeStatusEnabled();
+    } catch (err) {
+      debugLogger.debug('Failed to write runtime status sidecar:', err);
     }
 
     const wasRaw = process.stdin.isRaw;

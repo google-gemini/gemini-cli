@@ -37,6 +37,9 @@ export const clearCommand: SlashCommand = {
     // Start a new conversation recording with a new session ID
     // We MUST do this before calling resetChat() so the new ChatRecordingService
     // initialized by GeminiChat picks up the new session ID.
+    // Config.setSessionId (called from resetNewSessionState) handles the
+    // runtime.json sidecar swap centrally — gated on the bootstrap-set
+    // ownership flag — so /clear does not need to touch it directly.
     let newSessionId: string | undefined;
     if (config) {
       newSessionId = randomUUID();

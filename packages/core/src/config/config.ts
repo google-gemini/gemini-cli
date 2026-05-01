@@ -142,6 +142,10 @@ import type { AnyToolInvocation, AnyDeclarativeTool } from '../tools/tools.js';
 import { WorkspaceContext } from '../utils/workspaceContext.js';
 import { getWorkspaceContextOverride } from './scoped-config.js';
 import { Storage } from './storage.js';
+import {
+  clearRuntimeStatus,
+  writeRuntimeStatus,
+} from '../utils/runtimeStatus.js';
 import type { ShellExecutionConfig } from '../services/shellExecutionService.js';
 import { FileExclusions } from '../utils/ignorePatterns.js';
 import { MessageBus } from '../confirmation-bus/message-bus.js';
@@ -758,6 +762,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly acknowledgedAgentsService: AcknowledgedAgentsService;
   private skillManager!: SkillManager;
   private _sessionId: string;
+  private runtimeStatusEnabled = false;
   private readonly clientName: string | undefined;
   private clientVersion: string;
   private fileSystemService: FileSystemService;
@@ -1799,9 +1804,24 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   setSessionId(sessionId: string): void {
+    const previousSessionId = this._sessionId;
     const previousPlansDir = this.storage.isInitialized()
       ? this.storage.getPlansDir()
       : undefined;
+
+    // Capture the OUTGOING runtime.json path before storage updates its
+    // session id; the swap-time refresh below uses it to drop the stale
+    // claim on this PID. Skipped when the ownership flag is unset (no
+    // sidecar exists yet) or when the new session id matches the old
+    // (no swap, nothing to clear).
+    let previousSessionDir: string | undefined;
+    if (this.runtimeStatusEnabled && previousSessionId !== sessionId) {
+      try {
+        previousSessionDir = this.storage.getSessionTempDir();
+      } catch {
+        // Storage not yet resolvable; nothing to clear.
+      }
+    }
 
     this._sessionId = sessionId;
     this.storage.setSessionId(sessionId);
@@ -1810,6 +1830,54 @@ export class Config implements McpContext, AgentLoopContext {
     if (previousPlansDir) {
       this.refreshSessionScopedPlansDirectory(previousPlansDir);
     }
+
+    // After the interactive UI bootstrap has flipped the ownership flag,
+    // every in-process session swap (`/clear`, session browser resume,
+    // etc.) refreshes the runtime.json sidecar so an external observer's
+    // PID-liveness scan sees this PID mapped 1:1 to the live session.
+    // Before the flag is flipped (initial Config setup, or non-
+    // interactive entry points that never reach the bootstrap), the
+    // swap leaves sibling sidecars alone — a short-lived non-
+    // interactive process must never trample a concurrent shell's
+    // sidecar that happens to share the outgoing session id.
+    if (this.runtimeStatusEnabled && previousSessionId !== sessionId) {
+      this.refreshRuntimeStatusOnSwap(previousSessionDir);
+    }
+  }
+
+  private refreshRuntimeStatusOnSwap(
+    previousSessionDir: string | undefined,
+  ): void {
+    if (previousSessionDir !== undefined) {
+      clearRuntimeStatus(previousSessionDir);
+    }
+    let nextSessionDir: string;
+    try {
+      nextSessionDir = this.storage.getSessionTempDir();
+    } catch {
+      return;
+    }
+    // Fire-and-forget: the swap caller is synchronous and must not
+    // block on observability I/O. Failures are swallowed.
+    void writeRuntimeStatus(nextSessionDir, {
+      sessionId: this._sessionId,
+      workDir: this.targetDir,
+    }).catch(() => {
+      // Best-effort.
+    });
+  }
+
+  /**
+   * Marks this Config as the owner of a runtime.json sidecar for the
+   * current PID. Call once after the initial sidecar write succeeds
+   * (typically from the interactive UI bootstrap). Until this is called,
+   * `setSessionId()` leaves runtime.json alone, so a short-lived non-
+   * interactive process (e.g. `gemini --prompt`) cannot trample a
+   * concurrent shell's sidecar that happens to share the outgoing
+   * session id.
+   */
+  markRuntimeStatusEnabled(): void {
+    this.runtimeStatusEnabled = true;
   }
 
   resetNewSessionState(sessionId: string): void {

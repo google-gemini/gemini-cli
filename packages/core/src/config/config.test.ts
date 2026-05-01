@@ -1965,6 +1965,70 @@ describe('Server Config (config.ts)', () => {
     expect(config.getSessionId()).toBe('session-two');
     expect(config.getApprovedPlanPath()).toBeUndefined();
   });
+
+  it('refreshes runtime.json on same-PID session swap once the owner flag is set', async () => {
+    const realFs = await vi.importActual<typeof import('node:fs')>('node:fs');
+    const realPath =
+      await vi.importActual<typeof import('node:path')>('node:path');
+
+    const config = new Config({
+      ...baseParams,
+      sessionId: 'session-one',
+    });
+    await config.initialize();
+
+    // Use the same dir the production code would use, so the swap-time
+    // capture/clear/write all see the same paths.
+    const sessionOneDir = config.storage.getSessionTempDir();
+    realFs.mkdirSync(sessionOneDir, { recursive: true });
+    const sessionOneRuntime = realPath.join(sessionOneDir, 'runtime.json');
+    realFs.writeFileSync(sessionOneRuntime, '{}', 'utf8');
+
+    try {
+      // Before the flag is set, setSessionId leaves runtime.json alone.
+      // (Pre-bootstrap path: a non-interactive `gemini --prompt` that
+      // happens to share the outgoing session id must not trample it.)
+      config.setSessionId('session-pre');
+      expect(realFs.existsSync(sessionOneRuntime)).toBe(true);
+
+      // Restore for the actual swap test.
+      config.setSessionId('session-one');
+      realFs.writeFileSync(sessionOneRuntime, '{}', 'utf8');
+
+      // Simulate the bootstrap that flips the ownership flag.
+      config.markRuntimeStatusEnabled();
+
+      // Same-PID swap: outgoing sidecar must be cleared, incoming written.
+      config.setSessionId('session-two');
+      const sessionTwoDir = config.storage.getSessionTempDir();
+      const sessionTwoRuntime = realPath.join(sessionTwoDir, 'runtime.json');
+
+      // The new write is fire-and-forget; poll until both effects settle.
+      await vi.waitFor(() => {
+        expect(realFs.existsSync(sessionOneRuntime)).toBe(false);
+        expect(realFs.existsSync(sessionTwoRuntime)).toBe(true);
+      });
+
+      // Idempotent: setSessionId with the SAME id is a no-op for the
+      // sidecar (no clear, no rewrite over itself).
+      const beforeIdempotent = realFs.readFileSync(sessionTwoRuntime, 'utf8');
+      config.setSessionId('session-two');
+      await new Promise((resolve) => setImmediate(resolve));
+      expect(realFs.existsSync(sessionTwoRuntime)).toBe(true);
+      expect(realFs.readFileSync(sessionTwoRuntime, 'utf8')).toBe(
+        beforeIdempotent,
+      );
+    } finally {
+      // Clean up the per-session dirs we created.
+      const projectTempDir = config.storage.getProjectTempDir();
+      for (const sid of ['session-one', 'session-pre', 'session-two']) {
+        realFs.rmSync(realPath.join(projectTempDir, sid), {
+          recursive: true,
+          force: true,
+        });
+      }
+    }
+  });
 });
 
 describe('GemmaModelRouterSettings', () => {
