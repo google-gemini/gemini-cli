@@ -339,7 +339,7 @@ export async function retryWithBackoff<T>(
       // Handle ValidationRequiredError - user needs to verify before proceeding
       if (classifiedError instanceof ValidationRequiredError) {
         if (onValidationRequired) {
-          if (resetCount >= DEFAULT_RETRY_OPTIONS.maxFallbackCount) {
+          if (resetCount >= options.maxFallbackCount) {
             debugLogger.warn(
               `Exhausted allowed state resets. Aborting to prevent infinite validation loop.`,
             );
