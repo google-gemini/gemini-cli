@@ -609,13 +609,15 @@ export class AppRig {
         this.removeToolPolicy(pending.toolName);
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-floating-promises
-      messageBus.publish({
+      const p = messageBus.publish({
         type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
         correlationId: pending.correlationId,
         confirmed: outcome !== ToolConfirmationOutcome.Cancel,
         outcome,
       });
+      if (p instanceof Promise) {
+        p.catch(() => {});
+      }
     });
 
     await act(async () => {

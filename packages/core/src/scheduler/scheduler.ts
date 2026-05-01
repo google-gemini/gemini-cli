@@ -13,6 +13,7 @@ import { checkPolicy, updatePolicy, getPolicyDenialError } from './policy.js';
 import { evaluateBeforeToolHook } from './hook-utils.js';
 import { ToolExecutor } from './tool-executor.js';
 import { ToolModificationHandler } from './tool-modifier.js';
+import { debugLogger } from '../utils/debugLogger.js';
 import {
   type ToolCallRequestInfo,
   type ToolCall,
@@ -166,12 +167,16 @@ export class Scheduler {
   private readonly handleToolConfirmationRequest = async (
     request: ToolConfirmationRequest,
   ) => {
-    await this.messageBus.publish({
-      type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
-      correlationId: request.correlationId,
-      confirmed: false,
-      requiresUserConfirmation: true,
-    });
+    try {
+      await this.messageBus.publish({
+        type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+        correlationId: request.correlationId,
+        confirmed: false,
+        requiresUserConfirmation: true,
+      });
+    } catch (error) {
+      debugLogger.error('Failed to publish confirmation response', error);
+    }
   };
 
   private setupMessageBusListener(messageBus: MessageBus): void {

@@ -11,6 +11,7 @@ import { PolicyDecision } from '../policy/types.js';
 import { MessageBusType, type Message } from './types.js';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { sanitizeToolArgs } from '../utils/agent-sanitization-utils.js';
 
 export class MessageBus extends EventEmitter {
   private listenerToAbortCleanup = new WeakMap<
@@ -78,12 +79,16 @@ export class MessageBus extends EventEmitter {
 
   async publish(message: Message): Promise<void> {
     if (this.debug) {
-      debugLogger.debug(`[MESSAGE_BUS] publish: ${safeJsonStringify(message)}`);
+      debugLogger.debug(
+        `[MESSAGE_BUS] publish: ${safeJsonStringify(sanitizeToolArgs(message))}`,
+      );
     }
     try {
       if (!this.isValidMessage(message)) {
         throw new Error(
-          `Invalid message structure: ${safeJsonStringify(message)}`,
+          `Invalid message structure: ${safeJsonStringify(
+            sanitizeToolArgs(message),
+          )}`,
         );
       }
 
@@ -144,6 +149,7 @@ export class MessageBus extends EventEmitter {
       }
     } catch (error) {
       this.emit('error', error);
+      throw error;
     }
   }
 
@@ -239,8 +245,11 @@ export class MessageBus extends EventEmitter {
       this.subscribe<TResponse>(responseType, responseHandler);
 
       // Publish the request with correlation ID
-      // eslint-disable-next-line @typescript-eslint/no-floating-promises, @typescript-eslint/no-unsafe-type-assertion
-      this.publish({ ...request, correlationId } as TRequest);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      this.publish({ ...request, correlationId } as TRequest).catch((error) => {
+        cleanup();
+        reject(error);
+      });
     });
   }
 }
