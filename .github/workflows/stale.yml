@@ -38,7 +38,9 @@ jobs:
           close-pr-message: >-
             This pull request has been closed due to 14 additional days of inactivity after being marked as stale.
             If this is still relevant, you are welcome to reopen or leave a comment. Thanks for contributing!
-          days-before-stale: 60
+          days-before-issue-stale: -1
+          days-before-pr-stale: 60
           days-before-close: 14
+          operations-per-run: 300
           exempt-issue-labels: 'pinned,security,🔒 maintainer only,help wanted,🗓️ Public Roadmap'
           exempt-pr-labels: 'pinned,security,🔒 maintainer only,help wanted,🗓️ Public Roadmap'
