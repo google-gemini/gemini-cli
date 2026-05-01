@@ -414,8 +414,7 @@ export class ShellExecutionService {
       executable = 'cmd.exe';
     }
 
-    const resolvedExecutable =
-      (await resolveExecutable(executable)) ?? executable;
+    const resolvedExecutable = resolveExecutable(executable) ?? executable;
 
     const guardedCommand = ensurePromptvarsDisabled(commandToExecute, shell);
     const spawnArgs = [...argsPrefix, guardedCommand];
