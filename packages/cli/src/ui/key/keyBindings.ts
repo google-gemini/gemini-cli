@@ -422,6 +422,19 @@ export const defaultKeyBindingConfig: KeyBindingConfig = new Map([
   [Command.STOP_RECORDING, [new KeyBinding('f7')]],
 ]);
 
+/**
+ * The active key binding configuration for the application.
+ * Defaults to defaultKeyBindingConfig until custom bindings are loaded.
+ */
+export let activeKeyBindingConfig: KeyBindingConfig = defaultKeyBindingConfig;
+
+/**
+ * Internal setter for testing and initialization.
+ */
+export function setActiveKeyBindingConfig(config: KeyBindingConfig) {
+  activeKeyBindingConfig = config;
+}
+
 interface CommandCategory {
   readonly title: string;
   readonly commands: readonly Command[];
@@ -773,6 +786,7 @@ export async function loadCustomKeybindings(): Promise<{
     }
   }
 
+  activeKeyBindingConfig = config;
   return { config, errors };
 }
 
