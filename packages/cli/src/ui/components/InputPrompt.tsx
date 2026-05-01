@@ -1826,17 +1826,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
               <Text color={theme.text.accent}>(r:) </Text>
             ) : showYoloStyling ? (
               '*'
-            ) : showYoloStyling ? (
-              '*'
             ) : (
               '>'
             )}{' '}
           </Text>
-          {isRecording && (
-            <Text color={theme.status.success}>Listening... </Text>
-          )}
           <Box flexGrow={1} flexDirection="column" ref={innerBoxRef}>
-            {buffer.text.length === 0 && !isRecording ? (
+            {buffer.text.length === 0 ? (
               effectivePlaceholder ? (
                 showCursor ? (
                   <Text
