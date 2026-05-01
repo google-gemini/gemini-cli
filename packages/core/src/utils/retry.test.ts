@@ -9,7 +9,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ApiError } from '@google/genai';
 import { AuthType } from '../core/contentGenerator.js';
 import { type HttpError, ModelNotFoundError } from './httpErrors.js';
-import { retryWithBackoff } from './retry.js';
+import { DEFAULT_MAX_FALLBACK_COUNT, retryWithBackoff } from './retry.js';
 import { setSimulate429 } from './testUtils.js';
 import { debugLogger } from './debugLogger.js';
 import {
@@ -737,6 +737,30 @@ describe('retryWithBackoff', () => {
     expect(debugLogger.warn).not.toHaveBeenCalled();
     expect(shouldRetryOnContent).toHaveBeenCalledTimes(1);
     expect(mockFn).toHaveBeenCalledTimes(1);
+  });
+
+  it('should not loop infinitely if the fallback model also returns 500', async () => {
+    const fallbackCallback = vi.fn().mockResolvedValue('gemini-2.5-flash');
+
+    const mockFn = vi.fn().mockImplementation(async () => {
+      const error: HttpError = new Error('Persistent Backend Error');
+      error.status = 500;
+      throw error;
+    });
+
+    const promise = retryWithBackoff(mockFn, {
+      maxAttempts: 2,
+      initialDelayMs: 1,
+      onPersistent429: fallbackCallback,
+      authType: AuthType.LOGIN_WITH_GOOGLE,
+    });
+
+    await Promise.all([
+      expect(promise).rejects.toThrow('Persistent Backend Error'),
+      vi.runAllTimersAsync(),
+    ]);
+
+    expect(fallbackCallback).toHaveBeenCalledTimes(DEFAULT_MAX_FALLBACK_COUNT);
   });
 
   it('should trigger fallback for OAuth personal users on persistent 500 errors', async () => {
