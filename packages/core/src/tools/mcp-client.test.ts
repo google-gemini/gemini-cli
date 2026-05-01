@@ -2128,11 +2128,14 @@ describe('mcp-client', () => {
         .spyOn(SdkClientStdioLib, 'StdioClientTransport')
         .mockReturnValue({} as SdkClientStdioLib.StdioClientTransport);
 
-      const originalEnv = process.env;
-      process.env = {
-        ...originalEnv,
-        GEMINI_TEST_VAR: 'expanded-value',
+      const localContext = {
+        ...MOCK_CONTEXT,
+        sanitizationConfig: {
+          ...MOCK_CONTEXT.sanitizationConfig,
+          allowedEnvironmentVariables: ['GEMINI_TEST_VAR'],
+        },
       };
+      vi.stubEnv('GEMINI_TEST_VAR', 'expanded-value');
 
       try {
         await createTransport(
@@ -2145,7 +2148,7 @@ describe('mcp-client', () => {
             },
           },
           false,
-          MOCK_CONTEXT,
+          localContext,
         );
 
         const callArgs = mockedTransport.mock.calls[0][0];
@@ -2153,7 +2156,120 @@ describe('mcp-client', () => {
         expect(callArgs.env!['TEST_EXPANDED']).toBe('Value is expanded-value');
         expect(callArgs.env!['SECRET_KEY']).toBe('intentional-secret-123');
       } finally {
-        process.env = originalEnv;
+        vi.unstubAllEnvs();
+      }
+    });
+
+    it('should expand environment variables in args', async () => {
+      const mockedTransport = vi
+        .spyOn(SdkClientStdioLib, 'StdioClientTransport')
+        .mockReturnValue({} as SdkClientStdioLib.StdioClientTransport);
+
+      const localContext = {
+        ...MOCK_CONTEXT,
+        sanitizationConfig: {
+          ...MOCK_CONTEXT.sanitizationConfig,
+          allowedEnvironmentVariables: ['GEMINI_TEST_VAR'],
+        },
+      };
+      vi.stubEnv('GEMINI_TEST_VAR', 'expanded-value');
+
+      try {
+        await createTransport(
+          'test-server',
+          {
+            command: 'test-command',
+            args: [
+              '--arg1',
+              '$GEMINI_TEST_VAR',
+              '--arg2=value-$GEMINI_TEST_VAR',
+            ],
+            env: {},
+          },
+          false,
+          localContext,
+        );
+
+        const callArgs = mockedTransport.mock.calls[0][0];
+        expect(callArgs.args).toBeDefined();
+        expect(callArgs.args).toEqual([
+          '--arg1',
+          'expanded-value',
+          '--arg2=value-expanded-value',
+        ]);
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    });
+
+    it('should expand environment variables in command and cwd', async () => {
+      const mockedTransport = vi
+        .spyOn(SdkClientStdioLib, 'StdioClientTransport')
+        .mockReturnValue({} as SdkClientStdioLib.StdioClientTransport);
+
+      const localContext = {
+        ...MOCK_CONTEXT,
+        sanitizationConfig: {
+          ...MOCK_CONTEXT.sanitizationConfig,
+          allowedEnvironmentVariables: ['TEST_HOME', 'TEST_CWD'],
+        },
+      };
+
+      vi.stubEnv('TEST_HOME', '/home/user');
+      vi.stubEnv('TEST_CWD', '/path/to/project');
+
+      try {
+        await createTransport(
+          'test-server',
+          {
+            command: '$TEST_HOME/bin/server',
+            cwd: '$TEST_CWD/src',
+            env: {},
+          },
+          false,
+          localContext,
+        );
+
+        const callArgs = mockedTransport.mock.calls[0][0];
+        expect(callArgs.command).toBe('/home/user/bin/server');
+        expect(callArgs.cwd).toBe('/path/to/project/src');
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    });
+
+    it('should support sequential/multiple variable expansion', async () => {
+      const mockedTransport = vi
+        .spyOn(SdkClientStdioLib, 'StdioClientTransport')
+        .mockReturnValue({} as SdkClientStdioLib.StdioClientTransport);
+
+      const localContext = {
+        ...MOCK_CONTEXT,
+        sanitizationConfig: {
+          ...MOCK_CONTEXT.sanitizationConfig,
+          allowedEnvironmentVariables: ['VAR1', 'VAR2'],
+        },
+      };
+
+      vi.stubEnv('VAR1', 'foo');
+      vi.stubEnv('VAR2', 'bar');
+
+      try {
+        await createTransport(
+          'test-server',
+          {
+            command: 'test',
+            args: ['$VAR1-$VAR2', '${VAR1}_${VAR2}'],
+            env: {},
+          },
+          false,
+          localContext,
+        );
+
+        const callArgs = mockedTransport.mock.calls[0][0];
+        expect(callArgs.args).toEqual(['foo-bar', 'foo_bar']);
+      } finally {
+        vi.unstubAllEnvs();
       }
     });
 
