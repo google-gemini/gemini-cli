@@ -46,6 +46,7 @@ export interface ModelPolicy {
   actions: ModelPolicyActionMap;
   stateTransitions: ModelPolicyStateMap;
   isLastResort?: boolean;
+  maxAttempts?: number;
 }
 
 /**

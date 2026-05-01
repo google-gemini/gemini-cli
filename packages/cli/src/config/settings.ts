@@ -18,6 +18,7 @@ import {
   Storage,
   coreEvents,
   homedir,
+  AuthType,
   type AdminControlsSettings,
   createCache,
 } from '@google/gemini-cli-core';
@@ -532,16 +533,45 @@ function findEnvFile(startDir: string, isTrusted: boolean): string | null {
   }
 }
 
+// Internal env var used to preserve the user's original GOOGLE_CLOUD_PROJECT
+// across process restarts in Cloud Shell. This survives relaunch because child
+// processes inherit the parent's environment.
+const USER_GCP_PROJECT = '_GEMINI_USER_GCP_PROJECT';
+
 export function setUpCloudShellEnvironment(
   envFilePath: string | null,
   isTrusted: boolean,
   isSandboxed: boolean,
+  selectedAuthType?: string,
 ): void {
   // Special handling for GOOGLE_CLOUD_PROJECT in Cloud Shell:
   // Because GOOGLE_CLOUD_PROJECT in Cloud Shell tracks the project
   // set by the user using "gcloud config set project" we do not want to
   // use its value. So, unless the user overrides GOOGLE_CLOUD_PROJECT in
   // one of the .env files, we set the Cloud Shell-specific default here.
+  //
+  // However, if the user has explicitly selected Vertex AI auth, they intend
+  // to use their own GCP project, so we restore the original value and skip
+  // the Cloud Shell override to respect their .env settings.
+  if (selectedAuthType === AuthType.USE_VERTEX_AI) {
+    const saved = process.env[USER_GCP_PROJECT];
+    if (saved !== undefined) {
+      process.env['GOOGLE_CLOUD_PROJECT'] = saved;
+    } else if (process.env['GOOGLE_CLOUD_PROJECT'] === 'cloudshell-gca') {
+      delete process.env['GOOGLE_CLOUD_PROJECT'];
+    }
+    return;
+  }
+
+  // Save the user's original value before overwriting, so it can be restored
+  // if the user later switches to Vertex AI (even after a process restart).
+  if (!process.env[USER_GCP_PROJECT]) {
+    const current = process.env['GOOGLE_CLOUD_PROJECT'];
+    if (current && current !== 'cloudshell-gca') {
+      process.env[USER_GCP_PROJECT] = current;
+    }
+  }
+
   let value = 'cloudshell-gca';
 
   if (envFilePath && fs.existsSync(envFilePath)) {
@@ -584,7 +614,13 @@ export function loadEnvironment(
 
   // Cloud Shell environment variable handling
   if (process.env['CLOUD_SHELL'] === 'true') {
-    setUpCloudShellEnvironment(envFilePath, isTrusted, isSandboxed);
+    const selectedAuthType = settings.security?.auth?.selectedType;
+    setUpCloudShellEnvironment(
+      envFilePath,
+      isTrusted,
+      isSandboxed,
+      selectedAuthType,
+    );
   }
 
   if (envFilePath) {
@@ -673,7 +709,9 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
   const storage = new Storage(workspaceDir);
   const workspaceSettingsPath = storage.getWorkspaceSettingsPath();
 
-  const load = (filePath: string): { settings: Settings; rawJson?: string } => {
+  const load = (
+    filePath: string,
+  ): { settings: Settings; rawSettings: Settings; rawJson?: string } => {
     try {
       if (fs.existsSync(filePath)) {
         const content = fs.readFileSync(filePath, 'utf-8');
@@ -689,14 +727,19 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
             path: filePath,
             severity: 'error',
           });
-          return { settings: {} };
+          return { settings: {}, rawSettings: {} };
         }
 
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         const settingsObject = rawSettings as Record<string, unknown>;
 
-        // Validate settings structure with Zod
-        const validationResult = validateSettings(settingsObject);
+        // Expand environment variables
+        const expandedSettings = resolveEnvVarsInObject(
+          settingsObject as Settings,
+        );
+
+        // Validate settings structure with Zod after environment variable expansion
+        const validationResult = validateSettings(expandedSettings);
         if (!validationResult.success && validationResult.error) {
           const errorMessage = formatValidationError(
             validationResult.error,
@@ -707,9 +750,22 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
             path: filePath,
             severity: 'warning',
           });
+          return {
+            settings: expandedSettings,
+            rawSettings: settingsObject as Settings,
+            rawJson: content,
+          };
         }
 
-        return { settings: settingsObject as Settings, rawJson: content };
+        // Return the successfully cast and validated data
+        return {
+          // Since we've successfully validated expandedSettings against settingsZodSchema,
+          // it's safe to cast the resulting data to the Settings type.
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          settings: (validationResult.data as Settings) ?? expandedSettings,
+          rawSettings: settingsObject as Settings,
+          rawJson: content,
+        };
       }
     } catch (error: unknown) {
       settingsErrors.push({
@@ -718,33 +774,40 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
         severity: 'error',
       });
     }
-    return { settings: {} };
+    return { settings: {}, rawSettings: {} };
   };
 
   const systemResult = load(systemSettingsPath);
   const systemDefaultsResult = load(systemDefaultsPath);
   const userResult = load(USER_SETTINGS_PATH);
 
-  let workspaceResult: { settings: Settings; rawJson?: string } = {
+  let workspaceResult: {
+    settings: Settings;
+    rawSettings: Settings;
+    rawJson?: string;
+  } = {
     settings: {} as Settings,
+    rawSettings: {} as Settings,
     rawJson: undefined,
   };
   if (!storage.isWorkspaceHomeDir()) {
     workspaceResult = load(workspaceSettingsPath);
   }
 
-  const systemOriginalSettings = structuredClone(systemResult.settings);
+  const systemOriginalSettings = structuredClone(systemResult.rawSettings);
   const systemDefaultsOriginalSettings = structuredClone(
-    systemDefaultsResult.settings,
+    systemDefaultsResult.rawSettings,
   );
-  const userOriginalSettings = structuredClone(userResult.settings);
-  const workspaceOriginalSettings = structuredClone(workspaceResult.settings);
+  const userOriginalSettings = structuredClone(userResult.rawSettings);
+  const workspaceOriginalSettings = structuredClone(
+    workspaceResult.rawSettings,
+  );
 
-  // Environment variables for runtime use
-  systemSettings = resolveEnvVarsInObject(systemResult.settings);
-  systemDefaultSettings = resolveEnvVarsInObject(systemDefaultsResult.settings);
-  userSettings = resolveEnvVarsInObject(userResult.settings);
-  workspaceSettings = resolveEnvVarsInObject(workspaceResult.settings);
+  // Environment variables for runtime use are already resolved and validated in load()
+  systemSettings = systemResult.settings;
+  systemDefaultSettings = systemDefaultsResult.settings;
+  userSettings = userResult.settings;
+  workspaceSettings = workspaceResult.settings;
 
   // Support legacy theme names
   if (userSettings.ui?.theme === 'VS') {

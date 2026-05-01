@@ -602,6 +602,52 @@ describe('ChatRecordingService', () => {
       expect(fs.existsSync(sessionDir)).toBe(false);
     });
 
+    it('should delete legacy pretty-printed session files and their artifacts', async () => {
+      const sessionId = 'legacy-uuid';
+      const shortId = 'legacy12';
+      const chatsDir = path.join(testTempDir, 'chats');
+      const toolOutputsDir = path.join(testTempDir, 'tool-outputs');
+
+      fs.mkdirSync(chatsDir, { recursive: true });
+      fs.mkdirSync(toolOutputsDir, { recursive: true });
+
+      const sessionFile = path.join(
+        chatsDir,
+        `session-2023-01-01T00-00-${shortId}.json`,
+      );
+      // Pretty-printed JSON (not JSONL)
+      fs.writeFileSync(
+        sessionFile,
+        JSON.stringify({ sessionId, messages: [] }, null, 2),
+      );
+
+      const toolOutputDir = path.join(toolOutputsDir, `session-${sessionId}`);
+      fs.mkdirSync(toolOutputDir, { recursive: true });
+      fs.writeFileSync(path.join(toolOutputDir, 'output.txt'), 'data');
+
+      await chatRecordingService.deleteSession(shortId);
+
+      expect(fs.existsSync(sessionFile)).toBe(false);
+      expect(fs.existsSync(toolOutputDir)).toBe(false);
+    });
+
+    it('should delete the session file even if it is corrupted (invalid JSON)', async () => {
+      const shortId = 'corrupt1';
+      const chatsDir = path.join(testTempDir, 'chats');
+
+      fs.mkdirSync(chatsDir, { recursive: true });
+
+      const sessionFile = path.join(
+        chatsDir,
+        `session-2023-01-01T00-00-${shortId}.jsonl`,
+      );
+      fs.writeFileSync(sessionFile, 'not-json');
+
+      await chatRecordingService.deleteSession(shortId);
+
+      expect(fs.existsSync(sessionFile)).toBe(false);
+    });
+
     it('should delete subagent files and their logs when parent is deleted', async () => {
       const parentSessionId = '12345678-session-id';
       const shortId = '12345678';
@@ -731,6 +777,62 @@ describe('ChatRecordingService', () => {
     it('should not throw if session file does not exist', async () => {
       await expect(
         chatRecordingService.deleteSession('non-existent'),
+      ).resolves.not.toThrow();
+    });
+  });
+
+  describe('deleteCurrentSessionAsync', () => {
+    it('should asynchronously delete the current session file and tool outputs', async () => {
+      await chatRecordingService.initialize();
+      // Record a message to trigger the file write (writeConversation skips
+      // writing when there are no messages).
+      chatRecordingService.recordMessage({
+        type: 'user',
+        content: 'test',
+        model: 'gemini-pro',
+      });
+      const conversationFile = chatRecordingService.getConversationFilePath();
+      expect(conversationFile).not.toBeNull();
+
+      // Create a tool output directory matching the session ID used by
+      // deleteSessionArtifactsAsync (this.sessionId = mockConfig.promptId).
+      const toolOutputDir = path.join(
+        testTempDir,
+        'tool-outputs',
+        'session-test-session-id',
+      );
+      fs.mkdirSync(toolOutputDir, { recursive: true });
+      fs.writeFileSync(path.join(toolOutputDir, 'output.txt'), 'data');
+
+      expect(fs.existsSync(conversationFile!)).toBe(true);
+      expect(fs.existsSync(toolOutputDir)).toBe(true);
+
+      await chatRecordingService.deleteCurrentSessionAsync();
+
+      expect(fs.existsSync(conversationFile!)).toBe(false);
+      expect(fs.existsSync(toolOutputDir)).toBe(false);
+    });
+
+    it('should not throw if the session was never initialized', async () => {
+      // conversationFile is null when not initialized
+      await expect(
+        chatRecordingService.deleteCurrentSessionAsync(),
+      ).resolves.not.toThrow();
+    });
+
+    it('should not throw if session file does not exist on disk', async () => {
+      // initialize() writes an initial metadata record synchronously, so
+      // delete the file manually to simulate the "missing on disk" scenario.
+      await chatRecordingService.initialize();
+      const conversationFile = chatRecordingService.getConversationFilePath();
+      expect(conversationFile).not.toBeNull();
+      if (conversationFile && fs.existsSync(conversationFile)) {
+        fs.unlinkSync(conversationFile);
+      }
+      expect(fs.existsSync(conversationFile!)).toBe(false);
+
+      await expect(
+        chatRecordingService.deleteCurrentSessionAsync(),
       ).resolves.not.toThrow();
     });
   });

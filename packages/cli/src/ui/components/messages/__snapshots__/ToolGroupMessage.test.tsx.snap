@@ -62,9 +62,9 @@ exports[`<ToolGroupMessage /> > Golden Snapshots > renders empty tool calls arra
 
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders header when scrolled 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────╮
-│ ✓  tool-1 Description 1. This is a long description that will need to b… │                       ▄
+│ ✓  tool-1 Description 1. This is a long description that will need to be │
+│    truncated if the terminal width is small.                             │                       ▄
 │──────────────────────────────────────────────────────────────────────────│                       █
-│ line3                                                                    │                       █
 │ line4                                                                    │                       █
 │ line5                                                                    │                       █
 │                                                                          │                       █
@@ -161,7 +161,10 @@ exports[`<ToolGroupMessage /> > Golden Snapshots > renders with limited terminal
 
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders with narrow terminal width 1`] = `
 "╭──────────────────────────────────╮
-│ ✓  very-long-tool-name-that-mig… │
+│ ✓  very-long-tool-name-that-migh │
+│    t-wrap This is a very long    │
+│    description that might cause  │
+│    wrapping issues               │
 │                                  │
 │ Test result                      │
 ╰──────────────────────────────────╯
