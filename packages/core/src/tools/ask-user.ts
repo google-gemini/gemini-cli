@@ -110,7 +110,7 @@ export class AskUserTool extends BaseDeclarativeTool<
           normalizedQ.options = q.options.map((opt) => ({
             ...opt,
             label: unescape(opt.label),
-            description: unescape(opt.description),
+            description: opt.description?.trim() ? unescape(opt.description.trim()) : undefined,
           }));
         }
         return normalizedQ;
