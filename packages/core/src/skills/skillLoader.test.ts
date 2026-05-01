@@ -8,23 +8,34 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { loadSkillsFromDir } from './skillLoader.js';
+import {
+  loadSkillsFromDir,
+  loadSkillsFromDirWithReport,
+  loadSkillFromFile,
+} from './skillLoader.js';
 import { coreEvents } from '../utils/events.js';
 import { debugLogger } from '../utils/debugLogger.js';
 
 describe('skillLoader', () => {
   let testRootDir: string;
+  let tempHomeDir: string;
 
   beforeEach(async () => {
     testRootDir = await fs.mkdtemp(
       path.join(os.tmpdir(), 'skill-loader-test-'),
     );
+    tempHomeDir = await fs.mkdtemp(
+      path.join(os.tmpdir(), 'skill-loader-home-'),
+    );
+    vi.stubEnv('GEMINI_CLI_HOME', tempHomeDir);
     vi.spyOn(coreEvents, 'emitFeedback');
     vi.spyOn(debugLogger, 'debug').mockImplementation(() => {});
   });
 
   afterEach(async () => {
     await fs.rm(testRootDir, { recursive: true, force: true });
+    await fs.rm(tempHomeDir, { recursive: true, force: true });
+    vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
 
@@ -270,5 +281,119 @@ description: Test sanitization
 
     expect(skills).toHaveLength(1);
     expect(skills[0].name).toBe('gke-prs-troubleshooter');
+  });
+
+  it('should report load timings for discovered skills', async () => {
+    const skillDir = path.join(testRootDir, 'timed-skill');
+    await fs.mkdir(skillDir, { recursive: true });
+    const skillFile = path.join(skillDir, 'SKILL.md');
+    await fs.writeFile(
+      skillFile,
+      `---\nname: timed-skill\ndescription: A timed skill\n---\nBody\n`,
+    );
+
+    const result = await loadSkillsFromDirWithReport(testRootDir);
+
+    expect(result.skills).toHaveLength(1);
+    expect(result.report.skill_count).toBe(1);
+    expect(result.report.invalid_count).toBe(0);
+    expect(result.report.total_duration_ms).toBeGreaterThanOrEqual(0);
+    expect(result.report.glob_duration_ms).toBeGreaterThanOrEqual(0);
+    expect(result.report.skill_metrics).toEqual([
+      expect.objectContaining({
+        name: 'timed-skill',
+        location: skillFile,
+        parse_result: 'loaded',
+      }),
+    ]);
+    expect(result.skills[0].loadMetadata).toEqual(
+      expect.objectContaining({
+        name: 'timed-skill',
+        location: skillFile,
+        parse_result: 'loaded',
+      }),
+    );
+  });
+
+  it('should report invalid skills in discovery metrics', async () => {
+    const skillDir = path.join(testRootDir, 'broken-skill');
+    await fs.mkdir(skillDir, { recursive: true });
+    const skillFile = path.join(skillDir, 'SKILL.md');
+    await fs.writeFile(skillFile, 'broken');
+
+    const result = await loadSkillsFromDirWithReport(testRootDir);
+
+    expect(result.skills).toHaveLength(0);
+    expect(result.report.skill_count).toBe(0);
+    expect(result.report.invalid_count).toBe(1);
+    expect(result.report.skill_metrics).toEqual([
+      expect.objectContaining({
+        location: skillFile,
+        parse_result: 'invalid_frontmatter',
+      }),
+    ]);
+  });
+
+  it('should mark direct skill loads as uncached instrumentation', async () => {
+    const skillDir = path.join(testRootDir, 'instrumented-skill');
+    await fs.mkdir(skillDir, { recursive: true });
+    const skillFile = path.join(skillDir, 'SKILL.md');
+    await fs.writeFile(
+      skillFile,
+      `---\nname: instrumented-skill\ndescription: Instrument me\n---\nBody\n`,
+    );
+
+    const loaded = await loadSkillFromFile(skillFile);
+
+    expect(loaded.skill?.name).toBe('instrumented-skill');
+    expect(loaded.metric.cache_status).toBe('bypass');
+  });
+
+  it('should reload updated skill metadata after file changes', async () => {
+    const skillDir = path.join(testRootDir, 'changed-skill');
+    await fs.mkdir(skillDir, { recursive: true });
+    const skillFile = path.join(skillDir, 'SKILL.md');
+    await fs.writeFile(
+      skillFile,
+      `---\nname: changed-skill\ndescription: First\n---\nBody\n`,
+    );
+
+    await loadSkillFromFile(skillFile);
+    await fs.writeFile(
+      skillFile,
+      `---\nname: changed-skill\ndescription: Second\n---\nBody changed\n`,
+    );
+
+    const reloaded = await loadSkillFromFile(skillFile);
+
+    expect(reloaded.metric.cache_status).toBe('bypass');
+    expect(reloaded.skill?.description).toBe('Second');
+  });
+
+  it('should discover skills through linked directories', async () => {
+    const targetDir = path.join(testRootDir, 'remote-target-skill');
+    await fs.mkdir(targetDir, { recursive: true });
+    const targetSkillFile = path.join(targetDir, 'SKILL.md');
+    await fs.writeFile(
+      targetSkillFile,
+      `---\nname: linked-skill\ndescription: Linked directory skill\n---\nBody\n`,
+    );
+
+    const linkedDir = path.join(testRootDir, 'linked-skill');
+    if (process.platform === 'win32') {
+      await fs.symlink(targetDir, linkedDir, 'junction');
+    } else {
+      await fs.symlink(targetDir, linkedDir, 'dir');
+    }
+
+    const result = await loadSkillsFromDirWithReport(testRootDir);
+
+    expect(result.skills.map((skill) => skill.name)).toContain('linked-skill');
+    expect(
+      result.report.skill_metrics.some(
+        (metric) =>
+          metric.name === 'linked-skill' && metric.parse_result === 'loaded',
+      ),
+    ).toBe(true);
   });
 });

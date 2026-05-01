@@ -39,6 +39,7 @@ import {
   logExtensionUninstall,
   logExtensionUpdateEvent,
   loadSkillsFromDir,
+  loadSkillsFromDirWithReport,
   loadAgentsFromDirectory,
   homedir,
   ExtensionIntegrityManager,
@@ -916,9 +917,11 @@ Would you like to attempt to install via "git clone" instead?`,
         }
       }
 
-      let skills = await loadSkillsFromDir(
-        path.join(effectiveExtensionPath, 'skills'),
-      );
+      const { skills: loadedSkills, report: skillsDiscoveryReport } =
+        await loadSkillsFromDirWithReport(
+          path.join(effectiveExtensionPath, 'skills'),
+        );
+      let skills = loadedSkills;
       skills = skills.map((skill) => ({
         ...recursivelyHydrateStrings(skill, hydrationContext),
         extensionName: config.name,
@@ -975,6 +978,7 @@ Would you like to attempt to install via "git clone" instead?`,
         settings: config.settings,
         resolvedSettings,
         skills,
+        skillsDiscoveryReport,
         agents: agentLoadResult.agents,
         themes: config.themes,
         rules,
