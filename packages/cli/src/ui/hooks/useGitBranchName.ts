@@ -8,7 +8,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { spawnAsync } from '@google/gemini-cli-core';
 import fs from 'node:fs';
 import fsPromises from 'node:fs/promises';
-import path from 'node:path';
 
 export function useGitBranchName(cwd: string): string | undefined {
   const [branchName, setBranchName] = useState<string | undefined>(undefined);
@@ -40,23 +39,33 @@ export function useGitBranchName(cwd: string): string | undefined {
     // eslint-disable-next-line @typescript-eslint/no-floating-promises
     fetchBranchName(); // Initial fetch
 
-    const gitLogsHeadPath = path.join(cwd, '.git', 'logs', 'HEAD');
     let watcher: fs.FSWatcher | undefined;
     let cancelled = false;
 
     const setupWatcher = async () => {
       try {
-        // Check if .git/logs/HEAD exists, as it might not in a new repo or orphaned head
-        await fsPromises.access(gitLogsHeadPath, fs.constants.F_OK);
+        const { stdout } = await spawnAsync(
+          'git',
+          ['rev-parse', '--absolute-git-dir'],
+          { cwd },
+        );
+        const gitDir = stdout.toString().trim();
+        if (!gitDir) return;
+
+        // Ensure we can access the git dir
+        await fsPromises.access(gitDir, fs.constants.F_OK);
         if (cancelled) return;
-        watcher = fs.watch(gitLogsHeadPath, (eventType: string) => {
-          // Changes to .git/logs/HEAD (appends) indicate HEAD has likely changed
-          if (eventType === 'change' || eventType === 'rename') {
-            // Handle rename just in case
-            // eslint-disable-next-line @typescript-eslint/no-floating-promises
-            fetchBranchName();
-          }
-        });
+
+        watcher = fs.watch(
+          gitDir,
+          (eventType: string, filename: string | null) => {
+            // Changes to HEAD indicate branch checkout or detached commit
+            if (filename === 'HEAD') {
+              // eslint-disable-next-line @typescript-eslint/no-floating-promises
+              fetchBranchName();
+            }
+          },
+        );
       } catch {
         // Silently ignore watcher errors (e.g. permissions or file not existing),
         // similar to how exec errors are handled.
