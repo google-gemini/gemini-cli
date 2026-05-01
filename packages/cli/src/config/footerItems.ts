@@ -23,6 +23,11 @@ export const ALL_ITEMS = [
     description: 'Sandbox type and trust indicator',
   },
   {
+    id: 'hostname',
+    header: 'host',
+    description: 'System hostname',
+  },
+  {
     id: 'model-name',
     header: '/model',
     description: 'Current model identifier',
@@ -70,6 +75,7 @@ export const DEFAULT_ORDER = [
   'workspace',
   'git-branch',
   'sandbox',
+  'hostname',
   'model-name',
   'context-used',
   'quota',
@@ -87,6 +93,7 @@ export function deriveItemsFromLegacySettings(
     'workspace',
     'git-branch',
     'sandbox',
+    'hostname',
     'model-name',
     'quota',
   ];
