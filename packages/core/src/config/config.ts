@@ -140,7 +140,10 @@ import type { GenerateContentParameters } from '@google/genai';
 export type { MCPOAuthConfig, AnyToolInvocation, AnyDeclarativeTool };
 import type { AnyToolInvocation, AnyDeclarativeTool } from '../tools/tools.js';
 import { WorkspaceContext } from '../utils/workspaceContext.js';
-import { getWorkspaceContextOverride } from './scoped-config.js';
+import {
+  getWorkspaceContextOverride,
+  hasScopedMemoryInboxAccess,
+} from './scoped-config.js';
 import { Storage } from './storage.js';
 import type { ShellExecutionConfig } from '../services/shellExecutionService.js';
 import { FileExclusions } from '../utils/ignorePatterns.js';
@@ -3063,6 +3066,30 @@ export class Config implements McpContext, AgentLoopContext {
     this.ideMode = value;
   }
 
+  private isScopedMemoryInboxPatchPathAllowed(
+    absolutePath: string,
+    resolvedPath: string,
+    inboxRoot: string,
+  ): boolean {
+    if (!hasScopedMemoryInboxAccess()) {
+      return false;
+    }
+
+    const normalizedPath = path.resolve(absolutePath);
+    const isCanonicalPatchPath = (['private', 'global'] as const).some(
+      (kind) =>
+        normalizedPath === path.resolve(inboxRoot, kind, 'extraction.patch'),
+    );
+    if (!isCanonicalPatchPath) {
+      return false;
+    }
+
+    const resolvedMemoryRoot = resolveToRealPath(
+      this.storage.getProjectMemoryTempDir(),
+    );
+    return isSubpath(resolvedMemoryRoot, resolvedPath);
+  }
+
   /**
    * Get the current FileSystemService
    */
@@ -3077,11 +3104,47 @@ export class Config implements McpContext, AgentLoopContext {
    * file (the latter is the only file under `~/.gemini/` that is reachable —
    * settings, credentials, keybindings, etc. remain disallowed).
    *
+   * One subtree is *carved back out*: `<projectMemoryDir>/.inbox/` is owned by
+   * the auto-memory extraction agent and the `/memory inbox` review flow. The
+   * main agent is denied access to it even though it falls inside the project
+   * temp dir; the extraction agent receives a narrow execution-scoped exception
+   * for `.inbox/{private,global}/extraction.patch`.
+   *
    * @param absolutePath The absolute path to check.
    * @returns true if the path is allowed, false otherwise.
    */
   isPathAllowed(absolutePath: string): boolean {
     const resolvedPath = resolveToRealPath(absolutePath);
+
+    // The auto-memory inbox (`<projectMemoryDir>/.inbox/`) is owned by the
+    // background extraction agent and the `/memory inbox` review flow. The
+    // main agent must NOT drop files into it directly (that would let the
+    // model bypass review). Deny first, even if the path also satisfies the
+    // workspace or project-temp allowlists below.
+    const inboxRoot = path.join(
+      this.storage.getProjectMemoryTempDir(),
+      '.inbox',
+    );
+    const resolvedInboxRoot = resolveToRealPath(inboxRoot);
+    const normalizedPath = path.resolve(absolutePath);
+    const normalizedInboxRoot = path.resolve(inboxRoot);
+    if (
+      resolvedPath === resolvedInboxRoot ||
+      isSubpath(resolvedInboxRoot, resolvedPath) ||
+      normalizedPath === normalizedInboxRoot ||
+      isSubpath(normalizedInboxRoot, normalizedPath)
+    ) {
+      if (
+        this.isScopedMemoryInboxPatchPathAllowed(
+          absolutePath,
+          resolvedPath,
+          inboxRoot,
+        )
+      ) {
+        return true;
+      }
+      return false;
+    }
 
     const workspaceContext = this.getWorkspaceContext();
     if (workspaceContext.isPathWithinWorkspace(resolvedPath)) {

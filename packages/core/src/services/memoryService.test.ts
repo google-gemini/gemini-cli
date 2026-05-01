@@ -74,6 +74,7 @@ vi.mock('../agents/registry.js', () => ({
 vi.mock('../config/storage.js', () => ({
   Storage: {
     getUserSkillsDir: vi.fn().mockReturnValue('/tmp/fake-user-skills'),
+    getGlobalGeminiDir: vi.fn().mockReturnValue('/tmp/fake-global-gemini'),
   },
 }));
 
@@ -563,6 +564,277 @@ describe('memoryService', () => {
       expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
         'info',
         expect.stringContaining('/memory inbox'),
+      );
+    });
+
+    it('rolls back direct active memory writes (patches are the only path)', async () => {
+      const { startMemoryService, readExtractionState } = await import(
+        './memoryService.js'
+      );
+      const { LocalAgentExecutor } = await import(
+        '../agents/local-executor.js'
+      );
+
+      vi.mocked(coreEvents.emitFeedback).mockClear();
+      vi.mocked(LocalAgentExecutor.create).mockReset();
+
+      const memoryDir = path.join(tmpDir, 'memory-rollback');
+      const skillsDir = path.join(tmpDir, 'skills-rollback');
+      const projectTempDir = path.join(tmpDir, 'temp-rollback');
+      const chatsDir = path.join(projectTempDir, 'chats');
+      await fs.mkdir(memoryDir, { recursive: true });
+      await fs.mkdir(skillsDir, { recursive: true });
+      await fs.mkdir(chatsDir, { recursive: true });
+      await fs.writeFile(path.join(memoryDir, 'MEMORY.md'), '- original\n');
+
+      const conversation = createConversation({
+        sessionId: 'rollback-session',
+        messageCount: 20,
+      });
+      await fs.writeFile(
+        path.join(chatsDir, 'session-2025-01-01T00-00-rollback01.json'),
+        JSON.stringify(conversation),
+      );
+
+      // Agent ignores the patch contract and writes the active files directly.
+      vi.mocked(LocalAgentExecutor.create).mockResolvedValueOnce({
+        run: vi.fn().mockImplementation(async () => {
+          await fs.writeFile(path.join(memoryDir, 'MEMORY.md'), '- changed\n');
+          await fs.writeFile(path.join(memoryDir, 'topic.md'), 'new topic\n');
+          return undefined;
+        }),
+      } as never);
+
+      const mockConfig = {
+        storage: {
+          getProjectMemoryDir: vi.fn().mockReturnValue(memoryDir),
+          getProjectMemoryTempDir: vi.fn().mockReturnValue(memoryDir),
+          getProjectSkillsMemoryDir: vi.fn().mockReturnValue(skillsDir),
+          getProjectTempDir: vi.fn().mockReturnValue(projectTempDir),
+        },
+        getToolRegistry: vi.fn(),
+        getMessageBus: vi.fn(),
+        getGeminiClient: vi.fn(),
+        getSkillManager: vi.fn().mockReturnValue({ getSkills: () => [] }),
+        modelConfigService: {
+          registerRuntimeModelConfig: vi.fn(),
+        },
+        sandboxManager: undefined,
+      } as unknown as Parameters<typeof startMemoryService>[0];
+
+      await startMemoryService(mockConfig);
+
+      await expect(
+        fs.readFile(path.join(memoryDir, 'MEMORY.md'), 'utf-8'),
+      ).resolves.toBe('- original\n');
+      await expect(
+        fs.access(path.join(memoryDir, 'topic.md')),
+      ).rejects.toThrow();
+
+      const state = await readExtractionState(
+        path.join(memoryDir, '.extraction-state.json'),
+      );
+      expect(state.runs.at(-1)?.memoryFilesUpdated).toEqual([]);
+    });
+
+    // Known gap surfaced in PR review (#26338). The current snapshot/rollback
+    // is last-write-wins: pre-run vs. post-run snapshots, with no way to
+    // distinguish writes by the extraction agent from concurrent user edits
+    // in another process. If a user edits MEMORY.md while extraction is
+    // running, the rollback restores the pre-run content and clobbers the
+    // user's edit. The proper fix needs to track which writes were made by
+    // the agent (e.g. mtime windowing or a WriteFile hook), which is an
+    // architectural change deferred to a follow-up PR.
+    it.todo(
+      'preserves a concurrent user edit instead of clobbering it during rollback',
+    );
+
+    it('rolls back direct writes to <projectRoot>/GEMINI.md and ~/.gemini/GEMINI.md', async () => {
+      const { startMemoryService } = await import('./memoryService.js');
+      const { LocalAgentExecutor } = await import(
+        '../agents/local-executor.js'
+      );
+
+      vi.mocked(coreEvents.emitFeedback).mockClear();
+      vi.mocked(LocalAgentExecutor.create).mockReset();
+
+      const memoryDir = path.join(tmpDir, 'memory-protected');
+      const skillsDir = path.join(tmpDir, 'skills-protected');
+      const projectTempDir = path.join(tmpDir, 'temp-protected');
+      const projectRoot = path.join(tmpDir, 'project-protected');
+      const globalGeminiDir = path.join(tmpDir, 'global-protected');
+      const chatsDir = path.join(projectTempDir, 'chats');
+      await fs.mkdir(memoryDir, { recursive: true });
+      await fs.mkdir(skillsDir, { recursive: true });
+      await fs.mkdir(projectRoot, { recursive: true });
+      await fs.mkdir(globalGeminiDir, { recursive: true });
+      await fs.mkdir(chatsDir, { recursive: true });
+
+      // Pre-existing project GEMINI.md (committed team conventions). It must
+      // be restored to the original after the agent's misbehavior.
+      const projectGeminiPath = path.join(projectRoot, 'GEMINI.md');
+      await fs.writeFile(projectGeminiPath, '# Team conventions\n- Do X.\n');
+
+      // Global GEMINI.md does NOT exist yet — agent will try to create it.
+      const globalGeminiPath = path.join(globalGeminiDir, 'GEMINI.md');
+
+      vi.mocked(Storage.getGlobalGeminiDir).mockReturnValue(globalGeminiDir);
+
+      const conversation = createConversation({
+        sessionId: 'protected-session',
+        messageCount: 20,
+      });
+      await fs.writeFile(
+        path.join(chatsDir, 'session-2025-01-01T00-00-protected.json'),
+        JSON.stringify(conversation),
+      );
+
+      // Agent ignores the prompt: writes directly to both protected files.
+      vi.mocked(LocalAgentExecutor.create).mockResolvedValueOnce({
+        run: vi.fn().mockImplementation(async () => {
+          await fs.writeFile(
+            projectGeminiPath,
+            '# HACKED conventions\n',
+            'utf-8',
+          );
+          await fs.writeFile(
+            globalGeminiPath,
+            'rogue global preference\n',
+            'utf-8',
+          );
+          return undefined;
+        }),
+      } as never);
+
+      const mockConfig = {
+        storage: {
+          getProjectMemoryDir: vi.fn().mockReturnValue(memoryDir),
+          getProjectMemoryTempDir: vi.fn().mockReturnValue(memoryDir),
+          getProjectSkillsMemoryDir: vi.fn().mockReturnValue(skillsDir),
+          getProjectTempDir: vi.fn().mockReturnValue(projectTempDir),
+          getProjectRoot: vi.fn().mockReturnValue(projectRoot),
+        },
+        getProjectRoot: vi.fn().mockReturnValue(projectRoot),
+        getToolRegistry: vi.fn(),
+        getMessageBus: vi.fn(),
+        getGeminiClient: vi.fn(),
+        getSkillManager: vi.fn().mockReturnValue({ getSkills: () => [] }),
+        modelConfigService: {
+          registerRuntimeModelConfig: vi.fn(),
+        },
+        sandboxManager: undefined,
+      } as unknown as Parameters<typeof startMemoryService>[0];
+
+      await startMemoryService(mockConfig);
+
+      // Project GEMINI.md was restored to its original content.
+      await expect(fs.readFile(projectGeminiPath, 'utf-8')).resolves.toBe(
+        '# Team conventions\n- Do X.\n',
+      );
+      // Global GEMINI.md is removed (it didn't exist before).
+      await expect(fs.access(globalGeminiPath)).rejects.toThrow();
+    });
+
+    it('records inbox patches as memoryCandidatesCreated without applying them', async () => {
+      const { startMemoryService, readExtractionState } = await import(
+        './memoryService.js'
+      );
+      const { LocalAgentExecutor } = await import(
+        '../agents/local-executor.js'
+      );
+
+      vi.mocked(coreEvents.emitFeedback).mockClear();
+      vi.mocked(LocalAgentExecutor.create).mockReset();
+
+      const memoryDir = path.join(tmpDir, 'memory-inbox-only');
+      const skillsDir = path.join(tmpDir, 'skills-inbox-only');
+      const projectTempDir = path.join(tmpDir, 'temp-inbox-only');
+      const chatsDir = path.join(projectTempDir, 'chats');
+      await fs.mkdir(memoryDir, { recursive: true });
+      await fs.mkdir(skillsDir, { recursive: true });
+      await fs.mkdir(chatsDir, { recursive: true });
+
+      const conversation = createConversation({
+        sessionId: 'inbox-only-session',
+        messageCount: 20,
+      });
+      await fs.writeFile(
+        path.join(chatsDir, 'session-2025-01-01T00-00-inbox001.json'),
+        JSON.stringify(conversation),
+      );
+
+      vi.mocked(LocalAgentExecutor.create).mockResolvedValueOnce({
+        run: vi.fn().mockImplementation(async () => {
+          const inboxDir = path.join(memoryDir, '.inbox');
+          await fs.mkdir(path.join(inboxDir, 'private'), { recursive: true });
+          await fs.mkdir(path.join(inboxDir, 'global'), { recursive: true });
+          await fs.writeFile(
+            path.join(inboxDir, 'private', 'MEMORY.patch'),
+            [
+              `--- /dev/null`,
+              `+++ ${path.join(memoryDir, 'MEMORY.md')}`,
+              `@@ -0,0 +1,1 @@`,
+              `+- new project fact`,
+              ``,
+            ].join('\n'),
+          );
+          await fs.writeFile(
+            path.join(inboxDir, 'global', 'reply-style.patch'),
+            [
+              `--- /dev/null`,
+              `+++ /workspace/global/GEMINI.md`,
+              `@@ -0,0 +1,1 @@`,
+              `+Prefer concise architecture summaries.`,
+              ``,
+            ].join('\n'),
+          );
+          return undefined;
+        }),
+      } as never);
+
+      const mockConfig = {
+        storage: {
+          getProjectMemoryDir: vi.fn().mockReturnValue(memoryDir),
+          getProjectMemoryTempDir: vi.fn().mockReturnValue(memoryDir),
+          getProjectSkillsMemoryDir: vi.fn().mockReturnValue(skillsDir),
+          getProjectTempDir: vi.fn().mockReturnValue(projectTempDir),
+        },
+        getToolRegistry: vi.fn(),
+        getMessageBus: vi.fn(),
+        getGeminiClient: vi.fn(),
+        getSkillManager: vi.fn().mockReturnValue({ getSkills: () => [] }),
+        modelConfigService: {
+          registerRuntimeModelConfig: vi.fn(),
+        },
+        sandboxManager: undefined,
+      } as unknown as Parameters<typeof startMemoryService>[0];
+
+      await startMemoryService(mockConfig);
+
+      // No patch was applied — active files do not exist.
+      await expect(
+        fs.access(path.join(memoryDir, 'MEMORY.md')),
+      ).rejects.toThrow();
+
+      // Both patches remain in inbox awaiting review.
+      for (const relativePath of [
+        path.join('.inbox', 'private', 'MEMORY.patch'),
+        path.join('.inbox', 'global', 'reply-style.patch'),
+      ]) {
+        await expect(
+          fs.access(path.join(memoryDir, relativePath)),
+        ).resolves.toBeUndefined();
+      }
+
+      const state = await readExtractionState(
+        path.join(memoryDir, '.extraction-state.json'),
+      );
+      expect(state.runs.at(-1)?.memoryFilesUpdated ?? []).toEqual([]);
+      expect(state.runs.at(-1)?.memoryCandidatesCreated ?? []).toEqual(
+        expect.arrayContaining([
+          path.join('.inbox', 'private', 'MEMORY.patch'),
+          path.join('.inbox', 'global', 'reply-style.patch'),
+        ]),
       );
     });
 
