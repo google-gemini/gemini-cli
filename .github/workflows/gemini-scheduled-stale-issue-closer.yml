@@ -2,7 +2,7 @@ name: '🔒 Gemini Scheduled Stale Issue Closer'
 
 on:
   schedule:
-    - cron: '0 0 * * 0' # Every Sunday at midnight UTC
+    - cron: '30 1 * * *' # 1:30 AM UTC daily
   workflow_dispatch:
     inputs:
       dry_run:
@@ -20,140 +20,180 @@ defaults:
     shell: 'bash'
 
 jobs:
-  close-stale-issues:
+  stale-closer:
     if: "github.repository == 'google-gemini/gemini-cli'"
     runs-on: 'ubuntu-latest'
     permissions:
       issues: 'write'
+      pull-requests: 'write'
     steps:
       - name: 'Generate GitHub App Token'
         id: 'generate_token'
-        uses: 'actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349' # ratchet:actions/create-github-app-token@v2
+        uses: 'actions/create-github-app-token@7b81773bb9062a7943e883f3821594e530e6a0d4' # ratchet:actions/create-github-app-token@v2
         with:
           app-id: '${{ secrets.APP_ID }}'
           private-key: '${{ secrets.PRIVATE_KEY }}'
           permission-issues: 'write'
+          permission-pull-requests: 'write'
 
       - name: 'Process Stale Issues'
-        uses: 'actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b' # ratchet:actions/github-script@v7
+        uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea' # ratchet:actions/github-script@v7
         env:
           DRY_RUN: '${{ inputs.dry_run }}'
         with:
           github-token: '${{ steps.generate_token.outputs.token }}'
           script: |
             const dryRun = process.env.DRY_RUN === 'true';
-            if (dryRun) {
-              core.info('DRY RUN MODE ENABLED: No changes will be applied.');
-            }
-            const batchLabel = 'Stale';
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const staleLabel = 'Stale';
+            const nudgeDays = 30;
+            const graceDays = 7;
 
-            const threeMonthsAgo = new Date();
-            threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+            const now = new Date();
+            const nudgeCutoff = new Date(now.getTime() - (nudgeDays * 24 * 60 * 60 * 1000));
+            const graceCutoff = new Date(now.getTime() - (graceDays * 24 * 60 * 60 * 1000));
 
-            const tenDaysAgo = new Date();
-            tenDaysAgo.setDate(tenDaysAgo.getDate() - 10);
+            const exemptLabels = ['pinned', 'security', '🔒 maintainer only', 'help wanted', '🗓️ Public Roadmap'];
 
-            core.info(`Cutoff date for creation: ${threeMonthsAgo.toISOString()}`);
-            core.info(`Cutoff date for updates: ${tenDaysAgo.toISOString()}`);
+            core.info(`Nudge Cutoff: ${nudgeCutoff.toISOString()}`);
+            core.info(`Grace Cutoff: ${graceCutoff.toISOString()}`);
 
-            const query = `repo:${context.repo.owner}/${context.repo.repo} is:issue is:open created:<${threeMonthsAgo.toISOString()}`;
+            // Search for open issues and PRs that are NOT exempt
+            const query = `repo:${owner}/${repo} is:open -label:"${exemptLabels.join(`" -label:"`)}"`;
             core.info(`Searching with query: ${query}`);
 
-            const itemsToCheck = await github.paginate(github.rest.search.issuesAndPullRequests, {
+            const items = await github.paginate(github.rest.search.issuesAndPullRequests, {
               q: query,
-              sort: 'created',
-              order: 'asc',
               per_page: 100
             });
 
-            core.info(`Found ${itemsToCheck.length} open issues to check.`);
+            core.info(`Found ${items.length} candidates for stale check.`);
 
-            let processedCount = 0;
+            for (const item of items) {
+              const itemType = item.pull_request ? 'PR' : 'Issue';
+              const number = item.number;
+              const labels = item.labels.map(l => l.name);
+              const hasStaleLabel = labels.includes(staleLabel);
 
-            for (const issue of itemsToCheck) {
-              const createdAt = new Date(issue.created_at);
-              const updatedAt = new Date(issue.updated_at);
-              const reactionCount = issue.reactions.total_count;
+              // Fetch comments to determine last human activity
+              const comments = await github.paginate(github.rest.issues.listComments, {
+                owner,
+                repo,
+                issue_number: number,
+                per_page: 100
+              });
 
-              // Basic thresholds
-              if (reactionCount >= 5) {
-                continue;
+              const humanComments = comments.filter(c => c.user.type !== 'Bot');
+              const lastHumanComment = humanComments.length > 0 ? humanComments[humanComments.length - 1] : null;
+
+              let lastActivityDate = new Date(item.created_at);
+              if (lastHumanComment) {
+                lastActivityDate = new Date(lastHumanComment.created_at);
               }
 
-              // Skip if it has a maintainer, help wanted, or Public Roadmap label
-              const rawLabels = issue.labels.map((l) => l.name);
-              const lowercaseLabels = rawLabels.map((l) => l.toLowerCase());
-              if (
-                lowercaseLabels.some((l) => l.includes('maintainer')) ||
-                lowercaseLabels.includes('help wanted') ||
-                rawLabels.includes('🗓️ Public Roadmap')
-              ) {
-                continue;
-              }
-
-              let isStale = updatedAt < tenDaysAgo;
-
-              // If apparently active, check if it's only bot activity
-              if (!isStale) {
-                try {
-                  const comments = await github.rest.issues.listComments({
-                    owner: context.repo.owner,
-                    repo: context.repo.repo,
-                    issue_number: issue.number,
-                    per_page: 100,
-                    sort: 'created',
-                    direction: 'desc'
-                  });
-
-                  const lastHumanComment = comments.data.find(comment => comment.user.type !== 'Bot');
-                  if (lastHumanComment) {
-                    isStale = new Date(lastHumanComment.created_at) < tenDaysAgo;
-                  } else {
-                    // No human comments. Check if creator is human.
-                    if (issue.user.type !== 'Bot') {
-                       isStale = createdAt < tenDaysAgo;
-                    } else {
-                       isStale = true; // Bot created, only bot comments
-                    }
+              // Also check for activity in PR (reviews/commits)
+              if (item.pull_request) {
+                const reviews = await github.paginate(github.rest.pulls.listReviews, {
+                  owner,
+                  repo,
+                  pull_number: number,
+                  per_page: 100
+                });
+                const humanReviews = reviews.filter(r => r.user.type !== 'Bot');
+                if (humanReviews.length > 0) {
+                  const lastReviewDate = new Date(humanReviews[humanReviews.length - 1].submitted_at);
+                  if (lastReviewDate > lastActivityDate) {
+                    lastActivityDate = lastReviewDate;
                   }
-                } catch (error) {
-                  core.warning(`Failed to fetch comments for issue #${issue.number}: ${error.message}`);
-                  continue;
                 }
               }
 
-              if (isStale) {
-                processedCount++;
-                const message = `Closing stale issue #${issue.number}: "${issue.title}" (${issue.html_url})`;
-                core.info(message);
+              // Actor-awareness: only nudge if last human was a maintainer (waiting on author)
+              // OR if there are NO comments (new issue that went cold)
+              const isWaitingOnAuthor = !lastHumanComment ||
+                                       ['MEMBER', 'OWNER', 'COLLABORATOR'].includes(lastHumanComment.author_association);
 
-                if (!dryRun) {
-                  // Add label
-                  await github.rest.issues.addLabels({
-                    owner: context.repo.owner,
-                    repo: context.repo.repo,
-                    issue_number: issue.number,
-                    labels: [batchLabel]
-                  });
+              if (hasStaleLabel) {
+                // Determine WHEN it was marked stale to measure the grace period correctly
+                const timeline = await github.paginate(github.rest.issues.listEventsForTimeline, {
+                  owner,
+                  repo,
+                  issue_number: number,
+                  per_page: 100
+                });
 
-                  // Add comment
-                  await github.rest.issues.createComment({
-                    owner: context.repo.owner,
-                    repo: context.repo.repo,
-                    issue_number: issue.number,
-                    body: 'Hello! As part of our effort to keep our backlog manageable and focus on the most active issues, we are tidying up older reports.\n\nIt looks like this issue hasn\'t been active for a while, so we are closing it for now. However, if you are still experiencing this bug on the latest stable build, please feel free to comment on this issue or create a new one with updated details.\n\nThank you for your contribution!'
-                  });
+                const staleEvent = timeline.reverse().find(e => e.event === 'labeled' && e.label?.name === staleLabel);
+                const staleEventDate = staleEvent ? new Date(staleEvent.created_at) : null;
 
-                  // Close issue
-                  await github.rest.issues.update({
-                    owner: context.repo.owner,
-                    repo: context.repo.repo,
-                    issue_number: issue.number,
-                    state: 'closed',
-                    state_reason: 'not_planned'
-                  });
+                if (!staleEventDate) {
+                  core.warning(`Could not find stale event for ${itemType} #${number} even though it has the label.`);
+                  continue;
+                }
+
+                // If there has been ANY human activity since the stale label was added, REMOVE IT
+                if (lastActivityDate > staleEventDate) {
+                  core.info(`${itemType} #${number} has activity since being marked stale. Removing label.`);
+                  if (!dryRun) {
+                    await github.rest.issues.removeLabel({
+                      owner,
+                      repo,
+                      issue_number: number,
+                      name: staleLabel
+                    });
+                  }
+                  continue;
+                }
+
+                // If no activity, check if grace period (7 days from NUDGE) has expired
+                if (staleEventDate < graceCutoff) {
+                  core.info(`${itemType} #${number} is stale and grace period expired. Closing.`);
+                  if (!dryRun) {
+                    const closeMessage = item.pull_request
+                      ? "This pull request has been closed due to 7 additional days of inactivity after being marked as stale. If this is still relevant, you are welcome to reopen or leave a comment. Thanks for contributing!"
+                      : "This issue has been closed due to 7 additional days of inactivity after being marked as stale. If you believe this is still relevant, feel free to comment or reopen the issue. Thank you!";
+
+                    await github.rest.issues.createComment({
+                      owner,
+                      repo,
+                      issue_number: number,
+                      body: closeMessage
+                    });
+
+                    await github.rest.issues.update({
+                      owner,
+                      repo,
+                      issue_number: number,
+                      state: 'closed',
+                      state_reason: item.pull_request ? undefined : 'not_planned'
+                    });
+                  }
+                } else {
+                  core.info(`${itemType} #${number} is stale but still in grace period.`);
+                }
+              } else {
+                // Potential to mark as stale (Nudge)
+                if (lastActivityDate < nudgeCutoff && isWaitingOnAuthor) {
+                  core.info(`${itemType} #${number} is inactive for > ${nudgeDays} days and waiting on author. Marking as stale.`);
+                  if (!dryRun) {
+                    const staleMessage = item.pull_request
+                      ? "This pull request has been automatically marked as stale due to 30 days of inactivity. It will be closed in 7 days if no further activity occurs."
+                      : "This issue has been automatically marked as stale due to 30 days of inactivity. It will be closed in 7 days if no further activity occurs.";
+
+                    await github.rest.issues.addLabels({
+                      owner,
+                      repo,
+                      issue_number: number,
+                      labels: [staleLabel]
+                    });
+
+                    await github.rest.issues.createComment({
+                      owner,
+                      repo,
+                      issue_number: number,
+                      body: staleMessage
+                    });
+                  }
                 }
               }
             }
-
-            core.info(`\nTotal issues processed: ${processedCount}`);
