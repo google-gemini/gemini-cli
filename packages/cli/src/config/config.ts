@@ -1019,7 +1019,7 @@ export async function loadCliConfig(
     disableYoloMode:
       settings.security?.disableYoloMode || settings.admin?.secureModeEnabled,
     disableAlwaysAllow:
-      settings.security?.disableAlwaysAllow ||
+      settings.security?.enableAlwaysAllow === false ||
       settings.admin?.secureModeEnabled,
     showMemoryUsage: settings.ui?.showMemoryUsage || false,
     accessibility: {
@@ -1071,7 +1071,8 @@ export async function loadCliConfig(
     noBrowser: !!process.env['NO_BROWSER'],
     summarizeToolOutput: settings.model?.summarizeToolOutput,
     ideMode,
-    disableLoopDetection: settings.model?.disableLoopDetection,
+    disableLoopDetection:
+      settings.model?.enableLoopDetection === false ? true : undefined,
     compressionThreshold: settings.model?.compressionThreshold,
     folderTrust,
     interactive,
@@ -1087,7 +1088,10 @@ export async function loadCliConfig(
     shellToolInactivityTimeout: settings.tools?.shell?.inactivityTimeout,
     enableShellOutputEfficiency:
       settings.tools?.shell?.enableShellOutputEfficiency ?? true,
-    skipNextSpeakerCheck: settings.model?.skipNextSpeakerCheck,
+    skipNextSpeakerCheck:
+      settings.model?.enableNextSpeakerCheck === undefined
+        ? undefined
+        : !settings.model.enableNextSpeakerCheck,
     truncateToolOutputThreshold: settings.tools?.truncateToolOutputThreshold,
     eventEmitter: coreEvents,
     useWriteTodos: argv.useWriteTodos ?? settings.useWriteTodos,
@@ -1104,7 +1108,10 @@ export async function loadCliConfig(
     vertexAiRouting: settings.billing?.vertexAi,
     maxAttempts: settings.general?.maxAttempts,
     ptyInfo: ptyInfo?.name,
-    disableLLMCorrection: settings.tools?.disableLLMCorrection,
+    disableLLMCorrection:
+      settings.tools?.enableLLMCorrection === undefined
+        ? undefined
+        : !settings.tools.enableLLMCorrection,
     rawOutput: argv.rawOutput,
     acceptRawOutputRisk: argv.acceptRawOutputRisk,
     dynamicModelConfiguration: settings.experimental?.dynamicModelConfiguration,

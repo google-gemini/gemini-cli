@@ -169,8 +169,8 @@ describe('Settings Repro', () => {
         showCitations: true,
         useInkScrolling: true,
         footer: {
-          hideContextPercentage: false,
-          hideModelInfo: false,
+          showContextPercentage: true,
+          showModelInfo: true,
         },
       },
       useWriteTodos: true,

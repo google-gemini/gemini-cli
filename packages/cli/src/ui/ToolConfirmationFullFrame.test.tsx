@@ -152,7 +152,7 @@ describe('Full Terminal Tool Confirmation Snapshot', () => {
               showUserIdentity: false,
               showShortcutsHint: false,
               footer: {
-                hideContextPercentage: false,
+                showContextPercentage: true,
                 hideTokens: false,
                 hideModel: false,
               },
