@@ -124,11 +124,12 @@ describe('loadSettings', () => {
     expect(result.experimental?.enableAgents).toBe(true);
   });
 
-  it('should overwrite top-level settings from workspace (shallow merge)', () => {
+  it('should deep-merge workspace settings over user settings', () => {
     const userSettings = {
       showMemoryUsage: false,
       fileFiltering: {
         respectGitIgnore: true,
+        respectGeminiIgnore: true,
         enableRecursiveFileSearch: true,
       },
     };
@@ -150,8 +151,36 @@ describe('loadSettings', () => {
     // Primitive value overwritten
     expect(result.showMemoryUsage).toBe(true);
 
-    // Object value completely replaced (shallow merge behavior)
+    // Nested object values are merged; only explicitly provided keys override.
     expect(result.fileFiltering?.respectGitIgnore).toBe(false);
-    expect(result.fileFiltering?.enableRecursiveFileSearch).toBeUndefined();
+    expect(result.fileFiltering?.respectGeminiIgnore).toBe(true);
+    expect(result.fileFiltering?.enableRecursiveFileSearch).toBe(true);
+  });
+
+  it('should preserve user nested keys when workspace partially overrides', () => {
+    const userSettings = {
+      tools: {
+        allowed: ['user-allowed'],
+        exclude: ['user-excluded'],
+        core: ['user-core'],
+      },
+    };
+    fs.writeFileSync(USER_SETTINGS_PATH, JSON.stringify(userSettings));
+
+    const workspaceSettings = {
+      tools: {
+        exclude: ['workspace-excluded'],
+      },
+    };
+    const workspaceSettingsPath = path.join(
+      mockGeminiWorkspaceDir,
+      'settings.json',
+    );
+    fs.writeFileSync(workspaceSettingsPath, JSON.stringify(workspaceSettings));
+
+    const result = loadSettings(mockWorkspaceDir);
+    expect(result.tools?.exclude).toEqual(['workspace-excluded']);
+    expect(result.tools?.allowed).toEqual(['user-allowed']);
+    expect(result.tools?.core).toEqual(['user-core']);
   });
 });
