@@ -374,6 +374,12 @@ describe('memory commands', () => {
 
     beforeEach(async () => {
       tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'memory-patch-test-'));
+      // Canonicalize so test-side paths match production's
+      // canonicalizeDirIfPresent → fs.realpath. On Windows runners
+      // os.tmpdir() returns the 8.3 short form (C:\Users\RUNNER~1\...) but
+      // fs.realpath expands it to the long form (C:\Users\runneradmin\...),
+      // which would otherwise break the auto-pointer absolute-path asserts.
+      tmpDir = await fs.realpath(tmpDir);
       memoryTempDir = path.join(tmpDir, 'memory-temp');
       projectRoot = path.join(tmpDir, 'project');
       globalMemoryDir = path.join(tmpDir, 'global');
