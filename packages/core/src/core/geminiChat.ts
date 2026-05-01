@@ -51,6 +51,7 @@ import { isFunctionResponse } from '../utils/messageInspectors.js';
 import { partListUnionToString } from './geminiRequest.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
 import { estimateTokenCountSync } from '../utils/tokenCalculation.js';
+import { debugLogger } from '../utils/debugLogger.js';
 import {
   applyModelSelection,
   createAvailabilityContextProvider,
@@ -921,6 +922,10 @@ export class GeminiChat {
             ...content.parts.filter((part) => !part.thought),
           );
         }
+      } else {
+        debugLogger.warn(
+          '[GeminiChat.processStreamResponse] Skipping invalid streaming response chunk.',
+        );
       }
 
       // Record token usage if this chunk has usageMetadata
