@@ -413,7 +413,7 @@ To debug the CLI's React-based UI, you can use React DevTools.
     ```
 
     Your running CLI application should then connect to React DevTools.
-    ![](/docs/assets/connected_devtools.png)
+    ![Connected React DevTools](docs/assets/connected_devtools.png)
 
 ### Sandboxing
 
