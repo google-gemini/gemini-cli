@@ -1300,7 +1300,8 @@ export async function inferInstallMetadata(
     source.startsWith('git@') ||
     source.startsWith('sso://') ||
     source.startsWith('github:') ||
-    source.startsWith('gitlab:')
+    source.startsWith('gitlab:') ||
+    source.startsWith('ssh://')
   ) {
     return {
       source,
