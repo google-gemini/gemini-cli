@@ -8,6 +8,10 @@ import { type Config, ACTIVATE_SKILL_TOOL_NAME } from '@google/gemini-cli-core';
 import { CommandKind, type SlashCommand } from '../ui/commands/types.js';
 import { type ICommandLoader } from './types.js';
 
+function getDefaultPostSubmitPrompt(skillName: string): string {
+  return `The ${skillName} skill is now activated. If there is an active task in the conversation, continue it using this skill's instructions. If no task was provided, ask what task to apply it to.`;
+}
+
 /**
  * Loads Agent Skills as slash commands.
  */
@@ -42,15 +46,18 @@ export class SkillCommandLoader implements ICommandLoader {
         kind: CommandKind.SKILL,
         autoExecute: true,
         extensionName: skill.extensionName,
-        action: async (_context, args) => ({
-          type: 'tool',
-          toolName: ACTIVATE_SKILL_TOOL_NAME,
-          toolArgs: { name: skill.name },
-          postSubmitPrompt:
-            args.trim().length > 0
-              ? args.trim()
-              : `Use the skill ${skill.name}`,
-        }),
+        action: async (_context, args) => {
+          const trimmedArgs = args.trim();
+          return {
+            type: 'tool',
+            toolName: ACTIVATE_SKILL_TOOL_NAME,
+            toolArgs: { name: skill.name },
+            postSubmitPrompt:
+              trimmedArgs.length > 0
+                ? trimmedArgs
+                : getDefaultPostSubmitPrompt(skill.name),
+          };
+        },
       };
     });
   }
