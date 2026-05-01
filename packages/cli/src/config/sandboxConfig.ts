@@ -98,11 +98,13 @@ function getSandboxCommand(
     return sandbox;
   }
 
-  // look for seatbelt, docker, or podman, in that order
+  // look for seatbelt, windows-native, docker, or podman, in that order
   // for container-based sandboxing, require sandbox to be enabled explicitly
   // note: runsc is NOT auto-detected, it must be explicitly specified
   if (os.platform() === 'darwin' && commandExists.sync('sandbox-exec')) {
     return 'sandbox-exec';
+  } else if (os.platform() === 'win32') {
+    return 'windows-native';
   } else if (commandExists.sync('docker') && sandbox === true) {
     return 'docker';
   } else if (commandExists.sync('podman') && sandbox === true) {

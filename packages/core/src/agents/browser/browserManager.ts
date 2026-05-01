@@ -587,13 +587,14 @@ export class BrowserManager {
     const isContainerSandbox =
       !!sandboxType &&
       sandboxType !== 'sandbox-exec' &&
+      sandboxType !== 'windows-native' &&
       sandboxType !== 'sandbox:none';
     const isSeatbeltSandbox =
       sandboxType === 'sandbox-exec' && sessionMode !== 'existing';
 
     // Seatbelt sandbox: force isolated + headless for filesystem compatibility.
     // Chrome exists on the host, but persistent profiles may conflict with
-    // seatbelt restrictions. Isolated mode uses tmpdir (always writable).
+    // sandbox restrictions. Isolated mode uses tmpdir (always writable).
     if (isSeatbeltSandbox) {
       if (sessionMode !== 'isolated') {
         sessionMode = 'isolated';

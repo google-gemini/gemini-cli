@@ -1343,6 +1343,26 @@ describe('BrowserManager', () => {
       expect(args).not.toContain('--headless');
     });
 
+    it('should preserve --autoConnect when in windows-native sandbox with existing mode', async () => {
+      vi.stubEnv('SANDBOX', 'windows-native');
+      const existingConfig = makeFakeConfig({
+        agents: {
+          overrides: { browser_agent: { enabled: true } },
+          browser: { sessionMode: 'existing' },
+        },
+      });
+
+      const manager = new BrowserManager(existingConfig);
+      await manager.ensureConnection();
+
+      const args = vi.mocked(StdioClientTransport).mock.calls[0]?.[0]
+        ?.args as string[];
+      expect(args).toContain('--autoConnect');
+      expect(args).not.toContain('--isolated');
+      // Headless should NOT be forced for existing mode in windows-native
+      expect(args).not.toContain('--headless');
+    });
+
     it('should use --browser-url with resolved IP for container sandbox with existing mode', async () => {
       vi.stubEnv('SANDBOX', 'docker-container-0');
       // Mock DNS resolution of host.docker.internal

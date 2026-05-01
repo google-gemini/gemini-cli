@@ -154,6 +154,19 @@ describe('loadSandboxConfig', () => {
       });
     });
 
+    it('should use windows-native on win32', async () => {
+      mockedOsPlatform.mockReturnValue('win32');
+      mockedCommandExistsSync.mockImplementation(() => false);
+      const config = await loadSandboxConfig({}, { sandbox: true });
+      expect(config).toEqual({
+        enabled: true,
+        allowedPaths: [],
+        networkAccess: true,
+        command: 'windows-native',
+        image: 'default/image',
+      });
+    });
+
     it('should prefer sandbox-exec over docker on darwin', async () => {
       mockedOsPlatform.mockReturnValue('darwin');
       mockedCommandExistsSync.mockReturnValue(true); // all commands exist

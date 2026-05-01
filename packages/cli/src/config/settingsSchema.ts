@@ -1317,7 +1317,7 @@ const SETTINGS_SCHEMA = {
             label: 'Disable User Input',
             category: 'Advanced',
             requiresRestart: false,
-            default: true,
+            default: false,
             description:
               'Disable user input on browser window during automation.',
             showInDialog: false,
