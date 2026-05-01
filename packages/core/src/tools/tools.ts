@@ -1005,10 +1005,21 @@ export interface ToolExitPlanModeConfirmationPayload {
   feedback?: string;
 }
 
+export interface ToolCancelWithFeedbackPayload {
+  /**
+   * User-authored reason for cancelling the tool call. When present on a
+   * response whose outcome is Cancel, the scheduler appends this string to
+   * the cancellation message delivered back to the model, so the model can
+   * see why the call was denied without waiting for the next user turn.
+   */
+  feedback: string;
+}
+
 export type ToolConfirmationPayload =
   | ToolEditConfirmationPayload
   | ToolAskUserConfirmationPayload
-  | ToolExitPlanModeConfirmationPayload;
+  | ToolExitPlanModeConfirmationPayload
+  | ToolCancelWithFeedbackPayload;
 
 export interface ToolSandboxExpansionConfirmationDetails {
   type: 'sandbox_expansion';

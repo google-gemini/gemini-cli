@@ -647,6 +647,7 @@ export class Scheduler {
     // User Confirmation Loop
     let outcome = ToolConfirmationOutcome.ProceedOnce;
     let lastDetails: SerializableConfirmationDetails | undefined;
+    let cancelFeedback: string | undefined;
 
     if (decision === PolicyDecision.ASK_USER) {
       const result = await resolveConfirmation(toolCall, signal, {
@@ -662,6 +663,15 @@ export class Scheduler {
       });
       outcome = result.outcome;
       lastDetails = result.lastDetails;
+      if (
+        outcome === ToolConfirmationOutcome.Cancel &&
+        result.payload &&
+        'feedback' in result.payload &&
+        typeof result.payload.feedback === 'string' &&
+        result.payload.feedback.length > 0
+      ) {
+        cancelFeedback = result.payload.feedback;
+      }
     }
 
     this.state.setOutcome(callId, outcome);
@@ -680,11 +690,10 @@ export class Scheduler {
 
     // Handle cancellation (cascades to entire batch)
     if (outcome === ToolConfirmationOutcome.Cancel) {
-      this.state.updateStatus(
-        callId,
-        CoreToolCallStatus.Cancelled,
-        'User denied execution.',
-      );
+      const reason = cancelFeedback
+        ? `User denied execution. Feedback: ${cancelFeedback}`
+        : 'User denied execution.';
+      this.state.updateStatus(callId, CoreToolCallStatus.Cancelled, reason);
       this.state.cancelAllQueued('User cancelled operation');
       return; // Skip execution
     }
