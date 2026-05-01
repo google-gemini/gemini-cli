@@ -8,7 +8,7 @@ import type { UpdateObject } from '../ui/utils/updateCheck.js';
 import type { LoadedSettings } from '../config/settings.js';
 import { getInstallationInfo, PackageManager } from './installationInfo.js';
 import { updateEventEmitter } from './updateEventEmitter.js';
-import { MessageType, type HistoryItem } from '../ui/types.js';
+import { MessageType, type HistoryItemWithoutId } from '../ui/types.js';
 import { spawnWrapper } from './spawnWrapper.js';
 import type { spawn } from 'node:child_process';
 import {
@@ -120,7 +120,6 @@ export function handleAutoUpdate(
   }
   updateEventEmitter.emit('update-received', {
     ...info,
-    message: combinedMessage,
     isUpdating: true,
   });
   if (_updateInProgress) {
@@ -187,7 +186,7 @@ export function handleAutoUpdate(
 }
 
 export function setUpdateHandler(
-  addItem: (item: Omit<HistoryItem, 'id'>, timestamp: number) => void,
+  addItem: (item: HistoryItemWithoutId, timestamp: number) => void,
   setUpdateInfo: (info: UpdateObject | null) => void,
 ) {
   let successfullyInstalled = false;
