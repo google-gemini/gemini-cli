@@ -7,6 +7,7 @@
 import type { CSSProperties } from 'react';
 
 import type { SemanticColors } from './semantic-tokens.js';
+import { isLowColorDepth, isITerm2 } from '../utils/terminalUtils.js';
 
 import type { CustomTheme } from '@google/gemini-cli-core';
 import {
@@ -183,49 +184,121 @@ export interface ColorsTheme {
   GradientColors?: string[];
 }
 
-export const lightTheme: ColorsTheme = {
+export const safeLightTheme: ColorsTheme = {
   type: 'light',
+
+  Foreground: '#1C1C1C',
   Background: '#FFFFFF',
-  Foreground: '#000000',
-  LightBlue: '#005FAF',
-  AccentBlue: '#005FAF',
-  AccentPurple: '#5F00FF',
-  AccentCyan: '#005F87',
-  AccentGreen: '#005F00',
+  Comment: '#808080',
+  Gray: '#5F5F5F',
+  DarkGray: '#4E4E4E',
+
+  LightBlue: '#D7E7FF', // ANSI 189
+
+  AccentRed: '#D70000',
   AccentYellow: '#875F00',
-  AccentRed: '#AF0000',
+  AccentGreen: '#008700',
+  AccentCyan: '#00AFD7',
+  AccentBlue: '#0087FF',
+  AccentPurple: '#5F00FF',
+
   DiffAdded: '#D7FFD7',
   DiffRemoved: '#FFD7D7',
-  Comment: '#008700',
-  Gray: '#5F5F5F',
-  DarkGray: '#5F5F5F',
   InputBackground: '#E4E4E4',
-  MessageBackground: '#FAFAFA',
+  MessageBackground: '#fff3f3',
   FocusBackground: '#D7FFD7',
+
+  GradientColors: ['#5FAFD7', '#5F87D7', '#8787D7', '#AF5FAF', '#D75F87'],
+};
+
+export const richLightTheme: ColorsTheme = {
+  type: 'light',
+
+  Foreground: '#202124', // grey-900
+  Gray: '#3C4043', // grey-800
+  Comment: '#5F6368', // grey-700
+  DarkGray: '#80868B', // grey-600
+  Background: '#F8F9FA', // grey-50
+
+  LightBlue: '#1A73E8', // blue-600
+
+  AccentRed: '#D93025', // red-600
+  AccentYellow: '#B06000', // orange-900
+  AccentGreen: '#188038', // green-700
+  AccentCyan: '#007B83', // cyan-900
+  AccentBlue: '#1967D2', // blue-700
+  AccentPurple: '#9334E6', // purple-600
+
+  DiffRemoved: '#FCE8E6', // red-50
+  DiffAdded: '#E6F4EA', // green-50
+  InputBackground: '#E8EAED', // grey-200
+  MessageBackground: '#E8EAED', // grey-200
+  FocusBackground: '#CEEAD6', // green-100
+
   GradientColors: ['#4796E4', '#847ACE', '#C3677F'],
 };
 
-export const darkTheme: ColorsTheme = {
+export const richDarkTheme: ColorsTheme = {
   type: 'dark',
-  Background: '#000000',
-  Foreground: '#FFFFFF',
-  LightBlue: '#AFD7D7',
-  AccentBlue: '#87AFFF',
-  AccentPurple: '#D7AFFF',
-  AccentCyan: '#87D7D7',
-  AccentGreen: '#D7FFD7',
-  AccentYellow: '#FFFFAF',
-  AccentRed: '#FF87AF',
-  DiffAdded: '#005F00',
-  DiffRemoved: '#5F0000',
-  Comment: '#AFAFAF',
-  Gray: '#AFAFAF',
-  DarkGray: '#878787',
-  InputBackground: '#5F5F5F',
-  MessageBackground: '#5F5F5F',
-  FocusBackground: '#005F00',
+
+  Foreground: '#F8F9FA', // grey-50
+  Gray: '#DADCE0', // grey-300
+  Comment: '#BDC1C6', // grey-400
+  DarkGray: '#9AA0A6', // grey-500
+  Background: '#212121', // grey-900
+
+  LightBlue: '#E8F0FE', // blue-50
+
+  AccentRed: '#F6AEA9', // red-200
+  AccentYellow: '#FDE293', // yellow-200
+  AccentGreen: '#A8DAB5', // green-200
+  AccentCyan: '#87D7D7', // green-200
+  AccentBlue: '#AECBFA', // blue-200
+  AccentPurple: '#D7AEFB', // purple-200
+
+  DiffAdded: interpolateColor('#0D652D', '#000000', 0.5), // green-900 @ 50%
+  DiffRemoved: interpolateColor('#A50E0E', '#000000', 0.5), // red-900 @ 50%
+  InputBackground: interpolateColor('#212121', '#000000', 0.5), // grey-900 at 50%
+  MessageBackground: interpolateColor('#212121', '#000000', 0.5), // grey-900 at 50%
+  FocusBackground: interpolateColor('#0D652D', '#000000', 0.5), // green-900 at 50%
+
   GradientColors: ['#4796E4', '#847ACE', '#C3677F'],
 };
+
+export const safeDarkTheme: ColorsTheme = {
+  type: 'dark',
+
+  Foreground: '#eeeeee', // ANSI 231
+  Gray: '#BCC1C6', // ANSI 256
+  Comment: '#9AA0A6', // ANSI 247
+  DarkGray: '#80868B', // ANSI 245
+  Background: '#212121', // ANSI 235
+
+  LightBlue: '#AFD7D7',
+
+  AccentRed: '#FF87AF', // ANSI 211
+  AccentYellow: '#FFFFAF', // ANSI 229
+  AccentGreen: '#D7FFD7', // ANSI 194
+  AccentCyan: '#87D7D7', // ANSI 116
+  AccentBlue: '#87AFFF', // ANSI 111
+  AccentPurple: '#D7AFFF', // ANSI 183
+
+  DiffAdded: '#005F00', // ANSI 22
+  DiffRemoved: '#5F0000', // ANSI 52
+  InputBackground: '#5F5F5F', // ANSI 59
+  MessageBackground: '#5F5F5F', // ANSI 59
+  FocusBackground: '#005F00', // ANSI 22
+
+  GradientColors: ['#5FAFD7', '#5F87D7', '#8787D7', '#AF5FAF', '#D75F87'],
+};
+
+export const isActuallyTrueColor = !isLowColorDepth() || isITerm2();
+export const darkTheme: ColorsTheme = isActuallyTrueColor
+  ? richDarkTheme
+  : safeDarkTheme;
+export const lightTheme: ColorsTheme = isActuallyTrueColor
+  ? richLightTheme
+  : safeLightTheme;
 
 export const ansiTheme: ColorsTheme = {
   type: 'ansi',
