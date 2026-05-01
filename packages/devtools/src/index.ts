@@ -5,6 +5,8 @@
  */
 
 import http from 'node:http';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import { WebSocketServer, type WebSocket } from 'ws';
@@ -391,4 +393,19 @@ export class DevTools extends EventEmitter {
         break;
     }
   }
+}
+
+// Start the server if this module is being run directly.
+// This is used for the bundled version of the CLI.
+const isMain =
+  process.argv[1] &&
+  path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (isMain) {
+  DevTools.getInstance()
+    .start()
+    .catch((err) => {
+      // eslint-disable-next-line no-console
+      console.error('Failed to start DevTools server:', err);
+      process.exit(1);
+    });
 }
