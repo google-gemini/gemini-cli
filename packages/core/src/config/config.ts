@@ -1806,6 +1806,14 @@ export class Config implements McpContext, AgentLoopContext {
     this._sessionId = sessionId;
     this.storage.setSessionId(sessionId);
     this.trackerService = undefined;
+    this.approvedPlanPath = undefined;
+    this.topicState.reset();
+    this.skillManager.reset();
+    this.latestApiRequest = undefined;
+    this.lastModeSwitchTime = performance.now();
+    this.compressionTruncationCounter = 0;
+    this.quotaErrorOccurred = false;
+    this.creditsNotificationShown = false;
 
     if (previousPlansDir) {
       this.refreshSessionScopedPlansDirectory(previousPlansDir);
@@ -1814,7 +1822,6 @@ export class Config implements McpContext, AgentLoopContext {
 
   resetNewSessionState(sessionId: string): void {
     this.setSessionId(sessionId);
-    this.approvedPlanPath = undefined;
   }
 
   setTerminalBackground(terminalBackground: string | undefined): void {
