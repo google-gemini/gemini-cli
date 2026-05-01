@@ -364,10 +364,11 @@ export function renderGitRepo(options?: GitRepoOptions): string {
   - "Commit the change" -> add changed files and commit.
   - "Wrap up this PR for me" -> do not commit.
 - When asked to commit changes or prepare a commit, always start by gathering information using shell commands:
-  - \`git status\` to ensure that all relevant files are tracked and staged, using \`git add ...\` as needed.
+  - \`git status\` to ensure that all relevant files are tracked and staged, using \`git add <file>...\` for specific files as needed.
   - \`git diff HEAD\` to review all changes (including unstaged changes) to tracked files in work tree since last commit.
     - \`git diff --staged\` to review only staged changes when a partial commit makes sense or was requested by the user.
   - \`git log -n 3\` to review recent commit messages and match their style (verbosity, formatting, signature line, etc.)
+- Do not use \`git add .\` or \`git add -A\` unprompted as this can stage unwanted or untracked files. Instead, stage only the specific files that were changed or created as part of the task.
 - Combine shell commands whenever possible to save time/steps, e.g. \`git status && git diff HEAD && git log -n 3\`.
 - Always propose a draft commit message. Never just ask the user to give you the full commit message.
 - Prefer commit messages that are clear, concise, and focused more on "why" and less on "what".${gitRepoKeepUserInformed(options.interactive)}
@@ -477,7 +478,7 @@ ${options.planModeToolsList}
 - Save the implementation plan to the designated plans directory
 
 ### Phase 4: Review & Approval
-- Present the plan and request approval for the finalized plan using the \`${EXIT_PLAN_MODE_TOOL_NAME}\` tool
+- Present the plan and request approval for the finalized plan using the built-in \`${EXIT_PLAN_MODE_TOOL_NAME}\` tool. **CRITICAL: NEVER attempt to call this tool via \`${SHELL_TOOL_NAME}\`.**
 - If plan is approved, you can begin implementation
 - If plan is rejected, address the feedback and iterate on the plan
 

@@ -5164,9 +5164,10 @@ describe('InputPrompt', () => {
       );
 
       // Initially not recording
-      expect(lastFrame()).not.toContain('🎙️ Listening...');
+      expect(lastFrame()).not.toContain('Listening...');
+      expect(lastFrame()).toContain('🎤 >');
       expect(lastFrame()).toContain(
-        'Voice mode: Space to start/stop recording',
+        'Type your message or space to talk (Esc to exit)',
       );
 
       // Press space to start
@@ -5176,7 +5177,7 @@ describe('InputPrompt', () => {
 
       // Now should show listening
       await waitFor(() => {
-        expect(lastFrame()).toContain('🎙️ Listening...');
+        expect(lastFrame()).toContain('Listening...');
       });
 
       unmount();
@@ -5201,7 +5202,7 @@ describe('InputPrompt', () => {
         stdin.write(' ');
       });
       await waitFor(() => {
-        expect(lastFrame()).toContain('🎙️ Listening...');
+        expect(lastFrame()).toContain('Listening...');
       });
 
       // Stop recording
@@ -5209,10 +5210,8 @@ describe('InputPrompt', () => {
         stdin.write(' ');
       });
       await waitFor(() => {
-        expect(lastFrame()).not.toContain('🎙️ Listening...');
-        expect(lastFrame()).toContain(
-          'Voice mode: Space to start/stop recording',
-        );
+        expect(lastFrame()).not.toContain('Listening...');
+        expect(lastFrame()).toContain('🎤 >');
       });
 
       unmount();
@@ -5232,10 +5231,8 @@ describe('InputPrompt', () => {
         },
       );
 
-      // Should show voice mode hint even if buffer is not empty (new behavior)
-      expect(lastFrame()).toContain(
-        'Voice mode: Space to start/stop recording',
-      );
+      // Should show voice mode prefix even if buffer is not empty
+      expect(lastFrame()).toContain('🎤 >');
       expect(lastFrame()).toContain('some existing text');
 
       // Press space to start recording again
@@ -5244,7 +5241,7 @@ describe('InputPrompt', () => {
       });
 
       await waitFor(() => {
-        expect(lastFrame()).toContain('🎙️ Listening...');
+        expect(lastFrame()).toContain('Listening...');
       });
 
       unmount();
@@ -5270,7 +5267,7 @@ describe('InputPrompt', () => {
       });
 
       // Should NOT show listening, instead should call handleInput which handles space
-      expect(lastFrame()).not.toContain('🎙️ Listening...');
+      expect(lastFrame()).not.toContain('Listening...');
       expect(mockBuffer.handleInput).toHaveBeenCalled();
       unmount();
     });
@@ -5387,7 +5384,10 @@ describe('InputPrompt', () => {
           },
         );
 
-        expect(lastFrame()).toContain('Voice mode: Hold Space to record');
+        expect(lastFrame()).toContain('🎤 >');
+        expect(lastFrame()).toContain(
+          'Type your message or hold space to talk (Esc to exit)',
+        );
 
         // Press space once
         await act(async () => {
@@ -5396,14 +5396,14 @@ describe('InputPrompt', () => {
 
         // Should insert space optimistically
         expect(mockBuffer.insert).toHaveBeenCalledWith(' ');
-        expect(lastFrame()).not.toContain('🎙️ Listening...');
+        expect(lastFrame()).not.toContain('Listening...');
 
         // Advance timer past HOLD_DELAY_MS
         await act(async () => {
           vi.advanceTimersByTime(700);
         });
 
-        expect(lastFrame()).not.toContain('🎙️ Listening...');
+        expect(lastFrame()).not.toContain('Listening...');
         unmount();
       });
 
@@ -5433,7 +5433,7 @@ describe('InputPrompt', () => {
           // Should have backspaced the optimistic space
           expect(mockBuffer.backspace).toHaveBeenCalled();
           // Should show listening
-          expect(lastFrame()).toContain('🎙️ Listening...');
+          expect(lastFrame()).toContain('Listening...');
         });
 
         unmount();
@@ -5459,7 +5459,7 @@ describe('InputPrompt', () => {
         // Use a short interval in waitFor to prevent advancing fake timers past the 300ms RELEASE_DELAY_MS
         await waitFor(
           () => {
-            expect(lastFrame()).toContain('🎙️ Listening...');
+            expect(lastFrame()).toContain('Listening...');
           },
           { interval: 10 },
         );
@@ -5469,7 +5469,8 @@ describe('InputPrompt', () => {
           stdin.write(' ');
           vi.advanceTimersByTime(100);
         });
-        expect(lastFrame()).toContain('🎙️ Listening...');
+        expect(lastFrame()).toContain('🎤 >');
+        expect(lastFrame()).toContain('Listening...');
 
         // Stop heartbeat (release)
         await act(async () => {
@@ -5477,7 +5478,7 @@ describe('InputPrompt', () => {
         });
 
         await waitFor(() => {
-          expect(lastFrame()).not.toContain('🎙️ Listening...');
+          expect(lastFrame()).not.toContain('Listening...');
         });
 
         unmount();
