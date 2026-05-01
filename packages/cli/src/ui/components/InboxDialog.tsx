@@ -111,16 +111,21 @@ const PATCH_ACTION_CHOICES: PatchAction[] = [
   },
 ];
 
+// Dismiss-first: memory patches modify durable on-disk state outside the
+// project (private MEMORY.md and sibling files, plus ~/.gemini/GEMINI.md),
+// so a stray Enter on a freshly-opened memory-patch preview must NOT apply.
+// The lower-stakes skill-patch list (PATCH_ACTION_CHOICES) keeps Apply as
+// the default.
 const MEMORY_PATCH_ACTION_CHOICES: MemoryPatchAction[] = [
-  {
-    action: 'apply',
-    label: 'Apply',
-    description: 'Apply patch and delete from inbox',
-  },
   {
     action: 'dismiss',
     label: 'Dismiss',
     description: 'Delete from inbox without applying',
+  },
+  {
+    action: 'apply',
+    label: 'Apply',
+    description: 'Apply patch and delete from inbox',
   },
 ];
 
@@ -210,14 +215,14 @@ function formatDate(isoString: string): string {
   }
 }
 
-interface SkillInboxDialogProps {
+interface InboxDialogProps {
   config: Config;
   onClose: () => void;
   onReloadSkills: () => Promise<void>;
   onReloadMemory?: () => Promise<void>;
 }
 
-export const SkillInboxDialog: React.FC<SkillInboxDialogProps> = ({
+export const InboxDialog: React.FC<InboxDialogProps> = ({
   config,
   onClose,
   onReloadSkills,
@@ -316,7 +321,7 @@ export const SkillInboxDialog: React.FC<SkillInboxDialogProps> = ({
     const groups: Array<{ label: string; items: InboxItem[] }> = [
       { label: 'New Skills', items: skills },
       { label: 'Skill Updates', items: patches },
-      { label: 'Memory Patches', items: memoryPatches },
+      { label: 'Memory Updates', items: memoryPatches },
     ].filter((group) => group.items.length > 0);
     const showHeaders = groups.length > 1;
 

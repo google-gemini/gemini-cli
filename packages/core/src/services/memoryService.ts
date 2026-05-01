@@ -46,6 +46,11 @@ import { sanitizeWorkflowSummaryForScratchpad } from './sessionScratchpadUtils.j
 const LOCK_FILENAME = '.extraction.lock';
 const STATE_FILENAME = '.extraction-state.json';
 const LOCK_STALE_MS = 35 * 60 * 1000; // 35 minutes (exceeds agent's 30-min time limit)
+// Throttle: skip background extraction if the most recent run finished less
+// than this long ago. Pairs with the advisory lock — the lock prevents
+// concurrent runs; this throttle prevents back-to-back runs across short
+// CLI sessions on workspaces with a lot of session history.
+const MIN_EXTRACTION_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
 const MIN_USER_MESSAGES = 10;
 const MIN_IDLE_MS = 3 * 60 * 60 * 1000; // 3 hours
 const MAX_SESSION_INDEX_SIZE = 50;
@@ -1020,11 +1025,22 @@ async function buildPendingInboxSummary(memoryDir: string): Promise<string> {
       } catch {
         continue;
       }
+      // Guard against indirect prompt injection: patch contents originate
+      // from past sessions (which may include user-pasted text), so a
+      // crafted payload could include a closing ``` fence to break out of
+      // the surrounding markdown block. Pick a fence longer than the
+      // longest backtick-run actually present in the content so the close
+      // is guaranteed to terminate the block.
+      const longestBacktickRun = (content.match(/`+/g) ?? []).reduce(
+        (max, run) => Math.max(max, run.length),
+        2, // never go below the standard 3-backtick fence
+      );
+      const fence = '`'.repeat(longestBacktickRun + 1);
       filesSection.push('');
       filesSection.push(`### ${fileName}`);
-      filesSection.push('```');
+      filesSection.push(fence);
       filesSection.push(content.trimEnd());
-      filesSection.push('```');
+      filesSection.push(fence);
     }
     sections.push(filesSection.join('\n'));
   }
@@ -1285,6 +1301,24 @@ export async function startMemoryService(config: Config): Promise<void> {
     debugLogger.log(
       `[MemoryService] State loaded: ${previousRuns} previous run(s), ${previouslyProcessed} session(s) already processed`,
     );
+
+    // Throttle: short-circuit if the most recent run finished less than
+    // MIN_EXTRACTION_INTERVAL_MS ago. Avoids re-scanning session history on
+    // every CLI start when the user opens several short sessions in a row.
+    const lastRun = state.runs.at(-1);
+    if (lastRun?.runAt) {
+      const lastRunMs = Date.parse(lastRun.runAt);
+      if (
+        Number.isFinite(lastRunMs) &&
+        Date.now() - lastRunMs < MIN_EXTRACTION_INTERVAL_MS
+      ) {
+        const minutesAgo = Math.round((Date.now() - lastRunMs) / 60000);
+        debugLogger.log(
+          `[MemoryService] Skipped: last run was ${minutesAgo} minute(s) ago (min interval ${MIN_EXTRACTION_INTERVAL_MS / 60000}m)`,
+        );
+        return;
+      }
+    }
 
     // Build session index: all eligible sessions with summaries + file paths.
     // The agent decides which to read in full via read_file.

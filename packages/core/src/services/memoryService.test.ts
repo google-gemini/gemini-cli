@@ -637,6 +637,18 @@ describe('memoryService', () => {
       expect(state.runs.at(-1)?.memoryFilesUpdated).toEqual([]);
     });
 
+    // Known gap surfaced in PR review (#26338). The current snapshot/rollback
+    // is last-write-wins: pre-run vs. post-run snapshots, with no way to
+    // distinguish writes by the extraction agent from concurrent user edits
+    // in another process. If a user edits MEMORY.md while extraction is
+    // running, the rollback restores the pre-run content and clobbers the
+    // user's edit. The proper fix needs to track which writes were made by
+    // the agent (e.g. mtime windowing or a WriteFile hook), which is an
+    // architectural change deferred to a follow-up PR.
+    it.todo(
+      'preserves a concurrent user edit instead of clobbering it during rollback',
+    );
+
     it('rolls back direct writes to <projectRoot>/GEMINI.md and ~/.gemini/GEMINI.md', async () => {
       const { startMemoryService } = await import('./memoryService.js');
       const { LocalAgentExecutor } = await import(

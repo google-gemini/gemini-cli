@@ -791,8 +791,10 @@ describe('memory commands', () => {
         'private',
       );
 
-      // Aggregate is "partial success" — at least one applied.
-      expect(result.success).toBe(true);
+      // Any failure → success=false so the dialog keeps the inbox entry
+      // visible. (The successful sub-patches were already removed from disk;
+      // the next listing will surface only the failures for retry.)
+      expect(result.success).toBe(false);
       expect(result.message).toMatch(/applied 1 of 2/i);
       expect(result.message).toMatch(/b-stale\.patch/);
 

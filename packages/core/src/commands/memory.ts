@@ -846,8 +846,12 @@ async function applyAllInboxPatchesForKind(
   const failureSummary = failures
     .map((f) => `"${f.name}" — ${f.reason}`)
     .join('; ');
+  // Any failure → success=false so the dialog keeps the inbox entry visible
+  // (the user needs to see and retry/dismiss the remaining sub-patches).
+  // The successful sub-patches have already been removed from disk by
+  // applyMemoryPatchFile, so the next listing will show only the failures.
   return {
-    success: successes.length > 0,
+    success: false,
     message:
       `Applied ${successes.length} of ${total} ${kind} memory patches. ` +
       `${failures.length} failed: ${failureSummary}`,

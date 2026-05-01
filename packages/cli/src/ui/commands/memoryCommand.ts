@@ -18,7 +18,7 @@ import {
   type SlashCommand,
   type SlashCommandActionReturn,
 } from './types.js';
-import { SkillInboxDialog } from '../components/SkillInboxDialog.js';
+import { InboxDialog } from '../components/InboxDialog.js';
 
 export const memoryCommand: SlashCommand = {
   name: 'memory',
@@ -156,7 +156,7 @@ export const memoryCommand: SlashCommand = {
 
         return {
           type: 'custom_dialog',
-          component: React.createElement(SkillInboxDialog, {
+          component: React.createElement(InboxDialog, {
             config,
             onClose: () => context.ui.removeComponent(),
             onReloadSkills: async () => {

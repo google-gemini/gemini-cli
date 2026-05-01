@@ -179,7 +179,7 @@ console.log(`
 
      /memory inbox
 
-   You should see exactly 2 entries in the "Memory Patches" group:
+   You should see exactly 2 entries in the "Memory Updates" group:
      - Private memory     2 hunks from 1 source patch
      - Global memory      1 hunk from 1 source patch
 

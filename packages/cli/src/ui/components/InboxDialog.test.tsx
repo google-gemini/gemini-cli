@@ -26,7 +26,7 @@ import {
 } from '@google/gemini-cli-core';
 import { waitFor } from '../../test-utils/async.js';
 import { renderWithProviders } from '../../test-utils/render.js';
-import { SkillInboxDialog } from './SkillInboxDialog.js';
+import { InboxDialog } from './InboxDialog.js';
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const original =
@@ -172,7 +172,7 @@ const windowsGlobalPatch: InboxPatch = {
   ],
 };
 
-describe('SkillInboxDialog', () => {
+describe('InboxDialog', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockListInboxSkills.mockResolvedValue([inboxSkill]);
@@ -229,7 +229,7 @@ describe('SkillInboxDialog', () => {
     const onReloadMemory = vi.fn().mockResolvedValue(undefined);
     const { lastFrame, stdin, unmount, waitUntilReady } = await act(async () =>
       renderWithProviders(
-        <SkillInboxDialog
+        <InboxDialog
           config={config}
           onClose={vi.fn()}
           onReloadSkills={vi.fn()}
@@ -253,6 +253,13 @@ describe('SkillInboxDialog', () => {
       expect(frame).toMatch(/source patch/);
     });
 
+    // Memory patches default to Dismiss as the highlighted action so a stray
+    // Enter cannot apply durable changes. Arrow-down to reach Apply, then
+    // press Enter to confirm.
+    await act(async () => {
+      stdin.write('\u001B[B'); // arrow down → Apply
+      await waitUntilReady();
+    });
     await act(async () => {
       stdin.write('\r');
       await waitUntilReady();
@@ -278,7 +285,7 @@ describe('SkillInboxDialog', () => {
     const onReloadSkills = vi.fn().mockResolvedValue(undefined);
     const { lastFrame, stdin, unmount, waitUntilReady } = await act(async () =>
       renderWithProviders(
-        <SkillInboxDialog
+        <InboxDialog
           config={config}
           onClose={vi.fn()}
           onReloadSkills={onReloadSkills}
@@ -323,7 +330,7 @@ describe('SkillInboxDialog', () => {
     } as unknown as Config;
     const { lastFrame, stdin, unmount, waitUntilReady } = await act(async () =>
       renderWithProviders(
-        <SkillInboxDialog
+        <InboxDialog
           config={config}
           onClose={vi.fn()}
           onReloadSkills={vi.fn().mockResolvedValue(undefined)}
@@ -371,7 +378,7 @@ describe('SkillInboxDialog', () => {
       .mockRejectedValue(new Error('reload hook failed'));
     const { lastFrame, stdin, unmount, waitUntilReady } = await act(async () =>
       renderWithProviders(
-        <SkillInboxDialog
+        <InboxDialog
           config={config}
           onClose={vi.fn()}
           onReloadSkills={onReloadSkills}
@@ -427,7 +434,7 @@ describe('SkillInboxDialog', () => {
     } as unknown as Config;
     const { lastFrame, stdin, unmount, waitUntilReady } = await act(async () =>
       renderWithProviders(
-        <SkillInboxDialog
+        <InboxDialog
           config={config}
           onClose={vi.fn()}
           onReloadSkills={vi.fn().mockResolvedValue(undefined)}
@@ -500,7 +507,7 @@ describe('SkillInboxDialog', () => {
       } as unknown as Config;
       const { lastFrame, unmount } = await act(async () =>
         renderWithProviders(
-          <SkillInboxDialog
+          <InboxDialog
             config={config}
             onClose={vi.fn()}
             onReloadSkills={vi.fn().mockResolvedValue(undefined)}
@@ -532,7 +539,7 @@ describe('SkillInboxDialog', () => {
       const { lastFrame, stdin, unmount, waitUntilReady } = await act(
         async () =>
           renderWithProviders(
-            <SkillInboxDialog
+            <InboxDialog
               config={config}
               onClose={vi.fn()}
               onReloadSkills={vi.fn().mockResolvedValue(undefined)}
@@ -573,7 +580,7 @@ describe('SkillInboxDialog', () => {
       const onReloadSkills = vi.fn().mockResolvedValue(undefined);
       const { stdin, unmount, waitUntilReady } = await act(async () =>
         renderWithProviders(
-          <SkillInboxDialog
+          <InboxDialog
             config={config}
             onClose={vi.fn()}
             onReloadSkills={onReloadSkills}
@@ -621,7 +628,7 @@ describe('SkillInboxDialog', () => {
       const { lastFrame, stdin, unmount, waitUntilReady } = await act(
         async () =>
           renderWithProviders(
-            <SkillInboxDialog
+            <InboxDialog
               config={config}
               onClose={vi.fn()}
               onReloadSkills={vi.fn().mockResolvedValue(undefined)}
@@ -666,7 +673,7 @@ describe('SkillInboxDialog', () => {
       const { lastFrame, stdin, unmount, waitUntilReady } = await act(
         async () =>
           renderWithProviders(
-            <SkillInboxDialog
+            <InboxDialog
               config={config}
               onClose={vi.fn()}
               onReloadSkills={vi.fn().mockResolvedValue(undefined)}
@@ -710,7 +717,7 @@ describe('SkillInboxDialog', () => {
       const onReloadSkills = vi.fn().mockResolvedValue(undefined);
       const { stdin, unmount, waitUntilReady } = await act(async () =>
         renderWithProviders(
-          <SkillInboxDialog
+          <InboxDialog
             config={config}
             onClose={vi.fn()}
             onReloadSkills={onReloadSkills}
@@ -765,7 +772,7 @@ describe('SkillInboxDialog', () => {
       } as unknown as Config;
       const { lastFrame, unmount } = await act(async () =>
         renderWithProviders(
-          <SkillInboxDialog
+          <InboxDialog
             config={config}
             onClose={vi.fn()}
             onReloadSkills={vi.fn().mockResolvedValue(undefined)}
@@ -800,7 +807,7 @@ describe('SkillInboxDialog', () => {
       const { lastFrame, stdin, unmount, waitUntilReady } = await act(
         async () =>
           renderWithProviders(
-            <SkillInboxDialog
+            <InboxDialog
               config={config}
               onClose={vi.fn()}
               onReloadSkills={vi.fn().mockResolvedValue(undefined)}
