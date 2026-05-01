@@ -61,6 +61,9 @@ export const DEFAULT_GEMINI_MODEL = 'gemini-2.5-pro';
 export const DEFAULT_GEMINI_FLASH_MODEL = 'gemini-2.5-flash';
 export const DEFAULT_GEMINI_FLASH_LITE_MODEL = 'gemini-2.5-flash-lite';
 
+export const GEMMA_4_31B_IT_MODEL = 'gemma-4-31b-it';
+export const GEMMA_4_26B_A4B_IT_MODEL = 'gemma-4-26b-a4b-it';
+
 export const VALID_GEMINI_MODELS = new Set([
   PREVIEW_GEMINI_MODEL,
   PREVIEW_GEMINI_3_1_MODEL,
@@ -70,6 +73,9 @@ export const VALID_GEMINI_MODELS = new Set([
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
+
+  GEMMA_4_31B_IT_MODEL,
+  GEMMA_4_26B_A4B_IT_MODEL,
 ]);
 
 export const PREVIEW_GEMINI_MODEL_AUTO = 'auto-gemini-3';
@@ -103,8 +109,15 @@ export function resolveModel(
   hasAccessToPreview: boolean = true,
   config?: ModelCapabilityContext,
 ): string {
+  // Defensive check against non-string inputs at runtime
+  const normalizedModel = Array.isArray(requestedModel)
+    ? String(requestedModel.at(-1) ?? '').trim() || ''
+    : typeof requestedModel !== 'string'
+      ? String(requestedModel ?? '').trim() || ''
+      : requestedModel.trim() || '';
+
   if (config?.getExperimentalDynamicModelConfiguration?.() === true) {
-    const resolved = config.modelConfigService.resolveModelId(requestedModel, {
+    const resolved = config.modelConfigService.resolveModelId(normalizedModel, {
       useGemini3_1,
       useGemini3_1FlashLite,
       useCustomTools: useCustomToolModel,
@@ -126,7 +139,7 @@ export function resolveModel(
   }
 
   let resolved: string;
-  switch (requestedModel) {
+  switch (normalizedModel) {
     case PREVIEW_GEMINI_MODEL:
     case PREVIEW_GEMINI_MODEL_AUTO:
     case GEMINI_MODEL_ALIAS_AUTO:
@@ -155,7 +168,7 @@ export function resolveModel(
       break;
     }
     default: {
-      resolved = requestedModel;
+      resolved = normalizedModel;
       break;
     }
   }
@@ -257,6 +270,10 @@ export function getDisplayString(
       return 'Auto (Gemini 3)';
     case DEFAULT_GEMINI_MODEL_AUTO:
       return 'Auto (Gemini 2.5)';
+    case GEMMA_4_31B_IT_MODEL:
+      return GEMMA_4_31B_IT_MODEL;
+    case GEMMA_4_26B_A4B_IT_MODEL:
+      return GEMMA_4_26B_A4B_IT_MODEL;
     case GEMINI_MODEL_ALIAS_PRO:
       return PREVIEW_GEMINI_MODEL;
     case GEMINI_MODEL_ALIAS_FLASH:
@@ -438,9 +455,13 @@ export function isActiveModel(
   useGemini3_1: boolean = false,
   useGemini3_1FlashLite: boolean = false,
   useCustomToolModel: boolean = false,
+  experimentalGemma: boolean = true,
 ): boolean {
   if (!VALID_GEMINI_MODELS.has(model)) {
     return false;
+  }
+  if (model === GEMMA_4_31B_IT_MODEL || model === GEMMA_4_26B_A4B_IT_MODEL) {
+    return experimentalGemma;
   }
   if (model === PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL) {
     return useGemini3_1FlashLite;

@@ -192,6 +192,9 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
         !Array.isArray(prevGroup) &&
         isCompactTool(prevGroup, isCompactModeEnabled);
 
+      const prevIsTopic =
+        prevGroup && !Array.isArray(prevGroup) && isTopicTool(prevGroup.name);
+
       const nextGroup = !isLast ? groupedTools[i + 1] : null;
       const nextIsCompact =
         nextGroup &&
@@ -226,7 +229,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
 
       const isFirstProp = !!(isFirst
         ? (borderTopOverride ?? true)
-        : prevIsCompact);
+        : prevIsCompact || prevIsTopic);
 
       const showClosingBorder =
         !isCompact &&
@@ -363,6 +366,8 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
           prevGroup &&
           !Array.isArray(prevGroup) &&
           isCompactTool(prevGroup, isCompactModeEnabled);
+        const prevIsTopic =
+          prevGroup && !Array.isArray(prevGroup) && isTopicTool(prevGroup.name);
 
         const nextGroup = !isLast ? groupedTools[index + 1] : null;
         const nextIsCompact =
@@ -379,7 +384,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
 
         const isFirstProp = !!(isFirst
           ? (borderTopOverride ?? true)
-          : prevIsCompact);
+          : prevIsCompact || prevIsTopic);
 
         const showClosingBorder =
           !isCompact &&

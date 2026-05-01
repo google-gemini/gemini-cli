@@ -107,13 +107,19 @@ export class ContextWorkingBufferImpl implements ContextWorkingBuffer {
 
     // Calculate new node array
     const removedSet = new Set(removedIds);
-    const retainedNodes = this.nodes.filter((n) => !removedSet.has(n.id));
-    const newGraph = [...retainedNodes];
 
-    // We append the output nodes in the same general position if possible,
-    // but in a complex graph we just ensure they exist. V2 graph uses timestamps for order.
-    // For simplicity, we just push added nodes to the end of the retained array
-    newGraph.push(...addedNodes);
+    const newGraph = this.nodes.filter((n) => !removedSet.has(n.id));
+    const insertionIndex = this.nodes.findIndex((n) => removedSet.has(n.id));
+
+    // IMPORTANT: We do NOT use structuredClone here.
+    // The ContextTokenCalculator relies on a WeakMap tied to exact object references
+    // for O(1) performance. Deep cloning would cause catastrophic cache misses.
+    // The pipeline enforces immutability, making reference passing safe.
+    if (insertionIndex !== -1) {
+      newGraph.splice(insertionIndex, 0, ...addedNodes);
+    } else {
+      newGraph.push(...addedNodes);
+    }
 
     // Calculate new provenance map
     const newProvenanceMap = new Map(this.provenanceMap);

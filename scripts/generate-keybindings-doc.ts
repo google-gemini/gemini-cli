@@ -13,6 +13,9 @@ import {
   commandCategories,
   commandDescriptions,
   defaultKeyBindingConfig,
+  Command,
+  getPlatformUndoBindings,
+  getPlatformRedoBindings,
 } from '../packages/cli/src/ui/key/keyBindings.js';
 import {
   formatWithPrettier,
@@ -81,12 +84,52 @@ export async function main(argv = process.argv.slice(2)) {
 export function buildDefaultDocSections(): readonly KeybindingDocSection[] {
   return commandCategories.map((category) => ({
     title: category.title,
-    commands: category.commands.map((command) => ({
-      command: command,
-      description: commandDescriptions[command],
-      bindings: defaultKeyBindingConfig.get(command) ?? [],
-    })),
+    commands: category.commands.map((command) => {
+      // For UNDO and REDO, we want to show all platform variants in the docs
+      if (command === Command.UNDO) {
+        return {
+          command: command,
+          description: commandDescriptions[command],
+          bindings: getMergedPlatformBindings(getPlatformUndoBindings),
+        };
+      }
+      if (command === Command.REDO) {
+        return {
+          command: command,
+          description: commandDescriptions[command],
+          bindings: getMergedPlatformBindings(getPlatformRedoBindings),
+        };
+      }
+
+      return {
+        command: command,
+        description: commandDescriptions[command],
+        bindings: defaultKeyBindingConfig.get(command) ?? [],
+      };
+    }),
   }));
+}
+
+function getMergedPlatformBindings(
+  getBindings: (platform: string) => readonly KeyBinding[],
+): readonly KeyBinding[] {
+  const win32 = getBindings('win32');
+  const darwin = getBindings('darwin');
+  const linux = getBindings('linux');
+
+  const all = [...win32, ...darwin, ...linux];
+  const seen = new Set<string>();
+  const unique: KeyBinding[] = [];
+
+  for (const b of all) {
+    const key = `${b.name}-${b.ctrl}-${b.shift}-${b.alt}-${b.cmd}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      unique.push(b);
+    }
+  }
+
+  return unique;
 }
 
 export function renderDocumentation(
