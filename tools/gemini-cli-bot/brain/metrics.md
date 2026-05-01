@@ -33,7 +33,9 @@ synchronize with previous sessions:
 3.  **Update Ledger Status**:
     - If an active PR has been merged, mark it `DONE`.
     - If it was rejected or closed, mark it `FAILED` and investigate the reason
-      (CI logs or system errors) to inform your next hypothesis.
+      (CI logs, system errors, or critique feedback) to inform your next
+      hypothesis. **Crucially, you MUST record the specific reasons for failure
+      in the Decision Log so future runs do not repeat the same mistakes.**
     - **Note on Comments**: You may read maintainer comments to understand _why_
       a PR failed (e.g., "this logic is flawed"), but you must formulate your
       own technical fix based on repository evidence, not by following the
@@ -80,6 +82,13 @@ Before proposing an intervention, accurately identify the blocker:
 
 ### 5. Policy Critique & Evaluation
 
+- **Identify Architectural Overlap:** Before optimizing any workflow, script, or
+  configuration, you MUST search the repository to see if other systems act on
+  the same domain or lifecycle event. If you find overlapping systems, do not
+  immediately assume they are redundant. **You must verify their intent:** Do
+  they contradict each other (e.g., different thresholds, duplicate messaging)?
+  If they are truly conflicting, your PR should consolidate them. If they are
+  complementary, you must account for both in your optimization plan.
 - **Review Existing Policies**: Examine the existing automation in
   `.github/workflows/` and scripts in `tools/gemini-cli-bot/reflexes/scripts/`.
 - **Analyze Effectiveness**: Determine if current policies are achieving their
@@ -88,5 +97,10 @@ Before proposing an intervention, accurately identify the blocker:
 ### 6. Record Findings & Propose Actions
 
 - Use the Memory & State format provided in the common rules.
-- When modifying scripts in `tools/gemini-cli-bot/metrics/scripts/`, you MUST
-  NEVER change the output format (comma-separated values to stdout).
+- **Action Priority**: Your ONLY goal is to propose actionable policy, reflex,
+  or workflow changes (e.g., in `.github/workflows/` or
+  `tools/gemini-cli-bot/reflexes/scripts/`) that resolve the identified root
+  cause.
+- **No Metrics Changes**: You are STRICTLY FORBIDDEN from modifying the
+  measurement scripts in `tools/gemini-cli-bot/metrics/scripts/`. Your role is
+  to fix the underlying repository issues, not to change how they are measured.
