@@ -473,15 +473,15 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `0.5`
   - **Requires restart:** Yes
 
-- **`model.disableLoopDetection`** (boolean):
-  - **Description:** Disable automatic detection and prevention of infinite
+- **`model.enableLoopDetection`** (boolean):
+  - **Description:** Enable automatic detection and prevention of infinite
     loops.
-  - **Default:** `false`
+  - **Default:** `true`
   - **Requires restart:** Yes
 
-- **`model.skipNextSpeakerCheck`** (boolean):
-  - **Description:** Skip the next speaker check.
-  - **Default:** `true`
+- **`model.enableNextSpeakerCheck`** (boolean):
+  - **Description:** Enable the next speaker check.
+  - **Default:** `false`
 
 #### `modelConfigs`
 
@@ -1412,9 +1412,9 @@ their corresponding top-level category object in your `settings.json` file.
 
   - **Requires restart:** Yes
 
-- **`agents.browser.disableUserInput`** (boolean):
-  - **Description:** Disable user input on browser window during automation.
-  - **Default:** `true`
+- **`agents.browser.enableUserInput`** (boolean):
+  - **Description:** Enable user input on browser window during automation.
+  - **Default:** `false`
 
 - **`agents.browser.maxActionsPerTask`** (number):
   - **Description:** The maximum number of tool calls allowed per browser task.
@@ -1613,11 +1613,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `40000`
   - **Requires restart:** Yes
 
-- **`tools.disableLLMCorrection`** (boolean):
-  - **Description:** Disable LLM-based error correction for edit tools. When
-    enabled, tools will fail immediately if exact string matches are not found,
-    instead of attempting to self-correct.
-  - **Default:** `true`
+- **`tools.enableLLMCorrection`** (boolean):
+  - **Description:** Enable LLM-based error correction for edit tools. When
+    enabled, tools may attempt to self-correct if exact string matches are not
+    found.
+  - **Default:** `false`
   - **Requires restart:** Yes
 
 #### `mcp`
@@ -1651,9 +1651,9 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
-- **`security.enableYoloMode`** (boolean):
-  - **Description:** Allow YOLO mode when enabled by a flag.
-  - **Default:** `true`
+- **`security.disableYoloMode`** (boolean):
+  - **Description:** Disable YOLO mode, even if enabled by a flag.
+  - **Default:** `false`
   - **Requires restart:** Yes
 
 - **`security.enableAlwaysAllow`** (boolean):

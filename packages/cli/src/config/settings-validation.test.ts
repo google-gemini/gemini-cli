@@ -332,7 +332,7 @@ describe('settings-validation', () => {
         const settings = {
           ui: {
             autoThemeSwitching: 'true',
-            hideWindowTitle: 'false',
+            showWindowTitle: 'false',
           },
         };
 
@@ -340,14 +340,14 @@ describe('settings-validation', () => {
         expect(result.success).toBe(true);
         const data = result.data as Settings;
         expect(data.ui?.autoThemeSwitching).toBe(true);
-        expect(data.ui?.hideWindowTitle).toBe(false);
+        expect(data.ui?.showWindowTitle).toBe(false);
       });
 
       it('should cast boolean strings case-insensitively', () => {
         const settings = {
           ui: {
             autoThemeSwitching: 'TRUE',
-            hideWindowTitle: 'fAlSe',
+            showWindowTitle: 'fAlSe',
           },
         };
 
@@ -355,7 +355,7 @@ describe('settings-validation', () => {
         expect(result.success).toBe(true);
         const data = result.data as Settings;
         expect(data.ui?.autoThemeSwitching).toBe(true);
-        expect(data.ui?.hideWindowTitle).toBe(false);
+        expect(data.ui?.showWindowTitle).toBe(false);
       });
 
       it('should cast numeric strings to numbers', () => {

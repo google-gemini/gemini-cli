@@ -99,13 +99,13 @@ they appear in the UI.
 
 ### Model
 
-| UI Label                      | Setting                      | Description                                                                            | Default     |
-| ----------------------------- | ---------------------------- | -------------------------------------------------------------------------------------- | ----------- |
-| Model                         | `model.name`                 | The Gemini model to use for conversations.                                             | `undefined` |
-| Max Session Turns             | `model.maxSessionTurns`      | Maximum number of user/model/tool turns to keep in a session. -1 means unlimited.      | `-1`        |
-| Context Compression Threshold | `model.compressionThreshold` | The fraction of context usage at which to trigger context compression (e.g. 0.2, 0.3). | `0.5`       |
-| Disable Loop Detection        | `model.disableLoopDetection` | Disable automatic detection and prevention of infinite loops.                          | `false`     |
-| Skip Next Speaker Check       | `model.skipNextSpeakerCheck` | Skip the next speaker check.                                                           | `true`      |
+| UI Label                      | Setting                        | Description                                                                            | Default     |
+| ----------------------------- | ------------------------------ | -------------------------------------------------------------------------------------- | ----------- |
+| Model                         | `model.name`                   | The Gemini model to use for conversations.                                             | `undefined` |
+| Max Session Turns             | `model.maxSessionTurns`        | Maximum number of user/model/tool turns to keep in a session. -1 means unlimited.      | `-1`        |
+| Context Compression Threshold | `model.compressionThreshold`   | The fraction of context usage at which to trigger context compression (e.g. 0.2, 0.3). | `0.5`       |
+| Enable Loop Detection         | `model.enableLoopDetection`    | Enable automatic detection and prevention of infinite loops.                           | `true`      |
+| Enable Next Speaker Check     | `model.enableNextSpeakerCheck` | Enable the next speaker check.                                                         | `false`     |
 
 ### Agents
 
@@ -113,6 +113,7 @@ they appear in the UI.
 | ------------------------- | ---------------------------------------- | --------------------------------------------------------------------------------------------- | ------- |
 | Confirm Sensitive Actions | `agents.browser.confirmSensitiveActions` | Require manual confirmation for sensitive browser actions (e.g., fill_form, evaluate_script). | `false` |
 | Block File Uploads        | `agents.browser.blockFileUploads`        | Hard-block file upload requests from the browser agent.                                       | `false` |
+| Enable User Input         | `agents.browser.enableUserInput`         | Enable user input on the browser window during automation.                                    | `false` |
 
 ### Context
 
@@ -128,22 +129,22 @@ they appear in the UI.
 
 ### Tools
 
-| UI Label                         | Setting                              | Description                                                                                                                                                                | Default |
-| -------------------------------- | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
-| Sandbox Allowed Paths            | `tools.sandboxAllowedPaths`          | List of additional paths that the sandbox is allowed to access.                                                                                                            | `[]`    |
-| Sandbox Network Access           | `tools.sandboxNetworkAccess`         | Whether the sandbox is allowed to access the network.                                                                                                                      | `false` |
-| Enable Interactive Shell         | `tools.shell.enableInteractiveShell` | Use node-pty for an interactive shell experience. Fallback to child_process still applies.                                                                                 | `true`  |
-| Show Color                       | `tools.shell.showColor`              | Show color in shell output.                                                                                                                                                | `true`  |
-| Use Ripgrep                      | `tools.useRipgrep`                   | Use ripgrep for file content search instead of the fallback implementation. Provides faster search performance.                                                            | `true`  |
-| Tool Output Truncation Threshold | `tools.truncateToolOutputThreshold`  | Maximum characters to show when truncating large tool outputs. Set to 0 or negative to disable truncation.                                                                 | `40000` |
-| Disable LLM Correction           | `tools.disableLLMCorrection`         | Disable LLM-based error correction for edit tools. When enabled, tools will fail immediately if exact string matches are not found, instead of attempting to self-correct. | `true`  |
+| UI Label                         | Setting                              | Description                                                                                                                              | Default |
+| -------------------------------- | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| Sandbox Allowed Paths            | `tools.sandboxAllowedPaths`          | List of additional paths that the sandbox is allowed to access.                                                                          | `[]`    |
+| Sandbox Network Access           | `tools.sandboxNetworkAccess`         | Whether the sandbox is allowed to access the network.                                                                                    | `false` |
+| Enable Interactive Shell         | `tools.shell.enableInteractiveShell` | Use node-pty for an interactive shell experience. Fallback to child_process still applies.                                               | `true`  |
+| Show Color                       | `tools.shell.showColor`              | Show color in shell output.                                                                                                              | `true`  |
+| Use Ripgrep                      | `tools.useRipgrep`                   | Use ripgrep for file content search instead of the fallback implementation. Provides faster search performance.                          | `true`  |
+| Tool Output Truncation Threshold | `tools.truncateToolOutputThreshold`  | Maximum characters to show when truncating large tool outputs. Set to 0 or negative to disable truncation.                               | `40000` |
+| Enable LLM Correction            | `tools.enableLLMCorrection`          | Enable LLM-based error correction for edit tools. When enabled, tools may attempt to self-correct if exact string matches are not found. | `false` |
 
 ### Security
 
 | UI Label                              | Setting                                         | Description                                                                                                                                                                                                                          | Default |
 | ------------------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------- |
 | Tool Sandboxing                       | `security.toolSandboxing`                       | Tool-level sandboxing. Isolates individual tools instead of the entire CLI process.                                                                                                                                                  | `false` |
-| Enable YOLO Mode                      | `security.enableYoloMode`                       | Allow YOLO mode when enabled by a flag.                                                                                                                                                                                              | `true`  |
+| Disable YOLO Mode                     | `security.disableYoloMode`                      | Disable YOLO mode, even if enabled by a flag.                                                                                                                                                                                        | `false` |
 | Enable Always Allow                   | `security.enableAlwaysAllow`                    | Show "Always allow" options in tool confirmation dialogs.                                                                                                                                                                            | `true`  |
 | Allow Permanent Tool Approval         | `security.enablePermanentToolApproval`          | Enable the "Allow for all future sessions" option in tool confirmation dialogs.                                                                                                                                                      | `false` |
 | Auto-add to Policy by Default         | `security.autoAddToPolicyByDefault`             | When enabled, the "Allow for all future sessions" option becomes the default choice for low-risk tools in trusted workspaces.                                                                                                        | `false` |

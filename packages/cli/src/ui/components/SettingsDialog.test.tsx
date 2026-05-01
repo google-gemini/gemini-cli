@@ -1447,7 +1447,7 @@ describe('SettingsDialog', () => {
 
       await waitFor(() => {
         expect(lastFrame()).toContain('yolo');
-        expect(lastFrame()).toContain('Enable YOLO Mode');
+        expect(lastFrame()).toContain('Disable YOLO Mode');
       });
 
       unmount();

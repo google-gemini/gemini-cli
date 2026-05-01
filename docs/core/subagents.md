@@ -193,7 +193,7 @@ For full details, see the
 | `profilePath`             | `string`   | —              | Custom path to a browser profile directory.                                     |
 | `visualModel`             | `string`   | —              | Model override for the visual agent.                                            |
 | `allowedDomains`          | `string[]` | —              | Restrict navigation to specific domains (for example, `["github.com"]`).        |
-| `disableUserInput`        | `boolean`  | `true`         | Disable user input on the browser window during automation (non-headless only). |
+| `enableUserInput`         | `boolean`  | `false`        | Enable user input on the browser window during automation (non-headless only).  |
 | `maxActionsPerTask`       | `number`   | `100`          | Maximum tool calls per task. The agent is terminated when the limit is reached. |
 | `confirmSensitiveActions` | `boolean`  | `false`        | Require manual confirmation for `upload_file` and `evaluate_script`.            |
 | `blockFileUploads`        | `boolean`  | `false`        | Hard-block all file upload requests from the agent.                             |
@@ -203,7 +203,7 @@ For full details, see the
 In non-headless mode, the browser agent injects a visual overlay into the
 browser window to indicate that automation is in progress. By default, user
 input (keyboard and mouse) is also blocked to prevent accidental interference.
-You can disable this by setting `disableUserInput` to `false`.
+You can allow this by setting `enableUserInput` to `true`.
 
 #### Security
 

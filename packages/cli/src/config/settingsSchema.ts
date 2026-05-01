@@ -1093,23 +1093,23 @@ const SETTINGS_SCHEMA = {
         showInDialog: true,
         unit: '%',
       },
-      disableLoopDetection: {
+      enableLoopDetection: {
         type: 'boolean',
-        label: 'Disable Loop Detection',
+        label: 'Enable Loop Detection',
         category: 'Model',
         requiresRestart: true,
-        default: false,
+        default: true,
         description:
-          'Disable automatic detection and prevention of infinite loops.',
+          'Enable automatic detection and prevention of infinite loops.',
         showInDialog: true,
       },
-      skipNextSpeakerCheck: {
+      enableNextSpeakerCheck: {
         type: 'boolean',
-        label: 'Skip Next Speaker Check',
+        label: 'Enable Next Speaker Check',
         category: 'Model',
         requiresRestart: false,
-        default: true,
-        description: 'Skip the next speaker check.',
+        default: false,
+        description: 'Enable the next speaker check.',
         showInDialog: true,
       },
     },
@@ -1312,14 +1312,14 @@ const SETTINGS_SCHEMA = {
             showInDialog: false,
             items: { type: 'string' },
           },
-          disableUserInput: {
+          enableUserInput: {
             type: 'boolean',
-            label: 'Disable User Input',
+            label: 'Enable User Input',
             category: 'Advanced',
             requiresRestart: false,
-            default: true,
+            default: false,
             description:
-              'Disable user input on browser window during automation.',
+              'Enable user input on browser window during automation.',
             showInDialog: false,
           },
           maxActionsPerTask: {
@@ -1732,15 +1732,15 @@ const SETTINGS_SCHEMA = {
           'Maximum characters to show when truncating large tool outputs. Set to 0 or negative to disable truncation.',
         showInDialog: true,
       },
-      disableLLMCorrection: {
+      enableLLMCorrection: {
         type: 'boolean',
-        label: 'Disable LLM Correction',
+        label: 'Enable LLM Correction',
         category: 'Tools',
         requiresRestart: true,
-        default: true,
+        default: false,
         description: oneLine`
-          Disable LLM-based error correction for edit tools.
-          When enabled, tools will fail immediately if exact string matches are not found, instead of attempting to self-correct.
+          Enable LLM-based error correction for edit tools.
+          When enabled, tools may attempt to self-correct if exact string matches are not found.
         `,
         showInDialog: true,
       },
@@ -1816,13 +1816,13 @@ const SETTINGS_SCHEMA = {
           'Tool-level sandboxing. Isolates individual tools instead of the entire CLI process.',
         showInDialog: true,
       },
-      enableYoloMode: {
+      disableYoloMode: {
         type: 'boolean',
-        label: 'Enable YOLO Mode',
+        label: 'Disable YOLO Mode',
         category: 'Security',
         requiresRestart: true,
-        default: true,
-        description: 'Allow YOLO mode when enabled by a flag.',
+        default: false,
+        description: 'Disable YOLO mode, even if enabled by a flag.',
         showInDialog: true,
       },
       enableAlwaysAllow: {

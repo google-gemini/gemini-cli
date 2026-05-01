@@ -984,6 +984,37 @@ export function migrateDeprecatedSettings(
       }
     }
 
+    // Migrate model settings
+    const modelSettings = settings.model as Record<string, unknown> | undefined;
+    if (modelSettings) {
+      const newModel = { ...modelSettings };
+      let modified = false;
+
+      modified =
+        migrateBoolean(
+          newModel,
+          'disableLoopDetection',
+          'enableLoopDetection',
+          'model',
+          foundDeprecated,
+        ) || modified;
+      modified =
+        migrateBoolean(
+          newModel,
+          'skipNextSpeakerCheck',
+          'enableNextSpeakerCheck',
+          'model',
+          foundDeprecated,
+        ) || modified;
+
+      if (modified) {
+        loadedSettings.setValue(scope, 'model', newModel);
+        if (!settingsFile.readOnly) {
+          anyModified = true;
+        }
+      }
+    }
+
     // Migrate ui settings
     const uiSettings = settings.ui as Record<string, unknown> | undefined;
     if (uiSettings) {
@@ -1148,6 +1179,9 @@ export function migrateDeprecatedSettings(
     // Migrate tools settings
     const toolsSettings = settings.tools as Record<string, unknown> | undefined;
     if (toolsSettings) {
+      const newTools = { ...toolsSettings };
+      let modified = false;
+
       if (toolsSettings['approvalMode'] !== undefined) {
         foundDeprecated.push('tools.approvalMode');
 
@@ -1165,9 +1199,51 @@ export function migrateDeprecatedSettings(
         }
 
         if (removeDeprecated) {
-          const newTools = { ...toolsSettings };
           delete newTools['approvalMode'];
-          loadedSettings.setValue(scope, 'tools', newTools);
+          modified = true;
+        }
+      }
+
+      modified =
+        migrateBoolean(
+          newTools,
+          'disableLLMCorrection',
+          'enableLLMCorrection',
+          'tools',
+          foundDeprecated,
+        ) || modified;
+
+      if (modified) {
+        loadedSettings.setValue(scope, 'tools', newTools);
+        if (!settingsFile.readOnly) {
+          anyModified = true;
+        }
+      }
+    }
+
+    const agentsSettings = settings.agents as
+      | Record<string, unknown>
+      | undefined;
+    if (agentsSettings) {
+      const newAgents = { ...agentsSettings };
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      const browserSettings = newAgents['browser'] as
+        | Record<string, unknown>
+        | undefined;
+
+      if (browserSettings) {
+        const newBrowser = { ...browserSettings };
+        if (
+          migrateBoolean(
+            newBrowser,
+            'disableUserInput',
+            'enableUserInput',
+            'agents.browser',
+            foundDeprecated,
+          )
+        ) {
+          newAgents['browser'] = newBrowser;
+          loadedSettings.setValue(scope, 'agents', newAgents);
           if (!settingsFile.readOnly) {
             anyModified = true;
           }
@@ -1197,14 +1273,6 @@ export function migrateDeprecatedSettings(
       const newSecurity = { ...securitySettings };
       let modified = false;
 
-      modified =
-        migrateBoolean(
-          newSecurity,
-          'disableYoloMode',
-          'enableYoloMode',
-          'security',
-          foundDeprecated,
-        ) || modified;
       modified =
         migrateBoolean(
           newSecurity,
