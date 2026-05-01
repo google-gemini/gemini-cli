@@ -395,8 +395,7 @@ for removal instructions.
   [Terms & Privacy](https://www.geminicli.com/docs/resources/tos-privacy)
 - **Security**: [Security Policy](SECURITY.md)
 
-## - Star History
-<p align="center">
+<p align="left">
  <a href="https://www.star-history.com/google-gemini/gemini-cli">
   <picture>
    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/badge?repo=google-gemini/gemini-cli&theme=dark" />
