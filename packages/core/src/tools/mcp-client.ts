@@ -1043,6 +1043,8 @@ class DynamicStoredOAuthProvider implements McpAuthProvider {
   };
 
   private clientInfo?: OAuthClientInformation;
+  private readonly tokenStorage = new MCPOAuthTokenStorage();
+  private readonly oauthProvider = new MCPOAuthProvider(this.tokenStorage);
 
   constructor(
     private readonly serverName: string,
@@ -1059,9 +1061,7 @@ class DynamicStoredOAuthProvider implements McpAuthProvider {
 
   async tokens(): Promise<OAuthTokens | undefined> {
     if (this.serverConfig.oauth?.enabled && this.serverConfig.oauth) {
-      const tokenStorage = new MCPOAuthTokenStorage();
-      const mcpAuthProvider = new MCPOAuthProvider(tokenStorage);
-      const token = await mcpAuthProvider.getValidToken(
+      const token = await this.oauthProvider.getValidToken(
         this.serverName,
         this.serverConfig.oauth,
       );
@@ -1069,7 +1069,12 @@ class DynamicStoredOAuthProvider implements McpAuthProvider {
       return { access_token: token, token_type: 'Bearer' };
     }
 
-    const token = await getStoredOAuthToken(this.serverName);
+    const credentials = await this.tokenStorage.getCredentials(this.serverName);
+    if (!credentials) return undefined;
+
+    const token = await this.oauthProvider.getValidToken(this.serverName, {
+      clientId: credentials.clientId,
+    });
     if (!token) return undefined;
     return { access_token: token, token_type: 'Bearer' };
   }
