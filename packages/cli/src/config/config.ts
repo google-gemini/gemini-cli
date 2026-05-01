@@ -277,7 +277,7 @@ export async function parseArguments(
       yargsInstance
         .positional('query', {
           description:
-            'Initial prompt. Runs in interactive mode by default; use -p/--prompt for non-interactive.',
+            'Initial prompt. Runs in non-interactive (headless) mode by default; use -i/--prompt-interactive to continue in interactive mode.',
         })
         .option('model', {
           alias: 'm',
