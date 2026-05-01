@@ -1204,6 +1204,29 @@ provide tools. Enablement state is stored in
 The same commands are available as slash commands during an active session:
 `/mcp enable <name>` and `/mcp disable <name>`.
 
+### Removing a server (`/mcp remove`)
+
+During an interactive session you can permanently delete an MCP server entry
+from your settings without leaving the CLI:
+
+```text
+/mcp remove <name> [--scope user|workspace|all]
+```
+
+Aliases: `/mcp rm <name>`.
+
+If the server is only defined in one scope (workspace or user) it is removed
+automatically. If it is defined in **both** scopes, the command refuses and asks
+you to pass `--scope user`, `--scope workspace`, or `--scope all` to choose.
+This avoids the surprise where deleting the workspace copy leaves a forgotten
+"zombie" copy in your user settings still active after the next restart.
+
+Servers contributed by extensions cannot be removed this way — disable the
+extension instead.
+
+After removal the MCP client manager is restarted so the server is disconnected
+immediately and its tools are no longer available.
+
 ## Instructions
 
 Gemini CLI supports
