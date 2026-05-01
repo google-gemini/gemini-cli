@@ -19,6 +19,7 @@ import {
   truncateProportionally,
   normalizeFunctionResponse,
 } from './truncation.js';
+import { sanitizePromptValue } from '../utils/sanitizePromptInput.js';
 
 export class AgentHistoryProvider {
   // TODO(joshualitt): just pass the BaseLlmClient instead of the whole Config.
@@ -379,10 +380,10 @@ Distill these into a high-density Markdown block that orientates the agent on th
 - **Brevity:** Maximum 15 lines. No conversational preamble.
 
 ${hasPreviousSummary ? 'PREVIOUS SUMMARY AND TRUNCATED HISTORY:' : 'TRUNCATED HISTORY:'}
-${JSON.stringify(messagesToTruncate)}
+${sanitizePromptValue(messagesToTruncate)}
 
 ACTIVE BRIDGE (LOOKAHEAD):
-${JSON.stringify(bridge)}`;
+${sanitizePromptValue(bridge)}`;
 
     const summaryResponse = await this.config
       .getBaseLlmClient()
