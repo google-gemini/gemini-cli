@@ -273,6 +273,14 @@ export class GeminiChat {
     kind: 'main' | 'subagent' = 'main',
   ) {
     await this.chatRecordingService.initialize(resumedSessionData, kind);
+
+    // If we have history but didn't resume a session record, sync it to the recording service.
+    // This handles initial history passed to startChat.
+    if (!resumedSessionData && this.agentHistory.get().length > 0) {
+      this.chatRecordingService.updateMessagesFromHistory(
+        this.agentHistory.get(),
+      );
+    }
   }
 
   setSystemInstruction(sysInstr: string) {
@@ -775,7 +783,7 @@ export class GeminiChat {
     this.lastPromptTokenCount = estimateTokenCountSync(
       this.agentHistory.flatMap((c) => c.parts || []),
     );
-    this.chatRecordingService.updateMessagesFromHistory(history);
+    this.chatRecordingService.updateMessagesFromHistory(history, true);
   }
 
   stripThoughtsFromHistory(): void {

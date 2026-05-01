@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { type ThoughtSummary } from '../utils/thoughtUtils.js';
+import { type ThoughtSummary, parseThought } from '../utils/thoughtUtils.js';
 import { getProjectHash } from '../utils/paths.js';
 import path from 'node:path';
 import * as fs from 'node:fs';
@@ -23,6 +23,7 @@ import type {
   GenerateContentResponseUsageMetadata,
 } from '@google/genai';
 import { debugLogger } from '../utils/debugLogger.js';
+import { CoreToolCallStatus } from '../scheduler/types.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
 import {
   SESSION_FILE_PREFIX,
@@ -869,10 +870,127 @@ export class ChatRecordingService {
     return this.cachedConversation;
   }
 
-  updateMessagesFromHistory(history: readonly Content[]): void {
+  private reconstructMessagesFromHistory(
+    history: readonly Content[],
+  ): MessageRecord[] {
+    const messages: MessageRecord[] = [];
+    let i = 0;
+
+    while (i < history.length) {
+      const content = history[i];
+      const parts = content.parts || [];
+
+      if (content.role === 'user') {
+        // Simple user message
+        messages.push({
+          id: randomUUID(),
+          timestamp: new Date().toISOString(),
+          type: 'user',
+          content: parts,
+        });
+        i++;
+      } else if (content.role === 'model') {
+        const geminiMsg: MessageRecord & { type: 'gemini' } = {
+          id: randomUUID(),
+          timestamp: new Date().toISOString(),
+          type: 'gemini',
+          content: parts.filter(
+            (p) => !p.functionCall && !p.thought && !p.functionResponse,
+          ),
+          toolCalls: [],
+          thoughts: [],
+        };
+
+        // Add thoughts
+        for (const part of parts) {
+          if (part.thought) {
+            const thoughtObj = parseThought(part.text || '');
+            geminiMsg.thoughts!.push({
+              ...thoughtObj,
+              timestamp: new Date().toISOString(),
+            });
+          }
+        }
+
+        // Add tool calls
+        for (const part of parts) {
+          if (part.functionCall) {
+            geminiMsg.toolCalls!.push({
+              id: part.functionCall.id || `reconstructed-${randomUUID()}`,
+              name: part.functionCall.name || 'unknown_tool',
+              args: part.functionCall.args || {},
+              status: CoreToolCallStatus.Success, // Assume success for reconstructed history
+              timestamp: new Date().toISOString(),
+            });
+          }
+        }
+
+        // Look ahead for responses
+        if (
+          geminiMsg.toolCalls!.length > 0 &&
+          i + 1 < history.length &&
+          history[i + 1].role === 'user'
+        ) {
+          const nextTurn = history[i + 1];
+          const nextParts = nextTurn.parts || [];
+          const callIds = nextParts
+            .map((p) => p.functionResponse?.id)
+            .filter((id): id is string => !!id);
+
+          if (callIds.length > 0) {
+            const respMap = new Map<string, Part[]>();
+            let currentCallId = callIds[0];
+            for (const p of nextParts) {
+              if (p.functionResponse?.id) {
+                currentCallId = p.functionResponse.id;
+              }
+              if (!respMap.has(currentCallId)) {
+                respMap.set(currentCallId, []);
+              }
+              respMap.get(currentCallId)!.push(p);
+            }
+
+            for (const tc of geminiMsg.toolCalls!) {
+              const respParts = respMap.get(tc.id);
+              if (respParts) {
+                tc.result = respParts;
+              }
+            }
+            // Consume the response turn
+            i++;
+          }
+        }
+
+        messages.push(geminiMsg);
+        i++;
+      } else {
+        i++; // Skip unknown roles
+      }
+    }
+
+    return messages;
+  }
+
+  updateMessagesFromHistory(
+    history: readonly Content[],
+    reconstruct = false,
+  ): void {
     if (!this.conversationFile || !this.cachedConversation) return;
 
     try {
+      // If the cache is empty (e.g. after /resume load_history), or reconstruction is forced,
+      // reconstruct from history.
+      if (
+        (this.cachedConversation.messages.length === 0 && history.length > 0) ||
+        reconstruct
+      ) {
+        this.updateMetadata({
+          messages: this.reconstructMessagesFromHistory(history),
+          lastUpdated: new Date().toISOString(),
+        });
+        return;
+      }
+
       const partsMap = new Map<string, Part[]>();
       for (const content of history) {
         if (content.role === 'user' && content.parts) {
