@@ -813,6 +813,45 @@ describe('LocalAgentExecutor', () => {
       expect(agentRegistry.getTool(subAgentName)).toBeUndefined();
     });
 
+    it('should auto-register MCP tools when toolConfig is undefined without throwing', async () => {
+      const serverName = 'mcp-server';
+      const toolName = 'mcp-tool';
+
+      const mockMcpTool = {
+        tool: vi.fn(),
+        callTool: vi.fn(),
+      } as unknown as CallableTool;
+
+      const mcpTool = new DiscoveredMCPTool(
+        mockMcpTool,
+        serverName,
+        toolName,
+        'A test MCP tool',
+        {},
+        mockConfig.messageBus,
+      );
+
+      parentToolRegistry.registerTool(mcpTool);
+
+      // Create definition and force toolConfig to be undefined
+      const definition = createTestDefinition();
+      definition.toolConfig = undefined;
+
+      // Should NOT throw
+      const executor = await LocalAgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+
+      const agentRegistry = executor['toolRegistry'];
+
+      // MCP tool should be registered under its qualified name
+      expect(agentRegistry.getTool(mcpTool.name)).toBeDefined();
+      // Built-in tools should still be present
+      expect(agentRegistry.getTool(LS_TOOL_NAME)).toBeDefined();
+    });
+
     it('should automatically qualify MCP tools in agent definitions', async () => {
       const serverName = 'mcp-server';
       const toolName = 'mcp-tool';
