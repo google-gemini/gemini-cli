@@ -13,25 +13,22 @@ and logical checklist.
 
 ### Technical Robustness
 
-1. **Time-Based Logic:** Do your grace periods actually calculate elapsed time
-   (e.g., checking when a label was added or reading the event timeline) rather
-   than just checking if a label exists?
-2. **Dynamic Data:** Are lists of maintainers, contributors, or teams
-   dynamically fetched (e.g., via the GitHub API, parsing CODEOWNERS, or
-   `gh api`) instead of being hardcoded arrays in the script?
-3. **Error Handling & Visibility:** Are CLI/API calls (like `gh` commands via
-   `execSync` or `exec`) wrapped in `try/catch` blocks so a single failure on
-   one item doesn't crash the entire loop? Are file reads protected with
-   existence checks or `try/catch` blocks?
-4. **Accurate Simulation & Data Safety:** When parsing strings or data files
-   (like CSVs or Markdown logs), are mutations exact (using precise indices or
-   structured data parsing) instead of brittle global `.replace()` operations?
-5. **Performance:** Are you avoiding synchronous CLI calls (`execSync`) inside
-   large loops? Are you using asynchronous execution (`exec` or `spawn` with
-   `Promise.all` or concurrency limits) where appropriate?
-6. **Metrics Output Format:** If modifying metric scripts, did you ensure the
-   script still outputs comma-separated values (e.g.,
-   `console.log('metric_name,123')`) and NOT JSON or other formats?
+1. **Time-Based Logic:** Do grace periods correctly calculate elapsed time
+   (e.g., measuring from the timeline event when a label was added) rather than
+   just checking for the existence of a label?
+2. **Dynamic Data:** Are lists of maintainers or teams dynamically fetched
+   rather than hardcoded?
+3. **Error Handling & Fault Tolerance:** Are operations wrapped in `try/catch`
+   blocks so a single failure on one item doesn't crash an entire batch process?
+4. **Data Mutations:** Are data manipulations (like parsing CSVs or logs) robust
+   and precise, avoiding brittle global string replacements?
+5. **Scale & Rate Limits:** Will this code time out, hit API rate limits, or
+   consume excessive memory if run against a repository with 5,000 open issues?
+   You MUST reject any script that makes sequential API calls inside an
+   unbounded loop (N+1 queries) or uses excessively broad search queries (like
+   `is:open` without date or state filters).
+6. **Metrics Format:** Do metric scripts output strict comma-separated values
+   (`metric_name,value`) and not JSON or text?
 
 ### Logical & Workflow Integrity
 
@@ -82,15 +79,18 @@ and logical checklist.
     policies. Verify that the LLM is used ONLY for classification and not for
     logic or decision-making.
 
-## Systemic Simulation (MANDATORY FOR TIME-BASED LOGIC)
+## Systemic Simulation (MANDATORY)
 
-If the modified scripts or workflows involve time-based triggers (e.g., cron
-schedules), grace periods, or staleness checks:
+You MUST explicitly write out a timeline and scale simulation in your response
+to prove the logic holds up over time and at scale.
 
-- You MUST explicitly write out a timeline simulation in your response.
-- Step through the execution day by day (e.g., Day 1, Day 7, Day 14).
-- Ensure that the execution frequency (the cron schedule) aligns perfectly with
-  the logical grace periods promised in the code or comments.
+- **Timeline:** Step through the execution day by day (e.g., Day 1, Day 7, Day
+  14). Ensure the execution frequency (the cron schedule) aligns perfectly with
+  the logical grace periods promised.
+- **Scale:** Simulate running the logic against a repository with 5,000 open
+  issues. Does the script retrieve all 5,000 issues at once? If so, does it
+  iterate through them sequentially making API calls for each (N+1)? Reject the
+  change if it fails to handle scale efficiently.
 
 ## Evaluation Mandate
 
