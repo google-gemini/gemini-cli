@@ -95,5 +95,10 @@ Before proposing an intervention, accurately identify the blocker:
 ### 6. Record Findings & Propose Actions
 
 - Use the Memory & State format provided in the common rules.
-- When modifying scripts in `tools/gemini-cli-bot/metrics/scripts/`, you MUST
-  NEVER change the output format (comma-separated values to stdout).
+- **Action Priority**: Your ONLY goal is to propose actionable policy, reflex,
+  or workflow changes (e.g., in `.github/workflows/` or
+  `tools/gemini-cli-bot/reflexes/scripts/`) that resolve the identified root
+  cause.
+- **No Metrics Changes**: You are STRICTLY FORBIDDEN from modifying the
+  measurement scripts in `tools/gemini-cli-bot/metrics/scripts/`. Your role is
+  to fix the underlying repository issues, not to change how they are measured.
