@@ -838,6 +838,7 @@ const linkCommand: SlashCommand = {
 
 const uninstallCommand: SlashCommand = {
   name: 'uninstall',
+  altNames: ['delete'],
   description: 'Uninstall an extension',
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
