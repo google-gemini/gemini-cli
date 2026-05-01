@@ -304,6 +304,48 @@ describe('relaunchAppInChildProcess', () => {
       );
     });
 
+    it('should forward signals to the child process', async () => {
+      process.argv = ['/usr/bin/node', '/app/cli.js'];
+
+      const mockChild = createMockChildProcess(0, false);
+      const killSpy = vi.spyOn(mockChild, 'kill');
+
+      mockedSpawn.mockImplementation(() => mockChild);
+
+      // We need to trigger the signal on process
+      // But we don't want to actually kill the test process
+      const processOnSpy = vi.spyOn(process, 'on');
+      const processOffSpy = vi.spyOn(process, 'off');
+
+      const promise = relaunchAppInChildProcess([], []);
+
+      // Wait for handlers to be registered
+      await new Promise((resolve) => setImmediate(resolve));
+
+      // Find the SIGTERM handler
+      const sigtermHandler = processOnSpy.mock.calls.find(
+        (call) => call[0] === 'SIGTERM',
+      )?.[1] as (() => void) | undefined;
+
+      expect(sigtermHandler).toBeDefined();
+
+      // Trigger the handler
+      sigtermHandler?.();
+
+      expect(killSpy).toHaveBeenCalledWith('SIGTERM');
+
+      // Close the child to resolve the promise
+      mockChild.emit('close', 0);
+
+      await expect(promise).rejects.toThrow('PROCESS_EXIT_CALLED');
+
+      // Verify handlers were removed
+      expect(processOffSpy).toHaveBeenCalledWith('SIGTERM', sigtermHandler);
+
+      processOnSpy.mockRestore();
+      processOffSpy.mockRestore();
+    });
+
     it('should handle null exit code from child process', async () => {
       process.argv = ['/usr/bin/node', '/app/cli.js'];
 
