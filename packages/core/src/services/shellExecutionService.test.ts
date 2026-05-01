@@ -387,6 +387,49 @@ describe('ShellExecutionService', () => {
       );
     });
 
+    it('should stop a foreground PTY when output exceeds the configured limit', async () => {
+      const { result } = await simulateExecution(
+        'streaming-command',
+        async (pty) => {
+          pty.onData.mock.calls[0][0]('01234567890');
+          await new Promise(process.nextTick);
+          pty.onExit.mock.calls[0][0]({ exitCode: null, signal: 15 });
+        },
+        { ...shellExecutionConfig, maxOutputBytes: 10 },
+      );
+
+      expect(result.outputLimitExceeded).toBe(true);
+      expect(result.output).toContain(
+        'Command output exceeded the 10 bytes limit',
+      );
+      expect(result.output).toContain('read_background_output');
+      expect(mockProcessKill).toHaveBeenCalledWith(
+        -mockPtyProcess.pid,
+        'SIGTERM',
+      );
+    });
+
+    it('should disable the PTY output limit after moving to background', async () => {
+      const abortController = new AbortController();
+      const handle = await ShellExecutionService.execute(
+        'streaming-command',
+        '/test/dir',
+        onOutputEventMock,
+        abortController.signal,
+        true,
+        { ...shellExecutionConfig, maxOutputBytes: 10 },
+      );
+
+      await new Promise((resolve) => process.nextTick(resolve));
+      ShellExecutionService.background(12345, 'default', 'streaming-command');
+      mockPtyProcess.onData.mock.calls[0][0]('01234567890');
+
+      const result = await handle.result;
+      expect(result.backgrounded).toBe(true);
+      expect(result.outputLimitExceeded).toBeFalsy();
+      expect(mockProcessKill).not.toHaveBeenCalled();
+    });
+
     it('should not wrap long lines in the final output', async () => {
       // Set a small width to force wrapping
       const narrowConfig = { ...shellExecutionConfig, terminalWidth: 10 };
@@ -1279,6 +1322,7 @@ describe('ShellExecutionService child_process fallback', () => {
       cp: typeof mockChildProcess,
       ac: AbortController,
     ) => void | Promise<void>,
+    config = shellExecutionConfig,
   ) => {
     const abortController = new AbortController();
     const handle = await ShellExecutionService.execute(
@@ -1287,7 +1331,7 @@ describe('ShellExecutionService child_process fallback', () => {
       onOutputEventMock,
       abortController.signal,
       true,
-      shellExecutionConfig,
+      config,
     );
 
     await new Promise((resolve) => process.nextTick(resolve));
@@ -1408,6 +1452,44 @@ describe('ShellExecutionService child_process fallback', () => {
       ).toBe(true);
       expect(outputWithoutMessage.endsWith('c'.repeat(20))).toBe(true);
     }, 120000);
+
+    it('should stop a foreground child process when output exceeds the configured limit', async () => {
+      const { result } = await simulateExecution(
+        'streaming-output',
+        async (cp) => {
+          cp.stdout?.emit('data', Buffer.from('01234567890'));
+          await new Promise(process.nextTick);
+          cp.emit('exit', null, 'SIGTERM');
+        },
+        { ...shellExecutionConfig, maxOutputBytes: 10 },
+      );
+
+      expect(result.outputLimitExceeded).toBe(true);
+      expect(result.aborted).toBe(false);
+      expect(result.output).toContain(
+        'Command output exceeded the 10 bytes limit',
+      );
+      expect(result.output).toContain('read_background_output');
+      expect(mockProcessKill).toHaveBeenCalledWith(
+        -mockChildProcess.pid!,
+        'SIGTERM',
+      );
+    });
+
+    it('should disable the child process output limit after moving to background', async () => {
+      const { result } = await simulateExecution(
+        'streaming-output',
+        (cp) => {
+          ShellExecutionService.background(12345, 'default', 'streaming-output');
+          cp.stdout?.emit('data', Buffer.from('01234567890'));
+        },
+        { ...shellExecutionConfig, maxOutputBytes: 10 },
+      );
+
+      expect(result.backgrounded).toBe(true);
+      expect(result.outputLimitExceeded).toBeFalsy();
+      expect(mockProcessKill).not.toHaveBeenCalled();
+    });
   });
 
   describe('Failed Execution', () => {

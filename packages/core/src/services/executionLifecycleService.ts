@@ -24,6 +24,7 @@ export interface ExecutionResult {
   signal: number | null;
   error: Error | null;
   aborted: boolean;
+  outputLimitExceeded?: boolean;
   pid: number | undefined;
   executionMethod: ExecutionMethod;
   backgrounded?: boolean;
