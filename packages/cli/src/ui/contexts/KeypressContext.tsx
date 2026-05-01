@@ -360,14 +360,27 @@ function createDataListener(keypressHandler: KeypressHandler) {
   const parser = emitKeys(keypressHandler);
   parser.next(); // prime the generator so it starts listening.
 
-  let timeoutId: NodeJS.Timeout;
-  return (data: string) => {
-    clearTimeout(timeoutId);
-    for (const char of data) {
-      parser.next(char);
+  let timeoutId: NodeJS.Timeout | null = null;
+  return (data: string | Buffer) => {
+    const str = typeof data === 'string' ? data : data.toString('utf8');
+    if (timeoutId) {
+      clearTimeout(timeoutId);
     }
-    if (data.length !== 0) {
-      timeoutId = setTimeout(() => parser.next(''), ESC_TIMEOUT);
+    for (const char of str) {
+      try {
+        parser.next(char);
+      } catch (e) {
+        debugLogger.warn('Error in keypress parser:', e);
+      }
+    }
+    if (str.length !== 0) {
+      timeoutId = setTimeout(() => {
+        try {
+          parser.next('');
+        } catch (e) {
+          debugLogger.warn('Error in keypress parser timeout:', e);
+        }
+      }, ESC_TIMEOUT);
     }
   };
 }
@@ -386,6 +399,9 @@ function* emitKeys(
 
   while (true) {
     let ch = yield;
+    if (ch === '') {
+      continue; // Skip spurious timeout events at the top level
+    }
     let sequence = ch;
     let escaped = false;
 
@@ -400,11 +416,26 @@ function* emitKeys(
     if (ch === ESC) {
       escaped = true;
       ch = yield;
+      if (ch === '') {
+        // Lone ESC key followed by timeout
+        keypressHandler({
+          name: 'escape',
+          shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
+          insertable: false,
+          sequence: ESC,
+        });
+        continue;
+      }
       sequence += ch;
 
       if (ch === ESC) {
         ch = yield;
-        sequence += ch;
+        if (ch !== '') {
+          sequence += ch;
+        }
       }
     }
 
@@ -415,11 +446,7 @@ function* emitKeys(
 
       if (ch === ']') {
         // OSC sequence
-        // ESC ] <params> ; <data> BEL
-        // ESC ] <params> ; <data> ESC \
         let buffer = '';
-
-        // Read until BEL, `ESC \`, or timeout (empty string)
         while (true) {
           const next = yield;
           if (next === '' || next === '\u0007') {
@@ -434,9 +461,6 @@ function* emitKeys(
           }
           buffer += next;
         }
-
-        // Check for OSC 52 (Clipboard) response
-        // Format: 52;c;<base64> or 52;p;<base64>
         const match = /^52;[cp];(.*)$/.exec(buffer);
         if (match) {
           try {
@@ -455,129 +479,82 @@ function* emitKeys(
             debugLogger.log('Failed to decode OSC 52 clipboard data');
           }
         }
-
-        continue; // resume main loop
+        continue;
       } else if (ch === 'O') {
-        // ESC O letter
-        // ESC O modifier letter
         ch = yield;
-        sequence += ch;
-
-        if (ch >= '0' && ch <= '9') {
-          modifier = parseInt(ch, 10) - 1;
-          ch = yield;
+        if (ch !== '') {
           sequence += ch;
-        }
-
-        code += ch;
-      } else if (ch === '[') {
-        // ESC [ letter
-        // ESC [ modifier letter
-        // ESC [ [ modifier letter
-        // ESC [ [ num char
-        ch = yield;
-        sequence += ch;
-
-        if (ch === '[') {
-          // \x1b[[A
-          //      ^--- escape codes might have a second bracket
-          code += ch;
-          ch = yield;
-          sequence += ch;
-        }
-
-        /*
-         * Here and later we try to buffer just enough data to get
-         * a complete ascii sequence.
-         *
-         * We have basically two classes of ascii characters to process:
-         *
-         *
-         * 1. `\x1b[24;5~` should be parsed as { code: '[24~', modifier: 5 }
-         *
-         * This particular example is featuring Ctrl+F12 in xterm.
-         *
-         *  - `;5` part is optional, e.g. it could be `\x1b[24~`
-         *  - first part can contain one or two digits
-         *  - there is also special case when there can be 3 digits
-         *    but without modifier. They are the case of paste bracket mode
-         *
-         * So the generic regexp is like /^(?:\d\d?(;\d)?[~^$]|\d{3}~)$/
-         *
-         *
-         * 2. `\x1b[1;5H` should be parsed as { code: '[H', modifier: 5 }
-         *
-         * This particular example is featuring Ctrl+Home in xterm.
-         *
-         *  - `1;5` part is optional, e.g. it could be `\x1b[H`
-         *  - `1;` part is optional, e.g. it could be `\x1b[5H`
-         *
-         * So the generic regexp is like /^((\d;)?\d)?[A-Za-z]$/
-         *
-         */
-        const cmdStart = sequence.length - 1;
-
-        // collect as many digits as possible
-        while (ch >= '0' && ch <= '9') {
-          ch = yield;
-          sequence += ch;
-        }
-
-        // skip modifier
-        if (ch === ';') {
-          while (ch === ';') {
+          if (ch >= '0' && ch <= '9') {
+            modifier = parseInt(ch, 10) - 1;
             ch = yield;
-            sequence += ch;
-
-            // collect as many digits as possible
-            while (ch >= '0' && ch <= '9') {
-              ch = yield;
+            if (ch !== '') {
               sequence += ch;
             }
           }
-        } else if (ch === '<') {
-          // SGR mouse mode
-          ch = yield;
+          code += ch;
+        }
+      } else if (ch === '[') {
+        ch = yield;
+        if (ch !== '') {
           sequence += ch;
-          // Don't skip on empty string here to avoid timeouts on slow events.
-          while (ch === '' || ch === ';' || (ch >= '0' && ch <= '9')) {
+          if (ch === '[') {
+            code += ch;
             ch = yield;
+            if (ch !== '') {
+              sequence += ch;
+            }
+          }
+
+          const cmdStart = sequence.length - 1;
+          while (ch >= '0' && ch <= '9') {
+            ch = yield;
+            if (ch === '') break;
             sequence += ch;
           }
-        } else if (ch === 'M') {
-          // X11 mouse mode
-          // three characters after 'M'
-          ch = yield;
-          sequence += ch;
-          ch = yield;
-          sequence += ch;
-          ch = yield;
-          sequence += ch;
-        }
 
-        /*
-         * We buffered enough data, now trying to extract code
-         * and modifier from it
-         */
-        const cmd = sequence.slice(cmdStart);
-        let match;
-
-        if ((match = /^(\d+)(?:;(\d+))?(?:;(\d+))?([~^$u])$/.exec(cmd))) {
-          if (match[1] === '27' && match[3] && match[4] === '~') {
-            // modifyOtherKeys format: CSI 27 ; modifier ; key ~
-            // Treat as CSI u: key + 'u'
-            code += match[3] + 'u';
-            modifier = parseInt(match[2] ?? '1', 10) - 1;
-          } else {
-            code += match[1] + match[4];
-            // Defaults to '1' if no modifier exists, resulting in a 0 modifier value
-            modifier = parseInt(match[2] ?? '1', 10) - 1;
+          if (ch === ';') {
+            while (ch === ';') {
+              ch = yield;
+              if (ch === '') break;
+              sequence += ch;
+              while (ch >= '0' && ch <= '9') {
+                ch = yield;
+                if (ch === '') break;
+                sequence += ch;
+              }
+            }
+          } else if (ch === '<') {
+            ch = yield;
+            sequence += ch;
+            while (ch === '' || ch === ';' || (ch >= '0' && ch <= '9')) {
+              ch = yield;
+              if (ch === '') continue; // Stay for mouse
+              sequence += ch;
+            }
+          } else if (ch === 'M') {
+            for (let i = 0; i < 3; i++) {
+              ch = yield;
+              if (ch === '') break;
+              sequence += ch;
+            }
           }
-        } else if ((match = /^(\d+)?(?:;(\d+))?([A-Za-z])$/.exec(cmd))) {
-          code += match[3];
-          modifier = parseInt(match[2] ?? match[1] ?? '1', 10) - 1;
-        } else {
-          code += cmd;
+
+          const cmd = sequence.slice(cmdStart);
+          let match;
+          if ((match = /^(\d+)(?:;(\d+))?(?:;(\d+))?([~^$u])$/.exec(cmd))) {
+            if (match[1] === '27' && match[3] && match[4] === '~') {
+              code += match[3] + 'u';
+              modifier = parseInt(match[2] ?? '1', 10) - 1;
+            } else {
+              code += match[1] + match[4];
+              modifier = parseInt(match[2] ?? '1', 10) - 1;
+            }
+          } else if ((match = /^(\d+)?(?:;(\d+))?([A-Za-z])$/.exec(cmd))) {
+            code += match[3];
+            modifier = parseInt(match[2] ?? match[1] ?? '1', 10) - 1;
+          } else {
+            code += cmd;
+          }
         }
       }
 
@@ -872,7 +849,7 @@ export function KeypressProvider({
 
     if (debugKeystrokeLogging) {
       const old = dataListener;
-      dataListener = (data: string) => {
+      dataListener = (data: string | Buffer) => {
         if (data.length > 0) {
           debugLogger.log(`[DEBUG] Raw StdIn: ${JSON.stringify(data)}`);
         }

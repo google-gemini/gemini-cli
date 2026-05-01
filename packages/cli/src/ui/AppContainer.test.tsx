@@ -95,6 +95,16 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     },
   };
 });
+import { terminalCapabilityManager } from './utils/terminalCapabilityManager.js';
+
+vi.mock('./utils/terminalCapabilityManager.js', () => ({
+  terminalCapabilityManager: {
+    enableSupportedModes: vi.fn(),
+    isKittyProtocolEnabled: vi.fn(() => false),
+    getTerminalBackground: vi.fn(() => 'dark'),
+  },
+}));
+
 import ansiEscapes from 'ansi-escapes';
 import { type LoadedSettings } from '../config/settings.js';
 import { createMockSettings } from '../test-utils/settings.js';
@@ -3128,6 +3138,22 @@ describe('AppContainer State Management', () => {
       );
 
       expect(clearTerminalCalls).toHaveLength(0);
+      unmount();
+    });
+
+    it('calls enableSupportedModes when refreshing static', async () => {
+      const { unmount } = await act(async () => renderAppContainer());
+
+      // Clear previous calls
+      const enableSupportedModes =
+        terminalCapabilityManager.enableSupportedModes as import('vitest').Mock;
+      enableSupportedModes.mockClear();
+
+      await act(async () => {
+        capturedUIActions.refreshStatic();
+      });
+
+      expect(enableSupportedModes).toHaveBeenCalled();
       unmount();
     });
   });
