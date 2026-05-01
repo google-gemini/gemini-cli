@@ -15,6 +15,16 @@ import {
   DiscoveredMCPTool,
   type MessageBus,
 } from '@google/gemini-cli-core';
+import { loadSettings, SettingScope } from '../../config/settings.js';
+
+vi.mock('../../config/settings.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../../config/settings.js')>();
+  return {
+    ...actual,
+    loadSettings: vi.fn(),
+  };
+});
 
 import type { CallableTool } from '@google/genai';
 import { MessageType, type HistoryItemMcpStatus } from '../types.js';
@@ -315,6 +325,191 @@ describe('mcpCommand', () => {
       const call = vi.mocked(mockContext.ui.addItem).mock
         .calls[0][0] as HistoryItemMcpStatus;
       expect(Object.keys(call.servers)).toEqual(['server2']);
+    });
+  });
+
+  describe('remove subcommand', () => {
+    const findRemove = () =>
+      mcpCommand.subCommands!.find((c) => c.name === 'remove')!;
+
+    let setValueMock: ReturnType<typeof vi.fn>;
+    let restartMock: ReturnType<typeof vi.fn>;
+    let scopeContents: Record<string, Record<string, unknown>>;
+
+    const installSettingsMock = () => {
+      vi.mocked(loadSettings).mockReturnValue({
+        forScope: (scope: SettingScope) => ({
+          settings: { mcpServers: scopeContents[scope] ?? {} },
+        }),
+        setValue: setValueMock,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any);
+    };
+
+    beforeEach(() => {
+      setValueMock = vi.fn();
+      restartMock = vi.fn().mockResolvedValue(undefined);
+
+      const mockMcpServers = {
+        server1: { command: 'cmd1' },
+        ext1: { command: 'cmd2', extension: { name: 'my-ext' } },
+      };
+      mockConfig.getMcpClientManager = vi.fn().mockReturnValue({
+        getMcpServers: vi.fn().mockReturnValue(mockMcpServers),
+        getBlockedMcpServers: vi.fn().mockReturnValue([]),
+        getLastError: vi.fn().mockReturnValue(undefined),
+        restart: restartMock,
+      });
+
+      // Default: server1 only in workspace
+      scopeContents = {
+        [SettingScope.Workspace]: { server1: { command: 'cmd1' } },
+        [SettingScope.User]: {},
+      };
+      installSettingsMock();
+    });
+
+    it('errors when no server name is provided', async () => {
+      const result = await findRemove().action!(mockContext, '');
+      expect(result).toMatchObject({
+        messageType: 'error',
+        content: expect.stringContaining('Server name required'),
+      });
+    });
+
+    it('errors when server is not configured', async () => {
+      const result = await findRemove().action!(mockContext, 'unknown');
+      expect(result).toMatchObject({
+        messageType: 'error',
+        content: expect.stringContaining("'unknown' not found"),
+      });
+    });
+
+    it('errors when server is provided by an extension', async () => {
+      const result = await findRemove().action!(mockContext, 'ext1');
+      expect(result).toMatchObject({
+        messageType: 'error',
+        content: expect.stringContaining('extension'),
+      });
+      expect(setValueMock).not.toHaveBeenCalled();
+    });
+
+    it('removes the server from workspace settings and reloads', async () => {
+      const result = await findRemove().action!(mockContext, 'server1');
+      expect(setValueMock).toHaveBeenCalledWith(
+        SettingScope.Workspace,
+        'mcpServers',
+        {},
+      );
+      expect(restartMock).toHaveBeenCalled();
+      expect(mockContext.ui.reloadCommands).toHaveBeenCalled();
+      expect(result).toMatchObject({
+        messageType: 'info',
+        content: expect.stringContaining("'server1' removed"),
+      });
+    });
+
+    it('errors when server is not in user or workspace settings (e.g. system scope only)', async () => {
+      scopeContents = {
+        [SettingScope.Workspace]: {},
+        [SettingScope.User]: {},
+      };
+      installSettingsMock();
+      const result = await findRemove().action!(mockContext, 'server1');
+      expect(result).toMatchObject({
+        messageType: 'error',
+        content: expect.stringContaining('not defined in user or workspace'),
+      });
+      expect(setValueMock).not.toHaveBeenCalled();
+    });
+
+    it('refuses to delete when server exists in both scopes without explicit --scope', async () => {
+      scopeContents = {
+        [SettingScope.Workspace]: { server1: { command: 'cmd1' } },
+        [SettingScope.User]: { server1: { command: 'cmd1-user' } },
+      };
+      installSettingsMock();
+      const result = await findRemove().action!(mockContext, 'server1');
+      expect(result).toMatchObject({
+        messageType: 'error',
+        content: expect.stringContaining('BOTH workspace and user'),
+      });
+      expect(setValueMock).not.toHaveBeenCalled();
+    });
+
+    it('removes from user scope when --scope user is given', async () => {
+      scopeContents = {
+        [SettingScope.Workspace]: { server1: { command: 'cmd1' } },
+        [SettingScope.User]: { server1: { command: 'cmd1-user' } },
+      };
+      installSettingsMock();
+      const result = await findRemove().action!(
+        mockContext,
+        'server1 --scope user',
+      );
+      expect(setValueMock).toHaveBeenCalledTimes(1);
+      expect(setValueMock).toHaveBeenCalledWith(
+        SettingScope.User,
+        'mcpServers',
+        {},
+      );
+      expect(result).toMatchObject({ messageType: 'info' });
+    });
+
+    it('removes from both scopes when --scope all is given', async () => {
+      scopeContents = {
+        [SettingScope.Workspace]: { server1: { command: 'cmd1' } },
+        [SettingScope.User]: { server1: { command: 'cmd1-user' } },
+      };
+      installSettingsMock();
+      const result = await findRemove().action!(
+        mockContext,
+        'server1 --scope all',
+      );
+      expect(setValueMock).toHaveBeenCalledTimes(2);
+      expect(setValueMock).toHaveBeenCalledWith(
+        SettingScope.Workspace,
+        'mcpServers',
+        {},
+      );
+      expect(setValueMock).toHaveBeenCalledWith(
+        SettingScope.User,
+        'mcpServers',
+        {},
+      );
+      expect(result).toMatchObject({
+        messageType: 'info',
+        content: expect.stringContaining('workspace and user'),
+      });
+    });
+
+    it('errors when --scope user is given but server is not in user scope', async () => {
+      // Default scopeContents: only in workspace
+      const result = await findRemove().action!(
+        mockContext,
+        'server1 --scope user',
+      );
+      expect(result).toMatchObject({
+        messageType: 'error',
+        content: expect.stringContaining('not defined in user settings'),
+      });
+      expect(setValueMock).not.toHaveBeenCalled();
+    });
+
+    it('errors on invalid --scope value', async () => {
+      const result = await findRemove().action!(
+        mockContext,
+        'server1 --scope global',
+      );
+      expect(result).toMatchObject({
+        messageType: 'error',
+        content: expect.stringContaining('Invalid --scope value'),
+      });
+    });
+
+    it('completion returns servers without extension origin matching prefix', async () => {
+      const out = await findRemove().completion!(mockContext, 'ser');
+      expect(out).toEqual(['server1']);
     });
   });
 });

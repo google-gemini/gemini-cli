@@ -30,7 +30,7 @@ import {
   normalizeServerId,
   canLoadServer,
 } from '../../config/mcp/mcpServerEnablement.js';
-import { loadSettings } from '../../config/settings.js';
+import { loadSettings, SettingScope } from '../../config/settings.js';
 import { parseSlashCommand } from '../../utils/commands.js';
 
 const authCommand: SlashCommand = {
@@ -533,6 +533,192 @@ const disableCommand: SlashCommand = {
   completion: (ctx, arg) => getEnablementCompletion(ctx, arg, true),
 };
 
+async function handleRemove(
+  context: CommandContext,
+  args: string,
+): Promise<MessageActionReturn> {
+  const agentContext = context.services.agentContext;
+  const config = agentContext?.config;
+  if (!config) {
+    return {
+      type: 'message',
+      messageType: 'error',
+      content: 'Config not loaded.',
+    };
+  }
+
+  config.setUserInteractedWithMcp();
+
+  // Parse args: <server-name> [--scope user|workspace|all]
+  const tokens = args.trim().split(/\s+/).filter(Boolean);
+  let explicitScope: 'user' | 'workspace' | 'all' | null = null;
+  const positional: string[] = [];
+  for (let i = 0; i < tokens.length; i++) {
+    const t = tokens[i];
+    if (t === '--scope' || t === '-s') {
+      const v = tokens[++i];
+      if (v !== 'user' && v !== 'workspace' && v !== 'all') {
+        return {
+          type: 'message',
+          messageType: 'error',
+          content: `Invalid --scope value '${v ?? ''}'. Expected: user, workspace, or all.`,
+        };
+      }
+      explicitScope = v;
+    } else if (t.startsWith('--scope=')) {
+      const v = t.slice('--scope='.length);
+      if (v !== 'user' && v !== 'workspace' && v !== 'all') {
+        return {
+          type: 'message',
+          messageType: 'error',
+          content: `Invalid --scope value '${v}'. Expected: user, workspace, or all.`,
+        };
+      }
+      explicitScope = v;
+    } else {
+      positional.push(t);
+    }
+  }
+
+  const serverName = positional[0];
+  if (!serverName) {
+    return {
+      type: 'message',
+      messageType: 'error',
+      content:
+        'Server name required. Usage: /mcp remove <server-name> [--scope user|workspace|all]',
+    };
+  }
+
+  const name = normalizeServerId(serverName);
+  const servers = config.getMcpClientManager()?.getMcpServers() ?? {};
+  const matchedKey = Object.keys(servers).find(
+    (n) => normalizeServerId(n) === name,
+  );
+  if (!matchedKey) {
+    return {
+      type: 'message',
+      messageType: 'error',
+      content: `Server '${serverName}' not found. Use /mcp list to see available servers.`,
+    };
+  }
+
+  // Servers contributed by extensions live in the extension manifest, not in
+  // the user/workspace settings file, so they cannot be removed via /mcp.
+  const extensionInfo = servers[matchedKey]?.extension;
+  if (extensionInfo) {
+    return {
+      type: 'message',
+      messageType: 'error',
+      content: `'${matchedKey}' is provided by extension '${extensionInfo.name}'. Use /extensions to manage it.`,
+    };
+  }
+
+  // Detect which physical settings files actually contain this entry. The
+  // entry can live in workspace, user, or both (in which case workspace
+  // overrides user via shallow merge but the user copy stays as a "zombie").
+  const settings = loadSettings();
+  type RemovableScope = SettingScope.Workspace | SettingScope.User;
+  const scopeOrder: readonly RemovableScope[] = [
+    SettingScope.Workspace,
+    SettingScope.User,
+  ];
+  const foundIn: RemovableScope[] = [];
+  for (const scope of scopeOrder) {
+    const file = settings.forScope(scope);
+    const scoped = (file.settings.mcpServers ?? {}) as Record<string, unknown>;
+    if (matchedKey in scoped) foundIn.push(scope);
+  }
+
+  if (foundIn.length === 0) {
+    return {
+      type: 'message',
+      messageType: 'error',
+      content: `'${matchedKey}' is not defined in user or workspace settings and cannot be removed.`,
+    };
+  }
+
+  // Resolve which scope(s) to actually delete from.
+  let targetScopes: RemovableScope[];
+  if (explicitScope === 'all') {
+    targetScopes = foundIn;
+  } else if (explicitScope === 'user') {
+    if (!foundIn.includes(SettingScope.User)) {
+      return {
+        type: 'message',
+        messageType: 'error',
+        content: `'${matchedKey}' is not defined in user settings.`,
+      };
+    }
+    targetScopes = [SettingScope.User];
+  } else if (explicitScope === 'workspace') {
+    if (!foundIn.includes(SettingScope.Workspace)) {
+      return {
+        type: 'message',
+        messageType: 'error',
+        content: `'${matchedKey}' is not defined in workspace settings.`,
+      };
+    }
+    targetScopes = [SettingScope.Workspace];
+  } else if (foundIn.length > 1) {
+    // Ambiguous and no explicit choice — refuse rather than silently delete
+    // only one copy and leave the user wondering why /mcp list still shows it.
+    return {
+      type: 'message',
+      messageType: 'error',
+      content: `'${matchedKey}' is defined in BOTH workspace and user settings. Use \`/mcp remove ${matchedKey} --scope workspace\`, \`--scope user\`, or \`--scope all\` to choose.`,
+    };
+  } else {
+    targetScopes = foundIn;
+  }
+
+  for (const scope of targetScopes) {
+    const file = settings.forScope(scope);
+    const scoped = (file.settings.mcpServers ?? {}) as Record<string, unknown>;
+    const next = { ...scoped };
+    delete next[matchedKey];
+    settings.setValue(scope, 'mcpServers', next);
+  }
+
+  const mcpClientManager = config.getMcpClientManager();
+  if (mcpClientManager) {
+    context.ui.addItem(
+      { type: 'info', text: 'Reloading MCP servers...' },
+      Date.now(),
+    );
+    await mcpClientManager.restart();
+  }
+  if (agentContext.geminiClient?.isInitialized()) {
+    await agentContext.geminiClient.setTools();
+  }
+  context.ui.reloadCommands();
+
+  const where = targetScopes.map((s) => s.toLowerCase()).join(' and ');
+  return {
+    type: 'message',
+    messageType: 'info',
+    content: `MCP server '${matchedKey}' removed from ${where} settings.`,
+  };
+}
+
+const removeCommand: SlashCommand = {
+  name: 'remove',
+  altNames: ['rm'],
+  description: 'Remove an MCP server from your settings',
+  kind: CommandKind.BUILT_IN,
+  autoExecute: true,
+  action: handleRemove,
+  completion: async (context: CommandContext, partialArg: string) => {
+    const config = context.services.agentContext?.config;
+    if (!config) return [];
+    const servers = config.getMcpClientManager()?.getMcpServers() ?? {};
+    return Object.entries(servers)
+      .filter(([, s]) => !s.extension)
+      .map(([n]) => n)
+      .filter((n) => n.startsWith(partialArg));
+  },
+};
+
 export const mcpCommand: SlashCommand = {
   name: 'mcp',
   description: 'Manage configured Model Context Protocol (MCP) servers',
@@ -546,6 +732,7 @@ export const mcpCommand: SlashCommand = {
     reloadCommand,
     enableCommand,
     disableCommand,
+    removeCommand,
   ],
   action: async (
     context: CommandContext,
