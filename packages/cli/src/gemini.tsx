@@ -60,6 +60,11 @@ import { getUserStartupWarnings } from './utils/userStartupWarnings.js';
 import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
 import { runNonInteractive } from './nonInteractiveCli.js';
 import {
+  normalizeMaxAgents,
+  parseMultiAgentRoles,
+  runNonInteractiveMultiAgent,
+} from './multiAgent/nonInteractiveMultiAgent.js';
+import {
   cleanupCheckpoints,
   registerCleanup,
   registerSyncCleanup,
@@ -789,13 +794,28 @@ export async function main() {
 
     initializeOutputListenersAndFlush(config);
 
-    await runNonInteractive({
-      config,
-      settings,
-      input,
-      prompt_id,
-      resumedSessionData,
-    });
+    if (argv.multiAgent) {
+      await runNonInteractiveMultiAgent({
+        config,
+        settings,
+        input,
+        prompt_id,
+        resumedSessionData,
+        options: {
+          roles: parseMultiAgentRoles(argv.multiAgentRoles),
+          maxAgents: normalizeMaxAgents(argv.multiAgentMax),
+          dryRun: !!argv.multiAgentDryRun,
+        },
+      });
+    } else {
+      await runNonInteractive({
+        config,
+        settings,
+        input,
+        prompt_id,
+        resumedSessionData,
+      });
+    }
     // Call cleanup before process.exit, which causes cleanup to not run
     await runExitCleanup();
     process.exit(ExitCodes.SUCCESS);
