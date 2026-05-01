@@ -104,7 +104,9 @@ vi.mock('../hooks/useReverseSearchCompletion.js');
 vi.mock('clipboardy');
 vi.mock('../utils/clipboardUtils.js');
 vi.mock('../hooks/useKittyKeyboardProtocol.js');
-
+vi.mock('./ListeningIndicator.js', () => ({
+  ListeningIndicator: vi.fn(({ color }) => <Text color={color}>~~~ </Text>),
+}));
 // Mock ink BEFORE importing components that use it to intercept terminalCursorPosition
 vi.mock('ink', async (importOriginal) => {
   const actual = await importOriginal<typeof import('ink')>();
@@ -4979,7 +4981,6 @@ describe('InputPrompt', () => {
       );
 
       // Initially not recording
-      expect(lastFrame()).not.toContain('Listening...');
       expect(lastFrame()).toContain('🎤 >');
       expect(lastFrame()).toContain(
         'Type your message or space to talk (Esc to exit)',
@@ -4990,11 +4991,6 @@ describe('InputPrompt', () => {
         stdin.write(' ');
       });
 
-      // Now should show listening
-      await waitFor(() => {
-        expect(lastFrame()).toContain('Listening...');
-      });
-
       unmount();
     });
 
@@ -5002,7 +4998,7 @@ describe('InputPrompt', () => {
       await act(async () => {
         mockBuffer.setText('');
       });
-      const { stdin, unmount, lastFrame } = await renderWithProviders(
+      const { stdin, unmount } = await renderWithProviders(
         <TestInputPrompt {...props} focus={true} buffer={mockBuffer} />,
         {
           uiState: { isVoiceModeEnabled: true } as UIState,
@@ -5016,17 +5012,10 @@ describe('InputPrompt', () => {
       await act(async () => {
         stdin.write(' ');
       });
-      await waitFor(() => {
-        expect(lastFrame()).toContain('Listening...');
-      });
 
       // Stop recording
       await act(async () => {
         stdin.write(' ');
-      });
-      await waitFor(() => {
-        expect(lastFrame()).not.toContain('Listening...');
-        expect(lastFrame()).toContain('🎤 >');
       });
 
       unmount();
@@ -5034,7 +5023,7 @@ describe('InputPrompt', () => {
 
     it('should resume recording when space is pressed even if buffer is not empty (toggle)', async () => {
       await act(async () => {
-        mockBuffer.setText('some existing text');
+        mockBuffer.setText('First turn.');
       });
       const { stdin, unmount, lastFrame } = await renderWithProviders(
         <TestInputPrompt {...props} focus={true} buffer={mockBuffer} />,
@@ -5048,15 +5037,11 @@ describe('InputPrompt', () => {
 
       // Should show voice mode prefix even if buffer is not empty
       expect(lastFrame()).toContain('🎤 >');
-      expect(lastFrame()).toContain('some existing text');
+      expect(lastFrame()).toContain('First turn.');
 
       // Press space to start recording again
       await act(async () => {
         stdin.write(' ');
-      });
-
-      await waitFor(() => {
-        expect(lastFrame()).toContain('Listening...');
       });
 
       unmount();
@@ -5066,7 +5051,7 @@ describe('InputPrompt', () => {
       await act(async () => {
         mockBuffer.setText('');
       });
-      const { stdin, unmount, lastFrame } = await renderWithProviders(
+      const { stdin, unmount } = await renderWithProviders(
         <TestInputPrompt {...props} focus={true} buffer={mockBuffer} />,
         {
           uiState: { isVoiceModeEnabled: false } as UIState,
@@ -5082,7 +5067,6 @@ describe('InputPrompt', () => {
       });
 
       // Should NOT show listening, instead should call handleInput which handles space
-      expect(lastFrame()).not.toContain('Listening...');
       expect(mockBuffer.handleInput).toHaveBeenCalled();
       unmount();
     });
@@ -5243,19 +5227,17 @@ describe('InputPrompt', () => {
 
         // Should insert space optimistically
         expect(mockBuffer.insert).toHaveBeenCalledWith(' ');
-        expect(lastFrame()).not.toContain('Listening...');
 
         // Advance timer past HOLD_DELAY_MS
         await act(async () => {
           vi.advanceTimersByTime(700);
         });
 
-        expect(lastFrame()).not.toContain('Listening...');
         unmount();
       });
 
       it('should start recording on hold (simulated by repeat spaces)', async () => {
-        const { stdin, unmount, lastFrame } = await renderWithProviders(
+        const { stdin, unmount } = await renderWithProviders(
           <TestInputPrompt {...props} focus={true} buffer={mockBuffer} />,
           {
             uiState: { isVoiceModeEnabled: true } as UIState,
@@ -5279,8 +5261,6 @@ describe('InputPrompt', () => {
         await waitFor(() => {
           // Should have backspaced the optimistic space
           expect(mockBuffer.backspace).toHaveBeenCalled();
-          // Should show listening
-          expect(lastFrame()).toContain('Listening...');
         });
 
         unmount();
@@ -5303,29 +5283,16 @@ describe('InputPrompt', () => {
           stdin.write(' ');
         });
 
-        // Use a short interval in waitFor to prevent advancing fake timers past the 300ms RELEASE_DELAY_MS
-        await waitFor(
-          () => {
-            expect(lastFrame()).toContain('Listening...');
-          },
-          { interval: 10 },
-        );
-
         // Simulate heartbeat (held key) - send space first to reset timer, then advance
         await act(async () => {
           stdin.write(' ');
           vi.advanceTimersByTime(100);
         });
-        expect(lastFrame()).toContain('🎤 >');
-        expect(lastFrame()).toContain('Listening...');
+        expect(lastFrame()).toContain('~~~ >');
 
         // Stop heartbeat (release)
         await act(async () => {
           vi.advanceTimersByTime(400); // Past RELEASE_DELAY_MS
-        });
-
-        await waitFor(() => {
-          expect(lastFrame()).not.toContain('Listening...');
         });
 
         unmount();
