@@ -70,7 +70,7 @@ describe('file_creation_behavior', () => {
             typeof log.toolRequest.args === 'string'
               ? JSON.parse(log.toolRequest.args)
               : log.toolRequest.args;
-          return args.path === 'config.json';
+          return args.file_path === 'config.json';
         } catch {
           return false;
         }
@@ -83,7 +83,7 @@ describe('file_creation_behavior', () => {
             typeof log.toolRequest.args === 'string'
               ? JSON.parse(log.toolRequest.args)
               : log.toolRequest.args;
-          return args.path === 'config.json';
+          return args.file_path === 'config.json';
         } catch {
           return false;
         }
