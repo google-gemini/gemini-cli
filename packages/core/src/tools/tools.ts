@@ -1029,6 +1029,10 @@ export interface ToolExecuteConfirmationDetails {
   rootCommand: string;
   rootCommands: string[];
   commands?: string[];
+  /** Decoded version of command when obfuscation was detected. */
+  decodedCommand?: string;
+  /** Human-readable summary of detected obfuscation techniques. */
+  deobfuscationWarning?: string;
 }
 
 export interface ToolMcpConfirmationDetails {

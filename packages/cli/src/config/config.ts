@@ -1124,6 +1124,12 @@ export async function loadCliConfig(
       };
     },
     enableConseca: settings.security?.enableConseca,
+    enableSecretScanning:
+      settings.security?.experimental?.secretScanning?.enabled,
+    enableContentSanitization:
+      settings.security?.experimental?.contentSanitization?.enabled,
+    enableNerScanning:
+      settings.security?.experimental?.nerScanning?.enabled,
   });
 }
 
