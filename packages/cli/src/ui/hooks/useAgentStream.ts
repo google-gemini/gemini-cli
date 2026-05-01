@@ -36,11 +36,15 @@ import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import { useStateAndRef } from './useStateAndRef.js';
 import { type MinimalTrackedToolCall } from './useTurnActivityMonitor.js';
+import { useKeypress } from './useKeypress.js';
 
 export interface UseAgentStreamOptions {
   agent?: AgentProtocol;
   addItem: UseHistoryManagerReturn['addItem'];
-  onCancelSubmit: (shouldRestorePrompt?: boolean) => void;
+  onCancelSubmit: (
+    shouldRestorePrompt?: boolean,
+    clearBuffer?: boolean,
+  ) => void;
   isShellFocused?: boolean;
   logger?: Logger | null;
 }
@@ -120,13 +124,16 @@ export const useAgentStream = ({
     }
   }, [addItem, pendingHistoryItemRef, setPendingHistoryItem]);
 
-  const cancelOngoingRequest = useCallback(async () => {
-    if (agent) {
-      await agent.abort();
-      setStreamingState(StreamingState.Idle);
-      onCancelSubmit(false);
-    }
-  }, [agent, onCancelSubmit]);
+  const cancelOngoingRequest = useCallback(
+    async (clearBuffer: boolean = true) => {
+      if (agent) {
+        await agent.abort();
+        setStreamingState(StreamingState.Idle);
+        onCancelSubmit(false, clearBuffer);
+      }
+    },
+    [agent, onCancelSubmit],
+  );
 
   // TODO: Support native handleApprovalModeChange for Plan Mode
   const handleApprovalModeChange = useCallback(
@@ -321,6 +328,21 @@ export const useAgentStream = ({
     const unsubscribe = agent?.subscribe(handleEvent);
     return () => unsubscribe?.();
   }, [agent, handleEvent]);
+
+  useKeypress(
+    (key) => {
+      if (key.name === 'escape' && !isShellFocused) {
+        void cancelOngoingRequest(false);
+        return true;
+      }
+      return false;
+    },
+    {
+      isActive:
+        streamingState === StreamingState.Responding ||
+        streamingState === StreamingState.WaitingForConfirmation,
+    },
+  );
 
   const submitQuery = useCallback(
     async (
