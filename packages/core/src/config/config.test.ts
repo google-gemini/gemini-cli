@@ -3673,7 +3673,7 @@ describe('Config JIT Initialization', () => {
       expect(config.getExperimentalGemma()).toBe(false);
     });
 
-    it('should return false when experimentalGemma is not provided', () => {
+    it('should return true when experimentalGemma is not provided', () => {
       const params: ConfigParameters = {
         sessionId: 'test-session',
         targetDir: '/tmp/test',
@@ -3683,7 +3683,7 @@ describe('Config JIT Initialization', () => {
       };
 
       config = new Config(params);
-      expect(config.getExperimentalGemma()).toBe(false);
+      expect(config.getExperimentalGemma()).toBe(true);
     });
 
     it('should be independent of experimentalMemoryV2', () => {
