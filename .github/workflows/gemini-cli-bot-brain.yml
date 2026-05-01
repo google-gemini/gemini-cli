@@ -210,12 +210,12 @@ jobs:
                  # Discard rejected changes
                  git reset
                  git checkout .
-                 rm -f pr-description.md branch-name.txt pr-comment.md pr-number.txt issue-comment.md bot-changes.patch
+                 rm -f pr-description.md branch-name.txt pr-comment.md pr-number.txt issue-comment.md bot-changes.patch rejected-changes.patch
                else
                  echo "Max iterations reached. Failing."
                  echo "[REJECTED]" > critique_result.txt
                  # We still want to upload artifacts for debugging even if it failed.
-                 git diff --staged > bot-changes.patch || true
+                 git diff --staged > rejected-changes.patch || true
                  break
                fi
             fi
@@ -241,6 +241,7 @@ jobs:
             tools/gemini-cli-bot/lessons-learned.md
             tools/gemini-cli-bot/history/*.csv
             bot-changes.patch
+            rejected-changes.patch
             pr-description.md
             branch-name.txt
             pr-comment.md
