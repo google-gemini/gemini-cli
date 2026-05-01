@@ -602,6 +602,52 @@ describe('ChatRecordingService', () => {
       expect(fs.existsSync(sessionDir)).toBe(false);
     });
 
+    it('should delete legacy pretty-printed session files and their artifacts', async () => {
+      const sessionId = 'legacy-uuid';
+      const shortId = 'legacy12';
+      const chatsDir = path.join(testTempDir, 'chats');
+      const toolOutputsDir = path.join(testTempDir, 'tool-outputs');
+
+      fs.mkdirSync(chatsDir, { recursive: true });
+      fs.mkdirSync(toolOutputsDir, { recursive: true });
+
+      const sessionFile = path.join(
+        chatsDir,
+        `session-2023-01-01T00-00-${shortId}.json`,
+      );
+      // Pretty-printed JSON (not JSONL)
+      fs.writeFileSync(
+        sessionFile,
+        JSON.stringify({ sessionId, messages: [] }, null, 2),
+      );
+
+      const toolOutputDir = path.join(toolOutputsDir, `session-${sessionId}`);
+      fs.mkdirSync(toolOutputDir, { recursive: true });
+      fs.writeFileSync(path.join(toolOutputDir, 'output.txt'), 'data');
+
+      await chatRecordingService.deleteSession(shortId);
+
+      expect(fs.existsSync(sessionFile)).toBe(false);
+      expect(fs.existsSync(toolOutputDir)).toBe(false);
+    });
+
+    it('should delete the session file even if it is corrupted (invalid JSON)', async () => {
+      const shortId = 'corrupt1';
+      const chatsDir = path.join(testTempDir, 'chats');
+
+      fs.mkdirSync(chatsDir, { recursive: true });
+
+      const sessionFile = path.join(
+        chatsDir,
+        `session-2023-01-01T00-00-${shortId}.jsonl`,
+      );
+      fs.writeFileSync(sessionFile, 'not-json');
+
+      await chatRecordingService.deleteSession(shortId);
+
+      expect(fs.existsSync(sessionFile)).toBe(false);
+    });
+
     it('should delete subagent files and their logs when parent is deleted', async () => {
       const parentSessionId = '12345678-session-id';
       const shortId = '12345678';

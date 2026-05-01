@@ -68,13 +68,14 @@ export function handleAutoUpdate(
   info: UpdateObject | null,
   settings: LoadedSettings,
   projectRoot: string,
+  isSandboxEnabled: boolean,
   spawnFn: typeof spawn = spawnWrapper,
 ) {
   if (!info) {
     return;
   }
 
-  if (settings.merged.tools.sandbox || process.env['GEMINI_SANDBOX']) {
+  if (isSandboxEnabled) {
     updateEventEmitter.emit('update-info', {
       message: `${info.message}\nAutomatic update is not available in sandbox mode.`,
     });
