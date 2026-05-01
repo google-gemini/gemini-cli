@@ -1491,6 +1491,12 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
+- **`context.fileFiltering.maxFileCount`** (number):
+  - **Description:** Maximum number of files to index for autocomplete and
+    search.
+  - **Default:** `20000`
+  - **Requires restart:** Yes
+
 - **`context.fileFiltering.enableRecursiveFileSearch`** (boolean):
   - **Description:** Enable recursive file search functionality when completing
     @ references in the prompt.

@@ -6,7 +6,12 @@
 
 import crypto from 'node:crypto';
 
-const crawlCache = new Map<string, string[]>();
+export interface CachedResult {
+  files: string[];
+  truncated: boolean;
+}
+
+const crawlCache = new Map<string, CachedResult>();
 const cacheTimers = new Map<string, NodeJS.Timeout>();
 
 /**
@@ -32,19 +37,24 @@ export const getCacheKey = (
  * Reads cached data from the in-memory cache.
  * Returns undefined if the key is not found.
  */
-export const read = (key: string): string[] | undefined => crawlCache.get(key);
+export const read = (key: string): CachedResult | undefined =>
+  crawlCache.get(key);
 
 /**
  * Writes data to the in-memory cache and sets a timer to evict it after the TTL.
  */
-export const write = (key: string, results: string[], ttlMs: number): void => {
+export const write = (
+  key: string,
+  result: CachedResult,
+  ttlMs: number,
+): void => {
   // Clear any existing timer for this key to prevent premature deletion
   if (cacheTimers.has(key)) {
     clearTimeout(cacheTimers.get(key));
   }
 
   // Store the new data
-  crawlCache.set(key, results);
+  crawlCache.set(key, result);
 
   // Set a timer to automatically delete the cache entry after the TTL
   const timerId = setTimeout(() => {

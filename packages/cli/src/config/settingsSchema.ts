@@ -22,6 +22,7 @@ import {
   type CustomTheme,
   type SandboxConfig,
   type VertexAiRoutingConfig,
+  DEFAULT_FILE_FILTERING_OPTIONS,
 } from '@google/gemini-cli-core';
 import type { SessionRetentionSettings } from './settings.js';
 import { DEFAULT_MIN_RETENTION } from '../utils/sessionCleanup.js';
@@ -1481,6 +1482,16 @@ const SETTINGS_SCHEMA = {
               Enable file watcher updates for @ file suggestions (experimental).
             `,
             showInDialog: false,
+          },
+          maxFileCount: {
+            type: 'number',
+            label: 'Max File Count',
+            category: 'Context',
+            requiresRestart: true,
+            default: DEFAULT_FILE_FILTERING_OPTIONS.maxFileCount,
+            description:
+              'Maximum number of files to index for autocomplete and search.',
+            showInDialog: true,
           },
           enableRecursiveFileSearch: {
             type: 'boolean',
