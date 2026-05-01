@@ -43,6 +43,8 @@ const mockSettings = {
       theme: 'default', // DEFAULT_THEME.name
       autoThemeSwitching: true,
       terminalBackgroundPollingInterval: 60,
+      preferredLightTheme: undefined as string | undefined,
+      preferredDarkTheme: undefined as string | undefined,
     },
   },
 };
@@ -60,6 +62,11 @@ vi.mock('../themes/theme-manager.js', async (importOriginal) => {
       isDefaultTheme: (name: string) =>
         name === 'default' || name === 'default-light',
       setTerminalBackground: vi.fn(),
+      getAvailableThemes: () => [
+        { name: 'default' },
+        { name: 'default-light' },
+        { name: 'my-light-theme' },
+      ],
     },
     DEFAULT_THEME: { name: 'default' },
   };
@@ -88,6 +95,8 @@ describe('useTerminalTheme', () => {
     vi.mocked(themeManager.setTerminalBackground).mockClear();
     mockSettings.merged.ui.autoThemeSwitching = true;
     mockSettings.merged.ui.theme = 'default';
+    mockSettings.merged.ui.preferredLightTheme = undefined;
+    mockSettings.merged.ui.preferredDarkTheme = undefined;
   });
 
   afterEach(() => {
@@ -152,7 +161,40 @@ describe('useTerminalTheme', () => {
     unmount();
   });
 
+  it('should switch to preferred light theme if set', async () => {
+    mockSettings.merged.ui.preferredLightTheme = 'my-light-theme';
+
+    const { unmount } = await renderHook(() =>
+      useTerminalTheme(mockHandleThemeSelect, config, vi.fn()),
+    );
+
+    const handler = mockSubscribe.mock.calls[0][0];
+
+    // Simulate light background response (white)
+    handler('rgb:ffff/ffff/ffff');
+
+    expect(mockHandleThemeSelect).toHaveBeenCalledWith(
+      'my-light-theme',
+      expect.anything(),
+    );
+    unmount();
+  });
+
+  it('should poll if current theme is a preferred theme', async () => {
+    mockSettings.merged.ui.preferredLightTheme = 'my-light-theme';
+    mockSettings.merged.ui.theme = 'my-light-theme'; // Current theme is preferred light
+
+    const { unmount } = await renderHook(() =>
+      useTerminalTheme(mockHandleThemeSelect, config, vi.fn()),
+    );
+
+    vi.advanceTimersByTime(60000);
+    expect(mockQueryTerminalBackground).toHaveBeenCalled(); // Should poll
+    unmount();
+  });
+
   it('should switch to dark theme when background is dark', async () => {
+    // Start with light theme
     mockSettings.merged.ui.theme = 'default-light';
 
     config.setTerminalBackground('#ffffff');

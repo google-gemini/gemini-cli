@@ -49,6 +49,8 @@ export async function setupTerminalAndTheme(
       themeManager.getAllThemes(),
       DEFAULT_THEME.name,
       'Default Light',
+      settings.merged.ui.preferredDarkTheme,
+      settings.merged.ui.preferredLightTheme,
     );
     themeManager.setActiveTheme(themeName);
   }
