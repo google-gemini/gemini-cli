@@ -455,7 +455,7 @@ export function isActiveModel(
   useGemini3_1: boolean = false,
   useGemini3_1FlashLite: boolean = false,
   useCustomToolModel: boolean = false,
-  experimentalGemma: boolean = false,
+  experimentalGemma: boolean = true,
 ): boolean {
   if (!VALID_GEMINI_MODELS.has(model)) {
     return false;
