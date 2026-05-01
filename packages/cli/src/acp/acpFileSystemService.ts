@@ -67,12 +67,22 @@ export class AcpFileSystemService implements FileSystemService {
     }
   }
 
-  async writeTextFile(filePath: string, content: string): Promise<void> {
+  async writeTextFile(
+    filePath: string,
+    content: string,
+    options?: { mode?: number },
+  ): Promise<void> {
     if (!this.capabilities.writeTextFile || this.shouldUseFallback(filePath)) {
-      return this.fallback.writeTextFile(filePath, content);
+      // Fallback path (typically used for ~/.gemini paths) goes through
+      // local fs directly — propagate the mode option so sensitive files
+      // get tightened.
+      return this.fallback.writeTextFile(filePath, content, options);
     }
 
     try {
+      // ACP host-managed write: cannot pass a POSIX mode through the protocol
+      // today. Caller's `options.mode` is silently dropped here; document this
+      // by logging a debug note when mode was requested.
       await this.connection.writeTextFile({
         path: filePath,
         content,

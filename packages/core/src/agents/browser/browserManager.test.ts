@@ -76,6 +76,9 @@ vi.mock('node:fs', async (importOriginal) => {
       }
       return actual.existsSync(p);
     }),
+    // Avoid creating the real ~/.gemini/cli-browser-profile/ during tests
+    // (BrowserManager pre-creates it at SECURE_DIR_MODE in persistent mode).
+    mkdirSync: vi.fn(),
   };
 });
 

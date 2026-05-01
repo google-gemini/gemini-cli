@@ -3617,6 +3617,60 @@ describe('Config JIT Initialization', () => {
     });
   });
 
+  describe('write path classification', () => {
+    it('isPathAllowed and isSecureWritePath agree on the four classification cases', async () => {
+      // Pin the matrix that the shared classifyWritePath helper produces.
+      // This ensures the two predicates can never drift if one of them is
+      // updated in isolation.
+      //
+      //   path category               | isPathAllowed | isSecureWritePath
+      //   ----------------------------|---------------|-------------------
+      //   workspace                   | true          | false
+      //   projectTempDir              | true          | true
+      //   ~/.gemini/<GEMINI.md>       | true          | true
+      //   other ~/.gemini/ (settings) | false         | false
+      const params: ConfigParameters = {
+        sessionId: 'test-session',
+        targetDir: '/tmp/test',
+        debugMode: false,
+        model: 'test-model',
+        cwd: '/tmp/test',
+      };
+
+      config = new Config(params);
+      // Storage init alone is enough for classifyWritePath: it only needs
+      // workspaceContext + storage.getProjectTempDir() + the global
+      // GEMINI.md path. Skipping the full Config.initialize() avoids the
+      // unrelated telemetry/tool-registry/memory boot cost.
+      await config.storage.initialize();
+
+      const workspacePath = path.join('/tmp/test', 'src/index.ts');
+      const tempPath = path.join(
+        config.storage.getProjectTempDir(),
+        'logs.json',
+      );
+      const globalDir = Storage.getGlobalGeminiDir();
+      const globalMemoryPath = path.join(globalDir, 'GEMINI.md');
+      const otherGeminiPath = path.join(globalDir, 'settings.json');
+
+      // workspace: allowed but NOT secure (user's source code keeps umask)
+      expect(config.isPathAllowed(workspacePath)).toBe(true);
+      expect(config.isSecureWritePath(workspacePath)).toBe(false);
+
+      // projectTempDir: allowed AND secure
+      expect(config.isPathAllowed(tempPath)).toBe(true);
+      expect(config.isSecureWritePath(tempPath)).toBe(true);
+
+      // ~/.gemini/<GEMINI.md>: allowed AND secure (surgical allowlist)
+      expect(config.isPathAllowed(globalMemoryPath)).toBe(true);
+      expect(config.isSecureWritePath(globalMemoryPath)).toBe(true);
+
+      // other ~/.gemini/ files: denied AND NOT secure
+      expect(config.isPathAllowed(otherGeminiPath)).toBe(false);
+      expect(config.isSecureWritePath(otherGeminiPath)).toBe(false);
+    });
+  });
+
   describe('isAutoMemoryEnabled', () => {
     it('should default to false', () => {
       const params: ConfigParameters = {

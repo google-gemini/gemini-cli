@@ -43,6 +43,8 @@ import {
   buildToolVisibilityContext,
   UPDATE_TOPIC_TOOL_NAME,
   UPDATE_TOPIC_DISPLAY_NAME,
+  SECURE_DIR_MODE,
+  SECURE_FILE_MODE,
 } from '@google/gemini-cli-core';
 import type {
   Config,
@@ -2087,10 +2089,16 @@ export const useGeminiStream = (
         if (checkpointsToWrite.size > 0) {
           const checkpointDir = config.storage.getProjectTempCheckpointsDir();
           try {
-            await fs.mkdir(checkpointDir, { recursive: true });
+            // Pre-create projectTempDir at SECURE_DIR_MODE so the parent of
+            // checkpointDir is locked down even if it doesn't exist yet.
+            config.storage.ensureProjectTempDirExists();
+            await fs.mkdir(checkpointDir, {
+              recursive: true,
+              mode: SECURE_DIR_MODE,
+            });
             for (const [fileName, content] of checkpointsToWrite) {
               const filePath = path.join(checkpointDir, fileName);
-              await fs.writeFile(filePath, content);
+              await fs.writeFile(filePath, content, { mode: SECURE_FILE_MODE });
             }
           } catch (error) {
             onDebugMessage(

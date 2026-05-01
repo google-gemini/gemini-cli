@@ -91,6 +91,7 @@ describe('ChatRecordingService', () => {
       getProjectRoot: vi.fn().mockReturnValue('/test/project/root'),
       storage: {
         getProjectTempDir: vi.fn().mockReturnValue(testTempDir),
+        ensureProjectTempDirExists: vi.fn(),
       },
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getDebugMode: vi.fn().mockReturnValue(false),
@@ -1298,11 +1299,12 @@ describe('ChatRecordingService', () => {
         model: 'gemini-pro',
       });
 
-      // mkdirSync should be called with the parent directory and recursive option
+      // mkdirSync should be called with the parent directory, recursive option,
+      // and a 0o700 mode (sensitive conversation history must not be world-readable).
       const conversationFile = chatRecordingService.getConversationFilePath()!;
       expect(mkdirSyncSpy).toHaveBeenCalledWith(
         path.dirname(conversationFile),
-        { recursive: true },
+        { recursive: true, mode: 0o700 },
       );
 
       // mkdirSync should be called before writeFileSync
@@ -1313,6 +1315,35 @@ describe('ChatRecordingService', () => {
       expect(lastMkdir).toBeLessThan(lastWrite);
 
       mkdirSyncSpy.mockRestore();
+    });
+  });
+
+  describe('file permissions (security)', () => {
+    it('should create the chats directory with mode 0o700 and write conversation files with mode 0o600', async () => {
+      const mkdirSyncSpy = vi.mocked(fs.mkdirSync);
+      const appendFileSyncSpy = vi.mocked(fs.appendFileSync);
+      mkdirSyncSpy.mockClear();
+      appendFileSyncSpy.mockClear();
+
+      await chatRecordingService.initialize();
+
+      chatRecordingService.recordMessage({
+        type: 'user',
+        content: 'sensitive content that must not be world-readable',
+        model: 'gemini-pro',
+      });
+
+      // Every mkdirSync call inside the chats tree must restrict to user-only.
+      for (const call of mkdirSyncSpy.mock.calls) {
+        expect(call[1]).toMatchObject({ recursive: true, mode: 0o700 });
+      }
+      expect(mkdirSyncSpy).toHaveBeenCalled();
+
+      // Every appendFileSync call must specify mode 0o600.
+      for (const call of appendFileSyncSpy.mock.calls) {
+        expect(call[2]).toEqual({ mode: 0o600 });
+      }
+      expect(appendFileSyncSpy).toHaveBeenCalled();
     });
   });
 });

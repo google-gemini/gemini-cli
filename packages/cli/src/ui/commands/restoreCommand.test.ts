@@ -46,6 +46,7 @@ describe('restoreCommand', () => {
       storage: {
         getProjectTempCheckpointsDir: vi.fn().mockReturnValue(checkpointsDir),
         getProjectTempDir: vi.fn().mockReturnValue(geminiTempDir),
+        ensureProjectTempDirExists: vi.fn(),
       },
       geminiClient: {
         setHistory: mockSetHistory,

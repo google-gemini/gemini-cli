@@ -42,6 +42,7 @@ describe('ToolOutputMaskingService', () => {
       storage: {
         getHistoryDir: () => path.join(testTempDir, 'history'),
         getProjectTempDir: () => testTempDir,
+        ensureProjectTempDirExists: () => {},
       },
       getSessionId: () => 'mock-session',
       getUsageStatisticsEnabled: () => false,

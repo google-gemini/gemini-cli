@@ -148,6 +148,7 @@ describe('WriteFileTool', () => {
     const workspaceContext = new WorkspaceContext(rootDir, [plansDir]);
     const mockStorage = {
       getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
+      ensureProjectTempDirExists: vi.fn(),
     };
 
     mockConfig = {
@@ -160,6 +161,10 @@ describe('WriteFileTool', () => {
           return true;
         }
 
+        const projectTempDir = this.storage.getProjectTempDir();
+        return isSubpath(path.resolve(projectTempDir), absolutePath);
+      },
+      isSecureWritePath(this: Config, absolutePath: string): boolean {
         const projectTempDir = this.storage.getProjectTempDir();
         return isSubpath(path.resolve(projectTempDir), absolutePath);
       },
@@ -1134,6 +1139,54 @@ describe('WriteFileTool', () => {
       const expectedWritePath = path.join(plansDir, 'conductor/tracks/test.md');
       expect(fs.existsSync(expectedWritePath)).toBe(true);
       expect(fs.readFileSync(expectedWritePath, 'utf8')).toBe('nested content');
+    });
+  });
+
+  describe('secure write mode for ~/.gemini/ paths', () => {
+    const abortSignal = new AbortController().signal;
+    let secureTempDir: string;
+
+    beforeEach(() => {
+      // Earlier tests may flip isPlanMode to true via vi.mocked(...).mockReturnValue.
+      // vi.clearAllMocks() in the outer beforeEach only resets call history, not
+      // implementations, so reset it back to false here.
+      vi.mocked(mockConfig.isPlanMode).mockReturnValue(false);
+      secureTempDir = fs.mkdtempSync(
+        path.join(os.tmpdir(), 'write-file-secure-test-'),
+      );
+      mockConfig.storage.getProjectTempDir = vi
+        .fn()
+        .mockReturnValue(secureTempDir);
+    });
+
+    afterEach(() => {
+      fs.rmSync(secureTempDir, { recursive: true, force: true });
+    });
+
+    it('passes mode 0o600 to writeTextFile when target is under projectTempDir', async () => {
+      const writeSpy = vi.spyOn(fsService, 'writeTextFile');
+      const filePath = path.join(secureTempDir, 'sub', 'secure.txt');
+      const content = 'secret';
+      mockEnsureCorrectFileContent.mockResolvedValue(content);
+
+      const invocation = tool.build({ file_path: filePath, content });
+      await invocation.execute({ abortSignal });
+
+      expect(writeSpy).toHaveBeenCalledWith(filePath, content, {
+        mode: 0o600,
+      });
+    });
+
+    it('does NOT pass mode to writeTextFile for workspace paths', async () => {
+      const writeSpy = vi.spyOn(fsService, 'writeTextFile');
+      const filePath = path.join(rootDir, 'workspace-file.txt');
+      const content = 'just code';
+      mockEnsureCorrectFileContent.mockResolvedValue(content);
+
+      const invocation = tool.build({ file_path: filePath, content });
+      await invocation.execute({ abortSignal });
+
+      expect(writeSpy).toHaveBeenCalledWith(filePath, content, undefined);
     });
   });
 });

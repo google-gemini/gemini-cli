@@ -90,18 +90,18 @@ export class ProjectRegistry {
   private async save(data: RegistryData): Promise<void> {
     const dir = path.dirname(this.registryPath);
     if (!fs.existsSync(dir)) {
-      await fs.promises.mkdir(dir, { recursive: true });
+      await fs.promises.mkdir(dir, { recursive: true, mode: 0o700 });
     }
     // Use a randomized tmp path to avoid ENOENT crashes when save() is called concurrently
     const tmpPath = this.registryPath + '.' + randomUUID() + '.tmp';
     let savedSuccessfully = false;
 
     try {
-      // Unconditionally ensure the directory exists; recursive ignores EEXIST.
-      await fs.promises.mkdir(dir, { recursive: true });
-
       const content = JSON.stringify(data, null, 2);
-      await fs.promises.writeFile(tmpPath, content, 'utf8');
+      await fs.promises.writeFile(tmpPath, content, {
+        encoding: 'utf8',
+        mode: 0o600,
+      });
 
       // Exponential backoff for OS-level file locks (EBUSY/EPERM) during rename
       const maxRetries = 5;
@@ -157,7 +157,7 @@ export class ProjectRegistry {
     // Ensure directory exists so we can create a lock file
     const dir = path.dirname(this.registryPath);
     if (!fs.existsSync(dir)) {
-      await fs.promises.mkdir(dir, { recursive: true });
+      await fs.promises.mkdir(dir, { recursive: true, mode: 0o700 });
     }
     // Ensure the registry file exists so proper-lockfile can lock it.
     // If it doesn't exist, we try to create it. If someone else creates it
@@ -364,7 +364,7 @@ export class ProjectRegistry {
     for (const baseDir of this.baseDirs) {
       const slugDir = path.join(baseDir, slug);
       if (!fs.existsSync(slugDir)) {
-        await fs.promises.mkdir(slugDir, { recursive: true });
+        await fs.promises.mkdir(slugDir, { recursive: true, mode: 0o700 });
       }
       const markerPath = path.join(slugDir, PROJECT_ROOT_FILE);
       if (fs.existsSync(markerPath)) {
@@ -384,6 +384,7 @@ export class ProjectRegistry {
         await fs.promises.writeFile(markerPath, normalizedProject, {
           encoding: 'utf8',
           flag: 'wx',
+          mode: 0o600,
         });
       } catch (e: unknown) {
         if (isNodeError(e) && e.code === 'EEXIST') {

@@ -11,6 +11,7 @@ import { Storage } from '../config/storage.js';
 import { readPolicyFiles } from './toml-loader.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { isNodeError } from '../utils/errors.js';
+import { SECURE_DIR_MODE, SECURE_FILE_MODE } from '../utils/permissions.js';
 
 export enum IntegrityStatus {
   MATCH = 'MATCH',
@@ -144,8 +145,14 @@ export class PolicyIntegrityManager {
   private async saveIntegrityData(data: StoredIntegrityData): Promise<void> {
     const storagePath = Storage.getPolicyIntegrityStoragePath();
     try {
-      await fs.mkdir(path.dirname(storagePath), { recursive: true });
-      await fs.writeFile(storagePath, JSON.stringify(data, null, 2), 'utf-8');
+      await fs.mkdir(path.dirname(storagePath), {
+        recursive: true,
+        mode: SECURE_DIR_MODE,
+      });
+      await fs.writeFile(storagePath, JSON.stringify(data, null, 2), {
+        encoding: 'utf-8',
+        mode: SECURE_FILE_MODE,
+      });
     } catch (error) {
       debugLogger.error('Failed to save policy integrity data', error);
       throw error;

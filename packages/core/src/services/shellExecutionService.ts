@@ -23,6 +23,7 @@ import { isBinary, truncateString } from '../utils/textUtils.js';
 import pkg from '@xterm/headless';
 import { debugLogger } from '../utils/debugLogger.js';
 import { Storage } from '../config/storage.js';
+import { SECURE_FILE_MODE } from '../utils/permissions.js';
 import {
   serializeTerminalToObject,
   type AnsiOutput,
@@ -1417,7 +1418,10 @@ export class ShellExecutionService {
     const logDir = this.getLogDir();
     try {
       mkdirSync(logDir, { recursive: true, mode: 0o700 });
-      const stream = fs.createWriteStream(logPath, { flags: 'wx' });
+      const stream = fs.createWriteStream(logPath, {
+        flags: 'wx',
+        mode: SECURE_FILE_MODE,
+      });
       stream.on('error', (err) => {
         debugLogger.warn('Background log stream error:', err);
       });

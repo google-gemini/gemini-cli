@@ -5,6 +5,7 @@
  */
 
 import { spawn } from 'node:child_process';
+import { promises as fsp } from 'node:fs';
 import { type FileSystemService } from './fileSystemService.js';
 import { type SandboxManager } from './sandboxManager.js';
 import { debugLogger } from '../utils/debugLogger.js';
@@ -111,7 +112,11 @@ export class SandboxedFileSystemService implements FileSystemService {
     }
   }
 
-  async writeTextFile(filePath: string, content: string): Promise<void> {
+  async writeTextFile(
+    filePath: string,
+    content: string,
+    options?: { mode?: number },
+  ): Promise<void> {
     const safePath = this.sanitizeAndValidatePath(filePath);
     const prepared = await this.sandboxManager.prepareCommand({
       command: '__write',
@@ -157,8 +162,26 @@ export class SandboxedFileSystemService implements FileSystemService {
           error += data.toString();
         });
 
-        child.on('close', (code) => {
+        child.on('close', async (code) => {
           if (code === 0) {
+            // Best-effort post-write chmod when caller requested a mode.
+            // Sandbox `__write` does not currently propagate the mode option,
+            // so we apply it from the parent process. This works when the
+            // parent owns the file (typical case); silently ignored otherwise
+            // — the file already exists with the sandbox's default mode.
+            // Awaited so `writeTextFile`'s promise does not resolve until
+            // the chmod attempt has completed.
+            if (options?.mode !== undefined) {
+              try {
+                await fsp.chmod(safePath, options.mode);
+              } catch (err) {
+                debugLogger.error(
+                  `Sandbox post-write chmod failed for '${filePath}' (mode=${options.mode?.toString(8)}): ${
+                    err instanceof Error ? err.message : String(err)
+                  }`,
+                );
+              }
+            }
             resolve();
           } else {
             reject(

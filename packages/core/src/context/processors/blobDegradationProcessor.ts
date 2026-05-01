@@ -11,6 +11,7 @@ import * as path from 'node:path';
 import type { ConcreteNode, UserPrompt } from '../graph/types.js';
 import type { ContextEnvironment } from '../pipeline/environment.js';
 import { sanitizeFilenamePart } from '../../utils/fileUtils.js';
+import { SECURE_DIR_MODE, SECURE_FILE_MODE } from '../../utils/permissions.js';
 
 export type BlobDegradationProcessorOptions = Record<string, never>;
 
@@ -46,7 +47,17 @@ export function createBlobDegradationProcessor(
 
       const ensureDir = async () => {
         if (!directoryCreated) {
-          await fs.mkdir(blobOutputsDir, { recursive: true });
+          // Pre-create projectTempDir at SECURE_DIR_MODE first; recursive
+          // mkdir below would otherwise leave the parent at the umask
+          // default if it didn't already exist.
+          await fs.mkdir(env.projectTempDir, {
+            recursive: true,
+            mode: SECURE_DIR_MODE,
+          });
+          await fs.mkdir(blobOutputsDir, {
+            recursive: true,
+            mode: SECURE_DIR_MODE,
+          });
           directoryCreated = true;
         }
       };
@@ -75,7 +86,9 @@ export function createBlobDegradationProcessor(
                   const filePath = path.join(blobOutputsDir, fileName);
 
                   const buffer = Buffer.from(part.data, 'base64');
-                  await fs.writeFile(filePath, buffer);
+                  await fs.writeFile(filePath, buffer, {
+                    mode: SECURE_FILE_MODE,
+                  });
 
                   const mb = (buffer.byteLength / 1024 / 1024).toFixed(2);
                   newText = `[Multi-Modal Blob (${part.mimeType}, ${mb}MB) degraded to text to preserve context window. Saved to: ${filePath}]`;

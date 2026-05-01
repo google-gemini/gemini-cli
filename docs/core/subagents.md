@@ -174,6 +174,17 @@ The available modes are:
 | `isolated`   | Launches Chrome with a temporary profile that is deleted after each session. Use this for clean-state automation.                                                                           |
 | `existing`   | Attaches to an already-running Chrome instance. You must enable remote debugging first by navigating to `chrome://inspect/#remote-debugging` in Chrome. No new browser process is launched. |
 
+#### On-disk privacy
+
+In `persistent` mode the profile directory at `~/.gemini/cli-browser-profile/`
+may contain cookies, `localStorage`, `IndexedDB` data, and any session tokens
+established while the agent is browsing. On POSIX systems, Gemini CLI creates
+this directory with owner-only permissions (`0700`) so the profile content is
+unreadable to other local users on shared Linux or macOS hosts. Windows file
+modes are largely no-ops on NTFS, which uses ACLs instead. In `isolated` mode
+the profile lives in the OS temp directory and is deleted at the end of the
+session.
+
 #### First-run consent
 
 The first time the browser agent is invoked, Gemini CLI displays a consent

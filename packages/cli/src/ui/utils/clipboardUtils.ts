@@ -13,6 +13,8 @@ import {
   spawnAsync,
   escapePath,
   Storage,
+  SECURE_DIR_MODE,
+  SECURE_FILE_MODE,
 } from '@google/gemini-cli-core';
 
 /**
@@ -272,9 +274,26 @@ async function getProjectClipboardImagesDir(
 export async function saveClipboardImage(
   targetDir: string,
 ): Promise<string | null> {
+  // Best-effort post-write chmod helper. The actual file is written by an
+  // OS clipboard tool (xclip / wl-paste / PowerShell / osascript) which uses
+  // its own umask; we tighten the file permissions afterward so the captured
+  // clipboard image (potentially sensitive) isn't world-readable.
+  const tightenIfExists = async (filePath: string): Promise<string> => {
+    try {
+      await fs.chmod(filePath, SECURE_FILE_MODE);
+    } catch (err) {
+      debugLogger.debug(
+        `Failed to chmod clipboard image ${filePath} to 0o${SECURE_FILE_MODE.toString(8)}: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
+    return filePath;
+  };
+
   try {
     const tempDir = await getProjectClipboardImagesDir(targetDir);
-    await fs.mkdir(tempDir, { recursive: true });
+    await fs.mkdir(tempDir, { recursive: true, mode: SECURE_DIR_MODE });
 
     // Generate a unique filename with timestamp
     const timestamp = new Date().getTime();
@@ -284,11 +303,13 @@ export async function saveClipboardImage(
       const tool = getUserLinuxClipboardTool();
 
       if (tool === 'wl-paste') {
-        if (await saveFileWithWlPaste(tempFilePath)) return tempFilePath;
+        if (await saveFileWithWlPaste(tempFilePath))
+          return await tightenIfExists(tempFilePath);
         return null;
       }
       if (tool === 'xclip') {
-        if (await saveFileWithXclip(tempFilePath)) return tempFilePath;
+        if (await saveFileWithXclip(tempFilePath))
+          return await tightenIfExists(tempFilePath);
         return null;
       }
       return null;
@@ -319,7 +340,7 @@ export async function saveClipboardImage(
         try {
           const stats = await fs.stat(tempFilePath);
           if (stats.size > 0) {
-            return tempFilePath;
+            return await tightenIfExists(tempFilePath);
           }
         } catch {
           // File doesn't exist
@@ -364,7 +385,7 @@ export async function saveClipboardImage(
         try {
           const stats = await fs.stat(tempFilePath);
           if (stats.size > 0) {
-            return tempFilePath;
+            return await tightenIfExists(tempFilePath);
           }
         } catch (e) {
           // File doesn't exist, continue to next format

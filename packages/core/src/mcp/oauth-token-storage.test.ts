@@ -157,7 +157,7 @@ describe('MCPOAuthTokenStorage', () => {
 
         expect(fs.mkdir).toHaveBeenCalledWith(
           path.join('/mock/home', GEMINI_DIR),
-          { recursive: true },
+          { recursive: true, mode: 0o700 },
         );
         expect(fs.writeFile).toHaveBeenCalledWith(
           path.join('/mock/home', GEMINI_DIR, 'mcp-oauth-tokens.json'),

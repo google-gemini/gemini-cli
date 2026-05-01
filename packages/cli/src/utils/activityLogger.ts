@@ -703,7 +703,10 @@ function setupFileLogging(
 
   const logsDir = path.dirname(logFile);
   if (!fs.existsSync(logsDir)) {
-    fs.mkdirSync(logsDir, { recursive: true });
+    // Pre-create the project temp dir at 0o700 so the parent of logsDir is
+    // guaranteed to be locked down even if it doesn't already exist.
+    config.storage.ensureProjectTempDirExists();
+    fs.mkdirSync(logsDir, { recursive: true, mode: 0o700 });
   }
 
   const writeToLog = (type: 'console' | 'network', payload: unknown) => {
@@ -716,7 +719,7 @@ function setupFileLogging(
           timestamp: Date.now(),
         }) + '\n';
 
-      fs.promises.appendFile(logFile, entry).catch((err) => {
+      fs.promises.appendFile(logFile, entry, { mode: 0o600 }).catch((err) => {
         debugLogger.error('Failed to write to activity log:', err);
       });
     } catch (err) {

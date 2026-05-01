@@ -25,6 +25,7 @@ import { coreEvents } from '../../utils/events.js';
 import type { Config } from '../../config/config.js';
 import { Storage } from '../../config/storage.js';
 import { getBrowserConsentIfNeeded } from '../../utils/browserConsent.js';
+import { SECURE_DIR_MODE } from '../../utils/permissions.js';
 import { injectInputBlocker } from './inputBlocker.js';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
@@ -657,11 +658,27 @@ export class BrowserManager {
     if (browserConfig.customConfig.profilePath) {
       mcpArgs.push('--userDataDir', browserConfig.customConfig.profilePath);
     } else if (sessionMode === 'persistent') {
-      // Default persistent profile lives under ~/.gemini/cli-browser-profile
+      // Default persistent profile lives under ~/.gemini/cli-browser-profile.
+      // Pre-create the directory at SECURE_DIR_MODE so cookies, session
+      // tokens and localStorage written by chrome-devtools-mcp are not
+      // readable by other local users — chrome-devtools-mcp creates files
+      // inside with the user's umask, but the parent's 0o700 blocks
+      // traversal for everyone except the owner.
       const defaultProfilePath = path.join(
         Storage.getGlobalGeminiDir(),
         BROWSER_PROFILE_DIR,
       );
+      try {
+        fs.mkdirSync(defaultProfilePath, {
+          recursive: true,
+          mode: SECURE_DIR_MODE,
+        });
+      } catch (error) {
+        debugLogger.warn(
+          `Failed to pre-create browser profile dir at ${defaultProfilePath}`,
+          error,
+        );
+      }
       mcpArgs.push('--userDataDir', defaultProfilePath);
     }
 

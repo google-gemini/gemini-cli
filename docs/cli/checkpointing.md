@@ -34,6 +34,15 @@ repository while the conversation history and tool calls are saved in a JSON
 file in your project's temporary directory, typically located at
 `~/.gemini/tmp/<project_hash>/checkpoints`.
 
+### On-disk privacy
+
+On POSIX systems, both the shadow repository (`~/.gemini/history/`) and the
+project temporary directory (`~/.gemini/tmp/<project_hash>/`) are created with
+owner-only permissions (`0700` for directories, `0600` for files written by the
+CLI). On a shared Linux or macOS system, this prevents another local user from
+reading the conversation history, tool inputs, or restored snapshots. Windows
+uses NTFS ACLs, where the POSIX mode bits are largely no-ops.
+
 ## Enabling the feature
 
 The Checkpointing feature is disabled by default. To enable it, you need to edit

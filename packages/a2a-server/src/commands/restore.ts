@@ -9,6 +9,7 @@ import {
   getToolCallDataSchema,
   isNodeError,
   performRestore,
+  SECURE_DIR_MODE,
 } from '@google/gemini-cli-core';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
@@ -121,7 +122,11 @@ export class ListCheckpointsCommand implements Command {
 
     try {
       const checkpointDir = config.storage.getProjectTempCheckpointsDir();
-      await fs.mkdir(checkpointDir, { recursive: true });
+      config.storage.ensureProjectTempDirExists();
+      await fs.mkdir(checkpointDir, {
+        recursive: true,
+        mode: SECURE_DIR_MODE,
+      });
       const files = await fs.readdir(checkpointDir);
       const jsonFiles = files.filter((file) => file.endsWith('.json'));
 

@@ -30,6 +30,7 @@ import { type MessageBus } from '../confirmation-bus/message-bus.js';
 import { coreEvents } from '../utils/events.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { SHELL_TOOL_NAMES } from '../utils/shell-utils.js';
+import { SECURE_DIR_MODE, SECURE_FILE_MODE } from '../utils/permissions.js';
 import {
   SHELL_TOOL_NAME,
   TOOLS_REQUIRING_NARROWING,
@@ -767,7 +768,10 @@ export function createPolicyUpdater(
               message.persistScope === 'workspace'
                 ? storage.getWorkspaceAutoSavedPolicyPath()
                 : storage.getAutoSavedPolicyPath();
-            await fs.mkdir(path.dirname(policyFile), { recursive: true });
+            await fs.mkdir(path.dirname(policyFile), {
+              recursive: true,
+              mode: SECURE_DIR_MODE,
+            });
 
             // Read existing file
             let existingData: { rule?: TomlRule[] } = {};
@@ -839,7 +843,9 @@ export function createPolicyUpdater(
             let handle: fs.FileHandle | undefined;
             try {
               // Use 'wx' to create the file exclusively (fails if exists) for security.
-              handle = await fs.open(tmpFile, 'wx');
+              // Pass SECURE_FILE_MODE so the temp file is owner-only from creation,
+              // not just after rename.
+              handle = await fs.open(tmpFile, 'wx', SECURE_FILE_MODE);
               await handle.writeFile(newContent, 'utf-8');
             } finally {
               await handle?.close();

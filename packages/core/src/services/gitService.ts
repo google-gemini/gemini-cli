@@ -79,15 +79,15 @@ export class GitService {
     const repoDir = this.getHistoryDir();
     const gitConfigPath = path.join(repoDir, '.gitconfig');
 
-    await fs.mkdir(repoDir, { recursive: true });
+    await fs.mkdir(repoDir, { recursive: true, mode: 0o700 });
 
     // We don't want to inherit the user's name, email, or gpg signing
     // preferences for the shadow repository, so we create a dedicated gitconfig.
     const gitConfigContent = `[user]\n  name = ${SHADOW_REPO_AUTHOR_NAME}\n  email = ${SHADOW_REPO_AUTHOR_EMAIL}\n[commit]\n  gpgsign = false\n`;
-    await fs.writeFile(gitConfigPath, gitConfigContent);
+    await fs.writeFile(gitConfigPath, gitConfigContent, { mode: 0o600 });
 
     const shadowRepoEnv = this.getShadowRepoEnv(repoDir);
-    await fs.writeFile(shadowRepoEnv.GIT_CONFIG_SYSTEM, '');
+    await fs.writeFile(shadowRepoEnv.GIT_CONFIG_SYSTEM, '', { mode: 0o600 });
     const repo = simpleGit(repoDir).env(shadowRepoEnv);
     let isRepoDefined = false;
     try {

@@ -19,12 +19,19 @@ export interface FileSystemService {
   readTextFile(filePath: string): Promise<string>;
 
   /**
-   * Write text content to a file
+   * Write text content to a file.
    *
    * @param filePath - The path to the file to write
    * @param content - The content to write
+   * @param options - Optional write options. `mode` is applied when the file is
+   *   created (POSIX-only; ignored on Windows). Use `SECURE_FILE_MODE`
+   *   (`0o600`) for files under `~/.gemini/` containing sensitive state.
    */
-  writeTextFile(filePath: string, content: string): Promise<void>;
+  writeTextFile(
+    filePath: string,
+    content: string,
+    options?: { mode?: number },
+  ): Promise<void>;
 }
 
 /**
@@ -35,7 +42,17 @@ export class StandardFileSystemService implements FileSystemService {
     return fs.readFile(filePath, 'utf-8');
   }
 
-  async writeTextFile(filePath: string, content: string): Promise<void> {
-    await fs.writeFile(filePath, content, 'utf-8');
+  async writeTextFile(
+    filePath: string,
+    content: string,
+    options?: { mode?: number },
+  ): Promise<void> {
+    const writeOpts: { encoding: 'utf-8'; mode?: number } = {
+      encoding: 'utf-8',
+    };
+    if (options?.mode !== undefined) {
+      writeOpts.mode = options.mode;
+    }
+    await fs.writeFile(filePath, content, writeOpts);
   }
 }

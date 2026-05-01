@@ -386,7 +386,10 @@ export class ChatRecordingService {
           chatsDir = path.join(chatsDir, safeParentId);
         }
 
-        fs.mkdirSync(chatsDir, { recursive: true });
+        // Pre-create the project temp dir at 0o700 so the chats parent is
+        // guaranteed to be locked down even if it doesn't exist yet.
+        this.context.config.storage.ensureProjectTempDirExists();
+        fs.mkdirSync(chatsDir, { recursive: true, mode: 0o700 });
 
         const timestamp = new Date()
           .toISOString()
@@ -452,8 +455,16 @@ export class ChatRecordingService {
     if (!this.conversationFile) return;
     try {
       const line = JSON.stringify(record) + '\n';
-      fs.mkdirSync(path.dirname(this.conversationFile), { recursive: true });
-      fs.appendFileSync(this.conversationFile, line);
+      // appendRecord is called in a hot loop during session migration, so
+      // skip the redundant mkdir/ensureProjectTempDirExists when the parent
+      // already exists. The first call creates the dir at 0o700; subsequent
+      // calls skip the I/O entirely.
+      const dir = path.dirname(this.conversationFile);
+      if (!fs.existsSync(dir)) {
+        this.context.config.storage.ensureProjectTempDirExists();
+        fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+      }
+      fs.appendFileSync(this.conversationFile, line, { mode: 0o600 });
     } catch (error) {
       if (isNodeError(error) && error.code === 'ENOSPC') {
         this.conversationFile = null;

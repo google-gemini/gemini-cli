@@ -29,8 +29,11 @@ export class InstallationManager {
   private writeInstallationIdToFile(installationId: string) {
     const installationIdFile = this.getInstallationIdPath();
     const dir = path.dirname(installationIdFile);
-    fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(installationIdFile, installationId, 'utf-8');
+    fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+    fs.writeFileSync(installationIdFile, installationId, {
+      encoding: 'utf-8',
+      mode: 0o600,
+    });
   }
 
   /**

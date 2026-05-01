@@ -271,7 +271,10 @@ describe('clipboardUtils', () => {
       expect(result).toContain(mockTempDir);
       expect(result).toMatch(/clipboard-\d+\.png$/);
       expect(spawn).toHaveBeenCalledWith('wl-paste', expect.any(Array));
-      expect(fs.mkdir).toHaveBeenCalledWith(mockTempDir, { recursive: true });
+      expect(fs.mkdir).toHaveBeenCalledWith(mockTempDir, {
+        recursive: true,
+        mode: 0o700,
+      });
     });
 
     it('should return null if wl-paste fails', async () => {

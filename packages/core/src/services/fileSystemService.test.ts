@@ -52,8 +52,21 @@ describe('StandardFileSystemService', () => {
       expect(fs.writeFile).toHaveBeenCalledWith(
         '/test/file.txt',
         'Hello, World!',
-        'utf-8',
+        { encoding: 'utf-8' },
       );
+    });
+
+    it('should pass mode option to fs.writeFile when provided', async () => {
+      vi.mocked(fs.writeFile).mockResolvedValue();
+
+      await fileSystem.writeTextFile('/test/file.txt', 'sensitive', {
+        mode: 0o600,
+      });
+
+      expect(fs.writeFile).toHaveBeenCalledWith('/test/file.txt', 'sensitive', {
+        encoding: 'utf-8',
+        mode: 0o600,
+      });
     });
   });
 });

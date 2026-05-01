@@ -34,6 +34,7 @@ import { Storage } from '../config/storage.js';
 import { OAuthCredentialStorage } from './oauth-credential-storage.js';
 import { FORCE_ENCRYPTED_FILE_ENV_VAR } from '../mcp/token-storage/index.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { SECURE_DIR_MODE } from '../utils/permissions.js';
 import {
   writeToStdout,
   createWorkingStdio,
@@ -748,7 +749,10 @@ export function resetOauthClientForTesting() {
 
 async function cacheCredentials(credentials: Credentials) {
   const filePath = Storage.getOAuthCredsPath();
-  await fs.mkdir(path.dirname(filePath), { recursive: true });
+  await fs.mkdir(path.dirname(filePath), {
+    recursive: true,
+    mode: SECURE_DIR_MODE,
+  });
 
   const credString = JSON.stringify(credentials, null, 2);
   await fs.writeFile(filePath, credString, { mode: 0o600 });

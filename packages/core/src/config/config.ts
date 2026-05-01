@@ -3055,6 +3055,39 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   /**
+   * Single-source classifier for write paths. Both `isPathAllowed` and
+   * `isSecureWritePath` derive from this so the allowlist lives in exactly
+   * one place — the two predicates can never drift.
+   */
+  private classifyWritePath(
+    absolutePath: string,
+  ): 'workspace' | 'projectTemp' | 'globalMemory' | 'denied' {
+    const resolvedPath = resolveToRealPath(absolutePath);
+
+    if (this.getWorkspaceContext().isPathWithinWorkspace(resolvedPath)) {
+      return 'workspace';
+    }
+
+    const resolvedTempDir = resolveToRealPath(this.storage.getProjectTempDir());
+    if (isSubpath(resolvedTempDir, resolvedPath)) {
+      return 'projectTemp';
+    }
+
+    // Surgical allowlist: the global personal GEMINI.md file (and ONLY that
+    // file) is reachable so the prompt-driven memory flow can persist
+    // cross-project personal preferences. This deliberately does NOT
+    // allowlist the rest of `~/.gemini/`.
+    const resolvedGlobalMemoryFilePath = resolveToRealPath(
+      path.join(Storage.getGlobalGeminiDir(), getCurrentGeminiMdFilename()),
+    );
+    if (resolvedPath === resolvedGlobalMemoryFilePath) {
+      return 'globalMemory';
+    }
+
+    return 'denied';
+  }
+
+  /**
    * Checks if a given absolute path is allowed for file system operations.
    * A path is allowed if it's within the workspace context, the project's
    * temporary directory, or is exactly the global personal `~/.gemini/GEMINI.md`
@@ -3065,34 +3098,19 @@ export class Config implements McpContext, AgentLoopContext {
    * @returns true if the path is allowed, false otherwise.
    */
   isPathAllowed(absolutePath: string): boolean {
-    const resolvedPath = resolveToRealPath(absolutePath);
+    return this.classifyWritePath(absolutePath) !== 'denied';
+  }
 
-    const workspaceContext = this.getWorkspaceContext();
-    if (workspaceContext.isPathWithinWorkspace(resolvedPath)) {
-      return true;
-    }
-
-    const projectTempDir = this.storage.getProjectTempDir();
-    const resolvedTempDir = resolveToRealPath(projectTempDir);
-    if (isSubpath(resolvedTempDir, resolvedPath)) {
-      return true;
-    }
-
-    // Surgical allowlist: the global personal GEMINI.md file (and ONLY that
-    // file) is reachable so the prompt-driven memory flow can persist
-    // cross-project personal preferences. This deliberately does NOT
-    // allowlist the rest of `~/.gemini/`.
-    const globalMemoryFilePath = path.join(
-      Storage.getGlobalGeminiDir(),
-      getCurrentGeminiMdFilename(),
-    );
-    const resolvedGlobalMemoryFilePath =
-      resolveToRealPath(globalMemoryFilePath);
-    if (resolvedPath === resolvedGlobalMemoryFilePath) {
-      return true;
-    }
-
-    return false;
+  /**
+   * Returns `true` iff a write to `absolutePath` should land under `~/.gemini/`
+   * with restrictive permissions (`0o700`/`0o600`). True for any path under
+   * the project temp tree and for the surgically-allowlisted global
+   * `~/.gemini/<GEMINI.md>` file. Strict subset of `isPathAllowed` —
+   * workspace writes (the user's source code) keep the user's umask.
+   */
+  isSecureWritePath(absolutePath: string): boolean {
+    const kind = this.classifyWritePath(absolutePath);
+    return kind === 'projectTemp' || kind === 'globalMemory';
   }
 
   /**

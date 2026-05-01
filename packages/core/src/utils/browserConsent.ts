@@ -8,6 +8,7 @@ import { CoreEvent, coreEvents } from './events.js';
 import { Storage } from '../config/storage.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
+import { SECURE_DIR_MODE, SECURE_FILE_MODE } from './permissions.js';
 
 /** Sentinel file written after the user acknowledges the browser privacy notice. */
 const BROWSER_CONSENT_FLAG_FILE = 'browser-consent-acknowledged.txt';
@@ -82,10 +83,14 @@ async function markConsentAsAcknowledged(
   consentFilePath: string,
 ): Promise<void> {
   try {
-    await fs.mkdir(path.dirname(consentFilePath), { recursive: true });
+    await fs.mkdir(path.dirname(consentFilePath), {
+      recursive: true,
+      mode: SECURE_DIR_MODE,
+    });
     await fs.writeFile(
       consentFilePath,
       `Browser privacy consent acknowledged at ${new Date().toISOString()}\n`,
+      { mode: SECURE_FILE_MODE },
     );
   } catch {
     // Best-effort: if we can't persist, the dialog will appear again next time.

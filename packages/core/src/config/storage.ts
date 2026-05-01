@@ -204,7 +204,7 @@ export class Storage {
   }
 
   ensureProjectTempDirExists(): void {
-    fs.mkdirSync(this.getProjectTempDir(), { recursive: true });
+    fs.mkdirSync(this.getProjectTempDir(), { recursive: true, mode: 0o700 });
   }
 
   static getOAuthCredsPath(): string {
