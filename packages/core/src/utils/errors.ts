@@ -164,6 +164,18 @@ export class BadRequestError extends Error {
   }
 }
 
+export const SECURE_STORAGE_GENERIC_MESSAGE =
+  'A secure storage operation failed.';
+export const SECURE_STORAGE_ACCESS_DENIED_MESSAGE =
+  'Local keychain access was denied.';
+
+export class SecureStorageError extends Error {
+  constructor(message = SECURE_STORAGE_GENERIC_MESSAGE) {
+    super(message);
+    this.name = 'SecureStorageError';
+  }
+}
+
 export class ChangeAuthRequestedError extends Error {
   constructor() {
     super('User requested to change authentication method');
