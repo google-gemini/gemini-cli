@@ -310,9 +310,9 @@ export async function retryWithBackoff<T>(
         classifiedError instanceof ModelNotFoundError
       ) {
         if (onPersistent429) {
-          if (resetCount >= DEFAULT_RETRY_OPTIONS.maxFallbackCount) {
+          if (resetCount >= options.maxFallbackCount) {
             debugLogger.warn(
-              `Exhausted ${DEFAULT_RETRY_OPTIONS.maxFallbackCount} fallback attempts. Aborting to prevent infinite loop.`,
+              "Exhausted " + options.maxFallbackCount + " fallback attempts. Aborting to prevent infinite loop.",
             );
             throw classifiedError;
           }
