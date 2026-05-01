@@ -310,7 +310,6 @@ export const directoryCommand: SlashCommand = {
           ui: { addItem },
           services: { agentContext },
         } = context;
-        const [...rest] = args.split(' ');
 
         if (!agentContext) {
           addItem({
@@ -395,10 +394,22 @@ export const directoryCommand: SlashCommand = {
         if (result.removed.length > 0) {
           const gemini = agentContext.config.geminiClient;
           if (gemini) {
+            await gemini.addDirectoryContext();
             const chatRecordingService = gemini.getChatRecordingService();
             chatRecordingService?.recordDirectories(
               workspaceContext.getDirectories(),
             );
+          }
+          if (agentContext.config.shouldLoadMemoryFromIncludeDirectories()) {
+            try {
+              await refreshServerHierarchicalMemory(agentContext.config);
+            } catch (error) {
+              addItem({
+                type: MessageType.ERROR,
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+                text: 'Error refreshing memory: ' + (error as Error).message,
+              });
+            }
           }
           addItem({
             type: MessageType.INFO,

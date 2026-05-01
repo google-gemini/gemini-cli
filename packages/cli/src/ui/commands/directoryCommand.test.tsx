@@ -18,7 +18,11 @@ import {
   expandHomeDir,
   getDirectorySuggestions,
 } from '../utils/directoryUtils.js';
-import type { Config, WorkspaceContext } from '@google/gemini-cli-core';
+import {
+  type Config,
+  type WorkspaceContext,
+  refreshServerHierarchicalMemory,
+} from '@google/gemini-cli-core';
 import type { MultiFolderTrustDialogProps } from '../components/MultiFolderTrustDialog.js';
 import type { CommandContext, OpenCustomDialogActionReturn } from './types.js';
 import { MessageType } from '../types.js';
@@ -33,6 +37,15 @@ vi.mock('node:fs', async (importOriginal) => {
   return {
     ...actual,
     realpathSync: vi.fn((p) => p),
+  };
+});
+
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...actual,
+    refreshServerHierarchicalMemory: vi.fn(),
   };
 });
 
@@ -73,17 +86,20 @@ describe('directoryCommand', () => {
         ]),
     } as unknown as WorkspaceContext;
 
+    const mockGeminiClient = {
+      addDirectoryContext: vi.fn(),
+      getChatRecordingService: vi.fn().mockReturnValue({
+        recordDirectories: vi.fn(),
+      }),
+    };
+
     mockConfig = {
       getWorkspaceContext: () => mockWorkspaceContext,
       isRestrictiveSandbox: vi.fn().mockReturnValue(false),
-      getGeminiClient: vi.fn().mockReturnValue({
-        addDirectoryContext: vi.fn(),
-        getChatRecordingService: vi.fn().mockReturnValue({
-          recordDirectories: vi.fn(),
-        }),
-      }),
+      getGeminiClient: vi.fn().mockReturnValue(mockGeminiClient),
+      geminiClient: mockGeminiClient,
       getWorkingDir: () => path.resolve('/test/dir'),
-      shouldLoadMemoryFromIncludeDirectories: () => false,
+      shouldLoadMemoryFromIncludeDirectories: vi.fn().mockReturnValue(false),
       getDebugMode: () => false,
       getFileService: () => ({}),
       getFileFilteringOptions: () => ({ ignore: [], include: [] }),
@@ -594,6 +610,71 @@ describe('directoryCommand', () => {
           text: `The following directories were not found in the workspace:\n- ${notFoundPath}`,
         }),
       );
+    });
+
+    it('should call addDirectoryContext after removing a directory', async () => {
+      const removePath = path.resolve('/home/user/project1');
+      vi.mocked(mockWorkspaceContext.removeDirectories).mockReturnValue({
+        removed: [removePath],
+        notFound: [],
+      });
+      if (!removeCommand?.action) throw new Error('No action');
+      await removeCommand.action(mockContext, removePath);
+      expect(
+        (
+          mockConfig as unknown as {
+            geminiClient: { addDirectoryContext: Mock };
+          }
+        ).geminiClient.addDirectoryContext,
+      ).toHaveBeenCalled();
+    });
+
+    it('should call refreshServerHierarchicalMemory after removing a directory when shouldLoadMemoryFromIncludeDirectories is true', async () => {
+      const removePath = path.resolve('/home/user/project1');
+      vi.mocked(mockWorkspaceContext.removeDirectories).mockReturnValue({
+        removed: [removePath],
+        notFound: [],
+      });
+      vi.mocked(
+        mockConfig.shouldLoadMemoryFromIncludeDirectories,
+      ).mockReturnValue(true);
+      if (!removeCommand?.action) throw new Error('No action');
+      await removeCommand.action(mockContext, removePath);
+      expect(refreshServerHierarchicalMemory).toHaveBeenCalledWith(mockConfig);
+    });
+
+    it('should handle error from refreshServerHierarchicalMemory when removing a directory', async () => {
+      const removePath = path.resolve('/home/user/project1');
+      vi.mocked(mockWorkspaceContext.removeDirectories).mockReturnValue({
+        removed: [removePath],
+        notFound: [],
+      });
+      vi.mocked(
+        mockConfig.shouldLoadMemoryFromIncludeDirectories,
+      ).mockReturnValue(true);
+      vi.mocked(refreshServerHierarchicalMemory).mockRejectedValue(
+        new Error('Memory refresh failed'),
+      );
+      if (!removeCommand?.action) throw new Error('No action');
+      await removeCommand.action(mockContext, removePath);
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.ERROR,
+          text: 'Error refreshing memory: Memory refresh failed',
+        }),
+      );
+    });
+
+    it('should not call refreshServerHierarchicalMemory when shouldLoadMemoryFromIncludeDirectories is false', async () => {
+      vi.mocked(refreshServerHierarchicalMemory).mockClear();
+      const removePath = path.resolve('/home/user/project1');
+      vi.mocked(mockWorkspaceContext.removeDirectories).mockReturnValue({
+        removed: [removePath],
+        notFound: [],
+      });
+      if (!removeCommand?.action) throw new Error('No action');
+      await removeCommand.action(mockContext, removePath);
+      expect(refreshServerHierarchicalMemory).not.toHaveBeenCalled();
     });
 
     describe('completion', () => {
