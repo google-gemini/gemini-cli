@@ -587,10 +587,18 @@ describe('memory commands', () => {
         '# Orphan Topic\n',
       );
       // MEMORY.md now references the sibling — using ABSOLUTE PATH so a
-      // future agent can `read_file` it without resolving relatives.
+      // future agent can `read_file` it without resolving relatives. We
+      // assert the line shape is `- See <absolute>/orphan-topic.md ...` and
+      // verify the path is absolute via path.isAbsolute (cross-platform —
+      // the previous /^- See \/.+\/.../ regex was Unix-only and broke on
+      // Windows where the absolute path is e.g. `C:\Users\...\orphan-topic.md`).
       const memoryAfter = await fs.readFile(memoryMd, 'utf-8');
       expect(memoryAfter).toContain(target);
-      expect(memoryAfter).toMatch(/^- See \/.+\/orphan-topic\.md /m);
+      const pointerLineMatch = memoryAfter.match(
+        /^- See (.+orphan-topic\.md) /m,
+      );
+      expect(pointerLineMatch).not.toBeNull();
+      expect(path.isAbsolute(pointerLineMatch![1])).toBe(true);
       // The patch was committed and removed from inbox.
       await expect(
         fs.access(path.join(patchDir, 'orphan-topic.patch')),
