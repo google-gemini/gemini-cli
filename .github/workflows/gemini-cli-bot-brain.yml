@@ -53,9 +53,25 @@ jobs:
     env:
       GEMINI_CLI_TRUST_WORKSPACE: 'true'
     steps:
+      - name: 'Determine Checkout Ref'
+        id: 'determine_ref'
+        env:
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          ISSUE_NUMBER: '${{ github.event.issue.number || github.event.pull_request.number || github.event.inputs.issue_number }}'
+        run: |
+          REF="${{ github.ref }}"
+          if [ -n "$ISSUE_NUMBER" ]; then
+            PR_HEAD=$(gh pr view "$ISSUE_NUMBER" --repo "${{ github.repository }}" --json headRefName --jq .headRefName 2>/dev/null || echo "")
+            if [ -n "$PR_HEAD" ]; then
+              REF="$PR_HEAD"
+            fi
+          fi
+          echo "ref=$REF" >> "$GITHUB_OUTPUT"
+
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
         with:
+          ref: '${{ steps.determine_ref.outputs.ref }}'
           fetch-depth: 0
           persist-credentials: false
 
@@ -218,10 +234,25 @@ jobs:
           permission-pull-requests: 'write'
           permission-issues: 'write'
 
+      - name: 'Determine Checkout Ref'
+        id: 'determine_ref'
+        env:
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          ISSUE_NUMBER: '${{ github.event.issue.number || github.event.pull_request.number || github.event.inputs.issue_number }}'
+        run: |
+          REF="main"
+          if [ -n "$ISSUE_NUMBER" ]; then
+            PR_HEAD=$(gh pr view "$ISSUE_NUMBER" --repo "${{ github.repository }}" --json headRefName --jq .headRefName 2>/dev/null || echo "")
+            if [ -n "$PR_HEAD" ]; then
+              REF="$PR_HEAD"
+            fi
+          fi
+          echo "ref=$REF" >> "$GITHUB_OUTPUT"
+
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
         with:
-          ref: 'main'
+          ref: '${{ steps.determine_ref.outputs.ref }}'
           fetch-depth: 0
           persist-credentials: false
 
@@ -252,7 +283,7 @@ jobs:
               exit 1
             fi
 
-            git checkout -b "$BRANCH_NAME"
+            git checkout -B "$BRANCH_NAME"
             git apply "${{ runner.temp }}/brain-data/bot-changes.patch"
             git add .
 

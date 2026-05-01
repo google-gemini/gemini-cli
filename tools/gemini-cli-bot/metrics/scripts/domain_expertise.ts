@@ -6,7 +6,7 @@
  * @license
  */
 
-import { GITHUB_OWNER, GITHUB_REPO, type MetricOutput } from '../types.js';
+import { GITHUB_OWNER, GITHUB_REPO } from '../types.js';
 import { execSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -59,6 +59,27 @@ try {
   let totalMaintainerReviews = 0;
   let maintainerReviewsWithExpertise = 0;
 
+  // Cache git log authors per path to avoid redundant child_process calls
+  const authorCache = new Map<string, string>();
+  const getAuthors = (targetPath: string) => {
+    if (authorCache.has(targetPath)) return authorCache.get(targetPath)!;
+    try {
+      const authors = execSync(
+        `git log --format="%an|%ae" -- ${JSON.stringify(targetPath)}`,
+        {
+          cwd: repoRoot,
+          encoding: 'utf-8',
+          stdio: ['ignore', 'pipe', 'ignore'],
+        },
+      ).toLowerCase();
+      authorCache.set(targetPath, authors);
+      return authors;
+    } catch {
+      authorCache.set(targetPath, '');
+      return '';
+    }
+  };
+
   for (const pr of data.pullRequests.nodes) {
     if (!pr.reviews?.nodes || pr.reviews.nodes.length === 0) continue;
 
@@ -73,31 +94,12 @@ try {
     const files = diffTreeOutput.split('\n').filter(Boolean);
     if (files.length === 0) continue;
 
-    // Cache git log authors per path to avoid redundant child_process calls
-    const authorCache = new Map<string, string>();
-    const getAuthors = (targetPath: string) => {
-      if (authorCache.has(targetPath)) return authorCache.get(targetPath)!;
-      try {
-        const authors = execSync(
-          `git log --format="%an|%ae" -- ${JSON.stringify(targetPath)}`,
-          {
-            cwd: repoRoot,
-            encoding: 'utf-8',
-            stdio: ['ignore', 'pipe', 'ignore'],
-          },
-        ).toLowerCase();
-        authorCache.set(targetPath, authors);
-        return authors;
-      } catch {
-        authorCache.set(targetPath, '');
-        return '';
-      }
-    };
-
     const reviewersOnPR = new Map<string, { name?: string }>();
     for (const review of pr.reviews.nodes) {
       if (
-        ['MEMBER', 'OWNER'].includes(review.authorAssociation) &&
+        ['MEMBER', 'OWNER', 'COLLABORATOR'].includes(
+          review.authorAssociation,
+        ) &&
         review.author?.login
       ) {
         const login = review.author.login.toLowerCase();
@@ -138,19 +140,8 @@ try {
     totalMaintainerReviews > 0
       ? maintainerReviewsWithExpertise / totalMaintainerReviews
       : 0;
-  const timestamp = new Date().toISOString();
 
-  process.stdout.write(
-    JSON.stringify(<MetricOutput>{
-      metric: 'domain_expertise',
-      value: Math.round(ratio * 100) / 100,
-      timestamp,
-      details: {
-        totalMaintainerReviews,
-        maintainerReviewsWithExpertise,
-      },
-    }) + '\n',
-  );
+  process.stdout.write(`domain_expertise,${Math.round(ratio * 100) / 100}\n`);
 } catch (err) {
   process.stderr.write(err instanceof Error ? err.message : String(err));
   process.exit(1);
