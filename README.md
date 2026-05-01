@@ -395,15 +395,16 @@ for removal instructions.
   [Terms & Privacy](https://www.geminicli.com/docs/resources/tos-privacy)
 - **Security**: [Security Policy](SECURITY.md)
 
-## Star History
-
-<a href="https://www.star-history.com/?repos=google-gemini%2Fgemini-cli&type=date&legend=top-left">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=google-gemini/gemini-cli&type=date&theme=dark&legend=top-left" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=google-gemini/gemini-cli&type=date&legend=top-left" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=google-gemini/gemini-cli&type=date&legend=top-left" />
- </picture>
-</a>
+## - Star History
+<p align="center">
+ <a href="https://www.star-history.com/google-gemini/gemini-cli">
+  <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/badge?repo=google-gemini/gemini-cli&theme=dark" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/badge?repo=google-gemini/gemini-cli" />
+   <img alt="Star History Rank" src="https://api.star-history.com/badge?repo=google-gemini/gemini-cli" />
+  </picture>
+ </a>
+</p>
 
 ---
 
