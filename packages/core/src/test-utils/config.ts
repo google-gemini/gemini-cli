@@ -37,5 +37,9 @@ export function makeFakeConfig(
     get: () => 'test-project-id',
     configurable: true,
   });
+  Object.defineProperty(cfg.storage, 'getPlansDir', {
+    value: () => '/mocked/plans/dir',
+    configurable: true,
+  });
   return cfg;
 }
