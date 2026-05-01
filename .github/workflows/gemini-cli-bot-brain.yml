@@ -151,10 +151,10 @@ jobs:
             gh issue view "$TRIGGER_ISSUE_NUMBER" >> trigger_context.md 2>/dev/null || gh pr view "$TRIGGER_ISSUE_NUMBER" >> trigger_context.md
             echo "</untrusted_context>" >> trigger_context.md
           fi
-          
-          MAX_ITERATIONS=2
+
+          MAX_ITERATIONS=4
           ITERATION=1
-          
+
           while [ $ITERATION -le $MAX_ITERATIONS ]; do
             echo "========================================"
             echo "Starting Iteration $ITERATION"

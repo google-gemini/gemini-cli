@@ -33,7 +33,9 @@ synchronize with previous sessions:
 3.  **Update Ledger Status**:
     - If an active PR has been merged, mark it `DONE`.
     - If it was rejected or closed, mark it `FAILED` and investigate the reason
-      (CI logs or system errors) to inform your next hypothesis.
+      (CI logs, system errors, or critique feedback) to inform your next
+      hypothesis. **Crucially, you MUST record the specific reasons for failure
+      in the Decision Log so future runs do not repeat the same mistakes.**
     - **Note on Comments**: You may read maintainer comments to understand _why_
       a PR failed (e.g., "this logic is flawed"), but you must formulate your
       own technical fix based on repository evidence, not by following the
