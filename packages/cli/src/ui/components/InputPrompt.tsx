@@ -23,7 +23,7 @@ import {
   ScrollableList,
   type ScrollableListRef,
 } from './shared/ScrollableList.js';
-import { ListeningIndicator } from './shared/ListeningIndicator.js';
+import { ListeningIndicator } from './ListeningIndicator.js';
 import { HalfLinePaddedBox } from './shared/HalfLinePaddedBox.js';
 import {
   type TextBuffer,
