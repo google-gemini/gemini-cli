@@ -145,6 +145,9 @@ jobs:
 
             let totalUnassigned = 0;
 
+            for (const issue of assignedIssues) {
+              core.info(`Checking issue #${issue.number}: "${issue.title}"...`);
+
               let timelineEvents = [];
               try {
                 timelineEvents = await github.paginate(github.rest.issues.listEventsForTimeline, {

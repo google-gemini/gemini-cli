@@ -146,10 +146,10 @@ async function run() {
   if (newRows.length > 0) {
     timeseriesLines.push(...newRows);
 
-    // Keep header + last 100 data rows
-    if (timeseriesLines.length > 101) {
+    // Keep header + last 5000 data rows (enough for ~100 runs of ~50 metrics)
+    if (timeseriesLines.length > 5001) {
       const header = timeseriesLines[0];
-      timeseriesLines = [header, ...timeseriesLines.slice(-100)];
+      timeseriesLines = [header, ...timeseriesLines.slice(-5000)];
     }
 
     writeFileSync(TIMESERIES_FILE, timeseriesLines.join('\n') + '\n');

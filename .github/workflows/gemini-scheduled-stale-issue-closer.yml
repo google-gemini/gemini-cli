@@ -45,115 +45,141 @@ jobs:
             if (dryRun) {
               core.info('DRY RUN MODE ENABLED: No changes will be applied.');
             }
-            const batchLabel = 'Stale';
+            const staleLabel = 'Stale';
 
-            const threeMonthsAgo = new Date();
-            threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+            const ninetyDaysAgo = new Date();
+            ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
 
-            const tenDaysAgo = new Date();
-            tenDaysAgo.setDate(tenDaysAgo.getDate() - 10);
+            const fourteenDaysAgo = new Date();
+            fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
 
-            core.info(`Cutoff date for creation: ${threeMonthsAgo.toISOString()}`);
-            core.info(`Cutoff date for updates: ${tenDaysAgo.toISOString()}`);
+            core.info(`Cutoff date for staleness (Phase 1): ${ninetyDaysAgo.toISOString()}`);
+            core.info(`Cutoff date for closure (Phase 2): ${fourteenDaysAgo.toISOString()}`);
 
-            const query = `repo:${context.repo.owner}/${context.repo.repo} is:issue is:open created:<${threeMonthsAgo.toISOString()}`;
-            core.info(`Searching with query: ${query}`);
+            // PHASE 1: Find issues to mark as stale
+            const queryPhase1 = `repo:${context.repo.owner}/${context.repo.repo} is:issue is:open -label:"${staleLabel}" updated:<${ninetyDaysAgo.toISOString()}`;
+            core.info(`Phase 1 Search Query: ${queryPhase1}`);
 
-            const itemsToCheck = await github.paginate(github.rest.search.issuesAndPullRequests, {
-              q: query,
-              sort: 'created',
+            const issuesToStale = await github.paginate(github.rest.search.issuesAndPullRequests, {
+              q: queryPhase1,
+              sort: 'updated',
               order: 'asc',
               per_page: 100
             });
 
-            core.info(`Found ${itemsToCheck.length} open issues to check.`);
+            core.info(`Found ${issuesToStale.length} issues to potentially mark as stale.`);
 
-            let processedCount = 0;
+            // PHASE 2: Find issues to close
+            const queryPhase2 = `repo:${context.repo.owner}/${context.repo.repo} is:issue is:open label:"${staleLabel}" updated:<${fourteenDaysAgo.toISOString()}`;
+            core.info(`Phase 2 Search Query: ${queryPhase2}`);
 
-            for (const issue of itemsToCheck) {
-              const createdAt = new Date(issue.created_at);
-              const updatedAt = new Date(issue.updated_at);
-              const reactionCount = issue.reactions.total_count;
+            const issuesToClose = await github.paginate(github.rest.search.issuesAndPullRequests, {
+              q: queryPhase2,
+              sort: 'updated',
+              order: 'asc',
+              per_page: 100
+            });
 
-              // Basic thresholds
-              if (reactionCount >= 5) {
-                continue;
-              }
+            core.info(`Found ${issuesToClose.length} stale issues to potentially close.`);
 
-              // Skip if it has a maintainer, help wanted, or Public Roadmap label
+            const isMaintainer = (assoc) => ['MEMBER', 'OWNER', 'COLLABORATOR'].includes(assoc);
+
+            async function hasHumanActivity(issueNumber, sinceDate) {
+              const comments = await github.paginate(github.rest.issues.listComments, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issueNumber,
+                per_page: 100
+              });
+
+              return comments.some(comment => 
+                comment.user.type !== 'Bot' && 
+                !comment.user.login.endsWith('[bot]') &&
+                new Date(comment.created_at) > sinceDate
+              );
+            }
+
+            // Execute Phase 1
+            let staleCount = 0;
+            for (const issue of issuesToStale) {
+              if (staleCount >= 100) break; // Limit per run to be safe
+
+              // Skip if it has exempt labels
               const rawLabels = issue.labels.map((l) => l.name);
               const lowercaseLabels = rawLabels.map((l) => l.toLowerCase());
               if (
                 lowercaseLabels.some((l) => l.includes('maintainer')) ||
                 lowercaseLabels.includes('help wanted') ||
+                lowercaseLabels.includes('pinned') ||
+                lowercaseLabels.includes('security') ||
                 rawLabels.includes('🗓️ Public Roadmap')
               ) {
                 continue;
               }
 
-              let isStale = updatedAt < tenDaysAgo;
-
-              // If apparently active, check if it's only bot activity
-              if (!isStale) {
-                try {
-                  const comments = await github.rest.issues.listComments({
-                    owner: context.repo.owner,
-                    repo: context.repo.repo,
-                    issue_number: issue.number,
-                    per_page: 100,
-                    sort: 'created',
-                    direction: 'desc'
-                  });
-
-                  const lastHumanComment = comments.data.find(comment => comment.user.type !== 'Bot');
-                  if (lastHumanComment) {
-                    isStale = new Date(lastHumanComment.created_at) < tenDaysAgo;
-                  } else {
-                    // No human comments. Check if creator is human.
-                    if (issue.user.type !== 'Bot') {
-                       isStale = createdAt < tenDaysAgo;
-                    } else {
-                       isStale = true; // Bot created, only bot comments
-                    }
-                  }
-                } catch (error) {
-                  core.warning(`Failed to fetch comments for issue #${issue.number}: ${error.message}`);
-                  continue;
-                }
+              // Double check for human activity (search index might be stale)
+              if (await hasHumanActivity(issue.number, ninetyDaysAgo)) {
+                core.info(`Issue #${issue.number} has recent human activity, skipping Phase 1.`);
+                continue;
               }
 
-              if (isStale) {
-                processedCount++;
-                const message = `Closing stale issue #${issue.number}: "${issue.title}" (${issue.html_url})`;
-                core.info(message);
+              staleCount++;
+              core.info(`Marking #${issue.number} as stale.`);
+              if (!dryRun) {
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  labels: [staleLabel]
+                });
 
-                if (!dryRun) {
-                  // Add label
-                  await github.rest.issues.addLabels({
-                    owner: context.repo.owner,
-                    repo: context.repo.repo,
-                    issue_number: issue.number,
-                    labels: [batchLabel]
-                  });
-
-                  // Add comment
-                  await github.rest.issues.createComment({
-                    owner: context.repo.owner,
-                    repo: context.repo.repo,
-                    issue_number: issue.number,
-                    body: 'Hello! As part of our effort to keep our backlog manageable and focus on the most active issues, we are tidying up older reports.\n\nIt looks like this issue hasn\'t been active for a while, so we are closing it for now. However, if you are still experiencing this bug on the latest stable build, please feel free to comment on this issue or create a new one with updated details.\n\nThank you for your contribution!'
-                  });
-
-                  // Close issue
-                  await github.rest.issues.update({
-                    owner: context.repo.owner,
-                    repo: context.repo.repo,
-                    issue_number: issue.number,
-                    state: 'closed',
-                    state_reason: 'not_planned'
-                  });
-                }
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  body: `This issue has been automatically marked as stale because it has not had recent activity. It will be closed in 14 days if no further activity occurs. Thank you for your contributions.`
+                });
               }
             }
 
-            core.info(`\nTotal issues processed: ${processedCount}`);
+            // Execute Phase 2
+            let closeCount = 0;
+            for (const issue of issuesToClose) {
+              if (closeCount >= 100) break; // Limit per run to be safe
+
+              // Double check for human activity since it was marked stale
+              if (await hasHumanActivity(issue.number, fourteenDaysAgo)) {
+                core.info(`Issue #${issue.number} has recent human activity since being marked stale, removing label.`);
+                if (!dryRun) {
+                  await github.rest.issues.removeLabel({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: issue.number,
+                    name: staleLabel
+                  });
+                }
+                continue;
+              }
+
+              closeCount++;
+              core.info(`Closing stale issue #${issue.number}.`);
+              if (!dryRun) {
+                await github.rest.issues.update({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  state: 'closed',
+                  state_reason: 'not_planned'
+                });
+
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  body: `This issue has been closed because it has been stale for 14 days with no activity. If you believe this is still relevant, please feel free to comment or reopen the issue. Thank you!`
+                });
+              }
+            }
+
+            core.info(`\nSummary: Marked ${staleCount} as stale, closed ${closeCount}.`);
+
