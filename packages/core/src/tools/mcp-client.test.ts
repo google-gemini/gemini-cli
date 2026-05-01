@@ -1799,12 +1799,14 @@ describe('mcp-client', () => {
         );
 
         const testableTransport = transport as unknown as {
-          _authProvider?: { token: () => Promise<string | undefined> };
+          _authProvider?: {
+            tokens: () => Promise<{ access_token: string } | undefined>;
+          };
         };
 
         expect(testableTransport._authProvider).toBeDefined();
-        const token = await testableTransport._authProvider!.token();
-        expect(token).toBe('fresh-token');
+        const tokens = await testableTransport._authProvider!.tokens();
+        expect(tokens?.access_token).toBe('fresh-token');
       });
 
       it('uses dynamic authProvider when stored OAuth token exists', async () => {
@@ -1830,12 +1832,14 @@ describe('mcp-client', () => {
         );
 
         const testableTransport = transport as unknown as {
-          _authProvider?: { token: () => Promise<string | undefined> };
+          _authProvider?: {
+            tokens: () => Promise<{ access_token: string } | undefined>;
+          };
         };
 
         expect(testableTransport._authProvider).toBeDefined();
-        const token = await testableTransport._authProvider!.token();
-        expect(token).toBe('stored-fresh-token');
+        const tokens = await testableTransport._authProvider!.tokens();
+        expect(tokens?.access_token).toBe('stored-fresh-token');
       });
     });
 
