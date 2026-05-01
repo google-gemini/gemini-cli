@@ -89,6 +89,33 @@ export function convertToFunctionResponse(
     // Ignore other part types
   }
 
+  // build a list of unsupported MIME types for function responses
+  const unsupportedMimeTypes: string[] = [];
+  const filteredInlineDataParts: Part[] = [];
+
+  for (const part of inlineDataParts) {
+    const mimeType = part.inlineData?.mimeType;
+    if (
+      mimeType &&
+      (mimeType.startsWith('audio/') || mimeType.startsWith('video/'))
+    ) {
+      unsupportedMimeTypes.push(mimeType);
+    } else {
+      filteredInlineDataParts.push(part);
+    }
+  }
+
+  if (unsupportedMimeTypes.length > 0) {
+    const uniqueMimes = Array.from(new Set(unsupportedMimeTypes)).join(', ');
+    const steeringMessage =
+      `[SYSTEM ERROR: PROTOCOL_LIMITATION]\n` +
+      `The tool returned binary data with MIME types (${uniqueMimes}) that are not supported in tool responses by the Gemini API.\n\n` +
+      `ACTION REQUIRED:\n` +
+      `To analyze this content, you must immediately send a message to the user including the file reference using the '@' syntax (e.g., "I will now analyze @path/to/file.mp3").\n` +
+      `This will trigger the system to attach the file as a standard multimodal part in your next turn, which you can then analyze.`;
+    textParts.unshift(steeringMessage);
+  }
+
   // Build the primary response part
   const part: Part = {
     functionResponse: {
@@ -104,24 +131,25 @@ export function convertToFunctionResponse(
   );
   const siblingParts: Part[] = [...fileDataParts];
 
-  if (inlineDataParts.length > 0) {
+  if (filteredInlineDataParts.length > 0) {
     if (isMultimodalFRSupported) {
       // Nest inlineData if supported by the model
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       (part.functionResponse as unknown as { parts: Part[] }).parts =
-        inlineDataParts;
+        filteredInlineDataParts;
     } else {
       // Otherwise treat as siblings
-      siblingParts.push(...inlineDataParts);
+      siblingParts.push(...filteredInlineDataParts);
     }
   }
 
   // Add descriptive text if the response object is empty but we have binary content
   if (
     textParts.length === 0 &&
-    (inlineDataParts.length > 0 || fileDataParts.length > 0)
+    (filteredInlineDataParts.length > 0 || fileDataParts.length > 0)
   ) {
-    const totalBinaryItems = inlineDataParts.length + fileDataParts.length;
+    const totalBinaryItems =
+      filteredInlineDataParts.length + fileDataParts.length;
     part.functionResponse!.response = {
       output: `Binary content provided (${totalBinaryItems} item(s)).`,
     };
