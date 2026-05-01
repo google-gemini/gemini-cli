@@ -204,4 +204,23 @@ describe('useAgentStream', () => {
     expect(mockLegacyAgentProtocol.abort).toHaveBeenCalled();
     expect(mockOnCancelSubmit).toHaveBeenCalledWith(false);
   });
+
+  it('should clear pending user hints when cancelOngoingRequest is called', async () => {
+    const consumeUserHintSpy = vi.fn().mockReturnValue('some hint');
+    const { result } = await renderHookWithProviders(() =>
+      useAgentStream({
+        agent: mockLegacyAgentProtocol as unknown as LegacyAgentProtocol,
+        addItem: mockAddItem,
+        onCancelSubmit: mockOnCancelSubmit,
+        isShellFocused: false,
+        consumeUserHint: consumeUserHintSpy,
+      }),
+    );
+
+    await act(async () => {
+      await result.current.cancelOngoingRequest();
+    });
+
+    expect(consumeUserHintSpy).toHaveBeenCalled();
+  });
 });

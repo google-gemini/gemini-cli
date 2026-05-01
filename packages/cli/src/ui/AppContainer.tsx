@@ -1201,6 +1201,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
         onCancelSubmit,
         isShellFocused: embeddedShellFocused,
         logger,
+        consumeUserHint: consumePendingHints,
       })
     : // eslint-disable-next-line react-hooks/rules-of-hooks
       useGeminiStream(
