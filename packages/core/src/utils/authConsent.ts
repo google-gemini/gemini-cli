@@ -13,6 +13,14 @@ import { isHeadlessMode } from './headless.js';
 /**
  * Requests consent from the user for OAuth login.
  * Handles both interactive and non-interactive (headless) modes.
+ *
+ * NOTE: The listenerCount guard is load-bearing. During startup,
+ * refreshAuth() runs BEFORE the Ink UI mounts its ConsentRequest
+ * listener. Without the guard, emitConsentRequest queues the event
+ * and awaits the callback — but the UI won't mount until refreshAuth
+ * returns, creating a deadlock. The FatalAuthenticationError is
+ * caught upstream and lets the app continue; the UI's ValidationDialog
+ * handles re-auth after mounting.
  */
 export async function getConsentForOauth(prompt: string): Promise<boolean> {
   const finalPrompt =
