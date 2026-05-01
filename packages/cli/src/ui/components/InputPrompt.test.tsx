@@ -348,7 +348,7 @@ describe('InputPrompt', () => {
       visualToLogicalMap: [[0, 0]],
       visualToTransformedMap: [0],
       transformationsByLine: [],
-      getOffset: vi.fn().mockReturnValue(0),
+      getOffset: vi.fn().mockImplementation(() => mockBuffer.cursor[1]),
       pastedContent: {},
     } as unknown as TextBuffer;
 
@@ -5114,17 +5114,15 @@ describe('InputPrompt', () => {
         );
       });
       await waitFor(() => {
-        expect(mockBuffer.setText).toHaveBeenCalledWith('initial hello', 'end');
+        expect(mockBuffer.setText).toHaveBeenCalledWith('initial hello', 13);
       });
 
-      // Emit turnComplete (Gemini Live starts over after this)
+      // turnComplete advances the baseline; next turn appends after it
       await act(async () => {
         (fakeTranscriptionProvider as unknown as EventEmitter).emit(
           'turnComplete',
         );
       });
-
-      // Emit second part (Gemini Live sends new turn text starting from empty)
       await act(async () => {
         (fakeTranscriptionProvider as unknown as EventEmitter).emit(
           'transcription',
@@ -5132,10 +5130,9 @@ describe('InputPrompt', () => {
         );
       });
       await waitFor(() => {
-        // Should have appended 'world' to the baseline 'initial hello'
         expect(mockBuffer.setText).toHaveBeenCalledWith(
           'initial hello world',
-          'end',
+          19,
         );
       });
 
@@ -5172,10 +5169,45 @@ describe('InputPrompt', () => {
       await waitFor(() => {
         expect(mockBuffer.setText).toHaveBeenCalledWith(
           'First turn. Second turn.',
-          'end',
+          24,
         );
       });
 
+      unmount();
+    });
+
+    it('should insert transcription at cursor position when buffer has text before and after (toggle)', async () => {
+      await act(async () => {
+        mockBuffer.setText('hello world');
+        mockBuffer.cursor = [0, 5]; // cursor after 'hello'
+      });
+      const { stdin, unmount } = await renderWithProviders(
+        <TestInputPrompt {...props} focus={true} buffer={mockBuffer} />,
+        {
+          uiState: { isVoiceModeEnabled: true } as UIState,
+          settings: createMockSettings({
+            experimental: { voice: { activationMode: 'toggle' } },
+          }),
+        },
+      );
+
+      await act(async () => {
+        stdin.write(' ');
+      });
+      await act(async () => {
+        (fakeTranscriptionProvider as unknown as EventEmitter).emit(
+          'transcription',
+          'there',
+        );
+      });
+
+      // 'hello'(5) + ' '(1) + 'there'(5) = cursor at 11; ' world' preserved after
+      await waitFor(() => {
+        expect(mockBuffer.setText).toHaveBeenCalledWith(
+          'hello there world',
+          11,
+        );
+      });
       unmount();
     });
 
