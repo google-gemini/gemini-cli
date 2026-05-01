@@ -1777,41 +1777,65 @@ describe('mcp-client', () => {
 
   describe('createTransport', () => {
     describe('should connect via httpUrl', () => {
-      it('without headers', async () => {
+      it('uses MCP SDK authProvider token() path for oauth-enabled servers', async () => {
+        const mockGetValidToken = vi.fn().mockResolvedValue('fresh-token');
+        vi.mocked(MCPOAuthProvider).mockReturnValue({
+          getValidToken: mockGetValidToken,
+        } as unknown as MCPOAuthProvider);
+
+        vi.mocked(MCPOAuthTokenStorage).mockReturnValue({
+          getCredentials: vi.fn().mockResolvedValue({ clientId: 'cid' }),
+        } as unknown as MCPOAuthTokenStorage);
+
         const transport = await createTransport(
           'test-server',
           {
-            httpUrl: 'http://test-server',
+            url: 'http://test-server',
+            type: 'http',
+            oauth: { enabled: true },
           },
           false,
           MOCK_CONTEXT,
         );
 
-        expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
-        expect(transport).toMatchObject({
-          _url: new URL('http://test-server'),
-          _requestInit: { headers: {} },
-        });
+        const testableTransport = transport as unknown as {
+          _authProvider?: { token: () => Promise<string | undefined> };
+        };
+
+        expect(testableTransport._authProvider).toBeDefined();
+        const token = await testableTransport._authProvider!.token();
+        expect(token).toBe('fresh-token');
       });
 
-      it('with headers', async () => {
+      it('uses dynamic authProvider when stored OAuth token exists', async () => {
+        const mockGetValidToken = vi
+          .fn()
+          .mockResolvedValue('stored-fresh-token');
+        vi.mocked(MCPOAuthProvider).mockReturnValue({
+          getValidToken: mockGetValidToken,
+        } as unknown as MCPOAuthProvider);
+
+        vi.mocked(MCPOAuthTokenStorage).mockReturnValue({
+          getCredentials: vi.fn().mockResolvedValue({ clientId: 'cid' }),
+        } as unknown as MCPOAuthTokenStorage);
+
         const transport = await createTransport(
           'test-server',
           {
-            httpUrl: 'http://test-server',
-            headers: { Authorization: 'derp' },
+            url: 'http://test-server',
+            type: 'http',
           },
           false,
           MOCK_CONTEXT,
         );
 
-        expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
-        expect(transport).toMatchObject({
-          _url: new URL('http://test-server'),
-          _requestInit: {
-            headers: { Authorization: 'derp' },
-          },
-        });
+        const testableTransport = transport as unknown as {
+          _authProvider?: { token: () => Promise<string | undefined> };
+        };
+
+        expect(testableTransport._authProvider).toBeDefined();
+        const token = await testableTransport._authProvider!.token();
+        expect(token).toBe('stored-fresh-token');
       });
     });
 
