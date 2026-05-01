@@ -646,7 +646,26 @@ export function parseCommandDetails(
  *
  * @returns The ShellConfiguration for the current environment.
  */
-export function getShellConfiguration(): ShellConfiguration {
+export function getShellConfiguration(
+  overrideExecutable?: string,
+  overrideArgs?: string[],
+): ShellConfiguration {
+  if (overrideExecutable) {
+    const executable = overrideExecutable.toLowerCase();
+    const isPowerShell =
+      executable.endsWith('powershell.exe') ||
+      executable.endsWith('pwsh.exe') ||
+      executable === 'powershell' ||
+      executable === 'pwsh';
+
+    return {
+      executable: overrideExecutable,
+      argsPrefix:
+        overrideArgs || (isPowerShell ? ['-NoProfile', '-Command'] : ['-c']),
+      shell: isPowerShell ? 'powershell' : 'bash',
+    };
+  }
+
   if (isWindows()) {
     const comSpec = process.env['ComSpec'];
     if (comSpec) {

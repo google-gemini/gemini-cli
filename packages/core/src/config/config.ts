@@ -722,6 +722,8 @@ export interface ConfigParameters {
   topicUpdateNarration?: boolean;
 
   disableLLMCorrection?: boolean;
+  shellExecutable?: string;
+  shellArgs?: string[];
   plan?: boolean;
   tracker?: boolean;
   planSettings?: PlanSettings;
@@ -875,6 +877,8 @@ export class Config implements McpContext, AgentLoopContext {
   readonly interactive: boolean;
   private readonly ptyInfo: string;
   private readonly trustedFolder: boolean | undefined;
+  private readonly shellExecutable: string | undefined;
+  private readonly shellArgs: string[] | undefined;
   private readonly directWebFetch: boolean;
   private readonly useRipgrep: boolean;
   private readonly enableInteractiveShell: boolean;
@@ -1248,6 +1252,8 @@ export class Config implements McpContext, AgentLoopContext {
     this.compressionThreshold = params.compressionThreshold;
     this.interactive = params.interactive ?? false;
     this.ptyInfo = params.ptyInfo ?? 'child_process';
+    this.shellExecutable = params.shellExecutable;
+    this.shellArgs = params.shellArgs;
     this.trustedFolder = params.trustedFolder;
     this.directWebFetch = params.directWebFetch ?? false;
     this.useRipgrep = params.useRipgrep ?? true;
@@ -1270,6 +1276,8 @@ export class Config implements McpContext, AgentLoopContext {
       terminalHeight: params.shellExecutionConfig?.terminalHeight ?? 24,
       showColor: params.shellExecutionConfig?.showColor ?? false,
       pager: params.shellExecutionConfig?.pager ?? 'cat',
+      shellExecutable: this.shellExecutable,
+      shellArgs: this.shellArgs,
       sanitizationConfig: this.sanitizationConfig,
       sandboxManager: this._sandboxManager,
       sandboxConfig: this.sandbox,
@@ -3467,6 +3475,14 @@ export class Config implements McpContext, AgentLoopContext {
 
   getShellToolInactivityTimeout(): number {
     return this.shellToolInactivityTimeout;
+  }
+
+  getShellExecutable(): string | undefined {
+    return this.shellExecutable;
+  }
+
+  getShellArgs(): string[] | undefined {
+    return this.shellArgs;
   }
 
   getShellExecutionConfig(): ShellExecutionConfig {

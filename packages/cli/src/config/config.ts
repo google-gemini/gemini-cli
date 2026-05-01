@@ -1082,6 +1082,8 @@ export async function loadCliConfig(
     useRenderProcess: settings.ui?.renderProcess,
     useRipgrep: settings.tools?.useRipgrep,
     enableInteractiveShell: settings.tools?.shell?.enableInteractiveShell,
+    shellExecutable: settings.tools?.shell?.executable,
+    shellArgs: settings.tools?.shell?.args,
     shellBackgroundCompletionBehavior: settings.tools?.shell
       ?.backgroundCompletionBehavior as string | undefined,
     shellToolInactivityTimeout: settings.tools?.shell?.inactivityTimeout,
