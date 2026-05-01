@@ -199,7 +199,11 @@ export class KeychainService {
   ): Promise<T> {
     try {
       return await operation();
-    } catch {
+    } catch (error) {
+      console.error('Secure storage operation failed:', error);
+      if (error instanceof SecureStorageError) {
+        throw error;
+      }
       throw new SecureStorageError(SECURE_STORAGE_GENERIC_MESSAGE);
     }
   }
