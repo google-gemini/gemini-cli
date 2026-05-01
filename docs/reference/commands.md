@@ -14,6 +14,29 @@ Slash commands provide meta-level control over the CLI itself.
 
 - **Description:** Show version info. Share this information when filing issues.
 
+### `/agents`
+
+- **Description:** Manage local and remote subagents.
+- **Sub-commands:**
+  - **`list`**:
+    - **Description:** Lists all discovered agents, including built-in, local,
+      and remote agents.
+    - **Usage:** `/agents list`
+  - **`reload`** (alias: `refresh`):
+    - **Description:** Rescans agent directories (`~/.gemini/agents` and
+      `.gemini/agents`) and reloads the registry.
+    - **Usage:** `/agents reload`
+  - **`enable`**:
+    - **Description:** Enables a specific subagent.
+    - **Usage:** `/agents enable <agent-name>`
+  - **`disable`**:
+    - **Description:** Disables a specific subagent.
+    - **Usage:** `/agents disable <agent-name>`
+  - **`config`**:
+    - **Description:** Opens a configuration dialog for the specified agent to
+      adjust its model, temperature, or execution limits.
+    - **Usage:** `/agents config <agent-name>`
+
 ### `/auth`
 
 - **Description:** Open a dialog that lets you change the authentication method.
@@ -35,8 +58,8 @@ Slash commands provide meta-level control over the CLI itself.
     - `list` (selecting this opens the auto-saved session browser)
   - `-- checkpoints --`
     - `list`, `save`, `resume`, `delete`, `share` (manual tagged checkpoints)
-  - **Note:** Unique prefixes (for example `/cha` or `/resum`) resolve to the
-    same grouped menu.
+  - Unique prefixes (for example `/cha` or `/resu`) resolve to the same grouped
+    menu.
 - **Sub-commands:**
   - **`debug`**
     - **Description:** Export the most recent API request as a JSON payload.
@@ -71,9 +94,9 @@ Slash commands provide meta-level control over the CLI itself.
         [Checkpointing documentation](../cli/checkpointing.md).
       - **Equivalent:** `/resume save <tag>`
   - **`share [filename]`**
-    - **Description** Writes the current conversation to a provided Markdown or
+    - **Description:** Writes the current conversation to a provided Markdown or
       JSON file. If no filename is provided, then the CLI will generate one.
-    - **Usage** `/chat share file.md` or `/chat share file.json`.
+    - **Usage:** `/chat share file.md` or `/chat share file.json`.
     - **Equivalent:** `/resume share [filename]`
 
 ### `/clear`
@@ -88,6 +111,11 @@ Slash commands provide meta-level control over the CLI itself.
 
 - **Description:** Manage custom slash commands loaded from `.toml` files.
 - **Sub-commands:**
+  - **`list`**:
+    - **Description:** List available custom command `.toml` files from all
+      sources (user-level `~/.gemini/commands/`, project-level
+      `<project>/.gemini/commands/`, and active extensions).
+    - **Usage:** `/commands list`
   - **`reload`**:
     - **Description:** Reload custom command definitions from all sources
       (user-level `~/.gemini/commands/`, project-level
@@ -133,7 +161,7 @@ Slash commands provide meta-level control over the CLI itself.
 
 ### `/docs`
 
-- **Description:** Open the Gemini CLI documentation in your browser.
+- **Description:** Open Gemini CLI documentation in your browser.
 
 ### `/editor`
 
@@ -225,8 +253,8 @@ Slash commands provide meta-level control over the CLI itself.
   - **`list`** or **`ls`**:
     - **Description:** List configured MCP servers and tools. This is the
       default action if no subcommand is specified.
-  - **`refresh`**:
-    - **Description:** Restarts all MCP servers and re-discovers their available
+  - **`reload`**:
+    - **Description:** Reloads all MCP servers and re-discovers their available
       tools.
   - **`schema`**:
     - **Description:** List configured MCP servers and tools with descriptions
@@ -280,7 +308,7 @@ Slash commands provide meta-level control over the CLI itself.
 - **Description:** Switch to Plan Mode (read-only) and view the current plan if
   one has been generated.
   - **Note:** This feature is enabled by default. It can be disabled via the
-    `experimental.plan` setting in your configuration.
+    `general.plan.enabled` setting in your configuration.
 - **Sub-commands:**
   - **`copy`**:
     - **Description:** Copy the currently approved plan to your clipboard.
@@ -300,6 +328,11 @@ Slash commands provide meta-level control over the CLI itself.
 ### `/quit` (or `/exit`)
 
 - **Description:** Exit Gemini CLI.
+- **Flags:**
+  - **`--delete`** _(optional)_: Exit and permanently delete the current
+    session's history and temporary files (chat recording, tool outputs). Useful
+    for privacy or one-off tasks where you don't want to leave any traces.
+  - **Usage:** `/quit --delete` or `/exit --delete`
 
 ### `/restore`
 
@@ -377,8 +410,8 @@ Slash commands provide meta-level control over the CLI itself.
 
 ### `/shells` (or `/bashes`)
 
-- **Description:** Toggle the background shells view. This allows you to view
-  and manage long-running processes that you've sent to the background.
+- **Description:** Toggle the background shells view. This lets you view and
+  manage long-running processes that you've sent to the background.
 
 ### `/setup-github`
 
@@ -439,13 +472,20 @@ Slash commands provide meta-level control over the CLI itself.
   - **`nodesc`** or **`nodescriptions`**:
     - **Description:** Hide tool descriptions, showing only the tool names.
 
+### `/upgrade`
+
+- **Description:** Open the Gemini Code Assist upgrade page in your browser.
+  This lets you upgrade your tier for higher usage limits.
+- **Note:** This command is only available when logged in with Google.
+
 ### `/vim`
 
 - **Description:** Toggle vim mode on or off. When vim mode is enabled, the
   input area supports vim-style navigation and editing commands in both NORMAL
   and INSERT modes.
 - **Features:**
-  - **Count support:** Prefix commands with numbers (e.g., `3h`, `5w`, `10G`)
+  - **Count support:** Prefix commands with numbers (for example, `3h`, `5w`,
+    `10G`)
   - **Editing commands:** Delete with `x`, change with `c`, insert with `i`,
     `a`, `o`, `O`; complex operations like `dd`, `cc`, `dw`, `cw`
   - **INSERT mode:** Standard text input with escape to return to NORMAL mode
@@ -461,21 +501,20 @@ Slash commands provide meta-level control over the CLI itself.
 ### Custom commands
 
 Custom commands allow you to create personalized shortcuts for your most-used
-prompts. For detailed instructions on how to create, manage, and use them,
-please see the dedicated
-[Custom Commands documentation](../cli/custom-commands.md).
+prompts. For detailed instructions on how to create, manage, and use them, see
+the dedicated [Custom Commands documentation](../cli/custom-commands.md).
 
 ## Input prompt shortcuts
 
 These shortcuts apply directly to the input prompt for text manipulation.
 
 - **Undo:**
-  - **Keyboard shortcut:** Press **Alt+z** or **Cmd+z** to undo the last action
-    in the input prompt.
+  - **Keyboard shortcut:** Press **Ctrl+z** (Windows), **Cmd+z** (macOS), or
+    **Alt+z** (Linux/WSL) to undo the last action in the input prompt.
 
 - **Redo:**
-  - **Keyboard shortcut:** Press **Shift+Alt+Z** or **Shift+Cmd+Z** to redo the
-    last undone action in the input prompt.
+  - **Keyboard shortcut:** Press **Shift+Cmd+Z** (macOS), or **Shift+Alt+Z**
+    (Linux/WSL) to redo the last undone action in the input prompt.
 
 ## At commands (`@`)
 
@@ -494,7 +533,7 @@ your prompt to Gemini. These commands include git-aware filtering.
     - If a path to a single file is provided, the content of that file is read.
     - If a path to a directory is provided, the command attempts to read the
       content of files within that directory and any subdirectories.
-    - Spaces in paths should be escaped with a backslash (e.g.,
+    - Spaces in paths should be escaped with a backslash (for example,
       `@My\ Documents/file.txt`).
     - The command uses the `read_many_files` tool internally. The content is
       fetched and then inserted into your query before being sent to the Gemini
@@ -520,8 +559,8 @@ your prompt to Gemini. These commands include git-aware filtering.
 - If the path specified after `@` is not found or is invalid, an error message
   will be displayed, and the query might not be sent to the Gemini model, or it
   will be sent without the file content.
-- If the `read_many_files` tool encounters an error (e.g., permission issues),
-  this will also be reported.
+- If the `read_many_files` tool encounters an error (for example, permission
+  issues), this will also be reported.
 
 ## Shell mode and passthrough commands (`!`)
 
@@ -554,4 +593,4 @@ Gemini CLI.
 - **Environment variable:** When a command is executed via `!` or in shell mode,
   the `GEMINI_CLI=1` environment variable is set in the subprocess's
   environment. This allows scripts or tools to detect if they are being run from
-  within the Gemini CLI.
+  within Gemini CLI.

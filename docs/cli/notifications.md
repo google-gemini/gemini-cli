@@ -4,9 +4,10 @@ Gemini CLI can send system notifications to alert you when a session completes
 or when it needs your attention, such as when it's waiting for you to approve a
 tool call.
 
-> **Note:** This is a preview feature currently under active development.
-> Preview features may be available on the **Preview** channel or may need to be
-> enabled under `/settings`.
+<!-- prettier-ignore -->
+> [!NOTE]
+> This is an experimental feature currently under active development and
+> may need to be enabled under `/settings`.
 
 Notifications are particularly useful when running long-running tasks or using
 [Plan Mode](./plan-mode.md), letting you switch to other windows while Gemini
@@ -14,14 +15,14 @@ CLI works in the background.
 
 ## Requirements
 
-Currently, system notifications are only supported on macOS.
-
 ### Terminal support
 
 The CLI uses the OSC 9 terminal escape sequence to trigger system notifications.
-This is supported by several modern terminal emulators. If your terminal does
-not support OSC 9 notifications, Gemini CLI falls back to a system alert sound
-to get your attention.
+This is supported by several modern terminal emulators including iTerm2,
+WezTerm, Ghostty, and Kitty. If your terminal does not support OSC 9
+notifications, Gemini CLI falls back to a terminal bell (BEL) to get your
+attention. Most terminals respond to BEL with a taskbar flash or system alert
+sound.
 
 ## Enable notifications
 

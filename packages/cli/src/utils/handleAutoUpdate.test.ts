@@ -4,8 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Mock } from 'vitest';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type Mock,
+} from 'vitest';
 import { getInstallationInfo, PackageManager } from './installationInfo.js';
 import { updateEventEmitter } from './updateEventEmitter.js';
 import type { UpdateObject } from '../ui/utils/updateCheck.js';
@@ -89,7 +96,7 @@ describe('handleAutoUpdate', () => {
   });
 
   it('should do nothing if update info is null', () => {
-    handleAutoUpdate(null, mockSettings, '/root', mockSpawn);
+    handleAutoUpdate(null, mockSettings, '/root', false, mockSpawn);
     expect(mockGetInstallationInfo).not.toHaveBeenCalled();
     expect(updateEventEmitter.emit).not.toHaveBeenCalled();
     expect(mockSpawn).not.toHaveBeenCalled();
@@ -105,7 +112,7 @@ describe('handleAutoUpdate', () => {
 
     expect(isUpdateInProgress()).toBe(false);
 
-    handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', mockSpawn);
+    handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', false, mockSpawn);
 
     expect(isUpdateInProgress()).toBe(true);
 
@@ -122,7 +129,7 @@ describe('handleAutoUpdate', () => {
       packageManager: PackageManager.NPM,
     });
 
-    handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', mockSpawn);
+    handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', false, mockSpawn);
 
     expect(isUpdateInProgress()).toBe(true);
 
@@ -171,7 +178,7 @@ describe('handleAutoUpdate', () => {
 
   it('should do nothing if update prompts are disabled', () => {
     mockSettings.merged.general.enableAutoUpdateNotification = false;
-    handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', mockSpawn);
+    handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', false, mockSpawn);
     expect(mockGetInstallationInfo).not.toHaveBeenCalled();
     expect(updateEventEmitter.emit).not.toHaveBeenCalled();
     expect(mockSpawn).not.toHaveBeenCalled();
@@ -186,16 +193,23 @@ describe('handleAutoUpdate', () => {
       packageManager: PackageManager.NPM,
     });
 
-    handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', mockSpawn);
+    handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', false, mockSpawn);
 
     expect(updateEventEmitter.emit).toHaveBeenCalledTimes(1);
     expect(updateEventEmitter.emit).toHaveBeenCalledWith('update-received', {
+      ...mockUpdateInfo,
       message: 'An update is available!\nPlease update manually.',
+      isUpdating: false,
     });
     expect(mockSpawn).not.toHaveBeenCalled();
   });
 
-  it.each([PackageManager.NPX, PackageManager.PNPX, PackageManager.BUNX])(
+  it.each([
+    PackageManager.NPX,
+    PackageManager.PNPX,
+    PackageManager.BUNX,
+    PackageManager.BINARY,
+  ])(
     'should suppress update notifications when running via %s',
     (packageManager) => {
       mockGetInstallationInfo.mockReturnValue({
@@ -205,7 +219,7 @@ describe('handleAutoUpdate', () => {
         packageManager,
       });
 
-      handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', mockSpawn);
+      handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', false, mockSpawn);
 
       expect(updateEventEmitter.emit).not.toHaveBeenCalled();
       expect(mockSpawn).not.toHaveBeenCalled();
@@ -220,11 +234,13 @@ describe('handleAutoUpdate', () => {
       packageManager: PackageManager.NPM,
     });
 
-    handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', mockSpawn);
+    handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', false, mockSpawn);
 
     expect(updateEventEmitter.emit).toHaveBeenCalledTimes(1);
     expect(updateEventEmitter.emit).toHaveBeenCalledWith('update-received', {
+      ...mockUpdateInfo,
       message: 'An update is available!\nCannot determine update command.',
+      isUpdating: false,
     });
     expect(mockSpawn).not.toHaveBeenCalled();
   });
@@ -237,11 +253,13 @@ describe('handleAutoUpdate', () => {
       packageManager: PackageManager.NPM,
     });
 
-    handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', mockSpawn);
+    handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', false, mockSpawn);
 
     expect(updateEventEmitter.emit).toHaveBeenCalledTimes(1);
     expect(updateEventEmitter.emit).toHaveBeenCalledWith('update-received', {
+      ...mockUpdateInfo,
       message: 'An update is available!\nThis is an additional message.',
+      isUpdating: false,
     });
   });
 
@@ -258,7 +276,7 @@ describe('handleAutoUpdate', () => {
       mockChildProcess.emit('close', 0);
     }, 0);
 
-    handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', mockSpawn);
+    handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', false, mockSpawn);
 
     expect(mockSpawn).toHaveBeenCalledOnce();
   });
@@ -278,12 +296,12 @@ describe('handleAutoUpdate', () => {
         resolve();
       }, 0);
 
-      handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', mockSpawn);
+      handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', false, mockSpawn);
     });
 
     expect(updateEventEmitter.emit).toHaveBeenCalledWith('update-failed', {
       message:
-        'Automatic update failed. Please try updating manually. (command: npm i -g @google/gemini-cli@2.0.0)',
+        'Automatic update failed. Please try updating manually:\n\nnpm i -g @google/gemini-cli@2.0.0',
     });
   });
 
@@ -302,12 +320,12 @@ describe('handleAutoUpdate', () => {
         resolve();
       }, 0);
 
-      handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', mockSpawn);
+      handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', false, mockSpawn);
     });
 
     expect(updateEventEmitter.emit).toHaveBeenCalledWith('update-failed', {
       message:
-        'Automatic update failed. Please try updating manually. (error: Spawn error)',
+        'Automatic update failed. Please try updating manually. (error: Spawn error)\n\nnpm i -g @google/gemini-cli@2.0.0',
     });
   });
 
@@ -316,7 +334,8 @@ describe('handleAutoUpdate', () => {
       ...mockUpdateInfo,
       update: {
         ...mockUpdateInfo.update,
-        latest: '2.0.0-nightly',
+        current: '1.0.0-nightly.0',
+        latest: '2.0.0-nightly.1',
       },
     };
     mockGetInstallationInfo.mockReturnValue({
@@ -326,7 +345,7 @@ describe('handleAutoUpdate', () => {
       packageManager: PackageManager.NPM,
     });
 
-    handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', mockSpawn);
+    handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', false, mockSpawn);
 
     expect(mockSpawn).toHaveBeenCalledWith(
       'npm i -g @google/gemini-cli@nightly',
@@ -336,6 +355,26 @@ describe('handleAutoUpdate', () => {
         detached: true,
       },
     );
+  });
+
+  it('should NOT update if target is less stable than current (defense-in-depth)', async () => {
+    mockUpdateInfo = {
+      ...mockUpdateInfo,
+      update: {
+        ...mockUpdateInfo.update,
+        current: '1.0.0',
+        latest: '1.1.0-nightly.1',
+      },
+    };
+    mockGetInstallationInfo.mockReturnValue({
+      updateCommand: 'npm i -g @google/gemini-cli@latest',
+      isGlobal: false,
+      packageManager: PackageManager.NPM,
+    });
+
+    handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', false, mockSpawn);
+
+    expect(mockSpawn).not.toHaveBeenCalled();
   });
 
   it('should emit "update-success" when the update process succeeds', async () => {
@@ -353,13 +392,22 @@ describe('handleAutoUpdate', () => {
         resolve();
       }, 0);
 
-      handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', mockSpawn);
+      handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', false, mockSpawn);
     });
 
     expect(updateEventEmitter.emit).toHaveBeenCalledWith('update-success', {
       message:
         'Update successful! The new version will be used on your next run.',
     });
+  });
+
+  it('should suppress update if isSandboxEnabled is true', () => {
+    handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', true, mockSpawn);
+
+    expect(updateEventEmitter.emit).toHaveBeenCalledWith('update-info', {
+      message: `${mockUpdateInfo.message}\nAutomatic update is not available in sandbox mode.`,
+    });
+    expect(mockSpawn).not.toHaveBeenCalled();
   });
 });
 
@@ -417,13 +465,15 @@ describe('setUpdateHandler', () => {
   });
 
   it('should handle update-failed event', () => {
-    updateEventEmitter.emit('update-failed', { message: 'Failed' });
+    updateEventEmitter.emit('update-failed', {
+      message: 'Failed message with command',
+    });
 
     expect(setUpdateInfo).toHaveBeenCalledWith(null);
     expect(addItem).toHaveBeenCalledWith(
       {
         type: MessageType.ERROR,
-        text: 'Automatic update failed. Please try updating manually',
+        text: 'Failed message with command',
       },
       expect.any(Number),
     );

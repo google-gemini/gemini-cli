@@ -5,6 +5,7 @@
  */
 
 import type React from 'react';
+import { useState, useEffect } from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import {
@@ -12,6 +13,8 @@ import {
   tildeifyPath,
   getDisplayString,
   checkExhaustive,
+  AuthType,
+  UserAccountManager,
 } from '@google/gemini-cli-core';
 import { ConsoleSummaryDisplay } from './ConsoleSummaryDisplay.js';
 import process from 'node:process';
@@ -20,9 +23,11 @@ import { ContextUsageDisplay } from './ContextUsageDisplay.js';
 import { QuotaDisplay } from './QuotaDisplay.js';
 import { DebugProfiler } from './DebugProfiler.js';
 import { useUIState } from '../contexts/UIStateContext.js';
+import { useQuotaState } from '../contexts/QuotaContext.js';
 import { useConfig } from '../contexts/ConfigContext.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 import { useVimMode } from '../contexts/VimModeContext.js';
+import { useInputState } from '../contexts/InputContext.js';
 import {
   ALL_ITEMS,
   type FooterItemId,
@@ -64,26 +69,19 @@ interface SandboxIndicatorProps {
 const SandboxIndicator: React.FC<SandboxIndicatorProps> = ({
   isTrustedFolder,
 }) => {
+  const config = useConfig();
+  const sandboxEnabled = config.getSandboxEnabled();
   if (isTrustedFolder === false) {
     return <Text color={theme.status.warning}>untrusted</Text>;
   }
 
   const sandbox = process.env['SANDBOX'];
-  if (sandbox && sandbox !== 'sandbox-exec') {
-    return (
-      <Text color="green">{sandbox.replace(/^gemini-(?:cli-)?/, '')}</Text>
-    );
+  if (sandbox) {
+    return <Text color={theme.status.warning}>current process</Text>;
   }
 
-  if (sandbox === 'sandbox-exec') {
-    return (
-      <Text color={theme.status.warning}>
-        macOS Seatbelt{' '}
-        <Text color={theme.ui.comment}>
-          ({process.env['SEATBELT_PROFILE']})
-        </Text>
-      </Text>
-    );
+  if (sandboxEnabled) {
+    return <Text color={theme.status.warning}>all tools</Text>;
   }
 
   return <Text color={theme.status.error}>no sandbox</Text>;
@@ -106,6 +104,7 @@ export interface FooterRowItem {
   flexGrow?: number;
   flexShrink?: number;
   isFocused?: boolean;
+  alignItems?: 'flex-start' | 'center' | 'flex-end';
 }
 
 const COLUMN_GAP = 3;
@@ -117,10 +116,17 @@ export const FooterRow: React.FC<{
   const elements: React.ReactNode[] = [];
 
   items.forEach((item, idx) => {
-    if (idx > 0 && !showLabels) {
+    if (idx > 0) {
       elements.push(
-        <Box key={`sep-${item.key}`} height={1}>
-          <Text color={theme.ui.comment}> · </Text>
+        <Box
+          key={`sep-${item.key}`}
+          flexGrow={1}
+          flexShrink={1}
+          minWidth={showLabels ? COLUMN_GAP : 3}
+          justifyContent="center"
+          alignItems="center"
+        >
+          {!showLabels && <Text color={theme.ui.comment}> · </Text>}
         </Box>,
       );
     }
@@ -131,6 +137,7 @@ export const FooterRow: React.FC<{
         flexDirection="column"
         flexGrow={item.flexGrow ?? 0}
         flexShrink={item.flexShrink ?? 1}
+        alignItems={item.alignItems}
         backgroundColor={item.isFocused ? theme.background.focus : undefined}
       >
         {showLabels && (
@@ -148,12 +155,7 @@ export const FooterRow: React.FC<{
   });
 
   return (
-    <Box
-      flexDirection="row"
-      flexWrap="nowrap"
-      width="100%"
-      columnGap={showLabels ? COLUMN_GAP : 0}
-    >
+    <Box flexDirection="row" flexWrap="nowrap" width="100%">
       {elements}
     </Box>
   );
@@ -173,9 +175,23 @@ interface FooterColumn {
 
 export const Footer: React.FC = () => {
   const uiState = useUIState();
+  const quotaState = useQuotaState();
+  const { copyModeEnabled } = useInputState();
   const config = useConfig();
   const settings = useSettings();
   const { vimEnabled, vimMode } = useVimMode();
+
+  const authType = config.getContentGeneratorConfig()?.authType;
+  const [email, setEmail] = useState<string | undefined>();
+
+  useEffect(() => {
+    if (authType) {
+      const userAccountManager = new UserAccountManager();
+      setEmail(userAccountManager.getCachedGoogleAccount() ?? undefined);
+    } else {
+      setEmail(undefined);
+    }
+  }, [authType]);
 
   const {
     model,
@@ -189,7 +205,6 @@ export const Footer: React.FC = () => {
     promptTokenCount,
     isTrustedFolder,
     terminalWidth,
-    quotaStats,
   } = {
     model: uiState.currentModel,
     targetDir: config.getTargetDir(),
@@ -202,8 +217,9 @@ export const Footer: React.FC = () => {
     promptTokenCount: uiState.sessionStats.lastPromptTokenCount,
     isTrustedFolder: uiState.isTrustedFolder,
     terminalWidth: uiState.terminalWidth,
-    quotaStats: uiState.quota.stats,
   };
+
+  const quotaStats = quotaState.stats;
 
   const isFullErrorVerbosity = settings.merged.ui.errorVerbosity === 'full';
   const showErrorSummary =
@@ -211,6 +227,7 @@ export const Footer: React.FC = () => {
     errorCount > 0 &&
     (isFullErrorVerbosity || debugMode || isDevelopment);
   const displayVimMode = vimEnabled ? vimMode : undefined;
+
   const items =
     settings.merged.ui.footer.items ??
     deriveItemsFromLegacySettings(settings.merged);
@@ -291,9 +308,8 @@ export const Footer: React.FC = () => {
         let str = 'no sandbox';
         const sandbox = process.env['SANDBOX'];
         if (isTrustedFolder === false) str = 'untrusted';
-        else if (sandbox === 'sandbox-exec')
-          str = `macOS Seatbelt (${process.env['SEATBELT_PROFILE']})`;
-        else if (sandbox) str = sandbox.replace(/^gemini-(?:cli-)?/, '');
+        else if (sandbox) str = 'current process';
+        else if (config.getSandboxEnabled()) str = 'all tools';
 
         addCol(
           id,
@@ -337,19 +353,24 @@ export const Footer: React.FC = () => {
               <QuotaDisplay
                 remaining={quotaStats.remaining}
                 limit={quotaStats.limit}
-                resetTime={quotaStats.resetTime}
-                terse={true}
                 forceShow={true}
                 lowercase={true}
               />
             ),
-            10, // "daily 100%" is 10 chars, but terse is "100%" (4 chars)
+            9, // "100% used" is 9 chars
           );
         }
         break;
       }
       case 'memory-usage': {
-        addCol(id, header, () => <MemoryUsageDisplay color={itemColor} />, 10);
+        addCol(
+          id,
+          header,
+          () => (
+            <MemoryUsageDisplay color={itemColor} isActive={!copyModeEnabled} />
+          ),
+          10,
+        );
         break;
       }
       case 'session-id': {
@@ -362,6 +383,25 @@ export const Footer: React.FC = () => {
             </Text>
           ),
           8,
+        );
+        break;
+      }
+      case 'auth': {
+        if (!settings.merged.ui.showUserIdentity) break;
+        if (!authType) break;
+        const displayStr =
+          authType === AuthType.LOGIN_WITH_GOOGLE
+            ? (email ?? 'google')
+            : authType;
+        addCol(
+          id,
+          header,
+          () => (
+            <Text color={itemColor} wrap="truncate-end">
+              {displayStr}
+            </Text>
+          ),
+          displayStr.length,
         );
         break;
       }
@@ -441,8 +481,9 @@ export const Footer: React.FC = () => {
     }
   }
 
-  const rowItems: FooterRowItem[] = columnsToRender.map((col) => {
+  const rowItems: FooterRowItem[] = columnsToRender.map((col, index) => {
     const isWorkspace = col.id === 'workspace';
+    const isLast = index === columnsToRender.length - 1;
 
     // Calculate exact space available for growth to prevent over-estimation truncation
     const otherItemsWidth = columnsToRender
@@ -464,8 +505,10 @@ export const Footer: React.FC = () => {
       key: col.id,
       header: col.header,
       element: col.element(estimatedWidth),
-      flexGrow: isWorkspace ? 1 : 0,
+      flexGrow: 0,
       flexShrink: isWorkspace ? 1 : 0,
+      alignItems:
+        isLast && !droppedAny && index > 0 ? 'flex-end' : 'flex-start',
     };
   });
 
@@ -476,6 +519,7 @@ export const Footer: React.FC = () => {
       element: <Text color={theme.ui.comment}>…</Text>,
       flexGrow: 0,
       flexShrink: 0,
+      alignItems: 'flex-end',
     });
   }
 

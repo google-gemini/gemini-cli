@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -22,7 +22,7 @@ export class InitCommand implements Command {
     context: CommandContext,
     _args: string[] = [],
   ): Promise<CommandExecutionResponse> {
-    const targetDir = context.config.getTargetDir();
+    const targetDir = context.agentContext.config.getTargetDir();
     if (!targetDir) {
       throw new Error('Command requires a workspace.');
     }

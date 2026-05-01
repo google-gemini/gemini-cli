@@ -89,8 +89,11 @@ export interface HookPayload {
  */
 export interface HookStartPayload extends HookPayload {
   /**
+   * The source of the hook configuration.
+   */
+  source?: string;
+  /**
    * The 1-based index of the current hook in the execution sequence.
-   * Used for progress indication (e.g. "Hook 1/3").
    */
   hookIndex?: number;
   /**
@@ -104,6 +107,13 @@ export interface HookStartPayload extends HookPayload {
  */
 export interface HookEndPayload extends HookPayload {
   success: boolean;
+}
+
+/**
+ * Payload for the 'hook-system-message' event.
+ */
+export interface HookSystemMessagePayload extends HookPayload {
+  message: string;
 }
 
 /**
@@ -180,6 +190,7 @@ export enum CoreEvent {
   SettingsChanged = 'settings-changed',
   HookStart = 'hook-start',
   HookEnd = 'hook-end',
+  HookSystemMessage = 'hook-system-message',
   AgentsRefreshed = 'agents-refreshed',
   AdminSettingsChanged = 'admin-settings-changed',
   RetryAttempt = 'retry-attempt',
@@ -214,6 +225,7 @@ export interface CoreEvents extends ExtensionEvents {
   [CoreEvent.SettingsChanged]: never[];
   [CoreEvent.HookStart]: [HookStartPayload];
   [CoreEvent.HookEnd]: [HookEndPayload];
+  [CoreEvent.HookSystemMessage]: [HookSystemMessagePayload];
   [CoreEvent.AgentsRefreshed]: never[];
   [CoreEvent.AdminSettingsChanged]: never[];
   [CoreEvent.RetryAttempt]: [RetryAttemptPayload];
@@ -337,6 +349,13 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
   }
 
   /**
+   * Notifies subscribers that a hook has provided a system message.
+   */
+  emitHookSystemMessage(payload: HookSystemMessagePayload): void {
+    this.emit(CoreEvent.HookSystemMessage, payload);
+  }
+
+  /**
    * Notifies subscribers that agents have been refreshed.
    */
   emitAgentsRefreshed(): void {
@@ -403,8 +422,15 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
   /**
    * Flushes buffered messages. Call this immediately after primary UI listener
    * subscribes.
+   *
+   * @param transform - Optional function to transform events before they are emitted.
    */
-  drainBacklogs(): void {
+  drainBacklogs(
+    transform?: <K extends keyof CoreEvents>(
+      event: K,
+      args: CoreEvents[K],
+    ) => { event: K; args: CoreEvents[K] } | undefined,
+  ): void {
     const backlog = this._eventBacklog;
     const head = this._backlogHead;
     this._eventBacklog = [];
@@ -412,10 +438,21 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
     for (let i = head; i < backlog.length; i++) {
       const item = backlog[i];
       if (item === undefined) continue;
+
+      let eventToEmit = item.event;
+      let argsToEmit = item.args;
+
+      if (transform) {
+        const transformed = transform(item.event, item.args);
+        if (!transformed) continue;
+        eventToEmit = transformed.event;
+        argsToEmit = transformed.args;
+      }
+
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       (this.emit as (event: keyof CoreEvents, ...args: unknown[]) => boolean)(
-        item.event,
-        ...item.args,
+        eventToEmit,
+        ...argsToEmit,
       );
     }
   }

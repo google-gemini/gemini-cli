@@ -35,7 +35,7 @@ browser.
 
 This opens a searchable list of all your past sessions. You'll see:
 
-- A timestamp (e.g., "2 hours ago").
+- A timestamp (for example, "2 hours ago").
 - The first user message (helping you identify the topic).
 - The number of turns in the conversation.
 
@@ -60,6 +60,19 @@ gemini --list-sessions
 # Delete a specific session by ID or index
 gemini --delete-session 1
 ```
+
+### Scenario: Delete session on exit
+
+If you're doing a one-off task and don't want to leave any session history
+behind, use the `--delete` flag when exiting:
+
+```
+/exit --delete
+```
+
+This removes the current session's conversation history and tool output files
+before exiting. It's useful for privacy-sensitive tasks or quick one-off
+interactions.
 
 ## How to rewind time (Undo mistakes)
 

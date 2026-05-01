@@ -9,7 +9,7 @@ import open from 'open';
 import path from 'node:path';
 import { bugCommand } from './bugCommand.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
-import { getVersion } from '@google/gemini-cli-core';
+import { getVersion, type Config } from '@google/gemini-cli-core';
 import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
 import { formatBytes } from '../utils/formatters.js';
 
@@ -83,16 +83,19 @@ describe('bugCommand', () => {
   it('should generate the default GitHub issue URL', async () => {
     const mockContext = createMockCommandContext({
       services: {
-        config: {
-          getModel: () => 'gemini-pro',
-          getBugCommand: () => undefined,
-          getIdeMode: () => true,
-          getGeminiClient: () => ({
+        agentContext: {
+          config: {
+            getModel: () => 'gemini-pro',
+            getBugCommand: () => undefined,
+            getIdeMode: () => true,
+            getContentGeneratorConfig: () => ({ authType: 'oauth-personal' }),
+            getSessionId: vi.fn().mockReturnValue('test-session-id'),
+          } as unknown as Config,
+          geminiClient: {
             getChat: () => ({
               getHistory: () => [],
             }),
-          }),
-          getContentGeneratorConfig: () => ({ authType: 'oauth-personal' }),
+          },
         },
       },
     });
@@ -126,18 +129,21 @@ describe('bugCommand', () => {
     ];
     const mockContext = createMockCommandContext({
       services: {
-        config: {
-          getModel: () => 'gemini-pro',
-          getBugCommand: () => undefined,
-          getIdeMode: () => true,
-          getGeminiClient: () => ({
+        agentContext: {
+          config: {
+            getModel: () => 'gemini-pro',
+            getBugCommand: () => undefined,
+            getIdeMode: () => true,
+            getContentGeneratorConfig: () => ({ authType: 'vertex-ai' }),
+            storage: {
+              getProjectTempDir: () => '/tmp/gemini',
+            },
+            getSessionId: vi.fn().mockReturnValue('test-session-id'),
+          } as unknown as Config,
+          geminiClient: {
             getChat: () => ({
               getHistory: () => history,
             }),
-          }),
-          getContentGeneratorConfig: () => ({ authType: 'vertex-ai' }),
-          storage: {
-            getProjectTempDir: () => '/tmp/gemini',
           },
         },
       },
@@ -172,16 +178,19 @@ describe('bugCommand', () => {
       'https://internal.bug-tracker.com/new?desc={title}&details={info}';
     const mockContext = createMockCommandContext({
       services: {
-        config: {
-          getModel: () => 'gemini-pro',
-          getBugCommand: () => ({ urlTemplate: customTemplate }),
-          getIdeMode: () => true,
-          getGeminiClient: () => ({
+        agentContext: {
+          config: {
+            getModel: () => 'gemini-pro',
+            getBugCommand: () => ({ urlTemplate: customTemplate }),
+            getIdeMode: () => true,
+            getContentGeneratorConfig: () => ({ authType: 'vertex-ai' }),
+            getSessionId: vi.fn().mockReturnValue('test-session-id'),
+          } as unknown as Config,
+          geminiClient: {
             getChat: () => ({
               getHistory: () => [],
             }),
-          }),
-          getContentGeneratorConfig: () => ({ authType: 'vertex-ai' }),
+          },
         },
       },
     });

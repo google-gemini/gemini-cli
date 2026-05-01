@@ -124,7 +124,7 @@ export class DevTools extends EventEmitter {
         chunks: payload.chunk ? [payload.chunk] : undefined,
       } as NetworkLog;
       this.logs.push(entry);
-      if (this.logs.length > 2000) this.logs.shift();
+      if (this.logs.length > 10) this.logs.shift();
       this.emit('update', entry);
     }
   }
@@ -177,7 +177,41 @@ export class DevTools extends EventEmitter {
         }
 
         // API routes
-        if (req.url === '/events') {
+        if (req.url === '/api/trigger-debugger' && req.method === 'POST') {
+          let body = '';
+          req.on('data', (chunk) => {
+            body += chunk;
+          });
+          req.on('end', () => {
+            try {
+              const parsed: unknown = JSON.parse(body);
+              if (
+                typeof parsed !== 'object' ||
+                parsed === null ||
+                !('sessionId' in parsed) ||
+                typeof parsed.sessionId !== 'string'
+              ) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Invalid request' }));
+                return;
+              }
+              const sessionId = parsed.sessionId;
+              const session = this.sessions.get(sessionId);
+              if (session) {
+                session.ws.send(JSON.stringify({ type: 'trigger-debugger' }));
+
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: true }));
+              } else {
+                res.writeHead(404, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Session not found' }));
+              }
+            } catch {
+              res.writeHead(400, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ error: 'Invalid request' }));
+            }
+          });
+        } else if (req.url === '/events') {
           res.writeHead(200, {
             'Content-Type': 'text/event-stream',
             'Cache-Control': 'no-cache',

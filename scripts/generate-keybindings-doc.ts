@@ -8,12 +8,15 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { readFile, writeFile } from 'node:fs/promises';
 
-import type { KeyBinding } from '../packages/cli/src/config/keyBindings.js';
+import type { KeyBinding } from '../packages/cli/src/ui/key/keyBindings.js';
 import {
   commandCategories,
   commandDescriptions,
-  defaultKeyBindings,
-} from '../packages/cli/src/config/keyBindings.js';
+  defaultKeyBindingConfig,
+  Command,
+  getPlatformUndoBindings,
+  getPlatformRedoBindings,
+} from '../packages/cli/src/ui/key/keyBindings.js';
 import {
   formatWithPrettier,
   injectBetweenMarkers,
@@ -24,9 +27,10 @@ const START_MARKER = '<!-- KEYBINDINGS-AUTOGEN:START -->';
 const END_MARKER = '<!-- KEYBINDINGS-AUTOGEN:END -->';
 const OUTPUT_RELATIVE_PATH = ['docs', 'reference', 'keyboard-shortcuts.md'];
 
-import { formatKeyBinding } from '../packages/cli/src/ui/utils/keybindingUtils.js';
+import { formatKeyBinding } from '../packages/cli/src/ui/key/keybindingUtils.js';
 
 export interface KeybindingDocCommand {
+  command: string;
   description: string;
   bindings: readonly KeyBinding[];
 }
@@ -80,11 +84,52 @@ export async function main(argv = process.argv.slice(2)) {
 export function buildDefaultDocSections(): readonly KeybindingDocSection[] {
   return commandCategories.map((category) => ({
     title: category.title,
-    commands: category.commands.map((command) => ({
-      description: commandDescriptions[command],
-      bindings: defaultKeyBindings[command],
-    })),
+    commands: category.commands.map((command) => {
+      // For UNDO and REDO, we want to show all platform variants in the docs
+      if (command === Command.UNDO) {
+        return {
+          command: command,
+          description: commandDescriptions[command],
+          bindings: getMergedPlatformBindings(getPlatformUndoBindings),
+        };
+      }
+      if (command === Command.REDO) {
+        return {
+          command: command,
+          description: commandDescriptions[command],
+          bindings: getMergedPlatformBindings(getPlatformRedoBindings),
+        };
+      }
+
+      return {
+        command: command,
+        description: commandDescriptions[command],
+        bindings: defaultKeyBindingConfig.get(command) ?? [],
+      };
+    }),
   }));
+}
+
+function getMergedPlatformBindings(
+  getBindings: (platform: string) => readonly KeyBinding[],
+): readonly KeyBinding[] {
+  const win32 = getBindings('win32');
+  const darwin = getBindings('darwin');
+  const linux = getBindings('linux');
+
+  const all = [...win32, ...darwin, ...linux];
+  const seen = new Set<string>();
+  const unique: KeyBinding[] = [];
+
+  for (const b of all) {
+    const key = `${b.name}-${b.ctrl}-${b.shift}-${b.alt}-${b.cmd}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      unique.push(b);
+    }
+  }
+
+  return unique;
 }
 
 export function renderDocumentation(
@@ -94,14 +139,14 @@ export function renderDocumentation(
     const rows = section.commands.map((command) => {
       const formattedBindings = formatBindings(command.bindings);
       const keysCell = formattedBindings.join('<br />');
-      return `| ${command.description} | ${keysCell} |`;
+      return `| \`${command.command}\` | ${command.description} | ${keysCell} |`;
     });
 
     return [
       `#### ${section.title}`,
       '',
-      '| Action | Keys |',
-      '| --- | --- |',
+      '| Command | Action | Keys |',
+      '| --- | --- | --- |',
       ...rows,
     ].join('\n');
   });

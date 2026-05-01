@@ -16,9 +16,8 @@ import {
   MessageType,
 } from '../types.js';
 import { disableSkill, enableSkill } from '../../utils/skillSettings.js';
-import { getErrorMessage } from '../../utils/errors.js';
 
-import { getAdminErrorMessage } from '@google/gemini-cli-core';
+import { getAdminErrorMessage, getErrorMessage } from '@google/gemini-cli-core';
 import {
   linkSkill,
   renderSkillActionFeedback,
@@ -47,7 +46,7 @@ async function listAction(
     }
   }
 
-  const skillManager = context.services.config?.getSkillManager();
+  const skillManager = context.services.agentContext?.config.getSkillManager();
   if (!skillManager) {
     context.ui.addItem({
       type: MessageType.ERROR,
@@ -128,8 +127,8 @@ async function linkAction(
       text: `Successfully linked skills from "${sourcePath}" (${scope}).`,
     });
 
-    if (context.services.config) {
-      await context.services.config.reloadSkills();
+    if (context.services.agentContext?.config) {
+      await context.services.agentContext.config.reloadSkills();
     }
   } catch (error) {
     context.ui.addItem({
@@ -151,14 +150,14 @@ async function disableAction(
     });
     return;
   }
-  const skillManager = context.services.config?.getSkillManager();
+  const skillManager = context.services.agentContext?.config.getSkillManager();
   if (skillManager?.isAdminEnabled() === false) {
     context.ui.addItem(
       {
         type: MessageType.ERROR,
         text: getAdminErrorMessage(
           'Agent skills',
-          context.services.config ?? undefined,
+          context.services.agentContext?.config ?? undefined,
         ),
       },
       Date.now(),
@@ -212,14 +211,14 @@ async function enableAction(
     return;
   }
 
-  const skillManager = context.services.config?.getSkillManager();
+  const skillManager = context.services.agentContext?.config.getSkillManager();
   if (skillManager?.isAdminEnabled() === false) {
     context.ui.addItem(
       {
         type: MessageType.ERROR,
         text: getAdminErrorMessage(
           'Agent skills',
-          context.services.config ?? undefined,
+          context.services.agentContext?.config ?? undefined,
         ),
       },
       Date.now(),
@@ -247,7 +246,7 @@ async function enableAction(
 async function reloadAction(
   context: CommandContext,
 ): Promise<void | SlashCommandActionReturn> {
-  const config = context.services.config;
+  const config = context.services.agentContext?.config;
   if (!config) {
     context.ui.addItem({
       type: MessageType.ERROR,
@@ -285,6 +284,8 @@ async function reloadAction(
       }
       context.ui.setPendingItem(null);
     }
+
+    context.ui.reloadCommands();
 
     const afterSkills = skillManager.getSkills();
     const afterNames = new Set(afterSkills.map((s) => s.name));
@@ -334,7 +335,7 @@ function disableCompletion(
   context: CommandContext,
   partialArg: string,
 ): string[] {
-  const skillManager = context.services.config?.getSkillManager();
+  const skillManager = context.services.agentContext?.config.getSkillManager();
   if (!skillManager) {
     return [];
   }
@@ -348,7 +349,7 @@ function enableCompletion(
   context: CommandContext,
   partialArg: string,
 ): string[] {
-  const skillManager = context.services.config?.getSkillManager();
+  const skillManager = context.services.agentContext?.config.getSkillManager();
   if (!skillManager) {
     return [];
   }
@@ -357,6 +358,8 @@ function enableCompletion(
     .filter((s) => s.disabled && s.name.startsWith(partialArg))
     .map((s) => s.name);
 }
+
+import { parseSlashCommand } from '../../utils/commands.js';
 
 export const skillsCommand: SlashCommand = {
   name: 'skills',
@@ -403,5 +406,13 @@ export const skillsCommand: SlashCommand = {
       action: reloadAction,
     },
   ],
-  action: listAction,
+  action: async (context, args) => {
+    if (args) {
+      const parsed = parseSlashCommand(`/${args}`, skillsCommand.subCommands!);
+      if (parsed.commandToExecute?.action) {
+        return parsed.commandToExecute.action(context, parsed.args);
+      }
+    }
+    return listAction(context, args);
+  },
 };

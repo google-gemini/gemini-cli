@@ -46,6 +46,7 @@ import {
   handleMaxTurnsExceededError,
 } from './utils/errors.js';
 import { TextOutput } from './ui/utils/textOutput.js';
+import { runNonInteractive as runNonInteractiveAgentSession } from './nonInteractiveCliAgentSession.js';
 
 interface RunNonInteractiveParams {
   config: Config;
@@ -55,16 +56,27 @@ interface RunNonInteractiveParams {
   resumedSessionData?: ResumedSessionData;
 }
 
-export async function runNonInteractive({
-  config,
-  settings,
-  input,
-  prompt_id,
-  resumedSessionData,
-}: RunNonInteractiveParams): Promise<void> {
+/**
+ * Runs the non-interactive CLI loop.
+ *
+ * Programmatic output formats (JSON, STREAM_JSON) use lenient sanitization
+ * by stripping ANSI escape sequences from messages to ensure clean,
+ * parseable output for downstream consumers.
+ */
+export async function runNonInteractive(
+  params: RunNonInteractiveParams,
+): Promise<void> {
+  const useAgentSession = params.config.getAgentSessionNoninteractiveEnabled();
+  if (useAgentSession) {
+    return runNonInteractiveAgentSession(params);
+  }
+
+  const { config, settings, input, prompt_id, resumedSessionData } = params;
+
   return promptIdContext.run(prompt_id, async () => {
     const consolePatcher = new ConsolePatcher({
       stderr: true,
+      interactive: false,
       debugMode: config.getDebugMode(),
       onNewMessage: (msg) => {
         coreEvents.emitConsoleLog(msg.type, msg.content);
@@ -75,7 +87,7 @@ export async function runNonInteractive({
       const { setupInitialActivityLogger } = await import(
         './utils/devtoolsService.js'
       );
-      await setupInitialActivityLogger(config);
+      setupInitialActivityLogger(config);
     }
 
     const { stdout: workingStdout } = createWorkingStdio();
@@ -182,6 +194,7 @@ export async function runNonInteractive({
     };
 
     let errorToHandle: unknown | undefined;
+    let scheduler: Scheduler | undefined;
     try {
       consolePatcher.patch();
 
@@ -210,8 +223,8 @@ export async function runNonInteractive({
       });
 
       const geminiClient = config.getGeminiClient();
-      const scheduler = new Scheduler({
-        config,
+      scheduler = new Scheduler({
+        context: config,
         messageBus: config.getMessageBus(),
         getPreferredEditor: () => undefined,
         schedulerId: ROOT_SCHEDULER_ID,
@@ -263,8 +276,8 @@ export async function runNonInteractive({
           onDebugMessage: () => {},
           messageId: Date.now(),
           signal: abortController.signal,
+          escapePastedAtSymbols: false,
         });
-
         if (error || !processedQuery) {
           // An error occurred during @include processing (e.g., file not found).
           // The error message is already logged by handleAtCommand.
@@ -289,6 +302,8 @@ export async function runNonInteractive({
       let currentMessages: Content[] = [{ role: 'user', parts: query }];
 
       let turnCount = 0;
+      let invalidStreamError: string | undefined;
+      const warnings: string[] = [];
       while (true) {
         turnCount++;
         if (
@@ -345,23 +360,27 @@ export async function runNonInteractive({
             }
             toolCallRequests.push(event.value);
           } else if (event.type === GeminiEventType.LoopDetected) {
+            const message = 'Loop detected, stopping execution';
             if (streamFormatter) {
               streamFormatter.emitEvent({
                 type: JsonStreamEventType.ERROR,
                 timestamp: new Date().toISOString(),
                 severity: 'warning',
-                message: 'Loop detected, stopping execution',
+                message,
               });
             }
+            warnings.push(message);
           } else if (event.type === GeminiEventType.MaxSessionTurns) {
+            const message = 'Maximum session turns exceeded';
             if (streamFormatter) {
               streamFormatter.emitEvent({
                 type: JsonStreamEventType.ERROR,
                 timestamp: new Date().toISOString(),
                 severity: 'error',
-                message: 'Maximum session turns exceeded',
+                message,
               });
             }
+            warnings.push(message);
           } else if (event.type === GeminiEventType.Error) {
             throw event.value.error;
           } else if (event.type === GeminiEventType.AgentExecutionStopped) {
@@ -388,7 +407,30 @@ export async function runNonInteractive({
             const blockMessage = `Agent execution blocked: ${event.value.systemMessage?.trim() || event.value.reason}`;
             if (config.getOutputFormat() === OutputFormat.TEXT) {
               process.stderr.write(`[WARNING] ${blockMessage}\n`);
+            } else if (streamFormatter) {
+              streamFormatter.emitEvent({
+                type: JsonStreamEventType.ERROR,
+                timestamp: new Date().toISOString(),
+                severity: 'warning',
+                message: stripAnsi(blockMessage),
+              });
             }
+            warnings.push(blockMessage);
+          } else if (event.type === GeminiEventType.InvalidStream) {
+            invalidStreamError =
+              'Invalid stream: The model returned an empty response or malformed tool call.';
+            if (streamFormatter) {
+              streamFormatter.emitEvent({
+                type: JsonStreamEventType.ERROR,
+                timestamp: new Date().toISOString(),
+                severity: 'error',
+                message: invalidStreamError,
+              });
+            } else if (config.getOutputFormat() === OutputFormat.TEXT) {
+              process.stderr.write(`[ERROR] ${invalidStreamError}\n`);
+            }
+            toolCallRequests.length = 0;
+            break;
           }
         }
 
@@ -485,7 +527,13 @@ export async function runNonInteractive({
               const formatter = new JsonFormatter();
               const stats = uiTelemetryService.getMetrics();
               textOutput.write(
-                formatter.format(config.getSessionId(), responseText, stats),
+                formatter.format(
+                  config.getSessionId(),
+                  responseText,
+                  stats,
+                  undefined,
+                  warnings,
+                ),
               );
             } else {
               textOutput.ensureTrailingNewline(); // Ensure a final newline
@@ -502,14 +550,22 @@ export async function runNonInteractive({
             streamFormatter.emitEvent({
               type: JsonStreamEventType.RESULT,
               timestamp: new Date().toISOString(),
-              status: 'success',
+              status: invalidStreamError ? 'error' : 'success',
               stats: streamFormatter.convertToStreamStats(metrics, durationMs),
             });
           } else if (config.getOutputFormat() === OutputFormat.JSON) {
             const formatter = new JsonFormatter();
             const stats = uiTelemetryService.getMetrics();
             textOutput.write(
-              formatter.format(config.getSessionId(), responseText, stats),
+              formatter.format(
+                config.getSessionId(),
+                responseText,
+                stats,
+                invalidStreamError
+                  ? { type: 'INVALID_STREAM', message: invalidStreamError }
+                  : undefined,
+                warnings,
+              ),
             );
           } else {
             textOutput.ensureTrailingNewline(); // Ensure a final newline
@@ -523,6 +579,7 @@ export async function runNonInteractive({
       // Cleanup stdin cancellation before other cleanup
       cleanupStdinCancellation();
 
+      scheduler?.dispose();
       consolePatcher.cleanup();
       coreEvents.off(CoreEvent.UserFeedback, handleUserFeedback);
     }

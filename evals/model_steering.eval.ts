@@ -5,17 +5,16 @@
  */
 
 import { describe, expect } from 'vitest';
-import { act } from 'react';
 import path from 'node:path';
 import fs from 'node:fs';
 import { appEvalTest } from './app-test-helper.js';
-import { PolicyDecision } from '@google/gemini-cli-core';
 
 describe('Model Steering Behavioral Evals', () => {
-  appEvalTest('ALWAYS_PASSES', {
+  appEvalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'Corrective Hint: Model switches task based on hint during tool turn',
     configOverrides: {
-      excludeTools: ['run_shell_command', 'ls', 'google_web_search'],
       modelSteering: true,
     },
     files: {
@@ -52,10 +51,11 @@ describe('Model Steering Behavioral Evals', () => {
     },
   });
 
-  appEvalTest('ALWAYS_PASSES', {
+  appEvalTest('USUALLY_PASSES', {
+    suiteName: 'default',
+    suiteType: 'behavioral',
     name: 'Suggestive Hint: Model incorporates user guidance mid-stream',
     configOverrides: {
-      excludeTools: ['run_shell_command', 'ls', 'google_web_search'],
       modelSteering: true,
     },
     files: {},

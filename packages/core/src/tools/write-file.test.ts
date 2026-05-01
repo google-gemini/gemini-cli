@@ -76,6 +76,7 @@ vi.mocked(IdeClient.getInstance).mockResolvedValue(
 const fsService = new StandardFileSystemService();
 const mockConfigInternal = {
   getTargetDir: () => rootDir,
+  getProjectRoot: () => rootDir,
   getApprovalMode: vi.fn(() => ApprovalMode.DEFAULT),
   setApprovalMode: vi.fn(),
   getGeminiClient: vi.fn(), // Initialize as a plain mock function
@@ -105,6 +106,7 @@ const mockConfigInternal = {
     }) as unknown as ToolRegistry,
   isInteractive: () => false,
   getDisableLLMCorrection: vi.fn(() => true),
+  isPlanMode: vi.fn(() => false),
   getActiveModel: () => 'test-model',
   storage: {
     getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
@@ -113,6 +115,14 @@ const mockConfigInternal = {
 
 vi.mock('../telemetry/loggers.js', () => ({
   logFileOperation: vi.fn(),
+}));
+
+vi.mock('./jit-context.js', () => ({
+  discoverJitContext: vi.fn().mockResolvedValue(''),
+  appendJitContext: vi.fn().mockImplementation((content, context) => {
+    if (!context) return content;
+    return `${content}\n\n--- Newly Discovered Project Context ---\n${context}\n--- End Project Context ---`;
+  }),
 }));
 
 // --- END MOCKS ---
@@ -359,6 +369,7 @@ describe('WriteFileTool', () => {
       const abortSignal = new AbortController().signal;
 
       const mockGemini3Config = {
+        // eslint-disable-next-line @typescript-eslint/no-misused-spread
         ...mockConfig,
         getActiveModel: () => 'gemini-3.0-pro',
       } as unknown as Config;
@@ -662,7 +673,7 @@ describe('WriteFileTool', () => {
       const params = { file_path: relativePath, content };
       const invocation = tool.build(params);
 
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
 
       expect(result.llmContent).toMatch(
         /Successfully created and wrote to new file/,
@@ -683,7 +694,7 @@ describe('WriteFileTool', () => {
       });
 
       const invocation = tool.build(params);
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
       expect(result.llmContent).toContain('Error checking existing file');
       expect(result.returnDisplay).toMatch(
         /Error checking existing file: Simulated read error for execute/,
@@ -708,7 +719,7 @@ describe('WriteFileTool', () => {
 
       await confirmExecution(invocation);
 
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
 
       expect(mockEnsureCorrectFileContent).toHaveBeenCalledWith(
         proposedContent,
@@ -753,7 +764,7 @@ describe('WriteFileTool', () => {
 
       await confirmExecution(invocation);
 
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
 
       expect(mockEnsureCorrectFileContent).toHaveBeenCalledWith(
         proposedContent,
@@ -786,7 +797,7 @@ describe('WriteFileTool', () => {
 
       await confirmExecution(invocation);
 
-      await invocation.execute(abortSignal);
+      await invocation.execute({ abortSignal });
 
       expect(fs.existsSync(dirPath)).toBe(true);
       expect(fs.statSync(dirPath).isDirectory()).toBe(true);
@@ -823,7 +834,7 @@ describe('WriteFileTool', () => {
           ...(modified_by_user !== undefined && { modified_by_user }),
         };
         const invocation = tool.build(params);
-        const result = await invocation.execute(abortSignal);
+        const result = await invocation.execute({ abortSignal });
 
         if (shouldIncludeMessage) {
           expect(result.llmContent).toMatch(/User modified the `content`/);
@@ -841,7 +852,7 @@ describe('WriteFileTool', () => {
       const params = { file_path: filePath, content };
       const invocation = tool.build(params);
 
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
 
       expect(result.llmContent).toContain('Here is the updated code:');
       expect(result.llmContent).toContain(content);
@@ -868,7 +879,7 @@ describe('WriteFileTool', () => {
         await confirmDetails.onConfirm(ToolConfirmationOutcome.ProceedOnce);
       }
 
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute({ abortSignal });
 
       expect(result.llmContent).toContain('Here is the updated code:');
       // Should contain the modified line
@@ -989,7 +1000,7 @@ describe('WriteFileTool', () => {
 
           const params = { file_path: filePath, content };
           const invocation = tool.build(params);
-          const result = await invocation.execute(abortSignal);
+          const result = await invocation.execute({ abortSignal });
 
           expect(result.error?.type).toBe(errorType);
           const errorSuffix = errorCode ? ` (${errorCode})` : '';
@@ -1063,6 +1074,66 @@ describe('WriteFileTool', () => {
       expect(result.correctedContent).toBe(proposedContent);
       expect(result.originalContent).toBe(originalContent);
       expect(result.fileExists).toBe(true);
+    });
+  });
+
+  describe('JIT context discovery', () => {
+    const abortSignal = new AbortController().signal;
+
+    it('should append JIT context to output when enabled and context is found', async () => {
+      const { discoverJitContext } = await import('./jit-context.js');
+      vi.mocked(discoverJitContext).mockResolvedValue('Use the useAuth hook.');
+
+      const filePath = path.join(rootDir, 'jit-write-test.txt');
+      const content = 'JIT test content.';
+      mockEnsureCorrectFileContent.mockResolvedValue(content);
+
+      const params = { file_path: filePath, content };
+      const invocation = tool.build(params);
+      const result = await invocation.execute({ abortSignal });
+
+      expect(discoverJitContext).toHaveBeenCalled();
+      expect(result.llmContent).toContain('Newly Discovered Project Context');
+      expect(result.llmContent).toContain('Use the useAuth hook.');
+    });
+
+    it('should not append JIT context when disabled', async () => {
+      const { discoverJitContext } = await import('./jit-context.js');
+      vi.mocked(discoverJitContext).mockResolvedValue('');
+
+      const filePath = path.join(rootDir, 'jit-disabled-write-test.txt');
+      const content = 'No JIT content.';
+      mockEnsureCorrectFileContent.mockResolvedValue(content);
+
+      const params = { file_path: filePath, content };
+      const invocation = tool.build(params);
+      const result = await invocation.execute({ abortSignal });
+
+      expect(result.llmContent).not.toContain(
+        'Newly Discovered Project Context',
+      );
+    });
+  });
+
+  describe('plan mode path handling', () => {
+    const abortSignal = new AbortController().signal;
+
+    it('should correctly resolve nested paths in plan mode', async () => {
+      vi.mocked(mockConfig.isPlanMode).mockReturnValue(true);
+      // Extend storage mock with getPlansDir
+      mockConfig.storage.getPlansDir = vi.fn().mockReturnValue(plansDir);
+
+      const nestedFilePath = 'conductor/tracks/test.md';
+      const invocation = tool.build({
+        file_path: nestedFilePath,
+        content: 'nested content',
+      });
+
+      await invocation.execute({ abortSignal });
+
+      const expectedWritePath = path.join(plansDir, 'conductor/tracks/test.md');
+      expect(fs.existsSync(expectedWritePath)).toBe(true);
+      expect(fs.readFileSync(expectedWritePath, 'utf8')).toBe('nested content');
     });
   });
 });

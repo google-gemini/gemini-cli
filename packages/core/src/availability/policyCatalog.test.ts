@@ -28,6 +28,7 @@ describe('policyCatalog', () => {
     const chain = getModelPolicyChain({
       previewEnabled: true,
       useGemini31: true,
+      useGemini31FlashLite: false,
     });
     expect(chain[0]?.model).toBe(PREVIEW_GEMINI_3_1_MODEL);
     expect(chain).toHaveLength(2);
@@ -38,6 +39,7 @@ describe('policyCatalog', () => {
     const chain = getModelPolicyChain({
       previewEnabled: true,
       useGemini31: true,
+      useGemini31FlashLite: false,
       useCustomToolModel: true,
     });
     expect(chain[0]?.model).toBe(PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL);
@@ -51,10 +53,13 @@ describe('policyCatalog', () => {
     expect(chain).toHaveLength(2);
   });
 
-  it('marks preview transients as sticky retries', () => {
-    const [previewPolicy] = getModelPolicyChain({ previewEnabled: true });
+  it('marks preview transients as sticky retries when auto-selected', () => {
+    const [previewPolicy] = getModelPolicyChain({
+      previewEnabled: true,
+      isAutoSelection: true,
+    });
     expect(previewPolicy.model).toBe(PREVIEW_GEMINI_MODEL);
-    expect(previewPolicy.stateTransitions.transient).toBe('terminal');
+    expect(previewPolicy.stateTransitions.transient).toBe('sticky_retry');
   });
 
   it('applies default actions and state transitions for unspecified kinds', () => {

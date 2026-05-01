@@ -50,8 +50,31 @@ export const ACTIVE_SHELL_MAX_LINES = 15;
 // Max lines to preserve in history for completed shell commands
 export const COMPLETED_SHELL_MAX_LINES = 15;
 
+// Max lines to show for subagent results before collapsing
+export const SUBAGENT_MAX_LINES = 15;
+
 /** Minimum terminal width required to show the full context used label */
 export const MIN_TERMINAL_WIDTH_FOR_FULL_LABEL = 100;
 
 /** Default context usage fraction at which to trigger compression */
 export const DEFAULT_COMPRESSION_THRESHOLD = 0.5;
+
+/** Documentation URL for skills setup and configuration */
+export const SKILLS_DOCS_URL =
+  'https://github.com/google-gemini/gemini-cli/blob/main/docs/cli/skills.md';
+
+/** Max lines to show for a compact tool subview (e.g. diff) */
+export const COMPACT_TOOL_SUBVIEW_MAX_LINES = 15;
+
+// Maximum number of UTF-16 code units to retain in a background task's output
+// buffer. Beyond this, the oldest output is dropped to keep memory bounded.
+// 10 MB is large enough for ~200,000 lines of terminal output and stays well
+// below the V8 string length limit (~1 GB) even with multiple concurrent tasks.
+export const MAX_SHELL_OUTPUT_SIZE = 10_000_000; // 10 MB
+
+// Truncation is triggered only once the output exceeds
+// MAX_SHELL_OUTPUT_SIZE + SHELL_OUTPUT_TRUNCATION_BUFFER, then sliced back to
+// MAX_SHELL_OUTPUT_SIZE. This avoids an O(n) string copy on every appended
+// chunk, amortizing the cost to once per SHELL_OUTPUT_TRUNCATION_BUFFER bytes
+// of new input (i.e. once per ~1 MB on a busy shell).
+export const SHELL_OUTPUT_TRUNCATION_BUFFER = 1_000_000; // 1 MB

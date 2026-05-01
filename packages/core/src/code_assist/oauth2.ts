@@ -119,7 +119,8 @@ async function initOauthClient(
     credentials &&
     typeof credentials === 'object' &&
     'type' in credentials &&
-    credentials.type === 'external_account_authorized_user'
+    (credentials.type === 'external_account_authorized_user' ||
+      credentials.type === 'service_account')
   ) {
     const auth = new GoogleAuth({
       scopes: OAUTH_SCOPE,
@@ -130,7 +131,7 @@ async function initOauthClient(
     });
     const token = await byoidClient.getAccessToken();
     if (token) {
-      debugLogger.debug('Created BYOID auth client.');
+      debugLogger.debug(`Created ${credentials.type} auth client.`);
       return byoidClient;
     }
   }
@@ -332,8 +333,9 @@ async function initOauthClient(
 
     // Add timeout to prevent infinite waiting when browser tab gets stuck
     const authTimeout = 5 * 60 * 1000; // 5 minutes timeout
+    let timeoutId: NodeJS.Timeout | undefined;
     const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => {
+      timeoutId = setTimeout(() => {
         reject(
           new FatalAuthenticationError(
             'Authentication timed out after 5 minutes. The browser tab may have gotten stuck in a loading state. ' +
@@ -371,6 +373,9 @@ async function initOauthClient(
         cancellationPromise,
       ]);
     } finally {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
       if (sigIntHandler) {
         process.removeListener('SIGINT', sigIntHandler);
       }
@@ -419,6 +424,7 @@ async function authWithUserCode(client: OAuth2Client): Promise<boolean> {
         '\n\n',
     );
 
+    let authTimeoutId: NodeJS.Timeout | undefined;
     const code = await new Promise<string>((resolve, reject) => {
       const rl = readline.createInterface({
         input: process.stdin,
@@ -426,20 +432,29 @@ async function authWithUserCode(client: OAuth2Client): Promise<boolean> {
         terminal: true,
       });
 
-      const timeout = setTimeout(() => {
-        rl.close();
-        reject(
+      const abortController = new AbortController();
+      authTimeoutId = setTimeout(() => {
+        abortController.abort(
           new FatalAuthenticationError(
             'Authorization timed out after 5 minutes.',
           ),
         );
       }, 300000); // 5 minute timeout
+      authTimeoutId.unref();
+
+      const onAbort = () => {
+        rl.close();
+        reject(abortController.signal.reason);
+      };
+      abortController.signal.addEventListener('abort', onAbort, { once: true });
 
       rl.question('Enter the authorization code: ', (code) => {
-        clearTimeout(timeout);
+        abortController.signal.removeEventListener('abort', onAbort);
         rl.close();
         resolve(code.trim());
       });
+    }).finally(() => {
+      if (authTimeoutId) clearTimeout(authTimeoutId);
     });
 
     if (!code) {

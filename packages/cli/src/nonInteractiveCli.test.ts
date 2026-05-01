@@ -21,6 +21,7 @@ import {
   FatalInputError,
   CoreEvent,
   CoreToolCallStatus,
+  JsonStreamEventType,
 } from '@google/gemini-cli-core';
 import type { Part } from '@google/genai';
 import { runNonInteractive } from './nonInteractiveCli.js';
@@ -71,6 +72,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     Scheduler: class {
       schedule = mockSchedulerSchedule;
       cancelAll = vi.fn();
+      dispose = vi.fn();
     },
     isTelemetrySdkInitialized: vi.fn().mockReturnValue(true),
     ChatRecordingService: MockChatRecordingService,
@@ -166,7 +168,7 @@ describe('runNonInteractive', () => {
     };
 
     mockConfig = {
-      initialize: vi.fn().mockResolvedValue(undefined),
+      initialize: vi.fn().mockReturnValue(Promise.resolve(undefined)),
       getMessageBus: vi.fn().mockReturnValue({
         subscribe: vi.fn(),
         unsubscribe: vi.fn(),
@@ -190,6 +192,7 @@ describe('runNonInteractive', () => {
       isTrustedFolder: vi.fn().mockReturnValue(false),
       getRawOutput: vi.fn().mockReturnValue(false),
       getAcceptRawOutputRisk: vi.fn().mockReturnValue(false),
+      getAgentSessionNoninteractiveEnabled: vi.fn().mockReturnValue(false),
     } as unknown as Config;
 
     mockSettings = {
@@ -701,7 +704,7 @@ describe('runNonInteractive', () => {
       createStreamFromEvents(events),
     );
     vi.mocked(mockConfig.getOutputFormat).mockReturnValue(OutputFormat.JSON);
-    vi.mocked(uiTelemetryService.getMetrics).mockReturnValue(
+    vi.spyOn(uiTelemetryService, 'getMetrics').mockReturnValue(
       MOCK_SESSION_METRICS,
     );
 
@@ -791,7 +794,7 @@ describe('runNonInteractive', () => {
       .mockReturnValueOnce(createStreamFromEvents(secondCallEvents));
 
     vi.mocked(mockConfig.getOutputFormat).mockReturnValue(OutputFormat.JSON);
-    vi.mocked(uiTelemetryService.getMetrics).mockReturnValue(
+    vi.spyOn(uiTelemetryService, 'getMetrics').mockReturnValue(
       MOCK_SESSION_METRICS,
     );
 
@@ -834,7 +837,7 @@ describe('runNonInteractive', () => {
       createStreamFromEvents(events),
     );
     vi.mocked(mockConfig.getOutputFormat).mockReturnValue(OutputFormat.JSON);
-    vi.mocked(uiTelemetryService.getMetrics).mockReturnValue(
+    vi.spyOn(uiTelemetryService, 'getMetrics').mockReturnValue(
       MOCK_SESSION_METRICS,
     );
 
@@ -1137,6 +1140,7 @@ describe('runNonInteractive', () => {
 
     expect(
       processStderrSpy.mock.calls.some(
+        // eslint-disable-next-line no-restricted-syntax
         (call) => typeof call[0] === 'string' && call[0].includes('Cancelling'),
       ),
     ).toBe(true);
@@ -1527,7 +1531,7 @@ describe('runNonInteractive', () => {
     vi.mocked(mockConfig.getOutputFormat).mockReturnValue(
       OutputFormat.STREAM_JSON,
     );
-    vi.mocked(uiTelemetryService.getMetrics).mockReturnValue(
+    vi.spyOn(uiTelemetryService, 'getMetrics').mockReturnValue(
       MOCK_SESSION_METRICS,
     );
 
@@ -1689,7 +1693,7 @@ describe('runNonInteractive', () => {
       vi.mocked(mockConfig.getOutputFormat).mockReturnValue(
         OutputFormat.STREAM_JSON,
       );
-      vi.mocked(uiTelemetryService.getMetrics).mockReturnValue(
+      vi.spyOn(uiTelemetryService, 'getMetrics').mockReturnValue(
         MOCK_SESSION_METRICS,
       );
 
@@ -1711,7 +1715,7 @@ describe('runNonInteractive', () => {
           input,
           prompt_id: promptId,
         });
-      } catch (_error) {
+      } catch {
         // Expected exit
       }
 
@@ -1720,6 +1724,53 @@ describe('runNonInteractive', () => {
         .replace(/"timestamp":"[^"]+"/g, '"timestamp":"<TIMESTAMP>"')
         .replace(/"duration_ms":\d+/g, '"duration_ms":<DURATION>');
       expect(sanitizedOutput).toMatchSnapshot();
+    },
+  );
+
+  it.each([
+    {
+      name: 'loop detected',
+      events: [
+        { type: GeminiEventType.LoopDetected },
+      ] as ServerGeminiStreamEvent[],
+      expectedWarning: 'Loop detected, stopping execution',
+    },
+    {
+      name: 'max session turns',
+      events: [
+        { type: GeminiEventType.MaxSessionTurns },
+      ] as ServerGeminiStreamEvent[],
+      expectedWarning: 'Maximum session turns exceeded',
+    },
+  ])(
+    'should include warning in JSON mode for: $name',
+    async ({ events, expectedWarning }) => {
+      vi.mocked(mockConfig.getOutputFormat).mockReturnValue(OutputFormat.JSON);
+      vi.spyOn(uiTelemetryService, 'getMetrics').mockReturnValue(
+        MOCK_SESSION_METRICS,
+      );
+
+      const streamEvents: ServerGeminiStreamEvent[] = [
+        ...events,
+        {
+          type: GeminiEventType.Finished,
+          value: { reason: undefined, usageMetadata: { totalTokenCount: 0 } },
+        },
+      ];
+      mockGeminiClient.sendMessageStream.mockReturnValue(
+        createStreamFromEvents(streamEvents),
+      );
+
+      await runNonInteractive({
+        config: mockConfig,
+        settings: mockSettings,
+        input: 'test',
+        prompt_id: 'test',
+      });
+
+      const output = JSON.parse(getWrittenOutput());
+      expect(output.warnings).toBeDefined();
+      expect(output.warnings).toContain(expectedWarning);
     },
   );
 
@@ -1864,7 +1915,7 @@ describe('runNonInteractive', () => {
 
   it('should write JSON output when a tool call returns STOP_EXECUTION error', async () => {
     vi.mocked(mockConfig.getOutputFormat).mockReturnValue(OutputFormat.JSON);
-    vi.mocked(uiTelemetryService.getMetrics).mockReturnValue(
+    vi.spyOn(uiTelemetryService, 'getMetrics').mockReturnValue(
       MOCK_SESSION_METRICS,
     );
 
@@ -1928,7 +1979,7 @@ describe('runNonInteractive', () => {
     vi.mocked(mockConfig.getOutputFormat).mockReturnValue(
       OutputFormat.STREAM_JSON,
     );
-    vi.mocked(uiTelemetryService.getMetrics).mockReturnValue(
+    vi.spyOn(uiTelemetryService, 'getMetrics').mockReturnValue(
       MOCK_SESSION_METRICS,
     );
 
@@ -2033,6 +2084,235 @@ describe('runNonInteractive', () => {
       // sendMessageStream is called once, recursion is internal to it and transparent to the caller
       expect(mockGeminiClient.sendMessageStream).toHaveBeenCalledTimes(1);
       expect(getWrittenOutput()).toBe('Final answer\n');
+    });
+
+    it('should emit ERROR event in STREAM_JSON mode when AgentExecutionBlocked occurs', async () => {
+      const allEvents: ServerGeminiStreamEvent[] = [
+        {
+          type: GeminiEventType.AgentExecutionBlocked,
+          value: { reason: 'Blocked by hook' },
+        },
+        { type: GeminiEventType.Content, value: 'Final answer' },
+        {
+          type: GeminiEventType.Finished,
+          value: { reason: undefined, usageMetadata: { totalTokenCount: 10 } },
+        },
+      ];
+
+      mockGeminiClient.sendMessageStream.mockReturnValue(
+        createStreamFromEvents(allEvents),
+      );
+
+      vi.spyOn(uiTelemetryService, 'getMetrics').mockReturnValue(
+        MOCK_SESSION_METRICS,
+      );
+
+      // Setup stream-json format
+      vi.mocked(mockConfig.getOutputFormat).mockReturnValue(
+        OutputFormat.STREAM_JSON,
+      );
+
+      await runNonInteractive({
+        config: mockConfig,
+        settings: mockSettings,
+        input: 'test block',
+        prompt_id: 'prompt-id-block',
+      });
+
+      const calls = processStdoutSpy.mock.calls.map((call) =>
+        JSON.parse(call[0] as string),
+      );
+      const errorEvent = calls.find(
+        (c) => c.type === JsonStreamEventType.ERROR,
+      );
+
+      expect(errorEvent).toBeDefined();
+      expect(errorEvent.message).toContain(
+        'Agent execution blocked: Blocked by hook',
+      );
+      expect(errorEvent.severity).toBe('warning');
+    });
+
+    it('should include warning in JSON mode when AgentExecutionBlocked occurs', async () => {
+      const allEvents: ServerGeminiStreamEvent[] = [
+        {
+          type: GeminiEventType.AgentExecutionBlocked,
+          value: { reason: 'Blocked by hook' },
+        },
+        { type: GeminiEventType.Content, value: 'Final answer' },
+        {
+          type: GeminiEventType.Finished,
+          value: { reason: undefined, usageMetadata: { totalTokenCount: 10 } },
+        },
+      ];
+
+      mockGeminiClient.sendMessageStream.mockReturnValue(
+        createStreamFromEvents(allEvents),
+      );
+
+      vi.mocked(mockConfig.getOutputFormat).mockReturnValue(OutputFormat.JSON);
+
+      await runNonInteractive({
+        config: mockConfig,
+        settings: mockSettings,
+        input: 'test block',
+        prompt_id: 'prompt-id-block',
+      });
+
+      const output = JSON.parse(getWrittenOutput());
+      expect(output.warnings).toBeDefined();
+      expect(output.warnings).toContain(
+        'Agent execution blocked: Blocked by hook',
+      );
+    });
+
+    it('should handle multiple AgentExecutionBlocked events and collect all warnings', async () => {
+      const allEvents: ServerGeminiStreamEvent[] = [
+        {
+          type: GeminiEventType.AgentExecutionBlocked,
+          value: { reason: 'Block 1', systemMessage: 'Reason 1' },
+        },
+        {
+          type: GeminiEventType.AgentExecutionBlocked,
+          value: { reason: 'Block 2', systemMessage: 'Reason 2' },
+        },
+        { type: GeminiEventType.Content, value: 'Final answer' },
+        {
+          type: GeminiEventType.Finished,
+          value: { reason: undefined, usageMetadata: { totalTokenCount: 10 } },
+        },
+      ];
+
+      mockGeminiClient.sendMessageStream.mockImplementation(() =>
+        createStreamFromEvents(allEvents),
+      );
+      vi.spyOn(uiTelemetryService, 'getMetrics').mockReturnValue(
+        MOCK_SESSION_METRICS,
+      );
+
+      vi.mocked(mockConfig.getOutputFormat).mockReturnValue(OutputFormat.JSON);
+
+      await runNonInteractive({
+        config: mockConfig,
+        settings: mockSettings,
+        input: 'test',
+        prompt_id: 'test',
+      });
+
+      const output = JSON.parse(getWrittenOutput());
+      expect(output.warnings).toHaveLength(2);
+      expect(output.warnings).toContain('Agent execution blocked: Reason 1');
+      expect(output.warnings).toContain('Agent execution blocked: Reason 2');
+    });
+
+    it('should not include warnings field in JSON output if no blocks occur', async () => {
+      const allEvents: ServerGeminiStreamEvent[] = [
+        { type: GeminiEventType.Content, value: 'Clean answer' },
+        {
+          type: GeminiEventType.Finished,
+          value: { reason: undefined, usageMetadata: { totalTokenCount: 10 } },
+        },
+      ];
+
+      mockGeminiClient.sendMessageStream.mockImplementation(() =>
+        createStreamFromEvents(allEvents),
+      );
+      vi.spyOn(uiTelemetryService, 'getMetrics').mockReturnValue(
+        MOCK_SESSION_METRICS,
+      );
+
+      vi.mocked(mockConfig.getOutputFormat).mockReturnValue(OutputFormat.JSON);
+
+      await runNonInteractive({
+        config: mockConfig,
+        settings: mockSettings,
+        input: 'test',
+        prompt_id: 'test',
+      });
+
+      const output = JSON.parse(getWrittenOutput());
+      expect(output.warnings).toBeUndefined();
+    });
+
+    it('should handle InvalidStream event gracefully in TEXT mode', async () => {
+      const events: ServerGeminiStreamEvent[] = [
+        { type: GeminiEventType.InvalidStream },
+      ];
+      mockGeminiClient.sendMessageStream.mockReturnValue(
+        createStreamFromEvents(events),
+      );
+
+      await runNonInteractive({
+        config: mockConfig,
+        settings: mockSettings,
+        input: 'test invalid stream',
+        prompt_id: 'prompt-id-invalid',
+      });
+
+      expect(processStderrSpy).toHaveBeenCalledWith(
+        '[ERROR] Invalid stream: The model returned an empty response or malformed tool call.\n',
+      );
+      expect(mockGeminiClient.sendMessageStream).toHaveBeenCalledTimes(1);
+    });
+
+    it('should handle InvalidStream event gracefully in STREAM_JSON mode', async () => {
+      vi.spyOn(uiTelemetryService, 'getMetrics').mockReturnValue(
+        MOCK_SESSION_METRICS,
+      );
+      vi.spyOn(mockConfig, 'getOutputFormat').mockReturnValue(
+        OutputFormat.STREAM_JSON,
+      );
+      const events: ServerGeminiStreamEvent[] = [
+        { type: GeminiEventType.InvalidStream },
+      ];
+      mockGeminiClient.sendMessageStream.mockReturnValue(
+        createStreamFromEvents(events),
+      );
+
+      await runNonInteractive({
+        config: mockConfig,
+        settings: mockSettings,
+        input: 'test invalid stream',
+        prompt_id: 'prompt-id-invalid',
+      });
+
+      const output = getWrittenOutput();
+      expect(output).toContain('"type":"error"');
+      expect(output).toContain('"severity":"error"');
+      expect(output).toContain(
+        'Invalid stream: The model returned an empty response or malformed tool call.',
+      );
+      expect(mockGeminiClient.sendMessageStream).toHaveBeenCalledTimes(1);
+    });
+
+    it('should handle InvalidStream event gracefully in JSON mode', async () => {
+      vi.spyOn(uiTelemetryService, 'getMetrics').mockReturnValue(
+        MOCK_SESSION_METRICS,
+      );
+      vi.spyOn(mockConfig, 'getOutputFormat').mockReturnValue(
+        OutputFormat.JSON,
+      );
+      const events: ServerGeminiStreamEvent[] = [
+        { type: GeminiEventType.InvalidStream },
+      ];
+      mockGeminiClient.sendMessageStream.mockReturnValue(
+        createStreamFromEvents(events),
+      );
+
+      await runNonInteractive({
+        config: mockConfig,
+        settings: mockSettings,
+        input: 'test invalid stream',
+        prompt_id: 'prompt-id-invalid',
+      });
+
+      const output = getWrittenOutput();
+      expect(output).toContain('"error": {');
+      expect(output).toContain('"type": "INVALID_STREAM"');
+      expect(output).toContain(
+        'Invalid stream: The model returned an empty response or malformed tool call.',
+      );
+      expect(mockGeminiClient.sendMessageStream).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -2215,7 +2495,7 @@ describe('runNonInteractive', () => {
       vi.mocked(mockConfig.getOutputFormat).mockReturnValue(
         OutputFormat.STREAM_JSON,
       );
-      vi.mocked(uiTelemetryService.getMetrics).mockReturnValue(
+      vi.spyOn(uiTelemetryService, 'getMetrics').mockReturnValue(
         MOCK_SESSION_METRICS,
       );
 
