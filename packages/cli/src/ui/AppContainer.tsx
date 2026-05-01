@@ -1048,6 +1048,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     isConfigInitialized,
     setBannerVisible,
     setCustomDialog,
+    setUpdateInfo,
   );
 
   const [authConsentRequest, setAuthConsentRequest] =

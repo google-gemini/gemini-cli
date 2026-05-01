@@ -63,6 +63,7 @@ import {
   LogoutChoice,
 } from '../components/LogoutConfirmationDialog.js';
 import { runExitCleanup } from '../../utils/cleanup.js';
+import type { UpdateObject } from '../utils/updateCheck.js';
 
 interface SlashCommandProcessorActions {
   openAuthDialog: () => void;
@@ -108,6 +109,7 @@ export const useSlashCommandProcessor = (
   isConfigInitialized: boolean,
   setBannerVisible: (visible: boolean) => void,
   setCustomDialog: (dialog: React.ReactNode | null) => void,
+  setUpdateInfo: (info: UpdateObject | null) => void,
 ) => {
   const session = useSessionStats();
   const [commands, setCommands] = useState<readonly SlashCommand[] | undefined>(
@@ -222,6 +224,7 @@ export const useSlashCommandProcessor = (
           clearItems();
           refreshStatic();
           setBannerVisible(false);
+          setUpdateInfo(null);
         },
         loadHistory: (history, postLoadInput) => {
           loadHistory(history);
@@ -273,6 +276,7 @@ export const useSlashCommandProcessor = (
       extensionsUpdateState,
       setBannerVisible,
       setCustomDialog,
+      setUpdateInfo,
     ],
   );
 
