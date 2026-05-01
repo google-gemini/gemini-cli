@@ -2055,6 +2055,29 @@ ${JSON.stringify(
       );
     });
 
+    it('should update system instruction when ApprovalModeChanged event is emitted', async () => {
+      const { ApprovalMode } = await import('../policy/types.js');
+
+      vi.mocked(mockConfig.getSessionId).mockReturnValue('session-1');
+      vi.mocked(mockConfig.getSystemInstructionMemory).mockReturnValue(
+        'Current Memory',
+      );
+
+      const { getCoreSystemPrompt } = await import('./prompts.js');
+      const mockGetCoreSystemPrompt = vi.mocked(getCoreSystemPrompt);
+      mockGetCoreSystemPrompt.mockClear();
+
+      coreEvents.emit(CoreEvent.ApprovalModeChanged, {
+        sessionId: 'session-1',
+        mode: ApprovalMode.YOLO,
+      });
+
+      expect(mockGetCoreSystemPrompt).toHaveBeenCalledWith(
+        mockConfig,
+        'Current Memory',
+      );
+    });
+
     it('should propagate InvalidStream events without injecting "Please continue." or recursing', async () => {
       // Arrange: a single turn that yields an InvalidStream event.
       const mockStream = (async function* () {

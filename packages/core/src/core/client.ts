@@ -67,7 +67,11 @@ import {
 } from '../availability/policyHelpers.js';
 import { getDisplayString, resolveModel } from '../config/models.js';
 import { partToString } from '../utils/partUtils.js';
-import { coreEvents, CoreEvent } from '../utils/events.js';
+import {
+  coreEvents,
+  CoreEvent,
+  type ApprovalModeChangedPayload,
+} from '../utils/events.js';
 import { initializeContextManager } from '../context/initializer.js';
 
 const MAX_TURNS = 100;
@@ -116,6 +120,10 @@ export class GeminiClient {
 
     coreEvents.on(CoreEvent.ModelChanged, this.handleModelChanged);
     coreEvents.on(CoreEvent.MemoryChanged, this.handleMemoryChanged);
+    coreEvents.on(
+      CoreEvent.ApprovalModeChanged,
+      this.handleApprovalModeChanged,
+    );
   }
 
   private get config(): Config {
@@ -128,6 +136,12 @@ export class GeminiClient {
 
   private handleMemoryChanged = () => {
     this.updateSystemInstruction();
+  };
+
+  private handleApprovalModeChanged = (payload: ApprovalModeChangedPayload) => {
+    if (payload.sessionId === this.config.getSessionId()) {
+      this.updateSystemInstruction();
+    }
   };
 
   clearCurrentSequenceModel(): void {
@@ -314,6 +328,10 @@ export class GeminiClient {
   dispose() {
     coreEvents.off(CoreEvent.ModelChanged, this.handleModelChanged);
     coreEvents.off(CoreEvent.MemoryChanged, this.handleMemoryChanged);
+    coreEvents.off(
+      CoreEvent.ApprovalModeChanged,
+      this.handleApprovalModeChanged,
+    );
   }
 
   async resumeChat(
