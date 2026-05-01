@@ -53,8 +53,12 @@ jobs:
             const tenDaysAgo = new Date();
             tenDaysAgo.setDate(tenDaysAgo.getDate() - 10);
 
+            const sixMonthsAgo = new Date();
+            sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+
             core.info(`Cutoff date for creation: ${threeMonthsAgo.toISOString()}`);
             core.info(`Cutoff date for updates: ${tenDaysAgo.toISOString()}`);
+            core.info(`Cutoff date for 'help wanted': ${sixMonthsAgo.toISOString()}`);
 
             const query = `repo:${context.repo.owner}/${context.repo.repo} is:issue is:open created:<${threeMonthsAgo.toISOString()}`;
             core.info(`Searching with query: ${query}`);
@@ -80,14 +84,20 @@ jobs:
                 continue;
               }
 
-              // Skip if it has a maintainer, help wanted, or Public Roadmap label
+              // Skip if it has a maintainer or Public Roadmap label
               const rawLabels = issue.labels.map((l) => l.name);
               const lowercaseLabels = rawLabels.map((l) => l.toLowerCase());
               if (
                 lowercaseLabels.some((l) => l.includes('maintainer')) ||
-                lowercaseLabels.includes('help wanted') ||
                 rawLabels.includes('🗓️ Public Roadmap')
               ) {
+                continue;
+              }
+
+              // Special handling for 'help wanted'
+              const isHelpWanted = lowercaseLabels.includes('help wanted');
+              if (isHelpWanted && createdAt > sixMonthsAgo) {
+                // Help wanted is protected for 6 months
                 continue;
               }
 
@@ -122,35 +132,58 @@ jobs:
                 }
               }
 
+              const hasStaleLabel = rawLabels.includes(batchLabel);
+
               if (isStale) {
                 processedCount++;
-                const message = `Closing stale issue #${issue.number}: "${issue.title}" (${issue.html_url})`;
-                core.info(message);
+                if (!hasStaleLabel) {
+                  core.info(`Nudging stale issue #${issue.number}: "${issue.title}"`);
+                  if (!dryRun) {
+                    // Add label
+                    await github.rest.issues.addLabels({
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      issue_number: issue.number,
+                      labels: [batchLabel]
+                    });
 
+                    // Add comment
+                    await github.rest.issues.createComment({
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      issue_number: issue.number,
+                      body: 'Hello! As part of our effort to keep our backlog manageable and focus on the most active issues, we are tidying up older reports.\n\nIt looks like this issue hasn\'t been active for a while, so we\'ve labeled it as "Stale". If no activity occurs in the next 14 days, it will be closed. However, if this is still relevant, please leave a comment and we will keep it open.\n\nThank you for your contribution!'
+                    });
+                  }
+                } else {
+                  core.info(`Closing stale issue #${issue.number}: "${issue.title}"`);
+                  if (!dryRun) {
+                    // Add final comment
+                    await github.rest.issues.createComment({
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      issue_number: issue.number,
+                      body: 'Closing this issue as it has remained stale since our last nudge. Feel free to reopen if this is still an issue.'
+                    });
+
+                    // Close issue
+                    await github.rest.issues.update({
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      issue_number: issue.number,
+                      state: 'closed',
+                      state_reason: 'not_planned'
+                    });
+                  }
+                }
+              } else if (hasStaleLabel) {
+                core.info(`Removing Stale label from issue #${issue.number} as it is no longer stale.`);
                 if (!dryRun) {
-                  // Add label
-                  await github.rest.issues.addLabels({
+                  await github.rest.issues.removeLabel({
                     owner: context.repo.owner,
                     repo: context.repo.repo,
                     issue_number: issue.number,
-                    labels: [batchLabel]
-                  });
-
-                  // Add comment
-                  await github.rest.issues.createComment({
-                    owner: context.repo.owner,
-                    repo: context.repo.repo,
-                    issue_number: issue.number,
-                    body: 'Hello! As part of our effort to keep our backlog manageable and focus on the most active issues, we are tidying up older reports.\n\nIt looks like this issue hasn\'t been active for a while, so we are closing it for now. However, if you are still experiencing this bug on the latest stable build, please feel free to comment on this issue or create a new one with updated details.\n\nThank you for your contribution!'
-                  });
-
-                  // Close issue
-                  await github.rest.issues.update({
-                    owner: context.repo.owner,
-                    repo: context.repo.repo,
-                    issue_number: issue.number,
-                    state: 'closed',
-                    state_reason: 'not_planned'
+                    name: batchLabel
                   });
                 }
               }
