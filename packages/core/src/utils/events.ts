@@ -352,7 +352,7 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
    * Notifies subscribers that a hook has provided a system message.
    */
   emitHookSystemMessage(payload: HookSystemMessagePayload): void {
-    this.emit(CoreEvent.HookSystemMessage, payload);
+    this._emitOrQueue(CoreEvent.HookSystemMessage, payload);
   }
 
   /**

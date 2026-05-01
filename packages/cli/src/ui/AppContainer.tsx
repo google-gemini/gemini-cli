@@ -497,16 +497,6 @@ export const AppContainer = (props: AppContainerProps) => {
         ?.fireSessionStartEvent(sessionStartSource);
 
       if (result) {
-        if (result.systemMessage) {
-          historyManager.addItem(
-            {
-              type: MessageType.INFO,
-              text: result.systemMessage,
-            },
-            Date.now(),
-          );
-        }
-
         const additionalContext = result.getAdditionalContext();
         const geminiClient = config.getGeminiClient();
         if (additionalContext && geminiClient) {
