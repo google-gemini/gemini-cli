@@ -23,7 +23,11 @@ import {
   type SlashCommandActionReturn,
 } from './types.js';
 import { getUrlOpenCommand } from '../../ui/utils/commandUtils.js';
-import { debugLogger } from '@google/gemini-cli-core';
+import {
+  debugLogger,
+  escapeShellArg,
+  getShellConfiguration,
+} from '@google/gemini-cli-core';
 
 export const GITHUB_WORKFLOW_PATHS = [
   'gemini-dispatch/gemini-dispatch.yml',
@@ -60,8 +64,12 @@ function getOpenUrlsCommands(readmeUrl: string): string[] {
     );
   }
 
+  const { shell } = getShellConfiguration();
+
   // Create and join the individual commands
-  const commands = urlsToOpen.map((url) => `${openCmd} "${url}"`);
+  const commands = urlsToOpen.map(
+    (url) => `${openCmd} ${escapeShellArg(url, shell)}`,
+  );
   return commands;
 }
 
@@ -232,6 +240,11 @@ export const setupGithubCommand: SlashCommand = {
     // Get the latest release tag from GitHub
     const proxy = context?.services?.agentContext?.config.getProxy();
     const releaseTag = await getLatestGitHubRelease(proxy);
+    if (!/^v?\d+\.\d+\.\d+(-[a-zA-Z0-9.]+)?$/.test(releaseTag)) {
+      throw new Error(
+        `Invalid release tag format received from GitHub: ${releaseTag}`,
+      );
+    }
     const readmeUrl = `https://github.com/google-github-actions/run-gemini-cli/blob/${releaseTag}/README.md#quick-start`;
 
     // Create workflows directory
@@ -259,12 +272,12 @@ export const setupGithubCommand: SlashCommand = {
     if (process.platform !== 'win32') {
       commands.push('set -eEuo pipefail');
     }
-    commands.push(
-      `echo "Successfully downloaded ${GITHUB_WORKFLOW_PATHS.length} workflows , ${GITHUB_COMMANDS_PATHS.length} commands and updated .gitignore. Follow the steps in ${readmeUrl} (skipping the /setup-github step) to complete setup."`,
-    );
+    const { shell } = getShellConfiguration();
+    const echoMessage = `Successfully downloaded ${GITHUB_WORKFLOW_PATHS.length} workflows , ${GITHUB_COMMANDS_PATHS.length} commands and updated .gitignore. Follow the steps in ${readmeUrl} (skipping the /setup-github step) to complete setup.`;
+    commands.push(`echo ${escapeShellArg(echoMessage, shell)}`);
     commands.push(...getOpenUrlsCommands(readmeUrl));
 
-    const command = `(${commands.join(' && ')})`;
+    const command = commands.join(' && ');
     return {
       type: 'tool',
       toolName: 'run_shell_command',
