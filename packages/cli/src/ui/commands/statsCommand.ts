@@ -4,16 +4,19 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import process from 'node:process';
 import type {
   HistoryItemStats,
   HistoryItemModelStats,
   HistoryItemToolStats,
+  HistoryItemPerfStats,
 } from '../types.js';
 import { MessageType } from '../types.js';
 import { formatDuration } from '../utils/formatters.js';
 import {
   UserAccountManager,
   getG1CreditBalance,
+  startupProfiler,
 } from '@google/gemini-cli-core';
 import {
   type CommandContext,
@@ -139,6 +142,26 @@ export const statsCommand: SlashCommand = {
         context.ui.addItem({
           type: MessageType.TOOL_STATS,
         } as HistoryItemToolStats);
+      },
+    },
+    {
+      name: 'perf',
+      description: 'Show memory usage and startup performance breakdown',
+      kind: CommandKind.BUILT_IN,
+      autoExecute: true,
+      action: (context: CommandContext) => {
+        const memoryUsage = process.memoryUsage();
+        const startupPhases = startupProfiler.getLastFlushResults();
+        context.ui.addItem({
+          type: MessageType.PERF_STATS,
+          memoryUsage: {
+            rss: memoryUsage.rss,
+            heapUsed: memoryUsage.heapUsed,
+            heapTotal: memoryUsage.heapTotal,
+            external: memoryUsage.external,
+          },
+          startupPhases,
+        } as HistoryItemPerfStats);
       },
     },
   ],
