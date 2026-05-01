@@ -2697,26 +2697,28 @@ export class Config implements McpContext, AgentLoopContext {
         this,
         new ApprovalModeSwitchEvent(currentMode, mode),
       );
-    }
 
-    this.policyEngine.setApprovalMode(mode);
-    this.refreshSandboxManager();
+      this.policyEngine.setApprovalMode(mode);
+      this.refreshSandboxManager();
+      coreEvents.emit(CoreEvent.ApprovalModeChanged, {
+        sessionId: this.getSessionId(),
+        mode,
+      });
 
-    const isPlanModeTransition =
-      currentMode !== mode &&
-      (currentMode === ApprovalMode.PLAN || mode === ApprovalMode.PLAN);
-    const isYoloModeTransition =
-      currentMode !== mode &&
-      (currentMode === ApprovalMode.YOLO || mode === ApprovalMode.YOLO);
+      const isPlanModeTransition =
+        currentMode === ApprovalMode.PLAN || mode === ApprovalMode.PLAN;
+      const isYoloModeTransition =
+        currentMode === ApprovalMode.YOLO || mode === ApprovalMode.YOLO;
 
-    if (isPlanModeTransition || isYoloModeTransition) {
-      if (this._geminiClient?.isInitialized()) {
-        this._geminiClient.clearCurrentSequenceModel();
-        this._geminiClient.setTools().catch((err) => {
-          debugLogger.error('Failed to update tools', err);
-        });
+      if (isPlanModeTransition || isYoloModeTransition) {
+        if (this._geminiClient?.isInitialized()) {
+          this._geminiClient.clearCurrentSequenceModel();
+          this._geminiClient.setTools().catch((err) => {
+            debugLogger.error('Failed to update tools', err);
+          });
+        }
+        this.updateSystemInstructionIfInitialized();
       }
-      this.updateSystemInstructionIfInitialized();
     }
   }
 

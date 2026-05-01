@@ -37,6 +37,7 @@ import {
 } from '../tools/tool-names.js';
 import type { HierarchicalMemory } from '../config/memory.js';
 import { DEFAULT_CONTEXT_FILENAME } from '../tools/memoryTool.js';
+import type { ApprovalMode } from '../policy/types.js';
 
 // --- Options Structs ---
 
@@ -57,6 +58,7 @@ export interface SystemPromptOptions {
 
 export interface PreambleOptions {
   interactive: boolean;
+  approvalMode: ApprovalMode;
 }
 
 export interface CoreMandatesOptions {
@@ -188,9 +190,17 @@ ${renderUserMemory(userMemory, contextFilenames)}
 
 export function renderPreamble(options?: PreambleOptions): string {
   if (!options) return '';
-  return options.interactive
-    ? 'You are Gemini CLI, an interactive CLI agent specializing in software engineering tasks. Your primary goal is to help users safely and effectively.'
-    : 'You are Gemini CLI, an autonomous CLI agent specializing in software engineering tasks. Your primary goal is to help users safely and effectively.';
+
+  let modeStr = 'Default';
+  if (options.approvalMode === 'plan') modeStr = 'Plan';
+  if (options.approvalMode === 'yolo') modeStr = 'YOLO';
+  if (options.approvalMode === 'autoEdit') modeStr = 'Auto-Edit';
+
+  const base = options.interactive
+    ? 'You are Gemini CLI, an interactive CLI agent specializing in software engineering tasks.'
+    : 'You are Gemini CLI, an autonomous CLI agent specializing in software engineering tasks.';
+
+  return `${base} You are currently operating in **${modeStr}** mode. Your primary goal is to help users safely and effectively.`;
 }
 
 export function renderCoreMandates(options?: CoreMandatesOptions): string {
