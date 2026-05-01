@@ -24,16 +24,43 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, '..');
+// Detect Bun via the runtime check OR the user-agent env var, which the
+// package manager sets and child processes inherit. The latter matters when
+// `bun run build` invokes `node scripts/build.js` (per package.json), which
+// runs under Node but is still part of a Bun-driven build.
+const isBun =
+  !!process.versions.bun ||
+  !!process.env.npm_config_user_agent?.includes('bun');
 
-// npm install if node_modules was removed (e.g. via npm run clean or scripts/clean.js)
+// install if node_modules was removed (e.g. via npm run clean or scripts/clean.js)
 if (!existsSync(join(root, 'node_modules'))) {
-  execSync('npm install', { stdio: 'inherit', cwd: root });
+  execSync(isBun ? 'bun install' : 'npm install', {
+    stdio: 'inherit',
+    cwd: root,
+  });
 }
 
 // build all workspaces/packages
-execSync('npm run generate', { stdio: 'inherit', cwd: root });
+execSync(isBun ? 'bun run generate' : 'npm run generate', {
+  stdio: 'inherit',
+  cwd: root,
+});
 
-if (process.env.CI) {
+if (isBun) {
+  // bun run --filter does not respect topological order, so build core
+  // explicitly first (everyone depends on it) before the rest.
+  console.log('Building @google/gemini-cli-core...');
+  execSync('bun run --filter @google/gemini-cli-core build', {
+    stdio: 'inherit',
+    cwd: root,
+  });
+
+  console.log('Building other workspaces in parallel...');
+  execSync(
+    "bun run --filter '*' --filter '!@google/gemini-cli-core' --parallel build",
+    { stdio: 'inherit', cwd: root },
+  );
+} else if (process.env.CI) {
   console.log('CI environment detected. Building workspaces sequentially...');
   execSync('npm run build --workspaces', { stdio: 'inherit', cwd: root });
 } else {
