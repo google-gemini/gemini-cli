@@ -17,7 +17,7 @@ import {
 } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
 
-import { getErrorMessage, isAbortError } from '../utils/errors.js';
+import { getErrorMessage, isCancellationError } from '../utils/errors.js';
 import { getResponseText } from '../utils/partUtils.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { WEB_SEARCH_DEFINITION } from './definitions/coreTools.js';
@@ -178,7 +178,7 @@ class WebSearchToolInvocation extends BaseToolInvocation<
         sources,
       };
     } catch (error: unknown) {
-      if (isAbortError(error)) {
+      if (isCancellationError(error)) {
         return {
           llmContent: 'Web search was cancelled.',
           returnDisplay: 'Search cancelled.',

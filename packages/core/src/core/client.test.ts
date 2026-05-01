@@ -832,6 +832,21 @@ describe('Gemini Client (client.ts)', () => {
       expect(events).toEqual([{ type: GeminiEventType.UserCancelled }]);
     });
 
+    it('yields UserCancelled when processTurn throws a plain cancellation message', async () => {
+      vi.spyOn(client['loopDetector'], 'turnStarted').mockRejectedValueOnce(
+        new Error('The user aborted a request.'),
+      );
+
+      const stream = client.sendMessageStream(
+        [{ text: 'Hi' }],
+        new AbortController().signal,
+        'prompt-id-user-abort-message',
+      );
+      const events = await fromAsync(stream);
+
+      expect(events).toEqual([{ type: GeminiEventType.UserCancelled }]);
+    });
+
     it.each([
       {
         compressionStatus:
