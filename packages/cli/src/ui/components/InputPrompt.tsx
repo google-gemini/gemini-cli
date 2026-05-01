@@ -160,6 +160,37 @@ export function isLargePaste(text: string): boolean {
   );
 }
 
+export function splitWordForWidth(word: string, maxWidth: number): string[] {
+  const width = maxWidth > 0 ? maxWidth : 1;
+  const lines: string[] = [];
+  let currentPart = '';
+  let currentPartWidth = 0;
+
+  for (const char of toCodePoints(word)) {
+    const charWidth = stringWidth(char);
+    if (currentPartWidth + charWidth > width && currentPartWidth > 0) {
+      lines.push(currentPart);
+      currentPart = '';
+      currentPartWidth = 0;
+    }
+
+    currentPart += char;
+    currentPartWidth += charWidth;
+
+    if (currentPartWidth > width) {
+      lines.push(currentPart);
+      currentPart = '';
+      currentPartWidth = 0;
+    }
+  }
+
+  if (currentPart) {
+    lines.push(currentPart);
+  }
+
+  return lines;
+}
+
 const DOUBLE_TAB_CLEAN_UI_TOGGLE_WINDOW_MS = 350;
 /**
  * Attempt to toggle expansion of a paste placeholder in the buffer.
@@ -1485,26 +1516,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
               additionalLines.push(currentLine);
             }
 
-            let wordToProcess = word;
-            while (stringWidth(wordToProcess) > inputWidth) {
-              let part = '';
-              const wordCP = toCodePoints(wordToProcess);
-              let partWidth = 0;
-              let splitIndex = 0;
-              for (let i = 0; i < wordCP.length; i++) {
-                const char = wordCP[i];
-                const charWidth = stringWidth(char);
-                if (partWidth + charWidth > inputWidth) {
-                  break;
-                }
-                part += char;
-                partWidth += charWidth;
-                splitIndex = i + 1;
-              }
-              additionalLines.push(part);
-              wordToProcess = cpSlice(wordToProcess, splitIndex);
-            }
-            currentLine = wordToProcess;
+            const splitWord = splitWordForWidth(word, inputWidth);
+            additionalLines.push(...splitWord.slice(0, -1));
+            currentLine = splitWord.at(-1) ?? '';
           } else {
             currentLine = prospectiveLine;
           }
