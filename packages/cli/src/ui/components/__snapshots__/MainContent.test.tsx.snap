@@ -101,7 +101,7 @@ exports[`MainContent > renders a ToolConfirmationQueue without an extra line whe
 ╭──────────────────────────────────────────────────────────────────────────────╮
 │ Ready to start implementation?                                               │
 │                                                                              │
-│  Error reading plan: Storage must be initialized before use                  │
+│  Error reading plan: File not found: /path/to/plan                           │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 "
 `;
