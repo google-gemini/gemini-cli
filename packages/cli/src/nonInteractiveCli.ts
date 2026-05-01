@@ -319,7 +319,6 @@ export async function runNonInteractive(
           abortController.signal,
           prompt_id,
           undefined,
-          false,
           turnCount === 1 ? input : undefined,
         );
 

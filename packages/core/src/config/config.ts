@@ -681,7 +681,6 @@ export interface ConfigParameters {
   gemmaModelRouter?: GemmaModelRouterSettings;
   adk?: ADKSettings;
   disableModelRouterForAuth?: AuthType[];
-  continueOnFailedApiCall?: boolean;
   retryFetchErrors?: boolean;
   maxAttempts?: number;
   enableShellOutputEfficiency?: boolean;
@@ -911,7 +910,6 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly agentSessionNoninteractiveEnabled: boolean;
   private readonly agentSessionInteractiveEnabled: boolean;
 
-  private readonly continueOnFailedApiCall: boolean;
   private readonly retryFetchErrors: boolean;
   private readonly maxAttempts: number;
   private readonly enableShellOutputEfficiency: boolean;
@@ -1288,7 +1286,6 @@ export class Config implements McpContext, AgentLoopContext {
     this.enableHooks = params.enableHooks ?? true;
     this.disabledHooks = params.disabledHooks ?? [];
 
-    this.continueOnFailedApiCall = params.continueOnFailedApiCall ?? true;
     this.enableShellOutputEfficiency =
       params.enableShellOutputEfficiency ?? true;
     this.shellToolInactivityTimeout =
@@ -3447,10 +3444,6 @@ export class Config implements McpContext, AgentLoopContext {
 
   getSkipNextSpeakerCheck(): boolean {
     return this.skipNextSpeakerCheck;
-  }
-
-  getContinueOnFailedApiCall(): boolean {
-    return this.continueOnFailedApiCall;
   }
 
   getRetryFetchErrors(): boolean {
