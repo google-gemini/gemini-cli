@@ -263,7 +263,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           setShowEscapePrompt(true);
         } else if (count === 2) {
           resetEscapeState();
-          if (buffer.text.length > 0) {
+          if (buffer.text.trim()) {
+            inputHistory.checkpointCurrentInput(
+              buffer.text,
+              buffer.getOffset(),
+            );
             buffer.setText('');
             resetTurnBaseline();
             resetCompletionState();
@@ -1330,6 +1334,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           return true;
         }
         return false;
+      }
+
+      if (keyMatchers[Command.CLEAR_INPUT](key)) {
+        inputHistory.checkpointCurrentInput(buffer.text, buffer.getOffset());
       }
 
       // Fall back to the text buffer's default input handling for all other keys
