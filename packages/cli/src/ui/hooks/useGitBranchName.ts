@@ -4,13 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect, useCallback } from 'react';
-import { spawnAsync } from '@google/gemini-cli-core';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { spawnAsync, getAbsoluteGitDir } from '@google/gemini-cli-core';
 import fs from 'node:fs';
 import fsPromises from 'node:fs/promises';
 
 export function useGitBranchName(cwd: string): string | undefined {
   const [branchName, setBranchName] = useState<string | undefined>(undefined);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const fetchBranchName = useCallback(async () => {
     try {
@@ -36,20 +37,14 @@ export function useGitBranchName(cwd: string): string | undefined {
   }, [cwd, setBranchName]);
 
   useEffect(() => {
-    // eslint-disable-next-line @typescript-eslint/no-floating-promises
-    fetchBranchName(); // Initial fetch
+    void fetchBranchName(); // Initial fetch
 
     let watcher: fs.FSWatcher | undefined;
     let cancelled = false;
 
     const setupWatcher = async () => {
       try {
-        const { stdout } = await spawnAsync(
-          'git',
-          ['rev-parse', '--absolute-git-dir'],
-          { cwd },
-        );
-        const gitDir = stdout.toString().trim();
+        const gitDir = await getAbsoluteGitDir(cwd);
         if (!gitDir) return;
 
         // Ensure we can access the git dir
@@ -62,8 +57,12 @@ export function useGitBranchName(cwd: string): string | undefined {
             // Changes to HEAD indicate branch checkout or detached commit.
             // On some platforms filename may be null, so we refresh in that case too.
             if (!filename || filename === 'HEAD') {
-              // eslint-disable-next-line @typescript-eslint/no-floating-promises
-              fetchBranchName();
+              if (timeoutRef.current) {
+                clearTimeout(timeoutRef.current);
+              }
+              timeoutRef.current = setTimeout(() => {
+                void fetchBranchName();
+              }, 100);
             }
           },
         );
@@ -80,11 +79,13 @@ export function useGitBranchName(cwd: string): string | undefined {
       }
     };
 
-    // eslint-disable-next-line @typescript-eslint/no-floating-promises
-    setupWatcher();
+    void setupWatcher();
 
     return () => {
       cancelled = true;
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
       watcher?.close();
     };
   }, [cwd, fetchBranchName]);
