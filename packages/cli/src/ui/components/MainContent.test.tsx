@@ -686,7 +686,8 @@ describe('MainContent', () => {
       }),
     );
 
-    let lastFrame!: () => string; let unmount!: () => void;
+    let lastFrame!: () => string;
+    let unmount!: () => void;
     await act(async () => {
       const res = await renderWithProviders(<MainContent />, {
         uiState: uiState as Partial<UIState>,
