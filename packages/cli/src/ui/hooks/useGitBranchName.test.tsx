@@ -235,11 +235,30 @@ describe('useGitBranchName', () => {
 
     // Resolving the new branch name fetch
     await act(async () => {
+      // Find the specific abbrev-ref spawn for this update
       const spawn = deferredSpawn.find((s) => s.args.includes('--abbrev-ref'))!;
+      // Remove it from the array so subsequent lookups don't find the same one
+      deferredSpawn.splice(deferredSpawn.indexOf(spawn), 1);
       spawn.resolve({ stdout: 'develop\n', stderr: '' });
     });
 
     expect(result.current).toBe('develop');
+
+    // Simulate file change event with null filename (platform compatibility)
+    await act(async () => {
+      if (watchCallback) {
+        watchCallback('change', null);
+      }
+    });
+
+    // Resolving the new branch name fetch
+    await act(async () => {
+      const spawn = deferredSpawn.find((s) => s.args.includes('--abbrev-ref'))!;
+      deferredSpawn.splice(deferredSpawn.indexOf(spawn), 1);
+      spawn.resolve({ stdout: 'feature-x\n', stderr: '' });
+    });
+
+    expect(result.current).toBe('feature-x');
   });
 
   it('should handle watcher setup error silently', async () => {

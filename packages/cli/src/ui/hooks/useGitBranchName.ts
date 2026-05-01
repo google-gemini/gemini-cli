@@ -56,16 +56,23 @@ export function useGitBranchName(cwd: string): string | undefined {
         await fsPromises.access(gitDir, fs.constants.F_OK);
         if (cancelled) return;
 
-        watcher = fs.watch(
+        const w = fs.watch(
           gitDir,
           (eventType: string, filename: string | null) => {
-            // Changes to HEAD indicate branch checkout or detached commit
-            if (filename === 'HEAD') {
+            // Changes to HEAD indicate branch checkout or detached commit.
+            // On some platforms filename may be null, so we refresh in that case too.
+            if (!filename || filename === 'HEAD') {
               // eslint-disable-next-line @typescript-eslint/no-floating-promises
               fetchBranchName();
             }
           },
         );
+
+        if (cancelled) {
+          w.close();
+        } else {
+          watcher = w;
+        }
       } catch {
         // Silently ignore watcher errors (e.g. permissions or file not existing),
         // similar to how exec errors are handled.
