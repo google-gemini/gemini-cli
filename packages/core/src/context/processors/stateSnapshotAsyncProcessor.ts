@@ -92,6 +92,10 @@ export function createStateSnapshotAsyncProcessor(
           options.systemInstruction,
         );
 
+        console.error(
+          `[StateSnapshotAsyncProcessor] Generated async snapshot of ${nodesToSummarize.length} nodes (${snapshotText.length} chars).`,
+        );
+
         const newConsumedIds = [
           ...previousConsumedIds,
           ...targets.map((t) => t.id),

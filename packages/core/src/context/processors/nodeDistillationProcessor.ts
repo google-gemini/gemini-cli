@@ -97,6 +97,9 @@ export function createNodeDistillationProcessor(
               ]);
 
               if (newTokens < oldTokens) {
+                console.error(
+                  `[NodeDistillationProcessor] Distilled text node ${node.id} (${oldTokens} -> ${newTokens} tokens)`,
+                );
                 const distilledPayload = updatePart(payload, { text: summary });
 
                 returnedNodes.push({
@@ -151,6 +154,9 @@ export function createNodeDistillationProcessor(
                 );
 
                 if (newObsTokens < oldObsTokens) {
+                  console.error(
+                    `[NodeDistillationProcessor] Distilled tool observation for ${payload.functionResponse.name} in node ${node.id} (${oldObsTokens} -> ${newObsTokens} tokens)`,
+                  );
                   const newFR = cloneFunctionResponse(payload.functionResponse);
                   newFR.response = newObsObject;
 
