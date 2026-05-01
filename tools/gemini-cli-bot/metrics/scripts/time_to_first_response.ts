@@ -6,7 +6,7 @@
  * @license
  */
 
-import { GITHUB_OWNER, GITHUB_REPO, type MetricOutput } from '../types.js';
+import { GITHUB_OWNER, GITHUB_REPO } from '../types.js';
 import { execSync } from 'node:child_process';
 
 try {
@@ -118,8 +118,8 @@ try {
   const issues = processItems(data.issues.nodes);
   const allItems = [...prs, ...issues];
 
-  const isMaintainer = (assoc: string) => ['MEMBER', 'OWNER'].includes(assoc);
-  const is1P = (assoc: string) => ['COLLABORATOR'].includes(assoc);
+  const isMaintainer = (assoc: string) =>
+    ['MEMBER', 'OWNER', 'COLLABORATOR'].includes(assoc);
 
   const calculateAvg = (items: { ttfr: number; association: string }[]) =>
     items.length ? items.reduce((a, b) => a + b.ttfr, 0) / items.length : 0;
@@ -127,30 +127,14 @@ try {
   const maintainers = calculateAvg(
     allItems.filter((i) => isMaintainer(i.association)),
   );
-  const firstParty = calculateAvg(allItems.filter((i) => is1P(i.association)));
   const overall = calculateAvg(allItems);
 
-  const timestamp = new Date().toISOString();
-
-  const metrics: MetricOutput[] = [
-    {
-      metric: 'time_to_first_response_overall_hours',
-      value: Math.round(overall * 100) / 100,
-      timestamp,
-    },
-    {
-      metric: 'time_to_first_response_maintainers_hours',
-      value: Math.round(maintainers * 100) / 100,
-      timestamp,
-    },
-    {
-      metric: 'time_to_first_response_1p_hours',
-      value: Math.round(firstParty * 100) / 100,
-      timestamp,
-    },
-  ];
-
-  metrics.forEach((m) => process.stdout.write(JSON.stringify(m) + '\n'));
+  process.stdout.write(
+    `time_to_first_response_overall_hours,${Math.round(overall * 100) / 100}\n`,
+  );
+  process.stdout.write(
+    `time_to_first_response_maintainers_hours,${Math.round(maintainers * 100) / 100}\n`,
+  );
 } catch (err) {
   process.stderr.write(err instanceof Error ? err.message : String(err));
   process.exit(1);

@@ -18,6 +18,7 @@ import {
   Storage,
   coreEvents,
   homedir,
+  AuthType,
   type AdminControlsSettings,
   createCache,
 } from '@google/gemini-cli-core';
@@ -532,17 +533,41 @@ function findEnvFile(startDir: string, isTrusted: boolean): string | null {
   }
 }
 
+// Internal env var used to preserve the user's original GOOGLE_CLOUD_PROJECT
+// across process restarts in Cloud Shell. This survives relaunch because child
+// processes inherit the parent's environment.
+const USER_GCP_PROJECT = '_GEMINI_USER_GCP_PROJECT';
+
 export function setUpCloudShellEnvironment(
   envFilePath: string | null,
   isTrusted: boolean,
   isSandboxed: boolean,
+  selectedAuthType?: string,
 ): void {
   // Special handling for GOOGLE_CLOUD_PROJECT in Cloud Shell:
   // Because GOOGLE_CLOUD_PROJECT in Cloud Shell tracks the project
   // set by the user using "gcloud config set project" we do not want to
   // use its value. So, unless the user overrides GOOGLE_CLOUD_PROJECT in
   // one of the .env files, we set the Cloud Shell-specific default here.
-  let value = 'cloudshell-gca';
+  //
+  // However, if the user has explicitly selected Vertex AI auth, they intend
+  // to use their own GCP project, so we restore the original value and skip
+  // the Cloud Shell override to respect their .env settings.
+
+  // Save the user's original value before overwriting, so it can be restored
+  // if the user later switches to Vertex AI (even after a process restart).
+  if (!process.env[USER_GCP_PROJECT]) {
+    const current = process.env['GOOGLE_CLOUD_PROJECT'];
+    if (current && current !== 'cloudshell-gca') {
+      process.env[USER_GCP_PROJECT] = current;
+    }
+  }
+
+  let value: string | undefined = 'cloudshell-gca';
+
+  if (selectedAuthType === AuthType.USE_VERTEX_AI) {
+    value = process.env[USER_GCP_PROJECT];
+  }
 
   if (envFilePath && fs.existsSync(envFilePath)) {
     const envFileContent = fs.readFileSync(envFilePath);
@@ -555,7 +580,12 @@ export function setUpCloudShellEnvironment(
       }
     }
   }
-  process.env['GOOGLE_CLOUD_PROJECT'] = value;
+
+  if (value !== undefined) {
+    process.env['GOOGLE_CLOUD_PROJECT'] = value;
+  } else if (process.env['GOOGLE_CLOUD_PROJECT'] === 'cloudshell-gca') {
+    delete process.env['GOOGLE_CLOUD_PROJECT'];
+  }
 }
 
 export function loadEnvironment(
@@ -584,7 +614,13 @@ export function loadEnvironment(
 
   // Cloud Shell environment variable handling
   if (process.env['CLOUD_SHELL'] === 'true') {
-    setUpCloudShellEnvironment(envFilePath, isTrusted, isSandboxed);
+    const selectedAuthType = settings.security?.auth?.selectedType;
+    setUpCloudShellEnvironment(
+      envFilePath,
+      isTrusted,
+      isSandboxed,
+      selectedAuthType,
+    );
   }
 
   if (envFilePath) {

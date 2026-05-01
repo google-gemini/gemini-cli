@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { CommandHandler } from './commandHandler.js';
+import { CommandHandler } from './acpCommandHandler.js';
 import { describe, it, expect } from 'vitest';
 
 describe('CommandHandler', () => {
