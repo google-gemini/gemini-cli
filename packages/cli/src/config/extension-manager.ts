@@ -261,10 +261,10 @@ export class ExtensionManager extends ExtensionLoader {
             installMetadata.type = result.type;
             installMetadata.releaseTag = result.tagName;
           } else if (
-            // This repo has no github releases, and wasn't explicitly installed
-            // from a github release, unconditionally just clone it.
-            (result.failureReason === 'no release data' &&
-              installMetadata.type === 'git') ||
+            // The user provided a plain git URL (not explicitly a github-release
+            // install), so silently fall through to git clone on any release
+            // download failure -- no need to alarm the user with error details.
+            installMetadata.type === 'git' ||
             // Otherwise ask the user if they would like to try a git clone.
             (await (requestConsentOverride ?? this.requestConsent)(
               `Error downloading github release for ${installMetadata.source} with the following error: ${result.errorMessage}.
