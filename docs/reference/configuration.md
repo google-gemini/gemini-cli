@@ -1665,7 +1665,7 @@ their corresponding top-level category object in your `settings.json` file.
 - **`security.enablePermanentToolApproval`** (boolean):
   - **Description:** Enable the "Allow for all future sessions" option in tool
     confirmation dialogs.
-  - **Default:** `false`
+  - **Default:** `true`
 
 - **`security.autoAddToPolicyByDefault`** (boolean):
   - **Description:** When enabled, the "Allow for all future sessions" option

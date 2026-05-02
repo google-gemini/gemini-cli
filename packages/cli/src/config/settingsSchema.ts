@@ -1840,7 +1840,7 @@ const SETTINGS_SCHEMA = {
         label: 'Allow Permanent Tool Approval',
         category: 'Security',
         requiresRestart: false,
-        default: false,
+        default: true,
         description:
           'Enable the "Allow for all future sessions" option in tool confirmation dialogs.',
         showInDialog: true,
