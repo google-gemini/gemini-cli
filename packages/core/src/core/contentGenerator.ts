@@ -97,6 +97,8 @@ export type ContentGeneratorConfig = {
   vertexai?: boolean;
   authType?: AuthType;
   proxy?: string;
+  googleCloudProject?: string;
+  googleCloudLocation?: string;
   baseUrl?: string;
   customHeaders?: Record<string, string>;
   vertexAiRouting?: VertexAiRoutingConfig;
@@ -167,10 +169,13 @@ export async function createContentGeneratorConfig(
 
   if (
     authType === AuthType.USE_VERTEX_AI &&
-    (googleApiKey || (googleCloudProject && googleCloudLocation))
+    (googleApiKey || googleCloudProject)
   ) {
     contentGeneratorConfig.apiKey = googleApiKey;
     contentGeneratorConfig.vertexai = true;
+    contentGeneratorConfig.googleCloudProject = googleCloudProject;
+    contentGeneratorConfig.googleCloudLocation =
+      config.getVertexLocation?.() || googleCloudLocation;
 
     return contentGeneratorConfig;
   }
@@ -337,6 +342,12 @@ export async function createContentGenerator(
       const googleGenAI = new GoogleGenAI({
         apiKey: config.apiKey === '' ? undefined : config.apiKey,
         vertexai: config.vertexai ?? config.authType === AuthType.USE_VERTEX_AI,
+        ...(config.googleCloudProject !== undefined
+          ? { project: config.googleCloudProject }
+          : {}),
+        ...(config.googleCloudLocation !== undefined
+          ? { location: config.googleCloudLocation }
+          : {}),
         httpOptions,
         ...(apiVersionEnv && { apiVersion: apiVersionEnv }),
       });
