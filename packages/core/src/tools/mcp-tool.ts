@@ -6,6 +6,7 @@
 
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { SchemaValidator } from '../utils/schemaValidator.js';
 import {
   BaseDeclarativeTool,
   BaseToolInvocation,
@@ -18,7 +19,12 @@ import {
   type PolicyUpdateOptions,
   type ExecuteOptions,
 } from './tools.js';
-import type { CallableTool, FunctionCall, Part } from '@google/genai';
+import type {
+  CallableTool,
+  FunctionCall,
+  FunctionDeclaration,
+  Part,
+} from '@google/genai';
 import { ToolErrorType } from './tool-error.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { McpContext } from './mcp-client.js';
@@ -414,6 +420,23 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
     return this._toolAnnotations;
   }
 
+  override getSchema(_modelId?: string): FunctionDeclaration {
+    const schema = super.getSchema(_modelId);
+    if (
+      typeof schema.parametersJsonSchema === 'object' &&
+      schema.parametersJsonSchema !== null &&
+      '$schema' in schema.parametersJsonSchema
+    ) {
+      const { $schema: _, ...schemaWithout$schema } =
+        schema.parametersJsonSchema as Record<string, unknown>;
+      return {
+        ...schema,
+        parametersJsonSchema: schemaWithout$schema,
+      };
+    }
+    return schema;
+  }
+
   getFullyQualifiedPrefix(): string {
     return generateValidName(
       `${this.serverName}${MCP_QUALIFIED_NAME_SEPARATOR}`,
@@ -425,6 +448,19 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
       `${this.serverName}${MCP_QUALIFIED_NAME_SEPARATOR}${this.serverToolName}`,
     );
   }
+
+  override validateToolParams(params: ToolParams): string | null {
+    const { wait_for_previous: _, ...paramsToValidate } = params;
+    const errors = SchemaValidator.validate(
+      this.parameterSchema,
+      paramsToValidate,
+    );
+    if (errors) {
+      return errors;
+    }
+    return this.validateToolParamValues(params);
+  }
+
   protected createInvocation(
     params: ToolParams,
     messageBus: MessageBus,
