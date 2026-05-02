@@ -44,6 +44,7 @@ import {
   getAdminBlockedMcpServersMessage,
   getProjectRootForWorktree,
   isGeminiWorktree,
+  type ConfigParameters,
   type WorktreeSettings,
   type HookDefinition,
   type HookEventName,
@@ -76,6 +77,24 @@ import { requestConsentNonInteractive } from './extensions/consent.js';
 import { promptForSetting } from './extensions/extensionSettings.js';
 import type { EventEmitter } from 'node:stream';
 import { runExitCleanup } from '../utils/cleanup.js';
+
+function translateAgentsForCore(
+  agents: MergedSettings['agents'] | undefined,
+): ConfigParameters['agents'] {
+  if (!agents?.browser) {
+    return agents as ConfigParameters['agents'];
+  }
+
+  const { enableUserInput, ...browser } = agents.browser;
+
+  return {
+    ...agents,
+    browser: {
+      ...browser,
+      disableUserInput: enableUserInput === true ? false : undefined,
+    },
+  } as ConfigParameters['agents'];
+}
 
 export interface CliArgs {
   query: string | undefined;
@@ -996,7 +1015,7 @@ export async function loadCliConfig(
     mcpEnablementCallbacks,
     mcpEnabled,
     extensionsEnabled,
-    agents: settings.agents,
+    agents: translateAgentsForCore(settings.agents),
     adminSkillsEnabled,
     allowedMcpServers: mcpEnabled
       ? (argv.allowedMcpServerNames ?? settings.mcp?.allowed)
@@ -1127,7 +1146,7 @@ export async function loadCliConfig(
       const refreshedSettings = loadSettings(cwd);
       return {
         disabledSkills: refreshedSettings.merged.skills.disabled,
-        agents: refreshedSettings.merged.agents,
+        agents: translateAgentsForCore(refreshedSettings.merged.agents),
       };
     },
     enableConseca: settings.security?.enableConseca,
