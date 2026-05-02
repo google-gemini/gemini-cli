@@ -10,6 +10,7 @@ import {
   createDummyNode,
   createMockProcessArgs,
 } from '../testing/contextTestUtils.js';
+import { NodeType } from '../graph/types.js';
 import type { InboxSnapshotImpl } from '../pipeline/inbox.js';
 
 describe('StateSnapshotProcessor', () => {
@@ -22,7 +23,7 @@ describe('StateSnapshotProcessor', () => {
         target: 'incremental',
       },
     );
-    const targets = [createDummyNode('ep1', 'USER_PROMPT')];
+    const targets = [createDummyNode('ep1', NodeType.USER_PROMPT)];
     const result = await processor.process(createMockProcessArgs(targets));
     expect(result).toBe(targets); // Strict equality
   });
@@ -37,9 +38,27 @@ describe('StateSnapshotProcessor', () => {
       },
     );
 
-    const nodeA = createDummyNode('ep1', 'USER_PROMPT', 50, {}, 'node-A');
-    const nodeB = createDummyNode('ep1', 'AGENT_THOUGHT', 60, {}, 'node-B');
-    const nodeC = createDummyNode('ep2', 'USER_PROMPT', 50, {}, 'node-C');
+    const nodeA = createDummyNode(
+      'ep1',
+      NodeType.USER_PROMPT,
+      50,
+      {},
+      'node-A',
+    );
+    const nodeB = createDummyNode(
+      'ep1',
+      NodeType.AGENT_THOUGHT,
+      60,
+      {},
+      'node-B',
+    );
+    const nodeC = createDummyNode(
+      'ep2',
+      NodeType.USER_PROMPT,
+      50,
+      {},
+      'node-C',
+    );
 
     const targets = [nodeA, nodeB, nodeC];
 
@@ -62,7 +81,7 @@ describe('StateSnapshotProcessor', () => {
 
     // Should remove A and B, insert Snapshot, keep C
     expect(result.length).toBe(2);
-    expect(result[0].type).toBe('SNAPSHOT');
+    expect(result[0].type).toBe(NodeType.SNAPSHOT);
     expect(result[1].id).toBe('node-C');
 
     // Should consume the message
@@ -83,7 +102,13 @@ describe('StateSnapshotProcessor', () => {
     // Make deficit 0 so we don't fall through to the sync backstop and fail the test that way
 
     // node-A is MISSING (user deleted it)
-    const nodeB = createDummyNode('ep1', 'AGENT_THOUGHT', 60, {}, 'node-B');
+    const nodeB = createDummyNode(
+      'ep1',
+      NodeType.AGENT_THOUGHT,
+      60,
+      {},
+      'node-B',
+    );
     const targets = [nodeB];
 
     const messages = [
@@ -117,15 +142,33 @@ describe('StateSnapshotProcessor', () => {
       { target: 'max' },
     ); // Summarize all
 
-    const nodeA = createDummyNode('ep1', 'USER_PROMPT', 50, {}, 'node-A');
-    const nodeB = createDummyNode('ep1', 'AGENT_THOUGHT', 60, {}, 'node-B');
-    const nodeC = createDummyNode('ep2', 'USER_PROMPT', 50, {}, 'node-C');
+    const nodeA = createDummyNode(
+      'ep1',
+      NodeType.USER_PROMPT,
+      50,
+      {},
+      'node-A',
+    );
+    const nodeB = createDummyNode(
+      'ep1',
+      NodeType.AGENT_THOUGHT,
+      60,
+      {},
+      'node-B',
+    );
+    const nodeC = createDummyNode(
+      'ep2',
+      NodeType.USER_PROMPT,
+      50,
+      {},
+      'node-C',
+    );
     const targets = [nodeA, nodeB, nodeC];
     const result = await processor.process(createMockProcessArgs(targets));
 
     // Should synthesize a new snapshot synchronously
     expect(env.llmClient.generateContent).toHaveBeenCalled();
-    expect(result.length).toBe(2); // nodeA is skipped as "system prompt", snapshot + nodeA
-    expect(result[1].type).toBe('SNAPSHOT');
+    expect(result.length).toBe(1); // nodeA is no longer protected, so everything is snapshotted
+    expect(result[0].type).toBe(NodeType.SNAPSHOT);
   });
 });
