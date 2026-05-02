@@ -141,15 +141,23 @@ export class ContextManager {
       }
 
       if (agedOutNodes.size > 0) {
-        this.env.tokenCalculator.garbageCollectCache(
-          new Set(this.buffer.nodes.map((n) => n.id)),
-        );
-        this.eventBus.emitConsolidationNeeded({
-          nodes: this.buffer.nodes,
-          targetDeficit:
-            currentTokens - this.sidecar.config.budget.retainedTokens,
-          targetNodeIds: agedOutNodes,
-        });
+        const targetDeficit =
+          currentTokens - this.sidecar.config.budget.retainedTokens;
+
+        // Respect coalescing threshold for background work
+        const threshold =
+          this.sidecar.config.budget.coalescingThresholdTokens || 0;
+
+        if (targetDeficit >= threshold) {
+          this.env.tokenCalculator.garbageCollectCache(
+            new Set(this.buffer.nodes.map((n) => n.id)),
+          );
+          this.eventBus.emitConsolidationNeeded({
+            nodes: this.buffer.nodes,
+            targetDeficit,
+            targetNodeIds: agedOutNodes,
+          });
+        }
       }
     }
   }

@@ -146,10 +146,6 @@ export function createStateSnapshotProcessor(
           nodesToSummarize,
           options.systemInstruction,
         );
-
-        console.error(
-          `[StateSnapshotProcessor] Generated sync snapshot of ${nodesToSummarize.length} nodes (${snapshotText.length} chars).`,
-        );
         const newId = randomUUID();
         const snapshotNode: Snapshot = {
           id: newId,

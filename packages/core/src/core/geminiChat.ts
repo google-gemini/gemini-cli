@@ -769,23 +769,17 @@ export class GeminiChat {
    *
    * @param curated - whether to return the curated history or the comprehensive
    * history.
-   * @param skipScrubbing - if true, returns the raw history without removing internal metadata.
    * @return History contents alternating between user and model for the entire
    * chat session.
    */
-  getHistory(
-    curated: boolean = false,
-    skipScrubbing: boolean = false,
-  ): readonly Content[] {
+  getHistory(curated: boolean = false): readonly Content[] {
     const history = curated
       ? extractCuratedHistory([...this.agentHistory.get()])
       : this.agentHistory.get();
 
-    if (skipScrubbing) {
-      return [...history];
-    }
-
-    return scrubHistory([...history]);
+    return this.context.config.isContextManagementEnabled()
+      ? scrubHistory([...history])
+      : [...history];
   }
 
   /**
