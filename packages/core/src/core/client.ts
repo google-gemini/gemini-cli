@@ -67,7 +67,11 @@ import {
 } from '../availability/policyHelpers.js';
 import { getDisplayString, resolveModel } from '../config/models.js';
 import { partToString } from '../utils/partUtils.js';
-import { coreEvents, CoreEvent } from '../utils/events.js';
+import {
+  coreEvents,
+  CoreEvent,
+  type ApprovalModeChangedPayload,
+} from '../utils/events.js';
 import { initializeContextManager } from '../context/initializer.js';
 
 const MAX_TURNS = 100;
@@ -116,6 +120,10 @@ export class GeminiClient {
 
     coreEvents.on(CoreEvent.ModelChanged, this.handleModelChanged);
     coreEvents.on(CoreEvent.MemoryChanged, this.handleMemoryChanged);
+    coreEvents.on(
+      CoreEvent.ApprovalModeChanged,
+      this.handleApprovalModeChanged,
+    );
   }
 
   private get config(): Config {
@@ -128,6 +136,12 @@ export class GeminiClient {
 
   private handleMemoryChanged = () => {
     this.updateSystemInstruction();
+  };
+
+  private handleApprovalModeChanged = (payload: ApprovalModeChangedPayload) => {
+    if (payload.sessionId === this.config.getSessionId()) {
+      this.updateSystemInstruction();
+    }
   };
 
   clearCurrentSequenceModel(): void {
@@ -314,6 +328,10 @@ export class GeminiClient {
   dispose() {
     coreEvents.off(CoreEvent.ModelChanged, this.handleModelChanged);
     coreEvents.off(CoreEvent.MemoryChanged, this.handleMemoryChanged);
+    coreEvents.off(
+      CoreEvent.ApprovalModeChanged,
+      this.handleApprovalModeChanged,
+    );
   }
 
   async resumeChat(
@@ -369,7 +387,9 @@ export class GeminiClient {
     const toolDeclarations = toolRegistry.getFunctionDeclarations();
     const tools: Tool[] = [{ functionDeclarations: toolDeclarations }];
 
-    const history = await getInitialChatHistory(this.config, extraHistory);
+    const history = this.config.getContextManagementConfig().enabled
+      ? (extraHistory ?? [])
+      : await getInitialChatHistory(this.config, extraHistory);
 
     try {
       const systemMemory = this.config.getSystemInstructionMemory();
@@ -618,14 +638,25 @@ export class GeminiClient {
     const modelForLimitCheck = this._getActiveModelForCurrentTurn();
 
     if (this.config.getContextManagementConfig().enabled) {
-      const newHistory = this.contextManager
-        ? await this.contextManager.renderHistory()
-        : await this.agentHistoryProvider.manageHistory(
-            this.getHistory(),
-            signal,
-          );
-      if (newHistory.length !== this.getHistory().length) {
-        this.getChat().setHistory(newHistory);
+      if (this.contextManager) {
+        const pendingRequest = createUserContent(request);
+        const { history: newHistory, didApplyManagement } =
+          await this.contextManager.renderHistory(pendingRequest);
+
+        if (didApplyManagement) {
+          // If the manager pruned history, we update the chat before continuing.
+          // Note: we don't include the pendingRequest in this setHistory,
+          // because Turn.run will add it normally.
+          this.getChat().setHistory(newHistory, { silent: true });
+        }
+      } else {
+        const newHistory = await this.agentHistoryProvider.manageHistory(
+          this.getHistory(),
+          signal,
+        );
+        if (newHistory.length !== this.getHistory().length) {
+          this.getChat().setHistory(newHistory);
+        }
       }
     } else {
       const compressed = await this.tryCompressChat(prompt_id, false, signal);
