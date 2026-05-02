@@ -1461,8 +1461,8 @@ describe('mcp-client', () => {
       // Trigger notification - should fail internally but catch the error
       await notificationCallback();
 
-      // Should try to remove tools
-      expect(mockedToolRegistry.removeMcpToolsByServer).toHaveBeenCalled();
+      // Should NOT try to remove tools when discovery fails
+      expect(mockedToolRegistry.removeMcpToolsByServer).not.toHaveBeenCalled();
 
       // Should NOT emit success feedback
       expect(coreEvents.emitFeedback).not.toHaveBeenCalledWith(
