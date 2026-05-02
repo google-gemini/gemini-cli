@@ -81,6 +81,12 @@ vi.mock('os', async () => {
 describe('sea-launch', () => {
   describe('main', () => {
     it('executes main logic', async () => {
+      // Vitest workers run as forked processes (process.send is defined),
+      // which would trigger our fork-detection branch. Disable it here so
+      // we exercise the normal startup path.
+      const savedSend = process.send;
+      process.send = undefined;
+
       const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {});
       const consoleSpy = vi
         .spyOn(globalThis.console, 'error')
@@ -92,13 +98,55 @@ describe('sea-launch', () => {
         return Buffer.from('content');
       });
 
-      await main(mockGetAsset);
+      try {
+        await main(mockGetAsset);
 
-      expect(consoleSpy).toHaveBeenCalled();
-      expect(exitSpy).toHaveBeenCalled();
+        expect(consoleSpy).toHaveBeenCalled();
+        expect(exitSpy).toHaveBeenCalled();
+      } finally {
+        process.send = savedSend;
+        exitSpy.mockRestore();
+        consoleSpy.mockRestore();
+      }
+    });
 
-      exitSpy.mockRestore();
-      consoleSpy.mockRestore();
+    // Note: end-to-end fork()-detection behavior is verified by the integration
+    // test in sea-launch.fork.integration.test.cjs (runs against the actual
+    // SEA binary). Unit-testing it here is unreliable because vitest workers
+    // run as forked children themselves (process.send is set), and the mocked
+    // fs / require interactions make the real code path hard to exercise.
+
+    it('does not fork-detect when argv contains only execPath placeholders', async () => {
+      const savedSend = process.send;
+      const savedArgv = [...process.argv];
+
+      const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(globalThis.console, 'error')
+        .mockImplementation(() => {});
+
+      try {
+        process.send = vi.fn();
+        // The relaunch path uses execPath as a placeholder for the script slot.
+        // Fork detection must skip these and proceed to normal startup.
+        process.argv = [process.execPath, process.execPath];
+
+        const mockGetAsset = vi.fn((key) => {
+          if (key === 'manifest.json')
+            return JSON.stringify({ version: '1.0.0', mainHash: 'h1' });
+          return Buffer.from('content');
+        });
+
+        await main(mockGetAsset);
+
+        // Normal startup runs — getAsset IS called for the manifest
+        expect(mockGetAsset).toHaveBeenCalledWith('manifest.json', 'utf8');
+      } finally {
+        process.send = savedSend;
+        process.argv = savedArgv;
+        exitSpy.mockRestore();
+        consoleSpy.mockRestore();
+      }
     });
   });
 

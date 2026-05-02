@@ -225,6 +225,43 @@ function prepareRuntime(manifest, getAssetFn, deps = {}) {
 // --- Main Execution ---
 
 async function main(getAssetFn = getAsset) {
+  // Detect when we are spawned via child_process.fork() to run a helper script.
+  // fork() uses process.execPath (our SEA binary) as the Node.js interpreter,
+  // so any fork() call would start a second gemini session instead of running
+  // the intended script (e.g. node-pty's conpty_console_list_agent.js).
+  //
+  // The SEA inserts a duplicate of execPath at argv[1] (the "script-path slot"
+  // a non-SEA Node.js would have). So when fork() invokes us with
+  // `<binary> <script> <args>`, the child sees argv = [binary, binary, script, ...args].
+  // We find the first .js script after argv[0] and run it directly, while
+  // normalizing argv so the script sees argv[1] = its own path, argv[2..] = its
+  // args — matching the contract a regular Node.js fork would deliver.
+  if (typeof process.send === 'function') {
+    for (let i = 1; i < process.argv.length; i++) {
+      let candidate = process.argv[i];
+      if (!candidate || candidate === process.execPath) continue;
+      if (!candidate.endsWith('.js') && fs.existsSync(candidate + '.js')) {
+        candidate = candidate + '.js';
+      }
+      if (candidate.endsWith('.js') && fs.existsSync(candidate)) {
+        const remainingArgs = process.argv.slice(i + 1);
+        process.argv = [process.argv[0], candidate, ...remainingArgs];
+        try {
+          // The SEA's built-in require() only supports built-in modules; we
+          // need a disk-based require rooted at the script's directory so the
+          // helper can resolve its own dependencies.
+          const scriptRequire = nodeModule.createRequire(candidate);
+          scriptRequire(candidate);
+        } catch (_e) {
+          // Script load failed. Don't fall through to a gemini session — that
+          // is the bug we are preventing. Silently exit instead so the fork()
+          // parent can time out and recover.
+        }
+        return;
+      }
+    }
+  }
+
   process.env.IS_BINARY = 'true';
 
   if (nodeModule.enableCompileCache) {
