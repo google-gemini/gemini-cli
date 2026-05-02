@@ -38,6 +38,7 @@ import {
 import { RIP_GREP_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
 import { type GrepMatch, formatGrepResults } from './grep-utils.js';
+import { isBinaryAvailable } from '../utils/binaryCheck.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -59,6 +60,11 @@ export async function getRipgrepPath(): Promise<string | null> {
     if (await fileExists(candidate)) {
       return candidate;
     }
+  }
+
+  // 3. Fallback to system PATH
+  if (isBinaryAvailable('rg')) {
+    return 'rg';
   }
 
   return null;
