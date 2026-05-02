@@ -29,8 +29,12 @@ export function updateSettingsFilePreservingFormat(
 
   let parsed: Record<string, unknown>;
   try {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    parsed = parse(originalContent) as Record<string, unknown>;
+    if (!originalContent.trim()) {
+      parsed = {} as Record<string, unknown>;
+    } else {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      parsed = (parse(originalContent) || {}) as Record<string, unknown>;
+    }
   } catch (error) {
     coreEvents.emitFeedback(
       'error',
@@ -43,7 +47,15 @@ export function updateSettingsFilePreservingFormat(
   const updatedStructure = applyUpdates(parsed, updates);
   const updatedContent = stringify(updatedStructure, null, 2);
 
-  fs.writeFileSync(filePath, updatedContent, 'utf-8');
+  try {
+    fs.writeFileSync(filePath, updatedContent, 'utf-8');
+  } catch (error) {
+    coreEvents.emitFeedback(
+      'error',
+      `Failed to write settings to ${filePath}.`,
+      error,
+    );
+  }
 }
 
 /**
@@ -124,6 +136,13 @@ function applyKeyDiff(
   }
 
   for (const nextKey of Object.getOwnPropertyNames(desired)) {
+    if (
+      nextKey === '__proto__' ||
+      nextKey === 'constructor' ||
+      nextKey === 'prototype'
+    ) {
+      continue;
+    }
     const nextVal = desired[nextKey];
     const baseVal = base[nextKey];
 

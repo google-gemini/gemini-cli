@@ -107,6 +107,36 @@ function resolveEnvVarsInObjectInternal<T>(
     return resolveEnvVarsInString(obj, customEnv) as unknown as T;
   }
 
+  if (obj instanceof Map) {
+    if (visited.has(obj)) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      return new Map(obj) as unknown as T;
+    }
+    visited.add(obj);
+    const result = new Map();
+    for (const [key, val] of obj) {
+      result.set(key, resolveEnvVarsInObjectInternal(val, visited, customEnv));
+    }
+    visited.delete(obj);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    return result as unknown as T;
+  }
+
+  if (obj instanceof Set) {
+    if (visited.has(obj)) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      return new Set(obj) as unknown as T;
+    }
+    visited.add(obj);
+    const result = new Set();
+    for (const val of obj) {
+      result.add(resolveEnvVarsInObjectInternal(val, visited, customEnv));
+    }
+    visited.delete(obj);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    return result as unknown as T;
+  }
+
   if (Array.isArray(obj)) {
     // Check for circular reference
     if (visited.has(obj)) {
