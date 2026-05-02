@@ -1993,6 +1993,27 @@ describe('mcp-client', () => {
       });
     });
 
+    it('should unconditionally attach a data listener to stderr to prevent process hang', async () => {
+      const mockStderr = {
+        on: vi.fn(),
+      };
+
+      vi.spyOn(SdkClientStdioLib, 'StdioClientTransport').mockReturnValue({
+        stderr: mockStderr,
+      } as unknown as SdkClientStdioLib.StdioClientTransport);
+
+      await createTransport(
+        'test-server',
+        {
+          command: 'test-command',
+        },
+        false, // debugMode = false
+        MOCK_CONTEXT,
+      );
+
+      expect(mockStderr.on).toHaveBeenCalledWith('data', expect.any(Function));
+    });
+
     it('sets an env variable GEMINI_CLI=1 for stdio MCP servers', async () => {
       const mockedTransport = vi
         .spyOn(SdkClientStdioLib, 'StdioClientTransport')

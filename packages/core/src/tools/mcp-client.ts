@@ -2291,31 +2291,40 @@ export async function createTransport(
       transport = new XcodeMcpBridgeFixTransport(transport);
     }
 
-    if (debugMode) {
-      // The `XcodeMcpBridgeFixTransport` wrapper hides the underlying `StdioClientTransport`,
-      // which exposes `stderr` for debug logging. We need to unwrap it to attach the listener.
+    // The `XcodeMcpBridgeFixTransport` wrapper hides the underlying `StdioClientTransport`,
+    // which exposes `stderr` for debug logging. We need to unwrap it to attach the listener.
 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      const underlyingTransport =
-        transport instanceof XcodeMcpBridgeFixTransport
-          ? // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
-            (transport as any).transport
-          : transport;
+    const underlyingTransport =
+      transport instanceof XcodeMcpBridgeFixTransport
+        ? // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          (transport as unknown as { transport: unknown }).transport
+        : transport;
 
-      if (
-        underlyingTransport instanceof StdioClientTransport &&
-        underlyingTransport.stderr
-      ) {
-        underlyingTransport.stderr.on('data', (data) => {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-          const stderrStr = data.toString().trim();
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    const streamTransport = underlyingTransport as {
+      stderr?: {
+        on: (event: string, listener: (data: unknown) => void) => void;
+      };
+    };
+
+    if (
+      streamTransport &&
+      typeof streamTransport === 'object' &&
+      'stderr' in streamTransport &&
+      streamTransport.stderr &&
+      typeof streamTransport.stderr.on === 'function'
+    ) {
+      streamTransport.stderr.on('data', (data: unknown) => {
+        if (debugMode) {
+          const stderrStr = String(data).trim();
           debugLogger.debug(
             `[DEBUG] [MCP STDERR (${mcpServerName})]: `,
             stderrStr,
           );
-        });
-      }
+        }
+      });
     }
+
     return transport;
   }
 
