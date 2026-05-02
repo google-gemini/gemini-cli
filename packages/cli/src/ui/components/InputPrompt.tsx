@@ -23,6 +23,7 @@ import {
   ScrollableList,
   type ScrollableListRef,
 } from './shared/ScrollableList.js';
+import { ListeningIndicator } from './ListeningIndicator.js';
 import { HalfLinePaddedBox } from './shared/HalfLinePaddedBox.js';
 import {
   type TextBuffer,
@@ -1800,7 +1801,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         useBackgroundColor={useBackgroundColor}
       >
         <Box flexGrow={1} flexDirection="row" paddingX={1}>
-          {isVoiceModeEnabled && <Text color={theme.text.accent}>🎤 </Text>}
+          {isVoiceModeEnabled &&
+            (isRecording ? (
+              <ListeningIndicator color={theme.text.accent} />
+            ) : (
+              <Text color={theme.text.accent}>🎤 </Text>
+            ))}
           <Text
             color={statusColor ?? theme.text.accent}
             aria-label={statusText || undefined}
@@ -1825,12 +1831,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             )}{' '}
           </Text>
           <Box flexGrow={1} flexDirection="column" ref={innerBoxRef}>
-            {isRecording && (
-              <Box flexDirection="row" marginBottom={0}>
-                <Text color={theme.status.success}>Listening...</Text>
-              </Box>
-            )}
-            {buffer.text.length === 0 && !isRecording ? (
+            {buffer.text.length === 0 ? (
               effectivePlaceholder ? (
                 showCursor ? (
                   <Text
