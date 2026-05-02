@@ -53,23 +53,23 @@ they appear in the UI.
 | ------------------------------------ | -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
 | Auto Theme Switching                 | `ui.autoThemeSwitching`                | Automatically switch between default light and dark themes based on terminal background color.                                                                    | `true`  |
 | Terminal Background Polling Interval | `ui.terminalBackgroundPollingInterval` | Interval in seconds to poll the terminal background color.                                                                                                        | `60`    |
-| Hide Window Title                    | `ui.hideWindowTitle`                   | Hide the window title bar                                                                                                                                         | `false` |
+| Show Window Title                    | `ui.showWindowTitle`                   | Show the window title bar.                                                                                                                                        | `true`  |
 | Inline Thinking                      | `ui.inlineThinkingMode`                | Display model thinking inline: off or full.                                                                                                                       | `"off"` |
 | Show Thoughts in Title               | `ui.showStatusInTitle`                 | Show Gemini CLI model thoughts in the terminal window title during the working phase                                                                              | `false` |
 | Dynamic Window Title                 | `ui.dynamicWindowTitle`                | Update the terminal window title with current status icons (Ready: ◇, Action Required: ✋, Working: ✦)                                                            | `true`  |
 | Show Home Directory Warning          | `ui.showHomeDirectoryWarning`          | Show a warning when running Gemini CLI in the home directory.                                                                                                     | `true`  |
 | Show Compatibility Warnings          | `ui.showCompatibilityWarnings`         | Show warnings about terminal or OS compatibility issues.                                                                                                          | `true`  |
-| Hide Tips                            | `ui.hideTips`                          | Hide helpful tips in the UI                                                                                                                                       | `false` |
+| Show Tips                            | `ui.showTips`                          | Show helpful tips in the UI.                                                                                                                                      | `true`  |
 | Escape Pasted @ Symbols              | `ui.escapePastedAtSymbols`             | When enabled, @ symbols in pasted text are escaped to prevent unintended @path expansion.                                                                         | `false` |
 | Show Shortcuts Hint                  | `ui.showShortcutsHint`                 | Show the "? for shortcuts" hint above the input.                                                                                                                  | `true`  |
 | Compact Tool Output                  | `ui.compactToolOutput`                 | Display tool outputs (like directory listings and file reads) in a compact, structured format.                                                                    | `true`  |
-| Hide Banner                          | `ui.hideBanner`                        | Hide the application banner                                                                                                                                       | `false` |
-| Hide Context Summary                 | `ui.hideContextSummary`                | Hide the context summary (GEMINI.md, MCP servers) above the input.                                                                                                | `false` |
-| Hide CWD                             | `ui.footer.hideCWD`                    | Hide the current working directory in the footer.                                                                                                                 | `false` |
-| Hide Sandbox Status                  | `ui.footer.hideSandboxStatus`          | Hide the sandbox status indicator in the footer.                                                                                                                  | `false` |
-| Hide Model Info                      | `ui.footer.hideModelInfo`              | Hide the model name and context usage in the footer.                                                                                                              | `false` |
-| Hide Context Window Percentage       | `ui.footer.hideContextPercentage`      | Hides the context window usage percentage.                                                                                                                        | `true`  |
-| Hide Footer                          | `ui.hideFooter`                        | Hide the footer from the UI                                                                                                                                       | `false` |
+| Show Banner                          | `ui.showBanner`                        | Show the application banner.                                                                                                                                      | `true`  |
+| Show Context Summary                 | `ui.showContextSummary`                | Show the context summary (GEMINI.md, MCP servers) above the input.                                                                                                | `true`  |
+| Show CWD                             | `ui.footer.showCWD`                    | Show the current working directory in the footer.                                                                                                                 | `true`  |
+| Show Sandbox Status                  | `ui.footer.showSandboxStatus`          | Show the sandbox status indicator in the footer.                                                                                                                  | `true`  |
+| Show Model Info                      | `ui.footer.showModelInfo`              | Show the model name and context usage in the footer.                                                                                                              | `true`  |
+| Show Context Window Percentage       | `ui.footer.showContextPercentage`      | Show the context window usage percentage.                                                                                                                         | `false` |
+| Show Footer                          | `ui.showFooter`                        | Show the footer in the UI.                                                                                                                                        | `true`  |
 | Show Memory Usage                    | `ui.showMemoryUsage`                   | Display memory usage information in the UI                                                                                                                        | `false` |
 | Show Line Numbers                    | `ui.showLineNumbers`                   | Show line numbers in the chat.                                                                                                                                    | `true`  |
 | Show Citations                       | `ui.showCitations`                     | Show citations for generated text in the chat.                                                                                                                    | `false` |
@@ -99,13 +99,13 @@ they appear in the UI.
 
 ### Model
 
-| UI Label                      | Setting                      | Description                                                                            | Default     |
-| ----------------------------- | ---------------------------- | -------------------------------------------------------------------------------------- | ----------- |
-| Model                         | `model.name`                 | The Gemini model to use for conversations.                                             | `undefined` |
-| Max Session Turns             | `model.maxSessionTurns`      | Maximum number of user/model/tool turns to keep in a session. -1 means unlimited.      | `-1`        |
-| Context Compression Threshold | `model.compressionThreshold` | The fraction of context usage at which to trigger context compression (e.g. 0.2, 0.3). | `0.5`       |
-| Disable Loop Detection        | `model.disableLoopDetection` | Disable automatic detection and prevention of infinite loops.                          | `false`     |
-| Skip Next Speaker Check       | `model.skipNextSpeakerCheck` | Skip the next speaker check.                                                           | `true`      |
+| UI Label                      | Setting                        | Description                                                                            | Default     |
+| ----------------------------- | ------------------------------ | -------------------------------------------------------------------------------------- | ----------- |
+| Model                         | `model.name`                   | The Gemini model to use for conversations.                                             | `undefined` |
+| Max Session Turns             | `model.maxSessionTurns`        | Maximum number of user/model/tool turns to keep in a session. -1 means unlimited.      | `-1`        |
+| Context Compression Threshold | `model.compressionThreshold`   | The fraction of context usage at which to trigger context compression (e.g. 0.2, 0.3). | `0.5`       |
+| Enable Loop Detection         | `model.enableLoopDetection`    | Enable automatic detection and prevention of infinite loops.                           | `true`      |
+| Enable Next Speaker Check     | `model.enableNextSpeakerCheck` | Enable the next speaker check.                                                         | `false`     |
 
 ### Agents
 
@@ -113,6 +113,7 @@ they appear in the UI.
 | ------------------------- | ---------------------------------------- | --------------------------------------------------------------------------------------------- | ------- |
 | Confirm Sensitive Actions | `agents.browser.confirmSensitiveActions` | Require manual confirmation for sensitive browser actions (e.g., fill_form, evaluate_script). | `false` |
 | Block File Uploads        | `agents.browser.blockFileUploads`        | Hard-block file upload requests from the browser agent.                                       | `false` |
+| Enable User Input         | `agents.browser.enableUserInput`         | Enable user input on the browser window during automation.                                    | `false` |
 
 ### Context
 
@@ -128,15 +129,15 @@ they appear in the UI.
 
 ### Tools
 
-| UI Label                         | Setting                              | Description                                                                                                                                                                | Default |
-| -------------------------------- | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
-| Sandbox Allowed Paths            | `tools.sandboxAllowedPaths`          | List of additional paths that the sandbox is allowed to access.                                                                                                            | `[]`    |
-| Sandbox Network Access           | `tools.sandboxNetworkAccess`         | Whether the sandbox is allowed to access the network.                                                                                                                      | `false` |
-| Enable Interactive Shell         | `tools.shell.enableInteractiveShell` | Use node-pty for an interactive shell experience. Fallback to child_process still applies.                                                                                 | `true`  |
-| Show Color                       | `tools.shell.showColor`              | Show color in shell output.                                                                                                                                                | `true`  |
-| Use Ripgrep                      | `tools.useRipgrep`                   | Use ripgrep for file content search instead of the fallback implementation. Provides faster search performance.                                                            | `true`  |
-| Tool Output Truncation Threshold | `tools.truncateToolOutputThreshold`  | Maximum characters to show when truncating large tool outputs. Set to 0 or negative to disable truncation.                                                                 | `40000` |
-| Disable LLM Correction           | `tools.disableLLMCorrection`         | Disable LLM-based error correction for edit tools. When enabled, tools will fail immediately if exact string matches are not found, instead of attempting to self-correct. | `true`  |
+| UI Label                         | Setting                              | Description                                                                                                                              | Default |
+| -------------------------------- | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| Sandbox Allowed Paths            | `tools.sandboxAllowedPaths`          | List of additional paths that the sandbox is allowed to access.                                                                          | `[]`    |
+| Sandbox Network Access           | `tools.sandboxNetworkAccess`         | Whether the sandbox is allowed to access the network.                                                                                    | `false` |
+| Enable Interactive Shell         | `tools.shell.enableInteractiveShell` | Use node-pty for an interactive shell experience. Fallback to child_process still applies.                                               | `true`  |
+| Show Color                       | `tools.shell.showColor`              | Show color in shell output.                                                                                                              | `true`  |
+| Use Ripgrep                      | `tools.useRipgrep`                   | Use ripgrep for file content search instead of the fallback implementation. Provides faster search performance.                          | `true`  |
+| Tool Output Truncation Threshold | `tools.truncateToolOutputThreshold`  | Maximum characters to show when truncating large tool outputs. Set to 0 or negative to disable truncation.                               | `40000` |
+| Enable LLM Correction            | `tools.enableLLMCorrection`          | Enable LLM-based error correction for edit tools. When enabled, tools may attempt to self-correct if exact string matches are not found. | `false` |
 
 ### Security
 
@@ -144,7 +145,7 @@ they appear in the UI.
 | ------------------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------- |
 | Tool Sandboxing                       | `security.toolSandboxing`                       | Tool-level sandboxing. Isolates individual tools instead of the entire CLI process.                                                                                                                                                  | `false` |
 | Disable YOLO Mode                     | `security.disableYoloMode`                      | Disable YOLO mode, even if enabled by a flag.                                                                                                                                                                                        | `false` |
-| Disable Always Allow                  | `security.disableAlwaysAllow`                   | Disable "Always allow" options in tool confirmation dialogs.                                                                                                                                                                         | `false` |
+| Enable Always Allow                   | `security.enableAlwaysAllow`                    | Show "Always allow" options in tool confirmation dialogs.                                                                                                                                                                            | `true`  |
 | Allow Permanent Tool Approval         | `security.enablePermanentToolApproval`          | Enable the "Allow for all future sessions" option in tool confirmation dialogs.                                                                                                                                                      | `false` |
 | Auto-add to Policy by Default         | `security.autoAddToPolicyByDefault`             | When enabled, the "Allow for all future sessions" option becomes the default choice for low-risk tools in trusted workspaces.                                                                                                        | `false` |
 | Blocks extensions from Git            | `security.blockGitExtensions`                   | Blocks installing and loading extensions from Git.                                                                                                                                                                                   | `false` |

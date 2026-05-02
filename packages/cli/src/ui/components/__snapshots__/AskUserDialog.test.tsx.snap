@@ -11,6 +11,17 @@ Enter to submit · Esc to cancel
 "
 `;
 
+exports[`AskUserDialog > Choice question placeholder > uses default placeholder when not provided 2`] = `
+"Select your preferred language:
+
+● 1.  TypeScript                                                                
+  2.  JavaScript
+  3.  Enter a custom value
+
+Enter to select · ↑/↓ to navigate · Esc to cancel
+"
+`;
+
 exports[`AskUserDialog > Choice question placeholder > uses placeholder for "Other" option when provided 1`] = `
 "Select your preferred language:
 
@@ -19,6 +30,17 @@ exports[`AskUserDialog > Choice question placeholder > uses placeholder for "Oth
 ● 3.  Type another language...                                                  
 
 Enter to submit · Esc to cancel
+"
+`;
+
+exports[`AskUserDialog > Choice question placeholder > uses placeholder for "Other" option when provided 2`] = `
+"Select your preferred language:
+
+● 1.  TypeScript                                                                
+  2.  JavaScript
+  3.  Type another language...
+
+Enter to select · ↑/↓ to navigate · Esc to cancel
 "
 `;
 

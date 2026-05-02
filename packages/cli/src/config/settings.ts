@@ -984,14 +984,129 @@ export function migrateDeprecatedSettings(
       }
     }
 
+    // Migrate model settings
+    const modelSettings = settings.model as Record<string, unknown> | undefined;
+    if (modelSettings) {
+      const newModel = { ...modelSettings };
+      let modified = false;
+
+      modified =
+        migrateBoolean(
+          newModel,
+          'disableLoopDetection',
+          'enableLoopDetection',
+          'model',
+          foundDeprecated,
+        ) || modified;
+      modified =
+        migrateBoolean(
+          newModel,
+          'skipNextSpeakerCheck',
+          'enableNextSpeakerCheck',
+          'model',
+          foundDeprecated,
+        ) || modified;
+
+      if (modified) {
+        loadedSettings.setValue(scope, 'model', newModel);
+        if (!settingsFile.readOnly) {
+          anyModified = true;
+        }
+      }
+    }
+
     // Migrate ui settings
     const uiSettings = settings.ui as Record<string, unknown> | undefined;
     if (uiSettings) {
       const newUi = { ...uiSettings };
+      let modified = false;
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const accessibilitySettings = newUi['accessibility'] as
         | Record<string, unknown>
         | undefined;
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      const footerSettings = newUi['footer'] as
+        | Record<string, unknown>
+        | undefined;
+
+      modified =
+        migrateBoolean(
+          newUi,
+          'hideWindowTitle',
+          'showWindowTitle',
+          'ui',
+          foundDeprecated,
+        ) || modified;
+      modified =
+        migrateBoolean(newUi, 'hideTips', 'showTips', 'ui', foundDeprecated) ||
+        modified;
+      modified =
+        migrateBoolean(
+          newUi,
+          'hideBanner',
+          'showBanner',
+          'ui',
+          foundDeprecated,
+        ) || modified;
+      modified =
+        migrateBoolean(
+          newUi,
+          'hideContextSummary',
+          'showContextSummary',
+          'ui',
+          foundDeprecated,
+        ) || modified;
+      modified =
+        migrateBoolean(
+          newUi,
+          'hideFooter',
+          'showFooter',
+          'ui',
+          foundDeprecated,
+        ) || modified;
+
+      if (footerSettings) {
+        const newFooter = { ...footerSettings };
+        let footerModified = false;
+
+        footerModified =
+          migrateBoolean(
+            newFooter,
+            'hideCWD',
+            'showCWD',
+            'ui.footer',
+            foundDeprecated,
+          ) || footerModified;
+        footerModified =
+          migrateBoolean(
+            newFooter,
+            'hideSandboxStatus',
+            'showSandboxStatus',
+            'ui.footer',
+            foundDeprecated,
+          ) || footerModified;
+        footerModified =
+          migrateBoolean(
+            newFooter,
+            'hideModelInfo',
+            'showModelInfo',
+            'ui.footer',
+            foundDeprecated,
+          ) || footerModified;
+        footerModified =
+          migrateBoolean(
+            newFooter,
+            'hideContextPercentage',
+            'showContextPercentage',
+            'ui.footer',
+            foundDeprecated,
+          ) || footerModified;
+
+        if (footerModified) {
+          newUi['footer'] = newFooter;
+          modified = true;
+        }
+      }
 
       if (accessibilitySettings) {
         const newAccessibility = { ...accessibilitySettings };
@@ -1005,10 +1120,7 @@ export function migrateDeprecatedSettings(
           )
         ) {
           newUi['accessibility'] = newAccessibility;
-          loadedSettings.setValue(scope, 'ui', newUi);
-          if (!settingsFile.readOnly) {
-            anyModified = true;
-          }
+          modified = true;
         }
 
         // Migrate enableLoadingPhrases: false → loadingPhrases: 'off'
@@ -1019,12 +1131,16 @@ export function migrateDeprecatedSettings(
         ) {
           if (!enableLP) {
             newUi['loadingPhrases'] = 'off';
-            loadedSettings.setValue(scope, 'ui', newUi);
-            if (!settingsFile.readOnly) {
-              anyModified = true;
-            }
+            modified = true;
           }
           foundDeprecated.push('ui.accessibility.enableLoadingPhrases');
+        }
+      }
+
+      if (modified) {
+        loadedSettings.setValue(scope, 'ui', newUi);
+        if (!settingsFile.readOnly) {
+          anyModified = true;
         }
       }
     }
@@ -1063,6 +1179,9 @@ export function migrateDeprecatedSettings(
     // Migrate tools settings
     const toolsSettings = settings.tools as Record<string, unknown> | undefined;
     if (toolsSettings) {
+      const newTools = { ...toolsSettings };
+      let modified = false;
+
       if (toolsSettings['approvalMode'] !== undefined) {
         foundDeprecated.push('tools.approvalMode');
 
@@ -1080,9 +1199,51 @@ export function migrateDeprecatedSettings(
         }
 
         if (removeDeprecated) {
-          const newTools = { ...toolsSettings };
           delete newTools['approvalMode'];
-          loadedSettings.setValue(scope, 'tools', newTools);
+          modified = true;
+        }
+      }
+
+      modified =
+        migrateBoolean(
+          newTools,
+          'disableLLMCorrection',
+          'enableLLMCorrection',
+          'tools',
+          foundDeprecated,
+        ) || modified;
+
+      if (modified) {
+        loadedSettings.setValue(scope, 'tools', newTools);
+        if (!settingsFile.readOnly) {
+          anyModified = true;
+        }
+      }
+    }
+
+    const agentsSettings = settings.agents as
+      | Record<string, unknown>
+      | undefined;
+    if (agentsSettings) {
+      const newAgents = { ...agentsSettings };
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      const browserSettings = newAgents['browser'] as
+        | Record<string, unknown>
+        | undefined;
+
+      if (browserSettings) {
+        const newBrowser = { ...browserSettings };
+        if (
+          migrateBoolean(
+            newBrowser,
+            'disableUserInput',
+            'enableUserInput',
+            'agents.browser',
+            foundDeprecated,
+          )
+        ) {
+          newAgents['browser'] = newBrowser;
+          loadedSettings.setValue(scope, 'agents', newAgents);
           if (!settingsFile.readOnly) {
             anyModified = true;
           }
@@ -1102,6 +1263,30 @@ export function migrateDeprecatedSettings(
     if (experimentalModified) {
       if (!settingsFile.readOnly) {
         anyModified = true;
+      }
+    }
+
+    const securitySettings = settings.security as
+      | Record<string, unknown>
+      | undefined;
+    if (securitySettings) {
+      const newSecurity = { ...securitySettings };
+      let modified = false;
+
+      modified =
+        migrateBoolean(
+          newSecurity,
+          'disableAlwaysAllow',
+          'enableAlwaysAllow',
+          'security',
+          foundDeprecated,
+        ) || modified;
+
+      if (modified) {
+        loadedSettings.setValue(scope, 'security', newSecurity);
+        if (!settingsFile.readOnly) {
+          anyModified = true;
+        }
       }
     }
 

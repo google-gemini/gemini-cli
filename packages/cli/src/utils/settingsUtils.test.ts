@@ -338,7 +338,7 @@ describe('SettingsUtils', () => {
       it('should return true for settings marked to show in dialog', () => {
         expect(shouldShowInDialog('ui.requiresRestart')).toBe(true);
         expect(shouldShowInDialog('general.vimMode')).toBe(true);
-        expect(shouldShowInDialog('ui.hideWindowTitle')).toBe(true);
+        expect(shouldShowInDialog('ui.showWindowTitle')).toBe(true);
       });
 
       it('should return false for settings marked to hide from dialog', () => {

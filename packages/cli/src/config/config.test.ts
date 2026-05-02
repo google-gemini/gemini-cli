@@ -3770,7 +3770,7 @@ describe('loadCliConfig secureModeEnabled', () => {
     );
   });
 
-  it('should set disableYoloMode to true when secureModeEnabled is true', async () => {
+  it('should disable YOLO mode when secureModeEnabled is true', async () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments(createTestMergedSettings());
     const settings = createTestMergedSettings({
@@ -3853,6 +3853,26 @@ describe('loadCliConfig mcpEnabled', () => {
     expect(config.getMcpServers()).toEqual({ serverA: { url: 'http://a' } });
     expect(config.getAllowedMcpServers()).toEqual(['serverA']);
     expect(config.getBlockedMcpServers()).toEqual(['serverB']);
+  });
+
+  describe('browser agent settings', () => {
+    it('should translate enableUserInput to the core browser config', async () => {
+      process.argv = ['node', 'script.js'];
+      const argv = await parseArguments(createTestMergedSettings());
+      const settings = createTestMergedSettings({
+        agents: {
+          browser: {
+            enableUserInput: true,
+          },
+        },
+      });
+
+      const config = await loadCliConfig(settings, 'test-session', argv);
+      const browserConfig = config.getBrowserAgentConfig();
+
+      expect(browserConfig.customConfig.disableUserInput).toBe(false);
+      expect(config.shouldDisableBrowserUserInput()).toBe(false);
+    });
   });
 
   describe('extension plan settings', () => {
