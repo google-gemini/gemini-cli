@@ -561,6 +561,36 @@ describe('resolveToRealPath', () => {
     expect(resolveToRealPath(input)).toBe(expected);
   });
 
+  it('should return input path even if fs.realpathSync fails with ENAMETOOLONG', () => {
+    // Regression test for #26010: pasting long strings that the at-mention
+    // regex misinterprets as a path must not throw an unhandled ENAMETOOLONG
+    // up to the caller.
+    vi.spyOn(fs, 'realpathSync').mockImplementationOnce(() => {
+      const err = new Error('name too long') as NodeJS.ErrnoException;
+      err.code = 'ENAMETOOLONG';
+      throw err;
+    });
+
+    const longInput = path.resolve('/tmp', 'a'.repeat(4096));
+
+    expect(resolveToRealPath(longInput)).toBe(longInput);
+  });
+
+  it('should return input path even if fs.realpathSync fails with ENOTDIR', () => {
+    // Regression test for #26010: an intermediate path component being a
+    // regular file (e.g. @path/to/file.json/extra) surfaces ENOTDIR from
+    // realpathSync — handle it the same way as a non-existent path.
+    vi.spyOn(fs, 'realpathSync').mockImplementationOnce(() => {
+      const err = new Error('not a directory') as NodeJS.ErrnoException;
+      err.code = 'ENOTDIR';
+      throw err;
+    });
+
+    const input = path.resolve('/tmp', 'file.json', 'extra');
+
+    expect(resolveToRealPath(input)).toBe(input);
+  });
+
   it('should recursively resolve symlinks for non-existent child paths', () => {
     const parentPath = path.resolve('/some/parent/path');
     const resolvedParentPath = path.resolve('/resolved/parent/path');

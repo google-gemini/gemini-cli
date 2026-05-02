@@ -412,6 +412,14 @@ export function resolveToRealPath(pathStr: string): string {
   return robustRealpath(path.resolve(resolvedPath));
 }
 
+function hasErrorCode(e: unknown, codes: readonly string[]): boolean {
+  if (!e || typeof e !== 'object' || !('code' in e)) {
+    return false;
+  }
+  const code = e.code;
+  return typeof code === 'string' && codes.includes(code);
+}
+
 function robustRealpath(p: string, visited = new Set<string>()): string {
   const key = process.platform === 'win32' ? p.toLowerCase() : p;
   if (visited.has(key)) {
@@ -421,12 +429,7 @@ function robustRealpath(p: string, visited = new Set<string>()): string {
   try {
     return fs.realpathSync(p);
   } catch (e: unknown) {
-    if (
-      e &&
-      typeof e === 'object' &&
-      'code' in e &&
-      (e.code === 'ENOENT' || e.code === 'EISDIR')
-    ) {
+    if (hasErrorCode(e, ['ENOENT', 'EISDIR'])) {
       try {
         const stat = fs.lstatSync(p);
         if (stat.isSymbolicLink()) {
@@ -437,20 +440,21 @@ function robustRealpath(p: string, visited = new Set<string>()): string {
       } catch (lstatError: unknown) {
         // Not a symlink, or lstat failed. Re-throw if it's not an expected
         // ENOENT (e.g., a permissions error), otherwise resolve parent.
-        if (
-          !(
-            lstatError &&
-            typeof lstatError === 'object' &&
-            'code' in lstatError &&
-            (lstatError.code === 'ENOENT' || lstatError.code === 'EISDIR')
-          )
-        ) {
+        if (!hasErrorCode(lstatError, ['ENOENT', 'EISDIR'])) {
           throw lstatError;
         }
       }
       const parent = path.dirname(p);
       if (parent === p) return p;
       return path.join(robustRealpath(parent, visited), path.basename(p));
+    }
+    if (hasErrorCode(e, ['ENAMETOOLONG', 'ENOTDIR'])) {
+      // The input is not a resolvable real path — for example a caller
+      // is probing whether a pasted string is a file reference (see the
+      // @-mention path parsing in atCommandProcessor). Returning the
+      // input unchanged lets downstream fileExists / fs.stat calls
+      // reject it normally instead of surfacing an unhandled rejection.
+      return p;
     }
     throw e;
   }
