@@ -196,6 +196,8 @@ export const AGENT_TOOL_NAME = 'invoke_agent';
 
 // Tool Display Names
 export const WRITE_FILE_DISPLAY_NAME = 'WriteFile';
+export const RESTORE_FILE_TOOL_NAME = 'restore_file';
+export const RESTORE_FILE_DISPLAY_NAME = 'RestoreFile';
 export const EDIT_DISPLAY_NAME = 'Edit';
 export const ASK_USER_DISPLAY_NAME = 'Ask User';
 export const READ_FILE_DISPLAY_NAME = 'ReadFile';

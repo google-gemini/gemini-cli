@@ -52,6 +52,10 @@ import { detectOmissionPlaceholders } from './omissionPlaceholderDetector.js';
 import { resolveAndValidatePlanPath } from '../utils/planUtils.js';
 import { isGemini3Model } from '../config/models.js';
 import { discoverJitContext, appendJitContext } from './jit-context.js';
+import {
+  handlePreWriteBackup,
+  makeBackupVersionMessage,
+} from './file-backup.js';
 
 /**
  * Parameters for the WriteFile tool
@@ -340,6 +344,17 @@ class WriteFileToolInvocation extends BaseToolInvocation<
         finalContent = finalContent.replace(/\r?\n/g, '\r\n');
       }
 
+      const backupOutcome = await handlePreWriteBackup(
+        this.config,
+        this.resolvedPath,
+        isNewFile,
+        originalContent,
+      );
+      if ('errorResult' in backupOutcome) {
+        return backupOutcome.errorResult;
+      }
+      const backupVersion = backupOutcome.backupVersion;
+
       await this.config
         .getFileSystemService()
         .writeTextFile(this.resolvedPath, finalContent);
@@ -381,14 +396,24 @@ class WriteFileToolInvocation extends BaseToolInvocation<
         );
       }
 
-      // Return a diff of the file before and after the write so that the agent
-      // can avoid the need to spend a turn doing a verification read.
+      // Return a diff of the file before and after the write to allow
+      // avoiding a redundant verification read.
       const snippet = getDiffContextSnippet(
         isNewFile ? '' : originalContent,
         finalContent,
         5,
       );
       llmSuccessMessageParts.push(`Here is the updated code:\n${snippet}`);
+
+      if (backupVersion !== null) {
+        llmSuccessMessageParts.push(
+          makeBackupVersionMessage(
+            backupVersion,
+            this.resolvedPath,
+            this.config,
+          ),
+        );
+      }
 
       // Log file operation for telemetry (without diff_stat to avoid double-counting)
       const mimetype = getSpecificMimeType(this.resolvedPath);
