@@ -318,6 +318,7 @@ export class LoadedSettings {
     workspace: SettingsFile,
     isTrusted: boolean,
     errors: SettingsError[] = [],
+    workspaceDir: string,
   ) {
     this.system = system;
     this.systemDefaults = systemDefaults;
@@ -328,21 +329,23 @@ export class LoadedSettings {
       ? workspace
       : this.createEmptyWorkspace(workspace);
     this.errors = errors;
+    this._workspaceDir = workspaceDir;
     this._merged = this.computeMergedSettings();
     this._snapshot = this.computeSnapshot();
   }
 
-  readonly system: SettingsFile;
-  readonly systemDefaults: SettingsFile;
-  readonly user: SettingsFile;
+  system: SettingsFile;
+  systemDefaults: SettingsFile;
+  user: SettingsFile;
   workspace: SettingsFile;
   isTrusted: boolean;
-  readonly errors: SettingsError[];
+  errors: SettingsError[];
 
   private _workspaceFile: SettingsFile;
   private _merged: MergedSettings;
   private _snapshot: LoadedSettingsSnapshot;
   private _remoteAdminSettings: Partial<Settings> | undefined;
+  private _workspaceDir: string;
 
   get merged(): MergedSettings {
     return this._merged;
@@ -497,6 +500,30 @@ export class LoadedSettings {
 
     this._remoteAdminSettings = { admin };
     this._merged = this.computeMergedSettings();
+  }
+
+  /**
+   * Updates this instance with data from another instance.
+   * This preserves the object identity of this instance while refreshing its content.
+   */
+  updateFrom(other: LoadedSettings): void {
+    this.system = other.system;
+    this.systemDefaults = other.systemDefaults;
+    this.user = other.user;
+    this._workspaceFile = other._workspaceFile;
+    this.isTrusted = other.isTrusted;
+    this.workspace = other.workspace;
+    this.errors = [...other.errors];
+    this._merged = this.computeMergedSettings();
+    this._snapshot = this.computeSnapshot();
+    coreEvents.emitSettingsChanged();
+  }
+
+  /**
+   * Reloads settings from disk for the current workspace.
+   */
+  reload(): void {
+    this.updateFrom(loadSettings(this._workspaceDir));
   }
 }
 
@@ -888,6 +915,7 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
     },
     isTrusted,
     settingsErrors,
+    workspaceDir,
   );
 
   // Automatically migrate deprecated settings when loading.
