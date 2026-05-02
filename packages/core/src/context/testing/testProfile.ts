@@ -9,6 +9,7 @@ import type { ContextEnvironment } from '../pipeline/environment.js';
 import { createHistoryTruncationProcessor } from '../processors/historyTruncationProcessor.js';
 
 export const testTruncateProfile: ContextProfile = {
+  name: 'Test Truncate',
   config: {
     budget: {
       retainedTokens: 65000,

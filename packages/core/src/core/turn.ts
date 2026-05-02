@@ -409,7 +409,11 @@ export class Turn {
   ): ServerGeminiStreamEvent | null {
     const name = fnCall.name || 'undefined_tool_name';
     const args = fnCall.args || {};
-    const callId = fnCall.id ?? `${name}_${Date.now()}_${this.callCounter++}`;
+    const callId =
+      fnCall.id ??
+      (this.chat.context.config.isContextManagementEnabled()
+        ? `synth_${this.prompt_id}_${Date.now()}_${this.callCounter++}`
+        : `${name}_${Date.now()}_${this.callCounter++}`);
 
     const toolCallRequest: ToolCallRequestInfo = {
       callId,

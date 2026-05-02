@@ -1127,18 +1127,21 @@ Logging in with Google... Restarting Gemini CLI to continue.
     }
   }, [config, historyManager]);
 
-  const cancelHandlerRef = useRef<(shouldRestorePrompt?: boolean) => void>(
-    () => {},
-  );
+  const cancelHandlerRef = useRef<
+    (shouldRestorePrompt?: boolean, clearBuffer?: boolean) => void
+  >(() => {});
 
-  const onCancelSubmit = useCallback((shouldRestorePrompt?: boolean) => {
-    if (shouldRestorePrompt) {
-      setPendingRestorePrompt(true);
-    } else {
-      setPendingRestorePrompt(false);
-      cancelHandlerRef.current(false);
-    }
-  }, []);
+  const onCancelSubmit = useCallback(
+    (shouldRestorePrompt?: boolean, clearBuffer: boolean = false) => {
+      if (shouldRestorePrompt) {
+        setPendingRestorePrompt(true);
+      } else {
+        setPendingRestorePrompt(false);
+        cancelHandlerRef.current(false, clearBuffer);
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     if (pendingRestorePrompt) {
@@ -1321,18 +1324,18 @@ Logging in with Google... Restarting Gemini CLI to continue.
   });
 
   cancelHandlerRef.current = useCallback(
-    (shouldRestorePrompt: boolean = true) => {
-      if (isToolAwaitingConfirmation(pendingHistoryItems)) {
+    (shouldRestorePrompt: boolean = true, clearBuffer: boolean = false) => {
+      if (!clearBuffer && isToolAwaitingConfirmation(pendingHistoryItems)) {
         return; // Don't clear - user may be composing a follow-up message
       }
-      if (isToolExecuting(pendingHistoryItems)) {
-        buffer.setText(''); // Clear for Ctrl+C cancellation
-        return;
-      }
 
-      // If cancelling (shouldRestorePrompt=false), never modify the buffer
-      // User is in control - preserve whatever text they typed, pasted, or restored
+      // If cancelling (shouldRestorePrompt=false):
       if (!shouldRestorePrompt) {
+        // Clear the buffer if explicitly requested (e.g., Ctrl+C)
+        if (clearBuffer) {
+          buffer.setText('');
+        }
+        // Otherwise (e.g., Escape), user is in control - preserve whatever text they typed
         return;
       }
 
