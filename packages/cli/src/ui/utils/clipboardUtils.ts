@@ -31,6 +31,14 @@ export const IMAGE_EXTENSIONS = [
 /** Matches strings that start with a path prefix (/, ~, ., Windows drive letter, or UNC path) */
 const PATH_PREFIX_PATTERN = /^([/~.]|[a-zA-Z]:|\\\\)/;
 
+// Detect WSL2 via environment variables set by the WSL2 init system.
+const isWSL = (): boolean =>
+  Boolean(
+    process.env['WSL_DISTRO_NAME'] ||
+      process.env['WSLENV'] ||
+      process.env['WSL_INTEROP'],
+  );
+
 // Track which tool works on Linux to avoid redundant checks/failures
 let linuxClipboardTool: 'wl-paste' | 'xclip' | null = null;
 
@@ -163,6 +171,21 @@ async function checkXclipForImage() {
  */
 export async function clipboardHasImage(): Promise<boolean> {
   if (process.platform === 'linux') {
+    // WSL2: use Windows clipboard via PowerShell interop
+    if (isWSL()) {
+      try {
+        const { stdout } = await spawnAsync('powershell.exe', [
+          '-NoProfile',
+          '-Command',
+          'Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.Clipboard]::ContainsImage()',
+        ]);
+        return stdout.trim() === 'True';
+      } catch (error) {
+        debugLogger.warn('Error checking WSL clipboard for image:', error);
+        return false;
+      }
+    }
+
     const tool = getUserLinuxClipboardTool();
     if (tool === 'wl-paste') {
       if (await checkWlPasteForImage()) return true;
@@ -281,6 +304,45 @@ export async function saveClipboardImage(
 
     if (process.platform === 'linux') {
       const tempFilePath = path.join(tempDir, `clipboard-${timestamp}.png`);
+
+      // WSL2: save via PowerShell interop
+      if (isWSL()) {
+        try {
+          // Convert Linux path to Windows path for PowerShell
+          const { stdout: winPath } = await spawnAsync('wslpath', [
+            '-w',
+            tempFilePath,
+          ]);
+          const psPath = winPath.trim().replace(/'/g, "''");
+
+          const script = `
+            Add-Type -AssemblyName System.Windows.Forms
+            Add-Type -AssemblyName System.Drawing
+            if ([System.Windows.Forms.Clipboard]::ContainsImage()) {
+              $image = [System.Windows.Forms.Clipboard]::GetImage()
+              $image.Save('${psPath}', [System.Drawing.Imaging.ImageFormat]::Png)
+              Write-Output "success"
+            }
+          `;
+
+          const { stdout } = await spawnAsync('powershell.exe', [
+            '-NoProfile',
+            '-Command',
+            script,
+          ]);
+
+          if (stdout.trim() === 'success') {
+            const stats = await fs.stat(tempFilePath);
+            if (stats.size > 0) {
+              return tempFilePath;
+            }
+          }
+        } catch (error) {
+          debugLogger.warn('Error saving WSL clipboard image:', error);
+        }
+        return null;
+      }
+
       const tool = getUserLinuxClipboardTool();
 
       if (tool === 'wl-paste') {

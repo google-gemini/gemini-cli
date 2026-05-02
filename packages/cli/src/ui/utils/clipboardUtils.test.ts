@@ -190,6 +190,70 @@ describe('clipboardUtils', () => {
     });
   });
 
+  describe('clipboardHasImage (WSL2)', () => {
+    beforeEach(() => {
+      mockPlatform('linux');
+      process.env['WSL_DISTRO_NAME'] = 'Ubuntu';
+    });
+
+    afterEach(() => {
+      delete process.env['WSL_DISTRO_NAME'];
+    });
+
+    it('should return true when PowerShell reports image in clipboard', async () => {
+      vi.mocked(spawnAsync).mockResolvedValueOnce({
+        stdout: 'True\n',
+        stderr: '',
+      });
+
+      const result = await clipboardUtils.clipboardHasImage();
+
+      expect(result).toBe(true);
+      expect(spawnAsync).toHaveBeenCalledWith('powershell.exe', [
+        '-NoProfile',
+        '-Command',
+        'Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.Clipboard]::ContainsImage()',
+      ]);
+    });
+
+    it('should return false when PowerShell reports no image', async () => {
+      vi.mocked(spawnAsync).mockResolvedValueOnce({
+        stdout: 'False\n',
+        stderr: '',
+      });
+
+      const result = await clipboardUtils.clipboardHasImage();
+
+      expect(result).toBe(false);
+    });
+
+    it('should return false when powershell.exe is not available', async () => {
+      vi.mocked(spawnAsync).mockRejectedValueOnce(
+        new Error('spawn powershell.exe ENOENT'),
+      );
+
+      const result = await clipboardUtils.clipboardHasImage();
+
+      expect(result).toBe(false);
+    });
+
+    it('should not fall through to native Linux clipboard tools', async () => {
+      vi.mocked(spawnAsync).mockResolvedValueOnce({
+        stdout: 'False\n',
+        stderr: '',
+      });
+
+      await clipboardUtils.clipboardHasImage();
+
+      // Should only call powershell.exe, never wl-paste or xclip
+      expect(spawnAsync).toHaveBeenCalledTimes(1);
+      expect(spawnAsync).toHaveBeenCalledWith(
+        'powershell.exe',
+        expect.any(Array),
+      );
+    });
+  });
+
   describe('saveClipboardImage (Linux)', () => {
     const mockTargetDir = '/tmp/target';
     const mockTempDir = path.join('/tmp/global', 'images');
@@ -343,6 +407,117 @@ describe('clipboardUtils', () => {
       const result = await clipboardUtils.saveClipboardImage(mockTargetDir);
       expect(result).toBe(null);
       expect(spawn).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('saveClipboardImage (WSL2)', () => {
+    const mockTargetDir = '/tmp/target';
+    const mockTempDir = path.join('/tmp/global', 'images');
+
+    beforeEach(() => {
+      mockPlatform('linux');
+      process.env['WSL_DISTRO_NAME'] = 'Ubuntu';
+      vi.mocked(fs.mkdir).mockResolvedValue(undefined);
+    });
+
+    afterEach(() => {
+      delete process.env['WSL_DISTRO_NAME'];
+    });
+
+    it('should save image via PowerShell interop with wslpath conversion', async () => {
+      // Mock wslpath conversion
+      vi.mocked(spawnAsync).mockResolvedValueOnce({
+        stdout:
+          '\\\\wsl.localhost\\Ubuntu\\tmp\\global\\images\\clipboard-123.png\n',
+        stderr: '',
+      });
+      // Mock PowerShell save
+      vi.mocked(spawnAsync).mockResolvedValueOnce({
+        stdout: 'success\n',
+        stderr: '',
+      });
+      // Mock fs.stat
+      vi.mocked(fs.stat).mockResolvedValue({
+        size: 100,
+      } as unknown as import('node:fs').Stats);
+
+      const result = await clipboardUtils.saveClipboardImage(mockTargetDir);
+
+      expect(result).toContain(mockTempDir);
+      expect(result).toMatch(/clipboard-\d+\.png$/);
+      expect(spawnAsync).toHaveBeenCalledWith('wslpath', [
+        '-w',
+        expect.stringContaining('clipboard-'),
+      ]);
+      expect(spawnAsync).toHaveBeenCalledWith('powershell.exe', [
+        '-NoProfile',
+        '-Command',
+        expect.stringContaining('Save'),
+      ]);
+    });
+
+    it('should return null when PowerShell does not output success', async () => {
+      vi.mocked(spawnAsync).mockResolvedValueOnce({
+        stdout: '\\\\wsl.localhost\\Ubuntu\\tmp\\test.png\n',
+        stderr: '',
+      });
+      vi.mocked(spawnAsync).mockResolvedValueOnce({
+        stdout: '',
+        stderr: '',
+      });
+
+      const result = await clipboardUtils.saveClipboardImage(mockTargetDir);
+
+      expect(result).toBe(null);
+    });
+
+    it('should return null when wslpath fails', async () => {
+      vi.mocked(spawnAsync).mockRejectedValueOnce(
+        new Error('spawn wslpath ENOENT'),
+      );
+
+      const result = await clipboardUtils.saveClipboardImage(mockTargetDir);
+
+      expect(result).toBe(null);
+    });
+
+    it('should return null when saved file is empty', async () => {
+      vi.mocked(spawnAsync).mockResolvedValueOnce({
+        stdout: '\\\\wsl.localhost\\Ubuntu\\tmp\\test.png\n',
+        stderr: '',
+      });
+      vi.mocked(spawnAsync).mockResolvedValueOnce({
+        stdout: 'success\n',
+        stderr: '',
+      });
+      vi.mocked(fs.stat).mockResolvedValue({
+        size: 0,
+      } as unknown as import('node:fs').Stats);
+
+      const result = await clipboardUtils.saveClipboardImage(mockTargetDir);
+
+      expect(result).toBe(null);
+    });
+
+    it('should escape single quotes in Windows path for PowerShell', async () => {
+      vi.mocked(spawnAsync).mockResolvedValueOnce({
+        stdout: "\\\\wsl.localhost\\Ubuntu\\tmp\\User's Files\\test.png\n",
+        stderr: '',
+      });
+      vi.mocked(spawnAsync).mockResolvedValueOnce({
+        stdout: 'success\n',
+        stderr: '',
+      });
+      vi.mocked(fs.stat).mockResolvedValue({
+        size: 100,
+      } as unknown as import('node:fs').Stats);
+
+      await clipboardUtils.saveClipboardImage(mockTargetDir);
+
+      const psCall = vi.mocked(spawnAsync).mock.calls[1];
+      const script = psCall[1][2];
+      // Single quotes should be doubled for PowerShell escaping
+      expect(script).toContain("User''s Files");
     });
   });
 
