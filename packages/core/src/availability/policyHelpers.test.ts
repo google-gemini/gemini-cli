@@ -94,13 +94,18 @@ describe('policyHelpers', () => {
       expect(chain[1]?.model).toBe('gemini-2.5-flash');
     });
 
-    it('starts chain from preferredModel when model is "auto"', () => {
+    it('wraps chain when preferredModel is concrete and configured is auto', () => {
+      // When Auto mode routes to a concrete model (e.g. router picks Flash),
+      // the chain must wrap so the failed model has a fallback candidate.
+      // Without wrap, chain collapses to [Flash] and quota exhaustion has no
+      // fallback target.
       const config = createMockConfig({
         getModel: () => DEFAULT_GEMINI_MODEL_AUTO,
       });
       const chain = resolvePolicyChain(config, 'gemini-2.5-flash');
-      expect(chain).toHaveLength(1);
+      expect(chain).toHaveLength(2);
       expect(chain[0]?.model).toBe('gemini-2.5-flash');
+      expect(chain[1]?.model).toBe('gemini-2.5-pro');
     });
 
     it('returns flash-lite chain when preferred model is flash-lite', () => {
@@ -180,6 +185,76 @@ describe('policyHelpers', () => {
       expect(chain[0]?.actions).toEqual(SILENT_ACTIONS);
       expect(chain[1]?.actions).toEqual(SILENT_ACTIONS);
     });
+
+    describe('auto-mode quota failover (Flash → Flash Lite swap)', () => {
+      const FLASH = 'gemini-2.5-flash';
+      const FLASH_LITE = DEFAULT_GEMINI_FLASH_LITE_MODEL;
+      const PRO = 'gemini-2.5-pro';
+
+      const createConfigWithAvailability = (
+        getModelImpl: () => string,
+        availabilityMap: Record<string, { available: boolean }>,
+      ): Config =>
+        createMockConfig({
+          getModel: getModelImpl,
+          getModelAvailabilityService: () =>
+            ({
+              snapshot: (m: string) => availabilityMap[m],
+            }) as unknown as ReturnType<Config['getModelAvailabilityService']>,
+        });
+
+      it('swaps Flash for Flash Lite (with silent actions) when configured is auto and Flash is unavailable', () => {
+        const config = createConfigWithAvailability(
+          () => DEFAULT_GEMINI_MODEL_AUTO,
+          { [FLASH]: { available: false } },
+        );
+        const chain = resolvePolicyChain(config, FLASH);
+
+        // Chain length must be preserved for legacy/dynamic CI parity.
+        expect(chain).toHaveLength(2);
+        // After swap, the head of the chain is Flash Lite (silent), and the
+        // wrap-around tail is Pro (reachable as a further fallback).
+        expect(chain[0]?.model).toBe(FLASH_LITE);
+        expect(chain[0]?.actions).toEqual(SILENT_ACTIONS);
+        expect(chain[1]?.model).toBe(PRO);
+      });
+
+      it('does not swap Flash when it is still available', () => {
+        const config = createConfigWithAvailability(
+          () => DEFAULT_GEMINI_MODEL_AUTO,
+          { [FLASH]: { available: true } },
+        );
+        const chain = resolvePolicyChain(config, FLASH);
+
+        expect(chain).toHaveLength(2);
+        expect(chain[0]?.model).toBe(FLASH);
+        expect(chain[1]?.model).toBe(PRO);
+      });
+
+      it('does not swap Flash when not in auto mode (explicit Flash selection)', () => {
+        const config = createConfigWithAvailability(() => FLASH, {
+          [FLASH]: { available: false },
+        });
+        const chain = resolvePolicyChain(config, FLASH);
+
+        // Without auto mode, chain stays as the user explicitly requested.
+        expect(chain[0]?.model).toBe(FLASH);
+      });
+
+      it('does not duplicate Flash Lite if it is already in the chain', () => {
+        // When the configured model is already flash-lite, the chain is
+        // [Lite, Flash, Pro]. Flash being unavailable should not cause a
+        // second Lite to be inserted.
+        const config = createConfigWithAvailability(
+          () => DEFAULT_GEMINI_FLASH_LITE_MODEL,
+          { [FLASH]: { available: false } },
+        );
+        const chain = resolvePolicyChain(config);
+
+        const liteCount = chain.filter((p) => p.model === FLASH_LITE).length;
+        expect(liteCount).toBe(1);
+      });
+    });
   });
 
   describe('resolvePolicyChain behavior is identical between dynamic and legacy implementations', () => {
@@ -211,11 +286,29 @@ describe('policyHelpers', () => {
         model: DEFAULT_GEMINI_MODEL_AUTO,
         wrapsAround: true,
       },
+      {
+        name: 'Quota Failover Parity (Flash Unavailable)',
+        model: DEFAULT_GEMINI_MODEL_AUTO,
+        flashAvailable: false,
+      },
     ];
 
     testCases.forEach(
-      ({ name, model, useGemini31, hasAccess, authType, wrapsAround }) => {
+      ({
+        name,
+        model,
+        useGemini31,
+        hasAccess,
+        authType,
+        wrapsAround,
+        flashAvailable,
+      }) => {
         it(`achieves parity for: ${name}`, () => {
+          const availabilityMap: Record<string, { available: boolean }> =
+            flashAvailable === false
+              ? { 'gemini-2.5-flash': { available: false } }
+              : {};
+
           const createBaseConfig = (dynamic: boolean) =>
             createMockConfig({
               getExperimentalDynamicModelConfiguration: () => dynamic,
@@ -225,6 +318,12 @@ describe('policyHelpers', () => {
               getHasAccessToPreviewModel: () => hasAccess ?? true,
               getContentGeneratorConfig: () => ({ authType }),
               modelConfigService: new ModelConfigService(DEFAULT_MODEL_CONFIGS),
+              getModelAvailabilityService: () =>
+                ({
+                  snapshot: (m: string) => availabilityMap[m],
+                }) as unknown as ReturnType<
+                  Config['getModelAvailabilityService']
+                >,
             });
 
           const legacyChain = resolvePolicyChain(

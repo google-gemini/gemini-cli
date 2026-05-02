@@ -22,7 +22,9 @@ import {
 } from './policyCatalog.js';
 import {
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
+  DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_MODEL,
+  PREVIEW_GEMINI_FLASH_MODEL,
   PREVIEW_GEMINI_MODEL_AUTO,
   isAutoModel,
   isGemini3Model,
@@ -64,6 +66,12 @@ export function resolvePolicyChain(
     ? isAutoModel(preferredModel, config)
     : false;
   const isAutoConfigured = isAutoModel(configuredModel, config);
+
+  // Auto mode must always wrap chains so fallback candidates remain available
+  // when the router resolves to a non-primary model (e.g. Flash). Without this,
+  // applyDynamicSlicing reduces the chain to a single element and there is
+  // nowhere to fall back to when that model hits its quota.
+  const shouldWrapAround = wrapsAround || isAutoPreferred || isAutoConfigured;
 
   // --- DYNAMIC PATH ---
   if (config.getExperimentalDynamicModelConfiguration?.() === true) {
@@ -110,7 +118,7 @@ export function resolvePolicyChain(
       // No matching modelChains found, default to single model chain
       chain = createSingleModelChain(modelFromConfig);
     }
-    chain = applyDynamicSlicing(chain, resolvedModel, wrapsAround);
+    chain = applyDynamicSlicing(chain, resolvedModel, shouldWrapAround);
   } else {
     // --- LEGACY PATH ---
 
@@ -150,8 +158,52 @@ export function resolvePolicyChain(
     } else {
       chain = createSingleModelChain(modelFromConfig);
     }
-    chain = applyDynamicSlicing(chain, resolvedModel, wrapsAround);
+    chain = applyDynamicSlicing(chain, resolvedModel, shouldWrapAround);
   }
+
+  // --- AUTO MODE QUOTA FAILOVER ---
+  // In Auto mode, if Flash sits in the chain but its quota is already known to
+  // be exhausted, swap that slot for Flash Lite (independent quota) and mark
+  // the swapped policy as silent so subsequent failures fall back without
+  // prompting the user. Chain length is preserved to keep CI parity between
+  // the legacy and dynamic chain paths.
+  if (
+    (isAutoPreferred || isAutoConfigured) &&
+    typeof config.getModelAvailabilityService === 'function'
+  ) {
+    const availability = config.getModelAvailabilityService?.();
+    const flashIndex = chain.findIndex(
+      (p) =>
+        p.model === DEFAULT_GEMINI_FLASH_MODEL ||
+        p.model === PREVIEW_GEMINI_FLASH_MODEL,
+    );
+    if (flashIndex !== -1) {
+      const inChainFlash = chain[flashIndex].model;
+      const liteModel = resolveModel(
+        'flash-lite',
+        useGemini31,
+        useGemini31FlashLite,
+        useCustomToolModel,
+        hasAccessToPreview,
+        config,
+      );
+      const liteAlreadyInChain = chain.some((p) => p.model === liteModel);
+      const flashSnapshot = availability?.snapshot?.(inChainFlash);
+      if (!liteAlreadyInChain && flashSnapshot?.available === false) {
+        chain = chain.map((policy, idx) =>
+          idx === flashIndex
+            ? {
+                ...policy,
+                model: liteModel,
+                actions: { ...SILENT_ACTIONS },
+                stateTransitions: { ...policy.stateTransitions },
+              }
+            : policy,
+        );
+      }
+    }
+  }
+
   // Apply Unified Silent Injection for Plan Mode with defensive checks
   if (config?.getApprovalMode?.() === ApprovalMode.PLAN) {
     return chain.map((policy) => ({
