@@ -889,6 +889,63 @@ describe('ToolRegistry', () => {
       expect(description).toBe(JSON.stringify(params));
     });
   });
+
+  describe('tool limiting', () => {
+    it('should limit tools to 128 and prioritize built-in tools', async () => {
+      const config = new Config({ targetDir: '/tmp' } as any);
+      const registry = new ToolRegistry(config, mockMessageBusForHelper, true);
+
+      // Add 150 tools: 30 built-in, 120 MCP tools across 2 servers
+      for (let i = 0; i < 30; i++) {
+        const tool = new MockTool({
+          name: `builtin_${i}`,
+          description: `Built-in tool ${i}`,
+        });
+        registry.registerTool(tool);
+      }
+
+      for (let i = 0; i < 60; i++) {
+        const tool = createMCPTool(
+          'server1',
+          `mcp1_${i}`,
+          `MCP 1 tool ${i}`,
+          createMockCallableTool([{ name: `mcp1_${i}`, description: '' }]),
+        );
+        registry.registerTool(tool);
+      }
+
+      for (let i = 0; i < 60; i++) {
+        const tool = createMCPTool(
+          'server2',
+          `mcp2_${i}`,
+          `MCP 2 tool ${i}`,
+          createMockCallableTool([{ name: `mcp2_${i}`, description: '' }]),
+        );
+        registry.registerTool(tool);
+      }
+
+      const declarations = registry.getFunctionDeclarations();
+      expect(declarations.length).toBe(128);
+
+      // Verify built-in tools are present
+      for (let i = 0; i < 30; i++) {
+        expect(
+          declarations.some((d) => d.name && d.name === `builtin_${i}`),
+        ).toBe(true);
+      }
+
+      // Verify MCP tools are fairly distributed (approx 49 each from server1 and server2)
+      // 128 total - 30 built-in = 98 MCP slots. 98 / 2 = 49 per server.
+      const s1Count = declarations.filter(
+        (d) => d.name && d.name.includes('mcp1_'),
+      ).length;
+      const s2Count = declarations.filter(
+        (d) => d.name && d.name.includes('mcp2_'),
+      ).length;
+      expect(s1Count).toBe(49);
+      expect(s2Count).toBe(49);
+    });
+  });
 });
 
 /**
