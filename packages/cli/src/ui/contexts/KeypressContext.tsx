@@ -133,6 +133,7 @@ const KITTY_CODE_MAP: Record<number, { name: string; sequence?: string }> = {
   3: { name: 'delete' },
   5: { name: 'pageup' },
   6: { name: 'pagedown' },
+  8: { name: 'backspace' },
   9: { name: 'tab' },
   13: { name: 'enter' },
   14: { name: 'up' },
@@ -652,8 +653,12 @@ function* emitKeys(
       // tab
       name = 'tab';
       alt = escaped;
-    } else if (ch === '\b' || ch === '\x7f') {
-      // backspace or ctrl+h
+    } else if (ch === '\b') {
+      // ctrl+h / ctrl+backspace (windows terminals send \x08 for ctrl+backspace)
+      name = 'backspace';
+      alt = escaped;
+    } else if (ch === '\x7f') {
+      // backspace
       name = 'backspace';
       alt = escaped;
     } else if (ch === ESC) {
