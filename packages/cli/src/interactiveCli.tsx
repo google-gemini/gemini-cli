@@ -35,6 +35,7 @@ import type { LoadedSettings } from './config/settings.js';
 import { checkForUpdates } from './ui/utils/updateCheck.js';
 import { handleAutoUpdate } from './utils/handleAutoUpdate.js';
 import { SettingsContext } from './ui/contexts/SettingsContext.js';
+import { ConfigContext } from './ui/contexts/ConfigContext.js';
 import { MouseProvider } from './ui/contexts/MouseContext.js';
 import { StreamingState } from './ui/types.js';
 import { computeTerminalTitle } from './utils/windowTitle.js';
@@ -104,29 +105,31 @@ export async function startInteractiveUI(
 
     return (
       <SettingsContext.Provider value={settings}>
-        <KeyMatchersProvider value={matchers}>
-          <KeypressProvider config={config}>
-            <MouseProvider mouseEventsEnabled={mouseEventsEnabled}>
-              <TerminalProvider>
-                <ScrollProvider>
-                  <OverflowProvider>
-                    <SessionStatsProvider sessionId={config.getSessionId()}>
-                      <VimModeProvider>
-                        <AppContainer
-                          config={config}
-                          startupWarnings={startupWarnings}
-                          version={version}
-                          resumedSessionData={resumedSessionData}
-                          initializationResult={initializationResult}
-                        />
-                      </VimModeProvider>
-                    </SessionStatsProvider>
-                  </OverflowProvider>
-                </ScrollProvider>
-              </TerminalProvider>
-            </MouseProvider>
-          </KeypressProvider>
-        </KeyMatchersProvider>
+        <ConfigContext.Provider value={config}>
+          <KeyMatchersProvider value={matchers}>
+            <KeypressProvider config={config}>
+              <MouseProvider mouseEventsEnabled={mouseEventsEnabled}>
+                <TerminalProvider>
+                  <ScrollProvider>
+                    <OverflowProvider>
+                      <SessionStatsProvider sessionId={config.getSessionId()}>
+                        <VimModeProvider>
+                          <AppContainer
+                            config={config}
+                            startupWarnings={startupWarnings}
+                            version={version}
+                            resumedSessionData={resumedSessionData}
+                            initializationResult={initializationResult}
+                          />
+                        </VimModeProvider>
+                      </SessionStatsProvider>
+                    </OverflowProvider>
+                  </ScrollProvider>
+                </TerminalProvider>
+              </MouseProvider>
+            </KeypressProvider>
+          </KeyMatchersProvider>
+        </ConfigContext.Provider>
       </SettingsContext.Provider>
     );
   };

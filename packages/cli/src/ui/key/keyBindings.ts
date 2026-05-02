@@ -116,6 +116,10 @@ export enum Command {
   DUMP_FRAME = 'app.dumpFrame',
   START_RECORDING = 'app.startRecording',
   STOP_RECORDING = 'app.stopRecording',
+
+  // Model Controls
+  CYCLE_MODELS_FORWARD = 'model.cycleForward',
+  CYCLE_MODELS_BACKWARD = 'model.cycleBackward',
 }
 
 /**
@@ -374,7 +378,7 @@ export const defaultKeyBindingConfig: KeyBindingConfig = new Map([
     Command.OPEN_EXTERNAL_EDITOR,
     [new KeyBinding('ctrl+g'), new KeyBinding('ctrl+shift+g')],
   ],
-  [Command.DEPRECATED_OPEN_EXTERNAL_EDITOR, [new KeyBinding('ctrl+x')]],
+  [Command.DEPRECATED_OPEN_EXTERNAL_EDITOR, []],
   [
     Command.PASTE_CLIPBOARD,
     [
@@ -402,6 +406,10 @@ export const defaultKeyBindingConfig: KeyBindingConfig = new Map([
   [Command.SUSPEND_APP, [new KeyBinding('ctrl+z')]],
   [Command.SHOW_SHELL_INPUT_UNFOCUS_WARNING, [new KeyBinding('tab')]],
   [Command.VOICE_MODE_PTT, [new KeyBinding('space')]],
+
+  // Model Controls
+  [Command.CYCLE_MODELS_FORWARD, [new KeyBinding('ctrl+x')]],
+  [Command.CYCLE_MODELS_BACKWARD, [new KeyBinding('ctrl+shift+x')]],
 
   // Background Shell Controls
   [Command.BACKGROUND_SHELL_ESCAPE, [new KeyBinding('escape')]],
@@ -557,6 +565,10 @@ export const commandCategories: readonly CommandCategory[] = [
     title: 'Extension Controls',
     commands: [Command.UPDATE_EXTENSION, Command.LINK_EXTENSION],
   },
+  {
+    title: 'Model Controls',
+    commands: [Command.CYCLE_MODELS_FORWARD, Command.CYCLE_MODELS_BACKWARD],
+  },
 ];
 
 /**
@@ -679,6 +691,10 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.DUMP_FRAME]: 'Dump the current frame as a snapshot.',
   [Command.START_RECORDING]: 'Start recording the session.',
   [Command.STOP_RECORDING]: 'Stop recording the session.',
+
+  // Model Controls
+  [Command.CYCLE_MODELS_FORWARD]: 'Cycle to the next favorite model.',
+  [Command.CYCLE_MODELS_BACKWARD]: 'Cycle to the previous favorite model.',
 };
 
 const keybindingsSchema = z.array(
