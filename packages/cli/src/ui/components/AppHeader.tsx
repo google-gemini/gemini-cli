@@ -166,6 +166,14 @@ export const AppHeader = ({ version, showDetails = true }: AppHeaderProps) => {
         />
       )}
 
+      {showHeader && (
+        <Box paddingLeft={2} marginTop={1}>
+          <Text italic color={theme.text.secondary}>
+            Welcome to Gemini CLI!
+          </Text>
+        </Box>
+      )}
+
       {!(settings.merged.ui.hideTips || config.getScreenReader()) &&
         showTips && <Tips config={config} />}
     </Box>
