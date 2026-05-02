@@ -143,6 +143,7 @@
     "yargs": "^17.7.2"
   },
   "dependencies": {
+    "https-proxy-agent": "^7.0.6",
     "ink": "npm:@jrichman/ink@6.6.9",
     "latest-version": "^9.0.0",
     "node-fetch-native": "^1.6.7",

@@ -125,4 +125,16 @@ if (existsSync(extensionExamplesSrc)) {
   console.log('Copied extension examples to bundle/examples/');
 }
 
+// 8. Copy https-proxy-agent for external dynamic import resolution (proxy support)
+const proxyAgentPkgs = ['https-proxy-agent', 'agent-base', 'debug', 'ms'];
+for (const pkg of proxyAgentPkgs) {
+  const pkgSrc = join(root, 'node_modules', pkg);
+  const pkgDest = join(bundleDir, 'node_modules', pkg);
+  if (existsSync(pkgSrc)) {
+    mkdirSync(pkgDest, { recursive: true });
+    cpSync(pkgSrc, pkgDest, { recursive: true, dereference: true });
+    console.log(`Copied ${pkg} to bundle/node_modules/`);
+  }
+}
+
 console.log('Assets copied to bundle/');
