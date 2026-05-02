@@ -12,7 +12,11 @@ import { ContextTracer } from '../tracer.js';
 import { ContextEnvironmentImpl } from '../pipeline/environmentImpl.js';
 import { ContextEventBus } from '../eventBus.js';
 import { PipelineOrchestrator } from '../pipeline/orchestrator.js';
-import type { ConcreteNode, ToolExecution } from '../graph/types.js';
+import {
+  type ConcreteNode,
+  type ToolExecution,
+  NodeType,
+} from '../graph/types.js';
 import type { ContextEnvironment } from '../pipeline/environment.js';
 import type { Config } from '../../config/config.js';
 import type { BaseLlmClient } from '../../core/baseLlmClient.js';
@@ -37,57 +41,56 @@ export const createMockGenerateContentResponse = (
   }) as GenerateContentResponse;
 
 export function createDummyNode(
-  logicalParentId: string,
-  type: ConcreteNode['type'],
-  tokens = 100,
+  turnId: string,
+  type: NodeType,
+  _tokens = 100,
   overrides?: Partial<ConcreteNode>,
   id?: string,
 ): ConcreteNode {
+  const role =
+    type === NodeType.USER_PROMPT ||
+    type === NodeType.SYSTEM_EVENT ||
+    type === NodeType.SNAPSHOT ||
+    type === NodeType.ROLLING_SUMMARY
+      ? 'user'
+      : 'model';
+
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   return {
     id: id || randomUUID(),
-    episodeId: logicalParentId,
-    logicalParentId,
+    turnId,
     type,
     timestamp: Date.now(),
-    text: `Dummy ${type}`,
-    name: type === 'SYSTEM_EVENT' ? 'dummy_event' : undefined,
-    payload: type === 'SYSTEM_EVENT' ? {} : undefined,
-    semanticParts: [],
-    metadata: {
-      originalTokens: tokens,
-      currentTokens: tokens,
-      transformations: [],
-    },
+    role,
+    payload: { text: `Dummy ${type}` },
     ...overrides,
   } as unknown as ConcreteNode;
 }
 
 export function createDummyToolNode(
-  logicalParentId: string,
-  intentTokens = 100,
-  obsTokens = 200,
+  turnId: string,
+  _intentTokens = 100,
+  _obsTokens = 200,
   overrides?: Partial<ToolExecution>,
   id?: string,
 ): ToolExecution {
+  // We don't distinguish between call and response here, but ToolExecution nodes in 1:1 map to ONE part.
+  // Tests using this usually want to simulate a tool interaction.
+  // For simplicity, we'll make this a 'model' tool call by default.
+
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   return {
     id: id || randomUUID(),
-    episodeId: logicalParentId,
-    logicalParentId,
-    type: 'TOOL_EXECUTION',
+    turnId,
+    type: NodeType.TOOL_EXECUTION,
     timestamp: Date.now(),
-    toolName: 'dummy_tool',
-    intent: { action: 'test' },
-    observation: { result: 'ok' },
-    tokens: {
-      intent: intentTokens,
-      observation: obsTokens,
-    },
-    metadata: {
-      originalTokens: intentTokens + obsTokens,
-      currentTokens: intentTokens + obsTokens,
-      transformations: [],
+    role: 'model',
+    payload: {
+      functionCall: {
+        name: 'dummy_tool',
+        args: { action: 'test' },
+        id: id || 'dummy_id',
+      },
     },
     ...overrides,
   } as unknown as ToolExecution;
@@ -145,8 +148,8 @@ export function createMockEnvironment(
   });
   const eventBus = new ContextEventBus();
 
-  const env = new ContextEnvironmentImpl(
-    llmClient,
+  let env = new ContextEnvironmentImpl(
+    () => llmClient as BaseLlmClient,
     'mock-session',
     'mock-prompt-id',
     '/tmp/.gemini/trace',
@@ -157,7 +160,20 @@ export function createMockEnvironment(
   );
 
   if (overrides) {
-    Object.assign(env, overrides);
+    if (overrides.llmClient) {
+      env = new ContextEnvironmentImpl(
+        () => overrides.llmClient!,
+        env.sessionId,
+        env.promptId,
+        env.traceDir,
+        env.projectTempDir,
+        env.tracer,
+        env.charsPerToken,
+        env.eventBus,
+      );
+    }
+    const { llmClient: _llmClient, ...restOverrides } = overrides;
+    Object.assign(env, restOverrides);
   }
   return env;
 }
@@ -247,7 +263,7 @@ export function setupContextComponentTest(
   });
   const eventBus = new ContextEventBus();
   const env = new ContextEnvironmentImpl(
-    config.getBaseLlmClient(),
+    () => config.getBaseLlmClient(),
     'test prompt-id',
     'test-session',
     '/tmp',

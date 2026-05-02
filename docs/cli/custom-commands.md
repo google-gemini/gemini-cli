@@ -34,6 +34,7 @@ separator (`/` or `\`) being converted to a colon (`:`).
 > [!TIP]
 > After creating or modifying `.toml` command files, run
 > `/commands reload` to pick up your changes without restarting the CLI.
+> To see all available command files, run `/commands list`.
 
 ## TOML file format (v1)
 

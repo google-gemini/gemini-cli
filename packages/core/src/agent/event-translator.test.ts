@@ -378,7 +378,7 @@ describe('translateEvent', () => {
       expect(err.type).toBe('error');
       expect(err.fatal).toBe(false);
       expect(err._meta?.['code']).toBe('AGENT_EXECUTION_BLOCKED');
-      expect(err.message).toBe('Agent execution blocked: Policy violation');
+      expect(err.message).toBe('Policy violation');
     });
 
     it('uses systemMessage in the final error message when available', () => {
@@ -393,9 +393,7 @@ describe('translateEvent', () => {
       };
       const result = translateEvent(event, state);
       const err = result[0] as AgentEvent<'error'>;
-      expect(err.message).toBe(
-        'Agent execution blocked: Blocked by policy hook',
-      );
+      expect(err.message).toBe('Blocked by policy hook');
     });
   });
 

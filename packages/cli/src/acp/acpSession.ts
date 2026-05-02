@@ -1,575 +1,70 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
 import {
-  type Config,
-  type GeminiChat,
-  type ToolResult,
-  type ToolCallConfirmationDetails,
-  type FilterFilesOptions,
+  type ApprovalMode,
   type ConversationRecord,
   CoreToolCallStatus,
-  AuthType,
+  coreEvents,
+  CoreEvent,
+  type ApprovalModeChangedPayload,
   logToolCall,
   convertToFunctionResponse,
   ToolConfirmationOutcome,
-  clearCachedCredentialFile,
-  isNodeError,
-  getErrorMessage,
-  isWithinRoot,
   getErrorStatus,
-  MCPServerConfig,
   DiscoveredMCPTool,
-  StreamEventType,
   ToolCallEvent,
   debugLogger,
   ReadManyFilesTool,
-  REFERENCE_CONTENT_START,
-  type RoutingContext,
-  createWorkingStdio,
-  startupProfiler,
-  Kind,
   partListUnionToString,
-  LlmRole,
-  ApprovalMode,
-  getVersion,
-  convertSessionToClientHistory,
-  DEFAULT_GEMINI_MODEL,
-  DEFAULT_GEMINI_FLASH_MODEL,
-  DEFAULT_GEMINI_FLASH_LITE_MODEL,
-  PREVIEW_GEMINI_MODEL,
-  PREVIEW_GEMINI_3_1_MODEL,
-  PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL,
-  PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
-  PREVIEW_GEMINI_FLASH_MODEL,
-  DEFAULT_GEMINI_MODEL_AUTO,
-  PREVIEW_GEMINI_MODEL_AUTO,
-  getDisplayString,
-  processSingleFileContent,
-  InvalidStreamError,
   type AgentLoopContext,
   updatePolicy,
+  getErrorMessage,
+  type FilterFilesOptions,
+  isTextPart,
+  GeminiEventType,
+  type ToolCallRequestInfo,
+  type GeminiChat,
+  type ToolResult,
+  isWithinRoot,
+  processSingleFileContent,
+  isNodeError,
+  REFERENCE_CONTENT_START,
+  InvalidStreamError,
 } from '@google/gemini-cli-core';
 import * as acp from '@agentclientprotocol/sdk';
-import { AcpFileSystemService } from './fileSystemService.js';
-import { getAcpErrorMessage } from './acpErrors.js';
-import { Readable, Writable } from 'node:stream';
-
-function hasMeta(obj: unknown): obj is { _meta?: Record<string, unknown> } {
-  return typeof obj === 'object' && obj !== null && '_meta' in obj;
-}
-import type { Content, Part, FunctionCall } from '@google/genai';
-import {
-  SettingScope,
-  loadSettings,
-  type LoadedSettings,
-} from '../config/settings.js';
-import { createPolicyUpdater } from '../config/policy.js';
+import type { Part, FunctionCall } from '@google/genai';
+import type { LoadedSettings } from '../config/settings.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import { z } from 'zod';
-
 import { randomUUID } from 'node:crypto';
-import { loadCliConfig, type CliArgs } from '../config/config.js';
-import { runExitCleanup } from '../utils/cleanup.js';
-import { SessionSelector } from '../utils/sessionUtils.js';
-import { startAutoMemoryIfEnabled } from '../utils/autoMemory.js';
+import { CommandHandler } from './acpCommandHandler.js';
+import {
+  toToolCallContent,
+  toPermissionOptions,
+  toAcpToolKind,
+  buildAvailableModes,
+  RequestPermissionResponseSchema,
+} from './acpUtils.js';
+import { z } from 'zod';
+import { getAcpErrorMessage } from './acpErrors.js';
 
-import { CommandHandler } from './commandHandler.js';
-
-const RequestPermissionResponseSchema = z.object({
-  outcome: z.discriminatedUnion('outcome', [
-    z.object({ outcome: z.literal('cancelled') }),
-    z.object({
-      outcome: z.literal('selected'),
-      optionId: z.string(),
-    }),
-  ]),
+const StructuredErrorSchema = z.object({
+  status: z.number().optional(),
+  message: z.string().optional(),
 });
-
-export async function runAcpClient(
-  config: Config,
-  settings: LoadedSettings,
-  argv: CliArgs,
-) {
-  // ... (skip unchanged lines) ...
-
-  const { stdout: workingStdout } = createWorkingStdio();
-  const stdout = Writable.toWeb(workingStdout) as WritableStream;
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-  const stdin = Readable.toWeb(process.stdin) as ReadableStream<Uint8Array>;
-
-  const stream = acp.ndJsonStream(stdout, stdin);
-  const connection = new acp.AgentSideConnection(
-    (connection) => new GeminiAgent(config, settings, argv, connection),
-    stream,
-  );
-
-  // SIGTERM/SIGINT handlers (in sdk.ts) don't fire when stdin closes.
-  // We must explicitly await the connection close to flush telemetry.
-  // Use finally() to ensure cleanup runs even on stream errors.
-  await connection.closed.finally(runExitCleanup);
-}
-
-export class GeminiAgent {
-  private static callIdCounter = 0;
-
-  static generateCallId(name: string): string {
-    return `${name}-${Date.now()}-${++GeminiAgent.callIdCounter}`;
-  }
-
-  private sessions: Map<string, Session> = new Map();
-  private clientCapabilities: acp.ClientCapabilities | undefined;
-  private apiKey: string | undefined;
-  private baseUrl: string | undefined;
-  private customHeaders: Record<string, string> | undefined;
-
-  constructor(
-    private context: AgentLoopContext,
-    private settings: LoadedSettings,
-    private argv: CliArgs,
-    private connection: acp.AgentSideConnection,
-  ) {}
-
-  async initialize(
-    args: acp.InitializeRequest,
-  ): Promise<acp.InitializeResponse> {
-    this.clientCapabilities = args.clientCapabilities;
-
-    const authMethods = [
-      {
-        id: AuthType.LOGIN_WITH_GOOGLE,
-        name: 'Log in with Google',
-        description: 'Log in with your Google account',
-      },
-      {
-        id: AuthType.USE_GEMINI,
-        name: 'Gemini API key',
-        description: 'Use an API key with Gemini Developer API',
-        _meta: {
-          'api-key': {
-            provider: 'google',
-          },
-        },
-      },
-      {
-        id: AuthType.USE_VERTEX_AI,
-        name: 'Vertex AI',
-        description: 'Use an API key with Vertex AI GenAI API',
-      },
-      {
-        id: AuthType.GATEWAY,
-        name: 'AI API Gateway',
-        description: 'Use a custom AI API Gateway',
-        _meta: {
-          gateway: {
-            protocol: 'google',
-            restartRequired: 'false',
-          },
-        },
-      },
-    ];
-
-    await this.context.config.initialize();
-    const version = await getVersion();
-    return {
-      protocolVersion: acp.PROTOCOL_VERSION,
-      authMethods,
-      agentInfo: {
-        name: 'gemini-cli',
-        title: 'Gemini CLI',
-        version,
-      },
-      agentCapabilities: {
-        loadSession: true,
-        promptCapabilities: {
-          image: true,
-          audio: true,
-          embeddedContext: true,
-        },
-        mcpCapabilities: {
-          http: true,
-          sse: true,
-        },
-      },
-    };
-  }
-
-  async authenticate(req: acp.AuthenticateRequest): Promise<void> {
-    const { methodId } = req;
-    const method = z.nativeEnum(AuthType).parse(methodId);
-    const selectedAuthType = this.settings.merged.security.auth.selectedType;
-
-    // Only clear credentials when switching to a different auth method
-    if (selectedAuthType && selectedAuthType !== method) {
-      await clearCachedCredentialFile();
-    }
-    // Check for api-key in _meta
-    const meta = hasMeta(req) ? req._meta : undefined;
-    const apiKey =
-      typeof meta?.['api-key'] === 'string' ? meta['api-key'] : undefined;
-
-    // Refresh auth with the requested method
-    // This will reuse existing credentials if they're valid,
-    // or perform new authentication if needed
-    try {
-      if (apiKey) {
-        this.apiKey = apiKey;
-      }
-
-      // Extract gateway details if present
-      const gatewaySchema = z.object({
-        baseUrl: z.string().optional(),
-        headers: z.record(z.string()).optional(),
-      });
-
-      let baseUrl: string | undefined;
-      let headers: Record<string, string> | undefined;
-
-      if (meta?.['gateway']) {
-        const result = gatewaySchema.safeParse(meta['gateway']);
-        if (result.success) {
-          baseUrl = result.data.baseUrl;
-          headers = result.data.headers;
-        } else {
-          throw new acp.RequestError(
-            -32602,
-            `Malformed gateway payload: ${result.error.message}`,
-          );
-        }
-      }
-
-      this.baseUrl = baseUrl;
-      this.customHeaders = headers;
-
-      await this.context.config.refreshAuth(
-        method,
-        apiKey ?? this.apiKey,
-        baseUrl,
-        headers,
-      );
-    } catch (e) {
-      throw new acp.RequestError(-32000, getAcpErrorMessage(e));
-    }
-    this.settings.setValue(
-      SettingScope.User,
-      'security.auth.selectedType',
-      method,
-    );
-  }
-
-  async newSession({
-    cwd,
-    mcpServers,
-  }: acp.NewSessionRequest): Promise<acp.NewSessionResponse> {
-    const sessionId = randomUUID();
-    const loadedSettings = loadSettings(cwd);
-    const config = await this.newSessionConfig(
-      sessionId,
-      cwd,
-      mcpServers,
-      loadedSettings,
-    );
-
-    const authType =
-      loadedSettings.merged.security.auth.selectedType || AuthType.USE_GEMINI;
-
-    let isAuthenticated = false;
-    let authErrorMessage = '';
-    try {
-      await config.refreshAuth(
-        authType,
-        this.apiKey,
-        this.baseUrl,
-        this.customHeaders,
-      );
-      isAuthenticated = true;
-
-      // Extra validation for Gemini API key
-      const contentGeneratorConfig = config.getContentGeneratorConfig();
-      if (
-        authType === AuthType.USE_GEMINI &&
-        (!contentGeneratorConfig || !contentGeneratorConfig.apiKey)
-      ) {
-        isAuthenticated = false;
-        authErrorMessage = 'Gemini API key is missing or not configured.';
-      }
-    } catch (e) {
-      isAuthenticated = false;
-      authErrorMessage = getAcpErrorMessage(e);
-      debugLogger.error(
-        `Authentication failed: ${e instanceof Error ? e.stack : e}`,
-      );
-    }
-
-    if (!isAuthenticated) {
-      throw new acp.RequestError(
-        -32000,
-        authErrorMessage || 'Authentication required.',
-      );
-    }
-
-    if (this.clientCapabilities?.fs) {
-      const acpFileSystemService = new AcpFileSystemService(
-        this.connection,
-        sessionId,
-        this.clientCapabilities.fs,
-        config.getFileSystemService(),
-        cwd,
-      );
-      config.setFileSystemService(acpFileSystemService);
-    }
-
-    await config.initialize();
-    startupProfiler.flush(config);
-    startAutoMemoryIfEnabled(config);
-
-    const geminiClient = config.getGeminiClient();
-    const chat = await geminiClient.startChat();
-
-    const session = new Session(
-      sessionId,
-      chat,
-      config,
-      this.connection,
-      this.settings,
-    );
-    this.sessions.set(sessionId, session);
-
-    setTimeout(() => {
-      // eslint-disable-next-line @typescript-eslint/no-floating-promises
-      session.sendAvailableCommands();
-    }, 0);
-
-    const { availableModels, currentModelId } = buildAvailableModels(
-      config,
-      loadedSettings,
-    );
-
-    const response = {
-      sessionId,
-      modes: {
-        availableModes: buildAvailableModes(config.isPlanEnabled()),
-        currentModeId: config.getApprovalMode(),
-      },
-      models: {
-        availableModels,
-        currentModelId,
-      },
-    };
-    return response;
-  }
-
-  async loadSession({
-    sessionId,
-    cwd,
-    mcpServers,
-  }: acp.LoadSessionRequest): Promise<acp.LoadSessionResponse> {
-    const config = await this.initializeSessionConfig(
-      sessionId,
-      cwd,
-      mcpServers,
-    );
-
-    const sessionSelector = new SessionSelector(config.storage);
-    const { sessionData, sessionPath } =
-      await sessionSelector.resolveSession(sessionId);
-
-    const clientHistory = convertSessionToClientHistory(sessionData.messages);
-
-    const geminiClient = config.getGeminiClient();
-    await geminiClient.initialize();
-    await geminiClient.resumeChat(clientHistory, {
-      conversation: sessionData,
-      filePath: sessionPath,
-    });
-
-    const session = new Session(
-      sessionId,
-      geminiClient.getChat(),
-      config,
-      this.connection,
-      this.settings,
-    );
-    this.sessions.set(sessionId, session);
-
-    // Stream history back to client
-    // eslint-disable-next-line @typescript-eslint/no-floating-promises
-    session.streamHistory(sessionData.messages);
-
-    setTimeout(() => {
-      // eslint-disable-next-line @typescript-eslint/no-floating-promises
-      session.sendAvailableCommands();
-    }, 0);
-
-    const { availableModels, currentModelId } = buildAvailableModels(
-      config,
-      this.settings,
-    );
-
-    const response = {
-      modes: {
-        availableModes: buildAvailableModes(config.isPlanEnabled()),
-        currentModeId: config.getApprovalMode(),
-      },
-      models: {
-        availableModels,
-        currentModelId,
-      },
-    };
-    return response;
-  }
-
-  private async initializeSessionConfig(
-    sessionId: string,
-    cwd: string,
-    mcpServers: acp.McpServer[],
-  ): Promise<Config> {
-    const selectedAuthType = this.settings.merged.security.auth.selectedType;
-    if (!selectedAuthType) {
-      throw acp.RequestError.authRequired();
-    }
-
-    // 1. Create config WITHOUT initializing it (no MCP servers started yet)
-    const config = await this.newSessionConfig(sessionId, cwd, mcpServers);
-
-    // 2. Authenticate BEFORE initializing configuration or starting MCP servers.
-    // This satisfies the security requirement to verify the user before executing
-    // potentially unsafe server definitions.
-    try {
-      await config.refreshAuth(
-        selectedAuthType,
-        this.apiKey,
-        this.baseUrl,
-        this.customHeaders,
-      );
-    } catch (e) {
-      debugLogger.error(`Authentication failed: ${e}`);
-      throw acp.RequestError.authRequired();
-    }
-
-    // 3. Set the ACP FileSystemService (if supported) before config initialization
-    if (this.clientCapabilities?.fs) {
-      const acpFileSystemService = new AcpFileSystemService(
-        this.connection,
-        sessionId,
-        this.clientCapabilities.fs,
-        config.getFileSystemService(),
-        cwd,
-      );
-      config.setFileSystemService(acpFileSystemService);
-    }
-
-    // 4. Now that we are authenticated, it is safe to initialize the config
-    // which starts the MCP servers and other heavy resources.
-    await config.initialize();
-    startupProfiler.flush(config);
-    startAutoMemoryIfEnabled(config);
-
-    return config;
-  }
-
-  async newSessionConfig(
-    sessionId: string,
-    cwd: string,
-    mcpServers: acp.McpServer[],
-    loadedSettings?: LoadedSettings,
-  ): Promise<Config> {
-    const currentSettings = loadedSettings || this.settings;
-    const mergedMcpServers = { ...currentSettings.merged.mcpServers };
-
-    for (const server of mcpServers) {
-      if (
-        'type' in server &&
-        (server.type === 'sse' || server.type === 'http')
-      ) {
-        // HTTP or SSE MCP server
-        const headers = Object.fromEntries(
-          server.headers.map(({ name, value }) => [name, value]),
-        );
-        mergedMcpServers[server.name] = new MCPServerConfig(
-          undefined, // command
-          undefined, // args
-          undefined, // env
-          undefined, // cwd
-          server.type === 'sse' ? server.url : undefined, // url (sse)
-          server.type === 'http' ? server.url : undefined, // httpUrl
-          headers,
-        );
-      } else if ('command' in server) {
-        // Stdio MCP server
-        const env: Record<string, string> = {};
-        for (const { name: envName, value } of server.env) {
-          env[envName] = value;
-        }
-        mergedMcpServers[server.name] = new MCPServerConfig(
-          server.command,
-          server.args,
-          env,
-          cwd,
-        );
-      }
-    }
-
-    const settings = {
-      ...currentSettings.merged,
-      mcpServers: mergedMcpServers,
-    };
-
-    const config = await loadCliConfig(settings, sessionId, this.argv, { cwd });
-
-    createPolicyUpdater(
-      config.getPolicyEngine(),
-      config.messageBus,
-      config.storage,
-    );
-
-    return config;
-  }
-
-  async cancel(params: acp.CancelNotification): Promise<void> {
-    const session = this.sessions.get(params.sessionId);
-    if (!session) {
-      throw new Error(`Session not found: ${params.sessionId}`);
-    }
-    await session.cancelPendingPrompt();
-  }
-
-  async prompt(params: acp.PromptRequest): Promise<acp.PromptResponse> {
-    const session = this.sessions.get(params.sessionId);
-    if (!session) {
-      throw new Error(`Session not found: ${params.sessionId}`);
-    }
-    return session.prompt(params);
-  }
-
-  async setSessionMode(
-    params: acp.SetSessionModeRequest,
-  ): Promise<acp.SetSessionModeResponse> {
-    const session = this.sessions.get(params.sessionId);
-    if (!session) {
-      throw new Error(`Session not found: ${params.sessionId}`);
-    }
-    return session.setMode(params.modeId);
-  }
-
-  async unstable_setSessionModel(
-    params: acp.SetSessionModelRequest,
-  ): Promise<acp.SetSessionModelResponse> {
-    const session = this.sessions.get(params.sessionId);
-    if (!session) {
-      throw new Error(`Session not found: ${params.sessionId}`);
-    }
-    return session.setModel(params.modelId);
-  }
-}
 
 export class Session {
   private pendingPrompt: AbortController | null = null;
   private commandHandler = new CommandHandler();
+  private callIdCounter = 0;
+
+  private generateCallId(name: string): string {
+    return `${name}-${Date.now()}-${++this.callIdCounter}`;
+  }
 
   constructor(
     private readonly id: string,
@@ -577,7 +72,31 @@ export class Session {
     private readonly context: AgentLoopContext,
     private readonly connection: acp.AgentSideConnection,
     private readonly settings: LoadedSettings,
-  ) {}
+  ) {
+    coreEvents.on(
+      CoreEvent.ApprovalModeChanged,
+      this.handleApprovalModeChanged,
+    );
+  }
+
+  private handleApprovalModeChanged = (payload: ApprovalModeChangedPayload) => {
+    if (payload.sessionId === this.id) {
+      void this.sendUpdate({
+        sessionUpdate: 'agent_message_chunk',
+        content: {
+          type: 'text',
+          text: `[MODE_UPDATE] ${payload.mode}`,
+        },
+      });
+    }
+  };
+
+  dispose(): void {
+    coreEvents.off(
+      CoreEvent.ApprovalModeChanged,
+      this.handleApprovalModeChanged,
+    );
+  }
 
   async cancelPendingPrompt(): Promise<void> {
     if (!this.pendingPrompt) {
@@ -700,7 +219,6 @@ export class Session {
     await this.context.config.waitForMcpInit();
 
     const promptId = Math.random().toString(16).slice(2);
-    const chat = this.chat;
 
     const parts = await this.#resolvePrompt(params.prompt, pendingSend.signal);
 
@@ -709,13 +227,10 @@ export class Session {
 
     for (const part of parts) {
       if (typeof part === 'object' && part !== null) {
-        if ('text' in part) {
+        if (isTextPart(part)) {
           // It is a text part
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-type-assertion
-          const text = (part as any).text;
-          if (typeof text === 'string') {
-            commandText += text;
-          }
+          const text = part.text;
+          commandText += text;
         } else {
           // Non-text part (image, embedded resource)
           // Stop looking for command
@@ -751,100 +266,125 @@ export class Session {
     let totalOutputTokens = 0;
     const modelUsageMap = new Map<string, { input: number; output: number }>();
 
-    let nextMessage: Content | null = { role: 'user', parts };
+    let currentParts: Part[] = parts;
+    let turnCount = 0;
+    const maxTurns = this.context.config.getMaxSessionTurns();
 
-    while (nextMessage !== null) {
-      if (pendingSend.signal.aborted) {
-        chat.addHistory(nextMessage);
-        return { stopReason: CoreToolCallStatus.Cancelled };
+    while (true) {
+      turnCount++;
+      if (maxTurns >= 0 && turnCount > maxTurns) {
+        return {
+          stopReason: 'max_turn_requests',
+          _meta: {
+            quota: {
+              token_count: {
+                input_tokens: totalInputTokens,
+                output_tokens: totalOutputTokens,
+              },
+              model_usage: Array.from(modelUsageMap.entries()).map(
+                ([modelName, counts]) => ({
+                  model: modelName,
+                  token_count: {
+                    input_tokens: counts.input,
+                    output_tokens: counts.output,
+                  },
+                }),
+              ),
+            },
+          },
+        };
       }
 
-      const functionCalls: FunctionCall[] = [];
+      if (pendingSend.signal.aborted) {
+        return { stopReason: 'cancelled' };
+      }
+
+      const toolCallRequests: ToolCallRequestInfo[] = [];
+      let stopReason: acp.StopReason = 'end_turn';
+      let turnModelId = this.context.config.getModel();
+      let turnInputTokens = 0;
+      let turnOutputTokens = 0;
 
       try {
-        const routingContext: RoutingContext = {
-          history: chat.getHistory(/*curated=*/ true),
-          request: nextMessage?.parts ?? [],
-          signal: pendingSend.signal,
-          requestedModel: this.context.config.getModel(),
-        };
-
-        const router = this.context.config.getModelRouterService();
-        const { model } = await router.route(routingContext);
-        const responseStream = await chat.sendMessageStream(
-          { model },
-          nextMessage?.parts ?? [],
-          promptId,
+        const responseStream = this.context.geminiClient.sendMessageStream(
+          currentParts,
           pendingSend.signal,
-          LlmRole.MAIN,
+          promptId,
         );
-        nextMessage = null;
 
-        let turnInputTokens = 0;
-        let turnOutputTokens = 0;
-        let turnModelId = model;
-
-        for await (const resp of responseStream) {
+        for await (const event of responseStream) {
           if (pendingSend.signal.aborted) {
-            return { stopReason: CoreToolCallStatus.Cancelled };
+            return { stopReason: 'cancelled' };
           }
 
-          if (resp.type === StreamEventType.CHUNK && resp.value.usageMetadata) {
-            turnInputTokens =
-              resp.value.usageMetadata.promptTokenCount ?? turnInputTokens;
-            turnOutputTokens =
-              resp.value.usageMetadata.candidatesTokenCount ?? turnOutputTokens;
-            if (resp.value.modelVersion) {
-              turnModelId = resp.value.modelVersion;
-            }
-          }
-
-          if (
-            resp.type === StreamEventType.CHUNK &&
-            resp.value.candidates &&
-            resp.value.candidates.length > 0
-          ) {
-            const candidate = resp.value.candidates[0];
-            for (const part of candidate.content?.parts ?? []) {
-              if (!part.text) {
-                continue;
-              }
-
+          switch (event.type) {
+            case GeminiEventType.Content: {
               const content: acp.ContentBlock = {
                 type: 'text',
-                text: part.text,
+                text: event.value,
               };
 
-              // eslint-disable-next-line @typescript-eslint/no-floating-promises
-              this.sendUpdate({
-                sessionUpdate: part.thought
-                  ? 'agent_thought_chunk'
-                  : 'agent_message_chunk',
+              await this.sendUpdate({
+                sessionUpdate: 'agent_message_chunk',
                 content,
               });
+              break;
             }
+
+            case GeminiEventType.Thought: {
+              const thoughtText = `**${event.value.subject}**\n${event.value.description}`;
+              await this.sendUpdate({
+                sessionUpdate: 'agent_thought_chunk',
+                content: { type: 'text', text: thoughtText },
+              });
+              break;
+            }
+
+            case GeminiEventType.ToolCallRequest:
+              toolCallRequests.push(event.value);
+              break;
+
+            case GeminiEventType.Finished: {
+              const usage = event.value.usageMetadata;
+              if (usage) {
+                turnInputTokens = usage.promptTokenCount ?? turnInputTokens;
+                turnOutputTokens =
+                  usage.candidatesTokenCount ?? turnOutputTokens;
+              }
+              break;
+            }
+
+            case GeminiEventType.ModelInfo:
+              turnModelId = event.value;
+              break;
+
+            case GeminiEventType.MaxSessionTurns:
+              stopReason = 'max_turn_requests';
+              break;
+
+            case GeminiEventType.LoopDetected:
+              stopReason = 'max_turn_requests';
+              break;
+
+            case GeminiEventType.ContextWindowWillOverflow:
+              stopReason = 'max_tokens';
+              break;
+
+            case GeminiEventType.Error: {
+              const parseResult = StructuredErrorSchema.safeParse(
+                event.value.error,
+              );
+              const errData = parseResult.success ? parseResult.data : {};
+
+              throw new acp.RequestError(
+                errData.status ?? 500,
+                errData.message ?? 'Unknown stream execution error.',
+              );
+            }
+
+            default:
+              break;
           }
-
-          if (resp.type === StreamEventType.CHUNK && resp.value.functionCalls) {
-            functionCalls.push(...resp.value.functionCalls);
-          }
-        }
-
-        totalInputTokens += turnInputTokens;
-        totalOutputTokens += turnOutputTokens;
-
-        if (turnInputTokens > 0 || turnOutputTokens > 0) {
-          const existing = modelUsageMap.get(turnModelId) ?? {
-            input: 0,
-            output: 0,
-          };
-          existing.input += turnInputTokens;
-          existing.output += turnOutputTokens;
-          modelUsageMap.set(turnModelId, existing);
-        }
-
-        if (pendingSend.signal.aborted) {
-          return { stopReason: CoreToolCallStatus.Cancelled };
         }
       } catch (error) {
         if (getErrorStatus(error) === 429) {
@@ -858,7 +398,11 @@ export class Session {
           pendingSend.signal.aborted ||
           (error instanceof Error && error.name === 'AbortError')
         ) {
-          return { stopReason: CoreToolCallStatus.Cancelled };
+          return { stopReason: 'cancelled' };
+        }
+
+        if (error instanceof acp.RequestError) {
+          throw error;
         }
 
         if (
@@ -901,16 +445,59 @@ export class Session {
         );
       }
 
-      if (functionCalls.length > 0) {
-        const toolResponseParts: Part[] = [];
+      totalInputTokens += turnInputTokens;
+      totalOutputTokens += turnOutputTokens;
 
-        for (const fc of functionCalls) {
-          const response = await this.runTool(pendingSend.signal, promptId, fc);
-          toolResponseParts.push(...response);
-        }
-
-        nextMessage = { role: 'user', parts: toolResponseParts };
+      if (turnInputTokens > 0 || turnOutputTokens > 0) {
+        const existing = modelUsageMap.get(turnModelId) ?? {
+          input: 0,
+          output: 0,
+        };
+        existing.input += turnInputTokens;
+        existing.output += turnOutputTokens;
+        modelUsageMap.set(turnModelId, existing);
       }
+
+      if (stopReason !== 'end_turn') {
+        return {
+          stopReason,
+          _meta: {
+            quota: {
+              token_count: {
+                input_tokens: totalInputTokens,
+                output_tokens: totalOutputTokens,
+              },
+              model_usage: Array.from(modelUsageMap.entries()).map(
+                ([modelName, counts]) => ({
+                  model: modelName,
+                  token_count: {
+                    input_tokens: counts.input,
+                    output_tokens: counts.output,
+                  },
+                }),
+              ),
+            },
+          },
+        };
+      }
+
+      if (toolCallRequests.length === 0) {
+        break;
+      }
+
+      const toolResponseParts: Part[] = [];
+      for (const tReq of toolCallRequests) {
+        const fc: FunctionCall = {
+          id: tReq.callId,
+          name: tReq.name,
+          args: tReq.args,
+        };
+
+        const response = await this.runTool(pendingSend.signal, promptId, fc);
+        toolResponseParts.push(...response);
+      }
+
+      currentParts = toolResponseParts;
     }
 
     const modelUsageArray = Array.from(modelUsageMap.entries()).map(
@@ -972,7 +559,7 @@ export class Session {
     promptId: string,
     fc: FunctionCall,
   ): Promise<Part[]> {
-    const callId = fc.id ?? GeminiAgent.generateCallId(fc.name || 'unknown');
+    const callId = fc.id ?? this.generateCallId(fc.name || 'unknown');
     const args = fc.args ?? {};
 
     const startTime = Date.now();
@@ -1661,7 +1248,7 @@ export class Session {
         include: pathSpecsToRead,
       };
 
-      const callId = GeminiAgent.generateCallId(readManyFilesTool.name);
+      const callId = this.generateCallId(readManyFilesTool.name);
 
       try {
         const invocation = readManyFilesTool.build(toolArgs);
@@ -1798,334 +1385,4 @@ export class Session {
       debugLogger.warn(msg);
     }
   }
-}
-
-function toToolCallContent(toolResult: ToolResult): acp.ToolCallContent | null {
-  if (toolResult.error?.message) {
-    throw new Error(toolResult.error.message);
-  }
-
-  if (toolResult.returnDisplay) {
-    if (typeof toolResult.returnDisplay === 'string') {
-      return {
-        type: 'content',
-        content: { type: 'text', text: toolResult.returnDisplay },
-      };
-    } else {
-      if ('fileName' in toolResult.returnDisplay) {
-        return {
-          type: 'diff',
-          path:
-            toolResult.returnDisplay.filePath ??
-            toolResult.returnDisplay.fileName,
-          oldText: toolResult.returnDisplay.originalContent,
-          newText: toolResult.returnDisplay.newContent,
-          _meta: {
-            kind: !toolResult.returnDisplay.originalContent
-              ? 'add'
-              : toolResult.returnDisplay.newContent === ''
-                ? 'delete'
-                : 'modify',
-          },
-        };
-      }
-      return null;
-    }
-  } else {
-    return null;
-  }
-}
-
-const basicPermissionOptions = [
-  {
-    optionId: ToolConfirmationOutcome.ProceedOnce,
-    name: 'Allow',
-    kind: 'allow_once',
-  },
-  {
-    optionId: ToolConfirmationOutcome.Cancel,
-    name: 'Reject',
-    kind: 'reject_once',
-  },
-] as const;
-
-function toPermissionOptions(
-  confirmation: ToolCallConfirmationDetails,
-  config: Config,
-  enablePermanentToolApproval: boolean = false,
-): acp.PermissionOption[] {
-  const disableAlwaysAllow = config.getDisableAlwaysAllow();
-  const options: acp.PermissionOption[] = [];
-
-  if (!disableAlwaysAllow) {
-    switch (confirmation.type) {
-      case 'edit':
-        options.push({
-          optionId: ToolConfirmationOutcome.ProceedAlways,
-          name: 'Allow for this session',
-          kind: 'allow_always',
-        });
-        if (enablePermanentToolApproval) {
-          options.push({
-            optionId: ToolConfirmationOutcome.ProceedAlwaysAndSave,
-            name: 'Allow for this file in all future sessions',
-            kind: 'allow_always',
-          });
-        }
-        break;
-      case 'exec':
-        options.push({
-          optionId: ToolConfirmationOutcome.ProceedAlways,
-          name: 'Allow for this session',
-          kind: 'allow_always',
-        });
-        if (enablePermanentToolApproval) {
-          options.push({
-            optionId: ToolConfirmationOutcome.ProceedAlwaysAndSave,
-            name: 'Allow this command for all future sessions',
-            kind: 'allow_always',
-          });
-        }
-        break;
-      case 'mcp':
-        options.push(
-          {
-            optionId: ToolConfirmationOutcome.ProceedAlwaysServer,
-            name: 'Allow all server tools for this session',
-            kind: 'allow_always',
-          },
-          {
-            optionId: ToolConfirmationOutcome.ProceedAlwaysTool,
-            name: 'Allow tool for this session',
-            kind: 'allow_always',
-          },
-        );
-        if (enablePermanentToolApproval) {
-          options.push({
-            optionId: ToolConfirmationOutcome.ProceedAlwaysAndSave,
-            name: 'Allow tool for all future sessions',
-            kind: 'allow_always',
-          });
-        }
-        break;
-      case 'info':
-        options.push({
-          optionId: ToolConfirmationOutcome.ProceedAlways,
-          name: 'Allow for this session',
-          kind: 'allow_always',
-        });
-        if (enablePermanentToolApproval) {
-          options.push({
-            optionId: ToolConfirmationOutcome.ProceedAlwaysAndSave,
-            name: 'Allow for all future sessions',
-            kind: 'allow_always',
-          });
-        }
-        break;
-      case 'ask_user':
-      case 'exit_plan_mode':
-        // askuser and exit_plan_mode don't need "always allow" options
-        break;
-      default:
-        // No "always allow" options for other types
-        break;
-    }
-  }
-
-  options.push(...basicPermissionOptions);
-
-  // Exhaustive check
-  switch (confirmation.type) {
-    case 'edit':
-    case 'exec':
-    case 'mcp':
-    case 'info':
-    case 'ask_user':
-    case 'exit_plan_mode':
-    case 'sandbox_expansion':
-      break;
-    default: {
-      const unreachable: never = confirmation;
-      throw new Error(`Unexpected: ${unreachable}`);
-    }
-  }
-
-  return options;
-}
-
-/**
- * Maps our internal tool kind to the ACP ToolKind.
- * Fallback to 'other' for kinds that are not supported by the ACP protocol.
- */
-function toAcpToolKind(kind: Kind): acp.ToolKind {
-  switch (kind) {
-    case Kind.Read:
-    case Kind.Edit:
-    case Kind.Execute:
-    case Kind.Search:
-    case Kind.Delete:
-    case Kind.Move:
-    case Kind.Think:
-    case Kind.Fetch:
-    case Kind.SwitchMode:
-    case Kind.Other:
-      return kind as acp.ToolKind;
-    case Kind.Agent:
-      return 'think';
-    case Kind.Plan:
-    case Kind.Communicate:
-    default:
-      return 'other';
-  }
-}
-
-function buildAvailableModes(isPlanEnabled: boolean): acp.SessionMode[] {
-  const modes: acp.SessionMode[] = [
-    {
-      id: ApprovalMode.DEFAULT,
-      name: 'Default',
-      description: 'Prompts for approval',
-    },
-    {
-      id: ApprovalMode.AUTO_EDIT,
-      name: 'Auto Edit',
-      description: 'Auto-approves edit tools',
-    },
-    {
-      id: ApprovalMode.YOLO,
-      name: 'YOLO',
-      description: 'Auto-approves all tools',
-    },
-  ];
-
-  if (isPlanEnabled) {
-    modes.push({
-      id: ApprovalMode.PLAN,
-      name: 'Plan',
-      description: 'Read-only mode',
-    });
-  }
-
-  return modes;
-}
-
-function buildAvailableModels(
-  config: Config,
-  settings: LoadedSettings,
-): {
-  availableModels: Array<{
-    modelId: string;
-    name: string;
-    description?: string;
-  }>;
-  currentModelId: string;
-} {
-  const preferredModel = config.getModel() || DEFAULT_GEMINI_MODEL_AUTO;
-  const shouldShowPreviewModels = config.getHasAccessToPreviewModel();
-  const useGemini31 = config.getGemini31LaunchedSync?.() ?? false;
-  const useGemini31FlashLite =
-    config.getGemini31FlashLiteLaunchedSync?.() ?? false;
-  const selectedAuthType = settings.merged.security.auth.selectedType;
-  const useCustomToolModel =
-    useGemini31 && selectedAuthType === AuthType.USE_GEMINI;
-
-  // --- DYNAMIC PATH ---
-  if (
-    config.getExperimentalDynamicModelConfiguration?.() === true &&
-    config.getModelConfigService
-  ) {
-    const options = config.getModelConfigService().getAvailableModelOptions({
-      useGemini3_1: useGemini31,
-      useGemini3_1FlashLite: useGemini31FlashLite,
-      useCustomTools: useCustomToolModel,
-      hasAccessToPreview: shouldShowPreviewModels,
-    });
-
-    return {
-      availableModels: options,
-      currentModelId: preferredModel,
-    };
-  }
-
-  // --- LEGACY PATH ---
-  const mainOptions = [
-    {
-      value: DEFAULT_GEMINI_MODEL_AUTO,
-      title: getDisplayString(DEFAULT_GEMINI_MODEL_AUTO),
-      description:
-        'Let Gemini CLI decide the best model for the task: gemini-2.5-pro, gemini-2.5-flash',
-    },
-  ];
-
-  if (shouldShowPreviewModels) {
-    mainOptions.unshift({
-      value: PREVIEW_GEMINI_MODEL_AUTO,
-      title: getDisplayString(PREVIEW_GEMINI_MODEL_AUTO),
-      description: useGemini31
-        ? 'Let Gemini CLI decide the best model for the task: gemini-3.1-pro, gemini-3-flash'
-        : 'Let Gemini CLI decide the best model for the task: gemini-3-pro, gemini-3-flash',
-    });
-  }
-
-  const manualOptions = [
-    {
-      value: DEFAULT_GEMINI_MODEL,
-      title: getDisplayString(DEFAULT_GEMINI_MODEL),
-    },
-    {
-      value: DEFAULT_GEMINI_FLASH_MODEL,
-      title: getDisplayString(DEFAULT_GEMINI_FLASH_MODEL),
-    },
-    {
-      value: DEFAULT_GEMINI_FLASH_LITE_MODEL,
-      title: getDisplayString(DEFAULT_GEMINI_FLASH_LITE_MODEL),
-    },
-  ];
-
-  if (shouldShowPreviewModels) {
-    const previewProModel = useGemini31
-      ? PREVIEW_GEMINI_3_1_MODEL
-      : PREVIEW_GEMINI_MODEL;
-
-    const previewProValue = useCustomToolModel
-      ? PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL
-      : previewProModel;
-
-    const previewOptions = [
-      {
-        value: previewProValue,
-        title: getDisplayString(previewProModel),
-      },
-      {
-        value: PREVIEW_GEMINI_FLASH_MODEL,
-        title: getDisplayString(PREVIEW_GEMINI_FLASH_MODEL),
-      },
-    ];
-
-    if (useGemini31FlashLite) {
-      previewOptions.push({
-        value: PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL,
-        title: getDisplayString(PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL),
-      });
-    }
-
-    manualOptions.unshift(...previewOptions);
-  }
-
-  const scaleOptions = (
-    options: Array<{ value: string; title: string; description?: string }>,
-  ) =>
-    options.map((o) => ({
-      modelId: o.value,
-      name: o.title,
-      description: o.description,
-    }));
-
-  return {
-    availableModels: [
-      ...scaleOptions(mainOptions),
-      ...scaleOptions(manualOptions),
-    ],
-    currentModelId: preferredModel,
-  };
 }
