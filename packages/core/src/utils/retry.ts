@@ -18,9 +18,11 @@ import type { RetryAvailabilityContext } from '../availability/modelPolicy.js';
 
 export type { RetryAvailabilityContext };
 export const DEFAULT_MAX_ATTEMPTS = 10;
+export const DEFAULT_MAX_FALLBACK_COUNT = 3;
 
 export interface RetryOptions {
   maxAttempts: number;
+  maxFallbackCount: number;
   initialDelayMs: number;
   maxDelayMs: number;
   shouldRetryOnError: (error: Error, retryFetchErrors?: boolean) => boolean;
@@ -41,6 +43,7 @@ export interface RetryOptions {
 
 const DEFAULT_RETRY_OPTIONS: RetryOptions = {
   maxAttempts: DEFAULT_MAX_ATTEMPTS,
+  maxFallbackCount: DEFAULT_MAX_FALLBACK_COUNT,
   initialDelayMs: 5000,
   maxDelayMs: 30000, // 30 seconds
   shouldRetryOnError: isRetryableError,
@@ -232,6 +235,7 @@ export async function retryWithBackoff<T>(
 
   const {
     maxAttempts,
+    maxFallbackCount,
     initialDelayMs,
     maxDelayMs,
     onPersistent429,
@@ -253,6 +257,8 @@ export async function retryWithBackoff<T>(
     getAvailabilityContext?.()?.policy.maxAttempts ?? maxAttempts;
 
   let attempt = 0;
+  let resetCount = 0;
+
   let currentDelay = initialDelayMs;
   const throwIfAborted = () => {
     if (signal?.aborted) {
@@ -305,12 +311,20 @@ export async function retryWithBackoff<T>(
         classifiedError instanceof ModelNotFoundError
       ) {
         if (onPersistent429) {
+          if (resetCount >= maxFallbackCount) {
+            debugLogger.warn(
+              `Exhausted ${maxFallbackCount} fallback attempts. Aborting to prevent infinite loop.`,
+            );
+            throw classifiedError;
+          }
+
           try {
             const fallbackModel = await onPersistent429(
               authType,
               classifiedError,
             );
             if (fallbackModel) {
+              resetCount++;
               attempt = 0; // Reset attempts and retry with the new model.
               currentDelay = initialDelayMs;
               continue;
@@ -326,10 +340,18 @@ export async function retryWithBackoff<T>(
       // Handle ValidationRequiredError - user needs to verify before proceeding
       if (classifiedError instanceof ValidationRequiredError) {
         if (onValidationRequired) {
+          if (resetCount >= maxFallbackCount) {
+            debugLogger.warn(
+              `Exhausted allowed state resets. Aborting to prevent infinite validation loop.`,
+            );
+            throw classifiedError;
+          }
+
           try {
             const intent = await onValidationRequired(classifiedError);
             if (intent === 'verify') {
               // User verified, retry the request
+              resetCount++;
               attempt = 0;
               currentDelay = initialDelayMs;
               continue;
@@ -354,12 +376,22 @@ export async function retryWithBackoff<T>(
             `Attempt ${attempt} failed${errorMessage ? `: ${errorMessage}` : ''}. Max attempts reached`,
           );
           if (onPersistent429) {
+            if (resetCount >= maxFallbackCount) {
+              debugLogger.warn(
+                `Exhausted ${maxFallbackCount} fallback attempts. Aborting to prevent infinite loop.`,
+              );
+              throw classifiedError instanceof RetryableQuotaError
+                ? classifiedError
+                : error;
+            }
+
             try {
               const fallbackModel = await onPersistent429(
                 authType,
                 classifiedError,
               );
               if (fallbackModel) {
+                resetCount++;
                 attempt = 0; // Reset attempts and retry with the new model.
                 currentDelay = initialDelayMs;
                 continue;
