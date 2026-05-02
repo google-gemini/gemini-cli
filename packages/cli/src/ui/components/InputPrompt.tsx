@@ -14,7 +14,7 @@ import {
   Fragment,
 } from 'react';
 import clipboardy from 'clipboardy';
-import { Box, Text, useStdout, type DOMElement } from 'ink';
+import { Box, Text, useStdin, useStdout, type DOMElement } from 'ink';
 import { SuggestionsDisplay, MAX_WIDTH } from './SuggestionsDisplay.js';
 import { theme } from '../semantic-colors.js';
 import { useInputHistory } from '../hooks/useInputHistory.js';
@@ -56,6 +56,7 @@ import {
   coreEvents,
   debugLogger,
   type Config,
+  type EditorType,
 } from '@google/gemini-cli-core';
 import { useVoiceMode } from '../hooks/useVoiceMode.js';
 import {
@@ -92,6 +93,7 @@ import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 import { useIsHelpDismissKey } from '../utils/shortcutsHelp.js';
 import { useRepeatedKeyPress } from '../hooks/useRepeatedKeyPress.js';
 import { useKeyMatchers } from '../hooks/useKeyMatchers.js';
+import { openDirectory, openFileInEditor } from '../utils/editorUtils.js';
 
 /**
  * Returns if the terminal can be trusted to handle paste events atomically
@@ -231,6 +233,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   } = inputState;
   const isHelpDismissKey = useIsHelpDismissKey();
   const keyMatchers = useKeyMatchers();
+  const { stdin, setRawMode } = useStdin();
   const { stdout } = useStdout();
   const { merged: settings } = useSettings();
   const kittyProtocol = useKittyKeyboardProtocol();
@@ -354,6 +357,29 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   const activeCompletion = getActiveCompletion();
   const shouldShowSuggestions = activeCompletion.showSuggestions;
+  const selectedMentionSuggestion = useMemo(() => {
+    if (
+      completion.completionMode !== CompletionMode.AT ||
+      completion.suggestions.length === 0
+    ) {
+      return undefined;
+    }
+
+    const targetIndex =
+      completion.activeSuggestionIndex === -1
+        ? 0
+        : completion.activeSuggestionIndex;
+
+    if (targetIndex < 0 || targetIndex >= completion.suggestions.length) {
+      return undefined;
+    }
+
+    return completion.suggestions[targetIndex];
+  }, [
+    completion.activeSuggestionIndex,
+    completion.completionMode,
+    completion.suggestions,
+  ]);
 
   const {
     forceShowShellSuggestions,
@@ -361,6 +387,62 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     isShellSuggestionsVisible,
   } = completion;
 
+  const emitMentionShortcutHint = useCallback((message: string) => {
+    appEvents.emit(AppEvent.TransientMessage, {
+      message,
+      type: TransientMessageType.Hint,
+    });
+  }, []);
+
+  const handleMentionTargetOpen = useCallback(
+    async (openLocation: boolean) => {
+      if (completion.completionMode !== CompletionMode.AT) {
+        return;
+      }
+
+      if (!selectedMentionSuggestion?.mentionTargetPath) {
+        emitMentionShortcutHint(
+          'Only file and folder mentions can be opened from the suggestion list.',
+        );
+        return;
+      }
+
+      const targetPath = selectedMentionSuggestion.mentionTargetPath;
+      const directoryPath =
+        openLocation ||
+        selectedMentionSuggestion.mentionTargetKind === 'directory'
+          ? targetPath
+          : path.dirname(targetPath);
+
+      try {
+        if (
+          !openLocation &&
+          selectedMentionSuggestion.mentionTargetKind === 'file'
+        ) {
+          await openFileInEditor(
+            targetPath,
+            stdin,
+            setRawMode,
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+            settings.general.preferredEditor as EditorType | undefined,
+          );
+          return;
+        }
+
+        await openDirectory(directoryPath);
+      } catch (error) {
+        debugLogger.error('Failed to open selected @ mention target:', error);
+      }
+    },
+    [
+      completion.completionMode,
+      emitMentionShortcutHint,
+      selectedMentionSuggestion,
+      setRawMode,
+      settings.general.preferredEditor,
+      stdin,
+    ],
+  );
   const effectivePlaceholder = useMemo(() => {
     if (!isVoiceModeEnabled) return placeholder;
     const voiceAction =
@@ -1295,19 +1377,34 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return true;
       }
 
-      // External editor
-      if (keyMatchers[Command.OPEN_EXTERNAL_EDITOR](key)) {
-        // eslint-disable-next-line @typescript-eslint/no-floating-promises
-        buffer.openInExternalEditor();
-        return true;
+      if (completion.completionMode === CompletionMode.AT) {
+        if (keyMatchers[Command.OPEN_SELECTED_MENTION](key)) {
+          // eslint-disable-next-line @typescript-eslint/no-floating-promises
+          handleMentionTargetOpen(false);
+          return true;
+        }
+
+        if (keyMatchers[Command.OPEN_SELECTED_MENTION_LOCATION](key)) {
+          // eslint-disable-next-line @typescript-eslint/no-floating-promises
+          handleMentionTargetOpen(true);
+          return true;
+        }
+
+        if (keyMatchers[Command.DEPRECATED_OPEN_EXTERNAL_EDITOR](key)) {
+          emitMentionShortcutHint(
+            `Use ${formatCommand(Command.OPEN_SELECTED_MENTION)} to open the selected file or folder while @ suggestions are active.`,
+          );
+          return true;
+        }
       }
 
-      if (keyMatchers[Command.DEPRECATED_OPEN_EXTERNAL_EDITOR](key)) {
-        const cmdKey = formatCommand(Command.OPEN_EXTERNAL_EDITOR);
-        appEvents.emit(AppEvent.TransientMessage, {
-          message: `Use ${cmdKey} to open the external editor.`,
-          type: TransientMessageType.Hint,
-        });
+      // External editor
+      if (
+        keyMatchers[Command.OPEN_EXTERNAL_EDITOR](key) ||
+        keyMatchers[Command.DEPRECATED_OPEN_EXTERNAL_EDITOR](key)
+      ) {
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
+        buffer.openInExternalEditor();
         return true;
       }
 
@@ -1402,6 +1499,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       keyMatchers,
       isHelpDismissKey,
       settings,
+      emitMentionShortcutHint,
+      handleMentionTargetOpen,
       handleVoiceInput,
     ],
   );
@@ -1769,6 +1868,16 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
               : 'reverse'
         }
         expandedIndex={expandedSuggestionIndex}
+        mentionShortcuts={
+          selectedMentionSuggestion?.mentionTargetPath
+            ? {
+                openTarget: formatCommand(Command.OPEN_SELECTED_MENTION),
+                openLocation: formatCommand(
+                  Command.OPEN_SELECTED_MENTION_LOCATION,
+                ),
+              }
+            : undefined
+        }
       />
     </Box>
   ) : null;

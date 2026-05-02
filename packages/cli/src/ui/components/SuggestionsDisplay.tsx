@@ -11,6 +11,13 @@ import { CommandKind } from '../commands/types.js';
 import { Colors } from '../colors.js';
 import { sanitizeForDisplay } from '../utils/textUtils.js';
 
+export type MentionTargetKind = 'file' | 'directory';
+
+interface MentionShortcuts {
+  openTarget: string;
+  openLocation: string;
+}
+
 export interface Suggestion {
   label: string;
   value: string;
@@ -20,6 +27,8 @@ export interface Suggestion {
   commandKind?: CommandKind;
   sectionTitle?: string;
   submitValue?: string;
+  mentionTargetPath?: string;
+  mentionTargetKind?: MentionTargetKind;
 }
 interface SuggestionsDisplayProps {
   suggestions: Suggestion[];
@@ -30,6 +39,7 @@ interface SuggestionsDisplayProps {
   userInput: string;
   mode: 'reverse' | 'slash';
   expandedIndex?: number;
+  mentionShortcuts?: MentionShortcuts;
 }
 
 export const MAX_SUGGESTIONS_TO_SHOW = 8;
@@ -44,6 +54,7 @@ export function SuggestionsDisplay({
   userInput,
   mode,
   expandedIndex,
+  mentionShortcuts,
 }: SuggestionsDisplayProps) {
   if (isLoading) {
     return (
@@ -64,6 +75,10 @@ export function SuggestionsDisplay({
     suggestions.length,
   );
   const visibleSuggestions = suggestions.slice(startIndex, endIndex);
+  const hintSuggestionIndex = activeIndex === -1 ? 0 : activeIndex;
+  const activeSuggestion = suggestions[hintSuggestionIndex];
+  const showMentionShortcuts =
+    !!mentionShortcuts && !!activeSuggestion?.mentionTargetPath;
 
   const COMMAND_KIND_SUFFIX: Partial<Record<CommandKind, string>> = {
     [CommandKind.MCP_PROMPT]: ' [MCP]',
@@ -154,10 +169,29 @@ export function SuggestionsDisplay({
         );
       })}
       {endIndex < suggestions.length && <Text color="gray">▼</Text>}
-      {suggestions.length > MAX_SUGGESTIONS_TO_SHOW && (
-        <Text color="gray">
-          ({activeIndex + 1}/{suggestions.length})
-        </Text>
+      {(suggestions.length > MAX_SUGGESTIONS_TO_SHOW ||
+        showMentionShortcuts) && (
+        <Box flexDirection="row" justifyContent="space-between" width="100%">
+          <Box>
+            {suggestions.length > MAX_SUGGESTIONS_TO_SHOW && (
+              <Text color="gray">
+                ({activeIndex + 1}/{suggestions.length})
+              </Text>
+            )}
+          </Box>
+          {showMentionShortcuts && mentionShortcuts && (
+            <Text color="gray">
+              <Text color={theme.text.accent}>
+                {mentionShortcuts.openTarget}
+              </Text>{' '}
+              open target {'·'}{' '}
+              <Text color={theme.text.accent}>
+                {mentionShortcuts.openLocation}
+              </Text>{' '}
+              open folder
+            </Text>
+          )}
+        </Box>
       )}
     </Box>
   );
