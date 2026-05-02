@@ -10,6 +10,7 @@ import {
   createMockEnvironment,
   createDummyNode,
 } from '../testing/contextTestUtils.js';
+import { NodeType } from '../graph/types.js';
 
 describe('RollingSummaryProcessor', () => {
   it('should initialize with correct default options', () => {
@@ -43,13 +44,25 @@ describe('RollingSummaryProcessor', () => {
     const targets = [
       createDummyNode(
         'ep1',
-        'USER_PROMPT',
+        NodeType.USER_PROMPT,
         50,
-        { semanticParts: [{ type: 'text', text: text50 }] },
+        { payload: { text: text50 } },
         'id1',
       ),
-      createDummyNode('ep1', 'AGENT_THOUGHT', 50, { text: text50 }, 'id2'),
-      createDummyNode('ep1', 'AGENT_YIELD', 50, { text: text50 }, 'id3'),
+      createDummyNode(
+        'ep1',
+        NodeType.AGENT_THOUGHT,
+        50,
+        { payload: { text: text50 } },
+        'id2',
+      ),
+      createDummyNode(
+        'ep1',
+        NodeType.AGENT_YIELD,
+        50,
+        { payload: { text: text50 } },
+        'id3',
+      ),
     ];
 
     const result = await processor.process(createMockProcessArgs(targets));
@@ -59,8 +72,8 @@ describe('RollingSummaryProcessor', () => {
     // Node id2 adds 50 deficit. Node id3 adds 50 deficit. Total = 100 deficit, which hits the target break point.
     // Thus, id2 and id3 are summarized into a new ROLLING_SUMMARY node.
     expect(result.length).toBe(2);
-    expect(result[0].type).toBe('USER_PROMPT');
-    expect(result[1].type).toBe('ROLLING_SUMMARY');
+    expect(result[0].type).toBe(NodeType.USER_PROMPT);
+    expect(result[1].type).toBe(NodeType.ROLLING_SUMMARY);
   });
 
   it('should preserve targets if deficit does not trigger summary', async () => {
@@ -80,19 +93,25 @@ describe('RollingSummaryProcessor', () => {
     const targets = [
       createDummyNode(
         'ep1',
-        'USER_PROMPT',
+        NodeType.USER_PROMPT,
         10,
-        { semanticParts: [{ type: 'text', text: text10 }] },
+        { payload: { text: text10 } },
         'id1',
       ),
-      createDummyNode('ep1', 'AGENT_THOUGHT', 10, { text: text10 }, 'id2'),
+      createDummyNode(
+        'ep1',
+        NodeType.AGENT_THOUGHT,
+        10,
+        { payload: { text: text10 } },
+        'id2',
+      ),
     ];
 
     const result = await processor.process(createMockProcessArgs(targets));
 
     // Deficit accumulator reaches 10. This is < 100 limit, and total summarizable nodes < 2 anyway.
     expect(result.length).toBe(2);
-    expect(result[0].type).toBe('USER_PROMPT');
-    expect(result[1].type).toBe('AGENT_THOUGHT');
+    expect(result[0].type).toBe(NodeType.USER_PROMPT);
+    expect(result[1].type).toBe(NodeType.AGENT_THOUGHT);
   });
 });

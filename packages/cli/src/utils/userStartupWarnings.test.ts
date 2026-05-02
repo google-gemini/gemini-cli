@@ -34,6 +34,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     ...actual,
     homedir: () => os.homedir(),
     getCompatibilityWarnings: vi.fn().mockReturnValue([]),
+    isHeadlessMode: vi.fn().mockReturnValue(false),
     WarningPriority: {
       Low: 'low',
       High: 'high',
@@ -143,6 +144,51 @@ describe('getUserStartupWarnings', () => {
     });
   });
 
+  describe('folder trust check', () => {
+    it('should throw FatalUntrustedWorkspaceError when untrusted in headless mode', async () => {
+      const { isHeadlessMode, FatalUntrustedWorkspaceError } = await import(
+        '@google/gemini-cli-core'
+      );
+      vi.mocked(isFolderTrustEnabled).mockReturnValue(true);
+      vi.mocked(isWorkspaceTrusted).mockImplementation(() => {
+        throw new FatalUntrustedWorkspaceError(
+          'Gemini CLI is not running in a trusted directory',
+        );
+      });
+      vi.mocked(isHeadlessMode).mockReturnValue(true);
+
+      await expect(
+        getUserStartupWarnings({}, testRootDir),
+      ).rejects.toThrowError(FatalUntrustedWorkspaceError);
+    });
+
+    it('should not return a warning when trusted in headless mode', async () => {
+      const { isHeadlessMode } = await import('@google/gemini-cli-core');
+      vi.mocked(isFolderTrustEnabled).mockReturnValue(true);
+      vi.mocked(isWorkspaceTrusted).mockReturnValue({
+        isTrusted: true,
+        source: 'file',
+      });
+      vi.mocked(isHeadlessMode).mockReturnValue(true);
+
+      const warnings = await getUserStartupWarnings({}, testRootDir);
+      expect(warnings.find((w) => w.id === 'folder-trust')).toBeUndefined();
+    });
+
+    it('should not return a warning when untrusted in interactive mode', async () => {
+      const { isHeadlessMode } = await import('@google/gemini-cli-core');
+      vi.mocked(isFolderTrustEnabled).mockReturnValue(true);
+      vi.mocked(isWorkspaceTrusted).mockReturnValue({
+        isTrusted: false,
+        source: undefined,
+      });
+      vi.mocked(isHeadlessMode).mockReturnValue(false);
+
+      const warnings = await getUserStartupWarnings({}, testRootDir);
+      expect(warnings.find((w) => w.id === 'folder-trust')).toBeUndefined();
+    });
+  });
+
   describe('compatibility warnings', () => {
     it('should include compatibility warnings by default', async () => {
       const compWarning = {
@@ -173,6 +219,23 @@ describe('getUserStartupWarnings', () => {
         projectDir,
       );
       expect(warnings).not.toContainEqual(compWarning);
+    });
+
+    it('should correctly pass isAlternateBuffer option to getCompatibilityWarnings', async () => {
+      const projectDir = path.join(testRootDir, 'project-alt');
+      await fs.mkdir(projectDir);
+
+      await getUserStartupWarnings({}, projectDir, { isAlternateBuffer: true });
+      expect(getCompatibilityWarnings).toHaveBeenCalledWith({
+        isAlternateBuffer: true,
+      });
+
+      await getUserStartupWarnings({}, projectDir, {
+        isAlternateBuffer: false,
+      });
+      expect(getCompatibilityWarnings).toHaveBeenCalledWith({
+        isAlternateBuffer: false,
+      });
     });
   });
 });
