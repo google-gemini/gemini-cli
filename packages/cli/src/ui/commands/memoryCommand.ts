@@ -145,12 +145,12 @@ export const memoryCommand: SlashCommand = {
           };
         }
 
-        if (!config.isMemoryManagerEnabled()) {
+        if (!config.isAutoMemoryEnabled()) {
           return {
             type: 'message',
             messageType: 'info',
             content:
-              'The memory inbox requires the experimental memory manager. Enable it with: experimental.memoryManager = true in settings.',
+              'The memory inbox requires Auto Memory. Enable it with: experimental.autoMemory = true in settings.',
           };
         }
 

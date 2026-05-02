@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -135,10 +135,10 @@ export class InboxMemoryCommand implements Command {
     context: CommandContext,
     _: string[],
   ): Promise<CommandExecutionResponse> {
-    if (!context.agentContext.config.isMemoryManagerEnabled()) {
+    if (!context.agentContext.config.isAutoMemoryEnabled()) {
       return {
         name: this.name,
-        data: 'The memory inbox requires the experimental memory manager. Enable it with: experimental.memoryManager = true in settings.',
+        data: 'The memory inbox requires Auto Memory. Enable it with: experimental.autoMemory = true in settings.',
       };
     }
 

@@ -74,7 +74,12 @@ export interface OperationalGuidelinesOptions {
   enableShellEfficiency: boolean;
   interactiveShellEnabled: boolean;
   topicUpdateNarration?: boolean;
-  memoryManagerEnabled: boolean;
+  memoryV2Enabled: boolean;
+  /**
+   * Absolute path to the user's per-project private memory index. See
+   * snippets.ts for full semantics.
+   */
+  userProjectMemoryPath?: string;
 }
 
 export type SandboxMode = 'macos-seatbelt' | 'generic' | 'outside';
@@ -359,10 +364,11 @@ export function renderGitRepo(options?: GitRepoOptions): string {
   - "Commit the change" -> add changed files and commit.
   - "Wrap up this PR for me" -> do not commit.
 - When asked to commit changes or prepare a commit, always start by gathering information using shell commands:
-  - \`git status\` to ensure that all relevant files are tracked and staged, using \`git add ...\` as needed.
+  - \`git status\` to ensure that all relevant files are tracked and staged, using \`git add <file>...\` for specific files as needed.
   - \`git diff HEAD\` to review all changes (including unstaged changes) to tracked files in work tree since last commit.
     - \`git diff --staged\` to review only staged changes when a partial commit makes sense or was requested by the user.
   - \`git log -n 3\` to review recent commit messages and match their style (verbosity, formatting, signature line, etc.)
+- Do not use \`git add .\` or \`git add -A\` unprompted as this can stage unwanted or untracked files. Instead, stage only the specific files that were changed or created as part of the task.
 - Combine shell commands whenever possible to save time/steps, e.g. \`git status && git diff HEAD && git log -n 3\`.
 - Always propose a draft commit message. Never just ask the user to give you the full commit message.
 - Prefer commit messages that are clear, concise, and focused more on "why" and less on "what".${gitRepoKeepUserInformed(options.interactive)}
@@ -409,7 +415,7 @@ ${trimmed}
   }
   if (memory.userProjectMemory?.trim()) {
     sections.push(
-      `<user_project_memory>\n--- User's Project Memory (private, not committed to repo) ---\n${memory.userProjectMemory.trim()}\n--- End User's Project Memory ---\n</user_project_memory>`,
+      `<user_project_memory>\n--- Private Project Memory Index (private, not committed to repo) ---\n${memory.userProjectMemory.trim()}\n--- End Private Project Memory Index ---\n</user_project_memory>`,
     );
   }
   if (memory.extension?.trim()) {
@@ -472,7 +478,7 @@ ${options.planModeToolsList}
 - Save the implementation plan to the designated plans directory
 
 ### Phase 4: Review & Approval
-- Present the plan and request approval for the finalized plan using the \`${EXIT_PLAN_MODE_TOOL_NAME}\` tool
+- Present the plan and request approval for the finalized plan using the built-in \`${EXIT_PLAN_MODE_TOOL_NAME}\` tool. **CRITICAL: NEVER attempt to call this tool via \`${SHELL_TOOL_NAME}\`.**
 - If plan is approved, you can begin implementation
 - If plan is rejected, address the feedback and iterate on the plan
 
@@ -505,7 +511,8 @@ You are operating with a persistent file-based task tracking system located at \
 5.  **VERIFICATION**: Before marking a task as complete, verify the work is actually done (e.g., run the test, check the file existence).
 6.  **STATE OVER CHAT**: If the user says "I think we finished that," but the tool says it is 'pending', trust the tool--or verify explicitly before updating.
 7.  **DEPENDENCY MANAGEMENT**: Respect task topology. Never attempt to execute a task if its dependencies are not marked as 'closed'. If you are blocked, focus only on the leaf nodes of the task graph.
-8.  **DETAILED TASKS**: Ensure that the tasks created have highly detailed titles and descriptions. The description MUST provide significantly more specific details and technical context than the title.`.trim();
+8.  **DETAILED TASKS**: Ensure that the tasks created have highly detailed titles and descriptions. The description MUST provide significantly more specific details and technical context than the title.
+9.  **TURN EFFICIENCY**: Update the tracker immediately when a step is completed. Combine \`${TRACKER_UPDATE_TASK_TOOL_NAME}\` calls with other tool calls in the same turn to save turns.`.trim();
 }
 
 // --- Leaf Helpers (Strictly strings or simple calls) ---
@@ -697,9 +704,16 @@ function toolUsageInteractive(
 function toolUsageRememberingFacts(
   options: OperationalGuidelinesOptions,
 ): string {
-  if (options.memoryManagerEnabled) {
+  if (options.memoryV2Enabled) {
+    const userProjectBullet = options.userProjectMemoryPath
+      ? `
+  - **Private Project Memory** (\`${options.userProjectMemoryPath}\`): Personal-to-the-user, project-specific notes that must **NOT** be committed to the repo. Keep this file concise: it is the private index for this workspace. Store richer detail in sibling \`*.md\` files in the same folder and use \`MEMORY.md\` to point to them.`
+      : '';
     return `
-- **Memory Tool:** You MUST use the '${AGENT_TOOL_NAME}' tool with the 'save_memory' agent to proactively record facts, preferences, and workflows that apply across all sessions. Whenever the user explicitly tells you to "remember" something, or when they state a preference or workflow (like "always lint after editing"), you MUST immediately call the save_memory subagent. Never save transient session state. Do not use memory to store summaries of code changes, bug fixes, or findings discovered during a task; this tool is strictly for persistent general knowledge.`;
+- **Instruction and Memory Files:** You persist long-lived project context by editing markdown files directly with '${EDIT_TOOL_NAME}' or '${WRITE_FILE_TOOL_NAME}'. There is no \`save_memory\` tool. The current contents of all loaded \`GEMINI.md\` files and the private project \`MEMORY.md\` index are already in your context — do not re-read them before editing.
+  - **Project Instructions** (\`./GEMINI.md\`): Team-shared architecture, conventions, workflows, and other repo guidance. **Committed to the repo and shared with the team.**
+  - **Subdirectory Instructions** (e.g. \`./src/GEMINI.md\`): Scoped instructions for one part of the project. Reference them from \`./GEMINI.md\` so they remain discoverable.${userProjectBullet}
+  Whenever the user tells you to "remember" something or states a durable personal workflow for this codebase, save it in the private project memory folder immediately. Put concise index entries in \`MEMORY.md\`; if more detail is useful, create or update a sibling \`*.md\` note in the same folder and keep \`MEMORY.md\` as the pointer. Only update \`GEMINI.md\` files when the memory is a shared project instruction or convention that belongs in the repo. If it could be either tier, ask the user. Never save transient session state, summaries of code changes, bug fixes, or task-specific findings — these files are loaded into every session and must stay lean.`;
   }
   const base = `
 - **Remembering Facts:** Use the '${MEMORY_TOOL_NAME}' tool to remember specific, *user-related* facts or preferences when the user explicitly asks, or when they state a clear, concise piece of information that would help personalize or streamline *your future interactions with them* (e.g., preferred coding style, common project paths they use, personal tool aliases, or a workflow like "always lint after editing"). This tool is for user-specific information that should persist across sessions. Do *not* use it for general project context or information.`;

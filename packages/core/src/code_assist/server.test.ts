@@ -644,6 +644,28 @@ describe('CodeAssistServer', () => {
     );
   });
 
+  it('should throw friendly error for 403 on cloudshell-gca project', async () => {
+    const { server } = createTestServer();
+    const mock403Error = {
+      response: {
+        status: 403,
+        data: {
+          error: {
+            message: 'Permission denied',
+          },
+        },
+      },
+    };
+    vi.spyOn(server, 'requestPost').mockRejectedValue(mock403Error);
+
+    await expect(
+      server.loadCodeAssist({
+        cloudaicompanionProject: 'cloudshell-gca',
+        metadata: {},
+      }),
+    ).rejects.toThrow(/Access to the default Cloud Shell Gemini project/);
+  });
+
   it('should call the listExperiments endpoint with metadata', async () => {
     const { server } = createTestServer();
     const mockResponse = {

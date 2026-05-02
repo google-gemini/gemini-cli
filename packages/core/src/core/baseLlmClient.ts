@@ -339,7 +339,9 @@ export class BaseLlmClient {
         retryFetchErrors: this.config.getRetryFetchErrors(),
         onRetry: (attempt, error, delayMs) => {
           const actualMaxAttempts =
-            availabilityMaxAttempts ?? maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
+            getAvailabilityContext()?.policy.maxAttempts ??
+            maxAttempts ??
+            DEFAULT_MAX_ATTEMPTS;
           const modelName = getDisplayString(currentModel);
           const errorType = getRetryErrorType(error);
 

@@ -11,7 +11,11 @@ import type {
   BackstopTargetOptions,
 } from '../pipeline.js';
 import type { ContextEnvironment } from '../pipeline/environment.js';
-import type { ConcreteNode, RollingSummary } from '../graph/types.js';
+import {
+  type ConcreteNode,
+  type RollingSummary,
+  NodeType,
+} from '../graph/types.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 import { LlmRole } from '../../telemetry/llmRole.js';
 
@@ -45,16 +49,14 @@ export function createRollingSummaryProcessor(
   ): Promise<string> => {
     let transcript = '';
     for (const node of nodes) {
+      const payload = node.payload;
       let nodeContent = '';
-      if ('text' in node && typeof node.text === 'string') {
-        nodeContent = node.text;
-      } else if ('semanticParts' in node) {
-        nodeContent = JSON.stringify(node.semanticParts);
-      } else if ('observation' in node) {
-        nodeContent =
-          typeof node.observation === 'string'
-            ? node.observation
-            : JSON.stringify(node.observation);
+      if (payload.text) {
+        nodeContent = payload.text;
+      } else if (payload.functionCall) {
+        nodeContent = `CALL: ${payload.functionCall.name}(${JSON.stringify(payload.functionCall.args)})`;
+      } else if (payload.functionResponse) {
+        nodeContent = `RESPONSE: ${JSON.stringify(payload.functionResponse.response)}`;
       }
       transcript += `[${node.type}]: ${nodeContent}\n`;
     }
@@ -125,10 +127,11 @@ export function createRollingSummaryProcessor(
 
         const summaryNode: RollingSummary = {
           id: newId,
-          logicalParentId: newId,
-          type: 'ROLLING_SUMMARY',
-          timestamp: Date.now(),
-          text: snapshotText,
+          turnId: newId,
+          type: NodeType.ROLLING_SUMMARY,
+          timestamp: nodesToSummarize[nodesToSummarize.length - 1].timestamp,
+          role: 'user',
+          payload: { text: snapshotText },
           abstractsIds: nodesToSummarize.map((n) => n.id),
         };
 

@@ -331,4 +331,19 @@ describe('JsonFormatter', () => {
     expect(parsed.error.message).toBe('Error\x07 with\x08 control\x0B chars');
     expect(() => JSON.parse(formatted)).not.toThrow();
   });
+
+  it('should format warnings as JSON', () => {
+    const formatter = new JsonFormatter();
+    const warnings = ['Warning 1', '\x1B[33mWarning 2 with ANSI\x1B[0m'];
+    const formatted = formatter.format(
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      warnings,
+    );
+    const parsed = JSON.parse(formatted);
+
+    expect(parsed.warnings).toEqual(['Warning 1', 'Warning 2 with ANSI']);
+  });
 });

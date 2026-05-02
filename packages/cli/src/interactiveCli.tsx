@@ -151,7 +151,7 @@ export async function startInteractiveUI(
       isScreenReaderEnabled: config.getScreenReader(),
       onRender: ({ renderTime }: { renderTime: number }) => {
         if (renderTime > SLOW_RENDER_MS) {
-          recordSlowRender(config, renderTime);
+          recordSlowRender(config, Math.round(renderTime));
         }
         profiler.reportFrameRendered();
       },
@@ -179,7 +179,12 @@ export async function startInteractiveUI(
 
   checkForUpdates(settings)
     .then((info) => {
-      handleAutoUpdate(info, settings, config.getProjectRoot());
+      handleAutoUpdate(
+        info,
+        settings,
+        config.getProjectRoot(),
+        config.getSandboxEnabled(),
+      );
     })
     .catch((err) => {
       // Silently ignore update check errors.
