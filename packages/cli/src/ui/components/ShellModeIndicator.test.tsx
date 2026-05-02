@@ -12,7 +12,7 @@ describe('ShellModeIndicator', () => {
   it('renders correctly', async () => {
     const { lastFrame, unmount } = await render(<ShellModeIndicator />);
     expect(lastFrame()).toContain('shell mode enabled');
-    expect(lastFrame()).toContain('esc to disable');
+    expect(lastFrame()).toContain('esc or backspace to disable');
     unmount();
   });
 });

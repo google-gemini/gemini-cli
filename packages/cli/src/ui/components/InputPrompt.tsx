@@ -898,6 +898,15 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
 
       if (
+        keyMatchers[Command.DELETE_CHAR_LEFT](key) &&
+        buffer.text === '' &&
+        shellModeActive
+      ) {
+        setShellModeActive(false);
+        return true;
+      }
+
+      if (
         key.sequence === '!' &&
         buffer.text === '' &&
         !(completion.showSuggestions && isShellSuggestionsVisible)
