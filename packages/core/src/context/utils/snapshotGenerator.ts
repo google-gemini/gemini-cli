@@ -17,9 +17,9 @@ export class SnapshotGenerator {
     const systemPrompt =
       systemInstruction ??
       `You are an expert Context Memory Manager. You will be provided with a raw transcript of older conversation turns between a user and an AI assistant.
-Your task is to synthesize these turns into a single, dense, factual snapshot that preserves all critical context, preferences, active tasks, and factual knowledge, but discards conversational filler, pleasantries, and redundant back-and-forth iterations.
+Your task is to synthesize these turns into a single, dense, factual snapshot that preserves all critical context, preferences, active tasks, and factual knowledge.
 
-Output ONLY the raw factual snapshot, formatted compactly. Do not include markdown wrappers, prefixes like "Here is the snapshot", or conversational elements.`;
+Discard conversational filler, pleasantries, and redundant back-and-forth iterations. Output ONLY the raw factual snapshot, formatted compactly. Do not include markdown wrappers, prefixes like "Here is the snapshot", or conversational elements.`;
 
     let userPromptText = 'TRANSCRIPT TO SNAPSHOT:\n\n';
     for (const node of nodes) {

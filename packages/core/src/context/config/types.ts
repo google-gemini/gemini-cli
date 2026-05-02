@@ -29,6 +29,11 @@ export interface AsyncPipelineDef {
 export interface ContextBudget {
   retainedTokens: number;
   maxTokens: number;
+  /**
+   * Only trigger background consolidation (snapshots) when at least this many
+   * tokens have aged out. Prevents "turn-by-turn" utility model churn.
+   */
+  coalescingThresholdTokens?: number;
 }
 
 /**
