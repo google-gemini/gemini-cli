@@ -25,6 +25,7 @@ import {
 import { NoopSandboxManager } from './sandboxManager.js';
 import { ExecutionLifecycleService } from './executionLifecycleService.js';
 import type { AnsiOutput, AnsiToken } from '../utils/terminalSerializer.js';
+import { getCachedEncodingForBuffer } from '../utils/systemEncoding.js';
 
 // Hoisted Mocks
 const mockPtySpawn = vi.hoisted(() => vi.fn());
@@ -336,6 +337,23 @@ describe('ShellExecutionService', () => {
         pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
       });
       expect(result.output.trim()).toBe('你好');
+    });
+
+    it('should decode PTY output as UTF-8 regardless of system encoding', async () => {
+      // Simulate a Japanese Windows system where chcp returns code page 932 (Shift-JIS).
+      // The PTY decoder should be pre-initialized to UTF-8, so this mock override
+      // should have no effect on PTY output decoding. Regression test for #12468.
+      vi.mocked(getCachedEncodingForBuffer).mockReturnValue('shift_jis');
+
+      const { result } = await simulateExecution('echo "こんにちは"', (pty) => {
+        pty.onData.mock.calls[0][0]('こんにちは\r\n');
+        pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
+      });
+
+      expect(result.output).toContain('こんにちは');
+
+      // Restore default mock for subsequent tests
+      vi.mocked(getCachedEncodingForBuffer).mockReturnValue('utf-8');
     });
 
     it('should handle commands with no output', async () => {
