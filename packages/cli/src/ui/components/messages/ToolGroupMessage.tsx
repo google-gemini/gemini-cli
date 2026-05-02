@@ -34,6 +34,7 @@ import {
   WRITE_FILE_DISPLAY_NAME,
   READ_MANY_FILES_DISPLAY_NAME,
   isFileDiff,
+  isMcpToolName,
 } from '@google/gemini-cli-core';
 import { buildToolVisibilityContextFromDisplay } from '../../utils/historyUtils.js';
 import { useUIState } from '../../contexts/UIStateContext.js';
@@ -61,8 +62,13 @@ export const isCompactTool = (
   tool: IndividualToolCallDisplay,
   isCompactModeEnabled: boolean,
 ): boolean => {
-  const hasCompactOutputSupport = COMPACT_OUTPUT_ALLOWLIST.has(tool.name);
   const displayStatus = mapCoreStatusToDisplayStatus(tool.status);
+  const hasCompactOutputSupport =
+    (COMPACT_OUTPUT_ALLOWLIST.has(tool.name) ||
+      isMcpToolName(tool.functionName ?? '')) &&
+    !(
+      displayStatus === ToolCallStatus.Executing && tool.progress !== undefined
+    );
   return (
     isCompactModeEnabled &&
     hasCompactOutputSupport &&
