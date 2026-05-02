@@ -30,8 +30,24 @@ export const ScreenReaderAppLayout: React.FC = () => {
       <Notifications />
       <Footer />
       <Box flexGrow={1} overflow="hidden">
-        <MainContent />
+        <MainContent
+          history={uiState.history}
+          pendingHistoryItems={uiState.pendingHistoryItems}
+          mainAreaWidth={uiState.mainAreaWidth}
+          staticAreaMaxItemHeight={uiState.staticAreaMaxItemHeight}
+          availableTerminalHeight={uiState.availableTerminalHeight}
+          cleanUiDetailsVisible={uiState.cleanUiDetailsVisible}
+          mouseMode={uiState.mouseMode}
+          slashCommands={uiState.slashCommands}
+          constrainHeight={uiState.constrainHeight}
+          historyRemountKey={uiState.historyRemountKey}
+          isConfigInitialized={uiState.isConfigInitialized}
+          terminalWidth={uiState.terminalWidth}
+          isEditorDialogOpen={uiState.isEditorDialogOpen}
+          embeddedShellFocused={uiState.embeddedShellFocused}
+        />
       </Box>
+
       {uiState.dialogsVisible ? (
         <DialogManager
           terminalWidth={uiState.terminalWidth}

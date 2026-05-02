@@ -101,6 +101,8 @@ export interface ConversationRecord {
   directories?: string[];
   /** The kind of conversation (main agent or subagent) */
   kind?: 'main' | 'subagent';
+  /** Total number of messages in the session (optional metadata) */
+  messageCount?: number;
 }
 
 /**

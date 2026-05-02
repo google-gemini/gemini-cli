@@ -6,7 +6,7 @@
 
 import { Box, Static } from 'ink';
 import { HistoryItemDisplay } from './HistoryItemDisplay.js';
-import { useUIState } from '../contexts/UIStateContext.js';
+import { type UIState } from '../contexts/UIStateContext.js';
 import { useAppContext } from '../contexts/AppContext.js';
 import { AppHeader } from './AppHeader.js';
 
@@ -23,16 +23,36 @@ import { useConfirmingTool } from '../hooks/useConfirmingTool.js';
 import { ToolConfirmationQueue } from './ToolConfirmationQueue.js';
 import { appEvents, AppEvent } from '../../utils/events.js';
 
+interface MainContentProps {
+  history: UIState['history'];
+  pendingHistoryItems: UIState['pendingHistoryItems'];
+  mainAreaWidth: number;
+  staticAreaMaxItemHeight: number;
+  availableTerminalHeight: number | undefined;
+  cleanUiDetailsVisible: boolean;
+  mouseMode: boolean;
+  slashCommands: UIState['slashCommands'];
+  constrainHeight: boolean;
+  historyRemountKey: number;
+  isConfigInitialized: boolean;
+  terminalWidth: number;
+  isEditorDialogOpen: boolean;
+  embeddedShellFocused: boolean;
+}
+
 const MemoizedHistoryItemDisplay = memo(HistoryItemDisplay);
 const MemoizedAppHeader = memo(AppHeader);
 
+// MainContent component that renders the chat history and pending items.
+// Optimized with React.memo and prop-based updates to ensure high performance
+// in long sessions with thousands of messages.
+//
 // Limit Gemini messages to a very high number of lines to mitigate performance
 // issues in the worst case if we somehow get an enormous response from Gemini.
 // This threshold is arbitrary but should be high enough to never impact normal
 // usage.
-export const MainContent = () => {
+export const MainContent = memo((props: MainContentProps) => {
   const { version } = useAppContext();
-  const uiState = useUIState();
   const isAlternateBufferOrTerminalBuffer = useAlternateBuffer();
   const config = useConfig();
   const useTerminalBuffer = config.getUseTerminalBuffer();
@@ -61,29 +81,37 @@ export const MainContent = () => {
   }, []);
 
   const {
+    history,
     pendingHistoryItems,
     mainAreaWidth,
     staticAreaMaxItemHeight,
     availableTerminalHeight,
     cleanUiDetailsVisible,
     mouseMode,
-  } = uiState;
+    slashCommands,
+    constrainHeight,
+    historyRemountKey,
+    isConfigInitialized,
+    terminalWidth,
+    isEditorDialogOpen,
+    embeddedShellFocused,
+  } = props;
   const showHeaderDetails = cleanUiDetailsVisible;
 
   const lastUserPromptIndex = useMemo(() => {
-    for (let i = uiState.history.length - 1; i >= 0; i--) {
-      const type = uiState.history[i].type;
+    for (let i = history.length - 1; i >= 0; i--) {
+      const type = history[i].type;
       if (type === 'user' || type === 'user_shell') {
         return i;
       }
     }
     return -1;
-  }, [uiState.history]);
+  }, [history]);
 
   const augmentedHistory = useMemo(
     () =>
-      uiState.history.map((item, i) => {
-        const prevType = i > 0 ? uiState.history[i - 1]?.type : undefined;
+      history.map((item, i) => {
+        const prevType = i > 0 ? history[i - 1]?.type : undefined;
         const isFirstThinking =
           item.type === 'thinking' && prevType !== 'thinking';
         const isFirstAfterThinking =
@@ -100,7 +128,7 @@ export const MainContent = () => {
           isToolGroupBoundary,
         };
       }),
-    [uiState.history, lastUserPromptIndex],
+    [history, lastUserPromptIndex],
   );
 
   const historyItems = useMemo(
@@ -116,7 +144,7 @@ export const MainContent = () => {
           <MemoizedHistoryItemDisplay
             terminalWidth={mainAreaWidth}
             availableTerminalHeight={
-              uiState.constrainHeight || !isExpandable
+              constrainHeight || !isExpandable
                 ? staticAreaMaxItemHeight
                 : undefined
             }
@@ -124,7 +152,7 @@ export const MainContent = () => {
             key={item.id}
             item={item}
             isPending={false}
-            commands={uiState.slashCommands}
+            commands={slashCommands}
             isExpandable={isExpandable}
             isFirstThinking={isFirstThinking}
             isFirstAfterThinking={isFirstAfterThinking}
@@ -136,8 +164,8 @@ export const MainContent = () => {
       augmentedHistory,
       mainAreaWidth,
       staticAreaMaxItemHeight,
-      uiState.slashCommands,
-      uiState.constrainHeight,
+      slashCommands,
+      constrainHeight,
     ],
   );
 
@@ -156,9 +184,7 @@ export const MainContent = () => {
       <Box flexDirection="column" key="pending-items-group">
         {pendingHistoryItems.map((item, i) => {
           const prevType =
-            i === 0
-              ? uiState.history.at(-1)?.type
-              : pendingHistoryItems[i - 1]?.type;
+            i === 0 ? history.at(-1)?.type : pendingHistoryItems[i - 1]?.type;
           const isFirstThinking =
             item.type === 'thinking' && prevType !== 'thinking';
           const isFirstAfterThinking =
@@ -171,7 +197,7 @@ export const MainContent = () => {
             <HistoryItemDisplay
               key={`pending-${i}`}
               availableTerminalHeight={
-                uiState.constrainHeight ? availableTerminalHeight : undefined
+                constrainHeight ? availableTerminalHeight : undefined
               }
               terminalWidth={mainAreaWidth}
               item={{ ...item, id: -(i + 1) }}
@@ -193,12 +219,12 @@ export const MainContent = () => {
     ),
     [
       pendingHistoryItems,
-      uiState.constrainHeight,
+      constrainHeight,
       availableTerminalHeight,
       mainAreaWidth,
       showConfirmationQueue,
       confirmingTool,
-      uiState.history,
+      history,
     ],
   );
 
@@ -258,10 +284,8 @@ export const MainContent = () => {
       return (
         <ScrollableList
           ref={scrollableListRef}
-          hasFocus={
-            !uiState.isEditorDialogOpen && !uiState.embeddedShellFocused
-          }
-          width={uiState.terminalWidth}
+          hasFocus={!isEditorDialogOpen && !embeddedShellFocused}
+          width={terminalWidth}
           data={virtualizedData}
           renderItem={renderItem}
           estimatedItemHeight={estimatedItemHeight}
@@ -284,9 +308,9 @@ export const MainContent = () => {
     return null;
   }, [
     isAlternateBufferOrTerminalBuffer,
-    uiState.isEditorDialogOpen,
-    uiState.embeddedShellFocused,
-    uiState.terminalWidth,
+    isEditorDialogOpen,
+    embeddedShellFocused,
+    terminalWidth,
     virtualizedData,
     renderItem,
     estimatedItemHeight,
@@ -297,7 +321,7 @@ export const MainContent = () => {
     isAlternateBuffer,
   ]);
 
-  if (!uiState.isConfigInitialized) {
+  if (!isConfigInitialized) {
     return null;
   }
 
@@ -308,7 +332,7 @@ export const MainContent = () => {
   return (
     <>
       <Static
-        key={uiState.historyRemountKey}
+        key={historyRemountKey}
         items={[
           <AppHeader key="app-header" version={version} />,
           ...staticHistoryItems,
@@ -320,4 +344,6 @@ export const MainContent = () => {
       {pendingItems}
     </>
   );
-};
+});
+
+MainContent.displayName = 'MainContent';

@@ -31,6 +31,8 @@ describe('useSessionResume', () => {
     history: [],
     addItem: vi.fn(),
     updateItem: vi.fn(),
+    addItemsBatch: vi.fn(),
+    pruneHistory: vi.fn(),
     clearItems: vi.fn(),
     loadHistory: vi.fn(),
   });
@@ -100,20 +102,12 @@ describe('useSessionResume', () => {
 
       expect(mockSetQuittingMessages).toHaveBeenCalledWith(null);
       expect(mockHistoryManager.clearItems).toHaveBeenCalled();
-      expect(mockHistoryManager.addItem).toHaveBeenCalledTimes(2);
-      expect(mockHistoryManager.addItem).toHaveBeenNthCalledWith(
-        1,
-        { type: 'user', text: 'Hello' },
-        0,
-        true,
-      );
-      expect(mockHistoryManager.addItem).toHaveBeenNthCalledWith(
-        2,
-        { type: 'gemini', text: 'Hi there!' },
-        1,
+      expect(mockHistoryManager.addItemsBatch).toHaveBeenCalledWith(
+        uiHistory,
         true,
       );
       expect(mockRefreshStatic).toHaveBeenCalledTimes(1);
+
       expect(mockGeminiClient.resumeChat).toHaveBeenCalledWith(
         clientHistory,
         resumedData,
@@ -411,19 +405,7 @@ describe('useSessionResume', () => {
         expect(mockHistoryManager.clearItems).toHaveBeenCalled();
       });
 
-      expect(mockHistoryManager.addItem).toHaveBeenCalledTimes(2);
-      expect(mockHistoryManager.addItem).toHaveBeenNthCalledWith(
-        1,
-        { type: 'user', text: 'Hello from resumed session' },
-        0,
-        true,
-      );
-      expect(mockHistoryManager.addItem).toHaveBeenNthCalledWith(
-        2,
-        { type: 'gemini', text: 'Welcome back!' },
-        1,
-        true,
-      );
+      expect(mockHistoryManager.addItemsBatch).toHaveBeenCalled();
       expect(mockRefreshStatic).toHaveBeenCalledTimes(1);
       expect(mockGeminiClient.resumeChat).toHaveBeenCalled();
     });
@@ -533,7 +515,7 @@ describe('useSessionResume', () => {
       });
 
       // But UI history should have both
-      expect(mockHistoryManager.addItem).toHaveBeenCalledTimes(2);
+      expect(mockHistoryManager.addItemsBatch).toHaveBeenCalled();
     });
   });
 });

@@ -305,4 +305,81 @@ describe('useHistoryManager', () => {
       expect(result.current.history[0].type).toBe('info');
     });
   });
+
+  describe('addItemsBatch', () => {
+    it('should add multiple items at once', async () => {
+      const { result } = await renderHook(() => useHistory());
+      const itemsData = [
+        { type: 'user' as const, text: 'Item 1' },
+        { type: 'gemini' as const, text: 'Item 2' },
+        { type: 'info' as const, text: 'Item 3' },
+      ];
+
+      act(() => {
+        result.current.addItemsBatch(itemsData);
+      });
+
+      expect(result.current.history).toHaveLength(3);
+      expect(result.current.history[0].text).toBe('Item 1');
+      expect(result.current.history[1].text).toBe('Item 2');
+      expect(result.current.history[2].text).toBe('Item 3');
+      expect(result.current.history[0].id).toBeLessThan(
+        result.current.history[1].id,
+      );
+    });
+
+    it('should filter out consecutive duplicate user messages within a batch', async () => {
+      const { result } = await renderHook(() => useHistory());
+      const itemsData = [
+        { type: 'user' as const, text: 'Unique' },
+        { type: 'user' as const, text: 'Duplicate' },
+        { type: 'user' as const, text: 'Duplicate' }, // Should be filtered
+        { type: 'gemini' as const, text: 'Response' },
+        { type: 'user' as const, text: 'Duplicate' }, // Not consecutive now
+      ];
+
+      act(() => {
+        result.current.addItemsBatch(itemsData);
+      });
+
+      expect(result.current.history).toHaveLength(4);
+      expect(result.current.history[0].text).toBe('Unique');
+      expect(result.current.history[1].text).toBe('Duplicate');
+      expect(result.current.history[2].text).toBe('Response');
+      expect(result.current.history[3].text).toBe('Duplicate');
+    });
+
+    it('should respect isResuming flag by using index-based IDs', async () => {
+      const { result } = await renderHook(() => useHistory());
+      const itemsData = [
+        { type: 'user' as const, text: 'First' },
+        { type: 'gemini' as const, text: 'Second' },
+      ];
+
+      act(() => {
+        result.current.addItemsBatch(itemsData, true);
+      });
+
+      expect(result.current.history[0].id).toBe(1);
+      expect(result.current.history[1].id).toBe(2);
+    });
+
+    it('should avoid adding a duplicate user message if it matches the last existing item', async () => {
+      const initialItems: HistoryItem[] = [
+        { id: 1, type: 'user', text: 'Existing User Msg' },
+      ];
+      const { result } = await renderHook(() => useHistory({ initialItems }));
+
+      act(() => {
+        result.current.addItemsBatch([
+          { type: 'user', text: 'Existing User Msg' }, // Duplicate of last
+          { type: 'gemini', text: 'New Gemini Msg' },
+        ]);
+      });
+
+      expect(result.current.history).toHaveLength(2);
+      expect(result.current.history[0].text).toBe('Existing User Msg');
+      expect(result.current.history[1].text).toBe('New Gemini Msg');
+    });
+  });
 });

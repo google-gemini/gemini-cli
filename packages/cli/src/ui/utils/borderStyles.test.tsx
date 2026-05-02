@@ -23,6 +23,54 @@ const altBufferOptions = {
   settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
 };
 
+import { type UIState } from '../contexts/UIStateContext.js';
+
+const defaultMockUiState: Partial<UIState> = {
+  history: [],
+  pendingHistoryItems: [],
+  mainAreaWidth: 100,
+  staticAreaMaxItemHeight: 20,
+  availableTerminalHeight: 30,
+  cleanUiDetailsVisible: true,
+  mouseMode: false,
+  slashCommands: [],
+  constrainHeight: false,
+  historyRemountKey: 0,
+  isConfigInitialized: true,
+  terminalWidth: 100,
+  isEditorDialogOpen: false,
+  embeddedShellFocused: false,
+};
+
+const renderMainContentWithState = async (uiState: Partial<UIState> = {}) => {
+  const combinedState = {
+    ...defaultMockUiState,
+    ...uiState,
+  } as unknown as UIState;
+  return renderWithProviders(
+    <MainContent
+      history={combinedState.history}
+      pendingHistoryItems={combinedState.pendingHistoryItems}
+      mainAreaWidth={combinedState.mainAreaWidth}
+      staticAreaMaxItemHeight={combinedState.staticAreaMaxItemHeight}
+      availableTerminalHeight={combinedState.availableTerminalHeight}
+      cleanUiDetailsVisible={combinedState.cleanUiDetailsVisible}
+      mouseMode={combinedState.mouseMode}
+      slashCommands={combinedState.slashCommands}
+      constrainHeight={combinedState.constrainHeight}
+      historyRemountKey={combinedState.historyRemountKey}
+      isConfigInitialized={combinedState.isConfigInitialized}
+      terminalWidth={combinedState.terminalWidth}
+      isEditorDialogOpen={combinedState.isEditorDialogOpen}
+      embeddedShellFocused={combinedState.embeddedShellFocused}
+    />,
+    {
+      ...altBufferOptions,
+      uiState: combinedState,
+    },
+  );
+};
+
 describe('getToolGroupBorderAppearance', () => {
   it('should use warning color for pending non-shell tools', () => {
     const item = {
@@ -110,24 +158,20 @@ describe('getToolGroupBorderAppearance', () => {
 
 describe('MainContent tool group border SVG snapshots', () => {
   it('should render SVG snapshot for a pending search dialog (google_web_search)', async () => {
-    const renderResult = await renderWithProviders(<MainContent />, {
-      ...altBufferOptions,
-      uiState: {
-        history: [],
-        pendingHistoryItems: [
-          {
-            type: 'tool_group',
-            tools: [
-              {
-                name: 'google_web_search',
-                status: CoreToolCallStatus.Executing,
-                resultDisplay: 'Searching...',
-                callId: 'call-1',
-              } as unknown as IndividualToolCallDisplay,
-            ],
-          },
-        ],
-      },
+    const renderResult = await renderMainContentWithState({
+      pendingHistoryItems: [
+        {
+          type: 'tool_group',
+          tools: [
+            {
+              name: 'google_web_search',
+              status: CoreToolCallStatus.Executing,
+              resultDisplay: 'Searching...',
+              callId: 'call-1',
+            } as unknown as IndividualToolCallDisplay,
+          ],
+        },
+      ],
     });
 
     await renderResult.waitUntilReady();
@@ -135,28 +179,25 @@ describe('MainContent tool group border SVG snapshots', () => {
   });
 
   it('should render SVG snapshot for an empty slice following a search tool', async () => {
-    const renderResult = await renderWithProviders(<MainContent />, {
-      ...altBufferOptions,
-      uiState: {
-        history: [],
-        pendingHistoryItems: [
-          {
-            type: 'tool_group',
-            tools: [
-              {
-                name: 'google_web_search',
-                status: CoreToolCallStatus.Executing,
-                resultDisplay: 'Searching...',
-                callId: 'call-1',
-              } as unknown as IndividualToolCallDisplay,
-            ],
-          },
-          {
-            type: 'tool_group',
-            tools: [],
-          },
-        ],
-      },
+    const renderResult = await renderMainContentWithState({
+      history: [],
+      pendingHistoryItems: [
+        {
+          type: 'tool_group',
+          tools: [
+            {
+              name: 'google_web_search',
+              status: CoreToolCallStatus.Executing,
+              resultDisplay: 'Searching...',
+              callId: 'call-1',
+            } as unknown as IndividualToolCallDisplay,
+          ],
+        },
+        {
+          type: 'tool_group',
+          tools: [],
+        },
+      ],
     });
 
     await renderResult.waitUntilReady();
@@ -164,24 +205,21 @@ describe('MainContent tool group border SVG snapshots', () => {
   });
 
   it('should render SVG snapshot for a shell tool', async () => {
-    const renderResult = await renderWithProviders(<MainContent />, {
-      ...altBufferOptions,
-      uiState: {
-        history: [],
-        pendingHistoryItems: [
-          {
-            type: 'tool_group',
-            tools: [
-              {
-                name: 'run_shell_command',
-                status: CoreToolCallStatus.Executing,
-                resultDisplay: 'Running command...',
-                callId: 'call-1',
-              } as unknown as IndividualToolCallDisplay,
-            ],
-          },
-        ],
-      },
+    const renderResult = await renderMainContentWithState({
+      history: [],
+      pendingHistoryItems: [
+        {
+          type: 'tool_group',
+          tools: [
+            {
+              name: 'run_shell_command',
+              status: CoreToolCallStatus.Executing,
+              resultDisplay: 'Running command...',
+              callId: 'call-1',
+            } as unknown as IndividualToolCallDisplay,
+          ],
+        },
+      ],
     });
 
     await renderResult.waitUntilReady();

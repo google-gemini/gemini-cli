@@ -89,6 +89,8 @@ describe('useIncludeDirsTrust', () => {
       addItem: vi.fn(),
       history: [],
       updateItem: vi.fn(),
+      addItemsBatch: vi.fn(),
+      pruneHistory: vi.fn(),
       clearItems: vi.fn(),
       loadHistory: vi.fn(),
     };

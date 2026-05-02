@@ -120,6 +120,189 @@ export async function loadConversationRecord(
     return null;
   }
 
+  // Optimization: If we only need metadata and basic info, we don't need to
+  // parse the entire file line by line if we can get what we need from the
+  // first line (metadata) and maybe a few more.
+  if (options?.metadataOnly) {
+    try {
+      const fileStream = fs.createReadStream(filePath);
+      const rl = readline.createInterface({
+        input: fileStream,
+        crlfDelay: Infinity,
+      });
+
+      const uniqueMessageIds = new Set<string>();
+      let metadata: Partial<ConversationRecord> = {};
+      let firstUserMessageStr: string | undefined;
+      let userMessageCount = 0;
+      let hasUserOrAssistant = false;
+
+      for await (const line of rl) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+
+        // PERF: Message records are guaranteed to start with {"id": because
+        // newMessage() defines it as the first key, and V8's JSON.stringify()
+        // preserves insertion order for non-integer string keys.
+        // Other records (metadata, updates, rewinds) use different keys and
+        // will safely fall through to the full JSON.parse() block.
+        if (trimmed.startsWith('{"id":')) {
+          // Identify the message ID to ensure unique counting (JSONL appends updates)
+          const idMatch = /^\{"id":"((?:[^"\\]|\\.)*)"/.exec(trimmed);
+          if (!idMatch) {
+            // If even basic ID extraction fails, fallback to full parse
+            try {
+              const record = JSON.parse(trimmed) as unknown;
+              if (isMessageRecord(record)) {
+                if (!uniqueMessageIds.has(record.id)) {
+                  uniqueMessageIds.add(record.id);
+                  if (record.type === 'user' || record.type === 'gemini') {
+                    hasUserOrAssistant = true;
+                  }
+                  if (record.type === 'user') {
+                    userMessageCount++;
+                    if (!firstUserMessageStr) {
+                      const rawContent = record['content'];
+                      firstUserMessageStr = Array.isArray(rawContent)
+                        ? rawContent
+                            .map((p: unknown) =>
+                              isTextPart(p) ? p['text'] : '',
+                            )
+                            .join('')
+                        : typeof rawContent === 'string'
+                          ? rawContent
+                          : undefined;
+                    }
+                  }
+                }
+              }
+            } catch {
+              /* ignore */
+            }
+            continue;
+          }
+
+          const msgId = idMatch[1];
+          const isNewMessage = !uniqueMessageIds.has(msgId);
+          if (isNewMessage) {
+            uniqueMessageIds.add(msgId);
+          }
+
+          // PERF: Try a strict fast-path regex that assumes our standard key order:
+          // {"id":"...", "timestamp":"...", "type":"..."
+          // If this matches, we are extremely likely to be correct and can avoid JSON.parse.
+          const fastMatch =
+            /^\{"id":"[^"]+","timestamp":"[^"]+","type"\s*:\s*"(user|user_shell|gemini|info|error|warning)"/.exec(
+              trimmed,
+            );
+
+          if (fastMatch) {
+            const type = fastMatch[1];
+            const isUser = type === 'user' || type === 'user_shell';
+            const isGemini = type === 'gemini';
+
+            if (isNewMessage) {
+              if (isUser || isGemini) {
+                hasUserOrAssistant = true;
+              }
+              if (isUser) {
+                userMessageCount++;
+              }
+            }
+
+            // Only parse if we still need the first user message preview
+            if (!firstUserMessageStr && isUser) {
+              try {
+                const record = JSON.parse(trimmed) as unknown;
+                if (isMessageRecord(record) && record.type === 'user') {
+                  const rawContent = record['content'];
+                  firstUserMessageStr = Array.isArray(rawContent)
+                    ? rawContent
+                        .map((p: unknown) => (isTextPart(p) ? p['text'] : ''))
+                        .join('')
+                    : typeof rawContent === 'string'
+                      ? rawContent
+                      : undefined;
+                }
+              } catch {
+                /* ignore */
+              }
+            }
+          } else {
+            // Format is non-standard or "type" is further down (e.g. after content).
+            // Safe fallback to full parse for correctness.
+            try {
+              const record = JSON.parse(trimmed) as unknown;
+              if (isMessageRecord(record)) {
+                // If it's an update to a message we already counted, we just update the type info
+                if (record.type === 'user' || record.type === 'gemini') {
+                  hasUserOrAssistant = true;
+                }
+                if (isNewMessage && record.type === 'user') {
+                  userMessageCount++;
+                }
+                // Update preview if needed
+                if (!firstUserMessageStr && record.type === 'user') {
+                  const rawContent = record['content'];
+                  firstUserMessageStr = Array.isArray(rawContent)
+                    ? rawContent
+                        .map((p: unknown) => (isTextPart(p) ? p['text'] : ''))
+                        .join('')
+                    : typeof rawContent === 'string'
+                      ? rawContent
+                      : undefined;
+                }
+              }
+            } catch {
+              /* ignore */
+            }
+          }
+        } else {
+          // This is a metadata or control record (initial metadata, $set update, etc.)
+          // We must ALWAYS parse these to get the latest session state (summary, dirs, etc.)
+          try {
+            const record = JSON.parse(trimmed) as unknown;
+            if (isPartialMetadataRecord(record)) {
+              metadata = { ...metadata, ...record };
+            } else if (isMetadataUpdateRecord(record)) {
+              metadata = { ...metadata, ...record.$set };
+            }
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+
+      if (metadata.sessionId && metadata.projectHash) {
+        // Fast path for metadata-only
+        const stats = await fs.promises.stat(filePath);
+
+        return {
+          sessionId: metadata.sessionId,
+          projectHash: metadata.projectHash,
+          startTime:
+            metadata.startTime || new Date(stats.birthtime).toISOString(),
+          lastUpdated:
+            metadata.lastUpdated || new Date(stats.mtime).toISOString(),
+          summary: metadata.summary,
+          memoryScratchpad: metadata.memoryScratchpad,
+          directories: metadata.directories,
+          kind: metadata.kind,
+          messages: [],
+          messageCount: metadata.messageCount ?? uniqueMessageIds.size,
+          userMessageCount,
+          firstUserMessage: firstUserMessageStr,
+          hasUserOrAssistantMessage: hasUserOrAssistant,
+        };
+      }
+    } catch (e) {
+      debugLogger.debug(
+        'Fast metadata read failed, falling back to full read',
+        e,
+      );
+    }
+  }
+
   try {
     const fileStream = fs.createReadStream(filePath);
     const rl = readline.createInterface({
@@ -327,44 +510,51 @@ export class ChatRecordingService {
         this.sessionId = resumedSessionData.conversation.sessionId;
         this.kind = resumedSessionData.conversation.kind;
 
-        const loadedRecord = await loadConversationRecord(
-          this.conversationFile,
-        );
-        if (loadedRecord) {
-          this.cachedConversation = loadedRecord;
-          this.projectHash = this.cachedConversation.projectHash;
+        // Use the already loaded conversation data instead of reading from disk again.
+        this.cachedConversation = resumedSessionData.conversation;
+        this.projectHash = this.cachedConversation.projectHash;
 
-          if (this.conversationFile.endsWith('.json')) {
-            this.conversationFile = this.conversationFile + 'l'; // e.g. session-foo.jsonl
+        if (this.conversationFile.endsWith('.json')) {
+          const oldFilePath = this.conversationFile;
+          this.conversationFile = this.conversationFile + 'l'; // e.g. session-foo.jsonl
 
-            // Migrate the entire legacy record to the new file
-            const initialMetadata = {
-              sessionId: this.sessionId,
-              projectHash: this.projectHash,
-              startTime: this.cachedConversation.startTime,
-              lastUpdated: this.cachedConversation.lastUpdated,
-              kind: this.cachedConversation.kind,
-              directories: this.cachedConversation.directories,
-              summary: this.cachedConversation.summary,
-            };
-            this.appendRecord(initialMetadata);
-            for (const msg of this.cachedConversation.messages) {
-              this.appendRecord(msg);
-            }
-            if (this.cachedConversation.memoryScratchpad) {
-              this.appendRecord({
-                $set: {
-                  memoryScratchpad: this.cachedConversation.memoryScratchpad,
-                },
-              });
+          // CRITICAL: Ensure we have the full conversation record before migration.
+          // If metadataOnly was used, the messages array will be empty.
+          if (
+            this.cachedConversation.messages.length === 0 &&
+            (this.cachedConversation.messageCount ?? 0) > 0
+          ) {
+            const fullRecord = await loadConversationRecord(oldFilePath);
+            if (fullRecord) {
+              this.cachedConversation = fullRecord;
             }
           }
 
-          // Update the session ID in the existing file
-          this.updateMetadata({ sessionId: this.sessionId });
-        } else {
-          throw new Error('Failed to load resumed session data from file');
+          // Migrate the entire legacy record to the new file
+          const initialMetadata = {
+            sessionId: this.sessionId,
+            projectHash: this.projectHash,
+            startTime: this.cachedConversation.startTime,
+            lastUpdated: this.cachedConversation.lastUpdated,
+            kind: this.cachedConversation.kind,
+            directories: this.cachedConversation.directories,
+            summary: this.cachedConversation.summary,
+          };
+          this.appendRecord(initialMetadata);
+          for (const msg of this.cachedConversation.messages) {
+            this.appendRecord(msg);
+          }
+          if (this.cachedConversation.memoryScratchpad) {
+            this.appendRecord({
+              $set: {
+                memoryScratchpad: this.cachedConversation.memoryScratchpad,
+              },
+            });
+          }
         }
+
+        // Update the session ID in the existing file
+        this.updateMetadata({ sessionId: this.sessionId });
       } else {
         // Create new session
         this.sessionId = this.context.promptId;

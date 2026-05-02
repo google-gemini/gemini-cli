@@ -12,8 +12,9 @@ import { ScreenReaderAppLayout } from './layouts/ScreenReaderAppLayout.js';
 import { DefaultAppLayout } from './layouts/DefaultAppLayout.js';
 import { AlternateBufferQuittingDisplay } from './components/AlternateBufferQuittingDisplay.js';
 import { useAlternateBuffer } from './hooks/useAlternateBuffer.js';
+import { memo } from 'react';
 
-export const App = () => {
+export const App = memo(() => {
   const uiState = useUIState();
   const isAlternateBuffer = useAlternateBuffer();
   const isScreenReaderEnabled = useIsScreenReaderEnabled();
@@ -35,4 +36,5 @@ export const App = () => {
       {isScreenReaderEnabled ? <ScreenReaderAppLayout /> : <DefaultAppLayout />}
     </StreamingContext.Provider>
   );
-};
+});
+App.displayName = 'App';

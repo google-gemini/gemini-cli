@@ -67,9 +67,7 @@ export function useSessionResume({
         // Now that we have the client, load the history into the UI and the client.
         setQuittingMessages(null);
         historyManagerRef.current.clearItems();
-        uiHistory.forEach((item, index) => {
-          historyManagerRef.current.addItem(item, index, true);
-        });
+        historyManagerRef.current.addItemsBatch(uiHistory, true);
         refreshStaticRef.current(); // Force Static component to re-render with the updated history.
 
         // Restore directories from the resumed session

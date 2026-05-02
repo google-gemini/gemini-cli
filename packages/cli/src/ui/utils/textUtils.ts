@@ -277,3 +277,26 @@ export function escapeAnsiCtrlCodes<T>(obj: T): T {
 
   return newObj !== null ? newObj : obj;
 }
+
+/**
+ * Truncates a string to a maximum number of characters, keeping the start and
+ * end of the string if it exceeds the limit.
+ */
+export function truncateString(str: string, maxChars: number): string {
+  if (str.length <= maxChars) {
+    return str;
+  }
+
+  const headChars = Math.floor(maxChars * 0.2);
+  const tailChars = maxChars - headChars;
+
+  const head = str.slice(0, headChars);
+  const tail = str.slice(-tailChars);
+  const omittedChars = str.length - headChars - tailChars;
+
+  return (
+    head +
+    `\n\n... [${omittedChars.toLocaleString()} characters omitted] ...\n\n` +
+    tail
+  );
+}

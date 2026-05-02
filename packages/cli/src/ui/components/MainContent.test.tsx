@@ -358,6 +358,34 @@ describe('MainContent', () => {
     bannerVisible: false,
     copyModeEnabled: false,
     terminalWidth: 100,
+    mouseMode: false,
+    isConfigInitialized: true,
+  };
+
+  const renderMainContent = (uiState: Partial<UIState> = {}) => {
+    const combinedState = {
+      ...defaultMockUiState,
+      ...uiState,
+    } as unknown as UIState;
+    return renderWithProviders(
+      <MainContent
+        history={combinedState.history}
+        pendingHistoryItems={combinedState.pendingHistoryItems}
+        mainAreaWidth={combinedState.mainAreaWidth}
+        staticAreaMaxItemHeight={combinedState.staticAreaMaxItemHeight}
+        availableTerminalHeight={combinedState.availableTerminalHeight}
+        cleanUiDetailsVisible={combinedState.cleanUiDetailsVisible}
+        mouseMode={combinedState.mouseMode}
+        slashCommands={combinedState.slashCommands}
+        constrainHeight={combinedState.constrainHeight}
+        historyRemountKey={combinedState.historyRemountKey}
+        isConfigInitialized={combinedState.isConfigInitialized}
+        terminalWidth={combinedState.terminalWidth}
+        isEditorDialogOpen={combinedState.isEditorDialogOpen}
+        embeddedShellFocused={combinedState.embeddedShellFocused}
+      />,
+      { uiState: combinedState },
+    );
   };
 
   beforeEach(() => {
@@ -376,9 +404,7 @@ describe('MainContent', () => {
   });
 
   it('renders in normal buffer mode', async () => {
-    const { lastFrame, unmount } = await renderWithProviders(<MainContent />, {
-      uiState: defaultMockUiState as Partial<UIState>,
-    });
+    const { lastFrame, unmount } = await renderMainContent();
     await waitFor(() => expect(lastFrame()).toContain('AppHeader(full)'));
     const output = lastFrame();
 
@@ -390,9 +416,7 @@ describe('MainContent', () => {
 
   it('renders in alternate buffer mode', async () => {
     vi.mocked(useAlternateBuffer).mockReturnValue(true);
-    const { lastFrame, unmount } = await renderWithProviders(<MainContent />, {
-      uiState: defaultMockUiState as Partial<UIState>,
-    });
+    const { lastFrame, unmount } = await renderMainContent();
     const output = lastFrame();
     expect(output).toContain('AppHeader(full)');
     expect(output).toContain('Hello');
@@ -403,11 +427,8 @@ describe('MainContent', () => {
   it('renders minimal header in minimal mode (alternate buffer)', async () => {
     vi.mocked(useAlternateBuffer).mockReturnValue(true);
 
-    const { lastFrame, unmount } = await renderWithProviders(<MainContent />, {
-      uiState: {
-        ...defaultMockUiState,
-        cleanUiDetailsVisible: false,
-      } as Partial<UIState>,
+    const { lastFrame, unmount } = await renderMainContent({
+      cleanUiDetailsVisible: false,
     });
     await waitFor(() => expect(lastFrame()).toContain('Hello'));
     const output = lastFrame();
@@ -429,11 +450,29 @@ describe('MainContent', () => {
       );
       setShowDetails = setShowDetailsState;
 
+      const combinedState = {
+        ...outerState,
+        cleanUiDetailsVisible: showDetails,
+      };
+
       return (
-        <UIStateContext.Provider
-          value={{ ...outerState, cleanUiDetailsVisible: showDetails }}
-        >
-          <MainContent />
+        <UIStateContext.Provider value={combinedState}>
+          <MainContent
+            history={combinedState.history}
+            pendingHistoryItems={combinedState.pendingHistoryItems}
+            mainAreaWidth={combinedState.mainAreaWidth}
+            staticAreaMaxItemHeight={combinedState.staticAreaMaxItemHeight}
+            availableTerminalHeight={combinedState.availableTerminalHeight}
+            cleanUiDetailsVisible={combinedState.cleanUiDetailsVisible}
+            mouseMode={combinedState.mouseMode}
+            slashCommands={combinedState.slashCommands}
+            constrainHeight={combinedState.constrainHeight}
+            historyRemountKey={combinedState.historyRemountKey}
+            isConfigInitialized={combinedState.isConfigInitialized}
+            terminalWidth={combinedState.terminalWidth}
+            isEditorDialogOpen={combinedState.isEditorDialogOpen}
+            embeddedShellFocused={combinedState.embeddedShellFocused}
+          />
         </UIStateContext.Provider>
       );
     };
@@ -460,11 +499,8 @@ describe('MainContent', () => {
 
   it('always renders full header details in normal buffer mode', async () => {
     vi.mocked(useAlternateBuffer).mockReturnValue(false);
-    const { lastFrame } = await renderWithProviders(<MainContent />, {
-      uiState: {
-        ...defaultMockUiState,
-        cleanUiDetailsVisible: false,
-      } as Partial<UIState>,
+    const { lastFrame } = await renderMainContent({
+      cleanUiDetailsVisible: false,
     });
 
     await waitFor(() => expect(lastFrame()).toContain('AppHeader(full)'));
@@ -473,9 +509,7 @@ describe('MainContent', () => {
 
   it('does not constrain height in alternate buffer mode', async () => {
     vi.mocked(useAlternateBuffer).mockReturnValue(true);
-    const { lastFrame, unmount } = await renderWithProviders(<MainContent />, {
-      uiState: defaultMockUiState as Partial<UIState>,
-    });
+    const { lastFrame, unmount } = await renderMainContent();
     const output = lastFrame();
     expect(output).toContain('AppHeader(full)');
     expect(output).toContain('Hello');
@@ -495,11 +529,33 @@ describe('MainContent', () => {
       staticAreaMaxItemHeight: 5,
     };
 
-    const { lastFrame, unmount } = await renderWithProviders(<MainContent />, {
-      uiState: uiState as Partial<UIState>,
-      config: makeFakeConfig({ useAlternateBuffer: true }),
-      settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
-    });
+    const combinedState = {
+      ...defaultMockUiState,
+      ...uiState,
+    } as unknown as UIState;
+    const { lastFrame, unmount } = await renderWithProviders(
+      <MainContent
+        history={combinedState.history}
+        pendingHistoryItems={combinedState.pendingHistoryItems}
+        mainAreaWidth={combinedState.mainAreaWidth}
+        staticAreaMaxItemHeight={combinedState.staticAreaMaxItemHeight}
+        availableTerminalHeight={combinedState.availableTerminalHeight}
+        cleanUiDetailsVisible={combinedState.cleanUiDetailsVisible}
+        mouseMode={combinedState.mouseMode}
+        slashCommands={combinedState.slashCommands}
+        constrainHeight={combinedState.constrainHeight}
+        historyRemountKey={combinedState.historyRemountKey}
+        isConfigInitialized={combinedState.isConfigInitialized}
+        terminalWidth={combinedState.terminalWidth}
+        isEditorDialogOpen={combinedState.isEditorDialogOpen}
+        embeddedShellFocused={combinedState.embeddedShellFocused}
+      />,
+      {
+        uiState: combinedState,
+        config: makeFakeConfig({ useAlternateBuffer: true }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
+      },
+    );
 
     const output = lastFrame();
     expect(output).toMatchSnapshot();
@@ -518,11 +574,33 @@ describe('MainContent', () => {
       staticAreaMaxItemHeight: 5,
     };
 
-    const { lastFrame, unmount } = await renderWithProviders(<MainContent />, {
-      uiState: uiState as unknown as Partial<UIState>,
-      config: makeFakeConfig({ useAlternateBuffer: true }),
-      settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
-    });
+    const combinedState = {
+      ...defaultMockUiState,
+      ...uiState,
+    } as unknown as UIState;
+    const { lastFrame, unmount } = await renderWithProviders(
+      <MainContent
+        history={combinedState.history}
+        pendingHistoryItems={combinedState.pendingHistoryItems}
+        mainAreaWidth={combinedState.mainAreaWidth}
+        staticAreaMaxItemHeight={combinedState.staticAreaMaxItemHeight}
+        availableTerminalHeight={combinedState.availableTerminalHeight}
+        cleanUiDetailsVisible={combinedState.cleanUiDetailsVisible}
+        mouseMode={combinedState.mouseMode}
+        slashCommands={combinedState.slashCommands}
+        constrainHeight={combinedState.constrainHeight}
+        historyRemountKey={combinedState.historyRemountKey}
+        isConfigInitialized={combinedState.isConfigInitialized}
+        terminalWidth={combinedState.terminalWidth}
+        isEditorDialogOpen={combinedState.isEditorDialogOpen}
+        embeddedShellFocused={combinedState.embeddedShellFocused}
+      />,
+      {
+        uiState: combinedState,
+        config: makeFakeConfig({ useAlternateBuffer: true }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
+      },
+    );
 
     const output = lastFrame();
     expect(output).toMatchSnapshot();
@@ -564,10 +642,32 @@ describe('MainContent', () => {
       ],
     };
 
-    const { lastFrame, unmount } = await renderWithProviders(<MainContent />, {
-      uiState: uiState as Partial<UIState>,
-      config: makeFakeConfig({ useAlternateBuffer: false }),
-    });
+    const combinedState = {
+      ...defaultMockUiState,
+      ...uiState,
+    } as unknown as UIState;
+    const { lastFrame, unmount } = await renderWithProviders(
+      <MainContent
+        history={combinedState.history}
+        pendingHistoryItems={combinedState.pendingHistoryItems}
+        mainAreaWidth={combinedState.mainAreaWidth}
+        staticAreaMaxItemHeight={combinedState.staticAreaMaxItemHeight}
+        availableTerminalHeight={combinedState.availableTerminalHeight}
+        cleanUiDetailsVisible={combinedState.cleanUiDetailsVisible}
+        mouseMode={combinedState.mouseMode}
+        slashCommands={combinedState.slashCommands}
+        constrainHeight={combinedState.constrainHeight}
+        historyRemountKey={combinedState.historyRemountKey}
+        isConfigInitialized={combinedState.isConfigInitialized}
+        terminalWidth={combinedState.terminalWidth}
+        isEditorDialogOpen={combinedState.isEditorDialogOpen}
+        embeddedShellFocused={combinedState.embeddedShellFocused}
+      />,
+      {
+        uiState: combinedState,
+        config: makeFakeConfig({ useAlternateBuffer: false }),
+      },
+    );
 
     await waitFor(() => {
       expect(lastFrame()).toContain('codebase_investigator');
@@ -618,9 +718,31 @@ describe('MainContent', () => {
       ],
     };
 
-    const { lastFrame, unmount } = await renderWithProviders(<MainContent />, {
-      uiState: uiState as Partial<UIState>,
-    });
+    const combinedState = {
+      ...defaultMockUiState,
+      ...uiState,
+    } as unknown as UIState;
+    const { lastFrame, unmount } = await renderWithProviders(
+      <MainContent
+        history={combinedState.history}
+        pendingHistoryItems={combinedState.pendingHistoryItems}
+        mainAreaWidth={combinedState.mainAreaWidth}
+        staticAreaMaxItemHeight={combinedState.staticAreaMaxItemHeight}
+        availableTerminalHeight={combinedState.availableTerminalHeight}
+        cleanUiDetailsVisible={combinedState.cleanUiDetailsVisible}
+        mouseMode={combinedState.mouseMode}
+        slashCommands={combinedState.slashCommands}
+        constrainHeight={combinedState.constrainHeight}
+        historyRemountKey={combinedState.historyRemountKey}
+        isConfigInitialized={combinedState.isConfigInitialized}
+        terminalWidth={combinedState.terminalWidth}
+        isEditorDialogOpen={combinedState.isEditorDialogOpen}
+        embeddedShellFocused={combinedState.embeddedShellFocused}
+      />,
+      {
+        uiState: combinedState,
+      },
+    );
 
     await waitFor(() => {
       const output = lastFrame();
@@ -686,13 +808,35 @@ describe('MainContent', () => {
       }),
     );
 
+    const combinedState = {
+      ...defaultMockUiState,
+      ...uiState,
+    } as unknown as UIState;
     let lastFrame!: () => string;
     let unmount!: () => void;
     await act(async () => {
-      const res = await renderWithProviders(<MainContent />, {
-        uiState: uiState as Partial<UIState>,
-        config: makeFakeConfig({ useAlternateBuffer: false }),
-      });
+      const res = await renderWithProviders(
+        <MainContent
+          history={combinedState.history}
+          pendingHistoryItems={combinedState.pendingHistoryItems}
+          mainAreaWidth={combinedState.mainAreaWidth}
+          staticAreaMaxItemHeight={combinedState.staticAreaMaxItemHeight}
+          availableTerminalHeight={combinedState.availableTerminalHeight}
+          cleanUiDetailsVisible={combinedState.cleanUiDetailsVisible}
+          mouseMode={combinedState.mouseMode}
+          slashCommands={combinedState.slashCommands}
+          constrainHeight={combinedState.constrainHeight}
+          historyRemountKey={combinedState.historyRemountKey}
+          isConfigInitialized={combinedState.isConfigInitialized}
+          terminalWidth={combinedState.terminalWidth}
+          isEditorDialogOpen={combinedState.isEditorDialogOpen}
+          embeddedShellFocused={combinedState.embeddedShellFocused}
+        />,
+        {
+          uiState: combinedState,
+          config: makeFakeConfig({ useAlternateBuffer: false }),
+        },
+      );
       lastFrame = res.lastFrame;
       unmount = res.unmount;
     });
@@ -736,10 +880,32 @@ describe('MainContent', () => {
       ],
     };
 
-    const { lastFrame, unmount } = await renderWithProviders(<MainContent />, {
-      uiState: uiState as Partial<UIState>,
-      config: makeFakeConfig({ useAlternateBuffer: false }),
-    });
+    const combinedState = {
+      ...defaultMockUiState,
+      ...uiState,
+    } as unknown as UIState;
+    const { lastFrame, unmount } = await renderWithProviders(
+      <MainContent
+        history={combinedState.history}
+        pendingHistoryItems={combinedState.pendingHistoryItems}
+        mainAreaWidth={combinedState.mainAreaWidth}
+        staticAreaMaxItemHeight={combinedState.staticAreaMaxItemHeight}
+        availableTerminalHeight={combinedState.availableTerminalHeight}
+        cleanUiDetailsVisible={combinedState.cleanUiDetailsVisible}
+        mouseMode={combinedState.mouseMode}
+        slashCommands={combinedState.slashCommands}
+        constrainHeight={combinedState.constrainHeight}
+        historyRemountKey={combinedState.historyRemountKey}
+        isConfigInitialized={combinedState.isConfigInitialized}
+        terminalWidth={combinedState.terminalWidth}
+        isEditorDialogOpen={combinedState.isEditorDialogOpen}
+        embeddedShellFocused={combinedState.embeddedShellFocused}
+      />,
+      {
+        uiState: combinedState,
+        config: makeFakeConfig({ useAlternateBuffer: false }),
+      },
+    );
 
     await waitFor(() => {
       expect(lastFrame()).toContain('Apply plan');
@@ -794,9 +960,31 @@ describe('MainContent', () => {
       ],
     };
 
-    const renderResult = await renderWithProviders(<MainContent />, {
-      uiState: uiState as Partial<UIState>,
-    });
+    const combinedState = {
+      ...defaultMockUiState,
+      ...uiState,
+    } as unknown as UIState;
+    const renderResult = await renderWithProviders(
+      <MainContent
+        history={combinedState.history}
+        pendingHistoryItems={combinedState.pendingHistoryItems}
+        mainAreaWidth={combinedState.mainAreaWidth}
+        staticAreaMaxItemHeight={combinedState.staticAreaMaxItemHeight}
+        availableTerminalHeight={combinedState.availableTerminalHeight}
+        cleanUiDetailsVisible={combinedState.cleanUiDetailsVisible}
+        mouseMode={combinedState.mouseMode}
+        slashCommands={combinedState.slashCommands}
+        constrainHeight={combinedState.constrainHeight}
+        historyRemountKey={combinedState.historyRemountKey}
+        isConfigInitialized={combinedState.isConfigInitialized}
+        terminalWidth={combinedState.terminalWidth}
+        isEditorDialogOpen={combinedState.isEditorDialogOpen}
+        embeddedShellFocused={combinedState.embeddedShellFocused}
+      />,
+      {
+        uiState: combinedState,
+      },
+    );
 
     const output = renderResult.lastFrame();
     expect(output).toContain('Initial analysis');
@@ -897,12 +1085,33 @@ describe('MainContent', () => {
             warningText: '',
           },
           bannerVisible: false,
+          isConfigInitialized: true,
+          mouseMode: false,
         };
 
+        const combinedState = {
+          ...defaultMockUiState,
+          ...uiState,
+        } as unknown as UIState;
         const { lastFrame, unmount } = await renderWithProviders(
-          <MainContent />,
+          <MainContent
+            history={combinedState.history}
+            pendingHistoryItems={combinedState.pendingHistoryItems}
+            mainAreaWidth={combinedState.mainAreaWidth}
+            staticAreaMaxItemHeight={combinedState.staticAreaMaxItemHeight}
+            availableTerminalHeight={combinedState.availableTerminalHeight}
+            cleanUiDetailsVisible={combinedState.cleanUiDetailsVisible}
+            mouseMode={combinedState.mouseMode}
+            slashCommands={combinedState.slashCommands}
+            constrainHeight={combinedState.constrainHeight}
+            historyRemountKey={combinedState.historyRemountKey}
+            isConfigInitialized={combinedState.isConfigInitialized}
+            terminalWidth={combinedState.terminalWidth}
+            isEditorDialogOpen={combinedState.isEditorDialogOpen}
+            embeddedShellFocused={combinedState.embeddedShellFocused}
+          />,
           {
-            uiState: uiState as Partial<UIState>,
+            uiState: combinedState,
             config: makeFakeConfig({ useAlternateBuffer: isAlternateBuffer }),
             settings: createMockSettings({
               ui: { useAlternateBuffer: isAlternateBuffer },

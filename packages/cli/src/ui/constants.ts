@@ -78,3 +78,6 @@ export const MAX_SHELL_OUTPUT_SIZE = 10_000_000; // 10 MB
 // chunk, amortizing the cost to once per SHELL_OUTPUT_TRUNCATION_BUFFER bytes
 // of new input (i.e. once per ~1 MB on a busy shell).
 export const SHELL_OUTPUT_TRUNCATION_BUFFER = 1_000_000; // 1 MB
+
+// Maximum number of characters to retain in a tool result's display string in history.
+export const MAX_UI_TOOL_OUTPUT_LENGTH = 100_000;

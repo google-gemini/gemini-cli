@@ -237,7 +237,12 @@ export const AppContainer = (props: AppContainerProps) => {
     chatRecordingService: config.getGeminiClient()?.getChatRecordingService(),
   });
 
-  useMemoryMonitor(historyManager);
+  useMemoryMonitor({
+    addItem: historyManager.addItem,
+    pruneHistory: historyManager.pruneHistory,
+    historyLength: historyManager.history.length,
+  });
+
   const isAlternateBuffer = config.getUseAlternateBuffer();
   const [mouseMode, setMouseMode] = useState(() =>
     config.getUseAlternateBuffer(),

@@ -37,6 +37,8 @@ import { useSessionStats } from '../contexts/SessionContext.js';
 import { useStateAndRef } from './useStateAndRef.js';
 import { type MinimalTrackedToolCall } from './useTurnActivityMonitor.js';
 import { useKeypress } from './useKeypress.js';
+import { truncateString } from '../utils/textUtils.js';
+import { MAX_UI_TOOL_OUTPUT_LENGTH } from '../constants.js';
 
 export interface UseAgentStreamOptions {
   agent?: AgentProtocol;
@@ -242,13 +244,18 @@ export const useAgentStream = ({
               const ptyId = legacyState?.pid ?? tc.ptyId;
               const description = legacyState?.description ?? tc.description;
 
+              const resultDisplay =
+                typeof liveOutput === 'string'
+                  ? truncateString(liveOutput, MAX_UI_TOOL_OUTPUT_LENGTH)
+                  : liveOutput;
+
               return {
                 ...tc,
                 status,
                 display: event.display
                   ? { ...tc.display, ...event.display }
                   : tc.display,
-                resultDisplay: liveOutput,
+                resultDisplay,
                 progressMessage,
                 progress,
                 progressTotal,
@@ -267,8 +274,13 @@ export const useAgentStream = ({
               const legacyState = event._meta?.legacyState;
               const outputFile = legacyState?.outputFile;
               const display = event.display?.result;
-              const resultDisplay =
+              const rawResultDisplay =
                 displayContentToString(display) ?? tc.resultDisplay;
+
+              const resultDisplay =
+                typeof rawResultDisplay === 'string'
+                  ? truncateString(rawResultDisplay, MAX_UI_TOOL_OUTPUT_LENGTH)
+                  : rawResultDisplay;
 
               return {
                 ...tc,
