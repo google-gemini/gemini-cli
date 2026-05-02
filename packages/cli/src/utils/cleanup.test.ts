@@ -289,8 +289,40 @@ describe('signal and TTY handling', () => {
       });
 
       const cleanup = setupTtyCheck();
-      await vi.advanceTimersByTimeAsync(5000);
+      // TTY loss is confirmed after 5000ms check + 1000ms confirmation delay
+      await vi.advanceTimersByTimeAsync(6000);
       expect(process.exit).toHaveBeenCalledWith(0);
+      cleanup();
+    });
+
+    it('should not exit when TTY is restored during confirmation delay', async () => {
+      Object.defineProperty(process.stdin, 'isTTY', {
+        value: false,
+        writable: true,
+        configurable: true,
+      });
+      Object.defineProperty(process.stdout, 'isTTY', {
+        value: false,
+        writable: true,
+        configurable: true,
+      });
+
+      const cleanup = setupTtyCheck();
+      // Advance to when TTY loss is detected (5000ms), before confirmation fires
+      await vi.advanceTimersByTimeAsync(5000);
+      expect(process.exit).not.toHaveBeenCalled();
+
+      // Restore TTY before the 1s confirmation window expires
+      Object.defineProperty(process.stdin, 'isTTY', {
+        value: true,
+        writable: true,
+        configurable: true,
+      });
+
+      // Advance past the confirmation delay
+      await vi.advanceTimersByTimeAsync(1500);
+      // Should NOT have exited — TTY was restored (transient flicker)
+      expect(process.exit).not.toHaveBeenCalled();
       cleanup();
     });
 
