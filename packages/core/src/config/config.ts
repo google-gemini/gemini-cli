@@ -740,6 +740,7 @@ export interface ConfigParameters {
   billing?: {
     overageStrategy?: OverageStrategy;
   };
+  vertexAiRouting?: VertexAiRoutingConfig;
   vertexLocation?: string;
 }
 
