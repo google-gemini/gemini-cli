@@ -28,6 +28,7 @@ import { ConfigInitDisplay } from './ConfigInitDisplay.js';
 import { TodoTray } from './messages/Todo.js';
 import { useComposerStatus } from '../hooks/useComposerStatus.js';
 import { appEvents, AppEvent } from '../../utils/events.js';
+import { useTextBuffer } from './shared/text-buffer.js';
 
 export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
   const uiState = useUIState();
@@ -41,6 +42,11 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
   const isNarrow = isNarrowWidth(terminalWidth);
   const debugConsoleMaxHeight = Math.floor(Math.max(terminalWidth * 0.2, 5));
   const [suggestionsVisible, setSuggestionsVisible] = useState(false);
+  const debugConsoleSearchBuffer = useTextBuffer({
+    initialText: '',
+    viewport: { height: 1, width: Math.max(uiState.terminalWidth - 4, 1) },
+    singleLine: true,
+  });
 
   const isAlternateBuffer = useAlternateBuffer();
   const showUiDetails = uiState.cleanUiDetailsVisible;
@@ -135,6 +141,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
               }
               width={uiState.terminalWidth}
               hasFocus={uiState.showErrorDetails}
+              searchBuffer={debugConsoleSearchBuffer}
             />
             <ShowMoreLines constrainHeight={uiState.constrainHeight} />
           </Box>

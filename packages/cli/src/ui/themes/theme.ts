@@ -325,6 +325,13 @@ export class Theme {
         success: this.colors.AccentGreen,
         warning: this.colors.AccentYellow,
       },
+      logLevels: {
+        log: this.colors.Foreground,
+        info: this.colors.AccentBlue,
+        warn: this.colors.AccentYellow,
+        error: this.colors.AccentRed,
+        debug: this.colors.AccentPurple,
+      },
     };
     this._colorMap = Object.freeze(this._buildColorMap(rawMappings)); // Build and freeze the map
 
@@ -609,6 +616,13 @@ export function createCustomTheme(customTheme: CustomTheme): Theme {
       error: customTheme.status?.error ?? colors.AccentRed,
       success: customTheme.status?.success ?? colors.AccentGreen,
       warning: customTheme.status?.warning ?? colors.AccentYellow,
+    },
+    logLevels: {
+      log: customTheme.logLevels?.log ?? colors.Foreground,
+      info: customTheme.logLevels?.info ?? colors.AccentBlue,
+      warn: customTheme.logLevels?.warn ?? colors.AccentYellow,
+      error: customTheme.logLevels?.error ?? colors.AccentRed,
+      debug: customTheme.logLevels?.debug ?? colors.AccentPurple,
     },
   };
 
