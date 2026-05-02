@@ -29,6 +29,7 @@ export function createNonInteractiveUI(): CommandContext['ui'] {
     clear: () => {},
     setDebugMessage: (_message) => {},
     loadHistory: (_newHistory) => {},
+    setInput: (_text) => {},
     pendingItem: null,
     setPendingItem: (_item) => {},
     toggleCorgiMode: () => {},

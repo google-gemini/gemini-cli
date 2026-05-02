@@ -103,7 +103,7 @@ export class SimulationHarness {
     );
 
     // 3. Yield to event loop to allow internal async subscribers and orchestrator to finish
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await new Promise((resolve) => setTimeout(resolve, 200));
 
     // 3.1 Simulate what projectCompressedHistory does with the sync handlers
     let currentView = this.contextManager.getNodes();

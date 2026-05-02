@@ -3325,6 +3325,13 @@
           "markdownDescription": "Deprecated: Use general.topicUpdateNarration instead.\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
           "type": "boolean"
+        },
+        "enhanceCommand": {
+          "title": "Enhance Command",
+          "description": "Enable the experimental /enhance slash command.",
+          "markdownDescription": "Enable the experimental /enhance slash command.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
         }
       },
       "additionalProperties": false

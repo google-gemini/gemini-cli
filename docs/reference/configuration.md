@@ -1944,6 +1944,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Deprecated: Use general.topicUpdateNarration instead.
   - **Default:** `false`
 
+- **`experimental.enhanceCommand`** (boolean):
+  - **Description:** Enable the experimental /enhance slash command.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
 #### `skills`
 
 - **`skills.enabled`** (boolean):

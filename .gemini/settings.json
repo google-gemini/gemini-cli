@@ -5,9 +5,16 @@
     "autoMemory": true,
     "memoryManager": true,
     "topicUpdateNarration": true,
-    "voiceMode": true
+    "voiceMode": true,
+    "enhanceCommand": true
   },
   "general": {
-    "devtools": true
+    "devtools": true,
+    "plan": {
+      "enabled": true
+    }
+  },
+  "agents": {
+    "overrides": {}
   }
 }
