@@ -914,6 +914,7 @@ export class GeminiChat {
     let hasToolCall = false;
     let hasThoughts = false;
     let finishReason: FinishReason | undefined;
+    let observedModel: string | undefined;
 
     // The SDK provides fully assembled FunctionCall objects in chunk.functionCalls
     // We use a Map to ensure we only keep the latest version of each call (by ID)
@@ -924,6 +925,9 @@ export class GeminiChat {
     const callIndexToId = new Map<number, string>();
 
     for await (const chunk of streamResponse) {
+      if (!observedModel && chunk?.modelVersion) {
+        observedModel = chunk.modelVersion;
+      }
       const candidateWithReason = chunk?.candidates?.find(
         (candidate) => candidate.finishReason,
       );
@@ -1089,7 +1093,7 @@ export class GeminiChat {
     // so that BeforeTool hooks always see the latest transcript state.
     if (responseText || hasThoughts || hasToolCall) {
       this.chatRecordingService.recordMessage({
-        model,
+        model: observedModel || model,
         type: 'gemini',
         content: responseText,
       });
