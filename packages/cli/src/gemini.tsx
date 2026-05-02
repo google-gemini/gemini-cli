@@ -35,8 +35,10 @@ import {
   debugLogger,
   isHeadlessMode,
   Storage,
+  getVersion,
 } from '@google/gemini-cli-core';
 
+import { hideBin } from 'yargs/helpers';
 import { loadCliConfig, parseArguments } from './config/config.js';
 import * as cliConfig from './config/config.js';
 import { readStdin } from './utils/readStdin.js';
@@ -263,6 +265,16 @@ export async function startInteractiveUI(
 
 export async function main() {
   let config: Config | undefined;
+
+  // Handle --version before patchStdio: yargs prints via process.stdout.write,
+  // which patchStdio redirects to coreEvents, so a plain `gemini --version`
+  // would emit nothing on the real stdout (e.g. verify-release `$(gemini --version)`).
+  const earlyCliArgs = hideBin(process.argv);
+  if (earlyCliArgs.includes('--version') || earlyCliArgs.includes('-V')) {
+    writeToStdout((await getVersion()) + '\n');
+    process.exit(0);
+  }
+
   const cliStartupHandle = startupProfiler.start('cli_startup');
 
   // Listen for admin controls from parent process (IPC) in non-sandbox mode. In
