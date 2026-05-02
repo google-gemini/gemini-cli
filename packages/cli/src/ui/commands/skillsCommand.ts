@@ -115,10 +115,15 @@ async function linkAction(
           targetDir,
           true,
         );
-        return requestConsentInteractive(
-          consentString,
-          context.ui.setConfirmationRequest.bind(context.ui),
-        );
+        return requestConsentInteractive(consentString, (req) => {
+          context.ui.setConfirmationRequest({
+            prompt: req.prompt,
+            onConfirm: (confirmed) => {
+              context.ui.setConfirmationRequest(null);
+              req.onConfirm(confirmed);
+            },
+          });
+        });
       },
     );
 

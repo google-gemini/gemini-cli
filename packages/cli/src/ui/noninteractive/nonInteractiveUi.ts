@@ -6,6 +6,7 @@
 
 import type { CommandContext } from '../commands/types.js';
 import type { ExtensionUpdateAction } from '../state/extensions.js';
+import type { ConfirmationRequest } from '../types.js';
 
 /**
  * Creates a UI context object with no-op functions.
@@ -39,7 +40,7 @@ export function createNonInteractiveUI(): CommandContext['ui'] {
     extensionsUpdateState: new Map(),
     dispatchExtensionStateUpdate: (_action: ExtensionUpdateAction) => {},
     addConfirmUpdateExtensionRequest: (_request) => {},
-    setConfirmationRequest: (_request) => {},
+    setConfirmationRequest: (_request: ConfirmationRequest | null) => {},
     removeComponent: () => {},
     toggleBackgroundTasks: () => {},
     toggleShortcutsHelp: () => {},
