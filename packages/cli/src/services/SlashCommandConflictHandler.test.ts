@@ -126,26 +126,25 @@ describe('SlashCommandConflictHandler', () => {
     );
   });
 
-  it('should debounce multiple events within the flush window', () => {
-    simulateEvent([
-      {
-        name: 'a',
-        renamedTo: 'user.a',
-        loserKind: CommandKind.USER_FILE,
-        winnerKind: CommandKind.BUILT_IN,
-      },
-    ]);
+  it('should debounce newly active conflicts within the flush window', () => {
+    const conflictA = {
+      name: 'a',
+      renamedTo: 'user.a',
+      loserKind: CommandKind.USER_FILE,
+      winnerKind: CommandKind.BUILT_IN,
+    };
+    const conflictB = {
+      name: 'b',
+      renamedTo: 'user.b',
+      loserKind: CommandKind.USER_FILE,
+      winnerKind: CommandKind.BUILT_IN,
+    };
+
+    simulateEvent([conflictA]);
 
     vi.advanceTimersByTime(200);
 
-    simulateEvent([
-      {
-        name: 'b',
-        renamedTo: 'user.b',
-        loserKind: CommandKind.USER_FILE,
-        winnerKind: CommandKind.BUILT_IN,
-      },
-    ]);
+    simulateEvent([conflictA, conflictB]);
 
     vi.advanceTimersByTime(600);
 
@@ -171,6 +170,95 @@ describe('SlashCommandConflictHandler', () => {
     simulateEvent([conflict]);
     vi.advanceTimersByTime(600);
     expect(coreEvents.emitFeedback).not.toHaveBeenCalled();
+  });
+
+  it('should re-notify when a previously-resolved conflict reappears', () => {
+    const conflict = {
+      name: 'deploy',
+      renamedTo: 'firebase.deploy',
+      loserExtensionName: 'firebase',
+      loserKind: CommandKind.EXTENSION_FILE,
+      winnerKind: CommandKind.BUILT_IN,
+    };
+
+    // Initial occurrence triggers a notification.
+    simulateEvent([conflict]);
+    vi.advanceTimersByTime(600);
+    expect(coreEvents.emitFeedback).toHaveBeenCalledTimes(1);
+    vi.mocked(coreEvents.emitFeedback).mockClear();
+
+    // Conflict resolved: the next emission is empty (no conflicts active).
+    simulateEvent([]);
+    vi.advanceTimersByTime(600);
+    expect(coreEvents.emitFeedback).not.toHaveBeenCalled();
+
+    // Same conflict reintroduced later: a fresh notification must fire,
+    // because the dedup state was cleared when the conflict went away.
+    simulateEvent([conflict]);
+    vi.advanceTimersByTime(600);
+    expect(coreEvents.emitFeedback).toHaveBeenCalledTimes(1);
+  });
+
+  it('should not duplicate pending notifications when a conflict resolves and reappears before flush', () => {
+    const conflict = {
+      name: 'deploy',
+      renamedTo: 'firebase.deploy',
+      loserExtensionName: 'firebase',
+      loserKind: CommandKind.EXTENSION_FILE,
+      winnerKind: CommandKind.BUILT_IN,
+    };
+
+    simulateEvent([conflict]);
+    vi.advanceTimersByTime(200);
+
+    simulateEvent([]);
+    vi.advanceTimersByTime(200);
+
+    simulateEvent([conflict]);
+    vi.advanceTimersByTime(600);
+
+    expect(coreEvents.emitFeedback).toHaveBeenCalledTimes(1);
+    expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
+      'info',
+      "Extension 'firebase' command '/deploy' was renamed to '/firebase.deploy' because it conflicts with built-in command.",
+    );
+  });
+
+  it('should re-notify only the conflicts that were resolved and reappeared', () => {
+    const conflictA = {
+      name: 'deploy',
+      renamedTo: 'firebase.deploy',
+      loserExtensionName: 'firebase',
+      loserKind: CommandKind.EXTENSION_FILE,
+      winnerKind: CommandKind.BUILT_IN,
+    };
+    const conflictB = {
+      name: 'launch',
+      renamedTo: 'workspace.launch',
+      loserKind: CommandKind.WORKSPACE_FILE,
+      winnerKind: CommandKind.USER_FILE,
+    };
+
+    // Both active: each gets a notification.
+    simulateEvent([conflictA, conflictB]);
+    vi.advanceTimersByTime(600);
+    expect(coreEvents.emitFeedback).toHaveBeenCalledTimes(2);
+    vi.mocked(coreEvents.emitFeedback).mockClear();
+
+    // Only A is still active. B should be dropped from dedup.
+    simulateEvent([conflictA]);
+    vi.advanceTimersByTime(600);
+    expect(coreEvents.emitFeedback).not.toHaveBeenCalled();
+
+    // Both reported again. A is still deduped (continuously active);
+    // B re-fires because it was resolved between events.
+    simulateEvent([conflictA, conflictB]);
+    vi.advanceTimersByTime(600);
+    expect(coreEvents.emitFeedback).toHaveBeenCalledTimes(1);
+    expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
+      'info',
+      "Workspace command '/launch' was renamed to '/workspace.launch' because it conflicts with user command.",
+    );
   });
 
   it('should display a descriptive message for a skill conflict', () => {
