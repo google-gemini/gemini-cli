@@ -39,6 +39,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
 
 import {
   InputPrompt,
+  splitWordForWidth,
   tryTogglePasteExpansion,
   type InputPromptProps,
 } from './InputPrompt.js';
@@ -480,6 +481,28 @@ describe('InputPrompt', () => {
       expect(mockShellHistory.getPreviousCommand).toHaveBeenCalled(),
     );
     unmount();
+  });
+
+  describe('splitWordForWidth', () => {
+    it('continues consuming text when max width is zero', () => {
+      const lines = splitWordForWidth('@getskill.sh:3', 0);
+
+      expect(lines.join('')).toBe('@getskill.sh:3');
+      expect(lines).toEqual('@getskill.sh:3'.split(''));
+    });
+
+    it('continues consuming wide characters that exceed max width', () => {
+      const lines = splitWordForWidth('表x', 1);
+
+      expect(lines.join('')).toBe('表x');
+      expect(lines).toEqual(['表', 'x']);
+    });
+
+    it('does not split words when max width is infinite', () => {
+      expect(splitWordForWidth('@getskill.sh:3', Infinity)).toEqual([
+        '@getskill.sh:3',
+      ]);
+    });
   });
 
   it('should call shellHistory.getNextCommand on down arrow in shell mode', async () => {
