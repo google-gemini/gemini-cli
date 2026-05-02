@@ -18,7 +18,11 @@ import {
   expandHomeDir,
   getDirectorySuggestions,
 } from '../utils/directoryUtils.js';
-import type { Config, WorkspaceContext } from '@google/gemini-cli-core';
+import {
+  type Config,
+  type WorkspaceContext,
+  refreshServerHierarchicalMemory,
+} from '@google/gemini-cli-core';
 import type { MultiFolderTrustDialogProps } from '../components/MultiFolderTrustDialog.js';
 import type { CommandContext, OpenCustomDialogActionReturn } from './types.js';
 import { MessageType } from '../types.js';
@@ -33,6 +37,15 @@ vi.mock('node:fs', async (importOriginal) => {
   return {
     ...actual,
     realpathSync: vi.fn((p) => p),
+  };
+});
+
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...actual,
+    refreshServerHierarchicalMemory: vi.fn(),
   };
 });
 
@@ -55,12 +68,16 @@ describe('directoryCommand', () => {
   const showCommand = directoryCommand.subCommands?.find(
     (c) => c.name === 'show',
   );
+  const removeCommand = directoryCommand.subCommands?.find(
+    (c) => c.name === 'remove',
+  );
 
   beforeEach(() => {
     mockWorkspaceContext = {
       targetDir: path.resolve('/test/dir'),
       addDirectory: vi.fn(),
       addDirectories: vi.fn().mockReturnValue({ added: [], failed: [] }),
+      removeDirectories: vi.fn().mockReturnValue({ removed: [], notFound: [] }),
       getDirectories: vi
         .fn()
         .mockReturnValue([
@@ -69,17 +86,20 @@ describe('directoryCommand', () => {
         ]),
     } as unknown as WorkspaceContext;
 
+    const mockGeminiClient = {
+      addDirectoryContext: vi.fn(),
+      getChatRecordingService: vi.fn().mockReturnValue({
+        recordDirectories: vi.fn(),
+      }),
+    };
+
     mockConfig = {
       getWorkspaceContext: () => mockWorkspaceContext,
       isRestrictiveSandbox: vi.fn().mockReturnValue(false),
-      getGeminiClient: vi.fn().mockReturnValue({
-        addDirectoryContext: vi.fn(),
-        getChatRecordingService: vi.fn().mockReturnValue({
-          recordDirectories: vi.fn(),
-        }),
-      }),
+      getGeminiClient: vi.fn().mockReturnValue(mockGeminiClient),
+      geminiClient: mockGeminiClient,
       getWorkingDir: () => path.resolve('/test/dir'),
-      shouldLoadMemoryFromIncludeDirectories: () => false,
+      shouldLoadMemoryFromIncludeDirectories: vi.fn().mockReturnValue(false),
       getDebugMode: () => false,
       getFileService: () => ({}),
       getFileFilteringOptions: () => ({ ignore: [], include: [] }),
@@ -446,6 +466,247 @@ describe('directoryCommand', () => {
           type: 'custom_dialog',
         }),
       );
+    });
+  });
+
+  describe('remove', () => {
+    it('should show an error in a restrictive sandbox', async () => {
+      if (!removeCommand?.action) throw new Error('No action');
+      vi.mocked(mockConfig.isRestrictiveSandbox).mockReturnValue(true);
+      const result = await removeCommand.action(mockContext, '/some/path');
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'error',
+        content:
+          'The /directory remove command is not supported in restrictive sandbox profiles.',
+      });
+    });
+
+    it('should show an error if no path is provided', () => {
+      if (!removeCommand?.action) throw new Error('No action');
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
+      removeCommand.action(mockContext, '');
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.ERROR,
+          text: 'Please provide at least one path to remove.',
+        }),
+      );
+    });
+
+    it('should prevent removing the current working directory', async () => {
+      const targetDir = path.resolve('/test/dir');
+      if (!removeCommand?.action) throw new Error('No action');
+      await removeCommand.action(mockContext, targetDir);
+      expect(mockWorkspaceContext.removeDirectories).not.toHaveBeenCalled();
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.ERROR,
+          text: `Cannot remove the current working directory:\n- ${targetDir}`,
+        }),
+      );
+    });
+
+    it('should allow removing other directories while protecting cwd', async () => {
+      const targetDir = path.resolve('/test/dir');
+      const removePath = path.resolve('/home/user/project1');
+      vi.mocked(mockWorkspaceContext.removeDirectories).mockReturnValue({
+        removed: [removePath],
+        notFound: [],
+      });
+      if (!removeCommand?.action) throw new Error('No action');
+      await removeCommand.action(mockContext, `${targetDir},${removePath}`);
+      expect(mockWorkspaceContext.removeDirectories).toHaveBeenCalledWith([
+        removePath,
+      ]);
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.ERROR,
+          text: `Cannot remove the current working directory:\n- ${targetDir}`,
+        }),
+      );
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: `Successfully removed directories:\n- ${removePath}`,
+        }),
+      );
+    });
+
+    it('should remove a single directory and show success', async () => {
+      const removePath = path.resolve('/home/user/project1');
+      vi.mocked(mockWorkspaceContext.removeDirectories).mockReturnValue({
+        removed: [removePath],
+        notFound: [],
+      });
+      if (!removeCommand?.action) throw new Error('No action');
+      await removeCommand.action(mockContext, removePath);
+      expect(mockWorkspaceContext.removeDirectories).toHaveBeenCalledWith([
+        removePath,
+      ]);
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: `Successfully removed directories:\n- ${removePath}`,
+        }),
+      );
+    });
+
+    it('should remove multiple directories and show success', async () => {
+      const removePath1 = path.resolve('/home/user/project1');
+      const removePath2 = path.resolve('/home/user/project2');
+      vi.mocked(mockWorkspaceContext.removeDirectories).mockReturnValue({
+        removed: [removePath1, removePath2],
+        notFound: [],
+      });
+      if (!removeCommand?.action) throw new Error('No action');
+      await removeCommand.action(mockContext, `${removePath1},${removePath2}`);
+      expect(mockWorkspaceContext.removeDirectories).toHaveBeenCalledWith([
+        removePath1,
+        removePath2,
+      ]);
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: `Successfully removed directories:\n- ${removePath1}\n- ${removePath2}`,
+        }),
+      );
+    });
+
+    it('should show an error for directories not in the workspace', async () => {
+      const notFoundPath = path.resolve('/home/user/unknown');
+      vi.mocked(mockWorkspaceContext.removeDirectories).mockReturnValue({
+        removed: [],
+        notFound: [notFoundPath],
+      });
+      if (!removeCommand?.action) throw new Error('No action');
+      await removeCommand.action(mockContext, notFoundPath);
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.ERROR,
+          text: `The following directories were not found in the workspace:\n- ${notFoundPath}`,
+        }),
+      );
+    });
+
+    it('should handle a mix of removed and not found directories', async () => {
+      const removedPath = path.resolve('/home/user/project1');
+      const notFoundPath = path.resolve('/home/user/unknown');
+      vi.mocked(mockWorkspaceContext.removeDirectories).mockReturnValue({
+        removed: [removedPath],
+        notFound: [notFoundPath],
+      });
+      if (!removeCommand?.action) throw new Error('No action');
+      await removeCommand.action(mockContext, `${removedPath},${notFoundPath}`);
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: `Successfully removed directories:\n- ${removedPath}`,
+        }),
+      );
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.ERROR,
+          text: `The following directories were not found in the workspace:\n- ${notFoundPath}`,
+        }),
+      );
+    });
+
+    it('should call addDirectoryContext after removing a directory', async () => {
+      const removePath = path.resolve('/home/user/project1');
+      vi.mocked(mockWorkspaceContext.removeDirectories).mockReturnValue({
+        removed: [removePath],
+        notFound: [],
+      });
+      if (!removeCommand?.action) throw new Error('No action');
+      await removeCommand.action(mockContext, removePath);
+      expect(
+        (
+          mockConfig as unknown as {
+            geminiClient: { addDirectoryContext: Mock };
+          }
+        ).geminiClient.addDirectoryContext,
+      ).toHaveBeenCalled();
+    });
+
+    it('should call refreshServerHierarchicalMemory after removing a directory when shouldLoadMemoryFromIncludeDirectories is true', async () => {
+      const removePath = path.resolve('/home/user/project1');
+      vi.mocked(mockWorkspaceContext.removeDirectories).mockReturnValue({
+        removed: [removePath],
+        notFound: [],
+      });
+      vi.mocked(
+        mockConfig.shouldLoadMemoryFromIncludeDirectories,
+      ).mockReturnValue(true);
+      if (!removeCommand?.action) throw new Error('No action');
+      await removeCommand.action(mockContext, removePath);
+      expect(refreshServerHierarchicalMemory).toHaveBeenCalledWith(mockConfig);
+    });
+
+    it('should handle error from refreshServerHierarchicalMemory when removing a directory', async () => {
+      const removePath = path.resolve('/home/user/project1');
+      vi.mocked(mockWorkspaceContext.removeDirectories).mockReturnValue({
+        removed: [removePath],
+        notFound: [],
+      });
+      vi.mocked(
+        mockConfig.shouldLoadMemoryFromIncludeDirectories,
+      ).mockReturnValue(true);
+      vi.mocked(refreshServerHierarchicalMemory).mockRejectedValue(
+        new Error('Memory refresh failed'),
+      );
+      if (!removeCommand?.action) throw new Error('No action');
+      await removeCommand.action(mockContext, removePath);
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.ERROR,
+          text: 'Error refreshing memory: Memory refresh failed',
+        }),
+      );
+    });
+
+    it('should not call refreshServerHierarchicalMemory when shouldLoadMemoryFromIncludeDirectories is false', async () => {
+      vi.mocked(refreshServerHierarchicalMemory).mockClear();
+      const removePath = path.resolve('/home/user/project1');
+      vi.mocked(mockWorkspaceContext.removeDirectories).mockReturnValue({
+        removed: [removePath],
+        notFound: [],
+      });
+      if (!removeCommand?.action) throw new Error('No action');
+      await removeCommand.action(mockContext, removePath);
+      expect(refreshServerHierarchicalMemory).not.toHaveBeenCalled();
+    });
+
+    describe('completion', () => {
+      const completion = removeCommand!.completion!;
+
+      it('should return empty suggestions when config is unavailable', async () => {
+        const contextWithoutConfig = {
+          ...mockContext,
+          services: { ...mockContext.services, agentContext: null },
+        };
+        const results = await completion(contextWithoutConfig, '');
+        expect(results).toEqual([]);
+      });
+
+      it('should return matching directories', async () => {
+        const results = await completion(mockContext, '/home/user/proj');
+        expect(results).toEqual([
+          path.resolve('/home/user/project1'),
+          path.resolve('/home/user/project2'),
+        ]);
+      });
+
+      it('should support comma-separated paths', async () => {
+        const results = await completion(
+          mockContext,
+          `${path.resolve('/home/user/project1')},/home/user/proj`,
+        );
+        expect(results).toEqual([
+          `${path.resolve('/home/user/project1')},${path.resolve('/home/user/project1')}`,
+          `${path.resolve('/home/user/project1')},${path.resolve('/home/user/project2')}`,
+        ]);
+      });
     });
   });
 

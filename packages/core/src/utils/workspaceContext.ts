@@ -16,6 +16,11 @@ export interface AddDirectoriesResult {
   failed: Array<{ path: string; error: Error }>;
 }
 
+export interface RemoveDirectoriesResult {
+  removed: string[];
+  notFound: string[];
+}
+
 /**
  * WorkspaceContext manages multiple workspace directories and validates paths
  * against them. This allows the CLI to operate on files from multiple directories
@@ -104,6 +109,41 @@ export class WorkspaceContext {
           `[WARN] Skipping unreadable directory: ${directory} (${error.message})`,
         );
         result.failed.push({ path: directory, error });
+      }
+    }
+
+    if (changed) {
+      this.notifyDirectoriesChanged();
+    }
+
+    return result;
+  }
+
+  /**
+   * Removes multiple directories from the workspace.
+   * Emits a single change event if any directories are removed.
+   * @param directories The directory paths to remove
+   * @returns Object containing successfully removed directories and paths not found
+   */
+  removeDirectories(directories: string[]): RemoveDirectoriesResult {
+    const result: RemoveDirectoriesResult = { removed: [], notFound: [] };
+    let changed = false;
+
+    for (const directory of directories) {
+      const absolutePath = path.resolve(this.targetDir, directory);
+      let resolvedPath: string;
+      try {
+        resolvedPath = fs.realpathSync(absolutePath);
+      } catch {
+        resolvedPath = absolutePath;
+      }
+
+      if (this.directories.has(resolvedPath)) {
+        this.directories.delete(resolvedPath);
+        changed = true;
+        result.removed.push(directory);
+      } else {
+        result.notFound.push(directory);
       }
     }
 

@@ -23,6 +23,7 @@ import {
   expandHomeDir,
   getDirectorySuggestions,
   batchAddDirectories,
+  batchRemoveDirectories,
 } from '../utils/directoryUtils.js';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
@@ -270,6 +271,162 @@ export const directoryCommand: SlashCommand = {
           added,
           errors,
         );
+        return;
+      },
+    },
+    {
+      name: 'remove',
+      description:
+        'Remove directories from the workspace. Use comma to separate multiple paths',
+      kind: CommandKind.BUILT_IN,
+      autoExecute: false,
+      showCompletionLoading: false,
+      completion: async (context: CommandContext, partialArg: string) => {
+        if (!context.services.agentContext?.config) {
+          return [];
+        }
+        const workspaceContext =
+          context.services.agentContext.config.getWorkspaceContext();
+        const directories = workspaceContext.getDirectories();
+
+        const parts = partialArg.split(',');
+        const lastPart = parts[parts.length - 1];
+        const leadingWhitespace = lastPart.match(/^\s*/)?.[0] ?? '';
+        const trimmedLastPart = lastPart.trimStart();
+
+        const filtered = directories.filter((dir) =>
+          dir.toLowerCase().startsWith(trimmedLastPart.toLowerCase()),
+        );
+
+        if (parts.length > 1) {
+          const prefix = parts.slice(0, -1).join(',') + ',';
+          return filtered.map((s) => prefix + leadingWhitespace + s);
+        }
+
+        return filtered.map((s) => leadingWhitespace + s);
+      },
+      action: async (context: CommandContext, args: string) => {
+        const {
+          ui: { addItem },
+          services: { agentContext },
+        } = context;
+
+        if (!agentContext) {
+          addItem({
+            type: MessageType.ERROR,
+            text: 'Configuration is not available.',
+          });
+          return;
+        }
+
+        if (agentContext.config.isRestrictiveSandbox()) {
+          return {
+            type: 'message' as const,
+            messageType: 'error' as const,
+            content:
+              'The /directory remove command is not supported in restrictive sandbox profiles.',
+          };
+        }
+
+        const pathsToRemove = args
+          .split(',')
+          .map((p) => p.trim())
+          .filter((p) => p);
+        if (pathsToRemove.length === 0) {
+          addItem({
+            type: MessageType.ERROR,
+            text: 'Please provide at least one path to remove.',
+          });
+          return;
+        }
+
+        const workspaceContext = agentContext.config.getWorkspaceContext();
+        const resolvedTargetDir = path.resolve(workspaceContext.targetDir);
+        let targetDirReal: string;
+        try {
+          targetDirReal = fs.realpathSync(resolvedTargetDir);
+        } catch {
+          targetDirReal = resolvedTargetDir;
+        }
+
+        const protectedPaths: string[] = [];
+        const validPathsToRemove: string[] = [];
+
+        for (const pathToRemove of pathsToRemove) {
+          const trimmedPath = pathToRemove.trim();
+          const expandedPath = expandHomeDir(trimmedPath);
+          const absolutePath = path.resolve(
+            workspaceContext.targetDir,
+            expandedPath,
+          );
+          let resolvedPath: string;
+          try {
+            resolvedPath = fs.realpathSync(absolutePath);
+          } catch {
+            resolvedPath = absolutePath;
+          }
+
+          if (resolvedPath === targetDirReal) {
+            protectedPaths.push(trimmedPath);
+          } else {
+            validPathsToRemove.push(trimmedPath);
+          }
+        }
+
+        if (protectedPaths.length > 0) {
+          addItem({
+            type: MessageType.ERROR,
+            text: `Cannot remove the current working directory:\n- ${protectedPaths.join(
+              '\n- ',
+            )}`,
+          });
+        }
+
+        if (validPathsToRemove.length === 0) {
+          return;
+        }
+
+        const result = batchRemoveDirectories(
+          workspaceContext,
+          validPathsToRemove,
+        );
+
+        if (result.removed.length > 0) {
+          const gemini = agentContext.config.geminiClient;
+          if (gemini) {
+            await gemini.addDirectoryContext();
+            const chatRecordingService = gemini.getChatRecordingService();
+            chatRecordingService?.recordDirectories(
+              workspaceContext.getDirectories(),
+            );
+          }
+          if (agentContext.config.shouldLoadMemoryFromIncludeDirectories()) {
+            try {
+              await refreshServerHierarchicalMemory(agentContext.config);
+            } catch (error) {
+              addItem({
+                type: MessageType.ERROR,
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+                text: 'Error refreshing memory: ' + (error as Error).message,
+              });
+            }
+          }
+          addItem({
+            type: MessageType.INFO,
+            text: `Successfully removed directories:\n- ${result.removed.join(
+              '\n- ',
+            )}`,
+          });
+        }
+
+        if (result.notFound.length > 0) {
+          addItem({
+            type: MessageType.ERROR,
+            text: `The following directories were not found in the workspace:\n- ${result.notFound.join(
+              '\n- ',
+            )}`,
+          });
+        }
         return;
       },
     },

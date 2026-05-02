@@ -443,6 +443,88 @@ describe('WorkspaceContext with real filesystem', () => {
       expect(() => workspaceContext.addDirectory(nonExistent)).toThrow();
     });
   });
+
+  describe('removeDirectories', () => {
+    it('should remove existing directories and emit one event', () => {
+      const workspaceContext = new WorkspaceContext(cwd, [otherDir]);
+      const listener = vi.fn();
+      workspaceContext.onDirectoriesChanged(listener);
+
+      const result = workspaceContext.removeDirectories([otherDir]);
+
+      expect(workspaceContext.getDirectories()).not.toContain(otherDir);
+      expect(workspaceContext.getDirectories()).toContain(cwd);
+      expect(listener).toHaveBeenCalledOnce();
+      expect(result.removed).toEqual([otherDir]);
+      expect(result.notFound).toHaveLength(0);
+    });
+
+    it('should handle non-existent paths as not found', () => {
+      const workspaceContext = new WorkspaceContext(cwd);
+      const nonExistent = path.join(tempDir, 'does-not-exist');
+      const listener = vi.fn();
+      workspaceContext.onDirectoriesChanged(listener);
+
+      const result = workspaceContext.removeDirectories([nonExistent]);
+
+      expect(listener).not.toHaveBeenCalled();
+      expect(result.removed).toHaveLength(0);
+      expect(result.notFound).toEqual([nonExistent]);
+    });
+
+    it('should handle a mix of removed and not found', () => {
+      const workspaceContext = new WorkspaceContext(cwd, [otherDir]);
+      const nonExistent = path.join(tempDir, 'does-not-exist');
+      const listener = vi.fn();
+      workspaceContext.onDirectoriesChanged(listener);
+
+      const result = workspaceContext.removeDirectories([
+        otherDir,
+        nonExistent,
+      ]);
+
+      expect(workspaceContext.getDirectories()).not.toContain(otherDir);
+      expect(listener).toHaveBeenCalledOnce();
+      expect(result.removed).toEqual([otherDir]);
+      expect(result.notFound).toEqual([nonExistent]);
+    });
+
+    it('should not emit event if no directories removed', () => {
+      const workspaceContext = new WorkspaceContext(cwd);
+      const listener = vi.fn();
+      workspaceContext.onDirectoriesChanged(listener);
+
+      const nonExistent = path.join(tempDir, 'does-not-exist');
+      const result = workspaceContext.removeDirectories([nonExistent]);
+
+      expect(listener).not.toHaveBeenCalled();
+      expect(result.removed).toHaveLength(0);
+      expect(result.notFound).toEqual([nonExistent]);
+    });
+
+    it('should resolve relative paths before removing', () => {
+      const workspaceContext = new WorkspaceContext(cwd, [otherDir]);
+      const relativePath = path.relative(cwd, otherDir);
+
+      const result = workspaceContext.removeDirectories([relativePath]);
+
+      expect(workspaceContext.getDirectories()).not.toContain(otherDir);
+      expect(result.removed).toEqual([relativePath]);
+    });
+
+    it('should allow removing the target directory (cwd)', () => {
+      const workspaceContext = new WorkspaceContext(cwd, [otherDir]);
+      const listener = vi.fn();
+      workspaceContext.onDirectoriesChanged(listener);
+
+      const result = workspaceContext.removeDirectories([cwd]);
+
+      expect(workspaceContext.getDirectories()).not.toContain(cwd);
+      expect(workspaceContext.getDirectories()).toContain(otherDir);
+      expect(listener).toHaveBeenCalledOnce();
+      expect(result.removed).toEqual([cwd]);
+    });
+  });
 });
 
 describe('WorkspaceContext with optional directories', () => {
