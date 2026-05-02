@@ -9,7 +9,7 @@ and parameters.
 | ---------------------------------- | ---------------------------------- | ------------------------------------------------------------ |
 | `gemini`                           | Start interactive REPL             | `gemini`                                                     |
 | `gemini -p "query"`                | Query non-interactively            | `gemini -p "summarize README.md"`                            |
-| `gemini "query"`                   | Query and continue interactively   | `gemini "explain this project"`                              |
+| gemini "query"                     | Query and continue interactively   | gemini "explain this project"                                |
 | `cat file \| gemini`               | Process piped content              | `cat logs.txt \| gemini`<br>`Get-Content logs.txt \| gemini` |
 | `gemini -i "query"`                | Execute and continue interactively | `gemini -i "What is the purpose of this project?"`           |
 | `gemini -r "latest"`               | Continue most recent session       | `gemini -r "latest"`                                         |
@@ -33,6 +33,7 @@ These commands are available within the interactive REPL.
 | -------------------- | ----------------------------------------------- |
 | `/skills reload`     | Reload discovered skills from disk              |
 | `/agents reload`     | Reload the agent registry                       |
+| `/commands list`     | List available custom slash commands            |
 | `/commands reload`   | Reload custom slash commands                    |
 | `/memory reload`     | Reload context files (for example, `GEMINI.md`) |
 | `/mcp reload`        | Restart and reload MCP servers                  |

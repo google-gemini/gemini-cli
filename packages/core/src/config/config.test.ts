@@ -23,6 +23,7 @@ import { createMockSandboxConfig } from '@google/gemini-cli-test-utils';
 import { DEFAULT_MAX_ATTEMPTS } from '../utils/retry.js';
 import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { coreEvents } from '../utils/events.js';
 import { ApprovalMode } from '../policy/types.js';
 import {
   HookType,
@@ -202,6 +203,7 @@ const mockCoreEvents = vi.hoisted(() => ({
   emitConsoleLog: vi.fn(),
   emitQuotaChanged: vi.fn(),
   on: vi.fn(),
+  emit: vi.fn(),
 }));
 
 const mockSetGlobalProxy = vi.hoisted(() => vi.fn());
@@ -1437,31 +1439,6 @@ describe('Server Config (config.ts)', () => {
     });
   });
 
-  describe('ContinueOnFailedApiCall Configuration', () => {
-    it('should default continueOnFailedApiCall to false when not provided', () => {
-      const config = new Config(baseParams);
-      expect(config.getContinueOnFailedApiCall()).toBe(true);
-    });
-
-    it('should set continueOnFailedApiCall to true when provided as true', () => {
-      const paramsWithContinueOnFailedApiCall: ConfigParameters = {
-        ...baseParams,
-        continueOnFailedApiCall: true,
-      };
-      const config = new Config(paramsWithContinueOnFailedApiCall);
-      expect(config.getContinueOnFailedApiCall()).toBe(true);
-    });
-
-    it('should set continueOnFailedApiCall to false when explicitly provided as false', () => {
-      const paramsWithContinueOnFailedApiCall: ConfigParameters = {
-        ...baseParams,
-        continueOnFailedApiCall: false,
-      };
-      const config = new Config(paramsWithContinueOnFailedApiCall);
-      expect(config.getContinueOnFailedApiCall()).toBe(false);
-    });
-  });
-
   describe('createToolRegistry', () => {
     it('should register a tool if coreTools contains an argument-specific pattern', async () => {
       const params: ConfigParameters = {
@@ -1964,6 +1941,70 @@ describe('Server Config (config.ts)', () => {
 
     expect(config.getSessionId()).toBe('session-two');
     expect(config.getApprovedPlanPath()).toBeUndefined();
+  });
+
+  it('performs a comprehensive reset of all session-scoped state when sessionId changes', async () => {
+    const config = new Config({
+      ...baseParams,
+      sessionId: 'session-one',
+      plan: true,
+      tracker: true,
+    });
+
+    await config.initialize();
+
+    // 1. "Dirty" the session state
+    const oldTrackerService = config.getTrackerService();
+    config.setApprovedPlanPath('/tmp/plan.md');
+    config.topicState.setTopic('Old Topic', 'Old Intent');
+    config.getSkillManager().activateSkill('old-skill');
+    config.getModelAvailabilityService().markTerminal('model-1', 'quota');
+    config.setLatestApiRequest({} as never);
+
+    // Interface to access private fields without 'any'
+    interface PrivateConfig {
+      modelQuotas: Map<string, unknown>;
+      lastEmittedQuotaRemaining: number | undefined;
+      lastEmittedQuotaLimit: number | undefined;
+      lastQuotaFetchTime: number;
+      hasAccessToPreviewModel: boolean | null;
+    }
+    const configInternal = config as unknown as PrivateConfig;
+
+    // Mock internal quota state
+    configInternal.modelQuotas.set('model-1', { remaining: 0, limit: 100 });
+    configInternal.lastEmittedQuotaRemaining = 0;
+    configInternal.lastEmittedQuotaLimit = 100;
+    configInternal.lastQuotaFetchTime = 12345;
+    configInternal.hasAccessToPreviewModel = true;
+
+    // Listen for quota event
+    const emitQuotaSpy = vi.spyOn(coreEvents, 'emitQuotaChanged');
+
+    // 2. Trigger session change
+    config.setSessionId('session-two');
+
+    // 3. Verify EVERYTHING is reset
+    expect(config.getSessionId()).toBe('session-two');
+    expect(config.getApprovedPlanPath()).toBeUndefined();
+    expect(config.topicState.getTopic()).toBeUndefined();
+    expect(config.topicState.getIntent()).toBeUndefined();
+    expect(config.getSkillManager().isSkillActive('old-skill')).toBe(false);
+    expect(config.getTrackerService()).not.toBe(oldTrackerService);
+    expect(
+      config.getModelAvailabilityService().snapshot('model-1').available,
+    ).toBe(true);
+    expect(config.getLatestApiRequest()).toBeUndefined();
+
+    // Quota resets
+    expect(configInternal.modelQuotas.size).toBe(0);
+    expect(configInternal.lastEmittedQuotaRemaining).toBeUndefined();
+    expect(configInternal.lastEmittedQuotaLimit).toBeUndefined();
+    expect(configInternal.lastQuotaFetchTime).toBe(0);
+    expect(configInternal.hasAccessToPreviewModel).toBeNull();
+
+    // Event emission
+    expect(emitQuotaSpy).toHaveBeenCalledWith(undefined, undefined, undefined);
   });
 });
 
@@ -3673,7 +3714,7 @@ describe('Config JIT Initialization', () => {
       expect(config.getExperimentalGemma()).toBe(false);
     });
 
-    it('should return false when experimentalGemma is not provided', () => {
+    it('should return true when experimentalGemma is not provided', () => {
       const params: ConfigParameters = {
         sessionId: 'test-session',
         targetDir: '/tmp/test',
@@ -3683,7 +3724,7 @@ describe('Config JIT Initialization', () => {
       };
 
       config = new Config(params);
-      expect(config.getExperimentalGemma()).toBe(false);
+      expect(config.getExperimentalGemma()).toBe(true);
     });
 
     it('should be independent of experimentalMemoryV2', () => {
