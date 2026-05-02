@@ -48,6 +48,11 @@ export const ALL_ITEMS = [
     description: 'Unique identifier for the current session',
   },
   {
+    id: 'hostname',
+    header: 'machine',
+    description: 'Current machine hostname',
+  },
+  {
     id: 'auth',
     header: '/auth',
     description: 'Current authentication info',
@@ -75,6 +80,7 @@ export const DEFAULT_ORDER = [
   'quota',
   'memory-usage',
   'session-id',
+  'hostname',
   'auth',
   'code-changes',
   'token-count',
