@@ -466,5 +466,28 @@ describe('validateNonInterActiveAuth', () => {
         expect(payload.error.message).toBe('Auth error!');
       }
     });
+
+    it('should NOT return undefined in JSON mode when auth fails (regression test)', async () => {
+      const nonInteractiveConfig = createLocalMockConfig({
+        getOutputFormat: vi.fn().mockReturnValue(OutputFormat.JSON),
+      });
+
+      let result: unknown;
+      let threw = false;
+
+      try {
+        result = await validateNonInteractiveAuth(
+          undefined,
+          false,
+          nonInteractiveConfig,
+          mockSettings,
+        );
+      } catch {
+        threw = true;
+      }
+
+      expect(threw).toBe(true);
+      expect(result).toBeUndefined();
+    });
   });
 });

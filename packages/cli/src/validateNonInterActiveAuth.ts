@@ -56,6 +56,7 @@ export async function validateNonInteractiveAuth(
         nonInteractiveConfig,
         ExitCodes.FATAL_AUTHENTICATION_ERROR,
       );
+      throw error;
     } else {
       debugLogger.error(error instanceof Error ? error.message : String(error));
       await runExitCleanup();
