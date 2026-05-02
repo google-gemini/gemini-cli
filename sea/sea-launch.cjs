@@ -238,20 +238,28 @@ async function main(getAssetFn = getAsset) {
   // args — matching the contract a regular Node.js fork would deliver.
   if (typeof process.send === 'function') {
     for (let i = 1; i < process.argv.length; i++) {
-      let candidate = process.argv[i];
-      if (!candidate || candidate === process.execPath) continue;
-      if (!candidate.endsWith('.js') && fs.existsSync(candidate + '.js')) {
-        candidate = candidate + '.js';
+      const raw = process.argv[i];
+      if (!raw) continue;
+      // Resolve to an absolute path before comparing against process.execPath
+      // (which is always absolute) and before passing to createRequire (which
+      // per Node docs requires an absolute path or file URL — relative paths
+      // resolve against process.cwd() and break if cwd changes mid-startup).
+      const absPath = path.resolve(raw);
+      if (absPath === process.execPath) continue;
+
+      let scriptPath = absPath;
+      if (!scriptPath.endsWith('.js') && fs.existsSync(scriptPath + '.js')) {
+        scriptPath = scriptPath + '.js';
       }
-      if (candidate.endsWith('.js') && fs.existsSync(candidate)) {
+      if (scriptPath.endsWith('.js') && fs.existsSync(scriptPath)) {
         const remainingArgs = process.argv.slice(i + 1);
-        process.argv = [process.argv[0], candidate, ...remainingArgs];
+        process.argv = [process.argv[0], scriptPath, ...remainingArgs];
         try {
           // The SEA's built-in require() only supports built-in modules; we
           // need a disk-based require rooted at the script's directory so the
           // helper can resolve its own dependencies.
-          const scriptRequire = nodeModule.createRequire(candidate);
-          scriptRequire(candidate);
+          const scriptRequire = nodeModule.createRequire(scriptPath);
+          scriptRequire(scriptPath);
         } catch (_e) {
           // Script load failed. Don't fall through to a gemini session — that
           // is the bug we are preventing. Silently exit instead so the fork()
