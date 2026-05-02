@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import assert from 'node:assert';
 import { describe, it, expect } from 'vitest';
 import { createNodeTruncationProcessor } from './nodeTruncationProcessor.js';
 import {
@@ -12,7 +11,12 @@ import {
   createMockEnvironment,
   createDummyNode,
 } from '../testing/contextTestUtils.js';
-import type { UserPrompt, AgentThought, AgentYield } from '../graph/types.js';
+import {
+  NodeType,
+  type UserPrompt,
+  type AgentThought,
+  type AgentYield,
+} from '../graph/types.js';
 
 describe('NodeTruncationProcessor', () => {
   it('should truncate nodes that exceed maxTokensPerNode', async () => {
@@ -31,30 +35,30 @@ describe('NodeTruncationProcessor', () => {
 
     const prompt = createDummyNode(
       'ep1',
-      'USER_PROMPT',
+      NodeType.USER_PROMPT,
       50,
       {
-        semanticParts: [{ type: 'text', text: longText }],
+        payload: { text: longText },
       },
       'prompt-id',
     ) as UserPrompt;
 
     const thought = createDummyNode(
       'ep1',
-      'AGENT_THOUGHT',
+      NodeType.AGENT_THOUGHT,
       50,
       {
-        text: longText,
+        payload: { text: longText },
       },
       'thought-id',
     ) as AgentThought;
 
     const yieldNode = createDummyNode(
       'ep1',
-      'AGENT_YIELD',
+      NodeType.AGENT_YIELD,
       50,
       {
-        text: longText,
+        payload: { text: longText },
       },
       'yield-id',
     ) as AgentYield;
@@ -68,19 +72,17 @@ describe('NodeTruncationProcessor', () => {
     // 1. User Prompt
     const squashedPrompt = result[0] as UserPrompt;
     expect(squashedPrompt.id).not.toBe(prompt.id);
-    expect(squashedPrompt.semanticParts[0].type).toBe('text');
-    assert(squashedPrompt.semanticParts[0].type === 'text');
-    expect(squashedPrompt.semanticParts[0].text).toContain('[... OMITTED');
+    expect(squashedPrompt.payload.text).toContain('[... OMITTED');
 
     // 2. Agent Thought
     const squashedThought = result[1] as AgentThought;
     expect(squashedThought.id).not.toBe(thought.id);
-    expect(squashedThought.text).toContain('[... OMITTED');
+    expect(squashedThought.payload.text).toContain('[... OMITTED');
 
     // 3. Agent Yield
     const squashedYield = result[2] as AgentYield;
     expect(squashedYield.id).not.toBe(yieldNode.id);
-    expect(squashedYield.text).toContain('[... OMITTED');
+    expect(squashedYield.payload.text).toContain('[... OMITTED');
   });
 
   it('should ignore nodes that are below maxTokensPerNode', async () => {
@@ -98,20 +100,20 @@ describe('NodeTruncationProcessor', () => {
 
     const prompt = createDummyNode(
       'ep1',
-      'USER_PROMPT',
+      NodeType.USER_PROMPT,
       10,
       {
-        semanticParts: [{ type: 'text', text: shortText }],
+        payload: { text: shortText },
       },
       'prompt-id',
     ) as UserPrompt;
 
     const thought = createDummyNode(
       'ep1',
-      'AGENT_THOUGHT',
+      NodeType.AGENT_THOUGHT,
       13,
       {
-        text: 'Short thought', // 13 chars
+        payload: { text: 'Short thought' }, // 13 chars
       },
       'thought-id',
     ) as AgentThought;
@@ -125,12 +127,11 @@ describe('NodeTruncationProcessor', () => {
     // 1. User Prompt (untouched)
     const squashedPrompt = result[0] as UserPrompt;
     expect(squashedPrompt.id).toBe(prompt.id);
-    assert(squashedPrompt.semanticParts[0].type === 'text');
-    expect(squashedPrompt.semanticParts[0].text).not.toContain('[... OMITTED');
+    expect(squashedPrompt.payload.text).not.toContain('[... OMITTED');
 
     // 2. Agent Thought (untouched)
     const untouchedThought = result[1] as AgentThought;
     expect(untouchedThought.id).toBe(thought.id);
-    expect(untouchedThought.text).not.toContain('[... OMITTED');
+    expect(untouchedThought.payload.text).not.toContain('[... OMITTED');
   });
 });

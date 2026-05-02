@@ -81,6 +81,42 @@ export function partToString(
   return part.text ?? '';
 }
 
+/**
+ * Safely clones a Part object.
+ * We use a local eslint-disable because the linter incorrectly identifies Part
+ * as a class instance and warns about losing the prototype during spread.
+ * In reality, Parts in the GenAI SDK are plain data objects.
+ */
+export function clonePart(part: Part): Part {
+  return { ...part };
+}
+
+/**
+ * Safely updates a Part object with new fields.
+ */
+export function updatePart(part: Part, updates: Partial<Part>): Part {
+  return { ...part, ...updates };
+}
+
+/**
+ * Safely clones a FunctionResponse object.
+ */
+export function cloneFunctionResponse(
+  resp: NonNullable<Part['functionResponse']>,
+): NonNullable<Part['functionResponse']> {
+  // eslint-disable-next-line @typescript-eslint/no-misused-spread
+  return { ...resp };
+}
+
+/**
+ * Safely clones a FunctionCall object.
+ */
+export function cloneFunctionCall(
+  call: NonNullable<Part['functionCall']>,
+): NonNullable<Part['functionCall']> {
+  return { ...call };
+}
+
 export function getResponseText(
   response: GenerateContentResponse,
 ): string | null {
