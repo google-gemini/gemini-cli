@@ -200,7 +200,6 @@ describe('LegacyAgentSession', () => {
         expect.any(AbortSignal),
         'test-prompt',
         undefined,
-        false,
         'raw input',
       );
 

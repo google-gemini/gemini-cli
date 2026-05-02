@@ -1,7 +1,7 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`Core System Prompt (prompts.ts) > ApprovalMode in System Prompt > Approved Plan in Plan Mode > should NOT include approved plan section if no plan is set in config 1`] = `
-"You are Gemini CLI, an interactive CLI agent specializing in software engineering tasks. Your primary goal is to help users safely and effectively.
+"You are Gemini CLI, an interactive CLI agent specializing in software engineering tasks. You are currently operating in **Plan** mode. Your primary goal is to help users safely and effectively.
 
 # Core Mandates
 
@@ -181,7 +181,7 @@ ONLY use the built-in \`exit_plan_mode\` tool to present the plan for formal app
 `;
 
 exports[`Core System Prompt (prompts.ts) > ApprovalMode in System Prompt > Approved Plan in Plan Mode > should include approved plan path when set in config 1`] = `
-"You are Gemini CLI, an interactive CLI agent specializing in software engineering tasks. Your primary goal is to help users safely and effectively.
+"You are Gemini CLI, an interactive CLI agent specializing in software engineering tasks. You are currently operating in **Plan** mode. Your primary goal is to help users safely and effectively.
 
 # Core Mandates
 
@@ -482,7 +482,7 @@ Your core function is efficient and safe assistance. Balance extreme conciseness
 `;
 
 exports[`Core System Prompt (prompts.ts) > ApprovalMode in System Prompt > should include PLAN mode instructions 1`] = `
-"You are Gemini CLI, an interactive CLI agent specializing in software engineering tasks. Your primary goal is to help users safely and effectively.
+"You are Gemini CLI, an interactive CLI agent specializing in software engineering tasks. You are currently operating in **Plan** mode. Your primary goal is to help users safely and effectively.
 
 # Core Mandates
 
@@ -662,7 +662,7 @@ ONLY use the built-in \`exit_plan_mode\` tool to present the plan for formal app
 `;
 
 exports[`Core System Prompt (prompts.ts) > should append userMemory with separator when provided 1`] = `
-"You are Gemini CLI, an interactive CLI agent specializing in software engineering tasks. Your primary goal is to help users safely and effectively.
+"You are Gemini CLI, an interactive CLI agent specializing in software engineering tasks. You are currently operating in **Default** mode. Your primary goal is to help users safely and effectively.
 
 # Core Mandates
 
@@ -843,7 +843,7 @@ Be extra polite.
 `;
 
 exports[`Core System Prompt (prompts.ts) > should handle CodebaseInvestigator (enabled=false) 1`] = `
-"You are Gemini CLI, an autonomous CLI agent specializing in software engineering tasks. Your primary goal is to help users safely and effectively.
+"You are Gemini CLI, an autonomous CLI agent specializing in software engineering tasks. You are currently operating in **Default** mode. Your primary goal is to help users safely and effectively.
 
 # Core Mandates
 
@@ -976,7 +976,7 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 `;
 
 exports[`Core System Prompt (prompts.ts) > should handle CodebaseInvestigator (enabled=true) 1`] = `
-"You are Gemini CLI, an autonomous CLI agent specializing in software engineering tasks. Your primary goal is to help users safely and effectively.
+"You are Gemini CLI, an autonomous CLI agent specializing in software engineering tasks. You are currently operating in **Default** mode. Your primary goal is to help users safely and effectively.
 
 # Core Mandates
 
@@ -1591,7 +1591,7 @@ Your core function is efficient and safe assistance. Balance extreme conciseness
 `;
 
 exports[`Core System Prompt (prompts.ts) > should include available_skills with updated verbiage for preview models 1`] = `
-"You are Gemini CLI, an interactive CLI agent specializing in software engineering tasks. Your primary goal is to help users safely and effectively.
+"You are Gemini CLI, an interactive CLI agent specializing in software engineering tasks. You are currently operating in **Default** mode. Your primary goal is to help users safely and effectively.
 
 # Core Mandates
 
@@ -1768,7 +1768,7 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 `;
 
 exports[`Core System Prompt (prompts.ts) > should include correct sandbox instructions for SANDBOX=sandbox-exec 1`] = `
-"You are Gemini CLI, an interactive CLI agent specializing in software engineering tasks. Your primary goal is to help users safely and effectively.
+"You are Gemini CLI, an interactive CLI agent specializing in software engineering tasks. You are currently operating in **Default** mode. Your primary goal is to help users safely and effectively.
 
 # Core Mandates
 
@@ -1936,7 +1936,7 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 `;
 
 exports[`Core System Prompt (prompts.ts) > should include correct sandbox instructions for SANDBOX=true 1`] = `
-"You are Gemini CLI, an interactive CLI agent specializing in software engineering tasks. Your primary goal is to help users safely and effectively.
+"You are Gemini CLI, an interactive CLI agent specializing in software engineering tasks. You are currently operating in **Default** mode. Your primary goal is to help users safely and effectively.
 
 # Core Mandates
 
@@ -2104,7 +2104,7 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 `;
 
 exports[`Core System Prompt (prompts.ts) > should include correct sandbox instructions for SANDBOX=undefined 1`] = `
-"You are Gemini CLI, an interactive CLI agent specializing in software engineering tasks. Your primary goal is to help users safely and effectively.
+"You are Gemini CLI, an interactive CLI agent specializing in software engineering tasks. You are currently operating in **Default** mode. Your primary goal is to help users safely and effectively.
 
 # Core Mandates
 
@@ -2268,7 +2268,7 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 `;
 
 exports[`Core System Prompt (prompts.ts) > should include mandate to distinguish between Directives and Inquiries 1`] = `
-"You are Gemini CLI, an interactive CLI agent specializing in software engineering tasks. Your primary goal is to help users safely and effectively.
+"You are Gemini CLI, an interactive CLI agent specializing in software engineering tasks. You are currently operating in **Default** mode. Your primary goal is to help users safely and effectively.
 
 # Core Mandates
 
@@ -2432,7 +2432,7 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 `;
 
 exports[`Core System Prompt (prompts.ts) > should include modern approved plan instructions with completion in DEFAULT mode when approvedPlanPath is set 1`] = `
-"You are Gemini CLI, an interactive CLI agent specializing in software engineering tasks. Your primary goal is to help users safely and effectively.
+"You are Gemini CLI, an interactive CLI agent specializing in software engineering tasks. You are currently operating in **Default** mode. Your primary goal is to help users safely and effectively.
 
 # Core Mandates
 
@@ -2590,7 +2590,7 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 `;
 
 exports[`Core System Prompt (prompts.ts) > should include planning phase suggestion when enter_plan_mode tool is enabled 1`] = `
-"You are Gemini CLI, an interactive CLI agent specializing in software engineering tasks. Your primary goal is to help users safely and effectively.
+"You are Gemini CLI, an interactive CLI agent specializing in software engineering tasks. You are currently operating in **Default** mode. Your primary goal is to help users safely and effectively.
 
 # Core Mandates
 
@@ -2722,7 +2722,7 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 `;
 
 exports[`Core System Prompt (prompts.ts) > should include sub-agents in XML for preview models when invoke_agent tool is enabled 1`] = `
-"You are Gemini CLI, an interactive CLI agent specializing in software engineering tasks. Your primary goal is to help users safely and effectively.
+"You are Gemini CLI, an interactive CLI agent specializing in software engineering tasks. You are currently operating in **Default** mode. Your primary goal is to help users safely and effectively.
 
 # Core Mandates
 
@@ -3014,7 +3014,7 @@ Your core function is efficient and safe assistance. Balance extreme conciseness
 `;
 
 exports[`Core System Prompt (prompts.ts) > should include the TASK MANAGEMENT PROTOCOL when task tracker is enabled 1`] = `
-"You are Gemini CLI, an interactive CLI agent specializing in software engineering tasks. Your primary goal is to help users safely and effectively.
+"You are Gemini CLI, an interactive CLI agent specializing in software engineering tasks. You are currently operating in **Default** mode. Your primary goal is to help users safely and effectively.
 
 # Core Mandates
 
@@ -3436,7 +3436,7 @@ project context
 `;
 
 exports[`Core System Prompt (prompts.ts) > should return the base prompt when userMemory is empty string 1`] = `
-"You are Gemini CLI, an interactive CLI agent specializing in software engineering tasks. Your primary goal is to help users safely and effectively.
+"You are Gemini CLI, an interactive CLI agent specializing in software engineering tasks. You are currently operating in **Default** mode. Your primary goal is to help users safely and effectively.
 
 # Core Mandates
 
@@ -3600,7 +3600,7 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 `;
 
 exports[`Core System Prompt (prompts.ts) > should return the base prompt when userMemory is whitespace only 1`] = `
-"You are Gemini CLI, an interactive CLI agent specializing in software engineering tasks. Your primary goal is to help users safely and effectively.
+"You are Gemini CLI, an interactive CLI agent specializing in software engineering tasks. You are currently operating in **Default** mode. Your primary goal is to help users safely and effectively.
 
 # Core Mandates
 
@@ -3878,7 +3878,7 @@ Your core function is efficient and safe assistance. Balance extreme conciseness
 `;
 
 exports[`Core System Prompt (prompts.ts) > should use chatty system prompt for preview flash model 1`] = `
-"You are Gemini CLI, an interactive CLI agent specializing in software engineering tasks. Your primary goal is to help users safely and effectively.
+"You are Gemini CLI, an interactive CLI agent specializing in software engineering tasks. You are currently operating in **Default** mode. Your primary goal is to help users safely and effectively.
 
 # Core Mandates
 
@@ -4042,7 +4042,7 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 `;
 
 exports[`Core System Prompt (prompts.ts) > should use chatty system prompt for preview model 1`] = `
-"You are Gemini CLI, an interactive CLI agent specializing in software engineering tasks. Your primary goal is to help users safely and effectively.
+"You are Gemini CLI, an interactive CLI agent specializing in software engineering tasks. You are currently operating in **Default** mode. Your primary goal is to help users safely and effectively.
 
 # Core Mandates
 

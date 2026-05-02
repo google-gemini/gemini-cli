@@ -553,15 +553,6 @@ export function setUpCloudShellEnvironment(
   // However, if the user has explicitly selected Vertex AI auth, they intend
   // to use their own GCP project, so we restore the original value and skip
   // the Cloud Shell override to respect their .env settings.
-  if (selectedAuthType === AuthType.USE_VERTEX_AI) {
-    const saved = process.env[USER_GCP_PROJECT];
-    if (saved !== undefined) {
-      process.env['GOOGLE_CLOUD_PROJECT'] = saved;
-    } else if (process.env['GOOGLE_CLOUD_PROJECT'] === 'cloudshell-gca') {
-      delete process.env['GOOGLE_CLOUD_PROJECT'];
-    }
-    return;
-  }
 
   // Save the user's original value before overwriting, so it can be restored
   // if the user later switches to Vertex AI (even after a process restart).
@@ -572,7 +563,11 @@ export function setUpCloudShellEnvironment(
     }
   }
 
-  let value = 'cloudshell-gca';
+  let value: string | undefined = 'cloudshell-gca';
+
+  if (selectedAuthType === AuthType.USE_VERTEX_AI) {
+    value = process.env[USER_GCP_PROJECT];
+  }
 
   if (envFilePath && fs.existsSync(envFilePath)) {
     const envFileContent = fs.readFileSync(envFilePath);
@@ -585,7 +580,12 @@ export function setUpCloudShellEnvironment(
       }
     }
   }
-  process.env['GOOGLE_CLOUD_PROJECT'] = value;
+
+  if (value !== undefined) {
+    process.env['GOOGLE_CLOUD_PROJECT'] = value;
+  } else if (process.env['GOOGLE_CLOUD_PROJECT'] === 'cloudshell-gca') {
+    delete process.env['GOOGLE_CLOUD_PROJECT'];
+  }
 }
 
 export function loadEnvironment(

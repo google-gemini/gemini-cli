@@ -154,6 +154,55 @@ each tool.
 | [`google_web_search`](../tools/web-search.md) | `Search` | Performs a Google Search to find up-to-date information.                                                                                                                                                                                                                        |
 | [`web_fetch`](../tools/web-fetch.md)          | `Fetch`  | Retrieves and processes content from specific URLs. **Warning:** This tool can access local and private network addresses (for example, localhost), which may pose a security risk if used with untrusted prompts. In Plan Mode, this tool requires explicit user confirmation. |
 
+### Tool argument keys
+
+When writing [`argsPattern`](./policy-engine.md#arguments-pattern) rules for the
+[policy engine](./policy-engine.md), you need to know the JSON argument keys for
+each tool. The following table lists the keys that appear in the JSON
+representation of each tool's arguments.
+
+| Tool                     | JSON argument keys                                                                                                                                                                                   |
+| :----------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `run_shell_command`      | `command`, `description`, `dir_path`, `is_background`                                                                                                                                                |
+| `glob`                   | `pattern`, `dir_path`, `case_sensitive`, `respect_git_ignore`, `respect_gemini_ignore`                                                                                                               |
+| `grep_search`            | `pattern`, `dir_path`, `include_pattern`, `exclude_pattern`, `names_only`, `case_sensitive`, `fixed_strings`, `context`, `after`, `before`, `no_ignore`, `max_matches_per_file`, `total_max_matches` |
+| `list_directory`         | `dir_path`, `ignore`, `file_filtering_options`                                                                                                                                                       |
+| `read_file`              | `file_path`, `start_line`, `end_line`                                                                                                                                                                |
+| `read_many_files`        | `include`, `exclude`, `recursive`, `useDefaultExcludes`                                                                                                                                              |
+| `write_file`             | `file_path`, `content`                                                                                                                                                                               |
+| `replace`                | `file_path`, `old_string`, `new_string`, `instruction`, `allow_multiple`                                                                                                                             |
+| `ask_user`               | `questions` (array of `question`, `header`, `type`, `options`)                                                                                                                                       |
+| `write_todos`            | `todos` (array of `description`, `status`)                                                                                                                                                           |
+| `save_memory`            | `fact`                                                                                                                                                                                               |
+| `activate_skill`         | `name`                                                                                                                                                                                               |
+| `get_internal_docs`      | `path`                                                                                                                                                                                               |
+| `enter_plan_mode`        | `reason`                                                                                                                                                                                             |
+| `exit_plan_mode`         | `plan_path`                                                                                                                                                                                          |
+| `tracker_create_task`    | `title`, `description`, `type`                                                                                                                                                                       |
+| `tracker_update_task`    | `id`, `title`, `description`, `status`, `dependencies`                                                                                                                                               |
+| `tracker_get_task`       | `id`                                                                                                                                                                                                 |
+| `tracker_list_tasks`     | `status`, `type`, `parentId`                                                                                                                                                                         |
+| `tracker_add_dependency` | `taskId`, `dependencyId`                                                                                                                                                                             |
+| `tracker_visualize`      | _(none)_                                                                                                                                                                                             |
+| `update_topic`           | `title`, `summary`, `strategic_intent`                                                                                                                                                               |
+| `google_web_search`      | `query`                                                                                                                                                                                              |
+| `web_fetch`              | `prompt`                                                                                                                                                                                             |
+
+For example, to write a policy rule that blocks any `write_file` call targeting
+a `.env` file, you would match against the `file_path` key:
+
+```toml
+[[rule]]
+toolName = "write_file"
+argsPattern = '"file_path":".*\.env"'
+decision = "deny"
+priority = 100
+denyMessage = "Writing to .env files is not allowed."
+```
+
+For full argument descriptions and types, see the individual tool pages linked
+in the [tables above](#available-tools).
+
 ## Under the hood
 
 For developers, the tool system is designed to be extensible and robust. The

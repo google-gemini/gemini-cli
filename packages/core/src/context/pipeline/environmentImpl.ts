@@ -37,7 +37,7 @@ export class ContextEnvironmentImpl implements ContextEnvironment {
       this.behaviorRegistry,
     );
     this.inbox = new LiveInbox();
-    this.graphMapper = new ContextGraphMapper(this.behaviorRegistry);
+    this.graphMapper = new ContextGraphMapper();
   }
 
   get llmClient(): BaseLlmClient {

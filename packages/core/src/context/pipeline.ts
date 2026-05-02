@@ -28,7 +28,6 @@ export interface GraphMutation {
 export interface ContextWorkingBuffer {
   readonly nodes: readonly ConcreteNode[];
   getPristineNodes(id: string): readonly ConcreteNode[];
-  getLineage(id: string): readonly ConcreteNode[];
   getAuditLog(): readonly GraphMutation[];
 }
 

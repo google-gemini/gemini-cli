@@ -33,6 +33,10 @@ export class GeminiAgent {
     this.sessionManager = new AcpSessionManager(settings, argv, connection);
   }
 
+  dispose(): void {
+    this.sessionManager.dispose();
+  }
+
   async initialize(
     args: acp.InitializeRequest,
   ): Promise<acp.InitializeResponse> {

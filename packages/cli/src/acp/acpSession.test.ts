@@ -564,4 +564,26 @@ describe('Session', () => {
 
     expect(result.stopReason).toBe('max_turn_requests');
   });
+
+  it('should send sessionUpdate when approval mode changes', async () => {
+    const { coreEvents, CoreEvent, ApprovalMode } = await import(
+      '@google/gemini-cli-core'
+    );
+
+    coreEvents.emit(CoreEvent.ApprovalModeChanged, {
+      sessionId: 'session-1',
+      mode: ApprovalMode.PLAN,
+    });
+
+    expect(mockConnection.sessionUpdate).toHaveBeenCalledWith({
+      sessionId: 'session-1',
+      update: {
+        sessionUpdate: 'agent_message_chunk',
+        content: {
+          type: 'text',
+          text: `[MODE_UPDATE] ${ApprovalMode.PLAN}`,
+        },
+      },
+    });
+  });
 });

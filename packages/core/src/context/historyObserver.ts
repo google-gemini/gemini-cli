@@ -9,11 +9,8 @@ import type {
   HistoryEvent,
 } from '../core/agentChatHistory.js';
 import type { ContextGraphMapper } from './graph/mapper.js';
-import type { ContextTokenCalculator } from './utils/contextTokenCalculator.js';
 import type { ContextEventBus } from './eventBus.js';
 import type { ContextTracer } from './tracer.js';
-
-import type { ConcreteNode } from './graph/types.js';
 
 /**
  * Connects the raw AgentChatHistory to the ContextManager.
@@ -29,18 +26,25 @@ export class HistoryObserver {
     private readonly chatHistory: AgentChatHistory,
     private readonly eventBus: ContextEventBus,
     private readonly tracer: ContextTracer,
-    private readonly tokenCalculator: ContextTokenCalculator,
     private readonly graphMapper: ContextGraphMapper,
   ) {}
 
   private processEvent = (event: HistoryEvent) => {
-    let nodes: ConcreteNode[] = [];
-
     if (event.type === 'CLEAR') {
       this.seenNodeIds.clear();
     }
 
-    nodes = this.graphMapper.applyEvent(event, this.tokenCalculator);
+    if (event.type === 'SILENT_SYNC') {
+      return;
+    }
+
+    // Always process the FULL history to provide a complete view to the ContextManager.
+    // The ContextManager relies on the 'nodes' array to be the TOTAL set of valid pristine nodes.
+    const fullHistory = this.chatHistory.get();
+    const nodes = this.graphMapper.applyEvent({
+      ...event,
+      payload: fullHistory,
+    });
 
     const newNodes = new Set<string>();
     for (const node of nodes) {
