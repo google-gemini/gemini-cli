@@ -270,9 +270,9 @@ export async function main() {
   // which patchStdio redirects to coreEvents, so a plain `gemini --version`
   // would emit nothing on the real stdout (e.g. verify-release `$(gemini --version)`).
   const earlyCliArgs = hideBin(process.argv);
-  if (earlyCliArgs.includes('--version') || earlyCliArgs.includes('-V')) {
+  if (earlyCliArgs.includes('--version') || earlyCliArgs.includes('-v')) {
     writeToStdout((await getVersion()) + '\n');
-    process.exit(0);
+    process.exit(ExitCodes.SUCCESS);
   }
 
   const cliStartupHandle = startupProfiler.start('cli_startup');
