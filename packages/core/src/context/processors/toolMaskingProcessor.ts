@@ -8,7 +8,7 @@ import type { JSONSchemaType } from 'ajv';
 import type { ContextProcessor, ProcessArgs } from '../pipeline.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import type { ConcreteNode, ToolExecution } from '../graph/types.js';
+import type { ConcreteNode } from '../graph/types.js';
 import type { ContextEnvironment } from '../pipeline/environment.js';
 import { sanitizeFilenamePart } from '../../utils/fileUtils.js';
 import {
@@ -18,7 +18,11 @@ import {
   ENTER_PLAN_MODE_TOOL_NAME,
   EXIT_PLAN_MODE_TOOL_NAME,
 } from '../../tools/tool-names.js';
-import type { Part } from '@google/genai';
+import {
+  updatePart,
+  cloneFunctionCall,
+  cloneFunctionResponse,
+} from '../../utils/partUtils.js';
 
 export interface ToolMaskingProcessorOptions {
   stringLengthThresholdTokens: number;
@@ -138,149 +142,121 @@ export function createToolMaskingProcessor(
       const returnedNodes: ConcreteNode[] = [];
 
       for (const node of targets) {
-        switch (node.type) {
-          case 'TOOL_EXECUTION': {
-            const toolName = node.toolName;
-            if (toolName && UNMASKABLE_TOOLS.has(toolName)) {
-              returnedNodes.push(node);
-              break;
-            }
-
-            const callId = node.id || Date.now().toString();
-
-            const maskAsync = async (
-              obj: MaskableValue,
-              nodeType: string,
-            ): Promise<{ masked: MaskableValue; changed: boolean }> => {
-              if (typeof obj === 'string') {
-                if (obj.length > limitChars && !isAlreadyMasked(obj)) {
-                  const newString = await handleMasking(
-                    obj,
-                    toolName || 'unknown',
-                    callId,
-                    nodeType,
-                  );
-                  return { masked: newString, changed: true };
-                }
-                return { masked: obj, changed: false };
-              }
-              if (Array.isArray(obj)) {
-                let changed = false;
-                const masked: MaskableValue[] = [];
-                for (const item of obj) {
-                  const res = await maskAsync(item, nodeType);
-                  if (res.changed) changed = true;
-                  masked.push(res.masked);
-                }
-                return { masked, changed };
-              }
-              if (typeof obj === 'object' && obj !== null) {
-                let changed = false;
-                const masked: Record<string, MaskableValue> = {};
-                for (const [key, value] of Object.entries(obj)) {
-                  const res = await maskAsync(value, nodeType);
-                  if (res.changed) changed = true;
-                  masked[key] = res.masked;
-                }
-                return { masked, changed };
-              }
-              return { masked: obj, changed: false };
-            };
-
-            const rawIntent = node.intent;
-            const rawObs = node.observation;
-
-            if (!isMaskableRecord(rawIntent) || !isMaskableValue(rawObs)) {
-              returnedNodes.push(node);
-              break;
-            }
-
-            const intentRes = await maskAsync(rawIntent, 'intent');
-            const obsRes = await maskAsync(rawObs, 'observation');
-
-            if (intentRes.changed || obsRes.changed) {
-              const maskedIntent = isMaskableRecord(intentRes.masked)
-                ? (intentRes.masked as Record<string, unknown>)
-                : undefined;
-              // Ensure we strictly preserve the original intent if it was unchanged and is a record
-              const finalIntent = intentRes.changed
-                ? maskedIntent
-                : isMaskableRecord(rawIntent)
-                  ? (rawIntent as Record<string, unknown>)
-                  : undefined;
-
-              // Handle observation explicitly as string vs object
-              const maskedObs =
-                typeof obsRes.masked === 'string'
-                  ? ({ message: obsRes.masked } as Record<string, unknown>)
-                  : isMaskableRecord(obsRes.masked)
-                    ? (obsRes.masked as Record<string, unknown>)
-                    : undefined;
-              // Ensure we strictly preserve the original observation if it was unchanged
-              const finalObs = obsRes.changed
-                ? maskedObs
-                : typeof rawObs === 'string'
-                  ? ({ message: rawObs } as Record<string, unknown>)
-                  : isMaskableRecord(rawObs)
-                    ? (rawObs as Record<string, unknown>)
-                    : undefined;
-
-              const newIntentTokens =
-                env.tokenCalculator.estimateTokensForParts([
-                  {
-                    functionCall: {
-                      name: toolName || 'unknown',
-                      args: finalIntent,
-                      id: callId,
-                    },
-                  },
-                ]);
-
-              let obsPart: Record<string, unknown> = {};
-              if (maskedObs) {
-                obsPart = {
-                  functionResponse: {
-                    name: toolName || 'unknown',
-                    response: finalObs,
-                    id: callId,
-                  },
-                };
-              }
-
-              const newObsTokens = env.tokenCalculator.estimateTokensForParts([
-                obsPart as Part,
-              ]);
-
-              const tokensSaved =
-                env.tokenCalculator.getTokenCost(node) -
-                (newIntentTokens + newObsTokens);
-
-              if (tokensSaved > 0) {
-                const maskedNode: ToolExecution = {
-                  ...node,
-                  id: randomUUID(), // Modified, so generate new ID
-                  intent: finalIntent ?? node.intent,
-                  observation: finalObs ?? node.observation,
-                  tokens: {
-                    intent: newIntentTokens,
-                    observation: newObsTokens,
-                  },
-                  replacesId: node.id,
-                };
-
-                returnedNodes.push(maskedNode);
-              } else {
-                returnedNodes.push(node);
-              }
-            } else {
-              returnedNodes.push(node);
-            }
-            break;
-          }
-          default:
-            returnedNodes.push(node);
-            break;
+        if (node.type !== 'TOOL_EXECUTION') {
+          returnedNodes.push(node);
+          continue;
         }
+
+        const payload = node.payload;
+        const toolName =
+          payload.functionCall?.name || payload.functionResponse?.name;
+
+        if (toolName && UNMASKABLE_TOOLS.has(toolName)) {
+          returnedNodes.push(node);
+          continue;
+        }
+
+        const callId =
+          payload.functionCall?.id || payload.functionResponse?.id || 'unknown';
+
+        const maskAsync = async (
+          obj: MaskableValue,
+          nodeType: string,
+        ): Promise<{ masked: MaskableValue; changed: boolean }> => {
+          if (typeof obj === 'string') {
+            if (obj.length > limitChars && !isAlreadyMasked(obj)) {
+              const newString = await handleMasking(
+                obj,
+                toolName || 'unknown',
+                callId,
+                nodeType,
+              );
+              return { masked: newString, changed: true };
+            }
+            return { masked: obj, changed: false };
+          }
+          if (Array.isArray(obj)) {
+            let changed = false;
+            const masked: MaskableValue[] = [];
+            for (const item of obj) {
+              const res = await maskAsync(item, nodeType);
+              if (res.changed) changed = true;
+              masked.push(res.masked);
+            }
+            return { masked, changed };
+          }
+          if (typeof obj === 'object' && obj !== null) {
+            let changed = false;
+            const masked: Record<string, MaskableValue> = {};
+            for (const [key, value] of Object.entries(obj)) {
+              const res = await maskAsync(value, nodeType);
+              if (res.changed) changed = true;
+              masked[key] = res.masked;
+            }
+            return { masked, changed };
+          }
+          return { masked: obj, changed: false };
+        };
+
+        if (payload.functionCall) {
+          const rawIntent = payload.functionCall.args;
+          if (isMaskableRecord(rawIntent)) {
+            const res = await maskAsync(rawIntent, 'intent');
+            if (res.changed) {
+              const newFC = cloneFunctionCall(payload.functionCall);
+              let maskedRecord: Record<string, unknown>;
+              if (isMaskableRecord(res.masked)) {
+                maskedRecord = res.masked;
+              } else {
+                maskedRecord = { message: String(res.masked) };
+              }
+              newFC.args = maskedRecord;
+
+              const maskedPart = updatePart(payload, {
+                functionCall: newFC,
+              });
+
+              returnedNodes.push({
+                ...node,
+                id: randomUUID(),
+                payload: maskedPart,
+                replacesId: node.id,
+                turnId: node.turnId,
+              });
+              continue;
+            }
+          }
+        } else if (payload.functionResponse) {
+          const rawObs = payload.functionResponse.response;
+          if (isMaskableValue(rawObs)) {
+            const res = await maskAsync(rawObs, 'observation');
+            if (res.changed) {
+              const newFR = cloneFunctionResponse(payload.functionResponse);
+              let maskedRecord: Record<string, unknown>;
+              if (isMaskableRecord(res.masked)) {
+                maskedRecord = res.masked;
+              } else {
+                maskedRecord = { message: String(res.masked) };
+              }
+              newFR.response = maskedRecord;
+
+              const maskedPart = updatePart(payload, {
+                functionResponse: newFR,
+              });
+
+              returnedNodes.push({
+                ...node,
+                id: randomUUID(),
+                payload: maskedPart,
+                replacesId: node.id,
+                turnId: node.turnId,
+              });
+              continue;
+            }
+          }
+        }
+
+        returnedNodes.push(node);
       }
 
       return returnedNodes;
