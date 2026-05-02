@@ -285,6 +285,10 @@ class WebFetchToolInvocation extends BaseToolInvocation<
     signal: AbortSignal,
   ): Promise<string> {
     const url = convertGithubUrlToRaw(urlStr);
+    const rate = checkRateLimit(urlStr);
+    if (!rate.allowed) {
+      throw new Error(`Rate limit exceeded for ${urlStr}`);
+    }
     if (this.isBlockedHost(url)) {
       debugLogger.warn(`[WebFetchTool] Blocked access to host: ${url}`);
       throw new Error(

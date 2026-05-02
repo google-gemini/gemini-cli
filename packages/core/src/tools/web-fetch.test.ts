@@ -669,6 +669,36 @@ describe('WebFetchTool', () => {
         }
       },
     );
+
+    it('should respect rate limit in fallback execution', async () => {
+      vi.spyOn(fetchUtils, 'isPrivateIp').mockReturnValue(false);
+
+      // Force fallback (primary fails)
+      mockGenerateContent.mockResolvedValueOnce({
+        candidates: [],
+      });
+
+      // Mock fetch success
+      mockFetch('https://ratelimit-test.com/', {
+        text: () => Promise.resolve('ok'),
+      });
+
+      const tool = new WebFetchTool(mockConfig, bus);
+
+      // Hit rate limit (10 times)
+      for (let i = 0; i < 10; i++) {
+        await tool
+          .build({ prompt: 'fetch https://ratelimit-test.com' })
+          .execute({ abortSignal: new AbortController().signal });
+      }
+
+      // 11th call → should trigger rate limit inside fallback
+      const result = await tool
+        .build({ prompt: 'fetch https://ratelimit-test.com' })
+        .execute({ abortSignal: new AbortController().signal });
+
+      expect(result.llmContent).toContain('Error');
+    });
   });
 
   describe('shouldConfirmExecute', () => {
