@@ -42,6 +42,7 @@ describe('ExitPlanModeTool', () => {
 
     mockConfig = {
       getTargetDir: vi.fn().mockReturnValue(tempRootDir),
+      getProjectRoot: vi.fn().mockReturnValue(tempRootDir),
       setApprovalMode: vi.fn(),
       setApprovedPlanPath: vi.fn(),
       storage: {
@@ -72,8 +73,10 @@ describe('ExitPlanModeTool', () => {
 
   const createPlanFile = (name: string, content: string) => {
     const filePath = path.join(mockPlansDir, name);
+    // Ensure parent directory exists for nested tests
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
     fs.writeFileSync(filePath, content);
-    return path.join('plans', name);
+    return name;
   };
 
   describe('shouldConfirmExecute', () => {
@@ -482,7 +485,11 @@ Ask the user for specific feedback on how to improve the plan.`,
     });
 
     it('should reject non-existent plan file', async () => {
-      const result = await validatePlanPath('ghost.md', mockPlansDir);
+      const result = await validatePlanPath(
+        'ghost.md',
+        mockPlansDir,
+        tempRootDir,
+      );
       expect(result).toContain('Plan file does not exist');
     });
 
@@ -497,7 +504,7 @@ Ask the user for specific feedback on how to improve the plan.`,
       });
 
       expect(result).toBe(
-        `Access denied: plan path (${path.join(mockPlansDir, 'malicious.md')}) must be within the designated plans directory (${mockPlansDir}).`,
+        `Access denied: plan path (malicious.md) must be within the designated plans directory (${mockPlansDir}).`,
       );
     });
 

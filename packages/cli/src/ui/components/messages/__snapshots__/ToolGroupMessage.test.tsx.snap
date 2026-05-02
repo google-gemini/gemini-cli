@@ -62,9 +62,9 @@ exports[`<ToolGroupMessage /> > Golden Snapshots > renders empty tool calls arra
 
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders header when scrolled 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────╮
-│ ✓  tool-1 Description 1. This is a long description that will need to b… │                       ▄
+│ ✓  tool-1 Description 1. This is a long description that will need to be │
+│    truncated if the terminal width is small.                             │                       ▄
 │──────────────────────────────────────────────────────────────────────────│                       █
-│ line3                                                                    │                       █
 │ line4                                                                    │                       █
 │ line5                                                                    │                       █
 │                                                                          │                       █
@@ -77,8 +77,7 @@ exports[`<ToolGroupMessage /> > Golden Snapshots > renders header when scrolled 
 `;
 
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders mixed tool calls including update_topic 1`] = `
-"
-  Testing Topic: This is the description
+"  Testing Topic: This is the description
 
 ╭──────────────────────────────────────────────────────────────────────────╮
 │ ✓  read_file Read a file                                                 │
@@ -142,9 +141,24 @@ exports[`<ToolGroupMessage /> > Golden Snapshots > renders two tool groups where
 "
 `;
 
-exports[`<ToolGroupMessage /> > Golden Snapshots > renders update_topic tool call using TopicMessage > update_topic_tool 1`] = `
+exports[`<ToolGroupMessage /> > Golden Snapshots > renders update_topic in the middle of other tools > update_topic_middle 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────╮
+│ ✓  read_file A tool for testing                                          │
+│                                                                          │
+│ Test result                                                              │
+╰──────────────────────────────────────────────────────────────────────────╯
+  Middle Topic
+
+╭──────────────────────────────────────────────────────────────────────────╮
+│ ✓  write_file A tool for testing                                         │
+│                                                                          │
+│ Test result                                                              │
+╰──────────────────────────────────────────────────────────────────────────╯
 "
-  Testing Topic: This is the description
+`;
+
+exports[`<ToolGroupMessage /> > Golden Snapshots > renders update_topic tool call using TopicMessage > update_topic_tool 1`] = `
+"  Testing Topic: This is the description
 "
 `;
 
@@ -163,7 +177,10 @@ exports[`<ToolGroupMessage /> > Golden Snapshots > renders with limited terminal
 
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders with narrow terminal width 1`] = `
 "╭──────────────────────────────────╮
-│ ✓  very-long-tool-name-that-mig… │
+│ ✓  very-long-tool-name-that-migh │
+│    t-wrap This is a very long    │
+│    description that might cause  │
+│    wrapping issues               │
 │                                  │
 │ Test result                      │
 ╰──────────────────────────────────╯

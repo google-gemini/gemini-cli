@@ -23,6 +23,7 @@ import { createMockSandboxConfig } from '@google/gemini-cli-test-utils';
 import { DEFAULT_MAX_ATTEMPTS } from '../utils/retry.js';
 import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { coreEvents } from '../utils/events.js';
 import { ApprovalMode } from '../policy/types.js';
 import {
   HookType,
@@ -202,6 +203,7 @@ const mockCoreEvents = vi.hoisted(() => ({
   emitConsoleLog: vi.fn(),
   emitQuotaChanged: vi.fn(),
   on: vi.fn(),
+  emit: vi.fn(),
 }));
 
 const mockSetGlobalProxy = vi.hoisted(() => vi.fn());
@@ -348,6 +350,27 @@ describe('Server Config (config.ts)', () => {
           backgroundCompletionBehavior: 'notify',
         }),
       );
+    });
+
+    it('should ignore properties that are explicitly undefined and preserve existing values', () => {
+      const config = new Config(baseParams);
+
+      config.setShellExecutionConfig({
+        terminalWidth: 80,
+        showColor: true,
+      });
+
+      expect(config.getShellExecutionConfig().terminalWidth).toBe(80);
+      expect(config.getShellExecutionConfig().showColor).toBe(true);
+
+      // Provide undefined for terminalWidth, which should be ignored
+      config.setShellExecutionConfig({
+        terminalWidth: undefined,
+        showColor: false,
+      });
+
+      expect(config.getShellExecutionConfig().terminalWidth).toBe(80); // Should still be 80, not undefined
+      expect(config.getShellExecutionConfig().showColor).toBe(false); // Should be updated
     });
   });
 
@@ -689,6 +712,59 @@ describe('Server Config (config.ts)', () => {
       );
     });
 
+    describe('getProModelNoAccessSync', () => {
+      it('should return experiment value for AuthType.LOGIN_WITH_GOOGLE', async () => {
+        vi.mocked(getExperiments).mockResolvedValue({
+          experimentIds: [],
+          flags: {
+            [ExperimentFlags.PRO_MODEL_NO_ACCESS]: {
+              boolValue: true,
+            },
+          },
+        });
+        const config = new Config(baseParams);
+        vi.mocked(createContentGeneratorConfig).mockResolvedValue({
+          authType: AuthType.LOGIN_WITH_GOOGLE,
+        });
+        await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
+        expect(config.getProModelNoAccessSync()).toBe(true);
+      });
+
+      it('should return experiment value for AuthType.COMPUTE_ADC', async () => {
+        vi.mocked(getExperiments).mockResolvedValue({
+          experimentIds: [],
+          flags: {
+            [ExperimentFlags.PRO_MODEL_NO_ACCESS]: {
+              boolValue: true,
+            },
+          },
+        });
+        const config = new Config(baseParams);
+        vi.mocked(createContentGeneratorConfig).mockResolvedValue({
+          authType: AuthType.COMPUTE_ADC,
+        });
+        await config.refreshAuth(AuthType.COMPUTE_ADC);
+        expect(config.getProModelNoAccessSync()).toBe(true);
+      });
+
+      it('should return false for other auth types even if experiment is true', async () => {
+        vi.mocked(getExperiments).mockResolvedValue({
+          experimentIds: [],
+          flags: {
+            [ExperimentFlags.PRO_MODEL_NO_ACCESS]: {
+              boolValue: true,
+            },
+          },
+        });
+        const config = new Config(baseParams);
+        vi.mocked(createContentGeneratorConfig).mockResolvedValue({
+          authType: AuthType.USE_GEMINI,
+        });
+        await config.refreshAuth(AuthType.USE_GEMINI);
+        expect(config.getProModelNoAccessSync()).toBe(false);
+      });
+    });
+
     describe('getRequestTimeoutMs', () => {
       it('should return undefined if the flag is not set', () => {
         const config = new Config(baseParams);
@@ -762,10 +838,35 @@ describe('Server Config (config.ts)', () => {
         undefined,
         undefined,
         undefined,
+        undefined,
       );
       // Verify that contentGeneratorConfig is updated
       expect(config.getContentGeneratorConfig()).toEqual(mockContentConfig);
       expect(GeminiClient).toHaveBeenCalledWith(config);
+    });
+
+    it('should pass Vertex AI routing settings when refreshing auth', async () => {
+      const vertexAiRouting = {
+        requestType: 'shared' as const,
+        sharedRequestType: 'priority' as const,
+      };
+      const config = new Config({
+        ...baseParams,
+        vertexAiRouting,
+      });
+
+      vi.mocked(createContentGeneratorConfig).mockResolvedValue({});
+
+      await config.refreshAuth(AuthType.USE_VERTEX_AI);
+
+      expect(createContentGeneratorConfig).toHaveBeenCalledWith(
+        config,
+        AuthType.USE_VERTEX_AI,
+        undefined,
+        undefined,
+        undefined,
+        vertexAiRouting,
+      );
     });
 
     it('should reset model availability status', async () => {
@@ -861,8 +962,11 @@ describe('Server Config (config.ts)', () => {
       });
 
       await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
+      await config.getExperimentsAsync();
 
-      expect(config.getModel()).toBe(PREVIEW_GEMINI_FLASH_MODEL);
+      await vi.waitFor(() => {
+        expect(config.getModel()).toBe(PREVIEW_GEMINI_FLASH_MODEL);
+      });
     });
 
     it('should NOT switch to flash model if user has Pro access and model is auto', async () => {
@@ -1335,31 +1439,6 @@ describe('Server Config (config.ts)', () => {
     });
   });
 
-  describe('ContinueOnFailedApiCall Configuration', () => {
-    it('should default continueOnFailedApiCall to false when not provided', () => {
-      const config = new Config(baseParams);
-      expect(config.getContinueOnFailedApiCall()).toBe(true);
-    });
-
-    it('should set continueOnFailedApiCall to true when provided as true', () => {
-      const paramsWithContinueOnFailedApiCall: ConfigParameters = {
-        ...baseParams,
-        continueOnFailedApiCall: true,
-      };
-      const config = new Config(paramsWithContinueOnFailedApiCall);
-      expect(config.getContinueOnFailedApiCall()).toBe(true);
-    });
-
-    it('should set continueOnFailedApiCall to false when explicitly provided as false', () => {
-      const paramsWithContinueOnFailedApiCall: ConfigParameters = {
-        ...baseParams,
-        continueOnFailedApiCall: false,
-      };
-      const config = new Config(paramsWithContinueOnFailedApiCall);
-      expect(config.getContinueOnFailedApiCall()).toBe(false);
-    });
-  });
-
   describe('createToolRegistry', () => {
     it('should register a tool if coreTools contains an argument-specific pattern', async () => {
       const params: ConfigParameters = {
@@ -1774,6 +1853,159 @@ describe('Server Config (config.ts)', () => {
     expect(config1.topicState.getTopic()).toBe('Topic 1');
     expect(config2.topicState.getTopic()).toBe('Topic 2');
   });
+
+  it('updates storage session-scoped directories when the sessionId changes', async () => {
+    const config = new Config({
+      ...baseParams,
+      sessionId: 'session-one',
+      plan: true,
+    });
+
+    await config.initialize();
+    const tempDir = config.storage.getProjectTempDir();
+    const oldPlansDir = path.join(tempDir, 'session-one', 'plans');
+    const oldTrackerService = config.getTrackerService();
+
+    config.setSessionId('session-two');
+
+    expect(config.getSessionId()).toBe('session-two');
+    expect(config.storage.getProjectTempPlansDir()).toBe(
+      path.join(tempDir, 'session-two', 'plans'),
+    );
+    expect(config.storage.getProjectTempTrackerDir()).toBe(
+      path.join(tempDir, 'session-two', 'tracker'),
+    );
+    expect(config.getTrackerService()).not.toBe(oldTrackerService);
+    expect(config.getTrackerService().trackerDir).toBe(
+      path.join(tempDir, 'session-two', 'tracker'),
+    );
+    expect(config.getWorkspaceContext().getDirectories()).not.toContain(
+      oldPlansDir,
+    );
+  });
+
+  it('does not throw when changing sessions before the previous plans dir exists', async () => {
+    const config = new Config({
+      ...baseParams,
+      sessionId: 'session-one',
+      plan: true,
+    });
+
+    await config.initialize();
+    const missingPlansDir = config.storage.getProjectTempPlansDir();
+    const realpathMock = vi.mocked(fs.realpathSync);
+    const originalImplementation = realpathMock.getMockImplementation();
+
+    try {
+      realpathMock.mockImplementation((input) => {
+        const normalizedInput =
+          typeof input === 'string' || Buffer.isBuffer(input)
+            ? input
+            : input.toString();
+
+        if (normalizedInput === missingPlansDir) {
+          const error = new Error(
+            `ENOENT: no such file or directory, ${normalizedInput}`,
+          );
+          Object.assign(error, { code: 'ENOENT' });
+          throw error;
+        }
+        if (originalImplementation) {
+          return originalImplementation(input);
+        }
+        return normalizedInput;
+      });
+
+      expect(() => config.setSessionId('session-two')).not.toThrow();
+    } finally {
+      realpathMock.mockImplementation((input) => {
+        if (originalImplementation) {
+          return originalImplementation(input);
+        }
+        return typeof input === 'string' || Buffer.isBuffer(input)
+          ? input
+          : input.toString();
+      });
+    }
+  });
+
+  it('clears the approved plan when starting a new session', () => {
+    const config = new Config({
+      ...baseParams,
+      sessionId: 'session-one',
+    });
+
+    config.setApprovedPlanPath('/tmp/session-one/plans/approved.md');
+
+    expect(() => config.resetNewSessionState('session-two')).not.toThrow();
+
+    expect(config.getSessionId()).toBe('session-two');
+    expect(config.getApprovedPlanPath()).toBeUndefined();
+  });
+
+  it('performs a comprehensive reset of all session-scoped state when sessionId changes', async () => {
+    const config = new Config({
+      ...baseParams,
+      sessionId: 'session-one',
+      plan: true,
+      tracker: true,
+    });
+
+    await config.initialize();
+
+    // 1. "Dirty" the session state
+    const oldTrackerService = config.getTrackerService();
+    config.setApprovedPlanPath('/tmp/plan.md');
+    config.topicState.setTopic('Old Topic', 'Old Intent');
+    config.getSkillManager().activateSkill('old-skill');
+    config.getModelAvailabilityService().markTerminal('model-1', 'quota');
+    config.setLatestApiRequest({} as never);
+
+    // Interface to access private fields without 'any'
+    interface PrivateConfig {
+      modelQuotas: Map<string, unknown>;
+      lastEmittedQuotaRemaining: number | undefined;
+      lastEmittedQuotaLimit: number | undefined;
+      lastQuotaFetchTime: number;
+      hasAccessToPreviewModel: boolean | null;
+    }
+    const configInternal = config as unknown as PrivateConfig;
+
+    // Mock internal quota state
+    configInternal.modelQuotas.set('model-1', { remaining: 0, limit: 100 });
+    configInternal.lastEmittedQuotaRemaining = 0;
+    configInternal.lastEmittedQuotaLimit = 100;
+    configInternal.lastQuotaFetchTime = 12345;
+    configInternal.hasAccessToPreviewModel = true;
+
+    // Listen for quota event
+    const emitQuotaSpy = vi.spyOn(coreEvents, 'emitQuotaChanged');
+
+    // 2. Trigger session change
+    config.setSessionId('session-two');
+
+    // 3. Verify EVERYTHING is reset
+    expect(config.getSessionId()).toBe('session-two');
+    expect(config.getApprovedPlanPath()).toBeUndefined();
+    expect(config.topicState.getTopic()).toBeUndefined();
+    expect(config.topicState.getIntent()).toBeUndefined();
+    expect(config.getSkillManager().isSkillActive('old-skill')).toBe(false);
+    expect(config.getTrackerService()).not.toBe(oldTrackerService);
+    expect(
+      config.getModelAvailabilityService().snapshot('model-1').available,
+    ).toBe(true);
+    expect(config.getLatestApiRequest()).toBeUndefined();
+
+    // Quota resets
+    expect(configInternal.modelQuotas.size).toBe(0);
+    expect(configInternal.lastEmittedQuotaRemaining).toBeUndefined();
+    expect(configInternal.lastEmittedQuotaLimit).toBeUndefined();
+    expect(configInternal.lastQuotaFetchTime).toBe(0);
+    expect(configInternal.hasAccessToPreviewModel).toBeNull();
+
+    // Event emission
+    expect(emitQuotaSpy).toHaveBeenCalledWith(undefined, undefined, undefined);
+  });
 });
 
 describe('GemmaModelRouterSettings', () => {
@@ -1812,6 +2044,8 @@ describe('GemmaModelRouterSettings', () => {
     const config = new Config(baseParams);
     const settings = config.getGemmaModelRouterSettings();
     expect(settings.enabled).toBe(false);
+    expect(settings.autoStartServer).toBe(true);
+    expect(settings.binaryPath).toBe('');
     expect(settings.classifier?.host).toBe('http://localhost:9379');
     expect(settings.classifier?.model).toBe('gemma3-1b-gpu-custom');
   });
@@ -1821,6 +2055,8 @@ describe('GemmaModelRouterSettings', () => {
       ...baseParams,
       gemmaModelRouter: {
         enabled: true,
+        autoStartServer: false,
+        binaryPath: '/custom/lit',
         classifier: {
           host: 'http://custom:1234',
           model: 'custom-gemma',
@@ -1830,6 +2066,8 @@ describe('GemmaModelRouterSettings', () => {
     const config = new Config(params);
     const settings = config.getGemmaModelRouterSettings();
     expect(settings.enabled).toBe(true);
+    expect(settings.autoStartServer).toBe(false);
+    expect(settings.binaryPath).toBe('/custom/lit');
     expect(settings.classifier?.host).toBe('http://custom:1234');
     expect(settings.classifier?.model).toBe('custom-gemma');
   });
@@ -1844,6 +2082,8 @@ describe('GemmaModelRouterSettings', () => {
     const config = new Config(params);
     const settings = config.getGemmaModelRouterSettings();
     expect(settings.enabled).toBe(true);
+    expect(settings.autoStartServer).toBe(true);
+    expect(settings.binaryPath).toBe('');
     expect(settings.classifier?.host).toBe('http://localhost:9379');
     expect(settings.classifier?.model).toBe('gemma3-1b-gpu-custom');
   });
@@ -3304,7 +3544,121 @@ describe('Config JIT Initialization', () => {
     expect(config.getUserMemory()).toBe('Initial Memory');
   });
 
-  describe('isMemoryManagerEnabled', () => {
+  describe('isMemoryV2Enabled', () => {
+    it('should default to true', () => {
+      const params: ConfigParameters = {
+        sessionId: 'test-session',
+        targetDir: '/tmp/test',
+        debugMode: false,
+        model: 'test-model',
+        cwd: '/tmp/test',
+      };
+
+      config = new Config(params);
+      expect(config.isMemoryV2Enabled()).toBe(true);
+    });
+
+    it('should return false when experimentalMemoryV2 is explicitly false', () => {
+      const params: ConfigParameters = {
+        sessionId: 'test-session',
+        targetDir: '/tmp/test',
+        debugMode: false,
+        model: 'test-model',
+        cwd: '/tmp/test',
+        experimentalMemoryV2: false,
+      };
+
+      config = new Config(params);
+      expect(config.isMemoryV2Enabled()).toBe(false);
+    });
+
+    it('should return true when experimentalMemoryV2 is true', () => {
+      const params: ConfigParameters = {
+        sessionId: 'test-session',
+        targetDir: '/tmp/test',
+        debugMode: false,
+        model: 'test-model',
+        cwd: '/tmp/test',
+        experimentalMemoryV2: true,
+      };
+
+      config = new Config(params);
+      expect(config.isMemoryV2Enabled()).toBe(true);
+    });
+
+    it('should NOT add the global ~/.gemini directory to the workspace when enabled', async () => {
+      // The prompt-driven memoryV2 mode does not broaden the workspace
+      // to include the global ~/.gemini/ directory. Cross-project personal
+      // preferences are routed to ~/.gemini/GEMINI.md via the surgical
+      // isPathAllowed allowlist instead — see the next two tests.
+      const params: ConfigParameters = {
+        sessionId: 'test-session',
+        targetDir: '/tmp/test',
+        debugMode: false,
+        model: 'test-model',
+        cwd: '/tmp/test',
+        experimentalMemoryV2: true,
+      };
+
+      config = new Config(params);
+      await config.initialize();
+
+      const directories = config.getWorkspaceContext().getDirectories();
+      expect(directories).not.toContain(Storage.getGlobalGeminiDir());
+    });
+
+    it('should allow isPathAllowed to write the global ~/.gemini/GEMINI.md file', async () => {
+      // Surgical allowlist: when memoryV2 is on, the prompt routes
+      // cross-project personal preferences to ~/.gemini/GEMINI.md, so the
+      // agent must be able to edit that exact file via edit/write_file.
+      const params: ConfigParameters = {
+        sessionId: 'test-session',
+        targetDir: '/tmp/test',
+        debugMode: false,
+        model: 'test-model',
+        cwd: '/tmp/test',
+        experimentalMemoryV2: true,
+      };
+
+      config = new Config(params);
+      await config.initialize();
+
+      const globalGeminiMdPath = path.join(
+        Storage.getGlobalGeminiDir(),
+        'GEMINI.md',
+      );
+      expect(config.isPathAllowed(globalGeminiMdPath)).toBe(true);
+    });
+
+    it('should NOT allow isPathAllowed to write other files under ~/.gemini/ (least privilege)', async () => {
+      // The allowlist is surgical: only ~/.gemini/GEMINI.md is reachable.
+      // settings.json, keybindings.json, credentials, etc. remain disallowed.
+      const params: ConfigParameters = {
+        sessionId: 'test-session',
+        targetDir: '/tmp/test',
+        debugMode: false,
+        model: 'test-model',
+        cwd: '/tmp/test',
+        experimentalMemoryV2: true,
+      };
+
+      config = new Config(params);
+      await config.initialize();
+
+      const globalDir = Storage.getGlobalGeminiDir();
+      expect(config.isPathAllowed(path.join(globalDir, 'settings.json'))).toBe(
+        false,
+      );
+      expect(
+        config.isPathAllowed(path.join(globalDir, 'keybindings.json')),
+      ).toBe(false);
+      expect(
+        config.isPathAllowed(path.join(globalDir, 'oauth_creds.json')),
+      ).toBe(false);
+    });
+  });
+
+  describe('isAutoMemoryEnabled', () => {
     it('should default to false', () => {
       const params: ConfigParameters = {
         sessionId: 'test-session',
@@ -3315,21 +3669,77 @@ describe('Config JIT Initialization', () => {
       };
 
       config = new Config(params);
-      expect(config.isMemoryManagerEnabled()).toBe(false);
+      expect(config.isAutoMemoryEnabled()).toBe(false);
     });
 
-    it('should return true when experimentalMemoryManager is true', () => {
+    it('should return true when experimentalAutoMemory is true', () => {
       const params: ConfigParameters = {
         sessionId: 'test-session',
         targetDir: '/tmp/test',
         debugMode: false,
         model: 'test-model',
         cwd: '/tmp/test',
-        experimentalMemoryManager: true,
+        experimentalAutoMemory: true,
       };
 
       config = new Config(params);
-      expect(config.isMemoryManagerEnabled()).toBe(true);
+      expect(config.isAutoMemoryEnabled()).toBe(true);
+    });
+
+    it('should return true when experimentalGemma is true', () => {
+      const params: ConfigParameters = {
+        sessionId: 'test-session',
+        targetDir: '/tmp/test',
+        debugMode: false,
+        model: 'test-model',
+        cwd: '/tmp/test',
+        experimentalGemma: true,
+      };
+
+      config = new Config(params);
+      expect(config.getExperimentalGemma()).toBe(true);
+    });
+
+    it('should return false when experimentalGemma is false', () => {
+      const params: ConfigParameters = {
+        sessionId: 'test-session',
+        targetDir: '/tmp/test',
+        debugMode: false,
+        model: 'test-model',
+        cwd: '/tmp/test',
+        experimentalGemma: false,
+      };
+
+      config = new Config(params);
+      expect(config.getExperimentalGemma()).toBe(false);
+    });
+
+    it('should return true when experimentalGemma is not provided', () => {
+      const params: ConfigParameters = {
+        sessionId: 'test-session',
+        targetDir: '/tmp/test',
+        debugMode: false,
+        model: 'test-model',
+        cwd: '/tmp/test',
+      };
+
+      config = new Config(params);
+      expect(config.getExperimentalGemma()).toBe(true);
+    });
+
+    it('should be independent of experimentalMemoryV2', () => {
+      const params: ConfigParameters = {
+        sessionId: 'test-session',
+        targetDir: '/tmp/test',
+        debugMode: false,
+        model: 'test-model',
+        cwd: '/tmp/test',
+        experimentalMemoryV2: true,
+      };
+
+      config = new Config(params);
+      expect(config.isMemoryV2Enabled()).toBe(true);
+      expect(config.isAutoMemoryEnabled()).toBe(false);
     });
   });
 

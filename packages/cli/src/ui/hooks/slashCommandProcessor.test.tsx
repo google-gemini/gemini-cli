@@ -205,11 +205,13 @@ describe('useSlashCommandProcessor', () => {
             openSettingsDialog: vi.fn(),
             openSessionBrowser: vi.fn(),
             openModelDialog: mockOpenModelDialog,
+            openVoiceModelDialog: vi.fn(),
             openAgentConfigDialog,
             openPermissionsDialog: vi.fn(),
             quit: mockSetQuittingMessages,
             setDebugMessage: vi.fn(),
             toggleCorgiMode: vi.fn(),
+            toggleVoiceMode: vi.fn(),
             toggleDebugProfiler: vi.fn(),
             dispatchExtensionStateUpdate: vi.fn(),
             addConfirmUpdateExtensionRequest: vi.fn(),
@@ -644,6 +646,108 @@ describe('useSlashCommandProcessor', () => {
 
       expect(mockSetQuittingMessages).toHaveBeenCalledWith(['bye']);
     });
+
+    it('should delete the current session when quit action has deleteSession flag', async () => {
+      const mockDeleteCurrentSessionAsync = vi
+        .fn()
+        .mockResolvedValue(undefined);
+
+      const mockClient = {
+        getChatRecordingService: vi.fn().mockReturnValue({
+          deleteCurrentSessionAsync: mockDeleteCurrentSessionAsync,
+        }),
+      } as unknown as GeminiClient;
+      vi.spyOn(mockConfig, 'getGeminiClient').mockReturnValue(mockClient);
+
+      const quitAction = vi.fn().mockResolvedValue({
+        type: 'quit',
+        deleteSession: true,
+        messages: ['bye'],
+      });
+      const command = createTestCommand({
+        name: 'exit',
+        action: quitAction,
+      });
+      const result = await setupProcessorHook({
+        builtinCommands: [command],
+      });
+
+      await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
+
+      await act(async () => {
+        await result.current.handleSlashCommand('/exit --delete');
+      });
+
+      expect(mockDeleteCurrentSessionAsync).toHaveBeenCalled();
+      expect(mockSetQuittingMessages).toHaveBeenCalledWith(['bye']);
+    });
+
+    it('should not delete session when quit action does not have deleteSession flag', async () => {
+      const mockDeleteCurrentSessionAsync = vi
+        .fn()
+        .mockResolvedValue(undefined);
+      const mockClient = {
+        getChatRecordingService: vi.fn().mockReturnValue({
+          deleteCurrentSessionAsync: mockDeleteCurrentSessionAsync,
+        }),
+      } as unknown as GeminiClient;
+      vi.spyOn(mockConfig, 'getGeminiClient').mockReturnValue(mockClient);
+
+      const quitAction = vi.fn().mockResolvedValue({
+        type: 'quit',
+        messages: ['bye'],
+      });
+      const command = createTestCommand({
+        name: 'exit',
+        action: quitAction,
+      });
+      const result = await setupProcessorHook({
+        builtinCommands: [command],
+      });
+
+      await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
+
+      await act(async () => {
+        await result.current.handleSlashCommand('/exit');
+      });
+
+      expect(mockDeleteCurrentSessionAsync).not.toHaveBeenCalled();
+      expect(mockSetQuittingMessages).toHaveBeenCalledWith(['bye']);
+    });
+
+    it('should still quit even if session deletion fails', async () => {
+      const mockClient = {
+        getChatRecordingService: vi.fn().mockReturnValue({
+          deleteCurrentSessionAsync: vi
+            .fn()
+            .mockRejectedValue(new Error('Deletion failed')),
+        }),
+      } as unknown as GeminiClient;
+      vi.spyOn(mockConfig, 'getGeminiClient').mockReturnValue(mockClient);
+
+      const quitAction = vi.fn().mockResolvedValue({
+        type: 'quit',
+        deleteSession: true,
+        messages: ['bye'],
+      });
+      const command = createTestCommand({
+        name: 'exit',
+        action: quitAction,
+      });
+      const result = await setupProcessorHook({
+        builtinCommands: [command],
+      });
+
+      await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
+
+      await act(async () => {
+        await result.current.handleSlashCommand('/exit --delete');
+      });
+
+      // Should still quit even though deletion threw
+      expect(mockSetQuittingMessages).toHaveBeenCalledWith(['bye']);
+    });
+
     it('should handle "submit_prompt" action returned from a file-based command', async () => {
       const fileCommand = createTestCommand(
         {
@@ -858,11 +962,81 @@ describe('useSlashCommandProcessor', () => {
   });
 
   describe('Lifecycle', () => {
+    it('removes the IDE status listener on unmount after async initialization', async () => {
+      let resolveIdeClient:
+        | ((client: {
+            addStatusChangeListener: (listener: () => void) => void;
+            removeStatusChangeListener: (listener: () => void) => void;
+          }) => void)
+        | undefined;
+      const addStatusChangeListener = vi.fn();
+      const removeStatusChangeListener = vi.fn();
+
+      mockIdeClientGetInstance.mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            resolveIdeClient = resolve;
+          }),
+      );
+
+      const result = await setupProcessorHook();
+
+      await act(async () => {
+        resolveIdeClient?.({
+          addStatusChangeListener,
+          removeStatusChangeListener,
+        });
+      });
+
+      result.unmount();
+      unmountHook = undefined;
+
+      expect(addStatusChangeListener).toHaveBeenCalledTimes(1);
+      expect(removeStatusChangeListener).toHaveBeenCalledTimes(1);
+      expect(removeStatusChangeListener).toHaveBeenCalledWith(
+        addStatusChangeListener.mock.calls[0]?.[0],
+      );
+    });
+
+    it('does not register an IDE status listener if unmounted before async initialization resolves', async () => {
+      let resolveIdeClient:
+        | ((client: {
+            addStatusChangeListener: (listener: () => void) => void;
+            removeStatusChangeListener: (listener: () => void) => void;
+          }) => void)
+        | undefined;
+      const addStatusChangeListener = vi.fn();
+      const removeStatusChangeListener = vi.fn();
+
+      mockIdeClientGetInstance.mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            resolveIdeClient = resolve;
+          }),
+      );
+
+      const result = await setupProcessorHook();
+
+      result.unmount();
+      unmountHook = undefined;
+
+      await act(async () => {
+        resolveIdeClient?.({
+          addStatusChangeListener,
+          removeStatusChangeListener,
+        });
+      });
+
+      expect(addStatusChangeListener).not.toHaveBeenCalled();
+      expect(removeStatusChangeListener).not.toHaveBeenCalled();
+    });
+
     it('should abort command loading when the hook unmounts', async () => {
       const abortSpy = vi.spyOn(AbortController.prototype, 'abort');
       const { unmount } = await setupProcessorHook();
 
       unmount();
+      unmountHook = undefined;
 
       expect(abortSpy).toHaveBeenCalledTimes(1);
     });
