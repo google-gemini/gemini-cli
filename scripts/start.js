@@ -66,6 +66,29 @@ const env = {
   DEV: 'true',
 };
 
+if (!process.argv.includes('--no-interactive-check')) {
+  const scrubbedVars = [];
+  for (const key of Object.keys(env)) {
+    if (
+      key === 'CI' ||
+      key === 'CONTINUOUS_INTEGRATION' ||
+      key.startsWith('CI_')
+    ) {
+      delete env[key];
+      scrubbedVars.push(key);
+    }
+  }
+
+  if (scrubbedVars.length > 0) {
+    console.error(
+      `[gemini] Removed CI-related env vars to ensure interactive mode: ${scrubbedVars.join(', ')}`,
+    );
+    console.error(
+      `[gemini] These variables are still available in processes spawned by shell tools. Pass --no-interactive-check to suppress this.`,
+    );
+  }
+}
+
 if (isInDebugMode) {
   // If this is not set, the debugger will pause on the outer process rather
   // than the relaunched process making it harder to debug.
