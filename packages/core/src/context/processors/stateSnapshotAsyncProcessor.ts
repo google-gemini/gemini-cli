@@ -7,7 +7,7 @@ import { randomUUID } from 'node:crypto';
 import type { JSONSchemaType } from 'ajv';
 import type { AsyncContextProcessor, ProcessArgs } from '../pipeline.js';
 import type { ContextEnvironment } from '../pipeline/environment.js';
-import type { ConcreteNode } from '../graph/types.js';
+import { type ConcreteNode, NodeType } from '../graph/types.js';
 import { SnapshotGenerator } from '../utils/snapshotGenerator.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 
@@ -73,13 +73,14 @@ export function createStateSnapshotAsyncProcessor(
 
             previousConsumedIds = latest.payload.consumedIds;
 
-            // Prepend a synthetic node representing the previous rolling state
+            const snapshotId = randomUUID();
             const previousStateNode: ConcreteNode = {
-              id: randomUUID(),
-              logicalParentId: '',
-              type: 'SNAPSHOT',
+              id: snapshotId,
+              turnId: snapshotId,
+              type: NodeType.SNAPSHOT,
               timestamp: latest.timestamp,
-              text: latest.payload.newText,
+              role: 'user',
+              payload: { text: latest.payload.newText },
             };
 
             nodesToSummarize = [previousStateNode, ...targets];
@@ -101,6 +102,7 @@ export function createStateSnapshotAsyncProcessor(
           newText: snapshotText,
           consumedIds: newConsumedIds,
           type: processorType,
+          timestamp: targets[targets.length - 1].timestamp,
         });
       } catch (e) {
         debugLogger.error(
