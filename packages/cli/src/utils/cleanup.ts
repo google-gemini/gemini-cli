@@ -114,15 +114,30 @@ export async function runExitCleanup() {
 }
 
 async function drainStdin() {
-  if (!process.stdin?.isTTY) return;
-  // Resume stdin and attach a no-op listener to drain the buffer.
-  // We use removeAllListeners to ensure we don't trigger other handlers.
-  process.stdin
-    .resume()
-    .removeAllListeners('data')
-    .on('data', () => {});
-  // Give it a moment to flush the OS buffer.
-  await new Promise((resolve) => setTimeout(resolve, 50));
+  const stdin = process.stdin;
+  if (
+    !stdin?.isTTY ||
+    stdin.destroyed ||
+    stdin.readableEnded ||
+    stdin.closed ||
+    stdin.readable === false
+  ) {
+    return;
+  }
+
+  try {
+    // Resume stdin and attach a no-op listener to drain the buffer.
+    // We use removeAllListeners to ensure we don't trigger other handlers.
+    stdin
+      .resume()
+      .removeAllListeners('data')
+      .on('data', () => {});
+    // Give it a moment to flush the OS buffer.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  } catch {
+    // Ignore stdio teardown errors. This path can run after an SSH/TTY
+    // disconnect, where touching stdin may itself fail during exit cleanup.
+  }
 }
 
 /**

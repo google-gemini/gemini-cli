@@ -126,6 +126,66 @@ describe('cleanup', () => {
     expect(successFn).toHaveBeenCalledTimes(1);
   });
 
+  it('should skip draining stdin when tty input has already been torn down', async () => {
+    const originalResume = process.stdin.resume;
+    const originalIsTTY = process.stdin.isTTY;
+    const originalDestroyed = process.stdin.destroyed;
+    const resumeSpy = vi.fn();
+
+    process.stdin.resume = resumeSpy;
+    Object.defineProperty(process.stdin, 'isTTY', {
+      value: true,
+      configurable: true,
+    });
+    Object.defineProperty(process.stdin, 'destroyed', {
+      value: true,
+      configurable: true,
+    });
+
+    try {
+      await runExitCleanup();
+    } finally {
+      process.stdin.resume = originalResume;
+      Object.defineProperty(process.stdin, 'isTTY', {
+        value: originalIsTTY,
+        configurable: true,
+      });
+      Object.defineProperty(process.stdin, 'destroyed', {
+        value: originalDestroyed,
+        configurable: true,
+      });
+    }
+
+    expect(resumeSpy).not.toHaveBeenCalled();
+  });
+
+  it('should ignore errors raised while draining stdin during shutdown', async () => {
+    const cleanupFn = vi.fn();
+    const originalResume = process.stdin.resume;
+    const originalIsTTY = process.stdin.isTTY;
+
+    registerCleanup(cleanupFn);
+    process.stdin.resume = vi.fn().mockImplementation(() => {
+      throw new Error('stdin closed');
+    });
+    Object.defineProperty(process.stdin, 'isTTY', {
+      value: true,
+      configurable: true,
+    });
+
+    try {
+      await expect(runExitCleanup()).resolves.not.toThrow();
+    } finally {
+      process.stdin.resume = originalResume;
+      Object.defineProperty(process.stdin, 'isTTY', {
+        value: originalIsTTY,
+        configurable: true,
+      });
+    }
+
+    expect(cleanupFn).toHaveBeenCalledTimes(1);
+  });
+
   describe('sync cleanup', () => {
     it('should run registered sync functions', async () => {
       const syncFn = vi.fn();
