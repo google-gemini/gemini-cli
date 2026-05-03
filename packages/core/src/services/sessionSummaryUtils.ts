@@ -12,15 +12,29 @@ import {
   SESSION_FILE_PREFIX,
   loadConversationRecord,
   type ConversationRecord,
+  type MemoryScratchpad,
+  type ToolCallRecord,
 } from './chatRecordingService.js';
+import { CoreToolCallStatus } from '../scheduler/types.js';
+import { SHELL_TOOL_NAME } from '../tools/definitions/base-declarations.js';
+import { summarizeShellCommandForScratchpad } from './sessionScratchpadUtils.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
 const MIN_MESSAGES_FOR_SUMMARY = 1;
+const MAX_SCRATCHPAD_TOOLS = 6;
+const MAX_SCRATCHPAD_PATHS = 4;
+const MAX_SCRATCHPAD_PATH_DEPTH = 6;
+const MAX_WORKFLOW_SUMMARY_LENGTH = 160;
+const VALIDATION_COMMAND_REGEX =
+  /\b(test|tests|vitest|jest|pytest|cargo test|npm test|pnpm test|yarn test|bun test|lint|build|check|typecheck)\b/i;
+const PATH_KEY_REGEX = /(path|file|dir|directory|cwd|root)/i;
+const VALIDATION_TOOL_REGEX = /\b(test|lint|build|check|typecheck)\b/i;
 
 type LoadedSession = ConversationRecord & {
   messageCount?: number;
   userMessageCount?: number;
+  memoryScratchpadIsStale?: boolean;
 };
 
 interface SessionFileCandidate {
@@ -72,6 +86,238 @@ function getSessionTimestampMs(session: LoadedSession): number {
   return Number.isNaN(parsed) ? 0 : parsed;
 }
 
+function normalizeToolName(name: string): string {
+  const trimmed = name.trim();
+  return trimmed.length > 0 ? trimmed : 'unknown_tool';
+}
+
+function pushUniqueLimited(
+  target: string[],
+  value: string,
+  limit: number,
+): void {
+  if (!value || target.includes(value) || target.length >= limit) {
+    return;
+  }
+  target.push(value);
+}
+
+function normalizePathCandidate(
+  candidate: string,
+  projectRoot: string,
+): string | null {
+  const trimmed = candidate.trim();
+  if (
+    trimmed.length === 0 ||
+    trimmed.length > 240 ||
+    trimmed.includes('\n') ||
+    (!trimmed.includes('/') &&
+      !trimmed.includes('\\') &&
+      !trimmed.startsWith('.') &&
+      path.extname(trimmed).length === 0)
+  ) {
+    return null;
+  }
+
+  let normalized = trimmed.replace(/\\/g, '/');
+  if (path.isAbsolute(trimmed)) {
+    const relative = path.relative(projectRoot, trimmed);
+    normalized =
+      relative && !relative.startsWith('..') && !path.isAbsolute(relative)
+        ? relative.replace(/\\/g, '/')
+        : path.basename(trimmed);
+  }
+
+  if (normalized.length > 120) {
+    normalized = normalized.split('/').slice(-3).join('/');
+  }
+
+  return normalized.length > 0 ? normalized : null;
+}
+
+function collectPathsFromValue(
+  value: unknown,
+  projectRoot: string,
+  paths: string[],
+  keyHint?: string,
+  depth = 0,
+): void {
+  if (
+    paths.length >= MAX_SCRATCHPAD_PATHS ||
+    depth > MAX_SCRATCHPAD_PATH_DEPTH
+  ) {
+    return;
+  }
+
+  if (typeof value === 'string') {
+    if (!keyHint || !PATH_KEY_REGEX.test(keyHint)) {
+      return;
+    }
+
+    const normalized = normalizePathCandidate(value, projectRoot);
+    if (normalized) {
+      pushUniqueLimited(paths, normalized, MAX_SCRATCHPAD_PATHS);
+    }
+    return;
+  }
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      collectPathsFromValue(item, projectRoot, paths, keyHint, depth + 1);
+      if (paths.length >= MAX_SCRATCHPAD_PATHS) {
+        return;
+      }
+    }
+    return;
+  }
+
+  if (typeof value !== 'object' || value === null) {
+    return;
+  }
+
+  for (const [key, nestedValue] of Object.entries(value)) {
+    collectPathsFromValue(nestedValue, projectRoot, paths, key, depth + 1);
+    if (paths.length >= MAX_SCRATCHPAD_PATHS) {
+      return;
+    }
+  }
+}
+
+function getToolCallCommand(toolCall: ToolCallRecord): string | undefined {
+  for (const key of ['command', 'cmd', 'script']) {
+    const value = toolCall.args[key];
+    if (typeof value === 'string' && value.trim().length > 0) {
+      return value;
+    }
+  }
+  return undefined;
+}
+
+function getToolSequenceEntry(toolCall: ToolCallRecord): string {
+  const toolName = normalizeToolName(toolCall.name);
+  if (toolName !== SHELL_TOOL_NAME) {
+    return toolName;
+  }
+
+  const command = getToolCallCommand(toolCall);
+  const commandSummary = command
+    ? summarizeShellCommandForScratchpad(command)
+    : undefined;
+  return commandSummary ? `${toolName}: ${commandSummary}` : toolName;
+}
+
+function getValidationStatusForToolCall(
+  toolCall: ToolCallRecord,
+): MemoryScratchpad['validationStatus'] | undefined {
+  const command = getToolCallCommand(toolCall);
+  const isValidationTool =
+    VALIDATION_TOOL_REGEX.test(toolCall.name) ||
+    (command ? VALIDATION_COMMAND_REGEX.test(command) : false);
+  if (!isValidationTool) {
+    return undefined;
+  }
+
+  if (toolCall.status === CoreToolCallStatus.Success) {
+    return 'passed';
+  }
+  if (
+    toolCall.status === CoreToolCallStatus.Error ||
+    toolCall.status === CoreToolCallStatus.Cancelled
+  ) {
+    return 'failed';
+  }
+  return 'unknown';
+}
+
+function buildWorkflowSummary(
+  toolSequence: string[],
+  touchedPaths: string[],
+  validationStatus?: MemoryScratchpad['validationStatus'],
+): string | undefined {
+  const parts: string[] = [];
+
+  if (toolSequence.length > 0) {
+    parts.push(toolSequence.join(' -> '));
+  }
+  if (touchedPaths.length > 0) {
+    parts.push(`paths ${touchedPaths.join(', ')}`);
+  }
+  if (validationStatus === 'passed') {
+    parts.push('validated');
+  } else if (validationStatus === 'failed') {
+    parts.push('validation failed');
+  }
+
+  if (parts.length === 0) {
+    return undefined;
+  }
+
+  const summary = parts.join(' | ');
+  if (summary.length === 0) {
+    return undefined;
+  }
+  return summary.length > MAX_WORKFLOW_SUMMARY_LENGTH
+    ? `${summary.slice(0, MAX_WORKFLOW_SUMMARY_LENGTH - 3)}...`
+    : summary;
+}
+
+function buildMemoryScratchpad(
+  messages: ConversationRecord['messages'],
+  projectRoot: string,
+): MemoryScratchpad {
+  const toolSequence: string[] = [];
+  const touchedPaths: string[] = [];
+  let validationStatus: MemoryScratchpad['validationStatus'];
+
+  for (const message of messages) {
+    if (message.type !== 'gemini' || !message.toolCalls) {
+      continue;
+    }
+
+    for (const toolCall of message.toolCalls) {
+      pushUniqueLimited(
+        toolSequence,
+        getToolSequenceEntry(toolCall),
+        MAX_SCRATCHPAD_TOOLS,
+      );
+      collectPathsFromValue(toolCall.args, projectRoot, touchedPaths);
+
+      const toolValidationStatus = getValidationStatusForToolCall(toolCall);
+      if (toolValidationStatus) {
+        validationStatus = toolValidationStatus;
+      }
+    }
+  }
+
+  const workflowSummary = buildWorkflowSummary(
+    toolSequence,
+    touchedPaths,
+    validationStatus,
+  );
+
+  return {
+    version: 1,
+    ...(workflowSummary ? { workflowSummary } : {}),
+    ...(toolSequence.length > 0 ? { toolSequence } : {}),
+    ...(touchedPaths.length > 0 ? { touchedPaths } : {}),
+    ...(validationStatus ? { validationStatus } : {}),
+  };
+}
+
+function hasCurrentMemoryScratchpad(session: LoadedSession): boolean {
+  return Boolean(
+    session.memoryScratchpad && session.memoryScratchpadIsStale !== true,
+  );
+}
+
+function hasSessionSummaryMetadata(session: LoadedSession): boolean {
+  return hasCurrentMemoryScratchpad(session);
+}
+
+function getLoadedMessageCount(session: LoadedSession): number {
+  return session.messageCount ?? session.messages.length;
+}
+
 /**
  * Generates and saves a summary for a session file.
  */
@@ -85,10 +331,11 @@ async function generateAndSaveSummary(
     return;
   }
 
-  // Skip if summary already exists
-  if (conversation.summary) {
+  // Skip if workflow metadata already exists; memory extraction can use the
+  // scratchpad even when summary generation was unavailable.
+  if (hasSessionSummaryMetadata(conversation)) {
     debugLogger.debug(
-      `[SessionSummary] Summary already exists for ${sessionPath}, skipping`,
+      `[SessionSummary] Summary metadata already exists for ${sessionPath}, skipping`,
     );
     return;
   }
@@ -101,28 +348,30 @@ async function generateAndSaveSummary(
     return;
   }
 
-  // Create summary service
-  const contentGenerator = config.getContentGenerator();
-  if (!contentGenerator) {
-    debugLogger.debug(
-      '[SessionSummary] Content generator not available, skipping summary generation',
-    );
-    return;
-  }
-  const baseLlmClient = new BaseLlmClient(contentGenerator, config);
-  const summaryService = new SessionSummaryService(baseLlmClient);
-
-  // Generate summary
-  const summary = await summaryService.generateSummary({
-    messages: conversation.messages,
-  });
-
+  let summary = conversation.summary;
   if (!summary) {
-    debugLogger.warn(
-      `[SessionSummary] Failed to generate summary for ${sessionPath}`,
-    );
-    return;
+    const contentGenerator = config.getContentGenerator();
+    if (!contentGenerator) {
+      debugLogger.debug(
+        '[SessionSummary] Content generator not available, skipping summary generation',
+      );
+    } else {
+      const baseLlmClient = new BaseLlmClient(contentGenerator, config);
+      const summaryService = new SessionSummaryService(baseLlmClient);
+      summary =
+        (await summaryService.generateSummary({
+          messages: conversation.messages,
+        })) ?? undefined;
+
+      if (!summary) {
+        debugLogger.warn(
+          `[SessionSummary] Failed to generate summary for ${sessionPath}`,
+        );
+      }
+    }
   }
+
+  let scratchpadSourceConversation = conversation;
 
   // Re-read the file before writing to handle race conditions. For JSONL we
   // only need the metadata; for legacy JSON we need the full record so we can
@@ -136,18 +385,53 @@ async function generateAndSaveSummary(
     return;
   }
 
-  // Check if summary was added by another process
-  if (freshConversation.summary) {
+  // Check if summary metadata was added by another process
+  if (hasSessionSummaryMetadata(freshConversation)) {
     debugLogger.debug(
-      `[SessionSummary] Summary was added by another process for ${sessionPath}`,
+      `[SessionSummary] Summary metadata was added by another process for ${sessionPath}`,
     );
+    return;
+  }
+
+  if (
+    !hasCurrentMemoryScratchpad(freshConversation) &&
+    (getLoadedMessageCount(freshConversation) !==
+      getLoadedMessageCount(conversation) ||
+      freshConversation.lastUpdated !== conversation.lastUpdated)
+  ) {
+    const latestConversation = await loadConversationRecord(sessionPath);
+    if (!latestConversation) {
+      debugLogger.debug(`[SessionSummary] Could not re-read ${sessionPath}`);
+      return;
+    }
+    if (hasSessionSummaryMetadata(latestConversation)) {
+      debugLogger.debug(
+        `[SessionSummary] Summary metadata was added by another process for ${sessionPath}`,
+      );
+      return;
+    }
+    scratchpadSourceConversation = latestConversation;
+  }
+
+  const metadataUpdate: Partial<ConversationRecord> = {};
+  if (!freshConversation.summary && summary) {
+    metadataUpdate.summary = summary;
+  }
+  if (!hasCurrentMemoryScratchpad(freshConversation)) {
+    metadataUpdate.memoryScratchpad = buildMemoryScratchpad(
+      scratchpadSourceConversation.messages,
+      config.getProjectRoot(),
+    );
+  }
+
+  if (Object.keys(metadataUpdate).length === 0) {
     return;
   }
 
   if (isJsonl) {
     await fs.appendFile(
       sessionPath,
-      `${JSON.stringify({ $set: { summary } })}\n`,
+      `${JSON.stringify({ $set: metadataUpdate })}\n`,
     );
   } else {
     const lastUpdated = freshConversation.lastUpdated;
@@ -156,7 +440,7 @@ async function generateAndSaveSummary(
       JSON.stringify(
         {
           ...freshConversation,
-          summary,
+          ...metadataUpdate,
           lastUpdated,
         },
         null,
@@ -165,13 +449,13 @@ async function generateAndSaveSummary(
     );
   }
   debugLogger.debug(
-    `[SessionSummary] Saved summary for ${sessionPath}: "${summary}"`,
+    `[SessionSummary] Saved summary metadata for ${sessionPath}${summary ? `: "${summary}"` : ''}`,
   );
 }
 
 /**
- * Finds the most recently updated previous session that still needs a summary.
- * Returns the path if it needs a summary, null otherwise.
+ * Finds the most recently updated previous session that still needs workflow metadata.
+ * Returns the path if it needs a scratchpad, null otherwise.
  */
 export async function getPreviousSession(
   config: Config,
@@ -217,7 +501,8 @@ export async function getPreviousSession(
         });
         if (!conversation) continue;
         if (conversation.sessionId === config.getSessionId()) continue;
-        if (conversation.summary) continue;
+        if (conversation.kind === 'subagent') continue;
+        if (hasSessionSummaryMetadata(conversation)) continue;
 
         // Only generate summaries for sessions with more than 1 user message.
         // `loadConversationRecord` populates `userMessageCount` in metadataOnly
@@ -264,7 +549,7 @@ export async function getPreviousSession(
 }
 
 /**
- * Generates summary for the previous session if it lacks one.
+ * Generates summary metadata for the previous session if it lacks a scratchpad.
  * This is designed to be called fire-and-forget on startup.
  */
 export async function generateSummary(config: Config): Promise<void> {

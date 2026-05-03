@@ -112,6 +112,7 @@ export async function loadConversationRecord(
       userMessageCount?: number;
       firstUserMessage?: string;
       hasUserOrAssistantMessage?: boolean;
+      memoryScratchpadIsStale?: boolean;
     })
   | null
 > {
@@ -133,6 +134,8 @@ export async function loadConversationRecord(
       string,
       { isUser: boolean; isUserOrAssistant: boolean }
     >();
+    let isTrackingMemoryScratchpadFreshness = false;
+    let memoryScratchpadIsStale = false;
     let firstUserMessageStr: string | undefined;
 
     for await (const line of rl) {
@@ -140,6 +143,9 @@ export async function loadConversationRecord(
       try {
         const record = JSON.parse(line) as unknown;
         if (isRewindRecord(record)) {
+          if (isTrackingMemoryScratchpadFreshness) {
+            memoryScratchpadIsStale = true;
+          }
           const rewindId = record.$rewindTo;
           if (options?.metadataOnly) {
             const idx = messageIds.indexOf(rewindId);
@@ -168,6 +174,9 @@ export async function loadConversationRecord(
             }
           }
         } else if (isMessageRecord(record)) {
+          if (isTrackingMemoryScratchpadFreshness) {
+            memoryScratchpadIsStale = true;
+          }
           const id = record.id;
           const isUser = hasProperty(record, 'type') && record.type === 'user';
           const isUserOrAssistant =
@@ -206,6 +215,12 @@ export async function loadConversationRecord(
             }
           }
         } else if (isMetadataUpdateRecord(record)) {
+          if (hasProperty(record.$set, 'memoryScratchpad')) {
+            isTrackingMemoryScratchpadFreshness = Boolean(
+              record.$set.memoryScratchpad,
+            );
+            memoryScratchpadIsStale = false;
+          }
           // Metadata update
           metadata = {
             ...metadata,
@@ -257,6 +272,7 @@ export async function loadConversationRecord(
       startTime: metadata.startTime || new Date().toISOString(),
       lastUpdated: metadata.lastUpdated || new Date().toISOString(),
       summary: metadata.summary,
+      memoryScratchpad: metadata.memoryScratchpad,
       directories: metadata.directories,
       kind: metadata.kind,
       messages: options?.metadataOnly ? [] : loadedMessages,
@@ -267,6 +283,9 @@ export async function loadConversationRecord(
         options?.metadataOnly && metadataMessages.length > 0
           ? metadataMessages.filter((m) => m.type === 'user').length
           : userMessageCount,
+      memoryScratchpadIsStale: isTrackingMemoryScratchpadFreshness
+        ? memoryScratchpadIsStale
+        : undefined,
       firstUserMessage: fallbackFirstUserMessage,
       hasUserOrAssistantMessage:
         options?.metadataOnly && metadataMessages.length > 0
@@ -331,6 +350,13 @@ export class ChatRecordingService {
             this.appendRecord(initialMetadata);
             for (const msg of this.cachedConversation.messages) {
               this.appendRecord(msg);
+            }
+            if (this.cachedConversation.memoryScratchpad) {
+              this.appendRecord({
+                $set: {
+                  memoryScratchpad: this.cachedConversation.memoryScratchpad,
+                },
+              });
             }
           }
 
@@ -718,6 +744,8 @@ export class ChatRecordingService {
     tempDir: string,
   ): Promise<void> {
     const filePath = path.join(chatsDir, file);
+    let fullSessionId: string | undefined;
+
     try {
       const CHUNK_SIZE = 4096;
       const buffer = Buffer.alloc(CHUNK_SIZE);
@@ -726,31 +754,42 @@ export class ChatRecordingService {
       try {
         fd = await fs.promises.open(filePath, 'r');
         const { bytesRead } = await fd.read(buffer, 0, CHUNK_SIZE, 0);
-        if (bytesRead === 0) {
-          await fd.close();
-          await fs.promises.unlink(filePath);
-          return;
+        if (bytesRead > 0) {
+          const contentChunk = buffer.toString('utf8', 0, bytesRead);
+          const newlineIndex = contentChunk.indexOf('\n');
+          firstLine =
+            newlineIndex !== -1
+              ? contentChunk.substring(0, newlineIndex)
+              : contentChunk;
+
+          try {
+            const content = JSON.parse(firstLine) as unknown;
+            if (isSessionIdRecord(content)) {
+              fullSessionId = content.sessionId;
+            }
+          } catch {
+            // If first line parse fails, it might be a legacy pretty-printed JSON.
+            // We'll fall back to full file read below.
+          }
         }
-        const contentChunk = buffer.toString('utf8', 0, bytesRead);
-        const newlineIndex = contentChunk.indexOf('\n');
-        firstLine =
-          newlineIndex !== -1
-            ? contentChunk.substring(0, newlineIndex)
-            : contentChunk;
       } finally {
         if (fd !== undefined) {
           await fd.close();
         }
       }
-      const content = JSON.parse(firstLine) as unknown;
 
-      let fullSessionId: string | undefined;
-      if (isSessionIdRecord(content)) {
-        fullSessionId = content['sessionId'];
+      // Fallback for legacy JSON files if we couldn't get sessionId from first line
+      if (!fullSessionId) {
+        try {
+          const fileContent = await fs.promises.readFile(filePath, 'utf8');
+          const parsed = JSON.parse(fileContent) as unknown;
+          if (isSessionIdRecord(parsed)) {
+            fullSessionId = parsed.sessionId;
+          }
+        } catch {
+          // Ignore parse errors, we'll still try to unlink the file
+        }
       }
-
-      // Delete the session file
-      await fs.promises.unlink(filePath);
 
       if (fullSessionId) {
         // Delegate to shared utility!
@@ -762,7 +801,45 @@ export class ChatRecordingService {
         );
       }
     } catch (error) {
-      debugLogger.error(`Error deleting associated file ${file}:`, error);
+      debugLogger.error(
+        `Error deleting artifacts for session file ${file}:`,
+        error,
+      );
+    } finally {
+      // ALWAYS try to delete the session file itself
+      try {
+        await fs.promises.unlink(filePath);
+      } catch (error) {
+        if (isNodeError(error) && error.code !== 'ENOENT') {
+          debugLogger.error(`Error unlinking session file ${file}:`, error);
+        }
+      }
+    }
+  }
+
+  /**
+   * Asynchronously deletes the current session's chat file and tool outputs.
+   * This encapsulates the session ID logic and uses non-blocking I/O to avoid
+   * blocking the event loop on exit.
+   */
+  async deleteCurrentSessionAsync(): Promise<void> {
+    if (!this.conversationFile) {
+      return;
+    }
+
+    try {
+      const tempDir = this.context.config.storage.getProjectTempDir();
+
+      // Delete the conversation file directly using the tracked path.
+      await fs.promises.unlink(this.conversationFile).catch(() => {
+        // File may not exist; ignore.
+      });
+
+      // Delegate tool-output and log cleanup to the shared utility.
+      await deleteSessionArtifactsAsync(this.sessionId, tempDir);
+    } catch (error) {
+      debugLogger.error('Error deleting current session.', error);
+      throw error;
     }
   }
 

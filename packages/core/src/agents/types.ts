@@ -36,6 +36,8 @@ export enum AgentTerminateMode {
 export interface OutputObject {
   result: string;
   terminate_reason: AgentTerminateMode;
+  turn_count?: number;
+  duration_ms?: number;
 }
 
 /**

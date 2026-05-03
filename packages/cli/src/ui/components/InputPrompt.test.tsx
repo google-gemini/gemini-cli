@@ -9,12 +9,41 @@ import { createMockSettings } from '../../test-utils/settings.js';
 import { makeFakeConfig } from '@google/gemini-cli-core';
 import { waitFor } from '../../test-utils/async.js';
 import { act, useState, useMemo } from 'react';
+import type { EventEmitter } from 'node:events';
+
+const { fakeTranscriptionProvider } = vi.hoisted(() => {
+  // Use require within hoisted block for immediate synchronous access
+  // eslint-disable-next-line @typescript-eslint/no-require-imports, no-restricted-syntax
+  const { EventEmitter } = require('node:events');
+  class FakeTranscriptionProvider extends EventEmitter {
+    connect = vi.fn().mockResolvedValue(undefined);
+    disconnect = vi.fn();
+    sendAudioChunk = vi.fn();
+    getTranscription = vi.fn().mockReturnValue('');
+  }
+  return {
+    fakeTranscriptionProvider: new FakeTranscriptionProvider(),
+  };
+});
+
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const actual = (await importOriginal()) as any;
+  return {
+    ...actual,
+    TranscriptionFactory: {
+      createProvider: vi.fn(() => fakeTranscriptionProvider),
+    },
+  };
+});
+
 import {
   InputPrompt,
   tryTogglePasteExpansion,
   type InputPromptProps,
 } from './InputPrompt.js';
 import { InputContext } from '../contexts/InputContext.js';
+import { type UIState } from '../contexts/UIStateContext.js';
 import {
   calculateTransformationsForLine,
   calculateTransformedLine,
@@ -75,7 +104,9 @@ vi.mock('../hooks/useReverseSearchCompletion.js');
 vi.mock('clipboardy');
 vi.mock('../utils/clipboardUtils.js');
 vi.mock('../hooks/useKittyKeyboardProtocol.js');
-
+vi.mock('./ListeningIndicator.js', () => ({
+  ListeningIndicator: vi.fn(({ color }) => <Text color={color}>~~~ </Text>),
+}));
 // Mock ink BEFORE importing components that use it to intercept terminalCursorPosition
 vi.mock('ink', async (importOriginal) => {
   const actual = await importOriginal<typeof import('ink')>();
@@ -319,7 +350,7 @@ describe('InputPrompt', () => {
       visualToLogicalMap: [[0, 0]],
       visualToTransformedMap: [0],
       transformationsByLine: [],
-      getOffset: vi.fn().mockReturnValue(0),
+      getOffset: vi.fn().mockImplementation(() => mockBuffer.cursor[1]),
       pastedContent: {},
     } as unknown as TextBuffer;
 
@@ -417,6 +448,7 @@ describe('InputPrompt', () => {
         getWorkspaceContext: () => ({
           getDirectories: () => ['/test/project/src'],
         }),
+        getContentGeneratorConfig: () => ({ apiKey: 'test-api-key' }),
       } as unknown as Config,
       slashCommands: mockSlashCommands,
       commandContext: mockCommandContext,
@@ -4924,6 +4956,381 @@ describe('InputPrompt', () => {
         unmount();
       },
     );
+  });
+
+  describe('Voice Mode', () => {
+    beforeEach(() => {
+      (
+        fakeTranscriptionProvider as unknown as EventEmitter
+      ).removeAllListeners();
+      vi.clearAllMocks();
+    });
+
+    it('should start recording when space is pressed and voice mode is enabled (toggle)', async () => {
+      await act(async () => {
+        mockBuffer.setText('');
+      });
+      const { stdin, unmount, lastFrame } = await renderWithProviders(
+        <TestInputPrompt {...props} focus={true} buffer={mockBuffer} />,
+        {
+          uiState: { isVoiceModeEnabled: true } as UIState,
+          settings: createMockSettings({
+            experimental: { voice: { activationMode: 'toggle' } },
+          }),
+        },
+      );
+
+      // Initially not recording
+      expect(lastFrame()).toContain('🎤 >');
+      expect(lastFrame()).toContain(
+        'Type your message or space to talk (Esc to exit)',
+      );
+
+      // Press space to start
+      await act(async () => {
+        stdin.write(' ');
+      });
+
+      unmount();
+    });
+
+    it('should toggle recording off when space is pressed again (toggle)', async () => {
+      await act(async () => {
+        mockBuffer.setText('');
+      });
+      const { stdin, unmount } = await renderWithProviders(
+        <TestInputPrompt {...props} focus={true} buffer={mockBuffer} />,
+        {
+          uiState: { isVoiceModeEnabled: true } as UIState,
+          settings: createMockSettings({
+            experimental: { voice: { activationMode: 'toggle' } },
+          }),
+        },
+      );
+
+      // Start recording
+      await act(async () => {
+        stdin.write(' ');
+      });
+
+      // Stop recording
+      await act(async () => {
+        stdin.write(' ');
+      });
+
+      unmount();
+    });
+
+    it('should resume recording when space is pressed even if buffer is not empty (toggle)', async () => {
+      await act(async () => {
+        mockBuffer.setText('First turn.');
+      });
+      const { stdin, unmount, lastFrame } = await renderWithProviders(
+        <TestInputPrompt {...props} focus={true} buffer={mockBuffer} />,
+        {
+          uiState: { isVoiceModeEnabled: true } as UIState,
+          settings: createMockSettings({
+            experimental: { voice: { activationMode: 'toggle' } },
+          }),
+        },
+      );
+
+      // Should show voice mode prefix even if buffer is not empty
+      expect(lastFrame()).toContain('🎤 >');
+      expect(lastFrame()).toContain('First turn.');
+
+      // Press space to start recording again
+      await act(async () => {
+        stdin.write(' ');
+      });
+
+      unmount();
+    });
+
+    it('should not start recording if voice mode is disabled (toggle)', async () => {
+      await act(async () => {
+        mockBuffer.setText('');
+      });
+      const { stdin, unmount } = await renderWithProviders(
+        <TestInputPrompt {...props} focus={true} buffer={mockBuffer} />,
+        {
+          uiState: { isVoiceModeEnabled: false } as UIState,
+          settings: createMockSettings({
+            experimental: { voice: { activationMode: 'toggle' } },
+          }),
+        },
+      );
+
+      // Press space
+      await act(async () => {
+        stdin.write(' ');
+      });
+
+      // Should NOT show listening, instead should call handleInput which handles space
+      expect(mockBuffer.handleInput).toHaveBeenCalled();
+      unmount();
+    });
+
+    it('should append transcription correctly across multiple turn updates (toggle)', async () => {
+      await act(async () => {
+        mockBuffer.setText('initial');
+      });
+      const { stdin, unmount } = await renderWithProviders(
+        <TestInputPrompt {...props} focus={true} buffer={mockBuffer} />,
+        {
+          uiState: { isVoiceModeEnabled: true } as UIState,
+          settings: createMockSettings({
+            experimental: { voice: { activationMode: 'toggle' } },
+          }),
+        },
+      );
+
+      // Start recording
+      await act(async () => {
+        stdin.write(' ');
+      });
+
+      // Emit first transcription
+      await act(async () => {
+        (fakeTranscriptionProvider as unknown as EventEmitter).emit(
+          'transcription',
+          'hello',
+        );
+      });
+      await waitFor(() => {
+        expect(mockBuffer.setText).toHaveBeenCalledWith('initial hello', 13);
+      });
+
+      // turnComplete advances the baseline; next turn appends after it
+      await act(async () => {
+        (fakeTranscriptionProvider as unknown as EventEmitter).emit(
+          'turnComplete',
+        );
+      });
+      await act(async () => {
+        (fakeTranscriptionProvider as unknown as EventEmitter).emit(
+          'transcription',
+          'world',
+        );
+      });
+      await waitFor(() => {
+        expect(mockBuffer.setText).toHaveBeenCalledWith(
+          'initial hello world',
+          19,
+        );
+      });
+
+      unmount();
+    });
+
+    it('should append transcription correctly when resuming voice mode (toggle)', async () => {
+      await act(async () => {
+        mockBuffer.setText('First turn.');
+      });
+      const { stdin, unmount } = await renderWithProviders(
+        <TestInputPrompt {...props} focus={true} buffer={mockBuffer} />,
+        {
+          uiState: { isVoiceModeEnabled: true } as UIState,
+          settings: createMockSettings({
+            experimental: { voice: { activationMode: 'toggle' } },
+          }),
+        },
+      );
+
+      // Start recording (resumed)
+      await act(async () => {
+        stdin.write(' ');
+      });
+
+      // Emit transcription
+      await act(async () => {
+        (fakeTranscriptionProvider as unknown as EventEmitter).emit(
+          'transcription',
+          'Second turn.',
+        );
+      });
+
+      await waitFor(() => {
+        expect(mockBuffer.setText).toHaveBeenCalledWith(
+          'First turn. Second turn.',
+          24,
+        );
+      });
+
+      unmount();
+    });
+
+    it('should insert transcription at cursor position when buffer has text before and after (toggle)', async () => {
+      await act(async () => {
+        mockBuffer.setText('hello world');
+        mockBuffer.cursor = [0, 5]; // cursor after 'hello'
+      });
+      const { stdin, unmount } = await renderWithProviders(
+        <TestInputPrompt {...props} focus={true} buffer={mockBuffer} />,
+        {
+          uiState: { isVoiceModeEnabled: true } as UIState,
+          settings: createMockSettings({
+            experimental: { voice: { activationMode: 'toggle' } },
+          }),
+        },
+      );
+
+      await act(async () => {
+        stdin.write(' ');
+      });
+      await act(async () => {
+        (fakeTranscriptionProvider as unknown as EventEmitter).emit(
+          'transcription',
+          'there',
+        );
+      });
+
+      // 'hello'(5) + ' '(1) + 'there'(5) = cursor at 11; ' world' preserved after
+      await waitFor(() => {
+        expect(mockBuffer.setText).toHaveBeenCalledWith(
+          'hello there world',
+          11,
+        );
+      });
+      unmount();
+    });
+
+    describe('push-to-talk', () => {
+      beforeEach(() => {
+        vi.useFakeTimers();
+      });
+
+      afterEach(() => {
+        vi.useRealTimers();
+      });
+
+      it('should insert a space on a single tap', async () => {
+        const { stdin, unmount, lastFrame } = await renderWithProviders(
+          <TestInputPrompt {...props} focus={true} buffer={mockBuffer} />,
+          {
+            uiState: { isVoiceModeEnabled: true } as UIState,
+            settings: createMockSettings({
+              experimental: { voice: { activationMode: 'push-to-talk' } },
+            }),
+          },
+        );
+
+        expect(lastFrame()).toContain('🎤 >');
+        expect(lastFrame()).toContain(
+          'Type your message or hold space to talk (Esc to exit)',
+        );
+
+        // Press space once
+        await act(async () => {
+          stdin.write(' ');
+        });
+
+        // Should insert space optimistically
+        expect(mockBuffer.insert).toHaveBeenCalledWith(' ');
+
+        // Advance timer past HOLD_DELAY_MS
+        await act(async () => {
+          vi.advanceTimersByTime(700);
+        });
+
+        unmount();
+      });
+
+      it('should start recording on hold (simulated by repeat spaces)', async () => {
+        const { stdin, unmount } = await renderWithProviders(
+          <TestInputPrompt {...props} focus={true} buffer={mockBuffer} />,
+          {
+            uiState: { isVoiceModeEnabled: true } as UIState,
+            settings: createMockSettings({
+              experimental: { voice: { activationMode: 'push-to-talk' } },
+            }),
+          },
+        );
+
+        // First space
+        await act(async () => {
+          stdin.write(' ');
+        });
+        expect(mockBuffer.insert).toHaveBeenCalledWith(' ');
+
+        // Second space (repeat)
+        await act(async () => {
+          stdin.write(' ');
+        });
+
+        await waitFor(() => {
+          // Should have backspaced the optimistic space
+          expect(mockBuffer.backspace).toHaveBeenCalled();
+        });
+
+        unmount();
+      });
+
+      it('should stop recording when space heartbeat stops (release)', async () => {
+        const { stdin, unmount, lastFrame } = await renderWithProviders(
+          <TestInputPrompt {...props} focus={true} buffer={mockBuffer} />,
+          {
+            uiState: { isVoiceModeEnabled: true } as UIState,
+            settings: createMockSettings({
+              experimental: { voice: { activationMode: 'push-to-talk' } },
+            }),
+          },
+        );
+
+        // Start hold
+        await act(async () => {
+          stdin.write(' ');
+          stdin.write(' ');
+        });
+
+        // Simulate heartbeat (held key) - send space first to reset timer, then advance
+        await act(async () => {
+          stdin.write(' ');
+          vi.advanceTimersByTime(100);
+        });
+        expect(lastFrame()).toContain('~~~ >');
+
+        // Stop heartbeat (release)
+        await act(async () => {
+          vi.advanceTimersByTime(400); // Past RELEASE_DELAY_MS
+        });
+
+        unmount();
+      });
+
+      it('should cancel hold state if non-space key is pressed after first space', async () => {
+        const { stdin, unmount } = await renderWithProviders(
+          <TestInputPrompt {...props} focus={true} buffer={mockBuffer} />,
+          {
+            uiState: { isVoiceModeEnabled: true } as UIState,
+            settings: createMockSettings({
+              experimental: { voice: { activationMode: 'push-to-talk' } },
+            }),
+          },
+        );
+
+        // First space
+        await act(async () => {
+          stdin.write(' ');
+        });
+
+        // Type 'a'
+        await act(async () => {
+          stdin.write('a');
+        });
+
+        // Should NOT start recording on next space even if fast
+        await act(async () => {
+          stdin.write(' ');
+        });
+
+        expect(mockBuffer.insert).toHaveBeenCalledTimes(2); // Two spaces inserted
+        expect(mockBuffer.handleInput).toHaveBeenCalledWith(
+          expect.objectContaining({ name: 'a' }),
+        );
+        unmount();
+      });
+    });
   });
 });
 

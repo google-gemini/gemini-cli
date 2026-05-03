@@ -6,6 +6,7 @@
 
 import { type AgentLoopContext } from '../config/agent-loop-context.js';
 import { reportError } from '../utils/errorReporting.js';
+import { ApprovalMode } from '../policy/types.js';
 import { GeminiChat, StreamEventType } from '../core/geminiChat.js';
 import {
   type Content,
@@ -779,6 +780,8 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         return {
           result: finalResult || 'Task completed.',
           terminate_reason: terminateReason,
+          turn_count: turnCounter,
+          duration_ms: Date.now() - startTime,
         };
       }
 
@@ -786,6 +789,8 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         result:
           finalResult || 'Agent execution was terminated before completion.',
         terminate_reason: terminateReason,
+        turn_count: turnCounter,
+        duration_ms: Date.now() - startTime,
       };
     } catch (error) {
       // Check if the error is an AbortError caused by our internal timeout.
@@ -826,6 +831,8 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
             return {
               result: finalResult,
               terminate_reason: terminateReason,
+              turn_count: turnCounter,
+              duration_ms: Date.now() - startTime,
             };
           }
         }
@@ -840,6 +847,8 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         return {
           result: finalResult,
           terminate_reason: terminateReason,
+          turn_count: turnCounter,
+          duration_ms: Date.now() - startTime,
         };
       }
 
@@ -1346,6 +1355,12 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     // Append environment context (CWD and folder structure).
     const dirContext = await getDirectoryContextString(this.context.config);
     finalPrompt += `\n\n# Environment Context\n${dirContext}`;
+
+    const approvalMode = this.context.config.getApprovalMode();
+    if (approvalMode === ApprovalMode.PLAN) {
+      const plansDir = this.context.config.storage.getPlansDir();
+      finalPrompt += `\n\n# Execution Constraints\nYou are currently operating in Plan Mode. Your write tools are globally restricted to only modifying plan (.md) files in the plans directory: ${plansDir}/. Do not attempt to modify source code directly.`;
+    }
 
     // Append standard rules for non-interactive execution.
     finalPrompt += `
