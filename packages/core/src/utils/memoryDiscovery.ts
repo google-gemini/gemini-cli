@@ -8,7 +8,10 @@ import * as fs from 'node:fs/promises';
 import * as fsSync from 'node:fs';
 import * as path from 'node:path';
 import { bfsFileSearch } from './bfsFileSearch.js';
-import { getAllGeminiMdFilenames } from '../tools/memoryTool.js';
+import {
+  getAllGeminiMdFilenames,
+  PROJECT_MEMORY_INDEX_FILENAME,
+} from '../tools/memoryTool.js';
 import type { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { processImports } from './memoryImportProcessor.js';
 import {
@@ -403,19 +406,34 @@ export async function readGeminiMdFiles(
 
           return { filePath, content: processedResult.content };
         } catch (error: unknown) {
-          const isTestEnv =
-            process.env['NODE_ENV'] === 'test' || process.env['VITEST'];
-          if (!isTestEnv) {
-            const message =
-              error instanceof Error ? error.message : String(error);
-            logger.warn(
-              `Warning: Could not read ${getAllGeminiMdFilenames()} file at ${filePath}. Error: ${message}`,
+          const isEISDIR =
+            error instanceof Error &&
+            (error as NodeJS.ErrnoException).code === 'EISDIR';
+
+          if (isEISDIR) {
+            // A directory exists where a GEMINI.md file is expected.
+            // This is valid in some project structures (e.g. a folder named
+            // GEMINI.md held for organisational purposes) — skip it silently
+            // instead of surfacing a confusing warning to the user.
+            debugLogger.debug(
+              '[DEBUG] [MemoryDiscovery] Skipping directory at GEMINI.md path:',
+              filePath,
+            );
+          } else {
+            const isTestEnv =
+              process.env['NODE_ENV'] === 'test' || process.env['VITEST'];
+            if (!isTestEnv) {
+              const message =
+                error instanceof Error ? error.message : String(error);
+              logger.warn(
+                `Warning: Could not read ${getAllGeminiMdFilenames()} file at ${filePath}. Error: ${message}`,
+              );
+            }
+            debugLogger.debug(
+              '[DEBUG] [MemoryDiscovery] Failed to read:',
+              filePath,
             );
           }
-          debugLogger.debug(
-            '[DEBUG] [MemoryDiscovery] Failed to read:',
-            filePath,
-          );
           return { filePath, content: null }; // Still include it with null content
         }
       },
@@ -488,17 +506,34 @@ export async function getGlobalMemoryPaths(): Promise<string[]> {
 export async function getUserProjectMemoryPaths(
   projectMemoryDir: string,
 ): Promise<string[]> {
-  const geminiMdFilenames = getAllGeminiMdFilenames();
+  const preferredMemoryPath = normalizePath(
+    path.join(projectMemoryDir, PROJECT_MEMORY_INDEX_FILENAME),
+  );
 
+  try {
+    await fs.access(preferredMemoryPath, fsSync.constants.R_OK);
+    debugLogger.debug(
+      '[DEBUG] [MemoryDiscovery] Found user project memory index:',
+      preferredMemoryPath,
+    );
+    return [preferredMemoryPath];
+  } catch {
+    // Fall back to the legacy private GEMINI.md file if the project has not
+    // been migrated to MEMORY.md yet.
+  }
+
+  const geminiMdFilenames = getAllGeminiMdFilenames();
   const accessChecks = geminiMdFilenames.map(async (filename) => {
-    const memoryPath = normalizePath(path.join(projectMemoryDir, filename));
+    const legacyMemoryPath = normalizePath(
+      path.join(projectMemoryDir, filename),
+    );
     try {
-      await fs.access(memoryPath, fsSync.constants.R_OK);
+      await fs.access(legacyMemoryPath, fsSync.constants.R_OK);
       debugLogger.debug(
-        '[DEBUG] [MemoryDiscovery] Found user project memory file:',
-        memoryPath,
+        '[DEBUG] [MemoryDiscovery] Found legacy user project memory file:',
+        legacyMemoryPath,
       );
-      return memoryPath;
+      return legacyMemoryPath;
     } catch {
       return null;
     }

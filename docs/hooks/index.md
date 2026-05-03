@@ -138,6 +138,7 @@ multiple layers in the following order of precedence (highest to lowest):
 Hooks are executed with a sanitized environment.
 
 - `GEMINI_PROJECT_DIR`: The absolute path to the project root.
+- `GEMINI_PLANS_DIR`: The absolute path to the plans directory.
 - `GEMINI_SESSION_ID`: The unique ID for the current session.
 - `GEMINI_CWD`: The current working directory.
 - `CLAUDE_PROJECT_DIR`: (Alias) Provided for compatibility.

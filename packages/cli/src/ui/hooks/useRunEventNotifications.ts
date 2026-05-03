@@ -15,12 +15,14 @@ import { getPendingAttentionNotification } from '../utils/pendingAttentionNotifi
 import {
   buildRunEventNotificationContent,
   notifyViaTerminal,
+  type TerminalNotificationMethod,
 } from '../../utils/terminalNotifications.js';
 
 const ATTENTION_NOTIFICATION_COOLDOWN_MS = 20_000;
 
 interface RunEventNotificationParams {
   notificationsEnabled: boolean;
+  notificationMethod: TerminalNotificationMethod;
   isFocused: boolean;
   hasReceivedFocusEvent: boolean;
   streamingState: StreamingState;
@@ -36,6 +38,7 @@ interface RunEventNotificationParams {
 
 export function useRunEventNotifications({
   notificationsEnabled,
+  notificationMethod,
   isFocused,
   hasReceivedFocusEvent,
   streamingState,
@@ -124,11 +127,13 @@ export function useRunEventNotifications({
     void notifyViaTerminal(
       notificationsEnabled,
       buildRunEventNotificationContent(pendingAttentionNotification.event),
+      notificationMethod,
     );
   }, [
     isFocused,
     hasReceivedFocusEvent,
     notificationsEnabled,
+    notificationMethod,
     pendingAttentionNotification,
   ]);
 
@@ -159,12 +164,14 @@ export function useRunEventNotifications({
         type: 'session_complete',
         detail: 'Gemini CLI finished responding.',
       }),
+      notificationMethod,
     );
   }, [
     streamingState,
     isFocused,
     hasReceivedFocusEvent,
     notificationsEnabled,
+    notificationMethod,
     hasPendingActionRequired,
   ]);
 }

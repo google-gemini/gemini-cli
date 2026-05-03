@@ -39,7 +39,8 @@ import {
   isBackgroundExecutionData,
   Kind,
   ACTIVATE_SKILL_TOOL_NAME,
-  shouldHideToolCall,
+  isRenderedInHistory,
+  buildToolVisibilityContext,
   UPDATE_TOPIC_TOOL_NAME,
   UPDATE_TOPIC_DISPLAY_NAME,
 } from '@google/gemini-cli-core';
@@ -226,7 +227,10 @@ export const useGeminiStream = (
   performMemoryRefresh: () => Promise<void>,
   modelSwitchedFromQuotaError: boolean,
   setModelSwitchedFromQuotaError: React.Dispatch<React.SetStateAction<boolean>>,
-  onCancelSubmit: (shouldRestorePrompt?: boolean) => void,
+  onCancelSubmit: (
+    shouldRestorePrompt?: boolean,
+    clearBuffer?: boolean,
+  ) => void,
   setShellInputFocused: (value: boolean) => void,
   terminalWidth: number,
   terminalHeight: number,
@@ -647,29 +651,8 @@ export const useGeminiStream = (
       toolCalls.every((tc) => pushedToolCallIds.has(tc.request.callId));
 
     const isToolVisible = (tc: TrackedToolCall) => {
-      const displayName = tc.tool?.displayName ?? tc.request.name;
-
-      let hasResultDisplay = false;
-      if (
-        tc.status === CoreToolCallStatus.Success ||
-        tc.status === CoreToolCallStatus.Error ||
-        tc.status === CoreToolCallStatus.Cancelled
-      ) {
-        hasResultDisplay = !!tc.response?.resultDisplay;
-      } else if (tc.status === CoreToolCallStatus.Executing) {
-        hasResultDisplay = !!tc.liveOutput;
-      }
-
       // AskUser tools and Plan Mode write/edit are handled by this logic
-      if (
-        shouldHideToolCall({
-          displayName,
-          status: tc.status,
-          approvalMode: tc.approvalMode,
-          hasResultDisplay,
-          parentCallId: tc.request.parentCallId,
-        })
-      ) {
+      if (!isRenderedInHistory(buildToolVisibilityContext(tc))) {
         return false;
       }
 
@@ -823,100 +806,129 @@ export const useGeminiStream = (
     [addItem, config, isLowErrorVerbosity],
   );
 
-  const cancelOngoingRequest = useCallback(() => {
-    if (
-      streamingState !== StreamingState.Responding &&
-      streamingState !== StreamingState.WaitingForConfirmation
-    ) {
-      return;
-    }
-    if (turnCancelledRef.current) {
-      return;
-    }
-    turnCancelledRef.current = true;
-    setRetryStatus(null);
-
-    // A full cancellation means no tools have produced a final result yet.
-    // This determines if we show a generic "Request cancelled" message.
-    const isFullCancellation = !toolCalls.some(
-      (tc) => tc.status === 'success' || tc.status === 'error',
-    );
-
-    // Ensure we have an abort controller, creating one if it doesn't exist.
-    if (!abortControllerRef.current) {
-      abortControllerRef.current = new AbortController();
-    }
-
-    // The order is important here.
-    // 1. Fire the signal to interrupt any active async operations.
-    abortControllerRef.current.abort();
-    // 2. Call the imperative cancel to clear the queue of pending tools.
-    cancelAllToolCalls(abortControllerRef.current.signal);
-
-    if (pendingHistoryItemRef.current) {
-      const isShellCommand =
-        pendingHistoryItemRef.current.type === 'tool_group' &&
-        pendingHistoryItemRef.current.tools.some(
-          (t) => t.name === SHELL_COMMAND_NAME,
-        );
-
-      // If it is a shell command, we update the status to Canceled and clear the output
-      // to avoid artifacts, then add it to history immediately.
-      if (isShellCommand) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        const toolGroup = pendingHistoryItemRef.current as HistoryItemToolGroup;
-        const updatedTools = toolGroup.tools.map((tool) => {
-          if (tool.name === SHELL_COMMAND_NAME) {
-            return {
-              ...tool,
-              status: CoreToolCallStatus.Cancelled,
-              resultDisplay: tool.resultDisplay,
-            };
-          }
-          return tool;
-        });
-        addItem({ ...toolGroup, tools: updatedTools } as HistoryItemWithoutId);
-      } else {
-        addItem(pendingHistoryItemRef.current);
+  const cancelOngoingRequest = useCallback(
+    (clearBuffer: boolean = true) => {
+      // If we are already cancelled, do nothing
+      if (turnCancelledRef.current) {
+        if (clearBuffer) {
+          onCancelSubmit(false, true);
+        }
+        return;
       }
-    }
-    setPendingHistoryItem(null);
 
-    // If it was a full cancellation, add the info message now.
-    // Otherwise, we let handleCompletedTools figure out the next step,
-    // which might involve sending partial results back to the model.
-    if (isFullCancellation) {
-      // If shell is active, we delay this message to ensure correct ordering
-      // (Shell item first, then Info message).
-      if (!activeShellPtyId) {
-        addItem({
-          type: MessageType.INFO,
-          text: 'Request cancelled.',
-        });
-        setIsResponding(false);
+      const hasActiveTools = toolCalls.some(
+        (tc) =>
+          tc.status === CoreToolCallStatus.Executing ||
+          tc.status === CoreToolCallStatus.Scheduled ||
+          tc.status === CoreToolCallStatus.Validating,
+      );
+
+      // If we are not responding, not waiting for confirmation, and have no active tools,
+      // there is nothing to abort.
+      if (
+        streamingState === StreamingState.Idle &&
+        !isRespondingRef.current &&
+        !hasActiveTools
+      ) {
+        // Even if we are "idle", if we are called with clearBuffer=true (Ctrl+C),
+        // we still want to clear the buffer.
+        if (clearBuffer) {
+          onCancelSubmit(false, true);
+        }
+        return;
       }
-    }
 
-    onCancelSubmit(false);
-    setShellInputFocused(false);
-  }, [
-    streamingState,
-    addItem,
-    setPendingHistoryItem,
-    onCancelSubmit,
-    pendingHistoryItemRef,
-    setShellInputFocused,
-    cancelAllToolCalls,
-    toolCalls,
-    activeShellPtyId,
-    setIsResponding,
-  ]);
+      turnCancelledRef.current = true;
+      setRetryStatus(null);
+
+      // A full cancellation means no tools have produced a final result yet.
+      // This determines if we show a generic "Request cancelled" message.
+      const isFullCancellation = !toolCalls.some(
+        (tc) => tc.status === 'success' || tc.status === 'error',
+      );
+
+      // Ensure we have an abort controller, creating one if it doesn't exist.
+      if (!abortControllerRef.current) {
+        abortControllerRef.current = new AbortController();
+      }
+
+      // The order is important here.
+      // 1. Fire the signal to interrupt any active async operations.
+      abortControllerRef.current.abort();
+      // 2. Call the imperative cancel to clear the queue of pending tools.
+      cancelAllToolCalls(abortControllerRef.current.signal);
+
+      if (pendingHistoryItemRef.current) {
+        // If it is a shell command, we update the status to Canceled and clear the output
+        // to avoid artifacts, then add it to history immediately.
+        if (
+          pendingHistoryItemRef.current.type === 'tool_group' &&
+          pendingHistoryItemRef.current.tools.some(
+            (t) => t.name === SHELL_COMMAND_NAME,
+          )
+        ) {
+          const toolGroup = pendingHistoryItemRef.current;
+          const updatedTools = toolGroup.tools.map((tool) => {
+            if (tool.name === SHELL_COMMAND_NAME) {
+              return {
+                ...tool,
+                status: CoreToolCallStatus.Cancelled,
+                resultDisplay: tool.resultDisplay,
+              };
+            }
+            return tool;
+          });
+          const newToolGroup: HistoryItemToolGroup = {
+            ...toolGroup,
+            tools: updatedTools,
+          };
+          addItem(newToolGroup);
+        } else {
+          addItem(pendingHistoryItemRef.current);
+        }
+      }
+      setPendingHistoryItem(null);
+
+      // If it was a full cancellation, add the info message now.
+      // Otherwise, we let handleCompletedTools figure out the next step,
+      // which might involve sending partial results back to the model.
+      if (isFullCancellation) {
+        // If shell is active, we delay this message to ensure correct ordering
+        // (Shell item first, then Info message).
+        if (!activeShellPtyId) {
+          addItem({
+            type: MessageType.INFO,
+            text: 'Request cancelled.',
+          });
+          setIsResponding(false);
+        }
+      }
+
+      onCancelSubmit(false, clearBuffer);
+      setShellInputFocused(false);
+    },
+    [
+      streamingState,
+      addItem,
+      setPendingHistoryItem,
+      onCancelSubmit,
+      pendingHistoryItemRef,
+      isRespondingRef,
+      setShellInputFocused,
+      cancelAllToolCalls,
+      toolCalls,
+      activeShellPtyId,
+      setIsResponding,
+    ],
+  );
 
   useKeypress(
     (key) => {
       if (key.name === 'escape' && !isShellFocused) {
-        cancelOngoingRequest();
+        cancelOngoingRequest(false);
+        return true;
       }
+      return false;
     },
     {
       isActive:
@@ -1658,7 +1670,6 @@ export const useGeminiStream = (
                 abortSignal,
                 prompt_id!,
                 undefined,
-                false,
                 query,
               );
               const processingStatus = await processGeminiStreamEvents(

@@ -61,6 +61,8 @@ import { vimCommand } from '../ui/commands/vimCommand.js';
 import { setupGithubCommand } from '../ui/commands/setupGithubCommand.js';
 import { terminalSetupCommand } from '../ui/commands/terminalSetupCommand.js';
 import { upgradeCommand } from '../ui/commands/upgradeCommand.js';
+import { gemmaStatusCommand } from '../ui/commands/gemmaStatusCommand.js';
+import { voiceCommand } from '../ui/commands/voiceCommand.js';
 
 /**
  * Loads the core, hard-coded slash commands that are an integral part
@@ -221,10 +223,12 @@ export class BuiltinCommandLoader implements ICommandLoader {
           : [skillsCommand]
         : []),
       settingsCommand,
+      gemmaStatusCommand,
       tasksCommand,
       vimCommand,
       setupGithubCommand,
       terminalSetupCommand,
+      ...(this.config?.isVoiceModeEnabled() ? [voiceCommand] : []),
       ...(this.config?.getContentGeneratorConfig()?.authType ===
       AuthType.LOGIN_WITH_GOOGLE
         ? [upgradeCommand]

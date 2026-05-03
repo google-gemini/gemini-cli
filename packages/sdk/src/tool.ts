@@ -11,6 +11,7 @@ import {
   BaseToolInvocation,
   type ToolResult,
   type ToolInvocation,
+  type ExecuteOptions,
   Kind,
   type MessageBus,
 } from '@google/gemini-cli-core';
@@ -58,10 +59,10 @@ class SdkToolInvocation<T extends z.ZodTypeAny> extends BaseToolInvocation<
     return `Executing ${this._toolName}...`;
   }
 
-  async execute(
-    _signal: AbortSignal,
-    _updateOutput?: (output: string) => void,
-  ): Promise<ToolResult> {
+  async execute({
+    abortSignal: _abortSignal,
+    updateOutput: _updateOutput,
+  }: ExecuteOptions): Promise<ToolResult> {
     try {
       const result = await this.action(this.params, this.context);
       const output =

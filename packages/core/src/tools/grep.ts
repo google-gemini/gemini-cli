@@ -23,6 +23,7 @@ import {
   type ToolResult,
   type PolicyUpdateOptions,
   type ToolConfirmationOutcome,
+  type ExecuteOptions,
 } from './tools.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { getErrorMessage, isNodeError } from '../utils/errors.js';
@@ -138,7 +139,7 @@ class GrepToolInvocation extends BaseToolInvocation<
     return null;
   }
 
-  async execute(signal: AbortSignal): Promise<ToolResult> {
+  async execute({ abortSignal: signal }: ExecuteOptions): Promise<ToolResult> {
     try {
       const workspaceContext = this.config.getWorkspaceContext();
       const pathParam = this.params.dir_path;
@@ -464,7 +465,7 @@ class GrepToolInvocation extends BaseToolInvocation<
       const grepAvailable = await this.isCommandAvailable('grep');
       if (grepAvailable) {
         strategyUsed = 'system grep';
-        const grepArgs = ['-r', '-n', '-H', '-E', '-I'];
+        const grepArgs = ['-r', '-n', '-H', '-E', '-I', '-i'];
         // Extract directory names from exclusion patterns for grep --exclude-dir
         const globExcludes = this.fileExclusions.getGlobExcludes();
         const commonExcludes = globExcludes

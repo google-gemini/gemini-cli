@@ -77,6 +77,11 @@ export interface OAuth2AuthConfig extends BaseAuthConfig {
   authorization_url?: string;
   /** Override or provide the token endpoint URL. Discovered from agent card if omitted. */
   token_url?: string;
+  issuer?: string;
+  audiences?: string[];
+  redirect_uri?: string;
+  token_param_name?: string;
+  registration_url?: string;
 }
 
 /** Client config corresponding to OpenIdConnectSecurityScheme. */

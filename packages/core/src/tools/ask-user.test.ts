@@ -410,7 +410,9 @@ describe('AskUserTool', () => {
         });
       }
 
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
       expect(result.returnDisplay).toContain('User answered:');
       expect(result.returnDisplay).toContain(
         '  Approach → Quick fix (Recommended)',
@@ -453,7 +455,9 @@ describe('AskUserTool', () => {
         });
       }
 
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
       expect(result.returnDisplay).toBe(
         'User submitted without answering questions.',
       );
@@ -499,7 +503,9 @@ describe('AskUserTool', () => {
         await details.onConfirm(ToolConfirmationOutcome.Cancel);
       }
 
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
       expect(result.returnDisplay).toBe('User dismissed dialog');
       expect(result.llmContent).toBe(
         'User dismissed ask_user dialog without answering.',
