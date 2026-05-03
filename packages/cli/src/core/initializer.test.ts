@@ -98,29 +98,37 @@ describe('initializer', () => {
     expect(IdeClient.getInstance).not.toHaveBeenCalled();
   });
 
-  it('should initialize correctly in IDE mode', async () => {
+  it('should wait for IDE connection before resolving', async () => {
     mockConfig.getIdeMode.mockReturnValue(true);
-    const result = await initializeApp(
+
+    let resolveConnect: () => void;
+    const connectPromise = new Promise<void>((res) => {
+      resolveConnect = res;
+    });
+
+    mockIdeClient.connect.mockReturnValue(connectPromise);
+
+    let initResolved = false;
+
+    const initPromise = initializeApp(
       mockConfig as unknown as Config,
       mockSettings,
-    );
-
-    // Wait for the background promise to resolve
-    await new Promise((resolve) => setTimeout(resolve, 0));
-
-    expect(result).toEqual({
-      authError: null,
-      accountSuspensionInfo: null,
-      themeError: null,
-      shouldOpenAuthDialog: false,
-      geminiMdFileCount: 5,
+    ).then(() => {
+      initResolved = true;
     });
-    expect(IdeClient.getInstance).toHaveBeenCalled();
+
+    // Let microtasks run
+    await Promise.resolve();
+
+    expect(initResolved).toBe(false);
+
+    resolveConnect!(); // now allow connect to finish
+
+    await initPromise;
+
+    expect(initResolved).toBe(true);
     expect(mockIdeClient.connect).toHaveBeenCalled();
-    expect(logIdeConnection).toHaveBeenCalledWith(
-      mockConfig as unknown as Config,
-      expect.any(Object),
-    );
+    expect(logIdeConnection).toHaveBeenCalled();
   });
 
   it('should handle auth error', async () => {

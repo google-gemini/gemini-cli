@@ -56,18 +56,13 @@ export async function initializeApp(
   );
 
   if (config.getIdeMode()) {
-    IdeClient.getInstance()
-      .then(async (ideClient) => {
-        await ideClient.connect();
-        logIdeConnection(
-          config,
-          new IdeConnectionEvent(IdeConnectionType.START),
-        );
-      })
-      .catch((e) => {
-        // We log locally if IDE connection setup fails in the background.
-        debugLogger.error('Failed to initialize IDE client:', e);
-      });
+    try {
+      const ideClient = await IdeClient.getInstance();
+      await ideClient.connect();
+      logIdeConnection(config, new IdeConnectionEvent(IdeConnectionType.START));
+    } catch (e) {
+      debugLogger.error('Failed to initialize IDE client:', e);
+    }
   }
 
   return {
