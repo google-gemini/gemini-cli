@@ -561,6 +561,56 @@ describe('resolveToRealPath', () => {
     expect(resolveToRealPath(input)).toBe(expected);
   });
 
+  // Regression test for issue #26368: a long pasted blob containing an
+  // unescaped `@` was routed through resolveToRealPath, where fs.realpathSync
+  // (and the fallback fs.lstatSync) raised ENAMETOOLONG. The error escaped
+  // robustRealpath and surfaced as an unhandled promise rejection that crashed
+  // the CLI. resolveToRealPath must swallow ENAMETOOLONG and return the input
+  // path unchanged so downstream consumers (validatePathAccess, fileExists)
+  // can treat it as "not a real path" and let the caller fall through.
+  it('should not throw ENAMETOOLONG when a very long string is provided', () => {
+    vi.spyOn(fs, 'realpathSync').mockImplementationOnce(() => {
+      const err = new Error('name too long') as NodeJS.ErrnoException;
+      err.code = 'ENAMETOOLONG';
+      throw err;
+    });
+
+    const longString = 'a'.repeat(5000);
+    expect(() => resolveToRealPath(longString)).not.toThrow();
+  });
+
+  it('should return resolved path even if fs.realpathSync fails with ENAMETOOLONG', () => {
+    vi.spyOn(fs, 'realpathSync').mockImplementationOnce(() => {
+      const err = new Error('name too long') as NodeJS.ErrnoException;
+      err.code = 'ENAMETOOLONG';
+      throw err;
+    });
+
+    const longString = 'a'.repeat(5000);
+    // robustRealpath's fallback for a single-segment over-long name resolves
+    // path.dirname(p) === p, so the input is returned as-is after path.resolve.
+    expect(resolveToRealPath(longString)).toBe(path.resolve(longString));
+  });
+
+  it('should return decoded path even if fs.lstatSync fails with ENAMETOOLONG inside the symlink fallback', () => {
+    // First realpathSync throws ENOENT to enter the lstat fallback;
+    // then lstatSync throws ENAMETOOLONG (this is what actually fires on
+    // macOS for over-long leaf segments).
+    vi.spyOn(fs, 'realpathSync').mockImplementation(() => {
+      const err = new Error('not found') as NodeJS.ErrnoException;
+      err.code = 'ENOENT';
+      throw err;
+    });
+    vi.spyOn(fs, 'lstatSync').mockImplementation(() => {
+      const err = new Error('name too long') as NodeJS.ErrnoException;
+      err.code = 'ENAMETOOLONG';
+      throw err;
+    });
+
+    const longString = 'a'.repeat(5000);
+    expect(() => resolveToRealPath(longString)).not.toThrow();
+  });
+
   it('should recursively resolve symlinks for non-existent child paths', () => {
     const parentPath = path.resolve('/some/parent/path');
     const resolvedParentPath = path.resolve('/resolved/parent/path');

@@ -16,6 +16,7 @@ import {
 import {
   handleAtCommand,
   escapeAtSymbols,
+  checkPermissions,
   unescapeLiteralAt,
 } from './atCommandProcessor.js';
 import {
@@ -1538,5 +1539,66 @@ describe('unescapeLiteralAt', () => {
   it('roundtrips correctly with escapeAtSymbols', () => {
     const input = 'user@example.com and @scope/pkg';
     expect(unescapeLiteralAt(escapeAtSymbols(input))).toBe(input);
+  });
+});
+
+// Regression coverage for issue #26368: pasting a long string containing an
+// unescaped `@` previously crashed the CLI with an unhandled promise rejection
+// because `robustRealpath` did not catch ENAMETOOLONG. checkPermissions is the
+// async surface that runs synchronously inside an `await` on `handleFinalSubmit`,
+// so any error escaping it becomes the unhandled rejection.
+describe('checkPermissions — long-paste regression (#26368)', () => {
+  let testRootDir: string;
+  let mockConfig: Config;
+
+  beforeEach(async () => {
+    vi.restoreAllMocks();
+    vi.resetAllMocks();
+
+    testRootDir = await fsPromises.mkdtemp(
+      path.join(os.tmpdir(), 'checkperms-enametoolong-'),
+    );
+
+    // Minimal Config surface — checkPermissions only uses these methods,
+    // plus categorizeAtCommands' calls into getAgentRegistry/getResourceRegistry.
+    mockConfig = {
+      getTargetDir: () => testRootDir,
+      validatePathAccess: () => null,
+      getAgentRegistry: () => undefined,
+      getResourceRegistry: () => ({
+        findResourceByUri: () => undefined,
+        getAllResources: () => [],
+      }),
+    } as unknown as Config;
+  });
+
+  afterEach(async () => {
+    await fsPromises.rm(testRootDir, { recursive: true, force: true });
+  });
+
+  it('should not reject when the @-token is longer than PATH_MAX', async () => {
+    // 5000 chars is well over macOS PATH_MAX (1024) and Linux PATH_MAX (4096).
+    // Real filesystems will reject the lstat/realpath syscall with ENAMETOOLONG.
+    const longToken = 'a'.repeat(5000);
+    const query = `Look at this trace @${longToken}`;
+
+    // Must not throw, must not reject — just return an empty list because
+    // the candidate path can't possibly exist on disk.
+    await expect(checkPermissions(query, mockConfig)).resolves.toEqual([]);
+  });
+
+  it('should not reject when the pasted blob contains multiple over-long @-tokens', async () => {
+    const longToken = 'b'.repeat(3000);
+    const query = `error @${longToken} and also @${longToken}\nstack trace continues`;
+
+    await expect(checkPermissions(query, mockConfig)).resolves.toEqual([]);
+  });
+
+  it('should still resolve normally for an unescaped @ with no following token', async () => {
+    // Sanity check: a lone @ in pasted text should be treated as text and
+    // produce no permission entries — independently of the ENAMETOOLONG fix.
+    const query = 'send mail to user @ example dot com';
+
+    await expect(checkPermissions(query, mockConfig)).resolves.toEqual([]);
   });
 });
