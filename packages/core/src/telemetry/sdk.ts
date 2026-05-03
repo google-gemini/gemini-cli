@@ -98,6 +98,14 @@ let spanProcessor: BatchSpanProcessor | undefined;
 let logRecordProcessor: BatchLogRecordProcessor | undefined;
 let metricReader: PeriodicExportingMetricReader | undefined;
 let telemetryInitialized = false;
+// Set when telemetry is permanently off for this process (i.e. disabled in
+// config, or disabled because of an unresolvable misconfiguration). Used to
+// short-circuit `bufferTelemetryEvent` so that closures capturing huge events
+// (full conversation contents on every API request/response/error) are not
+// retained forever in `telemetryBuffer`. The deferred-init case (waiting for
+// OAuth credentials) intentionally leaves this false so events still buffer
+// and get flushed once init completes.
+let telemetryDisabled = false;
 let callbackRegistered = false;
 let authListener: ((newCredentials: JWTInput) => Promise<void>) | undefined =
   undefined;
@@ -115,12 +123,23 @@ export function isTelemetrySdkInitialized(): boolean {
 }
 
 export function bufferTelemetryEvent(fn: () => void | Promise<void>): void {
+  if (telemetryDisabled) {
+    return;
+  }
   if (telemetryInitialized) {
     // eslint-disable-next-line @typescript-eslint/no-floating-promises
     fn();
   } else {
     telemetryBuffer.push(fn);
   }
+}
+
+function markTelemetryDisabled(): void {
+  telemetryDisabled = true;
+  // Drop anything that was buffered before we knew telemetry was off — those
+  // closures retain their captured event objects (which can include the full
+  // conversation contents on API events) and would otherwise live forever.
+  telemetryBuffer.length = 0;
 }
 
 async function flushTelemetryBuffer(): Promise<void> {
@@ -167,8 +186,17 @@ export async function initializeTelemetry(
   credentials?: JWTInput,
 ): Promise<void> {
   if (!config.getTelemetryEnabled()) {
+    markTelemetryDisabled();
     return;
   }
+
+  // Reset the disabled flag in case a previous init had set it (e.g. config
+  // reload, or a test that re-enables telemetry without an intervening
+  // shutdown). Every code path past this point either flips
+  // `telemetryInitialized` true on success, calls `markTelemetryDisabled()`
+  // again on a permanent-off branch, or leaves the flag false to let the
+  // deferred-init path keep buffering until post-auth re-init.
+  telemetryDisabled = false;
 
   if (telemetryInitialized) {
     if (
@@ -188,6 +216,7 @@ export async function initializeTelemetry(
         'CLI authentication is only supported with in-process exporters. ' +
         'Disabling telemetry.',
     );
+    markTelemetryDisabled();
     return;
   }
 
@@ -417,47 +446,52 @@ export async function shutdownTelemetry(
   config: Config,
   fromProcessExit = true,
 ): Promise<void> {
-  if (!telemetryInitialized || !sdk) {
-    return;
-  }
-  try {
-    ClearcutLogger.getInstance()?.shutdown();
-    await sdk.shutdown();
-    if (config.getDebugMode() && fromProcessExit) {
-      debugLogger.log('OpenTelemetry SDK shut down successfully.');
+  // Tear down the OTel SDK only if it was actually started.
+  if (telemetryInitialized && sdk) {
+    try {
+      ClearcutLogger.getInstance()?.shutdown();
+      await sdk.shutdown();
+      if (config.getDebugMode() && fromProcessExit) {
+        debugLogger.log('OpenTelemetry SDK shut down successfully.');
+      }
+    } catch (error) {
+      debugLogger.error('Error shutting down SDK:', error);
     }
-  } catch (error) {
-    debugLogger.error('Error shutting down SDK:', error);
-  } finally {
-    telemetryInitialized = false;
-    sdk = undefined;
-    // Fully reset the global APIs to allow for re-initialization.
-    // This is primarily for testing environments where the SDK is started
-    // and stopped multiple times in the same process.
+    // Reset the global OTel APIs so a subsequent init can re-register them.
     trace.disable();
     context.disable();
     metrics.disable();
     propagation.disable();
     diag.disable();
-    if (authListener) {
-      authEvents.off('post_auth', authListener);
-      authListener = undefined;
-    }
-    if (keychainAvailabilityListener) {
-      coreEvents.off(
-        CoreEvent.TelemetryKeychainAvailability,
-        keychainAvailabilityListener,
-      );
-      keychainAvailabilityListener = undefined;
-    }
-    if (tokenStorageTypeListener) {
-      coreEvents.off(
-        CoreEvent.TelemetryTokenStorageType,
-        tokenStorageTypeListener,
-      );
-      tokenStorageTypeListener = undefined;
-    }
-    callbackRegistered = false;
-    activeTelemetryEmail = undefined;
   }
+
+  // Always reset module-level state and detach listeners, even when the SDK
+  // never finished initializing. This covers two cases that would otherwise
+  // leak: tests (and any caller) that init/shutdown multiple times, and the
+  // deferred-init path (CLI auth waiting for credentials) where
+  // `authListener` is registered before `telemetryInitialized` is flipped.
+  telemetryInitialized = false;
+  sdk = undefined;
+  telemetryDisabled = false;
+  telemetryBuffer.length = 0;
+  if (authListener) {
+    authEvents.off('post_auth', authListener);
+    authListener = undefined;
+  }
+  if (keychainAvailabilityListener) {
+    coreEvents.off(
+      CoreEvent.TelemetryKeychainAvailability,
+      keychainAvailabilityListener,
+    );
+    keychainAvailabilityListener = undefined;
+  }
+  if (tokenStorageTypeListener) {
+    coreEvents.off(
+      CoreEvent.TelemetryTokenStorageType,
+      tokenStorageTypeListener,
+    );
+    tokenStorageTypeListener = undefined;
+  }
+  callbackRegistered = false;
+  activeTelemetryEmail = undefined;
 }

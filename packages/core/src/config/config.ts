@@ -1390,10 +1390,16 @@ export class Config implements McpContext, AgentLoopContext {
       setGeminiMdFilename(params.contextFileName);
     }
 
-    if (this.telemetrySettings.enabled) {
-      // eslint-disable-next-line @typescript-eslint/no-floating-promises
-      initializeTelemetry(this);
-    }
+    // Always call initializeTelemetry, even when telemetry is disabled.
+    // The function short-circuits to markTelemetryDisabled() in that case,
+    // which sets the disabled flag and clears any events that were already
+    // pushed to the buffer at module-load time. Skipping the call would leave
+    // the buffer growing unbounded for the lifetime of the process — every
+    // log* helper pushes a closure capturing its event, and ApiRequestEvent /
+    // ApiResponseEvent / ApiErrorEvent each retain the full conversation
+    // contents.
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
+    initializeTelemetry(this);
 
     const proxy = this.getProxy();
     if (proxy) {

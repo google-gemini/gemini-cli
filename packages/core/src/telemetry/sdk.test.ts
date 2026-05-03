@@ -359,6 +359,78 @@ describe('Telemetry SDK', () => {
       await new Promise((resolve) => setTimeout(resolve, 10));
       expect(callback).toHaveBeenCalled();
     });
+
+    it('should drop pre-init events and stop buffering when telemetry is disabled', async () => {
+      // Regression test: when telemetry is disabled, every `logApi*` helper
+      // pushed a closure capturing the full event (with conversation contents)
+      // onto telemetryBuffer, which was never drained because init bailed
+      // before flipping `telemetryInitialized` to true. Confirmed live to
+      // retain GBs over a long-running session with frequent API errors.
+      //
+      // The fix has two halves: events buffered before init runs must be
+      // discarded once init sees telemetry is off, and events submitted after
+      // init must short-circuit instead of pushing onto the buffer.
+      const beforeInitCallback = vi.fn();
+      bufferTelemetryEvent(beforeInitCallback);
+
+      vi.spyOn(mockConfig, 'getTelemetryEnabled').mockReturnValue(false);
+      await initializeTelemetry(mockConfig);
+
+      const afterInitCallback = vi.fn();
+      bufferTelemetryEvent(afterInitCallback);
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      expect(beforeInitCallback).not.toHaveBeenCalled();
+      expect(afterInitCallback).not.toHaveBeenCalled();
+    });
+
+    it('should drop events when telemetry is disabled by config conflict', async () => {
+      // The other permanent-disable path: useCollector + useCliAuth both true.
+      vi.spyOn(mockConfig, 'getTelemetryUseCollector').mockReturnValue(true);
+      vi.spyOn(mockConfig, 'getTelemetryUseCliAuth').mockReturnValue(true);
+      await initializeTelemetry(mockConfig);
+
+      const callback = vi.fn();
+      bufferTelemetryEvent(callback);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      expect(callback).not.toHaveBeenCalled();
+    });
+
+    it('should re-enable buffering after a disabled init when telemetry is later enabled', async () => {
+      // Re-init scenario: first call disabled (sets telemetryDisabled=true),
+      // second call enabled. The second init must clear the flag so that
+      // events submitted after it are not silently dropped.
+      vi.spyOn(mockConfig, 'getTelemetryEnabled').mockReturnValue(false);
+      await initializeTelemetry(mockConfig);
+
+      vi.mocked(mockConfig.getTelemetryEnabled).mockReturnValue(true);
+      await initializeTelemetry(mockConfig);
+
+      const callback = vi.fn();
+      bufferTelemetryEvent(callback);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      expect(callback).toHaveBeenCalled();
+    });
+  });
+
+  it('should clean up the auth listener when shutdown is called from the deferred-init state', async () => {
+    // Reproduces a latent listener leak: when telemetry is enabled but uses
+    // CLI auth and no credentials are available yet, init registers an
+    // `authListener` and returns without setting `telemetryInitialized`. If
+    // shutdown is called before the post-auth re-init, the listener must
+    // still be detached.
+    vi.spyOn(mockConfig, 'getTelemetryUseCliAuth').mockReturnValue(true);
+    vi.spyOn(mockConfig, 'getTelemetryTarget').mockReturnValue(
+      TelemetryTarget.GCP,
+    );
+    vi.spyOn(mockConfig, 'getTelemetryOtlpEndpoint').mockReturnValue('');
+
+    const baseline = authEvents.listenerCount('post_auth');
+    await initializeTelemetry(mockConfig);
+    expect(authEvents.listenerCount('post_auth')).toBe(baseline + 1);
+
+    await shutdownTelemetry(mockConfig);
+    expect(authEvents.listenerCount('post_auth')).toBe(baseline);
   });
 
   it('should disable telemetry and log error if useCollector and useCliAuth are both true', async () => {
