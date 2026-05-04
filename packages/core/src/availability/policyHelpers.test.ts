@@ -293,6 +293,12 @@ describe('policyHelpers', () => {
         model: DEFAULT_GEMINI_MODEL_AUTO,
         flashAvailable: false,
       },
+      {
+        name: 'Complex Parity (Auto + Wrap + Quota Exhausted)',
+        model: DEFAULT_GEMINI_MODEL_AUTO,
+        wrapsAround: true,
+        flashAvailable: false,
+      },
     ];
 
     testCases.forEach(
