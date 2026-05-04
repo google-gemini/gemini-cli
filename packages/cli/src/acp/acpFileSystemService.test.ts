@@ -196,6 +196,31 @@ describe('AcpFileSystemService', () => {
         message: 'opaque server message',
       });
     });
+
+    it('should preserve the message when a structured ENOENT error is a plain (non-Error) object', async () => {
+      service = new AcpFileSystemService(
+        mockConnection,
+        'session-1',
+        { readTextFile: true, writeTextFile: true },
+        mockFallback,
+        '/path/to',
+      );
+      // JSON-RPC clients often surface error responses as plain objects
+      // (not Error instances). The `message` field must still be preserved
+      // — without explicit handling, `String({})` collapses to
+      // '[object Object]' and the real diagnostic is lost.
+      mockConnection.readTextFile.mockRejectedValue({
+        code: 'ENOENT',
+        message: 'plain object error message',
+      });
+
+      await expect(
+        service.readTextFile('/path/to/missing'),
+      ).rejects.toMatchObject({
+        code: 'ENOENT',
+        message: 'plain object error message',
+      });
+    });
   });
 
   describe('writeTextFile', () => {

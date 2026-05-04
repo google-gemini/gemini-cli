@@ -34,7 +34,18 @@ export class AcpFileSystemService implements FileSystemService {
   }
 
   private normalizeFileSystemError(err: unknown): never {
-    const errorMessage = err instanceof Error ? err.message : String(err);
+    // Resolve a useful message for both Error instances and plain objects
+    // that carry a `message` field (a common shape for JSON-RPC error
+    // responses). Avoids `String({}) === '[object Object]'` swallowing
+    // the real message for non-Error rejections.
+    const errMessage = (() => {
+      if (err instanceof Error) return err.message;
+      if (err && typeof err === 'object' && 'message' in err) {
+        const m = (err as { message?: unknown }).message;
+        if (typeof m === 'string') return m;
+      }
+      return String(err);
+    })();
 
     // Structured signal first: a JSON-RPC error object's `code` field is the
     // authoritative not-found indicator when the ACP server emits it. Falls
@@ -43,21 +54,21 @@ export class AcpFileSystemService implements FileSystemService {
     if (err && typeof err === 'object' && 'code' in err) {
       const code = (err as { code?: unknown }).code;
       if (code === 'ENOENT') {
-        const newErr = new Error(errorMessage) as NodeJS.ErrnoException;
+        const newErr = new Error(errMessage) as NodeJS.ErrnoException;
         newErr.code = 'ENOENT';
         throw newErr;
       }
     }
 
     if (
-      errorMessage.includes('Resource not found') ||
-      errorMessage.includes('ENOENT') ||
-      errorMessage.includes('does not exist') ||
-      errorMessage.includes('No such file') ||
-      errorMessage.includes('not_found') ||
-      errorMessage.includes('file not found')
+      errMessage.includes('Resource not found') ||
+      errMessage.includes('ENOENT') ||
+      errMessage.includes('does not exist') ||
+      errMessage.includes('No such file') ||
+      errMessage.includes('not_found') ||
+      errMessage.includes('file not found')
     ) {
-      const newErr = new Error(errorMessage) as NodeJS.ErrnoException;
+      const newErr = new Error(errMessage) as NodeJS.ErrnoException;
       newErr.code = 'ENOENT';
       throw newErr;
     }
