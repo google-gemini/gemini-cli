@@ -21,8 +21,8 @@ permissions:
 
 jobs:
   manage-lifecycle:
-    if: github.repository == 'google-gemini/gemini-cli'
-    runs-on: ubuntu-latest
+    if: "github.repository == 'google-gemini/gemini-cli'"
+    runs-on: 'ubuntu-latest'
     steps:
       - name: 'Generate GitHub App Token'
         id: 'generate_token'
@@ -140,7 +140,7 @@ jobs:
             // Nudge
             await processItems(`repo:${owner}/${repo} is:open is:pr -label:"help wanted" -label:"🔒 maintainer only" -label:"status/pr-nudge-sent" created:<${nudgeThreshold.toISOString()}`, async (pr) => {
               if (['OWNER', 'MEMBER', 'COLLABORATOR'].includes(pr.author_association) || pr.user.type === 'Bot') return;
-              
+
               core.info(`Nudging PR #${pr.number} for contribution policy.`);
               if (!dryRun) {
                 await github.rest.issues.addLabels({ owner, repo, issue_number: pr.number, labels: ['status/pr-nudge-sent'] });
@@ -154,7 +154,7 @@ jobs:
             // Close
             await processItems(`repo:${owner}/${repo} is:open is:pr -label:"help wanted" -label:"🔒 maintainer only" created:<${prCloseThreshold.toISOString()}`, async (pr) => {
               if (['OWNER', 'MEMBER', 'COLLABORATOR'].includes(pr.author_association) || pr.user.type === 'Bot') return;
-              
+
               core.info(`Closing PR #${pr.number} per contribution policy (no 'help wanted').`);
               if (!dryRun) {
                 await github.rest.issues.createComment({
