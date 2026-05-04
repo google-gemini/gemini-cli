@@ -50,16 +50,10 @@ export async function validateNonInteractiveAuth(
 
     return authType;
   } catch (error) {
-    if (nonInteractiveConfig.getOutputFormat() === OutputFormat.JSON) {
-      handleError(
-        error instanceof Error ? error : new Error(String(error)),
-        nonInteractiveConfig,
-        ExitCodes.FATAL_AUTHENTICATION_ERROR,
-      );
-    } else {
-      debugLogger.error(error instanceof Error ? error.message : String(error));
-      await runExitCleanup();
-      process.exit(ExitCodes.FATAL_AUTHENTICATION_ERROR);
-    }
+    handleError(
+      error instanceof Error ? error : new Error(String(error)),
+      nonInteractiveConfig,
+      ExitCodes.FATAL_AUTHENTICATION_ERROR,
+    );
   }
 }
