@@ -5,7 +5,6 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import type { MetricOutput } from '../types.js';
 
 function getWorkflowMinutes(): Record<string, number> {
   const output = execFileSync(
@@ -51,16 +50,20 @@ function run() {
       totalMinutes += minutes;
     }
 
-    const result: MetricOutput = {
-      metric: 'actions_spend_minutes',
-      value: totalMinutes,
-      timestamp: new Date().toISOString(),
-      details: workflowMinutes,
-    };
+    process.stdout.write(
+      `actions_spend_overall_minutes,${Math.round(totalMinutes * 100) / 100}\n`,
+    );
 
-    console.log(JSON.stringify(result));
+    for (const [name, minutes] of Object.entries(workflowMinutes)) {
+      const safeName = name.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+      process.stdout.write(
+        `actions_spend_workflow_${safeName}_minutes,${Math.round(minutes * 100) / 100}\n`,
+      );
+    }
   } catch (error) {
-    console.error('Error calculating actions spend:', error);
+    process.stderr.write(
+      error instanceof Error ? error.message : String(error),
+    );
     process.exit(1);
   }
 }
