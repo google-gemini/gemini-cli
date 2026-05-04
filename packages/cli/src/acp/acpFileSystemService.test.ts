@@ -145,6 +145,57 @@ describe('AcpFileSystemService', () => {
         message: 'Resource not found for document',
       });
     });
+
+    it.each([
+      {
+        name: 'snake_case "not_found"',
+        message: 'fs/read_text_file not_found: missing path',
+      },
+      {
+        name: 'phrase "file not found"',
+        message: 'agent: file not found at /tmp/x',
+      },
+    ])(
+      'should throw normalized ENOENT for $name message variants',
+      async ({ message }) => {
+        service = new AcpFileSystemService(
+          mockConnection,
+          'session-1',
+          { readTextFile: true, writeTextFile: true },
+          mockFallback,
+          '/path/to',
+        );
+        mockConnection.readTextFile.mockRejectedValue(new Error(message));
+
+        await expect(
+          service.readTextFile('/path/to/missing'),
+        ).rejects.toMatchObject({
+          code: 'ENOENT',
+          message,
+        });
+      },
+    );
+
+    it('should throw normalized ENOENT when the ACP error carries a structured `code: "ENOENT"` field', async () => {
+      service = new AcpFileSystemService(
+        mockConnection,
+        'session-1',
+        { readTextFile: true, writeTextFile: true },
+        mockFallback,
+        '/path/to',
+      );
+      const structured = Object.assign(new Error('opaque server message'), {
+        code: 'ENOENT',
+      });
+      mockConnection.readTextFile.mockRejectedValue(structured);
+
+      await expect(
+        service.readTextFile('/path/to/missing'),
+      ).rejects.toMatchObject({
+        code: 'ENOENT',
+        message: 'opaque server message',
+      });
+    });
   });
 
   describe('writeTextFile', () => {

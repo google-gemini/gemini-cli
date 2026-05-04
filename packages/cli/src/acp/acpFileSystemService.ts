@@ -35,11 +35,27 @@ export class AcpFileSystemService implements FileSystemService {
 
   private normalizeFileSystemError(err: unknown): never {
     const errorMessage = err instanceof Error ? err.message : String(err);
+
+    // Structured signal first: a JSON-RPC error object's `code` field is the
+    // authoritative not-found indicator when the ACP server emits it. Falls
+    // back to substring matching below for servers that haven't migrated to
+    // structured error codes yet.
+    if (err && typeof err === 'object' && 'code' in err) {
+      const code = (err as { code?: unknown }).code;
+      if (code === 'ENOENT') {
+        const newErr = new Error(errorMessage) as NodeJS.ErrnoException;
+        newErr.code = 'ENOENT';
+        throw newErr;
+      }
+    }
+
     if (
       errorMessage.includes('Resource not found') ||
       errorMessage.includes('ENOENT') ||
       errorMessage.includes('does not exist') ||
-      errorMessage.includes('No such file')
+      errorMessage.includes('No such file') ||
+      errorMessage.includes('not_found') ||
+      errorMessage.includes('file not found')
     ) {
       const newErr = new Error(errorMessage) as NodeJS.ErrnoException;
       newErr.code = 'ENOENT';
