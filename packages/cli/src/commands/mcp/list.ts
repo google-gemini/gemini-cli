@@ -179,6 +179,10 @@ async function getServerStatus(
     return MCPServerStatus.DISABLED;
   }
 
+  if (!isTrusted) {
+    return MCPServerStatus.DISABLED;
+  }
+
   // Test all server types by attempting actual connection
   return testMCPConnection(serverName, server, isTrusted, activeSettings);
 }
@@ -189,8 +193,15 @@ export async function listMcpServers(
   const loadedSettings = loadedSettingsArg ?? loadSettings();
   const activeSettings = loadedSettings.merged;
 
+  // If the folder is untrusted, we want to show all configured servers (including
+  // project-scoped ones) as disabled.
+  const allSettings =
+    !loadedSettings.isTrusted && loadedSettings.getMergedSettingsAsIfTrusted
+      ? loadedSettings.getMergedSettingsAsIfTrusted()
+      : activeSettings;
+
   const { mcpServers, blockedServerNames } =
-    await getMcpServersFromConfig(activeSettings);
+    await getMcpServersFromConfig(allSettings);
   const serverNames = Object.keys(mcpServers);
 
   if (blockedServerNames.length > 0) {
@@ -208,6 +219,15 @@ export async function listMcpServers(
     return;
   }
 
+  if (!loadedSettings.isTrusted) {
+    debugLogger.log(
+      chalk.yellow(
+        'Warning: MCP servers are configured but disabled because this folder is untrusted.\n' +
+          'User-level servers are also suppressed in untrusted folders to prevent accidental side-effects.\n',
+      ),
+    );
+  }
+
   debugLogger.log('Configured MCP servers:\n');
 
   for (const serverName of serverNames) {
@@ -217,7 +237,7 @@ export async function listMcpServers(
       serverName,
       server,
       loadedSettings.isTrusted,
-      activeSettings,
+      allSettings,
     );
 
     let statusIndicator = '';

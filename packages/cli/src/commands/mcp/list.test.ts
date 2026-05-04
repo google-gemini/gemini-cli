@@ -204,6 +204,7 @@ describe('mcp list command', () => {
           'test-server': { command: '/test/server' },
         },
       },
+      isTrusted: true,
     });
 
     mockClient.connect.mockRejectedValue(new Error('Connection failed'));
@@ -371,7 +372,7 @@ describe('mcp list command', () => {
     );
   });
 
-  it('should show stdio servers as disconnected in untrusted folders', async () => {
+  it('should show stdio servers as disabled in untrusted folders', async () => {
     const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
     mockedLoadSettings.mockReturnValue({
       merged: {
@@ -383,15 +384,15 @@ describe('mcp list command', () => {
       isTrusted: false,
     });
 
-    // createTransport will throw in core if not trusted
-    mockedCreateTransport.mockRejectedValue(new Error('Folder not trusted'));
-
     await listMcpServers();
 
     expect(debugLogger.log).toHaveBeenCalledWith(
       expect.stringContaining(
-        'test-server: /test/server  (stdio) - Disconnected',
+        'Warning: MCP servers are configured but disabled because this folder is untrusted.',
       ),
+    );
+    expect(debugLogger.log).toHaveBeenCalledWith(
+      expect.stringContaining('test-server: /test/server  (stdio) - Disabled'),
     );
   });
 
@@ -442,6 +443,47 @@ describe('mcp list command', () => {
     expect(debugLogger.log).toHaveBeenCalledWith(
       expect.stringContaining(
         'disabled-server: /test/server  (stdio) - Disabled',
+      ),
+    );
+    expect(mockedCreateTransport).not.toHaveBeenCalled();
+  });
+
+  it('should display warning and disabled status in untrusted folders', async () => {
+    const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
+    const mcpServers = {
+      'project-server': { command: '/path/to/project/server' },
+      'user-server': { url: 'https://example.com/user' },
+    };
+
+    mockedLoadSettings.mockReturnValue({
+      merged: {
+        ...defaultMergedSettings,
+        mcpServers: {
+          'user-server': mcpServers['user-server'],
+        },
+      },
+      isTrusted: false,
+      getMergedSettingsAsIfTrusted: () => ({
+        ...defaultMergedSettings,
+        mcpServers,
+      }),
+    });
+
+    await listMcpServers();
+
+    expect(debugLogger.log).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'Warning: MCP servers are configured but disabled because this folder is untrusted.',
+      ),
+    );
+    expect(debugLogger.log).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'project-server: /path/to/project/server  (stdio) - Disabled',
+      ),
+    );
+    expect(debugLogger.log).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'user-server: https://example.com/user (http) - Disabled',
       ),
     );
     expect(mockedCreateTransport).not.toHaveBeenCalled();
