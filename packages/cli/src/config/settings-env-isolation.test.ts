@@ -37,6 +37,7 @@ describe('Environment Isolation', () => {
   const mockHome = path.resolve('/mock/home');
   const mockWorkspace = path.resolve('/mock/workspace');
   const originalArgv = process.argv;
+  const originalEnv = { ...process.env };
 
   beforeEach(() => {
     vi.resetAllMocks();
@@ -45,10 +46,15 @@ describe('Environment Isolation', () => {
     // Default to no files existing
     vi.mocked(fs.existsSync).mockReturnValue(false);
     process.argv = ['node', 'gemini'];
+
+    // Clear env vars that might leak from the host environment
+    delete process.env['GEMINI_API_KEY'];
+    delete process.env['OTHER_VAR'];
   });
 
   afterEach(() => {
     process.argv = originalArgv;
+    process.env = { ...originalEnv };
   });
 
   it('should load local .env by default', () => {
