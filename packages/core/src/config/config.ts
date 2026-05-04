@@ -681,7 +681,6 @@ export interface ConfigParameters {
   gemmaModelRouter?: GemmaModelRouterSettings;
   adk?: ADKSettings;
   disableModelRouterForAuth?: AuthType[];
-  continueOnFailedApiCall?: boolean;
   retryFetchErrors?: boolean;
   maxAttempts?: number;
   enableShellOutputEfficiency?: boolean;
@@ -911,7 +910,6 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly agentSessionNoninteractiveEnabled: boolean;
   private readonly agentSessionInteractiveEnabled: boolean;
 
-  private readonly continueOnFailedApiCall: boolean;
   private readonly retryFetchErrors: boolean;
   private readonly maxAttempts: number;
   private readonly enableShellOutputEfficiency: boolean;
@@ -1179,7 +1177,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.experimentalJitContext = params.experimentalJitContext ?? true;
     this.experimentalMemoryV2 = params.experimentalMemoryV2 ?? true;
     this.experimentalAutoMemory = params.experimentalAutoMemory ?? false;
-    this.experimentalGemma = params.experimentalGemma ?? false;
+    this.experimentalGemma = params.experimentalGemma ?? true;
     this.experimentalContextManagementConfig =
       params.experimentalContextManagementConfig;
     this.memoryBoundaryMarkers = params.memoryBoundaryMarkers ?? ['.git'];
@@ -1288,7 +1286,6 @@ export class Config implements McpContext, AgentLoopContext {
     this.enableHooks = params.enableHooks ?? true;
     this.disabledHooks = params.disabledHooks ?? [];
 
-    this.continueOnFailedApiCall = params.continueOnFailedApiCall ?? true;
     this.enableShellOutputEfficiency =
       params.enableShellOutputEfficiency ?? true;
     this.shellToolInactivityTimeout =
@@ -1806,6 +1803,24 @@ export class Config implements McpContext, AgentLoopContext {
     this._sessionId = sessionId;
     this.storage.setSessionId(sessionId);
     this.trackerService = undefined;
+    this.approvedPlanPath = undefined;
+    this.topicState.reset();
+    this.skillManager.reset();
+    this.latestApiRequest = undefined;
+    this.lastModeSwitchTime = performance.now();
+    this.compressionTruncationCounter = 0;
+    this.quotaErrorOccurred = false;
+    this.creditsNotificationShown = false;
+    this.modelAvailabilityService.reset();
+    this.modelQuotas.clear();
+    this.lastRetrievedQuota = undefined;
+    this.lastQuotaFetchTime = 0;
+    this.hasAccessToPreviewModel = null;
+
+    // Force an event emission to clear the UI display
+    coreEvents.emitQuotaChanged(undefined, undefined, undefined);
+    this.lastEmittedQuotaRemaining = undefined;
+    this.lastEmittedQuotaLimit = undefined;
 
     if (previousPlansDir) {
       this.refreshSessionScopedPlansDirectory(previousPlansDir);
@@ -1814,7 +1829,6 @@ export class Config implements McpContext, AgentLoopContext {
 
   resetNewSessionState(sessionId: string): void {
     this.setSessionId(sessionId);
-    this.approvedPlanPath = undefined;
   }
 
   setTerminalBackground(terminalBackground: string | undefined): void {
@@ -2683,26 +2697,28 @@ export class Config implements McpContext, AgentLoopContext {
         this,
         new ApprovalModeSwitchEvent(currentMode, mode),
       );
-    }
 
-    this.policyEngine.setApprovalMode(mode);
-    this.refreshSandboxManager();
+      this.policyEngine.setApprovalMode(mode);
+      this.refreshSandboxManager();
+      coreEvents.emit(CoreEvent.ApprovalModeChanged, {
+        sessionId: this.getSessionId(),
+        mode,
+      });
 
-    const isPlanModeTransition =
-      currentMode !== mode &&
-      (currentMode === ApprovalMode.PLAN || mode === ApprovalMode.PLAN);
-    const isYoloModeTransition =
-      currentMode !== mode &&
-      (currentMode === ApprovalMode.YOLO || mode === ApprovalMode.YOLO);
+      const isPlanModeTransition =
+        currentMode === ApprovalMode.PLAN || mode === ApprovalMode.PLAN;
+      const isYoloModeTransition =
+        currentMode === ApprovalMode.YOLO || mode === ApprovalMode.YOLO;
 
-    if (isPlanModeTransition || isYoloModeTransition) {
-      if (this._geminiClient?.isInitialized()) {
-        this._geminiClient.clearCurrentSequenceModel();
-        this._geminiClient.setTools().catch((err) => {
-          debugLogger.error('Failed to update tools', err);
-        });
+      if (isPlanModeTransition || isYoloModeTransition) {
+        if (this._geminiClient?.isInitialized()) {
+          this._geminiClient.clearCurrentSequenceModel();
+          this._geminiClient.setTools().catch((err) => {
+            debugLogger.error('Failed to update tools', err);
+          });
+        }
+        this.updateSystemInstructionIfInitialized();
       }
-      this.updateSystemInstructionIfInitialized();
     }
   }
 
@@ -3447,10 +3463,6 @@ export class Config implements McpContext, AgentLoopContext {
 
   getSkipNextSpeakerCheck(): boolean {
     return this.skipNextSpeakerCheck;
-  }
-
-  getContinueOnFailedApiCall(): boolean {
-    return this.continueOnFailedApiCall;
   }
 
   getRetryFetchErrors(): boolean {
