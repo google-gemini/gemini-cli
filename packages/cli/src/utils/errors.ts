@@ -21,6 +21,7 @@ import {
   getErrorType,
   getErrorMessage,
   isAuthenticationError,
+  AuthType,
   ExitCodes,
 } from '@google/gemini-cli-core';
 import { runSyncCleanup } from './cleanup.js';
@@ -60,19 +61,30 @@ function getNumericExitCode(errorCode: string | number): number {
 }
 
 /**
- * Formats authentication errors into clear, actionable CLI messages.
+ * Formats authentication errors for terminal display.
+ * This function uses a lenient sanitization approach, stripping ANSI escape codes 
+ * and control characters while preserving newlines and tabs to ensure 
+ * readability while preventing terminal injection.
  */
-export function formatAuthError(error: any): string {
+export function formatAuthError(error: unknown, authType?: string): string {
   let reason = 'Invalid or missing API key';
   if (error instanceof Error) {
     reason = error.message;
   } else if (typeof error === 'string') {
     reason = error;
-  } else if (error && typeof error === 'object' && error.message) {
-    reason = String(error.message);
+  } else if (error && typeof error === 'object' && 'message' in error) {
+    reason = String((error as any).message);
   }
 
-  return `❌ Authentication Failed\n\nReason: ${reason}\n\nFix:\n1. Set your API key:\n   export GEMINI_API_KEY=your_key_here\n\n2. Or login again:\n   gemini auth login`;
+  const sanitizedReason = reason.replace(/[\x00-\x1F\x7F-\x9F]/g, (char) =>
+    char === '\n' || char === '\r' || char === '\t' ? char : ''
+  );
+
+  const fix = authType === 'google-cloud' 
+    ? '1. Run: gcloud auth application-default login' 
+    : '1. Set your API key:\n   export GEMINI_API_KEY=your_key_here\n\n2. Or login again:\n   gemini auth login';
+
+  return '❌ Authentication Failed\n\nReason: ' + sanitizedReason + '\n\nFix:\n' + fix;
 }
 
 /**
@@ -105,7 +117,7 @@ export function handleError(
   );
 
   if (isAuthError) {
-    errorMessage = formatAuthError(error);
+    errorMessage = formatAuthError(error, config.getContentGeneratorConfig()?.authType);
   }
 
   if (config.getOutputFormat() === OutputFormat.STREAM_JSON) {
