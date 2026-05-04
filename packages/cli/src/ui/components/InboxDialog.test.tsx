@@ -26,7 +26,12 @@ import {
 } from '@google/gemini-cli-core';
 import { waitFor } from '../../test-utils/async.js';
 import { renderWithProviders } from '../../test-utils/render.js';
+import { createMockSettings } from '../../test-utils/settings.js';
 import { InboxDialog } from './InboxDialog.js';
+
+const altBufferSettings = createMockSettings({
+  ui: { useAlternateBuffer: true },
+});
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const original =
@@ -835,5 +840,332 @@ describe('InboxDialog', () => {
       consoleErrorSpy.mockRestore();
       unmount();
     });
+
+    const tallPatch: InboxPatch = {
+      fileName: 'tall.patch',
+      name: 'tall-patch',
+      entries: [
+        {
+          targetPath: '/repo/.gemini/skills/docs-writer/SKILL.md',
+          diffContent: [
+            '--- /repo/.gemini/skills/docs-writer/SKILL.md',
+            '+++ /repo/.gemini/skills/docs-writer/SKILL.md',
+            '@@ -1,4 +1,8 @@',
+            ' line1',
+            ' line2',
+            '+added-1',
+            '+added-2',
+            '+added-3',
+            '+added-4',
+            ' line3',
+            ' line4',
+          ].join('\n'),
+        },
+      ],
+    };
+
+    it('alt-buffer: renders a bounded ScrollableList viewport for tall patches', async () => {
+      // Alt-buffer mode has no terminal scrollback, so the dialog must
+      // scroll inside itself. ScrollableList renders a `█` thumb when
+      // content exceeds viewport height — the regression signal that the
+      // diff is bounded and off-screen content is reachable via PgUp/PgDn.
+      mockListInboxSkills.mockResolvedValue([]);
+      mockListInboxPatches.mockResolvedValue([tallPatch]);
+      mockListInboxMemoryPatches.mockResolvedValue([]);
+
+      const config = {
+        isTrustedFolder: vi.fn().mockReturnValue(true),
+        storage: {
+          getProjectSkillsDir: vi.fn().mockReturnValue('/repo/.gemini/skills'),
+        },
+      } as unknown as Config;
+
+      const { lastFrame, stdin, unmount, waitUntilReady } = await act(
+        async () =>
+          renderWithProviders(
+            <InboxDialog
+              config={config}
+              onClose={vi.fn()}
+              onReloadSkills={vi.fn().mockResolvedValue(undefined)}
+            />,
+            {
+              settings: altBufferSettings,
+              uiState: { terminalHeight: 18 },
+            },
+          ),
+      );
+
+      await waitFor(() => {
+        expect(lastFrame()).toContain('tall-patch');
+      });
+
+      await act(async () => {
+        stdin.write('\r');
+        await waitUntilReady();
+      });
+
+      await waitFor(() => {
+        const frame = lastFrame() ?? '';
+        expect(frame).toContain('Apply');
+        expect(frame).toContain('Dismiss');
+        expect(frame).toContain('█');
+      });
+
+      unmount();
+    });
+
+    it('alt-buffer: surfaces PgUp/PgDn in the patch-preview footer', async () => {
+      mockListInboxSkills.mockResolvedValue([]);
+      mockListInboxPatches.mockResolvedValue([inboxPatch]);
+      mockListInboxMemoryPatches.mockResolvedValue([]);
+
+      const config = {
+        isTrustedFolder: vi.fn().mockReturnValue(true),
+        storage: {
+          getProjectSkillsDir: vi.fn().mockReturnValue('/repo/.gemini/skills'),
+        },
+      } as unknown as Config;
+
+      const { lastFrame, stdin, unmount, waitUntilReady } = await act(
+        async () =>
+          renderWithProviders(
+            <InboxDialog
+              config={config}
+              onClose={vi.fn()}
+              onReloadSkills={vi.fn().mockResolvedValue(undefined)}
+            />,
+            { settings: altBufferSettings },
+          ),
+      );
+
+      await waitFor(() => {
+        expect(lastFrame()).toContain('update-docs');
+      });
+
+      await act(async () => {
+        stdin.write('\r');
+        await waitUntilReady();
+      });
+
+      await waitFor(() => {
+        expect(lastFrame()).toContain('PgUp/PgDn to scroll');
+      });
+
+      unmount();
+    });
+
+    it('non-alt-buffer: clips the diff via DiffRenderer with a "lines hidden" hint', async () => {
+      // Non-alt-buffer mode uses the codebase's standard bounded
+      // DiffRenderer + ShowMoreLines + Ctrl+O pattern (matches
+      // FolderTrustDialog/ThemeDialog). MaxSizedBox emits a
+      // "... first/last N line(s) hidden ..." hint when it clips, which
+      // is the regression signal that the diff is bounded.
+      mockListInboxSkills.mockResolvedValue([]);
+      mockListInboxPatches.mockResolvedValue([tallPatch]);
+      mockListInboxMemoryPatches.mockResolvedValue([]);
+
+      const config = {
+        isTrustedFolder: vi.fn().mockReturnValue(true),
+        storage: {
+          getProjectSkillsDir: vi.fn().mockReturnValue('/repo/.gemini/skills'),
+        },
+      } as unknown as Config;
+
+      const { lastFrame, stdin, unmount, waitUntilReady } = await act(
+        async () =>
+          renderWithProviders(
+            <InboxDialog
+              config={config}
+              onClose={vi.fn()}
+              onReloadSkills={vi.fn().mockResolvedValue(undefined)}
+            />,
+            { uiState: { terminalHeight: 18, constrainHeight: true } },
+          ),
+      );
+
+      await waitFor(() => {
+        expect(lastFrame()).toContain('tall-patch');
+      });
+
+      await act(async () => {
+        stdin.write('\r');
+        await waitUntilReady();
+      });
+
+      await waitFor(() => {
+        expect(lastFrame() ?? '').toMatch(/lines? hidden/);
+      });
+
+      unmount();
+    });
+
+    it('non-alt-buffer: surfaces Ctrl+O inline (not in the footer) when the diff overflows', async () => {
+      // In non-alt-buffer mode the Ctrl+O affordance is rendered inline
+      // by ShowMoreLines above the footer when the diff is clipped. The
+      // footer itself stays clean (no PgUp/PgDn or Ctrl+O text) since
+      // duplicating the hint there would be noisy.
+      mockListInboxSkills.mockResolvedValue([]);
+      mockListInboxPatches.mockResolvedValue([tallPatch]);
+      mockListInboxMemoryPatches.mockResolvedValue([]);
+
+      const config = {
+        isTrustedFolder: vi.fn().mockReturnValue(true),
+        storage: {
+          getProjectSkillsDir: vi.fn().mockReturnValue('/repo/.gemini/skills'),
+        },
+      } as unknown as Config;
+
+      const { lastFrame, stdin, unmount, waitUntilReady } = await act(
+        async () =>
+          renderWithProviders(
+            <InboxDialog
+              config={config}
+              onClose={vi.fn()}
+              onReloadSkills={vi.fn().mockResolvedValue(undefined)}
+            />,
+            { uiState: { terminalHeight: 18, constrainHeight: true } },
+          ),
+      );
+
+      await waitFor(() => {
+        expect(lastFrame()).toContain('tall-patch');
+      });
+
+      await act(async () => {
+        stdin.write('\r');
+        await waitUntilReady();
+      });
+
+      await waitFor(() => {
+        const frame = lastFrame() ?? '';
+        expect(frame).toContain('Ctrl+O');
+        expect(frame).not.toContain('PgUp/PgDn to scroll');
+      });
+
+      unmount();
+    });
+  });
+
+  it('renders each list row as exactly two lines even with long descriptions', async () => {
+    // Reproduces the production bug: with the previous renderer, long
+    // descriptions wrapped onto multiple lines (and the date sibling was
+    // interleaved into the wrap), making each item 3-5 rows tall and
+    // breaking the listMaxItemsToShow budget. The fix uses height={2}
+    // and wrap="truncate-end" on every list row.
+    const longDescription =
+      'This is an extremely long description that would absolutely wrap to ' +
+      'multiple lines if rendered without truncation, which used to push the ' +
+      'list-phase footer off the bottom of the alternate buffer in production.';
+    mockListInboxSkills.mockResolvedValue([
+      {
+        dirName: 'long-skill',
+        name: 'long-skill',
+        description: longDescription,
+        content: '---\nname: x\ndescription: y\n---\n',
+      },
+    ]);
+    mockListInboxPatches.mockResolvedValue([]);
+    mockListInboxMemoryPatches.mockResolvedValue([]);
+
+    const config = {
+      isTrustedFolder: vi.fn().mockReturnValue(true),
+    } as unknown as Config;
+
+    const { lastFrame, unmount } = await act(async () =>
+      renderWithProviders(
+        <InboxDialog
+          config={config}
+          onClose={vi.fn()}
+          onReloadSkills={vi.fn().mockResolvedValue(undefined)}
+        />,
+      ),
+    );
+
+    await waitFor(() => {
+      expect(lastFrame()).toContain('long-skill');
+    });
+
+    const frame = lastFrame() ?? '';
+    expect(frame).not.toContain('production');
+    expect(frame).toContain('extremely long description');
+
+    unmount();
+  });
+
+  it('keeps the list-phase footer on screen with many long-description skills', async () => {
+    const longDesc =
+      'A very long description that would wrap across multiple lines if not ' +
+      'truncated, which was causing the dialog body to overflow the bottom ' +
+      'of the alternate buffer';
+    const manySkills: InboxSkill[] = Array.from({ length: 8 }, (_, i) => ({
+      dirName: `skill-${i}`,
+      name: `skill-${i}`,
+      description: `${longDesc} (#${i})`,
+      content: '---\nname: x\ndescription: y\n---\n',
+    }));
+    mockListInboxSkills.mockResolvedValue(manySkills);
+    mockListInboxPatches.mockResolvedValue([]);
+    mockListInboxMemoryPatches.mockResolvedValue([]);
+
+    const config = {
+      isTrustedFolder: vi.fn().mockReturnValue(true),
+    } as unknown as Config;
+
+    const { lastFrame, unmount } = await act(async () =>
+      renderWithProviders(
+        <InboxDialog
+          config={config}
+          onClose={vi.fn()}
+          onReloadSkills={vi.fn().mockResolvedValue(undefined)}
+        />,
+        { uiState: { terminalHeight: 28 } },
+      ),
+    );
+
+    await waitFor(() => {
+      const frame = lastFrame() ?? '';
+      expect(frame).toContain('Memory Inbox');
+      expect(frame).toContain('Esc to close');
+    });
+
+    unmount();
+  });
+
+  it('keeps the list-phase footer on screen on short terminals', async () => {
+    const manySkills: InboxSkill[] = Array.from({ length: 12 }, (_, i) => ({
+      dirName: `skill-${i}`,
+      name: `Skill ${i}`,
+      description: `Description ${i}`,
+      content: '---\nname: Skill\ndescription: Skill\n---\n',
+    }));
+    mockListInboxSkills.mockResolvedValue(manySkills);
+    mockListInboxPatches.mockResolvedValue([inboxPatch]);
+    mockListInboxMemoryPatches.mockResolvedValue([]);
+
+    const config = {
+      isTrustedFolder: vi.fn().mockReturnValue(true),
+      storage: {
+        getProjectSkillsDir: vi.fn().mockReturnValue('/repo/.gemini/skills'),
+      },
+    } as unknown as Config;
+
+    const { lastFrame, unmount } = await act(async () =>
+      renderWithProviders(
+        <InboxDialog
+          config={config}
+          onClose={vi.fn()}
+          onReloadSkills={vi.fn().mockResolvedValue(undefined)}
+        />,
+        { uiState: { terminalHeight: 18 } },
+      ),
+    );
+
+    await waitFor(() => {
+      const frame = lastFrame() ?? '';
+      expect(frame).toContain('Memory Inbox');
+      expect(frame).toContain('Esc to close');
+    });
+
+    unmount();
   });
 });

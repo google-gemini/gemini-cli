@@ -6,16 +6,26 @@
 
 import * as path from 'node:path';
 import type React from 'react';
-import { useState, useMemo, useCallback, useEffect } from 'react';
-import { Box, Text, useStdout } from 'ink';
+import { Fragment, useState, useMemo, useCallback, useEffect } from 'react';
+import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
+import { useUIState } from '../contexts/UIStateContext.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { Command } from '../key/keyMatchers.js';
 import { useKeyMatchers } from '../hooks/useKeyMatchers.js';
 import { BaseSelectionList } from './shared/BaseSelectionList.js';
 import type { SelectionListItem } from '../hooks/useSelectionList.js';
 import { DialogFooter } from './shared/DialogFooter.js';
-import { DiffRenderer } from './messages/DiffRenderer.js';
+import {
+  DiffRenderer,
+  parseDiffWithLineNumbers,
+  renderDiffLines,
+  type DiffLine,
+} from './messages/DiffRenderer.js';
+import { ScrollableList } from './shared/ScrollableList.js';
+import { ShowMoreLines } from './ShowMoreLines.js';
+import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
+import { OverflowProvider } from '../contexts/OverflowContext.js';
 import {
   type Config,
   type InboxSkill,
@@ -215,6 +225,102 @@ function formatDate(isoString: string): string {
   }
 }
 
+interface DiffSection {
+  /** Stable identifier for the section (e.g. patch entry path + index). */
+  key: string;
+  /** Header rendered above the diff body, e.g. file path or "SKILL.md". */
+  header: string;
+  /** Raw unified-diff string. Parsed via parseDiffWithLineNumbers. */
+  diffContent: string;
+}
+
+interface DiffViewportItem {
+  key: string;
+  /** Pre-rendered React node for this row. */
+  element: React.ReactElement;
+}
+
+/**
+ * A fixed-height, scrollable diff viewer used by the skill, patch, and
+ * memory-patch preview phases. It flattens one or more DiffSections into
+ * individual line items so ScrollableList can virtualize and so
+ * PgUp/PgDn/Shift+arrows move the viewport over arbitrarily long diffs
+ * without overflowing the alternate buffer.
+ *
+ * The visual styling matches DiffRenderer's renderDiffLines path; we share
+ * that helper instead of nesting DiffRenderer (whose own MaxSizedBox
+ * wrapping would interfere with virtualization).
+ */
+const ScrollableDiffViewport: React.FC<{
+  sections: DiffSection[];
+  width: number;
+  height: number;
+  hasFocus: boolean;
+}> = ({ sections, width, height, hasFocus }) => {
+  const items = useMemo<DiffViewportItem[]>(() => {
+    const result: DiffViewportItem[] = [];
+    sections.forEach((section, sectionIndex) => {
+      // Header (with a blank spacer row above for separation between
+      // sections — skipped above the first section).
+      if (sectionIndex > 0) {
+        result.push({
+          key: `${section.key}:spacer`,
+          element: <Text> </Text>,
+        });
+      }
+      result.push({
+        key: `${section.key}:header`,
+        element: (
+          <Text color={theme.text.secondary} bold>
+            {section.header}
+          </Text>
+        ),
+      });
+
+      const parsed: DiffLine[] = parseDiffWithLineNumbers(section.diffContent);
+      const rendered = renderDiffLines({
+        parsedLines: parsed,
+        filename: section.header,
+        terminalWidth: width,
+      });
+      rendered.forEach((node, index) => {
+        result.push({
+          key: `${section.key}:line:${index}`,
+          // renderDiffLines emits ReactNodes with their own keys; wrap each
+          // in a Fragment so ScrollableList sees a single ReactElement per
+          // row regardless of node shape.
+          element: <Fragment>{node}</Fragment>,
+        });
+      });
+    });
+    return result;
+  }, [sections, width]);
+
+  const renderItem = useCallback(
+    ({ item }: { item: DiffViewportItem }) => item.element,
+    [],
+  );
+  const keyExtractor = useCallback((item: DiffViewportItem) => item.key, []);
+  // Most diff rows are exactly one line tall; long lines wrap so this is a
+  // lower bound. ScrollableList re-measures via ResizeObserver, so the
+  // estimate only matters for initial sizing.
+  const estimatedItemHeight = useCallback(() => 1, []);
+
+  return (
+    <Box height={height} width={width} flexShrink={0} flexDirection="column">
+      <ScrollableList<DiffViewportItem>
+        data={items}
+        renderItem={renderItem}
+        keyExtractor={keyExtractor}
+        estimatedItemHeight={estimatedItemHeight}
+        hasFocus={hasFocus}
+        initialScrollIndex={0}
+        scrollbar={true}
+      />
+    </Box>
+  );
+};
+
 interface InboxDialogProps {
   config: Config;
   onClose: () => void;
@@ -229,8 +335,8 @@ export const InboxDialog: React.FC<InboxDialogProps> = ({
   onReloadMemory,
 }) => {
   const keyMatchers = useKeyMatchers();
-  const { stdout } = useStdout();
-  const terminalWidth = stdout?.columns ?? 80;
+  const { terminalWidth, terminalHeight, constrainHeight } = useUIState();
+  const isAlternateBuffer = useAlternateBuffer();
   const isTrustedFolder = config.isTrustedFolder();
   const [phase, setPhase] = useState<Phase>('list');
   const [items, setItems] = useState<InboxItem[]>([]);
@@ -676,6 +782,117 @@ export const InboxDialog: React.FC<InboxDialogProps> = ({
     { isActive: true, priority: true },
   );
 
+  // Hoist the per-phase preview data so the array literals passed to
+  // ScrollableDiffViewport don't change identity on every parent render.
+  // ScrollableDiffViewport memoizes its expensive `parseDiffWithLineNumbers`
+  // + `renderDiffLines` on `sections`, so a new array literal every render
+  // would defeat that and re-colorize the diff each time. Keying on
+  // `selectedItem` captures every input that affects the rendered diffs.
+  // Must live above the early returns below so React sees a consistent
+  // hook order.
+  const previewData = useMemo(() => {
+    if (!selectedItem) {
+      return {
+        skillSections: undefined as DiffSection[] | undefined,
+        patchSections: undefined as DiffSection[] | undefined,
+        memoryGroups: undefined as
+          | Array<[string, { isNewFile: boolean; diffs: string[] }]>
+          | undefined,
+        memorySections: undefined as DiffSection[] | undefined,
+      };
+    }
+
+    if (selectedItem.type === 'skill') {
+      const skill = selectedItem.skill;
+      if (!skill.content) {
+        return {
+          skillSections: undefined,
+          patchSections: undefined,
+          memoryGroups: undefined,
+          memorySections: undefined,
+        };
+      }
+      return {
+        skillSections: [
+          {
+            key: `skill:${skill.dirName}`,
+            header: 'SKILL.md',
+            diffContent: newFileDiff('SKILL.md', skill.content),
+          },
+        ],
+        patchSections: undefined,
+        memoryGroups: undefined,
+        memorySections: undefined,
+      };
+    }
+
+    if (selectedItem.type === 'patch') {
+      const patch = selectedItem.patch;
+      return {
+        skillSections: undefined,
+        patchSections: patch.entries.map((entry, index) => ({
+          key: `${patch.fileName}:${entry.targetPath}:${index}`,
+          header: entry.targetPath,
+          diffContent: entry.diffContent,
+        })),
+        memoryGroups: undefined,
+        memorySections: undefined,
+      };
+    }
+
+    if (selectedItem.type === 'memory-patch') {
+      // Group hunks by target file. Multiple source patches may touch the
+      // same file (e.g. several patches all updating MEMORY.md); showing
+      // the file path once with all its hunks beneath is less noisy than
+      // repeating the path for every hunk.
+      const groups = new Map<string, { isNewFile: boolean; diffs: string[] }>();
+      for (const entry of selectedItem.memoryPatch.entries) {
+        const existing = groups.get(entry.targetPath);
+        if (existing) {
+          existing.diffs.push(entry.diffContent);
+          if (entry.isNewFile) existing.isNewFile = true;
+        } else {
+          groups.set(entry.targetPath, {
+            isNewFile: entry.isNewFile,
+            diffs: [entry.diffContent],
+          });
+        }
+      }
+      const memoryGroups = Array.from(groups.entries());
+
+      const memorySections: DiffSection[] = [];
+      memoryGroups.forEach(([targetPath, { isNewFile, diffs }], groupIndex) => {
+        const headerAnnotation = `${isNewFile ? ' (new file)' : ''}${
+          diffs.length > 1
+            ? ` · ${diffs.length} changes from different patches`
+            : ''
+        }`;
+        diffs.forEach((diff, hunkIndex) => {
+          memorySections.push({
+            key: `${targetPath}:${groupIndex}:${hunkIndex}`,
+            header:
+              hunkIndex === 0 ? `${targetPath}${headerAnnotation}` : targetPath,
+            diffContent: diff,
+          });
+        });
+      });
+
+      return {
+        skillSections: undefined,
+        patchSections: undefined,
+        memoryGroups,
+        memorySections,
+      };
+    }
+
+    return {
+      skillSections: undefined,
+      patchSections: undefined,
+      memoryGroups: undefined,
+      memorySections: undefined,
+    };
+  }, [selectedItem]);
+
   if (loading) {
     return (
       <Box
@@ -711,421 +928,519 @@ export const InboxDialog: React.FC<InboxDialogProps> = ({
   // Border + paddingX account for 6 chars of width
   const contentWidth = terminalWidth - 6;
 
+  // Diff-rendering budgets. Two strategies, picked by `isAlternateBuffer`:
+  //
+  // - Alt-buffer: a fixed-height ScrollableList viewport. There is no
+  //   terminal scrollback, so we must scroll inside the dialog itself
+  //   via PgUp/PgDn/Shift+arrows.
+  //
+  // - Non-alt-buffer: the codebase's standard pattern of a bounded
+  //   DiffRenderer + ShowMoreLines + Ctrl+O (see FolderTrustDialog,
+  //   ThemeDialog). Clipped content lands in terminal scrollback when
+  //   the user expands via Ctrl+O.
+  //
+  // Chrome accounts for the dialog's borders, padding, title + subtitle,
+  // action list (two `minHeight={2}` rows), the section's `marginTop`,
+  // the dialog footer, and a couple of safety rows. Bumped when inline
+  // feedback is showing.
+  const DIALOG_CHROME_HEIGHT = 16;
+  const feedbackHeight = feedback ? 2 : 0;
+  const diffViewportHeight = Math.max(
+    3,
+    terminalHeight - DIALOG_CHROME_HEIGHT - feedbackHeight,
+  );
+
+  // For the non-alt-buffer DiffRenderer path, mirror MainContent /
+  // DialogManager and drop the clamp when the user has pressed Ctrl+O.
+  const availableContentHeight = constrainHeight
+    ? diffViewportHeight
+    : undefined;
+  const PATCH_ENTRY_OVERHEAD = 2; // target-path label + marginBottom
+  const patchEntryCount =
+    selectedItem?.type === 'patch'
+      ? selectedItem.patch.entries.length
+      : selectedItem?.type === 'memory-patch'
+        ? selectedItem.memoryPatch.entries.length
+        : 1;
+  const availablePatchEntryHeight =
+    availableContentHeight === undefined
+      ? undefined
+      : Math.max(
+          3,
+          Math.floor(
+            (availableContentHeight - patchEntryCount * PATCH_ENTRY_OVERHEAD) /
+              Math.max(1, patchEntryCount),
+          ),
+        );
+
+  const previewNavigationHint = isAlternateBuffer
+    ? 'PgUp/PgDn to scroll'
+    : undefined;
+
+  // Budget the list phase so the dialog footer never clips on shorter
+  // terminals. Every visible row — skill items, patch items, memory-patch
+  // items, and the section headers — renders at exactly 2 rows tall
+  // (enforced by `height={2}` on item renders and `marginTop={1}` + 1
+  // text line for headers), so the windowed-slot count maps directly to
+  // terminal rows.
+  //
+  // Chrome rows accounted for:
+  //   - round border (2)
+  //   - paddingY (2)
+  //   - DefaultAppLayout's alt-buffer paddingBottom (1)
+  //   - title + subtitle (2)
+  //   - marginTop above the list (1)
+  //   - dialog footer marginTop + text (2)
+  //   - BaseSelectionList ▲ + ▼ scroll arrows (2) — always shown when
+  //     items > maxItemsToShow, which is precisely when this budget
+  //     matters
+  const LIST_PHASE_CHROME_HEIGHT = 12;
+  const LIST_ROW_HEIGHT = 2;
+  const listMaxItemsToShow = Math.max(
+    1,
+    Math.min(
+      8,
+      Math.floor(
+        (terminalHeight - LIST_PHASE_CHROME_HEIGHT - feedbackHeight) /
+          LIST_ROW_HEIGHT,
+      ),
+    ),
+  );
+
   return (
-    <Box
-      flexDirection="column"
-      borderStyle="round"
-      borderColor={theme.border.default}
-      paddingX={2}
-      paddingY={1}
-      width="100%"
-    >
-      {phase === 'list' && (
-        <>
-          <Text bold>
-            Memory Inbox ({items.length} item{items.length !== 1 ? 's' : ''})
-          </Text>
-          <Text color={theme.text.secondary}>
-            Extracted from past sessions. Select one to review.
-          </Text>
+    <OverflowProvider>
+      <Box
+        flexDirection="column"
+        borderStyle="round"
+        borderColor={theme.border.default}
+        paddingX={2}
+        paddingY={1}
+        width="100%"
+      >
+        {phase === 'list' && (
+          <>
+            <Text bold>
+              Memory Inbox ({items.length} item{items.length !== 1 ? 's' : ''})
+            </Text>
+            <Text color={theme.text.secondary}>
+              Extracted from past sessions. Select one to review.
+            </Text>
 
-          <Box flexDirection="column" marginTop={1}>
-            <BaseSelectionList<InboxItem>
-              items={listItems}
-              initialIndex={Math.max(
-                0,
-                Math.min(lastListIndex, listItems.length - 1),
-              )}
-              onSelect={handleSelectItem}
-              isFocused={true}
-              showNumbers={false}
-              showScrollArrows={true}
-              maxItemsToShow={8}
-              renderItem={(item, { titleColor }) => {
-                if (item.value.type === 'header') {
-                  return (
-                    <Box marginTop={1}>
-                      <Text color={theme.text.secondary} bold>
-                        {item.value.label}
-                      </Text>
-                    </Box>
-                  );
-                }
-                if (item.value.type === 'skill') {
-                  const skill = item.value.skill;
-                  return (
-                    <Box flexDirection="column" minHeight={2}>
-                      <Text color={titleColor} bold>
-                        {skill.name}
-                      </Text>
-                      <Box flexDirection="row">
-                        <Text color={theme.text.secondary} wrap="wrap">
-                          {skill.description}
-                        </Text>
-                        {skill.extractedAt && (
-                          <Text color={theme.text.secondary}>
-                            {' · '}
-                            {formatDate(skill.extractedAt)}
-                          </Text>
-                        )}
-                      </Box>
-                    </Box>
-                  );
-                }
-                if (item.value.type === 'memory-patch') {
-                  const memoryPatch = item.value.memoryPatch;
-                  return (
-                    <Box flexDirection="column" minHeight={2}>
-                      <Text color={titleColor} bold>
-                        {memoryPatch.name}
-                      </Text>
-                      <Box flexDirection="row">
-                        <Text color={theme.text.secondary}>
-                          {formatMemoryPatchSummary(memoryPatch)}
-                        </Text>
-                        {memoryPatch.extractedAt && (
-                          <Text color={theme.text.secondary}>
-                            {' · '}
-                            {formatDate(memoryPatch.extractedAt)}
-                          </Text>
-                        )}
-                      </Box>
-                    </Box>
-                  );
-                }
-                const patch = item.value.patch;
-                const fileNames = patch.entries.map((e) =>
-                  getPathBasename(e.targetPath),
-                );
-                const origin = getSkillOriginTag(
-                  patch.entries[0]?.targetPath ?? '',
-                );
-                return (
-                  <Box flexDirection="column" minHeight={2}>
-                    <Box flexDirection="row">
-                      <Text color={titleColor} bold>
-                        {patch.name}
-                      </Text>
-                      {origin && (
-                        <Text color={theme.text.secondary}>
-                          {` [${origin}]`}
-                        </Text>
-                      )}
-                    </Box>
-                    <Box flexDirection="row">
-                      <Text color={theme.text.secondary}>
-                        {fileNames.join(', ')}
-                      </Text>
-                      {patch.extractedAt && (
-                        <Text color={theme.text.secondary}>
-                          {' · '}
-                          {formatDate(patch.extractedAt)}
-                        </Text>
-                      )}
-                    </Box>
-                  </Box>
-                );
-              }}
-            />
-          </Box>
-
-          {feedback && (
-            <Box marginTop={1}>
-              <Text
-                color={
-                  feedback.isError ? theme.status.error : theme.status.success
-                }
-              >
-                {feedback.isError ? '✗ ' : '✓ '}
-                {feedback.text}
-              </Text>
-            </Box>
-          )}
-
-          <DialogFooter
-            primaryAction="Enter to select"
-            cancelAction="Esc to close"
-          />
-        </>
-      )}
-
-      {phase === 'skill-preview' && selectedItem?.type === 'skill' && (
-        <>
-          <Text bold>{selectedItem.skill.name}</Text>
-          <Text color={theme.text.secondary}>
-            Review new skill before installing.
-          </Text>
-
-          {selectedItem.skill.content && (
             <Box flexDirection="column" marginTop={1}>
-              <Text color={theme.text.secondary} bold>
-                SKILL.md
-              </Text>
-              <DiffRenderer
-                diffContent={newFileDiff(
-                  'SKILL.md',
-                  selectedItem.skill.content,
+              <BaseSelectionList<InboxItem>
+                items={listItems}
+                initialIndex={Math.max(
+                  0,
+                  Math.min(lastListIndex, listItems.length - 1),
                 )}
-                filename="SKILL.md"
-                terminalWidth={contentWidth}
+                onSelect={handleSelectItem}
+                isFocused={true}
+                showNumbers={false}
+                showScrollArrows={true}
+                maxItemsToShow={listMaxItemsToShow}
+                renderItem={(item, { titleColor }) => {
+                  if (item.value.type === 'header') {
+                    return (
+                      <Box marginTop={1}>
+                        <Text color={theme.text.secondary} bold>
+                          {item.value.label}
+                        </Text>
+                      </Box>
+                    );
+                  }
+                  if (item.value.type === 'skill') {
+                    const skill = item.value.skill;
+                    const subtitle = skill.extractedAt
+                      ? `${skill.description} · ${formatDate(skill.extractedAt)}`
+                      : skill.description;
+                    return (
+                      <Box flexDirection="column" height={2}>
+                        <Text color={titleColor} bold wrap="truncate-end">
+                          {skill.name}
+                        </Text>
+                        <Text color={theme.text.secondary} wrap="truncate-end">
+                          {subtitle}
+                        </Text>
+                      </Box>
+                    );
+                  }
+                  if (item.value.type === 'memory-patch') {
+                    const memoryPatch = item.value.memoryPatch;
+                    const summary = formatMemoryPatchSummary(memoryPatch);
+                    const subtitle = memoryPatch.extractedAt
+                      ? `${summary} · ${formatDate(memoryPatch.extractedAt)}`
+                      : summary;
+                    return (
+                      <Box flexDirection="column" height={2}>
+                        <Text color={titleColor} bold wrap="truncate-end">
+                          {memoryPatch.name}
+                        </Text>
+                        <Text color={theme.text.secondary} wrap="truncate-end">
+                          {subtitle}
+                        </Text>
+                      </Box>
+                    );
+                  }
+                  const patch = item.value.patch;
+                  const fileNames = patch.entries.map((e) =>
+                    getPathBasename(e.targetPath),
+                  );
+                  const origin = getSkillOriginTag(
+                    patch.entries[0]?.targetPath ?? '',
+                  );
+                  const titleLine = origin
+                    ? `${patch.name} [${origin}]`
+                    : patch.name;
+                  const subtitle = patch.extractedAt
+                    ? `${fileNames.join(', ')} · ${formatDate(patch.extractedAt)}`
+                    : fileNames.join(', ');
+                  return (
+                    <Box flexDirection="column" height={2}>
+                      <Text color={titleColor} bold wrap="truncate-end">
+                        {titleLine}
+                      </Text>
+                      <Text color={theme.text.secondary} wrap="truncate-end">
+                        {subtitle}
+                      </Text>
+                    </Box>
+                  );
+                }}
               />
             </Box>
-          )}
 
-          <Box flexDirection="column" marginTop={1}>
-            <BaseSelectionList<SkillPreviewAction>
-              items={skillPreviewItems}
-              onSelect={handleSkillPreviewAction}
-              isFocused={true}
-              showNumbers={true}
-              renderItem={(item, { titleColor }) => (
-                <Box flexDirection="column" minHeight={2}>
-                  <Text color={titleColor} bold>
-                    {item.value.label}
-                  </Text>
-                  <Text color={theme.text.secondary}>
-                    {item.value.description}
-                  </Text>
-                </Box>
-              )}
-            />
-          </Box>
-
-          {feedback && (
-            <Box marginTop={1}>
-              <Text
-                color={
-                  feedback.isError ? theme.status.error : theme.status.success
-                }
-              >
-                {feedback.isError ? '✗ ' : '✓ '}
-                {feedback.text}
-              </Text>
-            </Box>
-          )}
-
-          <DialogFooter
-            primaryAction="Enter to confirm"
-            cancelAction="Esc to go back"
-          />
-        </>
-      )}
-
-      {phase === 'skill-action' && selectedItem?.type === 'skill' && (
-        <>
-          <Text bold>Move &quot;{selectedItem.skill.name}&quot;</Text>
-          <Text color={theme.text.secondary}>
-            Choose where to install this skill.
-          </Text>
-
-          <Box flexDirection="column" marginTop={1}>
-            <BaseSelectionList<DestinationChoice>
-              items={destinationItems}
-              onSelect={handleSelectDestination}
-              isFocused={true}
-              showNumbers={true}
-              renderItem={(item, { titleColor }) => (
-                <Box flexDirection="column" minHeight={2}>
-                  <Text color={titleColor} bold>
-                    {item.value.label}
-                  </Text>
-                  <Text color={theme.text.secondary}>
-                    {item.value.description}
-                  </Text>
-                </Box>
-              )}
-            />
-          </Box>
-
-          {feedback && (
-            <Box marginTop={1}>
-              <Text
-                color={
-                  feedback.isError ? theme.status.error : theme.status.success
-                }
-              >
-                {feedback.isError ? '✗ ' : '✓ '}
-                {feedback.text}
-              </Text>
-            </Box>
-          )}
-
-          <DialogFooter
-            primaryAction="Enter to confirm"
-            cancelAction="Esc to go back"
-          />
-        </>
-      )}
-
-      {phase === 'patch-preview' && selectedItem?.type === 'patch' && (
-        <>
-          <Text bold>{selectedItem.patch.name}</Text>
-          <Box flexDirection="row">
-            <Text color={theme.text.secondary}>
-              Review changes before applying.
-            </Text>
-            {(() => {
-              const origin = getSkillOriginTag(
-                selectedItem.patch.entries[0]?.targetPath ?? '',
-              );
-              return origin ? (
-                <Text color={theme.text.secondary}>{` [${origin}]`}</Text>
-              ) : null;
-            })()}
-          </Box>
-
-          <Box flexDirection="column" marginTop={1}>
-            {selectedItem.patch.entries.map((entry, index) => (
-              <Box
-                key={`${selectedItem.patch.fileName}:${entry.targetPath}:${index}`}
-                flexDirection="column"
-                marginBottom={1}
-              >
-                <Text color={theme.text.secondary} bold>
-                  {entry.targetPath}
+            {feedback && (
+              <Box marginTop={1}>
+                <Text
+                  color={
+                    feedback.isError ? theme.status.error : theme.status.success
+                  }
+                >
+                  {feedback.isError ? '✗ ' : '✓ '}
+                  {feedback.text}
                 </Text>
-                <DiffRenderer
-                  diffContent={entry.diffContent}
-                  filename={entry.targetPath}
-                  terminalWidth={contentWidth}
+              </Box>
+            )}
+
+            <DialogFooter
+              primaryAction="Enter to select"
+              cancelAction="Esc to close"
+            />
+          </>
+        )}
+
+        {phase === 'skill-preview' && selectedItem?.type === 'skill' && (
+          <>
+            <Text bold>{selectedItem.skill.name}</Text>
+            <Text color={theme.text.secondary}>
+              Review new skill before installing.
+            </Text>
+
+            {selectedItem.skill.content &&
+              (isAlternateBuffer ? (
+                <Box flexDirection="column" marginTop={1}>
+                  <ScrollableDiffViewport
+                    sections={previewData.skillSections ?? []}
+                    width={contentWidth}
+                    height={diffViewportHeight}
+                    hasFocus={true}
+                  />
+                </Box>
+              ) : (
+                <Box flexDirection="column" marginTop={1}>
+                  <Text color={theme.text.secondary} bold>
+                    SKILL.md
+                  </Text>
+                  <DiffRenderer
+                    diffContent={newFileDiff(
+                      'SKILL.md',
+                      selectedItem.skill.content,
+                    )}
+                    filename="SKILL.md"
+                    terminalWidth={contentWidth}
+                    availableTerminalHeight={availableContentHeight}
+                  />
+                </Box>
+              ))}
+
+            <Box flexDirection="column" marginTop={1}>
+              <BaseSelectionList<SkillPreviewAction>
+                items={skillPreviewItems}
+                onSelect={handleSkillPreviewAction}
+                isFocused={true}
+                showNumbers={true}
+                renderItem={(item, { titleColor }) => (
+                  <Box flexDirection="column" minHeight={2}>
+                    <Text color={titleColor} bold>
+                      {item.value.label}
+                    </Text>
+                    <Text color={theme.text.secondary}>
+                      {item.value.description}
+                    </Text>
+                  </Box>
+                )}
+              />
+            </Box>
+
+            {feedback && (
+              <Box marginTop={1}>
+                <Text
+                  color={
+                    feedback.isError ? theme.status.error : theme.status.success
+                  }
+                >
+                  {feedback.isError ? '✗ ' : '✓ '}
+                  {feedback.text}
+                </Text>
+              </Box>
+            )}
+
+            {!isAlternateBuffer && (
+              <ShowMoreLines constrainHeight={constrainHeight} />
+            )}
+
+            <DialogFooter
+              primaryAction="Enter to confirm"
+              navigationActions={previewNavigationHint}
+              cancelAction="Esc to go back"
+            />
+          </>
+        )}
+
+        {phase === 'skill-action' && selectedItem?.type === 'skill' && (
+          <>
+            <Text bold>Move &quot;{selectedItem.skill.name}&quot;</Text>
+            <Text color={theme.text.secondary}>
+              Choose where to install this skill.
+            </Text>
+
+            <Box flexDirection="column" marginTop={1}>
+              <BaseSelectionList<DestinationChoice>
+                items={destinationItems}
+                onSelect={handleSelectDestination}
+                isFocused={true}
+                showNumbers={true}
+                renderItem={(item, { titleColor }) => (
+                  <Box flexDirection="column" minHeight={2}>
+                    <Text color={titleColor} bold>
+                      {item.value.label}
+                    </Text>
+                    <Text color={theme.text.secondary}>
+                      {item.value.description}
+                    </Text>
+                  </Box>
+                )}
+              />
+            </Box>
+
+            {feedback && (
+              <Box marginTop={1}>
+                <Text
+                  color={
+                    feedback.isError ? theme.status.error : theme.status.success
+                  }
+                >
+                  {feedback.isError ? '✗ ' : '✓ '}
+                  {feedback.text}
+                </Text>
+              </Box>
+            )}
+
+            <DialogFooter
+              primaryAction="Enter to confirm"
+              cancelAction="Esc to go back"
+            />
+          </>
+        )}
+
+        {phase === 'patch-preview' && selectedItem?.type === 'patch' && (
+          <>
+            <Text bold>{selectedItem.patch.name}</Text>
+            <Box flexDirection="row">
+              <Text color={theme.text.secondary}>
+                Review changes before applying.
+              </Text>
+              {(() => {
+                const origin = getSkillOriginTag(
+                  selectedItem.patch.entries[0]?.targetPath ?? '',
+                );
+                return origin ? (
+                  <Text color={theme.text.secondary}>{` [${origin}]`}</Text>
+                ) : null;
+              })()}
+            </Box>
+
+            <Box flexDirection="column" marginTop={1}>
+              {isAlternateBuffer ? (
+                <ScrollableDiffViewport
+                  sections={previewData.patchSections ?? []}
+                  width={contentWidth}
+                  height={diffViewportHeight}
+                  hasFocus={true}
+                />
+              ) : (
+                selectedItem.patch.entries.map((entry, index) => (
+                  <Box
+                    key={`${selectedItem.patch.fileName}:${entry.targetPath}:${index}`}
+                    flexDirection="column"
+                    marginBottom={1}
+                  >
+                    <Text color={theme.text.secondary} bold>
+                      {entry.targetPath}
+                    </Text>
+                    <DiffRenderer
+                      diffContent={entry.diffContent}
+                      filename={entry.targetPath}
+                      terminalWidth={contentWidth}
+                      availableTerminalHeight={availablePatchEntryHeight}
+                    />
+                  </Box>
+                ))
+              )}
+            </Box>
+
+            <Box flexDirection="column" marginTop={1}>
+              <BaseSelectionList<PatchAction>
+                items={patchActionItems}
+                onSelect={handleSelectPatchAction}
+                isFocused={true}
+                showNumbers={true}
+                renderItem={(item, { titleColor }) => (
+                  <Box flexDirection="column" minHeight={2}>
+                    <Text color={titleColor} bold>
+                      {item.value.label}
+                    </Text>
+                    <Text color={theme.text.secondary}>
+                      {item.value.description}
+                    </Text>
+                  </Box>
+                )}
+              />
+            </Box>
+
+            {feedback && (
+              <Box marginTop={1}>
+                <Text
+                  color={
+                    feedback.isError ? theme.status.error : theme.status.success
+                  }
+                >
+                  {feedback.isError ? '✗ ' : '✓ '}
+                  {feedback.text}
+                </Text>
+              </Box>
+            )}
+
+            {!isAlternateBuffer && (
+              <ShowMoreLines constrainHeight={constrainHeight} />
+            )}
+
+            <DialogFooter
+              primaryAction="Enter to confirm"
+              navigationActions={previewNavigationHint}
+              cancelAction="Esc to go back"
+            />
+          </>
+        )}
+
+        {phase === 'memory-preview' &&
+          selectedItem?.type === 'memory-patch' && (
+            <>
+              <Text bold>{selectedItem.memoryPatch.name}</Text>
+              <Text color={theme.text.secondary}>
+                Review {formatMemoryPatchSummary(selectedItem.memoryPatch)}{' '}
+                before applying. Apply runs each source patch atomically;
+                Dismiss removes them all.
+              </Text>
+
+              {(() => {
+                // Grouping + section flattening were hoisted into the
+                // `previewData` useMemo so the array identities passed into
+                // ScrollableDiffViewport stay stable across re-renders.
+                const groupEntries = previewData.memoryGroups ?? [];
+
+                if (isAlternateBuffer) {
+                  return (
+                    <Box flexDirection="column" marginTop={1}>
+                      <ScrollableDiffViewport
+                        sections={previewData.memorySections ?? []}
+                        width={contentWidth}
+                        height={diffViewportHeight}
+                        hasFocus={true}
+                      />
+                    </Box>
+                  );
+                }
+
+                return groupEntries.map(
+                  ([targetPath, { isNewFile, diffs }]) => (
+                    <Box key={targetPath} flexDirection="column" marginTop={1}>
+                      <Text color={theme.text.secondary} bold>
+                        {targetPath}
+                        {isNewFile ? ' (new file)' : ''}
+                        {diffs.length > 1
+                          ? ` · ${diffs.length} changes from different patches`
+                          : ''}
+                      </Text>
+                      {diffs.map((diff, hunkIndex) => (
+                        <DiffRenderer
+                          key={`${targetPath}:${hunkIndex}`}
+                          diffContent={diff}
+                          filename={targetPath}
+                          terminalWidth={contentWidth}
+                          availableTerminalHeight={availablePatchEntryHeight}
+                        />
+                      ))}
+                    </Box>
+                  ),
+                );
+              })()}
+
+              <Box flexDirection="column" marginTop={1}>
+                <BaseSelectionList<MemoryPatchAction>
+                  items={memoryPatchActionItems}
+                  onSelect={handleSelectMemoryPatchAction}
+                  isFocused={true}
+                  showNumbers={true}
+                  renderItem={(item, { titleColor }) => (
+                    <Box flexDirection="column" minHeight={2}>
+                      <Text color={titleColor} bold>
+                        {item.value.label}
+                      </Text>
+                      <Text color={theme.text.secondary}>
+                        {item.value.description}
+                      </Text>
+                    </Box>
+                  )}
                 />
               </Box>
-            ))}
-          </Box>
 
-          <Box flexDirection="column" marginTop={1}>
-            <BaseSelectionList<PatchAction>
-              items={patchActionItems}
-              onSelect={handleSelectPatchAction}
-              isFocused={true}
-              showNumbers={true}
-              renderItem={(item, { titleColor }) => (
-                <Box flexDirection="column" minHeight={2}>
-                  <Text color={titleColor} bold>
-                    {item.value.label}
-                  </Text>
-                  <Text color={theme.text.secondary}>
-                    {item.value.description}
+              {feedback && (
+                <Box marginTop={1}>
+                  <Text
+                    color={
+                      feedback.isError
+                        ? theme.status.error
+                        : theme.status.success
+                    }
+                  >
+                    {feedback.isError ? '✗ ' : '✓ '}
+                    {feedback.text}
                   </Text>
                 </Box>
               )}
-            />
-          </Box>
 
-          {feedback && (
-            <Box marginTop={1}>
-              <Text
-                color={
-                  feedback.isError ? theme.status.error : theme.status.success
-                }
-              >
-                {feedback.isError ? '✗ ' : '✓ '}
-                {feedback.text}
-              </Text>
-            </Box>
-          )}
-
-          <DialogFooter
-            primaryAction="Enter to confirm"
-            cancelAction="Esc to go back"
-          />
-        </>
-      )}
-
-      {phase === 'memory-preview' && selectedItem?.type === 'memory-patch' && (
-        <>
-          <Text bold>{selectedItem.memoryPatch.name}</Text>
-          <Text color={theme.text.secondary}>
-            Review {formatMemoryPatchSummary(selectedItem.memoryPatch)} before
-            applying. Apply runs each source patch atomically; Dismiss removes
-            them all.
-          </Text>
-
-          {(() => {
-            // Group hunks by target file. Multiple source patches may touch
-            // the same file (e.g. several patches all updating MEMORY.md);
-            // showing the file path once with all its hunks beneath is much
-            // less visually noisy than repeating the path for every hunk.
-            const groups = new Map<
-              string,
-              { isNewFile: boolean; diffs: string[] }
-            >();
-            for (const entry of selectedItem.memoryPatch.entries) {
-              const existing = groups.get(entry.targetPath);
-              if (existing) {
-                existing.diffs.push(entry.diffContent);
-                // If any hunk for this target was a creation, treat the
-                // group as a creation overall.
-                if (entry.isNewFile) existing.isNewFile = true;
-              } else {
-                groups.set(entry.targetPath, {
-                  isNewFile: entry.isNewFile,
-                  diffs: [entry.diffContent],
-                });
-              }
-            }
-
-            return Array.from(groups.entries()).map(
-              ([targetPath, { isNewFile, diffs }]) => (
-                <Box key={targetPath} flexDirection="column" marginTop={1}>
-                  <Text color={theme.text.secondary} bold>
-                    {targetPath}
-                    {isNewFile ? ' (new file)' : ''}
-                    {diffs.length > 1
-                      ? ` · ${diffs.length} changes from different patches`
-                      : ''}
-                  </Text>
-                  {diffs.map((diff, hunkIndex) => (
-                    <DiffRenderer
-                      key={`${targetPath}:${hunkIndex}`}
-                      diffContent={diff}
-                      filename={targetPath}
-                      terminalWidth={contentWidth}
-                    />
-                  ))}
-                </Box>
-              ),
-            );
-          })()}
-
-          <Box flexDirection="column" marginTop={1}>
-            <BaseSelectionList<MemoryPatchAction>
-              items={memoryPatchActionItems}
-              onSelect={handleSelectMemoryPatchAction}
-              isFocused={true}
-              showNumbers={true}
-              renderItem={(item, { titleColor }) => (
-                <Box flexDirection="column" minHeight={2}>
-                  <Text color={titleColor} bold>
-                    {item.value.label}
-                  </Text>
-                  <Text color={theme.text.secondary}>
-                    {item.value.description}
-                  </Text>
-                </Box>
+              {!isAlternateBuffer && (
+                <ShowMoreLines constrainHeight={constrainHeight} />
               )}
-            />
-          </Box>
 
-          {feedback && (
-            <Box marginTop={1}>
-              <Text
-                color={
-                  feedback.isError ? theme.status.error : theme.status.success
-                }
-              >
-                {feedback.isError ? '✗ ' : '✓ '}
-                {feedback.text}
-              </Text>
-            </Box>
+              <DialogFooter
+                primaryAction="Enter to confirm"
+                navigationActions={previewNavigationHint}
+                cancelAction="Esc to go back"
+              />
+            </>
           )}
-
-          <DialogFooter
-            primaryAction="Enter to confirm"
-            cancelAction="Esc to go back"
-          />
-        </>
-      )}
-    </Box>
+      </Box>
+    </OverflowProvider>
   );
 };
