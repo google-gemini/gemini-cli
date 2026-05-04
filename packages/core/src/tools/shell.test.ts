@@ -96,6 +96,7 @@ describe('ShellTool', () => {
   let mockShellOutputCallback: (event: ShellOutputEvent) => void;
   let resolveExecutionPromise: (result: ShellExecutionResult) => void;
   let tempRootDir: string;
+  let extractedTmpFile: string;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -197,16 +198,28 @@ describe('ShellTool', () => {
     process.env['ComSpec'] =
       'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe';
 
+    extractedTmpFile = '';
+
     // Capture the output callback to simulate streaming events from the service
-    mockShellExecutionService.mockImplementation((_cmd, _cwd, callback) => {
-      mockShellOutputCallback = callback;
-      return {
-        pid: 12345,
-        result: new Promise((resolve) => {
-          resolveExecutionPromise = resolve;
-        }),
-      };
-    });
+    mockShellExecutionService.mockImplementation(
+      (
+        cmd: string,
+        _cwd: string,
+        callback: (event: ShellOutputEvent) => void,
+      ) => {
+        mockShellOutputCallback = callback;
+        const match = cmd.match(/pgrep -g 0 >([^ ]+)/);
+        if (match) {
+          extractedTmpFile = match[1].replace(/['"]/g, '');
+        }
+        return {
+          pid: 12345,
+          result: new Promise((resolve) => {
+            resolveExecutionPromise = resolve;
+          }),
+        };
+      },
+    );
 
     mockShellBackground.mockImplementation(() => {
       resolveExecutionPromise({
@@ -293,17 +306,16 @@ describe('ShellTool', () => {
     it('should wrap command on linux and parse pgrep output', async () => {
       const invocation = shellTool.build({ command: 'my-command &' });
       const promise = invocation.execute({ abortSignal: mockAbortSignal });
-      resolveShellExecution({ pid: 54321 });
 
       // Simulate pgrep output file creation by the shell command
-      const tmpFile = path.join(os.tmpdir(), 'shell_pgrep_abcdef.tmp');
-      fs.writeFileSync(tmpFile, `54321${os.EOL}54322${os.EOL}`);
+      fs.writeFileSync(extractedTmpFile, `54321${os.EOL}54322${os.EOL}`);
+
+      resolveShellExecution({ pid: 54321 });
 
       const result = await promise;
 
-      const wrappedCommand = `(\n${'my-command &'}\n); __code=$?; pgrep -g 0 >${tmpFile} 2>&1; exit $__code;`;
       expect(mockShellExecutionService).toHaveBeenCalledWith(
-        wrappedCommand,
+        expect.stringMatching(/pgrep -g 0 >.*gemini-shell-.*[/\\]pgrep\.tmp/),
         tempRootDir,
         expect.any(Function),
         expect.any(AbortSignal),
@@ -316,7 +328,7 @@ describe('ShellTool', () => {
       );
       expect(result.llmContent).toContain('Background PIDs: 54322');
       // The file should be deleted by the tool
-      expect(fs.existsSync(tmpFile)).toBe(false);
+      expect(fs.existsSync(extractedTmpFile)).toBe(false);
     });
 
     it('should add a space when command ends with a backslash to prevent escaping newline', async () => {
@@ -325,10 +337,8 @@ describe('ShellTool', () => {
       resolveShellExecution();
       await promise;
 
-      const tmpFile = path.join(os.tmpdir(), 'shell_pgrep_abcdef.tmp');
-      const wrappedCommand = `(\nls\\ \n); __code=$?; pgrep -g 0 >${tmpFile} 2>&1; exit $__code;`;
       expect(mockShellExecutionService).toHaveBeenCalledWith(
-        wrappedCommand,
+        expect.stringMatching(/pgrep -g 0 >.*gemini-shell-.*[/\\]pgrep\.tmp/),
         tempRootDir,
         expect.any(Function),
         expect.any(AbortSignal),
@@ -343,10 +353,8 @@ describe('ShellTool', () => {
       resolveShellExecution();
       await promise;
 
-      const tmpFile = path.join(os.tmpdir(), 'shell_pgrep_abcdef.tmp');
-      const wrappedCommand = `(\nls # comment\n); __code=$?; pgrep -g 0 >${tmpFile} 2>&1; exit $__code;`;
       expect(mockShellExecutionService).toHaveBeenCalledWith(
-        wrappedCommand,
+        expect.stringMatching(/pgrep -g 0 >.*gemini-shell-.*[/\\]pgrep\.tmp/),
         tempRootDir,
         expect.any(Function),
         expect.any(AbortSignal),
@@ -365,10 +373,8 @@ describe('ShellTool', () => {
       resolveShellExecution();
       await promise;
 
-      const tmpFile = path.join(os.tmpdir(), 'shell_pgrep_abcdef.tmp');
-      const wrappedCommand = `(\n${'ls'}\n); __code=$?; pgrep -g 0 >${tmpFile} 2>&1; exit $__code;`;
       expect(mockShellExecutionService).toHaveBeenCalledWith(
-        wrappedCommand,
+        expect.stringMatching(/pgrep -g 0 >.*gemini-shell-.*[/\\]pgrep\.tmp/),
         subdir,
         expect.any(Function),
         expect.any(AbortSignal),
@@ -390,10 +396,8 @@ describe('ShellTool', () => {
       resolveShellExecution();
       await promise;
 
-      const tmpFile = path.join(os.tmpdir(), 'shell_pgrep_abcdef.tmp');
-      const wrappedCommand = `(\n${'ls'}\n); __code=$?; pgrep -g 0 >${tmpFile} 2>&1; exit $__code;`;
       expect(mockShellExecutionService).toHaveBeenCalledWith(
-        wrappedCommand,
+        expect.stringMatching(/pgrep -g 0 >.*gemini-shell-.*[/\\]pgrep\.tmp/),
         path.join(tempRootDir, 'subdir'),
         expect.any(Function),
         expect.any(AbortSignal),
@@ -461,6 +465,26 @@ describe('ShellTool', () => {
       },
       20000,
     );
+
+    it('should correctly wrap heredoc commands', async () => {
+      const command = `cat << 'EOF'
+hello world
+EOF`;
+      const invocation = shellTool.build({ command });
+      const promise = invocation.execute({ abortSignal: mockAbortSignal });
+      resolveShellExecution();
+      await promise;
+
+      expect(mockShellExecutionService).toHaveBeenCalledWith(
+        expect.stringMatching(/pgrep -g 0 >.*gemini-shell-.*[/\\]pgrep\.tmp/),
+        tempRootDir,
+        expect.any(Function),
+        expect.any(AbortSignal),
+        false,
+        expect.any(Object),
+      );
+      expect(mockShellExecutionService.mock.calls[0][0]).toMatch(/\nEOF\n\)\n/);
+    });
 
     it('should format error messages correctly', async () => {
       const error = new Error('wrapped command failed');
@@ -562,10 +586,13 @@ describe('ShellTool', () => {
 
     it('should clean up the temp file on synchronous execution error', async () => {
       const error = new Error('sync spawn error');
-      mockShellExecutionService.mockImplementation(() => {
-        // Create the temp file before throwing to simulate it being left behind
-        const tmpFile = path.join(os.tmpdir(), 'shell_pgrep_abcdef.tmp');
-        fs.writeFileSync(tmpFile, '');
+      mockShellExecutionService.mockImplementation((cmd: string) => {
+        const match = cmd.match(/pgrep -g 0 >([^ ]+)/);
+        if (match) {
+          extractedTmpFile = match[1].replace(/['"]/g, ''); // remove any quotes if present
+          // Create the temp file before throwing to simulate it being left behind
+          fs.writeFileSync(extractedTmpFile, '');
+        }
         throw error;
       });
 
@@ -574,8 +601,7 @@ describe('ShellTool', () => {
         invocation.execute({ abortSignal: mockAbortSignal }),
       ).rejects.toThrow(error);
 
-      const tmpFile = path.join(os.tmpdir(), 'shell_pgrep_abcdef.tmp');
-      expect(fs.existsSync(tmpFile)).toBe(false);
+      expect(fs.existsSync(extractedTmpFile)).toBe(false);
     });
 
     it('should not log "missing pgrep output" when process is backgrounded', async () => {
@@ -968,7 +994,6 @@ describe('ShellTool', () => {
       const result = await promise;
       expect(result.llmContent).not.toContain('Process Group PGID:');
     });
-
     it('should have minimal output for successful command', async () => {
       const invocation = shellTool.build({ command: 'echo hello' });
       const promise = invocation.execute({ abortSignal: mockAbortSignal });
@@ -1194,6 +1219,401 @@ describe('ShellTool', () => {
       const schema = shellTool.getSchema(modelId);
       expect(schema.name).toBe(SHELL_TOOL_NAME);
       expect(schema.description).toMatchSnapshot();
+    });
+  });
+
+  describe('command injection detection', () => {
+    it('should block $() command substitution', async () => {
+      const tool = new ShellTool(mockConfig, createMockMessageBus());
+      const invocation = tool.build({ command: 'echo $(whoami)' });
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+      expect(result.returnDisplay).toContain('Blocked');
+    });
+
+    it('should block backtick command substitution', async () => {
+      const tool = new ShellTool(mockConfig, createMockMessageBus());
+      const invocation = tool.build({ command: 'echo `whoami`' });
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+      expect(result.returnDisplay).toContain('Blocked');
+    });
+
+    it('should allow normal commands without substitution', async () => {
+      mockShellExecutionService.mockImplementation((_cmd, _cwd, _callback) => ({
+        pid: 12345,
+        result: Promise.resolve({
+          output: 'hello',
+          rawOutput: Buffer.from('hello'),
+          exitCode: 0,
+          signal: null,
+          error: null,
+          aborted: false,
+          pid: 12345,
+          executionMethod: 'child_process',
+          backgrounded: false,
+        }),
+      }));
+      const tool = new ShellTool(mockConfig, createMockMessageBus());
+      const invocation = tool.build({ command: 'echo hello' });
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+      expect(result.returnDisplay).not.toContain('Blocked');
+    });
+
+    it('should allow single quoted strings with special chars', async () => {
+      mockShellExecutionService.mockImplementation((_cmd, _cwd, _callback) => ({
+        pid: 12345,
+        result: Promise.resolve({
+          output: '$(not substituted)',
+          rawOutput: Buffer.from('$(not substituted)'),
+          exitCode: 0,
+          signal: null,
+          error: null,
+          aborted: false,
+          pid: 12345,
+          executionMethod: 'child_process',
+          backgrounded: false,
+        }),
+      }));
+      const tool = new ShellTool(mockConfig, createMockMessageBus());
+      const invocation = tool.build({
+        command: "echo '$(not substituted)'",
+      });
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+      expect(result.returnDisplay).not.toContain('Blocked');
+    });
+
+    it('should allow escaped backtick outside double quotes', async () => {
+      mockShellExecutionService.mockImplementation((_cmd, _cwd, _callback) => ({
+        pid: 12345,
+        result: Promise.resolve({
+          output: 'hello',
+          rawOutput: Buffer.from('hello'),
+          exitCode: 0,
+          signal: null,
+          error: null,
+          aborted: false,
+          pid: 12345,
+          executionMethod: 'child_process',
+          backgrounded: false,
+        }),
+      }));
+      const tool = new ShellTool(mockConfig, createMockMessageBus());
+      const invocation = tool.build({ command: 'echo \\`hello\\`' });
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+      expect(result.returnDisplay).not.toContain('Blocked');
+    });
+
+    it('should block $() inside double quotes', async () => {
+      const tool = new ShellTool(mockConfig, createMockMessageBus());
+      const invocation = tool.build({ command: 'echo "$(whoami)"' });
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+      expect(result.returnDisplay).toContain('Blocked');
+    });
+
+    it('should block >() process substitution', async () => {
+      const tool = new ShellTool(mockConfig, createMockMessageBus());
+      const invocation = tool.build({ command: 'echo >(whoami)' });
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+      expect(result.returnDisplay).toContain('Blocked');
+    });
+
+    it('should allow $() inside single quotes', async () => {
+      mockShellExecutionService.mockImplementation((_cmd, _cwd, _callback) => ({
+        pid: 12345,
+        result: Promise.resolve({
+          output: '$(whoami)',
+          rawOutput: Buffer.from('$(whoami)'),
+          exitCode: 0,
+          signal: null,
+          error: null,
+          aborted: false,
+          pid: 12345,
+          executionMethod: 'child_process',
+          backgrounded: false,
+        }),
+      }));
+      const tool = new ShellTool(mockConfig, createMockMessageBus());
+      const invocation = tool.build({
+        command: "echo '$(whoami)'",
+      });
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+      expect(result.returnDisplay).not.toContain('Blocked');
+    });
+    it('should block PowerShell @() array subexpression', async () => {
+      mockPlatform.mockReturnValue('win32');
+      const tool = new ShellTool(mockConfig, createMockMessageBus());
+      const invocation = tool.build({ command: 'echo @(whoami)' });
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+      expect(result.returnDisplay).toContain('Blocked');
+    });
+
+    it('should block PowerShell $() subexpression', async () => {
+      mockPlatform.mockReturnValue('win32');
+      const tool = new ShellTool(mockConfig, createMockMessageBus());
+      const invocation = tool.build({ command: 'echo $(whoami)' });
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+      expect(result.returnDisplay).toContain('Blocked');
+    });
+
+    it('should allow PowerShell single quoted strings', async () => {
+      mockPlatform.mockReturnValue('win32');
+      mockShellExecutionService.mockImplementation((_cmd, _cwd, _callback) => ({
+        pid: 12345,
+        result: Promise.resolve({
+          output: '$(whoami)',
+          rawOutput: Buffer.from('$(whoami)'),
+          exitCode: 0,
+          signal: null,
+          error: null,
+          aborted: false,
+          pid: 12345,
+          executionMethod: 'child_process',
+          backgrounded: false,
+        }),
+      }));
+      const tool = new ShellTool(mockConfig, createMockMessageBus());
+      const invocation = tool.build({
+        command: "echo '$(whoami)'",
+      });
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+      expect(result.returnDisplay).not.toContain('Blocked');
+    });
+    it('should allow escaped substitution outside quotes', async () => {
+      mockShellExecutionService.mockImplementation((_cmd, _cwd, _callback) => ({
+        pid: 12345,
+        result: Promise.resolve({
+          output: '$(whoami)',
+          rawOutput: Buffer.from('$(whoami)'),
+          exitCode: 0,
+          signal: null,
+          error: null,
+          aborted: false,
+          pid: 12345,
+          executionMethod: 'child_process',
+          backgrounded: false,
+        }),
+      }));
+      const tool = new ShellTool(mockConfig, createMockMessageBus());
+      const invocation = tool.build({ command: 'echo \\$(whoami)' });
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+      expect(result.returnDisplay).not.toContain('Blocked');
+    });
+
+    it('should allow process substitution inside double quotes', async () => {
+      mockShellExecutionService.mockImplementation((_cmd, _cwd, _callback) => ({
+        pid: 12345,
+        result: Promise.resolve({
+          output: '<(whoami)',
+          rawOutput: Buffer.from('<(whoami)'),
+          exitCode: 0,
+          signal: null,
+          error: null,
+          aborted: false,
+          pid: 12345,
+          executionMethod: 'child_process',
+          backgrounded: false,
+        }),
+      }));
+      const tool = new ShellTool(mockConfig, createMockMessageBus());
+      const invocation = tool.build({ command: 'echo "<(whoami)"' });
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+      expect(result.returnDisplay).not.toContain('Blocked');
+    });
+
+    it('should block process substitution without quotes', async () => {
+      const tool = new ShellTool(mockConfig, createMockMessageBus());
+      const invocation = tool.build({ command: 'echo <(whoami)' });
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+      expect(result.returnDisplay).toContain('Blocked');
+    });
+
+    it('should allow escaped $() outside double quotes', async () => {
+      mockShellExecutionService.mockImplementation((_cmd, _cwd, _callback) => ({
+        pid: 12345,
+        result: Promise.resolve({
+          output: '$(whoami)',
+          rawOutput: Buffer.from('$(whoami)'),
+          exitCode: 0,
+          signal: null,
+          error: null,
+          aborted: false,
+          pid: 12345,
+          executionMethod: 'child_process',
+          backgrounded: false,
+        }),
+      }));
+      const tool = new ShellTool(mockConfig, createMockMessageBus());
+      const invocation = tool.build({ command: 'echo \\$(whoami)' });
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+      expect(result.returnDisplay).not.toContain('Blocked');
+    });
+
+    it('should allow output process substitution inside double quotes', async () => {
+      mockShellExecutionService.mockImplementation((_cmd, _cwd, _callback) => ({
+        pid: 12345,
+        result: Promise.resolve({
+          output: '<(whoami)',
+          rawOutput: Buffer.from('<(whoami)'),
+          exitCode: 0,
+          signal: null,
+          error: null,
+          aborted: false,
+          pid: 12345,
+          executionMethod: 'child_process',
+          backgrounded: false,
+        }),
+      }));
+      const tool = new ShellTool(mockConfig, createMockMessageBus());
+      const invocation = tool.build({ command: 'echo "<(whoami)"' });
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+      expect(result.returnDisplay).not.toContain('Blocked');
+    });
+
+    it('should block <() process substitution without quotes', async () => {
+      const tool = new ShellTool(mockConfig, createMockMessageBus());
+      const invocation = tool.build({ command: 'echo <(whoami)' });
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+      expect(result.returnDisplay).toContain('Blocked');
+    });
+    it('should block PowerShell bare () grouping operator', async () => {
+      mockPlatform.mockReturnValue('win32');
+      const tool = new ShellTool(mockConfig, createMockMessageBus());
+      const invocation = tool.build({ command: 'echo (whoami)' });
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+      expect(result.returnDisplay).toContain('Blocked');
+    });
+
+    it('should allow escaped $() inside double quotes', async () => {
+      mockShellExecutionService.mockImplementation((_cmd, _cwd, _callback) => ({
+        pid: 12345,
+        result: Promise.resolve({
+          output: '$(whoami)',
+          rawOutput: Buffer.from('$(whoami)'),
+          exitCode: 0,
+          signal: null,
+          error: null,
+          aborted: false,
+          pid: 12345,
+          executionMethod: 'child_process',
+          backgrounded: false,
+        }),
+      }));
+      const tool = new ShellTool(mockConfig, createMockMessageBus());
+      const invocation = tool.build({ command: 'echo "\\$(whoami)"' });
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+      expect(result.returnDisplay).not.toContain('Blocked');
+    });
+
+    it('should allow escaped substitution inside double quotes', async () => {
+      mockShellExecutionService.mockImplementation((_cmd, _cwd, _callback) => ({
+        pid: 12345,
+        result: Promise.resolve({
+          output: '$(whoami)',
+          rawOutput: Buffer.from('$(whoami)'),
+          exitCode: 0,
+          signal: null,
+          error: null,
+          aborted: false,
+          pid: 12345,
+          executionMethod: 'child_process',
+          backgrounded: false,
+        }),
+      }));
+      const tool = new ShellTool(mockConfig, createMockMessageBus());
+      const invocation = tool.build({ command: 'echo "\\$(whoami)"' });
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+      expect(result.returnDisplay).not.toContain('Blocked');
+    });
+
+    it('should allow PowerShell keyword with flag e.g. switch -regex ($x)', async () => {
+      mockPlatform.mockReturnValue('win32');
+      mockShellExecutionService.mockImplementation((_cmd, _cwd, _callback) => ({
+        pid: 12345,
+        result: Promise.resolve({
+          output: 'result',
+          rawOutput: Buffer.from('result'),
+          exitCode: 0,
+          signal: null,
+          error: null,
+          aborted: false,
+          pid: 12345,
+          executionMethod: 'child_process',
+          backgrounded: false,
+        }),
+      }));
+      const tool = new ShellTool(mockConfig, createMockMessageBus());
+      const invocation = tool.build({
+        command: 'switch -regex ($x) { "a" { 1 } }',
+      });
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+      expect(result.returnDisplay).not.toContain('Blocked');
+    });
+
+    it('should allow PowerShell nested parentheses e.g. if ((condition))', async () => {
+      mockPlatform.mockReturnValue('win32');
+      mockShellExecutionService.mockImplementation((_cmd, _cwd, _callback) => ({
+        pid: 12345,
+        result: Promise.resolve({
+          output: 'result',
+          rawOutput: Buffer.from('result'),
+          exitCode: 0,
+          signal: null,
+          error: null,
+          aborted: false,
+          pid: 12345,
+          executionMethod: 'child_process',
+          backgrounded: false,
+        }),
+      }));
+      const tool = new ShellTool(mockConfig, createMockMessageBus());
+      const invocation = tool.build({
+        command: 'if ((condition)) { Write-Host ok }',
+      });
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+      expect(result.returnDisplay).not.toContain('Blocked');
     });
   });
 });

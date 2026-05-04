@@ -8,10 +8,13 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { constants as fsConstants } from 'node:fs';
 import { randomUUID } from 'node:crypto';
+import * as Diff from 'diff';
 import type { Config } from '../config/config.js';
 import {
   SESSION_FILE_PREFIX,
+  loadConversationRecord,
   type ConversationRecord,
+  type MemoryScratchpad,
 } from './chatRecordingService.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { coreEvents } from '../utils/events.js';
@@ -20,6 +23,10 @@ import { FRONTMATTER_REGEX, parseFrontmatter } from '../skills/skillLoader.js';
 import { LocalAgentExecutor } from '../agents/local-executor.js';
 import { SkillExtractionAgent } from '../agents/skill-extraction-agent.js';
 import { getModelConfigAlias } from '../agents/registry.js';
+import {
+  isToolActivityError,
+  type SubagentActivityEvent,
+} from '../agents/types.js';
 import { ExecutionLifecycleService } from './executionLifecycleService.js';
 import { PromptRegistry } from '../prompts/prompt-registry.js';
 import { ResourceRegistry } from '../resources/resource-registry.js';
@@ -28,6 +35,12 @@ import { PolicyDecision } from '../policy/types.js';
 import { MessageBus } from '../confirmation-bus/message-bus.js';
 import { Storage } from '../config/storage.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
+import { READ_FILE_TOOL_NAME } from '../tools/tool-names.js';
+import {
+  applyParsedSkillPatches,
+  hasParsedPatchHunks,
+} from './memoryPatchUtils.js';
+import { sanitizeWorkflowSummaryForScratchpad } from './sessionScratchpadUtils.js';
 
 const LOCK_FILENAME = '.extraction.lock';
 const STATE_FILENAME = '.extraction-state.json';
@@ -35,6 +48,7 @@ const LOCK_STALE_MS = 35 * 60 * 1000; // 35 minutes (exceeds agent's 30-min time
 const MIN_USER_MESSAGES = 10;
 const MIN_IDLE_MS = 3 * 60 * 60 * 1000; // 3 hours
 const MAX_SESSION_INDEX_SIZE = 50;
+const MAX_NEW_SESSION_BATCH_SIZE = 10;
 
 /**
  * Lock file content for coordinating across CLI instances.
@@ -44,13 +58,30 @@ interface LockInfo {
   startedAt: string;
 }
 
+interface SessionVersion {
+  sessionId: string;
+  lastUpdated: string;
+}
+
+interface IndexedSession extends SessionVersion {
+  filePath: string;
+  summary?: string;
+  memoryScratchpad?: MemoryScratchpad;
+  userMessageCount: number;
+}
+
 /**
  * Metadata for a single extraction run.
  */
 export interface ExtractionRun {
   runAt: string;
   sessionIds: string[];
+  candidateSessions?: SessionVersion[];
+  processedSessions?: SessionVersion[];
   skillsCreated: string[];
+  turnCount?: number;
+  durationMs?: number;
+  terminateReason?: string;
 }
 
 /**
@@ -66,7 +97,10 @@ export interface ExtractionState {
 export function getProcessedSessionIds(state: ExtractionState): Set<string> {
   const ids = new Set<string>();
   for (const run of state.runs) {
-    for (const id of run.sessionIds) {
+    const processedSessionIds =
+      run.processedSessions?.map((session) => session.sessionId) ??
+      run.sessionIds;
+    for (const id of processedSessionIds) {
       ids.add(id);
     }
   }
@@ -84,30 +118,62 @@ function isLockInfo(value: unknown): value is LockInfo {
   );
 }
 
-function isConversationRecord(value: unknown): value is ConversationRecord {
+function isSessionVersion(value: unknown): value is SessionVersion {
   return (
     typeof value === 'object' &&
     value !== null &&
     'sessionId' in value &&
     typeof value.sessionId === 'string' &&
-    'messages' in value &&
-    Array.isArray(value.messages) &&
-    'projectHash' in value &&
-    'startTime' in value &&
-    'lastUpdated' in value
+    'lastUpdated' in value &&
+    typeof value.lastUpdated === 'string'
   );
 }
 
-function isExtractionRun(value: unknown): value is ExtractionRun {
+function normalizeSessionVersions(value: unknown): SessionVersion[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter(isSessionVersion).map((session) => ({
+    sessionId: session.sessionId,
+    lastUpdated: session.lastUpdated,
+  }));
+}
+
+function normalizeStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter((item): item is string => typeof item === 'string');
+}
+
+function normalizeOptionalNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value)
+    ? value
+    : undefined;
+}
+
+function normalizeOptionalString(value: unknown): string | undefined {
+  return typeof value === 'string' ? value : undefined;
+}
+
+function isExtractionRunLike(value: unknown): value is {
+  runAt: string;
+  sessionIds?: unknown;
+  candidateSessions?: unknown;
+  processedSessions?: unknown;
+  skillsCreated: unknown;
+  turnCount?: unknown;
+  durationMs?: unknown;
+  terminateReason?: unknown;
+} {
   return (
     typeof value === 'object' &&
     value !== null &&
     'runAt' in value &&
     typeof value.runAt === 'string' &&
-    'sessionIds' in value &&
-    Array.isArray(value.sessionIds) &&
-    'skillsCreated' in value &&
-    Array.isArray(value.skillsCreated)
+    'skillsCreated' in value
   );
 }
 
@@ -117,6 +183,199 @@ function isExtractionState(value: unknown): value is { runs: unknown[] } {
     value !== null &&
     'runs' in value &&
     Array.isArray(value.runs)
+  );
+}
+
+function buildExtractionRun(value: unknown): ExtractionRun | null {
+  if (!isExtractionRunLike(value)) {
+    return null;
+  }
+
+  const candidateSessions = normalizeSessionVersions(value.candidateSessions);
+  const processedSessions = normalizeSessionVersions(value.processedSessions);
+  const sessionIds = normalizeStringArray(value.sessionIds);
+
+  return {
+    runAt: value.runAt,
+    sessionIds:
+      sessionIds.length > 0
+        ? sessionIds
+        : processedSessions.map((session) => session.sessionId),
+    candidateSessions:
+      candidateSessions.length > 0 ? candidateSessions : undefined,
+    processedSessions:
+      processedSessions.length > 0 ? processedSessions : undefined,
+    skillsCreated: normalizeStringArray(value.skillsCreated),
+    turnCount: normalizeOptionalNumber(value.turnCount),
+    durationMs: normalizeOptionalNumber(value.durationMs),
+    terminateReason: normalizeOptionalString(value.terminateReason),
+  };
+}
+
+function getTimestampMs(timestamp: string): number {
+  const parsed = Date.parse(timestamp);
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+function getSessionVersionKey(session: SessionVersion): string {
+  return `${session.sessionId}\u0000${session.lastUpdated}`;
+}
+
+function hasLegacyRunProcessedSession(
+  run: ExtractionRun,
+  session: SessionVersion,
+): boolean {
+  return (
+    run.sessionIds.includes(session.sessionId) &&
+    getTimestampMs(run.runAt) >= getTimestampMs(session.lastUpdated)
+  );
+}
+
+function isSessionVersionProcessed(
+  state: ExtractionState,
+  session: SessionVersion,
+): boolean {
+  const sessionKey = getSessionVersionKey(session);
+
+  for (const run of state.runs) {
+    if (
+      run.processedSessions?.some(
+        (processed) => getSessionVersionKey(processed) === sessionKey,
+      )
+    ) {
+      return true;
+    }
+
+    if (!run.processedSessions && hasLegacyRunProcessedSession(run, session)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function getSessionAttemptCount(
+  state: ExtractionState,
+  session: SessionVersion,
+): number {
+  const sessionKey = getSessionVersionKey(session);
+  let attempts = 0;
+
+  for (const run of state.runs) {
+    if (run.candidateSessions) {
+      if (
+        run.candidateSessions.some(
+          (candidate) => getSessionVersionKey(candidate) === sessionKey,
+        )
+      ) {
+        attempts++;
+      }
+      continue;
+    }
+
+    if (hasLegacyRunProcessedSession(run, session)) {
+      attempts++;
+    }
+  }
+
+  return attempts;
+}
+
+function compareIndexedSessions(a: IndexedSession, b: IndexedSession): number {
+  const timestampDelta =
+    getTimestampMs(b.lastUpdated) - getTimestampMs(a.lastUpdated);
+  if (timestampDelta !== 0) {
+    return timestampDelta;
+  }
+
+  if (a.filePath.endsWith('.jsonl') !== b.filePath.endsWith('.jsonl')) {
+    return a.filePath.endsWith('.jsonl') ? -1 : 1;
+  }
+
+  return b.filePath.localeCompare(a.filePath);
+}
+
+function shouldReplaceIndexedSession(
+  existing: IndexedSession,
+  candidate: IndexedSession,
+): boolean {
+  return compareIndexedSessions(candidate, existing) < 0;
+}
+
+function isReadFileActivity(
+  activity: SubagentActivityEvent,
+): activity is SubagentActivityEvent & {
+  data: { name: string; args?: { file_path?: unknown }; callId?: unknown };
+} {
+  return (
+    activity.type === 'TOOL_CALL_START' &&
+    activity.data['name'] === READ_FILE_TOOL_NAME
+  );
+}
+
+function getReadFileCallId(activity: SubagentActivityEvent): string | null {
+  if (isReadFileActivity(activity)) {
+    const { callId } = activity.data;
+    return typeof callId === 'string' ? callId : null;
+  }
+
+  if (
+    activity.type === 'TOOL_CALL_END' &&
+    activity.data['name'] === READ_FILE_TOOL_NAME
+  ) {
+    const id = activity.data['id'];
+    return typeof id === 'string' ? id : null;
+  }
+
+  if (
+    activity.type === 'ERROR' &&
+    activity.data['name'] === READ_FILE_TOOL_NAME
+  ) {
+    const callId = activity.data['callId'];
+    return typeof callId === 'string' ? callId : null;
+  }
+
+  return null;
+}
+
+function getResolvedActivityFilePath(
+  config: Config,
+  activity: SubagentActivityEvent,
+): string | null {
+  if (!isReadFileActivity(activity)) {
+    return null;
+  }
+
+  const args = activity.data.args;
+  if (
+    typeof args !== 'object' ||
+    args === null ||
+    !('file_path' in args) ||
+    typeof args.file_path !== 'string'
+  ) {
+    return null;
+  }
+
+  const targetDir =
+    'getTargetDir' in config && typeof config.getTargetDir === 'function'
+      ? config.getTargetDir()
+      : process.cwd();
+  return path.resolve(targetDir, args.file_path);
+}
+
+function getUserMessageCount(
+  conversation: ConversationRecord & { userMessageCount?: number },
+): number {
+  return (
+    conversation.userMessageCount ??
+    conversation.messages.filter((message) => message.type === 'user').length
+  );
+}
+
+function isSupportedSessionFile(fileName: string): boolean {
+  return (
+    fileName.startsWith(SESSION_FILE_PREFIX) &&
+    (fileName.endsWith('.json') || fileName.endsWith('.jsonl'))
   );
 }
 
@@ -226,16 +485,9 @@ export async function readExtractionState(
 
     const runs: ExtractionRun[] = [];
     for (const run of parsed.runs) {
-      if (!isExtractionRun(run)) continue;
-      runs.push({
-        runAt: run.runAt,
-        sessionIds: run.sessionIds.filter(
-          (sid): sid is string => typeof sid === 'string',
-        ),
-        skillsCreated: run.skillsCreated.filter(
-          (sk): sk is string => typeof sk === 'string',
-        ),
-      });
+      const normalizedRun = buildExtractionRun(run);
+      if (!normalizedRun) continue;
+      runs.push(normalizedRun);
     }
 
     return { runs };
@@ -265,30 +517,32 @@ export async function writeExtractionState(
  * Filters out subagent sessions, sessions that haven't been idle long enough,
  * and sessions with too few user messages.
  */
-function shouldProcessConversation(parsed: ConversationRecord): boolean {
+function shouldProcessConversation(
+  parsed: ConversationRecord & { userMessageCount?: number },
+): boolean {
   // Skip subagent sessions
   if (parsed.kind === 'subagent') return false;
 
   // Skip sessions that are still active (not idle for 3+ hours)
-  const lastUpdated = new Date(parsed.lastUpdated).getTime();
+  const lastUpdated = getTimestampMs(parsed.lastUpdated);
   if (Date.now() - lastUpdated < MIN_IDLE_MS) return false;
 
   // Skip sessions with too few user messages
-  const userMessageCount = parsed.messages.filter(
-    (m) => m.type === 'user',
-  ).length;
-  if (userMessageCount < MIN_USER_MESSAGES) return false;
+  if (getUserMessageCount(parsed) < MIN_USER_MESSAGES) return false;
 
   return true;
 }
 
 /**
- * Scans the chats directory for eligible session files (sorted most-recent-first,
- * capped at MAX_SESSION_INDEX_SIZE). Shared by buildSessionIndex.
+ * Scans the chats directory for eligible session files, loading metadata from
+ * both JSONL and legacy JSON sessions, deduplicating migrated sessions by
+ * session ID, and sorting by actual lastUpdated. We scan the full directory
+ * here so already-processed recent sessions cannot permanently block older
+ * backlog sessions from surfacing as new candidates.
  */
 async function scanEligibleSessions(
   chatsDir: string,
-): Promise<Array<{ conversation: ConversationRecord; filePath: string }>> {
+): Promise<IndexedSession[]> {
   let allFiles: string[];
   try {
     allFiles = await fs.readdir(chatsDir);
@@ -296,33 +550,74 @@ async function scanEligibleSessions(
     return [];
   }
 
-  const sessionFiles = allFiles.filter(
-    (f) => f.startsWith(SESSION_FILE_PREFIX) && f.endsWith('.json'),
-  );
-
-  // Sort by filename descending (most recent first)
-  sessionFiles.sort((a, b) => b.localeCompare(a));
-
-  const results: Array<{ conversation: ConversationRecord; filePath: string }> =
-    [];
-
-  for (const file of sessionFiles) {
-    if (results.length >= MAX_SESSION_INDEX_SIZE) break;
-
+  const candidates: Array<{ filePath: string; mtimeMs: number }> = [];
+  for (const file of allFiles) {
+    if (!isSupportedSessionFile(file)) continue;
     const filePath = path.join(chatsDir, file);
     try {
-      const content = await fs.readFile(filePath, 'utf-8');
-      const parsed: unknown = JSON.parse(content);
-      if (!isConversationRecord(parsed)) continue;
-      if (!shouldProcessConversation(parsed)) continue;
+      const stat = await fs.stat(filePath);
+      if (!stat.isFile()) continue;
+      candidates.push({ filePath, mtimeMs: stat.mtimeMs });
+    } catch {
+      // Skip files that disappeared between readdir and stat.
+    }
+  }
 
-      results.push({ conversation: parsed, filePath });
+  candidates.sort((a, b) => b.mtimeMs - a.mtimeMs);
+
+  const latestBySessionId = new Map<string, IndexedSession>();
+
+  for (const { filePath } of candidates) {
+    try {
+      const conversation = await loadConversationRecord(filePath, {
+        metadataOnly: true,
+      });
+      if (!conversation || !shouldProcessConversation(conversation)) continue;
+
+      const indexedSession: IndexedSession = {
+        sessionId: conversation.sessionId,
+        lastUpdated: conversation.lastUpdated,
+        filePath,
+        summary: conversation.summary,
+        memoryScratchpad:
+          conversation.memoryScratchpadIsStale === true
+            ? undefined
+            : conversation.memoryScratchpad,
+        userMessageCount: getUserMessageCount(conversation),
+      };
+
+      const existing = latestBySessionId.get(indexedSession.sessionId);
+      if (!existing || shouldReplaceIndexedSession(existing, indexedSession)) {
+        latestBySessionId.set(indexedSession.sessionId, indexedSession);
+      }
     } catch {
       // Skip unreadable files
     }
   }
 
-  return results;
+  return Array.from(latestBySessionId.values()).sort(compareIndexedSessions);
+}
+
+function formatSessionHeadline(session: IndexedSession): string {
+  const rawWorkflowSummary = session.memoryScratchpad?.workflowSummary;
+  const sanitizedWorkflowSummary =
+    typeof rawWorkflowSummary === 'string'
+      ? sanitizeWorkflowSummaryForScratchpad(rawWorkflowSummary)
+      : undefined;
+  const workflowSummary = sanitizedWorkflowSummary?.trim()
+    ? sanitizedWorkflowSummary
+    : undefined;
+  const summary = session.summary ?? workflowSummary ?? '(no summary)';
+
+  if (
+    session.summary &&
+    workflowSummary &&
+    workflowSummary !== session.summary
+  ) {
+    return `${summary} | workflow: ${workflowSummary}`;
+  }
+
+  return summary;
 }
 
 /**
@@ -330,39 +625,66 @@ async function scanEligibleSessions(
  * eligible sessions with their summary, file path, and new/previously-processed status.
  * The agent can use read_file on paths to inspect sessions that look promising.
  *
- * Returns the index text and the list of new (unprocessed) session IDs.
+ * Returns the index text, the list of selected new (unprocessed) session IDs,
+ * and the surfaced candidate sessions for this run.
  */
 export async function buildSessionIndex(
   chatsDir: string,
   state: ExtractionState,
-): Promise<{ sessionIndex: string; newSessionIds: string[] }> {
-  const processedSet = getProcessedSessionIds(state);
+): Promise<{
+  sessionIndex: string;
+  newSessionIds: string[];
+  candidateSessions: IndexedSession[];
+}> {
   const eligible = await scanEligibleSessions(chatsDir);
 
   if (eligible.length === 0) {
-    return { sessionIndex: '', newSessionIds: [] };
+    return { sessionIndex: '', newSessionIds: [], candidateSessions: [] };
   }
 
-  const lines: string[] = [];
-  const newSessionIds: string[] = [];
-
-  for (const { conversation, filePath } of eligible) {
-    const userMessageCount = conversation.messages.filter(
-      (m) => m.type === 'user',
-    ).length;
-    const isNew = !processedSet.has(conversation.sessionId);
-    if (isNew) {
-      newSessionIds.push(conversation.sessionId);
+  const newSessions: IndexedSession[] = [];
+  const oldSessions: IndexedSession[] = [];
+  for (const session of eligible) {
+    if (isSessionVersionProcessed(state, session)) {
+      oldSessions.push(session);
+    } else {
+      newSessions.push(session);
     }
-
-    const status = isNew ? '[NEW]' : '[old]';
-    const summary = conversation.summary ?? '(no summary)';
-    lines.push(
-      `${status} ${summary} (${userMessageCount} user msgs) — ${filePath}`,
-    );
   }
 
-  return { sessionIndex: lines.join('\n'), newSessionIds };
+  newSessions.sort((a, b) => {
+    const attemptDelta =
+      getSessionAttemptCount(state, a) - getSessionAttemptCount(state, b);
+    if (attemptDelta !== 0) {
+      return attemptDelta;
+    }
+    return compareIndexedSessions(a, b);
+  });
+
+  const candidateSessions = newSessions.slice(0, MAX_NEW_SESSION_BATCH_SIZE);
+  const remainingSlots = Math.max(
+    0,
+    MAX_SESSION_INDEX_SIZE - candidateSessions.length,
+  );
+  const displayedOldSessions = oldSessions.slice(0, remainingSlots);
+  const candidateSessionIds = new Set(
+    candidateSessions.map((session) => getSessionVersionKey(session)),
+  );
+
+  const lines = [...candidateSessions, ...displayedOldSessions].map(
+    (session) => {
+      const status = candidateSessionIds.has(getSessionVersionKey(session))
+        ? '[NEW]'
+        : '[old]';
+      return `${status} ${formatSessionHeadline(session)} (${session.userMessageCount} user msgs) — ${session.filePath}`;
+    },
+  );
+
+  return {
+    sessionIndex: lines.join('\n'),
+    newSessionIds: candidateSessions.map((session) => session.sessionId),
+    candidateSessions,
+  };
 }
 
 /**
@@ -420,19 +742,18 @@ async function buildExistingSkillsSummary(
       const builtinSkills: string[] = [];
 
       for (const s of discoveredSkills) {
-        const entry = `- **${s.name}**: ${s.description}`;
         const loc = s.location;
         if (loc.includes('/bundle/') || loc.includes('\\bundle\\')) {
-          builtinSkills.push(entry);
+          builtinSkills.push(`- **${s.name}**: ${s.description}`);
         } else if (loc.startsWith(userSkillsDir)) {
-          globalSkills.push(entry);
+          globalSkills.push(`- **${s.name}**: ${s.description} (${loc})`);
         } else if (
           loc.includes('/extensions/') ||
           loc.includes('\\extensions\\')
         ) {
-          extensionSkills.push(entry);
+          extensionSkills.push(`- **${s.name}**: ${s.description}`);
         } else {
-          workspaceSkills.push(entry);
+          workspaceSkills.push(`- **${s.name}**: ${s.description} (${loc})`);
         }
       }
 
@@ -494,6 +815,89 @@ function buildAgentLoopContext(config: Config): AgentLoopContext {
 }
 
 /**
+ * Validates all .patch files in the skills directory using the `diff` library.
+ * Parses each patch, reads the target file(s), and attempts a dry-run apply.
+ * Removes patches that fail validation. Returns the filenames of valid patches.
+ */
+export async function validatePatches(
+  skillsDir: string,
+  config: Config,
+): Promise<string[]> {
+  let entries: string[];
+  try {
+    entries = await fs.readdir(skillsDir);
+  } catch {
+    return [];
+  }
+
+  const patchFiles = entries.filter((e) => e.endsWith('.patch'));
+  const validPatches: string[] = [];
+
+  for (const patchFile of patchFiles) {
+    const patchPath = path.join(skillsDir, patchFile);
+    let valid = true;
+    let reason = '';
+
+    try {
+      const patchContent = await fs.readFile(patchPath, 'utf-8');
+      const parsedPatches = Diff.parsePatch(patchContent);
+
+      if (!hasParsedPatchHunks(parsedPatches)) {
+        valid = false;
+        reason = 'no hunks found in patch';
+      } else {
+        const applied = await applyParsedSkillPatches(parsedPatches, config);
+        if (!applied.success) {
+          valid = false;
+          switch (applied.reason) {
+            case 'missingTargetPath':
+              reason = 'missing target file path in patch header';
+              break;
+            case 'invalidPatchHeaders':
+              reason = 'invalid diff headers';
+              break;
+            case 'outsideAllowedRoots':
+              reason = `target file is outside skill roots: ${applied.targetPath}`;
+              break;
+            case 'newFileAlreadyExists':
+              reason = `new file target already exists: ${applied.targetPath}`;
+              break;
+            case 'targetNotFound':
+              reason = `target file not found: ${applied.targetPath}`;
+              break;
+            case 'doesNotApply':
+              reason = `patch does not apply cleanly to ${applied.targetPath}`;
+              break;
+            default:
+              reason = 'unknown patch validation failure';
+              break;
+          }
+        }
+      }
+    } catch (err) {
+      valid = false;
+      reason = `failed to read or parse patch: ${err}`;
+    }
+
+    if (valid) {
+      validPatches.push(patchFile);
+      debugLogger.log(`[MemoryService] Patch validated: ${patchFile}`);
+    } else {
+      debugLogger.warn(
+        `[MemoryService] Removing invalid patch ${patchFile}: ${reason}`,
+      );
+      try {
+        await fs.unlink(patchPath);
+      } catch {
+        // Best-effort cleanup
+      }
+    }
+  }
+
+  return validPatches;
+}
+
+/**
  * Main entry point for the skill extraction background task.
  * Designed to be called fire-and-forget on session startup.
  *
@@ -545,14 +949,12 @@ export async function startMemoryService(config: Config): Promise<void> {
 
     // Build session index: all eligible sessions with summaries + file paths.
     // The agent decides which to read in full via read_file.
-    const { sessionIndex, newSessionIds } = await buildSessionIndex(
-      chatsDir,
-      state,
-    );
+    const { sessionIndex, newSessionIds, candidateSessions } =
+      await buildSessionIndex(chatsDir, state);
 
     const totalInIndex = sessionIndex ? sessionIndex.split('\n').length : 0;
     debugLogger.log(
-      `[MemoryService] Session scan: ${totalInIndex} eligible session(s) found, ${newSessionIds.length} new`,
+      `[MemoryService] Session scan: ${totalInIndex} indexed session(s), ${candidateSessions.length} surfaced as new candidates`,
     );
 
     if (newSessionIds.length === 0) {
@@ -562,9 +964,21 @@ export async function startMemoryService(config: Config): Promise<void> {
 
     // Snapshot existing skill directories before extraction
     const skillsBefore = new Set<string>();
+    const patchContentsBefore = new Map<string, string>();
     try {
       const entries = await fs.readdir(skillsDir);
       for (const e of entries) {
+        if (e.endsWith('.patch')) {
+          try {
+            patchContentsBefore.set(
+              e,
+              await fs.readFile(path.join(skillsDir, e), 'utf-8'),
+            );
+          } catch {
+            // Ignore unreadable existing patches.
+          }
+          continue;
+        }
         skillsBefore.add(e);
       }
     } catch {
@@ -603,10 +1017,58 @@ export async function startMemoryService(config: Config): Promise<void> {
       `[MemoryService] Starting extraction agent (model: ${agentDefinition.modelConfig.model}, maxTurns: 30, maxTime: 30min)`,
     );
 
-    // Create and run the extraction agent
-    const executor = await LocalAgentExecutor.create(agentDefinition, context);
+    const candidateSessionsByPath = new Map(
+      candidateSessions.map((session) => [
+        path.resolve(session.filePath),
+        session,
+      ]),
+    );
+    const pendingReadFileSessions = new Map<string, SessionVersion>();
+    const processedSessionKeys = new Set<string>();
 
-    await executor.run(
+    // Create and run the extraction agent
+    const executor = await LocalAgentExecutor.create(
+      agentDefinition,
+      context,
+      (activity) => {
+        const readFileCallId = getReadFileCallId(activity);
+
+        if (activity.type === 'TOOL_CALL_START') {
+          const resolvedPath = getResolvedActivityFilePath(config, activity);
+          if (!resolvedPath || !readFileCallId) {
+            return;
+          }
+
+          const session = candidateSessionsByPath.get(resolvedPath);
+          if (!session) {
+            return;
+          }
+
+          pendingReadFileSessions.set(readFileCallId, session);
+          return;
+        }
+
+        if (!readFileCallId) {
+          return;
+        }
+
+        const session = pendingReadFileSessions.get(readFileCallId);
+        if (!session) {
+          return;
+        }
+
+        pendingReadFileSessions.delete(readFileCallId);
+
+        if (
+          activity.type === 'TOOL_CALL_END' &&
+          !isToolActivityError(activity.data['data'])
+        ) {
+          processedSessionKeys.add(getSessionVersionKey(session));
+        }
+      },
+    );
+
+    const executorResult = await executor.run(
       { request: 'Extract skills from the provided sessions.' },
       abortController.signal,
     );
@@ -618,7 +1080,7 @@ export async function startMemoryService(config: Config): Promise<void> {
     try {
       const entriesAfter = await fs.readdir(skillsDir);
       for (const e of entriesAfter) {
-        if (!skillsBefore.has(e)) {
+        if (!skillsBefore.has(e) && !e.endsWith('.patch')) {
           skillsCreated.push(e);
         }
       }
@@ -626,29 +1088,90 @@ export async function startMemoryService(config: Config): Promise<void> {
       // Skills dir read failed
     }
 
+    // Validate any .patch files the agent generated
+    const validPatches = await validatePatches(skillsDir, config);
+    const patchesCreatedThisRun: string[] = [];
+    for (const patchFile of validPatches) {
+      const patchPath = path.join(skillsDir, patchFile);
+      let currentContent: string;
+      try {
+        currentContent = await fs.readFile(patchPath, 'utf-8');
+      } catch {
+        continue;
+      }
+      if (patchContentsBefore.get(patchFile) !== currentContent) {
+        patchesCreatedThisRun.push(patchFile);
+      }
+    }
+    if (validPatches.length > 0) {
+      debugLogger.log(
+        `[MemoryService] ${validPatches.length} valid patch(es) currently in inbox; ${patchesCreatedThisRun.length} created or updated this run`,
+      );
+    }
+
+    const processedSessions = candidateSessions
+      .filter((session) =>
+        processedSessionKeys.has(getSessionVersionKey(session)),
+      )
+      .map((session) => ({
+        sessionId: session.sessionId,
+        lastUpdated: session.lastUpdated,
+      }));
+
     // Record the run with full metadata
     const run: ExtractionRun = {
       runAt: new Date().toISOString(),
-      sessionIds: newSessionIds,
+      sessionIds: processedSessions.map((session) => session.sessionId),
+      candidateSessions: candidateSessions.map((session) => ({
+        sessionId: session.sessionId,
+        lastUpdated: session.lastUpdated,
+      })),
+      processedSessions,
       skillsCreated,
+      turnCount: normalizeOptionalNumber(executorResult?.turn_count),
+      durationMs: normalizeOptionalNumber(executorResult?.duration_ms),
+      terminateReason: normalizeOptionalString(
+        executorResult?.terminate_reason,
+      ),
     };
     const updatedState: ExtractionState = {
       runs: [...state.runs, run],
     };
     await writeExtractionState(statePath, updatedState);
 
-    if (skillsCreated.length > 0) {
+    if (skillsCreated.length > 0 || patchesCreatedThisRun.length > 0) {
+      const completionParts: string[] = [];
+      if (skillsCreated.length > 0) {
+        completionParts.push(
+          `created ${skillsCreated.length} skill(s): ${skillsCreated.join(', ')}`,
+        );
+      }
+      if (patchesCreatedThisRun.length > 0) {
+        completionParts.push(
+          `prepared ${patchesCreatedThisRun.length} patch(es): ${patchesCreatedThisRun.join(', ')}`,
+        );
+      }
       debugLogger.log(
-        `[MemoryService] Completed in ${elapsed}s. Created ${skillsCreated.length} skill(s): ${skillsCreated.join(', ')}`,
+        `[MemoryService] Completed in ${elapsed}s. ${completionParts.join('; ')} (read ${processedSessions.length}/${candidateSessions.length} surfaced session(s))`,
       );
-      const skillList = skillsCreated.join(', ');
+      const feedbackParts: string[] = [];
+      if (skillsCreated.length > 0) {
+        feedbackParts.push(
+          `${skillsCreated.length} new skill${skillsCreated.length > 1 ? 's' : ''} extracted from past sessions: ${skillsCreated.join(', ')}`,
+        );
+      }
+      if (patchesCreatedThisRun.length > 0) {
+        feedbackParts.push(
+          `${patchesCreatedThisRun.length} skill update${patchesCreatedThisRun.length > 1 ? 's' : ''} extracted from past sessions`,
+        );
+      }
       coreEvents.emitFeedback(
         'info',
-        `${skillsCreated.length} new skill${skillsCreated.length > 1 ? 's' : ''} extracted from past sessions: ${skillList}. Use /memory inbox to review.`,
+        `${feedbackParts.join('. ')}. Use /memory inbox to review.`,
       );
     } else {
       debugLogger.log(
-        `[MemoryService] Completed in ${elapsed}s. No new skills created (processed ${newSessionIds.length} session(s))`,
+        `[MemoryService] Completed in ${elapsed}s. No new skills or patches created (read ${processedSessions.length}/${candidateSessions.length} surfaced session(s))`,
       );
     }
   } catch (error) {

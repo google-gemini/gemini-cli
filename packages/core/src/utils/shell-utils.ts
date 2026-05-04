@@ -240,11 +240,15 @@ foreach ($commandAst in $commandAsts) {
   'utf16le',
 ).toString('base64');
 
-const REDIRECTION_NAMES = new Set([
+export const REDIRECTION_NAMES = new Set([
   'redirection (<)',
   'redirection (>)',
   'heredoc (<<)',
   'herestring (<<<)',
+  'command substitution',
+  'backtick substitution',
+  'process substitution',
+  'subshell',
 ]);
 
 function createParser(): Parser | null {
@@ -360,6 +364,14 @@ function extractNameFromNode(node: Node): string | null {
       return 'heredoc (<<)';
     case 'herestring_redirect':
       return 'herestring (<<<)';
+    case 'command_substitution':
+      return 'command substitution';
+    case 'backtick_substitution':
+      return 'backtick substitution';
+    case 'process_substitution':
+      return 'process substitution';
+    case 'subshell':
+      return 'subshell';
     default:
       return null;
   }
@@ -1019,4 +1031,120 @@ export async function* execStreaming(
   } finally {
     prepared.cleanup?.();
   }
+}
+
+export function detectCommandSubstitution(command: string): boolean {
+  const shell = getShellConfiguration().shell;
+  const isPowerShell =
+    typeof shell === 'string' &&
+    (shell.toLowerCase().includes('powershell') ||
+      shell.toLowerCase().includes('pwsh'));
+  if (isPowerShell) {
+    return detectPowerShellSubstitution(command);
+  }
+  return detectBashSubstitution(command);
+}
+
+function detectBashSubstitution(command: string): boolean {
+  let inSingleQuote = false;
+  let inDoubleQuote = false;
+  let i = 0;
+  while (i < command.length) {
+    const char = command[i];
+    if (char === "'" && !inDoubleQuote) {
+      inSingleQuote = !inSingleQuote;
+      i++;
+      continue;
+    }
+    if (char === '"' && !inSingleQuote) {
+      inDoubleQuote = !inDoubleQuote;
+      i++;
+      continue;
+    }
+    if (inSingleQuote) {
+      i++;
+      continue;
+    }
+    if (char === '\\' && i + 1 < command.length) {
+      if (inDoubleQuote) {
+        const next = command[i + 1];
+        if (['$', '`', '"', '\\', '\n'].includes(next)) {
+          i += 2;
+          continue;
+        }
+      } else {
+        i += 2;
+        continue;
+      }
+    }
+    if (char === '$' && command[i + 1] === '(') {
+      return true;
+    }
+    if (
+      !inDoubleQuote &&
+      (char === '<' || char === '>') &&
+      command[i + 1] === '('
+    ) {
+      return true;
+    }
+    if (char === '`') {
+      return true;
+    }
+    i++;
+  }
+  return false;
+}
+
+const POWERSHELL_KEYWORD_RE =
+  /\b(if|elseif|else|foreach|for|while|do|switch|try|catch|finally|until|trap|function|filter)(\s+[-\w]+)*\s*$/i;
+
+function detectPowerShellSubstitution(command: string): boolean {
+  let inSingleQuote = false;
+  let inDoubleQuote = false;
+  let i = 0;
+  while (i < command.length) {
+    const char = command[i];
+
+    if (char === "'" && !inDoubleQuote) {
+      inSingleQuote = !inSingleQuote;
+      i++;
+      continue;
+    }
+    if (char === '"' && !inSingleQuote) {
+      inDoubleQuote = !inDoubleQuote;
+      i++;
+      continue;
+    }
+
+    if (inSingleQuote) {
+      i++;
+      continue;
+    }
+    if (char === '`' && i + 1 < command.length) {
+      i += 2;
+      continue;
+    }
+    if (char === '$' && command[i + 1] === '(') {
+      return true;
+    }
+    if (!inDoubleQuote && char === '@' && command[i + 1] === '(') {
+      return true;
+    }
+    if (!inDoubleQuote && char === '(') {
+      const before = command.slice(0, i).trimEnd();
+      const prevChar = before[before.length - 1];
+      if (prevChar === '(') {
+        i++;
+        continue;
+      }
+      if (POWERSHELL_KEYWORD_RE.test(before)) {
+        i++;
+        continue;
+      }
+      return true;
+    }
+
+    i++;
+  }
+  return false;
 }

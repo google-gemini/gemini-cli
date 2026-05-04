@@ -20,6 +20,7 @@ import { ProjectRegistry } from './projectRegistry.js';
 import { StorageMigration } from './storageMigration.js';
 
 export const OAUTH_FILE = 'oauth_creds.json';
+export const TRUSTED_FOLDERS_FILENAME = 'trustedFolders.json';
 const TMP_DIR_NAME = 'tmp';
 const BIN_DIR_NAME = 'bin';
 const AGENTS_DIR_NAME = '.agents';
@@ -28,7 +29,7 @@ export const AUTO_SAVED_POLICY_FILENAME = 'auto-saved.toml';
 
 export class Storage {
   private readonly targetDir: string;
-  private readonly sessionId: string | undefined;
+  private sessionId: string | undefined;
   private projectIdentifier: string | undefined;
   private initPromise: Promise<void> | undefined;
   private customPlansDir: string | undefined;
@@ -40,6 +41,14 @@ export class Storage {
 
   setCustomPlansDir(dir: string | undefined): void {
     this.customPlansDir = dir;
+  }
+
+  setSessionId(sessionId: string | undefined): void {
+    this.sessionId = sessionId;
+  }
+
+  isInitialized(): boolean {
+    return !!this.projectIdentifier;
   }
 
   static getGlobalGeminiDir(): string {
@@ -76,6 +85,13 @@ export class Storage {
 
   static getGoogleAccountsPath(): string {
     return path.join(Storage.getGlobalGeminiDir(), GOOGLE_ACCOUNTS_FILENAME);
+  }
+
+  static getTrustedFoldersPath(): string {
+    if (process.env['GEMINI_CLI_TRUSTED_FOLDERS_PATH']) {
+      return process.env['GEMINI_CLI_TRUSTED_FOLDERS_PATH'];
+    }
+    return path.join(Storage.getGlobalGeminiDir(), TRUSTED_FOLDERS_FILENAME);
   }
 
   static getUserCommandsDir(): string {

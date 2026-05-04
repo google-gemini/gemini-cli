@@ -5,7 +5,7 @@
  */
 
 import fs from 'node:fs';
-import path from 'node:path';
+import path, { join } from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import {
@@ -25,7 +25,13 @@ import {
   getSecureSanitizationConfig,
 } from '../../services/environmentSanitization.js';
 import { debugLogger } from '../../utils/debugLogger.js';
-import { spawnAsync, getCommandName } from '../../utils/shell-utils.js';
+import {
+  spawnAsync,
+  getCommandName,
+  initializeShellParsers,
+  getCommandRoots,
+  stripShellWrapper,
+} from '../../utils/shell-utils.js';
 import {
   isKnownSafeCommand,
   isDangerousCommand,
@@ -33,6 +39,7 @@ import {
 } from './commandSafety.js';
 import { verifySandboxOverrides } from '../utils/commandUtils.js';
 import { parseWindowsSandboxDenials } from './windowsSandboxDenialUtils.js';
+import { isErrnoException } from '../utils/fsUtils.js';
 import {
   isSubpath,
   resolveToRealPath,
@@ -53,9 +60,12 @@ const __dirname = path.dirname(__filename);
  */
 export class WindowsSandboxManager implements SandboxManager {
   static readonly HELPER_EXE = 'GeminiSandbox.exe';
+
   private readonly helperPath: string;
-  private initialized = false;
   private readonly denialCache: SandboxDenialCache = createSandboxDenialCache();
+
+  private static helperCompiled = false;
+  private governanceFilesInitialized = false;
 
   constructor(private readonly options: GlobalSandboxOptions) {
     this.helperPath = path.resolve(__dirname, WindowsSandboxManager.HELPER_EXE);
@@ -86,33 +96,20 @@ export class WindowsSandboxManager implements SandboxManager {
     return this.options;
   }
 
-  /**
-   * Ensures a file or directory exists.
-   */
-  private touch(filePath: string, isDirectory: boolean): void {
-    assertValidPathString(filePath);
-    try {
-      // If it exists (even as a broken symlink), do nothing
-      if (fs.lstatSync(filePath)) return;
-    } catch {
-      // Ignore ENOENT
+  private ensureGovernanceFilesExist(workspace: string): void {
+    if (this.governanceFilesInitialized) return;
+
+    // These must exist on the host before running the sandbox to ensure they are protected.
+    for (const file of GOVERNANCE_FILES) {
+      const filePath = join(workspace, file.path);
+      touch(filePath, file.isDirectory);
     }
 
-    if (isDirectory) {
-      fs.mkdirSync(filePath, { recursive: true });
-    } else {
-      const dir = path.dirname(filePath);
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-      }
-      fs.closeSync(fs.openSync(filePath, 'a'));
-    }
+    this.governanceFilesInitialized = true;
   }
 
-  private async ensureInitialized(): Promise<void> {
-    if (this.initialized) return;
-    if (os.platform() !== 'win32') {
-      this.initialized = true;
+  private async ensureHelperCompiled(): Promise<void> {
+    if (WindowsSandboxManager.helperCompiled || os.platform() !== 'win32') {
       return;
     }
 
@@ -207,14 +204,14 @@ export class WindowsSandboxManager implements SandboxManager {
       );
     }
 
-    this.initialized = true;
+    WindowsSandboxManager.helperCompiled = true;
   }
 
   /**
    * Prepares a command for sandboxed execution on Windows.
    */
   async prepareCommand(req: SandboxRequest): Promise<SandboxedCommand> {
-    await this.ensureInitialized();
+    await this.ensureHelperCompiled();
 
     const sanitizationConfig = getSecureSanitizationConfig(
       req.policy?.sanitizationConfig,
@@ -270,11 +267,21 @@ export class WindowsSandboxManager implements SandboxManager {
       this.options.modeConfig?.network ?? req.policy?.networkAccess ?? false;
     const networkAccess = defaultNetwork || mergedAdditional.network;
 
+    await initializeShellParsers();
+    const fullCmd = [command, ...args].join(' ');
+    const stripped = stripShellWrapper(fullCmd);
+    const roots = getCommandRoots(stripped).filter(
+      (r) => r !== 'shopt' && r !== 'set',
+    );
+    const isGitCommand = roots.includes('git');
+
     const resolvedPaths = await resolveSandboxPaths(
       this.options,
       req,
       mergedAdditional,
     );
+
+    this.ensureGovernanceFilesExist(resolvedPaths.workspace.resolved);
 
     // 1. Collect all forbidden paths.
     // We start with explicitly forbidden paths from the options and request.
@@ -355,6 +362,13 @@ export class WindowsSandboxManager implements SandboxManager {
 
     if (workspaceWrite) {
       addWritableRoot(resolvedPaths.workspace.resolved);
+
+      // If the workspace is writable and we're running a git command,
+      // automatically allow write access to the .git directory.
+      if (isGitCommand) {
+        const gitDir = path.join(resolvedPaths.workspace.resolved, '.git');
+        addWritableRoot(gitDir);
+      }
     }
 
     // B. Globally included directories
@@ -400,14 +414,6 @@ export class WindowsSandboxManager implements SandboxManager {
     // Read access is inherited; skip addWritableRoot to ensure write protection.
     if (resolvedPaths.gitWorktree) {
       // No-op for read access on Windows.
-    }
-
-    // 4. Protected governance files
-    // These must exist on the host before running the sandbox to prevent
-    // the sandboxed process from creating them with Low integrity.
-    for (const file of GOVERNANCE_FILES) {
-      const filePath = path.join(resolvedPaths.workspace.resolved, file.path);
-      this.touch(filePath, file.isDirectory);
     }
 
     // 5. Generate Manifests
@@ -469,5 +475,31 @@ export class WindowsSandboxManager implements SandboxManager {
       resolvedPath.toLowerCase().startsWith(programFiles.toLowerCase()) ||
       resolvedPath.toLowerCase().startsWith(programFilesX86.toLowerCase())
     );
+  }
+}
+
+/**
+ * Ensures a file or directory exists.
+ */
+function touch(filePath: string, isDirectory: boolean): void {
+  assertValidPathString(filePath);
+  try {
+    // If it exists (even as a broken symlink), do nothing
+    fs.lstatSync(filePath);
+    return;
+  } catch (e: unknown) {
+    if (isErrnoException(e) && e.code !== 'ENOENT') {
+      throw e;
+    }
+  }
+
+  if (isDirectory) {
+    fs.mkdirSync(filePath, { recursive: true });
+  } else {
+    const dir = path.dirname(filePath);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    fs.closeSync(fs.openSync(filePath, 'a'));
   }
 }

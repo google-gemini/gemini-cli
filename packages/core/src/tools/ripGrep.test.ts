@@ -4,20 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  describe,
-  it,
-  expect,
-  beforeEach,
-  afterEach,
-  afterAll,
-  vi,
-} from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   canUseRipgrep,
   RipGrepTool,
   ensureRgPath,
   type RipGrepToolParams,
+  getRipgrepPath,
 } from './ripGrep.js';
 import type { GrepResult } from './tools.js';
 import path from 'node:path';
@@ -25,18 +18,21 @@ import { isSubpath } from '../utils/paths.js';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import type { Config } from '../config/config.js';
-import { Storage } from '../config/storage.js';
 import { GEMINI_IGNORE_FILE_NAME } from '../config/constants.js';
 import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { PassThrough, Readable } from 'node:stream';
 import EventEmitter from 'node:events';
-import { downloadRipGrep } from '@joshua.litt/get-ripgrep';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
-// Mock dependencies for canUseRipgrep
-vi.mock('@joshua.litt/get-ripgrep', () => ({
-  downloadRipGrep: vi.fn(),
-}));
+import { fileExists } from '../utils/fileUtils.js';
+
+vi.mock('../utils/fileUtils.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../utils/fileUtils.js')>();
+  return {
+    ...actual,
+    fileExists: vi.fn(),
+  };
+});
 
 // Mock child_process for ripgrep calls
 vi.mock('child_process', () => ({
@@ -44,161 +40,42 @@ vi.mock('child_process', () => ({
 }));
 
 const mockSpawn = vi.mocked(spawn);
-const downloadRipGrepMock = vi.mocked(downloadRipGrep);
-const originalGetGlobalBinDir = Storage.getGlobalBinDir.bind(Storage);
-const storageSpy = vi.spyOn(Storage, 'getGlobalBinDir');
-
-function getRipgrepBinaryName() {
-  return process.platform === 'win32' ? 'rg.exe' : 'rg';
-}
 
 describe('canUseRipgrep', () => {
-  let tempRootDir: string;
-  let binDir: string;
-
-  beforeEach(async () => {
-    downloadRipGrepMock.mockReset();
-    downloadRipGrepMock.mockResolvedValue(undefined);
-    tempRootDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ripgrep-bin-'));
-    binDir = path.join(tempRootDir, 'bin');
-    await fs.mkdir(binDir, { recursive: true });
-    storageSpy.mockImplementation(() => binDir);
-  });
-
-  afterEach(async () => {
-    storageSpy.mockImplementation(() => originalGetGlobalBinDir());
-    await fs.rm(tempRootDir, { recursive: true, force: true });
+  beforeEach(() => {
+    vi.mocked(fileExists).mockReset();
   });
 
   it('should return true if ripgrep already exists', async () => {
-    const existingPath = path.join(binDir, getRipgrepBinaryName());
-    await fs.writeFile(existingPath, '');
-
+    vi.mocked(fileExists).mockResolvedValue(true);
     const result = await canUseRipgrep();
     expect(result).toBe(true);
-    expect(downloadRipGrepMock).not.toHaveBeenCalled();
   });
 
-  it('should download ripgrep and return true if it does not exist initially', async () => {
-    const expectedPath = path.join(binDir, getRipgrepBinaryName());
-
-    downloadRipGrepMock.mockImplementation(async () => {
-      await fs.writeFile(expectedPath, '');
-    });
-
+  it('should return false if file does not exist', async () => {
+    vi.mocked(fileExists).mockResolvedValue(false);
     const result = await canUseRipgrep();
-
-    expect(result).toBe(true);
-    expect(downloadRipGrep).toHaveBeenCalledWith(binDir);
-    await expect(fs.access(expectedPath)).resolves.toBeUndefined();
-  });
-
-  it('should return false if download fails and file does not exist', async () => {
-    const result = await canUseRipgrep();
-
     expect(result).toBe(false);
-    expect(downloadRipGrep).toHaveBeenCalledWith(binDir);
-  });
-
-  it('should propagate errors from downloadRipGrep', async () => {
-    const error = new Error('Download failed');
-    downloadRipGrepMock.mockRejectedValue(error);
-
-    await expect(canUseRipgrep()).rejects.toThrow(error);
-    expect(downloadRipGrep).toHaveBeenCalledWith(binDir);
-  });
-
-  it('should only download once when called concurrently', async () => {
-    const expectedPath = path.join(binDir, getRipgrepBinaryName());
-
-    downloadRipGrepMock.mockImplementation(
-      () =>
-        new Promise<void>((resolve, reject) => {
-          setTimeout(() => {
-            fs.writeFile(expectedPath, '')
-              .then(() => resolve())
-              .catch(reject);
-          }, 0);
-        }),
-    );
-
-    const firstCall = ensureRgPath();
-    const secondCall = ensureRgPath();
-
-    const [pathOne, pathTwo] = await Promise.all([firstCall, secondCall]);
-
-    expect(pathOne).toBe(expectedPath);
-    expect(pathTwo).toBe(expectedPath);
-    expect(downloadRipGrepMock).toHaveBeenCalledTimes(1);
-    await expect(fs.access(expectedPath)).resolves.toBeUndefined();
   });
 });
 
 describe('ensureRgPath', () => {
-  let tempRootDir: string;
-  let binDir: string;
-
-  beforeEach(async () => {
-    downloadRipGrepMock.mockReset();
-    downloadRipGrepMock.mockResolvedValue(undefined);
-    tempRootDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ripgrep-bin-'));
-    binDir = path.join(tempRootDir, 'bin');
-    await fs.mkdir(binDir, { recursive: true });
-    storageSpy.mockImplementation(() => binDir);
-  });
-
-  afterEach(async () => {
-    storageSpy.mockImplementation(() => originalGetGlobalBinDir());
-    await fs.rm(tempRootDir, { recursive: true, force: true });
+  beforeEach(() => {
+    vi.mocked(fileExists).mockReset();
   });
 
   it('should return rg path if ripgrep already exists', async () => {
-    const existingPath = path.join(binDir, getRipgrepBinaryName());
-    await fs.writeFile(existingPath, '');
-
+    vi.mocked(fileExists).mockResolvedValue(true);
     const rgPath = await ensureRgPath();
-    expect(rgPath).toBe(existingPath);
-    expect(downloadRipGrep).not.toHaveBeenCalled();
+    expect(rgPath).toBe(await getRipgrepPath());
   });
 
-  it('should return rg path if ripgrep is downloaded successfully', async () => {
-    const expectedPath = path.join(binDir, getRipgrepBinaryName());
-
-    downloadRipGrepMock.mockImplementation(async () => {
-      await fs.writeFile(expectedPath, '');
-    });
-
-    const rgPath = await ensureRgPath();
-    expect(rgPath).toBe(expectedPath);
-    expect(downloadRipGrep).toHaveBeenCalledTimes(1);
-    await expect(fs.access(expectedPath)).resolves.toBeUndefined();
+  it('should throw an error if ripgrep cannot be used', async () => {
+    vi.mocked(fileExists).mockResolvedValue(false);
+    await expect(ensureRgPath()).rejects.toThrow(
+      /Cannot find bundled ripgrep binary/,
+    );
   });
-
-  it('should throw an error if ripgrep cannot be used after download attempt', async () => {
-    await expect(ensureRgPath()).rejects.toThrow('Cannot use ripgrep.');
-    expect(downloadRipGrep).toHaveBeenCalledTimes(1);
-  });
-
-  it('should propagate errors from downloadRipGrep', async () => {
-    const error = new Error('Download failed');
-    downloadRipGrepMock.mockRejectedValue(error);
-
-    await expect(ensureRgPath()).rejects.toThrow(error);
-    expect(downloadRipGrep).toHaveBeenCalledWith(binDir);
-  });
-
-  it.runIf(process.platform === 'win32')(
-    'should detect ripgrep when only rg.exe exists on Windows',
-    async () => {
-      const expectedRgExePath = path.join(binDir, 'rg.exe');
-      await fs.writeFile(expectedRgExePath, '');
-
-      const rgPath = await ensureRgPath();
-      expect(rgPath).toBe(expectedRgExePath);
-      expect(downloadRipGrep).not.toHaveBeenCalled();
-      await expect(fs.access(expectedRgExePath)).resolves.toBeUndefined();
-    },
-  );
 });
 
 // Helper function to create mock spawn implementations
@@ -247,9 +124,6 @@ function createMockSpawn(
 
 describe('RipGrepTool', () => {
   let tempRootDir: string;
-  let tempBinRoot: string;
-  let binDir: string;
-  let ripgrepBinaryPath: string;
   let grepTool: RipGrepTool;
   const abortSignal = new AbortController().signal;
 
@@ -266,18 +140,11 @@ describe('RipGrepTool', () => {
   } as unknown as Config;
 
   beforeEach(async () => {
-    downloadRipGrepMock.mockReset();
-    downloadRipGrepMock.mockResolvedValue(undefined);
     mockSpawn.mockReset();
     mockSpawn.mockImplementation(createMockSpawn());
-    tempBinRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'ripgrep-bin-'));
-    binDir = path.join(tempBinRoot, 'bin');
-    await fs.mkdir(binDir, { recursive: true });
-    const binaryName = process.platform === 'win32' ? 'rg.exe' : 'rg';
-    ripgrepBinaryPath = path.join(binDir, binaryName);
-    await fs.writeFile(ripgrepBinaryPath, '');
-    storageSpy.mockImplementation(() => binDir);
     tempRootDir = await fs.mkdtemp(path.join(os.tmpdir(), 'grep-tool-root-'));
+
+    vi.mocked(fileExists).mockResolvedValue(true);
 
     mockConfig = {
       getTargetDir: () => tempRootDir,
@@ -335,9 +202,7 @@ describe('RipGrepTool', () => {
   });
 
   afterEach(async () => {
-    storageSpy.mockImplementation(() => originalGetGlobalBinDir());
     await fs.rm(tempRootDir, { recursive: true, force: true });
-    await fs.rm(tempBinRoot, { recursive: true, force: true });
   });
 
   describe('validateToolParams', () => {
@@ -834,16 +699,16 @@ describe('RipGrepTool', () => {
     });
 
     it('should throw an error if ripgrep is not available', async () => {
-      await fs.rm(ripgrepBinaryPath, { force: true });
-      downloadRipGrepMock.mockResolvedValue(undefined);
+      vi.mocked(fileExists).mockResolvedValue(false);
 
       const params: RipGrepToolParams = { pattern: 'world' };
       const invocation = grepTool.build(params);
 
-      expect(await invocation.execute({ abortSignal })).toStrictEqual({
-        llmContent: 'Error during grep search operation: Cannot use ripgrep.',
-        returnDisplay: 'Error: Cannot use ripgrep.',
-      });
+      const result = await invocation.execute({ abortSignal });
+      expect(result.llmContent).toContain('Cannot find bundled ripgrep binary');
+
+      // restore the mock for subsequent tests
+      vi.mocked(fileExists).mockResolvedValue(true);
     });
   });
 
@@ -2080,6 +1945,70 @@ describe('RipGrepTool', () => {
   });
 });
 
-afterAll(() => {
-  storageSpy.mockRestore();
+describe('getRipgrepPath', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  describe('OS/Architecture Resolution', () => {
+    it.each([
+      { platform: 'darwin', arch: 'arm64', expectedBin: 'rg-darwin-arm64' },
+      { platform: 'darwin', arch: 'x64', expectedBin: 'rg-darwin-x64' },
+      { platform: 'linux', arch: 'arm64', expectedBin: 'rg-linux-arm64' },
+      { platform: 'linux', arch: 'x64', expectedBin: 'rg-linux-x64' },
+      { platform: 'win32', arch: 'x64', expectedBin: 'rg-win32-x64.exe' },
+    ])(
+      'should map $platform $arch to $expectedBin',
+      async ({ platform, arch, expectedBin }) => {
+        vi.spyOn(os, 'platform').mockReturnValue(platform as NodeJS.Platform);
+        vi.spyOn(os, 'arch').mockReturnValue(arch);
+        vi.mocked(fileExists).mockImplementation(async (checkPath) =>
+          checkPath.endsWith(expectedBin),
+        );
+
+        const resolvedPath = await getRipgrepPath();
+        expect(resolvedPath).not.toBeNull();
+        expect(resolvedPath?.endsWith(expectedBin)).toBe(true);
+      },
+    );
+  });
+
+  describe('Path Fallback Logic', () => {
+    beforeEach(() => {
+      vi.spyOn(os, 'platform').mockReturnValue('linux');
+      vi.spyOn(os, 'arch').mockReturnValue('x64');
+    });
+
+    it('should resolve the SEA (flattened) path first', async () => {
+      vi.mocked(fileExists).mockImplementation(async (checkPath) =>
+        checkPath.includes(path.normalize('tools/vendor/ripgrep')),
+      );
+
+      const resolvedPath = await getRipgrepPath();
+      expect(resolvedPath).not.toBeNull();
+      expect(resolvedPath).toContain(path.normalize('tools/vendor/ripgrep'));
+    });
+
+    it('should fall back to the Dev path if SEA path is missing', async () => {
+      vi.mocked(fileExists).mockImplementation(
+        async (checkPath) =>
+          checkPath.includes(path.normalize('core/vendor/ripgrep')) &&
+          !checkPath.includes(path.join(path.sep, 'tools', path.sep)),
+      );
+
+      const resolvedPath = await getRipgrepPath();
+      expect(resolvedPath).not.toBeNull();
+      expect(resolvedPath).toContain(path.normalize('core/vendor/ripgrep'));
+      expect(resolvedPath).not.toContain(
+        path.join(path.sep, 'tools', path.sep),
+      );
+    });
+
+    it('should return null if binary is missing from both paths', async () => {
+      vi.mocked(fileExists).mockResolvedValue(false);
+
+      const resolvedPath = await getRipgrepPath();
+      expect(resolvedPath).toBeNull();
+    });
+  });
 });

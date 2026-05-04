@@ -34,8 +34,8 @@ export const ALL_ITEMS = [
   },
   {
     id: 'quota',
-    header: '/stats',
-    description: 'Remaining usage on daily limit (not shown when unavailable)',
+    header: 'quota',
+    description: 'Percentage of daily limit used (not shown when unavailable)',
   },
   {
     id: 'memory-usage',

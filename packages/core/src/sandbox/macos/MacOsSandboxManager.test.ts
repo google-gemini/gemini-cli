@@ -5,7 +5,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { MacOsSandboxManager } from './MacOsSandboxManager.js';
-import type { ExecutionPolicy } from '../../services/sandboxManager.js';
+import { type ExecutionPolicy } from '../../services/sandboxManager.js';
 import * as seatbeltArgsBuilder from './seatbeltArgsBuilder.js';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -188,28 +188,6 @@ describe('MacOsSandboxManager', () => {
         );
         expect(result.args[result.args.length - 2]).toBe('_');
         expect(result.args[result.args.length - 1]).toBe(testFile);
-      });
-    });
-
-    describe('governance files', () => {
-      it('should ensure governance files exist', async () => {
-        await manager.prepareCommand({
-          command: 'echo',
-          args: [],
-          cwd: mockWorkspace,
-          env: {},
-          policy: mockPolicy,
-        });
-
-        // The seatbelt builder internally handles governance files, so we simply verify
-        // it is invoked correctly with the right workspace.
-        expect(seatbeltArgsBuilder.buildSeatbeltProfile).toHaveBeenCalledWith(
-          expect.objectContaining({
-            resolvedPaths: expect.objectContaining({
-              workspace: { resolved: mockWorkspace, original: mockWorkspace },
-            }),
-          }),
-        );
       });
     });
 

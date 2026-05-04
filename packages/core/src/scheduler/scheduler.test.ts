@@ -178,6 +178,7 @@ describe('Scheduler (Orchestrator)', () => {
       setApprovalMode: vi.fn(),
       getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
       getTelemetryLogPromptsEnabled: vi.fn().mockReturnValue(false),
+      getTelemetryTracesEnabled: vi.fn().mockReturnValue(false),
       getSessionId: vi.fn().mockReturnValue('test-session-id'),
     } as unknown as Mocked<Config>;
 
@@ -1517,6 +1518,7 @@ describe('Scheduler MCP Progress', () => {
       setApprovalMode: vi.fn(),
       getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
       getTelemetryLogPromptsEnabled: vi.fn().mockReturnValue(false),
+      getTelemetryTracesEnabled: vi.fn().mockReturnValue(false),
       getSessionId: vi.fn().mockReturnValue('test-session-id'),
     } as unknown as Mocked<Config>;
 
