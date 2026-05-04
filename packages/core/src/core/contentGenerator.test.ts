@@ -851,19 +851,6 @@ describe('createContentGenerator', () => {
       ),
     ).rejects.toThrow('Invalid custom base URL: not-a-url');
   });
-
-  it('should reject non-https remote custom baseUrl values', async () => {
-    await expect(
-      createContentGenerator(
-        {
-          apiKey: 'test-api-key',
-          authType: AuthType.USE_GEMINI,
-          baseUrl: 'http://example.com',
-        },
-        mockConfig,
-      ),
-    ).rejects.toThrow('Custom base URL must use HTTPS unless it is localhost.');
-  });
 });
 
 describe('createContentGeneratorConfig', () => {

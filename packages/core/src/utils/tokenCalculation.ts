@@ -9,11 +9,14 @@ import type { ContentGenerator } from '../core/contentGenerator.js';
 import { debugLogger } from './debugLogger.js';
 
 // Token estimation constants
-// ASCII characters (0-127) are roughly 4 chars per token
-export const ASCII_TOKENS_PER_CHAR = 0.25;
+// ASCII characters (0-127) are roughly 3-4 chars per token.
+// We use 0.33 (~3 chars/token) as a conservative baseline for mixed text and code.
+export const ASCII_TOKENS_PER_CHAR = 0.33;
 // Non-ASCII characters (including CJK) are often 1-2 tokens per char.
-// We use 1.3 as a conservative estimate to avoid underestimation.
-export const NON_ASCII_TOKENS_PER_CHAR = 1.3;
+// We use 1.5 as a conservative estimate to avoid underestimation.
+export const NON_ASCII_TOKENS_PER_CHAR = 1.5;
+// Structural overhead per Content turn (role prefixes, separators).
+export const MSG_OVERHEAD_TOKENS = 5;
 // Fixed token estimate for images
 const IMAGE_TOKEN_ESTIMATE = 3000;
 // Fixed token estimate for PDFs (~100 pages at 258 tokens/page)

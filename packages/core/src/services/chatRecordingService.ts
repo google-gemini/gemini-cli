@@ -744,6 +744,8 @@ export class ChatRecordingService {
     tempDir: string,
   ): Promise<void> {
     const filePath = path.join(chatsDir, file);
+    let fullSessionId: string | undefined;
+
     try {
       const CHUNK_SIZE = 4096;
       const buffer = Buffer.alloc(CHUNK_SIZE);
@@ -752,31 +754,42 @@ export class ChatRecordingService {
       try {
         fd = await fs.promises.open(filePath, 'r');
         const { bytesRead } = await fd.read(buffer, 0, CHUNK_SIZE, 0);
-        if (bytesRead === 0) {
-          await fd.close();
-          await fs.promises.unlink(filePath);
-          return;
+        if (bytesRead > 0) {
+          const contentChunk = buffer.toString('utf8', 0, bytesRead);
+          const newlineIndex = contentChunk.indexOf('\n');
+          firstLine =
+            newlineIndex !== -1
+              ? contentChunk.substring(0, newlineIndex)
+              : contentChunk;
+
+          try {
+            const content = JSON.parse(firstLine) as unknown;
+            if (isSessionIdRecord(content)) {
+              fullSessionId = content.sessionId;
+            }
+          } catch {
+            // If first line parse fails, it might be a legacy pretty-printed JSON.
+            // We'll fall back to full file read below.
+          }
         }
-        const contentChunk = buffer.toString('utf8', 0, bytesRead);
-        const newlineIndex = contentChunk.indexOf('\n');
-        firstLine =
-          newlineIndex !== -1
-            ? contentChunk.substring(0, newlineIndex)
-            : contentChunk;
       } finally {
         if (fd !== undefined) {
           await fd.close();
         }
       }
-      const content = JSON.parse(firstLine) as unknown;
 
-      let fullSessionId: string | undefined;
-      if (isSessionIdRecord(content)) {
-        fullSessionId = content['sessionId'];
+      // Fallback for legacy JSON files if we couldn't get sessionId from first line
+      if (!fullSessionId) {
+        try {
+          const fileContent = await fs.promises.readFile(filePath, 'utf8');
+          const parsed = JSON.parse(fileContent) as unknown;
+          if (isSessionIdRecord(parsed)) {
+            fullSessionId = parsed.sessionId;
+          }
+        } catch {
+          // Ignore parse errors, we'll still try to unlink the file
+        }
       }
-
-      // Delete the session file
-      await fs.promises.unlink(filePath);
 
       if (fullSessionId) {
         // Delegate to shared utility!
@@ -788,7 +801,19 @@ export class ChatRecordingService {
         );
       }
     } catch (error) {
-      debugLogger.error(`Error deleting associated file ${file}:`, error);
+      debugLogger.error(
+        `Error deleting artifacts for session file ${file}:`,
+        error,
+      );
+    } finally {
+      // ALWAYS try to delete the session file itself
+      try {
+        await fs.promises.unlink(filePath);
+      } catch (error) {
+        if (isNodeError(error) && error.code !== 'ENOENT') {
+          debugLogger.error(`Error unlinking session file ${file}:`, error);
+        }
+      }
     }
   }
 

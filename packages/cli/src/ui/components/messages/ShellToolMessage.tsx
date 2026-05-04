@@ -24,6 +24,7 @@ import type { ToolMessageProps } from './ToolMessage.js';
 import { ACTIVE_SHELL_MAX_LINES } from '../../constants.js';
 import { useAlternateBuffer } from '../../hooks/useAlternateBuffer.js';
 import { useUIState } from '../../contexts/UIStateContext.js';
+import { useToolActions } from '../../contexts/ToolActionsContext.js';
 import {
   type Config,
   ShellExecutionService,
@@ -41,6 +42,7 @@ export interface ShellToolMessageProps extends ToolMessageProps {
 }
 
 export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
+  callId,
   name,
   description,
   resultDisplay,
@@ -57,6 +59,12 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
   isExpandable,
   originalRequestName,
 }) => {
+  const { isExpanded: isExpandedInContext } = useToolActions();
+
+  const isExpanded =
+    (isExpandedInContext ? isExpandedInContext(callId) : false) ||
+    availableTerminalHeight === undefined;
+
   const {
     activePtyId: activeShellPtyId,
     embeddedShellFocused,
@@ -169,6 +177,7 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
           description={description}
           emphasis={emphasis}
           originalRequestName={originalRequestName}
+          isExpanded={isExpanded}
         />
 
         <FocusHint

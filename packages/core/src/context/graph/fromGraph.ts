@@ -3,52 +3,53 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import type { Content, Part } from '@google/genai';
+
+import type { Content } from '@google/genai';
 import type { ConcreteNode } from './types.js';
-import type {
-  NodeSerializationWriter,
-  NodeBehaviorRegistry,
-} from './behaviorRegistry.js';
+import { debugLogger } from '../../utils/debugLogger.js';
 
-class NodeSerializer implements NodeSerializationWriter {
-  private history: Content[] = [];
-  private currentModelParts: Part[] = [];
+/**
+ * Reconstructs a valid Gemini Chat History from a list of Concrete Nodes.
+ * This process is "role-alternation-aware" and uses turnId to
+ * preserve original turn boundaries even if multiple turns have the same role.
+ */
+export function fromGraph(nodes: readonly ConcreteNode[]): Content[] {
+  debugLogger.log(
+    `[fromGraph] Reconstructing history from ${nodes.length} nodes`,
+  );
 
-  appendContent(content: Content) {
-    this.flushModelParts();
-    this.history.push(content);
-  }
+  const history: Content[] = [];
+  let currentTurn: (Content & { _turnId?: string }) | null = null;
 
-  appendModelPart(part: Part) {
-    this.currentModelParts.push(part);
-  }
+  for (const node of nodes) {
+    const turnId = node.turnId;
 
-  appendUserPart(part: Part) {
-    this.flushModelParts();
-    this.history.push({ role: 'user', parts: [part] });
-  }
-
-  flushModelParts() {
-    if (this.currentModelParts.length > 0) {
-      this.history.push({ role: 'model', parts: [...this.currentModelParts] });
-      this.currentModelParts = [];
+    // We start a new turn if:
+    // 1. We don't have a current turn.
+    // 2. The role changes (Standard alternation).
+    // 3. The turnId changes (Preserving distinct turns of the same role).
+    if (
+      !currentTurn ||
+      currentTurn.role !== node.role ||
+      currentTurn._turnId !== turnId
+    ) {
+      currentTurn = {
+        role: node.role,
+        parts: [node.payload],
+        _turnId: turnId,
+      };
+      history.push(currentTurn);
+    } else {
+      currentTurn.parts = [...(currentTurn.parts || []), node.payload];
     }
   }
 
-  getContents(): Content[] {
-    this.flushModelParts();
-    return this.history;
+  // Final cleanup: remove our internal tracking field
+  for (const turn of history) {
+    const t = turn as Content & { _turnId?: string };
+    delete t._turnId;
   }
-}
 
-export function fromGraph(
-  nodes: readonly ConcreteNode[],
-  registry: NodeBehaviorRegistry,
-): Content[] {
-  const writer = new NodeSerializer();
-  for (const node of nodes) {
-    const behavior = registry.get(node.type);
-    behavior.serialize(node, writer);
-  }
-  return writer.getContents();
+  debugLogger.log(`[fromGraph] Reconstructed ${history.length} turns`);
+  return history;
 }
