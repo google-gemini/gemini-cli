@@ -310,8 +310,9 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     this.compressionService = new ChatCompressionService();
     this.parentCallId = parentCallId;
 
-    this.agentId = parentCallId
-      ? `${parentCallId}-${Math.random().toString(36).slice(2, 5)}`
+    const sanitizedParentId = parentCallId?.replace(/[^a-zA-Z0-9_-]/g, '_');
+    this.agentId = sanitizedParentId
+      ? `${sanitizedParentId}-${Math.random().toString(36).slice(2, 8)}`
       : Math.random().toString(36).slice(2, 8);
   }
 
