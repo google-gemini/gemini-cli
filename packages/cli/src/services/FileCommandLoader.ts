@@ -34,11 +34,18 @@ import {
 import { AtFileProcessor } from './prompt-processors/atFileProcessor.js';
 import { sanitizeForDisplay } from '../ui/utils/textUtils.js';
 
-interface CommandDirectory {
+export interface CommandDirectory {
   path: string;
   kind: CommandKind;
   extensionName?: string;
   extensionId?: string;
+}
+
+export interface CommandFileGroup {
+  displayName: string;
+  path: string;
+  files: string[];
+  error?: string;
 }
 
 /**
@@ -139,6 +146,59 @@ export class FileCommandLoader implements ICommandLoader {
     }
 
     return allCommands;
+  }
+
+  /**
+   * Lists available .toml command files from user, project, and extension directories.
+   */
+  async listAvailableFiles(): Promise<CommandFileGroup[]> {
+    const directories = this.getCommandDirectories();
+    const groups: CommandFileGroup[] = [];
+
+    for (const dir of directories) {
+      const displayName = this.getDisplayName(dir);
+
+      try {
+        const files = await glob('**/*.toml', { cwd: dir.path });
+        if (files.length > 0) {
+          groups.push({
+            displayName,
+            path: dir.path,
+            files: [...files].sort(),
+          });
+        }
+      } catch (e) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        if ((e as { code?: string }).code === 'ENOENT') {
+          continue;
+        }
+
+        groups.push({
+          displayName,
+          path: dir.path,
+          files: [],
+          error: e instanceof Error ? e.message : String(e),
+        });
+      }
+    }
+
+    return groups;
+  }
+
+  /**
+   * Returns a human-readable display name for the command directory source.
+   */
+  private getDisplayName(dir: CommandDirectory): string {
+    switch (dir.kind) {
+      case CommandKind.USER_FILE:
+        return 'User';
+      case CommandKind.WORKSPACE_FILE:
+        return 'Project';
+      case CommandKind.EXTENSION_FILE:
+        return `Extension: ${dir.extensionName || 'Unknown'}`;
+      default:
+        return 'Custom';
+    }
   }
 
   /**

@@ -273,6 +273,13 @@ describe('isCustomModel', () => {
     expect(isCustomModel(GEMINI_MODEL_ALIAS_AUTO)).toBe(false);
     expect(isCustomModel(GEMINI_MODEL_ALIAS_PRO)).toBe(false);
   });
+
+  it('should not throw if the model is an array (e.g. from yargs)', () => {
+    // @ts-expect-error - testing invalid runtime input
+    expect(() => isCustomModel(['gemini-2.0-flash', 'gpt-4'])).not.toThrow();
+    // @ts-expect-error - testing invalid runtime input
+    expect(isCustomModel(['gemini-2.0-flash', 'gpt-4'])).toBe(true); // last one is custom
+  });
 });
 
 describe('supportsModernFeatures', () => {
@@ -431,6 +438,15 @@ describe('resolveModel', () => {
       const model = resolveModel(customModel);
       expect(model).toBe(customModel);
     });
+
+    it('should handle non-string inputs gracefully', () => {
+      // @ts-expect-error - testing invalid runtime input
+      expect(resolveModel(['a', 'b'])).toBe('b');
+      // @ts-expect-error - testing invalid runtime input
+      expect(resolveModel(true)).toBe('true');
+      // @ts-expect-error - testing invalid runtime input
+      expect(resolveModel(null)).toBe('');
+    });
   });
 
   describe('hasAccessToPreview logic', () => {
@@ -579,9 +595,9 @@ describe('isActiveModel', () => {
     expect(isActiveModel(DEFAULT_GEMINI_FLASH_MODEL)).toBe(true);
   });
 
-  it('should return true for Gemma 4 models only when experimentalGemma is true', () => {
-    expect(isActiveModel(GEMMA_4_31B_IT_MODEL)).toBe(false);
-    expect(isActiveModel(GEMMA_4_26B_A4B_IT_MODEL)).toBe(false);
+  it('should return true for Gemma 4 models when experimentalGemma is not provided (defaults to true)', () => {
+    expect(isActiveModel(GEMMA_4_31B_IT_MODEL)).toBe(true);
+    expect(isActiveModel(GEMMA_4_26B_A4B_IT_MODEL)).toBe(true);
     expect(isActiveModel(GEMMA_4_31B_IT_MODEL, false, false, false, true)).toBe(
       true,
     );

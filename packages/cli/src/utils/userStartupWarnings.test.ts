@@ -220,5 +220,22 @@ describe('getUserStartupWarnings', () => {
       );
       expect(warnings).not.toContainEqual(compWarning);
     });
+
+    it('should correctly pass isAlternateBuffer option to getCompatibilityWarnings', async () => {
+      const projectDir = path.join(testRootDir, 'project-alt');
+      await fs.mkdir(projectDir);
+
+      await getUserStartupWarnings({}, projectDir, { isAlternateBuffer: true });
+      expect(getCompatibilityWarnings).toHaveBeenCalledWith({
+        isAlternateBuffer: true,
+      });
+
+      await getUserStartupWarnings({}, projectDir, {
+        isAlternateBuffer: false,
+      });
+      expect(getCompatibilityWarnings).toHaveBeenCalledWith({
+        isAlternateBuffer: false,
+      });
+    });
   });
 });
