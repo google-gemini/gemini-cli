@@ -389,9 +389,9 @@ export class MemoryMonitor {
 
   /**
    * Capture a V8 heap snapshot for memory diagnostics.
-   * @returns The absolute path to the generated .heapsnapshot file.
+   * @returns The absolute path to the generated .heapsnapshot file, or null if it failed.
    */
-  captureHeapSnapshot(): string {
+  captureHeapSnapshot(): string | null {
     return captureHeapSnapshot();
   }
 
