@@ -372,4 +372,58 @@ describe('validateCommandExecution', () => {
       expect(result.valid).toBe(true); // Normal unicode is ok
     });
   });
+
+  describe('unknown commands', () => {
+    it('should accept unknown commands with safe arguments', () => {
+      const result = validateCommandExecution('unknown-command', ['safe-arg']);
+      expect(result.valid).toBe(true);
+    });
+
+    it('should accept unknown commands with no arguments', () => {
+      const result = validateCommandExecution('unknown-command', []);
+      expect(result.valid).toBe(true);
+    });
+
+    it('should reject unknown commands with shell metacharacters in args', () => {
+      expect(
+        validateCommandExecution('unknown-command', ['arg;rm -rf /']).valid,
+      ).toBe(false);
+      expect(
+        validateCommandExecution('unknown-command', ['arg|whoami']).valid,
+      ).toBe(false);
+      expect(
+        validateCommandExecution('unknown-command', ['arg`cmd`']).valid,
+      ).toBe(false);
+      expect(
+        validateCommandExecution('unknown-command', ['arg$(cmd)']).valid,
+      ).toBe(false);
+      expect(
+        validateCommandExecution('unknown-command', ['arg*']).valid,
+      ).toBe(false);
+      expect(
+        validateCommandExecution('unknown-command', ['arg?']).valid,
+      ).toBe(false);
+      expect(
+        validateCommandExecution('unknown-command', ['arg[pattern]']).valid,
+      ).toBe(false);
+      expect(
+        validateCommandExecution('unknown-command', ['arg{a,b}']).valid,
+      ).toBe(false);
+    });
+
+    it('should reject unknown commands with newlines in args', () => {
+      expect(
+        validateCommandExecution('unknown-command', ['arg\nother']).valid,
+      ).toBe(false);
+      expect(
+        validateCommandExecution('unknown-command', ['arg\rother']).valid,
+      ).toBe(false);
+    });
+
+    it('should reject unknown commands with control characters in args', () => {
+      expect(
+        validateCommandExecution('unknown-command', ['arg\x00null']).valid,
+      ).toBe(false);
+    });
+  });
 });

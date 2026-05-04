@@ -276,15 +276,30 @@ function validateCommandArguments(
       return { valid: true };
 
     default:
-      // Unknown command to this validator - pass generic validation only
-      // The command registry will determine if the command actually exists
-      // We just ensure args don't contain obviously dangerous content
+      // Unknown command to this validator - apply strict allowlist-style checks
+      // to prevent argument injection for any command not explicitly registered.
+      // The command registry will determine if the command actually exists.
       for (const arg of args) {
-        // Check for null bytes and control characters
+        // Reject control characters
         if (hasControlCharacters(arg)) {
           return {
             valid: false,
             error: 'Arguments must not contain control characters',
+          };
+        }
+        // Reject newlines and carriage returns (intentionally allowed by
+        // hasControlCharacters for general text, but unsafe in command args)
+        if (arg.includes('\n') || arg.includes('\r')) {
+          return {
+            valid: false,
+            error: 'Arguments must not contain newlines or carriage returns',
+          };
+        }
+        // Reject shell metacharacters to prevent argument injection
+        if (hasShellMetacharacters(arg)) {
+          return {
+            valid: false,
+            error: 'Arguments must not contain shell metacharacters',
           };
         }
       }
