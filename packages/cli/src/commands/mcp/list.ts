@@ -195,10 +195,9 @@ export async function listMcpServers(
 
   // If the folder is untrusted, we want to show all configured servers (including
   // project-scoped ones) as disabled.
-  const allSettings =
-    !loadedSettings.isTrusted && loadedSettings.getMergedSettingsAsIfTrusted
-      ? loadedSettings.getMergedSettingsAsIfTrusted()
-      : activeSettings;
+  const allSettings = !loadedSettings.isTrusted
+    ? loadedSettings.getMergedSettingsAsIfTrusted()
+    : activeSettings;
 
   const { mcpServers, blockedServerNames } =
     await getMcpServersFromConfig(allSettings);
