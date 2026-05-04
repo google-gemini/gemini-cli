@@ -48,6 +48,7 @@ describe('getIdeProcessInfo', () => {
       expect(result).toEqual({ pid: 12345, command: 'my-ide-command' });
       expect(mockedExec).toHaveBeenCalledWith(
         expect.stringContaining('ps -o ppid=,command= -p 12345'),
+        expect.objectContaining({ timeout: expect.any(Number) }),
       );
     });
 
@@ -91,6 +92,11 @@ describe('getIdeProcessInfo', () => {
       const result = await getIdeProcessInfo();
 
       expect(result).toEqual({ pid: 700, command: '/usr/lib/vscode/code' });
+      expect(mockedExec).toHaveBeenNthCalledWith(
+        1,
+        expect.stringContaining('ps -o ppid=,command= -p 1000'),
+        expect.objectContaining({ timeout: expect.any(Number) }),
+      );
     });
 
     it('should return parent process info if grandparent lookup fails', async () => {

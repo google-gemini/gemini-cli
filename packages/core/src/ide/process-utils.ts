@@ -12,6 +12,7 @@ import path from 'node:path';
 const execAsync = promisify(exec);
 
 const MAX_TRAVERSAL_DEPTH = 32;
+const UNIX_PROCESS_LOOKUP_TIMEOUT_MS = 1000;
 
 interface ProcessInfo {
   pid: number;
@@ -86,7 +87,9 @@ async function getProcessInfo(pid: number): Promise<{
 }> {
   try {
     const command = `ps -o ppid=,command= -p ${pid}`;
-    const { stdout } = await execAsync(command);
+    const { stdout } = await execAsync(command, {
+      timeout: UNIX_PROCESS_LOOKUP_TIMEOUT_MS,
+    });
     const trimmedStdout = stdout.trim();
     if (!trimmedStdout) {
       return { parentPid: 0, name: '', command: '' };

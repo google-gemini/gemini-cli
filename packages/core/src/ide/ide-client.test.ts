@@ -58,11 +58,15 @@ describe('IdeClient', () => {
 
   beforeEach(async () => {
     // Reset singleton instance for test isolation
-    (IdeClient as unknown as { instance: IdeClient | undefined }).instance =
-      undefined;
+    (
+      IdeClient as unknown as {
+        instancePromise: Promise<IdeClient> | null;
+      }
+    ).instancePromise = null;
 
     // Mock environment variables
     process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'] = '/test/workspace';
+    delete process.env['GEMINI_CLI_IDE_PID'];
     delete process.env['GEMINI_CLI_IDE_SERVER_PORT'];
     delete process.env['GEMINI_CLI_IDE_SERVER_STDIO_COMMAND'];
     delete process.env['GEMINI_CLI_IDE_SERVER_STDIO_ARGS'];
@@ -102,6 +106,45 @@ describe('IdeClient', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  describe('getInstance', () => {
+    it('should skip process traversal when IDE integration is unsupported', async () => {
+      vi.mocked(detectIde).mockReset();
+      vi.mocked(detectIde).mockReturnValue(undefined);
+      vi.mocked(getIdeProcessInfo).mockReset();
+      (
+        IdeClient as unknown as {
+          instancePromise: Promise<IdeClient> | null;
+        }
+      ).instancePromise = null;
+
+      const ideClient = await IdeClient.getInstance();
+
+      expect(getIdeProcessInfo).not.toHaveBeenCalled();
+      expect(ideClient.getCurrentIde()).toBeUndefined();
+    });
+
+    it('should still inspect processes when GEMINI_CLI_IDE_PID is set', async () => {
+      vi.mocked(detectIde).mockReset();
+      vi.mocked(detectIde).mockReturnValue(IDE_DEFINITIONS.vscode);
+      vi.mocked(getIdeProcessInfo).mockReset();
+      vi.mocked(getIdeProcessInfo).mockResolvedValue({
+        pid: 54321,
+        command: 'test-ide',
+      });
+      process.env['GEMINI_CLI_IDE_PID'] = '54321';
+      (
+        IdeClient as unknown as {
+          instancePromise: Promise<IdeClient> | null;
+        }
+      ).instancePromise = null;
+
+      const ideClient = await IdeClient.getInstance();
+
+      expect(getIdeProcessInfo).toHaveBeenCalledTimes(1);
+      expect(ideClient.getCurrentIde()).toEqual(IDE_DEFINITIONS.vscode);
+    });
   });
 
   describe('connect', () => {

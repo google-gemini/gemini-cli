@@ -92,6 +92,17 @@ export class IdeClient {
     if (!IdeClient.instancePromise) {
       IdeClient.instancePromise = (async () => {
         const client = new IdeClient();
+        const idePidOverride = process.env['GEMINI_CLI_IDE_PID'];
+
+        // Skip process traversal when the current terminal cannot support IDE
+        // integration unless the user explicitly points us at an IDE PID.
+        if (!idePidOverride) {
+          client.currentIde = detectIde({ pid: process.pid, command: '' });
+          if (!client.currentIde) {
+            return client;
+          }
+        }
+
         client.ideProcessInfo = await getIdeProcessInfo();
         const connectionConfig = client.ideProcessInfo
           ? await getConnectionConfigFromFile(client.ideProcessInfo.pid)
