@@ -141,6 +141,22 @@ exports[`<ToolGroupMessage /> > Golden Snapshots > renders two tool groups where
 "
 `;
 
+exports[`<ToolGroupMessage /> > Golden Snapshots > renders update_topic in the middle of other tools > update_topic_middle 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────╮
+│ ✓  read_file A tool for testing                                          │
+│                                                                          │
+│ Test result                                                              │
+╰──────────────────────────────────────────────────────────────────────────╯
+  Middle Topic
+
+╭──────────────────────────────────────────────────────────────────────────╮
+│ ✓  write_file A tool for testing                                         │
+│                                                                          │
+│ Test result                                                              │
+╰──────────────────────────────────────────────────────────────────────────╯
+"
+`;
+
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders update_topic tool call using TopicMessage > update_topic_tool 1`] = `
 "  Testing Topic: This is the description
 "

@@ -54,6 +54,7 @@ export default tseslint.config(
     ignores: [
       '**/node_modules/**',
       'eslint.config.js',
+      '**/coverage/**',
       'packages/**/dist/**',
       'bundle/**',
       'package/bundle/**',

@@ -66,14 +66,23 @@ export class ContextWorkingBufferImpl implements ContextWorkingBuffer {
 
     const newPristineMap = new Map<string, ConcreteNode>(this.pristineNodesMap);
     const newProvenanceMap = new Map(this.provenanceMap);
+    const existingIds = new Set(this.nodes.map((n) => n.id));
 
+    const nodesToAdd: ConcreteNode[] = [];
+    const batchIds = new Set<string>();
     for (const node of newNodes) {
-      newPristineMap.set(node.id, node);
-      newProvenanceMap.set(node.id, new Set([node.id]));
+      if (!existingIds.has(node.id) && !batchIds.has(node.id)) {
+        newPristineMap.set(node.id, node);
+        newProvenanceMap.set(node.id, new Set([node.id]));
+        nodesToAdd.push(node);
+        batchIds.add(node.id);
+      }
     }
 
+    if (nodesToAdd.length === 0) return this;
+
     return new ContextWorkingBufferImpl(
-      [...this.nodes, ...newNodes],
+      [...this.nodes, ...nodesToAdd],
       newPristineMap,
       newProvenanceMap,
       [...this.history],
@@ -256,21 +265,5 @@ export class ContextWorkingBufferImpl implements ContextWorkingBuffer {
 
   getAuditLog(): readonly GraphMutation[] {
     return this.history;
-  }
-
-  getLineage(id: string): readonly ConcreteNode[] {
-    const lineage: ConcreteNode[] = [];
-    const currentNodesMap = new Map(this.nodes.map((n) => [n.id, n]));
-
-    let current = currentNodesMap.get(id);
-    while (current) {
-      lineage.push(current);
-      if (current.logicalParentId && current.logicalParentId !== current.id) {
-        current = currentNodesMap.get(current.logicalParentId);
-      } else {
-        break;
-      }
-    }
-    return lineage;
   }
 }

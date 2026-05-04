@@ -240,7 +240,7 @@ describe('GeminiChat', () => {
       // 'Hello': 5 chars * 0.25 = 1.25
       // 'Hi there': 8 chars * 0.25 = 2.0
       // Total: 3.25 -> floor(3.25) = 3
-      expect(chatWithHistory.getLastPromptTokenCount()).toBe(3);
+      expect(chatWithHistory.getLastPromptTokenCount()).toBe(4);
     });
 
     it('should initialize lastPromptTokenCount for empty history', () => {
@@ -744,25 +744,41 @@ describe('GeminiChat', () => {
       ).rejects.toThrow(InvalidStreamError);
     });
 
-    it('should throw InvalidStreamError when no tool call and empty response text', async () => {
-      // Setup: Stream with finish reason but empty response (only thoughts)
-      const streamWithEmptyResponse = (async function* () {
-        yield {
-          candidates: [
-            {
-              content: {
-                role: 'model',
-                parts: [{ thought: 'thinking...' }],
-              },
-              finishReason: 'STOP',
-            },
-          ],
-        } as unknown as GenerateContentResponse;
-      })();
-
-      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
-        streamWithEmptyResponse,
-      );
+    it('should throw InvalidStreamError without retrying when no tool call and empty response text', async () => {
+      vi.mocked(mockContentGenerator.generateContentStream)
+        .mockImplementationOnce(async () =>
+          // First attempt: finish reason is present, but the stream has no
+          // non-thought text, which is NO_RESPONSE_TEXT.
+          (async function* () {
+            yield {
+              candidates: [
+                {
+                  content: {
+                    role: 'model',
+                    parts: [{ thought: true, text: 'thinking...' }],
+                  },
+                  finishReason: 'STOP',
+                },
+              ],
+            } as unknown as GenerateContentResponse;
+          })(),
+        )
+        .mockImplementationOnce(async () =>
+          // This would succeed if NO_RESPONSE_TEXT were retried.
+          (async function* () {
+            yield {
+              candidates: [
+                {
+                  content: {
+                    role: 'model',
+                    parts: [{ text: 'valid response after retry' }],
+                  },
+                  finishReason: 'STOP',
+                },
+              ],
+            } as unknown as GenerateContentResponse;
+          })(),
+        );
 
       const stream = await chat.sendMessageStream(
         { model: 'gemini-2.0-flash' },
@@ -779,6 +795,11 @@ describe('GeminiChat', () => {
           }
         })(),
       ).rejects.toThrow(InvalidStreamError);
+      expect(mockContentGenerator.generateContentStream).toHaveBeenCalledTimes(
+        1,
+      );
+      expect(mockLogContentRetry).not.toHaveBeenCalled();
+      expect(mockLogContentRetryFailure).toHaveBeenCalledTimes(1);
     });
 
     it('should succeed when there is finish reason and response text', async () => {

@@ -230,6 +230,19 @@ if (includeNativeModules) {
     );
   }
 
+  // Copy @github/keytar to staging
+  const githubSrc = join(root, 'node_modules/@github');
+  const githubStaging = join(stagingDir, 'node_modules/@github');
+
+  if (existsSync(githubSrc)) {
+    mkdirSync(dirname(githubStaging), { recursive: true });
+    cpSync(githubSrc, githubStaging, { recursive: true });
+  } else {
+    console.warn(
+      'Warning: @github/keytar not found in node_modules. Secure keychain features will use file fallback.',
+    );
+  }
+
   // Sign Staged .node files
   try {
     const nodeFiles = globSync('**/*.node', {
@@ -351,6 +364,7 @@ if (existsSync(ripgrepVendorDest)) {
 // Add assets from Staging
 if (includeNativeModules) {
   addAssetsFromDir('node_modules/@lydell', 'node_modules/@lydell');
+  addAssetsFromDir('node_modules/@github', 'node_modules/@github');
 }
 
 writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));

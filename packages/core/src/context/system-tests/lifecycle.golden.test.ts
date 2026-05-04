@@ -18,14 +18,24 @@ import { createStateSnapshotAsyncProcessor } from '../processors/stateSnapshotAs
 expect.addSnapshotSerializer({
   test: (val) =>
     typeof val === 'string' &&
-    (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+    (/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i.test(
       val,
     ) ||
-      /^\/tmp\/sim/.test(val)), // Mask temp directories and UUIDs
-  print: (val) =>
-    typeof val === 'string' && /^\/tmp\/sim/.test(val)
-      ? '"<MOCKED_DIR>"'
-      : '"<UUID>"',
+      /[\\/]tmp[\\/]sim/.test(val)),
+  print: (val) => {
+    if (typeof val !== 'string') return `"${val}"`;
+    let scrubbed = val
+      .replace(
+        /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi,
+        '<UUID>',
+      )
+      .replace(/[\\/]tmp[\\/]sim[^\s"'\]]*/g, '<MOCKED_DIR>');
+
+    // Also scrub timestamps in filenames like blob_1234567890_...
+    scrubbed = scrubbed.replace(/blob_\d+_/g, 'blob_<TIMESTAMP>_');
+
+    return `"${scrubbed}"`;
+  },
 });
 
 describe('System Lifecycle Golden Tests', () => {
@@ -43,6 +53,7 @@ describe('System Lifecycle Golden Tests', () => {
   });
 
   const getAggressiveConfig = (): ContextProfile => ({
+    name: 'Aggressive Test',
     config: {
       budget: { maxTokens: 1000, retainedTokens: 500 }, // Extremely tight limits
     },
@@ -170,6 +181,7 @@ describe('System Lifecycle Golden Tests', () => {
 
   it('Scenario 2: Under Budget (No Modifications)', async () => {
     const generousConfig: ContextProfile = {
+      name: 'Generous Config',
       config: {
         budget: { maxTokens: 100000, retainedTokens: 50000 },
       },
@@ -202,6 +214,7 @@ describe('System Lifecycle Golden Tests', () => {
 
   it('Scenario 3: Async-Driven Background GC', async () => {
     const gcConfig: ContextProfile = {
+      name: 'GC Test Config',
       config: {
         budget: { maxTokens: 200, retainedTokens: 100 },
       },

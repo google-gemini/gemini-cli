@@ -48,6 +48,13 @@ export class AcpSessionManager {
     return this.sessions.get(sessionId);
   }
 
+  dispose(): void {
+    for (const session of this.sessions.values()) {
+      session.dispose();
+    }
+    this.sessions.clear();
+  }
+
   async newSession(
     { cwd, mcpServers }: acp.NewSessionRequest,
     authDetails: AuthDetails,
@@ -183,6 +190,12 @@ export class AcpSessionManager {
       this.connection,
       this.settings,
     );
+
+    const existingSession = this.sessions.get(sessionId);
+    if (existingSession) {
+      existingSession.dispose();
+    }
+
     this.sessions.set(sessionId, session);
 
     // Stream history back to client
