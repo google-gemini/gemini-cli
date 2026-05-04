@@ -354,3 +354,15 @@ export interface RunConfig {
    */
   maxTurns?: number;
 }
+
+/**
+ * Summary of an agent reload operation.
+ */
+export interface AgentReloadSummary {
+  totalLoaded: number;
+  localCount: number;
+  remoteCount: number;
+  newAgents: string[];
+  updatedAgents: string[];
+  errors: string[];
+}

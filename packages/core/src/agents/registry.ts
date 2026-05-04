@@ -6,9 +6,17 @@
 
 import * as crypto from 'node:crypto';
 import { Storage } from '../config/storage.js';
-import { CoreEvent, coreEvents } from '../utils/events.js';
+import {
+  CoreEvent,
+  coreEvents,
+  type UserFeedbackPayload,
+} from '../utils/events.js';
 import type { AgentOverride, Config } from '../config/config.js';
-import type { AgentDefinition, LocalAgentDefinition } from './types.js';
+import {
+  type AgentDefinition,
+  type LocalAgentDefinition,
+  type AgentReloadSummary,
+} from './types.js';
 import { getAgentCardLoadOptions, getRemoteAgentTargetUrl } from './types.js';
 import { loadAgentsFromDirectory } from './agentLoader.js';
 import { CodebaseInvestigatorAgent } from './codebase-investigator.js';
@@ -80,13 +88,52 @@ export class AgentRegistry {
   /**
    * Clears the current registry and re-scans for agents.
    */
-  async reload(): Promise<void> {
-    this.config.getA2AClientManager()?.clearCache();
-    await this.config.reloadAgents();
-    this.agents.clear();
-    this.allDefinitions.clear();
-    await this.loadAgents();
+  async reload(): Promise<AgentReloadSummary> {
+    const previousAgents = new Map(this.agents);
+    const reloadErrors: string[] = [];
+
+    const feedbackListener = (payload: UserFeedbackPayload) => {
+      if (payload.severity === 'error') {
+        reloadErrors.push(payload.message);
+      }
+    };
+    coreEvents.on(CoreEvent.UserFeedback, feedbackListener);
+
+    try {
+      this.config.getA2AClientManager()?.clearCache();
+      await this.config.reloadAgents();
+      this.agents.clear();
+      this.allDefinitions.clear();
+      await this.loadAgents();
+    } finally {
+      coreEvents.off(CoreEvent.UserFeedback, feedbackListener);
+    }
+
+    const currentAgents = Array.from(this.agents.values());
+    const newAgents: string[] = [];
+    const updatedAgents: string[] = [];
+
+    for (const agent of currentAgents) {
+      const prev = previousAgents.get(agent.name);
+      if (!prev) {
+        newAgents.push(agent.name);
+      } else if (
+        JSON.stringify(agent.metadata) !== JSON.stringify(prev.metadata)
+      ) {
+        updatedAgents.push(agent.name);
+      }
+    }
+
     coreEvents.emitAgentsRefreshed();
+
+    return {
+      totalLoaded: currentAgents.length,
+      localCount: currentAgents.filter((a) => a.kind === 'local').length,
+      remoteCount: currentAgents.filter((a) => a.kind === 'remote').length,
+      newAgents,
+      updatedAgents,
+      errors: reloadErrors,
+    };
   }
 
   /**
