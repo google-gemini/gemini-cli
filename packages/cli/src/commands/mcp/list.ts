@@ -237,7 +237,7 @@ export async function listMcpServers(
       serverName,
       server,
       loadedSettings.isTrusted,
-      allSettings,
+      activeSettings,
     );
 
     let statusIndicator = '';
