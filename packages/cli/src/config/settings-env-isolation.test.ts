@@ -59,7 +59,10 @@ describe('Environment Isolation', () => {
     vi.mocked(fs.readFileSync).mockReturnValue('GEMINI_API_KEY=local');
 
     const settings = { advanced: { ignoreLocalEnv: false } } as Settings;
-    loadEnvironment(settings, mockWorkspace, () => ({ isTrusted: true }));
+    loadEnvironment(settings, mockWorkspace, () => ({
+      isTrusted: true,
+      source: 'file',
+    }));
 
     expect(process.env['GEMINI_API_KEY']).toBe('local');
     delete process.env['GEMINI_API_KEY'];
@@ -81,7 +84,10 @@ describe('Environment Isolation', () => {
     });
 
     const settings = { advanced: { ignoreLocalEnv: true } } as Settings;
-    loadEnvironment(settings, mockWorkspace, () => ({ isTrusted: true }));
+    loadEnvironment(settings, mockWorkspace, () => ({
+      isTrusted: true,
+      source: 'file',
+    }));
 
     // Should skip local and find home
     expect(process.env['GEMINI_API_KEY']).toBe('home');
@@ -96,7 +102,10 @@ describe('Environment Isolation', () => {
     vi.mocked(fs.readFileSync).mockReturnValue('GEMINI_API_KEY=gemini-local');
 
     const settings = { advanced: { ignoreLocalEnv: true } } as Settings;
-    loadEnvironment(settings, mockWorkspace, () => ({ isTrusted: true }));
+    loadEnvironment(settings, mockWorkspace, () => ({
+      isTrusted: true,
+      source: 'file',
+    }));
 
     expect(process.env['GEMINI_API_KEY']).toBe('gemini-local');
     delete process.env['GEMINI_API_KEY'];
@@ -111,7 +120,10 @@ describe('Environment Isolation', () => {
 
     process.argv = ['node', 'gemini', '--ignore-env'];
     const settings = { advanced: { ignoreLocalEnv: false } } as Settings;
-    loadEnvironment(settings, mockWorkspace, () => ({ isTrusted: true }));
+    loadEnvironment(settings, mockWorkspace, () => ({
+      isTrusted: true,
+      source: 'file',
+    }));
 
     expect(process.env['GEMINI_API_KEY']).toBeUndefined();
   });
@@ -125,7 +137,10 @@ describe('Environment Isolation', () => {
 
     const settings = { advanced: { ignoreLocalEnv: true } } as Settings;
     // Running from home dir
-    loadEnvironment(settings, mockHome, () => ({ isTrusted: true }));
+    loadEnvironment(settings, mockHome, () => ({
+      isTrusted: true,
+      source: 'file',
+    }));
 
     expect(process.env['GEMINI_API_KEY']).toBe('home');
     delete process.env['GEMINI_API_KEY'];
@@ -150,7 +165,10 @@ describe('Environment Isolation', () => {
     });
 
     const settings = { advanced: { ignoreLocalEnv: true } } as Settings;
-    loadEnvironment(settings, deepProject, () => ({ isTrusted: true }));
+    loadEnvironment(settings, deepProject, () => ({
+      isTrusted: true,
+      source: 'file',
+    }));
 
     expect(process.env['GEMINI_API_KEY']).toBe('home');
     delete process.env['GEMINI_API_KEY'];
@@ -168,7 +186,10 @@ describe('Environment Isolation', () => {
 
     const settings = { advanced: { ignoreLocalEnv: true } } as Settings;
     // Running from an UNTRUSTED workspace
-    loadEnvironment(settings, mockWorkspace, () => ({ isTrusted: false }));
+    loadEnvironment(settings, mockWorkspace, () => ({
+      isTrusted: false,
+      source: 'file',
+    }));
 
     expect(process.env['GEMINI_API_KEY']).toBe('home');
     expect(process.env['OTHER_VAR']).toBeUndefined();
@@ -184,7 +205,10 @@ describe('Environment Isolation', () => {
 
     process.argv = ['node', 'gemini', '--ignore-env'];
     const settings = { advanced: { ignoreLocalEnv: false } } as Settings;
-    loadEnvironment(settings, mockWorkspace, () => ({ isTrusted: true }));
+    loadEnvironment(settings, mockWorkspace, () => ({
+      isTrusted: true,
+      source: 'file',
+    }));
 
     expect(process.env['GEMINI_API_KEY']).toBeUndefined();
   });
@@ -198,7 +222,10 @@ describe('Environment Isolation', () => {
 
     process.argv = ['node', 'gemini', '-s', '--ignore-env'];
     const settings = { advanced: { ignoreLocalEnv: false } } as Settings;
-    loadEnvironment(settings, mockWorkspace, () => ({ isTrusted: true }));
+    loadEnvironment(settings, mockWorkspace, () => ({
+      isTrusted: true,
+      source: 'file',
+    }));
 
     expect(process.env['GEMINI_API_KEY']).toBeUndefined();
   });
