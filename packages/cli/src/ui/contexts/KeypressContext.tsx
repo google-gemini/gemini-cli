@@ -654,11 +654,12 @@ function* emitKeys(
       name = 'tab';
       alt = escaped;
     } else if (ch === '\b') {
-      // ctrl+h / ctrl+backspace (windows terminals send \x08 for ctrl+backspace)
+      // backspace (0x08 - some terminals send this for ctrl+h/ctrl+backspace)
+      // Note: no ctrl=true heuristic is applied since raw \b is ambiguous
       name = 'backspace';
       alt = escaped;
     } else if (ch === '\x7f') {
-      // backspace
+      // backspace (0x7F - DEL, used as backspace on most modern terminals)
       name = 'backspace';
       alt = escaped;
     } else if (ch === ESC) {

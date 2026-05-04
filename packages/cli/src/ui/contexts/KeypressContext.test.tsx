@@ -413,6 +413,17 @@ describe('KeypressContext', () => {
           sequence: '\x1b[32;5u',
         },
       },
+      // Raw single-byte backspace sequences (no keyboard protocol)
+      {
+        name: 'Backspace (raw \\b = 0x08)',
+        inputSequence: '\b',
+        expected: { name: 'backspace', alt: false, ctrl: false, cmd: false },
+      },
+      {
+        name: 'Backspace (raw \\x7f = 0x7F)',
+        inputSequence: '\x7f',
+        expected: { name: 'backspace', alt: false, ctrl: false, cmd: false },
+      },
     ])(
       'should recognize $name in kitty protocol',
       async ({ inputSequence, expected }) => {
@@ -694,6 +705,11 @@ describe('KeypressContext', () => {
       {
         sequence: `\x1b[27;6;9~`,
         expected: { name: 'tab', shift: true, ctrl: true },
+      },
+      // ModifyOtherKeys: Ctrl+Backspace (code 8 = backspace)
+      {
+        sequence: `\x1b[27;5;8~`,
+        expected: { name: 'backspace', ctrl: true },
       },
       // Unicode CJK (Kitty/modifyOtherKeys scalar values)
       {
