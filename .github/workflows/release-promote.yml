@@ -197,9 +197,45 @@ jobs:
           gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
           working-directory: './release'
 
+  build-mac:
+    name: 'Build Unsigned (${{ matrix.arch }})'
+    needs: 'calculate-versions'
+    runs-on: 'macos-latest'
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: ['x64', 'arm64']
+    steps:
+      - name: 'Checkout Ref'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
+        with:
+          ref: '${{ github.event.inputs.ref }}'
+
+      - name: 'Set up Node.js'
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
+        with:
+          node-version-file: '.nvmrc'
+          architecture: '${{ matrix.arch }}'
+          cache: 'npm'
+
+      - name: 'Install dependencies'
+        run: 'npm ci'
+
+      - name: 'Build Binary'
+        env:
+          SKIP_SIGNING: 'true'
+        run: 'npm run build:binary'
+
+      - name: 'Upload Artifact'
+        uses: 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02'
+        with:
+          name: 'gemini-darwin-${{ matrix.arch }}-unsigned'
+          path: 'dist/darwin-${{ matrix.arch }}/gemini'
+          retention-days: 1
+
   publish-preview:
     name: 'Publish preview'
-    needs: ['calculate-versions', 'test']
+    needs: ['calculate-versions', 'test', 'build-mac']
     runs-on: 'ubuntu-latest'
     environment: "${{ github.event.inputs.environment || 'prod' }}"
     permissions:
@@ -228,6 +264,20 @@ jobs:
       - name: 'Install Dependencies'
         working-directory: './release'
         run: 'npm ci'
+
+      - name: 'Download macOS arm64 binary'
+        uses: 'actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16'
+        continue-on-error: true
+        with:
+          name: 'gemini-darwin-arm64-unsigned'
+          path: 'release/dist/darwin-arm64'
+
+      - name: 'Download macOS x64 binary'
+        uses: 'actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16'
+        continue-on-error: true
+        with:
+          name: 'gemini-darwin-x64-unsigned'
+          path: 'release/dist/darwin-x64'
 
       - name: 'Publish Release'
         uses: './.github/actions/publish-release'
@@ -266,7 +316,7 @@ jobs:
 
   publish-stable:
     name: 'Publish stable'
-    needs: ['calculate-versions', 'test', 'publish-preview']
+    needs: ['calculate-versions', 'test', 'publish-preview', 'build-mac']
     runs-on: 'ubuntu-latest'
     environment: "${{ github.event.inputs.environment || 'prod' }}"
     permissions:
@@ -295,6 +345,20 @@ jobs:
       - name: 'Install Dependencies'
         working-directory: './release'
         run: 'npm ci'
+
+      - name: 'Download macOS arm64 binary'
+        uses: 'actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16'
+        continue-on-error: true
+        with:
+          name: 'gemini-darwin-arm64-unsigned'
+          path: 'release/dist/darwin-arm64'
+
+      - name: 'Download macOS x64 binary'
+        uses: 'actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16'
+        continue-on-error: true
+        with:
+          name: 'gemini-darwin-x64-unsigned'
+          path: 'release/dist/darwin-x64'
 
       - name: 'Publish Release'
         uses: './.github/actions/publish-release'

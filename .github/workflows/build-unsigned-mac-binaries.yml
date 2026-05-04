@@ -53,4 +53,4 @@ jobs:
         with:
           name: 'gemini-darwin-${{ matrix.arch }}-unsigned'
           path: 'dist/darwin-${{ matrix.arch }}/'
-          retention-days: 5
+          retention-days: 14
