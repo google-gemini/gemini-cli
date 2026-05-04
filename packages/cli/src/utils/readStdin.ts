@@ -6,6 +6,23 @@
 
 import { debugLogger } from '@google/gemini-cli-core';
 
+/**
+ * Truncates a string to fit within a UTF-8 byte limit without splitting
+ * multi-byte characters. Walks back from the cut point to find the last
+ * complete character boundary.
+ */
+function truncateUtf8Bytes(str: string, maxBytes: number): string {
+  const buf = Buffer.from(str, 'utf8');
+  if (buf.length <= maxBytes) return str;
+  let end = maxBytes;
+  // Walk backward past any UTF-8 continuation bytes (10xxxxxx)
+  while (end > 0 && (buf[end] & 0xc0) === 0x80) {
+    end--;
+  }
+  // end now points to the lead byte of an incomplete sequence — exclude it
+  return buf.subarray(0, end).toString('utf8');
+}
+
 export async function readStdin(): Promise<string> {
   const MAX_STDIN_SIZE = 8 * 1024 * 1024; // 8MB
   return new Promise((resolve, reject) => {
@@ -30,9 +47,10 @@ export async function readStdin(): Promise<string> {
           pipedInputTimerId = null;
         }
 
-        if (totalSize + chunk.length > MAX_STDIN_SIZE) {
-          const remainingSize = MAX_STDIN_SIZE - totalSize;
-          data += chunk.slice(0, remainingSize);
+        const chunkByteLength = Buffer.byteLength(chunk, 'utf8');
+        if (totalSize + chunkByteLength > MAX_STDIN_SIZE) {
+          const remainingBytes = MAX_STDIN_SIZE - totalSize;
+          data += truncateUtf8Bytes(chunk, remainingBytes);
           debugLogger.warn(
             `Warning: stdin input truncated to ${MAX_STDIN_SIZE} bytes.`,
           );
@@ -41,7 +59,7 @@ export async function readStdin(): Promise<string> {
           break;
         }
         data += chunk;
-        totalSize += chunk.length;
+        totalSize += chunkByteLength;
       }
     };
 

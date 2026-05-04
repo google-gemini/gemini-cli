@@ -18,6 +18,24 @@ on GitHub.
 | [Preview](preview.md) | Experimental features ready for early feedback. |
 | [Stable](latest.md)   | Stable, recommended for general use.            |
 
+## Announcements: v0.40.0 - 2026-04-28
+
+- **Offline Search and Themes:** Bundled ripgrep for offline search support and
+  added GitHub-style colorblind themes
+  ([#25342](https://github.com/google-gemini/gemini-cli/pull/25342) by
+  @scidomino, [#15504](https://github.com/google-gemini/gemini-cli/pull/15504)
+  by @Z1xus).
+- **Advanced Resource and Memory Management:** Introduced MCP resource tools and
+  transitioned to a prompt-driven, four-tier memory management system
+  ([#25395](https://github.com/google-gemini/gemini-cli/pull/25395) by
+  @ruomengz, [#25716](https://github.com/google-gemini/gemini-cli/pull/25716) by
+  @SandyTao520).
+- **UX and Local Models:** Enabled topic update narrations by default and
+  streamlined Gemma local model setup with `gemini gemma`
+  ([#25586](https://github.com/google-gemini/gemini-cli/pull/25586) by
+  @gundermanc, [#25498](https://github.com/google-gemini/gemini-cli/pull/25498)
+  by @Samee24).
+
 ## Announcements: v0.39.0 - 2026-04-23
 
 - **Skill Management:** Added a new `/memory` inbox command for reviewing and
