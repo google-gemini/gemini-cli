@@ -412,6 +412,7 @@ export async function main() {
   const partialConfig = await loadCliConfig(settings.merged, sessionId, argv, {
     projectHooks: settings.workspace.settings.hooks,
     skipExtensions: true,
+    skipMemoryLoad: true,
   });
 
   adminControlsListner.setConfig(partialConfig);
