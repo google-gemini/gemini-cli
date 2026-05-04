@@ -154,7 +154,7 @@ module.exports = async ({ github, context, core }) => {
 
   // 3. Handle Stale Close (14 days with stale label)
   await processItems(
-    `repo:${owner}/${repo} is:open label:"${STALE_LABEL}" updated:<${closeThreshold.toISOString()}`,
+    `repo:${owner}/${repo} is:open label:"${STALE_LABEL}" ${exemptQuery} updated:<${closeThreshold.toISOString()}`,
     async (item) => {
       core.info(`Closing stale item #${item.number}.`);
       if (!dryRun) {
