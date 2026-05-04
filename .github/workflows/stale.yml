@@ -7,38 +7,44 @@ on:
   workflow_dispatch:
 
 jobs:
-  stale:
-    strategy:
-      fail-fast: false
-      matrix:
-        runner:
-          - 'ubuntu-latest' # GitHub-hosted
-    runs-on: '${{ matrix.runner }}'
-    if: |-
-      ${{ github.repository == 'google-gemini/gemini-cli' }}
+  stale-issues:
+    runs-on: ubuntu-latest
+    if: github.repository == 'google-gemini/gemini-cli'
     permissions:
-      issues: 'write'
-      pull-requests: 'write'
-    concurrency:
-      group: '${{ github.workflow }}-stale'
-      cancel-in-progress: true
+      issues: write
     steps:
-      - uses: 'actions/stale@5bef64f19d7facfb25b37b414482c7164d639639' # ratchet:actions/stale@v9
+      - uses: actions/stale@5bef64f19d7facfb25b37b414482c7164d639639 # ratchet:actions/stale@v9
         with:
-          repo-token: '${{ secrets.GITHUB_TOKEN }}'
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
           stale-issue-message: >-
             This issue has been automatically marked as stale due to 60 days of inactivity.
-            It will be closed in 14 days if no further activity occurs.
-          stale-pr-message: >-
-            This pull request has been automatically marked as stale due to 60 days of inactivity.
             It will be closed in 14 days if no further activity occurs.
           close-issue-message: >-
             This issue has been closed due to 14 additional days of inactivity after being marked as stale.
             If you believe this is still relevant, feel free to comment or reopen the issue. Thank you!
+          days-before-stale: 60
+          days-before-close: 14
+          exempt-issue-labels: 'pinned,security,🔒 maintainer only,help wanted,🗓️ Public Roadmap,needs-triage,waiting-on-maintainer,status: blocked'
+          operations-per-run: 300
+          only-issues: true
+
+  stale-prs:
+    runs-on: ubuntu-latest
+    if: github.repository == 'google-gemini/gemini-cli'
+    permissions:
+      pull-requests: write
+    steps:
+      - uses: actions/stale@5bef64f19d7facfb25b37b414482c7164d639639 # ratchet:actions/stale@v9
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          stale-pr-message: >-
+            This pull request has been automatically marked as stale due to 60 days of inactivity.
+            It will be closed in 14 days if no further activity occurs.
           close-pr-message: >-
             This pull request has been closed due to 14 additional days of inactivity after being marked as stale.
             If this is still relevant, you are welcome to reopen or leave a comment. Thanks for contributing!
           days-before-stale: 60
           days-before-close: 14
-          exempt-issue-labels: 'pinned,security,🔒 maintainer only,help wanted,🗓️ Public Roadmap'
-          exempt-pr-labels: 'pinned,security,🔒 maintainer only,help wanted,🗓️ Public Roadmap'
+          exempt-pr-labels: 'pinned,security,🔒 maintainer only,help wanted,🗓️ Public Roadmap,needs-triage,waiting-on-maintainer,status: blocked'
+          operations-per-run: 200
+          only-prs: true
