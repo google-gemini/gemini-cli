@@ -782,6 +782,117 @@ export const InboxDialog: React.FC<InboxDialogProps> = ({
     { isActive: true, priority: true },
   );
 
+  // Hoist the per-phase preview data so the array literals passed to
+  // ScrollableDiffViewport don't change identity on every parent render.
+  // ScrollableDiffViewport memoizes its expensive `parseDiffWithLineNumbers`
+  // + `renderDiffLines` on `sections`, so a new array literal every render
+  // would defeat that and re-colorize the diff each time. Keying on
+  // `selectedItem` captures every input that affects the rendered diffs.
+  // Must live above the early returns below so React sees a consistent
+  // hook order.
+  const previewData = useMemo(() => {
+    if (!selectedItem) {
+      return {
+        skillSections: undefined as DiffSection[] | undefined,
+        patchSections: undefined as DiffSection[] | undefined,
+        memoryGroups: undefined as
+          | Array<[string, { isNewFile: boolean; diffs: string[] }]>
+          | undefined,
+        memorySections: undefined as DiffSection[] | undefined,
+      };
+    }
+
+    if (selectedItem.type === 'skill') {
+      const skill = selectedItem.skill;
+      if (!skill.content) {
+        return {
+          skillSections: undefined,
+          patchSections: undefined,
+          memoryGroups: undefined,
+          memorySections: undefined,
+        };
+      }
+      return {
+        skillSections: [
+          {
+            key: `skill:${skill.dirName}`,
+            header: 'SKILL.md',
+            diffContent: newFileDiff('SKILL.md', skill.content),
+          },
+        ],
+        patchSections: undefined,
+        memoryGroups: undefined,
+        memorySections: undefined,
+      };
+    }
+
+    if (selectedItem.type === 'patch') {
+      const patch = selectedItem.patch;
+      return {
+        skillSections: undefined,
+        patchSections: patch.entries.map((entry, index) => ({
+          key: `${patch.fileName}:${entry.targetPath}:${index}`,
+          header: entry.targetPath,
+          diffContent: entry.diffContent,
+        })),
+        memoryGroups: undefined,
+        memorySections: undefined,
+      };
+    }
+
+    if (selectedItem.type === 'memory-patch') {
+      // Group hunks by target file. Multiple source patches may touch the
+      // same file (e.g. several patches all updating MEMORY.md); showing
+      // the file path once with all its hunks beneath is less noisy than
+      // repeating the path for every hunk.
+      const groups = new Map<string, { isNewFile: boolean; diffs: string[] }>();
+      for (const entry of selectedItem.memoryPatch.entries) {
+        const existing = groups.get(entry.targetPath);
+        if (existing) {
+          existing.diffs.push(entry.diffContent);
+          if (entry.isNewFile) existing.isNewFile = true;
+        } else {
+          groups.set(entry.targetPath, {
+            isNewFile: entry.isNewFile,
+            diffs: [entry.diffContent],
+          });
+        }
+      }
+      const memoryGroups = Array.from(groups.entries());
+
+      const memorySections: DiffSection[] = [];
+      memoryGroups.forEach(([targetPath, { isNewFile, diffs }], groupIndex) => {
+        const headerAnnotation = `${isNewFile ? ' (new file)' : ''}${
+          diffs.length > 1
+            ? ` · ${diffs.length} changes from different patches`
+            : ''
+        }`;
+        diffs.forEach((diff, hunkIndex) => {
+          memorySections.push({
+            key: `${targetPath}:${groupIndex}:${hunkIndex}`,
+            header:
+              hunkIndex === 0 ? `${targetPath}${headerAnnotation}` : targetPath,
+            diffContent: diff,
+          });
+        });
+      });
+
+      return {
+        skillSections: undefined,
+        patchSections: undefined,
+        memoryGroups,
+        memorySections,
+      };
+    }
+
+    return {
+      skillSections: undefined,
+      patchSections: undefined,
+      memoryGroups: undefined,
+      memorySections: undefined,
+    };
+  }, [selectedItem]);
+
   if (loading) {
     return (
       <Box
@@ -1028,16 +1139,7 @@ export const InboxDialog: React.FC<InboxDialogProps> = ({
               (isAlternateBuffer ? (
                 <Box flexDirection="column" marginTop={1}>
                   <ScrollableDiffViewport
-                    sections={[
-                      {
-                        key: `skill:${selectedItem.skill.dirName}`,
-                        header: 'SKILL.md',
-                        diffContent: newFileDiff(
-                          'SKILL.md',
-                          selectedItem.skill.content,
-                        ),
-                      },
-                    ]}
+                    sections={previewData.skillSections ?? []}
                     width={contentWidth}
                     height={diffViewportHeight}
                     hasFocus={true}
@@ -1170,11 +1272,7 @@ export const InboxDialog: React.FC<InboxDialogProps> = ({
             <Box flexDirection="column" marginTop={1}>
               {isAlternateBuffer ? (
                 <ScrollableDiffViewport
-                  sections={selectedItem.patch.entries.map((entry, index) => ({
-                    key: `${selectedItem.patch.fileName}:${entry.targetPath}:${index}`,
-                    header: entry.targetPath,
-                    diffContent: entry.diffContent,
-                  }))}
+                  sections={previewData.patchSections ?? []}
                   width={contentWidth}
                   height={diffViewportHeight}
                   hasFocus={true}
@@ -1255,58 +1353,16 @@ export const InboxDialog: React.FC<InboxDialogProps> = ({
               </Text>
 
               {(() => {
-                // Group hunks by target file. Multiple source patches may touch
-                // the same file (e.g. several patches all updating MEMORY.md);
-                // showing the file path once with all its hunks beneath is much
-                // less visually noisy than repeating the path for every hunk.
-                const groups = new Map<
-                  string,
-                  { isNewFile: boolean; diffs: string[] }
-                >();
-                for (const entry of selectedItem.memoryPatch.entries) {
-                  const existing = groups.get(entry.targetPath);
-                  if (existing) {
-                    existing.diffs.push(entry.diffContent);
-                    // If any hunk for this target was a creation, treat the
-                    // group as a creation overall.
-                    if (entry.isNewFile) existing.isNewFile = true;
-                  } else {
-                    groups.set(entry.targetPath, {
-                      isNewFile: entry.isNewFile,
-                      diffs: [entry.diffContent],
-                    });
-                  }
-                }
-
-                const groupEntries = Array.from(groups.entries());
+                // Grouping + section flattening were hoisted into the
+                // `previewData` useMemo so the array identities passed into
+                // ScrollableDiffViewport stay stable across re-renders.
+                const groupEntries = previewData.memoryGroups ?? [];
 
                 if (isAlternateBuffer) {
-                  const sections: DiffSection[] = [];
-                  groupEntries.forEach(
-                    ([targetPath, { isNewFile, diffs }], groupIndex) => {
-                      const headerAnnotation = `${
-                        isNewFile ? ' (new file)' : ''
-                      }${
-                        diffs.length > 1
-                          ? ` · ${diffs.length} changes from different patches`
-                          : ''
-                      }`;
-                      diffs.forEach((diff, hunkIndex) => {
-                        sections.push({
-                          key: `${targetPath}:${groupIndex}:${hunkIndex}`,
-                          header:
-                            hunkIndex === 0
-                              ? `${targetPath}${headerAnnotation}`
-                              : targetPath,
-                          diffContent: diff,
-                        });
-                      });
-                    },
-                  );
                   return (
                     <Box flexDirection="column" marginTop={1}>
                       <ScrollableDiffViewport
-                        sections={sections}
+                        sections={previewData.memorySections ?? []}
                         width={contentWidth}
                         height={diffViewportHeight}
                         hasFocus={true}
