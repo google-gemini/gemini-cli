@@ -36,7 +36,6 @@ import { MessageBus } from '../confirmation-bus/message-bus.js';
 import { Storage } from '../config/storage.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
 import { READ_FILE_TOOL_NAME } from '../tools/tool-names.js';
-import { getGlobalMemoryFilePath } from '../tools/memoryTool.js';
 import {
   applyParsedSkillPatches,
   hasParsedPatchHunks,
@@ -931,12 +930,6 @@ export async function validatePatches(
 
 type FileSnapshot = Map<string, string>;
 
-function isHiddenPath(relativePath: string): boolean {
-  return relativePath
-    .split(path.sep)
-    .some((part) => part.length > 0 && part.startsWith('.'));
-}
-
 async function snapshotFiles(
   rootDir: string,
   shouldIncludeFile: (relativePath: string) => boolean = () => true,
@@ -1047,20 +1040,6 @@ async function buildPendingInboxSummary(memoryDir: string): Promise<string> {
   return sections.join('\n\n');
 }
 
-async function snapshotActiveProjectMemory(
-  memoryDir: string,
-): Promise<FileSnapshot> {
-  return snapshotFiles(
-    memoryDir,
-    (relativePath) =>
-      relativePath.endsWith('.md') && !isHiddenPath(relativePath),
-    (relativePath) => {
-      const firstPart = relativePath.split(path.sep)[0];
-      return firstPart !== 'skills' && !firstPart.startsWith('.');
-    },
-  );
-}
-
 interface FileSnapshotDiff {
   added: string[];
   updated: string[];
@@ -1098,151 +1077,6 @@ function diffFileSnapshots(
 
 function getChangedSnapshotPaths(diff: FileSnapshotDiff): string[] {
   return [...diff.added, ...diff.updated].sort();
-}
-
-function getAllSnapshotDiffPaths(diff: FileSnapshotDiff): string[] {
-  return [...diff.added, ...diff.updated, ...diff.deleted].sort();
-}
-
-async function restoreFileSnapshot(
-  rootDir: string,
-  before: FileSnapshot,
-  after: FileSnapshot,
-  diff: FileSnapshotDiff,
-): Promise<void> {
-  for (const relativePath of diff.added) {
-    if (!after.has(relativePath)) {
-      continue;
-    }
-    await fs.rm(path.join(rootDir, relativePath), { force: true });
-  }
-
-  for (const relativePath of [...diff.updated, ...diff.deleted]) {
-    const content = before.get(relativePath);
-    if (content === undefined) {
-      continue;
-    }
-    const filePath = path.join(rootDir, relativePath);
-    await fs.mkdir(path.dirname(filePath), { recursive: true });
-    await fs.writeFile(filePath, content, 'utf-8');
-  }
-}
-
-/**
- * Resolves an absolute file path through symlinks (using the parent directory
- * if the file itself does not yet exist) so that snapshots and rollbacks key
- * off the same canonical path on macOS (`/var/...` vs `/private/var/...`),
- * symlinked home dirs, etc.
- */
-async function canonicalizeAbsoluteFilePath(
-  absolutePath: string,
-): Promise<string> {
-  const resolved = path.resolve(absolutePath);
-  try {
-    return await fs.realpath(resolved);
-  } catch {
-    // File doesn't exist yet; canonicalize the parent dir if possible so a
-    // future write to this path is comparable.
-    try {
-      const parent = await fs.realpath(path.dirname(resolved));
-      return path.join(parent, path.basename(resolved));
-    } catch {
-      return resolved;
-    }
-  }
-}
-
-/**
- * Snapshots a known list of absolute file paths. Files that don't exist are
- * simply absent from the returned map (matching `snapshotFiles` semantics).
- *
- * Used to guard "active memory" files that live OUTSIDE `<memoryDir>` (the
- * project's committed `<projectRoot>/GEMINI.md` and the user's global
- * `~/.gemini/GEMINI.md`). The extraction agent must NEVER edit these files
- * directly — they go through the `.inbox/<kind>/*.patch` review flow.
- */
-async function snapshotAbsoluteFiles(
-  absolutePaths: readonly string[],
-): Promise<FileSnapshot> {
-  const snapshot: FileSnapshot = new Map();
-  for (const absolutePath of absolutePaths) {
-    try {
-      snapshot.set(absolutePath, await fs.readFile(absolutePath, 'utf-8'));
-    } catch {
-      // File doesn't exist yet; not present in snapshot. Diff will mark it
-      // as `added` if the agent illegally creates it.
-    }
-  }
-  return snapshot;
-}
-
-/**
- * Restores the supplied diff against absolute file paths (no rootDir prefix).
- * Mirrors `restoreFileSnapshot` for absolute-path snapshots.
- */
-async function restoreAbsoluteFileSnapshot(
-  before: FileSnapshot,
-  after: FileSnapshot,
-  diff: FileSnapshotDiff,
-): Promise<void> {
-  for (const absolutePath of diff.added) {
-    if (!after.has(absolutePath)) {
-      continue;
-    }
-    await fs.rm(absolutePath, { force: true });
-  }
-
-  for (const absolutePath of [...diff.updated, ...diff.deleted]) {
-    const content = before.get(absolutePath);
-    if (content === undefined) {
-      continue;
-    }
-    await fs.mkdir(path.dirname(absolutePath), { recursive: true });
-    await fs.writeFile(absolutePath, content, 'utf-8');
-  }
-}
-
-/**
- * Returns the canonical absolute paths of the "active memory" files that live
- * OUTSIDE `<memoryDir>` and must never be touched by the extraction agent.
- * These are guarded by snapshot+rollback because the agent's WriteFile tool
- * is technically allowed to write under `<projectRoot>` (workspace-wide) and
- * to the surgical `~/.gemini/GEMINI.md` carve-out — neither of which we want
- * the extraction agent using.
- *
- * If projectRoot can't be resolved (test fixtures missing the accessor), we
- * still guard the global file — extraction must never silently lose its
- * post-run rollback because of a misconfigured config.
- */
-async function getProtectedActiveMemoryPaths(
-  config: Config,
-): Promise<string[]> {
-  const candidates: string[] = [];
-
-  let projectRoot: string | undefined;
-  try {
-    if (typeof config.getProjectRoot === 'function') {
-      projectRoot = config.getProjectRoot();
-    } else if (typeof config.storage?.getProjectRoot === 'function') {
-      projectRoot = config.storage.getProjectRoot();
-    }
-  } catch {
-    projectRoot = undefined;
-  }
-  if (typeof projectRoot === 'string' && projectRoot.length > 0) {
-    candidates.push(path.join(projectRoot, 'GEMINI.md'));
-  }
-
-  try {
-    candidates.push(getGlobalMemoryFilePath());
-  } catch {
-    // Global storage path unavailable — skip.
-  }
-
-  const canonical = await Promise.all(
-    candidates.map(canonicalizeAbsoluteFilePath),
-  );
-  return Array.from(new Set(canonical));
 }
 
 function prefixRelativePaths(
@@ -1362,15 +1196,6 @@ export async function startMemoryService(config: Config): Promise<void> {
     );
 
     const inboxCandidatesBefore = await snapshotInboxCandidates(memoryDir);
-    const activeMemoryBefore = await snapshotActiveProjectMemory(memoryDir);
-    // Active memory files outside <memoryDir> (project root GEMINI.md, global
-    // ~/.gemini/GEMINI.md). The extraction agent must NEVER touch these — any
-    // changes here are reverted after the agent finishes.
-    const protectedActiveMemoryPaths =
-      await getProtectedActiveMemoryPaths(config);
-    const protectedActiveMemoryBefore = await snapshotAbsoluteFiles(
-      protectedActiveMemoryPaths,
-    );
 
     // Read existing skills for context (memory-extracted + global/workspace)
     const existingSkillsSummary = await buildExistingSkillsSummary(
@@ -1502,53 +1327,6 @@ export async function startMemoryService(config: Config): Promise<void> {
     if (validPatches.length > 0) {
       debugLogger.log(
         `[MemoryService] ${validPatches.length} valid patch(es) currently in inbox; ${patchesCreatedThisRun.length} created or updated this run`,
-      );
-    }
-
-    // The agent contract is: all memory updates must go through .inbox/<kind>/*.patch
-    // files. Any direct write to active memory (MEMORY.md, sibling .md files) is a
-    // violation and is rolled back here so the user always sees patches before any
-    // active file changes.
-    const activeMemoryAfter = await snapshotActiveProjectMemory(memoryDir);
-    const activeMemoryDiff = diffFileSnapshots(
-      activeMemoryBefore,
-      activeMemoryAfter,
-    );
-    const rejectedMemoryWrites = getAllSnapshotDiffPaths(activeMemoryDiff);
-    if (rejectedMemoryWrites.length > 0) {
-      await restoreFileSnapshot(
-        memoryDir,
-        activeMemoryBefore,
-        activeMemoryAfter,
-        activeMemoryDiff,
-      );
-      debugLogger.log(
-        `[MemoryService] Rejected ${rejectedMemoryWrites.length} direct active memory write(s); patches in .inbox/ are the only supported path: ${rejectedMemoryWrites.join(', ')}`,
-      );
-    }
-
-    // Same defense for active memory files OUTSIDE <memoryDir>: project root
-    // GEMINI.md and global ~/.gemini/GEMINI.md. The extraction agent's WriteFile
-    // tool is allowed to reach these by the workspace policy and the surgical
-    // global allowlist, so we have to detect-and-rollback after the fact.
-    const protectedActiveMemoryAfter = await snapshotAbsoluteFiles(
-      protectedActiveMemoryPaths,
-    );
-    const protectedActiveMemoryDiff = diffFileSnapshots(
-      protectedActiveMemoryBefore,
-      protectedActiveMemoryAfter,
-    );
-    const rejectedProtectedWrites = getAllSnapshotDiffPaths(
-      protectedActiveMemoryDiff,
-    );
-    if (rejectedProtectedWrites.length > 0) {
-      await restoreAbsoluteFileSnapshot(
-        protectedActiveMemoryBefore,
-        protectedActiveMemoryAfter,
-        protectedActiveMemoryDiff,
-      );
-      debugLogger.log(
-        `[MemoryService] Rolled back ${rejectedProtectedWrites.length} direct write(s) to protected active memory file(s) outside <memoryDir>: ${rejectedProtectedWrites.join(', ')}`,
       );
     }
 

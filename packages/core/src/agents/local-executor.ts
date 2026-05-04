@@ -76,6 +76,7 @@ import {
 import type { InjectionSource } from '../config/injectionService.js';
 import {
   createScopedWorkspaceContext,
+  runWithScopedAutoMemoryExtractionWriteAccess,
   runWithScopedMemoryInboxAccess,
   runWithScopedWorkspaceContext,
 } from '../config/scoped-config.js';
@@ -547,11 +548,16 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       return this.runInternal(inputs, signal);
     };
 
-    if (this.definition.memoryInboxAccess) {
-      return runWithScopedMemoryInboxAccess(runWithWorkspaceScope);
+    const runWithInboxScope = () =>
+      this.definition.memoryInboxAccess
+        ? runWithScopedMemoryInboxAccess(runWithWorkspaceScope)
+        : runWithWorkspaceScope();
+
+    if (this.definition.autoMemoryExtractionWriteAccess) {
+      return runWithScopedAutoMemoryExtractionWriteAccess(runWithInboxScope);
     }
 
-    return runWithWorkspaceScope();
+    return runWithInboxScope();
   }
 
   private async runInternal(

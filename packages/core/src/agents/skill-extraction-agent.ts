@@ -13,7 +13,6 @@ import {
   GREP_TOOL_NAME,
   LS_TOOL_NAME,
   READ_FILE_TOOL_NAME,
-  SHELL_TOOL_NAME,
   WRITE_FILE_TOOL_NAME,
 } from '../tools/tool-names.js';
 import { PREVIEW_GEMINI_FLASH_MODEL } from '../config/models.js';
@@ -336,8 +335,7 @@ function buildSystemPrompt(skillsDir: string, memoryDir: string): string {
     '2. If skills exist, read their SKILL.md files to understand what is already captured.',
     '3. Use activate_skill to load the "skill-creator" skill. Follow its design guidance',
     '   (conciseness, progressive disclosure, frontmatter format, bundled resources) when',
-    '   writing SKILL.md files. You may also use its init_skill.cjs script to scaffold new',
-    '   skill directories and package_skill.cjs to validate finished skills.',
+    '   writing SKILL.md files.',
     '   IMPORTANT: You are a background agent with no user interaction. Skip any interactive',
     '   steps in the skill-creator guide (asking clarifying questions, requesting user feedback,',
     '   installation prompts, iteration loops). Use only its format and quality guidance.',
@@ -357,7 +355,7 @@ function buildSystemPrompt(skillsDir: string, memoryDir: string): string {
     '   the format in MEMORY PATCH FORMAT. Prefer updating existing memory files over',
     '   duplicating facts. Keep patches small and focused.',
     '9. Write new SKILL.md files or update existing ones in your skills directory.',
-    '   Use run_shell_command to run init_skill.cjs for scaffolding and package_skill.cjs for validation.',
+    '   Use write_file/edit directly; shell commands are intentionally unavailable in this background flow.',
     '   For skills that live OUTSIDE your skills directory, write a `.patch` file there instead (see UPDATING EXISTING SKILLS).',
     '10. Write COMPLETE SKILL.md files — never partially update a SKILL.md.',
     '',
@@ -416,6 +414,7 @@ export const SkillExtractionAgent = (
     model: PREVIEW_GEMINI_FLASH_MODEL,
   },
   memoryInboxAccess: true,
+  autoMemoryExtractionWriteAccess: true,
   toolConfig: {
     tools: [
       ACTIVATE_SKILL_TOOL_NAME,
@@ -425,7 +424,6 @@ export const SkillExtractionAgent = (
       LS_TOOL_NAME,
       GLOB_TOOL_NAME,
       GREP_TOOL_NAME,
-      SHELL_TOOL_NAME,
     ],
   },
   get promptConfig() {

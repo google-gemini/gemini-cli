@@ -12,6 +12,7 @@ import {
   GREP_TOOL_NAME,
   LS_TOOL_NAME,
   READ_FILE_TOOL_NAME,
+  SHELL_TOOL_NAME,
   WRITE_FILE_TOOL_NAME,
 } from '../tools/tool-names.js';
 import { PREVIEW_GEMINI_FLASH_MODEL } from '../config/models.js';
@@ -35,6 +36,7 @@ describe('SkillExtractionAgent', () => {
     expect(agent.displayName).toBe('Skill Extractor');
     expect(agent.modelConfig.model).toBe(PREVIEW_GEMINI_FLASH_MODEL);
     expect(agent.memoryInboxAccess).toBe(true);
+    expect(agent.autoMemoryExtractionWriteAccess).toBe(true);
     expect(agent.toolConfig?.tools).toEqual(
       expect.arrayContaining([
         READ_FILE_TOOL_NAME,
@@ -45,6 +47,7 @@ describe('SkillExtractionAgent', () => {
         GREP_TOOL_NAME,
       ]),
     );
+    expect(agent.toolConfig?.tools).not.toContain(SHELL_TOOL_NAME);
   });
 
   it('should default to no skill unless recurrence and durability are proven', () => {

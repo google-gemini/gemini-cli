@@ -238,6 +238,13 @@ export interface LocalAgentDefinition<
   memoryInboxAccess?: boolean;
 
   /**
+   * Restricts write validation for this agent to extracted skill artifacts and
+   * canonical auto-memory inbox patch files. Used by the background
+   * auto-memory extractor so active memory files cannot be edited directly.
+   */
+  autoMemoryExtractionWriteAccess?: boolean;
+
+  /**
    * Optional inline MCP servers for this agent.
    */
   mcpServers?: Record<string, MCPServerConfig>;

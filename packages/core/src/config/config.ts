@@ -142,6 +142,7 @@ import type { AnyToolInvocation, AnyDeclarativeTool } from '../tools/tools.js';
 import { WorkspaceContext } from '../utils/workspaceContext.js';
 import {
   getWorkspaceContextOverride,
+  hasScopedAutoMemoryExtractionWriteAccess,
   hasScopedMemoryInboxAccess,
 } from './scoped-config.js';
 import { Storage } from './storage.js';
@@ -3074,6 +3075,28 @@ export class Config implements McpContext, AgentLoopContext {
     return isSubpath(resolvedMemoryRoot, resolvedPath);
   }
 
+  private isScopedAutoMemoryExtractionWritePathAllowed(
+    absolutePath: string,
+    resolvedPath: string,
+  ): boolean {
+    if (!hasScopedAutoMemoryExtractionWriteAccess()) {
+      return false;
+    }
+
+    const resolvedSkillsMemoryDir = resolveToRealPath(
+      this.storage.getProjectSkillsMemoryDir(),
+    );
+    if (isSubpath(resolvedSkillsMemoryDir, resolvedPath)) {
+      return true;
+    }
+
+    return this.isScopedMemoryInboxPatchPathAllowed(
+      absolutePath,
+      resolvedPath,
+      path.join(this.storage.getProjectMemoryTempDir(), '.inbox'),
+    );
+  }
+
   /**
    * Get the current FileSystemService
    */
@@ -3169,6 +3192,19 @@ export class Config implements McpContext, AgentLoopContext {
     absolutePath: string,
     checkType: 'read' | 'write' = 'write',
   ): string | null {
+    if (checkType === 'write' && hasScopedAutoMemoryExtractionWriteAccess()) {
+      const resolvedPath = resolveToRealPath(absolutePath);
+      if (
+        this.isScopedAutoMemoryExtractionWritePathAllowed(
+          absolutePath,
+          resolvedPath,
+        )
+      ) {
+        return null;
+      }
+      return `Auto-memory extraction write denied: Attempted path "${absolutePath}" is outside the extraction write allowlist. Extraction may only write extracted skills under ${this.storage.getProjectSkillsMemoryDir()} and canonical inbox patches under ${path.join(this.storage.getProjectMemoryTempDir(), '.inbox', '{private,global}', 'extraction.patch')}.`;
+    }
+
     // For read operations, check read-only paths first
     if (checkType === 'read') {
       if (this.getWorkspaceContext().isPathReadable(absolutePath)) {
