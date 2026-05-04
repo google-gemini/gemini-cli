@@ -104,6 +104,7 @@ jobs:
         uses: 'google-github-actions/run-gemini-cli@a3bf79042542528e91937b3a3a6fbc4967ee3c31' # ratchet:google-github-actions/run-gemini-cli@v0
         id: 'gemini_issue_analysis'
         env:
+          GEMINI_CLI_TRUST_WORKSPACE: 'true'
           GITHUB_TOKEN: '' # Do not pass any auth token here since this runs on untrusted inputs
           ISSUES_TO_TRIAGE: '${{ steps.get_issue_from_event.outputs.issues_to_triage || steps.find_issues.outputs.issues_to_triage }}'
           REPOSITORY: '${{ github.repository }}'
