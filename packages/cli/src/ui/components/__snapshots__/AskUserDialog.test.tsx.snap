@@ -11,6 +11,17 @@ Enter to submit · Esc to cancel
 "
 `;
 
+exports[`AskUserDialog > Choice question placeholder > uses default placeholder when not provided 2`] = `
+"Select your preferred language:
+
+● 1.  TypeScript
+  2.  JavaScript
+  3.  Enter a custom value
+
+Enter to select · ↑/↓ to navigate · Esc to cancel
+"
+`;
+
 exports[`AskUserDialog > Choice question placeholder > uses placeholder for "Other" option when provided 1`] = `
 "Select your preferred language:
 
@@ -22,12 +33,39 @@ Enter to submit · Esc to cancel
 "
 `;
 
+exports[`AskUserDialog > Choice question placeholder > uses placeholder for "Other" option when provided 2`] = `
+"Select your preferred language:
+
+● 1.  TypeScript
+  2.  JavaScript
+  3.  Type another language...
+
+Enter to select · ↑/↓ to navigate · Esc to cancel
+"
+`;
+
 exports[`AskUserDialog > Scroll Arrows (useAlternateBuffer: false) > shows scroll arrows correctly when useAlternateBuffer is false 1`] = `
 "Choose an option
 
 ▲
 ●  1.  Option 1                                                                 
        Description 1                                                            
+   2.  Option 2
+       Description 2
+   3.  Option 3
+       Description 3
+▼
+
+Enter to select · ↑/↓ to navigate · Esc to cancel
+"
+`;
+
+exports[`AskUserDialog > Scroll Arrows (useAlternateBuffer: false) > shows scroll arrows correctly when useAlternateBuffer is false 2`] = `
+"Choose an option
+
+▲
+●  1.  Option 1
+       Description 1
    2.  Option 2
        Description 2
    3.  Option 3
@@ -111,6 +149,22 @@ Enter to select · ↑/↓ to navigate · Esc to cancel
 "
 `;
 
+exports[`AskUserDialog > navigates to custom option when typing unbound characters (Type-to-Jump) 1`] = `
+"Choose an option
+
+▲
+●  1.  Option 1
+       Description 1
+   2.  Option 2
+       Description 2
+   3.  Option 3
+       Description 3
+▼
+
+Enter to select · ↑/↓ to navigate · Esc to cancel
+"
+`;
+
 exports[`AskUserDialog > renders question and options 1`] = `
 "Which authentication method should we use?
 
@@ -181,6 +235,19 @@ Enter to submit · Tab/Shift+Tab to edit answers · Esc to cancel
 "
 `;
 
+exports[`AskUserDialog > shows warning for unanswered questions on Review tab 2`] = `
+"← □ License │ □ README │ ≡ Review →
+
+Which license?
+
+● 1.  MIT
+      Permissive license
+  2.  Enter a custom value
+
+Enter to select · ←/→ to switch questions · Esc to cancel
+"
+`;
+
 exports[`AskUserDialog > verifies "All of the above" visual state with snapshot 1`] = `
 "Which features?
 (Select all that apply)
@@ -189,6 +256,22 @@ exports[`AskUserDialog > verifies "All of the above" visual state with snapshot 
   2. [x] ESLint
 ● 3. [x] All of the above                                                                                               
       Select all options                                                                                                
+  4. [ ] Enter a custom value
+   Done
+   Finish selection
+
+Enter to select · ↑/↓ to navigate · Esc to cancel
+"
+`;
+
+exports[`AskUserDialog > verifies "All of the above" visual state with snapshot 2`] = `
+"Which features?
+(Select all that apply)
+
+  1. [x] TypeScript
+  2. [x] ESLint
+● 3. [x] All of the above
+      Select all options
   4. [ ] Enter a custom value
    Done
    Finish selection

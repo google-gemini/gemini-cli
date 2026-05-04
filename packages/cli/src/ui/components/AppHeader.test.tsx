@@ -22,6 +22,12 @@ vi.mock('../utils/terminalSetup.js', () => ({
 describe('<AppHeader />', () => {
   beforeEach(() => {
     _clearSessionBannersForTest();
+    // Clean CAMP env vars so tests don't bleed into each other
+    delete process.env['CAMP_VERSION'];
+    delete process.env['CAMP_AGENT_NAME'];
+    delete process.env['CAMP_AGENT_CODE'];
+    delete process.env['CAMP_SC2_STATUS'];
+    delete process.env['CAMP_INFRA_STATUS'];
   });
 
   it('should render the banner with default text', async () => {
@@ -287,6 +293,50 @@ describe('<AppHeader />', () => {
     await waitUntilReady();
 
     expect(lastFrame()).not.toContain('Tips');
+    unmount();
+  });
+
+  it('should render the CAMP identity line when CAMP_VERSION is set', async () => {
+    process.env['CAMP_VERSION'] = '3.9.4';
+    process.env['CAMP_AGENT_NAME'] = 'RickXy';
+    process.env['CAMP_AGENT_CODE'] = 'GEM';
+
+    const mockConfig = makeFakeConfig();
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
+      <AppHeader version="1.0.0" />,
+      { config: mockConfig },
+    );
+    await waitUntilReady();
+
+    expect(lastFrame()).toContain('CAMP v3.9.4');
+    expect(lastFrame()).toContain('@RickXy');
+    unmount();
+  });
+
+  it('should NOT render the CAMP identity line when CAMP_VERSION is absent', async () => {
+    const mockConfig = makeFakeConfig();
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
+      <AppHeader version="1.0.0" />,
+      { config: mockConfig },
+    );
+    await waitUntilReady();
+
+    expect(lastFrame()).not.toContain('CAMP v');
+    unmount();
+  });
+
+  it('should show SC2 warning in CAMP line when CAMP_SC2_STATUS is WARN', async () => {
+    process.env['CAMP_VERSION'] = '3.9.4';
+    process.env['CAMP_SC2_STATUS'] = 'WARN';
+
+    const mockConfig = makeFakeConfig();
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
+      <AppHeader version="1.0.0" />,
+      { config: mockConfig },
+    );
+    await waitUntilReady();
+
+    expect(lastFrame()).toContain('SC2');
     unmount();
   });
 });

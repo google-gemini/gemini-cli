@@ -107,6 +107,12 @@ export const AppHeader = ({ version, showDetails = true }: AppHeaderProps) => {
     </Box>
   );
 
+  const campVersion = process.env['CAMP_VERSION'];
+  const campAgent = process.env['CAMP_AGENT_NAME'];
+  const campCode = process.env['CAMP_AGENT_CODE'];
+  const campSC2Warn = process.env['CAMP_SC2_STATUS'] === 'WARN';
+  const campInfraFail = process.env['CAMP_INFRA_STATUS'] === 'FAIL';
+
   const renderMetadata = (isBelow = false) => (
     <Box marginLeft={isBelow ? 0 : 2} flexDirection="column">
       {/* Line 1: Gemini CLI vVersion [Updating] */}
@@ -123,6 +129,22 @@ export const AppHeader = ({ version, showDetails = true }: AppHeaderProps) => {
           </Box>
         )}
       </Box>
+
+      {/* Line 2: CAMP identity — only rendered when env vars are present */}
+      {campVersion && (
+        <Box>
+          <Text color={theme.text.secondary}>🏕 </Text>
+          {campAgent && (
+            <Text bold color={theme.text.primary}>
+              @{campAgent}
+            </Text>
+          )}
+          {campCode && <Text color={theme.text.secondary}> ({campCode})</Text>}
+          <Text color={theme.text.secondary}> · CAMP v{campVersion}</Text>
+          {campSC2Warn && <Text color="yellow"> · SC2: ⚠</Text>}
+          {campInfraFail && <Text color="red"> · Infra: ❌</Text>}
+        </Box>
+      )}
 
       {showDetails && (
         <>
