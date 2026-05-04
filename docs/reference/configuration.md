@@ -1752,6 +1752,12 @@ their corresponding top-level category object in your `settings.json` file.
     ["DEBUG", "DEBUG_MODE"]
     ```
 
+- **`advanced.ignoreLocalEnv`** (boolean):
+  - **Description:** Whether to ignore generic .env files in the project
+    directory.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
 - **`advanced.bugCommand`** (object):
   - **Description:** Configuration for the bug report command.
   - **Default:** `undefined`
