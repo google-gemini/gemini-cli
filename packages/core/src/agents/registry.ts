@@ -736,13 +736,14 @@ export class AgentRegistry {
       agent.metadata = {};
     }
 
-    // Use a cryptographic hash of the agent card's pointer (URL or JSON content)
-    // for consistent trust verification and change detection.
-    const contentToHash = agent.agentCardUrl ?? agent.agentCardJson;
-    if (contentToHash) {
+    // To avoid a breaking change for existing users, we continue to use
+    // the raw URL as the hash for URL-based remote agents.
+    if (agent.agentCardUrl) {
+      agent.metadata.hash = agent.agentCardUrl;
+    } else if (agent.agentCardJson) {
       agent.metadata.hash = crypto
         .createHash('sha256')
-        .update(contentToHash)
+        .update(agent.agentCardJson)
         .digest('hex');
     }
   }
