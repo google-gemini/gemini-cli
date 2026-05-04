@@ -26,7 +26,7 @@ import {
   OnboardingStartEvent,
   OnboardingSuccessEvent,
 } from '../telemetry/index.js';
-import { AuthType } from '../core/contentGenerator.js';
+import { AuthType } from '../core/auth_types.js';
 
 export class ProjectIdRequiredError extends Error {
   constructor() {

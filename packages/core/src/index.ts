@@ -35,6 +35,7 @@ export * from './commands/types.js';
 // Export Core Logic
 export * from './core/baseLlmClient.js';
 export * from './core/client.js';
+export * from './core/auth_types.js';
 export * from './core/contentGenerator.js';
 export * from './core/loggingContentGenerator.js';
 export * from './core/geminiChat.js';

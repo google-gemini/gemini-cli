@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { AuthType } from '../core/contentGenerator.js';
+import { AuthType } from '../core/auth_types.js';
 import { getOauthClient } from './oauth2.js';
 import { setupUser } from './setup.js';
 import { CodeAssistServer } from './server.js';
@@ -66,6 +66,7 @@ describe('codeAssist', () => {
         mockAuthClient,
         mockConfig,
         httpOptions,
+        AuthType.LOGIN_WITH_GOOGLE,
       );
       expect(MockedCodeAssistServer).toHaveBeenCalledWith(
         mockAuthClient,
@@ -98,6 +99,7 @@ describe('codeAssist', () => {
         mockAuthClient,
         mockConfig,
         httpOptions,
+        AuthType.COMPUTE_ADC,
       );
       expect(MockedCodeAssistServer).toHaveBeenCalledWith(
         mockAuthClient,

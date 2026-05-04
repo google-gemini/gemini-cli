@@ -11,7 +11,7 @@ import {
   resetUserDataCacheForTesting,
 } from './setup.js';
 import { ValidationRequiredError } from '../utils/googleQuotaErrors.js';
-import { AuthType } from '../core/contentGenerator.js';
+import { AuthType } from '../core/auth_types.js';
 import { CodeAssistServer } from '../code_assist/server.js';
 import type { OAuth2Client } from 'google-auth-library';
 import { UserTierId, type GeminiUserTier } from './types.js';

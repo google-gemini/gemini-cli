@@ -56,14 +56,9 @@ export interface ContentGenerator {
   paidTier?: GeminiUserTier;
 }
 
-export enum AuthType {
-  LOGIN_WITH_GOOGLE = 'oauth-personal',
-  USE_GEMINI = 'gemini-api-key',
-  USE_VERTEX_AI = 'vertex-ai',
-  LEGACY_CLOUD_SHELL = 'cloud-shell',
-  COMPUTE_ADC = 'compute-default-credentials',
-  GATEWAY = 'gateway',
-}
+import { AuthType } from './auth_types.js';
+
+export { AuthType };
 
 /**
  * Detects the best authentication type based on environment variables.
