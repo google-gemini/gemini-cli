@@ -2099,7 +2099,11 @@ const SETTINGS_SCHEMA = {
             category: 'Experimental',
             requiresRestart: false,
             default: 'gemini-live',
-            description: 'The backend to use for voice transcription.',
+            description: oneLine`
+              The backend to use for voice transcription. Note: When using the
+              Gemini Live backend, voice recordings are sent to Google Cloud for
+              transcription.
+            `,
             showInDialog: true,
             options: [
               { value: 'gemini-live', label: 'Gemini Live API (Cloud)' },

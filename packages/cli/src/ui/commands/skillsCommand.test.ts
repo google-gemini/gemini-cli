@@ -37,6 +37,7 @@ vi.mock('../../config/extensions/consent.js', async (importOriginal) => {
 });
 
 import { linkSkill } from '../../utils/skillUtils.js';
+import { requestConsentInteractive } from '../../config/extensions/consent.js';
 
 vi.mock('../../config/settings.js', async (importOriginal) => {
   const actual =
@@ -251,6 +252,36 @@ describe('skillsCommand', () => {
         expect.any(Function),
         expect.any(Function),
       );
+    });
+
+    it('should pass a cleanup callback for interactive workspace consent', async () => {
+      const linkCmd = skillsCommand.subCommands!.find(
+        (s) => s.name === 'link',
+      )!;
+      context.ui.setConfirmationRequest = vi.fn();
+      vi.mocked(linkSkill).mockImplementation(
+        async (_sourcePath, _scope, _addItem, requestConsent) => {
+          expect(requestConsent).toBeDefined();
+          await requestConsent!(
+            [{ name: 'test-skill', location: '/path' } as SkillDefinition],
+            '/workspace/.gemini/skills',
+          );
+          return [{ name: 'test-skill', location: '/path' }];
+        },
+      );
+
+      await linkCmd.action!(context, '/some/path --scope workspace');
+
+      const requestConsentCall = vi
+        .mocked(requestConsentInteractive)
+        .mock.calls.at(-1);
+      expect(requestConsentCall?.[1]).toEqual(expect.any(Function));
+
+      const clearConfirmationRequest = requestConsentCall?.[2];
+      expect(clearConfirmationRequest).toBeTypeOf('function');
+
+      clearConfirmationRequest?.();
+      expect(context.ui.setConfirmationRequest).toHaveBeenCalledWith(null);
     });
 
     it('should show error if link fails', async () => {

@@ -7,19 +7,20 @@
 import { describe, it, expect } from 'vitest';
 import { ContextWorkingBufferImpl } from './contextWorkingBuffer.js';
 import { createDummyNode } from '../testing/contextTestUtils.js';
+import { NodeType } from '../graph/types.js';
 
 describe('ContextWorkingBufferImpl', () => {
   it('should initialize with a pristine graph correctly', () => {
     const pristine1 = createDummyNode(
       'ep1',
-      'USER_PROMPT',
+      NodeType.USER_PROMPT,
       10,
       undefined,
       'p1',
     );
     const pristine2 = createDummyNode(
       'ep1',
-      'AGENT_THOUGHT',
+      NodeType.AGENT_THOUGHT,
       10,
       undefined,
       'p2',
@@ -38,7 +39,7 @@ describe('ContextWorkingBufferImpl', () => {
   it('should track 1:1 replacements (e.g., masking) and append to audit log', () => {
     const pristine1 = createDummyNode(
       'ep1',
-      'USER_PROMPT',
+      NodeType.USER_PROMPT,
       10,
       undefined,
       'p1',
@@ -47,7 +48,7 @@ describe('ContextWorkingBufferImpl', () => {
 
     const maskedNode = createDummyNode(
       'ep1',
-      'USER_PROMPT',
+      NodeType.USER_PROMPT,
       5,
       undefined,
       'm1',
@@ -76,15 +77,33 @@ describe('ContextWorkingBufferImpl', () => {
   });
 
   it('should track N:1 abstractions (e.g., rolling summaries)', () => {
-    const p1 = createDummyNode('ep1', 'USER_PROMPT', 10, undefined, 'p1');
-    const p2 = createDummyNode('ep1', 'AGENT_THOUGHT', 10, undefined, 'p2');
-    const p3 = createDummyNode('ep1', 'USER_PROMPT', 10, undefined, 'p3');
+    const p1 = createDummyNode(
+      'ep1',
+      NodeType.USER_PROMPT,
+      10,
+      undefined,
+      'p1',
+    );
+    const p2 = createDummyNode(
+      'ep1',
+      NodeType.AGENT_THOUGHT,
+      10,
+      undefined,
+      'p2',
+    );
+    const p3 = createDummyNode(
+      'ep1',
+      NodeType.USER_PROMPT,
+      10,
+      undefined,
+      'p3',
+    );
 
     let buffer = ContextWorkingBufferImpl.initialize([p1, p2, p3]);
 
     const summaryNode = createDummyNode(
       'ep1',
-      'ROLLING_SUMMARY',
+      NodeType.ROLLING_SUMMARY,
       15,
       undefined,
       's1',
@@ -105,11 +124,23 @@ describe('ContextWorkingBufferImpl', () => {
   });
 
   it('should track multi-generation provenance correctly', () => {
-    const p1 = createDummyNode('ep1', 'USER_PROMPT', 10, undefined, 'p1');
+    const p1 = createDummyNode(
+      'ep1',
+      NodeType.USER_PROMPT,
+      10,
+      undefined,
+      'p1',
+    );
     let buffer = ContextWorkingBufferImpl.initialize([p1]);
 
     // Gen 1: Masked
-    const gen1 = createDummyNode('ep1', 'USER_PROMPT', 8, undefined, 'gen1');
+    const gen1 = createDummyNode(
+      'ep1',
+      NodeType.USER_PROMPT,
+      8,
+      undefined,
+      'gen1',
+    );
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (gen1 as any).replacesId = 'p1';
     buffer = buffer.applyProcessorResult('Masking', [p1], [gen1]);
@@ -117,7 +148,7 @@ describe('ContextWorkingBufferImpl', () => {
     // Gen 2: Summarized
     const gen2 = createDummyNode(
       'ep1',
-      'ROLLING_SUMMARY',
+      NodeType.ROLLING_SUMMARY,
       5,
       undefined,
       'gen2',
@@ -140,12 +171,18 @@ describe('ContextWorkingBufferImpl', () => {
   });
 
   it('should handle net-new injected nodes without throwing', () => {
-    const p1 = createDummyNode('ep1', 'USER_PROMPT', 10, undefined, 'p1');
+    const p1 = createDummyNode(
+      'ep1',
+      NodeType.USER_PROMPT,
+      10,
+      undefined,
+      'p1',
+    );
     let buffer = ContextWorkingBufferImpl.initialize([p1]);
 
     const injected = createDummyNode(
       'ep1',
-      'SYSTEM_EVENT',
+      NodeType.SYSTEM_EVENT,
       5,
       undefined,
       'injected1',

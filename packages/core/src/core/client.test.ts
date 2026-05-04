@@ -1517,7 +1517,7 @@ ${JSON.stringify(
       const longText = 'a'.repeat(404);
       const request: Part[] = [{ text: longText }];
       // estimateTextOnlyLength counts only text content (400 chars), not JSON structure
-      const estimatedRequestTokenCount = Math.floor(longText.length / 4);
+      const estimatedRequestTokenCount = Math.floor(longText.length * 0.33);
       const remainingTokenCount = MOCKED_TOKEN_LIMIT - lastPromptTokenCount;
 
       // Mock tryCompressChat to not compress
@@ -1577,7 +1577,7 @@ ${JSON.stringify(
       const longText = 'a'.repeat(404);
       const request: Part[] = [{ text: longText }];
       // estimateTextOnlyLength counts only text content (400 chars), not JSON structure
-      const estimatedRequestTokenCount = Math.floor(longText.length / 4);
+      const estimatedRequestTokenCount = Math.floor(longText.length * 0.33);
       const remainingTokenCount = STICKY_MODEL_LIMIT - lastPromptTokenCount;
 
       vi.spyOn(client, 'tryCompressChat').mockResolvedValue({
@@ -2052,6 +2052,29 @@ ${JSON.stringify(
       expect(mockGetCoreSystemPrompt).toHaveBeenCalledWith(
         mockConfig,
         'Updated Memory',
+      );
+    });
+
+    it('should update system instruction when ApprovalModeChanged event is emitted', async () => {
+      const { ApprovalMode } = await import('../policy/types.js');
+
+      vi.mocked(mockConfig.getSessionId).mockReturnValue('session-1');
+      vi.mocked(mockConfig.getSystemInstructionMemory).mockReturnValue(
+        'Current Memory',
+      );
+
+      const { getCoreSystemPrompt } = await import('./prompts.js');
+      const mockGetCoreSystemPrompt = vi.mocked(getCoreSystemPrompt);
+      mockGetCoreSystemPrompt.mockClear();
+
+      coreEvents.emit(CoreEvent.ApprovalModeChanged, {
+        sessionId: 'session-1',
+        mode: ApprovalMode.YOLO,
+      });
+
+      expect(mockGetCoreSystemPrompt).toHaveBeenCalledWith(
+        mockConfig,
+        'Current Memory',
       );
     });
 

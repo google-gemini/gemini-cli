@@ -23,16 +23,14 @@ Output ONLY the raw factual snapshot, formatted compactly. Do not include markdo
 
     let userPromptText = 'TRANSCRIPT TO SNAPSHOT:\n\n';
     for (const node of nodes) {
+      const payload = node.payload;
       let nodeContent = '';
-      if ('text' in node && typeof node.text === 'string') {
-        nodeContent = node.text;
-      } else if ('semanticParts' in node) {
-        nodeContent = JSON.stringify(node.semanticParts);
-      } else if ('observation' in node) {
-        nodeContent =
-          typeof node.observation === 'string'
-            ? node.observation
-            : JSON.stringify(node.observation);
+      if (payload.text) {
+        nodeContent = payload.text;
+      } else if (payload.functionCall) {
+        nodeContent = `CALL: ${payload.functionCall.name}(${JSON.stringify(payload.functionCall.args)})`;
+      } else if (payload.functionResponse) {
+        nodeContent = `RESPONSE: ${JSON.stringify(payload.functionResponse.response)}`;
       }
 
       userPromptText += `[${node.type}]: ${nodeContent}\n`;
