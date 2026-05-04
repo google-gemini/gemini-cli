@@ -47,6 +47,8 @@ module.exports = async ({ github, context, core }) => {
       const response = await github.rest.search.issuesAndPullRequests({
         q: query,
         per_page: 100,
+        sort: 'updated',
+        order: 'asc',
       });
       const items = response.data.items;
       core.info(`Found ${items.length} items (batch limited).`);
@@ -84,7 +86,7 @@ module.exports = async ({ github, context, core }) => {
         !['OWNER', 'MEMBER', 'COLLABORATOR'].includes(
           lastComment.author_association,
         ) &&
-        lastComment.user.type !== 'Bot'
+        lastComment.user?.type !== 'Bot'
       ) {
         core.info(
           `Removing ${NEED_INFO_LABEL} from #${item.number} due to contributor response.`,
@@ -184,11 +186,11 @@ module.exports = async ({ github, context, core }) => {
 
   // Nudge
   await processItems(
-    `repo:${owner}/${repo} is:open is:pr -label:"help wanted" -label:"🔒 maintainer only" -label:"status/pr-nudge-sent" created:<${nudgeThreshold.toISOString()}`,
+    `repo:${owner}/${repo} is:open is:pr -label:"help wanted" -label:"🔒 maintainer only" -label:"status/pr-nudge-sent" created:${prCloseThreshold.toISOString()}..${nudgeThreshold.toISOString()}`,
     async (pr) => {
       if (
         ['OWNER', 'MEMBER', 'COLLABORATOR'].includes(pr.author_association) ||
-        pr.user.type === 'Bot'
+        pr.user?.type === 'Bot'
       )
         return;
 
@@ -216,7 +218,7 @@ module.exports = async ({ github, context, core }) => {
     async (pr) => {
       if (
         ['OWNER', 'MEMBER', 'COLLABORATOR'].includes(pr.author_association) ||
-        pr.user.type === 'Bot'
+        pr.user?.type === 'Bot'
       )
         return;
 
