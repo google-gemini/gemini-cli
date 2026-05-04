@@ -115,12 +115,6 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
         model: 'gemini-3-flash-preview',
       },
     },
-    'gemini-3-flash-lite-base': {
-      extends: 'base',
-      modelConfig: {
-        model: 'gemini-3.1-flash-lite-preview',
-      },
-    },
     classifier: {
       extends: 'base',
       modelConfig: {
@@ -189,7 +183,7 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       },
     },
     'web-search': {
-      extends: 'gemini-3-flash-lite-base',
+      extends: 'gemini-3-flash-base',
       modelConfig: {
         generateContentConfig: {
           tools: [{ googleSearch: {} }],
@@ -197,7 +191,7 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       },
     },
     'web-fetch': {
-      extends: 'gemini-3-flash-lite-base',
+      extends: 'gemini-3-flash-base',
       modelConfig: {
         generateContentConfig: {
           tools: [{ urlContext: {} }],
@@ -206,11 +200,11 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
     },
     // TODO(joshualitt): During cleanup, make modelConfig optional.
     'web-fetch-fallback': {
-      extends: 'gemini-3-flash-lite-base',
+      extends: 'gemini-3-flash-base',
       modelConfig: {},
     },
     'loop-detection': {
-      extends: 'gemini-3-flash-lite-base',
+      extends: 'gemini-3-flash-base',
       modelConfig: {},
     },
     'loop-detection-double-check': {
@@ -220,11 +214,11 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       },
     },
     'llm-edit-fixer': {
-      extends: 'gemini-3-flash-lite-base',
+      extends: 'gemini-3-flash-base',
       modelConfig: {},
     },
     'next-speaker-checker': {
-      extends: 'gemini-3-flash-lite-base',
+      extends: 'gemini-3-flash-base',
       modelConfig: {},
     },
     'chat-compression-3-pro': {
@@ -492,10 +486,6 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
     'gemini-3.1-flash-lite-preview': {
       default: 'gemini-3.1-flash-lite-preview',
       contexts: [
-        {
-          condition: { hasAccessToPreview: false },
-          target: 'gemini-2.5-flash-lite',
-        },
         {
           condition: { useGemini3_1FlashLite: false },
           target: 'gemini-2.5-flash-lite',

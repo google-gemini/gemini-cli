@@ -161,16 +161,13 @@ export function resolvePolicyChain(
     chain = applyDynamicSlicing(chain, resolvedModel, shouldWrapAround);
   }
 
-  // --- AUTO MODE QUOTA FAILOVER ---
-  // In Auto mode, if Flash sits in the chain but its quota is already known to
-  // be exhausted, swap that slot for Flash Lite (independent quota) and mark
-  // the swapped policy as silent so subsequent failures fall back without
-  // prompting the user. Chain length is preserved to keep CI parity between
-  // the legacy and dynamic chain paths.
-  if (
-    (isAutoPreferred || isAutoConfigured) &&
-    typeof config.getModelAvailabilityService === 'function'
-  ) {
+  // --- RESILIENCE INJECTION (QUOTA FAILOVER) ---
+  // If Flash sits in the chain but its quota is already known to be exhausted,
+  // we dynamically swap that slot for Flash Lite (independent quota) and mark
+  // the policy as silent. This prevents "silent hangs" in background tasks and
+  // ensure the CLI remains usable in Auto mode even when Flash is 100% used.
+  // Chain length is preserved to maintain parity between Legacy and Dynamic paths.
+  if (typeof config.getModelAvailabilityService === 'function') {
     const availability = config.getModelAvailabilityService?.();
     const flashIndex = chain.findIndex(
       (p) =>

@@ -231,14 +231,16 @@ describe('policyHelpers', () => {
         expect(chain[1]?.model).toBe(PRO);
       });
 
-      it('does not swap Flash when not in auto mode (explicit Flash selection)', () => {
+      it('swaps Flash for Flash Lite even when not in auto mode (broad resilience)', () => {
         const config = createConfigWithAvailability(() => FLASH, {
           [FLASH]: { available: false },
         });
         const chain = resolvePolicyChain(config, FLASH);
 
-        // Without auto mode, chain stays as the user explicitly requested.
-        expect(chain[0]?.model).toBe(FLASH);
+        // Broad resilience applies to all Flash uses to prevent silent hangs
+        // and improve CLI availability.
+        expect(chain[0]?.model).toBe(FLASH_LITE);
+        expect(chain[0]?.actions).toEqual(SILENT_ACTIONS);
       });
 
       it('does not duplicate Flash Lite if it is already in the chain', () => {
