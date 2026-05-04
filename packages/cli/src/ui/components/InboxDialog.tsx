@@ -20,22 +20,32 @@ import {
   type Config,
   type InboxSkill,
   type InboxPatch,
+  type InboxMemoryPatch,
   type InboxSkillDestination,
   getErrorMessage,
   listInboxSkills,
   listInboxPatches,
+  listInboxMemoryPatches,
   moveInboxSkill,
   dismissInboxSkill,
   applyInboxPatch,
   dismissInboxPatch,
+  applyInboxMemoryPatch,
+  dismissInboxMemoryPatch,
   isProjectSkillPatchTarget,
 } from '@google/gemini-cli-core';
 
-type Phase = 'list' | 'skill-preview' | 'skill-action' | 'patch-preview';
+type Phase =
+  | 'list'
+  | 'skill-preview'
+  | 'skill-action'
+  | 'patch-preview'
+  | 'memory-preview';
 
 type InboxItem =
   | { type: 'skill'; skill: InboxSkill }
   | { type: 'patch'; patch: InboxPatch; targetsProjectSkills: boolean }
+  | { type: 'memory-patch'; memoryPatch: InboxMemoryPatch }
   | { type: 'header'; label: string };
 
 interface DestinationChoice {
@@ -45,6 +55,12 @@ interface DestinationChoice {
 }
 
 interface PatchAction {
+  action: 'apply' | 'dismiss';
+  label: string;
+  description: string;
+}
+
+interface MemoryPatchAction {
   action: 'apply' | 'dismiss';
   label: string;
   description: string;
@@ -95,6 +111,24 @@ const PATCH_ACTION_CHOICES: PatchAction[] = [
   },
 ];
 
+// Dismiss-first: memory patches modify durable on-disk state outside the
+// project (private MEMORY.md and sibling files, plus ~/.gemini/GEMINI.md),
+// so a stray Enter on a freshly-opened memory-patch preview must NOT apply.
+// The lower-stakes skill-patch list (PATCH_ACTION_CHOICES) keeps Apply as
+// the default.
+const MEMORY_PATCH_ACTION_CHOICES: MemoryPatchAction[] = [
+  {
+    action: 'dismiss',
+    label: 'Dismiss',
+    description: 'Delete from inbox without applying',
+  },
+  {
+    action: 'apply',
+    label: 'Apply',
+    description: 'Apply patch and delete from inbox',
+  },
+];
+
 function normalizePathForUi(filePath: string): string {
   return path.posix.normalize(filePath.replaceAll('\\', '/'));
 }
@@ -103,6 +137,14 @@ function getPathBasename(filePath: string): string {
   const normalizedPath = normalizePathForUi(filePath);
   const basename = path.posix.basename(normalizedPath);
   return basename === '.' ? filePath : basename;
+}
+
+function formatMemoryPatchSummary(patch: InboxMemoryPatch): string {
+  const hunkCount = patch.entries.length;
+  const sourceCount = patch.sourceFiles.length;
+  const hunkLabel = hunkCount === 1 ? 'hunk' : 'hunks';
+  const sourceLabel = sourceCount === 1 ? 'patch' : 'patches';
+  return `${hunkCount} ${hunkLabel} from ${sourceCount} source ${sourceLabel}`;
 }
 
 async function patchTargetsProjectSkills(
@@ -173,16 +215,18 @@ function formatDate(isoString: string): string {
   }
 }
 
-interface SkillInboxDialogProps {
+interface InboxDialogProps {
   config: Config;
   onClose: () => void;
   onReloadSkills: () => Promise<void>;
+  onReloadMemory?: () => Promise<void>;
 }
 
-export const SkillInboxDialog: React.FC<SkillInboxDialogProps> = ({
+export const InboxDialog: React.FC<InboxDialogProps> = ({
   config,
   onClose,
   onReloadSkills,
+  onReloadMemory,
 }) => {
   const keyMatchers = useKeyMatchers();
   const { stdout } = useStdout();
@@ -196,15 +240,20 @@ export const SkillInboxDialog: React.FC<SkillInboxDialogProps> = ({
     text: string;
     isError: boolean;
   } | null>(null);
+  // Tracks the most recent highlighted/selected position in the list so we
+  // can restore focus when the user backs out of a sub-phase (e.g. ESC from
+  // the apply dialog) instead of jumping back to the top of the list.
+  const [lastListIndex, setLastListIndex] = useState(0);
 
   // Load inbox skills and patches on mount
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       try {
-        const [skills, patches] = await Promise.all([
+        const [skills, patches, memoryPatches] = await Promise.all([
           listInboxSkills(config),
           listInboxPatches(config),
+          listInboxMemoryPatches(config),
         ]);
         const patchItems = await Promise.all(
           patches.map(async (patch): Promise<InboxItem> => {
@@ -229,6 +278,12 @@ export const SkillInboxDialog: React.FC<SkillInboxDialogProps> = ({
           const combined: InboxItem[] = [
             ...skills.map((skill): InboxItem => ({ type: 'skill', skill })),
             ...patchItems,
+            ...memoryPatches.map(
+              (memoryPatch): InboxItem => ({
+                type: 'memory-patch',
+                memoryPatch,
+              }),
+            ),
           ];
           setItems(combined);
           setLoading(false);
@@ -251,42 +306,38 @@ export const SkillInboxDialog: React.FC<SkillInboxDialogProps> = ({
         ? `skill:${item.skill.dirName}`
         : item.type === 'patch'
           ? `patch:${item.patch.fileName}`
-          : `header:${item.label}`,
+          : item.type === 'memory-patch'
+            ? `memory:${item.memoryPatch.kind}:${item.memoryPatch.relativePath}`
+            : `header:${item.label}`,
     [],
   );
 
   const listItems: Array<SelectionListItem<InboxItem>> = useMemo(() => {
     const skills = items.filter((i) => i.type === 'skill');
     const patches = items.filter((i) => i.type === 'patch');
+    const memoryPatches = items.filter((i) => i.type === 'memory-patch');
     const result: Array<SelectionListItem<InboxItem>> = [];
 
-    // Only show section headers when both types are present
-    const showHeaders = skills.length > 0 && patches.length > 0;
+    const groups: Array<{ label: string; items: InboxItem[] }> = [
+      { label: 'New Skills', items: skills },
+      { label: 'Skill Updates', items: patches },
+      { label: 'Memory Updates', items: memoryPatches },
+    ].filter((group) => group.items.length > 0);
+    const showHeaders = groups.length > 1;
 
-    if (showHeaders) {
-      const header: InboxItem = { type: 'header', label: 'New Skills' };
-      result.push({
-        key: 'header:new-skills',
-        value: header,
-        disabled: true,
-        hideNumber: true,
-      });
-    }
-    for (const item of skills) {
-      result.push({ key: getItemKey(item), value: item });
-    }
-
-    if (showHeaders) {
-      const header: InboxItem = { type: 'header', label: 'Skill Updates' };
-      result.push({
-        key: 'header:skill-updates',
-        value: header,
-        disabled: true,
-        hideNumber: true,
-      });
-    }
-    for (const item of patches) {
-      result.push({ key: getItemKey(item), value: item });
+    for (const group of groups) {
+      if (showHeaders) {
+        const header: InboxItem = { type: 'header', label: group.label };
+        result.push({
+          key: `header:${group.label}`,
+          value: header,
+          disabled: true,
+          hideNumber: true,
+        });
+      }
+      for (const item of group.items) {
+        result.push({ key: getItemKey(item), value: item });
+      }
     }
 
     return result;
@@ -360,11 +411,36 @@ export const SkillInboxDialog: React.FC<SkillInboxDialogProps> = ({
       [],
     );
 
-  const handleSelectItem = useCallback((item: InboxItem) => {
-    setSelectedItem(item);
-    setFeedback(null);
-    setPhase(item.type === 'skill' ? 'skill-preview' : 'patch-preview');
-  }, []);
+  const memoryPatchActionItems: Array<SelectionListItem<MemoryPatchAction>> =
+    useMemo(
+      () =>
+        MEMORY_PATCH_ACTION_CHOICES.map((choice) => ({
+          key: choice.action,
+          value: choice,
+        })),
+      [],
+    );
+
+  const handleSelectItem = useCallback(
+    (item: InboxItem) => {
+      setSelectedItem(item);
+      setFeedback(null);
+      // Remember which list row we navigated away from so ESC restores focus
+      // instead of jumping the cursor back to the top of the list.
+      const idx = listItems.findIndex((i) => i.value === item);
+      if (idx >= 0) {
+        setLastListIndex(idx);
+      }
+      setPhase(
+        item.type === 'skill'
+          ? 'skill-preview'
+          : item.type === 'patch'
+            ? 'patch-preview'
+            : 'memory-preview',
+      );
+    },
+    [listItems],
+  );
 
   const removeItem = useCallback(
     (item: InboxItem) => {
@@ -521,6 +597,65 @@ export const SkillInboxDialog: React.FC<SkillInboxDialogProps> = ({
     [config, selectedItem, onReloadSkills, removeItem],
   );
 
+  const handleSelectMemoryPatchAction = useCallback(
+    (choice: MemoryPatchAction) => {
+      if (!selectedItem || selectedItem.type !== 'memory-patch') return;
+      const memoryPatch = selectedItem.memoryPatch;
+
+      setFeedback(null);
+
+      void (async () => {
+        try {
+          let result: { success: boolean; message: string };
+          if (choice.action === 'apply') {
+            result = await applyInboxMemoryPatch(
+              config,
+              memoryPatch.kind,
+              memoryPatch.relativePath,
+            );
+          } else {
+            result = await dismissInboxMemoryPatch(
+              config,
+              memoryPatch.kind,
+              memoryPatch.relativePath,
+            );
+          }
+
+          setFeedback({ text: result.message, isError: !result.success });
+
+          if (!result.success) {
+            return;
+          }
+
+          removeItem(selectedItem);
+          setSelectedItem(null);
+          setPhase('list');
+
+          if (choice.action === 'apply' && onReloadMemory) {
+            try {
+              await onReloadMemory();
+            } catch (error) {
+              setFeedback({
+                text: `${result.message} Failed to reload memory: ${getErrorMessage(error)}`,
+                isError: true,
+              });
+            }
+          }
+        } catch (error) {
+          const operation =
+            choice.action === 'apply'
+              ? 'apply memory patch'
+              : 'dismiss memory patch';
+          setFeedback({
+            text: `Failed to ${operation}: ${getErrorMessage(error)}`,
+            isError: true,
+          });
+        }
+      })();
+    },
+    [config, selectedItem, onReloadMemory, removeItem],
+  );
+
   useKeypress(
     (key) => {
       if (keyMatchers[Command.ESCAPE](key)) {
@@ -597,6 +732,10 @@ export const SkillInboxDialog: React.FC<SkillInboxDialogProps> = ({
           <Box flexDirection="column" marginTop={1}>
             <BaseSelectionList<InboxItem>
               items={listItems}
+              initialIndex={Math.max(
+                0,
+                Math.min(lastListIndex, listItems.length - 1),
+              )}
               onSelect={handleSelectItem}
               isFocused={true}
               showNumbers={false}
@@ -627,6 +766,27 @@ export const SkillInboxDialog: React.FC<SkillInboxDialogProps> = ({
                           <Text color={theme.text.secondary}>
                             {' · '}
                             {formatDate(skill.extractedAt)}
+                          </Text>
+                        )}
+                      </Box>
+                    </Box>
+                  );
+                }
+                if (item.value.type === 'memory-patch') {
+                  const memoryPatch = item.value.memoryPatch;
+                  return (
+                    <Box flexDirection="column" minHeight={2}>
+                      <Text color={titleColor} bold>
+                        {memoryPatch.name}
+                      </Text>
+                      <Box flexDirection="row">
+                        <Text color={theme.text.secondary}>
+                          {formatMemoryPatchSummary(memoryPatch)}
+                        </Text>
+                        {memoryPatch.extractedAt && (
+                          <Text color={theme.text.secondary}>
+                            {' · '}
+                            {formatDate(memoryPatch.extractedAt)}
                           </Text>
                         )}
                       </Box>
@@ -837,6 +997,101 @@ export const SkillInboxDialog: React.FC<SkillInboxDialogProps> = ({
             <BaseSelectionList<PatchAction>
               items={patchActionItems}
               onSelect={handleSelectPatchAction}
+              isFocused={true}
+              showNumbers={true}
+              renderItem={(item, { titleColor }) => (
+                <Box flexDirection="column" minHeight={2}>
+                  <Text color={titleColor} bold>
+                    {item.value.label}
+                  </Text>
+                  <Text color={theme.text.secondary}>
+                    {item.value.description}
+                  </Text>
+                </Box>
+              )}
+            />
+          </Box>
+
+          {feedback && (
+            <Box marginTop={1}>
+              <Text
+                color={
+                  feedback.isError ? theme.status.error : theme.status.success
+                }
+              >
+                {feedback.isError ? '✗ ' : '✓ '}
+                {feedback.text}
+              </Text>
+            </Box>
+          )}
+
+          <DialogFooter
+            primaryAction="Enter to confirm"
+            cancelAction="Esc to go back"
+          />
+        </>
+      )}
+
+      {phase === 'memory-preview' && selectedItem?.type === 'memory-patch' && (
+        <>
+          <Text bold>{selectedItem.memoryPatch.name}</Text>
+          <Text color={theme.text.secondary}>
+            Review {formatMemoryPatchSummary(selectedItem.memoryPatch)} before
+            applying. Apply runs each source patch atomically; Dismiss removes
+            them all.
+          </Text>
+
+          {(() => {
+            // Group hunks by target file. Multiple source patches may touch
+            // the same file (e.g. several patches all updating MEMORY.md);
+            // showing the file path once with all its hunks beneath is much
+            // less visually noisy than repeating the path for every hunk.
+            const groups = new Map<
+              string,
+              { isNewFile: boolean; diffs: string[] }
+            >();
+            for (const entry of selectedItem.memoryPatch.entries) {
+              const existing = groups.get(entry.targetPath);
+              if (existing) {
+                existing.diffs.push(entry.diffContent);
+                // If any hunk for this target was a creation, treat the
+                // group as a creation overall.
+                if (entry.isNewFile) existing.isNewFile = true;
+              } else {
+                groups.set(entry.targetPath, {
+                  isNewFile: entry.isNewFile,
+                  diffs: [entry.diffContent],
+                });
+              }
+            }
+
+            return Array.from(groups.entries()).map(
+              ([targetPath, { isNewFile, diffs }]) => (
+                <Box key={targetPath} flexDirection="column" marginTop={1}>
+                  <Text color={theme.text.secondary} bold>
+                    {targetPath}
+                    {isNewFile ? ' (new file)' : ''}
+                    {diffs.length > 1
+                      ? ` · ${diffs.length} changes from different patches`
+                      : ''}
+                  </Text>
+                  {diffs.map((diff, hunkIndex) => (
+                    <DiffRenderer
+                      key={`${targetPath}:${hunkIndex}`}
+                      diffContent={diff}
+                      filename={targetPath}
+                      terminalWidth={contentWidth}
+                    />
+                  ))}
+                </Box>
+              ),
+            );
+          })()}
+
+          <Box flexDirection="column" marginTop={1}>
+            <BaseSelectionList<MemoryPatchAction>
+              items={memoryPatchActionItems}
+              onSelect={handleSelectMemoryPatchAction}
               isFocused={true}
               showNumbers={true}
               renderItem={(item, { titleColor }) => (

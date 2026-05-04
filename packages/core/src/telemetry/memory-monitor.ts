@@ -17,6 +17,7 @@ import {
   isPerformanceMonitoringActive,
 } from './metrics.js';
 import { RateLimiter } from './rate-limiter.js';
+import { captureHeapSnapshot } from './heap-snapshot.js';
 
 export interface MemorySnapshot {
   timestamp: number;
@@ -384,6 +385,14 @@ export class MemoryMonitor {
    */
   resetHighWaterMarks(): void {
     this.highWaterMarkTracker.resetAllHighWaterMarks();
+  }
+
+  /**
+   * Capture a V8 heap snapshot for memory diagnostics.
+   * @returns The absolute path to the generated .heapsnapshot file, or null if it failed.
+   */
+  captureHeapSnapshot(): string | null {
+    return captureHeapSnapshot();
   }
 
   /**
