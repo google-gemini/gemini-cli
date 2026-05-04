@@ -13,6 +13,10 @@ import type { GeminiCliSession } from './session.js';
 /**
  * Instructions that guide the agent's behavior and personality.
  * Can be a static string or a dynamic function that receives the current session context.
+ *
+ * @issue-16272/packages/core/coverage/lcov-report/src/utils/security.ts.html WARNING: If using a dynamic function, ensure that any data from the
+ * session context is sanitized (e.g., removing newlines, ']', and escaping '<', '>')
+ * before being included in the returned instructions to prevent prompt injection.
  */
 export type SystemInstructions =
   | string
@@ -22,7 +26,11 @@ export type SystemInstructions =
  * Configuration options for creating a GeminiCliAgent.
  */
 export interface GeminiCliAgentOptions {
-  /** The system instructions defining the agent's behavior. */
+  /**
+   * The system instructions defining the agent's behavior.
+   * @issue-16272/packages/core/coverage/lcov-report/src/utils/security.ts.html WARNING: If using a dynamic function, sanitize all input from the
+   * SessionContext (e.g., removing newlines, ']', and escaping '<', '>') to prevent prompt injection.
+   */
   instructions: SystemInstructions;
   /** Optional list of tools the agent can use. */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -43,6 +51,10 @@ export interface GeminiCliAgentOptions {
 
 /**
  * Interface for basic filesystem operations that the agent can perform.
+ *
+ * Note: Implementations must internally validate and sanitize file paths to
+ * prevent path traversal attacks (e.g., checking for '..' or null bytes)
+ * using robust functions like resolveToRealPath.
  */
 export interface AgentFilesystem {
   /** Reads the content of a file at the given path. */
@@ -83,7 +95,11 @@ export interface AgentShellResult {
  * Interface for executing shell commands within the agent's environment.
  */
 export interface AgentShell {
-  /** Executes a shell command and returns the result. */
+  /**
+   * Executes a shell command and returns the result.
+   * @issue-16272/packages/core/coverage/lcov-report/src/utils/security.ts.html WARNING: Ensure the command string is properly sanitized and does
+   * not contain unvalidated user or LLM input to prevent command injection.
+   */
   exec(cmd: string, options?: AgentShellOptions): Promise<AgentShellResult>;
 }
 
@@ -99,9 +115,17 @@ export interface SessionContext {
   cwd: string;
   /** The ISO timestamp of when the context was generated. */
   timestamp: string;
-  /** Access to the filesystem for the agent. */
+  /**
+   * Access to the filesystem for the agent.
+   * @issue-16272/packages/core/coverage/lcov-report/src/utils/security.ts.html WARNING: This provides full access to the agent's filesystem.
+   * Ensure tools using this are trusted and validate their inputs.
+   */
   fs: AgentFilesystem;
-  /** Access to the shell for the agent. */
+  /**
+   * Access to the shell for the agent.
+   * @issue-16272/packages/core/coverage/lcov-report/src/utils/security.ts.html WARNING: This provides full access to the agent's shell.
+   * Any tool receiving this context can execute arbitrary commands.
+   */
   shell: AgentShell;
   /** Reference to the current GeminiCliAgent instance. */
   agent: GeminiCliAgent;
