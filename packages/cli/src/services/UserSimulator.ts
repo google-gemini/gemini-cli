@@ -23,6 +23,7 @@ interface SimulatorResponse {
   thought?: string;
   used_knowledge?: boolean;
   new_rule?: string;
+  session_notes?: string;
 }
 
 export class UserSimulator {
@@ -30,13 +31,15 @@ export class UserSimulator {
   private timer: NodeJS.Timeout | null = null;
   private lastStateKey = '';
   private isProcessing = false;
+  private isCompressingMemory = false;
+  private staleCycleCount = 0;
   private interactionsFile: string | null = null;
 
   private knowledgeBase = '';
   private editableKnowledgeFile: string | null = null;
   private actionHistory: string[] = [];
+  private sessionMemory: string[] = [];
   private pendingToolCalls: ToolCall[] = [];
-  private staleCycleCount = 0;
   private messageBusHandler: ((msg: ToolCallsUpdateMessage) => void) | null =
     null;
 
@@ -189,6 +192,12 @@ export class UserSimulator {
 Ignore any 'Responding' indicators, spinners, or timers. You MUST provide a response (e.g., 'y\\r', '2\\r') to unblock the tool execution NOW.\n`
           : '';
 
+      const sessionInstruction =
+        this.sessionMemory.length > 0
+          ? `\nYour Session Memory (Key facts you've recorded):
+${this.sessionMemory.map((m, i) => `${i + 1}. ${m}`).join('\n')}\n`
+          : '';
+
       const prompt = `You are evaluating a CLI agent by simulating a user sitting at the terminal.
 Look carefully at the screen and determine the CLI's current state:
 
@@ -211,15 +220,17 @@ CRITICAL RULES:
 - RULE 1: If there is a clear confirmation prompt (e.g. "[Y/n]", "1) Allow Once") or an input cursor (">"), YOU MUST RESPOND (State 2 or 3). Detect these states aggressively. Only <WAIT> (Rule 1 fallback) if the agent is truly mid-process with no interactive markers visible.
 - RULE 2: If there is an "Action Required" or confirmation prompt on the screen, YOU MUST HANDLE IT (State 2). This takes precedence over everything else.
 - RULE 3: If prompted to allow execution of a command with options like 'Allow once' and 'Allow for this session', you MUST choose the option for 'Allow for this session' (typically by sending '2\\r').
-- RULE 4: You MUST output a strictly formatted JSON object with no markdown wrappers or extra text.
+- RULE 4: Use the "session_notes" field to record important facts that are scrolling off the screen (e.g., test results, proposed plans, file names, errors). Keep notes extremely brief. DO NOT record transient states like "Agent is thinking". This memory helps you maintain context across the session.
+- RULE 5: You MUST output a strictly formatted JSON object with no markdown wrappers or extra text.
 
 JSON FORMAT:
 {
   "action": "<The exact raw characters to send, <WAIT>, or <DONE>>",
+  "session_notes": "<Brief factual note to remember for future turns, if applicable>",
   "used_knowledge": <true if you used the User Knowledge Base below to answer this prompt, false otherwise>,
   "new_rule": "<If used_knowledge is false and action is not <WAIT> or <DONE>, formulate a single, clear, reusable one-line rule combining the question and your answer without using option numbers (e.g. 1, 2) that might change. For example: 'If asked to allow pip execution, always allow it.' or 'Automatically accept edits for snake game implementation.'>"
 }
-${goalInstruction}${knowledgeInstruction}${historyInstruction}${pendingToolInstruction}
+${goalInstruction}${knowledgeInstruction}${sessionInstruction}${historyInstruction}${pendingToolInstruction}
 
 Here is the current terminal screen output:
 
@@ -271,6 +282,16 @@ ${strippedScreen}
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         parsedJson = JSON.parse(cleanJson) as SimulatorResponse;
         responseText = parsedJson.action || '';
+
+        if (parsedJson.session_notes) {
+          this.sessionMemory.push(parsedJson.session_notes);
+          if (this.interactionsFile) {
+            fs.appendFileSync(
+              this.interactionsFile,
+              `[LOG] [SIMULATOR] Recorded session note: ${JSON.stringify(parsedJson.session_notes)}\n\n`,
+            );
+          }
+        }
       } catch (err) {
         debugLogger.error('Failed to parse simulator response as JSON', err);
         const text = (response.text || '').trim();
@@ -394,10 +415,71 @@ ${strippedScreen}
           );
         }
       }
+
+      if (this.sessionMemory.length >= 5 && !this.isCompressingMemory) {
+        // Trigger background compression (do not await)
+        this.compressMemory().catch((err) => {
+          debugLogger.error('Failed to compress simulator memory', err);
+        });
+      }
     } catch (e: unknown) {
       debugLogger.error('UserSimulator tick failed', e);
     } finally {
       this.isProcessing = false;
+    }
+  }
+
+  private async compressMemory() {
+    this.isCompressingMemory = true;
+    try {
+      const contentGenerator = this.config.getContentGenerator();
+      if (!contentGenerator) return;
+
+      const memoryToCompress = [...this.sessionMemory];
+      const prompt = `Summarize the following chronological session notes into a single, concise list of key facts, preserving specific technical details like file paths, proposed plans, and test results. Drop transient or obsolete observations.
+Notes:
+${memoryToCompress.map((m, i) => `${i + 1}. ${m}`).join('\n')}`;
+
+      const model = resolveModel(
+        PREVIEW_GEMINI_FLASH_MODEL,
+        false, // useGemini3_1
+        false, // useGemini3_1FlashLite
+        false, // useCustomToolModel
+        this.config.getHasAccessToPreviewModel?.() ?? true,
+        this.config,
+      );
+
+      const response = await contentGenerator.generateContent(
+        {
+          model,
+          contents: [
+            {
+              role: 'user',
+              parts: [{ text: prompt }],
+            },
+          ],
+        },
+        'simulator-compression',
+        LlmRole.UTILITY_SIMULATOR,
+      );
+
+      const summary = response.text?.trim();
+      if (summary) {
+        debugLogger.log(`[SIMULATOR] Memory compressed. Summary: ${summary}`);
+        if (this.interactionsFile) {
+          fs.appendFileSync(
+            this.interactionsFile,
+            `[LOG] [SIMULATOR] Memory compressed. Summary: ${summary}\n\n`,
+          );
+        }
+
+        // Replace the older items with the new summary string, while preserving any new notes
+        // that arrived while the compression was running.
+        const newNotes = this.sessionMemory.slice(memoryToCompress.length);
+        this.sessionMemory = [summary, ...newNotes];
+      }
+    } finally {
+      this.isCompressingMemory = false;
     }
   }
 }

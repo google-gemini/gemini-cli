@@ -228,4 +228,116 @@ describe('UserSimulator', () => {
     simulator.stop();
     vi.useRealTimers();
   });
+
+  it('should capture session notes and inject them into subsequent prompts', async () => {
+    const simulator = new UserSimulator(
+      mockConfig,
+      mockGetScreen,
+      mockStdinBuffer,
+    );
+    mockGetScreen.mockReturnValue('> Prompt 1');
+    mockContentGenerator.generateContent.mockResolvedValueOnce({
+      text: JSON.stringify({
+        action: 'ls\r',
+        session_notes: 'I listed the directory contents.',
+      }),
+    });
+
+    vi.useFakeTimers();
+    simulator.start();
+
+    // First tick: captures note
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(mockContentGenerator.generateContent).toHaveBeenCalledTimes(1);
+
+    // Second tick: different screen to avoid skip
+    mockGetScreen.mockReturnValue('> Prompt 2');
+    mockContentGenerator.generateContent.mockResolvedValueOnce({
+      text: JSON.stringify({ action: 'pwd\r' }),
+    });
+    await vi.advanceTimersByTimeAsync(2000);
+
+    expect(mockContentGenerator.generateContent).toHaveBeenCalledTimes(2);
+    const secondCall = mockContentGenerator.generateContent.mock.calls[1];
+    const prompt = secondCall[0].contents[0].parts[0].text;
+
+    expect(prompt).toContain(
+      "Your Session Memory (Key facts you've recorded):",
+    );
+    expect(prompt).toContain('1. I listed the directory contents.');
+
+    simulator.stop();
+    vi.useRealTimers();
+  });
+
+  it('should trigger background compression when memory exceeds threshold and merge correctly', async () => {
+    const simulator = new UserSimulator(
+      mockConfig,
+      mockGetScreen,
+      mockStdinBuffer,
+    );
+
+    // Provide 4 existing notes
+    // We can't set private sessionMemory directly easily without casting or refactoring
+    // So we'll trigger 5 ticks that each return a note.
+    vi.useFakeTimers();
+    simulator.start();
+
+    for (let i = 0; i < 5; i++) {
+      mockGetScreen.mockReturnValue(`> Prompt ${i}`);
+      mockContentGenerator.generateContent.mockResolvedValueOnce({
+        text: JSON.stringify({
+          action: 'wait\r',
+          session_notes: `Note ${i}`,
+        }),
+      });
+      await vi.advanceTimersByTimeAsync(2000);
+    }
+
+    expect(mockContentGenerator.generateContent).toHaveBeenCalledTimes(5);
+
+    // The 5th tick should have triggered compression.
+    // Let's mock the compression response.
+    // The compression call uses 'simulator-compression' as prompt ID.
+    const compressionCall =
+      mockContentGenerator.generateContent.mock.calls.find(
+        (call) => call[1] === 'simulator-compression',
+      );
+    expect(compressionCall).toBeDefined();
+    expect(compressionCall[0].contents[0].parts[0].text).toContain(
+      'Summarize the following chronological session notes',
+    );
+
+    // Wait for the compression to finish and merge.
+    // We need to resolve the promise for the compression call.
+    // In our mock, it resolves to { action: 'y\r' } by default from beforeEach.
+    // Let's make it return a specific summary.
+    mockContentGenerator.generateContent.mockImplementation(async (req, id) => {
+      if (id === 'simulator-compression') {
+        return { text: 'Compressed Summary' };
+      }
+      return { text: JSON.stringify({ action: 'y\r' }) };
+    });
+
+    // Advance time to allow the background task to complete
+    await vi.advanceTimersByTimeAsync(1000);
+
+    // Trigger one more tick to see if the compressed memory is used
+    mockGetScreen.mockReturnValue('> Final Prompt');
+    await vi.advanceTimersByTimeAsync(2000);
+
+    const finalCall = mockContentGenerator.generateContent.mock.calls.find(
+      (call) =>
+        call[0].contents[0].parts[0].text.includes('> Final Prompt') &&
+        call[1] === 'simulator-prompt',
+    );
+
+    const finalPrompt = finalCall[0].contents[0].parts[0].text;
+    expect(finalPrompt).toContain('1. Compressed Summary');
+    // Note 5 (the one added during or after compression trigger) might be there too
+    // depending on timing, but 'Compressed Summary' must be there.
+
+    simulator.stop();
+    vi.useRealTimers();
+  });
 });
