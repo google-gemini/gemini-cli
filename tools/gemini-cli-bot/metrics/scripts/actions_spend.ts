@@ -6,7 +6,11 @@
 
 import { execFileSync } from 'node:child_process';
 
-function getWorkflowMinutes(): Record<string, number> {
+async function getWorkflowMinutes(): Promise<Record<string, number>> {
+  const sevenDaysAgoDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+    .toISOString()
+    .split('T')[0];
+
   const output = execFileSync(
     'gh',
     [
@@ -14,50 +18,100 @@ function getWorkflowMinutes(): Record<string, number> {
       'list',
       '--limit',
       '1000',
+      '--created',
+      `>=${sevenDaysAgoDate}`,
       '--json',
-      'workflowName,startedAt,updatedAt',
+      'databaseId,workflowName',
     ],
     { encoding: 'utf-8' },
   );
+
   const runs = JSON.parse(output);
-
   const workflowMinutes: Record<string, number> = {};
-  const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const token = execFileSync('gh', ['auth', 'token'], {
+    encoding: 'utf-8',
+  }).trim();
+  const repoInfo = JSON.parse(
+    execFileSync('gh', ['repo', 'view', '--json', 'nameWithOwner'], {
+      encoding: 'utf-8',
+    }),
+  );
+  const repoName = repoInfo.nameWithOwner;
 
-  for (const r of runs) {
-    if (!r.startedAt || !r.updatedAt) continue;
+  const chunkSize = 20;
+  for (let i = 0; i < runs.length; i += chunkSize) {
+    const chunk = runs.slice(i, i + chunkSize);
+    await Promise.all(
+      chunk.map(async (r: { databaseId: number; workflowName?: string }) => {
+        try {
+          const res = await fetch(
+            `https://api.github.com/repos/${repoName}/actions/runs/${r.databaseId}/jobs`,
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+                Accept: 'application/vnd.github.v3+json',
+              },
+            },
+          );
 
-    const start = new Date(r.startedAt).getTime();
-    if (start < sevenDaysAgo) continue;
-    const end = new Date(r.updatedAt).getTime();
-    const durationMinutes = (end - start) / (1000 * 60);
+          if (!res.ok) return;
 
-    if (durationMinutes >= 0) {
-      const name = r.workflowName || 'Unknown';
-      workflowMinutes[name] = (workflowMinutes[name] || 0) + durationMinutes;
-    }
+          const { jobs } = await res.json();
+          let runBillableMinutes = 0;
+
+          for (const job of jobs || []) {
+            if (!job.started_at || !job.completed_at) continue;
+            const start = new Date(job.started_at).getTime();
+            const end = new Date(job.completed_at).getTime();
+            const durationMs = end - start;
+
+            if (durationMs > 0) {
+              runBillableMinutes += Math.ceil(durationMs / (1000 * 60));
+            }
+          }
+
+          if (runBillableMinutes > 0) {
+            const name = r.workflowName || 'Unknown';
+            workflowMinutes[name] =
+              (workflowMinutes[name] || 0) + runBillableMinutes;
+          }
+        } catch {
+          // Ignore failures for individual runs
+        }
+      }),
+    );
   }
 
   return workflowMinutes;
 }
 
-function run() {
+async function run() {
   try {
-    const workflowMinutes = getWorkflowMinutes();
+    const workflowMinutes = await getWorkflowMinutes();
     let totalMinutes = 0;
 
     for (const minutes of Object.values(workflowMinutes)) {
       totalMinutes += minutes;
     }
 
-    process.stdout.write(
-      `actions_spend_overall_minutes,${Math.round(totalMinutes * 100) / 100}\n`,
+    const now = new Date().toISOString();
+    console.log(
+      JSON.stringify({
+        metric: 'actions_spend_minutes',
+        value: totalMinutes,
+        timestamp: now,
+        details: workflowMinutes,
+      }),
     );
 
     for (const [name, minutes] of Object.entries(workflowMinutes)) {
       const safeName = name.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
-      process.stdout.write(
-        `actions_spend_workflow_${safeName}_minutes,${Math.round(minutes * 100) / 100}\n`,
+      console.log(
+        JSON.stringify({
+          metric: `actions_spend_minutes_workflow:${safeName}`,
+          value: minutes,
+          timestamp: now,
+        }),
       );
     }
   } catch (error) {
