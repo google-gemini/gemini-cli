@@ -32,6 +32,7 @@ import {
   type SerializableConfirmationDetails,
 } from '../confirmation-bus/types.js';
 import { isToolCallResponseInfo } from '../utils/tool-utils.js';
+import { getDiffStatFromPatch } from '../tools/diffOptions.js';
 
 /**
  * Handler for terminal tool calls.
@@ -473,6 +474,8 @@ export class SchedulerStateManager {
           filePath: details.filePath,
           originalContent: details.originalContent,
           newContent: details.newContent,
+          // Derive stats from the patch if they aren't already present
+          diffStat: details.diffStat ?? getDiffStatFromPatch(details.fileDiff),
         };
       }
     }
@@ -514,7 +517,7 @@ export class SchedulerStateManager {
           {
             functionResponse: {
               id: call.request.callId,
-              name: call.request.name,
+              name: call.request.originalRequestName ?? call.request.name,
               response: { error: errorMessage },
             },
           },

@@ -19,7 +19,12 @@ import { Config, type ConfigParameters } from '../config/config.js';
 import { ApprovalMode } from '../policy/types.js';
 
 import { ToolRegistry, DiscoveredTool } from './tool-registry.js';
-import { DISCOVERED_TOOL_PREFIX } from './tool-names.js';
+import {
+  DISCOVERED_TOOL_PREFIX,
+  UPDATE_TOPIC_TOOL_NAME,
+  ENTER_PLAN_MODE_TOOL_NAME,
+  EXIT_PLAN_MODE_TOOL_NAME,
+} from './tool-names.js';
 import { DiscoveredMCPTool } from './mcp-tool.js';
 import {
   mcpToTool,
@@ -281,6 +286,26 @@ describe('ToolRegistry', () => {
       toolRegistry.getFunctionDeclarations(modelId);
 
       expect(getSchemaSpy).toHaveBeenCalledWith(modelId);
+    });
+  });
+
+  describe('removeMcpToolsByServer', () => {
+    it('should remove all tools from a specific server', () => {
+      const serverName = 'test-server';
+      const mcpTool1 = createMCPTool(serverName, 'tool1', 'desc1');
+      const mcpTool2 = createMCPTool(serverName, 'tool2', 'desc2');
+      const otherTool = createMCPTool('other-server', 'tool3', 'desc3');
+
+      toolRegistry.registerTool(mcpTool1);
+      toolRegistry.registerTool(mcpTool2);
+      toolRegistry.registerTool(otherTool);
+
+      expect(toolRegistry.getToolsByServer(serverName)).toHaveLength(2);
+
+      toolRegistry.removeMcpToolsByServer(serverName);
+
+      expect(toolRegistry.getToolsByServer(serverName)).toHaveLength(0);
+      expect(toolRegistry.getToolsByServer('other-server')).toHaveLength(1);
     });
   });
 
@@ -580,7 +605,9 @@ describe('ToolRegistry', () => {
       );
 
       const invocation = (discoveredTool as DiscoveredTool).build({});
-      const result = await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
 
       expect(result.error?.type).toBe(
         ToolErrorType.DISCOVERED_TOOL_EXECUTION_ERROR,
@@ -779,6 +806,70 @@ describe('ToolRegistry', () => {
       const allTools = toolRegistry.getAllTools();
       const toolNames = allTools.map((t) => t.name);
       expect(toolNames).not.toContain('mcp_test-server_write-mcp-tool');
+    });
+
+    it('should exclude topic tool when narration is disabled in config', () => {
+      const topicTool = new MockTool({
+        name: UPDATE_TOPIC_TOOL_NAME,
+        displayName: 'Topic Tool',
+      });
+      toolRegistry.registerTool(topicTool);
+
+      vi.spyOn(config, 'isTopicUpdateNarrationEnabled').mockReturnValue(false);
+      mockConfigGetExcludedTools.mockReturnValue(new Set());
+
+      expect(toolRegistry.getAllToolNames()).not.toContain(
+        UPDATE_TOPIC_TOOL_NAME,
+      );
+      expect(toolRegistry.getTool(UPDATE_TOPIC_TOOL_NAME)).toBeUndefined();
+    });
+
+    it('should NOT exclude topic tool when narration is enabled in config', () => {
+      const topicTool = new MockTool({
+        name: UPDATE_TOPIC_TOOL_NAME,
+        displayName: 'Topic Tool',
+      });
+      toolRegistry.registerTool(topicTool);
+
+      vi.spyOn(config, 'isTopicUpdateNarrationEnabled').mockReturnValue(true);
+      mockConfigGetExcludedTools.mockReturnValue(new Set());
+
+      expect(toolRegistry.getAllToolNames()).toContain(UPDATE_TOPIC_TOOL_NAME);
+      expect(toolRegistry.getTool(UPDATE_TOPIC_TOOL_NAME)).toBe(topicTool);
+    });
+
+    it('should show enter_plan_mode only when NOT in plan mode', () => {
+      const enterTool = new MockTool({ name: ENTER_PLAN_MODE_TOOL_NAME });
+      toolRegistry.registerTool(enterTool);
+
+      // Not in plan mode
+      vi.spyOn(config, 'getApprovalMode').mockReturnValue(ApprovalMode.DEFAULT);
+      expect(toolRegistry.getAllToolNames()).toContain(
+        ENTER_PLAN_MODE_TOOL_NAME,
+      );
+
+      // In plan mode
+      vi.spyOn(config, 'getApprovalMode').mockReturnValue(ApprovalMode.PLAN);
+      expect(toolRegistry.getAllToolNames()).not.toContain(
+        ENTER_PLAN_MODE_TOOL_NAME,
+      );
+    });
+
+    it('should show exit_plan_mode only when in plan mode', () => {
+      const exitTool = new MockTool({ name: EXIT_PLAN_MODE_TOOL_NAME });
+      toolRegistry.registerTool(exitTool);
+
+      // Not in plan mode
+      vi.spyOn(config, 'getApprovalMode').mockReturnValue(ApprovalMode.DEFAULT);
+      expect(toolRegistry.getAllToolNames()).not.toContain(
+        EXIT_PLAN_MODE_TOOL_NAME,
+      );
+
+      // In plan mode
+      vi.spyOn(config, 'getApprovalMode').mockReturnValue(ApprovalMode.PLAN);
+      expect(toolRegistry.getAllToolNames()).toContain(
+        EXIT_PLAN_MODE_TOOL_NAME,
+      );
     });
   });
 

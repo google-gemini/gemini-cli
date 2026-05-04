@@ -50,7 +50,7 @@ const TEST_CHECKPOINT_FILE_PATH = path.join(
 async function cleanupLogAndCheckpointFiles() {
   try {
     await fs.rm(TEST_GEMINI_DIR, { recursive: true, force: true });
-  } catch (_error) {
+  } catch {
     // Ignore errors, as the directory may not exist, which is fine.
   }
 }

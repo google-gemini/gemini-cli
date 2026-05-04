@@ -4,14 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import yargs from 'yargs/yargs';
+import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import process from 'node:process';
 import * as path from 'node:path';
+import { execa } from 'execa';
 import { mcpCommand } from '../commands/mcp.js';
 import { extensionsCommand } from '../commands/extensions.js';
 import { skillsCommand } from '../commands/skills.js';
 import { hooksCommand } from '../commands/hooks.js';
+import { gemmaCommand } from '../commands/gemma.js';
 import {
   setGeminiMdFilename as setServerGeminiMdFilename,
   getCurrentGeminiMdFilename,
@@ -22,6 +24,7 @@ import {
   FileDiscoveryService,
   resolveTelemetrySettings,
   FatalConfigError,
+  getErrorMessage,
   getPty,
   debugLogger,
   loadServerHierarchicalMemory,
@@ -34,9 +37,14 @@ import {
   getAdminErrorMessage,
   isHeadlessMode,
   Config,
+  SimpleExtensionLoader,
   resolveToRealPath,
   applyAdminAllowlist,
+  applyRequiredServers,
   getAdminBlockedMcpServersMessage,
+  getProjectRootForWorktree,
+  isGeminiWorktree,
+  type WorktreeSettings,
   type HookDefinition,
   type HookEventName,
   type OutputFormat,
@@ -47,10 +55,13 @@ import {
   type MergedSettings,
   saveModelChange,
   loadSettings,
+  isWorktreeEnabled,
+  type LoadedSettings,
 } from './settings.js';
 
 import { loadSandboxConfig } from './sandboxConfig.js';
 import { resolvePath } from '../utils/resolvePath.js';
+import { isRecord } from '../utils/settingsUtils.js';
 import { RESUME_LATEST } from '../utils/sessionUtils.js';
 
 import { isWorkspaceTrusted } from './trustedFolders.js';
@@ -73,6 +84,7 @@ export interface CliArgs {
   debug: boolean | undefined;
   prompt: string | undefined;
   promptInteractive: string | undefined;
+  worktree?: string;
 
   yolo: boolean | undefined;
   approvalMode: string | undefined;
@@ -85,6 +97,7 @@ export interface CliArgs {
   extensions: string[] | undefined;
   listExtensions: boolean | undefined;
   resume: string | typeof RESUME_LATEST | undefined;
+  sessionId: string | undefined;
   listSessions: boolean | undefined;
   deleteSession: string | undefined;
   includeDirectories: string[] | undefined;
@@ -96,6 +109,7 @@ export interface CliArgs {
   startupMessages?: string[];
   rawOutput: boolean | undefined;
   acceptRawOutputRisk: boolean | undefined;
+  skipTrust: boolean | undefined;
   isCommand: boolean | undefined;
 }
 
@@ -114,6 +128,36 @@ const coerceCommaSeparated = (values: string[]): string[] => {
   );
 };
 
+/**
+ * Pre-parses the command line arguments to find the worktree flag.
+ * Used for early setup before full argument parsing with settings.
+ */
+export function getWorktreeArg(argv: string[]): string | undefined {
+  const result = yargs(hideBin(argv))
+    .help(false)
+    .version(false)
+    .option('worktree', { alias: 'w', type: 'string' })
+    .strict(false)
+    .exitProcess(false)
+    .parseSync();
+
+  if (result.worktree === undefined) return undefined;
+  return typeof result.worktree === 'string' ? result.worktree.trim() : '';
+}
+
+/**
+ * Checks if a worktree is requested via CLI and enabled in settings.
+ * Returns the requested name (can be empty string for auto-generated) or undefined.
+ */
+export function getRequestedWorktreeName(
+  settings: LoadedSettings,
+): string | undefined {
+  if (!isWorktreeEnabled(settings)) {
+    return undefined;
+  }
+  return getWorktreeArg(process.argv);
+}
+
 export async function parseArguments(
   settings: MergedSettings,
 ): Promise<CliArgs> {
@@ -125,12 +169,110 @@ export async function parseArguments(
     .usage(
       'Usage: gemini [options] [command]\n\nGemini CLI - Defaults to interactive mode. Use -p/--prompt for non-interactive (headless) mode.',
     )
+    .option('isCommand', {
+      type: 'boolean',
+      hidden: true,
+      description: 'Internal flag to indicate if a subcommand is being run',
+    })
     .option('debug', {
       alias: 'd',
       type: 'boolean',
       description: 'Run in debug mode (open debug console with F12)',
       default: false,
     })
+    .middleware((argv) => {
+      const commandModules = [
+        mcpCommand,
+        extensionsCommand,
+        skillsCommand,
+        hooksCommand,
+        gemmaCommand,
+      ];
+
+      const subcommands = commandModules.flatMap((mod) => {
+        const names: string[] = [];
+
+        const cmd = mod.command;
+        if (cmd) {
+          if (Array.isArray(cmd)) {
+            for (const c of cmd) {
+              names.push(String(c).split(' ')[0]);
+            }
+          } else {
+            names.push(String(cmd).split(' ')[0]);
+          }
+        }
+
+        const aliases = mod.aliases;
+        if (aliases) {
+          if (Array.isArray(aliases)) {
+            for (const a of aliases) {
+              names.push(String(a).split(' ')[0]);
+            }
+          } else {
+            names.push(String(aliases).split(' ')[0]);
+          }
+        }
+
+        return names;
+      });
+
+      const firstArg = argv._[0];
+      if (typeof firstArg === 'string' && subcommands.includes(firstArg)) {
+        argv['isCommand'] = true;
+      }
+    }, true)
+    // Ensure validation flows through .fail() for clean UX
+    .fail((msg, err) => {
+      if (err) throw err;
+      throw new Error(msg);
+    })
+    .check((argv) => {
+      // The 'query' positional can be a string (for one arg) or string[] (for multiple).
+      // This guard safely checks if any positional argument was provided.
+      const queryArg = argv['query'];
+      const query =
+        typeof queryArg === 'string' || Array.isArray(queryArg)
+          ? queryArg
+          : undefined;
+      const hasPositionalQuery = Array.isArray(query)
+        ? query.length > 0
+        : !!query;
+
+      if (argv['resume'] !== undefined && argv['session-id'] !== undefined) {
+        return 'Cannot use both --resume (-r) and --session-id together';
+      }
+
+      if (argv['prompt'] && hasPositionalQuery) {
+        return 'Cannot use both a positional prompt and the --prompt (-p) flag together';
+      }
+      if (argv['prompt'] && argv['promptInteractive']) {
+        return 'Cannot use both --prompt (-p) and --prompt-interactive (-i) together';
+      }
+      if (argv['yolo'] && argv['approvalMode']) {
+        return 'Cannot use both --yolo (-y) and --approval-mode together. Use --approval-mode=yolo instead.';
+      }
+
+      const outputFormat = argv['outputFormat'];
+      if (
+        typeof outputFormat === 'string' &&
+        !['text', 'json', 'stream-json'].includes(outputFormat)
+      ) {
+        return `Invalid values:\n  Argument: output-format, Given: "${outputFormat}", Choices: "text", "json", "stream-json"`;
+      }
+      if (argv['worktree'] && !settings.experimental?.worktrees) {
+        return 'The --worktree flag is only available when experimental.worktrees is enabled in your settings.';
+      }
+      return true;
+    });
+
+  yargsInstance.command(mcpCommand);
+  yargsInstance.command(extensionsCommand);
+  yargsInstance.command(skillsCommand);
+  yargsInstance.command(hooksCommand);
+  yargsInstance.command(gemmaCommand);
+
+  yargsInstance
     .command('$0 [query..]', 'Launch Gemini CLI', (yargsInstance) =>
       yargsInstance
         .positional('query', {
@@ -156,6 +298,25 @@ export async function parseArguments(
           nargs: 1,
           description:
             'Execute the provided prompt and continue in interactive mode',
+        })
+        .option('skip-trust', {
+          type: 'boolean',
+          description: 'Trust the current workspace for this session.',
+          default: false,
+        })
+        .option('worktree', {
+          alias: 'w',
+          type: 'string',
+          skipValidation: true,
+          description:
+            'Start Gemini in a new git worktree. If no name is provided, one is generated automatically.',
+          coerce: (value: unknown): string => {
+            const trimmed = typeof value === 'string' ? value.trim() : '';
+            if (trimmed === '') {
+              return Math.random().toString(36).substring(2, 10);
+            }
+            return trimmed;
+          },
         })
         .option('sandbox', {
           alias: 's',
@@ -244,10 +405,30 @@ export async function parseArguments(
             // When --resume passed without a value (`gemini --resume`): value = "" (string)
             // When --resume not passed at all: this `coerce` function is not called at all, and
             //   `yargsInstance.argv.resume` is undefined.
-            if (value === '') {
+            const trimmed = value.trim();
+            if (trimmed === '') {
               return RESUME_LATEST;
             }
-            return value;
+            return trimmed;
+          },
+        })
+        .option('session-id', {
+          type: 'string',
+          nargs: 1,
+          description: 'Start a new session with a manually provided UUID.',
+          coerce: (value: string): string => {
+            const trimmed = value.trim();
+            if (!trimmed) {
+              throw new Error('The --session-id option cannot be empty.');
+            }
+            if (!/^[a-zA-Z0-9-_]+$/.test(trimmed)) {
+              throw new Error(
+                'Invalid session ID "' +
+                  trimmed +
+                  '": Only alphanumeric characters, dashes, and underscores are allowed.',
+              );
+            }
+            return trimmed;
           },
         })
         .option('list-sessions', {
@@ -299,56 +480,6 @@ export async function parseArguments(
           description: 'Suppress the security warning when using --raw-output.',
         }),
     )
-    // Register MCP subcommands
-    .command(mcpCommand)
-    // Ensure validation flows through .fail() for clean UX
-    .fail((msg, err) => {
-      if (err) throw err;
-      throw new Error(msg);
-    })
-    .check((argv) => {
-      // The 'query' positional can be a string (for one arg) or string[] (for multiple).
-      // This guard safely checks if any positional argument was provided.
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const query = argv['query'] as string | string[] | undefined;
-      const hasPositionalQuery = Array.isArray(query)
-        ? query.length > 0
-        : !!query;
-
-      if (argv['prompt'] && hasPositionalQuery) {
-        return 'Cannot use both a positional prompt and the --prompt (-p) flag together';
-      }
-      if (argv['prompt'] && argv['promptInteractive']) {
-        return 'Cannot use both --prompt (-p) and --prompt-interactive (-i) together';
-      }
-      if (argv['yolo'] && argv['approvalMode']) {
-        return 'Cannot use both --yolo (-y) and --approval-mode together. Use --approval-mode=yolo instead.';
-      }
-      if (
-        argv['outputFormat'] &&
-        !['text', 'json', 'stream-json'].includes(
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          argv['outputFormat'] as string,
-        )
-      ) {
-        return `Invalid values:\n  Argument: output-format, Given: "${argv['outputFormat']}", Choices: "text", "json", "stream-json"`;
-      }
-      return true;
-    });
-
-  if (settings.experimental?.extensionManagement) {
-    yargsInstance.command(extensionsCommand);
-  }
-
-  if (settings.skills?.enabled ?? true) {
-    yargsInstance.command(skillsCommand);
-  }
-  // Register hooks command if hooks are enabled
-  if (settings.hooksConfig.enabled) {
-    yargsInstance.command(hooksCommand);
-  }
-
-  yargsInstance
     .version(await getVersion()) // This will enable the --version flag based on package.json
     .alias('v', 'version')
     .help()
@@ -360,9 +491,16 @@ export async function parseArguments(
   yargsInstance.wrap(yargsInstance.terminalWidth());
   let result;
   try {
-    result = await yargsInstance.parse();
+    const parsed = await yargsInstance.parse();
+    if (!isRecord(parsed)) {
+      throw new Error('Failed to parse arguments');
+    }
+    result = parsed;
+    if (result['skip-trust']) {
+      process.env['GEMINI_CLI_TRUST_WORKSPACE'] = 'true';
+    }
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
+    const msg = getErrorMessage(e);
     debugLogger.error(msg);
     yargsInstance.showHelp();
     await runExitCleanup();
@@ -376,11 +514,13 @@ export async function parseArguments(
   }
 
   // Normalize query args: handle both quoted "@path file" and unquoted @path file
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-  const queryArg = (result as { query?: string | string[] | undefined }).query;
-  const q: string | undefined = Array.isArray(queryArg)
-    ? queryArg.join(' ')
-    : queryArg;
+  const queryArg = result['query'];
+  let q: string | undefined;
+  if (Array.isArray(queryArg)) {
+    q = queryArg.join(' ');
+  } else if (typeof queryArg === 'string') {
+    q = queryArg;
+  }
 
   // -p/--prompt forces non-interactive mode; positional args default to interactive in TTY
   if (q && !result['prompt']) {
@@ -395,8 +535,8 @@ export async function parseArguments(
   }
 
   // Keep CliArgs.query as a string for downstream typing
-  (result as Record<string, unknown>)['query'] = q || undefined;
-  (result as Record<string, unknown>)['startupMessages'] = startupMessages;
+  result['query'] = q || undefined;
+  result['startupMessages'] = startupMessages;
 
   // The import format is now only controlled by settings.memoryImportFormat
   // We no longer accept it as a CLI argument
@@ -418,6 +558,9 @@ export interface LoadCliConfigOptions {
   projectHooks?: { [K in HookEventName]?: HookDefinition[] } & {
     disabled?: string[];
   };
+  worktreeSettings?: WorktreeSettings;
+  skipExtensions?: boolean;
+  skipMemoryLoad?: boolean;
 }
 
 export async function loadCliConfig(
@@ -426,10 +569,16 @@ export async function loadCliConfig(
   argv: CliArgs,
   options: LoadCliConfigOptions = {},
 ): Promise<Config> {
-  const { cwd = process.cwd(), projectHooks } = options;
+  const {
+    cwd = process.cwd(),
+    projectHooks,
+    skipExtensions = false,
+    skipMemoryLoad = false,
+  } = options;
   const debugMode = isDebugMode(argv);
 
-  const loadedSettings = loadSettings(cwd);
+  const worktreeSettings =
+    options.worktreeSettings ?? (await resolveWorktreeSettings(cwd));
 
   if (argv.sandbox) {
     process.env['GEMINI_SANDBOX'] = 'true';
@@ -446,7 +595,7 @@ export async function loadCliConfig(
       ? false
       : (settings.security?.folderTrust?.enabled ?? false);
   const trustedFolder =
-    isWorkspaceTrusted(settings, cwd, undefined, {
+    isWorkspaceTrusted(settings, cwd, {
       prompt: argv.prompt,
       query: argv.query,
     })?.isTrusted ?? false;
@@ -474,27 +623,52 @@ export async function loadCliConfig(
     ...settings.context?.fileFiltering,
   };
 
+  //changes the includeDirectories to be absolute paths based on the cwd, and also include any additional directories specified via CLI args
   const includeDirectories = (settings.context?.includeDirectories || [])
     .map(resolvePath)
     .concat((argv.includeDirectories || []).map(resolvePath));
 
-  const extensionManager = new ExtensionManager({
-    settings,
-    requestConsent: requestConsentNonInteractive,
-    requestSetting: promptForSetting,
-    workspaceDir: cwd,
-    enabledExtensionOverrides: argv.extensions,
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    eventEmitter: coreEvents as EventEmitter<ExtensionEvents>,
-    clientVersion: await getVersion(),
-  });
-  await extensionManager.loadExtensions();
+  // When running inside VSCode with multiple workspace folders,
+  // automatically add the other folders as include directories
+  // so Gemini has context of all open folders, not just the cwd.
+  const ideWorkspacePath = process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'];
+  if (ideWorkspacePath) {
+    const realCwd = resolveToRealPath(cwd);
+    const ideFolders = ideWorkspacePath.split(path.delimiter).filter((p) => {
+      const trimmedPath = p.trim();
+      if (!trimmedPath) return false;
+      try {
+        return resolveToRealPath(trimmedPath) !== realCwd;
+      } catch (e) {
+        debugLogger.debug(
+          `[IDE] Skipping inaccessible workspace folder: ${trimmedPath} (${getErrorMessage(e)})`,
+        );
+        return false;
+      }
+    });
+    includeDirectories.push(...ideFolders);
+  }
+
+  let extensionManager: ExtensionManager | undefined;
+  if (!skipExtensions) {
+    extensionManager = new ExtensionManager({
+      settings,
+      requestConsent: requestConsentNonInteractive,
+      requestSetting: promptForSetting,
+      workspaceDir: cwd,
+      enabledExtensionOverrides: argv.extensions,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      eventEmitter: coreEvents as EventEmitter<ExtensionEvents>,
+      clientVersion: await getVersion(),
+    });
+    await extensionManager.loadExtensions();
+  }
 
   const extensionPlanSettings = extensionManager
-    .getExtensions()
-    .find((ext) => ext.isActive && ext.plan?.directory)?.plan;
+    ?.getExtensions()
+    ?.find((ext) => ext.isActive && ext.plan?.directory)?.plan;
 
-  const experimentalJitContext = settings.experimental?.jitContext ?? false;
+  const experimentalJitContext = settings.experimental.jitContext ?? true;
 
   let extensionRegistryURI =
     process.env['GEMINI_CLI_EXTENSION_REGISTRY_URI'] ??
@@ -510,7 +684,10 @@ export async function loadCliConfig(
   let fileCount = 0;
   let filePaths: string[] = [];
 
-  if (!experimentalJitContext) {
+  const finalExtensionLoader =
+    extensionManager ?? new SimpleExtensionLoader([]);
+
+  if (!experimentalJitContext && !skipMemoryLoad) {
     // Call the (now wrapper) loadHierarchicalGeminiMemory which calls the server's version
     const result = await loadServerHierarchicalMemory(
       cwd,
@@ -518,11 +695,12 @@ export async function loadCliConfig(
         ? includeDirectories
         : [],
       fileService,
-      extensionManager,
+      finalExtensionLoader,
       trustedFolder,
       memoryImportFormat,
       memoryFileFiltering,
       settings.context?.discoveryMaxDirs,
+      settings.context?.memoryBoundaryMarkers,
     );
     memoryContent = result.memoryContent;
     fileCount = result.fileCount;
@@ -549,9 +727,9 @@ export async function loadCliConfig(
         approvalMode = ApprovalMode.AUTO_EDIT;
         break;
       case 'plan':
-        if (!(settings.experimental?.plan ?? false)) {
+        if (!(settings.general?.plan?.enabled ?? true)) {
           debugLogger.warn(
-            'Approval mode "plan" is only available when experimental.plan is enabled. Falling back to "default".',
+            'Approval mode "plan" is disabled in your settings. Falling back to "default".',
           );
           approvalMode = ApprovalMode.DEFAULT;
         } else {
@@ -627,12 +805,16 @@ export async function loadCliConfig(
 
   const allowedTools = argv.allowedTools || settings.tools?.allowed || [];
 
+  const isAcpMode = !!argv.acp || !!argv.experimentalAcp;
+
   // In non-interactive mode, exclude tools that require a prompt.
   const extraExcludes: string[] = [];
-  if (!interactive) {
+  if (!interactive || isAcpMode) {
     // The Policy Engine natively handles headless safety by translating ASK_USER
     // decisions to DENY. However, we explicitly block ask_user here to guarantee
     // it can never be allowed via a high-priority policy rule when no human is present.
+    // We also exclude it in ACP mode as IDEs intercept tool calls and ask for permission,
+    // breaking conversational flows.
     extraExcludes.push(ASK_USER_TOOL_NAME);
   }
 
@@ -650,8 +832,12 @@ export async function loadCliConfig(
       ...settings.mcp,
       allowed: argv.allowedMcpServerNames ?? settings.mcp?.allowed,
     },
-    policyPaths: argv.policy ?? settings.policyPaths,
-    adminPolicyPaths: argv.adminPolicy ?? settings.adminPolicyPaths,
+    policyPaths: (argv.policy ?? settings.policyPaths)?.map((p) =>
+      resolvePath(p),
+    ),
+    adminPolicyPaths: (argv.adminPolicy ?? settings.adminPolicyPaths)?.map(
+      (p) => resolvePath(p),
+    ),
   };
 
   const { workspacePoliciesDir, policyUpdateConfirmationRequest } =
@@ -665,18 +851,38 @@ export async function loadCliConfig(
     effectiveSettings,
     approvalMode,
     workspacePoliciesDir,
+    interactive,
   );
-  policyEngineConfig.nonInteractive = !interactive;
 
   const defaultModel = PREVIEW_GEMINI_MODEL_AUTO;
-  const specifiedModel =
+  const rawModel =
     argv.model || process.env['GEMINI_MODEL'] || settings.model?.name;
+
+  // Ensure specifiedModel is a string (e.g. if yargs parsed multiple --model as an array)
+  const specifiedModel = Array.isArray(rawModel)
+    ? String(rawModel.at(-1) ?? '').trim() || ''
+    : rawModel === undefined
+      ? undefined
+      : String(rawModel ?? '').trim() || '';
 
   const resolvedModel =
     specifiedModel === GEMINI_MODEL_ALIAS_AUTO
       ? defaultModel
       : specifiedModel || defaultModel;
   const sandboxConfig = await loadSandboxConfig(settings, argv);
+  if (sandboxConfig) {
+    const existingPaths = sandboxConfig.allowedPaths || [];
+    if (settings.tools.sandboxAllowedPaths?.length) {
+      sandboxConfig.allowedPaths = [
+        ...new Set([...existingPaths, ...settings.tools.sandboxAllowedPaths]),
+      ];
+    }
+    if (settings.tools.sandboxNetworkAccess !== undefined) {
+      sandboxConfig.networkAccess =
+        sandboxConfig.networkAccess || settings.tools.sandboxNetworkAccess;
+    }
+  }
+
   const screenReader =
     argv.screenReader !== undefined
       ? argv.screenReader
@@ -712,7 +918,25 @@ export async function loadCliConfig(
     }
   }
 
-  const isAcpMode = !!argv.acp || !!argv.experimentalAcp;
+  // Apply admin-required MCP servers (injected regardless of allowlist)
+  if (mcpEnabled) {
+    const requiredMcpConfig = settings.admin?.mcp?.requiredConfig;
+    if (requiredMcpConfig && Object.keys(requiredMcpConfig).length > 0) {
+      const requiredResult = applyRequiredServers(
+        mcpServers ?? {},
+        requiredMcpConfig,
+      );
+      mcpServers = requiredResult.mcpServers;
+
+      if (requiredResult.requiredServerNames.length > 0) {
+        coreEvents.emitConsoleLog(
+          'info',
+          `Admin-required MCP servers injected: ${requiredResult.requiredServerNames.join(', ')}`,
+        );
+      }
+    }
+  }
+
   let clientName: string | undefined = undefined;
   if (isAcpMode) {
     const ide = detectIdeFromEnv();
@@ -721,8 +945,29 @@ export async function loadCliConfig(
       (ide.name !== 'vscode' || process.env['TERM_PROGRAM'] === 'vscode')
     ) {
       clientName = `acp-${ide.name}`;
+    } else {
+      clientName = 'acp';
     }
+  } else if (argv.isCommand) {
+    clientName = 'cli-command';
+  } else {
+    clientName = 'tui';
   }
+
+  // TODO(joshualitt): Clean this up alongside removal of the legacy config.
+  let profileSelector: string | undefined = undefined;
+  if (settings.experimental?.stressTestProfile) {
+    profileSelector = 'stressTestProfile';
+  } else if (
+    settings.experimental?.generalistProfile ||
+    settings.experimental?.contextManagement
+  ) {
+    profileSelector = 'generalistProfile';
+  }
+
+  const contextManagement = {
+    enabled: !!profileSelector,
+  };
 
   return new Config({
     acpMode: isAcpMode,
@@ -737,10 +982,15 @@ export async function loadCliConfig(
     includeDirectories,
     loadMemoryFromIncludeDirectories:
       settings.context?.loadMemoryFromIncludeDirectories || false,
+    discoveryMaxDirs: settings.context?.discoveryMaxDirs,
+    memoryBoundaryMarkers: settings.context?.memoryBoundaryMarkers,
+    importFormat: settings.context?.importFormat,
     debugMode,
     question,
+    worktreeSettings,
 
     coreTools: settings.tools?.core || undefined,
+    experimentalContextManagementConfig: profileSelector,
     allowedTools: allowedTools.length > 0 ? allowedTools : undefined,
     policyEngineConfig,
     policyUpdateConfirmationRequest,
@@ -764,6 +1014,8 @@ export async function loadCliConfig(
       : undefined,
     blockedEnvironmentVariables:
       settings.security?.environmentVariableRedaction?.blocked,
+    allowedEnvironmentVariables:
+      settings.security?.environmentVariableRedaction?.allowed,
     enableEnvironmentVariableRedaction:
       settings.security?.environmentVariableRedaction?.enabled,
     userMemory: memoryContent,
@@ -799,11 +1051,12 @@ export async function loadCliConfig(
     listSessions: argv.listSessions || false,
     deleteSession: argv.deleteSession,
     enabledExtensions: argv.extensions,
-    extensionLoader: extensionManager,
+    extensionLoader: finalExtensionLoader,
     extensionRegistryURI,
     enableExtensionReloading: settings.experimental?.extensionReloading,
     enableAgents: settings.experimental?.enableAgents,
-    plan: settings.experimental?.plan,
+    plan: settings.general?.plan?.enabled ?? true,
+    voiceMode: settings.experimental?.voiceMode,
     tracker: settings.experimental?.taskTracker,
     directWebFetch: settings.experimental?.directWebFetch,
     planSettings: settings.general?.plan?.directory
@@ -812,10 +1065,15 @@ export async function loadCliConfig(
     enableEventDrivenScheduler: true,
     skillsSupport: settings.skills?.enabled ?? true,
     disabledSkills: settings.skills?.disabled,
-    experimentalJitContext: settings.experimental?.jitContext,
+    experimentalJitContext,
+    experimentalMemoryV2: settings.experimental?.memoryV2,
+    experimentalAutoMemory: settings.experimental?.autoMemory,
+    experimentalGemma: settings.experimental?.gemma,
+    contextManagement,
     modelSteering: settings.experimental?.modelSteering,
-    topicUpdateNarration: settings.experimental?.topicUpdateNarration,
-    toolOutputMasking: settings.experimental?.toolOutputMasking,
+    topicUpdateNarration:
+      settings.general?.topicUpdateNarration ??
+      settings.experimental?.topicUpdateNarration,
     noBrowser: !!process.env['NO_BROWSER'],
     summarizeToolOutput: settings.model?.summarizeToolOutput,
     ideMode,
@@ -826,8 +1084,12 @@ export async function loadCliConfig(
     trustedFolder,
     useBackgroundColor: settings.ui?.useBackgroundColor,
     useAlternateBuffer: settings.ui?.useAlternateBuffer,
+    useTerminalBuffer: settings.ui?.terminalBuffer,
+    useRenderProcess: settings.ui?.renderProcess,
     useRipgrep: settings.tools?.useRipgrep,
     enableInteractiveShell: settings.tools?.shell?.enableInteractiveShell,
+    shellBackgroundCompletionBehavior: settings.tools?.shell
+      ?.backgroundCompletionBehavior as string | undefined,
     shellToolInactivityTimeout: settings.tools?.shell?.inactivityTimeout,
     enableShellOutputEfficiency:
       settings.tools?.shell?.enableShellOutputEfficiency ?? true,
@@ -840,10 +1102,12 @@ export async function loadCliConfig(
       format: (argv.outputFormat ?? settings.output?.format) as OutputFormat,
     },
     gemmaModelRouter: settings.experimental?.gemmaModelRouter,
+    adk: settings.experimental?.adk,
     fakeResponses: argv.fakeResponses,
     recordResponses: argv.recordResponses,
     retryFetchErrors: settings.general?.retryFetchErrors,
     billing: settings.billing,
+    vertexAiRouting: settings.billing?.vertexAi,
     maxAttempts: settings.general?.maxAttempts,
     ptyInfo: ptyInfo?.name,
     disableLLMCorrection: settings.tools?.disableLLMCorrection,
@@ -857,7 +1121,7 @@ export async function loadCliConfig(
     hooks: settings.hooks || {},
     disabledHooks: settings.hooksConfig?.disabled || [],
     projectHooks: projectHooks || {},
-    onModelChange: (model: string) => saveModelChange(loadedSettings, model),
+    onModelChange: (model: string) => saveModelChange(loadSettings(cwd), model),
     onReload: async () => {
       const refreshedSettings = loadSettings(cwd);
       return {
@@ -878,4 +1142,49 @@ function mergeExcludeTools(
     ...extraExcludes,
   ]);
   return Array.from(allExcludeTools);
+}
+
+async function resolveWorktreeSettings(
+  cwd: string,
+): Promise<WorktreeSettings | undefined> {
+  let worktreePath: string | undefined;
+  try {
+    const { stdout } = await execa('git', ['rev-parse', '--show-toplevel'], {
+      cwd,
+    });
+    const toplevel = stdout.trim();
+    const projectRoot = await getProjectRootForWorktree(toplevel);
+
+    if (isGeminiWorktree(toplevel, projectRoot)) {
+      worktreePath = toplevel;
+    }
+  } catch {
+    return undefined;
+  }
+
+  if (!worktreePath) {
+    return undefined;
+  }
+
+  let worktreeBaseSha: string | undefined;
+  try {
+    const { stdout } = await execa('git', ['rev-parse', 'HEAD'], {
+      cwd: worktreePath,
+    });
+    worktreeBaseSha = stdout.trim();
+  } catch (e: unknown) {
+    debugLogger.debug(
+      `Failed to resolve worktree base SHA at ${worktreePath}: ${getErrorMessage(e)}`,
+    );
+  }
+
+  if (!worktreeBaseSha) {
+    return undefined;
+  }
+
+  return {
+    name: path.basename(worktreePath),
+    path: worktreePath,
+    baseSha: worktreeBaseSha,
+  };
 }

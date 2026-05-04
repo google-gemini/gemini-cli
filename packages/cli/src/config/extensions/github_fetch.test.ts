@@ -62,6 +62,7 @@ describe('fetchJson', () => {
       const res = new EventEmitter() as IncomingMessage;
       res.statusCode = 302;
       res.headers = { location: 'https://example.com/final' };
+      res.resume = vi.fn();
       (callback as (res: IncomingMessage) => void)(res);
       res.emit('end');
       return new EventEmitter() as ClientRequest;
@@ -85,6 +86,7 @@ describe('fetchJson', () => {
       const res = new EventEmitter() as IncomingMessage;
       res.statusCode = 301;
       res.headers = { location: 'https://example.com/final-permanent' };
+      res.resume = vi.fn();
       (callback as (res: IncomingMessage) => void)(res);
       res.emit('end');
       return new EventEmitter() as ClientRequest;

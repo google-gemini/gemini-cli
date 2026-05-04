@@ -23,7 +23,7 @@ describe('<MaxSizedBox />', () => {
   });
 
   it('renders children without truncation when they fit', async () => {
-    const { lastFrame, waitUntilReady, unmount } = render(
+    const { lastFrame, waitUntilReady, unmount } = await render(
       <OverflowProvider>
         <MaxSizedBox maxWidth={80} maxHeight={10}>
           <Box>
@@ -42,7 +42,7 @@ describe('<MaxSizedBox />', () => {
   });
 
   it('hides lines when content exceeds maxHeight', async () => {
-    const { lastFrame, waitUntilReady, unmount } = render(
+    const { lastFrame, waitUntilReady, unmount } = await render(
       <OverflowProvider>
         <MaxSizedBox maxWidth={80} maxHeight={2}>
           <Box flexDirection="column">
@@ -65,7 +65,7 @@ describe('<MaxSizedBox />', () => {
   });
 
   it('hides lines at the end when content exceeds maxHeight and overflowDirection is bottom', async () => {
-    const { lastFrame, waitUntilReady, unmount } = render(
+    const { lastFrame, waitUntilReady, unmount } = await render(
       <OverflowProvider>
         <MaxSizedBox maxWidth={80} maxHeight={2} overflowDirection="bottom">
           <Box flexDirection="column">
@@ -88,7 +88,7 @@ describe('<MaxSizedBox />', () => {
   });
 
   it('shows plural "lines" when more than one line is hidden', async () => {
-    const { lastFrame, waitUntilReady, unmount } = render(
+    const { lastFrame, waitUntilReady, unmount } = await render(
       <OverflowProvider>
         <MaxSizedBox maxWidth={80} maxHeight={2}>
           <Box flexDirection="column">
@@ -111,7 +111,7 @@ describe('<MaxSizedBox />', () => {
   });
 
   it('shows singular "line" when exactly one line is hidden', async () => {
-    const { lastFrame, waitUntilReady, unmount } = render(
+    const { lastFrame, waitUntilReady, unmount } = await render(
       <OverflowProvider>
         <MaxSizedBox maxWidth={80} maxHeight={2} additionalHiddenLinesCount={1}>
           <Box flexDirection="column">
@@ -132,7 +132,7 @@ describe('<MaxSizedBox />', () => {
   });
 
   it('accounts for additionalHiddenLinesCount', async () => {
-    const { lastFrame, waitUntilReady, unmount } = render(
+    const { lastFrame, waitUntilReady, unmount } = await render(
       <OverflowProvider>
         <MaxSizedBox maxWidth={80} maxHeight={2} additionalHiddenLinesCount={5}>
           <Box flexDirection="column">
@@ -155,7 +155,7 @@ describe('<MaxSizedBox />', () => {
   });
 
   it('wraps text that exceeds maxWidth', async () => {
-    const { lastFrame, waitUntilReady, unmount } = render(
+    const { lastFrame, waitUntilReady, unmount } = await render(
       <OverflowProvider>
         <MaxSizedBox maxWidth={10} maxHeight={5}>
           <Box>
@@ -175,7 +175,7 @@ describe('<MaxSizedBox />', () => {
   });
 
   it('does not truncate when maxHeight is undefined', async () => {
-    const { lastFrame, waitUntilReady, unmount } = render(
+    const { lastFrame, waitUntilReady, unmount } = await render(
       <OverflowProvider>
         <MaxSizedBox maxWidth={80} maxHeight={undefined}>
           <Box flexDirection="column">
@@ -195,7 +195,7 @@ describe('<MaxSizedBox />', () => {
   });
 
   it('renders an empty box for empty children', async () => {
-    const { lastFrame, waitUntilReady, unmount } = render(
+    const { lastFrame, waitUntilReady, unmount } = await render(
       <OverflowProvider>
         <MaxSizedBox maxWidth={80} maxHeight={10}></MaxSizedBox>
       </OverflowProvider>,
@@ -209,7 +209,7 @@ describe('<MaxSizedBox />', () => {
   });
 
   it('handles React.Fragment as a child', async () => {
-    const { lastFrame, waitUntilReady, unmount } = render(
+    const { lastFrame, waitUntilReady, unmount } = await render(
       <OverflowProvider>
         <MaxSizedBox maxWidth={80} maxHeight={10}>
           <Box flexDirection="column">
@@ -236,7 +236,7 @@ describe('<MaxSizedBox />', () => {
       { length: 30 },
       (_, i) => `Line ${i + 1}`,
     ).join('\n');
-    const { lastFrame, waitUntilReady, unmount } = render(
+    const { lastFrame, waitUntilReady, unmount } = await render(
       <OverflowProvider>
         <MaxSizedBox maxWidth={80} maxHeight={10} overflowDirection="top">
           <Box>
@@ -262,7 +262,7 @@ describe('<MaxSizedBox />', () => {
       { length: 30 },
       (_, i) => `Line ${i + 1}`,
     ).join('\n');
-    const { lastFrame, waitUntilReady, unmount } = render(
+    const { lastFrame, waitUntilReady, unmount } = await render(
       <OverflowProvider>
         <MaxSizedBox maxWidth={80} maxHeight={10} overflowDirection="bottom">
           <Box>
@@ -288,7 +288,7 @@ describe('<MaxSizedBox />', () => {
       { length: 20 },
       (_, i) => `- Step ${i + 1}: Do something important`,
     ).join('\n');
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <MaxSizedBox maxWidth={80} maxHeight={5} overflowDirection="bottom">
         <MarkdownDisplay
           text={`## Plan\n\n${markdownContent}`}

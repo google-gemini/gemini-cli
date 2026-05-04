@@ -19,7 +19,7 @@ jobs:
           APP_ID: '${{ secrets.APP_ID }}'
         if: |-
           ${{ env.APP_ID != '' }}
-        uses: 'actions/create-github-app-token@v2'
+        uses: 'actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349' # ratchet:actions/create-github-app-token@v2
         with:
           app-id: '${{ secrets.APP_ID }}'
           private-key: '${{ secrets.PRIVATE_KEY }}'

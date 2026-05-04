@@ -248,7 +248,13 @@ export async function linkSkill(
       await fs.rm(destPath, { recursive: true, force: true });
     }
 
-    await fs.symlink(skillSourceDir, destPath, 'dir');
+    // Use 'junction' on Windows to avoid EPERM errors — junctions don't
+    // require elevated privileges or Developer Mode (fixes #24816)
+    await fs.symlink(
+      skillSourceDir,
+      destPath,
+      process.platform === 'win32' ? 'junction' : 'dir',
+    );
     linkedSkills.push({ name: skillName, location: destPath });
   }
 

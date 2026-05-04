@@ -9,10 +9,12 @@ import {
   WarningPriority,
   type Config,
   type ResumedSessionData,
+  type WorktreeInfo,
   type OutputPayload,
   type ConsoleLogPayload,
   type UserFeedbackPayload,
-  sessionId,
+  type CoreEvents,
+  createSessionId,
   logUserPrompt,
   AuthType,
   UserPromptEvent,
@@ -31,6 +33,8 @@ import {
   ValidationRequiredError,
   type AdminControlsSettings,
   debugLogger,
+  isHeadlessMode,
+  Storage,
 } from '@google/gemini-cli-core';
 
 import { loadCliConfig, parseArguments } from './config/config.js';
@@ -63,6 +67,7 @@ import {
   registerTelemetryConfig,
   setupSignalHandlers,
 } from './utils/cleanup.js';
+import { setupWorktree } from './utils/worktreeSetup.js';
 import {
   cleanupToolOutputFiles,
   cleanupExpiredSessions,
@@ -72,19 +77,15 @@ import {
   type InitializationResult,
 } from './core/initializer.js';
 import { validateAuthMethod } from './config/auth.js';
-import { runAcpClient } from './acp/acpClient.js';
+import { runAcpClient } from './acp/acpStdioTransport.js';
 import { validateNonInteractiveAuth } from './validateNonInterActiveAuth.js';
 import { appEvents, AppEvent } from './utils/events.js';
 import { SessionError, SessionSelector } from './utils/sessionUtils.js';
 
-import {
-  relaunchAppInChildProcess,
-  relaunchOnExitCode,
-} from './utils/relaunch.js';
+import { relaunchOnExitCode } from './utils/relaunch.js';
 import { loadSandboxConfig } from './config/sandboxConfig.js';
 import { deleteSession, listSessions } from './utils/sessions.js';
 import { createPolicyUpdater } from './config/policy.js';
-import { isAlternateBufferEnabled } from './ui/hooks/useAlternateBuffer.js';
 
 import { setupTerminalAndTheme } from './utils/terminalTheme.js';
 import { runDeferredCommand } from './deferred.js';
@@ -108,6 +109,8 @@ export function validateDnsResolutionOrder(
   return defaultValue;
 }
 
+const DEFAULT_EPT_SIZE = (256 * 1024 * 1024).toString();
+
 export function getNodeMemoryArgs(isDebugMode: boolean): string[] {
   const totalMemoryMB = os.totalmem() / (1024 * 1024);
   const heapStats = v8.getHeapStatistics();
@@ -127,21 +130,48 @@ export function getNodeMemoryArgs(isDebugMode: boolean): string[] {
     return [];
   }
 
+  const args: string[] = [];
+
+  // Automatically expand the V8 External Pointer Table to 256MB to prevent
+  // out-of-memory crashes during high native-handle concurrency.
+  // Note: Only supported in specific Node.js versions compiled with V8 Sandbox enabled.
+  const eptFlag = `--max-external-pointer-table-size=${DEFAULT_EPT_SIZE}`;
+  const isV8SandboxEnabled =
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
+    (process.config?.variables as any)?.v8_enable_sandbox === 1;
+
+  if (
+    isV8SandboxEnabled &&
+    !process.execArgv.some((arg) =>
+      arg.startsWith('--max-external-pointer-table-size'),
+    )
+  ) {
+    args.push(eptFlag);
+  }
+
   if (targetMaxOldSpaceSizeInMB > currentMaxOldSpaceSizeMb) {
     if (isDebugMode) {
       debugLogger.debug(
         `Need to relaunch with more memory: ${targetMaxOldSpaceSizeInMB.toFixed(2)} MB`,
       );
     }
-    return [`--max-old-space-size=${targetMaxOldSpaceSizeInMB}`];
+    args.push(`--max-old-space-size=${targetMaxOldSpaceSizeInMB}`);
   }
 
-  return [];
+  return args;
 }
 
 export function setupUnhandledRejectionHandler() {
   let unhandledRejectionOccurred = false;
   process.on('unhandledRejection', (reason, _promise) => {
+    // AbortError is expected when the user cancels a request (e.g. pressing ESC).
+    // It may surface as an unhandled rejection due to async timing in the
+    // streaming pipeline, but it is not a bug.
+    if (reason instanceof Error && reason.name === 'AbortError') {
+      debugLogger.log(`Suppressed unhandled AbortError: ${reason.message}`);
+      return;
+    }
+
     const errorMessage = `=========================================
 This is an unexpected error. Please file a bug report using the /bug tool.
 CRITICAL: Unhandled Promise Rejection!
@@ -159,6 +189,56 @@ ${reason.stack}`
       appEvents.emit(AppEvent.OpenDebugConsole);
     }
   });
+}
+
+export async function resolveSessionId(
+  resumeArg: string | undefined,
+  sessionIdArg?: string | undefined,
+): Promise<{
+  sessionId: string;
+  resumedSessionData?: ResumedSessionData;
+}> {
+  if (!resumeArg && !sessionIdArg) {
+    return { sessionId: createSessionId() };
+  }
+
+  const storage = new Storage(process.cwd());
+  await storage.initialize();
+
+  const sessionSelector = new SessionSelector(storage);
+
+  if (sessionIdArg) {
+    if (await sessionSelector.sessionExists(sessionIdArg)) {
+      coreEvents.emitFeedback(
+        'error',
+        `Error starting session: Session ID "${sessionIdArg}" already exists. Use --resume to resume it, or provide a different ID.`,
+      );
+      await runExitCleanup();
+      process.exit(ExitCodes.FATAL_INPUT_ERROR);
+    }
+    return { sessionId: sessionIdArg };
+  }
+
+  try {
+    const { sessionData, sessionPath } = await sessionSelector.resolveSession(
+      resumeArg!,
+    );
+    return {
+      sessionId: sessionData.sessionId,
+      resumedSessionData: { conversation: sessionData, filePath: sessionPath },
+    };
+  } catch (error) {
+    if (error instanceof SessionError && error.code === 'NO_SESSIONS_FOUND') {
+      coreEvents.emitFeedback('warning', error.message);
+      return { sessionId: createSessionId() };
+    }
+    coreEvents.emitFeedback(
+      'error',
+      `Error resuming session: ${error instanceof Error ? error.message : 'Unknown error'}`,
+    );
+    await runExitCleanup();
+    process.exit(ExitCodes.FATAL_INPUT_ERROR);
+  }
 }
 
 export async function startInteractiveUI(
@@ -182,6 +262,7 @@ export async function startInteractiveUI(
 }
 
 export async function main() {
+  let config: Config | undefined;
   const cliStartupHandle = startupProfiler.start('cli_startup');
 
   // Listen for admin controls from parent process (IPC) in non-sandbox mode. In
@@ -194,7 +275,7 @@ export async function main() {
   const cleanupStdio = patchStdio();
   registerSyncCleanup(() => {
     // This is needed to ensure we don't lose any buffered output.
-    initializeOutputListenersAndFlush();
+    initializeOutputListenersAndFlush(config);
     cleanupStdio();
   });
 
@@ -210,6 +291,37 @@ export async function main() {
   const settings = loadSettings();
   loadSettingsHandle?.end();
 
+  // If a worktree is requested and enabled, set it up early.
+  // This must be awaited before any other async tasks that depend on CWD (like loadCliConfig)
+  // because setupWorktree calls process.chdir().
+  const requestedWorktree = cliConfig.getRequestedWorktreeName(settings);
+  let worktreeInfo: WorktreeInfo | undefined;
+  if (requestedWorktree !== undefined) {
+    const worktreeHandle = startupProfiler.start('setup_worktree');
+    worktreeInfo = await setupWorktree(requestedWorktree || undefined);
+    worktreeHandle?.end();
+  }
+
+  const cleanupOpsHandle = startupProfiler.start('cleanup_ops');
+  Promise.all([
+    cleanupCheckpoints(),
+    cleanupToolOutputFiles(settings.merged),
+    cleanupBackgroundLogs(),
+  ])
+    .catch((e) => {
+      debugLogger.error('Early cleanup failed:', e);
+    })
+    .finally(() => {
+      cleanupOpsHandle?.end();
+    });
+
+  const parseArgsHandle = startupProfiler.start('parse_arguments');
+  const argvPromise = parseArguments(settings.merged).finally(() => {
+    parseArgsHandle?.end();
+  });
+
+  const rawStartupWarningsPromise = getStartupWarnings();
+
   // Report settings errors once during startup
   settings.errors.forEach((error) => {
     coreEvents.emitFeedback('warning', error.message);
@@ -223,15 +335,12 @@ export async function main() {
     );
   });
 
-  await Promise.all([
-    cleanupCheckpoints(),
-    cleanupToolOutputFiles(settings.merged),
-    cleanupBackgroundLogs(),
-  ]);
+  const argv = await argvPromise;
 
-  const parseArgsHandle = startupProfiler.start('parse_arguments');
-  const argv = await parseArguments(settings.merged);
-  parseArgsHandle?.end();
+  const { sessionId, resumedSessionData } = await resolveSessionId(
+    argv.resume,
+    argv.sessionId,
+  );
 
   if (
     (argv.allowedTools && argv.allowedTools.length > 0) ||
@@ -270,14 +379,14 @@ export async function main() {
 
   const isDebugMode = cliConfig.isDebugMode(argv);
   const consolePatcher = new ConsolePatcher({
-    stderr: true,
+    stderr: argv.isCommand ? false : true,
+    interactive: isHeadlessMode() && !argv.isCommand ? false : true,
     debugMode: isDebugMode,
     onNewMessage: (msg) => {
       coreEvents.emitConsoleLog(msg.type, msg.content);
     },
   });
   consolePatcher.patch();
-  registerCleanup(consolePatcher.cleanup);
 
   dns.setDefaultResultOrder(
     validateDnsResolutionOrder(settings.merged.advanced.dnsResolutionOrder),
@@ -302,14 +411,17 @@ export async function main() {
 
   const partialConfig = await loadCliConfig(settings.merged, sessionId, argv, {
     projectHooks: settings.workspace.settings.hooks,
+    skipExtensions: true,
+    skipMemoryLoad: true,
   });
+
   adminControlsListner.setConfig(partialConfig);
 
   // Refresh auth to fetch remote admin settings from CCPA and before entering
   // the sandbox because the sandbox will interfere with the Oauth2 web
   // redirect.
   let initialAuthFailed = false;
-  if (!settings.merged.security.auth.useExternal) {
+  if (!settings.merged.security.auth.useExternal && !argv.isCommand) {
     try {
       if (
         partialConfig.isInteractive() &&
@@ -355,13 +467,19 @@ export async function main() {
   // Set remote admin settings if returned from CCPA.
   if (remoteAdminSettings) {
     settings.setRemoteAdminSettings(remoteAdminSettings);
+    if (process.send) {
+      process.send({
+        type: 'admin-settings-update',
+        settings: remoteAdminSettings,
+      });
+    }
   }
 
   // Run deferred command now that we have admin settings.
   await runDeferredCommand(settings.merged);
 
   // hop into sandbox if we are outside and sandboxing is enabled
-  if (!process.env['SANDBOX']) {
+  if (!process.env['SANDBOX'] && !argv.isCommand) {
     const memoryArgs = settings.merged.advanced.autoConfigureMemory
       ? getNodeMemoryArgs(isDebugMode)
       : [];
@@ -412,10 +530,6 @@ export async function main() {
       );
       await runExitCleanup();
       process.exit(ExitCodes.SUCCESS);
-    } else {
-      // Relaunch app so we always have a child process that can be internally
-      // restarted if needed.
-      await relaunchAppInChildProcess(memoryArgs, [], remoteAdminSettings);
     }
   }
 
@@ -424,8 +538,9 @@ export async function main() {
   // may have side effects.
   {
     const loadConfigHandle = startupProfiler.start('load_cli_config');
-    const config = await loadCliConfig(settings.merged, sessionId, argv, {
+    config = await loadCliConfig(settings.merged, sessionId, argv, {
       projectHooks: settings.workspace.settings.hooks,
+      worktreeSettings: worktreeInfo,
     });
     loadConfigHandle?.end();
 
@@ -440,7 +555,7 @@ export async function main() {
       const { setupInitialActivityLogger } = await import(
         './utils/devtoolsService.js'
       );
-      await setupInitialActivityLogger(config);
+      setupInitialActivityLogger(config);
     }
 
     // Register config for telemetry shutdown
@@ -457,12 +572,16 @@ export async function main() {
       await config.getHookSystem()?.fireSessionEndEvent(SessionEndReason.Exit);
     });
 
-    // Cleanup sessions after config initialization
-    try {
-      await cleanupExpiredSessions(config, settings.merged);
-    } catch (e) {
-      debugLogger.error('Failed to cleanup expired sessions:', e);
+    // Register ConsolePatcher cleanup last to ensure logs from shutdown hooks
+    // are correctly redirected to stderr (especially for non-interactive JSON output).
+    if (!config.getAcpMode()) {
+      registerCleanup(consolePatcher.cleanup);
     }
+
+    // Launch cleanup expired sessions as a background task
+    cleanupExpiredSessions(config, settings.merged).catch((e) => {
+      debugLogger.error('Failed to cleanup expired sessions:', e);
+    });
 
     if (config.getListExtensions()) {
       debugLogger.log('Installed extensions:');
@@ -514,11 +633,30 @@ export async function main() {
       });
     }
 
+    const terminalHandle = startupProfiler.start('setup_terminal');
     await setupTerminalAndTheme(config, settings);
+    terminalHandle?.end();
 
     const initAppHandle = startupProfiler.start('initialize_app');
     const initializationResult = await initializeApp(config, settings);
     initAppHandle?.end();
+
+    import('./services/liteRtServerManager.js')
+      .then(({ LiteRtServerManager }) => {
+        const mergedGemma = settings.merged.experimental?.gemmaModelRouter;
+        if (!mergedGemma) return;
+        // Security: binaryPath and autoStartServer must come from user-scoped
+        // settings only to prevent workspace configs from triggering arbitrary
+        // binary execution.
+        const userGemma = settings.forScope(SettingScope.User).settings
+          .experimental?.gemmaModelRouter;
+        return LiteRtServerManager.ensureRunning({
+          ...mergedGemma,
+          binaryPath: userGemma?.binaryPath,
+          autoStartServer: userGemma?.autoStartServer,
+        });
+      })
+      .catch((e) => debugLogger.warn('LiteRT auto-start import failed:', e));
 
     if (
       settings.merged.security.auth.selectedType ===
@@ -535,10 +673,10 @@ export async function main() {
 
     let input = config.getQuestion();
     const useAlternateBuffer = shouldEnterAlternateScreen(
-      isAlternateBufferEnabled(config),
+      config.getUseAlternateBuffer(),
       config.getScreenReader(),
     );
-    const rawStartupWarnings = await getStartupWarnings();
+    const rawStartupWarnings = await rawStartupWarningsPromise;
     const startupWarnings: StartupWarning[] = [
       ...rawStartupWarnings.map((message) => ({
         id: `startup-${createHash('sha256').update(message).digest('hex').substring(0, 16)}`,
@@ -550,43 +688,24 @@ export async function main() {
       })),
     ];
 
-    // Handle --resume flag
-    let resumedSessionData: ResumedSessionData | undefined = undefined;
-    if (argv.resume) {
-      const sessionSelector = new SessionSelector(config);
-      try {
-        const result = await sessionSelector.resolveSession(argv.resume);
-        resumedSessionData = {
-          conversation: result.sessionData,
-          filePath: result.sessionPath,
-        };
-        // Use the existing session ID to continue recording to the same session
-        config.setSessionId(resumedSessionData.conversation.sessionId);
-      } catch (error) {
-        if (
-          error instanceof SessionError &&
-          error.code === 'NO_SESSIONS_FOUND'
-        ) {
-          // No sessions to resume — start a fresh session with a warning
-          startupWarnings.push({
-            id: 'resume-no-sessions',
-            message: error.message,
-            priority: WarningPriority.High,
-          });
-        } else {
-          coreEvents.emitFeedback(
-            'error',
-            `Error resuming session: ${error instanceof Error ? error.message : 'Unknown error'}`,
-          );
-          await runExitCleanup();
-          process.exit(ExitCodes.FATAL_INPUT_ERROR);
-        }
+    cliStartupHandle?.end();
+
+    if (!config.isInteractive()) {
+      for (const warning of startupWarnings) {
+        writeToStderr(warning.message + '\n');
       }
     }
 
-    cliStartupHandle?.end();
     // Render UI, passing necessary config values. Check that there is no command line question.
     if (config.isInteractive()) {
+      // Earlier initialization phases (like TerminalCapabilityManager resolving
+      // or authWithWeb) may have added and removed 'data' listeners on process.stdin.
+      // When the listener count drops to 0, Node.js implicitly pauses the stream buffer.
+      // React Ink's useInput hooks will silently fail to receive keystrokes if the stream remains paused.
+      if (process.stdin.isTTY) {
+        process.stdin.resume();
+      }
+
       await startInteractiveUI(
         config,
         settings,
@@ -634,11 +753,6 @@ export async function main() {
       }
     }
 
-    // Register SessionEnd hook for graceful exit
-    registerCleanup(async () => {
-      await config.getHookSystem()?.fireSessionEndEvent(SessionEndReason.Exit);
-    });
-
     if (!input) {
       debugLogger.error(
         `No input provided via stdin. Input can be provided by piping data into gemini or using the --prompt option.`,
@@ -647,7 +761,7 @@ export async function main() {
       process.exit(ExitCodes.FATAL_INPUT_ERROR);
     }
 
-    const prompt_id = Math.random().toString(16).slice(2);
+    const prompt_id = sessionId;
     logUserPrompt(
       config,
       new UserPromptEvent(
@@ -670,7 +784,7 @@ export async function main() {
       debugLogger.log('Session ID: %s', sessionId);
     }
 
-    initializeOutputListenersAndFlush();
+    initializeOutputListenersAndFlush(config);
 
     await runNonInteractive({
       config,
@@ -685,7 +799,7 @@ export async function main() {
   }
 }
 
-export function initializeOutputListenersAndFlush() {
+export function initializeOutputListenersAndFlush(config?: Config) {
   // If there are no listeners for output, make sure we flush so output is not
   // lost.
   if (coreEvents.listenerCount(CoreEvent.Output) === 0) {
@@ -697,28 +811,43 @@ export function initializeOutputListenersAndFlush() {
         writeToStdout(payload.chunk, payload.encoding);
       }
     });
-
-    if (coreEvents.listenerCount(CoreEvent.ConsoleLog) === 0) {
-      coreEvents.on(CoreEvent.ConsoleLog, (payload: ConsoleLogPayload) => {
-        if (payload.type === 'error' || payload.type === 'warn') {
-          writeToStderr(payload.content);
-        } else {
-          writeToStdout(payload.content);
-        }
-      });
-    }
-
-    if (coreEvents.listenerCount(CoreEvent.UserFeedback) === 0) {
-      coreEvents.on(CoreEvent.UserFeedback, (payload: UserFeedbackPayload) => {
-        if (payload.severity === 'error' || payload.severity === 'warning') {
-          writeToStderr(payload.message);
-        } else {
-          writeToStdout(payload.message);
-        }
-      });
-    }
   }
-  coreEvents.drainBacklogs();
+
+  if (coreEvents.listenerCount(CoreEvent.ConsoleLog) === 0) {
+    coreEvents.on(CoreEvent.ConsoleLog, (payload: ConsoleLogPayload) => {
+      if (payload.type === 'error' || payload.type === 'warn') {
+        writeToStderr(payload.content + '\n');
+      } else {
+        writeToStderr(payload.content + '\n');
+      }
+    });
+  }
+
+  if (coreEvents.listenerCount(CoreEvent.UserFeedback) === 0) {
+    coreEvents.on(CoreEvent.UserFeedback, (payload: UserFeedbackPayload) => {
+      writeToStderr(payload.message + '\n');
+    });
+  }
+
+  const outputFormat = config?.getOutputFormat();
+  const forceToStderr = outputFormat === 'json' || config === undefined;
+
+  coreEvents.drainBacklogs(
+    <K extends keyof CoreEvents>(event: K, args: CoreEvents[K]) => {
+      if (forceToStderr && event === (CoreEvent.Output as string)) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        const payload = args[0] as OutputPayload;
+        if (!payload.isStderr) {
+          return {
+            event,
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+            args: [{ ...payload, isStderr: true }] as unknown as CoreEvents[K],
+          };
+        }
+      }
+      return { event, args };
+    },
+  );
 }
 
 function setupAdminControlsListener() {

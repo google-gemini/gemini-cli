@@ -5,7 +5,7 @@
  */
 
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
-import { WEB_SEARCH_TOOL_NAME } from './tool-names.js';
+import { WEB_SEARCH_TOOL_NAME, WEB_SEARCH_DISPLAY_NAME } from './tool-names.js';
 import type { GroundingMetadata } from '@google/genai';
 import {
   BaseDeclarativeTool,
@@ -13,6 +13,7 @@ import {
   Kind,
   type ToolInvocation,
   type ToolResult,
+  type ExecuteOptions,
 } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
 
@@ -84,7 +85,9 @@ class WebSearchToolInvocation extends BaseToolInvocation<
     return `Searching the web for: "${this.params.query}"`;
   }
 
-  async execute(signal: AbortSignal): Promise<WebSearchToolResult> {
+  async execute({
+    abortSignal: signal,
+  }: ExecuteOptions): Promise<WebSearchToolResult> {
     const geminiClient = this.context.geminiClient;
 
     try {
@@ -212,7 +215,7 @@ export class WebSearchTool extends BaseDeclarativeTool<
   ) {
     super(
       WebSearchTool.Name,
-      'GoogleSearch',
+      WEB_SEARCH_DISPLAY_NAME,
       WEB_SEARCH_DEFINITION.base.description!,
       Kind.Search,
       WEB_SEARCH_DEFINITION.base.parametersJsonSchema,

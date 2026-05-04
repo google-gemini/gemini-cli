@@ -170,6 +170,7 @@ describe('BuiltinCommandLoader', () => {
         getAllSkills: vi.fn().mockReturnValue([]),
         isAdminEnabled: vi.fn().mockReturnValue(true),
       }),
+      isVoiceModeEnabled: vi.fn().mockReturnValue(true),
       getContentGeneratorConfig: vi.fn().mockReturnValue({
         authType: 'other',
       }),
@@ -266,6 +267,7 @@ describe('BuiltinCommandLoader', () => {
 
   it('should include policies command when message bus integration is enabled', async () => {
     const mockConfigWithMessageBus = {
+      // eslint-disable-next-line @typescript-eslint/no-misused-spread
       ...mockConfig,
       getEnableHooks: () => false,
       getMcpEnabled: () => true,
@@ -395,6 +397,7 @@ describe('BuiltinCommandLoader profile', () => {
         getAllSkills: vi.fn().mockReturnValue([]),
         isAdminEnabled: vi.fn().mockReturnValue(true),
       }),
+      isVoiceModeEnabled: vi.fn().mockReturnValue(true),
       getContentGeneratorConfig: vi.fn().mockReturnValue({
         authType: 'other',
       }),

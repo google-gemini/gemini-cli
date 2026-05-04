@@ -24,6 +24,7 @@ import type { ToolMessageProps } from './ToolMessage.js';
 import { ACTIVE_SHELL_MAX_LINES } from '../../constants.js';
 import { useAlternateBuffer } from '../../hooks/useAlternateBuffer.js';
 import { useUIState } from '../../contexts/UIStateContext.js';
+import { useToolActions } from '../../contexts/ToolActionsContext.js';
 import {
   type Config,
   ShellExecutionService,
@@ -41,36 +42,29 @@ export interface ShellToolMessageProps extends ToolMessageProps {
 }
 
 export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
+  callId,
   name,
-
   description,
-
   resultDisplay,
-
   status,
-
   availableTerminalHeight,
-
   terminalWidth,
-
   emphasis = 'medium',
-
   renderOutputAsMarkdown = true,
-
   ptyId,
-
   config,
-
   isFirst,
-
   borderColor,
-
   borderDimColor,
-
   isExpandable,
-
   originalRequestName,
 }) => {
+  const { isExpanded: isExpandedInContext } = useToolActions();
+
+  const isExpanded =
+    (isExpandedInContext ? isExpandedInContext(callId) : false) ||
+    availableTerminalHeight === undefined;
+
   const {
     activePtyId: activeShellPtyId,
     embeddedShellFocused,
@@ -142,11 +136,9 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
   }, [isThisShellFocused, embeddedShellFocused, setEmbeddedShellFocused]);
 
   const headerRef = React.useRef<DOMElement>(null);
-
   const contentRef = React.useRef<DOMElement>(null);
 
   // The shell is focusable if it's the shell command, it's executing, and the interactive shell is enabled.
-
   const isThisShellFocusable = checkIsShellFocusable(name, status, config);
 
   const handleFocus = () => {
@@ -156,7 +148,6 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
   };
 
   useMouseClick(headerRef, handleFocus, { isActive: !!isThisShellFocusable });
-
   useMouseClick(contentRef, handleFocus, { isActive: !!isThisShellFocusable });
 
   const { shouldShowFocusHint } = useFocusHint(
@@ -186,6 +177,7 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
           description={description}
           emphasis={emphasis}
           originalRequestName={originalRequestName}
+          isExpanded={isExpanded}
         />
 
         <FocusHint

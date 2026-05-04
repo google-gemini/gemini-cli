@@ -1,26 +1,28 @@
 # Advanced Model Configuration
 
-This guide details the Model Configuration system within the Gemini CLI.
-Designed for researchers, AI quality engineers, and advanced users, this system
-provides a rigorous framework for managing generative model hyperparameters and
+This guide details the Model Configuration system within Gemini CLI. Designed
+for researchers, AI quality engineers, and advanced users, this system provides
+a rigorous framework for managing generative model hyperparameters and
 behaviors.
 
-> **Warning**: This is a power-user feature. Configuration values are passed
+<!-- prettier-ignore -->
+> [!WARNING]
+> This is a power-user feature. Configuration values are passed
 > directly to the model provider with minimal validation. Incorrect settings
-> (e.g., incompatible parameter combinations) may result in runtime errors from
-> the API.
+> (for example, incompatible parameter combinations) may result in runtime
+> errors from the API.
 
 ## 1. System Overview
 
 The Model Configuration system (`ModelConfigService`) enables deterministic
-control over model generation. It decouples the requested model identifier
-(e.g., a CLI flag or agent request) from the underlying API configuration. This
-allows for:
+control over model generation. It decouples the requested model identifier (for
+example, a CLI flag or agent request) from the underlying API configuration.
+This allows for:
 
 - **Precise Hyperparameter Tuning**: Direct control over `temperature`, `topP`,
   `thinkingBudget`, and other SDK-level parameters.
 - **Environment-Specific Behavior**: Distinct configurations for different
-  operating contexts (e.g., testing vs. production).
+  operating contexts (for example, testing vs. production).
 - **Agent-Scoped Customization**: Applying specific settings only when a
   particular agent is active.
 
@@ -71,7 +73,7 @@ context. They are evaluated dynamically for each model request.
   specified `match` properties.
   - `model`: Matches the requested model name or alias.
   - `overrideScope`: Matches the distinct scope of the request (typically the
-    agent name, e.g., `codebaseInvestigator`).
+    agent name, for example, `codebaseInvestigator`).
 
 **Example Override**:
 
@@ -113,8 +115,8 @@ and `overrideScope`).
 1.  **Filtering**: All matching overrides are identified.
 2.  **Sorting**: Matches are prioritized by **specificity** (the number of
     matched keys in the `match` object).
-    - Specific matches (e.g., `model` + `overrideScope`) override broad matches
-      (e.g., `model` only).
+    - Specific matches (for example, `model` + `overrideScope`) override broad
+      matches (for example, `model` only).
     - Tie-breaking: If specificity is equal, the order of definition in the
       `overrides` array is preserved (last one wins).
 3.  **Merging**: The configurations from the sorted overrides are merged
@@ -128,10 +130,10 @@ The configuration follows the `ModelConfigServiceConfig` interface.
 
 Defines the actual parameters for the model.
 
-| Property                | Type     | Description                                                        |
-| :---------------------- | :------- | :----------------------------------------------------------------- |
-| `model`                 | `string` | The identifier of the model to be called (e.g., `gemini-2.5-pro`). |
-| `generateContentConfig` | `object` | The configuration object passed to the `@google/genai` SDK.        |
+| Property                | Type     | Description                                                               |
+| :---------------------- | :------- | :------------------------------------------------------------------------ |
+| `model`                 | `string` | The identifier of the model to be called (for example, `gemini-2.5-pro`). |
+| `generateContentConfig` | `object` | The configuration object passed to the `@google/genai` SDK.               |
 
 ### `GenerateContentConfig` (Common Parameters)
 
@@ -142,7 +144,7 @@ Directly maps to the SDK's `GenerateContentConfig`. Common parameters include:
 - **`topP`**: (`number`) Nucleus sampling probability.
 - **`maxOutputTokens`**: (`number`) Limit on generated response length.
 - **`thinkingConfig`**: (`object`) Configuration for models with reasoning
-  capabilities (e.g., `thinkingBudget`, `includeThoughts`).
+  capabilities (for example, `thinkingBudget`, `includeThoughts`).
 
 ## 5. Practical Examples
 
@@ -170,7 +172,7 @@ configuration but enforcing zero temperature.
 ### Agent-Specific Parameter Injection
 
 Enforce extended thinking budgets for a specific agent without altering the
-global default, e.g. for the `codebaseInvestigator`.
+global default, for example for the `codebaseInvestigator`.
 
 ```json
 "modelConfigs": {

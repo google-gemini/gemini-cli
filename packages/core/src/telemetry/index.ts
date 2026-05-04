@@ -48,6 +48,8 @@ export {
   logWebFetchFallbackAttempt,
   logNetworkRetryAttempt,
   logRewind,
+  logOnboardingStart,
+  logOnboardingSuccess,
 } from './loggers.js';
 export {
   logConsecaPolicyGeneration,
@@ -70,6 +72,8 @@ export {
   NetworkRetryAttemptEvent,
   ToolCallDecision,
   RewindEvent,
+  OnboardingStartEvent,
+  OnboardingSuccessEvent,
   ConsecaPolicyGenerationEvent,
   ConsecaVerdictEvent,
 } from './types.js';
@@ -89,6 +93,12 @@ export {
   stopGlobalMemoryMonitoring,
 } from './memory-monitor.js';
 export type { MemorySnapshot, ProcessMetrics } from './memory-monitor.js';
+export {
+  EventLoopMonitor,
+  startGlobalEventLoopMonitoring,
+  stopGlobalEventLoopMonitoring,
+  getEventLoopMonitor,
+} from './event-loop-monitor.js';
 export { HighWaterMarkTracker } from './high-water-mark-tracker.js';
 export { RateLimiter } from './rate-limiter.js';
 export { ActivityType } from './activity-types.js';
@@ -129,6 +139,7 @@ export {
   recordStartupPerformance,
   recordMemoryUsage,
   recordCpuUsage,
+  recordEventLoopDelay,
   recordToolQueueDepth,
   recordToolExecutionBreakdown,
   recordTokenEfficiency,

@@ -29,6 +29,7 @@ const VALID_SANDBOX_COMMANDS = [
   'sandbox-exec',
   'runsc',
   'lxc',
+  'windows-native',
 ];
 
 function isSandboxCommand(
@@ -75,8 +76,15 @@ function getSandboxCommand(
         'gVisor (runsc) sandboxing is only supported on Linux',
       );
     }
-    // confirm that specified command exists
-    if (!commandExists.sync(sandbox)) {
+    // windows-native is only supported on Windows
+    if (sandbox === 'windows-native' && os.platform() !== 'win32') {
+      throw new FatalSandboxError(
+        'Windows native sandboxing is only supported on Windows',
+      );
+    }
+
+    // confirm that specified command exists (unless it's built-in)
+    if (sandbox !== 'windows-native' && !commandExists.sync(sandbox)) {
       throw new FatalSandboxError(
         `Missing sandbox command '${sandbox}' (from GEMINI_SANDBOX)`,
       );
@@ -123,7 +131,7 @@ export async function loadSandboxConfig(
 
   let sandboxValue: boolean | string | null | undefined;
   let allowedPaths: string[] = [];
-  let networkAccess = false;
+  let networkAccess = true;
   let customImage: string | undefined;
 
   if (
@@ -134,7 +142,7 @@ export async function loadSandboxConfig(
     const config = sandboxOption;
     sandboxValue = config.enabled ? (config.command ?? true) : false;
     allowedPaths = config.allowedPaths ?? [];
-    networkAccess = config.networkAccess ?? false;
+    networkAccess = config.networkAccess ?? true;
     customImage = config.image;
   } else if (typeof sandboxOption !== 'object' || sandboxOption === null) {
     sandboxValue = sandboxOption;
@@ -149,7 +157,12 @@ export async function loadSandboxConfig(
     customImage ??
     packageJson?.config?.sandboxImageUri;
 
-  return command && image
+  const isNative =
+    command === 'windows-native' ||
+    command === 'sandbox-exec' ||
+    command === 'lxc';
+
+  return command && (image || isNative)
     ? { enabled: true, allowedPaths, networkAccess, command, image }
     : undefined;
 }

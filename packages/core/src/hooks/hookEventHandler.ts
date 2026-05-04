@@ -303,6 +303,7 @@ export class HookEventHandler {
         coreEvents.emitHookStart({
           hookName: this.getHookName(config),
           eventName,
+          source: config.source,
           hookIndex: index + 1,
           totalHooks: plan.hookConfigs.length,
         });
@@ -457,6 +458,15 @@ export class HookEventHandler {
       );
 
       logHookCall(this.context.config, hookCallEvent);
+
+      // Emit structured system message event for UI display
+      if (result.output?.systemMessage && result.outputFormat === 'json') {
+        coreEvents.emitHookSystemMessage({
+          hookName,
+          eventName,
+          message: result.output.systemMessage,
+        });
+      }
     }
 
     // Log individual errors

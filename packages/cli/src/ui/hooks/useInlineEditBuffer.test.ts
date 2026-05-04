@@ -6,19 +6,32 @@
 
 import { renderHook } from '../../test-utils/render.js';
 import { act } from 'react';
-import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type Mock,
+} from 'vitest';
 import { useInlineEditBuffer } from './useInlineEditBuffer.js';
 
 describe('useEditBuffer', () => {
   let mockOnCommit: Mock;
 
   beforeEach(() => {
+    vi.useFakeTimers();
     vi.clearAllMocks();
     mockOnCommit = vi.fn();
   });
 
-  it('should initialize with empty state', () => {
-    const { result } = renderHook(() =>
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('should initialize with empty state', async () => {
+    const { result } = await renderHook(() =>
       useInlineEditBuffer({ onCommit: mockOnCommit }),
     );
     expect(result.current.editState.editingKey).toBeNull();
@@ -26,8 +39,8 @@ describe('useEditBuffer', () => {
     expect(result.current.editState.cursorPos).toBe(0);
   });
 
-  it('should start editing correctly', () => {
-    const { result } = renderHook(() =>
+  it('should start editing correctly', async () => {
+    const { result } = await renderHook(() =>
       useInlineEditBuffer({ onCommit: mockOnCommit }),
     );
     act(() => result.current.startEditing('my-key', 'initial'));
@@ -37,8 +50,8 @@ describe('useEditBuffer', () => {
     expect(result.current.editState.cursorPos).toBe(7); // End of string
   });
 
-  it('should commit edit and reset state', () => {
-    const { result } = renderHook(() =>
+  it('should commit edit and reset state', async () => {
+    const { result } = await renderHook(() =>
       useInlineEditBuffer({ onCommit: mockOnCommit }),
     );
 
@@ -50,8 +63,8 @@ describe('useEditBuffer', () => {
     expect(result.current.editState.buffer).toBe('');
   });
 
-  it('should move cursor left and right', () => {
-    const { result } = renderHook(() =>
+  it('should move cursor left and right', async () => {
+    const { result } = await renderHook(() =>
       useInlineEditBuffer({ onCommit: mockOnCommit }),
     );
     act(() => result.current.startEditing('key', 'ab')); // cursor at 2
@@ -70,8 +83,8 @@ describe('useEditBuffer', () => {
     expect(result.current.editState.cursorPos).toBe(1);
   });
 
-  it('should handle home and end', () => {
-    const { result } = renderHook(() =>
+  it('should handle home and end', async () => {
+    const { result } = await renderHook(() =>
       useInlineEditBuffer({ onCommit: mockOnCommit }),
     );
     act(() => result.current.startEditing('key', 'testing')); // cursor at 7
@@ -83,8 +96,8 @@ describe('useEditBuffer', () => {
     expect(result.current.editState.cursorPos).toBe(7);
   });
 
-  it('should delete characters to the left (backspace)', () => {
-    const { result } = renderHook(() =>
+  it('should delete characters to the left (backspace)', async () => {
+    const { result } = await renderHook(() =>
       useInlineEditBuffer({ onCommit: mockOnCommit }),
     );
     act(() => result.current.startEditing('key', 'abc')); // cursor at 3
@@ -99,8 +112,8 @@ describe('useEditBuffer', () => {
     expect(result.current.editState.buffer).toBe('ab');
   });
 
-  it('should delete characters to the right (delete tab)', () => {
-    const { result } = renderHook(() =>
+  it('should delete characters to the right (delete tab)', async () => {
+    const { result } = await renderHook(() =>
       useInlineEditBuffer({ onCommit: mockOnCommit }),
     );
     act(() => result.current.startEditing('key', 'abc'));
@@ -111,8 +124,8 @@ describe('useEditBuffer', () => {
     expect(result.current.editState.cursorPos).toBe(0);
   });
 
-  it('should insert valid characters into string', () => {
-    const { result } = renderHook(() =>
+  it('should insert valid characters into string', async () => {
+    const { result } = await renderHook(() =>
       useInlineEditBuffer({ onCommit: mockOnCommit }),
     );
     act(() => result.current.startEditing('key', 'ab'));
@@ -129,8 +142,8 @@ describe('useEditBuffer', () => {
     expect(result.current.editState.cursorPos).toBe(2);
   });
 
-  it('should validate number character insertions', () => {
-    const { result } = renderHook(() =>
+  it('should validate number character insertions', async () => {
+    const { result } = await renderHook(() =>
       useInlineEditBuffer({ onCommit: mockOnCommit }),
     );
     act(() => result.current.startEditing('key', '12'));

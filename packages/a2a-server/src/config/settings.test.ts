@@ -112,6 +112,18 @@ describe('loadSettings', () => {
     expect(result.fileFiltering?.respectGitIgnore).toBe(true);
   });
 
+  it('should load experimental settings correctly', () => {
+    const settings = {
+      experimental: {
+        enableAgents: true,
+      },
+    };
+    fs.writeFileSync(USER_SETTINGS_PATH, JSON.stringify(settings));
+
+    const result = loadSettings(mockWorkspaceDir);
+    expect(result.experimental?.enableAgents).toBe(true);
+  });
+
   it('should overwrite top-level settings from workspace (shallow merge)', () => {
     const userSettings = {
       showMemoryUsage: false,

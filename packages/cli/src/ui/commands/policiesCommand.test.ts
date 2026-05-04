@@ -32,7 +32,7 @@ describe('policiesCommand', () => {
 
   describe('list subcommand', () => {
     it('should show error if config is missing', async () => {
-      mockContext.services.config = null;
+      mockContext.services.agentContext = null;
       const listCommand = policiesCommand.subCommands![0];
 
       await listCommand.action!(mockContext, '');
@@ -50,8 +50,11 @@ describe('policiesCommand', () => {
       const mockPolicyEngine = {
         getRules: vi.fn().mockReturnValue([]),
       };
-      mockContext.services.config = {
+      mockContext.services.agentContext = {
         getPolicyEngine: vi.fn().mockReturnValue(mockPolicyEngine),
+        get config() {
+          return this;
+        },
       } as unknown as Config;
 
       const listCommand = policiesCommand.subCommands![0];
@@ -85,8 +88,11 @@ describe('policiesCommand', () => {
       const mockPolicyEngine = {
         getRules: vi.fn().mockReturnValue(mockRules),
       };
-      mockContext.services.config = {
+      mockContext.services.agentContext = {
         getPolicyEngine: vi.fn().mockReturnValue(mockPolicyEngine),
+        get config() {
+          return this;
+        },
       } as unknown as Config;
 
       const listCommand = policiesCommand.subCommands![0];
@@ -110,7 +116,9 @@ describe('policiesCommand', () => {
       expect(content).toContain(
         '### Yolo Mode Policies (combined with normal mode policies)',
       );
-      expect(content).toContain('### Plan Mode Policies');
+      expect(content).toContain(
+        '### Plan Mode Policies (combined with normal mode policies)',
+      );
       expect(content).toContain(
         '**DENY** tool: `dangerousTool` [Priority: 10]',
       );
@@ -142,8 +150,11 @@ describe('policiesCommand', () => {
       const mockPolicyEngine = {
         getRules: vi.fn().mockReturnValue(mockRules),
       };
-      mockContext.services.config = {
+      mockContext.services.agentContext = {
         getPolicyEngine: vi.fn().mockReturnValue(mockPolicyEngine),
+        get config() {
+          return this;
+        },
       } as unknown as Config;
 
       const listCommand = policiesCommand.subCommands![0];
@@ -153,7 +164,9 @@ describe('policiesCommand', () => {
       const content = (call[0] as { text: string }).text;
 
       // Plan-only rules appear under Plan Mode section
-      expect(content).toContain('### Plan Mode Policies');
+      expect(content).toContain(
+        '### Plan Mode Policies (combined with normal mode policies)',
+      );
       // glob ALLOW is plan-only, should appear in plan section
       expect(content).toContain('**ALLOW** tool: `glob` [Priority: 70]');
       // shell ALLOW has no modes (applies to all), appears in normal section

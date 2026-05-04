@@ -78,7 +78,7 @@ function verifyIntegrity(dir, manifest, fsMod = fs, cryptoMod = crypto) {
       }
     }
     return true;
-  } catch (_e) {
+  } catch {
     return false;
   }
 }
@@ -115,7 +115,7 @@ function prepareRuntime(manifest, getAssetFn, deps = {}) {
         fsMod.mkdirSync(appDir, { recursive: true, mode: 0o700 });
       }
       tempBase = appDir;
-    } catch (_) {
+    } catch {
       // Fallback to tmpdir
     }
   }
@@ -137,7 +137,7 @@ function prepareRuntime(manifest, getAssetFn, deps = {}) {
       if (process.platform !== 'win32' && (stat.mode & 0o777) !== 0o700)
         return false;
       return true;
-    } catch (_) {
+    } catch {
       return false;
     }
   };
@@ -151,12 +151,12 @@ function prepareRuntime(manifest, getAssetFn, deps = {}) {
       } else {
         try {
           fsMod.rmSync(finalRuntimeDir, { recursive: true, force: true });
-        } catch (_) {}
+        } catch {}
       }
     } else {
       try {
         fsMod.rmSync(finalRuntimeDir, { recursive: true, force: true });
-      } catch (_) {}
+      } catch {}
     }
   }
 
@@ -202,7 +202,7 @@ function prepareRuntime(manifest, getAssetFn, deps = {}) {
           runtimeDir = finalRuntimeDir;
           try {
             fsMod.rmSync(setupDir, { recursive: true, force: true });
-          } catch (_) {}
+          } catch {}
         } else {
           throw renameErr;
         }
@@ -214,7 +214,7 @@ function prepareRuntime(manifest, getAssetFn, deps = {}) {
       );
       try {
         fsMod.rmSync(setupDir, { recursive: true, force: true });
-      } catch (_) {}
+      } catch {}
       process.exit(1);
     }
   }

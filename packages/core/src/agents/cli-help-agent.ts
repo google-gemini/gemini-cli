@@ -30,7 +30,7 @@ export const CliHelpAgent = (
   kind: 'local',
   displayName: 'CLI Help Agent',
   description:
-    'Specialized in answering questions about how users use you, (Gemini CLI): features, documentation, and current runtime configuration.',
+    'Specialized agent for answering questions about the Gemini CLI application. Invoke this agent for questions regarding CLI features, configuration schemas (e.g., policies), or instructions on how to create custom subagents. It queries internal documentation to provide accurate usage guidance.',
   inputConfig: {
     inputSchema: {
       type: 'object',

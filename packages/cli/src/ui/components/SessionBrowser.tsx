@@ -110,77 +110,16 @@ const SESSIONS_PER_PAGE = 20;
 // If the SessionItem layout changes, update this accordingly.
 const FIXED_SESSION_COLUMNS_WIDTH = 30;
 
-const Kbd = ({ name, shortcut }: { name: string; shortcut: string }) => (
-  <>
-    {name}: <Text bold>{shortcut}</Text>
-  </>
-);
-
+import {
+  SearchModeDisplay,
+  NavigationHelpDisplay,
+  NoResultsDisplay,
+} from './SessionBrowser/SessionBrowserNav.js';
+import { SessionListHeader } from './SessionBrowser/SessionListHeader.js';
 import { SessionBrowserLoading } from './SessionBrowser/SessionBrowserLoading.js';
 import { SessionBrowserError } from './SessionBrowser/SessionBrowserError.js';
 import { SessionBrowserEmpty } from './SessionBrowser/SessionBrowserEmpty.js';
-
 import { sortSessions, filterSessions } from './SessionBrowser/utils.js';
-
-/**
- * Search input display component.
- */
-const SearchModeDisplay = ({
-  state,
-}: {
-  state: SessionBrowserState;
-}): React.JSX.Element => (
-  <Box marginTop={1}>
-    <Text color={Colors.Gray}>Search: </Text>
-    <Text color={Colors.AccentPurple}>{state.searchQuery}</Text>
-    <Text color={Colors.Gray}> (Esc to cancel)</Text>
-  </Box>
-);
-
-/**
- * Header component showing session count and sort information.
- */
-const SessionListHeader = ({
-  state,
-}: {
-  state: SessionBrowserState;
-}): React.JSX.Element => (
-  <Box flexDirection="row" justifyContent="space-between">
-    <Text color={Colors.AccentPurple}>
-      Chat Sessions ({state.totalSessions} total
-      {state.searchQuery ? `, filtered` : ''})
-    </Text>
-    <Text color={Colors.Gray}>
-      sorted by {state.sortOrder} {state.sortReverse ? 'asc' : 'desc'}
-    </Text>
-  </Box>
-);
-
-/**
- * Navigation help component showing keyboard shortcuts.
- */
-const NavigationHelp = (): React.JSX.Element => (
-  <Box flexDirection="column">
-    <Text color={Colors.Gray}>
-      <Kbd name="Navigate" shortcut="↑/↓" />
-      {'   '}
-      <Kbd name="Resume" shortcut="Enter" />
-      {'   '}
-      <Kbd name="Search" shortcut="/" />
-      {'   '}
-      <Kbd name="Delete" shortcut="x" />
-      {'   '}
-      <Kbd name="Quit" shortcut="q" />
-    </Text>
-    <Text color={Colors.Gray}>
-      <Kbd name="Sort" shortcut="s" />
-      {'         '}
-      <Kbd name="Reverse" shortcut="r" />
-      {'      '}
-      <Kbd name="First/Last" shortcut="g/G" />
-    </Text>
-  </Box>
-);
 
 /**
  * Table header component with column labels and scroll indicators.
@@ -216,21 +155,6 @@ const SessionTableHeader = ({
         {state.searchQuery ? 'Match' : 'Name'}
       </Text>
     </Box>
-  </Box>
-);
-
-/**
- * No results display component for empty search results.
- */
-const NoResultsDisplay = ({
-  state,
-}: {
-  state: SessionBrowserState;
-}): React.JSX.Element => (
-  <Box marginTop={1}>
-    <Text color={Colors.Gray} dimColor>
-      No sessions found matching &apos;{state.searchQuery}&apos;.
-    </Text>
   </Box>
 );
 
@@ -398,7 +322,7 @@ const SessionList = ({
   <Box flexDirection="column">
     {/* Table Header */}
     <Box flexDirection="column">
-      {!state.isSearchMode && <NavigationHelp />}
+      {!state.isSearchMode && <NavigationHelpDisplay />}
       <SessionTableHeader state={state} />
     </Box>
 

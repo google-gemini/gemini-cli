@@ -1,0 +1,27 @@
+import { describe, expect } from 'vitest';
+import { appEvalTest } from './app-test-helper.js';
+
+describe('interactive_feature', () => {
+  // New tests MUST start as USUALLY_PASSES
+  appEvalTest('USUALLY_PASSES', {
+    name: 'should pause for user confirmation',
+    files: {
+      'package.json': JSON.stringify({ name: 'app' })
+    },
+    prompt: 'Task description here requiring approval',
+    timeout: 60000, 
+    setup: async (rig) => {
+      // ⚠️ Breakpoints are ONLY safe in appEvalTest
+      rig.setBreakpoint(['ask_user']);
+    },
+    assert: async (rig) => {
+      // 1. Wait for the breakpoint to trigger
+      const confirmation = await rig.waitForPendingConfirmation('ask_user');
+      expect(confirmation).toBeDefined();
+
+      // 2. Resolve it so the test can finish
+      await rig.resolveTool(confirmation);
+      await rig.waitForIdle();
+    },
+  });
+});

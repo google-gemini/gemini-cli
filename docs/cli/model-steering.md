@@ -4,9 +4,10 @@ Model steering lets you provide real-time guidance and feedback to Gemini CLI
 while it is actively executing a task. This lets you correct course, add missing
 context, or skip unnecessary steps without having to stop and restart the agent.
 
-> **Note:** This is a preview feature under active development. Preview features
-> may only be available in the **Preview** channel or may need to be enabled
-> under `/settings`.
+<!-- prettier-ignore -->
+> [!NOTE]
+> This is an experimental feature currently under active development and
+> may need to be enabled under `/settings`.
 
 Model steering is particularly useful during complex [Plan Mode](./plan-mode.md)
 workflows or long-running subagent executions where you want to ensure the agent
@@ -18,7 +19,7 @@ Model steering is an experimental feature and is disabled by default. You can
 enable it using the `/settings` command or by updating your `settings.json`
 file.
 
-1.  Type `/settings` in the Gemini CLI.
+1.  Type `/settings` in Gemini CLI.
 2.  Search for **Model Steering**.
 3.  Set the value to **true**.
 

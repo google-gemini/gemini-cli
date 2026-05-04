@@ -140,6 +140,31 @@ describe('getFsErrorMessage', () => {
         expected:
           'Too many open files in system. Close some unused files or applications.',
       },
+      {
+        code: 'ECONNRESET',
+        message: 'ECONNRESET: connection reset by peer',
+        expected:
+          'Connection reset by peer. The network connection was unexpectedly closed.',
+      },
+      {
+        code: 'ETIMEDOUT',
+        message: 'ETIMEDOUT: operation timed out',
+        expected:
+          'Operation timed out. The network connection or filesystem operation took too long.',
+      },
+      {
+        code: 'ENOTDIR',
+        message: 'ENOTDIR: not a directory',
+        path: '/some/file.txt/inner',
+        expected:
+          "Not a directory: '/some/file.txt/inner'. Check if the path is correct and that all parent components are directories.",
+      },
+      {
+        code: 'ENOTDIR',
+        message: 'ENOTDIR: not a directory',
+        expected:
+          'Not a directory. Check if the path is correct and that all parent components are directories.',
+      },
     ];
 
     it.each(testCases)(
