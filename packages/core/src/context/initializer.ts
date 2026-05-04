@@ -13,7 +13,7 @@ import { ContextEventBus } from './eventBus.js';
 import { ContextEnvironmentImpl } from './pipeline/environmentImpl.js';
 import { PipelineOrchestrator } from './pipeline/orchestrator.js';
 import { ContextManager } from './contextManager.js';
-import { debugLogger } from '../utils/debugLogger.js';
+// import { debugLogger } from '../utils/debugLogger.js';
 import { NodeTruncationProcessorOptionsSchema } from './processors/nodeTruncationProcessor.js';
 import { ToolMaskingProcessorOptionsSchema } from './processors/toolMaskingProcessor.js';
 import { HistoryTruncationProcessorOptionsSchema } from './processors/historyTruncationProcessor.js';
@@ -22,6 +22,7 @@ import { NodeDistillationProcessorOptionsSchema } from './processors/nodeDistill
 import { StateSnapshotProcessorOptionsSchema } from './processors/stateSnapshotProcessor.js';
 import { StateSnapshotAsyncProcessorOptionsSchema } from './processors/stateSnapshotAsyncProcessor.js';
 import { RollingSummaryProcessorOptionsSchema } from './processors/rollingSummaryProcessor.js';
+import { getEnvironmentContext } from '../utils/environmentContext.js';
 
 export async function initializeContextManager(
   config: Config,
@@ -29,10 +30,6 @@ export async function initializeContextManager(
   lastPromptId: string,
 ): Promise<ContextManager | undefined> {
   const isV1Enabled = config.getContextManagementConfig().enabled;
-  debugLogger.log(
-    `[initializer] called with enabled=${isV1Enabled}, GEMINI_CONTEXT_TRACE_DIR=${process.env['GEMINI_CONTEXT_TRACE_DIR']}`,
-  );
-
   if (!isV1Enabled) {
     return undefined;
   }
@@ -113,5 +110,9 @@ export async function initializeContextManager(
     tracer,
     orchestrator,
     chat.agentHistory,
+    async () => {
+      const parts = await getEnvironmentContext(config);
+      return { role: 'user', parts };
+    },
   );
 }

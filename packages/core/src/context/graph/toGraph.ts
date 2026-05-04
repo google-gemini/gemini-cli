@@ -5,294 +5,227 @@
  */
 
 import type { Content, Part } from '@google/genai';
-import type {
-  ConcreteNode,
-  Episode,
-  SemanticPart,
-  ToolExecution,
-  AgentThought,
-  AgentYield,
-  UserPrompt,
-} from './types.js';
-import type { ContextTokenCalculator } from '../utils/contextTokenCalculator.js';
-import { randomUUID } from 'node:crypto';
-import { isRecord } from '../../utils/markdownUtils.js';
+import { type ConcreteNode, NodeType } from './types.js';
+import { randomUUID, createHash } from 'node:crypto';
+import { debugLogger } from '../../utils/debugLogger.js';
 
-// We remove the global nodeIdentityMap and instead rely on one passed from ContextGraphMapper
-export function getStableId(
-  obj: object,
-  nodeIdentityMap: WeakMap<object, string>,
-): string {
-  let id = nodeIdentityMap.get(obj);
-  if (!id) {
-    id = randomUUID();
-    nodeIdentityMap.set(obj, id);
-  }
-  return id;
+interface PartWithSynthId extends Part {
+  _synthId?: string;
 }
 
-function isCompleteEpisode(ep: Partial<Episode>): ep is Episode {
+// Global WeakMap to cache hashes for Part objects.
+// This optimizes getStableId by avoiding redundant stringify/hash operations
+// on the same object instances across multiple management passes.
+const PART_HASH_CACHE = new WeakMap<object, string>();
+
+function isTextPart(part: Part): part is Part & { text: string } {
+  return typeof part.text === 'string';
+}
+
+function isInlineDataPart(
+  part: Part,
+): part is Part & { inlineData: { data: string } } {
   return (
-    typeof ep.id === 'string' &&
-    Array.isArray(ep.concreteNodes) &&
-    ep.concreteNodes.length > 0
+    typeof part.inlineData === 'object' &&
+    part.inlineData !== null &&
+    typeof part.inlineData.data === 'string'
   );
 }
 
-export class ContextGraphBuilder {
-  private episodes: Episode[] = [];
-  private currentEpisode: Partial<Episode> | null = null;
-  private pendingCallParts: Map<string, Part> = new Map();
-  private pendingCallPartsWithoutId: Part[] = [];
+function isFileDataPart(
+  part: Part,
+): part is Part & { fileData: { fileUri: string } } {
+  return (
+    typeof part.fileData === 'object' &&
+    part.fileData !== null &&
+    typeof part.fileData.fileUri === 'string'
+  );
+}
 
+function isFunctionCallPart(
+  part: Part,
+): part is Part & { functionCall: { id: string; name: string } } {
+  return (
+    typeof part.functionCall === 'object' &&
+    part.functionCall !== null &&
+    typeof part.functionCall.name === 'string'
+  );
+}
+
+function isFunctionResponsePart(
+  part: Part,
+): part is Part & { functionResponse: { id: string; name: string } } {
+  return (
+    typeof part.functionResponse === 'object' &&
+    part.functionResponse !== null &&
+    typeof part.functionResponse.name === 'string'
+  );
+}
+
+/**
+ * Generates a stable ID for an object reference using a WeakMap.
+ * Falls back to content-based hashing for Part-like objects to ensure
+ * stability across object re-creations (e.g. during history mapping).
+ */
+export function getStableId(
+  obj: object,
+  nodeIdentityMap: WeakMap<object, string>,
+  turnSalt: string = '',
+  partIdx: number = 0,
+): string {
+  let id = nodeIdentityMap.get(obj);
+  if (id) return id;
+
+  const cachedHash = PART_HASH_CACHE.get(obj);
+  if (cachedHash) {
+    id = `${cachedHash}_${turnSalt}_${partIdx}`;
+    nodeIdentityMap.set(obj, id);
+    return id;
+  }
+
+  const part = obj as PartWithSynthId;
+  let contentHash: string | undefined;
+
+  // If the object already has a synthetic ID property, use it.
+  if (typeof part._synthId === 'string') {
+    id = part._synthId;
+  } else if (isTextPart(part)) {
+    contentHash = createHash('sha256').update(part.text).digest('hex');
+    id = `text_${contentHash}_${turnSalt}_${partIdx}`;
+  } else if (isInlineDataPart(part)) {
+    contentHash = createHash('sha256')
+      .update(part.inlineData.data)
+      .digest('hex');
+    id = `media_${contentHash}_${turnSalt}_${partIdx}`;
+  } else if (isFileDataPart(part)) {
+    contentHash = createHash('sha256')
+      .update(part.fileData.fileUri)
+      .digest('hex');
+    id = `file_${contentHash}_${turnSalt}_${partIdx}`;
+  } else if (isFunctionCallPart(part)) {
+    contentHash = createHash('sha256')
+      .update(
+        `call:${part.functionCall.name}:${JSON.stringify(part.functionCall.args)}`,
+      )
+      .digest('hex');
+    id = `call_h_${contentHash}_${turnSalt}_${partIdx}`;
+  } else if (isFunctionResponsePart(part)) {
+    contentHash = createHash('sha256')
+      .update(
+        `resp:${part.functionResponse.name}:${JSON.stringify(part.functionResponse.response)}`,
+      )
+      .digest('hex');
+    id = `resp_h_${contentHash}_${turnSalt}_${partIdx}`;
+  }
+
+  if (contentHash) {
+    PART_HASH_CACHE.set(obj, contentHash);
+  }
+
+  if (!id) {
+    id = randomUUID();
+  }
+
+  nodeIdentityMap.set(obj, id);
+  return id;
+}
+
+/**
+ * Builds a 1:1 Mirror Graph from Chat History.
+ * Every Part in history is mapped to exactly one ConcreteNode.
+ */
+export class ContextGraphBuilder {
   constructor(
-    private readonly tokenCalculator: ContextTokenCalculator,
     private readonly nodeIdentityMap: WeakMap<object, string> = new WeakMap(),
   ) {}
 
-  clear() {
-    this.episodes = [];
-    this.currentEpisode = null;
-    this.pendingCallParts.clear();
-    this.pendingCallPartsWithoutId = [];
-  }
+  processHistory(history: readonly Content[]): ConcreteNode[] {
+    const nodes: ConcreteNode[] = [];
 
-  processHistory(history: readonly Content[]) {
-    const finalizeEpisode = () => {
-      if (this.currentEpisode && isCompleteEpisode(this.currentEpisode)) {
-        this.episodes.push(this.currentEpisode);
-      }
-      this.currentEpisode = null;
-    };
+    // Tracks occurrences of identical turn content to ensure unique stable IDs
+    const seenHashes = new Map<string, number>();
 
-    for (const msg of history) {
+    for (let turnIdx = 0; turnIdx < history.length; turnIdx++) {
+      const msg = history[turnIdx];
       if (!msg.parts) continue;
 
-      if (msg.role === 'user') {
-        const hasToolResponses = msg.parts.some((p) => !!p.functionResponse);
-        const hasUserParts = msg.parts.some(
-          (p) => !!p.text || !!p.inlineData || !!p.fileData,
-        );
-
-        if (hasToolResponses) {
-          this.currentEpisode = parseToolResponses(
-            msg,
-            this.currentEpisode,
-            this.pendingCallParts,
-            this.pendingCallPartsWithoutId,
-            this.tokenCalculator,
-            this.nodeIdentityMap,
+      // Defensive: Skip legacy environment header if it's the first turn.
+      // We now manage this as an orthogonal late-addition header.
+      if (turnIdx === 0 && msg.role === 'user' && msg.parts.length === 1) {
+        const text = msg.parts[0].text;
+        if (
+          text?.startsWith('<session_context>') &&
+          text?.includes('This is the Gemini CLI.')
+        ) {
+          debugLogger.log(
+            '[ContextGraphBuilder] Skipping legacy environment header turn from graph.',
           );
+          continue;
         }
+      }
 
-        if (hasUserParts) {
-          finalizeEpisode();
-          this.currentEpisode = parseUserParts(msg, this.nodeIdentityMap);
+      // Generate a stable salt for this turn based on its role and content
+      const turnContent = JSON.stringify(msg.parts);
+      const h = createHash('md5')
+        .update(`${msg.role}:${turnContent}`)
+        .digest('hex');
+      const occurrence = (seenHashes.get(h) || 0) + 1;
+      seenHashes.set(h, occurrence);
+      const turnSalt = `${h}_${occurrence}`;
+      const turnId = getStableId(msg, this.nodeIdentityMap, turnSalt, -1);
+
+      if (msg.role === 'user') {
+        for (let partIdx = 0; partIdx < msg.parts.length; partIdx++) {
+          const part = msg.parts[partIdx];
+          const apiId =
+            isFunctionResponsePart(part) &&
+            typeof part.functionResponse.id === 'string'
+              ? `resp_${part.functionResponse.id}_${turnSalt}_${partIdx}`
+              : isFunctionCallPart(part) &&
+                  typeof part.functionCall.id === 'string'
+                ? `call_${part.functionCall.id}_${turnSalt}_${partIdx}`
+                : undefined;
+          const id =
+            apiId || getStableId(part, this.nodeIdentityMap, turnSalt, partIdx);
+          const node: ConcreteNode = {
+            id,
+            timestamp: Date.now(),
+            type: isFunctionResponsePart(part)
+              ? NodeType.TOOL_EXECUTION
+              : NodeType.USER_PROMPT,
+            role: 'user',
+            payload: part,
+            turnId,
+          };
+          nodes.push(node);
         }
       } else if (msg.role === 'model') {
-        this.currentEpisode = parseModelParts(
-          msg,
-          this.currentEpisode,
-          this.pendingCallParts,
-          this.pendingCallPartsWithoutId,
-          this.nodeIdentityMap,
-        );
-      }
-    }
-  }
-
-  getNodes(): ConcreteNode[] {
-    const copy = [...this.episodes];
-    if (this.currentEpisode) {
-      const activeEp = {
-        ...this.currentEpisode,
-        concreteNodes: [...(this.currentEpisode.concreteNodes || [])],
-      };
-      finalizeYield(activeEp);
-      if (isCompleteEpisode(activeEp)) {
-        copy.push(activeEp);
-      }
-    }
-
-    const nodes: ConcreteNode[] = [];
-    for (const ep of copy) {
-      if (ep.concreteNodes) {
-        for (const child of ep.concreteNodes) {
-          nodes.push(child);
+        for (let partIdx = 0; partIdx < msg.parts.length; partIdx++) {
+          const part = msg.parts[partIdx];
+          const apiId =
+            isFunctionCallPart(part) && typeof part.functionCall.id === 'string'
+              ? `call_${part.functionCall.id}_${turnSalt}_${partIdx}`
+              : undefined;
+          const id =
+            apiId || getStableId(part, this.nodeIdentityMap, turnSalt, partIdx);
+          const node: ConcreteNode = {
+            id,
+            timestamp: Date.now(),
+            type: isFunctionCallPart(part)
+              ? NodeType.TOOL_EXECUTION
+              : NodeType.AGENT_THOUGHT,
+            role: 'model',
+            payload: part,
+            turnId,
+          };
+          nodes.push(node);
         }
       }
     }
+
+    debugLogger.log(
+      `[ContextGraphBuilder] Mirror Graph built with ${nodes.length} nodes.`,
+    );
     return nodes;
-  }
-}
-
-function parseToolResponses(
-  msg: Content,
-  currentEpisode: Partial<Episode> | null,
-  pendingCallParts: Map<string, Part>,
-  pendingCallPartsWithoutId: Part[],
-  tokenCalculator: ContextTokenCalculator,
-  nodeIdentityMap: WeakMap<object, string>,
-): Partial<Episode> {
-  if (!currentEpisode) {
-    currentEpisode = {
-      id: getStableId(msg, nodeIdentityMap),
-
-      concreteNodes: [],
-    };
-  }
-
-  const parts = msg.parts || [];
-  for (const part of parts) {
-    if (part.functionResponse) {
-      const callId = part.functionResponse.id || '';
-      let matchingCall = pendingCallParts.get(callId);
-
-      if (!matchingCall && pendingCallPartsWithoutId.length > 0) {
-        const idx = pendingCallPartsWithoutId.findIndex(
-          (p) => p.functionCall?.name === part.functionResponse!.name,
-        );
-        if (idx !== -1) {
-          matchingCall = pendingCallPartsWithoutId[idx];
-          pendingCallPartsWithoutId.splice(idx, 1);
-        } else {
-          matchingCall = pendingCallPartsWithoutId.shift();
-        }
-      }
-
-      const intentTokens = matchingCall
-        ? tokenCalculator.estimateTokensForParts([matchingCall])
-        : 0;
-      const obsTokens = tokenCalculator.estimateTokensForParts([part]);
-
-      const step: ToolExecution = {
-        id: getStableId(part, nodeIdentityMap),
-        timestamp: Date.now(),
-        type: 'TOOL_EXECUTION',
-        toolName: part.functionResponse.name || 'unknown',
-        intent: isRecord(matchingCall?.functionCall?.args)
-          ? matchingCall.functionCall.args
-          : {},
-        observation: isRecord(part.functionResponse.response)
-          ? part.functionResponse.response
-          : {},
-        tokens: {
-          intent: intentTokens,
-          observation: obsTokens,
-        },
-      };
-
-      currentEpisode.concreteNodes = [
-        ...(currentEpisode.concreteNodes || []),
-        step,
-      ];
-      if (callId) pendingCallParts.delete(callId);
-    }
-  }
-  return currentEpisode;
-}
-
-function parseUserParts(
-  msg: Content,
-  nodeIdentityMap: WeakMap<object, string>,
-): Partial<Episode> {
-  const semanticParts: SemanticPart[] = [];
-  const parts = msg.parts || [];
-  for (const p of parts) {
-    if (p.text !== undefined)
-      semanticParts.push({ type: 'text', text: p.text });
-    else if (p.inlineData)
-      semanticParts.push({
-        type: 'inline_data',
-        mimeType: p.inlineData.mimeType || '',
-        data: p.inlineData.data || '',
-      });
-    else if (p.fileData)
-      semanticParts.push({
-        type: 'file_data',
-        mimeType: p.fileData.mimeType || '',
-        fileUri: p.fileData.fileUri || '',
-      });
-    else if (!p.functionResponse)
-      semanticParts.push({ type: 'raw_part', part: p }); // Preserve unknowns
-  }
-
-  const baseObj = parts.length > 0 ? parts[0] : msg;
-  const trigger: UserPrompt = {
-    id: getStableId(baseObj, nodeIdentityMap),
-    timestamp: Date.now(),
-    type: 'USER_PROMPT',
-    semanticParts,
-  };
-  return {
-    id: getStableId(msg, nodeIdentityMap),
-
-    concreteNodes: [trigger],
-  };
-}
-
-function parseModelParts(
-  msg: Content,
-  currentEpisode: Partial<Episode> | null,
-  pendingCallParts: Map<string, Part>,
-  pendingCallPartsWithoutId: Part[],
-  nodeIdentityMap: WeakMap<object, string>,
-): Partial<Episode> {
-  if (!currentEpisode) {
-    currentEpisode = {
-      id: getStableId(msg, nodeIdentityMap),
-
-      concreteNodes: [],
-    };
-  }
-
-  const parts = msg.parts || [];
-  for (const part of parts) {
-    if (part.functionCall) {
-      const callId = part.functionCall.id || '';
-      if (callId) {
-        pendingCallParts.set(callId, part);
-      } else {
-        const lastIdx = pendingCallPartsWithoutId.length - 1;
-        const lastPart = pendingCallPartsWithoutId[lastIdx];
-
-        if (
-          lastPart &&
-          lastPart.functionCall &&
-          lastPart.functionCall.name === part.functionCall.name
-        ) {
-          // Replace the previous chunk with the more complete one
-          pendingCallPartsWithoutId[lastIdx] = part;
-        } else {
-          pendingCallPartsWithoutId.push(part);
-        }
-      }
-    } else if (part.text) {
-      const thought: AgentThought = {
-        id: getStableId(part, nodeIdentityMap),
-        timestamp: Date.now(),
-        type: 'AGENT_THOUGHT',
-        text: part.text,
-      };
-
-      currentEpisode.concreteNodes = [
-        ...(currentEpisode.concreteNodes || []),
-        thought,
-      ];
-    }
-  }
-  return currentEpisode;
-}
-
-function finalizeYield(currentEpisode: Partial<Episode>) {
-  if (currentEpisode.concreteNodes && currentEpisode.concreteNodes.length > 0) {
-    const yieldNode: AgentYield = {
-      id: randomUUID(),
-      timestamp: Date.now(),
-      type: 'AGENT_YIELD',
-      text: 'Yield', // Synthesized yield since we don't have the original concrete node
-    };
-    const existingNodes = currentEpisode.concreteNodes || [];
-    currentEpisode.concreteNodes = [...existingNodes, yieldNode];
   }
 }

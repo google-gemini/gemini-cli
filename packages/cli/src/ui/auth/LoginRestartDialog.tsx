@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -10,15 +10,17 @@ import { theme } from '../semantic-colors.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { relaunchApp } from '../../utils/processUtils.js';
 
-interface LoginWithGoogleRestartDialogProps {
+interface LoginRestartDialogProps {
   onDismiss: () => void;
   config: Config;
+  message?: string;
 }
 
-export const LoginWithGoogleRestartDialog = ({
+export const LoginRestartDialog = ({
   onDismiss,
   config,
-}: LoginWithGoogleRestartDialogProps) => {
+  message,
+}: LoginRestartDialogProps) => {
   useKeypress(
     (key) => {
       if (key.name === 'escape') {
@@ -44,14 +46,20 @@ export const LoginWithGoogleRestartDialog = ({
     { isActive: true },
   );
 
-  const message =
+  const displayMessage =
+    message ??
     "You've successfully signed in with Google. Gemini CLI needs to be restarted.";
 
   return (
-    <Box borderStyle="round" borderColor={theme.status.warning} paddingX={1}>
+    <Box
+      borderStyle="round"
+      borderColor={theme.status.warning}
+      paddingX={1}
+      flexDirection="column"
+    >
+      <Text color={theme.status.warning}>{displayMessage}</Text>
       <Text color={theme.status.warning}>
-        {message} Press R to restart, or Esc to choose a different
-        authentication method.
+        Press R to restart, or Esc to choose a different authentication method.
       </Text>
     </Box>
   );

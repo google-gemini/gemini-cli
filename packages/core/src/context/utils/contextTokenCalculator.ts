@@ -4,8 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Part } from '@google/genai';
-import { estimateTokenCountSync } from '../../utils/tokenCalculation.js';
+import type { Part, Content } from '@google/genai';
+import {
+  estimateTokenCountSync,
+  MSG_OVERHEAD_TOKENS,
+} from '../../utils/tokenCalculation.js';
 import type { ConcreteNode } from '../graph/types.js';
 import type { NodeBehaviorRegistry } from '../graph/behaviorRegistry.js';
 
@@ -74,15 +77,104 @@ export class ContextTokenCalculator {
   }
 
   /**
+   * Calculates a detailed breakdown of tokens by category for a list of nodes.
+   * Useful for calibration tracing and debugging overestimation.
+   */
+  calculateTokenBreakdown(nodes: readonly ConcreteNode[]): {
+    total: number;
+    text: number;
+    media: number;
+    tool: number;
+    overhead: number;
+  } {
+    const breakdown = { total: 0, text: 0, media: 0, tool: 0, overhead: 0 };
+    const seenIds = new Set<string>();
+    const seenTurnIds = new Set<string>();
+
+    for (const node of nodes) {
+      if (seenIds.has(node.id)) continue;
+      seenIds.add(node.id);
+
+      if (node.turnId) {
+        if (!seenTurnIds.has(node.turnId)) {
+          seenTurnIds.add(node.turnId);
+          breakdown.overhead += MSG_OVERHEAD_TOKENS;
+          breakdown.total += MSG_OVERHEAD_TOKENS;
+        }
+      }
+
+      const cost = this.getTokenCost(node);
+      breakdown.total += cost;
+
+      const behavior = this.registry.get(node.type);
+      const parts = behavior.getEstimatableParts(node);
+
+      for (const part of parts) {
+        if (typeof part.text === 'string') {
+          breakdown.text += estimateTokenCountSync(
+            [part],
+            0,
+            this.charsPerToken,
+          );
+        } else if (
+          part.inlineData?.mimeType?.startsWith('image/') ||
+          part.fileData?.mimeType?.startsWith('image/')
+        ) {
+          breakdown.media += estimateTokenCountSync(
+            [part],
+            0,
+            this.charsPerToken,
+          );
+        } else if (part.functionCall || part.functionResponse) {
+          breakdown.tool += estimateTokenCountSync(
+            [part],
+            0,
+            this.charsPerToken,
+          );
+        } else {
+          breakdown.overhead += estimateTokenCountSync(
+            [part],
+            0,
+            this.charsPerToken,
+          );
+        }
+      }
+    }
+    return breakdown;
+  }
+
+  /**
    * Fast calculation for a flat array of ConcreteNodes (The Nodes).
    * It relies entirely on the O(1) sidecar token cache.
    */
   calculateConcreteListTokens(nodes: readonly ConcreteNode[]): number {
     let tokens = 0;
+    const seenIds = new Set<string>();
+    const seenTurnIds = new Set<string>();
+
     for (const node of nodes) {
-      tokens += this.getTokenCost(node);
+      if (!seenIds.has(node.id)) {
+        seenIds.add(node.id);
+        tokens += this.getTokenCost(node);
+
+        if (node.turnId) {
+          if (!seenTurnIds.has(node.turnId)) {
+            seenTurnIds.add(node.turnId);
+            tokens += MSG_OVERHEAD_TOKENS;
+          }
+        }
+      }
     }
     return tokens;
+  }
+
+  /**
+   * Calculates the token cost for a single Gemini Content object.
+   */
+  calculateContentTokens(content: Content): number {
+    return (
+      this.estimateTokensForParts(content.parts || []) + MSG_OVERHEAD_TOKENS
+    );
   }
 
   /**

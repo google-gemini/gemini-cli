@@ -73,69 +73,24 @@ export function createNodeTruncationProcessor(
       const returnedNodes: ConcreteNode[] = [];
 
       for (const node of targets) {
-        switch (node.type) {
-          case 'USER_PROMPT': {
-            let modified = false;
-            const newParts = [...node.semanticParts];
+        const payload = node.payload;
+        const text = payload.text;
 
-            for (let j = 0; j < node.semanticParts.length; j++) {
-              const part = node.semanticParts[j];
-              if (part.type === 'text') {
-                const squashResult = tryApplySquash(part.text, limitChars);
-                if (squashResult) {
-                  newParts[j] = { type: 'text', text: squashResult.text };
-                  modified = true;
-                }
-              }
-            }
-
-            if (modified) {
-              returnedNodes.push({
-                ...node,
-                id: randomUUID(),
-                semanticParts: newParts,
-                replacesId: node.id,
-              });
-            } else {
-              returnedNodes.push(node);
-            }
-            break;
+        if (text) {
+          const squashResult = tryApplySquash(text, limitChars);
+          if (squashResult) {
+            returnedNodes.push({
+              ...node,
+              id: randomUUID(),
+              payload: { ...payload, text: squashResult.text },
+              replacesId: node.id,
+              turnId: node.turnId,
+            });
+            continue;
           }
-
-          case 'AGENT_THOUGHT': {
-            const squashResult = tryApplySquash(node.text, limitChars);
-            if (squashResult) {
-              returnedNodes.push({
-                ...node,
-                id: randomUUID(),
-                text: squashResult.text,
-                replacesId: node.id,
-              });
-            } else {
-              returnedNodes.push(node);
-            }
-            break;
-          }
-
-          case 'AGENT_YIELD': {
-            const squashResult = tryApplySquash(node.text, limitChars);
-            if (squashResult) {
-              returnedNodes.push({
-                ...node,
-                id: randomUUID(),
-                text: squashResult.text,
-                replacesId: node.id,
-              });
-            } else {
-              returnedNodes.push(node);
-            }
-            break;
-          }
-
-          default:
-            returnedNodes.push(node);
-            break;
         }
+
+        returnedNodes.push(node);
       }
 
       return returnedNodes;

@@ -48,7 +48,9 @@ import {
 } from '../telemetry/types.js';
 import { handleFallback } from '../fallback/handler.js';
 import { isFunctionResponse } from '../utils/messageInspectors.js';
+import { scrubHistory } from '../utils/historyHardening.js';
 import { partListUnionToString } from './geminiRequest.js';
+import { BINARY_INJECTION_KEY } from '../utils/generateContentResponseUtilities.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
 import { estimateTokenCountSync } from '../utils/tokenCalculation.js';
 import {
@@ -57,6 +59,7 @@ import {
 } from '../availability/policyHelpers.js';
 import { coreEvents } from '../utils/events.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 export enum StreamEventType {
   /** A regular content chunk from the API. */
@@ -95,6 +98,18 @@ const MID_STREAM_RETRY_OPTIONS: MidStreamRetryOptions = {
 };
 
 export const SYNTHETIC_THOUGHT_SIGNATURE = 'skip_thought_signature_validator';
+
+/**
+ * Internal interface for parts that carry the magic 'callIndex' property
+ * used during model response consolidation.
+ */
+interface IndexedPart extends Part {
+  callIndex?: number;
+}
+
+function isIndexedPart(part: Part): part is IndexedPart {
+  return 'callIndex' in part;
+}
 
 /**
  * Returns true if the response is valid, false otherwise.
@@ -250,10 +265,11 @@ export class GeminiChat {
   private sendPromise: Promise<void> = Promise.resolve();
   private readonly chatRecordingService: ChatRecordingService;
   private lastPromptTokenCount: number;
+  private callCounter = 0;
   agentHistory: AgentChatHistory;
 
   constructor(
-    private readonly context: AgentLoopContext,
+    readonly context: AgentLoopContext,
     private systemInstruction: string = '',
     private tools: Tool[] = [],
     history: Content[] = [],
@@ -321,7 +337,7 @@ export class GeminiChat {
     });
     this.sendPromise = streamDonePromise;
 
-    const userContent = createUserContent(message);
+    let userContent = createUserContent(message);
     const { model } =
       this.context.config.modelConfigService.getResolvedConfig(modelConfigKey);
 
@@ -351,6 +367,30 @@ export class GeminiChat {
     }
 
     // Add user content to history ONCE before any attempts.
+    const binaryInjections = this.extractBinaryInjections(userContent.parts);
+    if (binaryInjections) {
+      // Turn 1: The original tool response (now cleaned)
+      this.agentHistory.push(userContent);
+
+      // Turn 2: Synthetic Model Acknowledgment
+      this.agentHistory.push({
+        role: 'model',
+        parts: [
+          {
+            text: 'Binary content received. Proceeding with analysis.',
+            thought: true,
+            thoughtSignature: SYNTHETIC_THOUGHT_SIGNATURE,
+          },
+        ],
+      });
+
+      // Turn 3: The actual binary data (becomes the current request message)
+      userContent = {
+        role: 'user',
+        parts: binaryInjections,
+      };
+    }
+
     this.agentHistory.push(userContent);
     const requestContents = this.getHistory(true);
 
@@ -424,11 +464,13 @@ export class GeminiChat {
             );
 
             const isContentError = error instanceof InvalidStreamError;
+            const isRetryableContentError =
+              isContentError && error.type !== 'NO_RESPONSE_TEXT';
             const errorType = isContentError
               ? error.type
               : getRetryErrorType(error);
 
-            if (isContentError || (isRetryable && !signal.aborted)) {
+            if (isRetryableContentError || (isRetryable && !signal.aborted)) {
               // The issue requests exactly 3 retries (4 attempts) for API errors during stream iteration.
               // Regardless of the global maxAttempts (e.g. 10), we only want to retry these mid-stream API errors
               // up to 3 times before finally throwing the error to the user.
@@ -493,6 +535,32 @@ export class GeminiChat {
     return streamWithRetries.call(this);
   }
 
+  private extractBinaryInjections(
+    parts: Part[] | undefined,
+  ): Part[] | undefined {
+    if (!parts) {
+      return undefined;
+    }
+
+    const binaryInjections: Part[] = [];
+
+    for (const part of parts) {
+      const response = part.functionResponse?.response;
+
+      if (response && BINARY_INJECTION_KEY in response) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        const binaryParts = response[BINARY_INJECTION_KEY] as Part[];
+        delete response[BINARY_INJECTION_KEY];
+
+        if (Array.isArray(binaryParts)) {
+          binaryInjections.push(...binaryParts);
+        }
+      }
+    }
+
+    return binaryInjections.length > 0 ? binaryInjections : undefined;
+  }
+
   private async makeApiCallAndProcessStream(
     modelConfigKey: ModelConfigKey,
     requestContents: readonly Content[],
@@ -500,8 +568,14 @@ export class GeminiChat {
     abortSignal: AbortSignal,
     role: LlmRole,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
+    // Last mile scrubbing to remove internal tracking properties (e.g. callIndex)
+    // before sending to the Gemini API. This whitelists only standard Gemini fields.
+    const scrubbedContents = this.context.config.isContextManagementEnabled()
+      ? scrubHistory([...requestContents])
+      : [...requestContents];
+
     const contentsForPreviewModel =
-      this.ensureActiveLoopHasThoughtSignatures(requestContents);
+      this.ensureActiveLoopHasThoughtSignatures(scrubbedContents);
 
     // Track final request parameters for AfterModel hooks
     const {
@@ -770,8 +844,11 @@ export class GeminiChat {
     this.agentHistory.push(content);
   }
 
-  setHistory(history: readonly Content[]): void {
-    this.agentHistory.set(history);
+  setHistory(
+    history: readonly Content[],
+    options: { silent?: boolean } = {},
+  ): void {
+    this.agentHistory.set(history, options);
     this.lastPromptTokenCount = estimateTokenCountSync(
       this.agentHistory.flatMap((c) => c.parts || []),
     );
@@ -890,7 +967,12 @@ export class GeminiChat {
     let finishReason: FinishReason | undefined;
 
     // The SDK provides fully assembled FunctionCall objects in chunk.functionCalls
-    const finalFunctionCalls: FunctionCall[] = [];
+    // We use a Map to ensure we only keep the latest version of each call (by ID)
+    const finalFunctionCallsMap = new Map<string, FunctionCall>();
+    const legacyFunctionCalls: FunctionCall[] = [];
+
+    // Map to track synthetic IDs assigned to each call index across chunks
+    const callIndexToId = new Map<number, string>();
 
     for await (const chunk of streamResponse) {
       const candidateWithReason = chunk?.candidates?.find(
@@ -902,9 +984,26 @@ export class GeminiChat {
       }
 
       if (chunk.functionCalls && chunk.functionCalls.length > 0) {
-        finalFunctionCalls.push(...chunk.functionCalls);
+        if (this.context.config.isContextManagementEnabled()) {
+          for (let i = 0; i < chunk.functionCalls.length; i++) {
+            const fnCall = chunk.functionCalls[i];
+            if (!fnCall.id) {
+              let id = callIndexToId.get(i);
+              if (!id) {
+                id = `synth_${this.context.promptId}_${Date.now()}_${this.callCounter++}`;
+                callIndexToId.set(i, id);
+                debugLogger.log(
+                  `[GeminiChat] Assigned synthetic ID: ${id} to tool at index ${i}: ${fnCall.name}`,
+                );
+              }
+              fnCall.id = id;
+            }
+            finalFunctionCallsMap.set(fnCall.id, fnCall);
+          }
+        } else {
+          legacyFunctionCalls.push(...chunk.functionCalls);
+        }
       }
-
       if (isValidResponse(chunk)) {
         const content = chunk.candidates?.[0]?.content;
         if (content?.parts) {
@@ -918,7 +1017,19 @@ export class GeminiChat {
           }
 
           modelResponseParts.push(
-            ...content.parts.filter((part) => !part.thought),
+            ...content.parts
+              .filter((part) => !part.thought)
+              .map((part) => {
+                if (!this.context.config.isContextManagementEnabled()) {
+                  return part;
+                }
+                return {
+                  ...part,
+                  callIndex: chunk.functionCalls?.findIndex(
+                    (fc) => fc.name === part.functionCall?.name,
+                  ),
+                };
+              }),
           );
         }
       }
@@ -959,27 +1070,23 @@ export class GeminiChat {
 
     // String thoughts and consolidate text parts.
     const consolidatedParts: Part[] = [];
+    const finalFunctionCalls = this.context.config.isContextManagementEnabled()
+      ? Array.from(finalFunctionCallsMap.values())
+      : legacyFunctionCalls;
 
+    let currentCallSourceIndex = -1;
     if (this.context.config.isContextManagementEnabled()) {
+      debugLogger.log(
+        `[GeminiChat] Starting consolidation for ${modelResponseParts.length} raw parts and ${finalFunctionCalls.length} assembled function calls.`,
+      );
       for (const part of modelResponseParts) {
         if (part.functionCall) {
-          // Skip partial functionCall stream chunks! We will replace them
-          // entirely with the pristine, fully assembled objects from the SDK
-          // (finalFunctionCalls) immediately below. We only push the very first
-          // partial chunk of a sequence as a placeholder so we know *where*
-          // in the sequence of parts the tool call happened.
-          const lastPart = consolidatedParts[consolidatedParts.length - 1];
-          const currentId = part.functionCall.id;
-          const lastId = lastPart?.functionCall?.id;
-
+          const partIndex = isIndexedPart(part) ? part.callIndex : undefined;
           const isNewCall =
-            !lastPart?.functionCall ||
-            (currentId !== undefined &&
-              lastId !== undefined &&
-              currentId !== lastId) ||
-            lastPart.functionCall.name !== part.functionCall.name;
+            partIndex !== undefined && partIndex > currentCallSourceIndex;
 
           if (isNewCall) {
+            currentCallSourceIndex = partIndex;
             consolidatedParts.push({ ...part }); // Push placeholder
           }
         } else {
