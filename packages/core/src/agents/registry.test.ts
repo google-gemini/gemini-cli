@@ -5,6 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import * as crypto from 'node:crypto';
 import {
   AgentRegistry,
   getModelConfigAlias,
@@ -459,17 +460,21 @@ describe('AgentRegistry', () => {
 
       await registry.initialize();
 
-      // Verify ackService was called with the URL, not the file hash
+      const expectedHash = crypto
+        .createHash('sha256')
+        .update('https://example.com/card')
+        .digest('hex');
+
+      // Verify ackService was called with the hashed URL
       expect(ackService.isAcknowledged).toHaveBeenCalledWith(
         expect.anything(),
         'RemoteAgent',
-        'https://example.com/card',
+        expectedHash,
       );
 
-      // Also verify that the agent's metadata was updated to use the URL as hash
-      // Use getDefinition because registerAgent might have been called
+      // Also verify that the agent's metadata was updated to use the hashed URL
       expect(registry.getDefinition('RemoteAgent')?.metadata?.hash).toBe(
-        'https://example.com/card',
+        expectedHash,
       );
     });
   });

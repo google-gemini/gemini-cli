@@ -90,15 +90,21 @@ export class AgentRegistry {
 
     this.config.getA2AClientManager()?.clearCache();
     await this.config.reloadAgents();
-    this.agents.clear();
-    this.allDefinitions.clear();
     await this.loadAgents(reloadErrors);
 
     const currentAgents = Array.from(this.agents.values());
     const newAgents: string[] = [];
     const updatedAgents: string[] = [];
+    let localCount = 0;
+    let remoteCount = 0;
 
     for (const agent of currentAgents) {
+      if (agent.kind === 'local') {
+        localCount++;
+      } else if (agent.kind === 'remote') {
+        remoteCount++;
+      }
+
       const prev = previousAgents.get(agent.name);
       if (!prev) {
         newAgents.push(agent.name);
@@ -111,8 +117,8 @@ export class AgentRegistry {
 
     return {
       totalLoaded: currentAgents.length,
-      localCount: currentAgents.filter((a) => a.kind === 'local').length,
-      remoteCount: currentAgents.filter((a) => a.kind === 'remote').length,
+      localCount,
+      remoteCount,
       newAgents,
       updatedAgents,
       errors: reloadErrors,
@@ -169,6 +175,7 @@ export class AgentRegistry {
     await Promise.allSettled(
       userAgents.agents.map(async (agent) => {
         try {
+          this.ensureRemoteAgentHash(agent);
           await this.registerAgent(agent, errors);
         } catch (e) {
           const msg = `Error registering user agent "${agent.name}": ${e instanceof Error ? e.message : String(e)}`;
@@ -198,21 +205,7 @@ export class AgentRegistry {
       const agentsToRegister: AgentDefinition[] = [];
 
       for (const agent of projectAgents.agents) {
-        // If it's a remote agent, use the agentCardUrl as the hash.
-        // This allows multiple remote agents in a single file to be tracked independently.
-        if (agent.kind === 'remote') {
-          if (!agent.metadata) {
-            agent.metadata = {};
-          }
-          agent.metadata.hash =
-            agent.agentCardUrl ??
-            (agent.agentCardJson
-              ? crypto
-                  .createHash('sha256')
-                  .update(agent.agentCardJson)
-                  .digest('hex')
-              : undefined);
-        }
+        this.ensureRemoteAgentHash(agent);
 
         if (!agent.metadata?.hash) {
           agentsToRegister.push(agent);
@@ -721,5 +714,28 @@ export class AgentRegistry {
    */
   getDiscoveredDefinition(name: string): AgentDefinition | undefined {
     return this.allDefinitions.get(name);
+  }
+
+  /**
+   * Ensures that remote agents have a content-based hash for trust verification and change detection.
+   */
+  private ensureRemoteAgentHash(agent: AgentDefinition): void {
+    if (agent.kind !== 'remote') {
+      return;
+    }
+
+    if (!agent.metadata) {
+      agent.metadata = {};
+    }
+
+    // Use a cryptographic hash of the agent card's pointer (URL or JSON content)
+    // for consistent trust verification and change detection.
+    const contentToHash = agent.agentCardUrl ?? agent.agentCardJson;
+    if (contentToHash) {
+      agent.metadata.hash = crypto
+        .createHash('sha256')
+        .update(contentToHash)
+        .digest('hex');
+    }
   }
 }
