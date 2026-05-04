@@ -2030,6 +2030,16 @@ const SETTINGS_SCHEMA = {
         items: { type: 'string' },
         mergeStrategy: MergeStrategy.UNION,
       },
+      ignoreLocalEnv: {
+        type: 'boolean',
+        label: 'Ignore Local .env',
+        category: 'Advanced',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Whether to ignore generic .env files in the project directory.',
+        showInDialog: true,
+      },
       bugCommand: {
         type: 'object',
         label: 'Bug Command',
