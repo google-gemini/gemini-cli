@@ -77,4 +77,38 @@ describe('Fallback Integration', () => {
     // 5. Expect it to fallback to Flash (because Gemini 3 uses PREVIEW_CHAIN)
     expect(result.model).toBe(PREVIEW_GEMINI_FLASH_MODEL);
   });
+
+  it('should fallback to Flash after failures and restore Pro on next turn', () => {
+    const requestedModel = PREVIEW_GEMINI_MODEL;
+
+    // 1. Initial call should return Pro with 3 attempts
+    const result1 = applyModelSelection(config, {
+      model: requestedModel,
+      isChatModel: true,
+    });
+    expect(result1.model).toBe(PREVIEW_GEMINI_MODEL);
+    expect(result1.maxAttempts).toBe(3);
+
+    // 2. Simulate failure and transition to sticky_retry with consumed=true
+    availabilityService.markRetryOncePerTurn(PREVIEW_GEMINI_MODEL, 3);
+    availabilityService.consumeStickyAttempt(PREVIEW_GEMINI_MODEL);
+
+    // 3. Next call in same turn should fallback to Flash
+    const result2 = applyModelSelection(config, {
+      model: requestedModel,
+      isChatModel: true,
+    });
+    expect(result2.model).toBe(PREVIEW_GEMINI_FLASH_MODEL);
+
+    // 4. Reset turn (start of new interaction)
+    availabilityService.resetTurn();
+
+    // 5. Next call should restore Pro with 3 attempts
+    const result3 = applyModelSelection(config, {
+      model: requestedModel,
+      isChatModel: true,
+    });
+    expect(result3.model).toBe(PREVIEW_GEMINI_MODEL);
+    expect(result3.maxAttempts).toBe(3);
+  });
 });
