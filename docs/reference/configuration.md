@@ -1774,7 +1774,9 @@ their corresponding top-level category object in your `settings.json` file.
   - **Values:** `"push-to-talk"`, `"toggle"`
 
 - **`experimental.voice.backend`** (enum):
-  - **Description:** The backend to use for voice transcription.
+  - **Description:** The backend to use for voice transcription. Note: When
+    using the Gemini Live backend, voice recordings are sent to Google Cloud for
+    transcription.
   - **Default:** `"gemini-live"`
   - **Values:** `"gemini-live"`, `"whisper"`
 
