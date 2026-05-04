@@ -364,5 +364,6 @@ export interface AgentReloadSummary {
   remoteCount: number;
   newAgents: string[];
   updatedAgents: string[];
+  deletedAgents: string[];
   errors: string[];
 }

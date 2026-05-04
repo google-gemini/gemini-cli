@@ -111,11 +111,12 @@ describe('agentsCommand', () => {
 
   it('should reload the agent registry when reload subcommand is called', async () => {
     const reloadSpy = vi.fn().mockResolvedValue({
-      totalLoaded: 2,
-      localCount: 1,
+      totalLoaded: 3,
+      localCount: 2,
       remoteCount: 1,
       newAgents: ['new-agent'],
       updatedAgents: ['updated-agent'],
+      deletedAgents: ['deleted-agent'],
       errors: [],
     });
     mockConfig.getAgentRegistry = vi.fn().mockReturnValue({
@@ -144,12 +145,40 @@ describe('agentsCommand', () => {
       messageType: 'info',
       content: expect.stringContaining('Agents reloaded successfully:'),
     });
-    expect(result.content).toContain('- Total: 2 (1 local, 1 remote)');
+    expect(result.content).toContain('- Total: 3 (2 local, 1 remote)');
     expect(result.content).toContain('- New: new-agent');
     expect(result.content).toContain('- Updated: updated-agent');
+    expect(result.content).toContain('- Deleted: deleted-agent');
     expect(result.content).toContain(
       'Run /agents list to see all available agents.',
     );
+  });
+
+  it('should show "reloaded with errors" if errors occurred during reload', async () => {
+    const reloadSpy = vi.fn().mockResolvedValue({
+      totalLoaded: 1,
+      localCount: 1,
+      remoteCount: 0,
+      newAgents: [],
+      updatedAgents: [],
+      deletedAgents: [],
+      errors: ['Some error'],
+    });
+    mockConfig.getAgentRegistry = vi.fn().mockReturnValue({
+      reload: reloadSpy,
+    });
+
+    const reloadCommand = agentsCommand.subCommands?.find(
+      (cmd) => cmd.name === 'reload',
+    );
+
+    const result = (await reloadCommand!.action!(mockContext, '')) as {
+      type: 'message';
+      content: string;
+    };
+
+    expect(result.content).toContain('Agents reloaded with errors:');
+    expect(result.content).toContain('- Errors: 1 encountered during reload');
   });
 
   it('should show an error if agent registry is not available during reload', async () => {

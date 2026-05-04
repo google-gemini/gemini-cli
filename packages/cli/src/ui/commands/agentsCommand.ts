@@ -348,7 +348,10 @@ const agentsReloadCommand: SlashCommand = {
 
     const summary = await agentRegistry.reload();
 
-    let content = 'Agents reloaded successfully:';
+    let content =
+      summary.errors.length > 0
+        ? 'Agents reloaded with errors:'
+        : 'Agents reloaded successfully:';
     content += `\n- Total: ${summary.totalLoaded} (${summary.localCount} local, ${summary.remoteCount} remote)`;
 
     if (summary.newAgents.length > 0) {
@@ -356,6 +359,9 @@ const agentsReloadCommand: SlashCommand = {
     }
     if (summary.updatedAgents.length > 0) {
       content += `\n- Updated: ${summary.updatedAgents.join(', ')}`;
+    }
+    if (summary.deletedAgents.length > 0) {
+      content += `\n- Deleted: ${summary.deletedAgents.join(', ')}`;
     }
     if (summary.errors.length > 0) {
       content += `\n- Errors: ${summary.errors.length} encountered during reload`;

@@ -95,6 +95,7 @@ export class AgentRegistry {
     const currentAgents = Array.from(this.agents.values());
     const newAgents: string[] = [];
     const updatedAgents: string[] = [];
+    const deletedAgents: string[] = [];
     let localCount = 0;
     let remoteCount = 0;
 
@@ -113,6 +114,12 @@ export class AgentRegistry {
       }
     }
 
+    for (const prevName of previousAgents.keys()) {
+      if (!this.agents.has(prevName)) {
+        deletedAgents.push(prevName);
+      }
+    }
+
     coreEvents.emitAgentsRefreshed();
 
     return {
@@ -121,6 +128,7 @@ export class AgentRegistry {
       remoteCount,
       newAgents,
       updatedAgents,
+      deletedAgents,
       errors: reloadErrors,
     };
   }
