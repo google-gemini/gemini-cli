@@ -34,23 +34,12 @@ jobs:
       - name: 'Install dependencies'
         run: 'npm ci'
 
-      - name: 'Collect Metrics'
-        env:
-          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
-        run: 'npm run metrics'
-
-      - name: 'Archive Metrics'
-        uses: 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02' # ratchet:actions/upload-artifact@v4
-        with:
-          name: 'metrics-before'
-          path: 'metrics-before.csv'
-
       - name: 'Run Reflex Processes'
         env:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
         run: |
-          if [ -d "tools/gemini-cli-bot/processes/scripts" ] && [ "$(ls -A tools/gemini-cli-bot/processes/scripts)" ]; then
-            for script in tools/gemini-cli-bot/processes/scripts/*.ts; do
+          if [ -d "tools/gemini-cli-bot/reflexes/scripts" ] && [ "$(ls -A tools/gemini-cli-bot/reflexes/scripts)" ]; then
+            for script in tools/gemini-cli-bot/reflexes/scripts/*.ts; do
               echo "Running reflex script: $script"
               npx tsx "$script"
             done

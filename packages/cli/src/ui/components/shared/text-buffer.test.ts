@@ -41,6 +41,7 @@ import {
   getTransformedImagePath,
 } from './text-buffer.js';
 import { cpLen } from '../../utils/textUtils.js';
+import { type Key } from '../../hooks/useKeypress.js';
 import { escapePath } from '@google/gemini-cli-core';
 
 const defaultVisualLayout: VisualLayout = {
@@ -1797,6 +1798,229 @@ describe('useTextBuffer', () => {
         });
       });
       expect(getBufferState(result).text).toBe('');
+    });
+
+    it('should only handle Undo if there is something to undo', async () => {
+      const { result } = await renderHook(() => useTextBuffer({ viewport }));
+
+      // Platform-specific undo key
+      const undoKey: Key =
+        process.platform === 'win32'
+          ? {
+              name: 'z',
+              ctrl: true,
+              shift: false,
+              alt: false,
+              cmd: false,
+              insertable: false,
+              sequence: '\x1a',
+            }
+          : process.platform === 'darwin'
+            ? {
+                name: 'z',
+                ctrl: false,
+                shift: false,
+                alt: false,
+                cmd: true,
+                insertable: false,
+                sequence: '\u001b[122;D',
+              }
+            : {
+                name: 'z',
+                ctrl: false,
+                shift: false,
+                alt: true,
+                cmd: false,
+                insertable: false,
+                sequence: '\u001bz',
+              };
+
+      // 1. Initial state: nothing to undo
+      let handled = true;
+      act(() => {
+        handled = result.current.handleInput(undoKey);
+      });
+      expect(handled).toBe(false);
+
+      // 2. Insert something
+      act(() => {
+        result.current.handleInput({
+          name: 'a',
+          shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
+          insertable: true,
+          sequence: 'a',
+        });
+      });
+      expect(getBufferState(result).text).toBe('a');
+
+      // 3. Now undo should work
+      act(() => {
+        handled = result.current.handleInput(undoKey);
+      });
+      expect(handled).toBe(true);
+      expect(getBufferState(result).text).toBe('');
+
+      // 4. Undo again: nothing left to undo
+      act(() => {
+        handled = result.current.handleInput(undoKey);
+      });
+      expect(handled).toBe(false);
+    });
+
+    if (process.platform === 'linux') {
+      it('should handle "Ctrl+Z" for smart bubbling on Linux/WSL', async () => {
+        const { result } = await renderHook(() => useTextBuffer({ viewport }));
+
+        const ctrlZ: Key = {
+          name: 'z',
+          ctrl: true,
+          shift: false,
+          alt: false,
+          cmd: false,
+          insertable: false,
+          sequence: '\x1a',
+        };
+
+        // 1. Empty buffer: should NOT handle (bubble up to Suspend)
+        let handled = true;
+        act(() => {
+          handled = result.current.handleInput(ctrlZ);
+        });
+        expect(handled).toBe(false);
+
+        // 2. Add text
+        act(() => {
+          result.current.handleInput({
+            name: 'x',
+            insertable: true,
+            sequence: 'x',
+            shift: false,
+            alt: false,
+            ctrl: false,
+            cmd: false,
+          });
+        });
+
+        // 3. Has history: should handle (perform Undo)
+        act(() => {
+          handled = result.current.handleInput(ctrlZ);
+        });
+        expect(handled).toBe(true);
+        expect(getBufferState(result).text).toBe('');
+
+        // 4. Empty again: should NOT handle
+        act(() => {
+          handled = result.current.handleInput(ctrlZ);
+        });
+        expect(handled).toBe(false);
+      });
+    }
+
+    it('should only handle Redo if there is something to redo', async () => {
+      const { result } = await renderHook(() => useTextBuffer({ viewport }));
+
+      // Platform-specific redo key (first in list)
+      const redoKey: Key =
+        process.platform === 'win32'
+          ? {
+              name: 'z',
+              ctrl: true,
+              shift: true,
+              alt: false,
+              cmd: false,
+              insertable: false,
+              sequence: '\x1a',
+            }
+          : process.platform === 'darwin'
+            ? {
+                name: 'z',
+                ctrl: false,
+                shift: true,
+                alt: false,
+                cmd: true,
+                insertable: false,
+                sequence: '\u001b[122;2D',
+              }
+            : {
+                name: 'z',
+                ctrl: false,
+                shift: true,
+                alt: true,
+                cmd: false,
+                insertable: false,
+                sequence: '\u001bZ',
+              };
+
+      const undoKey: Key =
+        process.platform === 'win32'
+          ? {
+              name: 'z',
+              ctrl: true,
+              shift: false,
+              alt: false,
+              cmd: false,
+              insertable: false,
+              sequence: '\x1a',
+            }
+          : process.platform === 'darwin'
+            ? {
+                name: 'z',
+                ctrl: false,
+                shift: false,
+                alt: false,
+                cmd: true,
+                insertable: false,
+                sequence: '\u001b[122;D',
+              }
+            : {
+                name: 'z',
+                ctrl: false,
+                shift: false,
+                alt: true,
+                cmd: false,
+                insertable: false,
+                sequence: '\u001bz',
+              };
+
+      // 1. Initial state: nothing to redo
+      let handled = true;
+      act(() => {
+        handled = result.current.handleInput(redoKey);
+      });
+      expect(handled).toBe(false);
+
+      // 2. Insert and Undo
+      act(() => {
+        result.current.handleInput({
+          name: 'a',
+          shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
+          insertable: true,
+          sequence: 'a',
+        });
+      });
+      act(() => {
+        result.current.handleInput(undoKey);
+      });
+      expect(getBufferState(result).text).toBe('');
+
+      // 3. Now redo should work
+      act(() => {
+        handled = result.current.handleInput(redoKey);
+      });
+      expect(handled).toBe(true);
+      expect(getBufferState(result).text).toBe('a');
+
+      // 4. Redo again: nothing left to redo
+      act(() => {
+        handled = result.current.handleInput(redoKey);
+      });
+      expect(handled).toBe(false);
     });
 
     it('should handle multiple delete characters in one input', async () => {

@@ -59,7 +59,7 @@ export class SimulationHarness {
       sessionId: 'sim-session',
     });
     this.env = new ContextEnvironmentImpl(
-      mockLlmClient,
+      () => mockLlmClient,
       'sim-prompt',
       'sim-session',
       mockTempDir,
@@ -148,7 +148,8 @@ export class SimulationHarness {
   }
 
   async getGoldenState() {
-    const finalProjection = await this.contextManager.renderHistory();
+    const { history: finalProjection } =
+      await this.contextManager.renderHistory();
     return {
       tokenTrajectory: this.tokenTrajectory,
       finalProjection,
