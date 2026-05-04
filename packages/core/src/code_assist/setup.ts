@@ -26,6 +26,7 @@ import {
   OnboardingStartEvent,
   OnboardingSuccessEvent,
 } from '../telemetry/index.js';
+import { AuthType } from '../core/contentGenerator.js';
 
 export class ProjectIdRequiredError extends Error {
   constructor() {
@@ -116,11 +117,15 @@ export async function setupUser(
   client: AuthClient,
   config: Config,
   httpOptions: HttpOptions = {},
+  authType?: AuthType,
 ): Promise<UserData> {
-  const projectId =
+  const envProjectId =
     process.env['GOOGLE_CLOUD_PROJECT'] ||
     process.env['GOOGLE_CLOUD_PROJECT_ID'] ||
     undefined;
+
+  const initialProjectId =
+    authType === AuthType.LOGIN_WITH_GOOGLE ? undefined : envProjectId;
 
   const projectCache = userDataCache.getOrCreate(client, () =>
     createCache<string | undefined, Promise<UserData>>({
@@ -129,9 +134,23 @@ export async function setupUser(
     }),
   );
 
-  return projectCache.getOrCreate(projectId, () =>
-    _doSetupUser(client, projectId, config, httpOptions),
-  );
+  return projectCache.getOrCreate(initialProjectId, async () => {
+    try {
+      return await _doSetupUser(client, initialProjectId, config, httpOptions);
+    } catch (e) {
+      if (
+        authType === AuthType.LOGIN_WITH_GOOGLE &&
+        envProjectId &&
+        (e instanceof ProjectIdRequiredError ||
+          e instanceof IneligibleTierError)
+      ) {
+        return projectCache.getOrCreate(envProjectId, () =>
+          _doSetupUser(client, envProjectId, config, httpOptions),
+        );
+      }
+      throw e;
+    }
+  });
 }
 
 /**

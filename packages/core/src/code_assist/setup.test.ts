@@ -11,6 +11,7 @@ import {
   resetUserDataCacheForTesting,
 } from './setup.js';
 import { ValidationRequiredError } from '../utils/googleQuotaErrors.js';
+import { AuthType } from '../core/contentGenerator.js';
 import { CodeAssistServer } from '../code_assist/server.js';
 import type { OAuth2Client } from 'google-auth-library';
 import { UserTierId, type GeminiUserTier } from './types.js';
@@ -156,6 +157,59 @@ describe('setupUser', () => {
       await setupUser(client, mockConfig);
 
       expect(mockLoad).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('authType fallback logic', () => {
+    it('should try undefined first for LOGIN_WITH_GOOGLE, then fallback to env var if ProjectIdRequiredError is thrown', async () => {
+      vi.stubEnv('GOOGLE_CLOUD_PROJECT', 'env-project');
+
+      mockLoad.mockRejectedValueOnce(new ProjectIdRequiredError());
+      mockLoad.mockResolvedValueOnce({
+        cloudaicompanionProject: 'env-project',
+        currentTier: mockPaidTier,
+      });
+
+      const result = await setupUser(
+        {} as OAuth2Client,
+        mockConfig,
+        {},
+        AuthType.LOGIN_WITH_GOOGLE,
+      );
+
+      expect(mockLoad).toHaveBeenCalledTimes(2);
+      expect(result.projectId).toBe('env-project');
+    });
+
+    it('should NOT fallback to env var for COMPUTE_ADC if ProjectIdRequiredError is thrown', async () => {
+      vi.stubEnv('GOOGLE_CLOUD_PROJECT', 'env-project');
+
+      mockLoad.mockRejectedValueOnce(new ProjectIdRequiredError());
+
+      await expect(
+        setupUser({} as OAuth2Client, mockConfig, {}, AuthType.COMPUTE_ADC),
+      ).rejects.toThrow(ProjectIdRequiredError);
+
+      expect(mockLoad).toHaveBeenCalledTimes(1);
+    });
+
+    it('should ignore GOOGLE_CLOUD_PROJECT for LOGIN_WITH_GOOGLE if server returns a managed project successfully', async () => {
+      vi.stubEnv('GOOGLE_CLOUD_PROJECT', 'env-project');
+
+      mockLoad.mockResolvedValueOnce({
+        cloudaicompanionProject: 'server-managed-project',
+        currentTier: mockFreeTier,
+      });
+
+      const result = await setupUser(
+        {} as OAuth2Client,
+        mockConfig,
+        {},
+        AuthType.LOGIN_WITH_GOOGLE,
+      );
+
+      expect(mockLoad).toHaveBeenCalledTimes(1);
+      expect(result.projectId).toBe('server-managed-project');
     });
   });
 
