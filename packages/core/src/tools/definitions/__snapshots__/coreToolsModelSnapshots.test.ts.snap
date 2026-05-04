@@ -200,7 +200,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
 
 exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snapshot for tool: glob 1`] = `
 {
-  "description": "Efficiently finds files matching specific glob patterns (e.g., \`src/**/*.ts\`, \`**/*.md\`), returning absolute paths sorted by modification time (newest first). Ideal for quickly locating files based on their name or path structure, especially in large codebases.",
+  "description": "Efficiently finds files matching specific glob patterns (e.g., \`src/**/*.ts\`, \`**/*.md\`), returning absolute paths sorted alphabetically. Ideal for quickly locating files based on their name or path structure, especially in large codebases. Results are capped at 500; use dir_path or max_depth to narrow broad searches.",
   "name": "glob",
   "parametersJsonSchema": {
     "properties": {
@@ -211,6 +211,10 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
       "dir_path": {
         "description": "Optional: The absolute path to the directory to search within. If omitted, searches the root directory.",
         "type": "string",
+      },
+      "max_depth": {
+        "description": "Optional: Maximum directory depth to traverse. Defaults to 8. Reduce to speed up searches or prevent runaway scans on broad patterns.",
+        "type": "number",
       },
       "pattern": {
         "description": "The glob pattern to match against (e.g., '**/*.py', 'docs/*.md').",
@@ -1030,7 +1034,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
 
 exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview > snapshot for tool: glob 1`] = `
 {
-  "description": "Efficiently finds files matching specific glob patterns (e.g., \`src/**/*.ts\`, \`**/*.md\`), returning absolute paths sorted by modification time (newest first). Ideal for quickly locating files based on their name or path structure, especially in large codebases.",
+  "description": "Efficiently finds files matching specific glob patterns (e.g., \`src/**/*.ts\`, \`**/*.md\`), returning absolute paths sorted alphabetically. Ideal for quickly locating files based on their name or path structure, especially in large codebases. Results are capped at 500; use dir_path or max_depth to narrow broad searches.",
   "name": "glob",
   "parametersJsonSchema": {
     "properties": {
@@ -1041,6 +1045,10 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
       "dir_path": {
         "description": "Optional: The absolute path to the directory to search within. If omitted, searches the root directory.",
         "type": "string",
+      },
+      "max_depth": {
+        "description": "Optional: Maximum directory depth to traverse. Defaults to 8. Reduce to speed up searches or prevent runaway scans on broad patterns.",
+        "type": "number",
       },
       "pattern": {
         "description": "The glob pattern to match against (e.g., '**/*.py', 'docs/*.md').",

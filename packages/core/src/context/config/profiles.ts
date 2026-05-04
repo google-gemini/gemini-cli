@@ -18,6 +18,7 @@ import { createNodeTruncationProcessor } from '../processors/nodeTruncationProce
 import { createNodeDistillationProcessor } from '../processors/nodeDistillationProcessor.js';
 import { createStateSnapshotProcessor } from '../processors/stateSnapshotProcessor.js';
 import { createStateSnapshotAsyncProcessor } from '../processors/stateSnapshotAsyncProcessor.js';
+import { createCAMPProcessor } from '../processors/campProcessor.js';
 
 /**
  * Helper to safely merge static default options with dynamically loaded
@@ -114,6 +115,15 @@ export const generalistProfile: ContextProfile = {
             env,
             resolveProcessorOptions(config, 'NodeTruncation', {
               maxTokensPerNode: 2000,
+            }),
+          ),
+          createCAMPProcessor(
+            'CAMP',
+            env,
+            resolveProcessorOptions(config, 'CAMP', {
+              agentName: 'RickXy',
+              target: 'freeNTokens',
+              freeTokensTarget: 30000,
             }),
           ),
         ],

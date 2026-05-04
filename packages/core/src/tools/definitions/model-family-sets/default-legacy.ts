@@ -261,7 +261,7 @@ export const DEFAULT_LEGACY_SET: CoreToolSet = {
   glob: {
     name: GLOB_TOOL_NAME,
     description:
-      'Efficiently finds files matching specific glob patterns (e.g., `src/**/*.ts`, `**/*.md`), returning absolute paths sorted by modification time (newest first). Ideal for quickly locating files based on their name or path structure, especially in large codebases.',
+      'Efficiently finds files matching specific glob patterns (e.g., `src/**/*.ts`, `**/*.md`), returning absolute paths sorted alphabetically. Ideal for quickly locating files based on their name or path structure, especially in large codebases. Results are capped at 500; use dir_path or max_depth to narrow broad searches.',
     parametersJsonSchema: {
       type: 'object',
       properties: {
@@ -289,6 +289,11 @@ export const DEFAULT_LEGACY_SET: CoreToolSet = {
           description:
             'Optional: Whether to respect .geminiignore patterns when finding files. Defaults to true.',
           type: 'boolean',
+        },
+        max_depth: {
+          description:
+            'Optional: Maximum directory depth to traverse. Defaults to 8. Reduce to speed up searches or prevent runaway scans on broad patterns.',
+          type: 'number',
         },
       },
       required: [PARAM_PATTERN],

@@ -29,6 +29,12 @@ import { debugLogger } from '../utils/debugLogger.js';
 import { GLOB_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
 
+/** Hard cap on returned results to prevent memory exhaustion on broad patterns. */
+const MAX_RESULTS = 500;
+
+/** Default maximum directory traversal depth. Prevents runaway scans from home root. */
+const DEFAULT_MAX_DEPTH = 8;
+
 // Subset of 'Path' interface provided by 'glob' that we can implement for testing
 export interface GlobPath {
   fullpath(): string;
@@ -93,6 +99,12 @@ export interface GlobToolParams {
    * Whether to respect .geminiignore patterns (optional, defaults to true)
    */
   respect_gemini_ignore?: boolean;
+
+  /**
+   * Maximum directory depth to traverse (optional, defaults to 8).
+   * Prevents runaway scans on deep or broad patterns like `**\/...` from home root.
+   */
+  max_depth?: number;
 }
 
 class GlobToolInvocation extends BaseToolInvocation<
@@ -178,7 +190,8 @@ class GlobToolInvocation extends BaseToolInvocation<
           cwd: searchDir,
           withFileTypes: true,
           nodir: true,
-          stat: true,
+          stat: false,
+          maxDepth: this.params.max_depth ?? DEFAULT_MAX_DEPTH,
           nocase: !this.params.case_sensitive,
           dot: true,
           ignore: this.config.getFileExclusions().getGlobExcludes(),
@@ -187,6 +200,7 @@ class GlobToolInvocation extends BaseToolInvocation<
         })) as GlobPath[];
 
         allEntries.push(...entries);
+        if (allEntries.length >= MAX_RESULTS) break;
       }
 
       const relativePaths = allEntries.map((p) =>
@@ -255,7 +269,10 @@ class GlobToolInvocation extends BaseToolInvocation<
       if (ignoredCount > 0) {
         resultMessage += ` (${ignoredCount} additional files were ignored)`;
       }
-      resultMessage += `, sorted by modification time (newest first):\n${fileListDescription}`;
+      if (allEntries.length >= MAX_RESULTS) {
+        resultMessage += ` (results capped at ${MAX_RESULTS}; narrow your pattern or use dir_path)`;
+      }
+      resultMessage += `, sorted alphabetically:\n${fileListDescription}`;
 
       return {
         llmContent: resultMessage,
