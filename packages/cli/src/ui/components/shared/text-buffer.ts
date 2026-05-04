@@ -2889,6 +2889,8 @@ export function useTextBuffer({
     transformationsByLine,
     pastedContent,
     expandedPaste,
+    undoStack,
+    redoStack,
   } = state;
 
   const text = useMemo(() => lines.join('\n'), [lines]);
@@ -3454,10 +3456,16 @@ export function useTextBuffer({
         return true;
       }
       if (keyMatchers[Command.UNDO](key)) {
+        if (undoStack.length === 0) {
+          return false;
+        }
         undo();
         return true;
       }
       if (keyMatchers[Command.REDO](key)) {
+        if (redoStack.length === 0) {
+          return false;
+        }
         redo();
         return true;
       }
@@ -3486,6 +3494,8 @@ export function useTextBuffer({
       visualCursor,
       visualLines,
       keyMatchers,
+      undoStack.length,
+      redoStack.length,
     ],
   );
 

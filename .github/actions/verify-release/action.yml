@@ -63,7 +63,7 @@ runs:
       shell: 'bash'
       working-directory: '${{ inputs.working-directory }}'
       run: |-
-        gemini_version=$(gemini --version)
+        gemini_version=$(gemini --version 2>/dev/null)
         if [ "$gemini_version" != "${INPUTS_EXPECTED_VERSION}" ]; then
           echo "❌ NPM Version mismatch: Got $gemini_version from ${INPUTS_NPM_PACKAGE}, expected ${INPUTS_EXPECTED_VERSION}"
           exit 1
@@ -80,7 +80,7 @@ runs:
       shell: 'bash'
       working-directory: '${{ inputs.working-directory }}'
       run: |-
-        gemini_version=$(npx --prefer-online "${INPUTS_NPM_PACKAGE}" --version)
+        gemini_version=$(npx --prefer-online "${INPUTS_NPM_PACKAGE}" --version 2>/dev/null)
         if [ "$gemini_version" != "${INPUTS_EXPECTED_VERSION}" ]; then
           echo "❌ NPX Run Version mismatch: Got $gemini_version from ${INPUTS_NPM_PACKAGE}, expected ${INPUTS_EXPECTED_VERSION}"
           exit 1

@@ -200,7 +200,6 @@ export class LegacyAgentProtocol implements AgentProtocol {
         this._abortController.signal,
         this._promptId,
         undefined,
-        false,
         currentDisplayContent,
       );
       currentDisplayContent = undefined;
