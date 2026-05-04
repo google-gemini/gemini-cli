@@ -8,7 +8,7 @@
 
 Our release flows support both `dev` and `prod` environments.
 
-The `dev` environment pushes to a private Github-hosted NPM repository, with the
+The `dev` environment pushes to a private GitHub-hosted NPM repository, with the
 package names beginning with `@google-gemini/**` instead of `@google/**`.
 
 The `prod` environment pushes to the public global NPM registry via Wombat
@@ -20,7 +20,7 @@ More information can be found about these systems in the
 
 ### Package scopes
 
-| Package    | `prod` (Wombat Dressing Room) | `dev` (Github Private NPM Repo)           |
+| Package    | `prod` (Wombat Dressing Room) | `dev` (GitHub Private NPM Repo)           |
 | ---------- | ----------------------------- | ----------------------------------------- |
 | CLI        | @google/gemini-cli            | @google-gemini/gemini-cli                 |
 | Core       | @google/gemini-cli-core       | @google-gemini/gemini-cli-core A2A Server |
