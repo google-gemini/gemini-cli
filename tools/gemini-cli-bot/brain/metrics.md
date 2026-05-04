@@ -47,6 +47,7 @@ synchronize with previous sessions:
   than closure rates).
 - **Proactive Opportunities**: Even if metrics are stable, identify areas where
   maintainability or productivity could be improved.
+- **Actions Spend (Lowest Priority)**: Monitor `actions_spend_minutes` for significant anomalies or runaway workflows, but prioritize other repository health and latency metrics first.
 
 ### 2. Hypothesis Testing & Deep Dive
 
