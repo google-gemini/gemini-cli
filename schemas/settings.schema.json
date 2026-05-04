@@ -3078,8 +3078,8 @@
             },
             "backend": {
               "title": "Voice Transcription Backend",
-              "description": "The backend to use for voice transcription.",
-              "markdownDescription": "The backend to use for voice transcription.\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `gemini-live`",
+              "description": "The backend to use for voice transcription. Note: When using the Gemini Live backend, voice recordings are sent to Google Cloud for transcription.",
+              "markdownDescription": "The backend to use for voice transcription. Note: When using the Gemini Live backend, voice recordings are sent to Google Cloud for transcription.\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `gemini-live`",
               "default": "gemini-live",
               "type": "string",
               "enum": ["gemini-live", "whisper"]
