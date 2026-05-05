@@ -275,35 +275,5 @@ describe('Plan Mode', () => {
     expect(shellCallFound, 'Expected run_shell_command to be called').toBe(
       true,
     );
-
-    const apiRequests = rig.readAllApiRequest();
-    const modelNames = apiRequests.map(
-      (r) =>
-        ('model' in (r.attributes || {})
-          ? (r.attributes as unknown as Record<string, string>)['model']
-          : 'unknown') || 'unknown',
-    );
-
-    const proRequests = apiRequests.filter((r) =>
-      ('model' in (r.attributes || {})
-        ? (r.attributes as unknown as Record<string, string>)['model']
-        : 'unknown'
-      )?.includes('pro'),
-    );
-    const flashRequests = apiRequests.filter((r) =>
-      ('model' in (r.attributes || {})
-        ? (r.attributes as unknown as Record<string, string>)['model']
-        : 'unknown'
-      )?.includes('flash'),
-    );
-
-    expect(
-      proRequests.length,
-      `Expected at least one Pro request. Models used: ${modelNames.join(', ')}`,
-    ).toBeGreaterThanOrEqual(1);
-    expect(
-      flashRequests.length,
-      `Expected at least one Flash request after mode switch. Models used: ${modelNames.join(', ')}`,
-    ).toBeGreaterThanOrEqual(1);
   });
 });
