@@ -3578,7 +3578,7 @@ describe('AppContainer State Management', () => {
   });
 
   describe('Compression Queuing', () => {
-    it('queues messages during compression instead of handling as steering hints', async () => {
+    beforeEach(async () => {
       const { checkPermissions } = await import(
         './hooks/atCommandProcessor.js'
       );
@@ -3606,8 +3606,13 @@ describe('AppContainer State Management', () => {
           },
         ],
       }));
+    });
 
+    it('queues messages during compression instead of handling as steering hints', async () => {
       const { unmount } = await act(async () => renderAppContainer());
+
+      // Verify state isolation
+      expect(capturedUIState.streamingState).toBe(StreamingState.Idle);
 
       // Submit a message
       await act(async () =>
@@ -3616,6 +3621,18 @@ describe('AppContainer State Management', () => {
 
       // Verify it was queued, not submitted as steering hint
       expect(capturedUIState.messageQueue).toContain('follow up message');
+
+      unmount();
+    });
+
+    it('executes slash commands immediately during compression', async () => {
+      const { unmount } = await act(async () => renderAppContainer());
+
+      // Submit a slash command
+      await act(async () => capturedUIActions.handleFinalSubmit('/help'));
+
+      // Verify it was NOT queued
+      expect(capturedUIState.messageQueue).not.toContain('/help');
 
       unmount();
     });
