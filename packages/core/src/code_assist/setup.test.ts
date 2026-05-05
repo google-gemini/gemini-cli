@@ -8,6 +8,7 @@ import {
   ProjectIdRequiredError,
   setupUser,
   ValidationCancelledError,
+  InvalidNumericProjectIdError,
   resetUserDataCacheForTesting,
 } from './setup.js';
 import { ValidationRequiredError } from '../utils/googleQuotaErrors.js';
@@ -216,6 +217,13 @@ describe('setupUser', () => {
 
       await expect(setupUser({} as OAuth2Client, mockConfig)).rejects.toThrow(
         ProjectIdRequiredError,
+      );
+    });
+
+    it('should throw InvalidNumericProjectIdError when GOOGLE_CLOUD_PROJECT is numeric', async () => {
+      vi.stubEnv('GOOGLE_CLOUD_PROJECT', '1234567890');
+      await expect(setupUser({} as OAuth2Client, mockConfig)).rejects.toThrow(
+        InvalidNumericProjectIdError,
       );
     });
   });
