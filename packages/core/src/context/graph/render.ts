@@ -23,9 +23,11 @@ export async function render(
   env: ContextEnvironment,
   protectionReasons: Map<string, string> = new Map(),
   headerTokens: number = 0,
+  previewNodeIds: ReadonlySet<string> = new Set(),
 ): Promise<{ history: Content[]; didApplyManagement: boolean }> {
   if (!sidecar.config.budget) {
-    const contents = env.graphMapper.fromGraph(nodes);
+    const visibleNodes = nodes.filter((n) => !previewNodeIds.has(n.id));
+    const contents = env.graphMapper.fromGraph(visibleNodes);
     tracer.logEvent('Render', 'Render Context to LLM (No Budget)', {
       renderedContext: contents,
     });
@@ -57,17 +59,11 @@ export async function render(
   });
 
   if (currentTokens <= maxTokens) {
-    tracer.logEvent(
-      'Render',
-      `View is within maxTokens (${currentTokens} <= ${maxTokens}). Returning view.`,
-    );
-    const contents = env.graphMapper.fromGraph(nodes);
-    tracer.logEvent('Render', 'Render Context for LLM', {
-      renderedContext: contents,
-    });
+    tracer.logEvent('Render', 'Budget is healthy. GC Backstop bypassed.');
+    const visibleNodes = nodes.filter((n) => !previewNodeIds.has(n.id));
+    const contents = env.graphMapper.fromGraph(visibleNodes);
     return { history: contents, didApplyManagement: false };
   }
-
   const targetDelta = currentTokens - sidecar.config.budget.retainedTokens;
   tracer.logEvent(
     'Render',
@@ -103,7 +99,9 @@ export async function render(
     }
   }
 
-  const visibleNodes = processedNodes.filter((n) => !skipList.has(n.id));
+  const visibleNodes = processedNodes.filter(
+    (n) => !skipList.has(n.id) && !previewNodeIds.has(n.id),
+  );
 
   const contents = env.graphMapper.fromGraph(visibleNodes);
   tracer.logEvent('Render', 'Render Sanitized Context for LLM', {
