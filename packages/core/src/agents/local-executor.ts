@@ -77,6 +77,8 @@ import {
 import type { InjectionSource } from '../config/injectionService.js';
 import {
   createScopedWorkspaceContext,
+  runWithScopedAutoMemoryExtractionWriteAccess,
+  runWithScopedMemoryInboxAccess,
   runWithScopedWorkspaceContext,
 } from '../config/scoped-config.js';
 import { CompleteTaskTool } from '../tools/complete-task.js';
@@ -529,21 +531,34 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
    * @returns A promise that resolves to the agent's final output.
    */
   async run(inputs: AgentInputs, signal: AbortSignal): Promise<OutputObject> {
-    // If the agent definition declares additional workspace directories,
-    // wrap execution in a scoped workspace context. All calls to
-    // Config.getWorkspaceContext() within this scope will see the extended
-    // directories, without mutating the shared Config.
-    const dirs = this.definition.workspaceDirectories;
-    if (dirs && dirs.length > 0) {
-      const scopedCtx = createScopedWorkspaceContext(
-        this.context.config.getWorkspaceContext(),
-        dirs,
-      );
-      return runWithScopedWorkspaceContext(scopedCtx, () =>
-        this.runInternal(inputs, signal),
-      );
+    const runWithWorkspaceScope = () => {
+      // If the agent definition declares additional workspace directories,
+      // wrap execution in a scoped workspace context. All calls to
+      // Config.getWorkspaceContext() within this scope will see the extended
+      // directories, without mutating the shared Config.
+      const dirs = this.definition.workspaceDirectories;
+      if (dirs && dirs.length > 0) {
+        const scopedCtx = createScopedWorkspaceContext(
+          this.context.config.getWorkspaceContext(),
+          dirs,
+        );
+        return runWithScopedWorkspaceContext(scopedCtx, () =>
+          this.runInternal(inputs, signal),
+        );
+      }
+      return this.runInternal(inputs, signal);
+    };
+
+    const runWithInboxScope = () =>
+      this.definition.memoryInboxAccess
+        ? runWithScopedMemoryInboxAccess(runWithWorkspaceScope)
+        : runWithWorkspaceScope();
+
+    if (this.definition.autoMemoryExtractionWriteAccess) {
+      return runWithScopedAutoMemoryExtractionWriteAccess(runWithInboxScope);
     }
-    return this.runInternal(inputs, signal);
+
+    return runWithInboxScope();
   }
 
   private async runInternal(

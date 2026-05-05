@@ -5,10 +5,10 @@
  */
 
 import fs from 'node:fs/promises';
+import { homedir as osHomedir } from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
 import {
-  homedir,
   getCompatibilityWarnings,
   WarningPriority,
   type StartupWarning,
@@ -39,10 +39,10 @@ const homeDirectoryCheck: WarningCheck = {
     try {
       const [workspaceRealPath, homeRealPath] = await Promise.all([
         fs.realpath(workspaceRoot),
-        fs.realpath(homedir()),
+        fs.realpath(osHomedir()),
       ]);
 
-      if (workspaceRealPath === homeRealPath) {
+      if (path.resolve(workspaceRealPath) === path.resolve(homeRealPath)) {
         // If folder trust is enabled and the user trusts the home directory, don't show the warning.
         if (
           isFolderTrustEnabled(settings) &&
