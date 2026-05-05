@@ -522,9 +522,9 @@ export class Task {
 
     for (const [callId, status] of this.pendingToolCalls.entries()) {
       if (
-        status === 'executing' ||
-        status === 'scheduled' ||
-        status === 'validating' ||
+        status === CoreToolCallStatus.Executing ||
+        status === CoreToolCallStatus.Scheduled ||
+        status === CoreToolCallStatus.Validating ||
         this.toolsAlreadyConfirmed.has(callId)
       ) {
         isExecuting = true;
